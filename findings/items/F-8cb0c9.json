@@ -1,0 +1,17 @@
+{
+  "area": "kobo",
+  "body": "kobo.py:1236-1243 (embedded-state branch) advances new_reading_state_last_modified to the max of every reading state embedded in the page's books; the standalone loop at :1465 is ordered ascending and capped at SYNC_ITEM_LIMIT=100; :1687 writes the max of both to the token. Any KoboReadingState whose last_modified falls between the 100th standalone row and the embedded max is skipped and the cursor closes over it forever — when that book's entitlement later arrives, the embed condition (krs.last_modified > sync_token.reading_state_last_modified) is false, so it arrives stateless.\n\nTrigger: any sync with >100 states newer than the cursor plus one recently-read book in the current page. Canonical case is the recovery scenario itself: factory-reset device on a several-hundred-book library (KoboSyncedBooks-empty branch at :782 resets the cursor to datetime.min, making every state pending). Damage: device silently never receives progress/read-status for skipped books; a device-side open can then push a 0%/low state back.\n\nCONFIDENCE: mechanism OBSERVED in code (verified independently of the audit agent, 2026-09-01). Hardware effect likely. Settle with an integration test: 250 books with states, fresh token, walk all pages, count states delivered vs stored. Source: adversarial audit state/kobo-audit-2026-09-01.",
+  "created": "2026-09-01",
+  "id": "F-8cb0c9",
+  "refs": [],
+  "resolution": {
+    "commit": "87b09a3a47",
+    "date": "2026-09-01",
+    "note": "Shipped in #2107: one ordered reading-state frontier shared by embedded and standalone delivery; 250-state exact-once regression.",
+    "release": ""
+  },
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Reading-state cursor advances past states the capped loop never emitted; fresh-device sync permanently withholds positions on large libraries"
+}

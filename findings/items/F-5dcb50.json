@@ -1,0 +1,19 @@
+{
+  "area": "kobo",
+  "body": "ub.session_commit() returns False on OperationalError/InvalidRequestError (ub.py:5233-5257, the #1318 contract: callers whose answer depends on the write MUST check it). Unchecked at: HandleTagCreate -> 201 (kobo.py:2290), rename -> 200 (:2329), DELETE via shelf.py:835-844 delete_shelf_helper ignoring the commit and returning True -> 200, HandleTagAddItem -> 201 (:2388), HandleTagRemoveItem -> 200 (:2441). HandleStateRequest (:2708) and the annotation PATCH were fixed; these five sites were not.\n\nA transient SQLite lock (real here — DB contention during ingest is documented) during a device-side collection add/remove/create/rename/delete converts to permanent loss: Kobo uploads collection deltas once. With kobo_only_shelves_sync on, a lost shelf-add also means the book is never delivered. Same family as F-151f59/F-347c16, previously unlisted for the Kobo tag routes.\n\nCONFIDENCE: certain — all four unchecked commit sites OBSERVED independently of the audit agent, 2026-09-01. Fix mirrors the HandleStateRequest pattern. Source: adversarial audit state/kobo-audit-2026-09-01.",
+  "created": "2026-09-01",
+  "id": "F-5dcb50",
+  "refs": [
+    "#1318"
+  ],
+  "resolution": {
+    "commit": "bae46d9d4e",
+    "date": "2026-09-01",
+    "note": "Shipped in #2102: all five Kobo collection routes answer 503 on a rolled-back commit; red->green on six routes; main Test Suite green on bae46d9d4e.",
+    "release": ""
+  },
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "resolved",
+  "title": "All four Kobo collection handlers answer success on a rolled-back commit; the device clears its delta queue and the shelf operation is permanently lost"
+}

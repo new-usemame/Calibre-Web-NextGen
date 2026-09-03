@@ -1,0 +1,17 @@
+{
+  "area": "ci",
+  "body": "tests.yml \"Resolve image to test\" (main push branch) calls scripts/resolve-e2e-image.sh with attempts=240 x 30s regardless of whether the producing Build & Push run for SUBJECT_SHA has already concluded. tests.yml:38 sets cancel-in-progress false on main (intentional: every main push deserves a verdict), so a run parked in that 2h poll holds the group. OBSERVED 2026-09-01: run 33535148611 (translations commit 4d23102b, whose alias job had failed at 17:01Z) sat in \"Resolve image to test\" from 17:21Z until force-cancelled at ~18:45Z; behind it the #2101 run was cancelled at 9m16s, the #2100 run sat pending 38m then was replaced, and the #2102 run sat pending 40m+ - three real merges with no main verdict. Fix shape: consult the producer run (Build & Push for SUBJECT_SHA) via the API - if it or its alias/build jobs concluded failure, fail immediately with a pointer to that run; poll only while it is queued/in_progress, bounded by the producer's own timeout. Do not flip concurrency on main.",
+  "created": "2026-09-01",
+  "id": "F-5822aa",
+  "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-01",
+    "note": "Main/concurrency E2E resolver checks the exact SHA producer run and jobs before each 30-second retry, fails immediately for absent/terminal producers with the Actions URL, and caps live-producer polling at 95 minutes.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Test Suite E2E blind-polls 2h for a sha tag whose producer already failed, and because main's concurrency group does not cancel, one such run wedges every later main verdict"
+}

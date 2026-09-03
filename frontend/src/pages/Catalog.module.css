@@ -109,18 +109,19 @@
 
 .grid {
   --catalog-grid-gap: var(--sp-5);
+  --catalog-grid-min: 150px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(var(--catalog-grid-min), 1fr));
   column-gap: var(--catalog-grid-gap);
   row-gap: 0;
 }
-.grid.density_comfortable { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-.grid.density_compact { --catalog-grid-gap: var(--sp-4); grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
-.grid.density_dense { --catalog-grid-gap: var(--sp-3); grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+.grid.density_comfortable { --catalog-grid-min: 180px; }
+.grid.density_compact { --catalog-grid-gap: var(--sp-4); --catalog-grid-min: 140px; }
+.grid.density_dense { --catalog-grid-gap: var(--sp-3); --catalog-grid-min: 110px; }
 .virtualRow {
   display: grid;
   grid-column: 1 / -1;
-  grid-template-columns: subgrid;
+  column-gap: var(--catalog-grid-gap);
   padding-bottom: var(--catalog-grid-gap);
 }
 .virtualSpacer {
@@ -296,6 +297,9 @@
 }
 @media (max-width: 600px) {
   .container { padding-inline: var(--sp-3); }
+  /* Doubled class beats the density selectors above (0,2,0), so the 0px
+     minimum actually lands on the fixed-track mobile layouts. */
+  .grid.grid { --catalog-grid-min: 0px; }
   .grid.density_comfortable { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .grid.density_compact { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .grid.density_dense { --catalog-grid-gap: var(--sp-2); grid-template-columns: repeat(4, minmax(0, 1fr)); }

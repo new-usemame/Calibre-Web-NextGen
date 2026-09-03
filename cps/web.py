@@ -160,7 +160,7 @@ def add_security_headers(resp):
         csp += " *"
     if reader_like:
         csp += " blob: ; style-src-elem 'self' blob: 'unsafe-inline'"
-    # #60: the "Back to the classic view" feedback popup (layout.html) POSTs to our
+    # #60: the switched-back-to-Classic feedback popup (layout.html) POSTs to our
     # first-party feedback endpoint (a Cloudflare Worker on a different origin).
     # Without an explicit connect-src, fetch()/XHR fall back to default-src 'self'
     # and the browser blocks the cross-origin POST, so feedback never leaves the
@@ -1577,13 +1577,13 @@ def index(page):
         if arch_warning:
             flash(arch_warning, category="cwa_arch_warning")
 
-    # The SPA's "Back to classic view" nav lands here with a one-shot feedback
-    # marker. Persist the explicit Classic opt-out and clear the legacy SPA
-    # cookie (downgrade compatibility). Only the web index does this; books_list,
-    # authors, OPDS, Kobo and the API never touch either cookie.
+    # The SPA shell's no-JS/nomodule fallback lands here with a one-shot feedback
+    # marker. Enable Classic only for this browser session and clear the legacy
+    # SPA cookie for downgrade compatibility. Only the web index does this;
+    # books_list, authors, OPDS, Kobo and the API never mutate UI selection.
     if request.args.get('cwng_feedback'):
         response = make_response(render_books_list("root", sort_param, 1, page))
-        spa.stamp_prefer_classic_cookie(response)
+        spa.prefer_classic_for_session()
         spa.clear_prefer_spa_cookie(response)
         return response
 
@@ -2961,13 +2961,12 @@ def login():
     # accepts only our prefix-scoped marker and never redirects to ``next``.
     if spa.classic_fallback_requested_from_next(request.args.get("next")):
         response = make_response(render_login())
-        spa.stamp_prefer_classic_cookie(response)
+        spa.prefer_classic_for_session()
         spa.clear_prefer_spa_cookie(response)
         return response
 
-    # #908: the UI preference is per-browser, not per-user, so it remains readable
-    # after logout. Every configured login mode now has an SPA authentication
-    # path, so only an explicit Classic opt-out keeps the Classic login.
+    # Every configured login mode has an SPA authentication path. Only the
+    # transient Classic escape hatch keeps this browser session on Classic login.
     if spa.preferred_spa_html_request():
         # The destination is fixed and app-owned. spa_shell_url() preserves a
         # valid reverse-proxy subpath while rejecting hostile forwarded prefixes;

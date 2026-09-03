@@ -6,7 +6,7 @@ import {
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
   useBookShelves, useShelves, useKoboTwoWayAnnotations, selectKoboTwoWayBook,
   useAddToMyLibrary, useMyLibraryRemovalImpact, useRemoveFromMyLibrary,
-  useActiveDeliveryDevices, useQueueDeviceDelivery,
+  useActiveDeliveryDevices, useQueueDeviceDelivery, useClearMyCover,
 } from '../lib/queries';
 import { authorityLabel, opaqueLabel } from '../lib/koboTwoWay';
 import { MetadataTypeahead } from '../components/MetadataTypeahead';
@@ -21,7 +21,7 @@ import type { CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice } from 
 import { ApiError, resourceUrl, resourceSrcSet } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
-import { canDownloadBooks, canReadBooks } from '../lib/permissions';
+import { canDeleteBooks, canDownloadBooks, canReadBooks } from '../lib/permissions';
 import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { BookUserNotices } from '../components/UserNotices';
@@ -40,6 +40,7 @@ import { useMediaQuery } from '../lib/useMediaQuery';
    Drop the indirection on the React 19 upgrade, which knows the attribute. */
 type LowercaseFetchPriority = { fetchpriority: 'high' | 'low' | 'auto' };
 const COVER_PRIORITY: LowercaseFetchPriority = { fetchpriority: 'high' };
+const BOOK_DETAIL_NARROW_QUERY = '(max-width: 700px)';
 
 function formatBytes(bytes: number): string {
   const mb = bytes / (1024 * 1024);
@@ -199,8 +200,10 @@ function TagEditor({ bookId, tags, canEdit }:
   const [adding, setAdding] = useState(false);
   const [input, setInput] = useState('');
   const [expanded, setExpanded] = useState(false);
-  const visibleTags = expanded ? tags : tags.slice(0, 8);
-  const hasMore = tags.length > 8;
+  const narrowLayout = useMediaQuery(BOOK_DETAIL_NARROW_QUERY);
+  const collapsedTagLimit = narrowLayout ? 8 : 20;
+  const hasMore = tags.length - collapsedTagLimit >= 3;
+  const visibleTags = expanded || !hasMore ? tags : tags.slice(0, collapsedTagLimit);
 
   const names = tags.map((tg) => tg.name);
   const apply = (next: string[]) => update.mutate({ tags: next.join(', ') });
@@ -307,6 +310,9 @@ export function BookDetail() {
   const id = params.id;
 
   const { data: book, isLoading, error } = useBook(id);
+  const me = useMe().data;
+  const selectionMode = me?.library_mode === 'personal_library';
+  const inLibrary = !!book && (!selectionMode || book.in_my_library !== false);
   const toggleRead = useToggleRead(id);
   const toggleFavorite = useToggleFavorite(id);
   const toggleArchived = useToggleArchived(id);
@@ -318,20 +324,20 @@ export function BookDetail() {
   const addToLibrary = useAddToMyLibrary();
   const removalImpact = useMyLibraryRemovalImpact();
   const removeFromLibrary = useRemoveFromMyLibrary();
+  const clearMyCover = useClearMyCover(id);
   const [location, navigate] = useLocation();
-  const me = useMe().data;
   const deliveryDevices = useActiveDeliveryDevices(
-    !!me && !me.role?.anonymous && !!me.role?.download,
+    inLibrary && !!me && !me.role?.anonymous && !!me.role?.download,
   );
   /* Stage 0 two-way sync state chip (read-only; manage it on Account). */
   const twoWay = useKoboTwoWayAnnotations({
-    enabled: !!me && !me.role?.anonymous && !!me.features?.kobo_two_way_annotations,
+    enabled: inLibrary && !!me && !me.role?.anonymous && !!me.features?.kobo_two_way_annotations,
   });
   const bookBackTarget = backTarget(location);
   // The send-to-e-reader button only renders when mail is configured + the user
   // can download, so defer the account fetch (which carries the saved e-reader
   // address used to prefill the recipient field, #715) until that's possible.
-  const canSend = !!me?.features?.mail_configured && !!me?.role?.download;
+  const canSend = inLibrary && !!me?.features?.mail_configured && !!me?.role?.download;
   const savedEreader = useAccount({ enabled: canSend }).data?.kindle_mail ?? '';
   const [sendOpen, setSendOpen] = useState(false);
   const [sendBanner, setSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
@@ -345,12 +351,12 @@ export function BookDetail() {
      an empty accessible name (it has none — it is not rendered) and failed
      hidden-books.spec's every-control-is-named sweep on desktop. Keep this
      query in sync with the 700px mobile cutover in BookDetail.module.css. */
-  const narrowLayout = useMediaQuery('(max-width: 700px)');
+  const narrowLayout = useMediaQuery(BOOK_DETAIL_NARROW_QUERY);
   // Shelf membership for the metadata list (#1254). Both queries are already
   // in flight for the always-rendered AddToShelf popover below and share its
   // cache keys, so reading them here costs no extra request.
-  const shelfMembership = useBookShelves(id).data;
-  const visibleShelves = useShelves().data;
+  const shelfMembership = useBookShelves(id, { enabled: inLibrary }).data;
+  const visibleShelves = useShelves({ enabled: inLibrary }).data;
 
   if (isLoading) return <SpinnerCentered size={40} />;
   if (error || !book) {
@@ -369,14 +375,13 @@ export function BookDetail() {
     book.formats.map((f) => f.format),
     canReadBooks(me),
   );
+  const canDelete = canDeleteBooks(me);
 
   // The membership endpoint returns ids only, and both it and the shelf list
   // apply the same server-side visibility filter (own shelves + public ones),
   // so every id here resolves to a name the caller is allowed to see.
   const onShelfIds = new Set(shelfMembership?.shelf_ids ?? []);
   const bookShelves = (visibleShelves?.items ?? []).filter((s) => onShelfIds.has(s.id));
-  const selectionMode = me?.library_mode === 'personal_library';
-  const inLibrary = !selectionMode || book.in_my_library !== false;
 
   const requestDeleteBook = () => {
     if (deleteBook.isPending) return;
@@ -412,6 +417,29 @@ export function BookDetail() {
       onError: () => announce(t('Could not remove the book. Please try again.'), { assertive: true }),
     });
   };
+
+  const coverPreferences = !me?.role?.anonymous ? (
+    <div className={styles.coverPreferences} data-testid="book-cover-preferences">
+      <p>{t('Your own cover is private to you and your e-reader deliveries. The library cover stays unchanged for everyone else.')}</p>
+      <div className={styles.coverPreferenceActions}>
+        <Link href={`/book/${book.id}/cover?personal=1`}>
+          <ImageIcon size={15} aria-hidden="true" focusable={false} />
+          {book.using_my_cover ? t('Change my cover') : t('Use my own cover')}
+        </Link>
+        {book.using_my_cover && (
+          <button type="button" disabled={clearMyCover.isPending}
+            onClick={() => clearMyCover.mutate()}>
+            {clearMyCover.isPending ? t('Restoring…') : t('Use the library cover')}
+          </button>
+        )}
+        {me?.role?.edit && (
+          <Link href={`/book/${book.id}/cover`}>
+            {t('Change library cover')}
+          </Link>
+        )}
+      </div>
+    </div>
+  ) : null;
 
   return (
     <main className={styles.container}>
@@ -454,12 +482,13 @@ export function BookDetail() {
                 <span className={styles.coverFallbackMark} aria-hidden="true">NextGen</span>
               </div>
             )}
-            {me?.role?.edit && (
-              <Link href={`/book/${book.id}/cover`} className={styles.changeCover}>
-                <ImageIcon size={15} /> {t('Change cover')}
-              </Link>
-            )}
           </div>
+          {/* Keep cover choices under the artwork on wide layouts. On narrow
+              layouts this block follows the ordinary action row instead: when
+              it lived in the cover grid cell, its prose and two 44px controls
+              made that first row tall enough to push #1828's delete target
+              below the viewport even though the button remained rendered. */}
+          {!narrowLayout && coverPreferences}
         </div>
 
         {/* RIGHT: info */}
@@ -499,7 +528,7 @@ export function BookDetail() {
             {/* Passive "currently reading" marker (fork #634) — mirrors the classic
                 detail page. Sync-driven display only; the read toggle below stays a
                 2-state read/unread control. Shows the synced percent when known. */}
-            {book.in_progress && (
+            {inLibrary && book.in_progress && (
               <div className={styles.readProgressWrap}>
                 <p className={styles.currentlyReading}>
                   <BookOpen size={14} aria-hidden="true" focusable={false} />
@@ -572,7 +601,7 @@ export function BookDetail() {
               </button>
             )}
 
-            {(inLibrary || me?.role?.browse_global) && (
+            {inLibrary && (
               <AddToShelf bookId={book.id} inLibrary={inLibrary} />
             )}
 
@@ -735,7 +764,7 @@ export function BookDetail() {
                 separated region below renders instead (both share
                 requestDeleteBook, so behaviour is identical). Placed last so
                 the primary actions keep their positions. */}
-            {narrowLayout && me?.role?.delete_books && me?.role?.edit && (
+            {narrowLayout && canDelete && (
               <button
                 type="button"
                 data-testid="book-delete-icon"
@@ -750,6 +779,7 @@ export function BookDetail() {
             )}
 
           </div>
+          {narrowLayout && coverPreferences}
           <p className={reloadMessage ? styles.actionStatus : undefined} role="status">{reloadMessage}</p>
 
           {/* Whole-book deletion is intentionally separated from the wrapping row
@@ -758,7 +788,7 @@ export function BookDetail() {
               INSTEAD of this region (#1828) — neither is ever hidden in the DOM.
               This uses the same delete-and-edit policy as the server;
               this gate and grouping are the discoverability/UX layer. */}
-          {!narrowLayout && me?.role?.delete_books && me?.role?.edit && (
+          {!narrowLayout && canDelete && (
             <section className={styles.dangerZone} data-testid="book-destructive-actions"
               aria-label={t('Delete from the global library')}>
               <button
@@ -830,13 +860,13 @@ export function BookDetail() {
                 <dd className={styles.metaValue}>{book.original_filename}</dd>
               </>
             )}
-            {book.kosync_progress != null && (
+            {inLibrary && book.kosync_progress != null && (
               <>
                 <dt className={styles.metaLabel}>{t('KOReader Progress')}</dt>
                 <dd className={styles.metaValue}>{book.kosync_progress.toFixed(1)}%</dd>
               </>
             )}
-            {book.kosync_progress_created_at !== null && (
+            {inLibrary && book.kosync_progress_created_at !== null && (
               <>
                 <dt className={styles.metaLabel} title={t('When reading progress was first synced')}>
                   {t('Started reading')}
@@ -844,7 +874,7 @@ export function BookDetail() {
                 <dd className={styles.metaValue}>{formatDate(book.kosync_progress_created_at, true)}</dd>
               </>
             )}
-            {book.kosync_progress_timestamp !== null && (
+            {inLibrary && book.kosync_progress_timestamp !== null && (
               <>
                 <dt className={styles.metaLabel}>{t('Last synced')}</dt>
                 <dd className={styles.metaValue}>{formatDate(book.kosync_progress_timestamp, true)}</dd>
@@ -894,7 +924,7 @@ export function BookDetail() {
                 </dd>
               </>
             )}
-            {bookShelves.length > 0 && (
+            {inLibrary && bookShelves.length > 0 && (
               <>
                 {/* Always the plural msgid: "Shelf" is translated in no locale
                     today, so a count-switched label would render English for a

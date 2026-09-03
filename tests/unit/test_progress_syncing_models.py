@@ -191,8 +191,8 @@ class TestEnsureKosyncProgressTable:
         columns = {row[1] for row in cursor.fetchall()}
         assert columns == {'id', 'user_id', 'document', 'progress', 'percentage', 'device', 'device_id', 'timestamp'}
 
-    def test_handles_schema_mismatch(self, tmp_path, caplog):
-        """Verify schema mismatch triggers warning (production-safe behavior)."""
+    def test_rejects_schema_mismatch(self, tmp_path, caplog):
+        """A table without the writers' conflict target must stop startup."""
         db = tmp_path / "test.db"
         conn = sqlite3.connect(str(db))
         # Create table with wrong schema
@@ -200,7 +200,8 @@ class TestEnsureKosyncProgressTable:
         conn.commit()
 
         from cps.progress_syncing.models import ensure_kosync_progress_table
-        ensure_kosync_progress_table(conn)
+        with pytest.raises(RuntimeError, match="schema mismatch"):
+            ensure_kosync_progress_table(conn)
 
         # Should log warning about schema mismatch
         assert any('schema mismatch' in record.message.lower() for record in caplog.records)

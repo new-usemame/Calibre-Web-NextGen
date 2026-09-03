@@ -6,8 +6,14 @@
   "refs": [
     "#1596"
   ],
+  "resolution": {
+    "commit": "d0c3b8b526",
+    "date": "2026-09-01",
+    "note": "Shipped in #2121: both launch units run env -u PYTHONPATH PYTHONNOUSERSITE=1 python3 -P -m cps; hostile-PYTHONPATH control test pins it.",
+    "release": ""
+  },
   "severity": "security",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "python -m cps resolves via the editable .pth, so PYTHONPATH now outranks the application"
 }

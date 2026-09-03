@@ -1,26 +1,25 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""#739/#908: the SPA is the default UI and Classic is a sticky opt-out.
+"""#739/#908: the SPA is always-default; Classic is a session escape hatch.
 
 A cookie-less browser and the old ``cwng_prefer_spa=1`` population both use the
-SPA. Leaving through ``?cwng_feedback=newui`` stores ``cwng_prefer_classic=1``;
-only the marked Classic-nav action clears that opt-out so Classic -> SPA ->
-Classic can round-trip indefinitely; ordinary SPA deep links preserve it.
+SPA. Leaving through ``?cwng_feedback=newui`` marks the signed Flask session for
+Classic without creating a durable cookie. A login, logout, fresh browser session,
+or the marked Classic-to-SPA action clears that escape hatch. The obsolete
+``cwng_prefer_classic=1`` cookie is ignored and actively expired.
 Redirects are limited to explicit browser-document HTML requests,
 because wildcard or missing Accept headers are ordinary machine-client traffic.
 
-Most sticky-cookie cases exercise the REAL spa.py helpers through a minimal
+Most session-selection cases exercise the REAL spa.py helpers through a minimal
 Flask app whose '/' route mirrors web.py:index. Cases whose ordering or side
 effects matter mount the real web blueprint and patch only its final rendering
 and environment boundaries; a stand-in cannot prove those contracts. The
 SPA-shell cookie (test a) is hit over HTTP on the real spa blueprint; the
 template gating (test e) is a source-pin.
 
-Cookie mechanics: the test client is created with use_cookies=False so its own
-(empty) cookie jar doesn't clobber the HTTP_COOKIE we inject per-request, and we
-read Set-Cookie straight off resp.headers — so nothing depends on the
-set_cookie() test-client API, which changed signature across the supported Flask
-range (1.x–3.x).
+Cookie migration cases use a no-jar client so the injected legacy Cookie header
+reaches the request unchanged. Session behavior uses Flask's normal test-client
+jar and ``session_transaction`` so it exercises the signed session cookie.
 """
 import pathlib
 import inspect
@@ -75,7 +74,7 @@ def _spa_only_app(tmp_path):
 
 def _sticky_app(tmp_path):
     """App with the spa blueprint + a '/' route that mirrors web.py:index's
-    sticky-UI wiring: cwng_feedback clears the cookie, otherwise redirect when
+    UI-session wiring: cwng_feedback marks the session, otherwise redirect when
     the helper says so. The helpers are the real production code; the only
     stand-in is render_books_list (→ a placeholder string) and the auth stack."""
     monkey = _seed_bundle(tmp_path)
@@ -88,7 +87,7 @@ def _sticky_app(tmp_path):
     def _classic_index_stand_in():
         if flask.request.args.get("cwng_feedback"):
             resp = flask.make_response("CLASSIC HOME")
-            spa_mod.stamp_prefer_classic_cookie(resp)
+            spa_mod.prefer_classic_for_session()
             spa_mod.clear_prefer_spa_cookie(resp)
             return resp
         if spa_mod.classic_index_redirects_to_spa():
@@ -96,6 +95,37 @@ def _sticky_app(tmp_path):
         return "CLASSIC HOME"
 
     return app, monkey
+
+
+def _remembered_sticky_app(tmp_path):
+    """Sticky marker app using the production login/session-protection stack."""
+    from cps.MyLoginManager import MyLoginManager
+    from cps.cw_login import current_user, login_user
+
+    app, monkey = _sticky_app(tmp_path)
+    app.config["SESSION_PROTECTION"] = "strong"
+    login_manager = MyLoginManager(app)
+    user = MagicMock()
+    user.is_authenticated = True
+    user.is_active = True
+    user.is_anonymous = False
+    user.get_id.return_value = "7"
+    user.nickname = "remembered-user"
+
+    @login_manager.user_loader
+    def _load_user(user_id, _random, _session_key):
+        return user if user_id == "7" else None
+
+    @app.route("/test-remember-login")
+    def _test_remember_login():
+        assert login_user(user, remember=True)
+        return "LOGGED IN"
+
+    @app.route("/test-auth-state")
+    def _test_auth_state():
+        return flask.jsonify(authenticated=current_user.is_authenticated)
+
+    return app, user, monkey
 
 
 def _login_app(tmp_path):
@@ -244,6 +274,7 @@ def _call_real_index(path, tmp_path, *, headers=None, environ_overrides=None):
 
     monkey = _seed_bundle(tmp_path)
     app = flask.Flask(__name__)
+    app.config["SECRET_KEY"] = "test"
     _mirror_prod_session_config(app)
     anonymous = MagicMock()
     anonymous.is_authenticated = False
@@ -276,8 +307,8 @@ def test_a_app_shell_sets_prefer_cookie(tmp_path):
 
 
 @pytest.mark.unit
-def test_explicit_spa_choice_clears_classic_opt_out(tmp_path):
-    """Only the marked Classic-nav action revokes the durable opt-out.
+def test_explicit_spa_choice_clears_classic_session_and_legacy_cookie(tmp_path):
+    """The marked Classic-nav action revokes the transient escape hatch.
 
     It redirects to the clean shell URL so refreshing or bookmarking the SPA
     does not retain a preference-mutating query parameter.
@@ -286,6 +317,8 @@ def test_explicit_spa_choice_clears_classic_opt_out(tmp_path):
     try:
         client = app.test_client()
         client.set_cookie(spa_mod.PREFER_CLASSIC_COOKIE, "1")
+        with client.session_transaction() as sess:
+            sess[spa_mod.CLASSIC_SESSION_KEY] = True
 
         resp = client.get(
             "/app/?cwng_switch=spa", headers=_HTML_ACCEPT)
@@ -297,6 +330,8 @@ def test_explicit_spa_choice_clears_classic_opt_out(tmp_path):
         assert "Max-Age=0" in sc
         assert "cwng_prefer_spa=1" in sc
         assert client.get_cookie(spa_mod.PREFER_CLASSIC_COOKIE) is None
+        with client.session_transaction() as sess:
+            assert spa_mod.CLASSIC_SESSION_KEY not in sess
 
         shell = client.get(resp.headers["Location"], headers=_HTML_ACCEPT)
         assert shell.status_code == 200
@@ -313,18 +348,13 @@ def test_explicit_spa_choice_clears_classic_opt_out(tmp_path):
 
 
 @pytest.mark.unit
-def test_spa_deep_link_preserves_explicit_classic_choice(tmp_path):
-    """Visiting shared SPA content is not consent to revoke Classic.
-
-    Assert the response cookie mutation, the browser's resulting cookie jar,
-    and the next preference-routed navigation. A header-only assertion could
-    miss a differently-shaped deletion; a route-only assertion could miss a
-    stale duplicate cookie that happens to win in this test client.
-    """
+def test_spa_deep_link_preserves_classic_for_current_session(tmp_path):
+    """Visiting shared SPA content is not an explicit surface-selection action."""
     app, monkey = _sticky_app(tmp_path)
     try:
         client = app.test_client()
-        client.set_cookie(spa_mod.PREFER_CLASSIC_COOKIE, "1")
+        with client.session_transaction() as sess:
+            sess[spa_mod.CLASSIC_SESSION_KEY] = True
 
         deep_link = client.get("/app/book/5", headers=_HTML_ACCEPT)
 
@@ -334,18 +364,12 @@ def test_spa_deep_link_preserves_explicit_classic_choice(tmp_path):
             value.startswith("cwng_prefer_spa=1;")
             for value in set_cookies
         )
-        assert not any(
-            value.startswith("cwng_prefer_classic=")
-            for value in set_cookies
-        )
-        preserved = client.get_cookie(spa_mod.PREFER_CLASSIC_COOKIE)
-        assert preserved is not None
-        assert preserved.value == "1"
+        with client.session_transaction() as sess:
+            assert sess[spa_mod.CLASSIC_SESSION_KEY] is True
 
         classic_home = client.get("/", headers=_HTML_ACCEPT)
         assert classic_home.status_code == 200
         assert classic_home.get_data(as_text=True) == "CLASSIC HOME"
-        assert client.get_cookie(spa_mod.PREFER_CLASSIC_COOKIE).value == "1"
     finally:
         monkey.undo()
 
@@ -401,20 +425,106 @@ def test_b_legacy_spa_cookie_still_redirects(tmp_path):
 
 
 @pytest.mark.unit
-def test_c_feedback_sets_classic_opt_out_and_does_not_redirect(tmp_path):
-    """Leaving the SPA renders Classic, sets its durable opt-out, and deletes
-    the legacy SPA preference so downgrades preserve the same choice."""
+def test_c_feedback_sets_session_scoped_classic_escape_hatch(tmp_path):
+    """The fallback marks Classic without changing login-owned permanence."""
     app, monkey = _sticky_app(tmp_path)
     try:
-        resp = _client(app).get(
-            "/?cwng_feedback=newui",
-            headers=_HTML_ACCEPT, environ_overrides=_PREFER_COOKIE)
+        client = app.test_client()
+        client.set_cookie(spa_mod.PREFER_SPA_COOKIE, "1")
+        with client.session_transaction() as sess:
+            sess.permanent = True
+        resp = client.get("/?cwng_feedback=newui", headers=_HTML_ACCEPT)
         assert resp.status_code == 200
-        sc = _set_cookie(resp)
-        assert "cwng_prefer_classic=1" in sc
-        assert "Max-Age=31536000" in sc
-        assert "cwng_prefer_spa=" in sc
+        cookies = resp.headers.getlist("Set-Cookie")
+        assert any(value.startswith("cwng_prefer_spa=") for value in cookies)
+        assert not any(value.startswith("cwng_prefer_classic=1") for value in cookies)
+        session_cookie = next(value for value in cookies if value.startswith("session="))
+        assert "Expires=" in session_cookie
+        assert "Max-Age=" not in session_cookie
+        with client.session_transaction() as sess:
+            assert sess[spa_mod.CLASSIC_SESSION_KEY] is True
+            assert sess.permanent is True
     finally:
+        monkey.undo()
+
+
+@pytest.mark.unit
+def test_feedback_marker_preserves_real_remembered_login(tmp_path):
+    """Regression: choosing Classic must not silently sign the user out.
+
+    Use the real ``login_user(..., remember=True)`` and ``MyLoginManager``
+    response hook. Changing the marker request's address exercises production
+    strong-session-protection bookkeeping; the next request would clear both
+    authentication and ``remember_token`` if the marker flipped permanence.
+    """
+    from cps import ub
+
+    app, _user, monkey = _remembered_sticky_app(tmp_path)
+    try:
+        client = app.test_client()
+        with patch.object(ub, "check_user_session", return_value=True):
+            login_response = client.get("/test-remember-login")
+        assert login_response.status_code == 200
+        assert client.get_cookie("remember_token") is not None
+
+        marker = client.get(
+            "/?cwng_feedback=newui",
+            headers=_HTML_ACCEPT,
+            environ_overrides={"REMOTE_ADDR": "203.0.113.7"},
+        )
+        assert marker.status_code == 200
+        assert not any(
+            value.startswith("remember_token=;")
+            for value in marker.headers.getlist("Set-Cookie")
+        )
+        assert client.get_cookie("remember_token") is not None
+
+        authenticated = client.get(
+            "/test-auth-state",
+            environ_overrides={"REMOTE_ADDR": "203.0.113.7"},
+        )
+        assert authenticated.get_json() == {"authenticated": True}
+        assert not any(
+            value.startswith("remember_token=;")
+            for value in authenticated.headers.getlist("Set-Cookie")
+        )
+        assert client.get_cookie("remember_token") is not None
+    finally:
+        monkey.undo()
+
+
+@pytest.mark.unit
+def test_remember_cookie_restore_clears_classic_escape_hatch(tmp_path):
+    """A remember-cookie load is the fresh browser-session boundary."""
+    from cps import ub
+    from cps.cw_login.signals import user_loaded_from_cookie
+
+    app, user, monkey = _remembered_sticky_app(tmp_path)
+    restored_users = []
+
+    def _observe_cookie_restore(_sender, **extra):
+        restored_users.append(extra["user"])
+
+    user_loaded_from_cookie.connect(_observe_cookie_restore, sender=app, weak=False)
+    try:
+        login_client = app.test_client()
+        with patch.object(ub, "check_user_session", return_value=True):
+            assert login_client.get("/test-remember-login").status_code == 200
+        remember_cookie = login_client.get_cookie("remember_token")
+        assert remember_cookie is not None
+
+        restored_client = app.test_client()
+        restored_client.set_cookie("remember_token", remember_cookie.value)
+        with restored_client.session_transaction() as sess:
+            sess[spa_mod.CLASSIC_SESSION_KEY] = True
+
+        restored = restored_client.get("/test-auth-state")
+        assert restored.get_json() == {"authenticated": True}
+        assert restored_users == [user]
+        with restored_client.session_transaction() as sess:
+            assert spa_mod.CLASSIC_SESSION_KEY not in sess
+    finally:
+        user_loaded_from_cookie.disconnect(_observe_cookie_restore, sender=app)
         monkey.undo()
 
 
@@ -497,13 +607,51 @@ def test_fetch_metadata_document_navigation_redirects(tmp_path):
 
 
 @pytest.mark.unit
-def test_classic_opt_out_sticks_across_fresh_request(tmp_path):
+@pytest.mark.parametrize(
+    ("prefix", "location", "deleted_paths"),
+    [
+        ("", "/app/", {"/"}),
+        ("/cwa", "/cwa/app/", {"/", "/cwa"}),
+    ],
+)
+def test_legacy_classic_cookie_is_ignored_and_deleted(
+        tmp_path, prefix, location, deleted_paths):
     app, monkey = _sticky_app(tmp_path)
     try:
         resp = _client(app).get(
-            "/", headers=_HTML_ACCEPT, environ_overrides=_CLASSIC_COOKIE)
-        assert resp.status_code == 200
-        assert b"CLASSIC HOME" in resp.data
+            "/", headers=_HTML_ACCEPT, environ_overrides={
+                **_CLASSIC_COOKIE, "SCRIPT_NAME": prefix})
+        assert resp.status_code == 302
+        assert resp.headers["Location"] == location
+        stale_deletions = [
+            value for value in resp.headers.getlist("Set-Cookie")
+            if value.startswith("cwng_prefer_classic=")
+        ]
+        assert all("Max-Age=0" in value for value in stale_deletions)
+        assert {
+            re.search(r"(?:^|; )Path=([^;]+)", value).group(1)
+            for value in stale_deletions
+        } == deleted_paths
+    finally:
+        monkey.undo()
+
+
+@pytest.mark.unit
+def test_deliberate_classic_switch_sticks_only_within_same_session(tmp_path):
+    app, monkey = _sticky_app(tmp_path)
+    try:
+        client = app.test_client()
+        switched = client.get(
+            "/?cwng_feedback=newui", headers=_HTML_ACCEPT)
+        assert switched.status_code == 200
+
+        same_session = client.get("/", headers=_HTML_ACCEPT)
+        assert same_session.status_code == 200
+        assert same_session.get_data(as_text=True) == "CLASSIC HOME"
+
+        fresh_session = app.test_client().get("/", headers=_HTML_ACCEPT)
+        assert fresh_session.status_code == 302
+        assert fresh_session.headers["Location"] == "/app/"
     finally:
         monkey.undo()
 
@@ -528,8 +676,7 @@ def test_classic_index_redirect_rejects_hostile_proxy_prefix(tmp_path):
 
 @pytest.mark.unit
 def test_preferred_spa_redirects_anonymous_login_to_new_ui(tmp_path):
-    """After logout, an anonymous HTML browser that still carries the durable
-    preference must enter the SPA's logged-out tree instead of Classic login."""
+    """After logout, an anonymous HTML browser enters the SPA login tree."""
     app, web_mod, monkey = _login_app(tmp_path)
     try:
         resp = _get_login(
@@ -602,7 +749,7 @@ def test_auth_mode_does_not_disable_authenticated_index_spa(
 @pytest.mark.unit
 @pytest.mark.parametrize(("path", "headers", "cookie", "status"), [
     ("/", _HTML_ACCEPT, None, 302),
-    ("/", _HTML_ACCEPT, _CLASSIC_COOKIE, 200),
+    ("/", _HTML_ACCEPT, _CLASSIC_COOKIE, 302),
     ("/", {"Accept": "*/*", "User-Agent": "curl/8.7.1"}, None, 200),
     ("/?cwng_feedback=newui", _HTML_ACCEPT, _PREFER_COOKIE, 200),
 ])
@@ -618,7 +765,7 @@ def test_production_web_index_executes_the_preference_contract(
         assert response.get_data(as_text=True) == "CLASSIC HOME"
     if "cwng_feedback" in path:
         cookies = _set_cookie(response)
-        assert "cwng_prefer_classic=1" in cookies
+        assert "cwng_prefer_classic=1" not in cookies
         assert "cwng_prefer_spa=" in cookies
 
 
@@ -664,7 +811,8 @@ def test_real_index_flashes_architecture_warning_only_when_classic_renders(
                     ("cwa_arch_warning", warning)]
 
             classic_client = app.test_client()
-            classic_client.set_cookie("cwng_prefer_classic", "1")
+            with classic_client.session_transaction() as sess:
+                sess[spa_mod.CLASSIC_SESSION_KEY] = True
             classic = classic_client.get("/", headers=_HTML_ACCEPT)
             assert classic.status_code == 200
             with classic_client.session_transaction() as sess:
@@ -675,12 +823,14 @@ def test_real_index_flashes_architecture_warning_only_when_classic_renders(
 
 
 @pytest.mark.unit
-def test_classic_opt_out_keeps_anonymous_login_classic(tmp_path):
+def test_classic_session_keeps_anonymous_login_classic(tmp_path):
     app, web_mod, monkey = _login_app(tmp_path)
     try:
+        client = app.test_client()
+        with client.session_transaction() as sess:
+            sess[spa_mod.CLASSIC_SESSION_KEY] = True
         resp = _get_login(
-            _client(app), web_mod, "/login", headers=_HTML_ACCEPT,
-            environ_overrides=_CLASSIC_COOKIE,
+            client, web_mod, "/login", headers=_HTML_ACCEPT,
         )
         assert resp.status_code == 200
         assert resp.get_data(as_text=True) == "CLASSIC LOGIN"
@@ -866,7 +1016,7 @@ def test_real_unauthorized_login_redirect_drains_classic_flash(tmp_path):
         (0, True, "CLASSIC HOME"),
     ],
 )
-def test_no_js_bridge_reaches_sticky_classic_for_every_auth_combination(
+def test_no_js_bridge_reaches_session_classic_for_every_auth_combination(
         tmp_path, anonymous_browsing, authenticated, terminal_body):
     """A no-JS shell must terminate on a usable Classic surface.
 
@@ -913,10 +1063,13 @@ def test_no_js_bridge_reaches_sticky_classic_for_every_auth_combination(
             assert response.get_data(as_text=True) == terminal_body
             assert "/?cwng_feedback=newui" in visited
             cookies = _set_cookie(response)
-            assert "cwng_prefer_classic=1" in cookies
+            assert "cwng_prefer_classic=1" not in cookies
             assert "cwng_prefer_spa=" in cookies
+            with client.session_transaction() as sess:
+                assert sess[spa_mod.CLASSIC_SESSION_KEY] is True
+                assert sess.permanent is False
 
-            # A fresh navigation with only the cookie jar retained must stay on
+            # A navigation in the same signed browser session must stay on
             # Classic; authenticated /login redirects through the real index.
             fresh, _ = _walk_no_js_bridge(client, start="/login")
             assert fresh.get_data(as_text=True).startswith("CLASSIC ")
@@ -924,6 +1077,99 @@ def test_no_js_bridge_reaches_sticky_classic_for_every_auth_combination(
             if not anonymous_browsing and not authenticated:
                 assert displayed_flashes == [
                     ("message", "Please log in to access this page.")]
+    finally:
+        monkey.undo()
+
+
+@pytest.mark.unit
+def test_successful_login_clears_classic_then_no_js_bridge_terminates(tmp_path):
+    """Pin the login-required no-JS state machine through a successful login.
+
+    Login clears the Classic flag, so `/` first returns to `/app`; the shell's
+    no-JS fallback then marks the session again and terminates on Classic. This
+    is one extra capability-detection pass, never a redirect loop.
+    """
+    from cps.cw_login import login_user
+    from cps import ub
+
+    app, web_mod, monkey = _no_js_bridge_app(tmp_path, authenticated=True)
+    login_user_row = MagicMock()
+    login_user_row.is_active = True
+    login_user_row.get_id.return_value = "7"
+
+    @app.route("/test-successful-login")
+    def _test_successful_login():
+        assert login_user(login_user_row)
+        return flask.redirect("/")
+
+    try:
+        with patch.object(web_mod.config, "config_anonbrowse", 0, create=True), \
+             patch.object(web_mod.config, "config_login_type", 0, create=True), \
+             patch.object(web_mod.config,
+                          "config_allow_reverse_proxy_header_login", False,
+                          create=True), \
+             patch.object(web_mod.config, "config_disable_standard_login",
+                          False, create=True), \
+             patch.object(web_mod.config, "config_enable_oauth_auto_forward",
+                          False, create=True), \
+             patch.object(web_mod, "render_books_list",
+                          return_value="CLASSIC HOME"), \
+             patch.object(web_mod, "render_login",
+                          return_value="CLASSIC LOGIN"):
+            client = app.test_client()
+            classic_login, first_chain = _walk_no_js_bridge(client)
+            assert classic_login.get_data(as_text=True) == "CLASSIC LOGIN"
+            assert first_chain[-1].startswith("/login?")
+            with client.session_transaction() as sess:
+                assert sess[spa_mod.CLASSIC_SESSION_KEY] is True
+
+            # This minimal app has no configured user-session database. Keep the
+            # real login signal fan-out but make its unrelated DB receiver see
+            # the just-created session as already stored.
+            with patch.object(ub, "check_user_session", return_value=True):
+                logged_in = client.get("/test-successful-login")
+            assert logged_in.status_code == 302
+            assert logged_in.headers["Location"] == "/"
+            with client.session_transaction() as sess:
+                assert spa_mod.CLASSIC_SESSION_KEY not in sess
+
+            classic_home, post_login_chain = _walk_no_js_bridge(
+                client, start=logged_in.headers["Location"])
+            assert classic_home.get_data(as_text=True) == "CLASSIC HOME"
+            assert post_login_chain == [
+                "/", "/app/", "/?cwng_feedback=newui"]
+    finally:
+        monkey.undo()
+
+
+@pytest.mark.unit
+def test_logout_clears_classic_session_before_next_login(tmp_path):
+    from cps.cw_login import LoginManager
+    from cps.logout import cleanup_local_logout
+
+    app, monkey = _sticky_app(tmp_path)
+    login_manager = LoginManager(app)
+
+    @login_manager.user_loader
+    def _load_user(_user_id, *_session_parts):
+        return None
+
+    @app.route("/test-logout")
+    def _test_logout():
+        cleanup_local_logout()
+        return "LOGGED OUT"
+
+    try:
+        client = app.test_client()
+        with client.session_transaction() as sess:
+            sess[spa_mod.CLASSIC_SESSION_KEY] = True
+        assert client.get("/test-logout").status_code == 200
+        with client.session_transaction() as sess:
+            assert spa_mod.CLASSIC_SESSION_KEY not in sess
+
+        next_login = client.get("/", headers=_HTML_ACCEPT)
+        assert next_login.status_code == 302
+        assert next_login.headers["Location"] == "/app/"
     finally:
         monkey.undo()
 
@@ -966,11 +1212,12 @@ def test_e_layout_has_plain_return_affordance_without_banner():
 
 
 @pytest.mark.unit
-def test_web_index_wires_sticky_helpers():
-    """web.py:index must clear on cwng_feedback and call the redirect helper —
+def test_web_index_wires_session_helpers():
+    """web.py:index must mark cwng_feedback and call the redirect helper —
     pins that the stand-in '/' route above mirrors production."""
     src = _WEB.read_text()
-    assert "spa.stamp_prefer_classic_cookie" in src
+    assert "spa.prefer_classic_for_session" in src
+    assert "spa.stamp_prefer_classic_cookie" not in src
     assert "spa.clear_prefer_spa_cookie" in src
     assert "spa.classic_index_redirects_to_spa" in src
     assert "cwng_feedback" in src

@@ -1,0 +1,20 @@
+{
+  "area": "kobo",
+  "body": "OBSERVED in cps/kobo.py and a real-handler regression: each request initialized its outgoing archive cursor to datetime.min, advanced it only for archive rows and tombstones inspected in that request, then unconditionally serialized it. With no ArchivedBook rows and five acknowledged deletion tombstones, one request advanced the cursor through all five deletions and the next empty pass reset it to datetime.min. Repeating the returned tokens reproduced an exact latest/epoch alternation. This is the server-side producer of the partial-token condition whose entitlement replay risk is mitigated by F-e0843b and #2131.\n\nOBSERVED fix: the outgoing archive field now starts at the incoming value, so an empty pass cannot move it backward. The timestamp arm still compares against the original incoming value, while a missing acknowledged tombstone row for the physical device independently admits backdated deletions. Real-handler regressions prove at-least-once delivery: an unseen deletion below the timestamp high-watermark is re-offered until its pending response is acknowledged, then is absent from subsequent responses unless Full Sync clears that reader's deletion ledger. A 101-row missing-ledger frontier drains as bounded pages of 100 then one. #2131 same-reader fingerprint suppression remains enabled and unchanged.\n\nOBSERVED on a live instance after deployment, which closes the assumption this finding originally carried. Before the fix, 45 sync summaries in one day alternated between a real outgoing archive timestamp and epoch with no exception, 23 of them emitting epoch. After deploying the fix, five consecutive syncs driven from a physical reader emitted zero. The first of those five is the transition itself: the reader presented the epoch token it had been handed by the previous build and the fixed server answered with a real cursor, so an instance recovers without any reader-side reset. Five samples are decisive here because the prior behaviour was deterministic rather than intermittent - a strict alternation over 45 consecutive syncs would have produced two or three epoch outputs in any five.",
+  "created": "2026-09-02",
+  "id": "F-2b37e5",
+  "refs": [
+    "F-e0843b",
+    "#2131"
+  ],
+  "resolution": {
+    "commit": "fed3abe70f",
+    "date": "2026-09-02",
+    "note": "Preserve the incoming archive field as the outgoing floor; select tombstones by the original timestamp or a missing physical-device acknowledgment; retain the bounded deletion page cap.",
+    "release": ""
+  },
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Kobo archive cursor regresses on empty archive passes"
+}

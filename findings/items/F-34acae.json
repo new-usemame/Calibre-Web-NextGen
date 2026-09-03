@@ -1,0 +1,19 @@
+{
+  "area": "test",
+  "body": "tests/conftest.py: check_container_available() gates only on GET / returning 200 (line ~186). The API-client fixture (~1090-1120) then GETs /login, regexes for name=\"csrf_token\", and POSTs credentials; when the page has no token yet (app still initialising, or the shell served without the form) the POST returns 400 and pytest.fail() reports \"rejected the test credentials (HTTP 400). This is a regression in the login flow\" - a wrong diagnosis that sends the reader to the auth code. OBSERVED 2026-09-01: PR #2104 (no product code) run 33547551222 attempt 1 - 1 error at setup of test_web_interface_accessible, 119 passed; attempt 2 (rerun, same bytes) IT=success. Fix shape: (1) wait, bounded, for a /login response that actually contains the csrf token before posting; (2) split the failure text: \"no csrf token on /login after N s (page: <first 200 chars>)\" vs \"credentials rejected (HTTP <code>)\" - the two facts point at different code. Do not resolve via retries.",
+  "created": "2026-09-01",
+  "id": "F-34acae",
+  "refs": [
+    "#2104"
+  ],
+  "resolution": {
+    "commit": "d5d784765f",
+    "date": "2026-09-01",
+    "note": "Shipped in #2116 (squash of d78322e810): /health readiness + bounded CSRF-token gate with two distinct diagnoses; real-container run OBSERVED.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Integration container fixture races app startup and mislabels a token-less /login page as 'credentials rejected'"
+}

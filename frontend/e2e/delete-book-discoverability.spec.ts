@@ -32,7 +32,10 @@ async function setDeletePermission(page: Page, allowed: boolean) {
 test('the edit page exposes whole-book deletion to users with delete permission (#1046)', async ({ page }) => {
   await page.goto('/app');
   const book = await firstBook(page);
-  test.skip(book == null, 'seed has no books');
+  if (book == null) {
+    test.skip(true, 'seed has no books');
+    return;
+  }
 
   await setDeletePermission(page, true);
   await page.goto(`/app/book/${book.id}/edit`, { waitUntil: 'domcontentloaded' });
@@ -45,7 +48,10 @@ test('the edit page exposes whole-book deletion to users with delete permission 
 test('the edit page hides whole-book deletion without delete permission (#1046)', async ({ page }) => {
   await page.goto('/app');
   const book = await firstBook(page);
-  test.skip(book == null, 'seed has no books');
+  if (book == null) {
+    test.skip(true, 'seed has no books');
+    return;
+  }
 
   await setDeletePermission(page, false);
   await page.goto(`/app/book/${book.id}/edit`, { waitUntil: 'domcontentloaded' });
@@ -58,7 +64,10 @@ test('the edit page hides whole-book deletion without delete permission (#1046)'
 test('edit-page deletion confirms before mutation and a declined confirm does nothing (#1046)', async ({ page }) => {
   await page.goto('/app');
   const book = await firstBook(page);
-  test.skip(book == null, 'seed has no books');
+  if (book == null) {
+    test.skip(true, 'seed has no books');
+    return;
+  }
 
   await setDeletePermission(page, true);
   let deleteCalls = 0;
@@ -108,7 +117,10 @@ test('book-detail deletion is grouped outside the ordinary action chips (#1046)'
   test.skip(isMobile === true, 'desktop grouping — mobile intentionally differs (#1828)');
   await page.goto('/app');
   const book = await firstBook(page);
-  test.skip(book == null, 'seed has no books');
+  if (book == null) {
+    test.skip(true, 'seed has no books');
+    return;
+  }
 
   await setDeletePermission(page, true);
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
@@ -132,10 +144,13 @@ test('mobile groups deletion as an icon-level control inside the action row (#18
   test.skip(isMobile !== true, 'mobile-only grouping');
   await page.goto('/app');
   const book = await firstBook(page);
-  test.skip(book == null, 'seed has no books');
+  if (book == null) {
+    test.skip(true, 'seed has no books');
+    return;
+  }
 
   await setDeletePermission(page, true);
-  await page.goto(`/app/book/${book!.id}`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
 
   // The mobile trade: the destructive control joins the ordinary action row as
   // an icon (the confirm dialog is the guard), and the separated desktop

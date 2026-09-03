@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Private, passive capture of Kobo Reading Services exchanges.
+"""Private, passive capture of Kobo device API exchanges.
 
 The observer is deliberately harder to enable than an ordinary boolean flag:
 ``CWNG_KOBO_READING_SERVICES_CAPTURE`` must exactly equal
@@ -9,10 +9,12 @@ application database in a hidden, mode-0700 directory.  They are not included
 in the annotation backup format or any repository artifact.
 
 Each gzip record contains explicit authentication provenance, the device
-request, the exact request body actually sent upstream, Kobo's response, and
-the final response returned to the device. Credential-bearing headers are
-redacted. Annotation text remains only in the private record; ordinary logs
-contain structural counts and capture IDs only.
+request, any exact request body sent upstream, Kobo's response, and the final
+response returned to the device. Library-sync records also retain the opaque
+incoming/outgoing cursors and a structured pointer to the matching INFO
+summary. Credential-bearing generic headers are redacted. Annotation and
+library metadata remain only in the private record; ordinary logs contain
+structural counts and capture IDs only.
 
 Unauthenticated captures are opt-in, carry no user identity, and use a tighter
 independent store so untrusted traffic cannot evict authenticated diagnostics
@@ -283,7 +285,7 @@ class CaptureSession:
             else MAX_BODY_BYTES
         )
         self._record = {
-            "schema_version": 2,
+            "schema_version": 3,
             "capture_id": self.capture_id,
             "captured_at": datetime.now(timezone.utc).isoformat(),
             "exchange": str(exchange)[:64],
@@ -303,6 +305,7 @@ class CaptureSession:
             "upstream_error": None,
             "device_response": None,
             "decisions": [],
+            "sync_exchange": None,
         }
 
     def _mutate(self, callback) -> bool:
@@ -361,6 +364,81 @@ class CaptureSession:
         return self._mutate(lambda: self._record.__setitem__(
             "upstream_error", str(error_kind)[:64],
         ))
+
+    def record_sync_request(
+        self, *, incoming_token, x_kobo_sync, device_hash,
+    ) -> bool:
+        """Record the selected library-sync headers without a raw device id."""
+        value = {
+            "request": {
+                "incoming_token": str(incoming_token or ""),
+                "x_kobo_sync": (
+                    None if x_kobo_sync is None else str(x_kobo_sync)
+                ),
+                "device_hash": str(device_hash),
+            },
+            "response": {"outgoing_token": None},
+            "info_summary": None,
+        }
+        if not _body_is_within_bound(
+            json.dumps(value, separators=(",", ":")).encode("utf-8"),
+            max_bytes=self._max_body_bytes,
+        ):
+            self._invalid = True
+            return False
+        return self._mutate(lambda: self._record.__setitem__(
+            "sync_exchange", value,
+        ))
+
+    def record_sync_response(self, *, outgoing_token) -> bool:
+        """Record the exact opaque token returned to Nickel."""
+        token = str(outgoing_token or "")
+        if not _body_is_within_bound(
+            token.encode("utf-8"), max_bytes=self._max_body_bytes,
+        ):
+            self._invalid = True
+            return False
+
+        def _record():
+            sync_exchange = self._record.get("sync_exchange")
+            if not isinstance(sync_exchange, dict):
+                raise ValueError("sync request context was not recorded")
+            sync_exchange["response"] = {"outgoing_token": token}
+
+        return self._mutate(_record)
+
+    def record_sync_info_summary(
+        self, *, response_mode, incoming_cursor, outgoing_cursor, counters,
+    ) -> bool:
+        """Link the private body to the PII-free INFO summary and its counts."""
+        value = {
+            "log_event": "Kobo Sync summary",
+            "capture_id": self.capture_id,
+            "response_mode": str(response_mode)[:64],
+            "incoming_cursor": str(incoming_cursor),
+            "outgoing_cursor": str(outgoing_cursor),
+            "counters": counters,
+        }
+        try:
+            serialized = json.dumps(
+                value, ensure_ascii=True, separators=(",", ":"),
+            ).encode("utf-8")
+        except (TypeError, ValueError):
+            self._invalid = True
+            return False
+        if not _body_is_within_bound(
+            serialized, max_bytes=self._max_body_bytes,
+        ):
+            self._invalid = True
+            return False
+
+        def _record():
+            sync_exchange = self._record.get("sync_exchange")
+            if not isinstance(sync_exchange, dict):
+                raise ValueError("sync request context was not recorded")
+            sync_exchange["info_summary"] = value
+
+        return self._mutate(_record)
 
     def finish(self, *, status, headers, body) -> bool:
         """Persist the complete envelope; never raise into the observed route."""

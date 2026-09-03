@@ -4,8 +4,14 @@
   "created": "2026-08-29",
   "id": "F-e0d9fc",
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-02",
+    "note": "Fixed in this commit. Secondary-user creation now persists run/worker ownership intent before direct API creation and binds the exact returned id/name/email. Normal cleanup and next-setup recovery use isolated authenticated API sessions with bounded retries; live owner PIDs are excluded, identity conflicts remain deferred, and persistent failures retain structured deferred state while reporting without replacing product assertions. Node unit coverage uses a fake API for create/bind/cleanup, killed-owner recovery, persistent delete failure, and concurrent-owner isolation. Playwright was deliberately not run against the shared dev instance.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "SPA E2E secondary-user fixtures leak accounts when teardown loses its page or the runner is killed"
 }

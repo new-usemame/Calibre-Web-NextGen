@@ -1,0 +1,19 @@
+{
+  "area": "progress-sync",
+  "body": "kosync.py update_book_read_status mirrors the accepted kosync percentage onto KoboBookmark unconditionally (:589-591, :612-613; see also :1998-2039). Furthest-wins is enforced only against the KOSyncProgress row: (a) when no row exists for a book the Kobo is deep into (progress predates the #1425 sharing bridge, or the best-effort share failed), KOReader's first low-% push creates the row and drags KoboBookmark from e.g. 70% to 5%; (b) a same-device KOReader rewind (accepted by design, :1998) propagates cross-carrier the same way. ub.py:2112-2127 before_flush then stamps the parent KoboReadingState newer, so the next Kobo sync delivers the regressed position to the Kobo.\n\nDistinct writer from F-b521d3/F-fe2b1c/F-2ff8ac: this is the kosync->KoboBookmark mirror, not the Kobo PUT or the kosync row race.\n\nCONFIDENCE: likely. Source: adversarial audit state/kobo-audit-2026-09-01.",
+  "created": "2026-09-01",
+  "id": "F-6f9187",
+  "refs": [
+    "#1425"
+  ],
+  "resolution": {
+    "commit": "4d86c5bf90",
+    "date": "2026-09-01",
+    "note": "Shipped in #2114: kosync→KoboBookmark mirror goes through the shared resolved_position_accepts arbiter (furthest leg, no clock); Kobo PUT path uses the same primitive.",
+    "release": ""
+  },
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "resolved",
+  "title": "kosync PUT mirrors an older position onto the Kobo-visible bookmark carrier with no furthest/clock arbitration on the cross-carrier write"
+}

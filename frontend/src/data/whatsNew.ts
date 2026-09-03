@@ -1838,7 +1838,7 @@ export const WHATS_NEW: WhatsNewRelease[] = [
       },
       {
         title: 'The new interface stays chosen',
-        body: 'Once you switch to the new interface it now sticks: opening the site again — or a bookmarked link — keeps you in the new interface until you choose to go back to the classic view. Use "Back to the classic view" from the account menu to switch back.',
+        body: 'The new interface became the default browser experience in this release. The classic interface remained available as a compatibility fallback while the transition continued.',
         category: 'Account',
       },
       {

@@ -110,9 +110,9 @@ def test_operator_chosen_kobo_repair_notices_omit_superseded_caveats():
         "Hot",
         "Top Rated",
         "Load more",
-        "Full user table & restrictions",
-        "Basic configuration",
-        "Database & library path",
+        "User restrictions",
+        "Basic settings",
+        "Database path",
         "Scheduled tasks",
     ],
 )
@@ -141,7 +141,7 @@ def test_extractor_finds_known_frontend_call():
     assert any(f.endswith(".tsx") for f in keys["Table view"])
 
 
-@pytest.mark.parametrize("msgid", ["Formats", "Newest", "Basic configuration"])
+@pytest.mark.parametrize("msgid", ["Formats", "Newest", "Basic settings"])
 def test_extractor_finds_data_driven_labels(msgid):
     """Variable-rendered labels must not escape extraction again (#719/#615)."""
     keys = extractor.extract_frontend_keys()

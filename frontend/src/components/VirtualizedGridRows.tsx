@@ -18,10 +18,11 @@ interface VirtualizedGridRowsProps<T> {
 
 /** Window complete rows in a document-scrolling CSS grid.
  *
- * The parent owns the real grid tracks. Each mounted row spans those tracks and
- * uses `subgrid`, while spacers preserve the height of unmounted rows. Keeping
- * full rows mounted is load-bearing: slicing arbitrary cards would change CSS
- * auto-placement and no longer match the measured column count.
+ * The parent owns the real grid track count. Each mounted row spans the parent
+ * and recreates that many equal tracks with the shared gap, while spacers
+ * preserve the height of unmounted rows. Keeping full rows mounted is
+ * load-bearing: slicing arbitrary cards would change CSS auto-placement and no
+ * longer match the measured column count.
  *
  * Catalog is the first integration because it already has a reliable measured
  * column count. TODO(#1813): Shelf, AdvancedSearch, and MagicShelfView can adopt
@@ -131,6 +132,9 @@ export function VirtualizedGridRows<T>({
         key={`row-${row}`}
         className={rowClassName}
         data-virtual-grid-row={row}
+        // Do not replace this with subgrid: WebKit can resolve the parent's
+        // auto-fill tracks while exposing only one internal track to this row.
+        style={{ gridTemplateColumns: `repeat(${safeColumnCount}, minmax(0, 1fr))` }}
       >
         {items.slice(first, last).map((item, offset) => (
           <Fragment key={itemKey(item)}>{renderItem(item, first + offset)}</Fragment>

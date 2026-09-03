@@ -51,7 +51,7 @@ def test_ingest_processed_books_calls_use_resolved_root(
     processed_root = config_root / "processed_books"
     assert {
         child.name for child in processed_root.iterdir() if child.is_dir()
-    } == {"converted", "imported", "fixed_originals", "failed"}
+    } == {"converted", "imported", "fixed_originals", "failed", "overwritten"}
 
     ingest_processor._load_backup_destinations()
     assert ingest_processor.backup_destinations["failed"] == str(

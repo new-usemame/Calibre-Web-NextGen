@@ -1,0 +1,17 @@
+{
+  "area": "kobo",
+  "body": "OBSERVED on reader hardware and in private redacted exchange captures: the server sent an authoritative ChangedReadingState before the reader installed newly offered book bytes. The later download retained the locator and source-progress fields but replaced the coarse book percentage. The reader sent no state PUT for that local rewrite. Its next library sync returned the repair response token, but the server had cleared the one-shot rehydrate latch on that acknowledgment and emitted no second state.\n\nOBSERVED in cps/kobo.py: ordinary state selection is a strict last_modified-greater-than-token query. The independent rehydrate path emits a latched position once, and pending-page acknowledgment clears that latch. Restoring a test mutation's old timestamp therefore cannot rewind an already-advanced device cursor.\n\nThe fix echoes each successfully acknowledged rehydrate state once in the acknowledging request, after entitlement rendering. The echo is bounded by the prior page limit, remains byte-identical under pending-page replay, does not chain indefinitely, and rolls acknowledgment state back behind a retryable 503 if rendering fails. A firmware-shaped regression models entitlement, pre-download repair, token acknowledgment after device-local download materialization, one authoritative echo, replay, and terminal completion.",
+  "created": "2026-09-02",
+  "id": "F-ea81b6",
+  "refs": [],
+  "resolution": {
+    "commit": "416bf2e90f784e55ca52f33b0c6670ce07b468a1",
+    "date": "2026-09-02",
+    "note": "Fixed by one bounded confirmation echo after the acknowledged pre-download repair; firmware-shaped regression covers replay, termination, and retryable failure atomicity.",
+    "release": ""
+  },
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "resolved",
+  "title": "A reading-state repair can be acknowledged before a Kobo materializes its download"
+}

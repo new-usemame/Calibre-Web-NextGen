@@ -2,8 +2,9 @@ import { test, expect } from '@playwright/test';
 
 test('advanced server links disclose the intentional classic-view transition (#909)', async ({ page }) => {
   await page.goto('/app/admin');
-  await expect(page.getByText('Pages marked below open in the classic view. Changes there apply to the whole server.')).toBeVisible();
-  const cards = page.locator('a[href*="/admin/"], a[href$="/cwa-settings"], a[href$="/cwa-stats-show"]')
+  const adminNav = page.getByRole('navigation', { name: 'Admin navigation' });
+  await expect(adminNav).toBeVisible();
+  const cards = adminNav.locator('a[href*="/admin/"], a[href$="/cwa-settings"], a[href$="/cwa-stats-show"]')
     .filter({ hasText: 'Opens in classic view' });
   await expect(cards).toHaveCount(8);
 
@@ -17,7 +18,7 @@ test('advanced server links disclose the intentional classic-view transition (#9
   // This assertion was left pointing at the old row when that shipped, so the
   // spec has been red ever since — invisible because E2E does not gate PRs
   // (#953). Updated to the row that actually exists.
-  const duplicates = page.getByRole('link', { name: /Duplicate detection settings/ });
+  const duplicates = adminNav.getByRole('link', { name: /Duplicates/ });
   await expect(duplicates).toHaveAttribute('href', /cwa-settings#duplicate-detection$/);
   await expect(duplicates).toContainText('Opens in classic view');
 });

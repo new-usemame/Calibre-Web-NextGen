@@ -18,7 +18,7 @@ import { formatAuthors } from '../lib/authors';
 import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './EditBook.module.css';
-import { canDownloadBooks, canUploadBooks } from '../lib/permissions';
+import { canDeleteBooks, canDownloadBooks, canUploadBooks } from '../lib/permissions';
 
 interface Ident { type: string; val: string }
 
@@ -247,7 +247,7 @@ export function EditBook({ id }: { id: string }) {
       </Link>
       <div className={styles.pageHeader}>
         <h1 className={styles.title}>{t('Edit metadata')}</h1>
-        {me?.role?.delete_books && (
+        {canDeleteBooks(me) && (
           <Button type="button" variant="danger" data-testid="edit-book-delete"
             aria-label={t('Delete book')} disabled={deleteBook.isPending} onClick={onDeleteBook}>
             <Trash2 size={16} aria-hidden="true" focusable={false} />
@@ -800,7 +800,7 @@ function FormatsManager({ id }: { id: string }) {
   const sources = (convertOptions?.sources.length ? convertOptions.sources : formats.map((f) => f.toLowerCase()));
   const targets = convertOptions?.targets ?? [];
   if (!book) return null;
-  const canDelete = !!me?.role?.delete_books;
+  const canDelete = canDeleteBooks(me);
   // #1288: "Add a format" POSTs to /api/v1/books/<id>/formats, which requires
   // role_upload and now honours the admin's "Enable Uploads" switch. Gate the
   // control on the same pair, or the switch turns a hidden button into a 403.

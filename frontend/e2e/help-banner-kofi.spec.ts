@@ -8,6 +8,12 @@ const KOFI_KEY = 'cwng_banner_dismissed:kofi-support-v1';
 const SUPERSEDED_KOFI_KEY = 'cwng_banner_dismissed:kofi-support-v0';
 const SUPPORT_URL = 'https://ko-fi.com/calibrewebnextgen';
 
+declare global {
+  interface Window {
+    __bannerOpenCalls: unknown[][];
+  }
+}
+
 test('announcement channels keep only the last-declared entry before priority sorting', () => {
   const announcements = [
     { id: 'channel-less-high', priority: 300 },
@@ -63,10 +69,9 @@ async function resetDismissals(page: Page) {
 
 async function recordWindowOpenCalls(page: Page) {
   await page.evaluate(() => {
-    const browserWindow = window as Window & { __bannerOpenCalls: unknown[][] };
-    browserWindow.__bannerOpenCalls = [];
+    window.__bannerOpenCalls = [];
     window.open = ((...args: unknown[]) => {
-      browserWindow.__bannerOpenCalls.push(args);
+      window.__bannerOpenCalls.push(args);
       return null;
     }) as typeof window.open;
   });
@@ -136,9 +141,7 @@ test('clicking the Ko-fi banner opens Ko-fi and dismisses it durably', async ({ 
 
   await supportLink.click({ position: { x: 4, y: 4 } });
 
-  const openCalls = await page.evaluate(() =>
-    (window as Window & { __bannerOpenCalls: unknown[][] }).__bannerOpenCalls,
-  );
+  const openCalls = await page.evaluate(() => window.__bannerOpenCalls);
   expect(openCalls).toEqual([[SUPPORT_URL, '_blank', 'noopener,noreferrer']]);
   expect(await page.evaluate((key) => localStorage.getItem(key), KOFI_KEY)).toBe('1');
   await expect(page.locator('[data-announcement-id]')).toHaveCount(0);
@@ -161,9 +164,8 @@ test('keyboard activation opens Ko-fi and moves through link then dismiss button
   await supportLink.focus();
   await page.keyboard.press('Enter');
 
-  expect(await page.evaluate(() =>
-    (window as Window & { __bannerOpenCalls: unknown[][] }).__bannerOpenCalls,
-  )).toEqual([[SUPPORT_URL, '_blank', 'noopener,noreferrer']]);
+  expect(await page.evaluate(() => window.__bannerOpenCalls))
+    .toEqual([[SUPPORT_URL, '_blank', 'noopener,noreferrer']]);
   await expect(page.locator('[data-announcement-id]')).toHaveCount(0);
   await expect(page.locator('main#main')).toBeFocused();
 });
@@ -175,9 +177,8 @@ test('middle-click opens Ko-fi and dismisses the banner', async ({ page }) => {
 
   await page.getByRole('link', { name: /Support us on Ko-fi!.*Open Ko-fi/ }).click({ button: 'middle' });
 
-  expect(await page.evaluate(() =>
-    (window as Window & { __bannerOpenCalls: unknown[][] }).__bannerOpenCalls,
-  )).toEqual([[SUPPORT_URL, '_blank', 'noopener,noreferrer']]);
+  expect(await page.evaluate(() => window.__bannerOpenCalls))
+    .toEqual([[SUPPORT_URL, '_blank', 'noopener,noreferrer']]);
   await expect(page.locator('[data-announcement-id]')).toHaveCount(0);
   expect(await page.evaluate((key) => localStorage.getItem(key), KOFI_KEY)).toBe('1');
   await page.reload();
@@ -193,9 +194,7 @@ test('Ko-fi X dismisses without opening or navigating', async ({ page }) => {
   await page.getByRole('button', { name: 'Dismiss Ko-fi support message' }).click();
 
   expect(page.url()).toBe(startingUrl);
-  expect(await page.evaluate(() =>
-    (window as Window & { __bannerOpenCalls: unknown[][] }).__bannerOpenCalls,
-  )).toEqual([]);
+  expect(await page.evaluate(() => window.__bannerOpenCalls)).toEqual([]);
   expect(await page.evaluate((key) => localStorage.getItem(key), KOFI_KEY)).toBe('1');
   await expect(page.locator('[data-announcement-id]')).toHaveCount(0);
 });

@@ -16,7 +16,8 @@ Handles database tables for progress syncing functionality:
 
 from datetime import datetime, timezone
 import time
-from sqlalchemy import Column, Integer, String, TIMESTAMP, ForeignKey, Float, text
+from sqlalchemy import (Column, Float, ForeignKey, Integer, String, TIMESTAMP,
+                        UniqueConstraint, text)
 
 from .. import logger
 from ..db import Base as CalibreBase  # For metadata.db tables (books)
@@ -286,13 +287,91 @@ def ensure_checksum_table(conn):
         log.error(traceback.format_exc())
 
 
+_KOSYNC_CONFLICT_INDEX = "uq_kosync_progress_user_document"
+_KOSYNC_CONFLICT_COLUMNS = ("user_id", "document")
+
+
+class KOSyncProgressSchemaError(RuntimeError):
+    """The KOReader progress table cannot support its atomic writers."""
+
+
+def _kosync_index_definitions(execute_sql):
+    """Return ``name -> (unique, ordered columns, partial)`` from PRAGMAs."""
+    definitions = {}
+    for row in execute_sql("PRAGMA index_list(kosync_progress)").fetchall():
+        name = row[1]
+        quoted_name = name.replace("'", "''")
+        columns = tuple(
+            info[2]
+            for info in execute_sql(
+                "PRAGMA index_info('{}')".format(quoted_name)
+            ).fetchall()
+        )
+        definitions[name] = (
+            bool(row[2]),
+            columns,
+            bool(row[4]) if len(row) > 4 else False,
+        )
+    return definitions
+
+
+def _ensure_kosync_conflict_target(execute_sql):
+    """Deduplicate rows and require SQLite's exact ON CONFLICT target."""
+    definitions = _kosync_index_definitions(execute_sql)
+    named_definition = definitions.get(_KOSYNC_CONFLICT_INDEX)
+    expected_definition = (True, _KOSYNC_CONFLICT_COLUMNS, False)
+    if named_definition is not None and named_definition != expected_definition:
+        execute_sql(
+            'DROP INDEX "{}"'.format(
+                _KOSYNC_CONFLICT_INDEX.replace('"', '""'),
+            )
+        )
+
+    # This correlated winner query intentionally avoids ROW_NUMBER(), because
+    # source installs may link Python to SQLite older than 3.25. For every
+    # exact key it keeps the furthest row, preferring a real locator to the
+    # percentage-only sentinel and then the newest timestamp/id.
+    execute_sql("""
+        DELETE FROM kosync_progress
+        WHERE id <> (
+            SELECT winner.id
+            FROM kosync_progress AS winner
+            WHERE winner.user_id = kosync_progress.user_id
+              AND winner.document = kosync_progress.document
+            ORDER BY
+                winner.percentage DESC,
+                CASE WHEN winner.progress = 'cwng:percentage'
+                     THEN 0 ELSE 1 END DESC,
+                CASE WHEN winner.timestamp IS NULL THEN 0 ELSE 1 END DESC,
+                winner.timestamp DESC,
+                winner.id DESC
+            LIMIT 1
+        )
+    """)
+
+    definitions = _kosync_index_definitions(execute_sql)
+    if expected_definition not in definitions.values():
+        execute_sql(
+            "CREATE UNIQUE INDEX {} "
+            "ON kosync_progress(user_id, document)".format(
+                _KOSYNC_CONFLICT_INDEX,
+            )
+        )
+
+    definitions = _kosync_index_definitions(execute_sql)
+    if expected_definition not in definitions.values():
+        raise KOSyncProgressSchemaError(
+            "kosync_progress requires a unique (user_id, document) index"
+        )
+
+
 def ensure_kosync_progress_table(conn):
     """
     Ensure the kosync_progress table exists with the correct schema.
 
     This function is called during database initialization to create the KOSync
     progress table if it doesn't exist. If the table exists with a different schema,
-    a warning is logged and the table is left as-is to allow for proper migration.
+    startup fails loudly because every writer requires the exact conflict target.
     If the schema matches but the foreign key is missing ON DELETE CASCADE,
     the table is rebuilt in-place to add CASCADE and orphan rows are dropped.
 
@@ -319,7 +398,8 @@ def ensure_kosync_progress_table(conn):
             expected_columns = {'id', 'user_id', 'document', 'progress', 'percentage', 'device', 'device_id', 'timestamp'}
             actual_columns = set(columns)
 
-            # If schema doesn't match, log warning and skip (requires migration)
+            # A mismatched table cannot provide the conflict target every
+            # conditional writer depends on, so startup must not continue.
             if actual_columns != expected_columns:
                 missing = expected_columns - actual_columns
                 extra = actual_columns - expected_columns
@@ -329,7 +409,9 @@ def ensure_kosync_progress_table(conn):
                     f"Missing: {missing}. Extra: {extra}. "
                     f"Migration required."
                 )
-                return  # Skip creation, table exists but needs migration
+                raise KOSyncProgressSchemaError(
+                    "kosync_progress schema mismatch; migration required"
+                )
 
             # Check if foreign keys have CASCADE DELETE
             has_cascade = check_cascade_delete_on_fk(conn, "kosync_progress", {'user_id': 'user'})
@@ -388,8 +470,20 @@ def ensure_kosync_progress_table(conn):
             """)
             execute_sql("CREATE INDEX idx_kosync_user_document ON kosync_progress(user_id, document)")
             execute_sql("CREATE INDEX idx_kosync_document ON kosync_progress(document)")
-            conn.commit()
             log.info("Created kosync_progress table with indexes")
+
+        # F-9073e5: ON CONFLICT needs a verified uniqueness guarantee. Repair a
+        # same-named incompatible index, deduplicate legacy rows without a
+        # window function, and verify the ordered unique columns before return.
+        try:
+            _ensure_kosync_conflict_target(execute_sql)
+        except KOSyncProgressSchemaError:
+            raise
+        except Exception as error:
+            raise KOSyncProgressSchemaError(
+                "could not establish the kosync_progress conflict target"
+            ) from error
+        conn.commit()
 
     except Exception as e:
         log.error(f"Could not create kosync_progress table: {e}")
@@ -398,8 +492,11 @@ def ensure_kosync_progress_table(conn):
                 "app.db is locked while creating KOReader progress tables. "
                 "A restart may be required if another writer is holding a lock."
             )
-        import traceback
-        log.error(traceback.format_exc())
+        try:
+            conn.rollback()
+        except Exception:
+            pass
+        raise
 
 
 class BookFormatChecksum(CalibreBase):
@@ -474,6 +571,13 @@ class KOSyncProgress(AppBase):
     device_id = Column(String)
     timestamp = Column(TIMESTAMP, default=lambda: datetime.now(timezone.utc),
                        onupdate=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint(
+            'user_id', 'document',
+            name='uq_kosync_progress_user_document',
+        ),
+    )
 
     def __repr__(self):
         return f'<KOSyncProgress user={self.user_id} doc={self.document}>'

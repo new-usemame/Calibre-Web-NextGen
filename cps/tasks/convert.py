@@ -63,7 +63,8 @@ current_milli_time = lambda: int(round(time() * 1000))
 
 
 class TaskConvert(CalibreTask):
-    def __init__(self, file_path, book_id, task_message, settings, ereader_mail, user=None):
+    def __init__(self, file_path, book_id, task_message, settings, ereader_mail,
+                 user=None, cover_user_id=None):
         super(TaskConvert, self).__init__(task_message)
         self.worker_thread = None
         self.file_path = file_path
@@ -72,6 +73,7 @@ class TaskConvert(CalibreTask):
         self.settings = settings
         self.ereader_mail = ereader_mail
         self.user = user
+        self.cover_user_id = cover_user_id
 
         self.results = dict()
 
@@ -133,7 +135,8 @@ class TaskConvert(CalibreTask):
                                                                EmailText,
                                                                self.settings['body'],
                                                                id=self.book_id,
-                                                               internal=True)
+                                                               internal=True,
+                                                               cover_user_id=self.cover_user_id)
                                           )
                 except Exception as ex:
                     return self._handleError(str(ex))

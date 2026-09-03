@@ -52,6 +52,23 @@ def test_editable_metadata_includes_identifiers():
     ]
 
 
+def test_shared_identifier_reconciler_ignores_submitted_internal_marker():
+    from cps import editbooks
+    session = MagicMock()
+    digest = "c" * 64
+    submitted_marker = SimpleNamespace(
+        type=f"cwng_ingest_sha256_{digest}", val="forged",
+    )
+
+    changed, duplicate = editbooks.modify_identifiers(
+        [submitted_marker], [], session,
+    )
+
+    assert changed is False
+    assert duplicate is False
+    session.add.assert_not_called()
+
+
 def test_update_metadata_persists_identifiers_lowercased_and_skips_blank_rows():
     from cps.api import edit as mod
     session = MagicMock()
@@ -71,7 +88,7 @@ def test_update_metadata_persists_identifiers_lowercased_and_skips_blank_rows():
     with _ctx("/api/v1/books/5/metadata", body=body):
         with patch.object(mod, "current_user", _editor()), \
              patch.object(mod, "calibre_db",
-                          SimpleNamespace(get_book=lambda _id: _fake_book(), session=session,
+                          SimpleNamespace(get_filtered_book=lambda *a, **k: _fake_book(), session=session,
                                           get_cc_columns=lambda *a, **k: [])), \
              patch.object(mod, "modify_identifiers", side_effect=fake_modify), \
              patch.object(mod, "get_locale", return_value="en"):
@@ -99,7 +116,7 @@ def test_update_metadata_duplicate_identifier_reports_field_error():
     with _ctx("/api/v1/books/5/metadata", body=body):
         with patch.object(mod, "current_user", _editor()), \
              patch.object(mod, "calibre_db",
-                          SimpleNamespace(get_book=lambda _id: _fake_book(), session=session,
+                          SimpleNamespace(get_filtered_book=lambda *a, **k: _fake_book(), session=session,
                                           get_cc_columns=lambda *a, **k: [])), \
              patch.object(mod, "modify_identifiers", side_effect=fake_modify), \
              patch.object(mod, "get_locale", return_value="en"):
@@ -119,7 +136,7 @@ def test_update_metadata_without_identifiers_key_does_not_touch_them():
     with _ctx("/api/v1/books/5/metadata", body={"title": "New"}):
         with patch.object(mod, "current_user", _editor()), \
              patch.object(mod, "calibre_db",
-                          SimpleNamespace(get_book=lambda _id: _fake_book(), session=session,
+                          SimpleNamespace(get_filtered_book=lambda *a, **k: _fake_book(), session=session,
                                           get_cc_columns=lambda *a, **k: [])), \
              patch.object(mod, "modify_identifiers", side_effect=AssertionError("must not be called")), \
              patch.object(mod, "edit_book_param",

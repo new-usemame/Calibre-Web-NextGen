@@ -11,7 +11,7 @@ from datetime import datetime, timezone
 from flask import Blueprint, flash, redirect, request, url_for, abort, jsonify
 from flask_babel import gettext as _
 from .cw_login import current_user
-from sqlalchemy.exc import InvalidRequestError, OperationalError
+from sqlalchemy.exc import InvalidRequestError, OperationalError, SQLAlchemyError
 from sqlalchemy.sql.expression import func, true
 
 from . import calibre_db, config, constants, db, logger, ub, user_library
@@ -84,31 +84,186 @@ SHELF_MANAGED_MEMBERSHIP_REFUSAL = (
     "This book is not in your library. Ask an administrator to add it to "
     "My Library before adding it to a shelf."
 )
+SHELF_OWNER_MANAGED_MEMBERSHIP_REFUSAL = (
+    "This book is not in the shelf owner's library. The shelf owner cannot "
+    "browse the global library; an administrator must add it to their My "
+    "Library first."
+)
+SHELF_NON_OWNER_MEMBERSHIP_REFUSAL = (
+    "This book cannot be added to this shelf. Ask an administrator for help."
+)
+SHELF_INVALID_OWNER_REFUSAL = (
+    "This shelf has an invalid owner. Ask an administrator to repair it "
+    "before adding books."
+)
 SHELF_MEMBERSHIP_REQUIRED = (
     "This book is not in your library. Add it to My Library before adding "
     "it to a shelf."
 )
 
+SHELF_ADD_REFUSAL_SELF_MANAGED = "self_managed_membership"
+SHELF_ADD_REFUSAL_OWNER_MANAGED = "owner_managed_membership"
+SHELF_ADD_REFUSAL_OWNER_HIDDEN = "owner_managed_membership_hidden"
+SHELF_ADD_REFUSAL_INVALID_OWNER = "invalid_owner"
 
-def prepare_user_shelf_add(book_id):
-    """Establish membership for an explicit user shelf-add gesture.
+
+class ShelfAddRefusal(user_library.UserLibraryError):
+    """A shelf-add refusal with a stable presentation-independent reason."""
+
+    def __init__(self, reason, message):
+        super().__init__(message)
+        self.reason = reason
+
+
+def _resolve_shelf_owner(shelf_obj):
+    """Return ``(owner_id, owner)`` and fail closed on invalid non-NULL ids."""
+    if not isinstance(shelf_obj, ub.Shelf) or shelf_obj.user_id is None:
+        return None, None
+    try:
+        owner_id = int(shelf_obj.user_id)
+    except (TypeError, ValueError):
+        log.error(
+            "Shelf %s has malformed non-NULL owner id %r; refusing book add",
+            getattr(shelf_obj, "id", None), shelf_obj.user_id,
+        )
+        _raise_invalid_shelf_owner_refusal(shelf_obj)
+    shelf_owner = (ub.session.query(ub.User)
+                   .filter(ub.User.id == owner_id).first())
+    if shelf_owner is None:
+        log.error(
+            "Shelf %s references missing owner id %s; refusing book add",
+            getattr(shelf_obj, "id", None), owner_id,
+        )
+        _raise_invalid_shelf_owner_refusal(shelf_obj)
+    return owner_id, shelf_owner
+
+
+def _raise_invalid_shelf_owner_refusal(shelf_obj):
+    """Expose repair details only to an administrator or the recorded owner."""
+    try:
+        actor_is_owner = int(shelf_obj.user_id) == int(current_user.id)
+    except (TypeError, ValueError):
+        actor_is_owner = False
+    if current_user.role_admin() or actor_is_owner:
+        raise ShelfAddRefusal(
+            SHELF_ADD_REFUSAL_INVALID_OWNER,
+            SHELF_INVALID_OWNER_REFUSAL,
+        )
+    raise ShelfAddRefusal(
+        SHELF_ADD_REFUSAL_OWNER_HIDDEN,
+        SHELF_NON_OWNER_MEMBERSHIP_REFUSAL,
+    )
+
+
+def _translated_shelf_add_refusal(ex):
+    translators = {
+        SHELF_ADD_REFUSAL_SELF_MANAGED: lambda: _(
+            "This book is not in your library. Ask an administrator to add it "
+            "to My Library before adding it to a shelf."
+        ),
+        SHELF_ADD_REFUSAL_OWNER_MANAGED: lambda: _(
+            "This book is not in the shelf owner's library. The shelf owner "
+            "cannot browse the global library; an administrator must add it "
+            "to their My Library first."
+        ),
+        SHELF_ADD_REFUSAL_OWNER_HIDDEN: lambda: _(
+            "This book cannot be added to this shelf. Ask an administrator for help."
+        ),
+        SHELF_ADD_REFUSAL_INVALID_OWNER: lambda: _(
+            "This shelf has an invalid owner. Ask an administrator to repair it "
+            "before adding books."
+        ),
+    }
+    translator = translators.get(
+        getattr(ex, "reason", None),
+        translators[SHELF_ADD_REFUSAL_SELF_MANAGED],
+    )
+    return translator()
+
+
+def _classic_shelf_add_refusal_response(ex, xhr):
+    message = _translated_shelf_add_refusal(ex)
+    if not xhr:
+        flash(message, category="error")
+        return redirect(request.environ.get("HTTP_REFERER") or url_for('web.index'))
+    return message, 403
+
+
+def prepare_user_shelf_add(shelf_obj, book_id):
+    """Establish owner membership for an explicit regular-shelf add gesture.
 
     This deliberately lives above ``add_book_to_shelf``: the core is reused by
     non-gesture transports where an implicit My Library grant would be a wire
-    side effect. Existing members (including administrator-managed users) pass
-    without needing global browse permission; only a missing membership asks
-    ``user_library.add_book`` to apply the normal self-service add policy.
+    side effect. A shelf-add gesture follows the shelf owner rather than the
+    actor. Smart shelves never reach this path, and the type guard keeps that
+    invariant intact if a future caller passes one explicitly. Ownerless
+    shelves remain usable without granting anyone membership; invalid non-NULL
+    owners fail closed.
     """
-    if user_library.mode_for_user(current_user) != constants.LIBRARY_MODE_PERSONAL:
-        return
+    owner_id, shelf_owner = _resolve_shelf_owner(shelf_obj)
+    if shelf_owner is None:
+        return None
+    if user_library.mode_for_user(shelf_owner) != constants.LIBRARY_MODE_PERSONAL:
+        return None
     membership = (ub.session.query(ub.UserLibraryBook)
-                  .filter(ub.UserLibraryBook.user_id == int(current_user.id),
+                  .filter(ub.UserLibraryBook.user_id == owner_id,
                           ub.UserLibraryBook.book_id == int(book_id)).first())
     if membership is not None:
+        return None
+    if not shelf_owner.role_browse_global():
+        if owner_id == int(current_user.id):
+            reason = SHELF_ADD_REFUSAL_SELF_MANAGED
+            message = SHELF_MANAGED_MEMBERSHIP_REFUSAL
+        elif current_user.role_admin():
+            reason = SHELF_ADD_REFUSAL_OWNER_MANAGED
+            message = SHELF_OWNER_MANAGED_MEMBERSHIP_REFUSAL
+        else:
+            log.warning(
+                "Shelf owner membership grant refused: actor=%s shelf=%s "
+                "owner=%s book=%s; owner uses a personal library, lacks the "
+                "book membership, and cannot browse the global library",
+                current_user.id, shelf_obj.id, owner_id, book_id,
+            )
+            reason = SHELF_ADD_REFUSAL_OWNER_HIDDEN
+            message = SHELF_NON_OWNER_MEMBERSHIP_REFUSAL
+        raise ShelfAddRefusal(reason, message)
+    mutation = user_library.add_book(
+        shelf_owner, book_id, return_result=True,
+    )
+    return owner_id if mutation.changed else None
+
+
+def revert_prepared_user_shelf_add(owner_id, book_id):
+    """Remove only the owner membership created for this failed shelf add."""
+    if owner_id is None:
         return
-    if not current_user.role_browse_global():
-        raise user_library.UserLibraryError(SHELF_MANAGED_MEMBERSHIP_REFUSAL)
-    user_library.add_book(current_user, book_id)
+    try:
+        (ub.session.query(ub.UserLibraryBook)
+         .filter(ub.UserLibraryBook.user_id == int(owner_id),
+                 ub.UserLibraryBook.book_id == int(book_id))
+         .delete(synchronize_session=False))
+        ub.session.commit()
+    except SQLAlchemyError as ex:
+        log.error_or_exception(
+            "Could not compensate shelf-add membership for owner=%s book=%s: %s",
+            owner_id, book_id, ex,
+        )
+        try:
+            ub.session.rollback()
+        except SQLAlchemyError as rollback_ex:
+            log.error_or_exception(
+                "Could not roll back failed shelf-add compensation: %s",
+                rollback_ex,
+            )
+            try:
+                ub.session.close()
+            except SQLAlchemyError as close_ex:
+                log.error_or_exception(
+                    "Could not close session after failed shelf-add compensation: %s",
+                    close_ex,
+                )
+        return
+    user_library.invalidate_request_cache(owner_id)
 
 
 def add_book_to_shelf(shelf_obj, book_id):
@@ -122,9 +277,16 @@ def add_book_to_shelf(shelf_obj, book_id):
                                              ub.BookShelf.book_id == book_id).first():
         return SHELF_ALREADY_PRESENT, "Book is already part of the shelf: %s" % shelf_obj.name
 
+    owner_id, _shelf_owner = _resolve_shelf_owner(shelf_obj)
+    actor_owns_shelf = owner_id is not None and owner_id == int(current_user.id)
+    visibility_filter = (
+        calibre_db.common_filters()
+        if actor_owns_shelf
+        else calibre_db.common_filters(allow_show_global=True)
+    )
     book = (calibre_db.session.query(db.Books)
             .filter(db.Books.id == book_id)
-            .filter(calibre_db.common_filters()).one_or_none())
+            .filter(visibility_filter).one_or_none())
     if not book:
         visible_global_book = (calibre_db.session.query(db.Books.id)
                                .filter(db.Books.id == book_id)
@@ -183,34 +345,40 @@ def add_to_shelf(shelf_id, book_id):
             return redirect(url_for('web.index'))
         return "Sorry you are not allowed to add a book to the that shelf", 403
 
+    book_was_on_shelf = (ub.session.query(ub.BookShelf)
+                         .filter(ub.BookShelf.shelf == shelf.id,
+                                 ub.BookShelf.book_id == book_id)
+                         .first()) is not None
+    prepared_owner_id = None
     try:
-        prepare_user_shelf_add(book_id)
+        prepared_owner_id = prepare_user_shelf_add(shelf, book_id)
     except user_library.UserLibraryBookNotFound:
         message = "Book not found in the visible global library."
         if not xhr:
             flash(_("Book not found in the visible global library."), category="error")
             return redirect(request.environ.get("HTTP_REFERER") or url_for('web.index'))
         return message, 404
-    except user_library.UserLibraryError:
-        message = SHELF_MANAGED_MEMBERSHIP_REFUSAL
-        if not xhr:
-            flash(_(
-                "This book is not in your library. Ask an administrator to add it to "
-                "My Library before adding it to a shelf."
-            ), category="error")
-            return redirect(request.environ.get("HTTP_REFERER") or url_for('web.index'))
-        return message, 403
+    except user_library.UserLibraryError as ex:
+        return _classic_shelf_add_refusal_response(ex, xhr)
 
     try:
         status, _message = add_book_to_shelf(shelf, book_id)
+    except user_library.UserLibraryError as ex:
+        revert_prepared_user_shelf_add(prepared_owner_id, book_id)
+        return _classic_shelf_add_refusal_response(ex, xhr)
     except (OperationalError, InvalidRequestError) as e:
         ub.session.rollback()
+        revert_prepared_user_shelf_add(prepared_owner_id, book_id)
         log.error_or_exception("Settings Database error: {}".format(e))
         flash(_("Oops! Database Error: %(error)s.", error=getattr(e, 'orig', e)), category="error")
         if "HTTP_REFERER" in request.environ:
             return redirect(request.environ["HTTP_REFERER"])
         else:
             return redirect(url_for('web.index'))
+
+    if status != SHELF_OK and (
+            status != SHELF_ALREADY_PRESENT or book_was_on_shelf):
+        revert_prepared_user_shelf_add(prepared_owner_id, book_id)
 
     if status == SHELF_ALREADY_PRESENT:
         log.error("Book %s is already part of %s", book_id, shelf)
@@ -672,8 +840,7 @@ def delete_shelf_helper(cur_shelf):
     ub.session.query(ub.BookShelf).filter(ub.BookShelf.shelf == shelf_id).delete()
     ub.session.query(ub.OpdsShelfExposure).filter(ub.OpdsShelfExposure.shelf_id == shelf_id).delete()
     ub.session.add(ub.ShelfArchive(uuid=cur_shelf.uuid, user_id=cur_shelf.user_id))
-    ub.session_commit("successfully deleted Shelf {}".format(cur_shelf.name))
-    return True
+    return ub.session_commit("successfully deleted Shelf {}".format(cur_shelf.name))
 
 
 def change_shelf_order(shelf_id, order):
@@ -736,7 +903,8 @@ def render_show_shelf(shelf_type, shelf_id, page_no, sort_param):
                                                            ub.BookShelf.shelf == shelf_id,
                                                            [ub.BookShelf.order.asc()],
                                                            True, config.config_read_column,
-                                                           ub.BookShelf, ub.BookShelf.book_id == db.Books.id)
+                                                           ub.BookShelf, ub.BookShelf.book_id == db.Books.id,
+                                                           allow_public_shelf_books=bool(shelf.is_public))
         # delete shelf entries where book is not existent anymore, can happen if book is deleted outside calibre-web
         wrong_entries = calibre_db.session.query(ub.BookShelf) \
             .join(db.Books, ub.BookShelf.book_id == db.Books.id, isouter=True) \
@@ -988,6 +1156,20 @@ def _shelf_book_count(shelf, user=None):
     if books is None:
         return 0
     shelf_id = getattr(shelf, 'id', None)
+    if user is not None and shelf_id is not None:
+        try:
+            shelf_book_ids = [int(row.book_id) for row in (
+                ub.session.query(ub.BookShelf.book_id)
+                .filter(ub.BookShelf.shelf == shelf_id).all()
+            )]
+            return int(calibre_db.session.query(db.Books.id)
+                       .filter(db.Books.id.in_(shelf_book_ids))
+                       .filter(calibre_db.common_filters(
+                           allow_public_shelf_books=bool(shelf.is_public),
+                           user=user,
+                       )).count())
+        except Exception:
+            pass  # preserve the historical app-db-only fallback below
     if user is not None and not getattr(user, 'is_anonymous', False) and shelf_id is not None:
         try:
             archived_ids = (ub.session.query(ub.ArchivedBook.book_id)

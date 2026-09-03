@@ -175,6 +175,16 @@ def test_frontend_unit_tests_only_pr_does_not_require_a_changelog_entry():
     ) == []
 
 
+def test_current_frontend_unit_lane_does_not_require_a_changelog_entry():
+    assert changelog_requirement_errors(
+        ["frontend/unit/e2eUserOwnership.test.ts"]
+    ) == []
+
+
+def test_playwright_config_is_non_shipping_verification_config():
+    assert changelog_requirement_errors(["frontend/playwright.config.ts"]) == []
+
+
 def test_mixing_frontend_tests_with_shipping_frontend_still_requires_an_entry():
     errors = changelog_requirement_errors(
         [
@@ -257,8 +267,21 @@ def test_the_ledger_mixed_with_shipping_code_still_requires_an_entry():
     assert "shipping paths" in errors[0]
 
 
-def test_github_paths_and_top_level_dotfiles_are_not_blanket_exempt():
-    for path in (".github/workflows/tests.yml", ".dockerignore", ".editorconfig"):
+def test_ci_image_verdict_harness_is_non_shipping():
+    assert changelog_requirement_errors(
+        [
+            ".github/workflows/docker-image-build-dev.yml",
+            ".github/workflows/tests.yml",
+            "scripts/alias-e2e-image.sh",
+            "scripts/check-e2e-image-producer.py",
+            "scripts/resolve-e2e-image.sh",
+            "tests/unit/test_ci_e2e_commit_gate.py",
+        ]
+    ) == []
+
+
+def test_unlisted_github_paths_and_top_level_dotfiles_are_not_blanket_exempt():
+    for path in (".github/workflows/release.yml", ".dockerignore", ".editorconfig"):
         assert changelog_requirement_errors([path])
 
 
@@ -342,3 +365,15 @@ def test_a_rename_out_of_a_shipping_directory_still_reports_the_shipping_path(tm
         "a diff that removes a module from cps/ must still require a "
         "release-note entry"
     )
+
+
+def test_a_pull_request_that_changes_no_file_needs_no_changelog_entry():
+    """An empty tree diff ships nothing, so there is nothing to announce.
+
+    A `-s ours` back-merge that reconnects an off-main hotfix tag to main is
+    exactly this shape. Before the fix, `all([])` was blocked by a
+    `changed_paths and` clause that fell through to the error instead, so the
+    guard refused such a pull request for "changing shipping paths" while its
+    diff was empty.
+    """
+    assert GUARD.changelog_requirement_errors([]) == []

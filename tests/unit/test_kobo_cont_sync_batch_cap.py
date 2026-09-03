@@ -83,13 +83,20 @@ def test_handle_sync_has_one_false_local_continuation_writer():
 def test_books_stay_page_capped_but_never_request_local_continuation():
     """#248's batch cap remains while #1634 removes its unsafe signal."""
     source = _handle_sync_request_source()
-    page = "books_list = changed_entries.limit(SYNC_ITEM_LIMIT).all()"
-    count = "book_count = changed_entries.count()"
+    snapshot = (
+        "book_snapshot_ids = _capture_query_identities(\n"
+        "        changed_entries, db.Books.id,\n"
+        "    )"
+    )
+    page = (
+        "_bounded_query_pages(\n"
+        "            changed_entries,\n"
+        "            book_snapshot_ids,"
+    )
     terminal = "cont_sync = False"
     assert page in source
-    assert count in source
-    assert terminal in source
-    assert source.index(page) < source.index(count) < source.index(terminal)
+    assert snapshot in source
+    assert source.index(snapshot) < source.index(page) < source.index(terminal)
     assert "cont_sync = bool(book_count" not in source
 
 
@@ -97,9 +104,10 @@ def test_reading_states_stay_page_capped_without_continuation_writer():
     """A full reading-state page must also let its returned cursor persist."""
     source = _handle_sync_request_source()
     assert (
-        "for kobo_reading_state in "
-        "changed_reading_states.limit(SYNC_ITEM_LIMIT).all():"
+        "reading_state_page = "
+        "changed_reading_states.limit(SYNC_ITEM_LIMIT).all()"
     ) in source
+    assert "for kobo_reading_state in reading_state_page:" in source
     assert "cont_sync |= bool(changed_reading_states" not in source
     assert "cont_sync = bool(changed_reading_states" not in source
 
@@ -108,9 +116,15 @@ def test_deletions_stay_page_capped_without_continuation_writer():
     """Deletion tombstones page via the persisted archive cursor, not a pin."""
     source = _handle_sync_request_source()
     pending_start = source.index("pending_deletions = (")
-    pending_end = source.index("for tombstone in pending_deletions:")
+    pending_end = source.index("for deletion_page in _bounded_query_pages(")
     pending_query = source[pending_start:pending_end]
-    assert ".limit(SYNC_ITEM_LIMIT)" in pending_query
+    assert "deletion_snapshot_ids = _capture_query_identities(" in pending_query
+    assert (
+        "pending_deletions,\n"
+        "            deletion_snapshot_ids,"
+        in source
+    )
+    assert "for tombstone in deletion_page:" in source
     assert "cont_sync = True" not in source
     assert "cont_sync |= " not in source
     assert "response = generate_sync_response(sync_token, sync_results)" in source

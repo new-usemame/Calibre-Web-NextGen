@@ -21,6 +21,7 @@ import { usePersistentChoice } from '../lib/usePersistentChoice';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
+import { measureCatalogColumnCount } from '../lib/catalogGridMeasurement';
 import styles from './Catalog.module.css';
 import { canUploadBooks } from '../lib/permissions';
 import { SORT_OPTIONS } from '../lib/bookSortOptions';
@@ -342,37 +343,69 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const [seriesPresentation, setSeriesPresentation] = usePersistentChoice(
     'cwng:series-presentation-v1', ['grid', 'list'] as const, 'grid');
   const settingsRef = useRef<HTMLDivElement>(null);
+  const measureGridRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (!gridNode) return;
-    if (typeof ResizeObserver === 'undefined') return;
+    let frame = 0;
+    let cancelled = false;
 
-    const observer = new ResizeObserver(() => {
-      // Both layout reads happen in ResizeObserver's post-layout delivery. The
-      // old effect-body read ran immediately after React DOM writes and forced
-      // style/layout; keeping one grid node mounted also removes the loading ->
-      // loaded ref churn that used to repeat that forced read (#1813 item 8).
-      const tracks = getComputedStyle(gridNode).gridTemplateColumns.trim();
-      // An empty or 'none' track list means the grid has not been laid out yet
-      // (a hidden ancestor, a panel mid-transition), which is the absence of a
-      // measurement rather than a measurement of one column. Releasing the gate
-      // on it would query at rowsPerLoad x 1 and then correct once the real
-      // layout arrived — reinstating the double fetch this gate exists to stop.
-      // Leave gridMeasured false and let the next observer callback, or the
-      // fail-open timer, resolve it.
-      if (tracks && tracks !== 'none') {
-        setColumnCount(Math.max(1, tracks.split(/\s+/).length));
+    const measure = () => {
+      const style = getComputedStyle(gridNode);
+      const bounds = gridNode.getBoundingClientRect();
+      const nextColumnCount = measureCatalogColumnCount({
+        gridTemplateColumns: style.gridTemplateColumns,
+        gridWidth: bounds.width,
+        minColumnWidth: Number.parseFloat(style.getPropertyValue('--catalog-grid-min')),
+        columnGap: Number.parseFloat(style.columnGap),
+      });
+      // Zero width or an absent track list is no measurement. Keep the query
+      // gate closed (until its fail-open timer) and retain the last known count;
+      // a later observer/rAF/font sample can still correct it without user input.
+      if (nextColumnCount !== null) {
+        setColumnCount(nextColumnCount);
         setGridMeasured(true);
       }
-      setGridTop(gridNode.getBoundingClientRect().top + window.scrollY);
+      setGridTop(bounds.top + window.scrollY);
+    };
+    measureGridRef.current = measure;
+    const scheduleMeasure = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        measure();
+      });
+    };
+
+    // ResizeObserver remains the owner of live border-box measurement. Its first
+    // delivery can race Safari's resolved grid-track serialization, so every
+    // delivery gets one coalesced next-frame self-heal rather than trusting that
+    // delivery to be the only sample until the window changes again.
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
+      measure();
+      scheduleMeasure();
     });
-    observer.observe(gridNode);
+    observer?.observe(gridNode);
     // Content above the grid (notably Discover and the settings disclosure) can
     // change its document offset without changing the grid's own border box.
     // Observing the stable page container keeps that cached offset current;
     // scroll handling itself remains layout-read-free.
-    if (catalogNode) observer.observe(catalogNode);
-    return () => observer.disconnect();
+    if (catalogNode) observer?.observe(catalogNode);
+
+    // The first post-paint sample also keeps the fail-open path useful when
+    // ResizeObserver is unavailable. Web-font completion can change usable card
+    // geometry without guaranteeing another grid border-box notification.
+    scheduleMeasure();
+    void document.fonts?.ready.then(() => {
+      if (!cancelled) scheduleMeasure();
+    });
+
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+      cancelAnimationFrame(frame);
+      if (measureGridRef.current === measure) measureGridRef.current = () => {};
+    };
   }, [catalogNode, gridNode, density]);
 
   // Fail-open. The measurement needs the grid element to exist, and a first
@@ -380,11 +413,16 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // measurement -> query stays disabled -> no data. Rendering the loading state
   // inside the grid container (below) is what breaks that cycle, but the gate
   // must not be the only thing standing between a user and their library, so
-  // any path that fails to measure within a frame falls back to the guess and
-  // queries anyway. Worst case is the old redundant fetch; never an empty page.
+  // any path that fails to measure within a short grace window falls back to the
+  // guess and queries anyway. Recheck immediately before opening the gate so a
+  // first-layout race heals even if no second observer delivery arrives. Worst
+  // case is the old redundant fetch; never an empty page.
   useEffect(() => {
     if (gridMeasured) return;
-    const timer = setTimeout(() => setGridMeasured(true), 150);
+    const timer = setTimeout(() => {
+      measureGridRef.current();
+      setGridMeasured(true);
+    }, 150);
     return () => clearTimeout(timer);
   }, [gridMeasured]);
 
@@ -984,6 +1022,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         <div
           ref={setGridNode}
           data-testid="catalog-grid"
+          data-catalog-column-count={columnCount}
           data-virtualized-grid={usesGrid ? 'true' : undefined}
           className={`${styles.grid} ${styles[`density_${density}`]}`}
         >
@@ -1040,7 +1079,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         <>{personalLibrary && isPlainLibrary && !search && !filterActive && readFilter === 'all' ? (
           <EmptyState title={t('Your library is empty')}
             message={me?.role?.browse_global
-              ? t('Nothing is missing — the whole library is still on the server. What you see here is your own selection. Add books from the global library; they appear here and on your e-reader.')
+              ? t('Nothing is missing — the global library is still on the server. What you see here is your selection in My Library. Add books from the global library; they appear here and on your e-reader.')
               : t('Your administrator chooses which books are in your library. Ask them to add books, or to let you browse the global library.')}>
             {me?.role?.browse_global && <Link href="/global" className={styles.uploadLink}>{t('Browse the global library')}</Link>}
           </EmptyState>
@@ -1110,6 +1149,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
             setSelected(new Set());
             setSelecting(false);
           }}
+          onRetryable={(failedIds) => setSelected(new Set(failedIds))}
           onChanged={() => {
             // A bulk action changed read state / membership / removed books.
             // Reset the accumulated grid so the refetched first page replaces it

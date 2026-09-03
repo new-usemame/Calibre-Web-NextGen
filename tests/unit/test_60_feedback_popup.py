@@ -2,11 +2,11 @@
 # Copyright (C) 2024-2026 Calibre-Web-NextGen contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-"""Acceptance tests for fork #60 — the "Back to the classic view" feedback popup.
+"""Acceptance tests for fork #60 — the new-UI fallback feedback popup.
 
-When a user leaves the new UI, the new-UI top bar navigates to the classic page
-with ?cwng_feedback=newui; the classic layout includes a partial that shows a
-short, two-step, fully anonymous feedback prompt.
+When the SPA shell detects a browser that cannot run it, its capability fallback
+navigates to Classic with ?cwng_feedback=newui; the classic layout includes a
+partial that shows a short, two-step, fully anonymous feedback prompt.
 
 The load-bearing invariant is ANONYMITY ("unmarked mail"): the popup must POST
 only { type, reasons, comment } and must never attach identity — no username,
@@ -29,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 LAYOUT_HTML = REPO_ROOT / "cps" / "templates" / "layout.html"
 PARTIAL = REPO_ROOT / "cps" / "templates" / "cwng_feedback_popup.html"
 FEEDBACK_JS = REPO_ROOT / "cps" / "static" / "js" / "cwng-feedback.js"
-TOPBAR_TSX = REPO_ROOT / "frontend" / "src" / "components" / "TopBar.tsx"
+SPA_PY = REPO_ROOT / "cps" / "spa.py"
 WEB_PY = REPO_ROOT / "cps" / "web.py"
 
 WORKER_HOST = "https://app.calibrewebnextgen.com"
@@ -135,11 +135,12 @@ def test_js_gates_on_marker_and_strips_it():
     assert "replaceState" in js, "JS must strip the marker from the URL after showing"
 
 
-# ── SPA entry point ──────────────────────────────────────────────────────────
-def test_spa_topbar_has_back_to_classic_entry():
-    src = TOPBAR_TSX.read_text()
-    assert "Back to the classic view" in src, "SPA user menu must offer the switch-back item"
-    assert "cwng_feedback=newui" in src, "switch-back must navigate with the one-shot marker"
+# ── SPA capability-fallback entry point ─────────────────────────────────────
+def test_spa_shell_keeps_classic_capability_fallback():
+    src = SPA_PY.read_text()
+    assert "<noscript><meta" in src
+    assert "<script nomodule>" in src
+    assert "cwng_feedback=newui" in src
 
 
 # ── CSP must permit the cross-origin POST (regression: without connect-src the ─

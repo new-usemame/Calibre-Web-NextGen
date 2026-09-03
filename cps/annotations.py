@@ -191,6 +191,22 @@ def _device_kind_label(kind):
     }.get(kind, "E-reader")
 
 
+def _device_timestamp_json(value):
+    """Serialize database datetimes as unambiguous UTC API instants.
+
+    SQLite returns naive values for these columns. They represent UTC, so
+    attaching UTC here prevents JavaScript from interpreting them in the
+    browser's local timezone. Aware values are normalized to the same contract.
+    """
+    if value is None or not isinstance(value, datetime):
+        return value
+    if value.tzinfo is None or value.utcoffset() is None:
+        value = value.replace(tzinfo=timezone.utc)
+    else:
+        value = value.astimezone(timezone.utc)
+    return value.isoformat()
+
+
 def _empty_authority_rollup():
     return {**{status: 0 for status in AUTHORITY_STATUSES}, "books_partially_seeded": 0}
 
@@ -208,8 +224,8 @@ def _device_json(device, annotation_count=0, inventory_report=None, storage_snap
         "kind_label": _device_kind_label(device.kind),
         "model": device.model,
         "firmware": device.firmware_version,
-        "first_seen": device.first_seen_at.isoformat() if device.first_seen_at else None,
-        "last_seen": device.last_seen_at.isoformat() if device.last_seen_at else None,
+        "first_seen": _device_timestamp_json(device.first_seen_at),
+        "last_seen": _device_timestamp_json(device.last_seen_at),
         "annotation_count": int(annotation_count),
         "highlights": int(annotation_counts.get("highlight", 0)),
         "notes": int(annotation_counts.get("note", 0)),
@@ -218,23 +234,18 @@ def _device_json(device, annotation_count=0, inventory_report=None, storage_snap
             inventory_count if inventory_count is not None
             else inventory_report.item_count if inventory_report else 0
         ),
-        "inventory_observed": (
-            inventory_report.observed_at.isoformat()
-            if inventory_report and inventory_report.observed_at else None
+        "inventory_observed": _device_timestamp_json(
+            inventory_report.observed_at if inventory_report else None
         ),
         "storage_free": storage_snapshot.free_bytes if storage_snapshot else None,
         "storage_total": storage_snapshot.total_bytes if storage_snapshot else None,
-        "storage_observed": (
-            storage_snapshot.observed_at.isoformat()
-            if storage_snapshot and storage_snapshot.observed_at else None
+        "storage_observed": _device_timestamp_json(
+            storage_snapshot.observed_at if storage_snapshot else None
         ),
         "seeded_books": int(seeded_books),
         "unseeded_books": int(unseeded_books),
         "books_with_position": int(books_with_position),
-        "last_position_at": (
-            last_position_at.isoformat()
-            if hasattr(last_position_at, "isoformat") else last_position_at
-        ),
+        "last_position_at": _device_timestamp_json(last_position_at),
         "authority": authority_rollup or _empty_authority_rollup(),
         "can_receive_books": device.kind in ("kobo", "koreader"),
         "active": bool(device.active),
@@ -246,13 +257,20 @@ def _device_owner(device, session):
 
 
 def _visible_books_for_owner(owner, book_ids):
-    """Resolve a live, owner-filtered metadata view for a device-scoped read."""
+    """Resolve metadata for the owner's global annotation archive.
+
+    My Library membership is a catalogue curation boundary, not ownership of
+    reading data.  Keep every other live content restriction in force while
+    allowing annotations for a removed book to remain readable.
+    """
     if owner is None:
         log.error("annotations: device owner unavailable; filtered book view denied")
         raise FilteredBookVisibilityUnavailable("device owner unavailable")
     books = {}
     for book_id in sorted({int(value) for value in book_ids if value is not None}):
-        book = calibre_db.get_filtered_book(book_id, user=owner)
+        book = calibre_db.get_filtered_book(
+            book_id, allow_show_global=True, user=owner,
+        )
         if book is not None:
             books[book_id] = book
     return books
@@ -345,6 +363,7 @@ def _visible_book_scopes_for_owners(owners, session, candidates_by_owner):
     visibility_state = _owner_visibility_state(session, candidates_by_owner)
     resolved = calibre_db.get_filtered_book_ids_for_users(
         owners, visibility_state, candidates_by_owner,
+        allow_show_global=True,
     )
     return {
         int(owner.id): frozenset(resolved.get(int(owner.id), ()))
@@ -1982,8 +2001,15 @@ def _safe_filename_part(s: str, default: str = "book") -> str:
 
 
 def _resolve_book_or_404(book_id: int):
-    """Load the Book row + enforce visibility. Returns the Book."""
-    book = calibre_db.get_filtered_book(book_id, allow_show_archived=True)
+    """Load an annotation archive book while enforcing content policy.
+
+    A personal-library membership removal must not make the user's retained
+    annotations unreadable.  Bypass only that membership predicate; language,
+    tag, custom-column and hidden-book restrictions remain enforced.
+    """
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_global=True,
+    )
     if not book:
         abort(404)
     return book

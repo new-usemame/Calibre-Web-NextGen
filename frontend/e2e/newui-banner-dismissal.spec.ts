@@ -23,7 +23,7 @@ function isRootClassicFallback(url: URL) {
   return feedback || login;
 }
 
-test('a cookie-less browser opens the SPA and Classic remains an explicit opt-out', async ({
+test('a cookie-less browser always opens the SPA', async ({
   page, context,
 }) => {
   await context.clearCookies({ name: /^cwng_prefer_(spa|classic)$/ });
@@ -56,21 +56,19 @@ test('a JavaScript-disabled browser self-heals to Classic', async ({ browser, ba
       await expect(page.locator('#books').first()).toBeVisible();
     }
     const cookies = await preferenceCookies(context);
-    expect(cookies.cwng_prefer_classic).toBe('1');
+    expect(cookies.cwng_prefer_classic).toBeUndefined();
     expect(cookies.cwng_prefer_spa).toBeUndefined();
   } finally {
     await context.close();
   }
 });
 
-test('SPA to Classic to SPA round-trips and the removed nudge stays absent', async ({
+test('the session Classic escape hatch round-trips through Back to New UI', async ({
   page, context, isMobile,
 }) => {
-  await page.goto('/app');
-  await page.getByRole('button', { name: /^Account:/ }).click();
-  await page.getByText('Back to the classic view', { exact: true }).click();
+  await page.goto('/?cwng_feedback=newui', { waitUntil: 'domcontentloaded' });
   await expect(page).toHaveURL(/\/$/);
-  expect((await preferenceCookies(context)).cwng_prefer_classic).toBe('1');
+  expect((await preferenceCookies(context)).cwng_prefer_classic).toBeUndefined();
   await expect(page.locator('#cwng-newui-banner')).toHaveCount(0);
 
   await page.reload({ waitUntil: 'domcontentloaded' });

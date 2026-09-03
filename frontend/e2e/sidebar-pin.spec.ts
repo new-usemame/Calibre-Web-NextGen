@@ -142,7 +142,12 @@ test.describe('#1839 desktop sidebar pin', () => {
     expect(metricsBefore.scrollHeight).toBeGreaterThan(metricsBefore.clientHeight);
     expect(metricsBefore.scrollTop).toBe(0);
 
-    await pin.evaluate((element) => element.click());
+    await pin.evaluate((element) => {
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('Pin sidebar control must be an HTML element');
+      }
+      element.click();
+    });
     await expect(pin).toHaveAttribute('aria-pressed', 'true');
     expect(
       await nav.evaluate((element) => element.scrollTop),

@@ -1,13 +1,19 @@
 {
   "area": "spa",
-  "body": "OBSERVED, confirmed independently (Opus).\n\n`useBulkActions().remove` fans out per-book deletes through\n`settle = Promise.allSettled` (`frontend/src/lib/queries.ts:646,666-674`).\n`Promise.allSettled` NEVER rejects, so the mutation's `onSuccess` runs even when every\nrequest failed. `onSuccess` then evicts every requested id from cache unconditionally\n(`ids.forEach(removeBookFromCache)`), and `BulkBar.tsx:77-81` announces\n\"{n} book(s) deleted.\" using the ORIGINAL selection count.\n\nSo a bulk delete where some or all books failed to delete tells the user they were all\ndeleted and removes them from view. Reloading brings them back.\n\nThis is independent of F-c6b236: fixing the API's false 204 does not fix this, because\n`allSettled` would still resolve on genuine rejections.\n\nFix shape: inspect settlement status per item; evict only confirmed deletions; report\ntruthful succeeded/failed counts. Note the same `settle()` helper backs markRead and\naddToShelf, so audit those for the same false-success shape (compare F-a24ccb, which\nfound the equivalent bug in bulk metadata edits \u2014 this is the same defect class\nrecurring, which suggests fixing the helper rather than each caller).",
+  "body": "OBSERVED, confirmed independently (Opus).\n\n`useBulkActions().remove` fans out per-book deletes through\n`settle = Promise.allSettled` (`frontend/src/lib/queries.ts:646,666-674`).\n`Promise.allSettled` NEVER rejects, so the mutation's `onSuccess` runs even when every\nrequest failed. `onSuccess` then evicts every requested id from cache unconditionally\n(`ids.forEach(removeBookFromCache)`), and `BulkBar.tsx:77-81` announces\n\"{n} book(s) deleted.\" using the ORIGINAL selection count.\n\nSo a bulk delete where some or all books failed to delete tells the user they were all\ndeleted and removes them from view. Reloading brings them back.\n\nThis is independent of F-c6b236: fixing the API's false 204 does not fix this, because\n`allSettled` would still resolve on genuine rejections.\n\nFix shape: inspect settlement status per item; evict only confirmed deletions; report\ntruthful succeeded/failed counts. Note the same `settle()` helper backs markRead and\naddToShelf, so audit those for the same false-success shape (compare F-a24ccb, which\nfound the equivalent bug in bulk metadata edits — this is the same defect class\nrecurring, which suggests fixing the helper rather than each caller).",
   "created": "2026-08-23",
   "id": "F-567c75",
   "refs": [
     "#1831"
   ],
+  "resolution": {
+    "commit": "6f1ef8a8b2",
+    "date": "2026-09-02",
+    "note": "Bulk delete reports per-book outcomes (#2124)",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Bulk delete announces every selected book deleted even when requests failed"
 }

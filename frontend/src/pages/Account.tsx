@@ -213,15 +213,15 @@ export function Account() {
   const chooseLibraryMode = (mode: 'monolibrary' | 'personal_library') => {
     if (mode === account.library_mode || updateLibraryMode.isPending) return;
     const confirmText = mode === 'monolibrary'
-      ? t('Show the whole library again? Your selection is kept exactly as you left it — switch back any time and it is still there. At its next update, your e-reader syncs the whole library.')
+      ? t('Show the global library again? Your selection is kept exactly as you left it — switch back any time and it is still there. At its next update, your e-reader syncs the global library.')
       : account.my_library_seeded
-        ? t('Keep your own selection again? Your library goes back to the books you had chosen — nothing was lost while you saw everything. At its next update, your e-reader returns to your selection.')
-        : t('Start your own selection? It begins as everything you can see now, so nothing changes until you remove books yourself. Your e-reader keeps the same books at its next update.');
+        ? t('Switch back to My Library? Your library goes back to the books you had chosen — nothing was lost while you saw everything. At its next update, your e-reader returns to your selection.')
+        : t('Start My Library? It begins as everything you can see now, so nothing changes until you remove books yourself. Your e-reader keeps the same books at its next update.');
     if (!window.confirm(confirmText)) return;
     setLibraryModeError('');
     updateLibraryMode.mutate(mode, {
       onSuccess: () => announce(t(mode === 'monolibrary'
-        ? 'You now see the whole library.' : 'Your library now shows your selection.')),
+        ? 'You now see the global library.' : 'Your library now shows your selection.')),
       onError: (err) => setLibraryModeError(err instanceof ApiError ? err.message : t('Could not save.')),
     });
   };
@@ -237,7 +237,12 @@ export function Account() {
             {devices.data.devices.map((device) => <li key={device.public_id}>{device.label} · {t('{n} highlights and notes', { n: device.annotation_count })}</li>)}
           </ul>
         ) : <p className={styles.muted}>{devices.isError ? t('Could not load e-readers.') : t('No e-readers yet.')}</p>}
-        <Link href="/account/devices" className={styles.manageDevices}>{t('Manage e-readers')}</Link>
+        <div className={styles.deviceLinks}>
+          <Link href="/account/devices" className={styles.manageDevices}>{t('Manage e-readers')}</Link>
+          <Link href="/account/devices#kobo-pairing" className={styles.manageDevices}>
+            {t('Pair a Kobo or KOReader')}
+          </Link>
+        </div>
       </section>
 
       <section className={styles.card} aria-labelledby="library-contents-title">
@@ -249,14 +254,14 @@ export function Account() {
                 <input type="radio" name="library-mode" value="monolibrary"
                   checked={account.library_mode === 'monolibrary'} disabled={updateLibraryMode.isPending}
                   onChange={() => chooseLibraryMode('monolibrary')} />
-                <span className={styles.scopeText}><strong>{t('The whole library')}</strong>
+                <span className={styles.scopeText}><strong>{t('The global library')}</strong>
                   <small>{t('Everything on the server, including every new book added to it.')}</small></span>
               </label>
               <label className={styles.scopeOption}>
                 <input type="radio" name="library-mode" value="personal_library"
                   checked={account.library_mode === 'personal_library'} disabled={updateLibraryMode.isPending}
                   onChange={() => chooseLibraryMode('personal_library')} />
-                <span className={styles.scopeText}><strong>{t('My selection')}</strong>
+                <span className={styles.scopeText}><strong>{t('My Library')}</strong>
                   <small>{t('Only the books you choose. Add them from the global library; remove them any time.')}</small></span>
               </label>
             </>

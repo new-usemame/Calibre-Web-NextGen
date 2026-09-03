@@ -1,6 +1,10 @@
 import { test as setup, expect } from '@playwright/test';
 import fs from 'node:fs';
 import { reapOwnedE2EUsers } from './user-reaper';
+import {
+  adminCredentialsFromEnvironment,
+  DirectAdminApi,
+} from './direct-admin-api';
 
 /*
  * Log in once via the real UI (exercises the CSRF+session flow users hit) and
@@ -32,11 +36,11 @@ setup('authenticate', async ({ page, baseURL }) => {
   await expect(page.locator('a[href*="/book/"]').first()).toBeVisible({ timeout: 20_000 });
 
   if (!baseURL) throw new Error('global setup requires Playwright use.baseURL');
-  const reaped = await reapOwnedE2EUsers(page.request, baseURL);
-  if (reaped.reclaimed > 0 || reaped.deferred > 0) {
-    console.warn(
-      `[e2e-user-reaper] reclaimed=${reaped.reclaimed} deferred=${reaped.deferred} live=${reaped.live}`,
-    );
+  const adminApi = await DirectAdminApi.open(baseURL, adminCredentialsFromEnvironment());
+  try {
+    await reapOwnedE2EUsers(adminApi, baseURL);
+  } finally {
+    await adminApi.dispose().catch(() => undefined);
   }
 
   await page.context().storageState({ path: STORAGE });

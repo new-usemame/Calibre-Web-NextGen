@@ -33,6 +33,7 @@ Pinned here:
 """
 
 import inspect
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -41,6 +42,7 @@ from flask import Flask
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from cps import ub
 from cps.progress_syncing.models import AppBase, KOSyncProgress
 
 BOOK_ID = 42
@@ -208,35 +210,22 @@ def kobo_put(monkeypatch):
     AppBase.metadata.create_all(engine)
     session = sessionmaker(bind=engine)()
 
-    bookmark = SimpleNamespace(progress_percent=None, content_source_progress_percent=None,
-                               location_value=None, location_type=None, location_source=None,
-                               last_modified=None)
-    reading_state = SimpleNamespace(
-        current_bookmark=bookmark,
-        statistics=SimpleNamespace(spent_reading_minutes=None, remaining_time_minutes=None,
-                                   last_modified=None),
-        book_read_link=SimpleNamespace(read_status=0, times_started_reading=0,
-                                       last_time_started_reading=None, last_modified=None),
+    book_read = ub.ReadBook(
+        user_id=USER_ID,
+        book_id=BOOK_ID,
+        read_status=ub.ReadBook.STATUS_UNREAD,
+        times_started_reading=0,
     )
+    reading_state = ub.KoboReadingState(user_id=USER_ID, book_id=BOOK_ID)
+    reading_state.current_bookmark = ub.KoboBookmark(
+        last_modified=datetime(2020, 1, 1, tzinfo=timezone.utc),
+    )
+    reading_state.statistics = ub.KoboStatistics()
+    book_read.kobo_reading_state = reading_state
+    session.add(book_read)
+    session.commit()
     book = SimpleNamespace(id=BOOK_ID, data=[SimpleNamespace(format="KEPUB")])
 
-    class _SessionProxy:
-        """The real session, minus ``merge`` — the reading-state graph is a stub.
-
-        ``HandleStateRequest`` merges the ORM graph it was handed; that graph is
-        faked here so the test can stay at unit scope. Everything the fix uses
-        (flush, begin_nested, add, query) is the real session, and it is the
-        same object ``kosync`` writes through, so the savepoint is genuine.
-        """
-
-        def merge(self, obj):
-            return obj
-
-        def __getattr__(self, name):
-            return getattr(session, name)
-
-    kobo_ub = MagicMock(session=_SessionProxy())
-    kobo_ub.session_flush = lambda *a, **k: session.flush()
     def _session_commit(*_a, **_k):
         # Mirror the real ``ub.session_commit`` contract: True when the write
         # landed. The old stub returned ``session.commit()``, i.e. None — so
@@ -245,10 +234,9 @@ def kobo_put(monkeypatch):
         session.commit()
         return True
 
-    kobo_ub.session_commit = _session_commit
-    kobo_ub.ReadBook = SimpleNamespace(STATUS_UNREAD=0, STATUS_IN_PROGRESS=1, STATUS_FINISHED=2)
-
-    monkeypatch.setattr(kobo_module, "ub", kobo_ub)
+    monkeypatch.setattr(ub, "session", session)
+    monkeypatch.setattr(ub, "session_flush", lambda *a, **k: session.flush())
+    monkeypatch.setattr(ub, "session_commit", _session_commit)
     monkeypatch.setattr(kobo_module, "calibre_db",
                         SimpleNamespace(get_book_by_uuid_for_kobo=lambda *a, **k: book))
     monkeypatch.setattr(kobo_module, "get_or_create_reading_state", lambda _bid: reading_state)
@@ -256,7 +244,6 @@ def kobo_put(monkeypatch):
     monkeypatch.setattr(kobo_module, "push_reading_state_to_hardcover", lambda *a, **k: None)
     monkeypatch.setattr(kobo_module, "get_ub_read_status", lambda _s: 1)
 
-    monkeypatch.setattr(kosync, "ub", MagicMock(session=session))
     monkeypatch.setattr(kosync, "get_book_checksums", lambda _bid: [])
 
     app = Flask(__name__)
@@ -329,8 +316,6 @@ def test_bookmark_only_put_still_records_the_devices_own_state(kobo_put):
 ])
 def test_state_put_preserves_stored_clocks_when_device_clock_is_rejected(kobo_put, clock):
     """A rejected device observation must not be replaced with server ``now``."""
-    from datetime import datetime, timezone
-
     kobo_module, app, _session = kobo_put
     reading_state = kobo_module.get_or_create_reading_state(BOOK_ID)
     old_bookmark_clock = datetime(2020, 1, 2, tzinfo=timezone.utc)
@@ -343,14 +328,15 @@ def test_state_put_preserves_stored_clocks_when_device_clock_is_rejected(kobo_pu
 
     assert response.get_json()["RequestResult"] == "Success"
     assert reading_state.current_bookmark.progress_percent == 64.5
-    assert reading_state.current_bookmark.last_modified == old_bookmark_clock
+    stored_clock = reading_state.current_bookmark.last_modified
+    if stored_clock.tzinfo is None:
+        old_bookmark_clock = old_bookmark_clock.replace(tzinfo=None)
+    assert stored_clock == old_bookmark_clock
 
 
 @pytest.mark.unit
 def test_state_put_still_applies_a_valid_device_clock(kobo_put):
     """The rejected-clock branch must not change valid-input behaviour."""
-    from datetime import datetime, timezone
-
     kobo_module, app, _session = kobo_put
     reading_state = kobo_module.get_or_create_reading_state(BOOK_ID)
 
@@ -358,9 +344,11 @@ def test_state_put_still_applies_a_valid_device_clock(kobo_put):
         response = _handler(kobo_module)("uuid-under-test")
 
     assert response.get_json()["RequestResult"] == "Success"
-    assert reading_state.current_bookmark.last_modified == datetime(
-        2026, 8, 14, 6, 0, tzinfo=timezone.utc,
-    )
+    stored_clock = reading_state.current_bookmark.last_modified
+    expected = datetime(2026, 8, 14, 6, 0, tzinfo=timezone.utc)
+    if stored_clock.tzinfo is None:
+        expected = expected.replace(tzinfo=None)
+    assert stored_clock == expected
 
 
 # ── the call site, because the bug was a call that was never made ────────────

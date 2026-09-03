@@ -312,6 +312,7 @@ wiki-generated/
 # .gitignore edit. Only the Compose definitions and KOReader emulator image
 # sources below are repository source and must remain committable.
 /local-dev/*
+!/local-dev/private-e2e-rig.sh
 !/local-dev/docker-compose.koreader.yml
 !/local-dev/docker-compose.worktree.yml
 !/local-dev/koreader-emulator/

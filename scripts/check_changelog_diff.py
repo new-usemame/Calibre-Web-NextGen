@@ -24,6 +24,7 @@ NON_SHIPPING_PATH_PREFIXES = (
     "examples/",
     "findings/",
     "frontend/e2e/",
+    "frontend/unit/",
     # The runtime image deletes frontend/ and copies only the Vite-built bundle
     # from cps/static/app, so frontend test sources never ship (Dockerfile
     # steps 6 and 6.1).
@@ -40,6 +41,12 @@ NON_SHIPPING_PATH_PREFIXES = (
 )
 NON_SHIPPING_PATHS = frozenset(
     {
+        # CI image-verdict plumbing controls when an existing commit image is
+        # built, aliased, or tested; none of these files enter the image or the
+        # application. Changes confined to this harness are operational fixes,
+        # not user-facing release-note events.
+        ".github/workflows/docker-image-build-dev.yml",
+        ".github/workflows/tests.yml",
         # The upstream-comparison ledger records changes that have ALREADY
         # shipped, with their squash SHA and containing release tag. A
         # post-release backfill of those fields is bookkeeping about the past,
@@ -48,8 +55,12 @@ NON_SHIPPING_PATHS = frozenset(
         # carries (OBSERVED 2026-08-28: the v4.1.42 backfill PR went red here).
         "CHANGES-vs-upstream.md",
         "changelog.d/README.md",
+        "frontend/playwright.config.ts",
         "messages.pot",
+        "scripts/alias-e2e-image.sh",
         "scripts/check_changelog_diff.py",
+        "scripts/check-e2e-image-producer.py",
+        "scripts/resolve-e2e-image.sh",
     }
 )
 
@@ -124,6 +135,14 @@ def _is_non_shipping_path(path: str) -> bool:
 
 def changelog_requirement_errors(changed_paths: list[str]) -> list[str]:
     """Require a changelog entry unless every changed path is non-shipping."""
+    if not changed_paths:
+        # A pull request that changes no file ships nothing, so there is
+        # nothing to announce. This is not hypothetical: a `-s ours`
+        # back-merge that reconnects a hotfix tag to main has an empty tree
+        # diff by design, and the `changed_paths and` guard below (added so
+        # that all([]) could not vacuously pass) sent it here instead, where
+        # it was refused for "changing shipping paths" it had not touched.
+        return []
     if "CHANGELOG.md" in changed_paths:
         return []
     if any(

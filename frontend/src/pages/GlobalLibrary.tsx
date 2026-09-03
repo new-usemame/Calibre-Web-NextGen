@@ -116,7 +116,7 @@ export function GlobalLibrary() {
             {books.map((book) => {
               const owned = book.in_my_library !== false;
               return <BookCard key={book.id} book={book} membership={owned ? 'owned' : 'unowned'}
-                detailsEnabled={owned}
+                detailsEnabled
                 canRead={owned && !!me?.role?.viewer}
                 hideActions={cardActionsHidden}
                 onAddToLibrary={owned ? undefined : addBook}

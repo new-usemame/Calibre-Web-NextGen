@@ -11,14 +11,17 @@ const device = {
 async function stubDevices(page: import('@playwright/test').Page) {
   let current = { ...device };
   let restored = 0;
+  let deletePreflights = 0;
   await page.route('**/api/annotations/devices?*', async (route) => {
     if (route.request().method() === 'GET') {
       const devices = current.active ? [current] : [];
       await route.fulfill({ json: { devices, limit: 100, offset: 0, total: devices.length } });
     } else await route.continue();
   });
-  await page.route('**/api/annotations/devices/device-1/delete-preflight', (route) =>
-    route.fulfill({ json: { origin_count: 4, assigned_count: 2 } }));
+  await page.route('**/api/annotations/devices/device-1/delete-preflight', (route) => {
+    deletePreflights += 1;
+    return route.fulfill({ json: { origin_count: 4, assigned_count: 2 } });
+  });
   await page.route('**/api/annotations/devices/device-1', async (route) => {
     if (route.request().method() === 'PATCH') {
       current = { ...current, label: (await route.request().postDataJSON()).label };
@@ -33,8 +36,99 @@ async function stubDevices(page: import('@playwright/test').Page) {
     current = { ...current, active: true };
     await route.fulfill({ json: { device: current, restored_assignment_count: 2, assignment_conflict_count: 0 } });
   });
-  return { restored: () => restored };
+  return {
+    restored: () => restored,
+    deletePreflights: () => deletePreflights,
+  };
 }
+
+test('device actions menu dismisses on an outside pointer press', async ({ page }) => {
+  const calls = await stubDevices(page);
+  await page.goto('/app/account/devices');
+
+  const trigger = page.getByRole('button', { name: 'More actions for Libra Colour' });
+  const remove = page.getByRole('button', { name: 'Remove device' });
+  await trigger.click();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(remove).toBeVisible();
+
+  const heading = page.getByRole('heading', { name: 'E-readers' });
+  const box = await heading.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+  await page.mouse.down();
+  await expect(remove).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await page.mouse.up();
+
+  await trigger.click();
+  await expect(remove).toBeVisible();
+  const topBar = page.getByRole('banner');
+  const topBarBox = await topBar.boundingBox();
+  expect(topBarBox).not.toBeNull();
+  await page.mouse.move(
+    topBarBox!.x + topBarBox!.width / 2,
+    topBarBox!.y + topBarBox!.height / 2,
+  );
+  await page.mouse.down();
+  await expect(remove).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await page.mouse.up();
+  expect(calls.deletePreflights()).toBe(0);
+});
+
+test('Escape dismisses the device actions menu and restores trigger focus', async ({ page }) => {
+  const calls = await stubDevices(page);
+  await page.goto('/app/account/devices');
+
+  const trigger = page.getByRole('button', { name: 'More actions for Libra Colour' });
+  const remove = page.getByRole('button', { name: 'Remove device' });
+  await trigger.click();
+  await expect(remove).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(remove).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(trigger).toBeFocused();
+  expect(calls.deletePreflights()).toBe(0);
+});
+
+test('touch dismissal does not activate the control beneath the press', async ({ page }) => {
+  test.skip(test.info().project.use.hasTouch !== true, 'requires real touch input');
+
+  const calls = await stubDevices(page);
+  await page.goto('/app/account/devices');
+
+  const trigger = page.getByRole('button', { name: 'More actions for Libra Colour' });
+  const inventory = page.getByRole('button', { name: 'View device library' });
+  const remove = page.getByRole('button', { name: 'Remove device' });
+  await trigger.tap();
+  await expect(remove).toBeVisible();
+
+  const box = await inventory.boundingBox();
+  expect(box).not.toBeNull();
+  await page.touchscreen.tap(box!.x + box!.width / 2, box!.y + box!.height / 2);
+
+  await expect(remove).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(inventory).toHaveAttribute('aria-expanded', 'false');
+
+  await trigger.tap();
+  await expect(remove).toBeVisible();
+  const navigationToggle = page.getByRole('button', { name: 'Open navigation' });
+  const navigation = page.locator('nav[aria-label="Browse"]');
+  const navigationToggleBox = await navigationToggle.boundingBox();
+  expect(navigationToggleBox).not.toBeNull();
+  await page.touchscreen.tap(
+    navigationToggleBox!.x + navigationToggleBox!.width / 2,
+    navigationToggleBox!.y + navigationToggleBox!.height / 2,
+  );
+
+  await expect(remove).toBeHidden();
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(navigation).toHaveAttribute('inert', '');
+  expect(calls.deletePreflights()).toBe(0);
+});
 
 test('device manager renames and removes only through counted confirmation, then restores', async ({ page }) => {
   const calls = await stubDevices(page);
@@ -72,13 +166,13 @@ test('device manager is axe-clean and has no 390px overflow', async ({ page }, t
 });
 
 test('device inventory renders one bounded window and reports the true total', async ({ page }) => {
-  let inventoryRequestUrl: URL | null = null;
+  const inventoryRequestUrls: URL[] = [];
   await page.route('**/api/annotations/devices?*', (route) => route.fulfill({ json: {
     devices: [{ ...device, inventory_count: 5000, inventory_observed: '2026-08-09T12:00:00' }],
     limit: 100, offset: 0, total: 1,
   } }));
   await page.route('**/api/annotations/devices/device-1/inventory?*', (route) => {
-    inventoryRequestUrl = new URL(route.request().url());
+    inventoryRequestUrls.push(new URL(route.request().url()));
     return route.fulfill({ json: {
       observed_at: '2026-08-09T12:00:00',
       limit: 200,
@@ -110,10 +204,12 @@ test('device inventory renders one bounded window and reports the true total', a
     });
   expect(deleteGeometry.height).toBeGreaterThanOrEqual(44);
   expect(deleteGeometry.neighborGap).toBeGreaterThanOrEqual(24);
-  expect(inventoryRequestUrl?.searchParams.get('limit')).toBe('200');
-  expect(inventoryRequestUrl?.searchParams.get('offset')).toBe('0');
+  expect(inventoryRequestUrls).toHaveLength(1);
+  expect(inventoryRequestUrls[0].searchParams.get('limit')).toBe('200');
+  expect(inventoryRequestUrls[0].searchParams.get('offset')).toBe('0');
   await inventory.getByRole('button', { name: 'Next' }).click();
-  await expect.poll(() => inventoryRequestUrl?.searchParams.get('offset')).toBe('200');
+  await expect.poll(() => inventoryRequestUrls[inventoryRequestUrls.length - 1]
+    ?.searchParams.get('offset')).toBe('200');
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
     .analyze();
@@ -130,16 +226,10 @@ test('account summary makes the e-reader manager discoverable', async ({ page })
   await expect(card.getByRole('link', { name: 'Manage e-readers' })).toHaveAttribute('href', '/app/account/devices');
 });
 
-// The plugin that produces this page's inventory and storage figures had no
-// route from the SPA: its setup page was linked only from the classic admin
-// screen, so a KOReader user on the default surface could not reach the
-// download or the install steps. Pin both setup routes, not just the new one —
-// a later tidy-up of this section must not silently drop either.
-test('device manager routes to both e-reader setup pages', async ({ page }) => {
+test('device manager owns pairing instead of sending users to the classic account page', async ({ page }) => {
   await stubDevices(page);
   await page.goto('/app/account/devices');
-  await expect(page.getByRole('link', { name: 'Setup KOReader Sync' }))
-    .toHaveAttribute('href', '/kosync');
-  await expect(page.getByRole('link', { name: 'Set up Kobo sync' }))
-    .toHaveAttribute('href', '/me');
+  await expect(page.getByRole('heading', { name: 'Pair a Kobo or KOReader' })).toBeVisible();
+  await expect(page.getByText('Manage your Kobo sync URL in the classic account page.')).toHaveCount(0);
+  await expect(page.locator('a[href="/me"]')).toHaveCount(0);
 });

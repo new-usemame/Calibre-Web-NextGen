@@ -5,10 +5,11 @@ entry in a separate Markdown file under this directory. That keeps concurrent
 branches away from the shared `CHANGELOG.md` insertion point.
 
 A fragment is not required when every changed path is confined to `findings/`,
-`notes/`, `docs/`, `tests/`, `frontend/e2e/`, this `changelog.d/README.md` file,
-or the guard implementation itself at `scripts/check_changelog_diff.py`. Those
-paths contain evidence ledgers, working notes, documentation, verification code,
-or CI policy rather than application behavior. This is an all-paths exemption:
+`notes/`, `docs/`, `tests/`, `frontend/e2e/`, `frontend/unit/`,
+`frontend/playwright.config.ts`, this `changelog.d/README.md` file, or the guard
+implementation itself at `scripts/check_changelog_diff.py`. Those paths contain
+evidence ledgers, working notes, documentation, verification code, or CI policy
+rather than application behavior. This is an all-paths exemption:
 a pull request that mixes any of them with shipping code or assets still needs
 a fragment. Unlisted paths require a fragment by default.
 

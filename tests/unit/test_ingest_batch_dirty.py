@@ -52,17 +52,15 @@ def test_successful_import_marks_batch_dirty_without_hot_loop_http_calls(monkeyp
     source.write_bytes(b"book")
     processor = build_processor(ingest_processor, tmp_path)
 
-    result = subprocess.CompletedProcess(
-        args=["calibredb"],
-        returncode=0,
-        stdout="Added book id: 7\n",
-        stderr="",
-    )
-
     requests_mock = mock.Mock()
     monkeypatch.setattr(ingest_processor, "requests", requests_mock)
 
-    with mock.patch.object(ingest_processor.subprocess, "run", return_value=result) as run_mock, \
+    with mock.patch.object(processor, "_content_marker_book_ids", return_value=[]), \
+        mock.patch.object(
+            processor,
+            "_run_calibre_transaction",
+            return_value={"status": "imported", "book_ids": [7]},
+        ) as transaction_mock, \
         mock.patch.object(ingest_processor, "gdrive_sync_if_enabled"), \
         mock.patch.object(processor, "fetch_metadata_if_enabled"), \
         mock.patch.object(processor, "trigger_auto_send_if_enabled"), \
@@ -71,7 +69,7 @@ def test_successful_import_marks_batch_dirty_without_hot_loop_http_calls(monkeyp
         processor.add_book_to_library(str(source))
 
     wait_mock.assert_called_once()
-    assert run_mock.call_args.args[0][:2] == ["calibredb", "add"]
+    assert transaction_mock.call_args.args[-1] == "import"
     assert (tmp_path / "batch_dirty").exists()
     assert not (tmp_path / "batch_active").exists()
     assert processor.db.entries == [("source", "False")]
@@ -101,13 +99,14 @@ def test_failed_import_does_not_mark_batch_dirty(monkeypatch, tmp_path):
         stderr="failed",
     )
 
-    with mock.patch.object(ingest_processor.subprocess, "run", side_effect=error), \
-        mock.patch.object(processor, "backup") as backup_mock:
-        processor.add_book_to_library(str(source))
+    with mock.patch.object(processor, "_content_marker_book_ids", return_value=[]), \
+        mock.patch.object(processor, "_run_calibre_transaction", side_effect=error):
+        with pytest.raises(ingest_processor.RetryIngestSourceError):
+            processor.add_book_to_library(str(source))
 
     assert not (tmp_path / "batch_dirty").exists()
     assert not (tmp_path / "batch_active").exists()
-    backup_mock.assert_called_once()
+    assert source.read_bytes() == b"book"
 
 
 def test_successful_add_format_marks_batch_dirty(monkeypatch, tmp_path):

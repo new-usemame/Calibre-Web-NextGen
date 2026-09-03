@@ -138,15 +138,15 @@ class TestGetProgressRecordCrossKeyLookup:
         )
 
     def test_orders_by_timestamp_desc(self, in_memory_session):
-        """If two records exist under the same key set, return the newer one."""
+        """Equal percentages on legacy keys return the newer locator."""
         kosync_mod = _kosync_module()
         old = KOSyncProgress(
-            user_id=7, document="42", progress="p1", percentage=10.0,
+            user_id=7, document="42", progress="p1", percentage=99.0,
             device="d1", device_id="i1",
             timestamp=datetime.now(timezone.utc) - timedelta(days=1),
         )
         new = KOSyncProgress(
-            user_id=7, document="42", progress="p2", percentage=99.0,
+            user_id=7, document="abc123checksum", progress="p2", percentage=99.0,
             device="d2", device_id="i2",
             timestamp=datetime.now(timezone.utc),
         )
@@ -154,7 +154,7 @@ class TestGetProgressRecordCrossKeyLookup:
         in_memory_session.commit()
         with patch.object(kosync_mod, "ub", MagicMock(session=in_memory_session)):
             record = kosync_mod.get_progress_record(
-                user_id=7, document_checksum="anything", book_id=42,
+                user_id=7, document_checksum="abc123checksum", book_id=42,
             )
         assert record is not None
-        assert record.percentage == 99.0, "expected most-recent record"
+        assert record.progress == "p2", "expected most-recent tied locator"

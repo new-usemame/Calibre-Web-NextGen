@@ -6,6 +6,7 @@
 
 import atexit
 import collections
+import hashlib
 import json
 import os
 import subprocess
@@ -165,6 +166,22 @@ backup_destinations = {}
 process_lock = None
 _runtime_initialized = False
 _runtime_init_attempted = False
+
+
+class PreserveIngestSourceError(RuntimeError):
+    """Terminal ingest failure for which the watched source must remain."""
+
+
+class RetryIngestSourceError(RuntimeError):
+    """Transient ingest failure for which the watched source must remain."""
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 DUPLICATE_FULL_SCAN_WAIT_INTERVAL_SECONDS = 2
 DUPLICATE_FULL_SCAN_WAIT_TIMEOUT_SECONDS = int(os.environ.get("CWA_DUPLICATE_FULL_SCAN_WAIT_TIMEOUT_SECONDS", "7200"))
@@ -391,7 +408,7 @@ def _ensure_processed_books_dirs() -> None:
     try:
         processed_root = str(app_paths.processed_books_dir())
         os.makedirs(processed_root, exist_ok=True)
-        for name in ("converted", "imported", "fixed_originals", "failed"):
+        for name in ("converted", "imported", "fixed_originals", "failed", "overwritten"):
             os.makedirs(os.path.join(processed_root, name), exist_ok=True)
     except Exception as e:
         print(f"[ingest-processor] WARN: Could not ensure processed_books directories: {e}", flush=True)
@@ -1728,7 +1745,329 @@ class NewBookProcessor:
         return args
 
 
-    def add_book_to_library(self, book_path:str, text: bool=True, format: str="text" ) -> None:
+    @staticmethod
+    def _metadata_args_to_override(metadata_args) -> dict:
+        result = {}
+        metadata_args = list(metadata_args or [])
+        mapping = {
+            "--title": "title", "--authors": "authors", "--tags": "tags",
+            "--series": "series", "--series-index": "series_index",
+            "--languages": "languages", "--cover": "cover",
+        }
+        index = 0
+        identifiers = {}
+        while index < len(metadata_args):
+            option = metadata_args[index]
+            value = metadata_args[index + 1] if index + 1 < len(metadata_args) else ""
+            if option == "--identifier" and ":" in str(value):
+                key, identifier_value = str(value).split(":", 1)
+                identifiers[key] = identifier_value
+            elif option in mapping:
+                result[mapping[option]] = value
+            index += 2
+        if identifiers:
+            result["identifiers"] = identifiers
+        return result
+
+    def _calibre_transaction_command(
+        self,
+        staged_path: Path,
+        staged_identity_path: Path,
+        imported_digest: str,
+        source_digest: str,
+        metadata_override: dict,
+        action: str,
+    ) -> list[str]:
+        helper = Path(__file__).with_name("calibre_ingest_transaction.py")
+        command = [
+            "calibre-debug", "-e", str(helper), "--",
+            "--action", action,
+            "--library-path", self.library_dir,
+            "--path", str(staged_path),
+            "--identity-path", str(staged_identity_path),
+            "--expected-import-sha256", imported_digest,
+            "--expected-source-sha256", source_digest,
+            "--automerge", self.cwa_settings["auto_ingest_automerge"],
+            "--metadata-json", json.dumps(metadata_override),
+        ]
+        database_override = self.calibre_env.get("CALIBRE_OVERRIDE_DATABASE_PATH")
+        if database_override:
+            command.extend(["--database-path", database_override])
+        return command
+
+    @staticmethod
+    def _parse_calibre_transaction_result(completed: subprocess.CompletedProcess) -> dict:
+        for line in reversed((completed.stdout or "").splitlines()):
+            if line.startswith("CWNG_INGEST_RESULT="):
+                return json.loads(line.split("=", 1)[1])
+        raise RuntimeError("Calibre ingest helper returned no result record")
+
+    def _run_calibre_transaction(
+        self,
+        staged_path: Path,
+        staged_identity_path: Path,
+        imported_digest: str,
+        source_digest: str,
+        metadata_override: dict,
+        action: str,
+    ) -> dict:
+        completed = _run_calibredb_add_with_retry(
+            self._calibre_transaction_command(
+                staged_path,
+                staged_identity_path,
+                imported_digest,
+                source_digest,
+                metadata_override,
+                action,
+            ),
+            self.calibre_env,
+        )
+        return self._parse_calibre_transaction_result(completed)
+
+    def _content_marker_book_ids(self, digest: str) -> list[int]:
+        marker_type = f"cwng_ingest_sha256_{digest}"
+        with sqlite3.connect(self.metadata_db, timeout=30) as connection:
+            rows = connection.execute(
+                "SELECT book FROM identifiers WHERE type = ? AND val = ?",
+                (marker_type, digest),
+            ).fetchall()
+        return sorted(int(row[0]) for row in rows)
+
+
+    def _incoming_file_is_sane(self, staged_path: Path, text: bool = True) -> bool:
+        """Fail closed unless the incoming replacement is actually readable.
+
+        Metadata readability alone is not enough: DRM EPUBs and truncated
+        books can expose title/author while their content is unusable. A full
+        throwaway conversion exercises the input plugin and content pipeline.
+        Audiobooks use Mutagen in a bounded child process because ebook-convert
+        is not their validator and the production image does not ship ffprobe.
+        """
+        try:
+            raw_timeout = os.environ.get("CWA_INGEST_OVERWRITE_SANITY_TIMEOUT_SECONDS", "90")
+            try:
+                sanity_timeout = float(raw_timeout)
+                if sanity_timeout <= 0:
+                    raise ValueError
+            except (TypeError, ValueError):
+                sanity_timeout = 90.0
+            with tempfile.TemporaryDirectory(
+                prefix="overwrite-sanity-", dir=self.tmp_conversion_dir
+            ) as sanity_dir:
+                if text:
+                    output_path = Path(sanity_dir) / "validated.epub"
+                    subprocess.run(
+                        ["ebook-convert", str(staged_path), str(output_path)],
+                        env=self.calibre_env,
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                        timeout=sanity_timeout,
+                    )
+                    return output_path.is_file() and output_path.stat().st_size > 0
+
+                probe = (
+                    "import sys, mutagen; "
+                    "audio = mutagen.File(sys.argv[1]); "
+                    "duration = getattr(getattr(audio, 'info', None), 'length', 0) or 0; "
+                    "print(duration); "
+                    "raise SystemExit(0 if audio is not None and duration > 0 else 1)"
+                )
+                result = subprocess.run(
+                    [sys.executable, "-c", probe, str(staged_path)],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                    timeout=sanity_timeout,
+                )
+                return bool(result.stdout.strip())
+        except (OSError, subprocess.SubprocessError) as error:
+            print(
+                f"[ingest-processor] ERROR: Refusing destructive automerge for "
+                f"{staged_path.name}; incoming sanity check failed: {error}",
+                flush=True,
+            )
+            return False
+
+
+    @staticmethod
+    def _fsync_directory(path: Path) -> None:
+        directory_fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+
+    @staticmethod
+    def _overwrite_recovery_limit() -> int:
+        try:
+            value = int(os.environ.get("CWA_INGEST_OVERWRITE_RECOVERY_MAX_SETS", "100"))
+            return value if value > 0 else 100
+        except (TypeError, ValueError):
+            return 100
+
+    def _prune_overwrite_recovery_sets(self, recovery_root: Path, keep: int) -> None:
+        recovery_sets = sorted(
+            (item for item in recovery_root.iterdir() if item.is_dir()),
+            key=lambda item: (item.stat().st_mtime_ns, item.name),
+        )
+        stale_sets = recovery_sets if keep == 0 else recovery_sets[:-keep]
+        for stale in stale_sets if len(recovery_sets) > keep else ():
+            shutil.rmtree(stale)
+        if len(recovery_sets) > keep:
+            self._fsync_directory(recovery_root)
+
+    def _preserve_overwritten_formats(
+        self, existing_paths: list[Path], staged_path: Path
+    ) -> bool:
+        """Copy every format Calibre may replace into a unique recovery set."""
+        self._overwrite_recovery_pairs = []
+        recovery_root = backup_destinations.get("overwritten") or str(
+            app_paths.processed_books_dir() / "overwritten"
+        )
+        try:
+            recovery_root = Path(recovery_root)
+            recovery_root_existed = recovery_root.exists()
+            recovery_root.mkdir(parents=True, exist_ok=True)
+            if not recovery_root_existed:
+                self._fsync_directory(recovery_root.parent)
+            # Make room before creating a new set. Failure is fatal: silently
+            # allowing this directory to grow without bound is not recovery.
+            self._prune_overwrite_recovery_sets(
+                recovery_root, max(0, self._overwrite_recovery_limit() - 1)
+            )
+            recovery_dir = Path(
+                tempfile.mkdtemp(
+                    prefix=f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{staged_path.stem}_",
+                    dir=str(recovery_root),
+                )
+            )
+            self._fsync_directory(recovery_root)
+            for index, existing_path in enumerate(existing_paths, start=1):
+                destination = recovery_dir / f"{index}_{existing_path.name}"
+                source_digest = _sha256_file(existing_path)
+                shutil.copy2(existing_path, destination)
+                if _sha256_file(destination) != source_digest:
+                    raise OSError(f"digest mismatch preserving {existing_path}")
+                with destination.open("rb") as preserved_file:
+                    os.fsync(preserved_file.fileno())
+                self._overwrite_recovery_pairs.append((existing_path, destination))
+            self._fsync_directory(recovery_dir)
+            print(
+                f"[ingest-processor] Preserved {len(existing_paths)} existing "
+                f"format(s) before overwrite in {recovery_dir}",
+                flush=True,
+            )
+            return True
+        except Exception as error:
+            print(
+                f"[ingest-processor] ERROR: Refusing destructive automerge; "
+                f"could not preserve every existing format: {error}",
+                flush=True,
+            )
+            return False
+
+
+    def _restore_overwritten_formats(
+        self, recovery_pairs: list[tuple[Path, Path]]
+    ) -> bool:
+        """Restore each verified format after an uncommitted helper failure."""
+        try:
+            for existing_path, preserved_path in recovery_pairs:
+                expected_digest = _sha256_file(preserved_path)
+                restore_fd, restore_name = tempfile.mkstemp(
+                    prefix=f".{existing_path.name}.restore.",
+                    dir=str(existing_path.parent),
+                )
+                os.close(restore_fd)
+                restore_path = Path(restore_name)
+                try:
+                    shutil.copy2(preserved_path, restore_path)
+                    if _sha256_file(restore_path) != expected_digest:
+                        raise OSError(f"digest mismatch restoring {existing_path}")
+                    with restore_path.open("rb") as restored_file:
+                        os.fsync(restored_file.fileno())
+                    os.replace(restore_path, existing_path)
+                    self._fsync_directory(existing_path.parent)
+                finally:
+                    restore_path.unlink(missing_ok=True)
+            if recovery_pairs:
+                print(
+                    f"[ingest-processor] Restored {len(recovery_pairs)} previous "
+                    "format(s) after an uncommitted Calibre helper failure",
+                    flush=True,
+                )
+            return True
+        except Exception as error:
+            print(
+                f"[ingest-processor] ERROR: could not restore previous format "
+                f"after an uncommitted Calibre helper failure: {error}",
+                flush=True,
+            )
+            return False
+
+
+    def _quarantine_or_preserve_source(self, staged_path: Path, reason: str) -> bool:
+        print(f"[ingest-processor] ERROR: {reason}", flush=True)
+        if self.backup(str(staged_path), backup_type="failed"):
+            return False
+        raise PreserveIngestSourceError(
+            f"quarantine failed; source retained for operator recovery: {self.filepath}"
+        )
+
+    def _prepare_destructive_overwrite(
+        self, staged_path: Path, existing_paths: list[Path], *, text: bool
+    ) -> bool:
+        """Validate an actual same-format overwrite outside the metadata lock."""
+        if not existing_paths:
+            return True
+        if not self._incoming_file_is_sane(staged_path, text=text):
+            return self._quarantine_or_preserve_source(
+                staged_path, "Refusing destructive automerge; incoming file failed sanity validation"
+            )
+        return True
+
+    def _current_overwrite_candidates(
+        self,
+        staged_path: Path,
+        staged_identity_path: Path,
+        imported_digest: str,
+        source_digest: str,
+        metadata_override: dict,
+    ) -> list[Path]:
+        if self.cwa_settings.get("auto_ingest_automerge") != "overwrite":
+            return []
+        inspection = self._run_calibre_transaction(
+            staged_path,
+            staged_identity_path,
+            imported_digest,
+            source_digest,
+            metadata_override,
+            "inspect",
+        )
+        return [Path(item["path"]) for item in inspection.get("formats", [])]
+
+    def _preserve_current_overwrite_candidates(
+        self, staged_path: Path, existing_paths: list[Path]
+    ) -> bool:
+        if existing_paths and not self._preserve_overwritten_formats(existing_paths, staged_path):
+            return self._quarantine_or_preserve_source(
+                staged_path, "Refusing destructive automerge; previous format preservation failed"
+            )
+        return True
+
+
+    def add_book_to_library(
+        self,
+        book_path: str,
+        text: bool = True,
+        format: str = "text",
+        identity_path: str | None = None,
+    ) -> None:
+        # A converter may emit different package bytes on each run. Its durable
+        # retry identity is therefore the staged source that generated the
+        # package, while the imported package gets a separate integrity hash.
+        identity_source_path = Path(identity_path or book_path)
         # Normalize a KEPUB before it enters the library (#1715). Every ingest
         # route lands here -- kepubify output, a file already in the target
         # format, and a format the user told CWA not to convert -- and none of
@@ -1795,6 +2134,24 @@ class NewBookProcessor:
             self.backup(self.filepath, backup_type="failed")
             return
 
+        staged_identity_path = staged_path
+        if identity_source_path.resolve() != source_path.resolve():
+            try:
+                identity_fd, identity_name = tempfile.mkstemp(
+                    prefix="source-identity-",
+                    suffix=identity_source_path.suffix,
+                    dir=self.staging_dir,
+                )
+                os.close(identity_fd)
+                staged_identity_path = Path(identity_name)
+                shutil.copy2(identity_source_path, staged_identity_path)
+            except Exception as e:
+                print(f"[ingest-processor] ERROR: Failed to stage source identity: {e}", flush=True)
+                self.backup(self.filepath, backup_type="failed")
+                if staged_path.exists():
+                    os.remove(staged_path)
+                return
+
         if getattr(self, "is_comic_flatten_comicinfo", False) and comic is not None and staged_path.suffix.lower() == ".cbz":
             try:
                 if comic.flatten_comicinfo_to_root(str(staged_path)):
@@ -1807,27 +2164,24 @@ class NewBookProcessor:
         try:
             mark_ingest_batch_active()
             wait_for_duplicate_full_scan_to_finish()
-            # Process-shared lock around calibredb add: serialises with
-            # the Flask app's Edit Book commit + other ingest passes.
-            # Required for fork #192 — without it, mergerfs/SMB/NFS
-            # POSIX-lock weakness lets apsw.BusyError poison the import.
+            # Verify both staged snapshots. The source digest is the durable
+            # retry marker; the imported digest catches changes to the exact
+            # package Calibre will copy. The helper rehashes both paths.
+            imported_digest = _sha256_file(staged_path)
+            source_digest = _sha256_file(staged_identity_path)
+            already_imported_ids = self._content_marker_book_ids(source_digest)
+            if already_imported_ids:
+                self.last_added_book_ids = already_imported_ids
+                self.last_added_book_id = already_imported_ids[-1]
+                print(
+                    f"[ingest-processor] Content already imported; skipping duplicate add: {staged_path.name}",
+                    flush=True,
+                )
+                return
+
             if text:
                 comic_meta_args = self._comic_calibredb_metadata_args(staged_path)
-                with metadata_db_write_lock():
-                    result = _run_calibredb_add_with_retry(
-                        cmd=[
-                            "calibredb", "add", str(staged_path),
-                            "--automerge", self.cwa_settings['auto_ingest_automerge'],
-                            f"--library-path={self.library_dir}",
-                        ] + comic_meta_args,
-                        env=self.calibre_env,
-                    )
-                added_ids = self._parse_added_book_ids((result.stdout or '') + '\n' + (result.stderr or ''))
-                if added_ids:
-                    self.last_added_book_ids = added_ids
-                    self.last_added_book_id = added_ids[-1]
-                else:
-                    self._fallback_last_added_book_id()
+                metadata_override = self._metadata_args_to_override(comic_meta_args)
             else:  # audiobook path
                 meta = audiobook.get_audio_file_info(str(staged_path), format, os.path.basename(str(staged_path)), False)
 
@@ -1840,44 +2194,142 @@ class NewBookProcessor:
                 _languages = str(meta[9]) if meta[9] else ""
                 _cover = meta[4] if meta[4] and isinstance(meta[4], str) else None
 
-                add_command = [
-                    "calibredb", "add", str(staged_path), "--automerge", self.cwa_settings['auto_ingest_automerge'],
-                    f"--library-path={self.library_dir}",
-                ]
-                if _title:
-                    add_command.extend(["--title", _title])
-                if _authors:
-                    add_command.extend(["--authors", _authors])
-                if _tags:
-                    add_command.extend(["--tags", _tags])
-                if _series:
-                    add_command.extend(["--series", _series])
-                if _series_index:
-                    add_command.extend(["--series-index", str(_series_index)])
-                if _languages:
-                    add_command.extend(["--languages", _languages])
-                if _cover and os.path.exists(_cover):
-                    add_command.extend(["--cover", _cover])
-
-                # Add identifiers if present; expect entries like "isbn:12345"
+                metadata_override = {
+                    "title": _title,
+                    "authors": _authors,
+                    "tags": _tags,
+                    "series": _series,
+                    "series_index": _series_index,
+                    "languages": _languages,
+                    "cover": _cover if _cover and os.path.exists(_cover) else None,
+                }
                 try:
                     identifiers_list = meta[12] if isinstance(meta[12], (list, tuple)) else []
                 except Exception:
                     identifiers_list = []
+                identifiers = {}
                 for ident in identifiers_list:
                     if isinstance(ident, str) and ":" in ident and ident.strip():
-                        add_command.extend(["--identifier", ident.strip()])
+                        key, identifier_value = ident.strip().split(":", 1)
+                        identifiers[key] = identifier_value
+                if identifiers:
+                    metadata_override["identifiers"] = identifiers
 
+            overwrite_validated = False
+            try:
+                candidates = self._current_overwrite_candidates(
+                    staged_path,
+                    staged_identity_path,
+                    imported_digest,
+                    source_digest,
+                    metadata_override,
+                )
+            except Exception as error:
+                self._quarantine_or_preserve_source(
+                    staged_path,
+                    f"Refusing destructive automerge; could not identify formats at risk: {error}",
+                )
+                return
+
+            # Only an actual same-format match can be destructive. Validate it
+            # outside the metadata lock; unrelated new books skip this work.
+            if candidates:
+                if not self._prepare_destructive_overwrite(
+                    staged_path, candidates, text=text
+                ):
+                    return
+                overwrite_validated = True
+
+            while True:
+                needs_validation = False
+                # Reinspect under the cooperating-writer lock. If a matching
+                # format appeared after the unlocked inspection, release the
+                # lock and validate before trying again.
                 with metadata_db_write_lock():
-                    result = _run_calibredb_add_with_retry(
-                        cmd=add_command, env=self.calibre_env,
-                    )
-                added_ids = self._parse_added_book_ids((result.stdout or '') + '\n' + (result.stderr or ''))
-                if added_ids:
-                    self.last_added_book_ids = added_ids
-                    self.last_added_book_id = added_ids[-1]
-                else:
-                    self._fallback_last_added_book_id()
+                    try:
+                        candidates = self._current_overwrite_candidates(
+                            staged_path,
+                            staged_identity_path,
+                            imported_digest,
+                            source_digest,
+                            metadata_override,
+                        )
+                    except Exception as error:
+                        self._quarantine_or_preserve_source(
+                            staged_path,
+                            f"Refusing destructive automerge; could not identify formats at risk: {error}",
+                        )
+                        return
+                    if candidates and not overwrite_validated:
+                        needs_validation = True
+                    else:
+                        if not self._preserve_current_overwrite_candidates(
+                            staged_path, candidates
+                        ):
+                            return
+                        recovery_pairs = list(
+                            getattr(self, "_overwrite_recovery_pairs", ())
+                        )
+                        try:
+                            transaction_result = self._run_calibre_transaction(
+                                staged_path,
+                                staged_identity_path,
+                                imported_digest,
+                                source_digest,
+                                metadata_override,
+                                "import",
+                            )
+                        except Exception:
+                            # A helper can fail after Calibre replaced the format
+                            # but before its database transaction committed.  If
+                            # the marker is absent, restore the verified old bytes
+                            # while the cooperating-writer lock is still held.  A
+                            # present marker means the commit won the crash race,
+                            # so restoring would corrupt a successful import.
+                            try:
+                                committed_ids = self._content_marker_book_ids(source_digest)
+                            except Exception as marker_error:
+                                raise PreserveIngestSourceError(
+                                    "Calibre helper failed and commit state could not be "
+                                    f"determined; source and recovery retained: {marker_error}"
+                                ) from marker_error
+                            if committed_ids:
+                                transaction_result = {
+                                    "status": "already_imported",
+                                    "book_ids": committed_ids,
+                                }
+                            else:
+                                if not self._restore_overwritten_formats(recovery_pairs):
+                                    raise PreserveIngestSourceError(
+                                        "Calibre helper did not commit but previous format "
+                                        "could not be restored; source and recovery retained"
+                                    )
+                                raise
+                if not needs_validation:
+                    break
+                if not self._prepare_destructive_overwrite(
+                    staged_path, candidates, text=text
+                ):
+                    return
+                overwrite_validated = True
+
+            if transaction_result.get("status") == "already_imported":
+                imported_ids = [int(value) for value in transaction_result.get("book_ids", [])]
+                if imported_ids:
+                    self.last_added_book_ids = imported_ids
+                    self.last_added_book_id = imported_ids[-1]
+                print(
+                    f"[ingest-processor] Concurrent import already committed; skipping duplicate add: {staged_path.name}",
+                    flush=True,
+                )
+                return
+
+            imported_ids = [int(value) for value in transaction_result.get("book_ids", [])]
+            if imported_ids:
+                self.last_added_book_ids = imported_ids
+                self.last_added_book_id = imported_ids[-1]
+            else:
+                self._fallback_last_added_book_id()
             print(f"[ingest-processor] Added {staged_path.stem} to Calibre database", flush=True)
             self.record_original_filename()
 
@@ -1964,12 +2416,21 @@ class NewBookProcessor:
                     print(f"[ingest-processor] WARN: Failed to adjust timestamps after overwrite import: {e}", flush=True)
 
         except subprocess.CalledProcessError as e:
-            print(f"[ingest-processor] {staged_path.stem} was not able to be added to the Calibre Library due to the following error:\nCALIBREDB EXIT/ERROR CODE: {e.returncode}\n{e.stderr}", flush=True)
-            self.backup(str(staged_path), backup_type="failed")
+            message = (
+                f"{staged_path.stem} was not able to be added to the Calibre Library; "
+                f"Calibre helper exit {e.returncode}: {e.stderr}"
+            )
+            print(f"[ingest-processor] ERROR: {message}", flush=True)
+            raise RetryIngestSourceError(message) from e
+        except (PreserveIngestSourceError, RetryIngestSourceError):
+            raise
         except Exception as e:
             print(f"[ingest-processor] ingest-processor ran into the following error:\n{e}", flush=True)
+            raise RetryIngestSourceError(str(e)) from e
         finally:
             clear_ingest_batch_active()
+            if staged_identity_path != staged_path and staged_identity_path.exists():
+                os.remove(staged_identity_path)
             if staged_path.exists():
                 os.remove(staged_path)
 
@@ -2492,7 +2953,10 @@ def main(filepath=None):
                     convert_successful, converted_filepath = nbp.convert_book()
 
                 if convert_successful: # If previous conversion process was successful, remove tmp files and import into library
-                    nbp.add_book_to_library(converted_filepath) # type: ignore
+                    # The converted package may contain timestamps or other
+                    # nondeterministic bytes. Retry identity remains the staged
+                    # persistent source that generated it.
+                    nbp.add_book_to_library(converted_filepath, identity_path=filepath) # type: ignore
 
                     # If the original format should be retained, also add it as an additional format
                     if (
@@ -2542,6 +3006,14 @@ def main(filepath=None):
 
         return 0
 
+    except PreserveIngestSourceError as error:
+        skip_delete = True
+        print(f"[ingest-processor] TERMINAL: {error}", flush=True)
+        return 3
+    except RetryIngestSourceError as error:
+        skip_delete = True
+        print(f"[ingest-processor] RETRY: {error}", flush=True)
+        return 1
     except Exception as e:
         print(f"[ingest-processor] Unexpected error during processing: {e}", flush=True)
         raise

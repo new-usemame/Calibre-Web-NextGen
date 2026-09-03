@@ -37,10 +37,11 @@ describe('Global Library card permissions', () => {
     );
   });
 
-  test('an unowned book stays static and Add-only even for a viewer', () => {
+  test('an unowned book opens details and stays Add-only even for a viewer', () => {
     assert.equal(globalCardCanRead(false, true), false);
     assert.equal(getPrimaryReadTarget(42, ['EPUB'], globalCardCanRead(false, true)), null);
-    assert.ok(cardCall.includes('detailsEnabled={owned}'));
+    assert.ok(cardCall.includes('detailsEnabled'));
+    assert.ok(!cardCall.includes('detailsEnabled={owned}'));
     assert.ok(cardCall.includes('onAddToLibrary={owned ? undefined : addBook}'));
     assert.ok(
       bookCardSource.includes("const hasAddAction = membership === 'unowned' && !!onAddToLibrary;"),

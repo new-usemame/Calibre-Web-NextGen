@@ -6,11 +6,21 @@ import os
 import re
 from html import escape as html_escape
 from urllib.parse import parse_qsl, urlencode, urlsplit
-from flask import Blueprint, request, Response, abort, current_app, redirect
+from flask import (
+    Blueprint,
+    request,
+    Response,
+    abort,
+    current_app,
+    redirect,
+    has_request_context,
+    session as flask_session,
+)
 from werkzeug.datastructures import MIMEAccept
 from werkzeug.http import parse_accept_header
 
 from . import logger, constants, config
+from .cw_login.signals import user_loaded_from_cookie, user_logged_in
 
 log = logger.create()
 
@@ -85,13 +95,14 @@ def _mount_prefix():
     return prefix
 
 
-# UI preference cookies (#739/#908). ``cwng_prefer_spa`` is retained for
-# compatibility with browsers and older releases that used the opt-in scheme.
-# The current scheme is an explicit Classic opt-out: no Classic cookie means
-# SPA, and only the marked Classic-nav action clears that opt-out. Merely
-# entering /app (including a shared deep link) preserves it. Both cookies remain
-# per-browser.
+# Browser UI selection (#739/#908). ``cwng_prefer_spa`` is retained only for
+# downgrade compatibility with older releases that used the opt-in scheme.
+# Classic is a transient escape hatch stored in Flask's signed session; it is
+# never a per-user setting and never changes OPDS/Kobo/API/device routes.
+CLASSIC_SESSION_KEY = "_cwng_classic_session"
 PREFER_SPA_COOKIE = "cwng_prefer_spa"
+# Migration-only name. Never read this as a preference: the after-app hook below
+# actively expires the old year-long cookie wherever it is encountered.
 PREFER_CLASSIC_COOKIE = "cwng_prefer_classic"
 _UI_PREFERENCE_MAX_AGE = 60 * 60 * 24 * 365  # one year
 _SPA_CHOICE_PARAM = "cwng_switch"
@@ -131,26 +142,58 @@ def clear_prefer_spa_cookie(resp):
     return resp
 
 
-def stamp_prefer_classic_cookie(resp):
-    """Persist an explicit choice to use Classic on the two preference-routed
-    surfaces. The cookie shares the legacy preference cookie's security and
-    reverse-proxy path rules."""
-    resp.set_cookie(
-        PREFER_CLASSIC_COOKIE,
-        value="1",
-        max_age=_UI_PREFERENCE_MAX_AGE,
-        path=prefer_spa_cookie_path(),
-        secure=bool(current_app.config.get("SESSION_COOKIE_SECURE", False)),
-        samesite=current_app.config.get("SESSION_COOKIE_SAMESITE", "Lax"),
-        httponly=False,
-    )
+def prefer_classic_for_session():
+    """Keep preference-routed browser pages on Classic for this browser session.
+
+    Do not change ``session.permanent`` here. Flask-Login owns that state for
+    remembered logins, and changing it underneath strong session protection can
+    invalidate the authenticated session and delete the remember cookie. A
+    browser-session restart is detected through the remember-cookie load signal
+    below, which clears this escape hatch without touching login bookkeeping.
+    """
+    flask_session[CLASSIC_SESSION_KEY] = True
+
+
+def clear_prefer_classic_session():
+    """Return preference-routed browser pages to their always-SPA default."""
+    flask_session.pop(CLASSIC_SESSION_KEY, None)
+
+
+def clear_legacy_prefer_classic_cookie(resp):
+    """Expire the obsolete persistent Classic cookie without ever honoring it."""
+    cookie_path = prefer_spa_cookie_path()
+    resp.delete_cookie(PREFER_CLASSIC_COOKIE, path=cookie_path)
+    # A deployment moved from the domain root to a reverse-proxy subpath still
+    # receives its old Path=/ cookie. Expire both paths in that migration shape;
+    # browsers do not expose a received cookie's Path back in the Cookie header.
+    if cookie_path != "/":
+        resp.delete_cookie(PREFER_CLASSIC_COOKIE, path="/")
     return resp
 
 
-def clear_prefer_classic_cookie(resp):
-    """Remove the Classic opt-out when the user chooses the SPA again."""
-    resp.delete_cookie(PREFER_CLASSIC_COOKIE, path=prefer_spa_cookie_path())
+@spa.after_app_request
+def migrate_legacy_prefer_classic_cookie(resp):
+    """Delete the old year-long opt-out on the next response that sees it."""
+    if PREFER_CLASSIC_COOKIE in request.cookies:
+        clear_legacy_prefer_classic_cookie(resp)
     return resp
+
+
+@user_logged_in.connect
+@user_loaded_from_cookie.connect
+def clear_classic_escape_hatch_after_auth(_sender, **_extra):
+    """Every login or remember-cookie restoration starts on the new UI.
+
+    A no-JS login may therefore make one additional capability-detection pass:
+    login -> `/` -> `/app` -> the shell's fixed feedback marker -> Classic.
+    That chain terminates because the marker re-enables Classic for the session;
+    clearing here still guarantees that a normal JavaScript browser enters SPA.
+    Remember-cookie restoration is the explicit new-browser-session boundary for
+    remembered users; it clears only the UI flag and leaves Flask-Login's session
+    permanence and remember-token bookkeeping untouched.
+    """
+    if has_request_context():
+        clear_prefer_classic_session()
 
 
 def classic_index_redirects_to_spa():
@@ -174,7 +217,7 @@ def preferred_spa_html_request():
     """
     if not spa_available():
         return False
-    if request.cookies.get(PREFER_CLASSIC_COOKIE) == "1":
+    if flask_session.get(CLASSIC_SESSION_KEY):
         return False
     return _browser_document_html_request()
 
@@ -183,7 +226,7 @@ def classic_fallback_requested_from_next(next_url):
     """Whether ``next`` is the exact no-JS Classic fallback emitted by us.
 
     On login-required instances, the feedback index is intercepted by the auth
-    decorator before it can stamp the Classic cookie. Flask-Login then nests
+    decorator before it can mark the Classic session. Flask-Login then nests
     that fixed feedback URL in ``/login?next=...``. Recognize only the local,
     prefix-scoped marker so the login route can finish the no-JS handoff instead
     of routing back to the SPA and forming a cycle. This never redirects to
@@ -360,13 +403,13 @@ def spa_shell(path=""):
         # ordinary non-mutating navigations. The fixed redirect target shares
         # the same sanitized mount-prefix path as the marked URL.
         resp = redirect(spa_shell_url())
-        clear_prefer_classic_cookie(resp)
+        clear_prefer_classic_session()
         stamp_prefer_spa_cookie(resp)
         return resp
 
     resp = _render_shell(index_path, _mount_prefix())
-    # Every shell load retains the downgrade-compatible SPA cookie, but does
-    # not revoke an explicit Classic choice. Only the marked nav action above
-    # has authority to clear that opt-out.
+    # Every shell load retains the downgrade-compatible SPA cookie. An ordinary
+    # deep link is not preference-mutating; only the marked Classic control above
+    # clears the session escape hatch.
     stamp_prefer_spa_cookie(resp)
     return resp

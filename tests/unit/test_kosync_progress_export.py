@@ -303,6 +303,24 @@ def test_identifier_types_differing_only_beyond_ascii_case_both_survive(env):
     assert identifiers == {kelvin: "kelvin-id", "k": "ascii-k-id"}
 
 
+def test_internal_ingest_identifier_is_not_exported(env):
+    digest = "d" * 64
+    book = _seed_book(
+        env.calibre_session,
+        title="Internal Identifier",
+        authors=["A"],
+        identifiers={
+            "isbn": "9780000000004",
+            f"cwng_ingest_sha256_{digest}": digest,
+        },
+    )
+    _seed_progress(env.app_session, document=str(book.id))
+
+    identifiers = env.client.get("/kosync/export").get_json()[0]["identifiers"]
+
+    assert identifiers == {"isbn": "9780000000004"}
+
+
 def test_author_name_comma_is_unescaped(env):
     # Calibre escapes a comma inside a single author name as "|", so
     # "William H. Keith, Jr." is stored as "William H. Keith| Jr.". #730/#732

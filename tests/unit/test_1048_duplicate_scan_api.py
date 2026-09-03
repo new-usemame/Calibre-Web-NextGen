@@ -202,11 +202,12 @@ def test_spa_scan_mutation_posts_to_the_api_endpoint():
 @pytest.mark.unit
 def test_admin_panel_row_no_longer_duplicates_the_sidebar_link():
     """#1048's headline symptom: Admin → "Duplicate Books" landed on the same
-    page as the sidebar entry. It now opens the detection settings instead."""
-    src = (SPA / "pages" / "Admin.tsx").read_text(encoding="utf-8")
+    page as the catalog entry. The Admin context navigation now owns this
+    destination and must keep opening the detection settings instead."""
+    src = (SPA / "lib" / "contextSidebars.ts").read_text(encoding="utf-8")
     assert "href: '/duplicates'" not in src
     assert "'/cwa-settings#duplicate-detection'" in src
-    assert "Duplicate detection settings" in src
+    assert "label: 'Duplicates'" in src
 
 
 @pytest.mark.unit
@@ -222,6 +223,6 @@ def test_cwa_settings_template_has_the_deep_link_anchor():
 def test_new_spa_strings_are_anchored_for_extraction():
     """SPA-only msgids must live in cps/spa_strings.py or babel drops them."""
     anchored = (REPO / "cps" / "spa_strings.py").read_text(encoding="utf-8")
-    for msgid in ("Scan for duplicates", "Starting scan…", "Duplicate detection settings",
+    for msgid in ("Scan for duplicates", "Starting scan…", "Duplicates",
                   "Could not start the duplicate scan."):
         assert msgid in anchored, f"{msgid!r} not anchored in cps/spa_strings.py"

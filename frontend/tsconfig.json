@@ -5,6 +5,7 @@
     "skipLibCheck": true, "moduleResolution": "bundler",
     "allowImportingTsExtensions": true, "resolveJsonModule": true,
     "isolatedModules": true, "noEmit": true, "jsx": "react-jsx",
+    "types": [],
     "strict": true, "noUnusedLocals": true, "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },

@@ -5,8 +5,14 @@
   "id": "F-9073e5",
   "origin_issue": 1317,
   "refs": [],
+  "resolution": {
+    "commit": "6631b39cc3",
+    "date": "2026-09-01",
+    "note": "Shipped in #2118: conditional_position_update() decides acceptance in the UPDATE WHERE clause with rowcount as verdict, INSERT ON CONFLICT DO NOTHING + retry for the no-row case; every writer uses it. IntegrityError gap in session_commit left as-is: the new path cannot hit it.",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "Reading-position 'furthest wins' is decided in Python, not by the UPDATE"
 }

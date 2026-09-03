@@ -92,7 +92,7 @@ test('device detail exposes typed tabs, assignment view, inventory, and position
   await expect(notes).toBeFocused();
 
   await page.getByRole('checkbox', { name: 'Show annotations assigned to this device' }).check();
-  await expect.poll(() => requests.at(-1)?.searchParams.get('role')).toBe('assigned');
+  await expect.poll(() => requests[requests.length - 1]?.searchParams.get('role')).toBe('assigned');
 
   await notes.press('End');
   await expect(page.getByRole('tab', { name: 'Device library' })).toBeFocused();
@@ -117,5 +117,8 @@ test('admin device board reuses the device summaries', async ({ page }) => {
     .filter({ hasText: 'Libra Colour' });
   await expect(card).toHaveCount(1);
   await expect(card).toContainText('Account: e2e');
+  await expect(card).toContainText('Kobo · Kobo Libra Colour');
+  await expect(card).not.toContainText('Partially seeded books');
+  await card.getByRole('button', { name: 'Show device details' }).click();
   await expect(card).toContainText('Partially seeded books');
 });

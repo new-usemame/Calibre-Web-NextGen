@@ -5,8 +5,14 @@
   "id": "F-1b7a81",
   "origin_issue": 1186,
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-08-30",
+    "note": "Duplicate of F-5647b8 (the a11y harness sampled colours mid theme-transition), fixed in #2053. NOT a light-palette defect, and the remedy this finding proposes would have made the product worse.\n\nDISCRIMINATING EVIDENCE: every offending pair reported here crosses the two palettes, identified against cps-side styles/tokens.css:\n  #9aa7b2 on #ffffff  = DARK --text-muted on LIGHT --surface-1\n  #ece8e1 on #ffffff  = DARK --text       on LIGHT --surface-1\n  #54606b on #1b2530  = LIGHT --text-muted on DARK --surface-1\n  #23292f on #1b2530  = LIGHT --text       on DARK --surface-1\n  #9aa7b2 on #e7e1d4  = DARK --text-muted on LIGHT --surface-3\nNo static cascade produces dark --text on light --surface-1 AND light --text on dark --surface-1 in the same scan; both directions together is the signature of axe reading an in-flight interpolation, with color and background-color crossing at independent times.\n\nWithin-light contrast passes AA comfortably: #23292f on #ffffff ~14.5:1, #54606b on #ffffff ~6.4:1. Darkening the light tokens as suggested would have shipped a worse palette to chase a number the harness invented, and the gate would then have gone green, confirming it.\n\nMECHANISM: tokens.css --dur-fast is 120ms; a11y.spec.ts slept a fixed 250ms after flipping data-theme. A transition that starts late on a loaded runner still lands inside that window, which is why this reproduced reliably in July and is intermittent now. #2053 replaces the sleep with prefers-reduced-motion (global.css forces transition-duration 0.001ms !important) and asserts the preference actually reached the page.\n\nCURRENT STATE OBSERVED, CI job 99287165128: 24 a11y tests passed, 0 failed, KNOWN allowlist empty, covering every route named here (grid, book detail, edit book, smart shelf builder, account, advanced-search, shelves, duplicates, admin, login unauthenticated, announcement).",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "duplicate",
   "title": "[bug] SPA a11y gate is red on main: color-contrast (serious) on every light-theme route"
 }

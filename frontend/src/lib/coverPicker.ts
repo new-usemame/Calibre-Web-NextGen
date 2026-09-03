@@ -120,57 +120,69 @@ async function cpGet<T>(path: string): Promise<T> {
 }
 
 /** POST JSON with the same one-shot CSRF refresh-and-retry as api.apiPost. */
-async function cpPostJson<T>(path: string, body: unknown): Promise<T> {
-  const doPost = (csrf: string) => fetch(apiUrl(path), {
-    method: 'POST', credentials: 'include',
+async function cpJson<T>(method: 'POST' | 'PUT', path: string, body: unknown): Promise<T> {
+  const send = (csrf: string) => fetch(apiUrl(path), {
+    method, credentials: 'include',
     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
     body: JSON.stringify(body ?? {}),
   });
-  let res = await doPost(await getCsrf());
+  let res = await send(await getCsrf());
   if (res.status === 400 && !(res.headers.get('content-type') || '').includes('application/json')) {
-    res = await doPost(await getCsrf()); // stale token → HTML 400; refresh once
+    res = await send(await getCsrf()); // stale token → HTML 400; refresh once
   }
   if (!res.ok) return envelopeError(res);
   return res.json() as Promise<T>;
 }
 
+const cpPostJson = <T,>(path: string, body: unknown) => cpJson<T>('POST', path, body);
+
 /** POST multipart (file upload) — browser sets the boundary, so no Content-Type. */
-async function cpUpload<T>(path: string, form: FormData): Promise<T> {
-  const doPost = (csrf: string) => fetch(apiUrl(path), {
-    method: 'POST', credentials: 'include', headers: { 'X-CSRFToken': csrf }, body: form,
+async function cpUpload<T>(method: 'POST' | 'PUT', path: string, form: FormData): Promise<T> {
+  const send = (csrf: string) => fetch(apiUrl(path), {
+    method, credentials: 'include', headers: { 'X-CSRFToken': csrf }, body: form,
   });
-  let res = await doPost(await getCsrf());
+  let res = await send(await getCsrf());
   if (res.status === 400 && !(res.headers.get('content-type') || '').includes('application/json')) {
-    res = await doPost(await getCsrf());
+    res = await send(await getCsrf());
   }
   if (!res.ok) return envelopeError(res);
   return res.json() as Promise<T>;
 }
 
 const base = (id: string | number) => `/book/${id}/cover`;
+const personalBase = (id: string | number) => `/api/v1/books/${id}/my-cover`;
+const sourcePath = (id: string | number, suffix: string, personal: boolean) =>
+  `${base(id)}/${suffix}${personal ? '?scope=personal' : ''}`;
 
 // ---- raw calls --------------------------------------------------------------
 
 export const coverApi = {
-  state: (id: string | number) => cpGet<CoverState>(`${base(id)}/state`),
-  candidates: (id: string | number, query?: string) =>
-    cpPostJson<CandidatesResponse>(`${base(id)}/candidates`, query ? { query } : {}),
-  validate: (id: string | number, url: string) =>
-    cpPostJson<UrlValidation>(`${base(id)}/preview`, { url }),
-  applyUrl: (id: string | number, url: string) =>
-    cpPostJson<ApplyResult>(`${base(id)}/apply`, { kind: 'url', url }),
-  applyEmbedded: (id: string | number) =>
-    cpPostJson<ApplyResult>(`${base(id)}/apply`, { kind: 'embedded' }),
-  applyFile: (id: string | number, file: File) => {
+  state: (id: string | number, personal = false) => cpGet<CoverState>(
+    personal ? personalBase(id) : `${base(id)}/state`),
+  candidates: (id: string | number, query?: string, personal = false) =>
+    cpPostJson<CandidatesResponse>(sourcePath(id, 'candidates', personal), query ? { query } : {}),
+  validate: (id: string | number, url: string, personal = false) =>
+    cpPostJson<UrlValidation>(sourcePath(id, 'preview', personal), { url }),
+  applyUrl: (id: string | number, url: string, personal = false) =>
+    personal
+      ? cpJson<ApplyResult>('PUT', personalBase(id), { kind: 'url', url })
+      : cpPostJson<ApplyResult>(`${base(id)}/apply`, { kind: 'url', url }),
+  applyEmbedded: (id: string | number, personal = false) =>
+    personal
+      ? cpJson<ApplyResult>('PUT', personalBase(id), { kind: 'embedded' })
+      : cpPostJson<ApplyResult>(`${base(id)}/apply`, { kind: 'embedded' }),
+  applyFile: (id: string | number, file: File, personal = false) => {
     const fd = new FormData(); fd.append('file', file);
-    return cpUpload<ApplyResult>(`${base(id)}/apply`, fd);
+    return cpUpload<ApplyResult>(personal ? 'PUT' : 'POST',
+      personal ? personalBase(id) : `${base(id)}/apply`, fd);
   },
   setLock: (id: string | number, locked: boolean) =>
     cpPostJson<{ locked: boolean }>(`${base(id)}/lock`, { locked }),
   ereaderPreview: (
     id: string | number,
     opts: EreaderOptions & { candidate_url?: string; embedded?: boolean },
-  ) => cpPostJson<{ ok: boolean; data_url: string }>(`${base(id)}/ereader-preview`, opts),
+    personal = false,
+  ) => cpPostJson<{ ok: boolean; data_url: string }>(sourcePath(id, 'ereader-preview', personal), opts),
   keysList: () => cpGet<ProviderKey[]>(`/metadata/keys`),
   saveKey: (provId: string, value: string) =>
     cpPostJson<{ id: string; configured: boolean }>(`/metadata/keys/${encodeURIComponent(provId)}`, { value }),
@@ -178,14 +190,14 @@ export const coverApi = {
 
 // ---- hooks ------------------------------------------------------------------
 
-export function useCoverState(id: string) {
-  return useQuery({ queryKey: ['cover-state', id], queryFn: () => coverApi.state(id) });
+export function useCoverState(id: string, personal = false) {
+  return useQuery({ queryKey: ['cover-state', id, personal], queryFn: () => coverApi.state(id, personal) });
 }
 
-export function useCandidates(id: string) {
+export function useCandidates(id: string, personal = false) {
   return useQuery({
-    queryKey: ['cover-candidates', id],
-    queryFn: () => coverApi.candidates(id),
+    queryKey: ['cover-candidates', id, personal],
+    queryFn: () => coverApi.candidates(id, undefined, personal),
     staleTime: 60_000, // provider fan-out is slow; don't refetch on remount
     refetchOnWindowFocus: false,
   });

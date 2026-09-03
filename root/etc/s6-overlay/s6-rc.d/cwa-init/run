@@ -68,16 +68,18 @@ export CALIBRE_DBPATH=/config
 
 if [[ ! -f /config/app.db ]]; then
   echo "First time run, creating app.db..."
-  # -P for the same reason as svc-calibre-web-automated: cwd here is /config,
-  # a user-writable volume, and `python -m` would otherwise import a stray
-  # /config/cps.py or /config/cps/ instead of the application.
+  # Match svc-calibre-web-automated's import boundary exactly: -P excludes the
+  # user-writable /config cwd, PYTHONPATH is removed, and the user site is
+  # disabled so HOME/PYTHONUSERBASE cannot introduce /config .pth or
+  # usercustomize hooks. The image-controlled system site remains enabled
+  # because its editable .pth is what resolves cps from /app.
   #
   # The failure is reported rather than swallowed. stdout stays discarded (the
   # first-run banner is noise), but with the output going to /dev/null a failed
   # app.db creation used to surface only as the sqlite3 call below failing
   # against a database that was never made -- which names the wrong cause.
-  if ! cwa-as-abc python3 -P -m cps -d > /dev/null 2>&1; then
-    echo "[cwa-init] ERROR: could not create app.db (python3 -P -m cps -d failed)"
+  if ! cwa-as-abc /usr/bin/env -u PYTHONPATH PYTHONNOUSERSITE=1 python3 -P -m cps -d > /dev/null 2>&1; then
+    echo "[cwa-init] ERROR: could not create app.db (hardened python3 -P -m cps -d failed)"
   fi
 
   # Only touch app.db if the initializer actually produced one.

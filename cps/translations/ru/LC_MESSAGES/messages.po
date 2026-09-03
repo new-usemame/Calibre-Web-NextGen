@@ -1464,6 +1464,20 @@ msgid "There was an error converting this book: %(res)s"
 msgstr "Произошла ошибка при конвертации книги: %(res)s"
 
 #: cps/editbooks.py
+#, python-format
+msgid " (book IDs: %(failed_ids)s)"
+msgstr ""
+
+#: cps/editbooks.py
+#, python-format
+msgid ""
+"Bulk edit completed with errors: %(success_count)s succeeded and "
+"%(failure_count)s failed%(failed_ids_message)s. One or more failed books may "
+"have had files renamed before the database update failed; their files and "
+"database entries may now be inconsistent."
+msgstr ""
+
+#: cps/editbooks.py
 msgid "File type isn't allowed to be uploaded to this server"
 msgstr "Данный тип файлов не разрешён для загрузки на сервер"
 
@@ -1500,6 +1514,11 @@ msgstr ""
 #, python-format
 msgid "'%(langname)s' is not a valid language"
 msgstr "Язык '%(langname)s' не поддерживается"
+
+#: cps/editbooks.py cps/helper.py
+msgid "Cover-file is not a valid image file, or could not be stored"
+msgstr ""
+"Файл обложки не является допустимым изображением или не может быть сохранён"
 
 #: cps/editbooks.py
 msgid "Metadata successfully updated"
@@ -1791,11 +1810,6 @@ msgid "Cover image exceeds maximum size of %(size)s MB"
 msgstr "Изображение обложки превышает максимальный размер %(size)s МБ"
 
 #: cps/helper.py
-msgid "Cover-file is not a valid image file, or could not be stored"
-msgstr ""
-"Файл обложки не является допустимым изображением или не может быть сохранён"
-
-#: cps/helper.py
 msgid "Cover Format Error"
 msgstr "Ошибка формата обложки"
 
@@ -1810,18 +1824,6 @@ msgstr ""
 #: cps/helper.py
 msgid "Failed to create path for cover"
 msgstr "Не удалось создать путь для обложки"
-
-#: cps/helper.py
-msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
-msgstr "Только файлы jpg/jpeg/png/webp/bmp поддерживаются в качестве обложки"
-
-#: cps/helper.py
-msgid "Invalid cover file content"
-msgstr "Неверное содержимое файла обложки"
-
-#: cps/helper.py
-msgid "Only jpg/jpeg files are supported as coverfile"
-msgstr "Только файлы jpg/jpeg поддерживаются в качестве обложки"
 
 #: cps/helper.py cps/spa_strings.py
 msgid "Cover"
@@ -2264,7 +2266,8 @@ msgstr ""
 "прежде чем можно будет выполнять быструю проверку после импорта и изменения "
 "метаданных. "
 
-#: cps/render_template.py cps/spa_strings.py
+#: cps/render_template.py cps/spa_strings.py cps/templates/user_edit.html
+#: cps/templates/user_table.html
 msgid "My Library"
 msgstr ""
 
@@ -2406,6 +2409,28 @@ msgid "Advanced Search"
 msgstr "Расширенный поиск"
 
 #: cps/shelf.py
+msgid ""
+"This book is not in your library. Ask an administrator to add it to My "
+"Library before adding it to a shelf."
+msgstr ""
+
+#: cps/shelf.py
+msgid ""
+"This book is not in the shelf owner's library. The shelf owner cannot browse "
+"the global library; an administrator must add it to their My Library first."
+msgstr ""
+
+#: cps/shelf.py
+msgid "This book cannot be added to this shelf. Ask an administrator for help."
+msgstr ""
+
+#: cps/shelf.py
+msgid ""
+"This shelf has an invalid owner. Ask an administrator to repair it before "
+"adding books."
+msgstr ""
+
+#: cps/shelf.py
 msgid "Invalid shelf specified"
 msgstr "Указана недопустимая полка"
 
@@ -2415,12 +2440,6 @@ msgstr "Извините, у вас нет прав для добавления 
 
 #: cps/shelf.py
 msgid "Book not found in the visible global library."
-msgstr ""
-
-#: cps/shelf.py
-msgid ""
-"This book is not in your library. Ask an administrator to add it to My "
-"Library before adding it to a shelf."
 msgstr ""
 
 #: cps/shelf.py
@@ -2635,6 +2654,30 @@ msgstr "Метаданные применены к: {succeeded}; с ошибко
 
 #: cps/spa_strings.py
 msgid "A book must keep at least one format."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{succeeded} book(s) permanently deleted; {warnings} deleted with cleanup "
+"warnings; {failed} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Cleanup warning for book {id}: {message}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Book {id}: {message}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Failed: {failures}. The failed books remain selected; choose the action "
+"again to retry."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -2945,11 +2988,11 @@ msgstr ""
 msgid "Library scope"
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/user_edit.html
+#: cps/spa_strings.py
 msgid "My selection"
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/index.html
+#: cps/spa_strings.py
 msgid "New: your own library"
 msgstr ""
 
@@ -2963,7 +3006,7 @@ msgid ""
 "highlights, notes and reading progress are kept."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/index.html
+#: cps/spa_strings.py
 msgid ""
 "Nothing is missing — the whole library is still on the server. What you see "
 "here is your own selection. Add books from the global library; they appear "
@@ -2984,8 +3027,7 @@ msgid ""
 "time."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/user_edit.html
-#: cps/templates/user_table.html
+#: cps/spa_strings.py
 msgid "Own selection"
 msgstr ""
 
@@ -3022,6 +3064,14 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Set up My Library for all users"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Set up My Library for every non-anonymous account? Each account starts with "
+"every book it can currently see—not only books it has shelved, read, or "
+"downloaded. Users can curate from there by removing books. Accounts already "
+"set up are never reseeded."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -3072,21 +3122,21 @@ msgid ""
 "Switch {name} back to their own selection? Their chosen books are restored."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/user_edit.html
+#: cps/spa_strings.py
 msgid ""
 "Switching a user to their own selection first fills it with everything they "
 "can see now, so nothing changes for them until they remove books themselves. "
 "Switching back keeps the selection intact but unused."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/index.html
+#: cps/spa_strings.py
 msgid ""
 "The library is shared and holds every book once — what you keep is your own "
 "selection. Nothing you had is gone. Every book, new arrivals included, is "
 "under Global Library in the menu."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/index.html
+#: cps/spa_strings.py
 msgid ""
 "The library is shared and holds every book once — what you keep is your own "
 "selection. Nothing you had is gone. Your administrator manages what enters "
@@ -3108,7 +3158,7 @@ msgstr ""
 msgid "The whole archive. Add books to your library from here."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/user_edit.html
+#: cps/spa_strings.py
 msgid "The whole library"
 msgstr ""
 
@@ -4505,6 +4555,10 @@ msgid "Add note"
 msgstr "Добавить заметку"
 
 #: cps/spa_strings.py
+msgid "Add or replace this line in the [OneStoreServices] section:"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Add to existing"
 msgstr ""
 
@@ -4515,6 +4569,10 @@ msgstr "Добавить в избранное"
 #: cps/spa_strings.py
 msgid "Admin group"
 msgstr "Группа администраторов"
+
+#: cps/spa_strings.py
+msgid "Admin navigation"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Advanced"
@@ -4651,16 +4709,12 @@ msgid "Back to library"
 msgstr "Вернуться в библиотеку"
 
 #: cps/spa_strings.py
-msgid "Back to the classic view"
-msgstr "Вернуться к классическому виду"
-
-#: cps/spa_strings.py
 msgid "Base DN"
 msgstr "Base DN"
 
 #: cps/spa_strings.py
-msgid "Basic configuration"
-msgstr "Основные настройки"
+msgid "Basic settings"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Beta"
@@ -4734,8 +4788,8 @@ msgid "CA certificate path"
 msgstr "Путь к CA-сертификату"
 
 #: cps/spa_strings.py
-msgid "CWA settings (ingest/convert)"
-msgstr "Настройки CWA (импорт/конвертация)"
+msgid "CWA settings"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Can upload books"
@@ -4775,14 +4829,27 @@ msgstr "Путь к файлу сертификата"
 msgid "Certificate path"
 msgstr "Путь к сертификату"
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cover_picker.html cps/templates/detail.html
-msgid "Change cover"
-msgstr "Изменить обложку"
+#: cps/spa_strings.py
+msgid "Change library cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Change my cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Check again"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Checking…"
 msgstr "Проверка…"
+
+#: cps/spa_strings.py
+msgid ""
+"Choose Login and sign in with this NextGen account or one of its app "
+"passwords."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Choose a cover"
@@ -4803,6 +4870,10 @@ msgstr "Выбрать поля"
 #: cps/spa_strings.py
 msgid "Choose your theme"
 msgstr "Выберите тему оформления"
+
+#: cps/spa_strings.py
+msgid "Classic"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Clear default"
@@ -4849,6 +4920,10 @@ msgid "Compact"
 msgstr "Компактно"
 
 #: cps/spa_strings.py
+msgid "Configuration"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Configured"
 msgstr "Настроено"
 
@@ -4860,6 +4935,18 @@ msgstr "Подтвердите удаление тега {name}"
 #: cps/spa_strings.py
 msgid "Confirm new password"
 msgstr "Подтвердите новый пароль"
+
+#: cps/spa_strings.py
+msgid ""
+"Connect the Kobo to a computer and open .kobo/Kobo/Kobo eReader.conf in a "
+"text editor."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Connect this account to an e-reader, then sync once to confirm it reached "
+"your library."
+msgstr ""
 
 #: cps/spa_strings.py cps/tasks/convert.py
 msgid "Convert"
@@ -4874,16 +4961,40 @@ msgid "Convert from"
 msgstr "Конвертировать из"
 
 #: cps/spa_strings.py
+msgid "Copied"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Copied to clipboard"
 msgstr "Скопировано в буфер обмена"
+
+#: cps/spa_strings.py
+msgid "Copied to clipboard."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Copy link"
 msgstr "Скопировать ссылку"
 
 #: cps/spa_strings.py
+msgid "Copy server address"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Copy sync URL"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not assign."
 msgstr "Не удалось назначить."
+
+#: cps/spa_strings.py
+msgid "Could not complete the action."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not copy. Select the address and copy it manually."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not create shelf."
@@ -4900,6 +5011,10 @@ msgstr "Не удалось удалить полку."
 #: cps/spa_strings.py
 msgid "Could not delete tag"
 msgstr "Не удалось удалить тег"
+
+#: cps/spa_strings.py
+msgid "Could not delete the Kobo sync URL."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load candidates."
@@ -4920,6 +5035,10 @@ msgstr "Не удалось загрузить читалки."
 #: cps/spa_strings.py
 msgid "Could not load highlights and notes."
 msgstr "Не удалось загрузить выделения и заметки."
+
+#: cps/spa_strings.py
+msgid "Could not load pairing details."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load reading positions."
@@ -5014,6 +5133,10 @@ msgid "Could not start the duplicate scan."
 msgstr "Не удалось запустить поиск дубликатов."
 
 #: cps/spa_strings.py
+msgid "Could not update pairing details."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not update shelf."
 msgstr "Не удалось обновить полку."
 
@@ -5101,8 +5224,12 @@ msgid "Custom columns"
 msgstr "Пользовательские колонки"
 
 #: cps/spa_strings.py
-msgid "Database & library path"
-msgstr "База данных и путь к библиотеке"
+msgid "Data hoarder? This will help users organize their accounts!"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Database path"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Date added"
@@ -5156,6 +5283,10 @@ msgid "Delete shelf \"{name}\"? This cannot be undone."
 msgstr "Удалить полку «{name}»? Это действие нельзя отменить."
 
 #: cps/spa_strings.py
+msgid "Delete sync URL"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete tag {name}"
 msgstr "Удалить тег {name}"
@@ -5165,6 +5296,12 @@ msgstr "Удалить тег {name}"
 msgid ""
 "Delete the {fmt} file? The book record, metadata, shelves, and reading state "
 "stay available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Delete this Kobo sync URL? The current URL will stop working on every paired "
+"Kobo."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5244,6 +5381,11 @@ msgid "Device restored."
 msgstr "Устройство восстановлено."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Device seen: {name}, last synced {when}. Pairing is working."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Device summary"
 msgstr ""
 
@@ -5251,6 +5393,10 @@ msgstr ""
 #, python-brace-format
 msgid "Device: {name}"
 msgstr "Устройство: {name}"
+
+#: cps/spa_strings.py
+msgid "Devices"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Devices appear here after their first sync."
@@ -5278,8 +5424,16 @@ msgid "Dismiss"
 msgstr "Скрыть"
 
 #: cps/spa_strings.py
+msgid "Dismiss introduction"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Dismiss this group"
 msgstr "Пропустить эту группу"
+
+#: cps/spa_strings.py cps/templates/readcbr.html
+msgid "Display"
+msgstr "Отображение"
 
 #: cps/spa_strings.py
 msgid "Documentation"
@@ -5311,10 +5465,6 @@ msgid "Duplicate books"
 msgstr "Дубликаты книг"
 
 #: cps/spa_strings.py
-msgid "Duplicate detection settings"
-msgstr "Настройки поиска дубликатов"
-
-#: cps/spa_strings.py
 msgid ""
 "Duplicate scan started. It runs in the background — this list updates when "
 "it finishes."
@@ -5333,6 +5483,12 @@ msgstr "Предварительный просмотр для eReader"
 #: cps/spa_strings.py
 msgid "E-readers"
 msgstr "Электронные книги"
+
+#: cps/spa_strings.py
+msgid ""
+"Each account starts with every book it can currently see—not only books it "
+"has shelved, read, or downloaded."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Each type (isbn, amazon, google, doi…) may appear once."
@@ -5399,6 +5555,10 @@ msgid "Email me a reset"
 msgstr "Отправить мне письмо для сброса"
 
 #: cps/spa_strings.py
+msgid "Email server"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Email settings saved."
 msgstr "Настройки электронной почты сохранены."
 
@@ -5436,6 +5596,10 @@ msgstr "Выйти из полноэкранного режима"
 #: cps/spa_strings.py
 msgid "Expires in"
 msgstr "Истекает через"
+
+#: cps/spa_strings.py
+msgid "Explore the changes, you can always undo later."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Export"
@@ -5539,16 +5703,32 @@ msgid "Full screen"
 msgstr "Полноэкранный режим"
 
 #: cps/spa_strings.py
-msgid "Full user table & restrictions"
-msgstr "Полная таблица пользователей и ограничений"
-
-#: cps/spa_strings.py
 msgid "Generate a new link"
 msgstr "Создать новую ссылку"
 
 #: cps/spa_strings.py
+msgid ""
+"Generate a private sync URL for this account. You can delete it at any time."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Generate sync URL"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Generating…"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Give your smart shelf a name."
 msgstr "Введите название для смарт-полки."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Give {name} My Library? It starts as a copy of everything they can see now — "
+"nothing changes for them yet."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Go to this highlight"
@@ -5620,6 +5800,10 @@ msgid "Hide Discover section"
 msgstr "Скрыть раздел «Обзор»"
 
 #: cps/spa_strings.py
+msgid "Hide device details"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Hide device library"
 msgstr ""
 
@@ -5644,13 +5828,13 @@ msgid "Highlights"
 msgstr "Выделения"
 
 #: cps/spa_strings.py
+msgid "Highlights and notes"
+msgstr "Выделения и заметки"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Highlights, {count} saved annotations"
 msgstr ""
-
-#: cps/spa_strings.py
-msgid "Highlights and notes"
-msgstr "Выделения и заметки"
 
 #: cps/spa_strings.py
 msgid "Hot"
@@ -5662,6 +5846,10 @@ msgstr "Популярное — Самые скачиваемые"
 
 #: cps/spa_strings.py
 msgid "How should multi-value fields be applied?"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "How switching between the global library and My Library works"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5698,6 +5886,10 @@ msgid "Imported as"
 msgstr "Импортировано как"
 
 #: cps/spa_strings.py
+msgid "In KOReader, open NextGen Progress Sync and choose Set NextGen Server."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "In your book"
 msgstr "В вашей книге"
 
@@ -5716,6 +5908,16 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Included"
 msgstr "Включено"
+
+#: cps/spa_strings.py
+msgid "Install or update the NextGen Sync plugin."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Instead of forcing all of your books on friends, they can pick which ones "
+"they want!"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Issuer / base URL"
@@ -5738,10 +5940,6 @@ msgstr "KOReader"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "KOReader Progress"
 msgstr "Прогресс KOReader"
-
-#: cps/progress_syncing/protocols/kosync.py cps/spa_strings.py
-msgid "KOReader Sync Plugin"
-msgstr "Плагин синхронизации KOReader"
 
 #: cps/spa_strings.py
 msgid "Key file path"
@@ -5768,8 +5966,16 @@ msgid "Kobo Libra Color / Libra 2 (1264×1680)"
 msgstr "Kobo Libra Color / Libra 2 (1264×1680)"
 
 #: cps/spa_strings.py
-msgid "Kobo setup"
-msgstr "Настройка Kobo"
+msgid "Kobo sync URL deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Kobo sync URL ready."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Kobo sync is not enabled on this server."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Kobo sync on"
@@ -5846,6 +6052,10 @@ msgid "Loading new Discover picks."
 msgstr "Загрузка новых подборок в «Обзоре»."
 
 #: cps/spa_strings.py
+msgid "Loading pairing details…"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Loading reading positions…"
 msgstr ""
 
@@ -5912,11 +6122,6 @@ msgstr "Управление электронными книгами"
 #: cps/spa_strings.py
 msgid "Manage shelves"
 msgstr "Управление полками"
-
-#: cps/spa_strings.py
-msgid "Manage your Kobo sync URL in the classic account page."
-msgstr ""
-"Управляйте URL для синхронизации Kobo на классической странице аккаунта."
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #: cps/templates/book_table.html
@@ -5986,16 +6191,22 @@ msgstr ""
 "читалки)"
 
 #: cps/spa_strings.py
-msgid "More server configuration"
-msgstr "Дополнительные настройки сервера"
-
-#: cps/spa_strings.py
 msgid "Move down"
 msgstr "Переместить вниз"
 
 #: cps/spa_strings.py
 msgid "Move up"
 msgstr "Переместить вверх"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "My Library is now on for {accounts} accounts."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "My account"
@@ -6016,6 +6227,10 @@ msgstr "Никогда"
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "New"
 msgstr "Новый"
+
+#: cps/spa_strings.py
+msgid "New Feature!"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -6046,6 +6261,10 @@ msgstr "Новая смарт-полка"
 #: cps/spa_strings.py
 msgid "New user"
 msgstr "Новый пользователь"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "New: My Library"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Newest"
@@ -6114,6 +6333,10 @@ msgstr "В этой книге совпадений не найдено."
 #, python-brace-format
 msgid "No matching {items} for \"{query}\"."
 msgstr "В разделе «{items}» нет совпадений по запросу «{query}»."
+
+#: cps/spa_strings.py
+msgid "No new device check-in yet."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No pages found in this comic."
@@ -6208,6 +6431,13 @@ msgstr ""
 msgid "Nothing in this category yet."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"Nothing is missing — the global library is still on the server. What you see "
+"here is your selection in My Library. Add books from the global library; "
+"they appear here and on your e-reader."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Nothing to preview yet."
 msgstr ""
@@ -6263,6 +6493,12 @@ msgid "Open Account"
 msgstr "Открыть аккаунт"
 
 #: cps/spa_strings.py
+msgid ""
+"Open NextGen using an address your e-reader can reach before copying these "
+"settings. Localhost only points back to the device itself."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Open administration"
 msgstr "Открыть панель администрирования"
 
@@ -6315,6 +6551,12 @@ msgstr ""
 "настраивается и проверяется — её реальное состояние отображается здесь."
 
 #: cps/spa_strings.py
+msgid ""
+"Organize your library, your way. Checkout books from the Global Library to "
+"bring them into My Library."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "PDF reader"
 msgstr "PDF-читалка"
 
@@ -6337,12 +6579,12 @@ msgid "Page {page} of {pages}"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid ""
-"Pages marked below open in the classic view. Changes there apply to the "
-"whole server."
+msgid "Pair a Kobo or KOReader"
 msgstr ""
-"Отмеченные ниже страницы открываются в классическом интерфейсе. Внесённые "
-"там изменения применятся ко всему серверу."
+
+#: cps/spa_strings.py
+msgid "Pair an e-reader"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Partially seeded books"
@@ -6358,8 +6600,16 @@ msgid "Password (leave blank to keep)"
 msgstr "Пароль (оставьте пустым, чтобы не менять)"
 
 #: cps/spa_strings.py
+msgid "Paste this server address (the plugin adds /kosync itself):"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Paused after a problem"
 msgstr "Приостановлено из-за проблемы"
+
+#: cps/spa_strings.py
+msgid "People & devices"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid ""
@@ -6387,6 +6637,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Pink"
 msgstr "Розовый"
+
+#: cps/spa_strings.py
+msgid "Please give this a try, you can easily undo later."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/admin.html
 msgid "Port"
@@ -6617,6 +6871,15 @@ msgstr ""
 "а новый будет отправлен по электронной почте."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Restored the previous library mode for {accounts} accounts."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Restoring…"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Retry"
 msgstr "Повторить попытку"
 
@@ -6636,6 +6899,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Rows per load"
 msgstr "Строк при подгрузке"
+
+#: cps/spa_strings.py
+msgid "Run a sync from the plugin."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Run time"
@@ -6683,6 +6950,10 @@ msgid "Save settings"
 msgstr "Сохранить настройки"
 
 #: cps/spa_strings.py
+msgid "Save the file, safely eject the Kobo, then restart it."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Saved. Restart the server for the login changes to take effect."
 msgstr ""
 "Сохранено. Перезапустите сервер, чтобы изменения настроек входа вступили в "
@@ -6727,6 +6998,10 @@ msgstr "Поиск по этой книге…"
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
 msgstr "Поиск…"
+
+#: cps/spa_strings.py
+msgid "Security"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Security settings saved."
@@ -6820,6 +7095,10 @@ msgid "Server host"
 msgstr "Хост сервера"
 
 #: cps/spa_strings.py
+msgid "Server tools"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Service account (DN)"
 msgstr "Сервисный аккаунт (DN)"
 
@@ -6839,10 +7118,6 @@ msgstr ""
 "введите их вручную."
 
 #: cps/spa_strings.py
-msgid "Set up Kobo sync"
-msgstr "Настроить синхронизацию с Kobo"
-
-#: cps/spa_strings.py
 msgid "Set up Kobo sync first — then this preference becomes available."
 msgstr ""
 "Сначала настройте синхронизацию с Kobo — после этого данная настройка станет "
@@ -6855,10 +7130,6 @@ msgstr "Настройка…"
 #: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "Настройки сохранены."
-
-#: cps/spa_strings.py cps/templates/admin.html
-msgid "Setup KOReader Sync"
-msgstr "Настроить синхронизацию KOReader"
 
 #: cps/spa_strings.py
 msgid "Shelf name"
@@ -6899,6 +7170,10 @@ msgid "Show books in language"
 msgstr "Показывать книги на языке"
 
 #: cps/spa_strings.py
+msgid "Show device details"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Show e-reader previews on each candidate"
 msgstr "Показывать превью для читалки для каждого кандидата"
 
@@ -6913,6 +7188,20 @@ msgstr "Показать скрытые книги"
 #: cps/spa_strings.py
 msgid "Show password"
 msgstr "Показать пароль"
+
+#: cps/spa_strings.py
+msgid ""
+"Show the global library again? Your selection is kept exactly as you left it "
+"— switch back any time and it is still there. At its next update, your e-"
+"reader syncs the global library."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Show {name} the global library again? Their selection is kept but no longer "
+"used, and their e-reader syncs the global library at the next update."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7000,6 +7289,13 @@ msgid "Source details"
 msgstr "Сведения об источнике"
 
 #: cps/spa_strings.py
+msgid ""
+"Start My Library? It begins as everything you can see now, so nothing "
+"changes until you remove books yourself. Your e-reader keeps the same books "
+"at its next update."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Start the only OAuth provider automatically"
 msgstr "Автоматически запускать единственного провайдера OAuth"
 
@@ -7011,13 +7307,17 @@ msgstr "Начато чтение"
 msgid "Starting scan…"
 msgstr "Запуск поиска…"
 
-#: cps/spa_strings.py
-msgid "Statistics dashboard"
-msgstr "Панель статистики"
-
 #: cps/spa_strings.py cps/templates/tasks.html
 msgid "Status"
 msgstr "Статус"
+
+#: cps/spa_strings.py
+msgid "Stock Kobo"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Stock Kobo sync URL"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
@@ -7031,6 +7331,25 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Support on Ko-fi →"
 msgstr "Поддержать на Ko-fi →"
+
+#: cps/spa_strings.py
+msgid ""
+"Switch back to My Library? Your library goes back to the books you had "
+"chosen — nothing was lost while you saw everything. At its next update, your "
+"e-reader returns to your selection."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Switch {name} back to My Library? Their chosen books are restored."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid ""
+"Switching a user to My Library first fills it with everything they can see "
+"now, so nothing changes for them until they remove books themselves. "
+"Switching back keeps the selection intact but unused."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Sync only my selected shelves"
@@ -7061,6 +7380,10 @@ msgstr "Теги — исключить"
 msgid "Tags — include"
 msgstr "Теги — включить"
 
+#: cps/spa_strings.py
+msgid "Tap Sync on the Kobo. Your NextGen books should appear."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Target aspect ratio"
@@ -7088,6 +7411,23 @@ msgstr "По этому URL нет подходящего изображения
 msgid ""
 "The book record, metadata, shelves, and reading state stay available. If "
 "this is the last format, you can add a replacement later."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "The global library"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The library is shared and holds every book once — what you keep is My "
+"Library. Nothing you had is gone. Every book, new arrivals included, is "
+"under Global Library in the menu."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The library is shared and holds every book once — what you keep is My "
+"Library. Nothing you had is gone. Your administrator manages what enters it."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7175,6 +7515,14 @@ msgstr "Лучшие по рейтингу"
 msgid "Trust authentication header"
 msgstr "Доверять заголовку аутентификации"
 
+#: cps/spa_strings.py
+msgid "Try My Library"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
+msgid "Try again"
+msgstr "Попробовать снова"
+
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Two columns"
 msgstr "Две колонки"
@@ -7187,10 +7535,6 @@ msgstr "Двусторонняя синхронизация активна"
 msgid "Two-way sync preference saved."
 msgstr "Настройка двусторонней синхронизации сохранена."
 
-#: cps/spa_strings.py
-msgid "UI / display configuration"
-msgstr "Настройки интерфейса и отображения"
-
 #: cps/spa_strings.py cps/templates/book_table.html
 msgid "Unarchive"
 msgstr "Разархивировать"
@@ -7198,6 +7542,10 @@ msgstr "Разархивировать"
 #: cps/spa_strings.py
 msgid "Undo"
 msgstr "Отменить"
+
+#: cps/spa_strings.py
+msgid "Undoing…"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unhide"
@@ -7256,6 +7604,14 @@ msgid "Uploading is not available for your account on this server."
 msgstr "Загрузка недоступна для вашего аккаунта на этом сервере."
 
 #: cps/spa_strings.py
+msgid "Use my own cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use the library cover"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Use these to connect OPDS readers or KOReader sync without your main "
 "password."
@@ -7280,6 +7636,10 @@ msgid "User object filter"
 msgstr "Фильтр объектов пользователей"
 
 #: cps/spa_strings.py
+msgid "User restrictions"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Userinfo URL"
 msgstr "URL информации о пользователе"
 
@@ -7292,6 +7652,10 @@ msgstr "Имя пользователя"
 #: cps/spa_strings.py
 msgid "Username claim"
 msgstr "Атрибут имени пользователя (Claim)"
+
+#: cps/spa_strings.py
+msgid "Users"
+msgstr "Список пользователей"
 
 #: cps/spa_strings.py
 msgid "Versions"
@@ -7312,6 +7676,10 @@ msgstr "Настройки отображения"
 #: cps/spa_strings.py
 msgid "Viewer"
 msgstr "Читалка"
+
+#: cps/spa_strings.py
+msgid "Waiting for a Kobo or KOReader to sync with this account."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Waiting for you to authorise…"
@@ -7391,6 +7759,12 @@ msgstr "Написать заметку…"
 
 #: cps/spa_strings.py
 msgid ""
+"You're probably a long time user of calibre-web. Please let us know your "
+"feedback on this, why or why not this works with your flow."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
 "Your Kobo is still set to sync your whole library, so marking this shelf "
 "does nothing on its own. Switch your account to shelf-only syncing to make "
 "it take effect."
@@ -7406,6 +7780,23 @@ msgstr "Ваша библиотека"
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
 msgstr "Ваш браузер не может воспроизвести этот аудиоформат."
+
+#: cps/spa_strings.py
+msgid ""
+"Your cover appears only to you and on books delivered to your e-readers. The "
+"library cover stays unchanged for everyone else, and administrators manage "
+"it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Your cover was updated."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Your own cover is private to you and your e-reader deliveries. The library "
+"cover stays unchanged for everyone else."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Your personal digital library"
@@ -7540,8 +7931,18 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{name} now uses My Library."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{name} removed."
 msgstr "Устройство {name} удалено."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} sees the global library again."
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7608,6 +8009,11 @@ msgstr "Получен ответ {ok} из {total} источников"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{percent}% read"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{seeded} of {total} books seeded"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8077,6 +8483,10 @@ msgstr "Неверный ID книги."
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
 msgstr "Тег не удалось удалить"
+
+#: cps/progress_syncing/protocols/kosync.py
+msgid "KOReader Sync Plugin"
+msgstr "Плагин синхронизации KOReader"
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -8597,6 +9007,10 @@ msgid "Check NextGen Status"
 msgstr "Проверить статус NextGen"
 
 #: cps/templates/admin.html
+msgid "Setup KOReader Sync"
+msgstr "Настроить синхронизацию KOReader"
+
+#: cps/templates/admin.html
 msgid "NextGen Library Conversion Service"
 msgstr "Служба конвертации библиотеки NextGen"
 
@@ -8917,6 +9331,11 @@ msgstr "Удалить"
 #: cps/templates/book_edit.html
 msgid "Add Identifier"
 msgstr "Добавить идентификатор"
+
+#: cps/templates/book_edit.html cps/templates/cover_picker.html
+#: cps/templates/detail.html
+msgid "Change cover"
+msgstr "Изменить обложку"
 
 #: cps/templates/book_edit.html
 msgid ""
@@ -9670,9 +10089,9 @@ msgstr ""
 
 #: cps/templates/config_edit.html
 msgid ""
-"On by default. Unchanged books are suppressed only when the device returns a "
-"valid but stale CWNG sync token. Requests without a valid CWNG token always "
-"receive the full library, including after a factory reset."
+"On by default. Books already acknowledged by the same reader are protected "
+"for every sync-token shape. Use Full Sync or resend to deliberately deliver "
+"them again."
 msgstr ""
 
 #: cps/templates/config_edit.html
@@ -11227,6 +11646,12 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
+"Hardcover auto-fetch is off. Reading-progress and annotation sync are "
+"unaffected."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
 "Hardcover sync is enabled. The schedule below controls automatic ID fetching."
 msgstr ""
 "Синхронизация с Hardcover включена. Расписание ниже управляет автоматическим "
@@ -11234,11 +11659,16 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"Hardcover sync is disabled. Enable it once in Basic Configuration or set "
-"HARDCOVER_SYNC_ENABLED=true."
+"Hardcover sync is disabled, and auto-fetch is off. Enable Hardcover sync "
+"separately in Basic Configuration when you want reading-progress or "
+"annotation sync."
 msgstr ""
-"Синхронизация с Hardcover отключена. Включите её один раз в основных "
-"настройках или установите HARDCOVER_SYNC_ENABLED=true."
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"Hardcover sync is disabled, so auto-fetch, reading-progress sync, and "
+"annotation sync are off."
+msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11253,6 +11683,10 @@ msgstr ""
 #: cps/templates/cwa_settings.html
 msgid "Run Schedule:"
 msgstr "Расписание запуска:"
+
+#: cps/templates/cwa_settings.html
+msgid "Never (auto-fetch off)"
+msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid "How often to automatically run the Hardcover ID fetch task"
@@ -11973,10 +12407,6 @@ msgid ""
 msgstr ""
 "Нет проблем - ваш отзыв нигде не был сохранён. Вы можете закрыть это окно "
 "или попробовать снова."
-
-#: cps/templates/cwng_feedback_popup.html
-msgid "Try again"
-msgstr "Попробовать снова"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Anonymize my feedback"
@@ -13317,10 +13747,6 @@ msgid "Flip Image"
 msgstr "Отразить изображение"
 
 #: cps/templates/readcbr.html
-msgid "Display"
-msgstr "Отображение"
-
-#: cps/templates/readcbr.html
 msgid "Single Page"
 msgstr "Одна страница"
 
@@ -14330,6 +14756,64 @@ msgstr "Показывать выбранные полки в OPDS"
 msgid "Show Read/Unread Section"
 msgstr "Показать раздел прочитанного/непрочитанного"
 
+#~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
+#~ msgstr ""
+#~ "Только файлы jpg/jpeg/png/webp/bmp поддерживаются в качестве обложки"
+
+#~ msgid "Invalid cover file content"
+#~ msgstr "Неверное содержимое файла обложки"
+
+#~ msgid "Only jpg/jpeg files are supported as coverfile"
+#~ msgstr "Только файлы jpg/jpeg поддерживаются в качестве обложки"
+
+#~ msgid ""
+#~ "Hardcover sync is disabled. Enable it once in Basic Configuration or set "
+#~ "HARDCOVER_SYNC_ENABLED=true."
+#~ msgstr ""
+#~ "Синхронизация с Hardcover отключена. Включите её один раз в основных "
+#~ "настройках или установите HARDCOVER_SYNC_ENABLED=true."
+
+#~ msgid "Basic configuration"
+#~ msgstr "Основные настройки"
+
+#~ msgid "CWA settings (ingest/convert)"
+#~ msgstr "Настройки CWA (импорт/конвертация)"
+
+#~ msgid "Database & library path"
+#~ msgstr "База данных и путь к библиотеке"
+
+#~ msgid "Duplicate detection settings"
+#~ msgstr "Настройки поиска дубликатов"
+
+#~ msgid "Full user table & restrictions"
+#~ msgstr "Полная таблица пользователей и ограничений"
+
+#~ msgid "Statistics dashboard"
+#~ msgstr "Панель статистики"
+
+#~ msgid "UI / display configuration"
+#~ msgstr "Настройки интерфейса и отображения"
+
+#~ msgid "Kobo setup"
+#~ msgstr "Настройка Kobo"
+
+#~ msgid "Manage your Kobo sync URL in the classic account page."
+#~ msgstr ""
+#~ "Управляйте URL для синхронизации Kobo на классической странице аккаунта."
+
+#~ msgid "More server configuration"
+#~ msgstr "Дополнительные настройки сервера"
+
+#~ msgid ""
+#~ "Pages marked below open in the classic view. Changes there apply to the "
+#~ "whole server."
+#~ msgstr ""
+#~ "Отмеченные ниже страницы открываются в классическом интерфейсе. Внесённые "
+#~ "там изменения применятся ко всему серверу."
+
+#~ msgid "Set up Kobo sync"
+#~ msgstr "Настроить синхронизацию с Kobo"
+
 #~ msgid "HTML is allowed and sanitized on display."
 #~ msgstr ""
 #~ "HTML-теги разрешены и очищаются от вредоносного кода при отображении."
@@ -15079,9 +15563,6 @@ msgstr "Показать раздел прочитанного/непрочит�
 #, fuzzy
 #~ msgid "Repeat for confirmation"
 #~ msgstr "Дополнительный Настройки"
-
-#~ msgid "Users"
-#~ msgstr "Список пользователей"
 
 #~ msgid "Click the cover to load metadata to the form"
 #~ msgstr "Нажмите на обложку, чтобы получить метаданные"

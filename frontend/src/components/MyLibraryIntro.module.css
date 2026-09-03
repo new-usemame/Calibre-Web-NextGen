@@ -1,0 +1,152 @@
+/* Server-wide "Try My Library" intro card — the same cool-teal notice family
+   as the app's top banners (--hb-* tokens, per-theme), promoted to a bordered
+   card with structure: title, pitch, arrowed points, demoted feedback line,
+   left-aligned actions. */
+
+.card {
+  position: relative;
+  border: 1px solid var(--hb-edge);
+  border-radius: var(--r-lg);
+  background: linear-gradient(120deg, var(--hb-bg-start) 0%, var(--hb-bg-mid) 60%, var(--hb-bg-end) 100%);
+  box-shadow: inset 3px 0 0 var(--hb-icon);
+  color: var(--hb-text);
+  padding: var(--sp-4) var(--sp-5);
+  margin-bottom: var(--sp-5);
+}
+
+.headRow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-2);
+}
+
+.titleIcon { color: var(--hb-icon); flex: none; }
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  color: var(--hb-text);
+}
+
+.body {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body, 1.5);
+  margin-bottom: var(--sp-2);
+}
+
+.points {
+  list-style: none;
+  margin: 0 0 var(--sp-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.points li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+}
+
+.pointIcon {
+  flex: none;
+  margin-top: 2px; /* optical: center the arrow on the first text line */
+  color: var(--hb-icon);
+}
+
+/* The feedback ask: deliberately demoted — smallest scale step, bold, muted. */
+.feedback {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  color: var(--hb-text);
+  opacity: 0.75;
+  margin-bottom: var(--sp-3);
+  max-width: 60ch;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start; /* bottom-left aligned, per spec */
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semi);
+  color: var(--on-accent);
+  background: var(--accent);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-4);
+  min-height: 32px;
+  transition: filter var(--dur-fast) var(--ease);
+}
+
+.primary:hover:not(:disabled) { filter: brightness(1.08); }
+.primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.soft {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  font-size: var(--fs-sm);
+  color: var(--hb-text);
+  background: transparent;
+  border: 1px solid var(--hb-edge);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+  min-height: 32px;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.soft:hover:not(:disabled) { background: color-mix(in srgb, var(--hb-edge) 25%, transparent); }
+.soft:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.small {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-xs);
+  opacity: 0.8;
+}
+
+.error {
+  margin-top: var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semi);
+  color: var(--danger);
+}
+
+/* The x-mark rides the top-right corner, same idiom as the top banners. */
+.close {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-md);
+  color: var(--hb-text);
+  opacity: 0.75;
+  transition: opacity var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+
+.close:hover:not(:disabled) {
+  opacity: 1;
+  background: color-mix(in srgb, var(--hb-edge) 25%, transparent);
+}
+
+.close:focus-visible { outline: 2px solid var(--hb-focus, var(--accent)); outline-offset: 2px; }
+
+@media (max-width: 600px) {
+  .card { padding: var(--sp-4) var(--sp-3); }
+  /* Keep the title clear of the corner dismiss button. */
+  .headRow { padding-right: var(--sp-6); }
+}

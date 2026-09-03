@@ -1483,18 +1483,25 @@ def test_furthest_wins_parent_clock_emits_state_without_entitlement(
     ).one()
     original_fingerprint = ledger.fingerprint
     original_book_clock = sync_harness.book.last_modified
+    original_state_clock = kobo.get_or_create_reading_state(
+        sync_harness.book.id,
+    ).last_modified
+    device_clock = (
+        original_state_clock + timedelta(seconds=1)
+    ).replace(microsecond=0)
+    assert device_clock > original_state_clock
     sync_harness.session.query(ub.DeviceReadingPosition).update({
         ub.DeviceReadingPosition.rehydrate_needed: False,
     })
     sync_harness.session.commit()
 
     written = sync_harness.put_position(
-        45.0, clock="2026-09-03T15:00:00Z",
+        45.0, clock=device_clock.strftime("%Y-%m-%dT%H:%M:%SZ"),
     )
     assert written.status_code == 200
     sync_harness.session.expire_all()
     state = sync_harness.session.query(ub.KoboReadingState).one()
-    assert state.last_modified == datetime(2026, 9, 3, 15, 0, 0)
+    assert state.last_modified == device_clock
     assert sync_harness.session.get(
         type(sync_harness.book), sync_harness.book.id,
     ).last_modified == original_book_clock

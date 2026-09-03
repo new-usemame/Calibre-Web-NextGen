@@ -27,7 +27,7 @@ Coverage:
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import sqlite3
 from types import SimpleNamespace
@@ -597,8 +597,19 @@ class TestNewerDeviceMerge:
         )
         before = session.query(ub.Annotation).filter_by(annotation_id="bm-002").one()
         before_revision = before.content_revision
+        observed_watermark = max(filter(None, (
+            before.client_modified_at,
+            before.server_modified_at,
+            before.last_synced,
+            before.created_at,
+        )))
+        device_clock = (
+            observed_watermark + timedelta(seconds=1)
+        ).replace(microsecond=0)
+        assert device_clock > observed_watermark
         self._edit_fixture(
-            synthetic_db, modified="2099-01-01T00:00:00Z",
+            synthetic_db,
+            modified=device_clock.strftime("%Y-%m-%dT%H:%M:%SZ"),
             text="edited passage", note="edited note", color=3,
         )
 
@@ -623,7 +634,7 @@ class TestNewerDeviceMerge:
         assert row.end_offset == 17
         assert row.context_string == "replacement context"
         assert row.chapter_progress == 0.91
-        assert row.client_modified_at == datetime(2099, 1, 1)
+        assert row.client_modified_at == device_clock
         assert row.content_revision == before_revision + 1
 
     def test_older_device_copy_reports_conflict_without_overwriting_server(

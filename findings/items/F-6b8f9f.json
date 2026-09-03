@@ -1,0 +1,17 @@
+{
+  "area": "kobo",
+  "body": "OBSERVED in the merged Kobo sync pipeline: acknowledging a rehydrate repair clears its device latch and stages a one-shot ChangedReadingState confirmation echo. If that echo page is still pending when the same reader presents a different partial, malformed, or store token, the non-CWNG reset path deletes the pending page. Entitlements can recover through acknowledged fingerprints, and ordinary repairs retain their latch, but the echo has neither once its predecessor acknowledgment committed. The unconfirmed state therefore disappears from the feed permanently. The resolution records rendered echo IDs in the private pending confirmation and re-arms still-entitled IDs when a non-CWNG token resets that page. New or changed entitlements defer state until their normal repair cycle; removals suppress state and discard the device repair journal only when acknowledged. Explicit failure exits and exceptions escaping later query or render work roll back the staged reset; exceptions outside that reset window retain their established HTTP 500 behavior. Exact acknowledgment remains terminal and non-chaining.",
+  "created": "2026-09-02",
+  "id": "F-6b8f9f",
+  "refs": [],
+  "resolution": {
+    "commit": "45583a626b",
+    "date": "2026-09-02",
+    "note": "Fixed by recording rendered echo IDs, retrying only still-entitled state across a non-CWNG reset, canceling repair on acknowledged removal, and rolling back staged reset work on both explicit aborts and escaping response-generation exceptions.",
+    "release": ""
+  },
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "resolved",
+  "title": "A non-CWNG token can discard an unconfirmed position echo after its latch was cleared"
+}

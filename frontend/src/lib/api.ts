@@ -227,6 +227,10 @@ export interface BookDetail {
   /** Density candidates for the detail cover (`sm` 1x, `md` 2x). Absent on
    *  older servers — fall back to `cover_url` alone. */
   cover_srcset?: string | null;
+  /** True when cover_url points at this viewer's private override. */
+  using_my_cover?: boolean;
+  /** The authoritative shared-library cover, unaffected by a private override. */
+  library_cover_url?: string | null;
   pubdate: string | null;
   date_added: string | null;
   last_modified: string | null;

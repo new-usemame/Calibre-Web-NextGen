@@ -1,0 +1,20 @@
+{
+  "area": "ci",
+  "body": "OBSERVED 2026-09-01: commit 29cc301acd (#2105) touched only findings/INDEX.md, three findings/items/*.json and state/E2E-FLAKE-LEDGER.md. docker-image-build-dev.yml run 33553423050 classified it image=true and ran build-arm + build-amd64 + merge (~10 min of paid multi-arch build) instead of \"Alias unchanged image to commit\".\n\nCause: scripts/ci_path_classification.py:image_paths_changed() decides neutrality from a hand-maintained list (.md, docs/, tests/, .github/). .dockerignore is the actual SSOT for what enters the build context and already excludes findings, state, notes, drafts, examples, docs, changelog.d, local-dev, wiki-src, homepage, kubernetes, feedback-server, tests/ and more. Any file excluded from the context cannot change image bytes, so every ledger/notes/state commit pays for a full rebuild it cannot need. Conversely the hand list is not proven complete in the other direction either.\n\nCaveat for the fix: .dockerignore also lists Dockerfile and .github (docker reads the Dockerfile outside the context; the build workflow supplies build args), so \"excluded from context\" is NOT the same as \"cannot affect the image\" for those; the classifier must keep them image-relevant.",
+  "created": "2026-09-01",
+  "id": "F-3b30c7",
+  "refs": [
+    "#2105",
+    "#1956"
+  ],
+  "resolution": {
+    "commit": "76d43c61f9",
+    "date": "2026-09-01",
+    "note": "Shipped in #2110 (squash of 5a243c47a5): classifier derives from .dockerignore with explicit out-of-context inputs; PR consumers archive the base policy.",
+    "release": ""
+  },
+  "severity": "perf",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Image path classifier rebuilds the dev image for commits .dockerignore proves image-neutral"
+}

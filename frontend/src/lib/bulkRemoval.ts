@@ -6,17 +6,15 @@ import type { BulkFailureDetail } from './bulkResults';
 export const LAST_BOOK_REMOVAL_SERVER_MESSAGE =
   'The last book cannot be removed unless this user can browse the global library.';
 
-export function uniqueBulkRemovalFailureReasons(
-  details: readonly BulkFailureDetail[],
+export function bulkRemovalFailureReason(
+  detail: BulkFailureDetail,
   t: TFunction,
-): string[] {
-  return [...new Set(details.map((detail) => {
-    if (detail.code === 'library_membership_rejected'
-        && detail.message === LAST_BOOK_REMOVAL_SERVER_MESSAGE) {
-      return t('The last book cannot be removed unless you can browse the global library.');
-    }
-    // Unknown server policies must stay visible and verbatim: translating or
-    // paraphrasing an unrecognised reason would invent meaning.
-    return detail.message;
-  }).filter(Boolean))];
+): string {
+  if (detail.code === 'library_membership_rejected'
+      && detail.message === LAST_BOOK_REMOVAL_SERVER_MESSAGE) {
+    return t('The last book cannot be removed unless you can browse the global library.');
+  }
+  // Unknown server policies must stay visible and verbatim: translating or
+  // paraphrasing an unrecognised reason would invent meaning.
+  return detail.message;
 }

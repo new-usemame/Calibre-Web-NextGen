@@ -6,7 +6,7 @@
 # backend bytes that the subject commit does not contain.
 set -euo pipefail
 
-usage="usage: alias-e2e-image.sh IMAGE SOURCE_SHA SUBJECT_SHA [ATTEMPTS] [DELAY_SECONDS] [PRODUCER_REPOSITORY PRODUCER_EVENT API_URL]"
+usage="usage: alias-e2e-image.sh IMAGE SOURCE_SHA SUBJECT_SHA [ATTEMPTS] [DELAY_SECONDS] [PRODUCER_REPOSITORY PRODUCER_EVENT API_URL [RECOVERY_OUTPUT]]"
 image="${1:?$usage}"
 source_sha="${2:?$usage}"
 subject_sha="${3:?$usage}"
@@ -15,6 +15,7 @@ delay_seconds="${5:-30}"
 producer_repository="${6:-}"
 producer_event="${7:-}"
 api_url="${8:-}"
+recovery_output="${9:-}"
 repo_root="${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}"
 classifier="${CLASSIFIER_PATH:-$repo_root/scripts/ci_path_classification.py}"
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -29,6 +30,10 @@ if ! [[ "$attempts" =~ ^[1-9][0-9]*$ && "$delay_seconds" =~ ^[0-9]+$ ]]; then
   exit 2
 fi
 if [[ -n "$producer_repository" ]] && [[ -z "$producer_event" || -z "$api_url" ]]; then
+  echo "$usage" >&2
+  exit 2
+fi
+if [[ -n "$recovery_output" && -z "$producer_repository" ]]; then
   echo "$usage" >&2
   exit 2
 fi
@@ -58,11 +63,20 @@ for ((attempt = 1; attempt <= attempts; attempt++)); do
     break
   fi
   if [[ -n "$producer_repository" ]]; then
-    if python3 "$producer_check" \
+    if python3 "$producer_check" --terminal-exit-code 75 \
       "$producer_repository" "$source_sha" "$producer_event" "$api_url"; then
       :
     else
-      exit $?
+      producer_status=$?
+      if [[ "$producer_status" == 75 && -n "$recovery_output" ]]; then
+        printf 'recovery_build=true\n' >> "$recovery_output"
+        echo "Source image is terminally unavailable; building exact subject $subject_sha instead." >&2
+        exit 0
+      fi
+      # Preserve the aliaser's ordinary one-bit failure contract outside the
+      # workflow recovery mode. Unknown API state must never authorize a copy
+      # or be mistaken for a known terminal producer.
+      exit 1
     fi
   fi
   if (( attempt < attempts )); then

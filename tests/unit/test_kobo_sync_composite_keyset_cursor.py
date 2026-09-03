@@ -238,20 +238,18 @@ class TestCursorAdvanceWritesBooksLastId:
             "'id > -1' must match every valid id at that ts."
         )
 
-    def test_batch_materialized_once_into_books_list(self):
+    def test_each_bounded_candidate_page_is_materialized_once(self):
         src = _function_source(KOBO_PY, "HandleSyncRequest")
-        # The pre-fix shape called `books = changed_entries.limit(...)` then
-        # `len(books.all())` for logging, then `for book in books` — that
-        # round-tripped the joined-load query twice per sync request.
-        assert "books_list = changed_entries.limit(SYNC_ITEM_LIMIT).all()" in src, (
-            "The query must materialize into 'books_list' exactly once. "
-            "Iterating a lazy .limit() result twice (once for the count log, "
-            "once for the for-loop) runs the joined-load query twice — "
-            "doubles DB load on every Kobo sync request."
+        # Replay top-up may need several SQL chunks, but each chunk must be
+        # materialized once and iterated in memory. Re-running one lazy query
+        # for logging and delivery doubles the joined-load work.
+        assert "for candidate_page in _bounded_query_pages(" in src, (
+            "The handler must consume the finite page generator used to top "
+            "up past exact replay candidates."
         )
-        assert "for book in books_list:" in src, (
-            "The for-loop must iterate over 'books_list' (the materialized "
-            "result), not a fresh .limit() query."
+        assert "for book in candidate_page:" in src, (
+            "Each materialized candidate page must be iterated directly, not "
+            "re-issued as a second lazy query."
         )
 
 

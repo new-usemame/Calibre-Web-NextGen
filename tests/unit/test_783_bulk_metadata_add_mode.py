@@ -56,7 +56,7 @@ def _run(body):
     app = flask.Flask(__name__)
     book = _book()
     database = SimpleNamespace(
-        get_book=lambda _id: book,
+        get_filtered_book=lambda *args, **kwargs: book,
         get_cc_columns=lambda *args, **kwargs: [],
     )
     core = MagicMock(return_value=_SUCCESS)

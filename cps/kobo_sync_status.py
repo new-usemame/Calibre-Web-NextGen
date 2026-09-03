@@ -74,11 +74,12 @@ def add_synced_books_batch(book_identities, *, commit=True):
     return ub.session_commit() if commit else True
 
 
-def get_device_entitlement_fingerprints(device_id, book_ids):
+def get_device_entitlement_fingerprints(device_id, book_ids, *, _session=None):
     """Return the last delivered ledger record for each candidate book."""
     if not device_id or not book_ids:
         return {}
-    rows = ub.session.query(
+    query_session = _session or ub.session
+    rows = query_session.query(
             ub.KoboDeviceBookEntitlement.book_id,
             ub.KoboDeviceBookEntitlement.fingerprint,
             ub.KoboDeviceBookEntitlement.payload_schema_version,
@@ -132,11 +133,14 @@ def stage_device_entitlement_fingerprints(
         ub.session.execute(statement)
 
 
-def get_device_deleted_entitlement_fingerprints(device_id, book_uuids):
+def get_device_deleted_entitlement_fingerprints(
+    device_id, book_uuids, *, _session=None,
+):
     """Return delivered hard-delete ledger records for one device."""
     if not device_id or not book_uuids:
         return {}
-    rows = ub.session.query(
+    query_session = _session or ub.session
+    rows = query_session.query(
             ub.KoboDeviceDeletedEntitlement.book_uuid,
             ub.KoboDeviceDeletedEntitlement.fingerprint,
             ub.KoboDeviceDeletedEntitlement.payload_schema_version,

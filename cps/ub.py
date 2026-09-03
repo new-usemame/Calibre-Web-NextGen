@@ -878,6 +878,22 @@ class UserLibraryBook(Base):
     )
 
 
+class UserBookCover(Base):
+    """One viewer's cover choice for one global Calibre book.
+
+    Image bytes live below CONFIG_DIR, never in the shared Calibre library.
+    ``book_id`` cannot be a foreign key because metadata.db and app.db are
+    separate databases.
+    """
+    __tablename__ = 'user_book_cover'
+
+    user_id = Column(Integer, ForeignKey('user.id', ondelete='CASCADE'),
+                     primary_key=True)
+    book_id = Column(Integer, primary_key=True)
+    updated_at = Column(DateTime, nullable=False,
+                        default=lambda: datetime.now(timezone.utc))
+
+
 class KoboSyncedBooks(Base):
     __tablename__ = 'kobo_synced_books'
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -936,8 +952,9 @@ class KoboDeviceDeletedEntitlement(Base):
 
     Hard-deleted books no longer have a calibre ``book_id``.  Keep their UUID
     replay state separate from the live-book ledger so a stale archive cursor
-    cannot re-offer the same ``IsRemoved`` entitlement forever, while another
-    device and a tokenless factory-reset sync can still receive it.
+    cannot re-offer the same ``IsRemoved`` entitlement forever. Another device
+    still has its own ledger, and an explicit Full Sync clears this row before
+    requesting deliberate re-delivery.
     """
     __tablename__ = 'kobo_device_deleted_entitlement'
 
@@ -2289,6 +2306,7 @@ def add_missing_tables(engine, _session):
         ("kobo_annotation_backup", KoboAnnotationBackup.__table__),
         ("favorite_book", FavoriteBook.__table__),
         ("user_library_book", UserLibraryBook.__table__),
+        ("user_book_cover", UserBookCover.__table__),
         ("device_inventory_report", DeviceInventoryReport.__table__),
         ("device_inventory_item", DeviceInventoryItem.__table__),
         ("device_book_delivery", DeviceBookDelivery.__table__),
@@ -3499,6 +3517,13 @@ def migrate_book_cover_preview_table(engine, _session):
             )
         except Exception as e:
             print(f"[cover-preview-migration] Could not create idx_bcp_user_locked: {e}", flush=True)
+
+
+def migrate_user_book_cover_table(engine, _session):
+    """Create per-user cover metadata on upgraded app.db files."""
+    Base.metadata.create_all(
+        engine, tables=[UserBookCover.__table__], checkfirst=True,
+    )
 
 
 def migrate_notice_tables(engine, _session):
@@ -4846,6 +4871,7 @@ def migrate_Database(_session):
     migrate_kobo_annotation_seed_pipeline(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
     migrate_book_cover_preview_table(engine, _session)
+    migrate_user_book_cover_table(engine, _session)
     migrate_notice_tables(engine, _session)
     migrate_kepub_package_repair_disposition(engine, _session)
     migrate_dismissed_duplicate_groups_table(engine, _session)

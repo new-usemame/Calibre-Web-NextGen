@@ -312,6 +312,7 @@ def test_upstream_auth_failure_with_json_list_is_propagated(app, monkeypatch, st
 def test_annotation_get_for_unowned_content_still_proxies(app, monkeypatch):
     sentinel = object()
     monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: None)
+    monkeypatch.setattr(rs, "_possible_annotation_ownership", lambda _content_id: {})
     monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
     with app.test_request_context(
         f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
@@ -319,24 +320,34 @@ def test_annotation_get_for_unowned_content_still_proxies(app, monkeypatch):
         assert _view(rs.handle_annotations)(OWNED) is sentinel
 
 
-def test_unauthenticated_annotation_get_does_not_resolve_ownership(app, monkeypatch):
-    sentinel = object()
+def test_unauthenticated_owned_annotation_get_fails_closed(app, monkeypatch):
     monkeypatch.setattr(rs.config, "config_kobo_sync", True, raising=False)
     monkeypatch.setattr(
         rs, "current_user", SimpleNamespace(is_authenticated=False, id=None),
     )
     monkeypatch.setattr(
         rs, "resolve_entitlement_ownership",
-        lambda _content_id: pytest.fail("pre-auth annotation GET must not expose ownership"),
+        lambda _content_id: SimpleNamespace(id=347, uuid=OWNED),
     )
-    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services", lambda: sentinel)
+    monkeypatch.setattr(rs, "_possible_annotation_ownership", lambda _content_id: {})
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda: pytest.fail("unauthenticated owned GET must not contact Kobo"),
+    )
     decorated = rs.requires_reading_services_auth_and_config(
-        lambda: pytest.fail("unauthenticated request must not reach handler")
+        lambda _entitlement_id: pytest.fail(
+            "unauthenticated request must not reach handler"
+        )
     )
     with app.test_request_context(
         f"/api/v3/content/{OWNED}/annotations?limit=100", method="GET",
     ):
-        assert decorated() is sentinel
+        response = decorated(OWNED)
+
+    assert response.status_code == 503
+    assert response.get_json() == {
+        "error": "Authoritative annotation set temporarily unavailable",
+    }
 
 
 def test_unauthenticated_annotation_patch_is_not_acknowledged_upstream(app, monkeypatch):

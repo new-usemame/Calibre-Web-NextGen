@@ -14,11 +14,16 @@ installs the package editable (Dockerfile STEP 6,
 cwd. The container's own working directory is ``/config``, not the app root,
 so nothing else was holding that invocation up.
 
-Dropping the chdir has a second consequence the units now guard with ``-P``:
-``python -m`` puts the cwd at ``sys.path[0]``, and the cwd here is ``/config``
--- a volume the *user* mounts and writes. A stray ``/config/cps.py`` or
-``/config/cps/`` would be imported in place of the application. Verified: both
-forms hijack startup without ``-P`` and are ignored with it.
+Dropping the chdir has a second consequence the units guard in three parts.
+``-P`` prevents ``python -m`` from putting the user-mounted ``/config`` cwd at
+``sys.path[0]``; removing ``PYTHONPATH`` prevents an injected environment path
+from outranking the editable install; and ``PYTHONNOUSERSITE=1`` excludes user
+site ``.pth`` and ``usercustomize`` hooks, including a user base redirected
+under ``/config``. The image-controlled system site remains enabled because its
+editable ``.pth`` resolves the application from ``/app/calibre-web-automated``.
+Its ``.pth`` and any system ``sitecustomize`` are trusted image contents, not
+covered as runtime input. Verified: cwd and hostile ``PYTHONPATH`` copies both
+hijack the corresponding weaker command and are ignored by their control.
 
 That makes the entry point a real contract with three halves and no coverage:
 
@@ -27,7 +32,8 @@ That makes the entry point a real contract with three halves and no coverage:
    making it work in production, so every test here runs from ``tmp_path``.
 2. ``cps.py`` must keep working, because bare-metal and systemd installs (and
    ``AI_README.md``) still invoke it by path.
-3. The cwd must not be able to supply the ``cps`` that gets imported.
+3. Neither the cwd nor runtime-controlled Python path/user-site inputs may
+   supply the ``cps`` that gets imported.
 
 Without a pin, a later edit can silently restore cwd-dependence or drop
 ``__main__.py`` and the failure only shows up as a container that will not
@@ -36,8 +42,11 @@ redirects to ``/dev/null``.
 """
 
 import ast
+import os
+import shutil
 import subprocess
 import sys
+import venv
 from pathlib import Path
 
 import pytest
@@ -223,10 +232,106 @@ class TestS6UnitsUseTheModule:
     def test_unit_invokes_the_module_with_safe_path(self, unit):
         body = unit.read_text()
 
-        assert "python3 -P -m cps" in body, (
-            f"{unit.name} must start the app as a module with -P; without it the "
-            f"unit's cwd (/config, user-writable) lands on sys.path[0].\nfound:\n{body}"
+        command = "/usr/bin/env -u PYTHONPATH PYTHONNOUSERSITE=1 python3 -P -m cps"
+        assert command in body, (
+            f"{unit.name} must start the app with a clean import environment: "
+            "-P excludes the /config cwd, -u excludes an injected PYTHONPATH, "
+            "and PYTHONNOUSERSITE excludes /config-derived user site hooks.\n"
+            f"found:\n{body}"
         )
+
+    def test_hostile_pythonpath_cannot_shadow_the_editable_application(self, tmp_path):
+        """RED before F-9ca4a5: ``-P`` alone still honors PYTHONPATH.
+
+        The clean lookup is the image's editable application install (under
+        ``/app/calibre-web-automated`` in Docker).  The attacked lookup starts
+        with a hostile ``PYTHONPATH`` and runs through the exact ``env`` policy
+        pinned in both units above; it must resolve to the same trusted module.
+        ``find_spec`` avoids importing the Flask application and its optional
+        runtime dependencies just to inspect the selected path.
+        """
+        # Reproduce the image's import topology without importing the Flask
+        # application: an image-controlled site-packages .pth points at the
+        # /app-shaped application root, while deployment input supplies a
+        # competing PYTHONPATH. This avoids accidentally testing whichever
+        # editable checkout happens to be installed in the developer's Python.
+        app_root = tmp_path / "app" / "calibre-web-automated"
+        app_package = app_root / "cps"
+        app_package.mkdir(parents=True)
+        shutil.copyfile(REPO_ROOT / "cps" / "__init__.py", app_package / "__init__.py")
+
+        venv_dir = tmp_path / "venv"
+        venv.EnvBuilder(with_pip=False).create(venv_dir)
+        venv_python = venv_dir / "bin" / "python"
+        site_packages = Path(
+            subprocess.run(
+                [
+                    venv_python,
+                    "-P",
+                    "-c",
+                    "import site; print(site.getsitepackages()[0])",
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+            ).stdout.strip()
+        )
+        (site_packages / "cwa-editable.pth").write_text(f"{app_root}\n")
+
+        poison = tmp_path / "poison"
+        poison.mkdir()
+        (poison / "cps.py").write_text("# hostile PYTHONPATH module\n")
+        lookup = (
+            "import importlib.util; "
+            "spec = importlib.util.find_spec('cps'); "
+            "print(spec.origin if spec else 'NOT_FOUND')"
+        )
+        attacked_env = {**os.environ, "PYTHONPATH": str(poison)}
+        clean_env = dict(attacked_env)
+        clean_env.pop("PYTHONPATH")
+        clean_env["PYTHONNOUSERSITE"] = "1"
+
+        control = subprocess.run(
+            [venv_python, "-P", "-c", lookup],
+            cwd=tmp_path,
+            env=attacked_env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        trusted = subprocess.run(
+            [venv_python, "-P", "-c", lookup],
+            cwd=tmp_path,
+            env=clean_env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        hardened = subprocess.run(
+            [
+                shutil.which("env") or "/usr/bin/env",
+                "-u",
+                "PYTHONPATH",
+                "PYTHONNOUSERSITE=1",
+                venv_python,
+                "-P",
+                "-c",
+                lookup,
+            ],
+            cwd=tmp_path,
+            env=attacked_env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        assert Path(control.stdout.strip()).is_relative_to(poison)
+        assert Path(trusted.stdout.strip()).is_relative_to(app_root)
+        assert hardened.stdout == trusted.stdout
+        assert Path(hardened.stdout.strip()).is_relative_to(app_root)
+
+        dockerfile = (REPO_ROOT / "Dockerfile").read_text()
+        assert "-e /app/calibre-web-automated" in dockerfile
 
     @pytest.mark.parametrize("unit", [SVC_RUN, INIT_RUN], ids=["svc", "cwa-init"])
     def test_unit_does_not_reintroduce_the_script_path(self, unit):
@@ -252,8 +357,8 @@ class TestFailedFirstRunLeavesNoPhantomDatabase:
     """cwa-init must not invent an app.db the initializer failed to create.
 
     `sqlite3 <path>` creates the file it is pointed at. Running it after a
-    failed `python3 -P -m cps -d` therefore replaces "no database" with a
-    0-byte one, and cps.ub.init_db() branches on os.path.exists(): the
+    failed hardened `python3 -P -m cps -d` therefore replaces "no database"
+    with a 0-byte one, and cps.ub.init_db() branches on os.path.exists(): the
     existing-file branch migrates, and only the fresh branch calls
     create_admin_user()/create_anonymous_user(). The user gets a schema with no
     admin account, no login, and no retry -- the enclosing

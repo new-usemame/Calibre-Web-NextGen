@@ -441,14 +441,15 @@ jobs:
           # tree. The introducing PR has no trusted base implementation, so it
           # fails closed into every expensive gate instead of self-certifying.
           classifier_ref="$BASE_SHA"
-          if ! git cat-file -e "$classifier_ref:scripts/ci_path_classification.py"; then
-            echo "::warning::Base has no path classifier; enabling every path-derived gate"
+          if ! git cat-file -e "$classifier_ref:scripts/ci_path_classification.py" \
+            || ! git cat-file -e "$classifier_ref:.dockerignore"; then
+            echo "::warning::Base has no trusted classifier policy; enabling every path-derived gate"
             printf 'frontend=true\nbuild=true\nconcurrency=true\nimage=true\n' >> "$GITHUB_OUTPUT"
             exit 0
           fi
           classifier_root="$RUNNER_TEMP/base-path-classifier"
           mkdir -p "$classifier_root"
-          git archive "$classifier_ref" cps scripts/ci_path_classification.py \
+          git archive "$classifier_ref" cps .dockerignore scripts/ci_path_classification.py \
             | tar -x -C "$classifier_root"
           printf '%s\n' "$files" \
             | python3 "$classifier_root/scripts/ci_path_classification.py" \
@@ -911,7 +912,21 @@ jobs:
           python3 -c 'import json,sys; d=json.load(open("/tmp/ml.json")); sys.exit(0 if d.get("verify_url") else 1)' \
             || { echo "::error::magic-link/start returned 200 with no verify_url"; cat /tmp/ml.json; exit 1; }
 
+      - name: Resolve Playwright browser version
+        id: playwright-version
+        working-directory: frontend
+        run: |
+          version=$(node -p "require('./package-lock.json').packages['node_modules/playwright-core'].version")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}
+
       - name: Install Playwright
+        timeout-minutes: 3
         working-directory: frontend
         run: |
           npm ci

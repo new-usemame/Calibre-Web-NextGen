@@ -1,4 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
+
+// Playwright serializes config metadata to its workers, giving every ownership
+// record from one invocation the same durable run id without a user-facing env.
+const E2E_RUN_ID = randomUUID();
 
 /*
  * SPA end-to-end harness — Layer 2 of the verification system (notes/verify/).
@@ -38,6 +43,7 @@ const HOSTILE_LOAD_PROFILES = ['css-slow', 'script-slow'] as const;
 const serverStateEnabled = process.env.E2E_SERVER_STATE === '1';
 
 export default defineConfig({
+  metadata: { cwngE2ERunId: E2E_RUN_ID },
   testDir: './e2e',
   outputDir: './e2e/.results',
   fullyParallel: true,

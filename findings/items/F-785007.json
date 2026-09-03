@@ -1,0 +1,13 @@
+{
+  "area": "kobo",
+  "body": "OBSERVED in cps/kobo.py and cps/kobo_sync_status.py during #2143 review: the changed-book candidate query is armed by book or membership cursors and missing live-ledger rows, but not by ArchivedBook.last_modified. change_archived_books can flip is_archived and update only the ArchivedBook timestamp. A path that unarchives without also advancing Books.last_modified or clearing the physical-device live ledger therefore has no candidate arm to reannounce the book.\n\nASSUMED from the independent real-handler reproduction supplied in #2143 review: after an archive removal was acknowledged, flipping the server row back to unarchived produced no NewEntitlement or ChangedEntitlement, leaving the reader without the book. This implementation leg traced the source condition but deliberately did not add that separate product fix.\n\nOBSERVED scope: this gap predates #2143 and reverting the archive-cursor floor does not change live-book candidate selection. It is recorded separately so the cursor/tombstone repair remains focused.",
+  "created": "2026-09-02",
+  "id": "F-785007",
+  "refs": [
+    "#2143"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Kobo unarchive can leave a removed book absent from the reader"
+}

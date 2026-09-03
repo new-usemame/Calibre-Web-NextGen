@@ -233,7 +233,7 @@
       <div class="form-group" style="margin-left:10px;">
         <input type="checkbox" id="config_kobo_suppress_replayed_entitlements" name="config_kobo_suppress_replayed_entitlements" {% if config.config_kobo_suppress_replayed_entitlements %}checked{% endif %} aria-describedby="kobo-replay-suppression-help">
         <label for="config_kobo_suppress_replayed_entitlements">{{_('Suppress unchanged Kobo entitlement replays')}}</label>
-        <p id="kobo-replay-suppression-help" class="help-block">{{_('On by default. Unchanged books are suppressed only when the device returns a valid but stale CWNG sync token. Requests without a valid CWNG token always receive the full library, including after a factory reset.')}}</p>
+        <p id="kobo-replay-suppression-help" class="help-block">{{_('On by default. Books already acknowledged by the same reader are protected for every sync-token shape. Use Full Sync or resend to deliberately deliver them again.')}}</p>
       </div>
       <div class="form-group" style="margin-left:10px;">
         <label for="config_external_port">{{_('Server External Port (for port forwarded API calls)')}}</label>

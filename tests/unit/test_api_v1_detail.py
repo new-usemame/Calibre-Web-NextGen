@@ -211,6 +211,71 @@ def test_detail_endpoint_found():
 
 
 @pytest.mark.unit
+def test_global_detail_hides_member_state_for_non_member():
+    """Global metadata remains visible without leaking retained personal state."""
+    from cps.api import books as books_mod
+    from cps import ub
+
+    fake_book = _make_book()
+    membership_query = MagicMock()
+    membership_query.filter.return_value.first.return_value = None
+    user_session = SimpleNamespace(query=MagicMock(return_value=membership_query))
+    editor = SimpleNamespace(
+        id=17,
+        is_authenticated=True,
+        is_anonymous=False,
+        role_browse_global=lambda: True,
+    )
+    app = flask.Flask(__name__)
+    app.config["WTF_CSRF_ENABLED"] = False
+
+    with app.test_request_context("/api/v1/books/42"):
+        with patch.object(
+            books_mod.calibre_db, "get_book_read_archived",
+            return_value=(fake_book, ub.ReadBook.STATUS_FINISHED, True),
+        ) as get_book, \
+        patch.object(books_mod.user_library, "mode_for_user",
+                     return_value=books_mod.constants.LIBRARY_MODE_PERSONAL), \
+        patch.object(books_mod.ub, "session", user_session), \
+        patch.object(books_mod.config, "config_read_column", 0, create=True), \
+        patch.object(books_mod.calibre_db, "get_cc_columns", return_value=[]), \
+        patch.object(books_mod, "current_user", editor), \
+        patch.object(books_mod, "count_user_annotations") as annotations, \
+        patch.object(books_mod, "get_kosync_progress_display") as progress, \
+        patch.object(books_mod, "book_is_in_progress") as in_progress, \
+        patch.object(books_mod, "_original_filename", return_value=None), \
+        patch.object(books_mod, "get_convert_options", return_value=([], [])), \
+        patch.object(books_mod.user_cover, "override_for_user", return_value=None), \
+        patch("cps.api.books.get_locale", return_value="en"), \
+        patch("cps.api.books.isoLanguages.get_language_name", return_value="English"):
+            response = inspect.unwrap(books_mod.book_detail)(42)
+
+    body = json.loads(response.get_data(as_text=True))
+    assert response.status_code == 200
+    assert body["id"] == 42
+    assert body["in_my_library"] is False
+    assert body["read"] is False
+    assert body["archived"] is False
+    assert body["favorited"] is False
+    assert body["hidden"] is False
+    assert body["in_progress"] is False
+    assert body["annotation_count"] == 0
+    assert body["kosync_progress"] is None
+    assert body["kosync_progress_timestamp"] is None
+    assert body["kosync_progress_created_at"] is None
+    annotations.assert_not_called()
+    progress.assert_not_called()
+    in_progress.assert_not_called()
+    get_book.assert_called_once_with(
+        42,
+        0,
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        allow_show_global=True,
+    )
+
+
+@pytest.mark.unit
 def test_detail_endpoint_not_found():
     from cps.api import books as books_mod
 
@@ -229,6 +294,41 @@ def test_detail_endpoint_not_found():
     assert resp[1] == 404
     data = json.loads(resp[0].get_data(as_text=True))
     assert data["error"]["code"] == "not_found"
+
+
+@pytest.mark.unit
+def test_non_global_viewer_cannot_open_an_unowned_global_detail():
+    """The new deep link bypasses membership only for browse-global users."""
+    from cps.api import books as books_mod
+
+    viewer = SimpleNamespace(
+        id=17,
+        is_authenticated=True,
+        is_anonymous=False,
+        role_browse_global=lambda: False,
+    )
+    app = flask.Flask(__name__)
+    app.config["WTF_CSRF_ENABLED"] = False
+
+    with app.test_request_context("/api/v1/books/42"), \
+            patch.object(books_mod, "current_user", viewer), \
+            patch.object(books_mod.config, "config_read_column", 0, create=True), \
+            patch.object(
+                books_mod.calibre_db,
+                "get_book_read_archived",
+                return_value=None,
+            ) as lookup:
+        response, status = inspect.unwrap(books_mod.book_detail)(42)
+
+    assert status == 404
+    assert json.loads(response.get_data())["error"]["code"] == "not_found"
+    lookup.assert_called_once_with(
+        42,
+        0,
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        allow_show_global=False,
+    )
 
 
 @pytest.mark.unit

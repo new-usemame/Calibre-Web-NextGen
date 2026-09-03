@@ -81,7 +81,7 @@ def test_custom_column_key_reaches_the_edit_core():
     with _ctx("/api/v1/books/5/metadata", body={"custom_column_7": 250}):
         with patch.object(mod, "current_user", _editor()), \
              patch.object(mod, "calibre_db", SimpleNamespace(
-                 get_book=lambda _id: _book(custom_column_7=[]),
+                 get_filtered_book=lambda *a, **k: _book(custom_column_7=[]),
                  get_cc_columns=lambda *a, **k: [col])), \
              patch.object(mod, "edit_book_param", return_value=_SUCCESS) as core, \
              patch.object(mod, "get_locale", return_value="en"):
@@ -102,7 +102,7 @@ def test_unknown_custom_column_is_an_error_not_a_silent_success():
     with _ctx("/api/v1/books/5/metadata", body={"custom_column_99": "x"}):
         with patch.object(mod, "current_user", _editor()), \
              patch.object(mod, "calibre_db", SimpleNamespace(
-                 get_book=lambda _id: _book(),
+                 get_filtered_book=lambda *a, **k: _book(),
                  get_cc_columns=lambda *a, **k: [_column(7, "int")])), \
              patch.object(mod, "edit_book_param", return_value=_SUCCESS) as core, \
              patch.object(mod, "get_locale", return_value="en"):
@@ -120,7 +120,7 @@ def test_absent_custom_column_is_not_written():
     with _ctx("/api/v1/books/5/metadata", body={"title": "New"}):
         with patch.object(mod, "current_user", _editor()), \
              patch.object(mod, "calibre_db", SimpleNamespace(
-                 get_book=lambda _id: _book(custom_column_7=[_row(120)]),
+                 get_filtered_book=lambda *a, **k: _book(custom_column_7=[_row(120)]),
                  get_cc_columns=lambda *a, **k: [_column(7, "int")])), \
              patch.object(mod, "edit_book_param", return_value=_SUCCESS) as core, \
              patch.object(mod, "get_locale", return_value="en"):
@@ -137,7 +137,7 @@ def test_custom_column_failure_is_surfaced_per_field():
     with _ctx("/api/v1/books/5/metadata", body={"custom_column_7": "9"}):
         with patch.object(mod, "current_user", _editor()), \
              patch.object(mod, "calibre_db", SimpleNamespace(
-                 get_book=lambda _id: _book(custom_column_7=[]),
+                 get_filtered_book=lambda *a, **k: _book(custom_column_7=[]),
                  get_cc_columns=lambda *a, **k: [_column(7, "int")])), \
              patch.object(mod, "edit_book_param", return_value=failure), \
              patch.object(mod, "get_locale", return_value="en"):
@@ -271,7 +271,7 @@ def test_invalid_value_never_reaches_the_write_core():
     with _ctx("/api/v1/books/5/metadata", body={"custom_column_6": "not-a-number"}):
         with patch.object(mod, "current_user", _editor()), \
              patch.object(mod, "calibre_db", SimpleNamespace(
-                 get_book=lambda _id: _book(),
+                 get_filtered_book=lambda *a, **k: _book(),
                  get_cc_columns=lambda *a, **k: [_column(6, "rating")])), \
              patch.object(mod, "edit_book_param", return_value=_SUCCESS) as core, \
              patch.object(mod, "get_locale", return_value="en"):

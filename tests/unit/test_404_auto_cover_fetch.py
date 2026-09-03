@@ -62,6 +62,14 @@ class _FakeCDB:
         self.session = _FakeSession()
 
 
+class _StagedCover:
+    def publish(self):
+        return True, None
+
+    def discard(self):
+        return True, None
+
+
 def _metadata(cover):
     return types.SimpleNamespace(title="", cover=cover)
 
@@ -90,7 +98,7 @@ def harness(monkeypatch):
     state = {
         "settings": _settings(),
         "save_calls": [],
-        "save_result": (True, None),
+        "save_result": (_StagedCover(), None),
         "locked": False,
         "thumb_calls": [],
     }

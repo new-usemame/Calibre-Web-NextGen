@@ -4,8 +4,14 @@
   "created": "2026-09-01",
   "id": "F-8cb0c9",
   "refs": [],
+  "resolution": {
+    "commit": "87b09a3a47",
+    "date": "2026-09-01",
+    "note": "Shipped in #2107: one ordered reading-state frontier shared by embedded and standalone delivery; 250-state exact-once regression.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Reading-state cursor advances past states the capped loop never emitted; fresh-device sync permanently withholds positions on large libraries"
 }

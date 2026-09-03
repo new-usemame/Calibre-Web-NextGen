@@ -6,8 +6,14 @@
   "refs": [
     "#1425"
   ],
+  "resolution": {
+    "commit": "4d86c5bf90",
+    "date": "2026-09-01",
+    "note": "Shipped in #2114: kosync→KoboBookmark mirror goes through the shared resolved_position_accepts arbiter (furthest leg, no clock); Kobo PUT path uses the same primitive.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "kosync PUT mirrors an older position onto the Kobo-visible bookmark carrier with no furthest/clock arbitration on the cross-carrier write"
 }

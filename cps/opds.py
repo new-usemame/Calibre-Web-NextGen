@@ -983,7 +983,8 @@ def feed_shelf(book_id):
                                                  ub.BookShelf.shelf == shelf.id,
                                                  [ub.BookShelf.order.asc()],
                                                  True, config.config_read_column,
-                                                 ub.BookShelf, ub.BookShelf.book_id == db.Books.id)
+                                                 ub.BookShelf, ub.BookShelf.book_id == db.Books.id,
+                                                 allow_public_shelf_books=bool(shelf.is_public))
     # delete shelf entries where book is not existent anymore, can happen if book is deleted outside calibre-web
     wrong_entries = calibre_db.session.query(ub.BookShelf) \
         .join(db.Books, ub.BookShelf.book_id == db.Books.id, isouter=True) \

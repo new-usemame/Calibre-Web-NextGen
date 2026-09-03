@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import type { APIRequestContext, APIResponse } from '@playwright/test';
 
 import {
   cleanupOwnedUser,
@@ -11,6 +10,7 @@ import {
   reapOwnedE2EUsers,
   recordCreatedUser,
   registerOwnedUserIntent,
+  type OwnedUserAdminApi,
 } from '../../e2e/user-reaper.ts';
 
 const BASE_URL = 'http://fixture.invalid:8086';
@@ -27,35 +27,23 @@ async function registryRoot(): Promise<string> {
   return root;
 }
 
-function response(status: number, body: unknown): APIResponse {
-  return {
-    ok: () => status >= 200 && status < 300,
-    status: () => status,
-    json: async () => body,
-    text: async () => typeof body === 'string' ? body : JSON.stringify(body),
-  } as APIResponse;
-}
-
 function fakeAdmin(users: Array<{ id: number; name: string; email: string }>, failures = 0) {
   const deleted: number[] = [];
   let remainingFailures = failures;
-  const request = {
-    get: async (url: string) => {
-      if (url === '/api/v1/admin/users') return response(200, { items: users });
-      if (url === '/api/v1/auth/csrf') return response(200, { csrf_token: 'test-csrf' });
-      throw new Error(`unexpected GET ${url}`);
+  const request: OwnedUserAdminApi = {
+    createUser: async () => {
+      throw new Error('unexpected create');
     },
-    post: async (url: string) => {
-      const match = url.match(/^\/api\/v1\/admin\/users\/(\d+)\/delete$/);
-      if (!match) throw new Error(`unexpected POST ${url}`);
+    listUsers: async () => users,
+    deleteUser: async (userId: number) => {
       if (remainingFailures > 0) {
         remainingFailures -= 1;
-        return response(503, 'try later');
+        return { deleted: false, detail: 'HTTP 503 try later' };
       }
-      deleted.push(Number(match[1]));
-      return response(204, '');
+      deleted.push(userId);
+      return { deleted: true, detail: 'HTTP 204' };
     },
-  } as unknown as Pick<APIRequestContext, 'get' | 'post'>;
+  };
   return { request, deleted };
 }
 

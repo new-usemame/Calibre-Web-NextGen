@@ -5,8 +5,14 @@
   "id": "F-1b2fdd",
   "origin_issue": 1159,
   "refs": [],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-02",
+    "note": "Only an actual same-format overwrite runs bounded sanity conversion or Mutagen probing, outside the metadata lock under a separate 90-second default budget, and failure is closed. Under the lock, every at-risk prior format is SHA-256-verified into a crash-durable recovery set before Calibre replaces it. The format-file replacement itself is not transactional with Calibre's database update; if the helper fails and the source marker is absent, CWNG atomically replaces each affected format with its verified recovery copy before retrying. Recovery sets are bounded to 100 by default, and quarantine failure retains the source.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "Ingest can overwrite a good existing format when automerge is set to overwrite"
 }

@@ -24,6 +24,7 @@ NON_SHIPPING_PATH_PREFIXES = (
     "examples/",
     "findings/",
     "frontend/e2e/",
+    "frontend/unit/",
     # The runtime image deletes frontend/ and copies only the Vite-built bundle
     # from cps/static/app, so frontend test sources never ship (Dockerfile
     # steps 6 and 6.1).
@@ -54,6 +55,7 @@ NON_SHIPPING_PATHS = frozenset(
         # carries (OBSERVED 2026-08-28: the v4.1.42 backfill PR went red here).
         "CHANGES-vs-upstream.md",
         "changelog.d/README.md",
+        "frontend/playwright.config.ts",
         "messages.pot",
         "scripts/alias-e2e-image.sh",
         "scripts/check_changelog_diff.py",

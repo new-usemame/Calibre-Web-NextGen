@@ -15,6 +15,7 @@ interface GlobalBook {
   id: number;
   title: string;
   in_my_library: boolean;
+  cover_url?: string | null;
 }
 
 interface LibraryBook {
@@ -61,10 +62,11 @@ async function setManagedMode(
   userId: number,
   libraryMode: MePayload['library_mode'],
   browseGlobal = true,
+  roles: Record<string, boolean> = {},
 ) {
   const response = await adminPage.request.post(`/api/v1/admin/users/${userId}`, {
     headers: await csrfHeaders(adminPage),
-    data: { roles: { browse_global: browseGlobal }, library_mode: libraryMode },
+    data: { roles: { browse_global: browseGlobal, ...roles }, library_mode: libraryMode },
   });
   expect(response.ok(), await response.text()).toBeTruthy();
 }
@@ -198,15 +200,118 @@ async function expectNoSeriousAxeViolations(page: Page) {
     .analyze();
   const failures = results.violations
     .filter((violation) => violation.impact === 'critical' || violation.impact === 'serious')
-    .map((violation) => `${violation.id}: ${violation.help}`);
+    .map((violation) => {
+      const targets = violation.nodes.flatMap((node) => node.target).join(', ');
+      return `${violation.id}: ${violation.help}${targets ? ` (${targets})` : ''}`;
+    });
   expect(failures).toEqual([]);
 }
 
 test.describe('My Library', () => {
-  test('two real accounts see independent selections and can discover missing books', async ({
+  test('a non-member Global Library card loads the global cover', async ({
     page: adminPage,
     secondaryUser,
   }: { page: Page; secondaryUser: SecondaryUserSession }) => {
+    const page = secondaryUser.page;
+    let coveredBook: GlobalBook | undefined;
+
+    try {
+      await setManagedMode(adminPage, secondaryUser.id, 'personal_library');
+      const books = await firstGlobalBooks(page);
+      coveredBook = books.find((book) => !!book.cover_url);
+      test.skip(!coveredBook, 'seed library needs at least one book with a cover');
+      await removeMembership(page, coveredBook!.id);
+
+      const listing = await page.request.get('/api/v1/library/global?sort=new&per_page=200');
+      expect(listing.ok(), await listing.text()).toBeTruthy();
+      const listed = ((await listing.json()) as { items: GlobalBook[] }).items
+        .find((book) => book.id === coveredBook!.id);
+      expect(listed?.in_my_library).toBe(false);
+      expect(listed?.cover_url).toBeTruthy();
+
+      const cover = await page.request.get(listed!.cover_url!);
+      expect(cover.ok(), await cover.text()).toBeTruthy();
+      expect(cover.headers()['content-type']).toMatch(/^image\/(jpeg|webp)/);
+
+      await page.goto('/app/global');
+      await expect(page.getByRole('img', { name: coveredBook!.title })).toBeVisible();
+    } finally {
+      if (coveredBook) await addMembership(page, coveredBook.id).catch(() => undefined);
+    }
+  });
+
+  test('a non-member Global Library card opens read-only personal state with global editing', async ({
+    page: adminPage,
+    secondaryUser,
+  }: { page: Page; secondaryUser: SecondaryUserSession }) => {
+    const page = secondaryUser.page;
+    let book: GlobalBook | undefined;
+
+    try {
+      await setManagedMode(adminPage, secondaryUser.id, 'personal_library', true, {
+        edit: true,
+        delete_books: true,
+      });
+      // The fixture first loaded this account with viewer-only roles. A fresh
+      // document discards that pre-update React Query cache and exercises the
+      // same auth bootstrap a real role change receives on its next page load.
+      await page.goto('/app/global');
+      const me = (await page.request.get('/api/v1/auth/me').then((r) => r.json())) as MePayload;
+      expect(me.role.admin, 'global editing must not depend on the admin role').toBe(false);
+      expect(me.role.edit, 'the test account must exercise the editor gate').toBe(true);
+      expect(me.role.delete_books, 'the test account must exercise the combined delete gate').toBe(true);
+      [book] = await firstGlobalBooks(page);
+      test.skip(!book, 'seed library needs at least one book');
+      await removeMembership(page, book!.id);
+
+      await page.goto('/app/global');
+      await page.getByRole('link', { name: `Open details for ${book!.title}` }).click();
+      await expect(page).toHaveURL(new RegExp(`/app/book/${book!.id}$`));
+      await expect(page.getByRole('heading', { level: 1, name: book!.title })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Add to my library' })).toBeVisible();
+      await expect(page.getByRole('link', { name: 'Edit', exact: true })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Delete from the global library' })).toBeVisible();
+
+      await expect(page.getByRole('button', { name: 'Remove from my library' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: 'Add to shelf' })).toHaveCount(0);
+      await expect(page.getByRole('button', { name: /Mark as (?:un)?read/ })).toHaveCount(0);
+      await expect(page.getByRole('progressbar', { name: 'Reading progress' })).toHaveCount(0);
+      await expect(page.getByRole('link', { name: /^Highlights/ })).toHaveCount(0);
+
+      const detailResponse = await page.request.get(`/api/v1/books/${book!.id}`);
+      expect(detailResponse.ok(), await detailResponse.text()).toBeTruthy();
+      const detail = (await detailResponse.json()) as BookDetailPayload & {
+        read: boolean;
+        archived: boolean;
+        favorited: boolean;
+        hidden: boolean;
+        in_progress: boolean;
+        annotation_count: number;
+        kosync_progress: number | null;
+      };
+      expect(detail).toMatchObject({
+        in_my_library: false,
+        read: false,
+        archived: false,
+        favorited: false,
+        hidden: false,
+        in_progress: false,
+        annotation_count: 0,
+        kosync_progress: null,
+      });
+
+      const metadata = await page.request.get(`/api/v1/books/${book!.id}/metadata`);
+      expect(metadata.ok(), await metadata.text()).toBeTruthy();
+      await expectNoSeriousAxeViolations(page);
+    } finally {
+      if (book) await addMembership(page, book.id).catch(() => undefined);
+    }
+  });
+
+  test('two real accounts see independent selections and can discover missing books', async ({
+    page: adminPage,
+    secondaryUser,
+  }: { page: Page; secondaryUser: SecondaryUserSession }, testInfo) => {
     const adminMe = (await adminPage.request.get('/api/v1/auth/me').then((r) => r.json())) as MePayload;
     const originalMode = adminMe.library_mode;
     const originalBrowseGlobal = !!adminMe.role.browse_global;
@@ -217,11 +322,17 @@ test.describe('My Library', () => {
       await setManagedMode(adminPage, adminMe.id, 'personal_library');
       await setManagedMode(adminPage, secondaryUser.id, 'personal_library');
       books = await firstGlobalBooks(adminPage);
-      test.skip(books.length < 2, 'seed library needs at least two books');
-      const [adminBook, secondaryBook] = books;
+      const pairOffset = testInfo.project.name === 'mobile' ? 2 : 0;
+      test.skip(books.length < pairOffset + 2, 'seed library needs two books per viewport project');
+      const [adminBook, secondaryBook] = books.slice(pairOffset, pairOffset + 2);
 
-      // Seed-once initially gives both accounts every visible book. Curate each
-      // in the opposite direction so the same global records prove isolation.
+      // #2126 deliberately seeds each account once, but the assertion must not
+      // rely on whatever selection that account inherited. Establish both
+      // positive memberships before curating the opposite records away. Each
+      // viewport project owns a different pair because both projects run at the
+      // same time against one server-side primary account.
+      await addMembership(adminPage, adminBook.id);
+      await addMembership(secondaryPage, secondaryBook.id);
       await removeMembership(adminPage, secondaryBook.id);
       await removeMembership(secondaryPage, adminBook.id);
 
@@ -311,7 +422,7 @@ test.describe('My Library', () => {
     await freshPage.close();
   });
 
-  test('adding an unowned book to a shelf establishes membership first', async ({
+  test('shelf controls appear only after adding an unowned book to My Library', async ({
     page: adminPage,
     secondaryUser,
   }: { page: Page; secondaryUser: SecondaryUserSession }) => {
@@ -331,22 +442,23 @@ test.describe('My Library', () => {
 
     try {
       await page.goto(`/app/book/${book.id}`);
-      await expect(page.getByRole('button', { name: 'Add to my library' })).toBeVisible();
       const shelfTrigger = page.getByRole('button', { name: 'Add to shelf' });
+      const addButton = page.getByRole('button', { name: 'Add to my library' });
+      await expect(addButton).toBeVisible();
+      await expect(shelfTrigger).toHaveCount(0);
+      await addButton.click();
+      await expect.poll(async () => {
+        const response = await page.request.get(`/api/v1/books/${book.id}`);
+        return ((await response.json()) as BookDetailPayload).in_my_library;
+      }).toBe(true);
+      await expect(shelfTrigger).toBeVisible();
       await shelfTrigger.click();
-      await expect(page.getByText(
-        'Adding this book to a shelf also adds it to your library.',
-      )).toBeVisible();
 
       // The disclosure follows the shared popover keyboard contract.
       await page.keyboard.press('Escape');
       await expect(shelfTrigger).toBeFocused();
       await shelfTrigger.click();
       await page.getByRole('button', { name: shelfName }).click();
-      await expect(page.getByText(
-        `Added to your library and to ${shelfName}`,
-        { exact: true },
-      )).toBeAttached();
 
       const library = (await page.request.get('/api/v1/books?per_page=200').then((r) => r.json())) as {
         items: Array<{ id: number }>;
@@ -578,7 +690,8 @@ test.describe('My Library', () => {
     ]);
     await expect(page.locator('[aria-live="assertive"]')).toHaveText(
       '0 book(s) removed from your library; 1 failed. '
-      + 'The last book cannot be removed unless you can browse the global library.',
+      + 'The last book cannot be removed unless you can browse the global library. '
+      + `Failed: Book ${book.id}. The failed books remain selected; choose the action again to retry.`,
     );
     expect((await currentLibraryBooks(page)).map((item) => item.id)).toEqual([book.id]);
     await expect(page.getByRole('button', { name: `Deselect ${book.title}`, exact: true })).toBeVisible();

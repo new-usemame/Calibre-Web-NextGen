@@ -10,6 +10,7 @@ import pytest
 from flask import Flask, g
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.orm import sessionmaker
+from werkzeug.exceptions import BadRequest
 
 from cps import ub
 
@@ -17,6 +18,7 @@ from cps import ub
 pytestmark = pytest.mark.unit
 USER_ID = 17
 BOOK_ID = 42
+_DEFAULT_LOCATION = object()
 
 
 def _clock(hour):
@@ -206,17 +208,21 @@ def state_harness(monkeypatch):
 
     app = Flask(__name__)
 
-    def put(percent, *, clock, status="Reading", spent=10):
+    def put(
+            percent, *, clock, status="Reading", spent=10,
+            location=_DEFAULT_LOCATION):
+        if location is _DEFAULT_LOCATION:
+            location = {
+                "Value": "device.{}".format(percent),
+                "Type": "KoboSpan",
+                "Source": "kepub",
+            }
         payload = {"ReadingStates": [{
             "LastModified": clock,
             "CurrentBookmark": {
                 "ProgressPercent": percent,
                 "ContentSourceProgressPercent": percent,
-                "Location": {
-                    "Value": "device.{}".format(percent),
-                    "Type": "KoboSpan",
-                    "Source": "kepub",
-                },
+                "Location": location,
             },
             "Statistics": {
                 "SpentReadingMinutes": spent,
@@ -278,6 +284,112 @@ def test_newer_backward_jump_updates_resolved_row_and_both_fanouts(
         ("hardcover", 90.0),
         ("kosync", 90.0),
     ]
+
+
+def test_stored_80_and_older_device_70_stays_80(state_harness):
+    """F-b521d3: a trailing Kobo cannot rewind the resolved carrier."""
+    harness = state_harness
+
+    response = harness.put(70.0, clock="2026-08-29T09:00:00Z")
+    assert response.get_json()["RequestResult"] == "Success"
+    harness.session.expire_all()
+
+    assert harness.state.current_bookmark.progress_percent == 80.0
+    assert harness.state.current_bookmark.location_value == "resolved.80"
+    assert harness.fanout == []
+
+
+def test_stored_70_and_older_device_80_becomes_80(state_harness):
+    """F-b521d3: greater progress wins even when its source clock is older."""
+    harness = state_harness
+    harness.state.current_bookmark.progress_percent = 70.0
+    harness.state.current_bookmark.content_source_progress_percent = 70.0
+    harness.state.current_bookmark.location_value = "resolved.70"
+    harness.session.commit()
+
+    response = harness.put(80.0, clock="2026-08-29T09:00:00Z")
+    assert response.get_json()["RequestResult"] == "Success"
+    harness.session.expire_all()
+
+    assert harness.state.current_bookmark.progress_percent == 80.0
+    assert harness.state.current_bookmark.location_value == "device.80.0"
+    assert harness.fanout == [("hardcover", 80.0), ("kosync", 80.0)]
+
+
+def test_older_device_clock_cannot_move_resolved_clocks_backwards(
+        state_harness):
+    """F-b521d3: even an accepted further position keeps monotonic clocks."""
+    harness = state_harness
+    bookmark_clock = harness.state.current_bookmark.last_modified
+    state_clock = harness.state.last_modified
+
+    response = harness.put(90.0, clock="2026-08-29T09:00:00Z")
+    assert response.get_json()["RequestResult"] == "Success"
+    harness.session.expire_all()
+
+    assert harness.state.current_bookmark.progress_percent == 90.0
+    assert harness.state.current_bookmark.last_modified >= bookmark_clock
+    assert harness.state.last_modified >= state_clock
+
+
+@pytest.mark.parametrize(
+    "clock",
+    ["2026-08-29T10:00:00Z", "2026-08-29T09:00:00Z"],
+)
+def test_equal_progress_refreshes_location_without_regressing_clocks(
+        state_harness, clock):
+    """Equal percentage accepts a Kobo locator with an equal/older clock."""
+    harness = state_harness
+    bookmark_clock = harness.state.current_bookmark.last_modified
+    state_clock = harness.state.last_modified
+
+    response = harness.put(80.0, clock=clock)
+    assert response.get_json()["RequestResult"] == "Success"
+    harness.session.expire_all()
+
+    assert harness.state.current_bookmark.progress_percent == 80.0
+    assert harness.state.current_bookmark.location_value == "device.80.0"
+    assert harness.state.current_bookmark.last_modified >= bookmark_clock
+    assert harness.state.last_modified >= state_clock
+    assert harness.fanout == [("hardcover", 80.0), ("kosync", 80.0)]
+
+
+def test_malformed_nonempty_location_is_rejected(state_harness):
+    """Kobo's non-empty Location contract requires Value, Type, and Source."""
+    harness = state_harness
+
+    with pytest.raises(BadRequest):
+        harness.put(
+            80.0,
+            clock="2026-08-29T10:00:00Z",
+            location={"Type": "KoboSpan", "Source": "kepub"},
+        )
+
+    harness.session.expire_all()
+    assert harness.state.current_bookmark.location_value == "resolved.80"
+
+
+def test_supplied_null_location_value_clears_the_stored_value(state_harness):
+    """A valid supplied Location with Value:null remains an explicit clear."""
+    harness = state_harness
+
+    response = harness.put(
+        80.0,
+        clock="2026-08-29T09:00:00Z",
+        location={
+            "Value": None,
+            "Type": "KoboPage",
+            "Source": "application/epub+zip",
+        },
+    )
+    assert response.get_json()["RequestResult"] == "Success"
+    harness.session.expire_all()
+
+    bookmark = harness.state.current_bookmark
+    assert bookmark.progress_percent == 80.0
+    assert bookmark.location_value is None
+    assert bookmark.location_type == "KoboPage"
+    assert bookmark.location_source == "application/epub+zip"
 
 
 def test_rehydrate_latch_survives_cover_reset_until_sync_clears_it(

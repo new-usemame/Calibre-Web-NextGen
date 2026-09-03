@@ -175,6 +175,16 @@ def test_frontend_unit_tests_only_pr_does_not_require_a_changelog_entry():
     ) == []
 
 
+def test_current_frontend_unit_lane_does_not_require_a_changelog_entry():
+    assert changelog_requirement_errors(
+        ["frontend/unit/e2eUserOwnership.test.ts"]
+    ) == []
+
+
+def test_playwright_config_is_non_shipping_verification_config():
+    assert changelog_requirement_errors(["frontend/playwright.config.ts"]) == []
+
+
 def test_mixing_frontend_tests_with_shipping_frontend_still_requires_an_entry():
     errors = changelog_requirement_errors(
         [

@@ -61,7 +61,11 @@ def _patched_apply(book, ok, message):
                  "cps.cover_picker.url_for",
                  side_effect=lambda ep, **kw: f"/cover/{kw.get('book_id')}/{kw.get('resolution')}",
              ):
-            resp = cover_picker._apply_response(ok, message, book)
+            staged = MagicMock() if ok else None
+            if staged:
+                staged.publish.return_value = (True, None)
+                staged.discard.return_value = (True, None)
+            resp = cover_picker._apply_response(staged, message, book)
     return resp, set_dirty, remove_synced
 
 
@@ -101,8 +105,8 @@ class TestCoverApplyMarksModified:
 
     def test_commit_failure_reports_error_and_skips_post_commit(self):
         """If recording the cover change fails, the apply must NOT report
-        success (the cover bytes are on disk but last_modified never
-        persisted) and must not run the post-commit Kobo/thumbnail steps."""
+        success (the staged cover is discarded) and must not run the
+        post-commit Kobo/thumbnail steps."""
         from cps import cover_picker
 
         book = _fake_book()
@@ -119,7 +123,10 @@ class TestCoverApplyMarksModified:
                      "cps.cover_picker.url_for",
                      side_effect=lambda ep, **kw: f"/cover/{kw.get('book_id')}/{kw.get('resolution')}",
                  ):
-                resp = cover_picker._apply_response(True, None, book)
+                staged = MagicMock()
+                staged.publish.return_value = (True, None)
+                staged.discard.return_value = (True, None)
+                resp = cover_picker._apply_response(staged, None, book)
 
         assert resp.status_code == 500
         body = json.loads(resp.get_data(as_text=True))

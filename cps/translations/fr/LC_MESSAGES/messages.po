@@ -1545,6 +1545,12 @@ msgstr ""
 msgid "'%(langname)s' is not a valid language"
 msgstr "%(langname)s n'est pas une langue valide"
 
+#: cps/editbooks.py cps/helper.py
+msgid "Cover-file is not a valid image file, or could not be stored"
+msgstr ""
+"Le fichier couverture n'est pas un fichier image valide, ou ne peut pas être "
+"stocké"
+
 #: cps/editbooks.py
 msgid "Metadata successfully updated"
 msgstr "Les métadonnées ont bien été mises à jour"
@@ -1844,12 +1850,6 @@ msgid "Cover image exceeds maximum size of %(size)s MB"
 msgstr "La couverture dépasse la taille maximale de %(size)s Mo"
 
 #: cps/helper.py
-msgid "Cover-file is not a valid image file, or could not be stored"
-msgstr ""
-"Le fichier couverture n'est pas un fichier image valide, ou ne peut pas être "
-"stocké"
-
-#: cps/helper.py
 msgid "Cover Format Error"
 msgstr "Erreur de format de couverture"
 
@@ -1864,20 +1864,6 @@ msgstr ""
 #: cps/helper.py
 msgid "Failed to create path for cover"
 msgstr "Impossible de créer le chemin pour la couverture"
-
-#: cps/helper.py
-msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
-msgstr ""
-"Seuls les fichiers jpg/jpeg/png/webp/bmp sont supportés comme fichier de "
-"couverture"
-
-#: cps/helper.py
-msgid "Invalid cover file content"
-msgstr "Contenu du fichier de couverture invalide"
-
-#: cps/helper.py
-msgid "Only jpg/jpeg files are supported as coverfile"
-msgstr "Seuls les fichiers jpg/jpeg sont supportés comme fichier de couverture"
 
 #: cps/helper.py cps/spa_strings.py
 msgid "Cover"
@@ -2726,6 +2712,34 @@ msgid "A book must keep at least one format."
 msgstr "Un livre doit conserver au moins un format."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{succeeded} book(s) permanently deleted; {warnings} deleted with cleanup "
+"warnings; {failed} failed."
+msgstr ""
+"{succeeded} livre(s) supprimé(s) définitivement ; {warnings} supprimé(s) "
+"avec des avertissements de nettoyage ; {failed} échec(s)."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Cleanup warning for book {id}: {message}"
+msgstr "Avertissement de nettoyage pour le livre {id} : {message}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Book {id}: {message}"
+msgstr "Livre {id} : {message}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Failed: {failures}. The failed books remain selected; choose the action "
+"again to retry."
+msgstr ""
+"Échec : {failures}. Les livres en échec restent sélectionnés ; choisissez à "
+"nouveau l’action pour réessayer."
+
+#: cps/spa_strings.py
 msgid "Could not delete this format."
 msgstr "Impossible de supprimer ce format."
 
@@ -3141,6 +3155,19 @@ msgstr "Rechercher plutôt « {query} » dans la bibliothèque globale"
 #: cps/spa_strings.py
 msgid "Set up My Library for all users"
 msgstr "Configurer Ma bibliothèque pour tous les utilisateurs"
+
+#: cps/spa_strings.py
+msgid ""
+"Set up My Library for every non-anonymous account? Each account starts with "
+"every book it can currently see—not only books it has shelved, read, or "
+"downloaded. Users can curate from there by removing books. Accounts already "
+"set up are never reseeded."
+msgstr ""
+"Configurer Ma bibliothèque pour chaque compte non anonyme ? Chaque compte "
+"commence avec tous les livres qu’il peut actuellement voir, et pas seulement "
+"ceux qu’il a ajoutés à une étagère, lus ou téléchargés. Les utilisateurs "
+"peuvent ensuite affiner leur sélection en retirant des livres. Les comptes "
+"déjà configurés ne sont jamais réinitialisés."
 
 #: cps/spa_strings.py
 msgid ""
@@ -4955,10 +4982,13 @@ msgstr "Chemin du fichier de certificat"
 msgid "Certificate path"
 msgstr "Chemin du certificat"
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cover_picker.html cps/templates/detail.html
-msgid "Change cover"
-msgstr "Changer la couverture"
+#: cps/spa_strings.py
+msgid "Change library cover"
+msgstr "Modifier la couverture de la bibliothèque"
+
+#: cps/spa_strings.py
+msgid "Change my cover"
+msgstr "Modifier ma couverture"
 
 #: cps/spa_strings.py
 msgid "Check again"
@@ -5624,6 +5654,14 @@ msgstr "Aperçu sur liseuse"
 #: cps/spa_strings.py
 msgid "E-readers"
 msgstr "Liseuses"
+
+#: cps/spa_strings.py
+msgid ""
+"Each account starts with every book it can currently see—not only books it "
+"has shelved, read, or downloaded."
+msgstr ""
+"Chaque compte commence avec tous les livres qu’il peut actuellement voir, et "
+"pas seulement ceux qu’il a ajoutés à une étagère, lus ou téléchargés."
 
 #: cps/spa_strings.py
 msgid "Each type (isbn, amazon, google, doi…) may appear once."
@@ -7044,6 +7082,10 @@ msgstr ""
 "Le mode de bibliothèque précédent a été restauré pour {accounts} comptes."
 
 #: cps/spa_strings.py
+msgid "Restoring…"
+msgstr "Restauration…"
+
+#: cps/spa_strings.py
 msgid "Retry"
 msgstr "Réessayer"
 
@@ -7803,6 +7845,14 @@ msgstr ""
 "Le téléversement n'est pas disponible pour votre compte sur ce serveur."
 
 #: cps/spa_strings.py
+msgid "Use my own cover"
+msgstr "Utiliser ma propre couverture"
+
+#: cps/spa_strings.py
+msgid "Use the library cover"
+msgstr "Utiliser la couverture de la bibliothèque"
+
+#: cps/spa_strings.py
 msgid ""
 "Use these to connect OPDS readers or KOReader sync without your main "
 "password."
@@ -7981,6 +8031,29 @@ msgstr "Votre bibliothèque"
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
 msgstr "Votre navigateur ne peut pas lire ce format audio."
+
+#: cps/spa_strings.py
+msgid ""
+"Your cover appears only to you and on books delivered to your e-readers. The "
+"library cover stays unchanged for everyone else, and administrators manage "
+"it."
+msgstr ""
+"Votre couverture n’apparaît que pour vous et sur les livres envoyés à vos "
+"liseuses. La couverture de la bibliothèque reste inchangée pour tous les "
+"autres utilisateurs et les administrateurs la gèrent."
+
+#: cps/spa_strings.py
+msgid "Your cover was updated."
+msgstr "Votre couverture a été mise à jour."
+
+#: cps/spa_strings.py
+msgid ""
+"Your own cover is private to you and your e-reader deliveries. The library "
+"cover stays unchanged for everyone else."
+msgstr ""
+"Votre couverture personnelle est privée et s’applique à vos envois vers les "
+"liseuses. La couverture de la bibliothèque reste inchangée pour tous les "
+"autres utilisateurs."
 
 #: cps/spa_strings.py
 msgid "Your personal digital library"
@@ -9533,6 +9606,11 @@ msgstr "Supprimer"
 msgid "Add Identifier"
 msgstr "Ajouter un identifiant"
 
+#: cps/templates/book_edit.html cps/templates/cover_picker.html
+#: cps/templates/detail.html
+msgid "Change cover"
+msgstr "Changer la couverture"
+
 #: cps/templates/book_edit.html
 msgid ""
 "Pick a cover from any source, paste a URL, upload a file, or use the "
@@ -10238,9 +10316,9 @@ msgstr ""
 
 #: cps/templates/config_edit.html
 msgid ""
-"On by default. Unchanged books are suppressed only when the device returns a "
-"valid but stale CWNG sync token. Requests without a valid CWNG token always "
-"receive the full library, including after a factory reset."
+"On by default. Books already acknowledged by the same reader are protected "
+"for every sync-token shape. Use Full Sync or resend to deliberately deliver "
+"them again."
 msgstr ""
 
 #: cps/templates/config_edit.html
@@ -11721,13 +11799,26 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
+"Hardcover auto-fetch is off. Reading-progress and annotation sync are "
+"unaffected."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
 "Hardcover sync is enabled. The schedule below controls automatic ID fetching."
 msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"Hardcover sync is disabled. Enable it once in Basic Configuration or set "
-"HARDCOVER_SYNC_ENABLED=true."
+"Hardcover sync is disabled, and auto-fetch is off. Enable Hardcover sync "
+"separately in Basic Configuration when you want reading-progress or "
+"annotation sync."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"Hardcover sync is disabled, so auto-fetch, reading-progress sync, and "
+"annotation sync are off."
 msgstr ""
 
 #: cps/templates/cwa_settings.html
@@ -11744,6 +11835,10 @@ msgstr ""
 #: cps/templates/cwa_settings.html
 msgid "Run Schedule:"
 msgstr "Calendrier des lancements :"
+
+#: cps/templates/cwa_settings.html
+msgid "Never (auto-fetch off)"
+msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid "How often to automatically run the Hardcover ID fetch task"
@@ -14765,6 +14860,18 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
+#~ msgstr ""
+#~ "Seuls les fichiers jpg/jpeg/png/webp/bmp sont supportés comme fichier de "
+#~ "couverture"
+
+#~ msgid "Invalid cover file content"
+#~ msgstr "Contenu du fichier de couverture invalide"
+
+#~ msgid "Only jpg/jpeg files are supported as coverfile"
+#~ msgstr ""
+#~ "Seuls les fichiers jpg/jpeg sont supportés comme fichier de couverture"
 
 #~ msgid "You now see the global library."
 #~ msgstr "Vous voyez maintenant la bibliothèque globale."

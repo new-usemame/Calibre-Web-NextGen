@@ -5,13 +5,23 @@ import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { Spinner } from './Spinner';
 import { ApiError, type MetadataListMode, type MetadataUpdate } from '../lib/api';
-import { uniqueBulkRemovalFailureReasons } from '../lib/bulkRemoval';
+import { bulkRemovalFailureReason } from '../lib/bulkRemoval';
+import {
+  joinBulkSentences,
+  presentBulkFailures,
+  type BulkActionResult,
+  type BulkFailureDetail,
+  type BulkFailureReasonFor,
+} from '../lib/bulkResults';
+import { canDeleteBooks } from '../lib/permissions';
 import styles from './BulkBar.module.css';
 
 interface BulkBarProps {
   ids: number[];
   personalLibrary: boolean;
   onClear: () => void;
+  /** Keep only failed ids selected so invoking the same action retries them. */
+  onRetryable: (failedIds: number[]) => void;
   /** Called after a mutation that changes what the catalog should show
    *  (read state / membership / deletion), so the grid can refresh. */
   onChanged?: () => void;
@@ -64,7 +74,7 @@ export function BulkSelectionBar({ count, onClear, children, sticky = false }: {
 /** Floating action bar for the catalog's multi-select mode. Uses per-book
  *  accounting whether the server receives individual requests or bounded
  *  membership batches. */
-export function BulkBar({ ids, personalLibrary, onClear, onChanged }: BulkBarProps) {
+export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged }: BulkBarProps) {
   const t = useT();
   const announce = useAnnouncer();
   const me = useMe().data;
@@ -91,7 +101,7 @@ export function BulkBar({ ids, personalLibrary, onClear, onChanged }: BulkBarPro
     };
   }, [shelfOpen]);
 
-  const canDelete = !!me?.role?.delete_books && !!me?.role?.edit;
+  const canDelete = canDeleteBooks(me);
   const canEditPublic = !!me?.role?.edit_shelfs;
   const editableShelves = (shelvesData?.items ?? []).filter(
     (s) => s.is_owner || (s.is_public && canEditPublic),
@@ -100,6 +110,39 @@ export function BulkBar({ ids, personalLibrary, onClear, onChanged }: BulkBarPro
     || removeFromMyLibrary.isPending
     || setMetadata.isPending || mergeBooks.isPending;
   const count = ids.length;
+
+  const reportAccounting = (
+    result: BulkActionResult,
+    message: string,
+    options: {
+      assertive?: boolean;
+      failureReasonFor?: BulkFailureReasonFor;
+    } = {},
+  ) => {
+    if (result.failedIds.length) {
+      const presentation = presentBulkFailures(
+        result.failureDetails,
+        options.failureReasonFor,
+      );
+      if (presentation.sharedReason) {
+        message = joinBulkSentences(message, presentation.sharedReason);
+      }
+      const failures = presentation.items
+        .map((failure) => failure.reason
+          ? t('Book {id}: {message}', {
+            id: failure.id,
+            message: failure.reason,
+          })
+          : t('Book {id}', { id: failure.id }))
+        .join('; ');
+      message = joinBulkSentences(message, t(
+        'Failed: {failures}. The failed books remain selected; choose the action again to retry.',
+        { failures },
+      ));
+      onRetryable(result.failedIds);
+    }
+    announce(message, { assertive: options.assertive || result.failedIds.length > 0 });
+  };
 
   const onMerge = () => {
     if (count < 2) return;
@@ -112,11 +155,23 @@ export function BulkBar({ ids, personalLibrary, onClear, onChanged }: BulkBarPro
     deleteBooks.mutate(ids, {
       onSuccess: (result) => {
         const succeeded = result.succeededIds.length;
+        const warnings = result.warningIds.length;
         const failed = result.failedIds.length;
-        announce(failed
-          ? t('{succeeded} book(s) permanently deleted from the global library for every user; {failed} failed.', { succeeded, failed })
-          : t('{n} book(s) permanently deleted from the global library for every user.', { n: succeeded }), { assertive: failed > 0 });
-        if (succeeded) onChanged?.();
+        let message = warnings
+          ? t('{succeeded} book(s) permanently deleted; {warnings} deleted with cleanup warnings; {failed} failed.', {
+            succeeded, warnings, failed,
+          })
+          : failed
+            ? t('{succeeded} book(s) permanently deleted from the global library for every user; {failed} failed.', { succeeded, failed })
+            : t('{n} book(s) permanently deleted from the global library for every user.', { n: succeeded });
+        for (const warning of result.warnings) {
+          message += ' ' + t('Cleanup warning for book {id}: {message}', {
+            id: warning.id,
+            message: warning.message,
+          });
+        }
+        reportAccounting(result, message, { assertive: warnings > 0 });
+        if (succeeded || warnings) onChanged?.();
         if (!failed) onClear();
       },
     });
@@ -131,18 +186,20 @@ export function BulkBar({ ids, personalLibrary, onClear, onChanged }: BulkBarPro
         let message = failed
           ? t('{succeeded} book(s) removed from your library; {failed} failed.', { succeeded, failed })
           : t('{n} book(s) removed from your library.', { n: succeeded });
-        for (const reason of uniqueBulkRemovalFailureReasons(result.failureDetails, t)) {
-          message += ` ${reason}`;
-        }
         const tooLarge = result.errors.find((error) =>
           error instanceof ApiError && error.detail?.code === 'batch_too_large');
+        let tooLargeReason: string | undefined;
         if (tooLarge instanceof ApiError) {
           const maxItems = tooLarge.detail?.max_items;
-          message += ' ' + (typeof maxItems === 'number'
+          tooLargeReason = typeof maxItems === 'number'
             ? t('The server rejected a batch as too large (maximum {max} books).', { max: maxItems })
-            : t('The server rejected a batch as too large.'));
+            : t('The server rejected a batch as too large.');
         }
-        announce(message, { assertive: failed > 0 });
+        const failureReasonFor = (failure: BulkFailureDetail) =>
+          failure.code === 'batch_too_large' && tooLargeReason
+            ? tooLargeReason
+            : bulkRemovalFailureReason(failure, t);
+        reportAccounting(result, message, { failureReasonFor });
         if (succeeded) onChanged?.();
         if (!failed) onClear();
       },
@@ -154,10 +211,9 @@ export function BulkBar({ ids, personalLibrary, onClear, onChanged }: BulkBarPro
       onSuccess: (result) => {
         const succeeded = result.succeededIds.length;
         const failed = result.failedIds.length;
-        announce(failed
+        reportAccounting(result, failed
           ? t('{succeeded} updated; {failed} failed.', { succeeded, failed })
-          : (read ? t('{n} marked as read.', { n: succeeded }) : t('{n} marked as unread.', { n: succeeded })),
-        { assertive: failed > 0 });
+          : (read ? t('{n} marked as read.', { n: succeeded }) : t('{n} marked as unread.', { n: succeeded })));
         if (succeeded) onChanged?.();
       },
     });
@@ -167,9 +223,9 @@ export function BulkBar({ ids, personalLibrary, onClear, onChanged }: BulkBarPro
       onSuccess: (result) => {
         const succeeded = result.succeededIds.length;
         const failed = result.failedIds.length;
-        announce(failed
+        reportAccounting(result, failed
           ? t('{succeeded} added to the shelf; {failed} failed.', { succeeded, failed })
-          : t('{n} book(s) added to the shelf.', { n: succeeded }), { assertive: failed > 0 });
+          : t('{n} book(s) added to the shelf.', { n: succeeded }));
         if (succeeded) onChanged?.();
       },
     });
@@ -196,9 +252,9 @@ export function BulkBar({ ids, personalLibrary, onClear, onChanged }: BulkBarPro
       onSuccess: (result) => {
         const succeeded = result.succeededIds.length;
         const failed = result.failedIds.length;
-        announce(failed
+        reportAccounting(result, failed
           ? t('Metadata applied to {succeeded}; {failed} failed.', { succeeded, failed })
-          : t('Metadata applied to {n} book(s).', { n: succeeded }), { assertive: failed > 0 });
+          : t('Metadata applied to {n} book(s).', { n: succeeded }));
         if (succeeded) onChanged?.();
         if (!failed) {
           setMetaOpen(false);

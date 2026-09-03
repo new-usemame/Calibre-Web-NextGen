@@ -6,8 +6,14 @@
   "refs": [
     "#1427"
   ],
+  "resolution": {
+    "commit": "6631b39cc3",
+    "date": "2026-09-01",
+    "note": "Shipped in #2118: two-real-connection regression reproduces the interleaving (A reads 40, B commits 60+xpointer, A writes 50 sentinel); furthest and the real locator survive.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Lost update on the shared kosync row"
 }

@@ -6,8 +6,14 @@
   "refs": [
     "#1744"
   ],
+  "resolution": {
+    "commit": "d0c3b8b526",
+    "date": "2026-09-01",
+    "note": "Shipped in #2121: every DB-sourced number in cwa-ingest-service passes an arithmetic-free validator before use; s6 audit found no other DB-to-arithmetic path.",
+    "release": ""
+  },
   "severity": "security",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "cwa-ingest-service evaluates a DB-sourced value in an arithmetic context (shell-eval primitive)"
 }

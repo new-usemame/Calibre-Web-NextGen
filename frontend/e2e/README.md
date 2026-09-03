@@ -173,7 +173,7 @@ surfaces; reverse dependents cannot be discovered by that traversal and must be 
 prefixes. The whole `cps/api/` blueprint tree is therefore protected explicitly: its registration in
 `cps/main.py` points toward the handlers, opposite to the import direction walked by the classifier. The
 two-level cutoff only bounds each root's dependency fan-out—it is not what excludes reverse dependents.
-At this revision the derived set is 157 of 223 local Python modules (the closure correctly picks
+At this revision the derived set is 160 of 224 local Python modules (the closure correctly picks
 up `cps/services/device_delivery.py` through the book-action request path, and this branch's
 `cps/user_preferences.py` through the account API path). Measured at `origin/main`
 `e6298e0d560b`, the previous and expanded policies each fired on 26 of the latest 100 first-parent commits;
@@ -254,11 +254,17 @@ test('personal state is isolated', async ({ page, secondaryUser }) => {
 });
 ```
 
-The fixture writes a durable ownership intent under the user's CWNG cache before
-creating the account. Its normal teardown deletes through an API request context
-that does not depend on the closing page. If the runner is killed, the next
-`global.setup.ts` run reclaims only exact registered accounts whose local owner
-PID is no longer alive; live parallel workers remain outside the deletion set.
+The fixture writes a durable run/worker ownership intent under the user's CWNG
+cache before creating the account, then binds the server's exact id/name/email
+response to that record. Creation and normal teardown use a separately logged-in
+API request context with its own cookie jar, so neither a closed page nor a page's
+CSRF lifecycle can prevent deletion. Cleanup has bounded retries. A persistent
+failure records its status and detail in the ownership file and reports deferred
+cleanup without replacing a product assertion.
+
+If the runner is killed, the next `global.setup.ts` run opens another direct API
+session and reclaims only exact registered accounts whose local owner PID is no
+longer alive; live parallel workers remain outside the deletion set.
 
 The fixture is test-scoped and lazy, so the existing suite creates no extra users and keeps using
 `e2e/.auth/state.json` unchanged. Parallel workers receive different usernames and contexts. Multi-user

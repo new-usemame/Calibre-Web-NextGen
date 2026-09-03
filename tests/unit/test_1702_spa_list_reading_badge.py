@@ -104,7 +104,9 @@ def test_list_endpoint_exposes_in_progress_for_only_the_reading_book(
             ub.ReadBook(user_id=9, book_id=2, read_status=ub.ReadBook.STATUS_IN_PROGRESS),
         ])
         session.commit()
-        expected_queries = 1
+        # One read-status lookup plus one bulk personal-cover lookup. The
+        # latter stays one query for the page, never one per book.
+        expected_queries = 2
     else:
         rows = [
             SimpleNamespace(
@@ -120,7 +122,8 @@ def test_list_endpoint_exposes_in_progress_for_only_the_reading_book(
                 read_status=ub.ReadBook.STATUS_UNREAD,
             ),
         ]
-        expected_queries = 0
+        # Cover preferences are app.db state and resolve once per page.
+        expected_queries = 1
 
     statements = []
 

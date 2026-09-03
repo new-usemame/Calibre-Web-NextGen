@@ -121,6 +121,19 @@ def test_two_users_are_scoped_and_default_off_is_unchanged(
             .filter(cdb.common_filters()).order_by(db.Books.id)] == [1, 2, 3]
 
 
+def test_empty_personal_library_never_falls_back_to_global_catalogue(
+        app_session, calibre_session, monkeypatch):
+    empty = _user(app_session, "empty-personal-library", True)
+    monkeypatch.setattr(db.ub, "session", app_session)
+    monkeypatch.setattr(db, "current_user", empty)
+
+    visible = (calibre_session.query(db.Books.id)
+               .filter(_cdb(calibre_session).common_filters())
+               .order_by(db.Books.id).all())
+
+    assert visible == []
+
+
 def test_explicit_user_filter_delegates_and_duplicate_scan_stays_global(
         app_session, calibre_session, monkeypatch):
     import cps.duplicates as duplicates

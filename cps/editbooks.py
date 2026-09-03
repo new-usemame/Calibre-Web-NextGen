@@ -1004,6 +1004,7 @@ def do_edit_book(book_id, upload_formats=None):
     modify_date = False
     edit_error = False
     refresh_cover_thumbnail_after_commit = False
+    cover_stage = None
 
     # allow_show_hidden=True: the metadata-save POST must succeed against
     # a user's own hidden book — droM4X reported the metadata icon on
@@ -1015,6 +1016,8 @@ def do_edit_book(book_id, upload_formats=None):
         flash(_("Oops! Selected book is unavailable. File does not exist or is not accessible"),
               category="error")
         return redirect(url_for("web.index"))
+
+    previous_cover_metadata = (book.has_cover, book.last_modified)
 
     to_save = request.form.to_dict()
 
@@ -1046,6 +1049,7 @@ def do_edit_book(book_id, upload_formats=None):
 
         cover_upload_success = upload_cover(request, book)
         if cover_upload_success or to_save.get("format_cover"):
+            cover_stage = cover_upload_success or cover_stage
             book.has_cover = 1
             modify_date = True
 
@@ -1078,10 +1082,12 @@ def do_edit_book(book_id, upload_formats=None):
                 result, error = parallel.run_blocking(copy_current_request_context(partial(
                     helper.save_cover_from_url, to_save["cover_url"].strip(), book.path)))
                 if result:
+                    if cover_stage is not None:
+                        cover_stage.discard()
+                    cover_stage = result
                     book.has_cover = 1
                     modify_date = True
-                    refresh_cover_thumbnail_after_commit = True
-                    log.debug("[edit_book] cover saved book_id=%s duration=%.3fs", book.id, time.monotonic() - cover_start)
+                    log.debug("[edit_book] cover staged book_id=%s duration=%.3fs", book.id, time.monotonic() - cover_start)
                 else:
                     log.warning("[edit_book] cover save failed book_id=%s duration=%.3fs error=%s", book.id, time.monotonic() - cover_start, error)
                     edit_error = True
@@ -1132,7 +1138,7 @@ def do_edit_book(book_id, upload_formats=None):
 
         # Stage 3: Commit all changes to the database.
         if modify_date:
-            helper.mark_book_modified(book, unsync=True)
+            helper.mark_book_modified(book)
 
         # Hold the process-shared metadata.db write lock for the
         # duration of the commit. Coordinates with the ingest_processor
@@ -1162,12 +1168,49 @@ def do_edit_book(book_id, upload_formats=None):
                 calibre_db.session.commit()
             log.debug("[edit_book] db commit retry ok book_id=%s duration=%.3fs", book.id, time.monotonic() - request_start)
 
+        if cover_stage is not None:
+            published, publish_error = cover_stage.publish()
+            if not published:
+                cover_stage.discard()
+                cover_stage = None
+                book.has_cover, book.last_modified = previous_cover_metadata
+                try:
+                    with metadata_db_write_lock():
+                        calibre_db.session.merge(book)
+                        calibre_db.session.commit()
+                except Exception as compensation_error:
+                    log.error_or_exception(
+                        "Cover metadata compensation failed for book %s after "
+                        "publish failure %s: %s",
+                        book.id,
+                        publish_error,
+                        compensation_error,
+                    )
+                    try:
+                        calibre_db.session.rollback()
+                    except Exception:
+                        pass
+                flash(_("Cover-file is not a valid image file, or could not be stored"), category="error")
+                return redirect(url_for('web.show_book', book_id=book.id))
+            cover_stage = None
+            refresh_cover_thumbnail_after_commit = True
+
         if refresh_cover_thumbnail_after_commit:
-            helper.replace_cover_thumbnail_cache(
-                book.id,
-                book_path=book.path,
-                last_modified=book.last_modified,
-            )
+            try:
+                from . import kobo_sync_status
+                kobo_sync_status.remove_synced_book(book.id, all=True)
+            except Exception as ex:
+                log.error_or_exception("Failed to invalidate Kobo cover state for book %s: %s",
+                                       book.id, ex)
+            try:
+                helper.replace_cover_thumbnail_cache(
+                    book.id,
+                    book_path=book.path,
+                    last_modified=book.last_modified,
+                )
+            except Exception as ex:
+                log.error_or_exception("Failed to replace cover thumbnail cache for book %s: %s",
+                                       book.id, ex)
 
         # CWA: Export of changed Metadata after commit, to avoid race conditions with folder renames
         # Only create log if there were actual meaningful metadata changes
@@ -1243,11 +1286,17 @@ def do_edit_book(book_id, upload_formats=None):
     except (ValueError, OperationalError, IntegrityError, StaleDataError, InterfaceError, InvalidRequestError) as e:
         log.error_or_exception("Database or Value error: {}".format(e))
         calibre_db.session.rollback()
+        if cover_stage is not None:
+            cover_stage.discard()
+            book.has_cover, book.last_modified = previous_cover_metadata
         flash(_("Oops! Database Error: %(error)s.", error=e.orig if hasattr(e, "orig") else e), category="error")
         return redirect(url_for('web.show_book', book_id=book.id))
     except Exception as ex:
         log.error_or_exception(ex)
         calibre_db.session.rollback()
+        if cover_stage is not None:
+            cover_stage.discard()
+            book.has_cover, book.last_modified = previous_cover_metadata
         flash(_("Error editing book: {}".format(ex)), category="error")
         return redirect(url_for('web.show_book', book_id=book.id))
 
@@ -1644,7 +1693,12 @@ def get_visible_book_for_delete(book_id):
     for either surface (or a future caller) to fall back to the raw Books table.
     """
     book = calibre_db.get_filtered_book(
-        book_id, allow_show_archived=True, allow_show_hidden=True
+        book_id,
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        # Global metadata and deletion are library-wide operations. This only
+        # bypasses personal membership; common visibility filters still apply.
+        allow_show_global=bool(current_user.role_edit()),
     )
     if not book:
         abort(404)
@@ -2373,11 +2427,9 @@ def upload_cover(cover_request, book):
             if not current_user.role_edit():
                 flash(_("User has no rights to upload cover"), category="error")
                 return False
-            ret, message = helper.save_cover_with_thumbnail_update(requested_file, book.path, book.id)
-            if ret is True:
-                # Note: save_cover_with_thumbnail_update already triggers thumbnail generation
-                # No need to call replace_cover_thumbnail_cache here (would create duplicate tasks)
-                return True
+            staged_cover, message = helper.save_cover(requested_file, book.path)
+            if staged_cover:
+                return staged_cover
             else:
                 flash(message, category="error")
                 return False
@@ -2565,13 +2617,17 @@ def modify_database_object(input_elements, db_book_object, db_object, db_session
 def modify_identifiers(input_identifiers, db_identifiers, db_session):
     """Modify Identifiers to match input information.
        input_identifiers is a list of read-to-persist Identifiers objects.
-       db_identifiers is a list of already persisted list of Identifiers objects."""
+       db_identifiers is a list of already persisted list of Identifiers objects.
+
+       Books.identifiers excludes reserved ingest state at the ORM boundary.
+       Still reject reserved input here so a crafted form/API payload cannot
+       create or replace an internal row."""
     changed = False
     error = False
     input_dict = {}
     for identifier in input_identifiers:
         identifier_type = (identifier.type or "").strip().lower()
-        if not identifier_type:
+        if not identifier_type or db.is_internal_identifier_type(identifier_type):
             continue
         if identifier_type in input_dict:
             error = True

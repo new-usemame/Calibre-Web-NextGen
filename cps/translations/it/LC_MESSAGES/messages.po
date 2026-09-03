@@ -1520,6 +1520,12 @@ msgstr ""
 msgid "'%(langname)s' is not a valid language"
 msgstr "%(langname)s non è una lingua valida"
 
+#: cps/editbooks.py cps/helper.py
+msgid "Cover-file is not a valid image file, or could not be stored"
+msgstr ""
+"Il file della copertina non è in un formato di immagine valido o non può "
+"essere salvato"
+
 #: cps/editbooks.py
 msgid "Metadata successfully updated"
 msgstr "Metadati aggiornati correttamente"
@@ -1816,12 +1822,6 @@ msgid "Cover image exceeds maximum size of %(size)s MB"
 msgstr "L'immagine supera la dimensione massima di %(size)s MB"
 
 #: cps/helper.py
-msgid "Cover-file is not a valid image file, or could not be stored"
-msgstr ""
-"Il file della copertina non è in un formato di immagine valido o non può "
-"essere salvato"
-
-#: cps/helper.py
 msgid "Cover Format Error"
 msgstr "Errore nel formato della copertina"
 
@@ -1836,19 +1836,6 @@ msgstr ""
 #: cps/helper.py
 msgid "Failed to create path for cover"
 msgstr "Impossibile creare il percorso per la copertina"
-
-#: cps/helper.py
-msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
-msgstr ""
-"Solo i file jpg/jpeg/png/webp/bmp sono supportati come file di copertina"
-
-#: cps/helper.py
-msgid "Invalid cover file content"
-msgstr "Contenuto del file di copertina non valido"
-
-#: cps/helper.py
-msgid "Only jpg/jpeg files are supported as coverfile"
-msgstr "Solo i file jpg/jpeg sono supportati come file di copertina"
 
 #: cps/helper.py cps/spa_strings.py
 msgid "Cover"
@@ -2706,6 +2693,30 @@ msgid "A book must keep at least one format."
 msgstr "Un libro deve conservare almeno un formato."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{succeeded} book(s) permanently deleted; {warnings} deleted with cleanup "
+"warnings; {failed} failed."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Cleanup warning for book {id}: {message}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Book {id}: {message}"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Failed: {failures}. The failed books remain selected; choose the action "
+"again to retry."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not delete this format."
 msgstr "Rimozione del formato non riuscita."
 
@@ -3122,6 +3133,14 @@ msgstr "Cerca invece \"{query}\" nella biblioteca globale"
 #: cps/spa_strings.py
 msgid "Set up My Library for all users"
 msgstr "Configura la Biblioteca Personale per tutti gli utenti"
+
+#: cps/spa_strings.py
+msgid ""
+"Set up My Library for every non-anonymous account? Each account starts with "
+"every book it can currently see—not only books it has shelved, read, or "
+"downloaded. Users can curate from there by removing books. Accounts already "
+"set up are never reseeded."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -4928,10 +4947,13 @@ msgstr "Percorso del file di certificato"
 msgid "Certificate path"
 msgstr "Percorso del certificato"
 
-#: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/cover_picker.html cps/templates/detail.html
-msgid "Change cover"
-msgstr "Cambia copertina"
+#: cps/spa_strings.py
+msgid "Change library cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Change my cover"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Check again"
@@ -5594,6 +5616,12 @@ msgstr "Anteprima e-reader"
 #: cps/spa_strings.py
 msgid "E-readers"
 msgstr "E-reader"
+
+#: cps/spa_strings.py
+msgid ""
+"Each account starts with every book it can currently see—not only books it "
+"has shelved, read, or downloaded."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Each type (isbn, amazon, google, doi…) may appear once."
@@ -7009,6 +7037,10 @@ msgid "Restored the previous library mode for {accounts} accounts."
 msgstr "Ripristinata la modalità biblioteca precedente per {accounts} account."
 
 #: cps/spa_strings.py
+msgid "Restoring…"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Retry"
 msgstr "Riprova"
 
@@ -7769,6 +7801,14 @@ msgstr ""
 "server."
 
 #: cps/spa_strings.py
+msgid "Use my own cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use the library cover"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Use these to connect OPDS readers or KOReader sync without your main "
 "password."
@@ -7940,6 +7980,23 @@ msgstr "La tua biblioteca"
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
 msgstr "Il tuo browser non può riprodurre questo formato audio."
+
+#: cps/spa_strings.py
+msgid ""
+"Your cover appears only to you and on books delivered to your e-readers. The "
+"library cover stays unchanged for everyone else, and administrators manage "
+"it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Your cover was updated."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Your own cover is private to you and your e-reader deliveries. The library "
+"cover stays unchanged for everyone else."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Your personal digital library"
@@ -9482,6 +9539,11 @@ msgstr "Rimuovi"
 msgid "Add Identifier"
 msgstr "Aggiungi identificatore"
 
+#: cps/templates/book_edit.html cps/templates/cover_picker.html
+#: cps/templates/detail.html
+msgid "Change cover"
+msgstr "Cambia copertina"
+
 #: cps/templates/book_edit.html
 msgid ""
 "Pick a cover from any source, paste a URL, upload a file, or use the "
@@ -9911,9 +9973,9 @@ msgid ""
 "You can also use Last Resort Restore at the bottom of this page to try "
 "rebuilding your Calibre Database from the OPF files in your library."
 msgstr ""
-"Puoi anche utilizzare l'opzione \"Ripristino del database (ultima speranza)"
-"\" in fondo a questa pagina per provare a ricostruire il database di Calibre "
-"dai file OPF presenti nella tua biblioteca."
+"Puoi anche utilizzare l'opzione \"Ripristino del database (ultima "
+"speranza)\" in fondo a questa pagina per provare a ricostruire il database "
+"di Calibre dai file OPF presenti nella tua biblioteca."
 
 #: cps/templates/config_db.html
 msgid "Location of Calibre Database (metadata.db file)"
@@ -9997,9 +10059,9 @@ msgid ""
 "should remain in <code>/calibre-library</code>, however your library files "
 "can be wherever you desire"
 msgstr ""
-"<b>Separa i file degli Ebook dalla Biblioteca</b> - Il file "
-"<code>metadata.db</code> dovrebbe rimanere in <code>/calibre-library</code>, "
-"tuttavia, i file della biblioteca possono essere salvati dove preferisci"
+"<b>Separa i file degli Ebook dalla Biblioteca</b> - Il file <code>metadata."
+"db</code> dovrebbe rimanere in <code>/calibre-library</code>, tuttavia, i "
+"file della biblioteca possono essere salvati dove preferisci"
 
 #: cps/templates/config_db.html
 msgid "Use Google Drive?"
@@ -10255,15 +10317,10 @@ msgstr "Sopprimi i re-invii delle autorizzazioni Kobo non modificate"
 
 #: cps/templates/config_edit.html
 msgid ""
-"On by default. Unchanged books are suppressed only when the device returns a "
-"valid but stale CWNG sync token. Requests without a valid CWNG token always "
-"receive the full library, including after a factory reset."
+"On by default. Books already acknowledged by the same reader are protected "
+"for every sync-token shape. Use Full Sync or resend to deliberately deliver "
+"them again."
 msgstr ""
-"Attivo per impostazione predefinita. I libri non modificati vengono omessi "
-"solo quando il dispositivo restituisce un token di sincronizzazione CWNG "
-"valido ma obsoleto. Le richieste prive di un token CWNG valido ricevono "
-"sempre l'intera biblioteca, anche dopo un ripristino delle impostazioni di "
-"fabbrica."
 
 #: cps/templates/config_edit.html
 msgid "Server External Port (for port forwarded API calls)"
@@ -10415,8 +10472,8 @@ msgid ""
 msgstr ""
 "Opzionale. Senza una chiave, Google Books è soggetto a un limite di circa "
 "1.000 richieste al giorno per IP, soglia facilmente raggiungibile sui server "
-"condivisi (errore HTTP 429). Ottieni una chiave gratuita su https://"
-"console.cloud.google.com — abilita la \"Books API\" e crea una chiave API."
+"condivisi (errore HTTP 429). Ottieni una chiave gratuita su https://console."
+"cloud.google.com — abilita la \"Books API\" e crea una chiave API."
 
 #: cps/templates/config_edit.html
 msgid "Allow Reverse Proxy Authentication"
@@ -11844,6 +11901,12 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
+"Hardcover auto-fetch is off. Reading-progress and annotation sync are "
+"unaffected."
+msgstr ""
+
+#: cps/templates/cwa_settings.html
+msgid ""
 "Hardcover sync is enabled. The schedule below controls automatic ID fetching."
 msgstr ""
 "La sincronizzazione con Hardcover è abilitata. La programmazione seguente "
@@ -11851,11 +11914,16 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
-"Hardcover sync is disabled. Enable it once in Basic Configuration or set "
-"HARDCOVER_SYNC_ENABLED=true."
+"Hardcover sync is disabled, and auto-fetch is off. Enable Hardcover sync "
+"separately in Basic Configuration when you want reading-progress or "
+"annotation sync."
 msgstr ""
-"La sincronizzazione con Hardcover è disabilitata. Abilitala nelle "
-"Impostazioni di base o imposta HARDCOVER_SYNC_ENABLED=true."
+
+#: cps/templates/cwa_settings.html
+msgid ""
+"Hardcover sync is disabled, so auto-fetch, reading-progress sync, and "
+"annotation sync are off."
+msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11871,6 +11939,10 @@ msgstr ""
 #: cps/templates/cwa_settings.html
 msgid "Run Schedule:"
 msgstr "Avvia una pianificazione:"
+
+#: cps/templates/cwa_settings.html
+msgid "Never (auto-fetch off)"
+msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid "How often to automatically run the Hardcover ID fetch task"
@@ -14477,8 +14549,8 @@ msgid ""
 "→ Recreate with \"Re-pull image\" enabled."
 msgstr ""
 "Immagini → scarica l'immagine qui sotto, quindi Container → seleziona "
-"Calibre-Web NextGen → Ricrea (recreate) abilitando \"Riscarica immagine\" "
-"(Re-pull image)."
+"Calibre-Web NextGen → Ricrea (recreate) abilitando \"Riscarica "
+"immagine\" (Re-pull image)."
 
 #: cps/templates/update_now_modal.html
 msgid "Synology Container Manager:"
@@ -14973,6 +15045,34 @@ msgstr "Sincronizza gli scaffali selezionati con OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostra sezione Libri letti e Libri da leggere"
+
+#~ msgid ""
+#~ "On by default. Unchanged books are suppressed only when the device "
+#~ "returns a valid but stale CWNG sync token. Requests without a valid CWNG "
+#~ "token always receive the full library, including after a factory reset."
+#~ msgstr ""
+#~ "Attivo per impostazione predefinita. I libri non modificati vengono "
+#~ "omessi solo quando il dispositivo restituisce un token di "
+#~ "sincronizzazione CWNG valido ma obsoleto. Le richieste prive di un token "
+#~ "CWNG valido ricevono sempre l'intera biblioteca, anche dopo un ripristino "
+#~ "delle impostazioni di fabbrica."
+
+#~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
+#~ msgstr ""
+#~ "Solo i file jpg/jpeg/png/webp/bmp sono supportati come file di copertina"
+
+#~ msgid "Invalid cover file content"
+#~ msgstr "Contenuto del file di copertina non valido"
+
+#~ msgid "Only jpg/jpeg files are supported as coverfile"
+#~ msgstr "Solo i file jpg/jpeg sono supportati come file di copertina"
+
+#~ msgid ""
+#~ "Hardcover sync is disabled. Enable it once in Basic Configuration or set "
+#~ "HARDCOVER_SYNC_ENABLED=true."
+#~ msgstr ""
+#~ "La sincronizzazione con Hardcover è disabilitata. Abilitala nelle "
+#~ "Impostazioni di base o imposta HARDCOVER_SYNC_ENABLED=true."
 
 #~ msgid "Back to the classic view"
 #~ msgstr "Torna alla visualizzazione classica"

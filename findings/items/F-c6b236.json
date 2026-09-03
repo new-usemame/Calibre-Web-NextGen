@@ -1,13 +1,19 @@
 {
   "area": "api",
-  "body": "OBSERVED, confirmed independently (Opus).\n\n`delete_book_from_table()` returns a structured result describing failure:\n- `cps/editbooks.py:1615-1624` returns a `\"type\": \"danger\"` payload when\n  `helper.delete_book` fails to remove the format file;\n- `cps/editbooks.py:1596-1609` logs \"removed from the database but file ...\" on the\n  whole-book path;\n- `cps/editbooks.py:1669-1679` returns a danger payload after `session.rollback()`\n  on exception.\n\nBoth SPA endpoints throw that return value away and answer unconditionally:\n`cps/api/edit.py:423-426` (`delete_book`) and `cps/api/edit.py:438-442`\n(`delete_format`) both end `delete_book_from_table(...)` / `return \"\", 204`.\n\nSo a deletion that failed, rolled back, or orphaned a file reports HTTP 204 No Content\n\u2014 indistinguishable from success. React then treats it as a successful mutation and\nevicts the cached rows (`frontend/src/lib/queries.ts:778-795,816-826`), so the UI shows\nthe book gone whether or not it is.\n\nClassic surfaces the same conditions as a flash error. This is a strict safety\nregression in the new UI relative to the old.\n\nFix shape: translate the core's result into a non-2xx error (and an explicit warning\nresponse for the partial-success cases) rather than swallowing it.",
+  "body": "OBSERVED, confirmed independently (Opus).\n\n`delete_book_from_table()` returns a structured result describing failure:\n- `cps/editbooks.py:1615-1624` returns a `\"type\": \"danger\"` payload when\n  `helper.delete_book` fails to remove the format file;\n- `cps/editbooks.py:1596-1609` logs \"removed from the database but file ...\" on the\n  whole-book path;\n- `cps/editbooks.py:1669-1679` returns a danger payload after `session.rollback()`\n  on exception.\n\nBoth SPA endpoints throw that return value away and answer unconditionally:\n`cps/api/edit.py:423-426` (`delete_book`) and `cps/api/edit.py:438-442`\n(`delete_format`) both end `delete_book_from_table(...)` / `return \"\", 204`.\n\nSo a deletion that failed, rolled back, or orphaned a file reports HTTP 204 No Content\n— indistinguishable from success. React then treats it as a successful mutation and\nevicts the cached rows (`frontend/src/lib/queries.ts:778-795,816-826`), so the UI shows\nthe book gone whether or not it is.\n\nClassic surfaces the same conditions as a flash error. This is a strict safety\nregression in the new UI relative to the old.\n\nFix shape: translate the core's result into a non-2xx error (and an explicit warning\nresponse for the partial-success cases) rather than swallowing it.",
   "created": "2026-08-23",
   "id": "F-c6b236",
   "refs": [
     "#1963"
   ],
+  "resolution": {
+    "commit": "6f1ef8a8b2",
+    "date": "2026-09-02",
+    "note": "SPA delete endpoints now propagate the deletion core result (#2124)",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "SPA delete endpoints discard the deletion core's result and always return 204"
 }

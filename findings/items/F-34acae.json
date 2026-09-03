@@ -6,8 +6,14 @@
   "refs": [
     "#2104"
   ],
+  "resolution": {
+    "commit": "d5d784765f",
+    "date": "2026-09-01",
+    "note": "Shipped in #2116 (squash of d78322e810): /health readiness + bounded CSRF-token gate with two distinct diagnoses; real-container run OBSERVED.",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Integration container fixture races app startup and mislabels a token-less /login page as 'credentials rejected'"
 }

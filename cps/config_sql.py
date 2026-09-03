@@ -160,9 +160,10 @@ class _Settings(_Base):
     config_kobo_cover_padding_fill_mode = Column(String, default="edge_mirror")
     config_kobo_cover_padding_color = Column(String, default="")
     config_kobo_prefer_kepub = Column(Boolean, default=True)
-    # Issue #1925 replay protection. Clara hardware proved byte-stable payloads
-    # alone still de-download books after a sync hiccup, so suppression is the
-    # safe default; tokenless/factory-reset requests remain an explicit escape.
+    # Issue #1925 replay protection. Hardware proved byte-stable payloads alone
+    # still de-download books after a sync hiccup or USB eject, so suppression
+    # is the safe default for every token shape. Full Sync/resend deliberately
+    # clear the target device ledger when re-delivery is required.
     config_kobo_suppress_replayed_entitlements = Column(
         Boolean, nullable=False, default=True, server_default=text("1"),
     )

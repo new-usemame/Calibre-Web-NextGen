@@ -102,7 +102,7 @@ def harness(tmp_path):
         "CWA_INGEST_STABLE_INTERVAL": "0.05",
     }
 
-    def run(snippet: str):
+    def run(snippet: str, *, production_timings: bool = False):
         script = textwrap.dedent(
             f"""
             set -uo pipefail
@@ -110,7 +110,12 @@ def harness(tmp_path):
             {snippet}
             """
         )
-        subprocess.run(["bash", "-c", script], env=env, check=False)
+        run_env = env.copy()
+        if production_timings:
+            run_env.pop("CWA_INGEST_STABLE_CHECKS")
+            run_env.pop("CWA_INGEST_STABLE_CONSEC_MATCH")
+            run_env.pop("CWA_INGEST_STABLE_INTERVAL")
+        subprocess.run(["bash", "-c", script], env=run_env, check=False)
         return processor_log.read_text().splitlines()
 
     run.watch = watch
@@ -317,12 +322,14 @@ def test_startup_sweep_leaves_a_still_growing_file_to_the_watcher(harness):
     growing = harness.watch / "still-copying.epub"
     growing.write_text("start")
 
-    # A writer that keeps appending for the whole life of the stability probe,
-    # faster than the probe samples — see _start_busy_writer.
+    # Production timings are intentional here. Pause longer than the old
+    # single 0.5s quiet window, then resume before the full six-sample probe
+    # completes. That is a stalled copy, not a continuously busy writer.
     processed = harness(
-        _start_busy_writer(growing)
-        + "startup_ingest_sweep >/dev/null 2>&1 || true; "
-        + _STOP_BUSY_WRITER
+        f'( sleep 1.1; printf "more" >> "{growing}"; sleep 4 ) & '
+        + "WRITER=$!; startup_ingest_sweep >/dev/null 2>&1 || true; "
+        + _STOP_BUSY_WRITER,
+        production_timings=True,
     )
 
     assert str(growing) not in processed, (

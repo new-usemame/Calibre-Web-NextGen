@@ -332,7 +332,7 @@ def test_format_cleanup_failure_retains_quarantine_without_path_leak(
 
 
 @pytest.mark.parametrize("surface", ["classic", "api"])
-def test_invisible_format_target_is_404_on_both_surfaces(format_delete_server, surface):
+def test_global_editor_can_delete_a_non_member_format(format_delete_server, surface):
     server = format_delete_server
     server.session.query(ub.UserLibraryBook).filter_by(
         user_id=server.user.id, book_id=server.book_id
@@ -341,13 +341,13 @@ def test_invisible_format_target_is_404_on_both_surfaces(format_delete_server, s
 
     response = server.request(surface)
 
-    assert response.status_code == 404
-    assert server.format_file.exists()
+    assert response.status_code == (302 if surface == "classic" else 204)
+    assert not server.format_file.exists()
     assert (
         server.session.query(db.Data)
         .filter_by(book=server.book_id, format="EPUB")
         .count()
-        == 1
+        == 0
     )
     _assert_book_and_user_state_survive(server)
 
@@ -576,6 +576,7 @@ def test_google_drive_cache_delete_failure_reaches_api_cleanup_warning(
     assert response.status_code == 200
     assert response.get_json() == {
         "deleted": True,
+        "status": "warning",
         "warning": {
             "code": "cleanup_incomplete",
             "message": (

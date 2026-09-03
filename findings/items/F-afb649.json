@@ -6,8 +6,14 @@
   "refs": [
     "#1923"
   ],
+  "resolution": {
+    "commit": "364058553d",
+    "date": "2026-09-01",
+    "note": "Shipped in #2108: durable app-DB ownership evidence; snapshot-200 first on every failure path, 503 only where no snapshot exists, Kobo proxied only when provably never owned.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Annotations GET fails open (proxies to Kobo's starved cloud copy) in exactly the failure states where the PATCH deliberately fails closed"
 }

@@ -47,12 +47,11 @@ def _set_cover_source():
 def test_set_cover_resolves_the_book_the_way_its_neighbours_do():
     """A user's own hidden or archived book must not 404 on cover replace."""
     source = _set_cover_source()
-    assert "get_filtered_book(" in source, "set_cover no longer resolves a book"
-    assert "allow_show_archived=True" in source and "allow_show_hidden=True" in source, (
-        "set_cover resolves the book with strict defaults while its siblings in "
-        "this module pass allow_show_archived/allow_show_hidden, so the edit "
-        "page opens and the cover write 404s (F-65c93f)"
-    )
+    assert "_editable_book(book_id)" in source, "set_cover no longer resolves a book"
+    helper_source = inspect.getsource(edit_module._editable_book)
+    assert "allow_show_archived=True" in helper_source
+    assert "allow_show_hidden=True" in helper_source
+    assert "allow_show_global=True" in helper_source
 
 
 def test_the_lock_helper_is_actually_reachable_from_this_module():

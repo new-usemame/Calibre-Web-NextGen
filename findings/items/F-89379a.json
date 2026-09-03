@@ -1,0 +1,13 @@
+{
+  "area": "ingest",
+  "body": "OBSERVED 2026-09-01 (Sol, F-34acae leg) on this Mac, Docker Desktop, image built from 76d43c61f9 and run with the documented sequential command `pytest tests/docker/ tests/integration/ -v`: 115 passed, 4 skipped, 5 failed. All five failures are late ingest tests reporting files never consumed from /cwa-book-ingest: test_processing_survives_multiple_files, test_zero_byte_file_doesnt_crash_ingest, test_user_drops_book_and_it_appears_in_library, test_mixed_format_batch_import, test_simple_epub_ingest. Earlier ingest tests in the same run passed, and the CI \"Integration Tests (Docker)\" lane on the same commits is green.\n\nNot diagnosed. Candidate causes to discriminate: (a) macOS bind-mount inotify limitations (file events not delivered to the container's watcher after some volume of activity), (b) the ingest watcher dying/wedging mid-run (check container logs for the watcher process after the first failure), (c) host pressure (this Mac was running several codex legs and Docker concurrently). The CI-vs-local split makes (a)/(c) likelier than a product bug, but the watcher-death reading must be excluded by reading the container logs at the moment of the first failure, not inferred.\n\nSettle by: rerun locally with `docker logs -f` captured alongside pytest; note the first failing test's timestamp; check whether cwa-ingest-service is still alive and whether events arrive for a manual `touch` after that point. If the watcher is alive and a manual drop is still ignored, it is the bind-mount event delivery; if it is dead, it is a product bug and severity rises to correctness.",
+  "created": "2026-09-01",
+  "id": "F-89379a",
+  "refs": [
+    "#2116"
+  ],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "Local Docker integration run: ingest stops consuming /cwa-book-ingest partway through the suite (5 late ingest tests fail; CI lane green)"
+}

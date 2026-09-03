@@ -60,9 +60,28 @@ def edit_required(f):
     return inner
 
 
+def cover_source_required(f):
+    """Allow personal source browsing without granting global cover writes."""
+    @wraps(f)
+    def inner(*args, **kwargs):
+        if request.args.get("scope") == "personal":
+            return f(*args, **kwargs)
+        if current_user.role_edit() or current_user.role_admin():
+            return f(*args, **kwargs)
+        abort(403)
+    return inner
+
+
 def _load_book(book_id: int):
     """Fetch book + 404 if absent. Matches editbooks.py conventions."""
-    book = calibre_db.get_filtered_book(book_id)
+    personal = request.args.get("scope") == "personal"
+    global_editor = bool(current_user.role_edit() or current_user.role_admin())
+    book = calibre_db.get_filtered_book(
+        book_id,
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        allow_show_global=(personal and bool(current_user.role_browse_global())) or global_editor,
+    )
     if not book:
         abort(404)
     return book
@@ -173,7 +192,7 @@ def cover_picker_state(book_id):
 
 @cover_picker.route("/book/<int:book_id>/cover/candidates", methods=["POST"])
 @user_login_required
-@edit_required
+@cover_source_required
 def cover_picker_candidates(book_id):
     """Run the provider pool + cover_booster; return candidate list +
     per-provider status. Same JSON shape pattern as /metadata/search."""
@@ -211,7 +230,7 @@ def cover_picker_candidates(book_id):
 
 @cover_picker.route("/book/<int:book_id>/cover/preview", methods=["POST"])
 @user_login_required
-@edit_required
+@cover_source_required
 def cover_picker_preview(book_id):
     """Validate a URL the user pasted (in the picker URL panel OR the
     inline cover_url field on the edit page). Same code path; the inline
@@ -224,7 +243,7 @@ def cover_picker_preview(book_id):
 
 @cover_picker.route("/book/<int:book_id>/cover/extract", methods=["POST"])
 @user_login_required
-@edit_required
+@cover_source_required
 def cover_picker_extract(book_id):
     """Re-render the embedded-cover candidate as a data URL. Used when
     the picker page wants to refresh just the embedded cover after an
@@ -259,8 +278,8 @@ def cover_picker_apply(book_id):
 
     # Multipart upload from the picker's file panel.
     if request.files.get("file"):
-        ok, message = _apply_uploaded_file(book, request.files["file"])
-        return _apply_response(ok, message, book)
+        staged_cover, message = _apply_uploaded_file(book, request.files["file"])
+        return _apply_response(staged_cover, message, book)
 
     body = request.get_json(silent=True) or {}
     kind = body.get("kind") or "url"
@@ -269,15 +288,15 @@ def cover_picker_apply(book_id):
         url = (body.get("url") or "").strip()
         if not url:
             return _json_error("empty_url", _(u"Provide a cover URL."), 400)
-        ok, message = helper.save_cover_from_url(url, book.path)
-        return _apply_response(ok, message, book)
+        staged_cover, message = helper.save_cover_from_url(url, book.path)
+        return _apply_response(staged_cover, message, book)
 
     if kind == "embedded":
         extracted = cover_extract.extract_embedded_cover(book)
         if extracted is None:
             return _json_error("no_embedded", _(u"This book doesn't have an embedded cover we can extract."), 400)
-        ok, message = _apply_bytes(book, extracted.data, extracted.extension)
-        return _apply_response(ok, message, book)
+        staged_cover, message = _apply_bytes(book, extracted.data, extracted.extension)
+        return _apply_response(staged_cover, message, book)
 
     return _json_error("bad_kind", _(u"Unknown cover source."), 400)
 
@@ -317,7 +336,7 @@ def cover_picker_lock(book_id):
 
 @cover_picker.route("/book/<int:book_id>/cover/ereader-preview", methods=["POST"])
 @user_login_required
-@edit_required
+@cover_source_required
 def cover_picker_ereader_preview(book_id):
     """Re-render an image through the e-reader cover-padding pipeline and
     return a base64 data URL the picker page can drop straight into an
@@ -514,9 +533,15 @@ def _fetch_url_bytes(url: str) -> Optional[bytes]:
 def _read_current_cover_bytes(book) -> Optional[bytes]:
     """Load the book's on-disk cover.jpg. Returns None if the book has
     no saved cover or the read fails."""
-    if not getattr(book, "has_cover", False):
-        return None
     try:
+        if request.args.get("scope") == "personal":
+            from .services import user_cover
+            override = user_cover.override_for_user(current_user.id, book.id)
+            if override is not None:
+                with open(user_cover.path_for_row(override), "rb") as fh:
+                    return fh.read()
+        if not getattr(book, "has_cover", False):
+            return None
         cover_path = os.path.join(config.config_calibre_dir, book.path, "cover.jpg")
         if not os.path.isfile(cover_path):
             return None
@@ -561,8 +586,10 @@ def _apply_bytes(book, raw: bytes, extension: str):
     return helper.save_cover(storage, book.path)
 
 
-def _apply_response(ok: bool, message, book):
-    if ok:
+def _apply_response(staged_cover, message, book):
+    if staged_cover:
+        previous_has_cover = book.has_cover
+        previous_last_modified = book.last_modified
         try:
             book.has_cover = 1
             # A new cover IS a metadata change: bump last_modified (drives the
@@ -571,33 +598,58 @@ def _apply_response(ok: bool, message, book):
             # runs post-commit below (best-effort) so a commit failure can't
             # leave it half-applied. Single source of truth: helper.mark_book_modified.
             helper.mark_book_modified(book)
-            # #707: a cover change must also embed into the book file, not just
-            # update cover.jpg. mark_book_modified only stamps last_modified +
-            # the dirty bit; the file-level cover embed is driven by the metadata
-            # enforcer, which fires off a change-log entry. Without this the
-            # download/embedded cover (and the picker's "Currently embedded"
-            # preview) stayed on the old image.
-            helper.log_metadata_change(book, {'cover': True})
             calibre_db.session.commit()
         except Exception as exc:
-            # The cover bytes are on disk but we could not record the change.
-            # Do NOT report success — the UI must not show a stale "saved"
-            # state when last_modified never persisted.
             log.error("cover apply: failed to record cover change for book %s: %s", book.id, exc)
+            staged_cover.discard()
             try:
                 calibre_db.session.rollback()
             except Exception:
                 pass
+            book.has_cover = previous_has_cover
+            book.last_modified = previous_last_modified
             return _json_error("commit_failed", _(u"Cover save failed."), 500)
+
+        published, publish_error = staged_cover.publish()
+        if not published:
+            staged_cover.discard()
+            book.has_cover = previous_has_cover
+            book.last_modified = previous_last_modified
+            try:
+                calibre_db.session.commit()
+            except Exception as compensation_exc:
+                log.error(
+                    "cover apply: metadata compensation failed for book %s "
+                    "after publish failure %s: %s",
+                    book.id,
+                    publish_error,
+                    compensation_exc,
+                )
+                try:
+                    calibre_db.session.rollback()
+                except Exception:
+                    pass
+            return _json_error("publish_failed", _(u"Cover save failed."), 500)
+
+        # #707: enqueue file-level embedding only after both metadata and the
+        # canonical cover are visible.  A pre-publish record could be consumed
+        # against the old cover bytes.
+        try:
+            helper.log_metadata_change(book, {'cover': True})
+        except Exception as exc:
+            log.error("cover apply: enforcement record failed for book %s: %s", book.id, exc)
         # Post-commit best-effort: the cover is applied and the last_modified
         # bump above already drives both the web cache-bust and Kobo
         # re-selection, so a failure here self-heals on the next sync /
         # thumbnail access. Log loudly but still report success.
         try:
             kobo_sync_status.remove_synced_book(book.id, all=True)
+        except Exception as exc:
+            log.error("post-apply Kobo housekeeping failed for book %s: %s", book.id, exc)
+        try:
             helper.replace_cover_thumbnail_cache(book.id)
         except Exception as exc:
-            log.error("post-apply cover housekeeping failed for book %s: %s", book.id, exc)
+            log.error("post-apply thumbnail housekeeping failed for book %s: %s", book.id, exc)
         return jsonify({
             "ok": True,
             "cover_url": url_for("web.get_cover", book_id=book.id, resolution="og") + f"?ts={int(datetime.now(timezone.utc).timestamp())}",

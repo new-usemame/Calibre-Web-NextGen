@@ -23,6 +23,7 @@ TESTS_WORKFLOW = REPO / ".github" / "workflows" / "tests.yml"
 DEV_WORKFLOW = REPO / ".github" / "workflows" / "docker-image-build-dev.yml"
 RESOLVER = REPO / "scripts" / "resolve-e2e-image.sh"
 ALIASER = REPO / "scripts" / "alias-e2e-image.sh"
+PRODUCER_CHECKER = REPO / "scripts" / "check-e2e-image-producer.py"
 
 
 @pytest.mark.parametrize(
@@ -139,7 +140,11 @@ def test_pr_classification_executes_the_base_copy_in_both_consumers():
         assert 'classifier_ref="$BASE_SHA"' in text, workflow.name
         assert 'classifier_ref="$HEAD_SHA"' not in text
         assert "frontend=true\\nbuild=true\\nconcurrency=true\\nimage=true" in text
-        assert 'git archive "$classifier_ref" cps scripts/ci_path_classification.py' in text
+        assert 'git cat-file -e "$classifier_ref:.dockerignore"' in text
+        assert (
+            'git archive "$classifier_ref" cps .dockerignore '
+            'scripts/ci_path_classification.py' in text
+        )
         assert 'python3 "$classifier_root/scripts/ci_path_classification.py"' in text
         assert "| python3 scripts/ci_path_classification.py --github-output" not in text
 
@@ -223,6 +228,12 @@ def _commit(repo: Path, message: str, path: str, content: str) -> str:
     return _git(repo, "rev-parse", "HEAD")
 
 
+def _stage_alias_test_dockerignore(repo: Path) -> None:
+    """Give history fixtures the same SSOT the production classifier requires."""
+    (repo / ".dockerignore").write_text("docs\n", encoding="utf-8")
+    _git(repo, "add", ".dockerignore")
+
+
 class _ActionsApi:
     def __init__(self, responses: list[dict[str, Any]]):
         self.responses = responses
@@ -236,6 +247,9 @@ class _ActionsApi:
                     index = min(api.run_requests, len(api.responses) - 1)
                     response = dict(api.responses[index])
                     api.run_requests += 1
+                    if response.pop("malformed", False):
+                        self._send_body(b'{"workflow_runs":')
+                        return
                     if response.pop("absent", False):
                         payload = {"workflow_runs": []}
                         self._send_json(payload)
@@ -254,7 +268,9 @@ class _ActionsApi:
                 self._send_json(payload)
 
             def _send_json(self, payload):
-                body = json.dumps(payload).encode()
+                self._send_body(json.dumps(payload).encode())
+
+            def _send_body(self, body):
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
@@ -286,6 +302,7 @@ def _run_alias(
     dev_matches: bool = True,
     source_succeeds_on: int = 1,
     api_url: str | None = None,
+    recovery_output: Path | None = None,
 ):
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir(exist_ok=True)
@@ -323,6 +340,8 @@ def _run_alias(
     command = ["bash", str(ALIASER), "registry.example/project/app", source, subject]
     if api_url:
         command.extend(["4", "0", "example/project", "push", api_url])
+        if recovery_output is not None:
+            command.append(str(recovery_output))
     proc = subprocess.run(
         command,
         cwd=tmp_path,
@@ -336,6 +355,7 @@ def _run_alias(
 
 def test_neutral_alias_requires_the_newest_relevant_ancestor_and_matching_dev(tmp_path):
     _git(tmp_path, "init", "-q")
+    _stage_alias_test_dockerignore(tmp_path)
     source = _commit(tmp_path, "backend", "cps/web.py", "WRITE = 1\n")
     subject = _commit(tmp_path, "docs", "docs/usage.md", "docs\n")
 
@@ -352,15 +372,28 @@ def test_neutral_alias_requires_the_newest_relevant_ancestor_and_matching_dev(tm
 
 def test_neutral_alias_rejects_an_intervening_image_relevant_commit(tmp_path):
     _git(tmp_path, "init", "-q")
+    _stage_alias_test_dockerignore(tmp_path)
     old_source = _commit(tmp_path, "old backend", "cps/web.py", "WRITE = 1\n")
     _commit(tmp_path, "middle docs", "docs/one.md", "one\n")
     new_source = _commit(tmp_path, "new backend", "cps/kobo.py", "WRITE = 2\n")
     subject = _commit(tmp_path, "new docs", "docs/two.md", "two\n")
+    recovery_output = tmp_path / "github-output"
+    recovery_output.write_text("sentinel=preserved\n", encoding="utf-8")
 
-    proc, log = _run_alias(tmp_path, old_source, subject)
+    with _ActionsApi([{"status": "completed", "conclusion": "failure"}]) as api:
+        proc, log = _run_alias(
+            tmp_path,
+            old_source,
+            subject,
+            api_url=api.url,
+            recovery_output=recovery_output,
+        )
+
     assert proc.returncode == 1
     assert "is not the newest image-relevant ancestor" in proc.stderr
     assert f"Expected source: {new_source}" in proc.stderr
+    assert api.run_requests == 0
+    assert recovery_output.read_text(encoding="utf-8") == "sentinel=preserved\n"
     assert log == ""
 
 
@@ -480,6 +513,7 @@ def test_resolver_polls_only_while_producer_runs_then_returns_digest(tmp_path):
 
 def test_alias_waits_for_live_source_producer_then_preserves_digest_invariants(tmp_path):
     _git(tmp_path, "init", "-q")
+    _stage_alias_test_dockerignore(tmp_path)
     source = _commit(tmp_path, "backend", "cps/web.py", "WRITE = 1\n")
     subject = _commit(tmp_path, "docs", "docs/usage.md", "docs\n")
     responses = [
@@ -500,11 +534,15 @@ def test_alias_waits_for_live_source_producer_then_preserves_digest_invariants(t
     assert f"-t registry.example/project/app:sha-{subject}" in log
 
 
-def test_alias_stops_when_source_producer_has_failed(tmp_path):
+@pytest.mark.parametrize("conclusion", ["cancelled", "failure"])
+def test_alias_routes_terminal_source_producer_to_subject_rebuild(tmp_path, conclusion):
+    """Observed terminal producers recover without manufacturing an alias."""
     _git(tmp_path, "init", "-q")
+    _stage_alias_test_dockerignore(tmp_path)
     source = _commit(tmp_path, "backend", "cps/web.py", "WRITE = 1\n")
     subject = _commit(tmp_path, "docs", "docs/usage.md", "docs\n")
-    responses = [{"status": "completed", "conclusion": "failure"}]
+    recovery_output = tmp_path / "github-output"
+    responses = [{"status": "completed", "conclusion": conclusion}]
     with _ActionsApi(responses) as api:
         proc, log = _run_alias(
             tmp_path,
@@ -512,13 +550,108 @@ def test_alias_stops_when_source_producer_has_failed(tmp_path):
             subject,
             source_succeeds_on=99,
             api_url=api.url,
+            recovery_output=recovery_output,
         )
 
-    assert proc.returncode == 1
+    assert proc.returncode == 0, proc.stderr
     assert api.run_requests == 1
     assert "https://github.example/runs/77" in proc.stderr
-    assert "concluded failure" in proc.stderr
+    assert f"concluded {conclusion}" in proc.stderr
+    assert recovery_output.read_text(encoding="utf-8") == "recovery_build=true\n"
     assert log == ""
+
+
+@pytest.mark.parametrize(
+    ("response", "error_fragment"),
+    [
+        ({"absent": True}, "no Build & Push producer run exists"),
+        ({"malformed": True}, "GitHub Actions API request failed"),
+    ],
+    ids=("absent-run", "malformed-api-response"),
+)
+def test_alias_recovery_refuses_unknown_producer_state(
+    tmp_path, response, error_fragment
+):
+    """Unknown producer state cannot authorize an exact-subject recovery build."""
+    _git(tmp_path, "init", "-q")
+    _stage_alias_test_dockerignore(tmp_path)
+    source = _commit(tmp_path, "backend", "cps/web.py", "WRITE = 1\n")
+    subject = _commit(tmp_path, "docs", "docs/usage.md", "docs\n")
+    recovery_output = tmp_path / "github-output"
+    recovery_output.write_text("sentinel=preserved\n", encoding="utf-8")
+
+    with _ActionsApi([response]) as api:
+        proc, log = _run_alias(
+            tmp_path,
+            source,
+            subject,
+            source_succeeds_on=99,
+            api_url=api.url,
+            recovery_output=recovery_output,
+        )
+
+    output = recovery_output.read_text(encoding="utf-8")
+    assert proc.returncode == 1
+    assert api.run_requests == 1
+    assert error_fragment in proc.stderr
+    assert "recovery_build=" not in output
+    assert output == "sentinel=preserved\n"
+    assert log == ""
+
+
+@pytest.mark.parametrize(
+    ("response", "expected_exit", "error_fragment"),
+    [
+        (
+            {"status": "completed", "conclusion": "cancelled"},
+            75,
+            "concluded cancelled",
+        ),
+        (
+            {
+                "status": "in_progress",
+                "conclusion": None,
+                "jobs": [
+                    {
+                        "name": "Build and push",
+                        "status": "completed",
+                        "conclusion": "failure",
+                    }
+                ],
+            },
+            75,
+            "job 'Build and push' concluded failure",
+        ),
+        ({"absent": True}, 1, "no Build & Push producer run exists"),
+        ({"malformed": True}, 1, "GitHub Actions API request failed"),
+    ],
+    ids=("terminal-run", "terminal-job", "absent-run", "malformed-api-response"),
+)
+def test_producer_checker_reserves_terminal_exit_code_for_known_terminal_state(
+    response, expected_exit, error_fragment
+):
+    """The recovery-specific code distinguishes terminal facts from API unknowns."""
+    with _ActionsApi([response]) as api:
+        proc = subprocess.run(
+            [
+                "python3",
+                str(PRODUCER_CHECKER),
+                "--terminal-exit-code",
+                "75",
+                "example/project",
+                "a" * 40,
+                "push",
+                api.url,
+            ],
+            cwd=REPO,
+            env={**os.environ, "GITHUB_TOKEN": "test-token"},
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+    assert proc.returncode == expected_exit
+    assert error_fragment in proc.stderr
 
 
 def test_resolver_stops_on_failed_job_before_live_run_concludes(tmp_path):

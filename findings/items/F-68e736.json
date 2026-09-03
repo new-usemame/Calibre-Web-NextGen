@@ -1,0 +1,19 @@
+{
+  "area": "test",
+  "body": "OBSERVED 2026-09-01: main run 33570322308 (6631b39cc3) Fast Tests failed once: tests/unit/test_annotation_sync_background_920.py::test_request_path_does_not_wait_for_a_slow_remote — \"request path blocked on the remote for 0.69s\", assertion `elapsed < 0.4`. The same tree passed on PR #2118. Ten local runs: 0.16–0.19 s.\n\nThe test registers a SlowHandler(delay=0.4) and dispatches THREE annotations; if the request path blocked on the remote, elapsed would be >= 1.2 s. The bound 0.4 s therefore leaves a 0.4–1.2 s zone in which nothing was proven about blocking and the test fails on ordinary runner load (xdist, 2 workers, 8k tests). The structural discriminator — the handler was never called on the request path (`handler.calls == []`) — is asserted by the sibling test but NOT by this one.\n\nFix shape: assert the structural fact (handler.calls == [] at return, queue length 3) and keep only a generous sanity bound derived from the delay (elapsed < delay, or < delay * n), with a comment stating that the bound proves \"did not wait even one remote round trip\" rather than a fixed wall-clock. Do not resolve via a bigger magic number.",
+  "created": "2026-09-01",
+  "id": "F-68e736",
+  "refs": [
+    "#2118"
+  ],
+  "resolution": {
+    "commit": "522cd58087",
+    "date": "2026-09-02",
+    "note": "Wall-clock bound replaced in #2123",
+    "release": ""
+  },
+  "severity": "test",
+  "source": "audit",
+  "status": "resolved",
+  "title": "test_request_path_does_not_wait_for_a_slow_remote is a wall-clock assertion that flakes on loaded runners (0.69 s vs 0.4 s bound; blocking would take 1.2 s)"
+}

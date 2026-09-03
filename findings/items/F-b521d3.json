@@ -5,8 +5,14 @@
   "id": "F-b521d3",
   "origin_issue": 1390,
   "refs": [],
+  "resolution": {
+    "commit": "6631b39cc3",
+    "date": "2026-09-01",
+    "note": "Shipped in #2118 (percentage cases were already fixed by #1942/#2114 and are pinned); bookmark and parent clocks are now monotonic under an older device LastModified.",
+    "release": ""
+  },
   "severity": "data-integrity",
   "source": "migrated-issue",
-  "status": "open",
+  "status": "resolved",
   "title": "Kobo sync overwrites a further reading position with a device's older one (progress goes backwards)"
 }

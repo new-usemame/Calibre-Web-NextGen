@@ -2138,7 +2138,7 @@ msgstr "Rak"
 msgid "Books organized in shelves"
 msgstr "本棚に整理された本"
 
-#: cps/opds.py
+#: cps/opds.py cps/templates/config_view_edit.html
 #, fuzzy
 msgid "Magic Shelves"
 msgstr "Sinkronkan Rak yang dipilih dengan Kob"
@@ -5124,7 +5124,7 @@ msgstr ""
 msgid "Custom border colour"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
 msgstr ""
 
@@ -10557,6 +10557,10 @@ msgstr "Ekspresi Reguler untuk Mengabaikan Kolom"
 msgid "Regex pattern to hide custom columns from being displayed in the UI."
 msgstr ""
 
+#: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
+msgid "Sort by"
+msgstr ""
+
 #: cps/templates/config_view_edit.html
 msgid "Link Read/Unread Status to Calibre Column"
 msgstr "Tautkan Status Baca/Belum Dibaca ke Kolom Kaliber"
@@ -13573,10 +13577,6 @@ msgstr "Pengguna tidak ditemukan"
 #: cps/templates/shelf_order.html
 msgid "Hidden Book"
 msgstr "Buku Tersembunyi"
-
-#: cps/templates/shelf_reorder.html
-msgid "Sort by"
-msgstr ""
 
 #: cps/templates/shelf_reorder.html
 msgid "You do not have any shelves to reorder yet."

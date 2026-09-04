@@ -2103,7 +2103,7 @@ msgstr ""
 msgid "Books organized in shelves"
 msgstr "Kirjat sarjoittain"
 
-#: cps/opds.py
+#: cps/opds.py cps/templates/config_view_edit.html
 #, fuzzy
 msgid "Magic Shelves"
 msgstr "Muokkaa hyllyä"
@@ -5092,7 +5092,7 @@ msgstr ""
 msgid "Custom border colour"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
 msgstr ""
 
@@ -10524,6 +10524,10 @@ msgstr "Regular expression sarakkeiden poisjättämiseen"
 msgid "Regex pattern to hide custom columns from being displayed in the UI."
 msgstr ""
 
+#: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
+msgid "Sort by"
+msgstr ""
+
 #: cps/templates/config_view_edit.html
 msgid "Link Read/Unread Status to Calibre Column"
 msgstr "Linkitä luettu/ei luettu -tieto Calibren sarakkeeseen"
@@ -13550,10 +13554,6 @@ msgstr "Valtuutusta ei löytynyt"
 #, fuzzy
 msgid "Hidden Book"
 msgstr "Näytä ekirjat"
-
-#: cps/templates/shelf_reorder.html
-msgid "Sort by"
-msgstr ""
 
 #: cps/templates/shelf_reorder.html
 msgid "You do not have any shelves to reorder yet."

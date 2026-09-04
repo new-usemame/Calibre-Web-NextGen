@@ -2216,7 +2216,7 @@ msgstr "Полки"
 msgid "Books organized in shelves"
 msgstr "Книги, расставленные на полках"
 
-#: cps/opds.py
+#: cps/opds.py cps/templates/config_view_edit.html
 msgid "Magic Shelves"
 msgstr "Умные полки"
 
@@ -5219,7 +5219,7 @@ msgstr "Читаю сейчас"
 msgid "Custom border colour"
 msgstr "Пользовательский цвет рамки"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
 msgstr "Пользовательские колонки"
 
@@ -10833,6 +10833,10 @@ msgstr ""
 "Регулярное выражение (regex) для скрытия пользовательских столбцов в "
 "интерфейсе."
 
+#: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
+msgid "Sort by"
+msgstr "Сортировать по"
+
 #: cps/templates/config_view_edit.html
 msgid "Link Read/Unread Status to Calibre Column"
 msgstr "Привязать статус «прочитано/не прочитано» к столбцу Calibre"
@@ -14044,10 +14048,6 @@ msgstr "Порядок полок"
 #: cps/templates/shelf_order.html
 msgid "Hidden Book"
 msgstr "Скрытая книга"
-
-#: cps/templates/shelf_reorder.html
-msgid "Sort by"
-msgstr "Сортировать по"
 
 #: cps/templates/shelf_reorder.html
 msgid "You do not have any shelves to reorder yet."

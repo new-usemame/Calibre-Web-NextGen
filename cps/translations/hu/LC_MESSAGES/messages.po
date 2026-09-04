@@ -2181,7 +2181,7 @@ msgstr "Polcok"
 msgid "Books organized in shelves"
 msgstr "Könyvek sorozat szerint rendezve"
 
-#: cps/opds.py
+#: cps/opds.py cps/templates/config_view_edit.html
 msgid "Magic Shelves"
 msgstr "Varázspolcok"
 
@@ -5154,7 +5154,7 @@ msgstr ""
 msgid "Custom border colour"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
 msgstr ""
 
@@ -10608,6 +10608,10 @@ msgstr "Reguláris kifejezés oszlopok kihagyásához"
 msgid "Regex pattern to hide custom columns from being displayed in the UI."
 msgstr "Regex minta az egyéni oszlopok elrejtéséhez a felületen."
 
+#: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
+msgid "Sort by"
+msgstr "Rendezés"
+
 #: cps/templates/config_view_edit.html
 msgid "Link Read/Unread Status to Calibre Column"
 msgstr "Olvasva/olvasatlan állapot hozzárendelése Calibre oszlophoz"
@@ -13723,10 +13727,6 @@ msgstr "Polc nem található"
 #: cps/templates/shelf_order.html
 msgid "Hidden Book"
 msgstr "Rejtett könyvek"
-
-#: cps/templates/shelf_reorder.html
-msgid "Sort by"
-msgstr "Rendezés"
 
 #: cps/templates/shelf_reorder.html
 msgid "You do not have any shelves to reorder yet."

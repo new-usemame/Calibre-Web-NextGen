@@ -2215,7 +2215,7 @@ msgstr "Półki"
 msgid "Books organized in shelves"
 msgstr "Książki ułożone na półkach"
 
-#: cps/opds.py
+#: cps/opds.py cps/templates/config_view_edit.html
 msgid "Magic Shelves"
 msgstr "Magiczne Półki"
 
@@ -5227,7 +5227,7 @@ msgstr "Obecnie czytane"
 msgid "Custom border colour"
 msgstr "Niestandardowy kolor obramowania"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
 msgstr "Niestandardowe kolumny"
 
@@ -10769,6 +10769,10 @@ msgstr ""
 "Wzorzec wyrażenia regularnego ukrywający kolumny niestandardowe przed "
 "wyświetleniem w interfejsie."
 
+#: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
+msgid "Sort by"
+msgstr "Sortuj według"
+
 #: cps/templates/config_view_edit.html
 msgid "Link Read/Unread Status to Calibre Column"
 msgstr "Połącz status przeczytane/nieprzeczytane z kolumną Calibre"
@@ -13946,10 +13950,6 @@ msgstr "Kolejność półek"
 #: cps/templates/shelf_order.html
 msgid "Hidden Book"
 msgstr "Ukryta książka"
-
-#: cps/templates/shelf_reorder.html
-msgid "Sort by"
-msgstr "Sortuj według"
 
 #: cps/templates/shelf_reorder.html
 msgid "You do not have any shelves to reorder yet."

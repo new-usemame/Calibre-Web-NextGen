@@ -2114,7 +2114,7 @@ msgstr "الأرفف"
 msgid "Books organized in shelves"
 msgstr "الكتب منظمة في أرفف"
 
-#: cps/opds.py
+#: cps/opds.py cps/templates/config_view_edit.html
 #, fuzzy
 msgid "Magic Shelves"
 msgstr "مزامنة الرفوف المختارة مع Kobo"
@@ -5089,7 +5089,7 @@ msgstr ""
 msgid "Custom border colour"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
 msgstr ""
 
@@ -10488,6 +10488,10 @@ msgstr "تعبير عادي لتجاهل الأعمدة"
 msgid "Regex pattern to hide custom columns from being displayed in the UI."
 msgstr ""
 
+#: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
+msgid "Sort by"
+msgstr ""
+
 #: cps/templates/config_view_edit.html
 msgid "Link Read/Unread Status to Calibre Column"
 msgstr "ربط حالة المقروء/غير المقروء بعمود Calibre"
@@ -13486,10 +13490,6 @@ msgstr "لم يتم العثور على المستخدم"
 #: cps/templates/shelf_order.html
 msgid "Hidden Book"
 msgstr "كتاب مخفي"
-
-#: cps/templates/shelf_reorder.html
-msgid "Sort by"
-msgstr ""
 
 #: cps/templates/shelf_reorder.html
 msgid "You do not have any shelves to reorder yet."

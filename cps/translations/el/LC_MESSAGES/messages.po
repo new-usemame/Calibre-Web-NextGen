@@ -2150,7 +2150,7 @@ msgstr "Ράφια"
 msgid "Books organized in shelves"
 msgstr "Βιβλία οργανωμένα σε ράφια"
 
-#: cps/opds.py
+#: cps/opds.py cps/templates/config_view_edit.html
 #, fuzzy
 msgid "Magic Shelves"
 msgstr "Δημόσιο Ράφι"
@@ -5141,7 +5141,7 @@ msgstr ""
 msgid "Custom border colour"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
 msgstr ""
 
@@ -10601,6 +10601,10 @@ msgstr "Συνήθης Έφραση για  για να Αγνοηθούν Στ�
 msgid "Regex pattern to hide custom columns from being displayed in the UI."
 msgstr ""
 
+#: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
+msgid "Sort by"
+msgstr ""
+
 #: cps/templates/config_view_edit.html
 msgid "Link Read/Unread Status to Calibre Column"
 msgstr "Σύνδεση Κατάστασης Διαβασμένο/Αδιάβαστο σε Στήλη Calibre"
@@ -13630,10 +13634,6 @@ msgstr "Δεν βρέθηκε χρήστης"
 #: cps/templates/shelf_order.html
 msgid "Hidden Book"
 msgstr "Κρυμμένο Βιβλίο"
-
-#: cps/templates/shelf_reorder.html
-msgid "Sort by"
-msgstr ""
 
 #: cps/templates/shelf_reorder.html
 msgid "You do not have any shelves to reorder yet."

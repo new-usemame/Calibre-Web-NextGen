@@ -2132,7 +2132,7 @@ msgstr "Police"
 msgid "Books organized in shelves"
 msgstr "Knihy organizované v policiach"
 
-#: cps/opds.py
+#: cps/opds.py cps/templates/config_view_edit.html
 #, fuzzy
 msgid "Magic Shelves"
 msgstr "Synchronizovať vybrané police s Kobo"
@@ -5109,7 +5109,7 @@ msgstr ""
 msgid "Custom border colour"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
 msgstr ""
 
@@ -10533,6 +10533,10 @@ msgstr "Regulárny výraz pre ignorované stĺpce"
 msgid "Regex pattern to hide custom columns from being displayed in the UI."
 msgstr ""
 
+#: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
+msgid "Sort by"
+msgstr ""
+
 #: cps/templates/config_view_edit.html
 msgid "Link Read/Unread Status to Calibre Column"
 msgstr "Prepojiť stav Prečítané/Neprečítané do Calibre stĺpca"
@@ -13544,10 +13548,6 @@ msgstr "Používateľ sa nenašiel"
 #: cps/templates/shelf_order.html
 msgid "Hidden Book"
 msgstr "Skryté chyby"
-
-#: cps/templates/shelf_reorder.html
-msgid "Sort by"
-msgstr ""
 
 #: cps/templates/shelf_reorder.html
 msgid "You do not have any shelves to reorder yet."

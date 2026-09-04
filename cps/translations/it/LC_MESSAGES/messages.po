@@ -2225,7 +2225,7 @@ msgstr "Scaffali"
 msgid "Books organized in shelves"
 msgstr "Libri organizzati in scaffali"
 
-#: cps/opds.py
+#: cps/opds.py cps/templates/config_view_edit.html
 msgid "Magic Shelves"
 msgstr "Scaffali magici"
 
@@ -5343,7 +5343,7 @@ msgstr "In lettura"
 msgid "Custom border colour"
 msgstr "Colore del bordo personalizzato"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
 msgstr "Colonne personalizzate"
 
@@ -11072,6 +11072,10 @@ msgstr ""
 "Pattern Regex per nascondere le colonne personalizzate dalla visualizzazione "
 "nell'interfaccia utente."
 
+#: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
+msgid "Sort by"
+msgstr "Ordina per"
+
 #: cps/templates/config_view_edit.html
 msgid "Link Read/Unread Status to Calibre Column"
 msgstr "Collega lo stato letto/da leggere nella colonna di Calibre"
@@ -14335,10 +14339,6 @@ msgstr "Ordine dello scaffale"
 #: cps/templates/shelf_order.html
 msgid "Hidden Book"
 msgstr "Libro nascosto"
-
-#: cps/templates/shelf_reorder.html
-msgid "Sort by"
-msgstr "Ordina per"
 
 #: cps/templates/shelf_reorder.html
 msgid "You do not have any shelves to reorder yet."

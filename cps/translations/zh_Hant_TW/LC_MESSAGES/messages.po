@@ -2066,7 +2066,7 @@ msgstr "書架列表"
 msgid "Books organized in shelves"
 msgstr "書架上的書"
 
-#: cps/opds.py
+#: cps/opds.py cps/templates/config_view_edit.html
 msgid "Magic Shelves"
 msgstr "魔法書架"
 
@@ -5041,7 +5041,7 @@ msgstr ""
 msgid "Custom border colour"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
 msgstr ""
 
@@ -10427,6 +10427,10 @@ msgstr "可忽略的自定義欄位（正則表達式）"
 msgid "Regex pattern to hide custom columns from being displayed in the UI."
 msgstr ""
 
+#: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
+msgid "Sort by"
+msgstr "排序方式"
+
 #: cps/templates/config_view_edit.html
 msgid "Link Read/Unread Status to Calibre Column"
 msgstr "選擇自定義欄位作為閱讀狀態"
@@ -13388,10 +13392,6 @@ msgstr "書架排序"
 #: cps/templates/shelf_order.html
 msgid "Hidden Book"
 msgstr "隱藏書籍"
-
-#: cps/templates/shelf_reorder.html
-msgid "Sort by"
-msgstr "排序方式"
 
 #: cps/templates/shelf_reorder.html
 msgid "You do not have any shelves to reorder yet."

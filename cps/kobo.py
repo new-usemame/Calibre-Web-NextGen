@@ -10,7 +10,7 @@ import base64
 from collections import Counter
 import hashlib
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import os
 import secrets
 import uuid
@@ -1950,6 +1950,16 @@ def HandleSyncRequest():
     book_count = len(book_snapshot_ids)
     log.debug("Kobo Sync: changed entries: {}".format(book_count))
 
+    # The configured Calibre boolean column is the application's canonical
+    # finished/not-finished value, while Kobo can only emit timestamped rows
+    # from app.db.  Bridge changed Calibre books before freezing the state
+    # frontier so a direct Calibre edit becomes a normal incremental
+    # ChangedReadingState.  This also creates the missing state graph left by
+    # older custom-column web toggles (#2144).
+    reconcile_custom_read_column_for_kobo(
+        book_snapshot_ids, sync_token.reading_state_last_modified,
+    )
+
     reading_state_book_ids_emitted = []
 
     # Establish one ordered reading-state frontier before rendering any
@@ -3695,15 +3705,23 @@ def HandleStateRequest(book_uuid):
             if request_status_info:
                 book_read = kobo_reading_state.book_read_link
                 new_book_read_status = get_ub_read_status(request_status_info["Status"])
+                status_clock_accepted = device_positions.timestamp_is_newer(
+                    request_lm, book_read.last_modified,
+                )
                 if (new_book_read_status != book_read.read_status
-                        and device_positions.timestamp_is_newer(
-                            request_lm, book_read.last_modified,
-                        )):
+                        and status_clock_accepted):
                     if new_book_read_status == ub.ReadBook.STATUS_IN_PROGRESS:
                         book_read.times_started_reading += 1
                         book_read.last_time_started_reading = datetime.now(timezone.utc)
                     book_read.read_status = new_book_read_status
                     _apply_kobo_last_modified(book_read, request_lm)
+                if (status_clock_accepted
+                        and new_book_read_status == ub.ReadBook.STATUS_FINISHED
+                        and not helper.set_custom_read_column_value(
+                            book.id, True, source="Kobo read-status",
+                        )):
+                    ub.session.rollback()
+                    return "", 500
                 update_results_response["StatusInfoResult"] = {"Result": "Success"}
         except (KeyError, TypeError, ValueError, StatementError):
             log.debug("Received malformed v1/library/<book_uuid>/state request.")
@@ -3825,6 +3843,110 @@ def get_read_status_for_kobo(ub_book_read):
         ub.ReadBook.STATUS_IN_PROGRESS: "Reading",
     }
     return enum_to_string_map[ub_book_read.read_status]
+
+
+def reconcile_custom_read_column_for_kobo(book_ids, reading_state_cursor):
+    """Mirror changed Calibre read markers into timestamped Kobo state rows.
+
+    The Calibre column is boolean while ReadBook is tri-state.  A true marker
+    always means FINISHED; false is intentionally ignored because it cannot
+    distinguish UNREAD from a legitimate IN_PROGRESS value reported by a
+    reader.  Work is limited to the already-selected entitlement candidates,
+    so an incremental sync never scans the full library and no token is
+    invalidated.
+    """
+    if not getattr(config, "config_read_column", 0) or not book_ids:
+        return 0
+
+    user_id = int(current_user.id)
+    reconciled = 0
+    reconciled_states = []
+    chunk_size = 500
+    for start in range(0, len(book_ids), chunk_size):
+        chunk = book_ids[start:start + chunk_size]
+        books = calibre_db.session.query(db.Books).filter(
+            db.Books.id.in_(chunk),
+        ).all()
+        read_by_book = {
+            row.book_id: row
+            for row in ub.session.query(ub.ReadBook).filter(
+                ub.ReadBook.user_id == user_id,
+                ub.ReadBook.book_id.in_(chunk),
+            ).all()
+        }
+
+        for book in books:
+            try:
+                finished = helper.custom_read_column_value(book)
+            except (KeyError, AttributeError, IndexError):
+                log.error(
+                    "Kobo read-status: custom column No.%s does not exist "
+                    "in calibre database",
+                    config.config_read_column,
+                )
+                return reconciled
+
+            # Sync-originated completion is deliberately sticky throughout
+            # this subsystem: false cannot distinguish UNREAD from the richer
+            # IN_PROGRESS device state, and must not erase it.
+            if not finished:
+                continue
+
+            book_read = read_by_book.get(book.id)
+            if book_read is None:
+                book_read = ub.ReadBook(
+                    user_id=user_id,
+                    book_id=book.id,
+                    read_status=ub.ReadBook.STATUS_FINISHED,
+                )
+                ub.session.add(book_read)
+                read_by_book[book.id] = book_read
+                status_changed = True
+            else:
+                status_changed = (
+                    book_read.read_status != ub.ReadBook.STATUS_FINISHED
+                )
+                if status_changed:
+                    book_read.read_status = ub.ReadBook.STATUS_FINISHED
+
+            needs_state = status_changed or (
+                book_read.kobo_reading_state is None
+            )
+            if not needs_state:
+                continue
+            if book_read.kobo_reading_state is None:
+                state = ub.KoboReadingState(
+                    user_id=user_id, book_id=book.id,
+                )
+                state.current_bookmark = ub.KoboBookmark()
+                state.statistics = ub.KoboStatistics()
+                book_read.kobo_reading_state = state
+            reconciled_states.append(book_read.kobo_reading_state)
+            reconciled += 1
+
+    if reconciled:
+        # Populate onupdate/default clocks before the ordered frontier query.
+        ub.session.flush()
+        # SQLite reloads DateTime columns as UTC-naive values, which is also
+        # the sync-token cursor basis.  Newly flushed ORM objects retain the
+        # aware Python defaults until expiration, so normalize this request's
+        # instances before the frontier's max comparisons. Give bulk-created
+        # rows distinct microseconds too: the token is timestamp-only, so
+        # >100 equal clocks would otherwise be skipped after page one.
+        clock = max(
+            books_cursor_datetime(reading_state_cursor),
+            datetime.now(timezone.utc).replace(tzinfo=None),
+        )
+        for offset, state in enumerate(reconciled_states, start=1):
+            state_clock = clock + timedelta(microseconds=offset)
+            state.last_modified = state_clock
+            state.priority_timestamp = state_clock
+        ub.session.flush()
+        log.debug(
+            "Kobo Sync: reconciled %d configured read-column states",
+            reconciled,
+        )
+    return reconciled
 
 
 def get_ub_read_status(kobo_read_status):

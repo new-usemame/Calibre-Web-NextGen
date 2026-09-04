@@ -23,6 +23,20 @@ from sqlalchemy.orm import sessionmaker
 
 pytestmark = pytest.mark.unit
 
+READ_COLUMN_ID = 2144
+
+
+@pytest.fixture(scope="module")
+def read_column_class():
+    """Real Calibre boolean custom column used by the #2144 regressions."""
+    from cps import db
+
+    if READ_COLUMN_ID not in db.cc_classes:
+        db.CalibreDB.setup_db_cc_classes([
+            SimpleNamespace(id=READ_COLUMN_ID, datatype="bool"),
+        ])
+    return db.cc_classes[READ_COLUMN_ID]
+
 
 def _state_book_ids(response, uuid_to_id):
     delivered = []
@@ -58,9 +72,9 @@ def _entitlement_book_ids(response):
 
 
 @pytest.fixture
-def reading_state_sync(monkeypatch):
+def reading_state_sync(monkeypatch, read_column_class):
     """Real handler + SQLAlchemy harness with 250 state-bearing books."""
-    from cps import db, kobo, kobo_sync_status, ub
+    from cps import db, helper, kobo, kobo_sync_status, ub
 
     engine = create_engine("sqlite://")
     event.listen(
@@ -160,14 +174,21 @@ def reading_state_sync(monkeypatch):
         get_book=lambda book_id: session.query(db.Books).filter_by(
             id=book_id
         ).one_or_none(),
+        get_book_by_uuid_for_kobo=lambda book_uuid, enforce_policy=False: (
+            session.query(db.Books).filter_by(uuid=book_uuid).one_or_none()
+        ),
     )
 
     monkeypatch.setattr(ub, "session", session)
-    monkeypatch.setattr(ub, "session_commit", lambda *_args, **_kwargs: session.commit())
+    monkeypatch.setattr(
+        ub, "session_commit", lambda *_args, **_kwargs: session.commit() or True,
+    )
     monkeypatch.setattr(kobo, "calibre_db", fake_calibre_db)
+    monkeypatch.setattr(helper, "calibre_db", fake_calibre_db)
     monkeypatch.setattr(kobo, "current_user", user)
     monkeypatch.setattr(kobo_sync_status, "current_user", user)
     monkeypatch.setattr(kobo.config, "config_kobo_proxy", False, raising=False)
+    monkeypatch.setattr(kobo.config, "config_read_column", 0, raising=False)
     monkeypatch.setattr(
         kobo.config,
         "config_kobo_suppress_replayed_entitlements",
@@ -228,6 +249,8 @@ def reading_state_sync(monkeypatch):
     try:
         yield SimpleNamespace(
             books=books,
+            app=app,
+            read_column_class=read_column_class,
             device=device,
             session=session,
             states=[state for state, _clock in states],
@@ -239,6 +262,120 @@ def reading_state_sync(monkeypatch):
     finally:
         session.close()
         engine.dispose()
+
+
+def _reading_state_for(response, book_uuid):
+    """Return one book's state whether embedded or standalone."""
+    for item in response.get_json():
+        if "ChangedReadingState" in item:
+            state = item["ChangedReadingState"]["ReadingState"]
+        else:
+            entitlement = (
+                item.get("NewEntitlement") or item.get("ChangedEntitlement")
+            )
+            state = entitlement.get("ReadingState") if entitlement else None
+        if state is not None and state["EntitlementId"] == str(book_uuid):
+            return state
+    return None
+
+
+def test_calibre_custom_read_column_reaches_incremental_kobo_sync(
+    reading_state_sync, monkeypatch,
+):
+    """#2144: a Calibre-only read mark must become Finished on the wire.
+
+    Model the reporter's mixed population precisely: the book was already
+    entitled to the device, but unlike the books the Kobo has opened it has no
+    app.db ReadBook/KoboReadingState graph.  Calibre then marks its configured
+    boolean column and advances Books.last_modified.  The next incremental
+    sync must bridge that canonical display value into a timestamped Kobo
+    state; merely re-sending the changed entitlement is insufficient.
+    """
+    from cps import config, kobo, ub
+
+    harness = reading_state_sync
+    book = harness.books[0]
+    old_books_cursor = max(candidate.last_modified for candidate in harness.books)
+    old_state_cursor = max(state.last_modified for state in harness.states)
+    harness.session.add(ub.KoboSyncedBooks(
+        user_id=harness.user.id,
+        book_id=book.id,
+        book_uuid=str(book.uuid),
+    ))
+    harness.session.commit()
+    token = kobo.SyncToken.SyncToken(
+        books_last_created=max(candidate.timestamp for candidate in harness.books),
+        books_last_modified=old_books_cursor,
+        books_last_id=harness.books[-1].id,
+        reading_state_last_modified=old_state_cursor,
+    ).build_sync_token()
+
+    # The entitlement remains known, while this never-opened book has no
+    # reading-state carrier.  This is the half of the reporter's library that
+    # failed; opened books already have the graph and account for partial hits.
+    read = harness.session.query(ub.ReadBook).filter_by(
+        user_id=harness.user.id, book_id=book.id,
+    ).one()
+    harness.session.delete(read)
+    harness.session.flush()
+    assert harness.session.query(ub.KoboReadingState).filter_by(
+        user_id=harness.user.id, book_id=book.id,
+    ).one_or_none() is None
+
+    harness.session.add(harness.read_column_class(book=book.id, value=True))
+    book.last_modified = old_books_cursor + timedelta(seconds=1)
+    harness.session.commit()
+    monkeypatch.setattr(
+        config, "config_read_column", READ_COLUMN_ID, raising=False,
+    )
+
+    response = harness.sync(token, physical_device=False)
+
+    assert response.status_code == 200
+    state = _reading_state_for(response, book.uuid)
+    assert state is not None, (
+        "the changed entitlement must carry or accompany a reading state"
+    )
+    assert state["StatusInfo"]["Status"] == "Finished"
+
+
+def test_finished_from_kobo_updates_configured_calibre_read_column(
+    reading_state_sync, monkeypatch,
+):
+    """The reverse bridge keeps the app's configured read source truthful."""
+    from cps import config, kobo, ub
+
+    harness = reading_state_sync
+    book = harness.books[1]
+    monkeypatch.setattr(
+        config, "config_read_column", READ_COLUMN_ID, raising=False,
+    )
+    assert getattr(book, f"custom_column_{READ_COLUMN_ID}") == []
+
+    read = harness.session.query(ub.ReadBook).filter_by(
+        user_id=harness.user.id, book_id=book.id,
+    ).one()
+    observed_at = max(read.last_modified, harness.states[1].last_modified) \
+        + timedelta(seconds=1)
+    payload = {
+        "ReadingStates": [{
+            "LastModified": kobo.convert_to_kobo_timestamp_string(observed_at),
+            "CurrentBookmark": {},
+            "Statistics": {},
+            "StatusInfo": {"Status": "Finished"},
+        }],
+    }
+
+    with harness.app.test_request_context(
+        f"/v1/library/{book.uuid}/state", method="PUT", json=payload,
+    ):
+        response = kobo.HandleStateRequest.__wrapped__(str(book.uuid))
+
+    assert response.status_code == 200
+    harness.session.expire(book, [f"custom_column_{READ_COLUMN_ID}"])
+    values = getattr(book, f"custom_column_{READ_COLUMN_ID}")
+    assert len(values) == 1
+    assert values[0].value is True
 
 
 def test_factory_reset_sync_delivers_every_reading_state_exactly_once(

@@ -950,6 +950,56 @@ def mirror_read_status_to_readbook(session, user_id, book_id, finished):
     row.read_status = ub.ReadBook.STATUS_FINISHED if finished else ub.ReadBook.STATUS_UNREAD
 
 
+def custom_read_column_value(book):
+    """Return the configured Calibre boolean read marker for ``book``.
+
+    The caller deliberately gets an exception for a missing/reflection-stale
+    column so it can choose whether that is fatal for its own operation.
+    Absence of a row is Calibre's ordinary false value.
+    """
+    values = getattr(
+        book, "custom_column_{}".format(config.config_read_column),
+    )
+    return bool(values and values[0].value)
+
+
+def set_custom_read_column_value(book_id, value, source="read-status"):
+    """Write the configured Calibre read marker and report whether it landed.
+
+    Calibre custom columns are book-level, so this intentionally has no user
+    parameter.  Sync callers use the boolean result to avoid acknowledging a
+    device status that the application's configured source of truth did not
+    accept.
+    """
+    column_id = getattr(config, "config_read_column", 0)
+    if not column_id:
+        return True
+    try:
+        book = calibre_db.get_book(book_id)
+        if book is None:
+            log.error("%s: book %s not found in calibre database", source, book_id)
+            return False
+        read_status = getattr(book, "custom_column_{}".format(column_id))
+        if read_status:
+            read_status[0].value = bool(value)
+        else:
+            cc_class = db.cc_classes[column_id]
+            calibre_db.session.add(
+                cc_class(value=bool(value), book=book_id),
+            )
+        calibre_db.session.commit()
+        return True
+    except (KeyError, AttributeError, IndexError):
+        log.error(
+            "%s: custom column No.%s does not exist in calibre database",
+            source, column_id,
+        )
+    except (OperationalError, InvalidRequestError) as ex:
+        calibre_db.session.rollback()
+        log.error("%s: custom column write failed: %s", source, ex)
+    return False
+
+
 def edit_book_read_status(book_id, read_status=None):
     if not config.config_read_column:
         book = ub.session.query(ub.ReadBook).filter(and_(ub.ReadBook.user_id == int(current_user.id),

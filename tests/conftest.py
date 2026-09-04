@@ -14,14 +14,18 @@ Environment Variables:
     USE_DOCKER_VOLUMES: Set to 'true' to use Docker volumes instead of bind mounts.
                        Required for Docker-in-Docker test environments.
                        Example: USE_DOCKER_VOLUMES=true pytest tests/integration/
+    CWNG_PYTEST_TMP_BASE: Explicit base for per-process pytest temp directories.
+    CWNG_PYTEST_TMP_PROBE_SECONDS: External-volume probe timeout (default: 5).
 """
 
+import math
 import os
 import re
 import sys
 import pytest
 import tempfile
 import shutil
+import threading
 import time
 import requests
 import subprocess
@@ -421,11 +425,109 @@ def mock_calibre_tools(mocker):
 # ============================================================================
 
 _PYTEST_EXTERNAL_VOLUME_ROOT = "/Volumes/Crucial X8"
+_PYTEST_EXTERNAL_VOLUME_PROBE_SECONDS = 5.0
+_PYTEST_EXTERNAL_VOLUME_PROBE_CODE = r"""
+import os
+import sys
+
+volume_root, external_base = sys.argv[1:3]
+if not (os.path.isdir(volume_root) and os.path.ismount(volume_root)):
+    raise SystemExit(3)
+
+os.makedirs(external_base, exist_ok=True)
+probe_path = os.path.join(external_base, f".cwng-pytest-probe-{os.getpid()}")
+try:
+    descriptor = os.open(
+        probe_path,
+        os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+        0o600,
+    )
+    try:
+        os.write(descriptor, b"probe")
+    finally:
+        os.close(descriptor)
+finally:
+    try:
+        os.unlink(probe_path)
+    except FileNotFoundError:
+        pass
+"""
 
 
-def _pytest_external_volume_is_mounted(volume_root):
-    """Return whether ``volume_root`` is an available mounted directory."""
-    return os.path.isdir(volume_root) and os.path.ismount(volume_root)
+def _pytest_external_volume_probe_runner(command, timeout_seconds):
+    """Run the volume probe without ever waiting indefinitely in the parent.
+
+    ``subprocess.run(timeout=...)`` kills and then waits for a timed-out child.
+    That final wait is not bounded when the child is stuck in an uninterruptible
+    filesystem operation. Poll with a timeout instead; if SIGKILL cannot finish
+    the child promptly, a daemon reaper owns the eventual blocking wait.
+    """
+    process = subprocess.Popen(
+        command,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        return process.wait(timeout=timeout_seconds)
+    except subprocess.TimeoutExpired:
+        try:
+            process.kill()
+        except ProcessLookupError:
+            pass
+        try:
+            process.wait(timeout=0.1)
+        except subprocess.TimeoutExpired:
+            threading.Thread(target=process.wait, daemon=True).start()
+        raise
+
+
+def _pytest_external_volume_probe_timeout():
+    """Return the configured positive probe timeout, or the safe default."""
+    configured = os.environ.get(
+        "CWNG_PYTEST_TMP_PROBE_SECONDS",
+        str(_PYTEST_EXTERNAL_VOLUME_PROBE_SECONDS),
+    )
+    try:
+        timeout_seconds = float(configured)
+    except (TypeError, ValueError):
+        return _PYTEST_EXTERNAL_VOLUME_PROBE_SECONDS
+    if timeout_seconds <= 0 or not math.isfinite(timeout_seconds):
+        return _PYTEST_EXTERNAL_VOLUME_PROBE_SECONDS
+    return timeout_seconds
+
+
+def _probe_pytest_external_volume(volume_root, external_base, timeout_seconds):
+    """Return whether the child proved the external scratch base is usable."""
+    command = [
+        sys.executable,
+        "-c",
+        _PYTEST_EXTERNAL_VOLUME_PROBE_CODE,
+        volume_root,
+        external_base,
+    ]
+    timeout_label = f"{timeout_seconds:g}"
+    try:
+        returncode = _pytest_external_volume_probe_runner(command, timeout_seconds)
+    except subprocess.TimeoutExpired:
+        return (
+            False,
+            f"external volume did not answer within {timeout_label}s — falling back",
+        )
+    except Exception as error:
+        detail = " ".join(str(error).split()) or type(error).__name__
+        return False, f"external volume probe could not start: {detail} — falling back"
+
+    if returncode == 0:
+        return True, f"{volume_root} is mounted and writable"
+    if returncode == 3:
+        return False, f"{volume_root} is not mounted — falling back"
+    if returncode < 0:
+        return (
+            False,
+            f"external volume probe was killed by signal {-returncode} — falling back",
+        )
+    return False, f"external volume probe failed with exit {returncode} — falling back"
 
 
 def _isolate_pytest_tempdir():
@@ -472,11 +574,11 @@ def _isolate_pytest_tempdir():
     `test_802`'s. This promotes that workaround to the harness, and the local one
     can go once this has settled.
 
-    Scratch lives on the external volume when it is mounted and writable, with
-    ``CWNG_PYTEST_TMP_BASE`` as an explicit override. Otherwise it remains under
-    the system tempdir, and the selected location and reason are reported.
+    Scratch lives on the external volume when a bounded child process proves it
+    is mounted and writable, with ``CWNG_PYTEST_TMP_BASE`` as an explicit
+    override. Otherwise it remains under the system tempdir, and the selected
+    location and reason are reported.
     """
-    fallback_base = os.path.join(tempfile.gettempdir(), "cwng-pytest")
     override_base = os.environ.get("CWNG_PYTEST_TMP_BASE")
     if override_base is not None:
         base = override_base
@@ -484,27 +586,16 @@ def _isolate_pytest_tempdir():
     else:
         volume_root = _PYTEST_EXTERNAL_VOLUME_ROOT
         external_base = os.path.join(volume_root, "agent-scratch", "cwng-pytest")
-        if _pytest_external_volume_is_mounted(volume_root):
-            try:
-                os.makedirs(external_base, exist_ok=True)
-            except OSError as error:
-                base = fallback_base
-                reason = (
-                    f"{volume_root} is mounted but the external base could not "
-                    f"be created: {error}"
-                )
-            else:
-                if os.access(external_base, os.W_OK):
-                    base = external_base
-                    reason = f"{volume_root} is mounted and writable"
-                else:
-                    base = fallback_base
-                    reason = (
-                        f"{volume_root} is mounted but {external_base} is not writable"
-                    )
+        timeout_seconds = _pytest_external_volume_probe_timeout()
+        usable, reason = _probe_pytest_external_volume(
+            volume_root,
+            external_base,
+            timeout_seconds,
+        )
+        if usable:
+            base = external_base
         else:
-            base = fallback_base
-            reason = f"{volume_root} is not mounted"
+            base = os.path.join(tempfile.gettempdir(), "cwng-pytest")
 
     print(f"pytest temp base: {base} ({reason})", file=sys.stderr)
     _reap_stale_pytest_tempdirs(base)

@@ -17,7 +17,11 @@ from . import api_v1
 from .books import _rows_to_items
 from .. import ub, config, db, calibre_db, logger, magic_shelf
 from ..cw_login import current_user
-from ..sort_orders import BOOK_SORT_ORDERS
+from ..custom_column_sort import (
+    custom_sort_options,
+    load_configured_columns,
+    resolve_magic_shelf_sort,
+)
 from ..usermanagement import login_required_if_no_ano, user_login_required
 
 log = logger.create()
@@ -97,6 +101,11 @@ def magic_shelf_books(shelf_id):
 
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", config.config_books_per_page, type=int)
+    configured_sort_columns = load_configured_columns(config)
+    resolved_sort = resolve_magic_shelf_sort(
+        request.args.get("sort", "new"), config, configured_sort_columns
+    )
+    sort_options = custom_sort_options(config, configured_sort_columns)
 
     try:
         query_filter = magic_shelf.build_query_from_rules(shelf.rules, user_id=uid)
@@ -106,17 +115,23 @@ def magic_shelf_books(shelf_id):
     shelf_item = _shelf_item(shelf, current_user)
     if query_filter is None:
         return jsonify({**shelf_item, "items": [], "page": 1,
-                        "per_page": per_page, "total": 0})
+                        "per_page": per_page, "total": 0,
+                        "sort": resolved_sort.key,
+                        "sort_persistable": resolved_sort.persistable,
+                        "custom_sort_options": sort_options})
 
     series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
     entries, _random, pagination = calibre_db.fill_indexpage(
-        page, per_page, db.Books, query_filter, BOOK_SORT_ORDERS["new"],
-        True, config.config_read_column, *series_join)
+        page, per_page, db.Books, query_filter, list(resolved_sort.order_by),
+        True, config.config_read_column, *series_join, *resolved_sort.join)
     return jsonify({
         **shelf_item,
         # rules included so the builder can load this shelf for editing
         "rules": shelf.rules or {"condition": "AND", "rules": []},
         "items": _rows_to_items(entries),
+        "sort": resolved_sort.key,
+        "sort_persistable": resolved_sort.persistable,
+        "custom_sort_options": sort_options,
         "page": pagination.page, "per_page": pagination.per_page, "total": pagination.total_count,
     })
 

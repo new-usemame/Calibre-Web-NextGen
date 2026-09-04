@@ -72,6 +72,21 @@
         <input type="text" class="form-control" name="config_columns_to_ignore" id="config_columns_to_ignore" value="{% if conf.config_columns_to_ignore != None %}{{ conf.config_columns_to_ignore }}{% endif %}" autocomplete="off">
         <p class="settings-explanation">{{_('Regex pattern to hide custom columns from being displayed in the UI.')}}</p>
       </div>
+
+      <div class="form-group">
+        <label>{{_('Custom columns')}}</label>
+        <p class="settings-explanation">{{_('Magic Shelves')}} — {{_('Sort by')}}</p>
+        {% set selected_sort_columns = (conf.config_sortable_custom_columns or '').split(',') %}
+        {% for sortColumn in sortableColumns %}
+        <div class="checkbox">
+          <label>
+            <input type="checkbox" name="config_sortable_custom_columns" value="{{ sortColumn.id }}"
+                   {% if sortColumn.id|string in selected_sort_columns %}checked{% endif %}>
+            {{ sortColumn.name }} ({{ sortColumn.datatype }})
+          </label>
+        </div>
+        {% endfor %}
+      </div>
       
       <div class="form-group">
         <label for="config_read_column">{{_('Link Read/Unread Status to Calibre Column')}}</label>

@@ -14,6 +14,22 @@ import type { Book } from '../lib/api';
 import { ApiError } from '../lib/api';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
+import {
+  canonicalMagicShelfSortAdoption,
+  customMagicShelfSortOptions,
+} from '../lib/magicShelfSort';
+
+function magicShelfSortKey(id: string) {
+  return `cwng:magic-shelf-sort:${id}`;
+}
+
+function savedMagicShelfSort(id: string) {
+  try {
+    return localStorage.getItem(magicShelfSortKey(id)) || 'new';
+  } catch {
+    return 'new';
+  }
+}
 
 function dedupAppend(prev: Book[], next: Book[]): Book[] {
   const seen = new Set(prev.map((b) => b.id));
@@ -27,9 +43,19 @@ export function MagicShelfView({ id }: { id: string }) {
   const t = useT();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
+  const [sortState, setSortState] = useState(() => ({
+    shelfId: id,
+    value: savedMagicShelfSort(id),
+    persist: true,
+  }));
+  // Route reuse can render once before its reset effect. Resolve that render
+  // against the new shelf's own saved value, never the prior shelf's value.
+  const sort = sortState.shelfId === id ? sortState.value : savedMagicShelfSort(id);
   const [books, setBooks] = useState<Book[]>([]);
   const accKey = useRef('');
-  const { data, isLoading, isFetching, isPlaceholderData, error } = useMagicShelfBooks(id, page);
+  const { data, isLoading, isFetching, isPlaceholderData, error } = useMagicShelfBooks(
+    id, page, sort,
+  );
   const del = useDeleteMagicShelf();
   const dup = useDuplicateMagicShelf();
   const { data: me } = useMe();
@@ -43,13 +69,43 @@ export function MagicShelfView({ id }: { id: string }) {
     setPage(1);
   }, [id]);
 
+  // Keep sort state paired with its shelf so the old value is never written
+  // into the new shelf's storage key during route reuse.
+  useEffect(() => {
+    setSortState({ shelfId: id, value: savedMagicShelfSort(id), persist: true });
+  }, [id]);
+
+  useEffect(() => {
+    if (sortState.shelfId !== id || !sortState.persist) return;
+    try {
+      localStorage.setItem(magicShelfSortKey(id), sortState.value);
+    } catch {
+      // Private browsing and hardened browsers may disable storage.
+    }
+  }, [id, sortState]);
+
+  // A deleted, disabled, or type-changed custom column is normalized by the
+  // server. Adopt that canonical fallback in the control and saved setting.
+  // A transient library outage also serves a fallback, but marks it as unsafe
+  // to persist so the administrator's configured choice survives recovery.
+  useEffect(() => {
+    if (!data) return;
+    const adoption = canonicalMagicShelfSortAdoption(
+      sort, data.sort, isPlaceholderData, data.sort_persistable,
+    );
+    if (!adoption) return;
+    setPage(1);
+    setSortState({ shelfId: id, ...adoption });
+  }, [data, id, isPlaceholderData, sort]);
+
   // Skip placeholder data — accumulating the previous shelf's briefly-served
   // rows under the new id would mix both shelves' books (#612, see Shelf.tsx).
   useEffect(() => {
     if (!data || isPlaceholderData) return;
-    if (String(id) !== accKey.current) { setBooks(data.items); accKey.current = String(id); }
+    const key = `${id}:${sort}`;
+    if (key !== accKey.current) { setBooks(data.items); accKey.current = key; }
     else setBooks((p) => dedupAppend(p, data.items));
-  }, [data, id, isPlaceholderData]);
+  }, [data, id, sort, isPlaceholderData]);
 
   // Infinite-scroll sentinel. Called before the conditional early returns below
   // so the hook order stays stable across the loading→loaded transition; `data`
@@ -69,6 +125,13 @@ export function MagicShelfView({ id }: { id: string }) {
 
   const total = data.total;
   const hasMore = books.length < total;
+  const sortOptions = [
+    { value: 'new', label: t('Newest') },
+    { value: 'old', label: t('Oldest') },
+    { value: 'abc', label: t('Title A–Z') },
+    { value: 'zyx', label: t('Title Z–A') },
+    ...customMagicShelfSortOptions(data.custom_sort_options),
+  ];
 
   // #870 (@auspex, umbrella #867): ordinary shelves have had this button since
   // the SPA landed; smart shelves were the only type you had to open the rule
@@ -114,6 +177,19 @@ export function MagicShelfView({ id }: { id: string }) {
         </div>
         <div className={styles.subRow}>
           <span className={styles.count}>{total} {t('books')}</span>
+          <select
+            className={styles.manageBtn}
+            value={sort}
+            onChange={(event) => {
+              setPage(1);
+              setSortState({ shelfId: id, value: event.target.value, persist: true });
+            }}
+            aria-label={t('Sort order')}
+          >
+            {sortOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
           {(data.can_edit || data.can_duplicate || canKobo || data.can_delete) && (
             <div className={styles.manage}>
               {data.can_edit && (

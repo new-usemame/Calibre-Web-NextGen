@@ -45,6 +45,10 @@ from .helper import check_valid_domain, check_email, check_username, \
     edit_book_read_status, valid_password, get_kosync_progress_display
 from .pagination import Pagination
 from .sort_orders import BOOK_SORT_ORDERS, book_sort_order
+from .custom_column_sort import (
+    load_configured_columns,
+    resolve_magic_shelf_sort,
+)
 from .redirect import get_redirect_location
 from .cw_babel import get_available_locale, get_available_translations, sanitize_locale_for_write
 from .usermanagement import login_required_if_no_ano
@@ -1252,8 +1256,18 @@ def render_magic_shelf(shelf_id, sort_param, page):
         log.warning(f"User {current_user.id} attempted to access private magic shelf {shelf_id} owned by {shelf.user_id}")
         abort(403)
     
-    # Get sort order using the same function as other book lists
-    order = get_sort_function(sort_param, "magicshelf")
+    custom_sort_columns = load_configured_columns(config)
+    requested_sort = (
+        current_user.get_view_property("magicshelf", "stored")
+        if sort_param == "stored"
+        else sort_param
+    )
+    resolved_sort = resolve_magic_shelf_sort(
+        requested_sort, config, custom_sort_columns
+    )
+    if sort_param != "stored" and resolved_sort.persistable:
+        current_user.set_view_property("magicshelf", "stored", resolved_sort.key)
+    order = (list(resolved_sort.order_by), resolved_sort.key)
     
     # Get pagination settings\
     per_page = config.config_books_per_page or 20
@@ -1271,7 +1285,8 @@ def render_magic_shelf(shelf_id, sort_param, page):
             page=page, 
             page_size=per_page,
             sort_order=sort_order,
-            sort_param=sort_param,
+            sort_param=resolved_sort.key,
+            sort_join=resolved_sort.join,
             bypass_cache=bypass_cache
         )
         log.debug(f"Magic shelf {shelf_id} returned {len(books)} books out of {total_count} total")
@@ -1324,7 +1339,8 @@ def render_magic_shelf(shelf_id, sort_param, page):
                                  shelf=shelf,
                                  is_hidden_shelf=is_hidden,
                                  id=shelf_id, 
-                                 order=order[1])
+                                 order=order[1],
+                                 custom_sort_columns=custom_sort_columns)
 
 
 # ################################### Health Check ##################################################################

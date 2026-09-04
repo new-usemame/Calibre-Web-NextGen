@@ -934,7 +934,7 @@ def rules_reference_read_status(rules_json):
 
 
 def get_book_ids_for_magic_shelf(shelf_id, sort_order=None, sort_param='stored', bypass_cache=False,
-                                 raise_on_error=False):
+                                 raise_on_error=False, sort_join=()):
     """Return ordered book IDs for a magic shelf without loading book objects.
 
     raise_on_error=True re-raises a DB error instead of masking it as an empty
@@ -961,7 +961,9 @@ def get_book_ids_for_magic_shelf(shelf_id, sort_order=None, sort_param='stored',
                     log.debug(f"Magic shelf {shelf_id} ID list served from cache ({cache.total_count} books)")
                     return cache.book_ids, cache.total_count
 
-        query, magic_shelf = build_book_query_for_magic_shelf(shelf_id, sort_order=sort_order)
+        query, magic_shelf = build_book_query_for_magic_shelf(
+            shelf_id, sort_order=sort_order, sort_join=sort_join
+        )
         if query is None:
             return [], 0
 
@@ -969,14 +971,14 @@ def get_book_ids_for_magic_shelf(shelf_id, sort_order=None, sort_param='stored',
         total_count = len(all_ids)
 
         if current_user.is_authenticated and not bypass_cache:
-            existing = ub.session.query(ub.MagicShelfCache).filter_by(
+            existing_rows = ub.session.query(ub.MagicShelfCache).filter_by(
                 shelf_id=shelf_id,
                 user_id=current_user.id,
-                sort_param=sort_param,
-            ).first()
-            # Preserve created_at when the rebuilt membership SET is
-            # unchanged (fork #468). created_at doubles as the Kobo sync's
-            # "membership added" timestamp: get_magic_shelf_membership_added_at
+            ).all()
+            # Preserve created_at only when every sort-key row belongs to the
+            # same membership generation (fork #468). created_at supplies the
+            # Kobo sync's "membership added" timestamp:
+            # get_magic_shelf_membership_added_at
             # takes max(created_at) across the user's kobo_sync magic shelves,
             # and the Kobo sync arm re-emits the whole shelf whenever that
             # timestamp advances past the device cursor. If a 30-minute TTL
@@ -985,18 +987,28 @@ def get_book_ids_for_magic_shelf(shelf_id, sort_order=None, sort_param='stored',
             # ChangedEntitlement and the Kobo drops the local copies back to
             # "Download"/"Unread" — except on a back-to-back sync inside the
             # TTL window, which is exactly the reporter's symptom. Comparing
-            # as sets keeps the timestamp tied to membership, not to sort
-            # order (browse re-sorts must not re-fire the device).
-            preserved_created_at = (
-                existing.created_at
-                if existing is not None and set(existing.book_ids or []) == set(all_ids)
-                else None
+            # as sets across every current row keeps the timestamp tied to
+            # membership, not to sort order (browse re-sorts must not re-fire
+            # the device). One differing row proves that membership changed;
+            # all other rows are then a superseded generation and must be
+            # removed so a later oscillation cannot resurrect their timestamp.
+            rebuilt_membership = set(all_ids)
+            membership_unchanged = bool(existing_rows) and all(
+                set(cache_row.book_ids or []) == rebuilt_membership
+                for cache_row in existing_rows
             )
-            ub.session.query(ub.MagicShelfCache).filter_by(
+            preserved_created_at = max((
+                cache_row.created_at
+                for cache_row in existing_rows
+                if cache_row.created_at is not None
+            ), default=None) if membership_unchanged else None
+            stale_cache_query = ub.session.query(ub.MagicShelfCache).filter_by(
                 shelf_id=shelf_id,
                 user_id=current_user.id,
-                sort_param=sort_param,
-            ).delete()
+            )
+            if membership_unchanged:
+                stale_cache_query = stale_cache_query.filter_by(sort_param=sort_param)
+            stale_cache_query.delete()
             new_cache = ub.MagicShelfCache(
                 shelf_id=shelf_id,
                 user_id=current_user.id,
@@ -1018,7 +1030,7 @@ def get_book_ids_for_magic_shelf(shelf_id, sort_order=None, sort_param='stored',
         return [], 0
 
 
-def build_book_query_for_magic_shelf(shelf_id, sort_order=None, extra_filter=None):
+def build_book_query_for_magic_shelf(shelf_id, sort_order=None, extra_filter=None, sort_join=()):
     """Build a Books query for a magic shelf.
 
     Returns:
@@ -1052,6 +1064,8 @@ def build_book_query_for_magic_shelf(shelf_id, sort_order=None, extra_filter=Non
     query = cdb.session.query(db.Books).filter(query_filter).filter(
         cdb.common_filters(return_all_languages=bypass_language, extra_filter=extra_filter)
     )
+    if sort_join:
+        query = query.outerjoin(*sort_join)
     # Fork-specific (#38, backport of CWA #1233): outerjoin Series when the
     # sort references Series-derived columns. Without this, ORDER BY
     # series.name produces empty results.
@@ -1071,7 +1085,7 @@ def build_book_query_for_magic_shelf(shelf_id, sort_order=None, extra_filter=Non
     return query, magic_shelf
 
 def get_books_for_magic_shelf(shelf_id, page=1, page_size=None, sort_order=None, sort_param='stored', bypass_cache=False,
-                              raise_on_error=False):
+                              raise_on_error=False, sort_join=()):
     """
     Takes a MagicShelf ID and returns a paginated list of book objects that match its rules.
 
@@ -1097,6 +1111,7 @@ def get_books_for_magic_shelf(shelf_id, page=1, page_size=None, sort_order=None,
             sort_param=sort_param,
             bypass_cache=bypass_cache,
             raise_on_error=raise_on_error,
+            sort_join=sort_join,
         )
         
         # Apply pagination to the list of IDs we just fetched

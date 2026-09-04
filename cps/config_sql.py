@@ -129,6 +129,9 @@ class _Settings(_Base):
     # to that locale unless the client overrides via ?lang= or Accept-Language.
     config_opds_default_locale = Column(String(8), default="")
     config_columns_to_ignore = Column(String)
+    # Comma-separated Calibre custom-column IDs selected by an administrator.
+    # Request-time use is revalidated against the live Calibre schema.
+    config_sortable_custom_columns = Column(String, default="")
 
     config_denied_tags = Column(String, default="")
     config_allowed_tags = Column(String, default="")

@@ -89,7 +89,7 @@ jobs:
 
       - name: Install frontend dependencies (npm ci)
         working-directory: frontend
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
 
       - name: Install system dependencies
         run: |
@@ -218,7 +218,7 @@ jobs:
 
       - name: Install dependencies (npm ci)
         working-directory: frontend
-        run: npm ci
+        run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
 
       - name: Build SPA (tsc -b && vite build)
         working-directory: frontend
@@ -925,12 +925,20 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ steps.playwright-version.outputs.version }}
 
-      - name: Install Playwright
-        timeout-minutes: 3
+      # Same-lockfile green run 33833541562 measured 56s total: the npm/browser
+      # medians were 35s/21s. Run 33848680049 twice saw npm ci alone stall for
+      # 193s (>3m) with both caches warm. Ten minutes per step gives >17x/28x
+      # median headroom and >3x that observed stall floor, while still failing
+      # a real setup hang far before the job's 180m guard.
+      - name: Install frontend dependencies (npm ci)
+        timeout-minutes: 10
         working-directory: frontend
-        run: |
-          npm ci
-          npx playwright install --with-deps chromium webkit
+        run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
+
+      - name: Install Playwright browsers
+        timeout-minutes: 10
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium webkit
 
       # Frontend-only PRs intentionally reuse a digest-pinned :dev backend to
       # avoid a full multi-arch build for a static-bundle change. Overlay their
@@ -944,7 +952,6 @@ jobs:
           needs.changed_paths.outputs.concurrency != 'true'
         working-directory: frontend
         run: |
-          npm ci
           npm run build          # writes ../cps/static/app
           docker cp ../cps/static/app/. cwn-e2e:/app/calibre-web-automated/cps/static/app/
           # Jinja templates too. Not every user-facing surface is React: the PDF

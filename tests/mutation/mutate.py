@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Run committed-state mutation diagnostics in a disposable detached worktree.
+"""Change committed source, run selected tests, and report whether they noticed.
 
-Every collection, baseline and mutant phase uses provenance preflight and scrub.
-macOS results are UNVERIFIED and exit nonzero. Shared Git writes are UNSUPPORTED.
-See tests/mutation/ISOLATION.md for the execution boundary and legacy recovery.
+Use --backend container for fresh Linux containers on Linux or macOS.
+The legacy macOS backend uses disposable worktrees and local processes.
+See tests/mutation/ISOLATION.md for setup, results, and limitations.
 
 Usage:
-    mutate.py --seed COMMIT --file F --old STR --new STR --test TARGET
-    mutate.py --seed COMMIT --spec mutants.json
+    mutate.py --backend container --seed COMMIT --file F --old STR --new STR --test TARGET
+    mutate.py --backend container --seed COMMIT --spec mutants.json
 """
 from __future__ import annotations
 

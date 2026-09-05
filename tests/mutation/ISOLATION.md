@@ -2,17 +2,22 @@
 
 Change one line of code, run the tests, report whether the tests noticed.
 
-    mutate.py --seed COMMIT --file relative/file.py --old OLD --new NEW --test tests/test_file.py
-    mutate.py --seed COMMIT --spec mutants.json
+    python tests/mutation/mutate.py --backend container --seed COMMIT --file relative/file.py --old OLD --new NEW --test tests/test_file.py
+    python tests/mutation/mutate.py --backend container --seed COMMIT --spec mutants.json
 
 `--seed` is required and resolved once for the whole sweep. `--spec` takes a JSON list of
 `{file, old, new, test}` items. Paths are repository-relative. Use the project's own venv
-interpreter by absolute path.
+interpreter (Python 3.12+ with pytest installed); use its absolute path when needed.
+Docker must have a local Linux image, by default `python:3.12` (`docker pull python:3.12`).
+The harness copies pytest into each phase. Use `--image IMAGE` when your tests need
+additional Python packages or system libraries installed in the image.
 
 ## What isolation you get, and why it matters
 
-Each phase — collection, baseline, mutant — runs against a **disposable worktree** at the pinned
-seed, scrubbed clean before every phase. Your checkout is never written to.
+Each phase — collection, baseline, mutant — starts from the pinned commit. The container
+backend copies a Git archive into a fresh container; the macOS backend scrubs a disposable
+worktree before every phase. Your checkout is never written to. A failed baseline stops
+the sweep before the mutation is tested.
 
 This exists because of a real bug, not a hypothetical one. When the harness mutated the live tree
 and restored it afterwards, leftover state from one phase could silently change the next phase's
@@ -34,26 +39,43 @@ its own Docker container, which is how you run this on a Linux server rather tha
 If Docker is not reachable the run stops with a message telling you so — it does not quietly fall
 back to something weaker.
 
-Results are reported `UNVERIFIED`: the harness tells you what the tests did, and does not claim to
-have proved anything beyond that. The exit status is nonzero so a script cannot mistake a diagnostic
-run for a passing build.
+Container results are `caught` (an ordinary test failed after a passing baseline), `SURVIVED`
+(the tests still passed), or `ERROR` (the sweep could not complete). Exit codes are 0 when
+all mutations are caught, 1 when any survive, and 2 for an error. Skipped-only selections
+and collection/setup failures are errors, not caught mutations.
+
+The legacy macOS output retains `UNVERIFIED`: its cleanup cannot guarantee that detached
+children stop writing after a phase. That backend still exits nonzero. Container results
+omit this label because ordinary test outcomes already say what a reader needs.
+
+Container scratch defaults to `/tmp`, independently of pytest's external-volume scratch.
+Override it with `--scratch-dir DIR` (CLI) or `CWNG_DOCKER_SCRATCH` (CLI and tests), choosing
+a writable directory shared with Docker. An unresponsive create fails after five seconds
+with advice to check sharing. Each created container is labelled and removed at phase end.
+The daemon must remain available for cleanup; do not forcibly kill the host runner.
+
+`--timeout` bounds each test phase (default 1800 seconds). JSON results go to
+`--evidence-dir DIR`, outside the source checkout; the default is temporary storage.
+An error stops the sweep, and there is no automatic backend fallback.
 
 ## What it does not check
 
-Outside the boundary: temporary directories, the virtualenv, your home directory, shared Git data,
-Docker, databases, network services, ports, caches, and any process or daemon the tests hand work to
-outside the phase. It is not hermetic and does not claim to be.
+Container-local files and descendants are discarded. Only a dedicated output directory is
+bind-mounted; the host virtualenv, source checkout, Git metadata and Docker socket are not.
+Network access is disabled. Work delegated to external databases, network services, shared
+ports, remote service managers or other daemons is not reset. This is not hermeticity.
+The macOS backend also leaves host temporary files, the virtualenv, home and caches outside
+its disposable worktree.
 
-Selections that write to **shared Git state** — refs, common config, hooks, or another worktree —
+On macOS, selections that write to **shared Git state** — refs, common config, hooks, or another worktree —
 are unsupported. A linked worktree has its own index and HEAD but shares those, and scrubbing does
 not restore them. Tests may create and mutate their own temporary repositories.
 
 **Known limitations, reproducible.** Code that hooks Python's import machinery can make the harness
 report the wrong result: a repository `sitecustomize.py`, a code object compiled with the target's
 filename, a `sys.meta_path` finder, or a `SourceFileLoader.source_to_code` override. All four are
-reproduced by `leg7_probe.py`. They require the repository itself to carry that machinery, which
-this one does not, and closing them is not worth the complexity for a test-quality tool — but if you
-ever see a result you cannot explain, this is a place to look.
+reproduced by `leg7_probe.py`. The harness runs trusted code and specs; it does not try to
+detect deliberate substitution of the code being tested.
 
 On macOS a process that calls `setsid()` and clears its environment can outlive its phase. The
 container backend does not have that problem.

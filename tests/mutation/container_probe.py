@@ -1,9 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Port leg7 fixtures unchanged into Linux containers with the real pytest witness.
+"""Run the leg7 import-hook examples inside Linux containers.
 
 No package installation or network access: copy the installed pure-Python pytest
-runtime into the disposable container. This is a reproduction tool, not a trusted
-measurement agent. Container containment does not authenticate its JSON report.
+runtime into the disposable container. These examples demonstrate known
+limitations; they are not checks run by the mutation CLI.
 """
 import importlib.util
 from pathlib import Path

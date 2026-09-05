@@ -50,7 +50,7 @@ class ContainerObservation:
 
 
 def present_observation(result: ContainerObservation) -> int:
-    """Display only literal diagnostic scope, never trust phase output as a verdict."""
+    """Compatibility output for the standalone phase probes."""
     if (type(result) is not ContainerObservation or result.status != "UNVERIFIED"
             or result.authoritative is not False):
         raise ValueError("invalid diagnostic authority fields")

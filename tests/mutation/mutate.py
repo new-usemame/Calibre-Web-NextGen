@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Run committed-state mutation diagnostics in a disposable detached worktree.
+"""Change committed source, run selected tests, and report whether they noticed.
 
-Every collection, baseline and mutant phase uses provenance preflight and scrub.
-macOS results are UNVERIFIED and exit nonzero. Shared Git writes are UNSUPPORTED.
-See tests/mutation/ISOLATION.md for the execution boundary and legacy recovery.
+Use --backend container for fresh Linux containers on Linux or macOS.
+The legacy macOS backend uses disposable worktrees and local processes.
+See tests/mutation/ISOLATION.md for setup, results, and limitations.
 
 Usage:
-    mutate.py --seed COMMIT --file F --old STR --new STR --test TARGET
-    mutate.py --seed COMMIT --spec mutants.json
+    mutate.py --backend container --seed COMMIT --file F --old STR --new STR --test TARGET
+    mutate.py --backend container --seed COMMIT --spec mutants.json
 """
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ import argparse
 from dataclasses import dataclass, field
 import fcntl
 import hashlib
+import importlib.util
 import json
 import os
 import pathlib
@@ -129,6 +130,18 @@ def _has_phase_token(pid: int, token: str) -> bool:
             if error in (errno.ESRCH, errno.EINVAL):
                 # Kernel tasks / exited processes have no inspectable exec args.
                 return False
+            if error == errno.EIO:
+                # The process may have exited since the process-table snapshot.
+                # A fresh absent/zombie result needs no environment inspection.
+                try:
+                    state = subprocess.run(["ps", "-p", str(pid), "-o", "state="],
+                                           capture_output=True, text=True, timeout=5)
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
+                else:
+                    if ((state.returncode == 1 and not state.stdout.strip() and not state.stderr.strip())
+                            or (state.returncode == 0 and state.stdout.strip().startswith("Z"))):
+                        return False
             raise IsolationError(f"cannot inspect process environment: errno {error}")
     data = buffer.raw[:size.value]
     argc = int.from_bytes(data[:4], sys.byteorder, signed=True)
@@ -980,6 +993,23 @@ def _cli_mutants(args):
     return mutants
 
 
+def _load_sibling(name):
+    """Resolve harness helpers beside this file, including location-based callers."""
+    path = pathlib.Path(__file__).resolve().with_name(name + ".py")
+    module = sys.modules.get(name)
+    if module is not None and getattr(module, "__file__", None) == str(path):
+        return module
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+    except BaseException:
+        del sys.modules[name]
+        raise
+    return module
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -989,6 +1019,12 @@ def main():
     ap.add_argument("--name", default="mutant")
     ap.add_argument("--repo", type=pathlib.Path, default=REPO)
     ap.add_argument("--seed", required=True, help="committed seed; resolved once before any phase")
+    ap.add_argument("--backend", choices=("macos", "container"),
+                    default="macos" if sys.platform == "darwin" else "container",
+                    help="phase runner (default: macos on macOS, container elsewhere; requires Docker)")
+    ap.add_argument("--image", default="python:3.12", help="local Linux image for the container backend")
+    ap.add_argument("--scratch-dir", type=pathlib.Path, default=None,
+                    help="temporary directory accessible to Docker bind mounts")
     ap.add_argument("--evidence-dir", type=pathlib.Path)
     ap.add_argument("--timeout", type=float, default=1800, help="bounded per-phase hang watchdog in seconds")
     args = ap.parse_args()
@@ -1002,6 +1038,13 @@ def main():
         # Never place durable output in the source checkout.
         if evidence.is_relative_to(repo):
             raise IsolationError("evidence directory must be outside the source checkout")
+        if args.backend == "container":
+            run_sweep = _load_sibling("container_backend").run_sweep
+            args.repo, args.evidence_dir = repo, evidence
+            try:
+                return run_sweep(args, mutants, sys.modules[__name__])
+            except RuntimeError as exc:
+                raise IsolationError(str(exc)) from exc
         print("UNVERIFIED diagnostic backend; committed seed only; shared Git writes UNSUPPORTED", flush=True)
         print("Outside boundary: temporary directories, venv, home, common Git data, Docker, "
               "databases, network, ports, caches, services and escaped processes", flush=True)
@@ -1019,8 +1062,9 @@ def main():
         return 1
     except (IsolationError, OSError, ValueError) as exc:
         detail = str(exc) if isinstance(exc, IsolationError) else type(exc).__name__
-        print(f"UNVERIFIED ERROR: {detail}", flush=True)
-        return 1
+        prefix = "ERROR" if args.backend == "container" else "UNVERIFIED ERROR"
+        print(f"{prefix}: {detail}", flush=True)
+        return 2 if args.backend == "container" else 1
 
 
 if __name__ == "__main__":

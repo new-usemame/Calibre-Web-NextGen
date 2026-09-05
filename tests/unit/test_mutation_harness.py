@@ -983,7 +983,7 @@ def test_cli_refuses_legacy_journal_without_changing_it(tmp_path, monkeypatch, c
     journal = mutate.legacy_journal(mutate.REPO)
     journal.parent.mkdir(parents=True)
     journal.write_text(content)
-    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--seed', 'HEAD', '--file', 'unused', '--old', 'a',
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--backend', 'macos', '--seed', 'HEAD', '--file', 'unused', '--old', 'a',
                                       '--new', 'b', '--test', 'unused'])
     assert mutate.main() == 1
     output = capsys.readouterr().out
@@ -1038,7 +1038,7 @@ def test_cli_invalid_spec_never_allocates_sweep(tmp_path, monkeypatch, capsys, d
     if defect == 'traversal': item['file'] = '../victim.py'
     if defect == 'option': item['test'] = ['--pyargs']
     spec.write_text('not json' if defect == 'malformed' else json.dumps([] if defect == 'empty' else [item]))
-    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--repo', str(repo), '--seed', 'HEAD', '--spec', str(spec)])
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--backend', 'macos', '--repo', str(repo), '--seed', 'HEAD', '--spec', str(spec)])
     def forbidden(*a, **k): pytest.fail('invalid specification allocated a sweep')
     monkeypatch.setattr(mutate.IsolatedSweep, 'create', forbidden)
     assert mutate.main() == 1
@@ -1239,7 +1239,7 @@ def test_git_timeout_is_a_handled_isolation_error(tmp_path, monkeypatch, capsys)
     monkeypatch.setattr(mutate.subprocess, 'run', timeout)
     with pytest.raises(mutate.IsolationError, match='git command timed out'):
         mutate._git(tmp_path, 'rev-parse', 'HEAD')
-    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--repo', str(tmp_path),
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--backend', 'macos', '--repo', str(tmp_path),
         '--seed', 'HEAD', '--file', 'victim.py', '--old', '1', '--new', '2',
         '--test', 'test_victim.py'])
     assert mutate.main() == 1
@@ -1286,3 +1286,467 @@ def test_group_signal_refuses_nonpositive_ids_before_kernel(monkeypatch, pgid):
     with pytest.raises(mutate.IsolationError, match='positive process group'):
         mutate._signal_group(pgid, signal.SIGKILL)
     assert calls == []
+
+
+@pytest.fixture
+def docker_scratch(container_module):
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix='cwng-mutation-test-',
+                                     dir=container_module.default_scratch_root()) as directory:
+        yield pathlib.Path(directory)
+
+
+@pytest.fixture
+def container_module():
+    module_path = pathlib.Path(__file__).resolve().parents[1] / 'mutation/container_backend.py'
+    spec = importlib.util.spec_from_file_location('container_backend', module_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture
+def container_backend(monkeypatch, container_module):
+    import shutil
+    if shutil.which('docker') is None:
+        pytest.skip('Docker required for real Linux container boundary tests')
+    module = container_module
+    try:
+        daemon = module._docker('info', '--format', '{{.OSType}}', timeout=5)
+        if daemon.returncode or daemon.stdout.strip() != b'linux':
+            pytest.skip('Reachable Linux Docker daemon required for container tests')
+        image = module._docker('image', 'inspect', 'python:3.12', '--format', '{{.Id}}', timeout=5)
+        if image.returncode or not image.stdout.strip():
+            pytest.skip('Local python:3.12 image required; run docker pull python:3.12')
+    except module.ContainerError as exc:
+        pytest.skip(f'Docker unavailable for container tests: {exc}')
+    # Explicit negative-control mode. The fixture owns an emergency cleanup
+    # for these deliberate defects, after test assertions have seen the leak.
+    fault = os.environ.get('CWNG_CONTAINER_TEST_FAULT')
+    if not fault:
+        yield module
+        return
+    original = module._docker
+    owned = []
+
+    def defective(*args, **kwargs):
+        if fault == 'cleanup' and args[0] == 'rm':
+            return subprocess.CompletedProcess(args, 0, b'', b'')
+        if fault == 'cleanup' and args[:2] == ('ps', '-aq'):
+            return subprocess.CompletedProcess(args, 0, b'', b'')
+        result = original(*args, **kwargs)
+        if args[0] == 'create' and result.returncode == 0:
+            owned.append(result.stdout.decode().strip())
+        return result
+
+    monkeypatch.setattr(module, '_docker', defective)
+    if fault == 'seed':
+        original_init = module.ContainerSweep.__init__
+
+        def changed_seed(self, *args, **kwargs):
+            original_init(self, *args, **kwargs)
+            self.archive = self.archive.replace(b'VALUE = 1', b'VALUE = 9')
+
+        monkeypatch.setattr(module.ContainerSweep, '__init__', changed_seed)
+    try:
+        yield module
+    finally:
+        for cid in owned:
+            if original('container', 'inspect', cid).returncode == 0:
+                assert original('rm', '-f', cid).returncode == 0
+
+
+@pytest.mark.parametrize('finish', ['exit', 'timeout', 'failure'])
+def test_container_tokenless_writes_stop_after_phase(tmp_path, docker_scratch, container_backend, finish):
+    repo, seed = _committed_repo(tmp_path)
+    out = docker_scratch / 'out'
+    out.mkdir()
+    sweep = container_backend.ContainerSweep(repo, seed)
+    # Same setsid/env -i counterexample as the diagnostic limitation. Bound the
+    # writer too, so an intentionally red cleanup regression cannot live forever.
+    writer = "i=0; while [ $i -lt 80 ]; do echo tick >> /out/escaped.log; i=$((i+1)); sleep 0.1; done"
+    tail = {'exit': 'exit 0', 'failure': 'exit 7', 'timeout': 'sleep 20'}[finish]
+    result = sweep.run_phase(['sh', '-c',
+        "setsid env -i sh -c '" + writer + "' >/dev/null 2>&1 & "
+        "while [ ! -s /out/escaped.log ]; do sleep 0.1; done; sleep 0.3; " + tail],
+        output=out, timeout=2 if finish == 'timeout' else 20)
+    before = (out / 'escaped.log').read_bytes()
+    time.sleep(1)
+    after = (out / 'escaped.log').read_bytes()
+    assert before.count(b'tick') >= 2
+    assert after == before, 'tokenless detached writer survived container removal'
+    assert result.timed_out is (finish == 'timeout')
+    assert result.returncode == {'exit': 0, 'failure': 7, 'timeout': None}[finish]
+    remaining = subprocess.run(['docker', 'ps', '-aq', '--filter',
+        'id=' + result.container_id], check=True, capture_output=True, text=True).stdout.strip()
+    assert remaining == ''
+    print(f'CONTAINMENT {finish}: alive_writes={before.count(b"tick")} '
+          f'after_removal_writes={after.count(b"tick") - before.count(b"tick")} containers=0')
+
+
+def test_container_phases_copy_pinned_seed_and_discard_damage(tmp_path, docker_scratch, container_backend):
+    repo, seed = _committed_repo(tmp_path)
+    sweep = container_backend.ContainerSweep(repo, seed)
+    (repo / 'victim.py').write_text('DIRTY SOURCE\n')
+    ids = []
+    for index in range(2):
+        out = docker_scratch / f'out{index}'
+        out.mkdir()
+        result = sweep.run_phase(['python', '-c',
+            "from pathlib import Path; "
+            "assert Path('victim.py').read_text() == 'VALUE = 1\\n'; "
+            "assert not Path('.git').exists(); "
+            "Path('victim.py').write_text('DAMAGE'); print('pinned seed')"], output=out)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip() == 'pinned seed'
+        assert result.seed_sha == seed
+        ids.append(result.container_id)
+    assert len(set(ids)) == 2
+    assert (repo / 'victim.py').read_text() == 'DIRTY SOURCE\n'
+
+
+def test_container_setup_failure_removes_owned_container(tmp_path, docker_scratch, container_backend, monkeypatch):
+    repo, seed = _committed_repo(tmp_path)
+    sweep = container_backend.ContainerSweep(repo, seed)
+    out = docker_scratch / 'out'
+    out.mkdir()
+    original = container_backend._docker
+    owned = []
+
+    def inject(*args, **kwargs):
+        if args[0] == 'cp':
+            raise KeyboardInterrupt('injected after create')
+        result = original(*args, **kwargs)
+        if args[0] == 'create' and result.returncode == 0:
+            owned.append(result.stdout.decode().strip())
+        return result
+
+    monkeypatch.setattr(container_backend, '_docker', inject)
+    with pytest.raises(KeyboardInterrupt):
+        sweep.run_phase(['true'], output=out)
+    assert len(owned) == 1
+    assert subprocess.run(['docker', 'ps', '-aq', '--filter', 'id=' + owned[0]],
+        check=True, capture_output=True).stdout.strip() == b''
+    with pytest.raises(RuntimeError, match='after an error'):
+        sweep.run_phase(['true'], output=out)
+
+
+@pytest.mark.parametrize('mode', ['clean_control', 'absent_control', 'startup_rewrite',
+                                 'frame_forge', 'meta_transform', 'loader_transform'])
+def test_container_leg7_execution_provenance_limit(tmp_path, docker_scratch, container_backend, mode):
+    import hashlib
+    directory = pathlib.Path(__file__).resolve().parents[1] / 'mutation'
+    modules = []
+    for name in ('leg7_probe', 'container_probe'):
+        spec = importlib.util.spec_from_file_location(name, directory / (name + '.py'))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        modules.append(module)
+    leg7, probe = modules
+    repo = leg7.fixture(tmp_path, mode)
+    seed = _git(repo, 'rev-parse', 'HEAD')
+    out = docker_scratch / 'out'
+    out.mkdir()
+    sweep = container_backend.ContainerSweep(repo, seed)
+    result = sweep.run_phase(probe.COMMAND, output=out, files=probe.runtime_overlay(),
+                             environment=probe.ENVIRONMENT, timeout=30)
+    assert (out / 'report.json').exists(), result.stderr
+    report = json.loads((out / 'report.json').read_text())
+    witness = report['target_provenance']
+    assert report['complete'] is True
+    assert report['selected_count'] == 1
+    assert witness['active'] is True and witness['foreign'] is False
+    assert result.returncode == (1 if mode == 'clean_control' else 0), result.stderr
+    assert witness['seen'] is (mode != 'absent_control')
+    diagnostic = mutate.PhaseResult(tuple(probe.COMMAND), result.returncode, result.stdout,
+        result.stderr, result.timed_out, None, ())
+    check = mutate.validate_execution(diagnostic, report, ('test_probe.py::test_value',))
+    assert check.signal == ('TEST_FAILURE' if mode == 'clean_control' else 'TESTS_PASSED')
+    assert result.status == 'UNVERIFIED' and result.authoritative is False
+    if mode in ('meta_transform', 'loader_transform'):
+        assert (out / 'loaded-hash').read_text() == hashlib.sha256(b'VALUE = 2\n').hexdigest()
+    print(f'LINUX PROBE {mode}: exit={result.returncode} seen={witness["seen"]} '
+          f'active={witness["active"]} signal={check.signal} authority={result.authoritative}')
+    # Red requirement run: a passing mutant must not obtain an accepted witness
+    # when these vectors replace its execution. Keep the failed requirement
+    # reproducible; the normal test asserts the observed limitation honestly.
+    if os.environ.get('CWNG_REQUIRE_CONTAINER_PROVENANCE') == '1' and mode not in (
+            'clean_control', 'absent_control'):
+        assert not witness['seen'] or result.returncode != 0, (
+            'container removal did not detect substituted target execution')
+
+
+def test_container_output_names_external_delegation_limits(container_backend, capsys):
+    result = container_backend.ContainerObservation(0, 'untrusted output', '', False, 'id', 'seed')
+    assert container_backend.present_observation(result) == 1
+    text = capsys.readouterr().out
+    for term in ('UNVERIFIED', 'databases', 'network services', 'shared ports',
+                 'remote service managers', 'daemons outside', 'Not hermetic'):
+        assert term in text
+    assert 'untrusted output' not in text
+    assert 'SURVIVED' not in text and 'caught' not in text
+    print(text, end='')
+
+
+@pytest.mark.parametrize('shape', ['setattr', 'subclass', 'duck'])
+def test_container_presentation_rejects_forged_authority(container_backend, shape):
+    from types import SimpleNamespace
+    result_type = container_backend.ContainerObservation
+    if shape == 'subclass':
+        class Derived(result_type):
+            pass
+        result_type = Derived
+    result = result_type(0, '', '', False, 'id', 'seed')
+    if shape == 'setattr':
+        object.__setattr__(result, 'authoritative', True)
+        object.__setattr__(result, 'status', 'SURVIVED')
+    if shape == 'duck':
+        result = SimpleNamespace(status='UNVERIFIED', authoritative=False)
+    with pytest.raises(ValueError, match='invalid'):
+        container_backend.present_observation(result)
+
+
+@pytest.mark.parametrize('kind', ['caught', 'survived', 'baseline_error', 'spec'])
+def test_container_cli_runs_real_sweep(tmp_path, docker_scratch, container_backend, kind):
+    repo, seed = _committed_repo(tmp_path)
+    assertion = {'caught': 'victim.VALUE == 1', 'survived': 'victim.VALUE > 0',
+                 'baseline_error': 'False', 'spec': 'victim.VALUE == 1'}[kind]
+    (repo / 'test_probe.py').write_text(
+        "from pathlib import Path\nimport victim\n"
+        "assert not Path('previous-phase').exists()\n"
+        "Path('previous-phase').write_text('seen')\n"
+        f"def test_value(): assert {assertion}\n")
+    _git(repo, 'add', '.')
+    _git(repo, 'commit', '-qm', 'container CLI fixture')
+    seed = _git(repo, 'rev-parse', 'HEAD')
+    evidence = tmp_path / 'evidence'
+    command = [sys.executable, str(_HARNESS), '--backend', 'container', '--repo', str(repo),
+               '--seed', seed, '--evidence-dir', str(evidence), '--scratch-dir', str(docker_scratch)]
+    if kind == 'spec':
+        spec = tmp_path / 'spec.json'
+        spec.write_text(json.dumps([{'file': 'victim.py', 'old': '1', 'new': str(n),
+                                    'test': 'test_probe.py'} for n in (2, 3)]))
+        command += ['--spec', str(spec)]
+    else:
+        command += ['--file', 'victim.py', '--old', '1', '--new', '2', '--test', 'test_probe.py']
+    result = subprocess.run(command, capture_output=True, text=True, timeout=60)
+    assert result.returncode == {'caught': 0, 'survived': 1, 'baseline_error': 2, 'spec': 0}[kind], result.stdout + result.stderr
+    reports = [json.loads(path.read_text()) for path in evidence.glob('*.json')]
+    assert len(reports) == (2 if kind == 'spec' else 1)
+    expected = 'ERROR' if kind == 'baseline_error' else ('SURVIVED' if kind == 'survived' else 'caught')
+    assert all(report['status'] == expected for report in reports)
+    assert all([phase['phase'] for phase in report['phases']] ==
+               (['collection', 'baseline'] if kind == 'baseline_error' else ['collection', 'baseline', 'mutant'])
+               for report in reports)
+    assert all(report['seed_sha'] == seed for report in reports)
+    assert 'UNVERIFIED' not in result.stdout
+    assert 'Traceback' not in result.stderr
+    assert (repo / 'victim.py').read_text() == 'VALUE = 1\n'
+    assert not (repo / 'previous-phase').exists()
+    print(result.stdout, end='')
+
+
+@pytest.mark.parametrize('failure,expected', [
+    ('missing', 'Docker CLI not found. Install Docker'),
+    ('daemon', 'Cannot reach the Docker daemon. Start Docker'),
+    ('image', 'not available locally. Pull or build it first'),
+    ('create', 'Docker could not create the phase container. Check free resources'),
+])
+def test_container_cli_docker_errors_are_actionable(tmp_path, failure, expected):
+    import shutil
+    repo, seed = _committed_repo(tmp_path)
+    binaries = tmp_path / 'bin'
+    binaries.mkdir()
+    (binaries / 'git').symlink_to(shutil.which('git'))
+    if failure != 'missing':
+        docker = binaries / 'docker'
+        docker.write_text('#!/bin/sh\n'
+            + ('exit 1\n' if failure == 'daemon' else
+               'case "$1" in\ninfo) printf "linux\\n";;\n'
+               + ('image) exit 1;;\n' if failure == 'image' else 'image) printf "sha256:fixture\\n";;\n')
+               + '*) exit 1;;\nesac\n'))
+        docker.chmod(0o755)
+    result = subprocess.run([sys.executable, str(_HARNESS), '--backend', 'container',
+        '--repo', str(repo), '--seed', seed, '--file', 'victim.py', '--old', '1', '--new', '2',
+        '--test', 'test_probe.py', '--evidence-dir', str(tmp_path / 'evidence'),
+        '--scratch-dir', str(tmp_path)], capture_output=True, text=True, timeout=30,
+        env={**os.environ, 'PATH': str(binaries)})
+    assert result.returncode == 2
+    assert expected in result.stdout, result.stdout + result.stderr
+    assert result.stdout.count('ERROR') == 1
+    assert 'UNVERIFIED' not in result.stdout
+    assert 'Traceback' not in result.stderr
+    assert result.stderr == ''
+    print(result.stdout, end='')
+
+
+@pytest.mark.parametrize('state,returncode,stderr,finished', [
+    ('Z\n', 0, '', True), ('', 1, '', True), ('S\n', 0, '', False),
+    ('', 1, 'ps failed', False),
+])
+def test_darwin_process_exit_between_table_and_arguments(monkeypatch, state, returncode, stderr, finished):
+    from types import SimpleNamespace
+    monkeypatch.setattr(mutate.ctypes, 'CDLL', lambda *a, **k: SimpleNamespace(sysctl=lambda *a: -1))
+    monkeypatch.setattr(mutate.ctypes, 'get_errno', lambda: 5)
+    monkeypatch.setattr(mutate.subprocess, 'run', lambda *a, **k:
+                        subprocess.CompletedProcess(a, returncode, state, stderr))
+    if finished:
+        assert mutate._has_phase_token(123, 'test-token') is False
+    else:
+        with pytest.raises(mutate.IsolationError, match='errno 5'):
+            mutate._has_phase_token(123, 'test-token')
+
+
+def test_container_scratch_does_not_follow_pytest_tmp_path(tmp_path, request, monkeypatch):
+    import tempfile
+    # Reproduce conftest's temp redirection without asking Docker to touch it.
+    monkeypatch.setenv('TMPDIR', str(tmp_path))
+    monkeypatch.setattr(tempfile, 'tempdir', str(tmp_path))
+    monkeypatch.delenv('CWNG_DOCKER_SCRATCH', raising=False)
+    scratch = request.getfixturevalue('docker_scratch')
+    assert not scratch.is_relative_to(tmp_path)
+    assert scratch.is_relative_to(pathlib.Path('/tmp').resolve())
+
+
+def test_container_unshareable_scratch_fails_fast(container_module, monkeypatch):
+    def blocked(command, **kwargs):
+        assert kwargs['timeout'] <= 5, 'unshareable scratch can hang for 30 seconds'
+        raise subprocess.TimeoutExpired(command, kwargs['timeout'])
+
+    monkeypatch.setattr(container_module.subprocess, 'run', blocked)
+    with pytest.raises(container_module.ContainerError, match='--scratch-dir /tmp') as error:
+        container_module._docker('create', '--mount', 'type=bind,src=/unshared,dst=/out')
+    print(str(error.value))
+
+
+def test_container_create_timeout_removes_container_if_created(tmp_path, docker_scratch, container_module, monkeypatch):
+    repo, seed = _committed_repo(tmp_path)
+    original = subprocess.run
+    created, removed = [], []
+    token = None
+
+    def engine(command, **kwargs):
+        nonlocal token
+        if command[0] != 'docker':
+            return original(command, **kwargs)
+        action = command[1]
+        if action == 'info':
+            output = b'linux\n'
+        elif action == 'image':
+            output = b'sha256:fixture\n'
+        elif action == 'create':
+            token = command[command.index('--label') + 1].split('=', 1)[1]
+            created.append('a' * 64)
+            # Model Docker creating the object but losing the CLI reply.
+            raise subprocess.TimeoutExpired(command, kwargs['timeout'])
+        elif action == 'container':
+            output = json.dumps([{'Id': created[0], 'Config': {'Labels': {
+                container_module.LABEL: token}}}]).encode()
+        elif action == 'rm':
+            removed.append(command[-1])
+            output = b''
+        elif action == 'ps':
+            output = b''
+        else:
+            pytest.fail('unexpected Docker operation: ' + action)
+        return subprocess.CompletedProcess(command, 0, output, b'')
+
+    monkeypatch.setattr(container_module.subprocess, 'run', engine)
+    sweep = container_module.ContainerSweep(repo, seed)
+    with pytest.raises(container_module.ContainerError, match='--scratch-dir /tmp'):
+        sweep.run_phase(['true'], output=docker_scratch)
+    assert created == removed == ['a' * 64]
+
+
+def test_container_scratch_timeout_message_with_real_wait(tmp_path, container_module, monkeypatch):
+    binaries = tmp_path / 'bin'
+    binaries.mkdir()
+    docker = binaries / 'docker'
+    # Simulate the measured stalled create without disturbing a shared daemon.
+    # exec keeps this a single child that subprocess.run kills and reaps.
+    docker.write_text('#!/bin/sh\nexec /bin/sleep 60\n')
+    docker.chmod(0o755)
+    monkeypatch.setenv('PATH', str(binaries))
+    start = time.monotonic()
+    with pytest.raises(container_module.ContainerError, match='--scratch-dir /tmp') as error:
+        container_module._docker('create', '--mount', 'type=bind,src=/unshared,dst=/out')
+    elapsed = time.monotonic() - start
+    assert elapsed < 8, 'scratch failure exceeded the short create timeout'
+    print(f'Simulated stalled create: {elapsed:.2f}s; {error.value}')
+
+
+@pytest.mark.parametrize('platform_name', ['linux', 'win32'])
+def test_container_is_default_off_macos(tmp_path, monkeypatch, container_module, platform_name):
+    from types import SimpleNamespace
+    repo, seed = _committed_repo(tmp_path)
+    seen = []
+    def run(args, mutants, harness):
+        seen.append(args.backend)
+        print('CONTAINER selected by platform default')
+        return 0
+    monkeypatch.setattr(container_module, 'run_sweep', run)
+    monkeypatch.setattr(mutate, 'sys', SimpleNamespace(**{**vars(sys), 'platform': platform_name}))
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--repo', str(repo), '--seed', seed,
+        '--file', 'victim.py', '--old', '1', '--new', '2', '--test', 'test_probe.py'])
+    assert mutate.main() == 0
+    assert seen == ['container']
+
+
+def test_container_missing_report_keeps_output(tmp_path, docker_scratch, container_backend, monkeypatch):
+    from types import SimpleNamespace
+    repo, seed = _committed_repo(tmp_path)
+    monkeypatch.syspath_prepend(str(_HARNESS.parent))
+    import pytest_runtime
+    monkeypatch.setattr(pytest_runtime, 'runtime_overlay', lambda: {
+        '_phase_evidence.py': b"print('starting pytest', flush=True)\nimport missing_test_dependency\n"})
+    evidence = tmp_path / 'evidence'
+    args = SimpleNamespace(repo=repo, seed=seed, image='python:3.12',
+                           scratch_dir=docker_scratch, timeout=30, evidence_dir=evidence)
+    assert container_backend.run_sweep(args, [{'file': 'victim.py', 'old': '1',
+        'new': '2', 'test': ['test_probe.py']}], mutate) == 2
+    report, = [json.loads(p.read_text()) for p in evidence.glob('*.json')]
+    phase, = report['phases']
+    assert phase['phase'] == 'collection'
+    assert phase['returncode'] == 1
+    assert phase['report'] is None
+    assert 'starting pytest' in phase['stdout']
+    assert "No module named 'missing_test_dependency'" in phase['stderr']
+
+
+def test_container_cli_loaded_by_location_without_sibling_imports(tmp_path):
+    repo, seed = _committed_repo(tmp_path)
+    launcher = """
+import importlib.util, pathlib, sys
+path = pathlib.Path(sys.argv.pop(1))
+assert str(path.parent) not in sys.path
+assert 'container_backend' not in sys.modules
+assert 'pytest_runtime' not in sys.modules
+spec = importlib.util.spec_from_file_location('location_loaded_mutate', path)
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+sys.exit(module.main())
+"""
+    result = subprocess.run([sys.executable, '-c', launcher, str(_HARNESS),
+        '--backend', 'container', '--repo', str(repo), '--seed', seed,
+        '--file', 'victim.py', '--old', '1', '--new', '2', '--test', 'test_probe.py'],
+        cwd=tmp_path, env={**os.environ, 'PATH': '', 'PYTHONPATH': ''},
+        capture_output=True, text=True, timeout=15)
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert 'ERROR: Docker CLI not found' in result.stdout
+    assert 'Traceback' not in result.stderr
+
+
+@pytest.mark.parametrize('operation', ['info', 'image'])
+def test_container_capability_probe_has_short_timeout(container_module, monkeypatch, request, operation):
+    import shutil
+    monkeypatch.setattr(shutil, 'which', lambda name: '/fixture/docker')
+    def wedged(*args, **kwargs):
+        if args[0] == operation:
+            assert kwargs.get('timeout') == 5, 'capability probe must stop within five seconds'
+            raise container_module.ContainerError('wedged daemon')
+        return subprocess.CompletedProcess(args, 0, b'linux\n', b'')
+    monkeypatch.setattr(container_module, '_docker', wedged)
+    with pytest.raises(pytest.skip.Exception, match='wedged daemon'):
+        request.getfixturevalue('container_backend')

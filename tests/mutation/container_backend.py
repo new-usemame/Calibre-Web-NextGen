@@ -220,6 +220,9 @@ def run_sweep(args, mutants, harness):
                         environment={"PYTHONPATH": "/work/_runtime:/work", "PYTHONDONTWRITEBYTECODE": "1",
                                      "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1", "PYTEST_ADDOPTS": "",
                                      "CWNG_MEASURED_TARGET": "", "CWNG_PYTEST_EVIDENCE": "/out/report.json"})
+                    checked = harness.PhaseResult(tuple(command), result.returncode, result.stdout,
+                                                  result.stderr, result.timed_out, None, ())
+                    trace.append((name, checked, None))
                     if result.timed_out:
                         raise harness.IsolationError(f"{name} timed out; increase --timeout or fix the test hang")
                     report_path = output / "report.json"
@@ -227,9 +230,7 @@ def run_sweep(args, mutants, harness):
                         raise harness.IsolationError(
                             f"{name} could not run pytest; use --image with Python 3.12+ and the test dependencies installed")
                     report = json.loads(report_path.read_text())
-                    checked = harness.PhaseResult(tuple(command), result.returncode, result.stdout,
-                                                  result.stderr, False, None, ())
-                    trace.append((name, checked, report))
+                    trace[-1] = (name, checked, report)
                     return checked, report
 
                 collected, report = phase("collection", collect=True)
@@ -245,6 +246,10 @@ def run_sweep(args, mutants, harness):
             payload = {"backend": "container", "seed_sha": sweep.seed_sha, "status": status,
                        "file": item["file"], "tests": item["test"], "detail": detail,
                        "phases": harness._safe_trace(trace)}
+            # Startup failures have no pytest report: retain the diagnostic logs.
+            for entry, (_, checked, report) in zip(payload["phases"], trace):
+                if report is None:
+                    entry.update(stdout=checked.stdout, stderr=checked.stderr)
             evidence, _ = harness._record_evidence(args.evidence_dir, payload)
             print(f"{status} mutation={index} file={item['file']}: {detail}; evidence={evidence.name}", flush=True)
             if status == "ERROR":

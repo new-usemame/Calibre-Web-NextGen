@@ -1691,3 +1691,24 @@ def test_container_is_default_off_macos(tmp_path, monkeypatch, container_module,
         '--file', 'victim.py', '--old', '1', '--new', '2', '--test', 'test_probe.py'])
     assert mutate.main() == 0
     assert seen == ['container']
+
+
+def test_container_missing_report_keeps_output(tmp_path, docker_scratch, container_backend, monkeypatch):
+    from types import SimpleNamespace
+    repo, seed = _committed_repo(tmp_path)
+    monkeypatch.syspath_prepend(str(_HARNESS.parent))
+    import pytest_runtime
+    monkeypatch.setattr(pytest_runtime, 'runtime_overlay', lambda: {
+        '_phase_evidence.py': b"print('starting pytest', flush=True)\nimport missing_test_dependency\n"})
+    evidence = tmp_path / 'evidence'
+    args = SimpleNamespace(repo=repo, seed=seed, image='python:3.12',
+                           scratch_dir=docker_scratch, timeout=30, evidence_dir=evidence)
+    assert container_backend.run_sweep(args, [{'file': 'victim.py', 'old': '1',
+        'new': '2', 'test': ['test_probe.py']}], mutate) == 2
+    report, = [json.loads(p.read_text()) for p in evidence.glob('*.json')]
+    phase, = report['phases']
+    assert phase['phase'] == 'collection'
+    assert phase['returncode'] == 1
+    assert phase['report'] is None
+    assert 'starting pytest' in phase['stdout']
+    assert "No module named 'missing_test_dependency'" in phase['stderr']

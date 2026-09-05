@@ -1674,3 +1674,20 @@ def test_container_scratch_timeout_message_with_real_wait(tmp_path, container_mo
     elapsed = time.monotonic() - start
     assert elapsed < 8, 'scratch failure exceeded the short create timeout'
     print(f'Simulated stalled create: {elapsed:.2f}s; {error.value}')
+
+
+@pytest.mark.parametrize('platform_name', ['linux', 'win32'])
+def test_container_is_default_off_macos(tmp_path, monkeypatch, container_module, platform_name):
+    from types import SimpleNamespace
+    repo, seed = _committed_repo(tmp_path)
+    seen = []
+    def run(args, mutants, harness):
+        seen.append(args.backend)
+        print('CONTAINER selected by platform default')
+        return 0
+    monkeypatch.setattr(container_module, 'run_sweep', run)
+    monkeypatch.setattr(mutate, 'sys', SimpleNamespace(**{**vars(sys), 'platform': platform_name}))
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--repo', str(repo), '--seed', seed,
+        '--file', 'victim.py', '--old', '1', '--new', '2', '--test', 'test_probe.py'])
+    assert mutate.main() == 0
+    assert seen == ['container']

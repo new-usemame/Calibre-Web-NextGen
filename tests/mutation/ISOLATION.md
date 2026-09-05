@@ -38,7 +38,8 @@ included nor reset.
 
 ## Backends
 
-`--backend macos` (default) runs phases as local processes. `--backend container` runs each phase in
+`--backend macos` (default on macOS) runs phases as local processes.
+`--backend container` (default on Linux and other platforms) runs each phase in
 its own Docker container, which is how you run this on a Linux server rather than a developer Mac.
 If Docker is not reachable the run stops with a message telling you so — it does not quietly fall
 back to something weaker.

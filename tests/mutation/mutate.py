@@ -1001,7 +1001,9 @@ def main():
     ap.add_argument("--name", default="mutant")
     ap.add_argument("--repo", type=pathlib.Path, default=REPO)
     ap.add_argument("--seed", required=True, help="committed seed; resolved once before any phase")
-    ap.add_argument("--backend", choices=("macos", "container"), default="macos")
+    ap.add_argument("--backend", choices=("macos", "container"),
+                    default="macos" if sys.platform == "darwin" else "container",
+                    help="phase runner (default: macos on macOS, container elsewhere; requires Docker)")
     ap.add_argument("--image", default="python:3.12", help="local Linux image for the container backend")
     ap.add_argument("--scratch-dir", type=pathlib.Path, default=None,
                     help="temporary directory accessible to Docker bind mounts")

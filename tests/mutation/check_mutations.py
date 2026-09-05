@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Sequential, temporary-copy mutation experiments for the soundness checks."""
+"""UNVERIFIED temporary-copy mutation diagnostics; completion exits nonzero."""
 import argparse
 import os
 from pathlib import Path
@@ -45,7 +45,8 @@ CASES = [
     ('schema_version', [('report["version"] != 1', 'False')]),
     ('baseline_mutated', [('baseline, report = _run_pytest(sweep, targets, environment, timeout, target=plan.relative)',
                           'baseline, report = _run_pytest(sweep, targets, environment, timeout, mutation=plan, target=plan.relative)')]),
-    ('mutation_not_applied', [('if mutation is not None:', 'if False:')]),
+    ('mutation_not_applied', [('apply_mutation(self.root, mutation)\n                if _mutation_target',
+                              'pass\n                if _mutation_target')]),
 ]
 
 
@@ -56,7 +57,7 @@ def main():
     args = parser.parse_args()
     source = (HERE / 'mutate.py').read_text()
     output = Path(args.output)
-    output.write_text('Mutation experiment — Mac/APFS only; retries 0; no maxfail.\n'
+    output.write_text('UNVERIFIED mutation experiment — Mac/APFS only; retries 0; no maxfail.\n'
                       'Each variant runs in a temporary module copy with the absolute venv interpreter.\n'
                       'Test file: tests/unit/test_mutation_harness.py; flags -q -o addopts= '
                       '-p no:rerunfailures -p no:flaky --tb=no.\n'
@@ -85,8 +86,8 @@ def main():
                 env={**os.environ, 'CWNG_CHECK_MUTANT': str(module), 'PYTEST_ADDOPTS': '', 'PYTHONDONTWRITEBYTECODE': '1'})
             summary = next((line for line in reversed(proc.stdout.splitlines())
                             if re.search(r'\d+ (?:passed|failed).* in ', line)), 'no test summary')
-            status = {0: 'SURVIVOR', 1: 'KILLED'}.get(proc.returncode, 'INVALID')
-            line = f'{name}: {status}; {summary}'
+            status = {0: 'NO_TEST_FAILURE', 1: 'TEST_FAILURE'}.get(proc.returncode, 'INVALID')
+            line = f'UNVERIFIED {name}: {status}; {summary} (Mac/APFS only)'
             print(line, flush=True)
             with output.open('a') as stream:
                 stream.write(line + '\n')
@@ -95,6 +96,8 @@ def main():
             if status == 'INVALID':
                 raise RuntimeError('mutation experiment failed to execute: ' + name)
 
+    return 1
+
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

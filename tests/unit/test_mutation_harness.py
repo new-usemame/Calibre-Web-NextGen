@@ -1133,3 +1133,16 @@ def test_review_forged_authority_cannot_exit_zero(tmp_path, shape):
         print(f'REVIEW3 shape={shape} PRESENT=REJECTED (Mac/APFS only)')
         return
     pytest.fail(f'forged result reached presentation with exit {code}')
+
+
+def test_review_matrix_driver_is_diagnostic_and_nonzero(tmp_path):
+    output = tmp_path / 'check-output.txt'
+    proc = subprocess.run([sys.executable, str(_HARNESS.with_name('check_mutations.py')),
+        '--only', 'equivalent_integer_bound', '--output', str(output)],
+        capture_output=True, text=True, timeout=120,
+        env={**os.environ, 'PYTEST_ADDOPTS': ''})
+    print(proc.stdout, end='')
+    print(f'REVIEW4 EXIT={proc.returncode} (Mac/APFS only)')
+    assert proc.returncode == 1
+    assert 'UNVERIFIED' in proc.stdout and 'UNVERIFIED' in output.read_text()
+    assert 'SURVIVOR' not in proc.stdout

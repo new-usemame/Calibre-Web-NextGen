@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Subprocess instrumentation; reports canonical paths relative to the execution tree."""
+"""Witness cps package roots only; measured-target checks live in pytest_evidence."""
 import importlib
 import json
 import os

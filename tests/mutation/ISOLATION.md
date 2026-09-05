@@ -55,3 +55,21 @@ retention is outside this boundary; choose persistent external storage when need
 
 The direct-mutation API, backup/restore path and old observation type are removed.
 All CLI execution goes through IsolatedSweep and run_checked_mutation.
+
+## Import witness scope
+
+The three preflight shapes witness cps package roots only. They do not establish
+where an arbitrary mutation target was imported. Their collection can write
+files, so its state is scrubbed and the mutant reapplied/rechecked before launch.
+
+Measured baseline and mutant pytest interpreters separately profile actual
+Python calls from the requested target's canonical source path. Missing target
+execution, a matching relative module path outside the execution tree, or a
+disabled profiler rejects the assessment. Targets must be Python source files.
+An import performed only in a child process, native code, renamed foreign code,
+or a target loaded before instrumentation is not a supported witness.
+Same relative module paths from another location are conservatively rejected.
+No import is forced merely to make this check pass. This witnesses observed
+target code; it does not prove every dependency or execution path is confined.
+Deliberate instrumentation tampering and tokenless escaped writers remain
+outside this diagnostic boundary.

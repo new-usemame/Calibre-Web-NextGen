@@ -756,6 +756,8 @@ def test_execution_summary_and_reality_guards(tmp_path, defect):
 def _soundness_repo(tmp_path, *, broken=False, body=None):
     repo, seed = _committed_repo(tmp_path)
     (repo / 'victim.py').write_text('VALUE = ' + ('2' if broken else '1') + '\n')
+    if body and 'victim' not in body:
+        body = 'import victim\n' + body
     (repo / 'test_probe.py').write_text(body or 'from victim import VALUE\ndef test_value(): assert VALUE == 1\n')
     _git(repo, 'add', '.')
     _git(repo, 'commit', '-qm', 'soundness fixture')
@@ -1057,3 +1059,53 @@ def test_review_post_preflight_boundary_rejects_contamination(tmp_path, monkeypa
         else:
             sweep.run_phase(['unused'], environment={}, timeout=60,
                 ownership_contract='inherited-token', mutation=plan)
+
+
+def test_review_actual_target_import_must_be_local(tmp_path):
+    body = (
+        'import os,sys\nfrom pathlib import Path\nimport cps\n'
+        'sys.path.insert(0, os.environ["SOURCE_CHECKOUT"])\nimport victim\n'
+        'Path(os.environ["IMPORT_WITNESS"]).write_text("SOURCE_CHECKOUT" if '
+        'Path(victim.__file__).resolve() == Path(os.environ["SOURCE_CHECKOUT"]) / "victim.py" else "OTHER")\n'
+        'def test_value(): assert victim.VALUE == 1\n')
+    repo = _soundness_repo(tmp_path, body=body)
+    witness = tmp_path / 'import-witness'
+    evidence = tmp_path / 'evidence'
+    cli = subprocess.run([sys.executable, str(_HARNESS), '--repo', str(repo), '--seed', 'HEAD',
+        '--evidence-dir', str(evidence), '--file', 'victim.py', '--old', 'VALUE = 1',
+        '--new', 'VALUE = 2', '--test', 'test_probe.py'], capture_output=True, text=True,
+        env={**os.environ, 'SOURCE_CHECKOUT': str(repo), 'IMPORT_WITNESS': str(witness),
+             'PYTEST_ADDOPTS': '', 'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'}, timeout=120)
+    payload = json.loads(next(evidence.glob('*.json')).read_text())
+    print(f'REVIEW2 IMPORTED_FROM={witness.read_text()} SIGNAL={payload["signal"]} HARNESS_EXIT={cli.returncode} (Mac/APFS only)')
+    assert payload['signal'] == 'ERROR' and 'target provenance' in payload['detail'], cli.stdout
+
+
+def test_review_unobserved_target_is_not_a_passing_mutation(tmp_path):
+    repo = _soundness_repo(tmp_path)
+    (repo / 'test_probe.py').write_text('def test_value(): assert True\n')
+    _git(repo, 'add', '.')
+    _git(repo, 'commit', '-qm', 'unobserved target')
+    with mutate.IsolatedSweep.create(repo, 'HEAD', state_root=tmp_path / 'state') as sweep:
+        result = mutate.run_checked_mutation(sweep, 'victim.py', '1', '2', ['test_probe.py'],
+            environment={**os.environ, 'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'}, timeout=60,
+            evidence_dir=tmp_path / 'evidence')
+    assert result.signal == 'ERROR' and 'target provenance' in result.detail
+
+
+@pytest.mark.parametrize('relative', ['victim.py', 'cps/__init__.py'])
+def test_review_target_witness_accepts_real_local_execution(tmp_path, relative):
+    repo = _soundness_repo(tmp_path)
+    if relative == 'cps/__init__.py':
+        (repo / relative).write_text('VALUE = 1\n')
+        body = 'def test_value():\n    import cps\n    assert cps.VALUE == 1\n'
+    else:
+        body = 'def test_value():\n    import victim\n    assert victim.VALUE == 1\n'
+    (repo / 'test_probe.py').write_text(body)
+    _git(repo, 'add', '.')
+    _git(repo, 'commit', '-qm', 'local target witness')
+    with mutate.IsolatedSweep.create(repo, 'HEAD', state_root=tmp_path / 'state') as sweep:
+        result = mutate.run_checked_mutation(sweep, relative, '1', '2', ['test_probe.py'],
+            environment={**os.environ, 'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'}, timeout=60,
+            evidence_dir=tmp_path / 'evidence')
+    assert result.signal == 'TEST_FAILURE', result.detail

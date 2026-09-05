@@ -43,8 +43,8 @@ CASES = [
     ('equivalent_integer_bound', [(FAIL_CALL, 'if phase.returncode == 1 and actual_failures <= 0:')]),
     ('noop_apply', [('if plan.after == plan.before:', 'if False:')]),
     ('schema_version', [('report["version"] != 1', 'False')]),
-    ('baseline_mutated', [('baseline, report = _run_pytest(sweep, targets, environment, timeout)',
-                          'baseline, report = _run_pytest(sweep, targets, environment, timeout, mutation=plan)')]),
+    ('baseline_mutated', [('baseline, report = _run_pytest(sweep, targets, environment, timeout, target=plan.relative)',
+                          'baseline, report = _run_pytest(sweep, targets, environment, timeout, mutation=plan, target=plan.relative)')]),
     ('mutation_not_applied', [('if mutation is not None:', 'if False:')]),
 ]
 

@@ -254,7 +254,7 @@ def run_phase_process(
     Arbitrary process-tree containment is unavailable on this backend. The default
     rejects before launch. Diagnostic callers must explicitly require every child
     to retain its token and user identity, and permit process-table inspection.
-    The command-line mutation flow does not opt in to this weaker contract.
+    The command-line flow opts in only for UNVERIFIED diagnostics.
     """
     if ownership_contract != _TOKEN_CONTRACT or sys.platform != "darwin":
         raise IsolationError(
@@ -512,13 +512,15 @@ def validate_execution(phase: PhaseResult, report: dict, expected: tuple[str, ..
 def _assess_mutation(sweep, relative, old, new, targets, environment, timeout, trace):
     sweep.scrub()
     plan = prepare_mutation(sweep.root, relative, old, new)
+    if pathlib.Path(relative).suffix != ".py":
+        raise IsolationError("target provenance supports Python source targets only")
     collection, report = _run_pytest(sweep, targets, environment, timeout, collect_only=True)
     trace.append(("collection", collection, report))
     nodes = validate_collection(sweep.root, collection, report)
-    baseline, report = _run_pytest(sweep, targets, environment, timeout)
+    baseline, report = _run_pytest(sweep, targets, environment, timeout, target=plan.relative)
     trace.append(("baseline", baseline, report))
     validate_execution(baseline, report, nodes, baseline=True)
-    mutant, report = _run_pytest(sweep, targets, environment, timeout, mutation=plan)
+    mutant, report = _run_pytest(sweep, targets, environment, timeout, mutation=plan, target=plan.relative)
     trace.append(("mutant", mutant, report))
     return validate_execution(mutant, report, nodes)
 
@@ -611,7 +613,7 @@ def present_checked_result(result: CheckedResult) -> int:
     return result.exit_code
 
 
-def _run_pytest(sweep, targets, environment, timeout, *, collect_only=False, mutation=None):
+def _run_pytest(sweep, targets, environment, timeout, *, collect_only=False, mutation=None, target=None):
     report_path = sweep.entry / "reports" / (uuid.uuid4().hex + ".json")
     report_path.parent.mkdir(exist_ok=True)
     helper = pathlib.Path(__file__).with_name("pytest_evidence.py")
@@ -622,7 +624,9 @@ def _run_pytest(sweep, targets, environment, timeout, *, collect_only=False, mut
         options.append("--collect-only")
     phase = sweep.run_phase(
         [sys.executable, "-c", bootstrap, str(helper), *options, *targets],
-        environment={**environment, "PYTEST_ADDOPTS": "", "CWNG_PYTEST_EVIDENCE": str(report_path)},
+        environment={**environment, "PYTEST_ADDOPTS": "", "CWNG_PYTEST_EVIDENCE": str(report_path),
+                     "CWNG_MEASURED_TARGET": str(sweep.root / target) if target else "",
+                     "CWNG_MEASURED_ROOT": str(sweep.root)},
         timeout=timeout, ownership_contract=_TOKEN_CONTRACT, mutation=mutation,
         pytest_targets=targets,
     )
@@ -630,6 +634,11 @@ def _run_pytest(sweep, targets, environment, timeout, *, collect_only=False, mut
         report = json.loads(report_path.read_text())
     except (OSError, ValueError) as exc:
         raise IsolationError("pytest evidence missing or malformed") from exc
+    if target:
+        witness = report.get("target_provenance") if isinstance(report, dict) else None
+        if (not isinstance(witness, dict) or witness.get("seen") is not True
+                or witness.get("foreign") is not False or witness.get("active") is not True):
+            raise IsolationError("target provenance REJECTED: missing, foreign or disabled execution witness")
     return phase, report
 
 

@@ -357,16 +357,26 @@ def _poison_program(channel, seed):
     return "\n".join([
         "import importlib.machinery,os,pathlib,py_compile,subprocess,sys,time",
         "root = pathlib.Path.cwd()",
+        "gate = root.parent / 'poison-release'",
+        "def cached_value_changed():",
+        "    if not pathlib.Path('explicit.pyc').exists(): return False",
+        "    values = {}",
+        "    exec(importlib.machinery.SourcelessFileLoader('poison_cache', 'explicit.pyc').get_code('poison_cache'), values)",
+        "    return values['VALUE'] != 1",
         "def git(*args): return subprocess.check_output(['git', *args], text=True).strip()",
         f"channel = {channel!r}",
         "if os.environ['MUTATION_PHASE'] == 'mutant':",
+        "    if channel == 'child':",
+        "        gate.write_text('mutant has started')",
+        "        deadline = time.monotonic() + 1.5",
+        "        while not pathlib.Path('late.ignored').exists() and time.monotonic() < deadline: time.sleep(.005)",
         "    dirty = {",
         "        'ignored': lambda: pathlib.Path('baseline.ignored').exists(),",
         "        'tracked': lambda: pathlib.Path('victim.py').read_text() != 'VALUE = 1\\n',",
         "        'collateral': lambda: pathlib.Path('collateral.py').read_text() != 'ORIGINAL\\n',",
         "        'index': lambda: git('show', ':victim.py') != 'VALUE = 1',",
         f"        'head': lambda: git('rev-parse', 'HEAD') != {seed!r},",
-        "        'bytecode': lambda: pathlib.Path('explicit.pyc').exists() and importlib.machinery.SourcelessFileLoader('poison_cache', 'explicit.pyc').get_code('poison_cache') is not None,",
+        "        'bytecode': cached_value_changed,",
         "        'child': lambda: pathlib.Path('late.ignored').exists(),",
         "    }[channel]()",
         "    sys.exit(1 if dirty else 0)",
@@ -379,7 +389,8 @@ def _poison_program(channel, seed):
         "pathlib.Path('victim.py').write_text('VALUE = 77\\n')",
         "git('add', 'victim.py')",
         "pathlib.Path('victim.py').write_text('VALUE = 88\\n')",
-        "child = \"import pathlib,time; pathlib.Path('child-ready.ignored').write_text('ready'); time.sleep(1.5); pathlib.Path('late.ignored').write_text('late')\"",
+        "gate.unlink(missing_ok=True)",
+        'child = "import pathlib,time; pathlib.Path(\'child-ready.ignored\').write_text(\'ready\'); gate=pathlib.Path(\'..\') / \'poison-release\'; deadline=time.monotonic()+5\\nwhile not gate.exists() and time.monotonic()<deadline: time.sleep(.005)\\nif gate.exists(): pathlib.Path(\'late.ignored\').write_text(\'late\')"',
         "proc = subprocess.Popen([sys.executable, '-c', child], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)",
         "deadline = time.monotonic() + 3",
         "while not pathlib.Path('child-ready.ignored').exists():",
@@ -401,22 +412,24 @@ def test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one(tmp_
             if shared:
                 return subprocess.run([sys.executable, "-c", program], cwd=root, env=env,
                                       capture_output=True, text=True, timeout=5)
-            sweep.scrub()
-            result = mutate.run_phase_process(
+            return sweep.run_phase(
+                [sys.executable, "-c", program], environment=env, timeout=5,
                 ownership_contract="inherited-token",
-                argv=[sys.executable, "-c", program], cwd=root, environment=env,
-                timeout=5, artifacts=sweep.entry / "artifacts",
             )
-            assert result.containment_error is None
-            sweep.scrub()
-            return result
         # A clean selection passes before poison is introduced.
         clean = phase("mutant")
         baseline = phase("baseline")
         assert clean.returncode == baseline.returncode == 0, baseline.stderr
-        time.sleep(1.6)
+        if channel == "child" and shared:
+            _git(root, "reset", "--hard", seed)
+            _git(root, "clean", "-ffdx")
+            assert _git(root, "status", "--porcelain", "--ignored") == ""
+            print("CHILD_BOUNDARY shared tree scrubbed clean before mutant releases writer (Mac/APFS only)")
+        if channel != "child":
+            (root.parent / "poison-release").write_text("release finite fixture child")
+            time.sleep(.1)
         mutant = phase("mutant")
-        print(f"ORACLE boundary={'shared' if shared else 'isolated'} channel={channel} "
+        print(f"ORACLE boundary={'shared' if shared else 'isolated-diagnostic'} channel={channel} "
               f"clean={clean.returncode} baseline={baseline.returncode} mutant={mutant.returncode} "
               f"{'CONTAMINATING' if mutant.returncode else 'CLEAN'} (Mac/APFS only)")
         assert mutant.returncode == clean.returncode, f"CONTAMINATING: {channel} changed the verdict"

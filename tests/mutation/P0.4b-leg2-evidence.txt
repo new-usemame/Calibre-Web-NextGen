@@ -1,0 +1,31 @@
+P0.4b leg 2 — real output excerpts, Mac/APFS only
+
+$ROOT is resolved from the worktree; the interpreter is executed by absolute path.
+No maxfail option; retries 0. No Linux gate.
+
+RED command:
+CWNG_POISON_BOUNDARY=shared "$ROOT/repo/.venv/bin/python" -m pytest tests/unit/test_mutation_harness.py -k poison_suite -q -s -o addopts='' --tb=short
+Exit status: 1
+ORACLE boundary=shared channel=ignored clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+ORACLE boundary=shared channel=tracked clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+ORACLE boundary=shared channel=collateral clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+ORACLE boundary=shared channel=index clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+ORACLE boundary=shared channel=head clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+ORACLE boundary=shared channel=bytecode clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+CHILD_BOUNDARY shared tree scrubbed clean before mutant releases writer (Mac/APFS only)
+ORACLE boundary=shared channel=child clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+7 failed, 18 deselected in 14.72s
+
+
+GREEN/full-suite command (retries disabled, no maxfail):
+PYTEST_ADDOPTS= "$ROOT/repo/.venv/bin/python" -m pytest tests/unit/test_mutation_harness.py -q -s -o addopts= -p no:rerunfailures -p no:flaky --tb=short
+Exit status: 0
+LIMITATION tokenless detached child survived diagnostic cleanup; strict mode rejects before launch (Mac/APFS only)
+ORACLE boundary=isolated-diagnostic channel=ignored clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+ORACLE boundary=isolated-diagnostic channel=tracked clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+ORACLE boundary=isolated-diagnostic channel=collateral clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+ORACLE boundary=isolated-diagnostic channel=index clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+ORACLE boundary=isolated-diagnostic channel=head clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+ORACLE boundary=isolated-diagnostic channel=bytecode clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+ORACLE boundary=isolated-diagnostic channel=child clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+25 passed in 67.55s (0:01:07)

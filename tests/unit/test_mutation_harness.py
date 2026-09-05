@@ -1286,3 +1286,124 @@ def test_group_signal_refuses_nonpositive_ids_before_kernel(monkeypatch, pgid):
     with pytest.raises(mutate.IsolationError, match='positive process group'):
         mutate._signal_group(pgid, signal.SIGKILL)
     assert calls == []
+
+
+@pytest.fixture
+def container_backend(monkeypatch):
+    import shutil
+    if shutil.which('docker') is None:
+        pytest.skip('Docker required for real Linux container boundary tests')
+    module_path = pathlib.Path(__file__).resolve().parents[1] / 'mutation/container_backend.py'
+    spec = importlib.util.spec_from_file_location('container_backend', module_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    # Explicit negative-control mode. The fixture owns an emergency cleanup
+    # for these deliberate defects, after test assertions have seen the leak.
+    fault = os.environ.get('CWNG_CONTAINER_TEST_FAULT')
+    if not fault:
+        yield module
+        return
+    original = module._docker
+    owned = []
+
+    def defective(*args, **kwargs):
+        if fault == 'cleanup' and args[0] == 'rm':
+            return subprocess.CompletedProcess(args, 0, b'', b'')
+        if fault == 'cleanup' and args[:2] == ('ps', '-aq'):
+            return subprocess.CompletedProcess(args, 0, b'', b'')
+        result = original(*args, **kwargs)
+        if args[0] == 'create' and result.returncode == 0:
+            owned.append(result.stdout.decode().strip())
+        return result
+
+    monkeypatch.setattr(module, '_docker', defective)
+    if fault == 'seed':
+        original_init = module.ContainerSweep.__init__
+
+        def changed_seed(self, *args, **kwargs):
+            original_init(self, *args, **kwargs)
+            self.archive = self.archive.replace(b'VALUE = 1', b'VALUE = 9')
+
+        monkeypatch.setattr(module.ContainerSweep, '__init__', changed_seed)
+    try:
+        yield module
+    finally:
+        for cid in owned:
+            if original('container', 'inspect', cid).returncode == 0:
+                assert original('rm', '-f', cid).returncode == 0
+
+
+@pytest.mark.parametrize('finish', ['exit', 'timeout', 'failure'])
+def test_container_tokenless_writes_stop_after_phase(tmp_path, container_backend, finish):
+    repo, seed = _committed_repo(tmp_path)
+    out = tmp_path / 'out'
+    out.mkdir()
+    sweep = container_backend.ContainerSweep(repo, seed)
+    # Same setsid/env -i counterexample as the diagnostic limitation. Bound the
+    # writer too, so an intentionally red cleanup regression cannot live forever.
+    writer = "i=0; while [ $i -lt 80 ]; do echo tick >> /out/escaped.log; i=$((i+1)); sleep 0.1; done"
+    tail = {'exit': 'exit 0', 'failure': 'exit 7', 'timeout': 'sleep 20'}[finish]
+    result = sweep.run_phase(['sh', '-c',
+        "setsid env -i sh -c '" + writer + "' >/dev/null 2>&1 & "
+        "while [ ! -s /out/escaped.log ]; do sleep 0.1; done; sleep 0.3; " + tail],
+        output=out, timeout=2 if finish == 'timeout' else 20)
+    before = (out / 'escaped.log').read_bytes()
+    time.sleep(1)
+    after = (out / 'escaped.log').read_bytes()
+    assert before.count(b'tick') >= 2
+    assert after == before, 'tokenless detached writer survived container removal'
+    assert result.timed_out is (finish == 'timeout')
+    assert result.returncode == {'exit': 0, 'failure': 7, 'timeout': None}[finish]
+    remaining = subprocess.run(['docker', 'ps', '-aq', '--filter',
+        'id=' + result.container_id], check=True, capture_output=True, text=True).stdout.strip()
+    assert remaining == ''
+    print(f'CONTAINMENT {finish}: alive_writes={before.count(b"tick")} '
+          f'after_removal_writes={after.count(b"tick") - before.count(b"tick")} containers=0')
+
+
+def test_container_phases_copy_pinned_seed_and_discard_damage(tmp_path, container_backend):
+    repo, seed = _committed_repo(tmp_path)
+    sweep = container_backend.ContainerSweep(repo, seed)
+    (repo / 'victim.py').write_text('DIRTY SOURCE\n')
+    ids = []
+    for index in range(2):
+        out = tmp_path / f'out{index}'
+        out.mkdir()
+        result = sweep.run_phase(['python', '-c',
+            "from pathlib import Path; "
+            "assert Path('victim.py').read_text() == 'VALUE = 1\\n'; "
+            "assert not Path('.git').exists(); "
+            "Path('victim.py').write_text('DAMAGE'); print('pinned seed')"], output=out)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip() == 'pinned seed'
+        assert result.seed_sha == seed
+        ids.append(result.container_id)
+    assert len(set(ids)) == 2
+    assert (repo / 'victim.py').read_text() == 'DIRTY SOURCE\n'
+
+
+def test_container_setup_failure_removes_owned_container(tmp_path, container_backend, monkeypatch):
+    repo, seed = _committed_repo(tmp_path)
+    sweep = container_backend.ContainerSweep(repo, seed)
+    out = tmp_path / 'out'
+    out.mkdir()
+    original = container_backend._docker
+    owned = []
+
+    def inject(*args, **kwargs):
+        if args[0] == 'cp':
+            raise KeyboardInterrupt('injected after create')
+        result = original(*args, **kwargs)
+        if args[0] == 'create' and result.returncode == 0:
+            owned.append(result.stdout.decode().strip())
+        return result
+
+    monkeypatch.setattr(container_backend, '_docker', inject)
+    with pytest.raises(KeyboardInterrupt):
+        sweep.run_phase(['true'], output=out)
+    assert len(owned) == 1
+    assert subprocess.run(['docker', 'ps', '-aq', '--filter', 'id=' + owned[0]],
+        check=True, capture_output=True).stdout.strip() == b''
+    with pytest.raises(RuntimeError, match='after an error'):
+        sweep.run_phase(['true'], output=out)

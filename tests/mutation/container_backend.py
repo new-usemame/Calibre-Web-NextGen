@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import io
 import json
+import os
 from pathlib import Path
 import subprocess
 import tarfile
@@ -28,6 +29,11 @@ LIMITS = ("Outside containment: externally delegated work in databases, network 
 
 class ContainerError(RuntimeError):
     """A container operation failed; the message tells the developer what to try."""
+
+
+def default_scratch_root():
+    """Use Docker Desktop's shared temp area, independently of pytest's TMPDIR."""
+    return Path(os.environ.get("CWNG_DOCKER_SCRATCH", "/tmp")).resolve()
 
 
 @dataclass(frozen=True, slots=True)
@@ -178,7 +184,8 @@ def run_sweep(args, mutants, harness):
     runtime = runtime_overlay()
     print(f"CONTAINER seed={sweep.seed_sha}", flush=True)
     survived = False
-    with tempfile.TemporaryDirectory(prefix="mutation-container-", dir=args.scratch_dir) as scratch:
+    with tempfile.TemporaryDirectory(prefix="mutation-container-",
+                                     dir=args.scratch_dir or default_scratch_root()) as scratch:
         scratch = Path(scratch)
         tree = scratch / "seed"
         tree.mkdir()

@@ -1289,15 +1289,29 @@ def test_group_signal_refuses_nonpositive_ids_before_kernel(monkeypatch, pgid):
 
 
 @pytest.fixture
-def container_backend(monkeypatch):
-    import shutil
-    if shutil.which('docker') is None:
-        pytest.skip('Docker required for real Linux container boundary tests')
+def docker_scratch(container_module):
+    import tempfile
+    with tempfile.TemporaryDirectory(prefix='cwng-mutation-test-',
+                                     dir=container_module.default_scratch_root()) as directory:
+        yield pathlib.Path(directory)
+
+
+@pytest.fixture
+def container_module():
     module_path = pathlib.Path(__file__).resolve().parents[1] / 'mutation/container_backend.py'
     spec = importlib.util.spec_from_file_location('container_backend', module_path)
     module = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = module
     spec.loader.exec_module(module)
+    return module
+
+
+@pytest.fixture
+def container_backend(monkeypatch, container_module):
+    import shutil
+    if shutil.which('docker') is None:
+        pytest.skip('Docker required for real Linux container boundary tests')
+    module = container_module
     # Explicit negative-control mode. The fixture owns an emergency cleanup
     # for these deliberate defects, after test assertions have seen the leak.
     fault = os.environ.get('CWNG_CONTAINER_TEST_FAULT')
@@ -1335,9 +1349,9 @@ def container_backend(monkeypatch):
 
 
 @pytest.mark.parametrize('finish', ['exit', 'timeout', 'failure'])
-def test_container_tokenless_writes_stop_after_phase(tmp_path, container_backend, finish):
+def test_container_tokenless_writes_stop_after_phase(tmp_path, docker_scratch, container_backend, finish):
     repo, seed = _committed_repo(tmp_path)
-    out = tmp_path / 'out'
+    out = docker_scratch / 'out'
     out.mkdir()
     sweep = container_backend.ContainerSweep(repo, seed)
     # Same setsid/env -i counterexample as the diagnostic limitation. Bound the
@@ -1362,13 +1376,13 @@ def test_container_tokenless_writes_stop_after_phase(tmp_path, container_backend
           f'after_removal_writes={after.count(b"tick") - before.count(b"tick")} containers=0')
 
 
-def test_container_phases_copy_pinned_seed_and_discard_damage(tmp_path, container_backend):
+def test_container_phases_copy_pinned_seed_and_discard_damage(tmp_path, docker_scratch, container_backend):
     repo, seed = _committed_repo(tmp_path)
     sweep = container_backend.ContainerSweep(repo, seed)
     (repo / 'victim.py').write_text('DIRTY SOURCE\n')
     ids = []
     for index in range(2):
-        out = tmp_path / f'out{index}'
+        out = docker_scratch / f'out{index}'
         out.mkdir()
         result = sweep.run_phase(['python', '-c',
             "from pathlib import Path; "
@@ -1383,10 +1397,10 @@ def test_container_phases_copy_pinned_seed_and_discard_damage(tmp_path, containe
     assert (repo / 'victim.py').read_text() == 'DIRTY SOURCE\n'
 
 
-def test_container_setup_failure_removes_owned_container(tmp_path, container_backend, monkeypatch):
+def test_container_setup_failure_removes_owned_container(tmp_path, docker_scratch, container_backend, monkeypatch):
     repo, seed = _committed_repo(tmp_path)
     sweep = container_backend.ContainerSweep(repo, seed)
-    out = tmp_path / 'out'
+    out = docker_scratch / 'out'
     out.mkdir()
     original = container_backend._docker
     owned = []
@@ -1411,7 +1425,7 @@ def test_container_setup_failure_removes_owned_container(tmp_path, container_bac
 
 @pytest.mark.parametrize('mode', ['clean_control', 'absent_control', 'startup_rewrite',
                                  'frame_forge', 'meta_transform', 'loader_transform'])
-def test_container_leg7_execution_provenance_limit(tmp_path, container_backend, mode):
+def test_container_leg7_execution_provenance_limit(tmp_path, docker_scratch, container_backend, mode):
     import hashlib
     directory = pathlib.Path(__file__).resolve().parents[1] / 'mutation'
     modules = []
@@ -1423,7 +1437,7 @@ def test_container_leg7_execution_provenance_limit(tmp_path, container_backend, 
     leg7, probe = modules
     repo = leg7.fixture(tmp_path, mode)
     seed = _git(repo, 'rev-parse', 'HEAD')
-    out = tmp_path / 'out'
+    out = docker_scratch / 'out'
     out.mkdir()
     sweep = container_backend.ContainerSweep(repo, seed)
     result = sweep.run_phase(probe.COMMAND, output=out, files=probe.runtime_overlay(),
@@ -1485,7 +1499,7 @@ def test_container_presentation_rejects_forged_authority(container_backend, shap
 
 
 @pytest.mark.parametrize('kind', ['caught', 'survived', 'baseline_error', 'spec'])
-def test_container_cli_runs_real_sweep(tmp_path, container_backend, kind):
+def test_container_cli_runs_real_sweep(tmp_path, docker_scratch, container_backend, kind):
     repo, seed = _committed_repo(tmp_path)
     assertion = {'caught': 'victim.VALUE == 1', 'survived': 'victim.VALUE > 0',
                  'baseline_error': 'False', 'spec': 'victim.VALUE == 1'}[kind]
@@ -1499,7 +1513,7 @@ def test_container_cli_runs_real_sweep(tmp_path, container_backend, kind):
     seed = _git(repo, 'rev-parse', 'HEAD')
     evidence = tmp_path / 'evidence'
     command = [sys.executable, str(_HARNESS), '--backend', 'container', '--repo', str(repo),
-               '--seed', seed, '--evidence-dir', str(evidence), '--scratch-dir', str(tmp_path)]
+               '--seed', seed, '--evidence-dir', str(evidence), '--scratch-dir', str(docker_scratch)]
     if kind == 'spec':
         spec = tmp_path / 'spec.json'
         spec.write_text(json.dumps([{'file': 'victim.py', 'old': '1', 'new': str(n),
@@ -1573,3 +1587,14 @@ def test_darwin_process_exit_between_table_and_arguments(monkeypatch, state, ret
     else:
         with pytest.raises(mutate.IsolationError, match='errno 5'):
             mutate._has_phase_token(123, 'test-token')
+
+
+def test_container_scratch_does_not_follow_pytest_tmp_path(tmp_path, request, monkeypatch):
+    import tempfile
+    # Reproduce conftest's temp redirection without asking Docker to touch it.
+    monkeypatch.setenv('TMPDIR', str(tmp_path))
+    monkeypatch.setattr(tempfile, 'tempdir', str(tmp_path))
+    monkeypatch.delenv('CWNG_DOCKER_SCRATCH', raising=False)
+    scratch = request.getfixturevalue('docker_scratch')
+    assert not scratch.is_relative_to(tmp_path)
+    assert scratch.is_relative_to(pathlib.Path('/tmp').resolve())

@@ -1452,3 +1452,33 @@ def test_container_leg7_execution_provenance_limit(tmp_path, container_backend, 
             'clean_control', 'absent_control'):
         assert not witness['seen'] or result.returncode != 0, (
             'container removal did not detect substituted target execution')
+
+
+def test_container_output_names_external_delegation_limits(container_backend, capsys):
+    result = container_backend.ContainerObservation(0, 'untrusted output', '', False, 'id', 'seed')
+    assert container_backend.present_observation(result) == 1
+    text = capsys.readouterr().out
+    for term in ('UNVERIFIED', 'databases', 'network services', 'shared ports',
+                 'remote service managers', 'daemons outside', 'Not hermetic'):
+        assert term in text
+    assert 'untrusted output' not in text
+    assert 'SURVIVED' not in text and 'caught' not in text
+    print(text, end='')
+
+
+@pytest.mark.parametrize('shape', ['setattr', 'subclass', 'duck'])
+def test_container_presentation_rejects_forged_authority(container_backend, shape):
+    from types import SimpleNamespace
+    result_type = container_backend.ContainerObservation
+    if shape == 'subclass':
+        class Derived(result_type):
+            pass
+        result_type = Derived
+    result = result_type(0, '', '', False, 'id', 'seed')
+    if shape == 'setattr':
+        object.__setattr__(result, 'authoritative', True)
+        object.__setattr__(result, 'status', 'SURVIVED')
+    if shape == 'duck':
+        result = SimpleNamespace(status='UNVERIFIED', authoritative=False)
+    with pytest.raises(ValueError, match='invalid'):
+        container_backend.present_observation(result)

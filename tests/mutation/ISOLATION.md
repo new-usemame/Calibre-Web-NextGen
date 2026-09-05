@@ -1,5 +1,29 @@
 # Diagnostic execution policy
 
+## Linux container investigation (P0.4c — blocked, not authoritative)
+
+`container_backend.py` supplies a container-per-phase primitive using a pinned
+Git archive. It removes each owned container before returning an observation.
+The committed tokenless setsid/env-i test observes writes stopping after removal,
+including on timeout. The primitive is not wired into `mutate.py`'s CLI.
+
+The four leg7 execution-provenance vectors still defeat the existing observer
+inside this boundary. Container removal contains descendants; it does not
+detect substituted Python code. Therefore this primitive also returns only
+UNVERIFIED observations. No authoritative backend or kernel-to-verdict gate
+is claimed. See `P0.4c-evidence.md` for the explicit failing requirement check.
+
+Outside containment: externally delegated work in databases, network services,
+shared ports, remote service managers, and daemons outside the container. This
+is not hermeticity. These limits are also in the primitive's code and literal
+diagnostic output. Its default network is disabled and no Docker socket is
+mounted; those settings do not establish a general external-delegation guarantee.
+Removal requires a responsive Docker daemon and kernel. SIGKILL of the host
+runner and ambiguous asynchronous Docker-create completion are unproved cleanup
+cases. Do not promote the primitive into verdict authority.
+
+## macOS backend
+
 The macOS backend reports UNVERIFIED observations and exits nonzero.
 Git-writing selections that change shared refs, common Git configuration,
 hooks, or another worktree are UNSUPPORTED. This includes mutation-induced

@@ -37,6 +37,15 @@ class ContainerObservation:
     authoritative: bool = field(default=False, init=False)
 
 
+def present_observation(result: ContainerObservation) -> int:
+    """Display only literal diagnostic scope, never trust phase output as a verdict."""
+    if (type(result) is not ContainerObservation or result.status != "UNVERIFIED"
+            or result.authoritative is not False):
+        raise ValueError("invalid diagnostic authority fields")
+    print("UNVERIFIED Linux container phase observation. " + LIMITS)
+    return 1
+
+
 def _docker(*args, **kwargs):
     return subprocess.run(["docker", *args], capture_output=True, timeout=30, **kwargs)
 

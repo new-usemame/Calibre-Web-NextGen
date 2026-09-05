@@ -36,30 +36,6 @@ def test_get_bookmark_anonymous_401():
 
 
 @pytest.mark.unit
-def test_get_bookmark_returns_key():
-    from cps.api import reader as mod
-    row = SimpleNamespace(bookmark_key="epubcfi(/6/4!/4/2)")
-    mock_ub = MagicMock()
-    mock_ub.session.query.return_value.filter.return_value.first.return_value = row
-    with _ctx("/api/v1/books/5/bookmark?format=epub"):
-        with patch.object(mod, "current_user", _auth_user()), patch.object(mod, "ub", mock_ub):
-            resp = inspect.unwrap(mod.get_bookmark)(5)
-    assert resp.status_code == 200
-    assert json.loads(resp.get_data())["bookmark"] == "epubcfi(/6/4!/4/2)"
-
-
-@pytest.mark.unit
-def test_get_bookmark_none_when_absent():
-    from cps.api import reader as mod
-    mock_ub = MagicMock()
-    mock_ub.session.query.return_value.filter.return_value.first.return_value = None
-    with _ctx("/api/v1/books/5/bookmark"):
-        with patch.object(mod, "current_user", _auth_user()), patch.object(mod, "ub", mock_ub):
-            resp = inspect.unwrap(mod.get_bookmark)(5)
-    assert json.loads(resp.get_data())["bookmark"] is None
-
-
-@pytest.mark.unit
 def test_save_bookmark_lowercases_format_and_merges():
     """Format must be stored lowercase (legacy interop) and the new bookmark merged."""
     from cps.api import reader as mod

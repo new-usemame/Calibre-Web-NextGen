@@ -7,7 +7,7 @@
 
 The web reader keeps its exact position as an epub.js CFI in ``ub.Bookmark``.
 Nothing outside the readers reads that row — it is opaque, format-specific and
-carries no timestamp — so a browser reading session used to be invisible to the
+formerly carried no timestamp — so a browser reading session used to be invisible to the
 user's Kobo and to the book-detail progress display.
 
 The portable part of a position is the *percentage*, which the client already
@@ -257,3 +257,60 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
     log.debug("Web reader advanced progress for user %s book %s to %.2f%%",
               user_id, book_id, percentage)
     return True
+
+
+def read_resume_position(engine, user_id, book_id, fmt="epub"):
+    """Read an optional portable resume hint without touching the CFI store.
+
+    A separate read-only SQLite connection avoids ORM autoflush and the app
+    connection's multi-second busy timeout. Both reads share a snapshot. If the
+    optional carrier fails, retain the local CFI already read. Pre-migration
+    bookmarks have no trustworthy clock, so cannot be silently superseded.
+    """
+    import sqlite3
+    from pathlib import Path
+
+    result = {"bookmark": None, "resume": None}
+    connection = None
+    try:
+        database = engine.url.database
+        if not database or database == ":memory:":
+            return result
+        connection = sqlite3.connect(
+            Path(database).resolve().as_uri() + "?mode=ro", uri=True, timeout=0,
+        )
+        connection.execute("BEGIN")
+        local = connection.execute(
+            "SELECT bookmark_key, updated_at FROM bookmark "
+            "WHERE user_id=? AND book_id=? AND format=? COLLATE NOCASE LIMIT 1",
+            (user_id, book_id, fmt),
+        ).fetchone()
+        if local:
+            result["bookmark"] = local[0]
+        if fmt != "epub":
+            return result
+        remote = connection.execute(
+            "SELECT b.progress_percent, b.last_modified FROM kobo_bookmark b "
+            "JOIN kobo_reading_state s ON s.id=b.kobo_reading_state_id "
+            "WHERE s.user_id=? AND s.book_id=? LIMIT 1", (user_id, book_id),
+        ).fetchone()
+        if not remote:
+            return result
+        percentage = coerce_percentage(remote[0])
+        if percentage is None or not remote[1]:
+            return result
+        def utc(raw):
+            value = datetime.fromisoformat(raw)
+            return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+        synced_at = utc(remote[1])
+        if result["bookmark"] and (not local[1] or synced_at <= utc(local[1])):
+            return result
+        result["resume"] = {"percentage": percentage,
+                            "synced_at": synced_at.isoformat(),
+                            "mode": "offer" if result["bookmark"] else "automatic"}
+    except Exception:
+        log.debug("Could not load reader resume position for book %s", book_id, exc_info=True)
+    finally:
+        if connection is not None:
+            connection.close()
+    return result

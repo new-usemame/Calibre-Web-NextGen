@@ -747,6 +747,7 @@ class Bookmark(Base):
     book_id = Column(Integer)
     format = Column(String(collation='NOCASE'))
     bookmark_key = Column(String)
+    updated_at = Column(DateTime)
 
 
 class BookCoverLock(Base):
@@ -4832,6 +4833,19 @@ def migrate_kobo_bookmark_created_at(engine, _session):
             raise
 
 
+def migrate_bookmark_updated_at(engine, _session):
+    """Keep old CFI timestamps unknown; future saves record their own clock."""
+    with engine.begin() as conn:
+        columns = {row[1] for row in conn.execute(text("PRAGMA table_info(bookmark)"))}
+    if not columns or "updated_at" in columns:
+        return
+    try:
+        _run_ddl_with_retry(engine, "ALTER TABLE bookmark ADD COLUMN updated_at DATETIME")
+    except exc.OperationalError as error:
+        if "duplicate column" not in str(error).lower():
+            raise
+
+
 def migrate_bookmark_format_lowercase(engine, _session):
     """Normalize legacy Bookmark formats and merge case-only duplicates.
 
@@ -4910,6 +4924,7 @@ def migrate_Database(_session):
     migrate_kobo_unique_constraints(engine, _session)
     migrate_kobo_deleted_book(engine, _session)
     migrate_kobo_bookmark_created_at(engine, _session)
+    migrate_bookmark_updated_at(engine, _session)
     migrate_bookmark_format_lowercase(engine, _session)
     # Must run before config_sql.load_configuration (it does — ub.init_db
     # precedes config load in cps/__init__.py) so the flipped value is live

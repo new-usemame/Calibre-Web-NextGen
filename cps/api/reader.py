@@ -7,6 +7,8 @@ Reads/writes the SAME ub.Bookmark row the legacy reader uses
 progress is shared between the legacy reader and the SPA reader: open a book in
 one, resume in the other. The bookmark_key is the epub.js CFI string.
 """
+from datetime import datetime, timezone
+
 from flask import g, jsonify, request
 from sqlalchemy import and_
 from sqlalchemy.orm.attributes import flag_modified
@@ -47,8 +49,9 @@ def get_bookmark(book_id):
     if guard:
         return guard
     fmt = (request.args.get("format") or "epub").lower()
-    row = ub.session.query(ub.Bookmark).filter(_bookmark_filter(book_id, fmt)).first()
-    return jsonify({"bookmark": row.bookmark_key if row else None})
+    return jsonify(reading_position.read_resume_position(
+        ub.session.get_bind(), int(current_user.id), book_id, fmt,
+    ))
 
 
 @api_v1.route("/books/<int:book_id>/bookmark", methods=["POST"])
@@ -78,7 +81,7 @@ def save_bookmark(book_id):
     # Replace-on-write: one bookmark per (user, book, format), like the legacy route.
     ub.session.query(ub.Bookmark).filter(_bookmark_filter(book_id, fmt)).delete()
     if bookmark_key:
-        ub.session.merge(ub.Bookmark(
+        row = ub.session.merge(ub.Bookmark(
             user_id=current_user.id,
             book_id=book_id,
             format=fmt,
@@ -106,6 +109,9 @@ def save_bookmark(book_id):
             except Exception as e:
                 # Position sharing must never cost the user their bookmark.
                 log.warning("Could not share web reader progress for book %s: %s", book_id, e)
+
+        # Stamp after sharing: our own mirror must never supersede this CFI.
+        row.updated_at = datetime.now(timezone.utc)
 
     # The SPA debounces one of these every 800ms; answering 204 on a rolled-back
     # write drops the position silently and tells the client not to retry.

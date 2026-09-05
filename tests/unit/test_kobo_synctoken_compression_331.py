@@ -29,6 +29,7 @@ from base64 import b64decode, b64encode
 from datetime import datetime
 
 import pytest
+from flask import Flask
 
 from cps.services.SyncToken import SyncToken, to_epoch_timestamp
 
@@ -104,24 +105,6 @@ class TestCompressedTokens:
         assert out.magic_shelf_last_id == 7
         assert out.raw_kobo_store_token == src.raw_kobo_store_token
 
-    @pytest.mark.parametrize(
-        "make_jwt", [_fake_store_jwt, _fake_store_jwt_high_entropy],
-        ids=["compressible", "high-entropy"])
-    def test_oversized_store_token_fits_4k_budget(self, make_jwt):
-        """The reporter-mirror case: a realistic ~2.4KB store JWT must leave
-        the whole header value comfortably inside nginx's 4K default once
-        cookies (~300B) + CSP (~140B) + the rest (~400B) are accounted
-        for. Budget: token value < 3000 bytes. The high-entropy variant is
-        the one that actually exercises the boundary (~2650B measured) —
-        real JWTs barely compress, so a regression that bloats the encoding
-        for incompressible input fails here first."""
-        src = SyncToken(raw_kobo_store_token=make_jwt(2400))
-        header = src.build_sync_token()
-        assert len(header) < 3000, (
-            f"compressed token is {len(header)}B — must stay under the 3000B "
-            "budget so total response headers fit nginx's 4K default"
-        )
-
     def test_compression_beats_legacy_encoding(self):
         src = SyncToken(raw_kobo_store_token=_fake_store_jwt(2400))
         compressed = src.build_sync_token()
@@ -187,3 +170,46 @@ class TestCompressedTokens:
         header = src.build_sync_token()
         raw = zlib.decompress(b64decode(header[3:]))
         assert json.loads(raw)["version"] == "1-5-0"
+
+
+def _durable_token(store_token=""):
+    """Populated durable-page cursors and a fixed token_hex(16) sample.
+
+    Keep the random nonce sample fixed so byte-budget evidence is repeatable.
+    """
+    return SyncToken(
+        raw_kobo_store_token=store_token,
+        books_last_created=datetime(2026, 8, 12, 5, 9, 48, 351127),
+        books_last_modified=datetime(2026, 9, 5, 12, 31, 42, 123456),
+        archive_last_modified=datetime(2026, 8, 30, 9, 20, 11, 654321),
+        reading_state_last_modified=datetime(2026, 9, 4, 18, 3, 21, 987654),
+        tags_last_modified=datetime(2026, 9, 1, 7, 15, 33, 456789),
+        books_last_id=12345,
+        magic_shelf_last_id=6789,
+        magic_shelf_membership_at=datetime(2026, 9, 3, 15, 41, 2, 135790),
+        delivery_epoch="01093fd64f67b61d6cb0ea795ab895ab",
+    )
+
+
+@pytest.mark.unit
+class TestCompressedTokenBudget:
+    @pytest.mark.parametrize(
+        "make_jwt", [_fake_store_jwt, _fake_store_jwt_high_entropy],
+        ids=["compressible", "high-entropy"])
+    def test_oversized_store_token_fits_4k_budget(self, make_jwt):
+        """The reporter-mirror case: a realistic ~2.4KB store JWT must leave
+        the whole header value comfortably inside nginx's 4K default once
+        cookies (~300B) + CSP (~140B) + the rest (~400B) are accounted
+        for. Budget: token value < 3000 bytes. The high-entropy variant is
+        the one that actually exercises the boundary (measured below) —
+        real JWTs barely compress, so a regression that bloats the encoding
+        for incompressible input fails here first."""
+        src = _durable_token(make_jwt(2400))
+        # Production uses Flask JSON serialization (including key ordering).
+        with Flask(__name__).app_context():
+            header = src.build_sync_token()
+        print(f"durable {make_jwt.__name__}: token_bytes={len(header)}")
+        assert len(header) < 3000, (
+            f"compressed token is {len(header)}B — must stay under the 3000B "
+            "budget so total response headers fit nginx's 4K default"
+        )

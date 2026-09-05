@@ -5117,6 +5117,10 @@ msgid "Could not open that search result."
 msgstr "Kan dat zoekresultaat niet openen."
 
 #: cps/spa_strings.py
+msgid "Could not open the synced position."
+msgstr "De gesynchroniseerde leespositie kon niet worden geopend."
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "Kan dit comic-archief niet lezen."
 
@@ -6944,6 +6948,11 @@ msgstr "De vorige bibliotheekmodus is hersteld voor {accounts} accounts."
 #: cps/spa_strings.py
 msgid "Restoring…"
 msgstr "Herstellen…"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resume at {percent} from another device"
+msgstr "Verder lezen bij {percent} vanaf een ander apparaat"
 
 #: cps/spa_strings.py
 msgid "Retry"

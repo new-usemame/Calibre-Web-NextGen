@@ -606,3 +606,31 @@
   font-size: var(--fs-sm); text-align: left; cursor: pointer;
 }
 .annNewNote:hover { background: var(--surface-2); }
+
+.resumeNotice {
+  position: absolute;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  width: max-content;
+  max-width: calc(100% - 24px);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-1);
+  color: var(--text);
+  box-shadow: 0 2px 12px #0003;
+}
+.resumeNotice button {
+  background: transparent;
+  color: inherit;
+  border: 0;
+  padding: 12px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.resumeNotice button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: -3px;
+}

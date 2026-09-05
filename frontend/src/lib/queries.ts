@@ -1,3 +1,4 @@
+import type { ReaderBookmark } from "./readerResume";
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import {
@@ -1280,9 +1281,9 @@ export function useSaveReaderSettings() {
 }
 
 export function useBookmark(bookId: string | number, format = 'epub') {
-  return useQuery<{ bookmark: string | null }>({
+  return useQuery<ReaderBookmark>({
     queryKey: ['bookmark', String(bookId), format],
-    queryFn: () => apiGet<{ bookmark: string | null }>(
+    queryFn: () => apiGet<ReaderBookmark>(
       `/api/v1/books/${bookId}/bookmark?format=${encodeURIComponent(format)}`),
     staleTime: 0,
     retry: retryUnlessUnauthorized,

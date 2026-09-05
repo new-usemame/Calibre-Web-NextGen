@@ -320,7 +320,7 @@ def set_bookmark(book_id, book_format):
                              book_id=book_id,
                              format=book_format,
                              bookmark_key=bookmark_key)
-    ub.session.merge(l_bookmark)
+    l_bookmark = ub.session.merge(l_bookmark)
 
     # #1318: settle the user's own write here, before the optional one below.
     # This flush IS the bookmark; performed inside the progress helper it landed
@@ -349,6 +349,8 @@ def set_bookmark(book_id, book_format):
         except Exception as e:
             # Position sharing must never cost the user their bookmark.
             log.warning("Could not share web reader progress for book %s: %s", book_id, e)
+
+    l_bookmark.updated_at = datetime.now(timezone.utc)
 
     # The classic reader posts on every page turn, so a client told 201 after a
     # rolled-back write simply loses the position with no reason to retry.

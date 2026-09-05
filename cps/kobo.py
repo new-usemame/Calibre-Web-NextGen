@@ -233,6 +233,33 @@ def _pending_page_reset_is_staged():
     )
 
 
+def _warn_sync_header_budget(response):
+    """Observe the HTTP/1 header block without affecting sync delivery.
+
+    Count each Latin-1 WSGI header name/value, ': ', CRLF, and the final
+    empty line. Server-added headers and the status line are not available
+    here, so this measures the application's header block only.
+    """
+    try:
+        header_bytes = 2 + sum(
+            len(name.encode("latin-1")) + len(value.encode("latin-1")) + 4
+            for name, value in response.headers
+        )
+        if header_bytes >= 4096:
+            token_bytes = len(response.headers.get(
+                SyncToken.SyncToken.SYNC_TOKEN_HEADER, "",
+            ).encode("latin-1"))
+            log.warning(
+                "Kobo Sync: response header budget exceeded: header_bytes=%d "
+                "synctoken_bytes=%d store_proxy_enabled=%s; see README Kobo "
+                "sync 'nginx buffer sizes': proxy_buffer_size 32k",
+                header_bytes, token_bytes, bool(config.config_kobo_proxy),
+            )
+    except Exception:
+        # Diagnostics (including logging failures) must never break delivery.
+        pass
+
+
 def _pending_response(page):
     """Recreate a previously committed response without touching live state."""
     try:
@@ -250,6 +277,7 @@ def _pending_response(page):
         response.headers[header_name] = header_value
     response.headers[SyncToken.SyncToken.SYNC_TOKEN_HEADER] = page.outgoing_token
     response.headers["Content-Type"] = "application/json; charset=utf-8"
+    _warn_sync_header_budget(response)
     return response
 
 
@@ -2859,6 +2887,7 @@ def generate_sync_response(sync_token, sync_results):
     # jsonify decodes the unicode string different to what kobo expects
     response = make_response(json.dumps(sync_results), extra_headers)
     response.headers["Content-Type"] = "application/json; charset=utf-8"
+    _warn_sync_header_budget(response)
     return response
 
 

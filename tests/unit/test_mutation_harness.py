@@ -1482,3 +1482,43 @@ def test_container_presentation_rejects_forged_authority(container_backend, shap
         result = SimpleNamespace(status='UNVERIFIED', authoritative=False)
     with pytest.raises(ValueError, match='invalid'):
         container_backend.present_observation(result)
+
+
+@pytest.mark.parametrize('kind', ['caught', 'survived', 'baseline_error', 'spec'])
+def test_container_cli_runs_real_sweep(tmp_path, container_backend, kind):
+    repo, seed = _committed_repo(tmp_path)
+    assertion = {'caught': 'victim.VALUE == 1', 'survived': 'victim.VALUE > 0',
+                 'baseline_error': 'False', 'spec': 'victim.VALUE == 1'}[kind]
+    (repo / 'test_probe.py').write_text(
+        "from pathlib import Path\nimport victim\n"
+        "assert not Path('previous-phase').exists()\n"
+        "Path('previous-phase').write_text('seen')\n"
+        f"def test_value(): assert {assertion}\n")
+    _git(repo, 'add', '.')
+    _git(repo, 'commit', '-qm', 'container CLI fixture')
+    seed = _git(repo, 'rev-parse', 'HEAD')
+    evidence = tmp_path / 'evidence'
+    command = [sys.executable, str(_HARNESS), '--backend', 'container', '--repo', str(repo),
+               '--seed', seed, '--evidence-dir', str(evidence), '--scratch-dir', str(tmp_path)]
+    if kind == 'spec':
+        spec = tmp_path / 'spec.json'
+        spec.write_text(json.dumps([{'file': 'victim.py', 'old': '1', 'new': str(n),
+                                    'test': 'test_probe.py'} for n in (2, 3)]))
+        command += ['--spec', str(spec)]
+    else:
+        command += ['--file', 'victim.py', '--old', '1', '--new', '2', '--test', 'test_probe.py']
+    result = subprocess.run(command, capture_output=True, text=True, timeout=60)
+    assert result.returncode == {'caught': 0, 'survived': 1, 'baseline_error': 2, 'spec': 0}[kind], result.stdout + result.stderr
+    reports = [json.loads(path.read_text()) for path in evidence.glob('*.json')]
+    assert len(reports) == (2 if kind == 'spec' else 1)
+    expected = 'ERROR' if kind == 'baseline_error' else ('SURVIVED' if kind == 'survived' else 'caught')
+    assert all(report['status'] == expected for report in reports)
+    assert all([phase['phase'] for phase in report['phases']] ==
+               (['collection', 'baseline'] if kind == 'baseline_error' else ['collection', 'baseline', 'mutant'])
+               for report in reports)
+    assert all(report['seed_sha'] == seed for report in reports)
+    assert 'UNVERIFIED' not in result.stdout
+    assert 'Traceback' not in result.stderr
+    assert (repo / 'victim.py').read_text() == 'VALUE = 1\n'
+    assert not (repo / 'previous-phase').exists()
+    print(result.stdout, end='')

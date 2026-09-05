@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 import subprocess
 import tarfile
+import tempfile
 import uuid
 
 
@@ -95,7 +96,7 @@ class ContainerSweep:
                     "--mount", f"type=bind,src={output},dst=/out"]
             for key, value in (environment or {}).items():
                 args.extend(["--env", f"{key}={value}"])
-            args.extend([self.image, *argv])
+            args.extend(["--entrypoint", argv[0], self.image, *argv[1:]])
             cid = _checked(_docker(*args)).decode().strip()
             _checked(_docker("cp", "-", cid + ":/work", input=self.archive))
             if files:
@@ -147,3 +148,68 @@ class ContainerSweep:
         if timed_out:
             self.failed = True
         return observation
+
+
+def run_sweep(args, mutants, harness):
+    """Collect, check a clean baseline, then test each replacement in fresh containers."""
+    from pytest_runtime import runtime_overlay
+
+    sweep = ContainerSweep(args.repo, args.seed, image=args.image)
+    runtime = runtime_overlay()
+    print(f"CONTAINER seed={sweep.seed_sha}", flush=True)
+    survived = False
+    with tempfile.TemporaryDirectory(prefix="mutation-container-", dir=args.scratch_dir) as scratch:
+        scratch = Path(scratch)
+        tree = scratch / "seed"
+        tree.mkdir()
+        with tarfile.open(fileobj=io.BytesIO(sweep.archive)) as archive:
+            archive.extractall(tree, filter="data")
+        for index, item in enumerate(mutants, 1):
+            trace = []
+            try:
+                plan = harness.prepare_mutation(tree, item["file"], item["old"], item["new"])
+
+                def phase(name, *, collect=False, mutated=False):
+                    output = scratch / f"{index}-{name}"
+                    output.mkdir()
+                    files = {**runtime, **({plan.relative: plan.after} if mutated else {})}
+                    command = ["python", "_phase_evidence.py", "-q", "-o", "addopts=",
+                               "-p", "no:cacheprovider", "--color=no"]
+                    if collect:
+                        command.append("--collect-only")
+                    command.extend(item["test"])
+                    result = sweep.run_phase(command, output=output, files=files, timeout=args.timeout,
+                        environment={"PYTHONPATH": "/work/_runtime:/work", "PYTHONDONTWRITEBYTECODE": "1",
+                                     "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1", "PYTEST_ADDOPTS": "",
+                                     "CWNG_MEASURED_TARGET": "", "CWNG_PYTEST_EVIDENCE": "/out/report.json"})
+                    if result.timed_out:
+                        raise harness.IsolationError(f"{name} timed out; increase --timeout or fix the test hang")
+                    report_path = output / "report.json"
+                    if not report_path.is_file():
+                        raise harness.IsolationError(
+                            f"{name} could not run pytest; use --image with Python 3.12+ and the test dependencies installed")
+                    report = json.loads(report_path.read_text())
+                    checked = harness.PhaseResult(tuple(command), result.returncode, result.stdout,
+                                                  result.stderr, False, None, ())
+                    trace.append((name, checked, report))
+                    return checked, report
+
+                collected, report = phase("collection", collect=True)
+                nodes = harness.validate_collection(tree, collected, report)
+                baseline, report = phase("baseline")
+                harness.validate_execution(baseline, report, nodes, baseline=True)
+                mutant, report = phase("mutant", mutated=True)
+                check = harness.validate_execution(mutant, report, nodes)
+                status = "caught" if check.failures else "SURVIVED"
+                detail = f"{check.executed} test(s) ran; {check.failures} failed"
+            except (harness.IsolationError, RuntimeError, OSError, ValueError) as exc:
+                status, detail = "ERROR", str(exc)
+            payload = {"backend": "container", "seed_sha": sweep.seed_sha, "status": status,
+                       "file": item["file"], "tests": item["test"], "detail": detail,
+                       "phases": harness._safe_trace(trace)}
+            evidence, _ = harness._record_evidence(args.evidence_dir, payload)
+            print(f"{status} mutation={index} file={item['file']}: {detail}; evidence={evidence.name}", flush=True)
+            if status == "ERROR":
+                return 2
+            survived |= status == "SURVIVED"
+    return 1 if survived else 0

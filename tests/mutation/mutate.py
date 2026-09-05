@@ -989,6 +989,10 @@ def main():
     ap.add_argument("--name", default="mutant")
     ap.add_argument("--repo", type=pathlib.Path, default=REPO)
     ap.add_argument("--seed", required=True, help="committed seed; resolved once before any phase")
+    ap.add_argument("--backend", choices=("macos", "container"), default="macos")
+    ap.add_argument("--image", default="python:3.12", help="local Linux image for the container backend")
+    ap.add_argument("--scratch-dir", type=pathlib.Path, default=None,
+                    help="temporary directory accessible to Docker bind mounts")
     ap.add_argument("--evidence-dir", type=pathlib.Path)
     ap.add_argument("--timeout", type=float, default=1800, help="bounded per-phase hang watchdog in seconds")
     args = ap.parse_args()
@@ -1002,6 +1006,10 @@ def main():
         # Never place durable output in the source checkout.
         if evidence.is_relative_to(repo):
             raise IsolationError("evidence directory must be outside the source checkout")
+        if args.backend == "container":
+            from container_backend import run_sweep
+            args.repo, args.evidence_dir = repo, evidence
+            return run_sweep(args, mutants, sys.modules[__name__])
         print("UNVERIFIED diagnostic backend; committed seed only; shared Git writes UNSUPPORTED", flush=True)
         print("Outside boundary: temporary directories, venv, home, common Git data, Docker, "
               "databases, network, ports, caches, services and escaped processes", flush=True)

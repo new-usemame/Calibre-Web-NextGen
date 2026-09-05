@@ -831,6 +831,13 @@ class IsolatedSweep:
                 self.root, environment=environment, artifacts=self.entry / "provenance",
                 pytest_targets=targets,
             )
+            # Collection imports in preflight are writers. Discard their state
+            # and restore the exact measured input after all probe processes end.
+            self.scrub()
+            if mutation is not None:
+                apply_mutation(self.root, mutation)
+                if _mutation_target(self.root, mutation.relative).read_bytes() != mutation.after:
+                    raise IsolationError("measured mutation bytes changed before launch")
             result = run_phase_process(
                 argv, cwd=self.root, environment=environment, timeout=timeout,
                 artifacts=self.entry / "artifacts", ownership_contract=ownership_contract,

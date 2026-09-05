@@ -338,7 +338,7 @@ def test_sweep_scrubs_after_cleanup_and_again_before_each_phase(tmp_path, monkey
             assert (sweep.root / "victim.py").read_text() == "VALUE = 1\n"
             assert not (sweep.root / "between.ignored").exists()
         assert leaders[0] != leaders[1]
-        assert events == (["scrubbed"] + ["terminated"] * 4 + ["scrubbed"]) * 2
+        assert events == (["scrubbed"] + ["terminated"] * 3 + ["scrubbed", "terminated", "scrubbed"]) * 2
 
 
 @pytest.mark.parametrize("failure", ["escape", "timeout"])
@@ -1003,3 +1003,57 @@ def test_cli_invalid_spec_never_allocates_sweep(tmp_path, monkeypatch, capsys, d
     monkeypatch.setattr(mutate.IsolatedSweep, 'create', forbidden)
     assert mutate.main() == 1
     assert 'UNVERIFIED ERROR' in capsys.readouterr().out
+
+
+def test_review_preflight_cannot_erase_measured_mutant(tmp_path):
+    repo = _soundness_repo(tmp_path)
+    (repo / 'conftest.py').write_text(
+        'import os\nfrom pathlib import Path\n'
+        'if os.environ.get("CWNG_PROVENANCE_ROOT"):\n'
+        '    Path("victim.py").write_text("VALUE = 1\\n")\n')
+    _git(repo, 'add', '.')
+    _git(repo, 'commit', '-qm', 'preflight erasure reproduction')
+    (repo / 'victim.py').write_text('VALUE = 2\n')
+    direct = subprocess.run([sys.executable, '-m', 'pytest', 'test_probe.py', '-q',
+        '-o', 'addopts=', '-p', 'no:cacheprovider', '--color=no'], cwd=repo,
+        env={**os.environ, 'PYTHONPATH': str(repo), 'PYTEST_ADDOPTS': '',
+             'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'}, capture_output=True, text=True, timeout=60)
+    _git(repo, 'restore', 'victim.py')
+    evidence = tmp_path / 'evidence'
+    cli = subprocess.run([sys.executable, str(_HARNESS), '--repo', str(repo), '--seed', 'HEAD',
+        '--evidence-dir', str(evidence), '--file', 'victim.py', '--old', 'VALUE = 1',
+        '--new', 'VALUE = 2', '--test', 'test_probe.py'], capture_output=True, text=True,
+        env={**os.environ, 'PYTEST_ADDOPTS': '', 'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'}, timeout=120)
+    payload = json.loads(next(evidence.glob('*.json')).read_text())
+    codes = [p['returncode'] for p in payload['phases']]
+    print(f'REVIEW1 DIRECT_EXIT={direct.returncode} HARNESS_EXIT={cli.returncode} SIGNAL={payload["signal"]} PHASE_RETURNCODES={codes} (Mac/APFS only)')
+    assert direct.returncode == 1
+    assert payload['signal'] == 'TEST_FAILURE' and codes == [0, 0, 1], cli.stdout
+
+
+@pytest.mark.parametrize('fault', ['scrub', 'verification'])
+def test_review_post_preflight_boundary_rejects_contamination(tmp_path, monkeypatch, fault):
+    repo, seed = _committed_repo(tmp_path)
+    with mutate.IsolatedSweep.create(repo, seed, state_root=tmp_path / 'state') as sweep:
+        plan = mutate.prepare_mutation(sweep.root, 'victim.py', '1', '2')
+        def poison(*a, **k):
+            if fault == 'scrub': (sweep.root / 'collateral.py').write_text('poison')
+        monkeypatch.setattr(mutate, 'provenance_preflight', poison)
+        if fault == 'verification':
+            original = mutate.apply_mutation
+            def bad_apply(root, plan):
+                original(root, plan)
+                (root / plan.relative).write_bytes(plan.before)
+            monkeypatch.setattr(mutate, 'apply_mutation', bad_apply)
+        def measured(*a, **k):
+            assert (sweep.root / 'collateral.py').read_text() == 'ORIGINAL\n'
+            assert (sweep.root / 'victim.py').read_bytes() == plan.after
+            return mutate.PhaseResult((), 0, '', '', False, None, ())
+        monkeypatch.setattr(mutate, 'run_phase_process', measured)
+        if fault == 'verification':
+            with pytest.raises(mutate.IsolationError, match='measured'):
+                sweep.run_phase(['unused'], environment={}, timeout=60,
+                    ownership_contract='inherited-token', mutation=plan)
+        else:
+            sweep.run_phase(['unused'], environment={}, timeout=60,
+                ownership_contract='inherited-token', mutation=plan)

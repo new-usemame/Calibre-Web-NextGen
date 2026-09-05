@@ -44,7 +44,9 @@ resolved once to a commit for the whole sweep. Local uncommitted changes are
 neither included nor reset. There is no --allow-dirty mode.
 Each specification item has file, old, new, and test (one target or a list).
 v1 accepts repository-relative test paths/node IDs, not arbitrary pytest flags.
-An ERROR stops the sweep. Diagnostics always exit 1, including passing selections.
+An ERROR stops the sweep. Completed diagnostics and handled infrastructure errors
+exit 1, including passing selections. Argument parsing errors exit 2; unexpected
+exceptions and interruption also remain nonzero, without a guaranteed exit code.
 
 --timeout defaults to 1800 seconds per execution phase. Provenance has its own
 bounded watchdog. --evidence-dir must be outside the source checkout; by default

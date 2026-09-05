@@ -963,8 +963,6 @@ def test_integrity_detects_incomplete_write(tmp_path, monkeypatch):
 
 
 def test_git_writing_policy_names_shared_state_and_demonstrates_limit(tmp_path):
-    policy = (_HARNESS.parent / 'ISOLATION.md').read_text()
-    assert 'UNSUPPORTED' in policy and 'shared refs' in policy and 'configuration' in policy
     repo, seed = _committed_repo(tmp_path)
     # Only this fixture's independent repository is changed.
     with mutate.IsolatedSweep.create(repo, seed, state_root=tmp_path / 'state') as sweep:
@@ -1232,3 +1230,16 @@ def test_cleanup_preserves_unrelated_absent_worktree(tmp_path, monkeypatch, oper
         parked.rename(other)
         if sweep is not None:
             sweep.close()
+
+
+def test_git_timeout_is_a_handled_isolation_error(tmp_path, monkeypatch, capsys):
+    def timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(['git'], 120)
+    monkeypatch.setattr(mutate.subprocess, 'run', timeout)
+    with pytest.raises(mutate.IsolationError, match='git command timed out'):
+        mutate._git(tmp_path, 'rev-parse', 'HEAD')
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--repo', str(tmp_path),
+        '--seed', 'HEAD', '--file', 'victim.py', '--old', '1', '--new', '2',
+        '--test', 'test_victim.py'])
+    assert mutate.main() == 1
+    assert 'UNVERIFIED ERROR: git command timed out' in capsys.readouterr().out

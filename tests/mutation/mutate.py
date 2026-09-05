@@ -649,12 +649,15 @@ def _run_pytest(sweep, targets, environment, timeout, *, collect_only=False, mut
 
 
 def _git(repo: pathlib.Path, *args: str) -> str:
-    proc = subprocess.run(
-        ["git", "-C", str(repo), *args],
-        capture_output=True,
-        text=True,
-        timeout=120,
-    )
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(repo), *args],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise IsolationError("git command timed out") from exc
     if proc.returncode:
         detail = proc.stderr.strip() or proc.stdout.strip() or f"exit {proc.returncode}"
         raise IsolationError(f"git {' '.join(args)} failed: {detail}")

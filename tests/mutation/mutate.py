@@ -1,34 +1,18 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Run mutation diagnostics and emit UNVERIFIED observations.
+"""Run committed-state mutation diagnostics in a disposable detached worktree.
 
-Mutation testing by hand is the most error-prone thing in this repo's workflow,
-and every one of its failure modes reports as a PASS. Measured on 2026-08-29,
-in a single session, doing it with `cp` and `sed`:
-
-* An anchor that no longer matched left the mutant UNAPPLIED. pytest printed a
-  green summary, which is indistinguishable from "the test caught nothing".
-* `cp cps/admin.py /tmp/$(basename …)` and `cp cps/api/admin.py /tmp/$(basename …)`
-  both wrote `/tmp/admin.py`. The restore then put a 476-line SPA module on top
-  of a 3,788-line one, and the tree only failed at import.
-* A restore was assumed rather than checked; a `git checkout --` on a file whose
-  fix was uncommitted silently discarded it.
-
-So this tool refuses to report a result it cannot stand behind:
-
-    anchor must match exactly once   -> otherwise ERROR, never a verdict
-    backups are path-derived         -> cps/admin.py and cps/api/admin.py differ
-    restore is hash-verified         -> and failure is loud
-    diagnostic observations exit 1  -> they cannot satisfy an authoritative gate
+Every collection, baseline and mutant phase uses provenance preflight and scrub.
+macOS results are UNVERIFIED and exit nonzero. Shared Git writes are UNSUPPORTED.
+See tests/mutation/ISOLATION.md for the execution boundary and legacy recovery.
 
 Usage:
-    mutate.py --file F --old STR --new STR --test TARGET [--test TARGET ...]
-    mutate.py --spec mutants.json          # [{name, file, old, new, test}, ...]
+    mutate.py --seed COMMIT --file F --old STR --new STR --test TARGET
+    mutate.py --seed COMMIT --spec mutants.json
 """
 from __future__ import annotations
 
 import argparse
-from collections.abc import Mapping
 from dataclasses import dataclass, field
 import fcntl
 import hashlib
@@ -65,31 +49,6 @@ class PhaseResult:
     escaped_pids: tuple[int, ...]
     status: str = field(default="UNVERIFIED", init=False)
     authoritative: bool = field(default=False, init=False)
-
-
-@dataclass(frozen=True, slots=True)
-class DiagnosticObservation(Mapping):
-    """An immutable observation; no constructor or replacement can grant authority.
-
-    Mutants are abnormal input: conversion can erase the token while its wrapper
-    starts a new session. Only a future strong backend may supply verdicts.
-    """
-    name: str
-    returncode: int | None
-    summary: str
-    status: str = field(default="UNVERIFIED", init=False)
-    authoritative: bool = field(default=False, init=False)
-
-    def __iter__(self):
-        return iter(("name", "returncode", "summary", "status", "authoritative"))
-
-    def __len__(self):
-        return 5
-
-    def __getitem__(self, key):
-        if key not in tuple(self):
-            raise KeyError(key)
-        return getattr(self, key)
 
 
 @dataclass(frozen=True, slots=True)
@@ -921,48 +880,6 @@ def _digest(path: pathlib.Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _backup_name(rel: str) -> str:
-    """Path-derived, so same-named modules in different packages never collide."""
-    return "mut_" + rel.replace("/", "_").replace("\\", "_")
-
-
-def run_mutant(name, rel_file, old, new, tests, quiet=False):
-    target = REPO / rel_file
-    if not target.is_file():
-        return {"name": name, "status": "ERROR", "detail": f"no such file: {rel_file}"}
-
-    source = target.read_text()
-    hits = source.count(old)
-    if hits != 1:
-        # The failure that looks exactly like success. Never return a verdict.
-        return {"name": name, "status": "ERROR",
-                "detail": f"anchor matched {hits} times, expected exactly 1 — mutant NOT applied"}
-
-    before = _digest(target)
-    backup = pathlib.Path(tempfile.gettempdir()) / _backup_name(rel_file)
-    shutil.copy2(target, backup)
-
-    try:
-        target.write_text(source.replace(old, new, 1))
-        if _digest(target) == before:
-            return {"name": name, "status": "ERROR", "detail": "file unchanged after write"}
-        proc = subprocess.run(
-            [sys.executable, "-m", "pytest", *tests, "-q", "-p", "no:randomly"],
-            cwd=REPO, capture_output=True, text=True, timeout=1800)
-        tail = [ln for ln in proc.stdout.strip().splitlines() if " passed" in ln or " failed" in ln]
-        summary = tail[-1] if tail else "(no pytest summary)"
-    finally:
-        shutil.copy2(backup, target)
-        backup.unlink(missing_ok=True)
-
-    restored = _digest(target)
-    if restored != before:
-        return {"name": name, "status": "ERROR",
-                "detail": "RESTORE FAILED — working tree is dirty, fix before continuing"}
-
-    return DiagnosticObservation(name=name, returncode=proc.returncode, summary=summary)
-
-
 def legacy_journal(repo: pathlib.Path) -> pathlib.Path:
     # Match the retired P0.4a state-directory identity without creating it.
     key = hashlib.sha256(os.fsencode(repo.resolve())).hexdigest()[:20]
@@ -981,6 +898,34 @@ def refuse_legacy_journal(repo: pathlib.Path) -> None:
         )
 
 
+def _cli_mutants(args):
+    if args.spec:
+        if args.file or args.old is not None or args.new is not None or args.test:
+            raise IsolationError("--spec cannot be combined with inline mutation arguments")
+        mutants = json.loads(pathlib.Path(args.spec).read_text())
+    else:
+        mutants = [{"name": args.name, "file": args.file, "old": args.old,
+                    "new": args.new, "test": args.test}]
+    if not isinstance(mutants, list) or not mutants:
+        raise IsolationError("specification must contain at least one mutation")
+    for item in mutants:
+        if (not isinstance(item, dict) or
+                not all(isinstance(item.get(key), str) for key in ("file", "old", "new"))):
+            raise IsolationError("each mutation requires file, old and new strings")
+        tests = item.get("test")
+        if isinstance(tests, str):
+            tests = [tests]
+        if not isinstance(tests, list) or not tests or not all(isinstance(t, str) and t for t in tests):
+            raise IsolationError("each mutation requires test targets")
+        # v1 accepts committed, repository-relative node/file selections only.
+        for value in [item["file"], *[t.split("::", 1)[0] for t in tests]]:
+            path = pathlib.PurePosixPath(value)
+            if not value or value.startswith("-") or path.is_absolute() or ".." in path.parts:
+                raise IsolationError("mutation files and test targets must be repository-relative paths")
+        item["test"] = tests
+    return mutants
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -988,35 +933,40 @@ def main():
     ap.add_argument("--test", action="append", default=[])
     ap.add_argument("--spec")
     ap.add_argument("--name", default="mutant")
+    ap.add_argument("--repo", type=pathlib.Path, default=REPO)
+    ap.add_argument("--seed", required=True, help="committed seed; resolved once before any phase")
+    ap.add_argument("--evidence-dir", type=pathlib.Path)
+    ap.add_argument("--timeout", type=float, default=1800, help="bounded per-phase hang watchdog in seconds")
     args = ap.parse_args()
     try:
-        refuse_legacy_journal(REPO)
-    except IsolationError as exc:
-        print(f"UNVERIFIED ERROR: {exc}")
+        repo = args.repo.resolve(strict=True)
+        refuse_legacy_journal(repo)
+        if not 0 < args.timeout < float("inf"):
+            raise IsolationError("timeout must be positive and finite")
+        mutants = _cli_mutants(args)
+        evidence = (args.evidence_dir or (_isolation_root(repo) / "evidence")).resolve()
+        # Never place durable output in the source checkout.
+        if evidence.is_relative_to(repo):
+            raise IsolationError("evidence directory must be outside the source checkout")
+        print("UNVERIFIED diagnostic backend; committed seed only; shared Git writes UNSUPPORTED", flush=True)
+        print("Outside boundary: temporary directories, venv, home, common Git data, Docker, "
+              "databases, network, ports, caches, services and escaped processes", flush=True)
+        with IsolatedSweep.create(repo, args.seed) as sweep:
+            print(f"UNVERIFIED seed={sweep.seed_sha}", flush=True)
+            for index, item in enumerate(mutants, 1):
+                result = run_checked_mutation(
+                    sweep, item["file"], item["old"], item["new"], item["test"],
+                    environment=os.environ.copy(), timeout=args.timeout, evidence_dir=evidence,
+                )
+                present_checked_result(result)
+                print(f"UNVERIFIED observation={index} evidence={result.evidence.name}", flush=True)
+                if result.signal == "ERROR":
+                    break
         return 1
-
-    if args.spec:
-        mutants = json.loads(pathlib.Path(args.spec).read_text())
-    else:
-        if not (args.file and args.old is not None and args.new is not None and args.test):
-            ap.error("need --file, --old, --new and at least one --test (or --spec)")
-        mutants = [{"name": args.name, "file": args.file, "old": args.old,
-                    "new": args.new, "test": args.test}]
-
-    results = []
-    for m in mutants:
-        tests = m["test"] if isinstance(m["test"], list) else [m["test"]]
-        r = run_mutant(m.get("name", m["file"]), m["file"], m["old"], m["new"], tests)
-        results.append(r)
-        # This harness has no strong backend. Even stale caller-supplied labels
-        # cannot promote an observation at the terminal boundary.
-        mark = "ERROR" if r["status"] == "ERROR" else "UNVERIFIED"
-        print(f"  {mark}  {r['name']}  {r.get('summary', r.get('detail',''))}", flush=True)
-
-    errored = sum(r["status"] == "ERROR" for r in results)
-    print(f"\n{len(results)} observation(s): {len(results)-errored} UNVERIFIED, {errored} error")
-    print("UNVERIFIED: no strong containment backend; diagnostic observations are not verdicts")
-    return 1
+    except (IsolationError, OSError, ValueError) as exc:
+        detail = str(exc) if isinstance(exc, IsolationError) else type(exc).__name__
+        print(f"UNVERIFIED ERROR: {detail}", flush=True)
+        return 1
 
 
 if __name__ == "__main__":

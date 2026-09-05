@@ -1,0 +1,42 @@
+Full unit suite — Mac/APFS only; retries 0; no maxfail.
+Command: "$ROOT/repo/.venv/bin/python" -m pytest tests/unit/test_mutation_harness.py -q -s -o addopts= -p no:rerunfailures -p no:flaky --tb=short
+PYTEST_ADDOPTS empty. Safe output excerpts:
+....ORACLE boundary=isolated-diagnostic channel=ignored clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+.ORACLE boundary=isolated-diagnostic channel=tracked clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+.ORACLE boundary=isolated-diagnostic channel=collateral clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+.ORACLE boundary=isolated-diagnostic channel=index clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+.ORACLE boundary=isolated-diagnostic channel=head clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+.ORACLE boundary=isolated-diagnostic channel=bytecode clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+.ORACLE boundary=isolated-diagnostic channel=child clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+......PROVENANCE shape=pytest path=cps/__init__.py ACCEPTED (Mac/APFS only)
+PROVENANCE shape=child path=cps/__init__.py ACCEPTED (Mac/APFS only)
+PROVENANCE shape=console path=cps/__init__.py ACCEPTED (Mac/APFS only)
+PROVENANCE installed-checkout negative control: provenance REJECTED: child resolved outside disposable root (Mac/APFS only)
+.PROVENANCE negative shape=pytest: provenance REJECTED: pytest resolved outside disposable root (Mac/APFS only)
+.PROVENANCE negative shape=child: provenance REJECTED: child resolved outside disposable root (Mac/APFS only)
+.PROVENANCE negative shape=console: provenance REJECTED: console resolved outside disposable root (Mac/APFS only)
+.......UNVERIFIED diagnostic backend; committed seed only; shared Git writes UNSUPPORTED
+Outside boundary: temporary directories, venv, home, common Git data, Docker, databases, network, ports, caches, services and escaped processes
+UNVERIFIED seed=<pinned-seed>
+UNVERIFIED TESTS_PASSED: execution checks passed; authority remains unverified
+UNVERIFIED observation=1 evidence=a48e1fcdb06b4e01ae24027b7835687b.json
+CLI isolated phases=3 observed_exit=0 terminal_exit=1 source-preserved (Mac/APFS only)
+.UNVERIFIED diagnostic backend; committed seed only; shared Git writes UNSUPPORTED
+Outside boundary: temporary directories, venv, home, common Git data, Docker, databases, network, ports, caches, services and escaped processes
+UNVERIFIED seed=<pinned-seed>
+UNVERIFIED TEST_FAILURE: execution checks passed; authority remains unverified
+UNVERIFIED observation=1 evidence=801c6c80155747f8821da4c0c1ed4d23.json
+CLI isolated phases=3 observed_exit=1 terminal_exit=1 source-preserved (Mac/APFS only)
+.......................ACCOUNTING real pytest: 2/3 tests collected; selected=2 ACCEPTED (Mac/APFS only)
+.....................SOUNDNESS clean baseline=0 mutant=1 actual_failures=1 UNVERIFIED (Mac/APFS only)
+.......SOUNDNESS real xfail_notrun: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real xfail_run: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real setup_error: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real timeout: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real noop: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real pass: TESTS_PASSED UNVERIFIED durable (Mac/APFS only)
+...POLICY shared refs/common config survive scrub: UNSUPPORTED (Mac/APFS only)
+....CLI spec: UNVERIFIED exit=1 evidence-count=2 (Mac/APFS only)
+.CLI provenance_reject: UNVERIFIED exit=1 evidence-count=1 (Mac/APFS only)
+106 passed in 116.51s (0:01:56)
+exit=0

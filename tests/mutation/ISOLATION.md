@@ -31,3 +31,27 @@ journal outside the active location. Do not simply delete an unresolved journal.
 The new CLI has no --clear-journal command and creates no recovery journal.
 A different TMPDIR can hide old temporary state: use the original temporary
 directory when checking for a previous run.
+
+## Command line
+
+Use the pinned absolute venv interpreter to run tests/mutation/mutate.py:
+
+    mutate.py --seed COMMIT --file relative/file.py --old OLD --new NEW --test tests/test_file.py
+    mutate.py --seed COMMIT --spec mutants.json --evidence-dir /chosen/external/directory
+
+--repo defaults to the checkout containing the harness. --seed is required and
+resolved once to a commit for the whole sweep. Local uncommitted changes are
+neither included nor reset. There is no --allow-dirty mode.
+Each specification item has file, old, new, and test (one target or a list).
+v1 accepts repository-relative test paths/node IDs, not arbitrary pytest flags.
+An ERROR stops the sweep. Diagnostics always exit 1, including passing selections.
+
+--timeout defaults to 1800 seconds per execution phase. Provenance has its own
+bounded watchdog. --evidence-dir must be outside the source checkout; by default
+it is in the temporary cwng-mutation-isolated/<repository-key>/evidence directory,
+where this key is the first 16 hex digits of SHA-256 over the canonical path's
+UTF-8 encoding. Each output names its durable evidence file. Temporary storage
+retention is outside this boundary; choose persistent external storage when needed.
+
+The direct-mutation API, backup/restore path and old observation type are removed.
+All CLI execution goes through IsolatedSweep and run_checked_mutation.

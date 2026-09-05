@@ -443,62 +443,36 @@ def test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one(tmp_
         assert mutant.returncode == clean.returncode, f"CONTAMINATING: {channel} changed the verdict"
 
 
-def test_backup_names_are_path_derived_not_basename():
-    """cps/admin.py and cps/api/admin.py must not share a backup file."""
-    a = mutate._backup_name("cps/admin.py")
-    b = mutate._backup_name("cps/api/admin.py")
-    assert a != b, (
-        "same-basename modules collide, so restoring one writes the other's "
-        "contents over it — this clobbered a 3,788-line module once already"
-    )
+def test_old_direct_mutation_route_is_removed():
+    assert not hasattr(mutate, 'run_mutant')
+    assert not hasattr(mutate, '_backup_name')
+    assert not hasattr(mutate, 'DiagnosticObservation')
 
 
-def test_a_stale_anchor_is_an_error_never_a_verdict(tmp_path, monkeypatch):
-    victim = tmp_path / "cps" / "thing.py"
-    victim.parent.mkdir(parents=True)
-    victim.write_text("value = 1\n")
-    monkeypatch.setattr(mutate, "REPO", tmp_path)
-
-    result = mutate.run_mutant("stale", "cps/thing.py", "NOT PRESENT", "x", ["ignored"])
-
-    assert result["status"] == "ERROR", (
-        "an unapplied mutant must never be reported as caught or survived — "
-        "a green pytest summary is indistinguishable from a missed defect"
-    )
-    assert "NOT applied" in result["detail"]
-    assert victim.read_text() == "value = 1\n", "the file was touched despite the error"
+@pytest.mark.parametrize('old,body', [('NOT PRESENT', 'VALUE = 1\n'), ('1', 'VALUE = 1 + 1\n')])
+def test_isolated_invalid_anchor_preserves_source(tmp_path, old, body):
+    repo, seed = _committed_repo(tmp_path)
+    (repo / 'victim.py').write_text(body)
+    _git(repo, 'add', '.')
+    _git(repo, 'commit', '--allow-empty', '-qm', 'anchor fixture')
+    with mutate.IsolatedSweep.create(repo, 'HEAD', state_root=tmp_path / 'state') as sweep:
+        result = mutate.run_checked_mutation(sweep, 'victim.py', old, '2', ['unused'],
+            environment=os.environ.copy(), timeout=60, evidence_dir=tmp_path / 'evidence')
+        assert result.signal == 'ERROR' and 'exactly once' in result.detail
+        assert (repo / 'victim.py').read_text() == body
+        assert json.loads(result.evidence.read_text())['phases'] == []
 
 
-def test_an_ambiguous_anchor_is_also_an_error(tmp_path, monkeypatch):
-    victim = tmp_path / "cps" / "thing.py"
-    victim.parent.mkdir(parents=True)
-    victim.write_text("x = 1\nx = 1\n")
-    monkeypatch.setattr(mutate, "REPO", tmp_path)
-
-    result = mutate.run_mutant("ambiguous", "cps/thing.py", "x = 1", "x = 2", ["ignored"])
-
-    assert result["status"] == "ERROR" and "matched 2 times" in result["detail"], (
-        "replacing the first of several identical anchors mutates a line the "
-        "author did not choose"
-    )
-
-
-def test_a_surviving_mutant_is_reported_and_the_file_is_restored(tmp_path, monkeypatch):
-    victim = tmp_path / "cps" / "thing.py"
-    victim.parent.mkdir(parents=True)
-    original = "GUARD = True\n"
-    victim.write_text(original)
-    monkeypatch.setattr(mutate, "REPO", tmp_path)
-    # A suite that passes no matter what the code says: the mutant survives.
-    monkeypatch.setattr(mutate.subprocess, "run",
-                        lambda *a, **k: type("P", (), {"returncode": 0, "stdout": "1 passed"})())
-
-    result = mutate.run_mutant("survivor", "cps/thing.py", "GUARD = True",
-                               "GUARD = False", ["ignored"])
-
-    assert result["status"] == "UNVERIFIED", "a diagnostic observation must not become a verdict"
-    assert result["returncode"] == 0
-    assert victim.read_text() == original, "the harness left the mutation in the working tree"
+def test_isolated_passing_mutant_preserves_dirty_source(tmp_path):
+    repo = _soundness_repo(tmp_path, body='def test_value(): assert True\n')
+    (repo / 'victim.py').write_text('LOCAL = 99\n')
+    with mutate.IsolatedSweep.create(repo, 'HEAD', state_root=tmp_path / 'state') as sweep:
+        result = mutate.run_checked_mutation(sweep, 'victim.py', '1', '2', ['test_probe.py'],
+            environment={**os.environ, 'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'},
+            timeout=60, evidence_dir=tmp_path / 'evidence')
+        assert result.signal == 'TESTS_PASSED', result.detail
+        assert result.status == 'UNVERIFIED' and result.exit_code == 1
+    assert (repo / 'victim.py').read_text() == 'LOCAL = 99\n'
 
 
 def test_provenance_environment_pins_root_without_mutating_input(tmp_path):
@@ -569,19 +543,12 @@ def test_provenance_rejection_prevents_phase_execution(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize('returncode', [0, 1])
-def test_diagnostic_labelling_cannot_be_bypassed(tmp_path, monkeypatch, returncode):
+def test_diagnostic_labelling_cannot_be_bypassed(tmp_path, returncode):
     import dataclasses
-    victim = tmp_path / 'victim.py'
-    victim.write_text('VALUE = 1\n')
-    monkeypatch.setattr(mutate, 'REPO', tmp_path)
-    monkeypatch.setattr(mutate.subprocess, 'run', lambda *a, **k: subprocess.CompletedProcess(
-        a[0], returncode, stdout='1 passed' if returncode == 0 else '1 failed', stderr=''))
-    result = mutate.run_mutant('diagnostic', 'victim.py', 'VALUE = 1', 'VALUE = 2', ['unused'])
-    assert result['status'] == 'UNVERIFIED', 'weak backend emitted an authoritative verdict'
-    assert result['authoritative'] is False
-    assert result['returncode'] == returncode
-    with pytest.raises((TypeError, AttributeError)):
-        result['status'] = 'caught'
+    signal = 'TESTS_PASSED' if returncode == 0 else 'TEST_FAILURE'
+    result = mutate.CheckedResult(signal, 'diagnostic', tmp_path / 'evidence', 'digest')
+    assert result.status == 'UNVERIFIED' and result.authoritative is False
+    assert result.exit_code == 1
     with pytest.raises((TypeError, ValueError)):
         dataclasses.replace(result, status='SURVIVED')
     with pytest.raises((TypeError, AttributeError)):
@@ -589,9 +556,7 @@ def test_diagnostic_labelling_cannot_be_bypassed(tmp_path, monkeypatch, returnco
     assert dataclasses.asdict(result)['status'] == 'UNVERIFIED'
     assert not hasattr(result, '__dict__')
     with pytest.raises(TypeError):
-        mutate.DiagnosticObservation('forged', 0, 'observation', status='caught')
-    assert victim.read_text() == 'VALUE = 1\n'
-    print(f'LABEL observation exit={returncode} UNVERIFIED immutable (Mac/APFS only)')
+        mutate.CheckedResult(signal, 'diagnostic', tmp_path / 'evidence', 'digest', status='caught')
 
 
 def test_phase_result_cannot_gain_authority(tmp_path):
@@ -608,39 +573,51 @@ def test_phase_result_cannot_gain_authority(tmp_path):
 
 
 @pytest.mark.parametrize('legacy_label', ['caught', 'SURVIVED'])
-def test_terminal_cannot_promote_diagnostic_results(monkeypatch, capsys, legacy_label):
-    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--file', 'unused', '--old', 'a', '--new', 'b', '--test', 'unused'])
-    monkeypatch.setattr(mutate, 'run_mutant', lambda *a, **k: {
-        'name': 'diagnostic', 'status': legacy_label, 'summary': 'observation only',
-    })
-    code = mutate.main()
-    output = capsys.readouterr().out
-    assert code != 0, 'diagnostic output must not satisfy an authoritative gate'
-    assert 'UNVERIFIED' in output
-    assert 'caught' not in output and 'SURVIVED' not in output
+def test_terminal_cannot_promote_diagnostic_results(tmp_path, capsys, legacy_label):
+    result = mutate.CheckedResult(legacy_label, 'diagnostic', tmp_path / 'unused', 'digest')
+    with pytest.raises(mutate.IsolationError, match='unsupported diagnostic signal'):
+        mutate.present_checked_result(result)
+    assert capsys.readouterr().out == ''
 
 
 @pytest.mark.parametrize('observed_exit', [0, 1])
 def test_real_cli_observations_never_satisfy_authoritative_gate(tmp_path, observed_exit):
-    harness = tmp_path / 'tests' / 'mutation' / 'mutate.py'
-    harness.parent.mkdir(parents=True)
-    harness.write_bytes(_HARNESS.read_bytes())
-    victim = tmp_path / 'victim.py'
-    victim.write_text('VALUE = 1\n')
-    (tmp_path / 'test_result.py').write_text(
-        'from victim import VALUE\ndef test_value(): assert VALUE == ' + ('2' if observed_exit == 0 else '1') + '\n')
+    body = """from pathlib import Path
+import cps
+from victim import VALUE
+def test_value():
+    assert Path(cps.__file__).resolve().parent == Path.cwd() / 'cps'
+    assert Path('collateral.py').read_text() == 'ORIGINAL\\n'
+    assert not Path('phase.ignored').exists()
+    Path('collateral.py').write_text('phase dirt')
+    Path('phase.ignored').touch()
+    assert """ + ('VALUE in (1, 2)' if observed_exit == 0 else 'VALUE == 1') + '\n'
+    repo = _soundness_repo(tmp_path, body=body)
+    seed = _git(repo, 'rev-parse', 'HEAD')
+    # Committed state only: this local change must neither be graded nor reset.
+    (repo / 'victim.py').write_text('LOCAL = 99\n')
+    before = _git(repo, 'status', '--porcelain')
+    evidence = tmp_path / 'evidence'
     result = subprocess.run(
-        [sys.executable, str(harness), '--file', 'victim.py', '--old', 'VALUE = 1',
-         '--new', 'VALUE = 2', '--test', 'test_result.py'],
-        cwd=tmp_path, capture_output=True, text=True, timeout=30,
+        [sys.executable, str(_HARNESS), '--repo', str(repo), '--seed', seed,
+         '--evidence-dir', str(evidence), '--file', 'victim.py', '--old', 'VALUE = 1',
+         '--new', 'VALUE = 2', '--test', 'test_probe.py'],
+        cwd=repo, capture_output=True, text=True, timeout=120,
         env={**os.environ, 'PYTEST_ADDOPTS': '', 'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'},
     )
     assert result.returncode == 1, result.stderr
-    assert '1 passed' in result.stdout if observed_exit == 0 else '1 failed' in result.stdout
-    assert 'UNVERIFIED' in result.stdout
+    assert 'UNVERIFIED ' + ('TESTS_PASSED' if observed_exit == 0 else 'TEST_FAILURE') in result.stdout, result.stdout
     assert 'caught' not in result.stdout and 'SURVIVED' not in result.stdout
-    assert victim.read_text() == 'VALUE = 1\n'
-    print(f'LABEL real-cli observed_exit={observed_exit} terminal_exit=1 UNVERIFIED (Mac/APFS only)')
+    payloads = list(evidence.glob('*.json'))
+    assert len(payloads) == 1
+    payload = json.loads(payloads[0].read_text())
+    assert [p['returncode'] for p in payload['phases']] == [0, 0, observed_exit]
+    assert payload['status'] == 'UNVERIFIED'
+    assert (repo / 'victim.py').read_text() == 'LOCAL = 99\n'
+    assert _git(repo, 'status', '--porcelain') == before
+    assert len(_git(repo, 'worktree', 'list', '--porcelain').split('worktree ')) == 2
+    print(result.stdout.replace(seed, '<pinned-seed>'), end='')
+    print(f'CLI isolated phases=3 observed_exit={observed_exit} terminal_exit=1 source-preserved (Mac/APFS only)')
 
 
 @pytest.mark.parametrize('source,old,new', [
@@ -963,10 +940,11 @@ def test_git_writing_policy_names_shared_state_and_demonstrates_limit(tmp_path):
 def test_cli_refuses_legacy_journal_without_changing_it(tmp_path, monkeypatch, capsys, content):
     monkeypatch.setattr(mutate, 'REPO', tmp_path / 'source')
     monkeypatch.setattr(mutate.tempfile, 'gettempdir', lambda: str(tmp_path))
+    mutate.REPO.mkdir()
     journal = mutate.legacy_journal(mutate.REPO)
     journal.parent.mkdir(parents=True)
     journal.write_text(content)
-    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--file', 'unused', '--old', 'a',
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--seed', 'HEAD', '--file', 'unused', '--old', 'a',
                                       '--new', 'b', '--test', 'unused'])
     assert mutate.main() == 1
     output = capsys.readouterr().out
@@ -975,7 +953,53 @@ def test_cli_refuses_legacy_journal_without_changing_it(tmp_path, monkeypatch, c
 
 
 def test_cli_has_no_clear_journal_option(monkeypatch):
-    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--clear-journal'])
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--seed', 'HEAD', '--clear-journal'])
     with pytest.raises(SystemExit) as exc:
         mutate.main()
     assert exc.value.code == 2
+
+
+@pytest.mark.parametrize('mode', ['spec', 'provenance_reject'])
+def test_cli_spec_and_provenance_rejection_are_live(tmp_path, mode):
+    repo = _soundness_repo(tmp_path, body='def test_value(): assert True\n')
+    if mode == 'provenance_reject':
+        (repo / 'conftest.py').write_text("import cps\nfrom pathlib import Path\ncps.__file__ = str(Path(__file__).resolve().parents[1] / 'metadata.json')\n")
+        _git(repo, 'add', '.')
+        _git(repo, 'commit', '-qm', 'outside provenance fixture')
+    spec = tmp_path / 'spec.json'
+    spec.write_text(json.dumps([
+        {'file': 'victim.py', 'old': '1', 'new': str(value), 'test': ['test_probe.py']}
+        for value in (2, 3)]))
+    evidence = tmp_path / 'evidence'
+    result = subprocess.run([sys.executable, str(_HARNESS), '--repo', str(repo),
+        '--seed', 'HEAD', '--spec', str(spec), '--evidence-dir', str(evidence)],
+        capture_output=True, text=True, timeout=120,
+        env={**os.environ, 'PYTEST_ADDOPTS': '', 'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'})
+    assert result.returncode == 1
+    payloads = [json.loads(p.read_text()) for p in evidence.glob('*.json')]
+    if mode == 'spec':
+        assert len(payloads) == 2
+        assert all(p['signal'] == 'TESTS_PASSED' and len(p['phases']) == 3 for p in payloads)
+        assert len({p['seed_sha'] for p in payloads}) == 1
+    else:
+        assert len(payloads) == 1
+        assert payloads[0]['signal'] == 'ERROR'
+        assert 'provenance REJECTED: pytest resolved outside disposable root' in result.stdout
+        assert payloads[0]['phases'] == []
+    assert (repo / 'victim.py').read_text() == 'VALUE = 1\n'
+    print(f'CLI {mode}: UNVERIFIED exit=1 evidence-count={len(payloads)} (Mac/APFS only)')
+
+
+@pytest.mark.parametrize('defect', ['empty', 'malformed', 'traversal', 'option'])
+def test_cli_invalid_spec_never_allocates_sweep(tmp_path, monkeypatch, capsys, defect):
+    repo, _ = _committed_repo(tmp_path)
+    spec = tmp_path / 'spec.json'
+    item = {'file': 'victim.py', 'old': '1', 'new': '2', 'test': ['test_probe.py']}
+    if defect == 'traversal': item['file'] = '../victim.py'
+    if defect == 'option': item['test'] = ['--pyargs']
+    spec.write_text('not json' if defect == 'malformed' else json.dumps([] if defect == 'empty' else [item]))
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--repo', str(repo), '--seed', 'HEAD', '--spec', str(spec)])
+    def forbidden(*a, **k): pytest.fail('invalid specification allocated a sweep')
+    monkeypatch.setattr(mutate.IsolatedSweep, 'create', forbidden)
+    assert mutate.main() == 1
+    assert 'UNVERIFIED ERROR' in capsys.readouterr().out

@@ -943,3 +943,17 @@ def test_integrity_detects_incomplete_write(tmp_path, monkeypatch):
     monkeypatch.setattr(pathlib.Path, 'write_bytes', truncated)
     with pytest.raises(mutate.IsolationError, match='requested bytes'):
         mutate.apply_mutation(tmp_path, plan)
+
+
+def test_git_writing_policy_names_shared_state_and_demonstrates_limit(tmp_path):
+    policy = (_HARNESS.parent / 'ISOLATION.md').read_text()
+    assert 'UNSUPPORTED' in policy and 'shared refs' in policy and 'configuration' in policy
+    repo, seed = _committed_repo(tmp_path)
+    # Only this fixture's independent repository is changed.
+    with mutate.IsolatedSweep.create(repo, seed, state_root=tmp_path / 'state') as sweep:
+        _git(sweep.root, 'update-ref', 'refs/heads/policy-probe', seed)
+        _git(sweep.root, 'config', 'mutation.policyProbe', 'changed')
+        sweep.scrub()
+        assert _git(repo, 'rev-parse', 'refs/heads/policy-probe') == seed
+        assert _git(repo, 'config', 'mutation.policyProbe') == 'changed'
+    print('POLICY shared refs/common config survive scrub: UNSUPPORTED (Mac/APFS only)')

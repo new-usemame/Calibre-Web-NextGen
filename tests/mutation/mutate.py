@@ -465,6 +465,101 @@ def validate_collection(root: pathlib.Path, phase: PhaseResult, report: dict) ->
     return nodes
 
 
+@dataclass(frozen=True, slots=True)
+class ExecutionCheck:
+    signal: str
+    executed: int
+    failures: int
+    status: str = field(default="UNVERIFIED", init=False)
+    authoritative: bool = field(default=False, init=False)
+
+
+def _execution_summary(stdout: str) -> dict[str, int]:
+    counts = {}
+    for part in _summary_body(stdout).split(", "):
+        match = re.fullmatch(r"([0-9]+) (passed|failed|skipped|xfailed|xpassed|deselected|errors?|warnings?)", part)
+        if not match:
+            raise IsolationError("malformed pytest execution summary")
+        key = {"errors": "error", "warnings": "warning"}.get(match[2], match[2])
+        if key in counts:
+            raise IsolationError("duplicate summary category")
+        counts[key] = int(match[1])
+    return counts
+
+
+def validate_execution(phase: PhaseResult, report: dict, expected: tuple[str, ...], *, baseline=False) -> ExecutionCheck:
+    _check_report(phase, report)
+    if phase.returncode not in (0, 1):
+        raise IsolationError("pytest infrastructure exit is not an execution outcome")
+    if set(report["selected"]) != set(expected):
+        raise IsolationError("executed selection differs from validated collection")
+    counts = _execution_summary(phase.stdout)
+    if counts.get("error", 0):
+        raise IsolationError("pytest summary contains infrastructure errors")
+    by_node = {node: {} for node in expected}
+    for event in report["reports"]:
+        if (not isinstance(event, dict) or event.get("nodeid") not in by_node
+                or event.get("when") not in ("setup", "call", "teardown")
+                or event.get("outcome") not in ("passed", "failed", "skipped")
+                or type(event.get("wasxfail")) is not bool):
+            raise IsolationError("malformed or foreign pytest execution report")
+        events = by_node[event["nodeid"]]
+        if event["when"] in events:
+            raise IsolationError("duplicate execution report; retries are unsupported")
+        events[event["when"]] = event
+    observed = dict.fromkeys(("passed", "failed", "skipped", "xfailed", "xpassed"), 0)
+    actual_failures = 0
+    for events in by_node.values():
+        if "setup" not in events or events.get("teardown", {}).get("outcome") != "passed":
+            raise IsolationError("test setup or teardown was not accounted for")
+        setup = events["setup"]
+        if setup["outcome"] == "skipped":
+            if "call" in events:
+                raise IsolationError("skipped setup cannot have a test call")
+            terminal = setup
+        else:
+            if "call" not in events:
+                raise IsolationError("test body never produced a call report")
+            terminal = events["call"]
+        outcome = terminal["outcome"]
+        if terminal["wasxfail"]:
+            outcome = "xfailed" if outcome == "skipped" else "xpassed"
+        observed[outcome] += 1
+        if "call" in events and events["call"]["outcome"] == "failed":
+            actual_failures += 1
+    for outcome, count in observed.items():
+        if counts.get(outcome, 0) != count:
+            raise IsolationError("terminal summary disagrees with actual test reports")
+    if sum(observed.values()) != len(expected) or counts.get("deselected", 0) != len(report["deselected"]):
+        raise IsolationError("selected tests are not fully accounted for")
+    # Independent guards: terminal failure claims and actual call failures must
+    # both support exit 1. The composed mutation experiment exercises redundancy.
+    if phase.returncode == 1 and counts.get("failed", 0) < 1:
+        raise IsolationError("exit 1 has no failed test in its summary")
+    if phase.returncode == 1 and actual_failures < 1:
+        raise IsolationError("exit 1 has no actually-failed test call")
+    if phase.returncode == 0 and actual_failures:
+        raise IsolationError("exit 0 contradicts failed test reports")
+    if baseline and phase.returncode != 0:
+        raise IsolationError("clean baseline did not pass")
+    return ExecutionCheck("TEST_FAILURE" if phase.returncode == 1 else "TESTS_PASSED",
+                          len(expected), actual_failures)
+
+
+def _assess_mutation(sweep, relative, old, new, targets, environment, timeout, trace):
+    sweep.scrub()
+    plan = prepare_mutation(sweep.root, relative, old, new)
+    collection, report = _run_pytest(sweep, targets, environment, timeout, collect_only=True)
+    trace.append(("collection", collection, report))
+    nodes = validate_collection(sweep.root, collection, report)
+    baseline, report = _run_pytest(sweep, targets, environment, timeout)
+    trace.append(("baseline", baseline, report))
+    validate_execution(baseline, report, nodes, baseline=True)
+    mutant, report = _run_pytest(sweep, targets, environment, timeout, mutation=plan)
+    trace.append(("mutant", mutant, report))
+    return validate_execution(mutant, report, nodes)
+
+
 def _run_pytest(sweep, targets, environment, timeout, *, collect_only=False, mutation=None):
     report_path = sweep.entry / "reports" / (uuid.uuid4().hex + ".json")
     report_path.parent.mkdir(exist_ok=True)

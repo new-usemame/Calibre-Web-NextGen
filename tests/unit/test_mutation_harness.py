@@ -721,3 +721,82 @@ def test_collection_real_pytest_selected_numerator(tmp_path):
         assert len(nodes) == 2
         assert '2/3 tests collected' in phase.stdout
         print('ACCOUNTING real pytest: 2/3 tests collected; selected=2 ACCEPTED (Mac/APFS only)')
+
+
+def _execution_fixture(tmp_path):
+    from dataclasses import replace
+    phase, report = _collection_fixture(tmp_path)
+    phase = replace(phase, stdout='2 passed in 0.01s\n')
+    report['reports'] = [{'nodeid': node, 'when': when, 'outcome': 'passed', 'wasxfail': False}
+                         for node in report['selected'] for when in ('setup', 'call', 'teardown')]
+    return phase, report, tuple(report['selected'])
+
+
+@pytest.mark.parametrize('code', [2, 3, 4, 5, 6, -9, 255])
+def test_execution_rejects_infrastructure_exit_codes(tmp_path, code):
+    from dataclasses import replace
+    phase, report, nodes = _execution_fixture(tmp_path)
+    phase = replace(phase, returncode=code)
+    report['exitstatus'] = code
+    with pytest.raises(mutate.IsolationError):
+        mutate.validate_execution(phase, report, nodes)
+
+
+@pytest.mark.parametrize('defect', ['missing_summary', 'malformed_summary', 'wrong_count', 'duplicate_summary',
+    'exit_one_without_failure', 'exit_zero_with_failure', 'summary_not_actual', 'missing_selected',
+    'missing_call', 'duplicate_call', 'foreign_report', 'baseline_failure'])
+def test_execution_summary_and_reality_guards(tmp_path, defect):
+    from dataclasses import replace
+    phase, report, nodes = _execution_fixture(tmp_path)
+    if defect == 'missing_summary': phase = replace(phase, stdout='')
+    if defect == 'malformed_summary': phase = replace(phase, stdout='2 passed, nonsense in 0.01s\n')
+    if defect == 'wrong_count': phase = replace(phase, stdout='1 passed in 0.01s\n')
+    if defect == 'duplicate_summary': phase = replace(phase, stdout='1 passed, 1 passed in 0.01s\n')
+    if defect == 'exit_one_without_failure':
+        phase = replace(phase, returncode=1)
+        report['exitstatus'] = 1
+    if defect in ('exit_zero_with_failure', 'summary_not_actual', 'baseline_failure'):
+        phase = replace(phase, stdout='1 failed, 1 passed in 0.01s\n',
+                        returncode=0 if defect == 'exit_zero_with_failure' else 1)
+        report['exitstatus'] = phase.returncode
+        if defect != 'summary_not_actual': report['reports'][1]['outcome'] = 'failed'
+    if defect == 'missing_selected':
+        report.update(selected=[nodes[0]], selected_count=1, reports=report['reports'][:3])
+        phase = replace(phase, stdout='1 passed in 0.01s\n')
+    if defect == 'missing_call': report['reports'].pop(1)
+    if defect == 'duplicate_call': report['reports'].append(report['reports'][1].copy())
+    if defect == 'foreign_report': report['reports'][1]['nodeid'] = 'test_probe.py::foreign'
+    with pytest.raises(mutate.IsolationError):
+        mutate.validate_execution(phase, report, nodes, baseline=defect == 'baseline_failure')
+
+
+def _soundness_repo(tmp_path, *, broken=False, body=None):
+    repo, seed = _committed_repo(tmp_path)
+    (repo / 'victim.py').write_text('VALUE = ' + ('2' if broken else '1') + '\n')
+    (repo / 'test_probe.py').write_text(body or 'from victim import VALUE\ndef test_value(): assert VALUE == 1\n')
+    _git(repo, 'add', '.')
+    _git(repo, 'commit', '-qm', 'soundness fixture')
+    return repo
+
+
+def test_execution_real_broken_baseline_stops_mutant(tmp_path):
+    repo = _soundness_repo(tmp_path, broken=True)
+    trace = []
+    with mutate.IsolatedSweep.create(repo, 'HEAD', state_root=tmp_path / 'state') as sweep:
+        with pytest.raises(mutate.IsolationError):
+            mutate._assess_mutation(sweep, 'victim.py', '2', '1', ['test_probe.py'],
+                {**os.environ, 'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'}, 10, trace)
+        assert [name for name, _, _ in trace] == ['collection', 'baseline']
+
+
+def test_execution_real_clean_baseline_and_visible_mutation(tmp_path):
+    repo = _soundness_repo(tmp_path)
+    trace = []
+    with mutate.IsolatedSweep.create(repo, 'HEAD', state_root=tmp_path / 'state') as sweep:
+        check = mutate._assess_mutation(sweep, 'victim.py', '1', '2', ['test_probe.py'],
+            {**os.environ, 'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'}, 10, trace)
+        assert [phase.returncode for _, phase, _ in trace] == [0, 0, 1]
+        assert check.signal == 'TEST_FAILURE' and check.failures == 1
+        assert check.status == 'UNVERIFIED' and check.authoritative is False
+        assert (sweep.root / 'victim.py').read_text() == 'VALUE = 1\n'
+        print('SOUNDNESS clean baseline=0 mutant=1 actual_failures=1 UNVERIFIED (Mac/APFS only)')

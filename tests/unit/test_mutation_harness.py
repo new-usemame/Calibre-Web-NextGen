@@ -1407,3 +1407,48 @@ def test_container_setup_failure_removes_owned_container(tmp_path, container_bac
         check=True, capture_output=True).stdout.strip() == b''
     with pytest.raises(RuntimeError, match='after an error'):
         sweep.run_phase(['true'], output=out)
+
+
+@pytest.mark.parametrize('mode', ['clean_control', 'absent_control', 'startup_rewrite',
+                                 'frame_forge', 'meta_transform', 'loader_transform'])
+def test_container_leg7_execution_provenance_limit(tmp_path, container_backend, mode):
+    import hashlib
+    directory = pathlib.Path(__file__).resolve().parents[1] / 'mutation'
+    modules = []
+    for name in ('leg7_probe', 'container_probe'):
+        spec = importlib.util.spec_from_file_location(name, directory / (name + '.py'))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        modules.append(module)
+    leg7, probe = modules
+    repo = leg7.fixture(tmp_path, mode)
+    seed = _git(repo, 'rev-parse', 'HEAD')
+    out = tmp_path / 'out'
+    out.mkdir()
+    sweep = container_backend.ContainerSweep(repo, seed)
+    result = sweep.run_phase(probe.COMMAND, output=out, files=probe.runtime_overlay(),
+                             environment=probe.ENVIRONMENT, timeout=30)
+    assert (out / 'report.json').exists(), result.stderr
+    report = json.loads((out / 'report.json').read_text())
+    witness = report['target_provenance']
+    assert report['complete'] is True
+    assert report['selected_count'] == 1
+    assert witness['active'] is True and witness['foreign'] is False
+    assert result.returncode == (1 if mode == 'clean_control' else 0), result.stderr
+    assert witness['seen'] is (mode != 'absent_control')
+    diagnostic = mutate.PhaseResult(tuple(probe.COMMAND), result.returncode, result.stdout,
+        result.stderr, result.timed_out, None, ())
+    check = mutate.validate_execution(diagnostic, report, ('test_probe.py::test_value',))
+    assert check.signal == ('TEST_FAILURE' if mode == 'clean_control' else 'TESTS_PASSED')
+    assert result.status == 'UNVERIFIED' and result.authoritative is False
+    if mode in ('meta_transform', 'loader_transform'):
+        assert (out / 'loaded-hash').read_text() == hashlib.sha256(b'VALUE = 2\n').hexdigest()
+    print(f'LINUX PROBE {mode}: exit={result.returncode} seen={witness["seen"]} '
+          f'active={witness["active"]} signal={check.signal} authority={result.authoritative}')
+    # Red requirement run: a passing mutant must not obtain an accepted witness
+    # when these vectors replace its execution. Keep the failed requirement
+    # reproducible; the normal test asserts the observed limitation honestly.
+    if os.environ.get('CWNG_REQUIRE_CONTAINER_PROVENANCE') == '1' and mode not in (
+            'clean_control', 'absent_control'):
+        assert not witness['seen'] or result.returncode != 0, (
+            'container removal did not detect substituted target execution')

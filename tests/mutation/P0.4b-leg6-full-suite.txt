@@ -1,0 +1,24 @@
+Full unit suite — Mac/APFS only; retries 0; no maxfail.
+Command: "$ROOT/repo/.venv/bin/python" -m pytest tests/unit/test_mutation_harness.py -q -s -o addopts= -p no:rerunfailures -p no:flaky --tb=short
+PYTEST_ADDOPTS empty. Safe output excerpts:
+CLI isolated phases=3 observed_exit=0 terminal_exit=1 source-preserved (Mac/APFS only)
+CLI isolated phases=3 observed_exit=1 terminal_exit=1 source-preserved (Mac/APFS only)
+.......................ACCOUNTING real pytest: 2/3 tests collected; selected=2 ACCEPTED (Mac/APFS only)
+.....................SOUNDNESS clean baseline=0 mutant=1 actual_failures=1 UNVERIFIED (Mac/APFS only)
+.......SOUNDNESS real xfail_notrun: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real xfail_run: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real setup_error: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real timeout: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real noop: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real pass: TESTS_PASSED UNVERIFIED durable (Mac/APFS only)
+...POLICY shared refs/common config survive scrub: UNSUPPORTED (Mac/APFS only)
+....CLI spec: UNVERIFIED exit=1 evidence-count=2 (Mac/APFS only)
+.CLI provenance_reject: UNVERIFIED exit=1 evidence-count=1 (Mac/APFS only)
+.....REVIEW1 DIRECT_EXIT=1 HARNESS_EXIT=1 SIGNAL=TEST_FAILURE PHASE_RETURNCODES=[0, 0, 1] (Mac/APFS only)
+...REVIEW2 IMPORTED_FROM=SOURCE_CHECKOUT SIGNAL=ERROR HARNESS_EXIT=1 (Mac/APFS only)
+....REVIEW3 shape=setattr PRESENT=REJECTED (Mac/APFS only)
+.REVIEW3 shape=duck PRESENT=REJECTED (Mac/APFS only)
+.UNVERIFIED equivalent_integer_bound: NO_TEST_FAILURE; 49 passed, 67 deselected in 2.39s (Mac/APFS only)
+REVIEW4 EXIT=1 (Mac/APFS only)
+116 passed in 150.63s (0:02:30)
+exit=0

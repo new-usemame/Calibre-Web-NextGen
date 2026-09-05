@@ -1,0 +1,6 @@
+Unchanged baseline suite — Mac/APFS only; retries 0; no maxfail.
+Command: "$ROOT/repo/.venv/bin/python" -m pytest tests/unit/test_mutation_harness.py -q -o addopts= -p no:rerunfailures -p no:flaky --tb=short
+PYTEST_ADDOPTS empty.
+116 passed in 155.91s (0:02:35)
+exit=0
+This run does not test or close the newly reproduced defects.

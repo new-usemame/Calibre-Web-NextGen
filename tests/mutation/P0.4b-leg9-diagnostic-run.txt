@@ -1,0 +1,4 @@
+Additional diagnostic full run; Mac/APFS only. Does not replace any of the requested five runs.
+COMMAND: "$PY" -m pytest tests/unit/test_mutation_harness.py -q -o addopts= -p no:rerunfailures -p no:flaky --tb=short
+EXIT=0
+131 passed in 155.89s (0:02:35)

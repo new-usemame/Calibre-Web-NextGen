@@ -1,0 +1,9 @@
+Mutation experiment — Mac/APFS only; retries 0; no maxfail.
+Each variant runs in a temporary module copy with the absolute venv interpreter.
+Test file: tests/unit/test_mutation_harness.py; flags -q -o addopts= -p no:rerunfailures -p no:flaky --tb=no.
+Default selection: integrity or collection_accounting or execution_rejects or execution_summary or execution_all_xfailed or execution_xfail_notrun or durable_evidence or durability_failure or evidence_cannot or noop_is_refused
+baseline_mutated/mutation_not_applied select execution_real_clean only.
+
+write_verification: KILLED; 1 failed, 48 passed, 47 deselected in 2.81s
+numerator: KILLED; 1 failed, 48 passed, 47 deselected in 2.86s
+schema_version: KILLED; 1 failed, 48 passed, 47 deselected in 2.88s

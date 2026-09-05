@@ -15,3 +15,19 @@ They must not modify the sweep's shared Git state or external repositories.
 Outside the boundary: temporary directories, the venv, home, common Git data,
 Docker, databases, network, ports, caches, services and escaped processes.
 This is an explicit unsupported-use policy, not enforcement of arbitrary writes.
+
+## Legacy recovery
+
+The CLI refuses an existing legacy journal, including malformed journals.
+The old location is the system temporary directory, then
+cwng-mutation/<repository-key>/active.json. The repository key is the first
+20 hex digits of SHA-256 over os.fsencode(the canonical source repository path).
+No journal or recovery copy is rewritten, restored, or deleted by the new CLI.
+
+Preserve the journal, any recovery copies it names, and current source bytes.
+Inspect the recorded target and compare it with the recovery copy and the
+intended committed content. Recover any needed work before archiving the
+journal outside the active location. Do not simply delete an unresolved journal.
+The new CLI has no --clear-journal command and creates no recovery journal.
+A different TMPDIR can hide old temporary state: use the original temporary
+directory when checking for a previous run.

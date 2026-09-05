@@ -963,6 +963,24 @@ def run_mutant(name, rel_file, old, new, tests, quiet=False):
     return DiagnosticObservation(name=name, returncode=proc.returncode, summary=summary)
 
 
+def legacy_journal(repo: pathlib.Path) -> pathlib.Path:
+    # Match the retired P0.4a state-directory identity without creating it.
+    key = hashlib.sha256(os.fsencode(repo.resolve())).hexdigest()[:20]
+    return pathlib.Path(tempfile.gettempdir()) / "cwng-mutation" / key / "active.json"
+
+
+def refuse_legacy_journal(repo: pathlib.Path) -> None:
+    journal = legacy_journal(repo)
+    if journal.exists() or journal.is_symlink():
+        raise IsolationError(
+            "legacy journal detected in temporary cwng-mutation/<repository-key>/active.json; "
+            "preserve the journal, its recovery copies and the source checkout. "
+            "Inspect the recorded target and compare recovery/source bytes; recover needed work "
+            "before archiving the journal outside that active location. "
+            "See tests/mutation/ISOLATION.md. No files were restored or deleted."
+        )
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -971,6 +989,11 @@ def main():
     ap.add_argument("--spec")
     ap.add_argument("--name", default="mutant")
     args = ap.parse_args()
+    try:
+        refuse_legacy_journal(REPO)
+    except IsolationError as exc:
+        print(f"UNVERIFIED ERROR: {exc}")
+        return 1
 
     if args.spec:
         mutants = json.loads(pathlib.Path(args.spec).read_text())

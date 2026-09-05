@@ -957,3 +957,25 @@ def test_git_writing_policy_names_shared_state_and_demonstrates_limit(tmp_path):
         assert _git(repo, 'rev-parse', 'refs/heads/policy-probe') == seed
         assert _git(repo, 'config', 'mutation.policyProbe') == 'changed'
     print('POLICY shared refs/common config survive scrub: UNSUPPORTED (Mac/APFS only)')
+
+
+@pytest.mark.parametrize('content', ['{}', 'not json'])
+def test_cli_refuses_legacy_journal_without_changing_it(tmp_path, monkeypatch, capsys, content):
+    monkeypatch.setattr(mutate, 'REPO', tmp_path / 'source')
+    monkeypatch.setattr(mutate.tempfile, 'gettempdir', lambda: str(tmp_path))
+    journal = mutate.legacy_journal(mutate.REPO)
+    journal.parent.mkdir(parents=True)
+    journal.write_text(content)
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--file', 'unused', '--old', 'a',
+                                      '--new', 'b', '--test', 'unused'])
+    assert mutate.main() == 1
+    output = capsys.readouterr().out
+    assert 'legacy journal detected' in output and 'preserve' in output
+    assert journal.read_text() == content
+
+
+def test_cli_has_no_clear_journal_option(monkeypatch):
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--clear-journal'])
+    with pytest.raises(SystemExit) as exc:
+        mutate.main()
+    assert exc.value.code == 2

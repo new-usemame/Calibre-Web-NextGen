@@ -34,7 +34,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from . import constants, logger, isoLanguages, services, helper, spa, oauth_auto_redirect
 from . import db, ub, config, app, user_library
-from . import calibre_db, kobo_sync_status
+from . import calibre_db, kobo_sync_status, hierarchy
 from .services.ereader_send import send_includes_own_address
 from .services import reading_position
 from .search import render_search_results, render_adv_search_results
@@ -55,7 +55,7 @@ from .usermanagement import login_required_if_no_ano
 from .ui_themes import config_theme_code
 from .kobo_sync_status import remove_synced_book
 from . import magic_shelf
-from .render_template import render_title_template
+from .render_template import render_title_template, get_custom_column_visibility_options
 from .kobo_sync_status import change_archived_books
 from . import limiter
 from .services.worker import WorkerThread
@@ -725,6 +725,13 @@ def render_books_list(data, sort_param, book_id, page):
         return render_formats_books(page, book_id, order)
     elif data == "category":
         return render_category_books(page, book_id, order)
+    elif data.startswith("cc_"):
+        # Hierarchical custom column browse view (data == "cc_<column_id>")
+        try:
+            col_id = int(data[3:])
+        except ValueError:
+            abort(404)
+        return render_cc_category(page, col_id, book_id or '', order)
     elif data == "language":
         return render_language_books(page, book_id, order)
     elif data == "archived":
@@ -2468,6 +2475,85 @@ def category_list():
         abort(404)
 
 
+@web.route("/custom_column/<int:column_id>", defaults={'category_path': ''},
+           strict_slashes=False)
+@web.route("/custom_column/<int:column_id>/<path:category_path>",
+           strict_slashes=False)
+@login_required_if_no_ano
+def cc_category_list(column_id, category_path):
+    """Tree/list view for one hierarchical custom column.
+
+    /custom_column/5                     -> top-level nodes of column #5
+    /custom_column/5/Computers           -> books under 'Computers' (+ descendants)
+    /custom_column/5/Computers/DB        -> books under 'Computers.DB'
+    """
+    if column_id not in db.cc_classes:
+        abort(404)
+    col = calibre_db.session.query(db.CustomColumns).filter(
+        db.CustomColumns.id == column_id).first()
+    if not col or col.datatype not in ('text', 'enumeration'):
+        abort(404)
+    order = get_sort_function(request.args.get('sort_param', 'stored'), 'cc_%d' % column_id)
+    return render_cc_category(request.args.get('page', 1), column_id,
+                              category_path, order)
+
+
+def render_cc_category(page, col_id, path, order):
+    """Render either the tree overview (no path) or the filtered book list
+    for one node of a hierarchical custom column."""
+    if col_id not in db.cc_classes:
+        abort(404)
+    col = calibre_db.session.query(db.CustomColumns).filter(
+        db.CustomColumns.id == col_id).first()
+    if not col or col.datatype not in ('text', 'enumeration'):
+        abort(404)
+
+    # Flask's <path:...> converter captures slashes; our separator is '.'
+    path = (path or '').replace('/', hierarchy.SEPARATOR)
+    path = hierarchy.join_path([path])
+
+    try:
+        page = int(page)
+    except (TypeError, ValueError):
+        page = 1
+
+    if path:
+        node = hierarchy.get_node_by_path(
+            calibre_db.get_hierarchical_tree(col_id), path)
+        if node is None:
+            abort(404)
+        cc_rel = getattr(db.Books, 'custom_column_' + str(col_id))
+        entries, random, pagination = calibre_db.fill_indexpage(
+            page, 0,
+            db.Books,
+            cc_rel.any(calibre_db.hierarchical_cc_filter(col_id, path)),
+            [order[0][0], db.Series.name, db.Books.series_index],
+            True, config.config_read_column,
+            db.books_series_link,
+            db.Books.id == db.books_series_link.c.book,
+            db.Series)
+        # Prepend the column root as first crumb so every level can step back
+        # up to /custom_column/<id>
+        return render_title_template(
+            'index.html', random=random, entries=entries, pagination=pagination,
+            id=path,
+            title=_("%(column)s: %(name)s", column=col.name, name=path),
+            page="category", order=order[1],
+            breadcrumbs=[[ (col.name, '') ] + hierarchy.breadcrumb_trail(path)],
+            subcategories=node['children'], col_id=col_id)
+
+    # Root behaviour: show top-level nodes with aggregated child counts
+    tree = calibre_db.get_hierarchical_tree(col_id)
+    entries = []
+    for n in tree:
+        cat = db.Category(n['name'], n['path'], path=n['path'])
+        cat.count = n['total_count']
+        cat.children = n['children']
+        entries.append(cat)
+    return render_title_template(
+        'cc_list.html', entries=entries, folder='web.books_list',
+        charlist=list(), title=col.name, page="cclist",
+        data='cc_%d' % col_id, order=1, col_id=col_id, hierarchical=True)
 
 
 # ################################### Download/Send ##################################################################
@@ -3248,6 +3334,15 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
                 current_user.name = check_username(to_save.get("name"))
         current_user.random_books = 1 if to_save.get("show_random") == "on" else 0
         current_user.default_language = to_save.get("default_language", "all")
+        # Per-custom-column sidebar visibility (independent of the built-in
+        # section bitflags); stored in User.view_settings as 'cc_sidebar'
+        try:
+            for option in get_custom_column_visibility_options():
+                key = 'show_cc_%d' % option['id']
+                current_user.set_view_property('cc_sidebar', key,
+                                               to_save.get(key) == 'on')
+        except Exception:
+            log.error("Could not save custom column sidebar visibility", exc_info=True)
         # A stored locale is returned verbatim by get_locale() on every later
         # request, so it has to be one we actually ship (F-011141). An
         # unusable value leaves the current one alone rather than being stored.
@@ -3620,6 +3715,7 @@ def profile():
                                  config=config,
                                  kobo_support=kobo_support,
                                  hardcover_support=hardcover_support,
+                                 cc_visibility=get_custom_column_visibility_options(),
                                  system_shelf_templates=system_shelf_templates,
                                  hidden_shelf_templates=hidden_shelf_templates,
                                  hidden_custom_shelf_ids=hidden_custom_shelf_ids,

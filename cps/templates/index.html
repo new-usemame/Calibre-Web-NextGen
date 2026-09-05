@@ -1,6 +1,7 @@
 {% extends "layout.html" %}
 {% import 'image.html' as image %}
 {% import '_book_organizer.html' as organizer with context %}
+{% block body %}
 {% block header %}
 <style>
 .shelf-actions {
@@ -27,6 +28,22 @@
 </style>
 {% endblock %}
 {% block body %}
+{% if breadcrumbs %}
+  {% from 'macros/hierarchy.html' import hierarchy_breadcrumbs %}
+  <div class="discover">
+  {{ hierarchy_breadcrumbs(breadcrumbs, col_id) }}
+  </div>
+{% endif %}
+{% if subcategories %}
+  <div class="discover hierarchy-subcategories">
+    <h3>{{_('Subcategories')}}</h3>
+    <ul class="hierarchy-sublist list-unstyled">
+    {% for sub in subcategories %}
+      <li><a href="{{ url_for('web.cc_category_list', column_id=col_id, category_path=sub.path) }}">{{ sub.name }} <span class="badge badge-sm">{{ sub.total_count }}</span></a></li>
+    {% endfor %}
+    </ul>
+  </div>
+{% endif %}
 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 {% if page == 'root' and current_user.is_authenticated and not current_user.is_anonymous and current_user.library_mode() == 'personal_library' and not current_user.my_library_intro_dismissed %}
 <div id="my-library-intro" class="alert alert-info alert-dismissible" role="status">

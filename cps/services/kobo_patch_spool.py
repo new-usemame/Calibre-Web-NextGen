@@ -26,7 +26,6 @@ artifact, excluded from annotation backups and support bundles.
 from __future__ import annotations
 
 import base64
-import fcntl
 import gzip
 import hashlib
 import json
@@ -42,6 +41,7 @@ from pathlib import Path
 from gevent import Timeout, get_hub
 
 from .. import constants
+from . import file_lock
 
 
 _current_thread = threading.current_thread
@@ -356,14 +356,21 @@ class _RootLock:
 
     def __enter__(self):
         self.fd = os.open(self.root / ".spool.lock", os.O_CREAT | os.O_RDWR, 0o600)
-        os.fchmod(self.fd, 0o600)
-        fcntl.flock(self.fd, fcntl.LOCK_EX)
+        try:
+            if hasattr(os, "fchmod"):
+                os.fchmod(self.fd, 0o600)
+            else:
+                os.chmod(self.root / ".spool.lock", 0o600)
+            file_lock.acquire(self.fd)
+        except BaseException:
+            os.close(self.fd)
+            raise
         return self
 
     def __exit__(self, exc_type, exc, traceback):
         del exc_type, exc, traceback
         try:
-            fcntl.flock(self.fd, fcntl.LOCK_UN)
+            file_lock.release(self.fd)
         finally:
             os.close(self.fd)
 

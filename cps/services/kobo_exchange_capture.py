@@ -28,7 +28,6 @@ best-effort, and :meth:`CaptureSession.finish` swallows storage failures.
 from __future__ import annotations
 
 import base64
-import fcntl
 import gzip
 import hashlib
 import json
@@ -44,6 +43,7 @@ from pathlib import Path
 from gevent import Timeout, get_hub
 
 from .. import constants
+from . import file_lock
 
 
 log = logging.getLogger(__name__)
@@ -507,8 +507,11 @@ class CaptureSession:
             lock_path = root / ".capture.lock"
             lock_fd = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
             try:
-                os.fchmod(lock_fd, 0o600)
-                fcntl.flock(lock_fd, fcntl.LOCK_EX)
+                if hasattr(os, "fchmod"):
+                    os.fchmod(lock_fd, 0o600)
+                else:
+                    os.chmod(lock_path, 0o600)
+                file_lock.acquire(lock_fd)
                 _prune_locked(
                     root,
                     incoming_bytes=len(compressed),
@@ -551,7 +554,7 @@ class CaptureSession:
                         pass
             finally:
                 try:
-                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                    file_lock.release(lock_fd)
                 finally:
                     os.close(lock_fd)
 

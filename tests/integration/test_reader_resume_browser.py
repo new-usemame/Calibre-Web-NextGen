@@ -1,11 +1,30 @@
 """Local browser contract; requires frontend npm ci and Playwright Chromium/Chrome."""
 import inspect
+import shutil
 import time
+from pathlib import Path
 from types import SimpleNamespace
 import flask
 import pytest
 from cps import ub
 from tests.unit.test_reader_resume import store
+
+
+def _frontend_dependencies_available(frontend):
+    return all((frontend / path).is_file() for path in (
+        'node_modules/vite/bin/vite.js',
+        'node_modules/@playwright/test/package.json',
+    ))
+
+
+pytestmark = [
+    pytest.mark.skipif(shutil.which('node') is None, reason='Node.js is required for the local reader-resume browser test; install Node.js before running it'),
+    pytest.mark.skipif(
+        not _frontend_dependencies_available(Path(__file__).resolve().parents[2] / 'frontend'),
+        reason='Local reader-resume browser test requires frontend Vite and @playwright/test; install with `npm ci --prefix frontend` and Chrome with `cd frontend && npx playwright install chrome`, then run `python -m pytest tests/integration/test_reader_resume_browser.py -rs`',
+    ),
+]
+
 
 def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch):
     """Replay KOReader HTTP into SQLite, then drive the real Reader with Chromium.

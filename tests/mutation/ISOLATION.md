@@ -83,11 +83,29 @@ observation stays UNVERIFIED and cannot become a `caught` or `SURVIVED`; the cos
 is a misleading diagnostic, not a false verdict. The authoritative backend is a
 separate, kernel-enforced execution boundary.
 
-Scope note: none of these can be produced by a mutation. A mutation changes bytes
-in an existing file; it cannot create a startup hook or install a loader. They
-require the repository itself to carry the machinery. This repository contains
-none of it: no `sitecustomize.py`, no `usercustomize.py`, no `.pth` files, no
-`source_to_code` override, and no production `sys.meta_path` manipulation.
+Scope note, corrected 2026-09-05 after judge review. An earlier version of this
+paragraph claimed none of these can be produced by a mutation. **That was wrong
+for three of the four.** `--new` is arbitrary unvalidated replacement text: the
+CLI validates that `file`, `old` and `new` are strings and that paths are
+repository-relative, but never constrains the replacement itself
+(`mutate.py:73`, `_cli_mutants` at `:933-947`). So a mutation spec targeting any
+executed `.py` can insert a `sys.meta_path` finder, a `source_to_code` override,
+or a `compile`-with-target-filename call. Vectors 2, 3 and 4 are therefore
+reachable by a mutation. Only vector 1 is not, because creating a *new*
+`sitecustomize.py` file is outside what a byte replacement can do.
+
+What does still hold is the contract above: this backend never emits an
+authoritative verdict, so any of these produces a misleading UNVERIFIED
+diagnostic rather than a false `caught`/`SURVIVED`.
+
+The repository's own source carries none of this machinery — no
+`sitecustomize.py`, no `usercustomize.py`, no `.pth` files, no `source_to_code`
+override, no production `sys.meta_path` manipulation. But note that reassurance
+is scoped to the repository while the vectors act on the *interpreter*: the venv
+each phase runs under carries an editable-install finder live in `sys.meta_path`
+and `.pth` startup hooks of its own. The harness defends that specific case with
+a `PYTHONPATH` prepend and a three-shape preflight carrying its own negative
+control, and `:15` already places the venv outside the isolation boundary.
 
 ## Import witness scope
 

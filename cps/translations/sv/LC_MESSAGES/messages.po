@@ -25,7 +25,7 @@ msgstr "Statistik"
 
 #: cps/admin.py
 msgid "Calibre database unavailable. Please reconfigure the library path."
-msgstr ""
+msgstr "Calibre-databasen är inte tillgänglig. Konfigurera om sökvägen till biblioteket."
 
 #: cps/admin.py
 #, fuzzy
@@ -39,7 +39,7 @@ msgstr "Stänger servern, vänligen stäng fönstret"
 
 #: cps/admin.py
 msgid "Success! Database Reconnected"
-msgstr ""
+msgstr "Databasen har återanslutits"
 
 #: cps/admin.py
 msgid "Unknown command"
@@ -58,31 +58,37 @@ msgid ""
 "Error: Hardcover sync is disabled. Enable it in Basic Configuration or with "
 "HARDCOVER_SYNC_ENABLED."
 msgstr ""
+"Fel: Synkronisering med Hardcover är inaktiverad. Aktivera den i "
+"grundkonfigurationen eller med HARDCOVER_SYNC_ENABLED."
 
 #: cps/admin.py
 msgid ""
 "Error: No Hardcover token available. Set HARDCOVER_TOKEN environment "
 "variable or configure in Basic Configuration."
 msgstr ""
+"Fel: Ingen Hardcover-token är tillgänglig. Ange miljövariabeln "
+"HARDCOVER_TOKEN eller konfigurera den i grundkonfigurationen."
 
 #: cps/admin.py
 msgid ""
 "Success! Hardcover auto-fetch task started. Check Tasks panel for progress."
 msgstr ""
+"Den automatiska hämtningen från Hardcover har startats. Kontrollera "
+"panelen Uppgifter för förloppet."
 
 #: cps/admin.py
 #, python-format
 msgid "Error starting Hardcover auto-fetch task: %(error)s"
-msgstr ""
+msgstr "Fel när automatisk hämtning från Hardcover skulle startas: %(error)s"
 
 #: cps/admin.py cps/templates/admin.html
 msgid "Review Hardcover Matches"
-msgstr ""
+msgstr "Granska träffar från Hardcover"
 
 #: cps/admin.py
 #, python-format
 msgid "Error loading review queue: %(error)s"
-msgstr ""
+msgstr "Fel när granskningskön lästes in: %(error)s"
 
 #: cps/admin.py
 #, fuzzy
@@ -92,31 +98,33 @@ msgstr "{} användare har tagits bort"
 #: cps/admin.py
 #, python-format
 msgid "Match %(action)s"
-msgstr ""
+msgstr "Matcha %(action)s"
 
 #: cps/admin.py
 msgid "No pending matches to reject"
-msgstr ""
+msgstr "Det finns inga väntande träffar att avvisa"
 
 #: cps/admin.py
 #, python-format
 msgid "Rejected %(count)s match(es)"
-msgstr ""
+msgstr "Avvisade %(count)s träff(ar)"
 
 #: cps/admin.py
 #, python-brace-format
 msgid ""
 "Thumbnail cache refresh started for {} book(s). This may take a few minutes."
 msgstr ""
+"Uppdatering av miniatyrbildscachen har startats för {} bok/böcker. Det kan "
+"ta några minuter."
 
 #: cps/admin.py
 msgid "No books with covers found to process."
-msgstr ""
+msgstr "Det finns inga böcker med omslag att behandla."
 
 #: cps/admin.py
 #, python-brace-format
 msgid "Failed to start thumbnail refresh: {}"
-msgstr ""
+msgstr "Det gick inte att starta uppdateringen av miniatyrbilder: {}"
 
 #: cps/admin.py
 msgid "Admin page"
@@ -214,7 +222,7 @@ msgstr "Parameter hittades inte"
 
 #: cps/admin.py
 msgid "Settings DB is not Writeable"
-msgstr ""
+msgstr "Inställningsdatabasen är inte skrivbar"
 
 #: cps/admin.py
 msgid ""
@@ -229,11 +237,11 @@ msgstr "Ogiltig roll"
 
 #: cps/admin.py
 msgid "Invalid Restricted Column"
-msgstr ""
+msgstr "Ogiltig begränsad kolumn"
 
 #: cps/admin.py
 msgid "Calibre-Web NextGen configuration updated"
-msgstr ""
+msgstr "Konfigurationen för Calibre-Web NextGen har uppdaterats"
 
 #: cps/admin.py
 msgid "Do you really want to delete the Kobo Token?"
@@ -306,12 +314,16 @@ msgid ""
 "Calibre-Web NextGen will search for updated Covers and update Cover "
 "Thumbnails, this may take a while?"
 msgstr ""
+"Calibre-Web NextGen kommer att söka efter uppdaterade omslag och uppdatera "
+"miniatyrbilder av omslag. Detta kan ta en stund."
 
 #: cps/admin.py
 msgid ""
 "Are you sure you want delete Calibre-Web NextGen's sync database to force a "
 "full sync with your Kobo Reader?"
 msgstr ""
+"Vill du verkligen ta bort Calibre-Web NextGens synkroniseringsdatabas för "
+"att tvinga fram en fullständig synkronisering med din Kobo-läsare?"
 
 #: cps/admin.py cps/templates/modal_dialogs.html cps/templates/user_table.html
 msgid "Deny"
@@ -324,7 +336,7 @@ msgstr "Tillåt"
 #: cps/admin.py
 #, python-brace-format
 msgid "{} sync entries deleted"
-msgstr ""
+msgstr "{} synkroniseringsposter har tagits bort"
 
 #: cps/admin.py
 #, fuzzy, python-brace-format
@@ -337,6 +349,8 @@ msgid ""
 "Cleared sync state for book {0} (user {1}); the device will re-receive the "
 "book on next sync"
 msgstr ""
+"Synkroniseringstillståndet för bok {0} (användare {1}) har rensats. "
+"Enheten tar emot boken igen vid nästa synkronisering."
 
 #: cps/admin.py
 #, python-brace-format
@@ -344,38 +358,42 @@ msgid ""
 "Book {0} was not in the sync record for user {1}; last_modified bumped so "
 "the device will receive on next sync"
 msgstr ""
+"Bok {0} fanns inte i synkroniseringsposten för användare {1}. last_modified "
+"har uppdaterats så att enheten tar emot boken vid nästa synkronisering."
 
 #: cps/admin.py cps/templates/kobo_reconcile.html
 #, python-format
 msgid "Reconcile deleted Kobo books for %(user)s"
-msgstr ""
+msgstr "Stäm av borttagna Kobo-böcker för %(user)s"
 
 #: cps/admin.py
 msgid "Choose a KoboReader.sqlite file."
-msgstr ""
+msgstr "Välj en KoboReader.sqlite-fil."
 
 #: cps/admin.py
 msgid "The uploaded file is not a SQLite database."
-msgstr ""
+msgstr "Den uppladdade filen är inte en SQLite-databas."
 
 #: cps/admin.py
 #, python-format
 msgid "The file is larger than %(max)d MB."
-msgstr ""
+msgstr "Filen är större än %(max)d MB."
 
 #: cps/admin.py
 msgid "This preview is invalid or expired. Upload the device database again."
-msgstr ""
+msgstr "Den här förhandsvisningen är ogiltig eller har upphört att gälla. Ladda upp enhetens databas igen."
 
 #: cps/admin.py
 msgid "Select at least one book to archive."
-msgstr ""
+msgstr "Välj minst en bok att arkivera."
 
 #: cps/admin.py
 msgid ""
 "The selected books do not match this preview. Upload the device database "
 "again."
 msgstr ""
+"De valda böckerna stämmer inte överens med denna förhandsvisning. Ladda upp "
+"enhetens databas igen."
 
 #: cps/admin.py cps/api/browse.py cps/spa_strings.py
 msgid "Tag not found"
@@ -409,7 +427,7 @@ msgstr "Ange giltigt användarnamn för att återställa lösenordet"
 
 #: cps/admin.py
 msgid "Please Enter a LDAP Service Account"
-msgstr ""
+msgstr "Ange ett LDAP-tjänstkonto"
 
 #: cps/admin.py
 #, python-format
@@ -457,7 +475,7 @@ msgstr "Ändra SMTP-inställningar"
 
 #: cps/admin.py
 msgid "Success! Gmail Account Verified."
-msgstr ""
+msgstr "Gmail-kontot har verifierats."
 
 #: cps/admin.py cps/editbooks.py cps/shelf.py cps/tasks/convert.py cps/web.py
 #, python-format
@@ -498,11 +516,11 @@ msgstr "Konfigurera SMTP-postinställningarna först..."
 
 #: cps/admin.py
 msgid "Please enter a subject for the announcement email."
-msgstr ""
+msgstr "Ange ett ämne för e-postmeddelandet med tillkännagivandet."
 
 #: cps/admin.py
 msgid "Please enter a message body for the announcement email."
-msgstr ""
+msgstr "Ange meddelandetext för e-postmeddelandet med tillkännagivandet."
 
 #: cps/admin.py
 #, fuzzy
@@ -516,7 +534,7 @@ msgstr "Nytt lösenord skickades till din e-postadress"
 
 #: cps/admin.py
 msgid "No valid recipients — nothing was sent."
-msgstr ""
+msgstr "Det finns inga giltiga mottagare — inget skickades."
 
 #: cps/admin.py
 #, fuzzy, python-format
@@ -538,23 +556,23 @@ msgstr ""
 #: cps/admin.py
 #, python-format
 msgid "%(num)s address(es) were skipped as invalid or duplicate."
-msgstr ""
+msgstr "%(num)s adress(er) hoppades över eftersom de är ogiltiga eller dubbletter."
 
 #: cps/admin.py cps/templates/admin.html
 msgid "Edit Scheduled Tasks Settings"
-msgstr ""
+msgstr "Redigera inställningar för schemalagda uppgifter"
 
 #: cps/admin.py
 msgid "Invalid start time for task specified"
-msgstr ""
+msgstr "Ogiltig starttid har angetts för uppgiften"
 
 #: cps/admin.py
 msgid "Invalid duration for task specified"
-msgstr ""
+msgstr "Ogiltig varaktighet har angetts för uppgiften"
 
 #: cps/admin.py
 msgid "Scheduled tasks settings updated"
-msgstr ""
+msgstr "Inställningarna för schemalagda uppgifter har uppdaterats"
 
 #: cps/admin.py cps/web.py
 msgid "Oops! An unknown error occurred. Please try again later."

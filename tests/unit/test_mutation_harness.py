@@ -42,6 +42,9 @@ def _committed_repo(tmp_path: pathlib.Path) -> tuple[pathlib.Path, str]:
     _git(repo, "config", "user.name", "Mutation Tests")
     _git(repo, "config", "user.email", "mutation-tests.invalid")
     (repo / ".gitignore").write_text("*.ignored\n*.pyc\n__pycache__/\n")
+    (repo / "cps").mkdir()
+    (repo / "cps" / "__init__.py").write_text("# Synthetic import fixture.\n")
+    (repo / "cps" / "main.py").write_text("def main(): raise RuntimeError('application must not start')\n")
     (repo / "victim.py").write_text("VALUE = 1\n")
     (repo / "collateral.py").write_text("ORIGINAL\n")
     _git(repo, "add", ".")
@@ -330,7 +333,7 @@ def test_sweep_scrubs_after_cleanup_and_again_before_each_phase(tmp_path, monkey
             assert (sweep.root / "victim.py").read_text() == "VALUE = 1\n"
             assert not (sweep.root / "between.ignored").exists()
         assert leaders[0] != leaders[1]
-        assert events == ["scrubbed", "terminated", "scrubbed"] * 2
+        assert events == (["scrubbed"] + ["terminated"] * 4 + ["scrubbed"]) * 2
 
 
 @pytest.mark.parametrize("failure", ["escape", "timeout"])
@@ -490,3 +493,70 @@ def test_a_surviving_mutant_is_reported_and_the_file_is_restored(tmp_path, monke
 
     assert result["status"] == "SURVIVED", "a mutant the suite ignores must be reported, loudly"
     assert victim.read_text() == original, "the harness left the mutation in the working tree"
+
+
+def test_provenance_environment_pins_root_without_mutating_input(tmp_path):
+    env = {"PYTHONPATH": "relative-path" + os.pathsep + str(tmp_path), "KEEP": "yes"}
+    before = env.copy()
+    prepared = mutate.provenance_environment(tmp_path, env)
+    assert env == before
+    assert prepared["PYTHONPATH"].split(os.pathsep) == [str(tmp_path.resolve()), str(pathlib.Path('relative-path').resolve())]
+    assert prepared["KEEP"] == "yes"
+
+
+def test_real_cps_provenance_all_three_shapes(tmp_path):
+    seed = _git(mutate.REPO, 'rev-parse', 'HEAD')
+    with mutate.IsolatedSweep.create(mutate.REPO, seed, state_root=tmp_path / 'state') as sweep:
+        env = mutate.provenance_environment(sweep.root, os.environ.copy())
+        records = mutate.provenance_preflight(
+            sweep.root, environment=env, artifacts=sweep.entry / 'probe',
+            pytest_targets=['tests/unit/test_mutation_harness.py'],
+        )
+        assert [record['shape'] for record in records] == ['pytest', 'child', 'console']
+        for record in records:
+            assert record['paths'][0] == 'cps/__init__.py'
+            print(f"PROVENANCE shape={record['shape']} path={record['paths'][0]} ACCEPTED (Mac/APFS only)")
+        assert records[-1]['paths'][-1] == 'cps/main.py'
+        # Removing PYTHONPATH reproduces the installed editable checkout escape.
+        broken = {**os.environ, 'PYTHONPATH': ''}
+        with pytest.raises(mutate.IsolationError, match='child') as error:
+            mutate.provenance_preflight(sweep.root, environment=broken, artifacts=sweep.entry / 'negative')
+        print('PROVENANCE installed-checkout negative control: ' + str(error.value) + ' (Mac/APFS only)')
+
+
+@pytest.mark.parametrize('shape', ['pytest', 'child', 'console'])
+def test_provenance_rejects_each_outside_import(tmp_path, shape):
+    repo, seed = _committed_repo(tmp_path)
+    foreign = tmp_path / 'foreign'
+    (foreign / 'cps').mkdir(parents=True)
+    (foreign / 'cps' / '__init__.py').write_text('# Foreign import fixture.\n')
+    (foreign / 'cps' / 'main.py').write_text("def main(): raise RuntimeError('must not start')\n")
+    with mutate.IsolatedSweep.create(repo, seed, state_root=tmp_path / 'state') as sweep:
+        env = mutate.provenance_environment(sweep.root, {**os.environ, 'FOREIGN_ROOT': str(foreign)})
+        kwargs = {}
+        if shape == 'pytest':
+            (foreign / 'conftest.py').write_text("import os,sys\nsys.path.insert(0, os.environ['FOREIGN_ROOT'])\nimport cps\n")
+            (foreign / 'test_empty.py').write_text('# Collection only.\n')
+            kwargs['pytest_targets'] = [str(foreign / 'test_empty.py')]
+        elif shape == 'child':
+            env['PYTHONPATH'] = str(foreign)
+        else:
+            launcher = foreign / 'console'
+            launcher.write_text("import os,sys\nsys.path.insert(0, os.environ['FOREIGN_ROOT'])\nfrom cps.main import main\nmain()\n")
+            kwargs['console'] = launcher
+        with pytest.raises(mutate.IsolationError, match=shape) as error:
+            mutate.provenance_preflight(sweep.root, environment=env, artifacts=sweep.entry / 'probe', **kwargs)
+        print(f"PROVENANCE negative shape={shape}: {error.value} (Mac/APFS only)")
+
+
+def test_provenance_rejection_prevents_phase_execution(tmp_path, monkeypatch):
+    repo, seed = _committed_repo(tmp_path)
+    monkeypatch.setattr(mutate, 'provenance_environment', lambda root, env: {**env, 'PYTHONPATH': ''})
+    with mutate.IsolatedSweep.create(repo, seed, state_root=tmp_path / 'state') as sweep:
+        with pytest.raises(mutate.IsolationError, match='provenance REJECTED'):
+            sweep.run_phase(
+                [sys.executable, '-c', "from pathlib import Path; Path('must-not-run').touch()"],
+                environment=os.environ.copy(), timeout=5, ownership_contract='inherited-token',
+            )
+        assert not (sweep.root / 'must-not-run').exists()
+        assert sweep._phase_failed

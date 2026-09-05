@@ -262,6 +262,76 @@ def run_phase_process(
     )
 
 
+def provenance_environment(root: pathlib.Path, environment: dict[str, str]) -> dict[str, str]:
+    """Keep the disposable root first even for children that change cwd.
+
+    The venv, home, temporary directories, shared Git data, services, network,
+    ports, caches and escaped processes remain outside this boundary.
+    """
+    root = root.resolve(strict=True)
+    inherited = environment.get("PYTHONPATH", "")
+    # Resolve relative entries now so a different-cwd child cannot reinterpret them.
+    paths = [str(root)]
+    for value in inherited.split(os.pathsep):
+        if value:
+            path = str(pathlib.Path(value).resolve())
+            if path not in paths:
+                paths.append(path)
+    return {**environment, "PYTHONPATH": os.pathsep.join(paths),
+            "PYTHONDONTWRITEBYTECODE": "1"}
+
+
+def provenance_preflight(
+    root: pathlib.Path, *, environment: dict[str, str], artifacts: pathlib.Path,
+    console: pathlib.Path | None = None, pytest_targets: list[str] | None = None,
+) -> tuple[dict, ...]:
+    """Check the supplied environment in three real invocation contexts.
+
+    This deliberately does not repair the environment: callers prepare it with
+    provenance_environment, and the preflight must reject a broken one.
+    """
+    root = root.resolve(strict=True)
+    artifacts.mkdir(parents=True, exist_ok=True)
+    console = console or pathlib.Path(sys.executable).parent / "cps"
+    if not console.is_file():
+        raise IsolationError("provenance REJECTED: installed cps console script is missing")
+    child_cwd = artifacts / "different-cwd"
+    child_cwd.mkdir(exist_ok=True)
+    empty_test = artifacts / "test_provenance_empty.py"
+    empty_test.write_text("# Collection-only provenance probe.\n")
+    env = {**environment, "CWNG_PROVENANCE_ROOT": str(root),
+           "CWNG_PROVENANCE_CONSOLE": str(console), "PYTEST_ADDOPTS": "",
+           "PYTHONWARNINGS": "ignore",
+           "CWNG_PROVENANCE_TARGETS": json.dumps(pytest_targets or [str(empty_test)])}
+    helper = pathlib.Path(__file__).with_name("provenance_probe.py")
+    # -c preserves cwd on sys.path for the pytest and different-cwd probes.
+    bootstrap = "import runpy,sys; p=sys.argv.pop(1); runpy.run_path(p,run_name='__main__')"
+    records = []
+    for shape in ("pytest", "child", "console"):
+        result = run_phase_process(
+            [sys.executable, "-c", bootstrap, str(helper), shape],
+            cwd=root if shape == "pytest" else child_cwd, environment=env,
+            timeout=30, artifacts=artifacts, ownership_contract=_TOKEN_CONTRACT,
+        )
+        lines = [line.removeprefix("CWNG_PROVENANCE ") for line in result.stdout.splitlines()
+                 if line.startswith("CWNG_PROVENANCE ")]
+        try:
+            record = json.loads(lines[0]) if len(lines) == 1 else None
+        except json.JSONDecodeError:
+            record = None
+        if (result.timed_out or result.containment_error or result.returncode not in ((0, 5) if shape == "pytest" else (0,))
+                or not isinstance(record, dict) or record.get("shape") != shape
+                or record.get("inside") is not True or not record.get("paths")):
+            raise IsolationError(f"provenance REJECTED: {shape} import missing, failed, or outside disposable root")
+        # Validate the relative witness as well; traversal and symlinks are refused.
+        for relative in record["paths"]:
+            path = pathlib.Path(relative)
+            if path.is_absolute() or not (root / path).resolve(strict=True).is_relative_to(root):
+                raise IsolationError(f"provenance REJECTED: {shape} path outside disposable root")
+        records.append(record)
+    return tuple(records)
+
+
 def _git(repo: pathlib.Path, *args: str) -> str:
     proc = subprocess.run(
         ["git", "-C", str(repo), *args],
@@ -445,7 +515,15 @@ class IsolatedSweep:
         if self._phase_failed:
             raise IsolationError("sweep cannot run another phase after an error")
         try:
+            if ownership_contract != _TOKEN_CONTRACT or sys.platform != "darwin":
+                raise IsolationError("arbitrary descendant containment is unavailable")
             self.scrub()
+            environment = provenance_environment(self.root, environment)
+            targets = argv[3:] if len(argv) >= 3 and argv[1:3] == ["-m", "pytest"] else None
+            provenance_preflight(
+                self.root, environment=environment, artifacts=self.entry / "provenance",
+                pytest_targets=targets,
+            )
             result = run_phase_process(
                 argv, cwd=self.root, environment=environment, timeout=timeout,
                 artifacts=self.entry / "artifacts", ownership_contract=ownership_contract,

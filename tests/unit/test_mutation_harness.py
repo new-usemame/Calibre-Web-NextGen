@@ -983,7 +983,7 @@ def test_cli_refuses_legacy_journal_without_changing_it(tmp_path, monkeypatch, c
     journal = mutate.legacy_journal(mutate.REPO)
     journal.parent.mkdir(parents=True)
     journal.write_text(content)
-    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--seed', 'HEAD', '--file', 'unused', '--old', 'a',
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--backend', 'macos', '--seed', 'HEAD', '--file', 'unused', '--old', 'a',
                                       '--new', 'b', '--test', 'unused'])
     assert mutate.main() == 1
     output = capsys.readouterr().out
@@ -1038,7 +1038,7 @@ def test_cli_invalid_spec_never_allocates_sweep(tmp_path, monkeypatch, capsys, d
     if defect == 'traversal': item['file'] = '../victim.py'
     if defect == 'option': item['test'] = ['--pyargs']
     spec.write_text('not json' if defect == 'malformed' else json.dumps([] if defect == 'empty' else [item]))
-    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--repo', str(repo), '--seed', 'HEAD', '--spec', str(spec)])
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--backend', 'macos', '--repo', str(repo), '--seed', 'HEAD', '--spec', str(spec)])
     def forbidden(*a, **k): pytest.fail('invalid specification allocated a sweep')
     monkeypatch.setattr(mutate.IsolatedSweep, 'create', forbidden)
     assert mutate.main() == 1
@@ -1239,7 +1239,7 @@ def test_git_timeout_is_a_handled_isolation_error(tmp_path, monkeypatch, capsys)
     monkeypatch.setattr(mutate.subprocess, 'run', timeout)
     with pytest.raises(mutate.IsolationError, match='git command timed out'):
         mutate._git(tmp_path, 'rev-parse', 'HEAD')
-    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--repo', str(tmp_path),
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--backend', 'macos', '--repo', str(tmp_path),
         '--seed', 'HEAD', '--file', 'victim.py', '--old', '1', '--new', '2',
         '--test', 'test_victim.py'])
     assert mutate.main() == 1

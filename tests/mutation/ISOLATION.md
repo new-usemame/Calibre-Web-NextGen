@@ -132,3 +132,19 @@ boundary: Python can forge their fields. Presentation checks the concrete result
 its diagnostic status/authority/exit fields, allowed signal and evidence digest,
 then returns a literal nonzero status. A forged instance or duck-typed result is
 rejected before presentation.
+
+## Process-group signalling limits
+
+Non-positive group IDs are refused before calling the kernel. After EPERM,
+only a freshly confirmed nonempty group of same-UID zombies is accepted as
+requiring reaping rather than another signal. Other permission failures remain
+containment errors, and zombies still have to disappear before cleanup succeeds.
+
+PID reuse is not fully defended by this diagnostic backend. Popen can reap the
+leader before the final group signal. A process-table snapshot and the individual
+PID birth-time checks do not reserve a numeric PGID between inspection and
+killpg; the inspection-error fallback also uses the numeric PGID. A reused ID
+could therefore refer to an unrelated group. The non-positive guard does not
+solve that race. A complete defense needs ownership retained through the last
+signal, rather than another snapshot check. No such lifetime redesign is claimed
+here; this remains a limit of the diagnostic backend.

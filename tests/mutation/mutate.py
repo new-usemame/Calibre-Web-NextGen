@@ -197,6 +197,8 @@ def _group_is_zombie_only(pgid: int) -> bool:
 
 
 def _signal_group(pgid: int, sig: signal.Signals) -> None:
+    if pgid <= 0:
+        raise IsolationError("signalling requires a positive process group ID")
     try:
         os.killpg(pgid, sig)
     except ProcessLookupError:
@@ -230,7 +232,8 @@ def _terminate_phase_processes(proc, token: str) -> tuple[tuple[int, ...], str |
                     if group != proc.pid:
                         escaped.add(pid)
             # Kill immediately: a grace period permits further forks and writes.
-            # Do not signal a reused process-group ID after the group has vanished.
+            # This snapshot avoids signalling an absent group, but does not pin
+            # its identity against reuse between inspection and the syscall.
             if any(group == proc.pid for group, _ in members.values()):
                 _signal_group(proc.pid, signal.SIGKILL)
             for pid, identity in list(known.items()):

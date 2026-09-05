@@ -1277,3 +1277,12 @@ def test_group_signal_does_not_hide_unconfirmed_permission_errors(monkeypatch, r
                         subprocess.CompletedProcess(a, code, rows, ''))
     with pytest.raises((PermissionError, mutate.IsolationError)):
         mutate._signal_group(123, signal.SIGKILL)
+
+
+@pytest.mark.parametrize('pgid', [0, -1, -123])
+def test_group_signal_refuses_nonpositive_ids_before_kernel(monkeypatch, pgid):
+    calls = []
+    monkeypatch.setattr(mutate.os, 'killpg', lambda *args: calls.append(args))
+    with pytest.raises(mutate.IsolationError, match='positive process group'):
+        mutate._signal_group(pgid, signal.SIGKILL)
+    assert calls == []

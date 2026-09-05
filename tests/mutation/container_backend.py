@@ -1,12 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Linux PID-namespace phase boundary; execution provenance is NOT established.
+"""Run mutation-test phases in fresh Linux containers.
 
 Each phase receives a Git archive of one pinned commit, never the source checkout
 or its Git directory. Only a dedicated disposable output directory is shared.
 Removing the container contains descendants, including setsid/env -i children.
 It does not contain externally delegated work: databases, network services,
 shared ports, remote service managers, or daemons outside the container. This is
-not hermeticity. A contained process may still execute substituted Python code.
+not hermeticity. The CLI runs trusted tests and mutation specifications.
 """
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ import uuid
 
 
 LABEL = "org.cwng.mutation-phase"
+CREATE_TIMEOUT = 5
 LIMITS = ("Outside containment: externally delegated work in databases, network "
           "services, shared ports, remote service managers, and daemons outside "
           "the container. Not hermetic. Execution provenance is UNVERIFIED.")
@@ -57,12 +58,19 @@ def present_observation(result: ContainerObservation) -> int:
     return 1
 
 
-def _docker(*args, **kwargs):
+def _docker(*args, timeout=None, **kwargs):
+    if timeout is None:
+        timeout = CREATE_TIMEOUT if args[0] == "create" else 30
     try:
-        return subprocess.run(["docker", *args], capture_output=True, timeout=30, **kwargs)
+        return subprocess.run(["docker", *args], capture_output=True, timeout=timeout, **kwargs)
     except FileNotFoundError as exc:
         raise ContainerError("Docker CLI not found. Install Docker and put docker on PATH, then retry --backend container.") from exc
     except subprocess.TimeoutExpired as exc:
+        if args[0] == "create":
+            raise ContainerError(
+                f"Docker could not create the phase container within {CREATE_TIMEOUT} seconds. "
+                "The scratch directory may not be shared. Use --scratch-dir /tmp "
+                "or share the directory in Docker Desktop.") from exc
         raise ContainerError(f"Docker {args[0]} timed out. Check the Docker daemon and available resources, then retry.") from exc
     except OSError as exc:
         raise ContainerError("Cannot start Docker. Check the Docker installation and executable permissions.") from exc
@@ -70,7 +78,7 @@ def _docker(*args, **kwargs):
 
 def _checked(proc, message="Docker command failed. Check docker info and the selected image, then retry."):
     if proc.returncode:
-        # Do not relay paths or arbitrary damaged-code output in host exceptions.
+        # Keep host-specific paths out of CLI errors.
         raise ContainerError(message)
     return proc.stdout
 
@@ -80,8 +88,7 @@ class ContainerSweep:
 
     The caller supplies an empty disposable output directory for each phase.
     No socket, host PID namespace, credentials, or caller environment is passed.
-    Docker daemon/kernel correctness and a trusted image are prerequisites.
-    This class deliberately cannot issue a mutation verdict.
+    Tests need their Python and system dependencies in the selected image.
     """
 
     def __init__(self, repo: Path, seed: str, *, image="python:3.12"):
@@ -153,7 +160,7 @@ class ContainerSweep:
         finally:
             # Also recover a create whose CLI lost its reply. Never remove by a
             # guessed name without checking our unique ownership label first.
-            inspected = _docker("container", "inspect", cid or name)
+            inspected = _docker("container", "inspect", cid or name, timeout=5)
             if inspected.returncode == 0:
                 info = json.loads(inspected.stdout)[0]
                 if info["Config"]["Labels"].get(LABEL) != token:
@@ -184,8 +191,12 @@ def run_sweep(args, mutants, harness):
     runtime = runtime_overlay()
     print(f"CONTAINER seed={sweep.seed_sha}", flush=True)
     survived = False
-    with tempfile.TemporaryDirectory(prefix="mutation-container-",
-                                     dir=args.scratch_dir or default_scratch_root()) as scratch:
+    try:
+        temporary = tempfile.TemporaryDirectory(prefix="mutation-container-",
+                                                dir=args.scratch_dir or default_scratch_root())
+    except OSError as exc:
+        raise ContainerError("Cannot create scratch files. Choose a writable, Docker-shared directory with --scratch-dir /tmp.") from exc
+    with temporary as scratch:
         scratch = Path(scratch)
         tree = scratch / "seed"
         tree.mkdir()

@@ -185,7 +185,7 @@ class ContainerSweep:
 
 def run_sweep(args, mutants, harness):
     """Collect, check a clean baseline, then test each replacement in fresh containers."""
-    from pytest_runtime import runtime_overlay
+    runtime_overlay = harness._load_sibling("pytest_runtime").runtime_overlay
 
     sweep = ContainerSweep(args.repo, args.seed, image=args.image)
     runtime = runtime_overlay()

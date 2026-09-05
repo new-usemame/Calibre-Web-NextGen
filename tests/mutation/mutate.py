@@ -16,6 +16,7 @@ import argparse
 from dataclasses import dataclass, field
 import fcntl
 import hashlib
+import importlib.util
 import json
 import os
 import pathlib
@@ -992,6 +993,23 @@ def _cli_mutants(args):
     return mutants
 
 
+def _load_sibling(name):
+    """Resolve harness helpers beside this file, including location-based callers."""
+    path = pathlib.Path(__file__).resolve().with_name(name + ".py")
+    module = sys.modules.get(name)
+    if module is not None and getattr(module, "__file__", None) == str(path):
+        return module
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+    except BaseException:
+        del sys.modules[name]
+        raise
+    return module
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1021,7 +1039,7 @@ def main():
         if evidence.is_relative_to(repo):
             raise IsolationError("evidence directory must be outside the source checkout")
         if args.backend == "container":
-            from container_backend import run_sweep
+            run_sweep = _load_sibling("container_backend").run_sweep
             args.repo, args.evidence_dir = repo, evidence
             try:
                 return run_sweep(args, mutants, sys.modules[__name__])

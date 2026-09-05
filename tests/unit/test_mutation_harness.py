@@ -1712,3 +1712,27 @@ def test_container_missing_report_keeps_output(tmp_path, docker_scratch, contain
     assert phase['report'] is None
     assert 'starting pytest' in phase['stdout']
     assert "No module named 'missing_test_dependency'" in phase['stderr']
+
+
+def test_container_cli_loaded_by_location_without_sibling_imports(tmp_path):
+    repo, seed = _committed_repo(tmp_path)
+    launcher = """
+import importlib.util, pathlib, sys
+path = pathlib.Path(sys.argv.pop(1))
+assert str(path.parent) not in sys.path
+assert 'container_backend' not in sys.modules
+assert 'pytest_runtime' not in sys.modules
+spec = importlib.util.spec_from_file_location('location_loaded_mutate', path)
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+sys.exit(module.main())
+"""
+    result = subprocess.run([sys.executable, '-c', launcher, str(_HARNESS),
+        '--backend', 'container', '--repo', str(repo), '--seed', seed,
+        '--file', 'victim.py', '--old', '1', '--new', '2', '--test', 'test_probe.py'],
+        cwd=tmp_path, env={**os.environ, 'PATH': '', 'PYTHONPATH': ''},
+        capture_output=True, text=True, timeout=15)
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert 'ERROR: Docker CLI not found' in result.stdout
+    assert 'Traceback' not in result.stderr

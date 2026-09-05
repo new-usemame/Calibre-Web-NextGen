@@ -385,10 +385,9 @@ def render_adv_search_results(term, offset=None, order=None, limit=None):
         pagination = Pagination(page=1, per_page=limit, total_count=result_count)
         results = q.all()
 
-    # Note: store_combo_ids will now only contain the IDs of the currently visible page.
-    # This improves performance drastically for large search results, but affects
-    # functionality that relies on having all search result IDs (e.g., "download all").
-    ub.store_combo_ids(results)
+    # Bulk shelf additions need every match, without loading off-page Book objects.
+    # ID-only rows have the .id attribute expected by store_ids.
+    ub.store_ids(q.with_entities(db.Books.id).distinct().all())
 
     entries = calibre_db.order_authors(results, list_return=True, combined=True)
     return render_title_template('search.html',

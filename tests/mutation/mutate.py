@@ -724,7 +724,6 @@ def _reap_stale_sweeps(repo: pathlib.Path, state_root: pathlib.Path) -> list[pat
             continue
         shutil.rmtree(entry)
         reaped.append(worktree)
-    _git(repo, "worktree", "prune", "--expire", "now")
     return reaped
 
 
@@ -781,8 +780,8 @@ class IsolatedSweep:
             try:
                 _git(source_repo, "worktree", "add", "--detach", str(worktree), seed_sha)
             except Exception:
-                shutil.rmtree(entry, ignore_errors=True)
-                _git(source_repo, "worktree", "prune", "--expire", "now")
+                # Keep ownership metadata if registration partially succeeded;
+                # the stale reaper can later remove this exact worktree.
                 raise
             metadata["state"] = "active"
             _write_json(entry / "metadata.json", metadata)
@@ -889,7 +888,6 @@ class IsolatedSweep:
             detail = removal.stderr.strip() or removal.stdout.strip()
             raise IsolationError(f"could not remove disposable worktree: {detail}")
         shutil.rmtree(self.entry, ignore_errors=False)
-        _git(self.source_repo, "worktree", "prune", "--expire", "now")
 
     def __enter__(self) -> "IsolatedSweep":
         return self

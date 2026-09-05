@@ -1199,3 +1199,36 @@ def test_platform_partition_retains_native_coverage(request):
     for item in marked:
         mark = next(m for m in item.iter_markers('skipif') if m.kwargs.get('reason') == DARWIN_REASON)
         assert mark.args[0] is (TEST_PLATFORM != 'darwin')
+
+
+@pytest.mark.parametrize('operation', ['create', 'close', 'failed_add'])
+def test_cleanup_preserves_unrelated_absent_worktree(tmp_path, monkeypatch, operation):
+    repo, seed = _committed_repo(tmp_path)
+    state = tmp_path / 'state'
+    sweep = mutate.IsolatedSweep.create(repo, seed, state_root=state) if operation == 'close' else None
+    other = tmp_path / 'other'
+    parked = tmp_path / 'parked'
+    _git(repo, 'worktree', 'add', '--detach', str(other), seed)
+    other.rename(parked)
+    original_git = mutate._git
+    if operation == 'failed_add':
+        def fail_add(repo, *args):
+            if args[:2] == ('worktree', 'add'):
+                raise mutate.IsolationError('injected add failure')
+            return original_git(repo, *args)
+        monkeypatch.setattr(mutate, '_git', fail_add)
+        # Exercise the add-failure cleanup separately from the stale reaper.
+        monkeypatch.setattr(mutate, '_reap_stale_sweeps', lambda *args: [])
+    try:
+        if operation == 'failed_add':
+            with pytest.raises(mutate.IsolationError, match='injected'):
+                mutate.IsolatedSweep.create(repo, seed, state_root=state)
+        elif operation == 'create':
+            sweep = mutate.IsolatedSweep.create(repo, seed, state_root=state)
+        else:
+            sweep.close()
+        assert f'worktree {other}' in _git(repo, 'worktree', 'list', '--porcelain')
+    finally:
+        parked.rename(other)
+        if sweep is not None:
+            sweep.close()

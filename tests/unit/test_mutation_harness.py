@@ -666,3 +666,58 @@ def test_integrity_preserves_bytes_and_refuses_stale_or_noop_application(tmp_pat
         mutate.apply_mutation(tmp_path, mutate.MutationPlan('victim.py', plan.before, plan.before))
     mutate.apply_mutation(tmp_path, plan)
     assert target.read_bytes() == plan.after
+
+
+def _collection_fixture(tmp_path):
+    (tmp_path / 'test_probe.py').write_text('def test_one(): pass\ndef test_two(): pass\n')
+    nodes = ['test_probe.py::test_one', 'test_probe.py::test_two']
+    phase = mutate.PhaseResult((), 0, '2 tests collected in 0.01s\n', '', False, None, ())
+    report = {'version': 1, 'complete': True, 'exitstatus': 0, 'selected': nodes,
+              'selected_count': 2, 'deselected': [], 'collection_errors': [], 'reports': []}
+    return phase, report
+
+
+@pytest.mark.parametrize('defect', ['empty', 'fake_node', 'missing_file', 'duplicate', 'count',
+    'numerator', 'denominator', 'collection_error', 'exit', 'missing_summary', 'malformed_summary',
+    'incomplete', 'missing_report', 'setup_error'])
+def test_collection_accounting_rejects_unsound_selection(tmp_path, defect):
+    from dataclasses import replace
+    phase, report = _collection_fixture(tmp_path)
+    if defect == 'empty': report.update(selected=[], selected_count=0)
+    if defect == 'fake_node': report['selected'] = ['not-a-node', report['selected'][1]]
+    if defect == 'missing_file': report['selected'][0] = 'missing.py::test_one'
+    if defect == 'duplicate': report['selected'][1] = report['selected'][0]
+    if defect == 'count': report['selected_count'] = 3
+    if defect == 'numerator': phase = replace(phase, stdout='1/2 tests collected (1 deselected) in 0.01s\n')
+    if defect == 'denominator': phase = replace(phase, stdout='2/3 tests collected (1 deselected) in 0.01s\n')
+    if defect == 'collection_error': report['collection_errors'] = ['test_broken.py']
+    if defect == 'exit': phase = replace(phase, returncode=2)
+    if defect == 'missing_summary': phase = replace(phase, stdout='test_probe.py::test_one\n')
+    if defect == 'malformed_summary': phase = replace(phase, stdout='many tests collected in 0.01s\n')
+    if defect == 'incomplete': report['complete'] = False
+    if defect == 'missing_report': report = {}
+    if defect == 'setup_error': report['reports'] = [{'nodeid': report['selected'][0], 'when': 'setup', 'outcome': 'failed'}]
+    with pytest.raises(mutate.IsolationError):
+        mutate.validate_collection(tmp_path, phase, report)
+
+
+def test_collection_accounting_accepts_selected_numerator(tmp_path):
+    from dataclasses import replace
+    phase, report = _collection_fixture(tmp_path)
+    report['deselected'] = ['test_probe.py::test_other']
+    phase = replace(phase, stdout='2/3 tests collected (1 deselected) in 0.01s\n')
+    assert mutate.validate_collection(tmp_path, phase, report) == tuple(report['selected'])
+
+
+def test_collection_real_pytest_selected_numerator(tmp_path):
+    repo, seed = _committed_repo(tmp_path)
+    (repo / 'test_probe.py').write_text('def test_one(): pass\ndef test_two(): pass\ndef test_other(): pass\n')
+    _git(repo, 'add', '.')
+    _git(repo, 'commit', '-qm', 'collection fixture')
+    with mutate.IsolatedSweep.create(repo, 'HEAD', state_root=tmp_path / 'state') as sweep:
+        phase, report = mutate._run_pytest(sweep, ['test_probe.py', '-k', 'not other'],
+            {**os.environ, 'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'}, 10, collect_only=True)
+        nodes = mutate.validate_collection(sweep.root, phase, report)
+        assert len(nodes) == 2
+        assert '2/3 tests collected' in phase.stdout
+        print('ACCOUNTING real pytest: 2/3 tests collected; selected=2 ACCEPTED (Mac/APFS only)')

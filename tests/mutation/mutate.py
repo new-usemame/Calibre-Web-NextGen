@@ -35,6 +35,7 @@ import hashlib
 import json
 import os
 import pathlib
+import re
 import ctypes
 import errno
 import signal
@@ -388,7 +389,9 @@ def provenance_preflight(
             raise IsolationError(f"provenance REJECTED: {shape} resolved outside disposable root")
         if (result.timed_out or result.containment_error
                 or result.returncode not in ((0, 5) if shape == "pytest" else (0,))):
-            raise IsolationError(f"provenance REJECTED: {shape} probe execution failed")
+            raise IsolationError(f"provenance REJECTED: {shape} probe execution failed "
+                                 f"(exit={result.returncode}, timeout={result.timed_out}, "
+                                 f"cleanup={result.containment_error})")
         if (not isinstance(record, dict) or record.get("shape") != shape
                 or record.get("inside") is not True or not isinstance(record.get("paths"), list)
                 or len(record["paths"]) < 3 or not all(isinstance(p, str) for p in record["paths"])):
@@ -400,6 +403,88 @@ def provenance_preflight(
                 raise IsolationError(f"provenance REJECTED: {shape} path outside disposable root")
         records.append(record)
     return tuple(records)
+
+
+def _check_report(phase: PhaseResult, report: dict) -> None:
+    if phase.timed_out or phase.containment_error:
+        raise IsolationError("pytest phase timed out or failed containment")
+    if (not isinstance(report, dict) or type(report.get("version")) is not int
+            or report["version"] != 1 or report.get("complete") is not True
+            or report.get("exitstatus") != phase.returncode):
+        raise IsolationError("pytest evidence missing, incomplete or inconsistent")
+    for key in ("selected", "deselected", "collection_errors", "reports"):
+        if not isinstance(report.get(key), list):
+            raise IsolationError("malformed pytest evidence lists")
+    for event in report["reports"]:
+        if isinstance(event, dict) and event.get("when") in ("setup", "teardown") and event.get("outcome") == "failed":
+            raise IsolationError("pytest setup or teardown error is not a test failure")
+    if report["collection_errors"]:
+        raise IsolationError("pytest collection errors are infrastructure errors")
+    nodes = report["selected"]
+    if (not nodes or not all(isinstance(node, str) for node in nodes)
+            or len(set(nodes)) != len(nodes)):
+        raise IsolationError("collection did not resolve unique real test nodes")
+    if type(report.get("selected_count")) is not int or report["selected_count"] != len(nodes):
+        raise IsolationError("selected node count disagrees with reported collection")
+
+
+def _summary_body(stdout: str) -> str:
+    bodies = []
+    for line in stdout.splitlines():
+        line = line.strip().strip("= ")
+        match = re.fullmatch(r"(.+) in [0-9]+(?:\.[0-9]+)?s(?: \([0-9:]+\))?", line)
+        if match:
+            bodies.append(match[1])
+    if len(bodies) != 1:
+        raise IsolationError("missing or ambiguous pytest summary")
+    return bodies[0]
+
+
+def validate_collection(root: pathlib.Path, phase: PhaseResult, report: dict) -> tuple[str, ...]:
+    _check_report(phase, report)
+    if phase.returncode != 0:
+        raise IsolationError("pytest collection did not succeed")
+    nodes = tuple(report["selected"])
+    for node in nodes:
+        relative, separator, selector = node.partition("::")
+        path = (root / relative).resolve()
+        if (not separator or not selector or pathlib.Path(relative).is_absolute()
+                or not path.is_relative_to(root.resolve()) or not path.is_file()):
+            raise IsolationError("collection contains a non-real or outside test node")
+    match = re.fullmatch(r"([0-9]+)(?:/([0-9]+))? tests? collected(?: \(([0-9]+) deselected\))?",
+                         _summary_body(phase.stdout))
+    if not match:
+        raise IsolationError("malformed pytest collection summary")
+    selected = int(match[1])
+    total = int(match[2]) if match[2] is not None else selected
+    deselected = int(match[3] or 0)
+    if selected != len(nodes):
+        raise IsolationError("collection numerator disagrees with selected nodes")
+    if total != selected + len(report["deselected"]) or deselected != len(report["deselected"]):
+        raise IsolationError("collection denominator or deselection count disagrees")
+    return nodes
+
+
+def _run_pytest(sweep, targets, environment, timeout, *, collect_only=False, mutation=None):
+    report_path = sweep.entry / "reports" / (uuid.uuid4().hex + ".json")
+    report_path.parent.mkdir(exist_ok=True)
+    helper = pathlib.Path(__file__).with_name("pytest_evidence.py")
+    bootstrap = "import runpy,sys; p=sys.argv.pop(1); runpy.run_path(p,run_name='__main__')"
+    options = ["-q", "-o", "addopts=", "-p", "no:cacheprovider", "-p", "no:randomly",
+               "-p", "no:rerunfailures", "-p", "no:flaky", "--color=no"]
+    if collect_only:
+        options.append("--collect-only")
+    phase = sweep.run_phase(
+        [sys.executable, "-c", bootstrap, str(helper), *options, *targets],
+        environment={**environment, "PYTEST_ADDOPTS": "", "CWNG_PYTEST_EVIDENCE": str(report_path)},
+        timeout=timeout, ownership_contract=_TOKEN_CONTRACT, mutation=mutation,
+        pytest_targets=targets,
+    )
+    try:
+        report = json.loads(report_path.read_text())
+    except (OSError, ValueError) as exc:
+        raise IsolationError("pytest evidence missing or malformed") from exc
+    return phase, report
 
 
 def _git(repo: pathlib.Path, *args: str) -> str:
@@ -576,6 +661,7 @@ class IsolatedSweep:
         timeout: float,
         ownership_contract: str | None = None,
         mutation: MutationPlan | None = None,
+        pytest_targets: list[str] | None = None,
     ) -> PhaseResult:
         """Scrub around a completed diagnostic phase, refusing reuse after an error.
 
@@ -592,7 +678,9 @@ class IsolatedSweep:
             if mutation is not None:
                 apply_mutation(self.root, mutation)
             environment = provenance_environment(self.root, environment)
-            targets = argv[3:] if len(argv) >= 3 and argv[1:3] == ["-m", "pytest"] else None
+            targets = pytest_targets
+            if targets is None and len(argv) >= 3 and argv[1:3] == ["-m", "pytest"]:
+                targets = argv[3:]
             provenance_preflight(
                 self.root, environment=environment, artifacts=self.entry / "provenance",
                 pytest_targets=targets,

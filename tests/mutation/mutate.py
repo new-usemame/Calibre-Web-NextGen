@@ -348,10 +348,15 @@ def provenance_preflight(
             record = json.loads(lines[0]) if len(lines) == 1 else None
         except json.JSONDecodeError:
             record = None
-        if (result.timed_out or result.containment_error or result.returncode not in ((0, 5) if shape == "pytest" else (0,))
-                or not isinstance(record, dict) or record.get("shape") != shape
-                or record.get("inside") is not True or not record.get("paths")):
-            raise IsolationError(f"provenance REJECTED: {shape} import missing, failed, or outside disposable root")
+        if isinstance(record, dict) and record.get("shape") == shape and record.get("inside") is False:
+            raise IsolationError(f"provenance REJECTED: {shape} resolved outside disposable root")
+        if (result.timed_out or result.containment_error
+                or result.returncode not in ((0, 5) if shape == "pytest" else (0,))):
+            raise IsolationError(f"provenance REJECTED: {shape} probe execution failed")
+        if (not isinstance(record, dict) or record.get("shape") != shape
+                or record.get("inside") is not True or not isinstance(record.get("paths"), list)
+                or len(record["paths"]) < 3 or not all(isinstance(p, str) for p in record["paths"])):
+            raise IsolationError(f"provenance REJECTED: {shape} missing or malformed import witness")
         # Validate the relative witness as well; traversal and symlinks are refused.
         for relative in record["paths"]:
             path = pathlib.Path(relative)

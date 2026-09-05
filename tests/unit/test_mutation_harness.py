@@ -521,7 +521,7 @@ def test_real_cps_provenance_all_three_shapes(tmp_path):
         assert records[-1]['paths'][-1] == 'cps/main.py'
         # Removing PYTHONPATH reproduces the installed editable checkout escape.
         broken = {**os.environ, 'PYTHONPATH': ''}
-        with pytest.raises(mutate.IsolationError, match='child') as error:
+        with pytest.raises(mutate.IsolationError, match='child resolved outside disposable root') as error:
             mutate.provenance_preflight(sweep.root, environment=broken, artifacts=sweep.entry / 'negative')
         print('PROVENANCE installed-checkout negative control: ' + str(error.value) + ' (Mac/APFS only)')
 
@@ -546,7 +546,7 @@ def test_provenance_rejects_each_outside_import(tmp_path, shape):
             launcher = foreign / 'console'
             launcher.write_text("import os,sys\nsys.path.insert(0, os.environ['FOREIGN_ROOT'])\nfrom cps.main import main\nmain()\n")
             kwargs['console'] = launcher
-        with pytest.raises(mutate.IsolationError, match=shape) as error:
+        with pytest.raises(mutate.IsolationError, match=shape + ' resolved outside disposable root') as error:
             mutate.provenance_preflight(sweep.root, environment=env, artifacts=sweep.entry / 'probe', **kwargs)
         print(f"PROVENANCE negative shape={shape}: {error.value} (Mac/APFS only)")
 
@@ -583,6 +583,9 @@ def test_diagnostic_labelling_cannot_be_bypassed(tmp_path, monkeypatch, returnco
     with pytest.raises((TypeError, AttributeError)):
         result.status = 'caught'
     assert dataclasses.asdict(result)['status'] == 'UNVERIFIED'
+    assert not hasattr(result, '__dict__')
+    with pytest.raises(TypeError):
+        mutate.DiagnosticObservation('forged', 0, 'observation', status='caught')
     assert victim.read_text() == 'VALUE = 1\n'
     print(f'LABEL observation exit={returncode} UNVERIFIED immutable (Mac/APFS only)')
 
@@ -611,3 +614,26 @@ def test_terminal_cannot_promote_diagnostic_results(monkeypatch, capsys, legacy_
     assert code != 0, 'diagnostic output must not satisfy an authoritative gate'
     assert 'UNVERIFIED' in output
     assert 'caught' not in output and 'SURVIVED' not in output
+
+
+@pytest.mark.parametrize('observed_exit', [0, 1])
+def test_real_cli_observations_never_satisfy_authoritative_gate(tmp_path, observed_exit):
+    harness = tmp_path / 'tests' / 'mutation' / 'mutate.py'
+    harness.parent.mkdir(parents=True)
+    harness.write_bytes(_HARNESS.read_bytes())
+    victim = tmp_path / 'victim.py'
+    victim.write_text('VALUE = 1\n')
+    (tmp_path / 'test_result.py').write_text(
+        'from victim import VALUE\ndef test_value(): assert VALUE == ' + ('2' if observed_exit == 0 else '1') + '\n')
+    result = subprocess.run(
+        [sys.executable, str(harness), '--file', 'victim.py', '--old', 'VALUE = 1',
+         '--new', 'VALUE = 2', '--test', 'test_result.py'],
+        cwd=tmp_path, capture_output=True, text=True, timeout=30,
+        env={**os.environ, 'PYTEST_ADDOPTS': '', 'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'},
+    )
+    assert result.returncode == 1, result.stderr
+    assert '1 passed' in result.stdout if observed_exit == 0 else '1 failed' in result.stdout
+    assert 'UNVERIFIED' in result.stdout
+    assert 'caught' not in result.stdout and 'SURVIVED' not in result.stdout
+    assert victim.read_text() == 'VALUE = 1\n'
+    print(f'LABEL real-cli observed_exit={observed_exit} terminal_exit=1 UNVERIFIED (Mac/APFS only)')

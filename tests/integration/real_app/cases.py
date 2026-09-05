@@ -4,6 +4,72 @@ import pytest
 pytestmark = pytest.mark.integration
 
 
+def test_second_app_preserves_live_runtime(real_app):
+    import sys
+    import threading
+    import _thread
+    import cps
+    from cps import services
+    from cps.services.background_scheduler import BackgroundScheduler
+
+    updater = cps.updater_thread
+    scheduler = BackgroundScheduler._instance
+    assert scheduler is not None
+    assert updater.is_alive()
+    assert scheduler.scheduler.running
+    scheduler_thread = scheduler.scheduler._thread
+    assert scheduler_thread.is_alive()
+    assert isinstance(cps._process_runtime_lock, _thread.RLock)
+    assert not cps._process_runtime_lock._is_owned()
+    # Nonblocking acquisition from a different OS thread checks ownership and
+    # release without risking a deadlock or invoking the factory off-thread.
+    def foreign_acquire():
+        acquired = cps._process_runtime_lock.acquire(blocking=False)
+        acquisitions.append(acquired)
+        if acquired:
+            cps._process_runtime_lock.release()
+
+    acquisitions = []
+    with cps._process_runtime_lock:
+        probe = threading.Thread(target=foreign_acquire)
+        probe.start()
+        probe.join(timeout=2)
+        assert not probe.is_alive()
+    assert acquisitions == [False]
+
+    ownership = []
+    def profile(frame, event, arg):
+        if event == "call" and frame.f_code is cps.create_app.__wrapped__.__code__:
+            ownership.append(cps._process_runtime_lock._is_owned())
+
+    previous = sys.getprofile()
+    try:
+        sys.setprofile(profile)
+        second = cps.create_app(cps.config, services)
+    finally:
+        sys.setprofile(previous)
+    assert second is not real_app
+    assert ownership == [True]
+    assert cps.updater_thread is updater and updater.is_alive()
+    assert BackgroundScheduler._instance is scheduler
+    assert scheduler.scheduler.running
+    assert scheduler.scheduler._thread is scheduler_thread
+    assert scheduler_thread.is_alive()
+    assert sum(t is updater for t in threading.enumerate()) == 1
+    assert sum(isinstance(t, type(updater)) for t in threading.enumerate()) == 1
+    assert sum(t.name == scheduler_thread.name for t in threading.enumerate()) == 1
+    assert not cps._process_runtime_lock._is_owned()
+    probe = threading.Thread(target=foreign_acquire)
+    probe.start()
+    probe.join(timeout=2)
+    assert not probe.is_alive()
+    assert acquisitions == [False, True]
+    print("LIFECYCLE second: updater_alive=True updater_count=1 scheduler_running=True "
+          "scheduler_thread_count=1 same_runtime=True factory_lock_owned=True "
+          "foreign_acquire_held=False foreign_acquire_after=True")
+
+
+
 def test_real_bootstrap(real_app):
     from cps.reverseproxy import ReverseProxied
 
@@ -90,3 +156,44 @@ def test_registration_is_load_bearing(real_app):
     assert b"csrf_token" in response.data
     assert registered.test_client().post("/login", data={}).status_code == 400
     assert real_app.test_client().post("/login", data={}).status_code == 400
+
+
+def test_native_lock_stalls_greenlets(real_app):
+    """Characterize the forward constraint in this disposable process only."""
+    import threading
+    import gevent
+    from gevent import monkey
+    import cps
+
+    assert not monkey.is_module_patched("threading")
+    held = threading.Event()
+    release = threading.Event()
+    events = []
+
+    def owner():
+        with cps._process_runtime_lock:
+            held.set()
+            # Bounded OS wait guarantees release even if the hub is blocked.
+            release.wait(timeout=0.2)
+            events.append("os_release")
+
+    thread = threading.Thread(target=owner)
+    thread.start()
+    assert held.wait(timeout=2)
+
+    def contender():
+        events.append("lock_wait")
+        with cps._process_runtime_lock:
+            events.append("lock_acquired")
+
+    def observer():
+        events.append("greenlet_ran")
+        release.set()
+
+    jobs = [gevent.spawn(contender), gevent.spawn(observer)]
+    gevent.joinall(jobs, timeout=3, raise_error=True)
+    thread.join(timeout=2)
+    assert not thread.is_alive()
+    assert all(job.ready() for job in jobs)
+    assert events == ["lock_wait", "os_release", "lock_acquired", "greenlet_ran"]
+    print("LOCK native unpatched: " + " -> ".join(events))

@@ -41,6 +41,11 @@ def real_app(tmp_path_factory):
         settings.config_calibre_dir = str(root / "library")
         cps.ub.session.commit()
 
+        assert not cps.updater_thread.is_alive()
+        assert cps.updater_thread.ident is None
+        assert BackgroundScheduler._instance is None
+        assert not cps._process_runtime_state.initialized
+        print("LIFECYCLE before: updater_alive=False scheduler_exists=False initialized=False")
         try:
             app = cps.create_app(cps.config, services)
             register_blueprints(app)
@@ -53,3 +58,6 @@ def real_app(tmp_path_factory):
             if scheduler is not None and scheduler.scheduler.running:
                 scheduler.scheduler.shutdown(wait=True)
             assert not cps.updater_thread.is_alive()
+            if scheduler is not None:
+                assert not scheduler.scheduler.running
+            print("LIFECYCLE teardown: updater_alive=False scheduler_running=False")

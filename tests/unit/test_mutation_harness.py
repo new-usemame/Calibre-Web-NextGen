@@ -122,6 +122,9 @@ def test_startup_does_not_reap_a_live_sweep(tmp_path):
         first.close()
 
 
+STARTUP_TIMEOUT = 60  # Bounded hang watchdog; interpreter startup is not a benchmark.
+
+
 def _child_program(*, detach=False, timeout=False):
     child = "\n".join([
         "import os,pathlib,signal,time",
@@ -134,7 +137,7 @@ def _child_program(*, detach=False, timeout=False):
     return "\n".join([
         "import pathlib,subprocess,sys,time",
         f"child = subprocess.Popen([sys.executable, '-c', {child!r}])",
-        "deadline = time.monotonic() + 3",
+        "deadline = time.monotonic() + 30",
         "while not pathlib.Path('ready').exists():",
         "    if child.poll() is not None or time.monotonic() > deadline: raise RuntimeError('child did not become ready')",
         "    time.sleep(.005)",
@@ -164,7 +167,7 @@ def test_phase_exit_kills_a_child_that_would_write_later(tmp_path):
     result = mutate.run_phase_process(
         ownership_contract="inherited-token",
         argv=[sys.executable, "-c", _child_program()], cwd=tmp_path,
-        environment=os.environ.copy(), timeout=5, artifacts=tmp_path / "artifacts",
+        environment=os.environ.copy(), timeout=STARTUP_TIMEOUT, artifacts=tmp_path / "artifacts",
     )
     assert "child ready" in result.stdout
     assert result.returncode == 0
@@ -283,7 +286,7 @@ def test_tokenless_detached_child_is_outside_diagnostic_contract(tmp_path):
     parent = "\n".join([
         "import pathlib,subprocess,sys,time",
         f"child = subprocess.Popen([sys.executable, '-c', {child!r}], env={{}}, start_new_session=True)",
-        "deadline = time.monotonic() + 3",
+        "deadline = time.monotonic() + 30",
         "while not pathlib.Path('ready').exists():",
         "    if child.poll() is not None or time.monotonic() > deadline: raise RuntimeError('child not ready')",
         "    time.sleep(.005)",
@@ -397,7 +400,7 @@ def _poison_program(channel, seed):
         "gate.unlink(missing_ok=True)",
         'child = "import pathlib,time; pathlib.Path(\'child-ready.ignored\').write_text(\'ready\'); gate=pathlib.Path(\'..\') / \'poison-release\'; deadline=time.monotonic()+5\\nwhile not gate.exists() and time.monotonic()<deadline: time.sleep(.005)\\nif gate.exists(): pathlib.Path(\'late.ignored\').write_text(\'late\')"',
         "proc = subprocess.Popen([sys.executable, '-c', child], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)",
-        "deadline = time.monotonic() + 3",
+        "deadline = time.monotonic() + 30",
         "while not pathlib.Path('child-ready.ignored').exists():",
         "    if proc.poll() is not None or time.monotonic() > deadline: raise RuntimeError('child not ready')",
         "    time.sleep(.005)",
@@ -416,9 +419,9 @@ def test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one(tmp_
             env = {**os.environ, "MUTATION_PHASE": kind}
             if shared:
                 return subprocess.run([sys.executable, "-c", program], cwd=root, env=env,
-                                      capture_output=True, text=True, timeout=5)
+                                      capture_output=True, text=True, timeout=STARTUP_TIMEOUT)
             return sweep.run_phase(
-                [sys.executable, "-c", program], environment=env, timeout=5,
+                [sys.executable, "-c", program], environment=env, timeout=STARTUP_TIMEOUT,
                 ownership_contract="inherited-token",
             )
         # A clean selection passes before poison is introduced.

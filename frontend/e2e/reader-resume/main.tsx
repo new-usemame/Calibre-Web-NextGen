@@ -11,7 +11,17 @@ locationsPrototype.generate = async function (...args: any[]) {
 probe.destroy();
 const renditionPrototype = (ePub as any).Rendition.prototype;
 const display = renditionPrototype.display;
+(window as any).displayTargets = [];
 renditionPrototype.display = function (...args: any[]) {
+  (window as any).displayTargets.push(args[0]);
+  (window as any).pointVisible = async (cfi: string, id: string) => {
+    const range = await this.book.getRange(cfi);
+    const location = this.currentLocation();
+    if (!location?.start?.cfi || !location?.end?.cfi) return false;
+    const compare = new (ePub as any).CFI().compare;
+    return range.startContainer.parentElement.id === id
+      && compare(location.start.cfi, cfi) <= 0 && compare(cfi, location.end.cfi) <= 0;
+  };
   (window as any).visiblePercentageRange = () => {
     const location = this.currentLocation();
     return ['start', 'end'].map(edge => this.book.locations.percentageFromCfi(location[edge].cfi) * 100);

@@ -14,3 +14,27 @@ test('portable percentages reach epub.js as fractions, including zero and comple
   }
   assert.equal(fractions.length, 4);
 });
+
+test('an exact point wins over a materially different percentage in automatic and offer modes', () => {
+  const exact = 'epubcfi(/6/2!/4/2/2[kobo.1.1]/1:0)';
+  for (const mode of ['automatic', 'offer'] as const) {
+    let approximated = false;
+    const target = resumeCfi({ cfiFromPercentage: () => { approximated = true; return 'approximate'; } },
+      { percentage: 95, synced_at: '', mode, cfi: exact });
+    assert.equal(target, exact);
+    assert.equal(approximated, false);
+  }
+});
+
+test('exact resume belongs to the archive actually opened, including concurrent replacement', async () => {
+  const { resumeForArchive } = await import('../src/lib/readerResume.ts');
+  const archive = new TextEncoder().encode('same EPUB bytes').buffer;
+  const digest = await crypto.subtle.digest('SHA-256', archive);
+  const epub_sha256 = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+  const hint = { cfi: 'epubcfi(/6/2!/4/2/1:0)', epub_sha256, percentage: 95, mode: 'automatic' as const, synced_at: '' };
+  assert.equal((await resumeForArchive(hint, archive))?.cfi, hint.cfi);
+  const changed = await resumeForArchive(hint, new TextEncoder().encode('replacement EPUB').buffer);
+  assert.equal(resumeCfi({ cfiFromPercentage: p => `percentage:${p}` }, changed), 'percentage:0.95');
+  const fallback = { percentage: 37.5, mode: 'offer' as const, synced_at: '' };
+  assert.equal(await resumeForArchive(fallback, archive), fallback);
+});

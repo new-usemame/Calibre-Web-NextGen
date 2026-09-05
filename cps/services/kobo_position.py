@@ -197,6 +197,108 @@ def compute_cfi_range(epub_path: Path, position: KoboPosition) -> Optional[str]:
     return f"epubcfi({spine_step}!{start_step}:{position.start_offset},{end_step}:{position.end_offset})"
 
 
+# Reading progress has only a chapter and span id, with no highlight end or
+# character offset. Resolve its span START, and never use the context fallback.
+# These limits bound optional work, including compressed XML bombs. The caller
+# must run filesystem access off the request thread with a deadline.
+MAX_RESUME_ARCHIVE_BYTES = 16 * 1024 * 1024
+MAX_RESUME_XML_BYTES = 2 * 1024 * 1024
+
+
+def compute_cfi_point(epub_path, source, location_type, value):
+    """Resolve a Kobo progress span to a source-document point, or None.
+
+    Uses the same DOM-to-CFI walk as highlights, but requires an unambiguous
+    chapter and an actual text node. No basename guessing, context matching,
+    highlight-range passthrough, or separate KEPUB substitution is allowed.
+    """
+    snapshot = _resume_snapshot(epub_path, source, location_type, value)
+    return snapshot[0] if snapshot else None
+
+
+def _resume_snapshot(epub_path, source, location_type, value):
+    """Return (point, archive SHA256) from one bounded, stable file snapshot."""
+    import hashlib
+    import io
+    import os
+    import posixpath
+    import stat
+    from urllib.parse import unquote
+    from lxml import etree
+
+    if (location_type != "KoboSpan" or not isinstance(source, str)
+            or not source or len(source) > 2048 or not isinstance(value, str)
+            or len(value) > 128 or not re.fullmatch(r"kobo\.[0-9]+\.[0-9]+", value)):
+        return None
+    try:
+        path = Path(epub_path)
+        with path.open("rb") as stream:
+            before = os.fstat(stream.fileno())
+            if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_RESUME_ARCHIVE_BYTES:
+                return None
+            raw = stream.read(MAX_RESUME_ARCHIVE_BYTES + 1)
+            after = os.fstat(stream.fileno())
+        identity = lambda st: (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+        if (len(raw) > MAX_RESUME_ARCHIVE_BYTES or identity(before) != identity(after)
+                or identity(after) != identity(path.stat())):
+            return None
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            def xml(name):
+                info = archive.getinfo(name)
+                if info.file_size > MAX_RESUME_XML_BYTES:
+                    raise ValueError("resume XML exceeds size limit")
+                return etree.fromstring(archive.read(info), etree.XMLParser(
+                    resolve_entities=False, no_network=True, load_dtd=False))
+
+            container = xml("META-INF/container.xml")
+            rootfile = container.find(".//c:rootfile", _CONTAINER_NS)
+            if rootfile is None:
+                return None
+            opf_path = rootfile.get("full-path")
+            package = xml(opf_path)
+            spine = package.find("opf:spine", _OPF_NS)
+            if spine is None:
+                return None
+            # The shared highlight walk uses /6; packages with a differently
+            # placed spine need their actual element step instead.
+            spine_step = _cfi_element_step(spine)
+            manifest = {item.get("id"): item.get("href")
+                        for item in package.findall("opf:manifest/opf:item", _OPF_NS)}
+            matches = []
+            for index, ref in enumerate(spine.findall("opf:itemref", _OPF_NS)):
+                href = manifest.get(ref.get("idref"))
+                if not href or "#" in href:
+                    continue
+                member = posixpath.normpath(posixpath.join(posixpath.dirname(opf_path), unquote(href)))
+                if unquote(source) in (member, unquote(href)):
+                    matches.append((index, member))
+            if len(matches) != 1:
+                return None
+            index, member = matches[0]
+            tree = xml(member)
+            spans = tree.xpath("//*[@id=$v]", v=value)
+            if len(spans) != 1 or not spans[0].text:
+                return None
+            span = spans[0]
+            # The shared walk anchors the body as /4. Validate that convention
+            # and avoid assertion delimiters the highlight walk does not escape.
+            body = next((e for e in span.iterancestors() if etree.QName(e).localname == "body"), None)
+            if body is None or _cfi_element_step(body).split("[")[0] != "/4":
+                return None
+            for element in [spine, body, span, *span.iterancestors()]:
+                if any(c in (element.get("id") or "") for c in "[](),;=^!"):
+                    return None
+            cfi_range = _kepub_range_cfi(tree, f"{spine_step}/{2 * (index + 1)}",
+                                        value, value, 0, 0)
+            if not cfi_range:
+                return None
+            common, start, _end = cfi_range[8:-1].split(",")
+            return f"epubcfi({common}{start})", hashlib.sha256(raw).hexdigest()
+    except Exception:
+        log.debug("Could not resolve Kobo reading point", exc_info=True)
+        return None
+
+
 @lru_cache(maxsize=64)
 def _get_spine(cache_key: tuple, epub_path_arg: Path) -> list[str]:
     """Cache-keyed wrapper over :func:`parse_spine`. ``cache_key``

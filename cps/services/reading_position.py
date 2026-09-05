@@ -309,6 +309,25 @@ def read_resume_position(engine, user_id, book_id, fmt="epub"):
         result["resume"] = {"percentage": percentage,
                             "synced_at": synced_at.isoformat(),
                             "mode": "offer" if result["bookmark"] else "automatic"}
+        # Keep the original percentage query/response independent of optional
+        # location fields (including older or partially migrated databases).
+        try:
+            location = connection.execute(
+                "SELECT b.location_source, b.location_type, b.location_value "
+                "FROM kobo_bookmark b JOIN kobo_reading_state s "
+                "ON s.id=b.kobo_reading_state_id WHERE s.user_id=? AND s.book_id=? LIMIT 1",
+                (user_id, book_id),
+            ).fetchone()
+            # Release the read snapshot before any optional EPUB work.
+            connection.close()
+            connection = None
+            if location and location[1] == "KoboSpan" and location[0] and location[2]:
+                from .kobo_resume import exact_resume
+                exact = exact_resume(book_id, *location)
+                if exact:
+                    result["resume"].update(exact)
+        except Exception:
+            log.debug("Could not load exact reader resume for book %s", book_id, exc_info=True)
     except Exception:
         log.debug("Could not load reader resume position for book %s", book_id, exc_info=True)
     finally:

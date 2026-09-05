@@ -1,4 +1,4 @@
-import { resumeCfi } from "../lib/readerResume";
+import { resumeCfi, resumeForArchive } from "../lib/readerResume";
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'wouter';
 import ePub from 'epubjs';
@@ -1045,7 +1045,8 @@ export function Reader({ id }: { id: string }) {
         let locationsReady: Promise<unknown> | undefined;
         const generateLocations = () => locationsReady ??= epubBook.ready
           .then(() => epubBook.locations.generate(1600));
-        const resume = savedBookmark?.resume;
+        const resume = await resumeForArchive(savedBookmark?.resume, buf);
+        if (cancelled) return;
         // epub.js may emit delayed layout relocations after display resolves.
         // Treat opening with a synced hint as a preview until a real page turn,
         // or those layout events would stamp the local CFI newer than the hint.

@@ -7,7 +7,8 @@ from types import SimpleNamespace
 import flask
 import pytest
 from cps import ub
-from tests.unit.test_reader_resume import store
+from tests.unit.test_reader_resume import store, seed
+from tests.unit.test_kobo_resume_point import epub
 
 
 def _frontend_dependencies_available(frontend):
@@ -26,7 +27,8 @@ pytestmark = [
 ]
 
 
-def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch):
+@pytest.mark.parametrize('carrier', ['koreader', 'kobo'])
+def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch, tmp_path, epub, carrier):
     """Replay KOReader HTTP into SQLite, then drive the real Reader with Chromium.
 
     Authentication and Calibre checksum lookup are fixture boundaries; the sync
@@ -60,14 +62,53 @@ def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch):
     monkeypatch.setattr(device_registry, 'ensure_webreader_device_best_effort', lambda **kw: None)
     monkeypatch.setattr(ub, 'session_flush', lambda: session.flush() is None)
     monkeypatch.setattr(ub, 'session_commit', lambda *args: session.commit() is None)
+    archive_path = root / 'tests/fixtures/sample_books/christmas_carol.epub'
+    if carrier == 'kobo':
+        import sqlite3
+        import zipfile
+        from datetime import datetime, timezone
+        from sqlalchemy import text
+        from cps import config
+        from tests.fixtures.kepub_fixture import _kobo_chapter_html
+        archive_path = epub
+        with zipfile.ZipFile(epub) as source:
+            members = {name: source.read(name) for name in source.namelist()}
+        members['OEBPS/chapter.xhtml'] = _kobo_chapter_html([
+            (f'kobo.1.{i}', f'Paragraph {i}. ' + 'A precise reading position survives the trip from the device. ' * 30)
+            for i in range(1, 101)
+        ]).encode()
+        with zipfile.ZipFile(epub, 'w', zipfile.ZIP_DEFLATED) as archive:
+            for name, raw in members.items():
+                archive.writestr(name, raw)
+        with sqlite3.connect(tmp_path / 'metadata.db') as metadata:
+            metadata.executescript('CREATE TABLE books (id INTEGER, path TEXT); '
+                                  'CREATE TABLE data (book INTEGER, format TEXT, name TEXT); '
+                                  "INSERT INTO books VALUES (42, ''); "
+                                  "INSERT INTO data VALUES (42, 'EPUB', 'reader');")
+        monkeypatch.setattr(config, 'config_calibre_dir', str(tmp_path), raising=False)
+        monkeypatch.setattr(config, 'get_book_path', lambda: str(tmp_path))
+        monkeypatch.setattr(config, 'config_use_google_drive', False, raising=False)
+        seed(session, remote=95)
+        def sync_kobo(value='kobo.1.50'):
+            session.execute(text("UPDATE kobo_bookmark SET location_source='OEBPS/chapter.xhtml', "
+                                 "location_type='KoboSpan', location_value=:value, last_modified=:clock"),
+                            {'value': value, 'clock': datetime.now(timezone.utc).replace(tzinfo=None)})
+            session.commit()
+            return flask.jsonify(ok=True)
+        # Recorded Kobo progress Location shape, at the persisted carrier seam.
+        with flask.Flask(__name__).app_context():
+            sync_kobo()
     app = flask.Flask(__name__)
+    if carrier == 'kobo':
+        app.add_url_rule('/test-state/kobo', 'fixture_sync',
+                         lambda: sync_kobo(flask.request.json['value']), methods=['POST'])
     app.add_url_rule('/api/v1/books/<int:book_id>/bookmark', 'get', inspect.unwrap(reader.get_bookmark))
     app.add_url_rule('/api/v1/books/<int:book_id>/bookmark', 'save', inspect.unwrap(reader.save_bookmark), methods=['POST'])
     app.add_url_rule('/kosync/syncs/progress', 'sync', kosync.update_progress, methods=['PUT'])
     app.add_url_rule('/api/v1/auth/csrf', 'csrf', lambda: flask.jsonify(csrf_token='fixture'))
     app.add_url_rule('/api/v1/reader/settings', 'settings', inspect.unwrap(reader.get_reader_settings))
     app.add_url_rule('/api/v1/books/42', 'book', lambda: flask.jsonify(id=42,title='A Christmas Carol',authors=[],formats=[{'format':'EPUB','content_url':'/fixture.epub'}]))
-    app.add_url_rule('/fixture.epub', 'epub', lambda: flask.send_file(root / 'tests/fixtures/sample_books/christmas_carol.epub'))
+    app.add_url_rule('/fixture.epub', 'epub', lambda: flask.send_file(archive_path))
     app.add_url_rule('/annotations/42/data.json', 'annotations', lambda: flask.jsonify(annotations=[]))
     server = make_server('127.0.0.1', 0, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -89,7 +130,7 @@ def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch):
             if time.monotonic() > deadline:
                 pytest.fail(Path('/tmp/324-vite.log').read_text())
             time.sleep(.1)
-        result = subprocess.run(['node', 'e2e/reader-resume/run.mjs'], cwd=root/'frontend', text=True, capture_output=True, timeout=120, env=env)
+        result = subprocess.run(['node', 'e2e/reader-resume/run-kobo.mjs' if carrier == 'kobo' else 'e2e/reader-resume/run.mjs'], cwd=root/'frontend', text=True, capture_output=True, timeout=120, env=env)
         print(result.stdout)
         assert result.returncode == 0, result.stdout + result.stderr
     finally:

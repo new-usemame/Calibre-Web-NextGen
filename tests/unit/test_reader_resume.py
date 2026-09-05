@@ -12,6 +12,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from cps import ub
 from cps.services import reading_position
+from tests.unit.test_kobo_resume_point import epub
 
 
 @pytest.fixture
@@ -179,3 +180,78 @@ def test_both_browser_writes_win_over_their_own_mirror_even_without_percentage(s
             mirror = session.query(ub.KoboBookmark).one()
             assert saved.updated_at is not None
             assert saved.updated_at >= mirror.last_modified
+
+
+def test_exact_kobo_resume_preserves_offer_and_percentage_fallback(store, tmp_path, monkeypatch, epub):
+    """Real SQLite + EPUB lookup: same-book span wins; failed resolution changes no payload."""
+    from cps import config
+    engine, session = store
+    archive = epub
+    metadata = sqlite3.connect(tmp_path / 'metadata.db')
+    metadata.executescript('CREATE TABLE books (id INTEGER, path TEXT); '
+                          'CREATE TABLE data (book INTEGER, format TEXT, name TEXT); '
+                          "INSERT INTO books VALUES (42, ''); "
+                          "INSERT INTO data VALUES (42, 'EPUB', 'reader');")
+    metadata.close()
+    monkeypatch.setattr(config, 'config_calibre_dir', str(tmp_path), raising=False)
+    monkeypatch.setattr(config, 'get_book_path', lambda: str(tmp_path))
+    monkeypatch.setattr(config, 'config_use_google_drive', False, raising=False)
+    seed(session)
+    original = read(engine)
+    session.execute(text("UPDATE kobo_bookmark SET location_source='OEBPS/chapter.xhtml', "
+                         "location_type='KoboSpan', location_value='kobo.1.2'"))
+    session.commit()
+    exact = read(engine)
+    assert exact['resume']['cfi'] == 'epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)'
+    assert exact['resume']['percentage'] == original['resume']['percentage']
+    assert exact['resume']['mode'] == 'automatic'
+    assert read(engine, 8) == {'bookmark': None, 'resume': None}
+    session.add(ub.Bookmark(user_id=7, book_id=42, format='epub', bookmark_key='local-cfi'))
+    session.commit()
+    offered = read(engine)
+    assert offered['bookmark'] == 'local-cfi'
+    assert offered['resume'] == {**exact['resume'], 'mode': 'offer'}
+    fallback = {'bookmark': 'local-cfi', 'resume': {**original['resume'], 'mode': 'offer'}}
+    session.execute(text("UPDATE kobo_bookmark SET location_value='kobo.99.99'"))
+    session.commit()
+    assert read(engine) == fallback
+    session.execute(text("UPDATE kobo_bookmark SET location_value='kobo.1.2'"))
+    session.commit()
+    archive.unlink()
+    assert read(engine) == fallback
+    assert reading_position.read_resume_position(engine, 7, 42, 'pdf') == {'bookmark': None, 'resume': None}
+    session.expire_all()
+    assert session.query(ub.Bookmark).one().bookmark_key == 'local-cfi'
+
+
+def test_stalled_conversion_keeps_percentage_response_and_bounded_worker_admission(store, monkeypatch):
+    """Slow filesystem work cannot hold the endpoint or accumulate queued jobs."""
+    from cps.services import kobo_resume
+    from cps.services.parallel import cooperative_sleep
+    engine, session = store
+    seed(session)
+    original = read(engine)
+    session.execute(text("UPDATE kobo_bookmark SET location_source='chapter.xhtml', "
+                         "location_type='KoboSpan', location_value='kobo.1.2'"))
+    session.commit()
+    release = threading.Event()
+    calls = []
+    finished = []
+    def stalled(*args):
+        calls.append(args)
+        release.wait(.8)
+        finished.append(True)
+        return None
+    monkeypatch.setattr(kobo_resume, '_resolve', stalled)
+    try:
+        for _ in range(4):
+            started = time.monotonic()
+            assert read(engine) == original
+            assert time.monotonic() - started < .25
+        assert len(calls) == 2
+    finally:
+        release.set()
+        deadline = time.monotonic() + 2
+        while len(finished) < len(calls) and time.monotonic() < deadline:
+            cooperative_sleep(.001)
+    assert len(finished) == 2

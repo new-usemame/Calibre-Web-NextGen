@@ -56,6 +56,39 @@ retention is outside this boundary; choose persistent external storage when need
 The direct-mutation API, backup/restore path and old observation type are removed.
 All CLI execution goes through IsolatedSweep and run_checked_mutation.
 
+## Confirmed defeat vectors (known, reproducible, NOT fixed)
+
+A repository that carries any of the following can make this backend report
+`TESTS_PASSED` for a mutant that is in truth caught. All four are reproduced by
+`tests/mutation/leg7_probe.py`; run it to see each subject beside its control.
+
+1. `sitecustomize.py` in the repository. It runs in the child at interpreter
+   startup, after the parent rechecks the mutated bytes and before the target is
+   imported, so it can restore the original source.
+2. A code object compiled with the target's filename. The execution witness
+   accepts a matching frame filename, so `compile(src, target_path, "exec")`
+   followed by `exec` satisfies it without the target ever being loaded.
+3. A `sys.meta_path` loader that reads the intended mutated source and then
+   compiles different code under the target's filename.
+4. A `SourceFileLoader.source_to_code` replacement doing the same.
+
+Vectors 3 and 4 also refute content hashing at the loader as a fix: both read the
+intended mutant, so a read-hash matches, and then execute something else.
+
+These are limitations of in-process observation, not oversights. Establishing
+that the bytes an interpreter executed are the intended bytes is not achievable
+by an observer living inside the process it observes. Under the diagnostic
+contract above this backend never emits an authoritative verdict, so a defeated
+observation stays UNVERIFIED and cannot become a `caught` or `SURVIVED`; the cost
+is a misleading diagnostic, not a false verdict. The authoritative backend is a
+separate, kernel-enforced execution boundary.
+
+Scope note: none of these can be produced by a mutation. A mutation changes bytes
+in an existing file; it cannot create a startup hook or install a loader. They
+require the repository itself to carry the machinery. This repository contains
+none of it: no `sitecustomize.py`, no `usercustomize.py`, no `.pth` files, no
+`source_to_code` override, and no production `sys.meta_path` manipulation.
+
 ## Import witness scope
 
 The three preflight shapes witness cps package roots only. They do not establish

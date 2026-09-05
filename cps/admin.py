@@ -19,8 +19,6 @@ from urllib.parse import urlparse
 import shutil  # noqa: F401 -- test/extension monkeypatch compatibility
 import subprocess
 import tempfile
-import fcntl
-import errno
 
 from flask import Blueprint, current_app, flash, redirect, url_for, abort, request, make_response, send_from_directory, g, Response, jsonify
 from markupsafe import Markup
@@ -42,6 +40,7 @@ from .helper import check_valid_domain, send_test_mail, reset_password, generate
 from .embed_helper import get_calibre_binarypath
 from .gdriveutils import is_gdrive_ready, gdrive_support
 from .render_template import render_title_template, get_sidebar_config
+from .services import file_lock
 from .services.worker import WorkerThread
 from .services.kobo_import import (
     KoboContentDatabaseError,
@@ -3628,12 +3627,9 @@ def _acquire_restore_file_lock(lock_name):
     lock_path = os.path.join(tempfile.gettempdir(), lock_name)
     lock_handle = open(lock_path, "a+", encoding="utf-8")
     try:
-        fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-    except OSError as error:
-        lock_handle.close()
-        if error.errno in (errno.EACCES, errno.EAGAIN):
+        if not file_lock.acquire(lock_handle.fileno(), blocking=False):
+            lock_handle.close()
             return None
-        raise
     except Exception:
         lock_handle.close()
         raise
@@ -3643,7 +3639,7 @@ def _acquire_restore_file_lock(lock_name):
 def _release_restore_locks(lock_handles):
     for handle in lock_handles:
         try:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            file_lock.release(handle.fileno())
         except Exception:
             pass
         try:

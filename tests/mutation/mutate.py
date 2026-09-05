@@ -173,12 +173,40 @@ def _phase_members(pgid: int, token: str) -> dict[int, tuple[int, bool]]:
     return members
 
 
+def _group_is_zombie_only(pgid: int) -> bool:
+    """Confirm Darwin's zombie-only EPERM without treating zombies as reaped."""
+    try:
+        table = subprocess.run(['ps', '-axo', 'pgid=,uid=,state='],
+                               capture_output=True, text=True, timeout=5)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise IsolationError("cannot inspect group after signal permission error") from exc
+    if table.returncode:
+        raise IsolationError("cannot inspect group after signal permission error")
+    group = []
+    for line in table.stdout.splitlines():
+        fields = line.split()
+        try:
+            group_id, uid, state = fields
+            group_id, uid = int(group_id), int(uid)
+        except ValueError as exc:
+            raise IsolationError("malformed group table after signal permission error") from exc
+        if group_id == pgid:
+            group.append((uid, state))
+    return bool(group) and all(uid == os.getuid() and state.startswith('Z')
+                               for uid, state in group)
+
+
 def _signal_group(pgid: int, sig: signal.Signals) -> None:
     try:
         os.killpg(pgid, sig)
     except ProcessLookupError:
         pass
-    # Permission and other errors must reach the caller's error result.
+    except PermissionError:
+        # XNU excludes zombies from group signalling. A nonempty group with
+        # only our zombies returns EPERM; the cleanup loop must still reap it.
+        if not _group_is_zombie_only(pgid):
+            raise
+    # All other permission and inspection errors remain containment errors.
 
 
 def _terminate_phase_processes(proc, token: str) -> tuple[tuple[int, ...], str | None]:

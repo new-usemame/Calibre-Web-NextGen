@@ -12,6 +12,7 @@ import importlib.util
 import json
 import os
 import pathlib
+import signal
 import subprocess
 import sys
 import time
@@ -1243,3 +1244,36 @@ def test_git_timeout_is_a_handled_isolation_error(tmp_path, monkeypatch, capsys)
         '--test', 'test_victim.py'])
     assert mutate.main() == 1
     assert 'UNVERIFIED ERROR: git command timed out' in capsys.readouterr().out
+
+
+@DARWIN_ONLY
+def test_group_signal_handles_confirmed_zombie_only_eperm(tmp_path):
+    child = subprocess.Popen([sys.executable, '-c', 'pass'], start_new_session=True)
+    try:
+        deadline = time.monotonic() + 10
+        while True:
+            state = subprocess.check_output(['ps', '-p', str(child.pid), '-o', 'state='], text=True).strip()
+            if state.startswith('Z'):
+                break
+            assert time.monotonic() < deadline, 'child did not exit before watchdog'
+            time.sleep(.01)
+        # Popen has not reaped this child; Darwin rejects its zombie-only group.
+        mutate._signal_group(child.pid, signal.SIGKILL)
+    finally:
+        child.wait(timeout=10)
+    assert child.returncode == 0
+
+
+@pytest.mark.parametrize('rows,code', [
+    ('123 501 S\n', 0), ('123 501 Z\n123 501 S\n', 0),
+    ('123 502 Z\n', 0), ('', 0), ('malformed\n', 0), ('123 501 Z\n', 1),
+])
+def test_group_signal_does_not_hide_unconfirmed_permission_errors(monkeypatch, rows, code):
+    def denied(*args):
+        raise PermissionError(1, 'injected permission error')
+    monkeypatch.setattr(mutate.os, 'killpg', denied)
+    monkeypatch.setattr(mutate.os, 'getuid', lambda: 501)
+    monkeypatch.setattr(mutate.subprocess, 'run', lambda *a, **k:
+                        subprocess.CompletedProcess(a, code, rows, ''))
+    with pytest.raises((PermissionError, mutate.IsolationError)):
+        mutate._signal_group(123, signal.SIGKILL)

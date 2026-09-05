@@ -73,3 +73,9 @@ No import is forced merely to make this check pass. This witnesses observed
 target code; it does not prove every dependency or execution path is confined.
 Deliberate instrumentation tampering and tokenless escaped writers remain
 outside this diagnostic boundary.
+
+Frozen result objects prevent ordinary assignment only. They are not an authority
+boundary: Python can forge their fields. Presentation checks the concrete result,
+its diagnostic status/authority/exit fields, allowed signal and evidence digest,
+then returns a literal nonzero status. A forged instance or duck-typed result is
+rejected before presentation.

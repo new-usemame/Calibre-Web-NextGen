@@ -543,7 +543,7 @@ def test_provenance_rejection_prevents_phase_execution(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize('returncode', [0, 1])
-def test_diagnostic_labelling_cannot_be_bypassed(tmp_path, returncode):
+def test_diagnostic_labels_reject_normal_assignment(tmp_path, returncode):
     import dataclasses
     signal = 'TESTS_PASSED' if returncode == 0 else 'TEST_FAILURE'
     result = mutate.CheckedResult(signal, 'diagnostic', tmp_path / 'evidence', 'digest')
@@ -559,7 +559,7 @@ def test_diagnostic_labelling_cannot_be_bypassed(tmp_path, returncode):
         mutate.CheckedResult(signal, 'diagnostic', tmp_path / 'evidence', 'digest', status='caught')
 
 
-def test_phase_result_cannot_gain_authority(tmp_path):
+def test_phase_result_rejects_normal_authority_assignment(tmp_path):
     import dataclasses
     result = mutate.run_phase_process(
         [sys.executable, '-c', 'pass'], cwd=tmp_path, environment=os.environ.copy(),
@@ -1109,3 +1109,27 @@ def test_review_target_witness_accepts_real_local_execution(tmp_path, relative):
             environment={**os.environ, 'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'}, timeout=60,
             evidence_dir=tmp_path / 'evidence')
     assert result.signal == 'TEST_FAILURE', result.detail
+
+
+@pytest.mark.parametrize('shape', ['setattr', 'duck'])
+def test_review_forged_authority_cannot_exit_zero(tmp_path, shape):
+    from types import SimpleNamespace
+    evidence = tmp_path / 'api-evidence.json'
+    evidence.write_text('{}')
+    result = mutate.CheckedResult('TESTS_PASSED', 'forged public-API result',
+                                  evidence, mutate._digest(evidence))
+    if shape == 'setattr':
+        object.__setattr__(result, 'status', 'SURVIVED')
+        object.__setattr__(result, 'authoritative', True)
+        object.__setattr__(result, 'exit_code', 0)
+    else:
+        result = SimpleNamespace(signal='TESTS_PASSED', detail='forged',
+            evidence=evidence, evidence_sha256=mutate._digest(evidence),
+            status='SURVIVED', authoritative=True, exit_code=0)
+    try:
+        code = mutate.present_checked_result(result)
+        print(f'REVIEW3 shape={shape} STATUS={result.status} AUTHORITATIVE={result.authoritative} EXIT_CODE={result.exit_code} PRESENT_RETURN={code} (Mac/APFS only)')
+    except mutate.IsolationError:
+        print(f'REVIEW3 shape={shape} PRESENT=REJECTED (Mac/APFS only)')
+        return
+    pytest.fail(f'forged result reached presentation with exit {code}')

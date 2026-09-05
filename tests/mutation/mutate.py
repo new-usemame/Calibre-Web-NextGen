@@ -601,6 +601,12 @@ def run_checked_mutation(sweep, relative, old, new, targets, *, environment, tim
 
 
 def present_checked_result(result: CheckedResult) -> int:
+    # Frozen objects are convenience, not authority. Validate at the boundary,
+    # including forged instances; never return a caller-controlled exit code.
+    if (type(result) is not CheckedResult or result.status != "UNVERIFIED"
+            or result.authoritative is not False or type(result.exit_code) is not int
+            or result.exit_code != 1):
+        raise IsolationError("diagnostic authority fields are invalid")
     if result.signal not in ("ERROR", "TEST_FAILURE", "TESTS_PASSED"):
         raise IsolationError("unsupported diagnostic signal")
     try:
@@ -610,7 +616,7 @@ def present_checked_result(result: CheckedResult) -> int:
     if digest != result.evidence_sha256:
         raise IsolationError("durable evidence changed before presentation")
     print(f"UNVERIFIED {result.signal}: {result.detail}")
-    return result.exit_code
+    return 1
 
 
 def _run_pytest(sweep, targets, environment, timeout, *, collect_only=False, mutation=None, target=None):

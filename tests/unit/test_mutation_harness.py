@@ -20,7 +20,8 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
-_HARNESS = pathlib.Path(__file__).resolve().parents[1] / "mutation" / "mutate.py"
+_HARNESS = pathlib.Path(os.environ.get("CWNG_CHECK_MUTANT",
+    str(pathlib.Path(__file__).resolve().parents[1] / "mutation" / "mutate.py")))
 _spec = importlib.util.spec_from_file_location("mutate", _HARNESS)
 mutate = importlib.util.module_from_spec(_spec)
 sys.modules[_spec.name] = mutate
@@ -679,7 +680,7 @@ def _collection_fixture(tmp_path):
 
 @pytest.mark.parametrize('defect', ['empty', 'fake_node', 'missing_file', 'duplicate', 'count',
     'numerator', 'denominator', 'collection_error', 'exit', 'missing_summary', 'malformed_summary',
-    'incomplete', 'missing_report', 'setup_error'])
+    'incomplete', 'missing_report', 'setup_error', 'numerator_only', 'schema_version'])
 def test_collection_accounting_rejects_unsound_selection(tmp_path, defect):
     from dataclasses import replace
     phase, report = _collection_fixture(tmp_path)
@@ -689,6 +690,8 @@ def test_collection_accounting_rejects_unsound_selection(tmp_path, defect):
     if defect == 'duplicate': report['selected'][1] = report['selected'][0]
     if defect == 'count': report['selected_count'] = 3
     if defect == 'numerator': phase = replace(phase, stdout='1/2 tests collected (1 deselected) in 0.01s\n')
+    if defect == 'numerator_only': phase = replace(phase, stdout='1 test collected in 0.01s\n')
+    if defect == 'schema_version': report['version'] = 2
     if defect == 'denominator': phase = replace(phase, stdout='2/3 tests collected (1 deselected) in 0.01s\n')
     if defect == 'collection_error': report['collection_errors'] = ['test_broken.py']
     if defect == 'exit': phase = replace(phase, returncode=2)
@@ -800,3 +803,140 @@ def test_execution_real_clean_baseline_and_visible_mutation(tmp_path):
         assert check.status == 'UNVERIFIED' and check.authoritative is False
         assert (sweep.root / 'victim.py').read_text() == 'VALUE = 1\n'
         print('SOUNDNESS clean baseline=0 mutant=1 actual_failures=1 UNVERIFIED (Mac/APFS only)')
+
+
+def _xfail_fixture(tmp_path, *, run, mixed=False):
+    from dataclasses import replace
+    phase, report, nodes = _execution_fixture(tmp_path)
+    for node in nodes[:1] if mixed else nodes:
+        if run:
+            for event in report['reports']:
+                if event['nodeid'] == node and event['when'] == 'call':
+                    event.update(outcome='skipped', wasxfail=True)
+        else:
+            report['reports'] = [e for e in report['reports'] if not (e['nodeid'] == node and e['when'] == 'call')]
+            for event in report['reports']:
+                if event['nodeid'] == node and event['when'] == 'setup':
+                    event.update(outcome='skipped', wasxfail=True)
+    phase = replace(phase, stdout=('1 passed, 1 xfailed' if mixed else '2 xfailed') + ' in 0.01s\n')
+    return phase, report, nodes
+
+
+@pytest.mark.parametrize('run', [False, True])
+def test_execution_all_xfailed_has_no_outcome(tmp_path, run):
+    phase, report, nodes = _xfail_fixture(tmp_path, run=run)
+    with pytest.raises(mutate.IsolationError):
+        mutate.validate_execution(phase, report, nodes)
+
+
+def test_execution_xfail_notrun_is_not_a_body_execution(tmp_path):
+    phase, report, nodes = _xfail_fixture(tmp_path, run=False, mixed=True)
+    check = mutate.validate_execution(phase, report, nodes)
+    assert check.executed == 1, 'xfail(run=False) was counted as executed'
+
+
+def _mock_assessment(monkeypatch):
+    monkeypatch.setattr(mutate, '_assess_mutation', lambda *a, **k: mutate.ExecutionCheck('TESTS_PASSED', 1, 0))
+
+
+def test_durable_evidence_precedes_return_and_presentation(tmp_path, monkeypatch, capsys):
+    repo, _ = _committed_repo(tmp_path)
+    _mock_assessment(monkeypatch)
+    with mutate.IsolatedSweep.create(repo, 'HEAD', state_root=tmp_path / 'state') as sweep:
+        events = []
+        sync, rename, control = mutate.os.fsync, mutate.os.replace, mutate.fcntl.fcntl
+        def synced(fd): events.append('sync'); return sync(fd)
+        def renamed(*args): events.append('rename'); return rename(*args)
+        def controlled(fd, command, *args):
+            if command == mutate.fcntl.F_FULLFSYNC: events.append('fullsync')
+            return control(fd, command, *args)
+        monkeypatch.setattr(mutate.os, 'fsync', synced)
+        monkeypatch.setattr(mutate.os, 'replace', renamed)
+        monkeypatch.setattr(mutate.fcntl, 'fcntl', controlled)
+        result = mutate.run_checked_mutation(sweep, 'victim.py', '1', '2', ['unused'],
+            environment=os.environ.copy(), timeout=5, evidence_dir=tmp_path / 'evidence')
+        assert events == ['sync', 'rename', 'sync', 'fullsync'], 'result returned before durable publication'
+        assert capsys.readouterr().out == ''
+        assert mutate.present_checked_result(result) == 1
+        assert 'UNVERIFIED' in capsys.readouterr().out
+    assert result.evidence.is_file(), 'sweep teardown removed the evidence'
+
+
+def test_durability_failure_does_not_present_a_result(tmp_path, monkeypatch, capsys):
+    repo, _ = _committed_repo(tmp_path)
+    _mock_assessment(monkeypatch)
+    with mutate.IsolatedSweep.create(repo, 'HEAD', state_root=tmp_path / 'state') as sweep:
+        def broken(fd): raise OSError('injected sync failure')
+        monkeypatch.setattr(mutate.os, 'fsync', broken)
+        with pytest.raises(mutate.IsolationError):
+            result = mutate.run_checked_mutation(sweep, 'victim.py', '1', '2', ['unused'],
+                environment=os.environ.copy(), timeout=5, evidence_dir=tmp_path / 'evidence')
+            mutate.present_checked_result(result)
+        assert capsys.readouterr().out == ''
+
+
+def test_evidence_cannot_be_disposable_or_changed_before_presentation(tmp_path, monkeypatch):
+    repo, _ = _committed_repo(tmp_path)
+    _mock_assessment(monkeypatch)
+    with mutate.IsolatedSweep.create(repo, 'HEAD', state_root=tmp_path / 'state') as sweep:
+        with pytest.raises(mutate.IsolationError):
+            mutate.run_checked_mutation(sweep, 'victim.py', '1', '2', ['unused'],
+                environment=os.environ.copy(), timeout=5, evidence_dir=sweep.entry / 'evidence')
+        result = mutate.run_checked_mutation(sweep, 'victim.py', '1', '2', ['unused'],
+            environment=os.environ.copy(), timeout=5, evidence_dir=tmp_path / 'evidence')
+        result.evidence.write_text('{}')
+        with pytest.raises(mutate.IsolationError):
+            mutate.present_checked_result(result)
+
+
+@pytest.mark.parametrize('kind', ['xfail_notrun', 'xfail_run', 'setup_error', 'timeout', 'noop', 'pass'])
+def test_checked_real_outcomes_are_durable_and_unverified(tmp_path, kind):
+    bodies = {
+        'xfail_notrun': "import pytest\n@pytest.mark.xfail(run=False)\ndef test_value(): raise AssertionError('must not execute')\n",
+        'xfail_run': "import pytest\n@pytest.mark.xfail\ndef test_value(): assert False\n",
+        'setup_error': "import pytest\n@pytest.fixture\ndef broken(): raise RuntimeError('fixture failure')\ndef test_value(broken): pass\n",
+        'timeout': "import time\ndef test_value(): time.sleep(2)\n",
+        'pass': "def test_value(): assert True\n",
+    }
+    repo = _soundness_repo(tmp_path, body=bodies.get(kind))
+    with mutate.IsolatedSweep.create(repo, 'HEAD', state_root=tmp_path / 'state') as sweep:
+        result = mutate.run_checked_mutation(sweep, 'victim.py', '1', '1' if kind == 'noop' else '2',
+            ['test_probe.py'], environment={**os.environ, 'PYTEST_DISABLE_PLUGIN_AUTOLOAD': '1'},
+            timeout=.05 if kind == 'timeout' else 10, evidence_dir=tmp_path / 'evidence')
+        assert result.status == 'UNVERIFIED' and result.authoritative is False
+        assert result.exit_code == 1
+        assert result.signal == ('TESTS_PASSED' if kind == 'pass' else 'ERROR'), result.detail
+        reasons = {'xfail_notrun': 'no ordinary', 'xfail_run': 'no ordinary',
+                   'setup_error': 'setup', 'timeout': 'timed out', 'noop': 'no-op'}
+        if kind in reasons:
+            assert reasons[kind] in result.detail, result.detail
+        if kind == 'pass':
+            phases = json.loads(result.evidence.read_text())['phases']
+            assert len(phases) == 3
+            assert all(phase['returncode'] == 0 for phase in phases)
+        if kind == 'noop': assert json.loads(result.evidence.read_text())['phases'] == []
+    payload = json.loads(result.evidence.read_text())
+    assert payload['signal'] == result.signal
+    assert payload['status'] == 'UNVERIFIED'
+    print(f'SOUNDNESS real {kind}: {result.signal} UNVERIFIED durable (Mac/APFS only)')
+
+
+def test_noop_is_refused_before_any_pytest_collection(tmp_path, monkeypatch):
+    repo, _ = _committed_repo(tmp_path)
+    def forbidden(*a, **k): pytest.fail('pytest ran for a no-op mutation')
+    monkeypatch.setattr(mutate, '_run_pytest', forbidden)
+    with mutate.IsolatedSweep.create(repo, 'HEAD', state_root=tmp_path / 'state') as sweep:
+        with pytest.raises(mutate.IsolationError, match='no-op'):
+            mutate._assess_mutation(sweep, 'victim.py', '1', '1', ['unused'], os.environ.copy(), 5, [])
+
+
+def test_integrity_detects_incomplete_write(tmp_path, monkeypatch):
+    target = tmp_path / 'victim.py'
+    target.write_bytes(b'VALUE = 1\n')
+    plan = mutate.prepare_mutation(tmp_path, 'victim.py', '1', '2')
+    original = pathlib.Path.write_bytes
+    def truncated(path, data):
+        return original(path, data[:-1] if path == target else data)
+    monkeypatch.setattr(pathlib.Path, 'write_bytes', truncated)
+    with pytest.raises(mutate.IsolationError, match='requested bytes'):
+        mutate.apply_mutation(tmp_path, plan)

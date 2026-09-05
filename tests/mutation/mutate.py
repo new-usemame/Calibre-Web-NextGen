@@ -540,10 +540,14 @@ def validate_execution(phase: PhaseResult, report: dict, expected: tuple[str, ..
         raise IsolationError("exit 1 has no actually-failed test call")
     if phase.returncode == 0 and actual_failures:
         raise IsolationError("exit 0 contradicts failed test reports")
+    executed = sum("call" in events for events in by_node.values())
+    supporting = sum(events.get("call", {}).get("outcome") in ("passed", "failed") for events in by_node.values())
+    if not supporting:
+        raise IsolationError("selection has no ordinary executed pass or failure; no outcome")
     if baseline and phase.returncode != 0:
         raise IsolationError("clean baseline did not pass")
     return ExecutionCheck("TEST_FAILURE" if phase.returncode == 1 else "TESTS_PASSED",
-                          len(expected), actual_failures)
+                          executed, actual_failures)
 
 
 def _assess_mutation(sweep, relative, old, new, targets, environment, timeout, trace):
@@ -558,6 +562,94 @@ def _assess_mutation(sweep, relative, old, new, targets, environment, timeout, t
     mutant, report = _run_pytest(sweep, targets, environment, timeout, mutation=plan)
     trace.append(("mutant", mutant, report))
     return validate_execution(mutant, report, nodes)
+
+
+@dataclass(frozen=True, slots=True)
+class CheckedResult:
+    signal: str
+    detail: str
+    evidence: pathlib.Path
+    evidence_sha256: str
+    status: str = field(default="UNVERIFIED", init=False)
+    authoritative: bool = field(default=False, init=False)
+    exit_code: int = field(default=1, init=False)
+
+
+def _record_evidence(directory: pathlib.Path, payload: dict) -> tuple[pathlib.Path, str]:
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / (uuid.uuid4().hex + ".json")
+    temporary = path.with_suffix(".tmp")
+    try:
+        with temporary.open("x") as stream:
+            json.dump(payload, stream, sort_keys=True)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+            os.replace(temporary, path)
+            directory_fd = os.open(directory, os.O_RDONLY)
+            try:
+                os.fsync(directory_fd)
+            finally:
+                os.close(directory_fd)
+            if sys.platform == "darwin":
+                fcntl.fcntl(stream.fileno(), fcntl.F_FULLFSYNC)
+    except OSError as exc:
+        raise IsolationError("evidence publication failed; no result may be presented") from exc
+    finally:
+        temporary.unlink(missing_ok=True)
+    return path, _digest(path)
+
+
+def _safe_trace(trace):
+    phases = []
+    for name, phase, report in trace:
+        # Keep the actual decision inputs without raw tracebacks/local variables.
+        try:
+            summary = _summary_body(phase.stdout)
+            if not re.fullmatch(r"[0-9a-zA-Z ,/()]+", summary):
+                summary = None
+        except IsolationError:
+            summary = None
+        phases.append({"phase": name, "returncode": phase.returncode, "summary": summary,
+                       "stdout_sha256": hashlib.sha256(phase.stdout.encode()).hexdigest(),
+                       "stderr_sha256": hashlib.sha256(phase.stderr.encode()).hexdigest(),
+                       "report": report})
+    return phases
+
+
+def run_checked_mutation(sweep, relative, old, new, targets, *, environment, timeout, evidence_dir) -> CheckedResult:
+    directory = pathlib.Path(evidence_dir).resolve()
+    if directory.is_relative_to(sweep.entry.resolve()):
+        raise IsolationError("durable evidence cannot live in the disposable sweep")
+    trace = []
+    try:
+        check = _assess_mutation(sweep, relative, old, new, targets, environment, timeout, trace)
+        signal_name, detail = check.signal, "execution checks passed; authority remains unverified"
+    except (IsolationError, OSError, ValueError) as exc:
+        signal_name, detail = "ERROR", str(exc) if isinstance(exc, IsolationError) else type(exc).__name__
+    for root, replacement in ((sweep.root, "<execution-root>"), (sweep.source_repo, "<source-root>"),
+                              (sweep.entry, "<sweep>")):
+        detail = detail.replace(str(root), replacement)
+    payload = {"version": 1, "status": "UNVERIFIED", "authoritative": False,
+               "signal": signal_name, "detail": detail, "seed_sha": sweep.seed_sha,
+               "old_sha256": hashlib.sha256(old.encode()).hexdigest(),
+               "new_sha256": hashlib.sha256(new.encode()).hexdigest(),
+               "phases": _safe_trace(trace)}
+    path, digest = _record_evidence(directory, payload)
+    return CheckedResult(signal_name, detail, path, digest)
+
+
+def present_checked_result(result: CheckedResult) -> int:
+    if result.signal not in ("ERROR", "TEST_FAILURE", "TESTS_PASSED"):
+        raise IsolationError("unsupported diagnostic signal")
+    try:
+        digest = _digest(result.evidence)
+    except OSError as exc:
+        raise IsolationError("durable evidence is unavailable") from exc
+    if digest != result.evidence_sha256:
+        raise IsolationError("durable evidence changed before presentation")
+    print(f"UNVERIFIED {result.signal}: {result.detail}")
+    return result.exit_code
 
 
 def _run_pytest(sweep, targets, environment, timeout, *, collect_only=False, mutation=None):

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Run a mutation and report whether the suite actually caught it.
+"""Run mutation diagnostics and emit UNVERIFIED observations.
 
 Mutation testing by hand is the most error-prone thing in this repo's workflow,
 and every one of its failure modes reports as a PASS. Measured on 2026-08-29,
@@ -19,7 +19,7 @@ So this tool refuses to report a result it cannot stand behind:
     anchor must match exactly once   -> otherwise ERROR, never a verdict
     backups are path-derived         -> cps/admin.py and cps/api/admin.py differ
     restore is hash-verified         -> and failure is loud
-    a SURVIVING mutant exits 1       -> the gap is the finding, not the pass
+    diagnostic observations exit 1  -> they cannot satisfy an authoritative gate
 
 Usage:
     mutate.py --file F --old STR --new STR --test TARGET [--test TARGET ...]
@@ -28,6 +28,8 @@ Usage:
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 import fcntl
 import hashlib
 import json
@@ -41,7 +43,6 @@ import subprocess
 import sys
 import tempfile
 import time
-import typing
 import uuid
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -52,7 +53,8 @@ class IsolationError(RuntimeError):
     """The disposable execution tree could not be made trustworthy."""
 
 
-class PhaseResult(typing.NamedTuple):
+@dataclass(frozen=True, slots=True)
+class PhaseResult:
     argv: tuple[str, ...]
     returncode: int | None
     stdout: str
@@ -60,6 +62,33 @@ class PhaseResult(typing.NamedTuple):
     timed_out: bool
     containment_error: str | None
     escaped_pids: tuple[int, ...]
+    status: str = field(default="UNVERIFIED", init=False)
+    authoritative: bool = field(default=False, init=False)
+
+
+@dataclass(frozen=True, slots=True)
+class DiagnosticObservation(Mapping):
+    """An immutable observation; no constructor or replacement can grant authority.
+
+    Mutants are abnormal input: conversion can erase the token while its wrapper
+    starts a new session. Only a future strong backend may supply verdicts.
+    """
+    name: str
+    returncode: int | None
+    summary: str
+    status: str = field(default="UNVERIFIED", init=False)
+    authoritative: bool = field(default=False, init=False)
+
+    def __iter__(self):
+        return iter(("name", "returncode", "summary", "status", "authoritative"))
+
+    def __len__(self):
+        return 5
+
+    def __getitem__(self, key):
+        if key not in tuple(self):
+            raise KeyError(key)
+        return getattr(self, key)
 
 
 # This is an explicit diagnostic contract, not arbitrary descendant containment.
@@ -601,7 +630,6 @@ def run_mutant(name, rel_file, old, new, tests, quiet=False):
         proc = subprocess.run(
             [sys.executable, "-m", "pytest", *tests, "-q", "-p", "no:randomly"],
             cwd=REPO, capture_output=True, text=True, timeout=1800)
-        caught = proc.returncode != 0
         tail = [ln for ln in proc.stdout.strip().splitlines() if " passed" in ln or " failed" in ln]
         summary = tail[-1] if tail else "(no pytest summary)"
     finally:
@@ -613,7 +641,7 @@ def run_mutant(name, rel_file, old, new, tests, quiet=False):
         return {"name": name, "status": "ERROR",
                 "detail": "RESTORE FAILED — working tree is dirty, fix before continuing"}
 
-    return {"name": name, "status": "caught" if caught else "SURVIVED", "summary": summary}
+    return DiagnosticObservation(name=name, returncode=proc.returncode, summary=summary)
 
 
 def main():
@@ -638,16 +666,15 @@ def main():
         tests = m["test"] if isinstance(m["test"], list) else [m["test"]]
         r = run_mutant(m.get("name", m["file"]), m["file"], m["old"], m["new"], tests)
         results.append(r)
-        mark = {"caught": "caught  ", "SURVIVED": "SURVIVED", "ERROR": "ERROR   "}[r["status"]]
+        # This harness has no strong backend. Even stale caller-supplied labels
+        # cannot promote an observation at the terminal boundary.
+        mark = "ERROR" if r["status"] == "ERROR" else "UNVERIFIED"
         print(f"  {mark}  {r['name']}  {r.get('summary', r.get('detail',''))}", flush=True)
 
-    survived = [r for r in results if r["status"] == "SURVIVED"]
-    errored = [r for r in results if r["status"] == "ERROR"]
-    print(f"\n{len(results)} mutant(s): {len(results)-len(survived)-len(errored)} caught, "
-          f"{len(survived)} SURVIVED, {len(errored)} error")
-    if errored:
-        print("errors are not verdicts — the mutant never ran; fix the anchor and re-run")
-    return 1 if (survived or errored) else 0
+    errored = sum(r["status"] == "ERROR" for r in results)
+    print(f"\n{len(results)} observation(s): {len(results)-errored} UNVERIFIED, {errored} error")
+    print("UNVERIFIED: no strong containment backend; diagnostic observations are not verdicts")
+    return 1
 
 
 if __name__ == "__main__":

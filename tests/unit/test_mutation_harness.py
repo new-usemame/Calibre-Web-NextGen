@@ -23,6 +23,7 @@ pytestmark = pytest.mark.unit
 _HARNESS = pathlib.Path(__file__).resolve().parents[1] / "mutation" / "mutate.py"
 _spec = importlib.util.spec_from_file_location("mutate", _HARNESS)
 mutate = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = mutate
 _spec.loader.exec_module(mutate)
 
 
@@ -491,7 +492,8 @@ def test_a_surviving_mutant_is_reported_and_the_file_is_restored(tmp_path, monke
     result = mutate.run_mutant("survivor", "cps/thing.py", "GUARD = True",
                                "GUARD = False", ["ignored"])
 
-    assert result["status"] == "SURVIVED", "a mutant the suite ignores must be reported, loudly"
+    assert result["status"] == "UNVERIFIED", "a diagnostic observation must not become a verdict"
+    assert result["returncode"] == 0
     assert victim.read_text() == original, "the harness left the mutation in the working tree"
 
 
@@ -560,3 +562,52 @@ def test_provenance_rejection_prevents_phase_execution(tmp_path, monkeypatch):
             )
         assert not (sweep.root / 'must-not-run').exists()
         assert sweep._phase_failed
+
+
+@pytest.mark.parametrize('returncode', [0, 1])
+def test_diagnostic_labelling_cannot_be_bypassed(tmp_path, monkeypatch, returncode):
+    import dataclasses
+    victim = tmp_path / 'victim.py'
+    victim.write_text('VALUE = 1\n')
+    monkeypatch.setattr(mutate, 'REPO', tmp_path)
+    monkeypatch.setattr(mutate.subprocess, 'run', lambda *a, **k: subprocess.CompletedProcess(
+        a[0], returncode, stdout='1 passed' if returncode == 0 else '1 failed', stderr=''))
+    result = mutate.run_mutant('diagnostic', 'victim.py', 'VALUE = 1', 'VALUE = 2', ['unused'])
+    assert result['status'] == 'UNVERIFIED', 'weak backend emitted an authoritative verdict'
+    assert result['authoritative'] is False
+    assert result['returncode'] == returncode
+    with pytest.raises((TypeError, AttributeError)):
+        result['status'] = 'caught'
+    with pytest.raises((TypeError, ValueError)):
+        dataclasses.replace(result, status='SURVIVED')
+    with pytest.raises((TypeError, AttributeError)):
+        result.status = 'caught'
+    assert dataclasses.asdict(result)['status'] == 'UNVERIFIED'
+    assert victim.read_text() == 'VALUE = 1\n'
+    print(f'LABEL observation exit={returncode} UNVERIFIED immutable (Mac/APFS only)')
+
+
+def test_phase_result_cannot_gain_authority(tmp_path):
+    import dataclasses
+    result = mutate.run_phase_process(
+        [sys.executable, '-c', 'pass'], cwd=tmp_path, environment=os.environ.copy(),
+        timeout=5, artifacts=tmp_path / 'artifacts', ownership_contract='inherited-token',
+    )
+    assert getattr(result, 'status', None) == 'UNVERIFIED', 'raw backend result lost diagnostic label'
+    assert result.authoritative is False
+    assert dataclasses.asdict(result)['status'] == 'UNVERIFIED'
+    with pytest.raises((TypeError, ValueError)):
+        dataclasses.replace(result, authoritative=True)
+
+
+@pytest.mark.parametrize('legacy_label', ['caught', 'SURVIVED'])
+def test_terminal_cannot_promote_diagnostic_results(monkeypatch, capsys, legacy_label):
+    monkeypatch.setattr(sys, 'argv', ['mutate.py', '--file', 'unused', '--old', 'a', '--new', 'b', '--test', 'unused'])
+    monkeypatch.setattr(mutate, 'run_mutant', lambda *a, **k: {
+        'name': 'diagnostic', 'status': legacy_label, 'summary': 'observation only',
+    })
+    code = mutate.main()
+    output = capsys.readouterr().out
+    assert code != 0, 'diagnostic output must not satisfy an authoritative gate'
+    assert 'UNVERIFIED' in output
+    assert 'caught' not in output and 'SURVIVED' not in output

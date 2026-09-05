@@ -5076,6 +5076,10 @@ msgid "Could not open that search result."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Could not open the synced position."
+msgstr "Die synchronisierte Leseposition konnte nicht geöffnet werden."
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "Lesen des Comic-Archivs fehlgeschlagen."
 
@@ -6841,6 +6845,11 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Restoring…"
 msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resume at {percent} from another device"
+msgstr "Bei {percent} vom anderen Gerät weiterlesen"
 
 #: cps/spa_strings.py
 msgid "Retry"
@@ -14979,12 +14988,3 @@ msgstr "Zeige Gelesen/Ungelesen-Abschnitt"
 #~ msgstr ""
 #~ "Bücher müssen zuerst archiviert werden und dann mit dem Gerät "
 #~ "synchronisiert werden, bevor ein Buch sicher gelöscht werden kann."
-
-
-#: cps/spa_strings.py
-msgid "Resume at {percent} from another device"
-msgstr "Bei {percent} vom anderen Gerät weiterlesen"
-
-#: cps/spa_strings.py
-msgid "Could not open the synced position."
-msgstr "Die synchronisierte Leseposition konnte nicht geöffnet werden."

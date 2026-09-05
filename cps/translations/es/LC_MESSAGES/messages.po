@@ -5207,6 +5207,10 @@ msgid "Could not open that search result."
 msgstr "No se pudo abrir ese resultado de búsqueda."
 
 #: cps/spa_strings.py
+msgid "Could not open the synced position."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not read this comic archive."
 msgstr "No se pudo leer este archivo de cómic."
 
@@ -7032,6 +7036,11 @@ msgstr "Se restauró el modo de biblioteca anterior para {accounts} cuentas."
 
 #: cps/spa_strings.py
 msgid "Restoring…"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Resume at {percent} from another device"
 msgstr ""
 
 #: cps/spa_strings.py

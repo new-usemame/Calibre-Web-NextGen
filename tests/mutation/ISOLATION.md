@@ -12,6 +12,10 @@ Docker must have a local Linux image, by default `python:3.12` (`docker pull pyt
 The harness copies pytest into each phase. Use `--image IMAGE` when your tests need
 additional Python packages or system libraries installed in the image.
 
+The container tests also require a reachable Linux Docker daemon and a local `python:3.12`
+image. Run `docker pull python:3.12` before enabling them. They skip when the CLI, daemon,
+or image is unavailable; they never pull an image automatically.
+
 ## What isolation you get, and why it matters
 
 Each phase — collection, baseline, mutant — starts from the pinned commit. The container

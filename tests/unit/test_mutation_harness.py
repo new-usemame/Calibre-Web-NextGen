@@ -1312,6 +1312,15 @@ def container_backend(monkeypatch, container_module):
     if shutil.which('docker') is None:
         pytest.skip('Docker required for real Linux container boundary tests')
     module = container_module
+    try:
+        daemon = module._docker('info', '--format', '{{.OSType}}')
+        if daemon.returncode or daemon.stdout.strip() != b'linux':
+            pytest.skip('Reachable Linux Docker daemon required for container tests')
+        image = module._docker('image', 'inspect', 'python:3.12', '--format', '{{.Id}}')
+        if image.returncode or not image.stdout.strip():
+            pytest.skip('Local python:3.12 image required; run docker pull python:3.12')
+    except module.ContainerError as exc:
+        pytest.skip(f'Docker unavailable for container tests: {exc}')
     # Explicit negative-control mode. The fixture owns an emergency cleanup
     # for these deliberate defects, after test assertions have seen the leak.
     fault = os.environ.get('CWNG_CONTAINER_TEST_FAULT')

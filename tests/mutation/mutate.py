@@ -33,13 +33,13 @@ import hashlib
 import json
 import os
 import pathlib
-import select
+import ctypes
+import errno
 import signal
 import shutil
 import subprocess
 import sys
 import tempfile
-import threading
 import time
 import typing
 import uuid
@@ -62,122 +62,90 @@ class PhaseResult(typing.NamedTuple):
     escaped_pids: tuple[int, ...]
 
 
-_PHASE_GATE_WRAPPER = (
-    "import os,sys; fd=int(sys.argv[1]); os.read(fd,1); os.close(fd); "
-    "os.execvpe(sys.argv[2], sys.argv[2:], os.environ)"
-)
+# This is an explicit diagnostic contract, not arbitrary descendant containment.
+_TOKEN_CONTRACT = "inherited-token"
 
 
-class _DarwinProcessTracker:
-    """Track fork notifications and retain descendant PIDs across setsid calls."""
+class _BsdInfo(ctypes.Structure):
+    """Darwin proc_bsdinfo, used to distinguish a PID from a later reuse."""
 
-    def __init__(self, leader: int) -> None:
-        self._queue = select.kqueue()
-        self._stop = threading.Event()
-        self._lock = threading.Lock()
-        self._pids = {leader}
-        self.error: str | None = None
-        self._leader = leader
-        self._register(leader)
-        self._thread = threading.Thread(target=self._watch, daemon=True)
-        self._thread.start()
-
-    def _register(self, pid: int) -> None:
-        event = select.kevent(
-            pid,
-            filter=select.KQ_FILTER_PROC,
-            flags=select.KQ_EV_ADD | select.KQ_EV_ENABLE | select.KQ_EV_CLEAR,
-            fflags=select.KQ_NOTE_FORK | select.KQ_NOTE_EXIT,
-        )
-        self._queue.control([event], 0, 0)
-
-    @staticmethod
-    def _table() -> list[tuple[int, int, int, str]]:
-        proc = subprocess.run(
-            ["ps", "-axo", "pid=,ppid=,pgid=,state="],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if proc.returncode:
-            raise IsolationError("cannot inspect Darwin process ancestry")
-        rows = []
-        for line in proc.stdout.splitlines():
-            fields = line.split()
-            if len(fields) >= 4 and all(field.isdigit() for field in fields[:3]):
-                rows.append((int(fields[0]), int(fields[1]), int(fields[2]), fields[3]))
-        return rows
-
-    def _discover_children(self) -> None:
-        rows = self._table()
-        with self._lock:
-            known = set(self._pids)
-        changed = True
-        while changed:
-            changed = False
-            for pid, ppid, pgid, state in rows:
-                if state.startswith("Z") or pid in known:
-                    continue
-                if ppid in known or pgid == self._leader:
-                    known.add(pid)
-                    changed = True
-        with self._lock:
-            new_pids = known - self._pids
-            self._pids.update(new_pids)
-        for pid in new_pids:
-            try:
-                self._register(pid)
-            except OSError:
-                if _pid_is_running(pid):
-                    self.error = f"could not register phase descendant {pid}"
-
-    def _watch(self) -> None:
-        while not self._stop.is_set():
-            try:
-                events = self._queue.control(None, 128, 0.02)
-            except OSError as exc:
-                self.error = f"process tracker failed: {exc}"
-                return
-            if any(event.fflags & select.KQ_NOTE_FORK for event in events):
-                try:
-                    self._discover_children()
-                except IsolationError as exc:
-                    self.error = str(exc)
-
-    def snapshot(self) -> set[int]:
-        with self._lock:
-            return set(self._pids)
-
-    def close(self) -> None:
-        self._stop.set()
-        self._thread.join(timeout=1)
-        self._queue.close()
+    _fields_ = (
+        [(name, ctypes.c_uint32) for name in (
+            "flags", "status", "xstatus", "pid", "ppid", "uid", "gid", "ruid",
+            "rgid", "svuid", "svgid", "reserved",
+        )]
+        + [("comm", ctypes.c_char * 16), ("name", ctypes.c_char * 32)]
+        + [(name, ctypes.c_uint32) for name in ("nfiles", "pgid", "jobc", "tdev", "tpgid")]
+        + [("nice", ctypes.c_int32), ("start_sec", ctypes.c_uint64), ("start_usec", ctypes.c_uint64)]
+    )
 
 
-def _processes_with_phase_token(token: str) -> set[int]:
-    """Find same-user descendants even after they detach from the process group."""
+def _process_identity(pid: int) -> tuple[int, int] | None:
+    info = _BsdInfo()
+    library = ctypes.CDLL(None, use_errno=True)
+    count = library.proc_pidinfo(pid, 3, 0, ctypes.byref(info), ctypes.sizeof(info))
+    if count == ctypes.sizeof(info):
+        return info.start_sec, info.start_usec
+    error = ctypes.get_errno()
+    if error == errno.ESRCH:
+        return None
+    raise IsolationError(f"cannot inspect identity of process {pid}: errno {error}")
+
+
+def _has_phase_token(pid: int, token: str) -> bool:
+    """Read Darwin's exec environment without logging arguments or environment."""
+    library = ctypes.CDLL(None, use_errno=True)
+    mib = (ctypes.c_int * 3)(1, 49, pid)  # CTL_KERN, KERN_PROCARGS2
+    size = ctypes.c_size_t()
+    for allocate in (False, True):
+        buffer = ctypes.create_string_buffer(size.value) if allocate else None
+        if library.sysctl(mib, 3, buffer, ctypes.byref(size), None, 0):
+            error = ctypes.get_errno()
+            if error in (errno.ESRCH, errno.EINVAL):
+                # Kernel tasks / exited processes have no inspectable exec args.
+                return False
+            raise IsolationError(f"cannot inspect process environment: errno {error}")
+    data = buffer.raw[:size.value]
+    argc = int.from_bytes(data[:4], sys.byteorder, signed=True)
+    if argc < 0:
+        raise IsolationError("malformed process arguments")
+    try:
+        offset = data.index(b"\0", 4) + 1  # executable path, then padding
+        while offset < len(data) and data[offset] == 0:
+            offset += 1
+        for _ in range(argc):
+            offset = data.index(b"\0", offset) + 1
+    except ValueError as exc:
+        raise IsolationError("malformed process arguments") from exc
     marker = f"CWNG_MUTATION_PHASE_TOKEN={token}".encode()
-    if sys.platform.startswith("linux"):
-        matches: set[int] = set()
-        try:
-            entries = pathlib.Path("/proc").iterdir()
-        except OSError as exc:
-            raise IsolationError(f"cannot inspect phase processes: {exc}") from exc
-        for entry in entries:
-            if not entry.name.isdigit():
-                continue
-            try:
-                environment = (entry / "environ").read_bytes()
-            except (FileNotFoundError, PermissionError, ProcessLookupError):
-                continue
-            except OSError as exc:
-                raise IsolationError(f"cannot inspect process {entry.name}: {exc}") from exc
-            if marker in environment.split(b"\0"):
-                matches.add(int(entry.name))
-        return matches
-    if sys.platform == "darwin":
-        raise IsolationError("Darwin phase ownership requires the active kqueue tracker")
-    raise IsolationError(f"process-tree verification is unsupported on {sys.platform}")
+    return marker in data[offset:].split(b"\0")
+
+
+def _phase_members(pgid: int, token: str) -> dict[int, tuple[int, bool]]:
+    """Inspect group and visible inherited-token processes, retaining zombies.
+
+    Clearing a token, changing credentials, and uninspectable exec environments
+    are outside this diagnostic contract. This is not a complete ownership proof.
+    """
+    try:
+        result = subprocess.run(
+            ["ps", "-U", str(os.getuid()), "-o", "pid=,pgid=,state="],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise IsolationError("cannot inspect phase process table") from exc
+    if result.returncode:
+        raise IsolationError("cannot inspect phase process table")
+    members = {}
+    for line in result.stdout.splitlines():
+        fields = line.split()
+        if len(fields) != 3 or not fields[0].isdigit() or not fields[1].isdigit():
+            raise IsolationError("malformed process table")
+        pid, group = int(fields[0]), int(fields[1])
+        zombie = fields[2].startswith("Z")
+        if group == pgid or (not zombie and _has_phase_token(pid, token)):
+            members[pid] = (group, zombie)
+    return members
 
 
 def _signal_group(pgid: int, sig: signal.Signals) -> None:
@@ -185,133 +153,66 @@ def _signal_group(pgid: int, sig: signal.Signals) -> None:
         os.killpg(pgid, sig)
     except ProcessLookupError:
         pass
-    except PermissionError:
-        pass
+    # Permission and other errors must reach the caller's error result.
 
 
-def _pid_is_running(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
-        return False
-    except PermissionError:
-        return True
-    if sys.platform.startswith("linux"):
+def _terminate_phase_processes(proc, token: str) -> tuple[tuple[int, ...], str | None]:
+    """Kill and observe disappearance under the inherited-token diagnostic contract.
+
+    The direct child is reaped by Popen; orphan descendants are reaped by the OS.
+    Zombies are retained until disappearance, rather than treated as reaped.
+    """
+    escaped = set()
+    known = {}
+    errors = []
+    deadline = time.monotonic() + 3
+    while True:
+        proc.poll()  # reap the leader before checking the process group
         try:
-            return (pathlib.Path("/proc") / str(pid) / "stat").read_text().split()[2] != "Z"
-        except (FileNotFoundError, ProcessLookupError):
-            return False
-    if sys.platform == "darwin":
-        proc = subprocess.run(
-            ["ps", "-p", str(pid), "-o", "state="],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        return proc.returncode == 0 and not proc.stdout.strip().startswith("Z")
-    return True
-
-
-def _group_exists(pgid: int) -> bool:
-    if sys.platform.startswith("linux"):
-        for entry in pathlib.Path("/proc").iterdir():
-            if not entry.name.isdigit():
-                continue
+            members = _phase_members(proc.pid, token)
+            for pid, (group, zombie) in members.items():
+                identity = _process_identity(pid)
+                if identity is not None:
+                    known[pid] = identity
+                    if group != proc.pid:
+                        escaped.add(pid)
+            # Kill immediately: a grace period permits further forks and writes.
+            # Do not signal a reused process-group ID after the group has vanished.
+            if any(group == proc.pid for group, _ in members.values()):
+                _signal_group(proc.pid, signal.SIGKILL)
+            for pid, identity in list(known.items()):
+                current = _process_identity(pid)
+                if current != identity:
+                    del known[pid]
+                    continue
+                if pid in members and members[pid][1]:
+                    continue  # a zombie cannot be signalled into being reaped
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            proc.poll()
+            if not members and not known and proc.returncode is not None:
+                break
+        except (IsolationError, OSError) as exc:
+            errors.append(str(exc))
+            # Ownership inspection failure must not bypass direct group cleanup.
             try:
-                fields = (entry / "stat").read_text().split()
-            except (FileNotFoundError, PermissionError, ProcessLookupError):
-                continue
-            if int(fields[4]) == pgid and fields[2] != "Z":
-                return True
-        return False
-    if sys.platform == "darwin":
-        proc = subprocess.run(
-            ["ps", "-axo", "pgid=,state="],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if proc.returncode:
-            return True
-        for line in proc.stdout.splitlines():
-            fields = line.split()
-            if len(fields) >= 2 and fields[0].isdigit():
-                if int(fields[0]) == pgid and not fields[1].startswith("Z"):
-                    return True
-        return False
+                _signal_group(proc.pid, signal.SIGKILL)
+            except OSError as cleanup_error:
+                errors.append(str(cleanup_error))
+            break
+        if time.monotonic() >= deadline:
+            errors.append("phase processes remain or have not been reaped before cleanup deadline")
+            break
+        time.sleep(.01)
     try:
-        os.killpg(pgid, 0)
-    except ProcessLookupError:
-        return False
-    return True
-
-
-def _wait_until_gone(check, timeout: float) -> bool:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if not check():
-            return True
-        time.sleep(0.01)
-    return not check()
-
-
-def _terminate_phase_processes(
-    pgid: int,
-    token: str,
-    tracked_pids: set[int],
-    tracking_error: str | None,
-) -> tuple[tuple[int, ...], str | None]:
-    """Terminate the group, then detect and terminate token-bearing escapees."""
-    observed_escapees = set()
-    for pid in tracked_pids:
-        if pid == pgid or not _pid_is_running(pid):
-            continue
-        try:
-            if os.getpgid(pid) != pgid:
-                observed_escapees.add(pid)
-        except ProcessLookupError:
-            pass
-    _signal_group(pgid, signal.SIGTERM)
-    if not _wait_until_gone(lambda: _group_exists(pgid), 0.5):
-        _signal_group(pgid, signal.SIGKILL)
-        _wait_until_gone(lambda: _group_exists(pgid), 0.5)
-
-    if sys.platform.startswith("linux"):
-        try:
-            escaped = _processes_with_phase_token(token)
-        except IsolationError as exc:
-            return (), str(exc)
-    else:
-        escaped = {pid for pid in tracked_pids if _pid_is_running(pid)}
-    escaped.discard(os.getpid())
-    observed_escapees.update(escaped)
-    for pid in escaped:
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-    _wait_until_gone(lambda: any(_pid_is_running(pid) for pid in escaped), 0.5)
-    remaining = {pid for pid in escaped if _pid_is_running(pid)}
-    for pid in remaining:
-        try:
-            os.kill(pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-    if not _wait_until_gone(lambda: any(_pid_is_running(pid) for pid in remaining), 0.5):
-        still_running = sorted(pid for pid in remaining if _pid_is_running(pid))
-        return tuple(sorted(observed_escapees)), (
-            f"phase-owned processes remain after termination: {still_running}"
-        )
-    if _group_exists(pgid):
-        return tuple(sorted(observed_escapees)), (
-            f"phase process group {pgid} remains after termination"
-        )
-    if tracking_error:
-        return tuple(sorted(observed_escapees)), tracking_error
-    if observed_escapees:
-        observed = tuple(sorted(observed_escapees))
-        return observed, f"phase process escaped its process group: {list(observed)}"
-    return (), None
+        proc.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        errors.append("phase leader survived termination")
+    if escaped:
+        errors.append(f"phase process escaped its process group: {sorted(escaped)}")
+    return tuple(sorted(escaped)), "; ".join(errors) or None
 
 
 def run_phase_process(
@@ -321,70 +222,43 @@ def run_phase_process(
     environment: dict[str, str],
     timeout: float,
     artifacts: pathlib.Path,
+    ownership_contract: str | None = None,
 ) -> PhaseResult:
-    """Run one phase and prove that no token-bearing process survived it."""
+    """Run a Mac diagnostic phase with a deliberately restricted ownership contract.
+
+    Arbitrary process-tree containment is unavailable on this backend. The default
+    rejects before launch. Diagnostic callers must explicitly require every child
+    to retain its token and user identity, and permit process-table inspection.
+    The command-line mutation flow does not opt in to this weaker contract.
+    """
+    if ownership_contract != _TOKEN_CONTRACT or sys.platform != "darwin":
+        raise IsolationError(
+            "arbitrary descendant containment is unavailable; "
+            "the Mac diagnostic backend requires an explicit inherited-token contract"
+        )
+    if timeout <= 0 or not argv:
+        raise ValueError("a phase needs an argv and a positive timeout")
     artifacts.mkdir(parents=True, exist_ok=True)
     token = uuid.uuid4().hex
-    env = dict(environment)
-    env["CWNG_MUTATION_PHASE_TOKEN"] = token
+    env = {**environment, "CWNG_MUTATION_PHASE_TOKEN": token}
     stdout_path = artifacts / f"{token}.stdout"
     stderr_path = artifacts / f"{token}.stderr"
-    returncode: int | None = None
     timed_out = False
-    containment_error: str | None = None
-    escaped: tuple[int, ...] = ()
-    with stdout_path.open("wb") as stdout_file, stderr_path.open("wb") as stderr_file:
-        gate_read, gate_write = os.pipe()
+    with stdout_path.open("wb") as out, stderr_path.open("wb") as err:
+        # No gate or tracker is needed: ownership is inherited at exec, not sampled
+        # from a disappearing parent-child relationship after a fork notification.
         proc = subprocess.Popen(
-            [sys.executable, "-c", _PHASE_GATE_WRAPPER, str(gate_read), *argv],
-            cwd=cwd,
-            env=env,
-            stdout=stdout_file,
-            stderr=stderr_file,
-            start_new_session=True,
-            pass_fds=(gate_read,),
+            argv, cwd=cwd, env=env, stdout=out, stderr=err, start_new_session=True,
         )
-        os.close(gate_read)
-        tracker = _DarwinProcessTracker(proc.pid) if sys.platform == "darwin" else None
-        os.write(gate_write, b"1")
-        os.close(gate_write)
         try:
-            returncode = proc.wait(timeout=timeout)
+            proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
             timed_out = True
         finally:
-            if timed_out and proc.poll() is None:
-                _signal_group(proc.pid, signal.SIGTERM)
-                try:
-                    returncode = proc.wait(timeout=0.5)
-                except subprocess.TimeoutExpired:
-                    _signal_group(proc.pid, signal.SIGKILL)
-                    try:
-                        returncode = proc.wait(timeout=0.5)
-                    except subprocess.TimeoutExpired:
-                        pass
-            tracked = tracker.snapshot() if tracker else {proc.pid}
-            tracking_error = tracker.error if tracker else None
-            escaped, containment_error = _terminate_phase_processes(
-                proc.pid, token, tracked, tracking_error
-            )
-            if tracker:
-                tracker.close()
-            if proc.poll() is None:
-                try:
-                    returncode = proc.wait(timeout=1)
-                except subprocess.TimeoutExpired:
-                    containment_error = containment_error or "phase leader survived termination"
-    stdout = stdout_path.read_text(errors="replace")
-    stderr = stderr_path.read_text(errors="replace")
+            escaped, containment_error = _terminate_phase_processes(proc, token)
     return PhaseResult(
-        argv=tuple(argv),
-        returncode=returncode,
-        stdout=stdout,
-        stderr=stderr,
-        timed_out=timed_out,
-        containment_error=containment_error,
-        escaped_pids=escaped,
+        tuple(argv), proc.returncode, stdout_path.read_text(errors="replace"),
+        stderr_path.read_text(errors="replace"), timed_out, containment_error, escaped,
     )
 
 

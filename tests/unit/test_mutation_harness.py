@@ -1598,3 +1598,70 @@ def test_container_scratch_does_not_follow_pytest_tmp_path(tmp_path, request, mo
     scratch = request.getfixturevalue('docker_scratch')
     assert not scratch.is_relative_to(tmp_path)
     assert scratch.is_relative_to(pathlib.Path('/tmp').resolve())
+
+
+def test_container_unshareable_scratch_fails_fast(container_module, monkeypatch):
+    def blocked(command, **kwargs):
+        assert kwargs['timeout'] <= 5, 'unshareable scratch can hang for 30 seconds'
+        raise subprocess.TimeoutExpired(command, kwargs['timeout'])
+
+    monkeypatch.setattr(container_module.subprocess, 'run', blocked)
+    with pytest.raises(container_module.ContainerError, match='--scratch-dir /tmp') as error:
+        container_module._docker('create', '--mount', 'type=bind,src=/unshared,dst=/out')
+    print(str(error.value))
+
+
+def test_container_create_timeout_removes_container_if_created(tmp_path, docker_scratch, container_module, monkeypatch):
+    repo, seed = _committed_repo(tmp_path)
+    original = subprocess.run
+    created, removed = [], []
+    token = None
+
+    def engine(command, **kwargs):
+        nonlocal token
+        if command[0] != 'docker':
+            return original(command, **kwargs)
+        action = command[1]
+        if action == 'info':
+            output = b'linux\n'
+        elif action == 'image':
+            output = b'sha256:fixture\n'
+        elif action == 'create':
+            token = command[command.index('--label') + 1].split('=', 1)[1]
+            created.append('a' * 64)
+            # Model Docker creating the object but losing the CLI reply.
+            raise subprocess.TimeoutExpired(command, kwargs['timeout'])
+        elif action == 'container':
+            output = json.dumps([{'Id': created[0], 'Config': {'Labels': {
+                container_module.LABEL: token}}}]).encode()
+        elif action == 'rm':
+            removed.append(command[-1])
+            output = b''
+        elif action == 'ps':
+            output = b''
+        else:
+            pytest.fail('unexpected Docker operation: ' + action)
+        return subprocess.CompletedProcess(command, 0, output, b'')
+
+    monkeypatch.setattr(container_module.subprocess, 'run', engine)
+    sweep = container_module.ContainerSweep(repo, seed)
+    with pytest.raises(container_module.ContainerError, match='--scratch-dir /tmp'):
+        sweep.run_phase(['true'], output=docker_scratch)
+    assert created == removed == ['a' * 64]
+
+
+def test_container_scratch_timeout_message_with_real_wait(tmp_path, container_module, monkeypatch):
+    binaries = tmp_path / 'bin'
+    binaries.mkdir()
+    docker = binaries / 'docker'
+    # Simulate the measured stalled create without disturbing a shared daemon.
+    # exec keeps this a single child that subprocess.run kills and reaps.
+    docker.write_text('#!/bin/sh\nexec /bin/sleep 60\n')
+    docker.chmod(0o755)
+    monkeypatch.setenv('PATH', str(binaries))
+    start = time.monotonic()
+    with pytest.raises(container_module.ContainerError, match='--scratch-dir /tmp') as error:
+        container_module._docker('create', '--mount', 'type=bind,src=/unshared,dst=/out')
+    elapsed = time.monotonic() - start
+    assert elapsed < 8, 'scratch failure exceeded the short create timeout'
+    print(f'Simulated stalled create: {elapsed:.2f}s; {error.value}')

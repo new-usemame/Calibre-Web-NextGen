@@ -96,7 +96,7 @@ def blueprint_probes(app):
                  if r.endpoint.rsplit(".", 1)[0] == name]
         if not rules:
             assert name == "jinjia", f"New routeless blueprint needs a behavioral check: {name}"
-            assert "shortentitle" in app.jinja_env.filters
+            assert app.jinja_env.filters["shortentitle"]("fixture", 20) == "fixture"
             continue
         candidates = sorted(rules, key=lambda r: (
             "GET" not in r.methods, not r.endpoint.endswith(".authorized"),

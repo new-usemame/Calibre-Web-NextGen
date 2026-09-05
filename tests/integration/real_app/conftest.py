@@ -1,5 +1,6 @@
 """Real application fixture. Run in a fresh interpreter; cps owns process state."""
 import sqlite3
+import tempfile
 from pathlib import Path
 import sys
 
@@ -10,9 +11,10 @@ import pytest
 def real_app(tmp_path_factory):
     assert "cps" not in sys.modules, "Run these cases in a fresh interpreter"
     root = tmp_path_factory.mktemp("real-app")
-    for name in ("config", "library", "ingest", "conversion"):
+    for name in ("config", "library", "ingest", "conversion", "tmp"):
         (root / name).mkdir()
     overrides = {
+        "TMPDIR": str(root / "tmp"),
         "CALIBRE_DBPATH": str(root / "config"),
         "CWA_DB_PATH": str(root / "config"),
         "CWA_CALIBRE_LIBRARY_DIR": str(root / "library"),
@@ -23,6 +25,7 @@ def real_app(tmp_path_factory):
     with pytest.MonkeyPatch.context() as patch:
         for key, value in overrides.items():
             patch.setenv(key, value)
+        patch.setattr(tempfile, "tempdir", str(root / "tmp"))
         patch.setattr(sys, "argv", ["cps", "-p", str(root / "config" / "app.db")])
         import cps
         from cps import services

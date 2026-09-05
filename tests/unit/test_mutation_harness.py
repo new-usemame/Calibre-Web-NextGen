@@ -20,6 +20,23 @@ import pytest
 
 pytestmark = pytest.mark.unit
 
+# Test-only proxy exercises the Linux selection and backend rejection on macOS.
+TEST_PLATFORM = os.environ.get("CWNG_TEST_PLATFORM", sys.platform)
+DARWIN_REASON = "requires macOS diagnostic process backend"
+DARWIN_ONLY = pytest.mark.skipif(TEST_PLATFORM != "darwin", reason=DARWIN_REASON)
+
+
+@pytest.fixture(autouse=True)
+def _platform_proxy(monkeypatch):
+    if TEST_PLATFORM == "linux" and sys.platform != "linux":
+        from types import SimpleNamespace
+        monkeypatch.setattr(mutate, "sys", SimpleNamespace(**{**vars(sys), "platform": "linux"}))
+        def forbidden(*a, **k):
+            pytest.fail("Linux proxy reached a Darwin process syscall")
+        monkeypatch.setattr(mutate, "_process_identity", forbidden)
+        monkeypatch.setattr(mutate, "_has_phase_token", forbidden)
+
+
 _HARNESS = pathlib.Path(os.environ.get("CWNG_CHECK_MUTANT",
     str(pathlib.Path(__file__).resolve().parents[1] / "mutation" / "mutate.py")))
 _spec = importlib.util.spec_from_file_location("mutate", _HARNESS)
@@ -163,6 +180,7 @@ def _assert_child_gone(root):
     assert not (root / "late-write").exists(), "child invalidated the boundary after exit"
 
 
+@DARWIN_ONLY
 def test_phase_exit_kills_a_child_that_would_write_later(tmp_path):
     result = mutate.run_phase_process(
         ownership_contract="inherited-token",
@@ -175,6 +193,7 @@ def test_phase_exit_kills_a_child_that_would_write_later(tmp_path):
     _assert_child_gone(tmp_path)
 
 
+@DARWIN_ONLY
 def test_phase_escape_is_terminated_and_is_an_error(tmp_path):
     result = mutate.run_phase_process(
         ownership_contract="inherited-token",
@@ -188,6 +207,7 @@ def test_phase_escape_is_terminated_and_is_an_error(tmp_path):
     _assert_child_gone(tmp_path)
 
 
+@DARWIN_ONLY
 def test_phase_timeout_is_not_a_process_leak(tmp_path):
     result = mutate.run_phase_process(
         ownership_contract="inherited-token",
@@ -233,6 +253,7 @@ def test_strict_containment_is_rejected_before_launch(tmp_path, monkeypatch):
     assert not (tmp_path / "artifacts").exists()
 
 
+@DARWIN_ONLY
 def test_process_inspection_failure_is_an_error_and_still_kills_group(tmp_path, monkeypatch):
     def broken(*args):
         raise mutate.IsolationError("injected process inspection failure")
@@ -245,6 +266,7 @@ def test_process_inspection_failure_is_an_error_and_still_kills_group(tmp_path, 
     _assert_child_gone(tmp_path)
 
 
+@DARWIN_ONLY
 def test_interruption_still_terminates_phase_group(tmp_path, monkeypatch):
     original = mutate.subprocess.Popen
     class InterruptingPopen(original):
@@ -270,6 +292,7 @@ def test_interruption_still_terminates_phase_group(tmp_path, monkeypatch):
     _assert_child_gone(tmp_path)
 
 
+@DARWIN_ONLY
 def test_launch_failure_does_not_leak_descriptors(tmp_path):
     before = len(list(pathlib.Path("/dev/fd").iterdir()))
     with pytest.raises(FileNotFoundError):
@@ -280,6 +303,7 @@ def test_launch_failure_does_not_leak_descriptors(tmp_path):
     assert len(list(pathlib.Path("/dev/fd").iterdir())) == before
 
 
+@DARWIN_ONLY
 def test_tokenless_detached_child_is_outside_diagnostic_contract(tmp_path):
     # This finite child is deliberate evidence of the remaining backend gap.
     child = "import pathlib,time; pathlib.Path('ready').write_text('ready'); time.sleep(1.5); pathlib.Path('outside').write_text('wrote')"
@@ -302,6 +326,7 @@ def test_tokenless_detached_child_is_outside_diagnostic_contract(tmp_path):
     print("LIMITATION tokenless detached child survived diagnostic cleanup; strict mode rejects before launch (Mac/APFS only)")
 
 
+@DARWIN_ONLY
 def test_sweep_scrubs_after_cleanup_and_again_before_each_phase(tmp_path, monkeypatch):
     repo, seed = _committed_repo(tmp_path)
     events = []
@@ -342,6 +367,7 @@ def test_sweep_scrubs_after_cleanup_and_again_before_each_phase(tmp_path, monkey
 
 
 @pytest.mark.parametrize("failure", ["escape", "timeout"])
+@DARWIN_ONLY
 def test_sweep_errors_stop_the_next_phase(tmp_path, failure):
     repo, seed = _committed_repo(tmp_path)
     with mutate.IsolatedSweep.create(repo, seed, state_root=tmp_path / "state") as sweep:
@@ -408,6 +434,7 @@ def _poison_program(channel, seed):
 
 
 @pytest.mark.parametrize("channel", _POISON_CHANNELS)
+@DARWIN_ONLY
 def test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one(tmp_path, channel):
     """Set CWNG_POISON_BOUNDARY=shared to observe this same assertion red."""
     repo, seed = _committed_repo(tmp_path)
@@ -463,6 +490,7 @@ def test_isolated_invalid_anchor_preserves_source(tmp_path, old, body):
         assert json.loads(result.evidence.read_text())['phases'] == []
 
 
+@DARWIN_ONLY
 def test_isolated_passing_mutant_preserves_dirty_source(tmp_path):
     repo = _soundness_repo(tmp_path, body='def test_value(): assert True\n')
     (repo / 'victim.py').write_text('LOCAL = 99\n')
@@ -484,6 +512,7 @@ def test_provenance_environment_pins_root_without_mutating_input(tmp_path):
     assert prepared["KEEP"] == "yes"
 
 
+@DARWIN_ONLY
 def test_real_cps_provenance_all_three_shapes(tmp_path):
     seed = _git(mutate.REPO, 'rev-parse', 'HEAD')
     with mutate.IsolatedSweep.create(mutate.REPO, seed, state_root=tmp_path / 'state') as sweep:
@@ -505,6 +534,7 @@ def test_real_cps_provenance_all_three_shapes(tmp_path):
 
 
 @pytest.mark.parametrize('shape', ['pytest', 'child', 'console'])
+@DARWIN_ONLY
 def test_provenance_rejects_each_outside_import(tmp_path, shape):
     repo, seed = _committed_repo(tmp_path)
     foreign = tmp_path / 'foreign'
@@ -529,6 +559,7 @@ def test_provenance_rejects_each_outside_import(tmp_path, shape):
         print(f"PROVENANCE negative shape={shape}: {error.value} (Mac/APFS only)")
 
 
+@DARWIN_ONLY
 def test_provenance_rejection_prevents_phase_execution(tmp_path, monkeypatch):
     repo, seed = _committed_repo(tmp_path)
     monkeypatch.setattr(mutate, 'provenance_environment', lambda root, env: {**env, 'PYTHONPATH': ''})
@@ -559,6 +590,7 @@ def test_diagnostic_labels_reject_normal_assignment(tmp_path, returncode):
         mutate.CheckedResult(signal, 'diagnostic', tmp_path / 'evidence', 'digest', status='caught')
 
 
+@DARWIN_ONLY
 def test_phase_result_rejects_normal_authority_assignment(tmp_path):
     import dataclasses
     result = mutate.run_phase_process(
@@ -581,6 +613,7 @@ def test_terminal_cannot_promote_diagnostic_results(tmp_path, capsys, legacy_lab
 
 
 @pytest.mark.parametrize('observed_exit', [0, 1])
+@DARWIN_ONLY
 def test_real_cli_observations_never_satisfy_authoritative_gate(tmp_path, observed_exit):
     body = """from pathlib import Path
 import cps
@@ -692,6 +725,7 @@ def test_collection_accounting_accepts_selected_numerator(tmp_path):
     assert mutate.validate_collection(tmp_path, phase, report) == tuple(report['selected'])
 
 
+@DARWIN_ONLY
 def test_collection_real_pytest_selected_numerator(tmp_path):
     repo, seed = _committed_repo(tmp_path)
     (repo / 'test_probe.py').write_text('def test_one(): pass\ndef test_two(): pass\ndef test_other(): pass\n')
@@ -764,6 +798,7 @@ def _soundness_repo(tmp_path, *, broken=False, body=None):
     return repo
 
 
+@DARWIN_ONLY
 def test_execution_real_broken_baseline_stops_mutant(tmp_path):
     repo = _soundness_repo(tmp_path, broken=True)
     trace = []
@@ -774,6 +809,7 @@ def test_execution_real_broken_baseline_stops_mutant(tmp_path):
         assert [name for name, _, _ in trace] == ['collection', 'baseline']
 
 
+@DARWIN_ONLY
 def test_execution_real_clean_baseline_and_visible_mutation(tmp_path):
     repo = _soundness_repo(tmp_path)
     trace = []
@@ -821,6 +857,7 @@ def _mock_assessment(monkeypatch):
     monkeypatch.setattr(mutate, '_assess_mutation', lambda *a, **k: mutate.ExecutionCheck('TESTS_PASSED', 1, 0))
 
 
+@DARWIN_ONLY
 def test_durable_evidence_precedes_return_and_presentation(tmp_path, monkeypatch, capsys):
     repo, _ = _committed_repo(tmp_path)
     _mock_assessment(monkeypatch)
@@ -872,6 +909,7 @@ def test_evidence_cannot_be_disposable_or_changed_before_presentation(tmp_path, 
 
 
 @pytest.mark.parametrize('kind', ['xfail_notrun', 'xfail_run', 'setup_error', 'timeout', 'noop', 'pass'])
+@DARWIN_ONLY
 def test_checked_real_outcomes_are_durable_and_unverified(tmp_path, kind):
     bodies = {
         'xfail_notrun': "import pytest\n@pytest.mark.xfail(run=False)\ndef test_value(): raise AssertionError('must not execute')\n",
@@ -962,6 +1000,7 @@ def test_cli_has_no_clear_journal_option(monkeypatch):
 
 
 @pytest.mark.parametrize('mode', ['spec', 'provenance_reject'])
+@DARWIN_ONLY
 def test_cli_spec_and_provenance_rejection_are_live(tmp_path, mode):
     repo = _soundness_repo(tmp_path, body='def test_value(): assert True\n')
     if mode == 'provenance_reject':
@@ -1007,6 +1046,7 @@ def test_cli_invalid_spec_never_allocates_sweep(tmp_path, monkeypatch, capsys, d
     assert 'UNVERIFIED ERROR' in capsys.readouterr().out
 
 
+@DARWIN_ONLY
 def test_review_preflight_cannot_erase_measured_mutant(tmp_path):
     repo = _soundness_repo(tmp_path)
     (repo / 'conftest.py').write_text(
@@ -1034,6 +1074,7 @@ def test_review_preflight_cannot_erase_measured_mutant(tmp_path):
 
 
 @pytest.mark.parametrize('fault', ['scrub', 'verification'])
+@DARWIN_ONLY
 def test_review_post_preflight_boundary_rejects_contamination(tmp_path, monkeypatch, fault):
     repo, seed = _committed_repo(tmp_path)
     with mutate.IsolatedSweep.create(repo, seed, state_root=tmp_path / 'state') as sweep:
@@ -1061,6 +1102,7 @@ def test_review_post_preflight_boundary_rejects_contamination(tmp_path, monkeypa
                 ownership_contract='inherited-token', mutation=plan)
 
 
+@DARWIN_ONLY
 def test_review_actual_target_import_must_be_local(tmp_path):
     body = (
         'import os,sys\nfrom pathlib import Path\nimport cps\n'
@@ -1081,6 +1123,7 @@ def test_review_actual_target_import_must_be_local(tmp_path):
     assert payload['signal'] == 'ERROR' and 'target provenance' in payload['detail'], cli.stdout
 
 
+@DARWIN_ONLY
 def test_review_unobserved_target_is_not_a_passing_mutation(tmp_path):
     repo = _soundness_repo(tmp_path)
     (repo / 'test_probe.py').write_text('def test_value(): assert True\n')
@@ -1094,6 +1137,7 @@ def test_review_unobserved_target_is_not_a_passing_mutation(tmp_path):
 
 
 @pytest.mark.parametrize('relative', ['victim.py', 'cps/__init__.py'])
+@DARWIN_ONLY
 def test_review_target_witness_accepts_real_local_execution(tmp_path, relative):
     repo = _soundness_repo(tmp_path)
     if relative == 'cps/__init__.py':
@@ -1146,3 +1190,12 @@ def test_review_matrix_driver_is_diagnostic_and_nonzero(tmp_path):
     assert proc.returncode == 1
     assert 'UNVERIFIED' in proc.stdout and 'UNVERIFIED' in output.read_text()
     assert 'SURVIVOR' not in proc.stdout
+
+
+def test_platform_partition_retains_native_coverage(request):
+    marked = [item for item in request.session.items
+              if any(mark.kwargs.get('reason') == DARWIN_REASON for mark in item.iter_markers('skipif'))]
+    assert marked, 'macOS-specific tests must remain visibly collected'
+    for item in marked:
+        mark = next(m for m in item.iter_markers('skipif') if m.kwargs.get('reason') == DARWIN_REASON)
+        assert mark.args[0] is (TEST_PLATFORM != 'darwin')

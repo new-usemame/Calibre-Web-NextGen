@@ -129,6 +129,18 @@ def _has_phase_token(pid: int, token: str) -> bool:
             if error in (errno.ESRCH, errno.EINVAL):
                 # Kernel tasks / exited processes have no inspectable exec args.
                 return False
+            if error == errno.EIO:
+                # The process may have exited since the process-table snapshot.
+                # A fresh absent/zombie result needs no environment inspection.
+                try:
+                    state = subprocess.run(["ps", "-p", str(pid), "-o", "state="],
+                                           capture_output=True, text=True, timeout=5)
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
+                else:
+                    if ((state.returncode == 1 and not state.stdout.strip() and not state.stderr.strip())
+                            or (state.returncode == 0 and state.stdout.strip().startswith("Z"))):
+                        return False
             raise IsolationError(f"cannot inspect process environment: errno {error}")
     data = buffer.raw[:size.value]
     argc = int.from_bytes(data[:4], sys.byteorder, signed=True)
@@ -1009,7 +1021,10 @@ def main():
         if args.backend == "container":
             from container_backend import run_sweep
             args.repo, args.evidence_dir = repo, evidence
-            return run_sweep(args, mutants, sys.modules[__name__])
+            try:
+                return run_sweep(args, mutants, sys.modules[__name__])
+            except RuntimeError as exc:
+                raise IsolationError(str(exc)) from exc
         print("UNVERIFIED diagnostic backend; committed seed only; shared Git writes UNSUPPORTED", flush=True)
         print("Outside boundary: temporary directories, venv, home, common Git data, Docker, "
               "databases, network, ports, caches, services and escaped processes", flush=True)
@@ -1027,8 +1042,9 @@ def main():
         return 1
     except (IsolationError, OSError, ValueError) as exc:
         detail = str(exc) if isinstance(exc, IsolationError) else type(exc).__name__
-        print(f"UNVERIFIED ERROR: {detail}", flush=True)
-        return 1
+        prefix = "ERROR" if args.backend == "container" else "UNVERIFIED ERROR"
+        print(f"{prefix}: {detail}", flush=True)
+        return 2 if args.backend == "container" else 1
 
 
 if __name__ == "__main__":

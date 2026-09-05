@@ -1522,3 +1522,54 @@ def test_container_cli_runs_real_sweep(tmp_path, container_backend, kind):
     assert (repo / 'victim.py').read_text() == 'VALUE = 1\n'
     assert not (repo / 'previous-phase').exists()
     print(result.stdout, end='')
+
+
+@pytest.mark.parametrize('failure,expected', [
+    ('missing', 'Docker CLI not found. Install Docker'),
+    ('daemon', 'Cannot reach the Docker daemon. Start Docker'),
+    ('image', 'not available locally. Pull or build it first'),
+    ('create', 'Docker could not create the phase container. Check free resources'),
+])
+def test_container_cli_docker_errors_are_actionable(tmp_path, failure, expected):
+    import shutil
+    repo, seed = _committed_repo(tmp_path)
+    binaries = tmp_path / 'bin'
+    binaries.mkdir()
+    (binaries / 'git').symlink_to(shutil.which('git'))
+    if failure != 'missing':
+        docker = binaries / 'docker'
+        docker.write_text('#!/bin/sh\n'
+            + ('exit 1\n' if failure == 'daemon' else
+               'case "$1" in\ninfo) printf "linux\\n";;\n'
+               + ('image) exit 1;;\n' if failure == 'image' else 'image) printf "sha256:fixture\\n";;\n')
+               + '*) exit 1;;\nesac\n'))
+        docker.chmod(0o755)
+    result = subprocess.run([sys.executable, str(_HARNESS), '--backend', 'container',
+        '--repo', str(repo), '--seed', seed, '--file', 'victim.py', '--old', '1', '--new', '2',
+        '--test', 'test_probe.py', '--evidence-dir', str(tmp_path / 'evidence'),
+        '--scratch-dir', str(tmp_path)], capture_output=True, text=True, timeout=30,
+        env={**os.environ, 'PATH': str(binaries)})
+    assert result.returncode == 2
+    assert expected in result.stdout, result.stdout + result.stderr
+    assert result.stdout.count('ERROR') == 1
+    assert 'UNVERIFIED' not in result.stdout
+    assert 'Traceback' not in result.stderr
+    assert result.stderr == ''
+    print(result.stdout, end='')
+
+
+@pytest.mark.parametrize('state,returncode,stderr,finished', [
+    ('Z\n', 0, '', True), ('', 1, '', True), ('S\n', 0, '', False),
+    ('', 1, 'ps failed', False),
+])
+def test_darwin_process_exit_between_table_and_arguments(monkeypatch, state, returncode, stderr, finished):
+    from types import SimpleNamespace
+    monkeypatch.setattr(mutate.ctypes, 'CDLL', lambda *a, **k: SimpleNamespace(sysctl=lambda *a: -1))
+    monkeypatch.setattr(mutate.ctypes, 'get_errno', lambda: 5)
+    monkeypatch.setattr(mutate.subprocess, 'run', lambda *a, **k:
+                        subprocess.CompletedProcess(a, returncode, state, stderr))
+    if finished:
+        assert mutate._has_phase_token(123, 'test-token') is False
+    else:
+        with pytest.raises(mutate.IsolationError, match='errno 5'):
+            mutate._has_phase_token(123, 'test-token')

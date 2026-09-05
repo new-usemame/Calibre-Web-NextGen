@@ -26,6 +26,10 @@ LIMITS = ("Outside containment: externally delegated work in databases, network 
           "the container. Not hermetic. Execution provenance is UNVERIFIED.")
 
 
+class ContainerError(RuntimeError):
+    """A container operation failed; the message tells the developer what to try."""
+
+
 @dataclass(frozen=True, slots=True)
 class ContainerObservation:
     returncode: int | None
@@ -48,13 +52,20 @@ def present_observation(result: ContainerObservation) -> int:
 
 
 def _docker(*args, **kwargs):
-    return subprocess.run(["docker", *args], capture_output=True, timeout=30, **kwargs)
+    try:
+        return subprocess.run(["docker", *args], capture_output=True, timeout=30, **kwargs)
+    except FileNotFoundError as exc:
+        raise ContainerError("Docker CLI not found. Install Docker and put docker on PATH, then retry --backend container.") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise ContainerError(f"Docker {args[0]} timed out. Check the Docker daemon and available resources, then retry.") from exc
+    except OSError as exc:
+        raise ContainerError("Cannot start Docker. Check the Docker installation and executable permissions.") from exc
 
 
-def _checked(proc):
+def _checked(proc, message="Docker command failed. Check docker info and the selected image, then retry."):
     if proc.returncode:
         # Do not relay paths or arbitrary damaged-code output in host exceptions.
-        raise RuntimeError("container boundary operation failed")
+        raise ContainerError(message)
     return proc.stdout
 
 
@@ -69,14 +80,22 @@ class ContainerSweep:
 
     def __init__(self, repo: Path, seed: str, *, image="python:3.12"):
         self.repo = repo.resolve()
-        self.seed_sha = subprocess.run(
-            ["git", "-C", str(self.repo), "rev-parse", "--verify", f"{seed}^{{commit}}"],
-            check=True, capture_output=True, text=True, timeout=30).stdout.strip()
+        operating_system = _checked(_docker("info", "--format", "{{.OSType}}"),
+            "Cannot reach the Docker daemon. Start Docker and check your Docker context with docker info, then retry.")
+        if operating_system.strip() != b"linux":
+            raise ContainerError("Docker must use Linux containers. Switch to a Linux Docker engine, then retry.")
         # Resolve the tag once; later tag changes cannot change phase images.
-        self.image = _checked(_docker("image", "inspect", image, "--format", "{{.Id}}" )).decode().strip()
-        self.archive = subprocess.run(
-            ["git", "-C", str(self.repo), "archive", "--format=tar", self.seed_sha],
-            check=True, capture_output=True, timeout=30).stdout
+        self.image = _checked(_docker("image", "inspect", image, "--format", "{{.Id}}"),
+            f"Docker image {image!r} is not available locally. Pull or build it first, or select an installed image with --image.").decode().strip()
+        try:
+            self.seed_sha = subprocess.run(
+                ["git", "-C", str(self.repo), "rev-parse", "--verify", f"{seed}^{{commit}}"],
+                check=True, capture_output=True, text=True, timeout=30).stdout.strip()
+            self.archive = subprocess.run(
+                ["git", "-C", str(self.repo), "archive", "--format=tar", self.seed_sha],
+                check=True, capture_output=True, timeout=30).stdout
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise ContainerError("Cannot read the committed seed. Check Git is installed and --repo and --seed are valid.") from exc
         self.failed = False
 
     def run_phase(self, argv, *, output: Path, timeout=30, files=None, environment=None):
@@ -97,7 +116,7 @@ class ContainerSweep:
             for key, value in (environment or {}).items():
                 args.extend(["--env", f"{key}={value}"])
             args.extend(["--entrypoint", argv[0], self.image, *argv[1:]])
-            cid = _checked(_docker(*args)).decode().strip()
+            cid = _checked(_docker(*args), "Docker could not create the phase container. Check free resources and Docker access to --scratch-dir; try a shared directory such as /tmp.").decode().strip()
             _checked(_docker("cp", "-", cid + ":/work", input=self.archive))
             if files:
                 stream = io.BytesIO()
@@ -135,7 +154,8 @@ class ContainerSweep:
                     self.failed = True
                     raise RuntimeError("container ownership mismatch")
                 try:
-                    _checked(_docker("rm", "-f", info["Id"]))
+                    _checked(_docker("rm", "-f", info["Id"]),
+                        f"Docker could not remove the phase container. Restore Docker access and run: docker rm -f {info['Id']}")
                     remaining = _checked(_docker("ps", "-aq", "--filter", f"label={LABEL}={token}"))
                     if remaining.strip():
                         raise RuntimeError("phase container remains after removal")

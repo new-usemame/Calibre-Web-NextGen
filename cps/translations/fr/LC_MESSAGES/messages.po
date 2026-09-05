@@ -15764,3 +15764,12 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+
+#: cps/spa_strings.py
+msgid "Resume at {percent} from another device"
+msgstr "Reprendre à {percent} depuis un autre appareil"
+
+#: cps/spa_strings.py
+msgid "Could not open the synced position."
+msgstr "Impossible d’ouvrir la position synchronisée."

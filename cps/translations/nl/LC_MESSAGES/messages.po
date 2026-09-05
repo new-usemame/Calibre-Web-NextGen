@@ -15258,3 +15258,12 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+
+#: cps/spa_strings.py
+msgid "Resume at {percent} from another device"
+msgstr "Verder lezen bij {percent} vanaf een ander apparaat"
+
+#: cps/spa_strings.py
+msgid "Could not open the synced position."
+msgstr "De gesynchroniseerde leespositie kon niet worden geopend."

@@ -13875,3 +13875,11 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+#: cps/spa_strings.py
+msgid "Could not open the synced position."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Resume at {percent} from another device"
+msgstr ""

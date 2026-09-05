@@ -14979,3 +14979,12 @@ msgstr "Zeige Gelesen/Ungelesen-Abschnitt"
 #~ msgstr ""
 #~ "Bücher müssen zuerst archiviert werden und dann mit dem Gerät "
 #~ "synchronisiert werden, bevor ein Buch sicher gelöscht werden kann."
+
+
+#: cps/spa_strings.py
+msgid "Resume at {percent} from another device"
+msgstr "Bei {percent} vom anderen Gerät weiterlesen"
+
+#: cps/spa_strings.py
+msgid "Could not open the synced position."
+msgstr "Die synchronisierte Leseposition konnte nicht geöffnet werden."

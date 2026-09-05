@@ -1,3 +1,4 @@
+import { resumeCfi } from "../lib/readerResume";
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'wouter';
 import ePub from 'epubjs';
@@ -248,6 +249,7 @@ export function Reader({ id }: { id: string }) {
   const saveCoalesced = useRef(false);
   const saveFailureAnnounced = useRef(false);
   // Hold the freshest saved CFI so it survives re-renders without re-running the effect.
+  const [remoteResume, setRemoteResume] = useState<{ cfi: string; percentage: number } | null>(null);
   const savedCfiRef = useRef<string | null>(null);
   /*
    * True while the book sits where a JUMP put it rather than where the reader
@@ -976,8 +978,8 @@ export function Reader({ id }: { id: string }) {
   // A page turn is the reader moving themselves, so it ends any preview: from
   // here on the relocations are theirs and the position saves again. This is the
   // ONLY thing that clears the flag — see previewingRef's note.
-  const goPrev = useCallback(() => { previewingRef.current = false; return renditionRef.current?.prev(); }, []);
-  const goNext = useCallback(() => { previewingRef.current = false; return renditionRef.current?.next(); }, []);
+  const goPrev = useCallback(() => { setRemoteResume(null); previewingRef.current = false; return renditionRef.current?.prev(); }, []);
+  const goNext = useCallback(() => { setRemoteResume(null); previewingRef.current = false; return renditionRef.current?.next(); }, []);
 
   // Which way the page physically turns. In an RTL book the left of the screen
   // is forward, so the left zone advances and the right zone goes back. Labels
@@ -1036,7 +1038,35 @@ export function Reader({ id }: { id: string }) {
           applyTypography();
         });
 
-        await rendition.display(savedCfiRef.current || undefined);
+        setRemoteResume(null);
+        // Only a book with no local CFI waits for locations before first display.
+        // Cache the promise so automatic resume never generates the index twice.
+        let readerMoved = false;
+        let locationsReady: Promise<unknown> | undefined;
+        const generateLocations = () => locationsReady ??= epubBook.ready
+          .then(() => epubBook.locations.generate(1600));
+        const resume = savedBookmark?.resume;
+        // epub.js may emit delayed layout relocations after display resolves.
+        // Treat opening with a synced hint as a preview until a real page turn,
+        // or those layout events would stamp the local CFI newer than the hint.
+        previewingRef.current = !!resume;
+        let initialTarget = savedCfiRef.current || undefined;
+        if (!initialTarget && resume?.mode === 'automatic') {
+          try {
+            await generateLocations();
+            if (cancelled) return;
+            initialTarget = resumeCfi(epubBook.locations, resume);
+          } catch { /* Keep opening the book when its index cannot be generated. */ }
+        }
+        await rendition.display(initialTarget);
+        if (cancelled) return;
+        if (!savedCfiRef.current && initialTarget && resume?.mode === 'automatic') {
+          // The rendered hook applies typography, which can reflow the target
+          // out of the initial spread. Place it again after that layout frame.
+          await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+          if (cancelled) return;
+          await rendition.display(initialTarget);
+        }
         if (cancelled) return;
         // display() resolves only after the package document is parsed, so the
         // spine's page-progression-direction is readable by here.
@@ -1050,10 +1080,13 @@ export function Reader({ id }: { id: string }) {
         });
 
         // Lazily generate locations for a progress percentage.
-        epubBook.ready
-          .then(() => epubBook.locations.generate(1600))
+        generateLocations()
           .then(() => {
             if (cancelled) return;
+            if (!readerMoved && savedCfiRef.current && resume?.mode === 'offer') {
+              const cfi = resumeCfi(epubBook.locations, resume);
+              if (cfi) setRemoteResume({ cfi, percentage: resume.percentage });
+            }
             const loc = rendition.currentLocation() as any;
             if (loc?.start?.cfi && epubBook.locations.length()) {
               setProgress(Math.round(epubBook.locations.percentageFromCfi(loc.start.cfi) * 100));
@@ -1077,7 +1110,11 @@ export function Reader({ id }: { id: string }) {
           // showing the old one would be a lie about the page on screen. What
           // it must not do is SAVE: the bookmark, the synced percentage and the
           // finished-at-99% decision all hang off persistCfi.
-          if (!previewingRef.current) persistCfi(cfi, exact);
+          if (!previewingRef.current) {
+            readerMoved = true;
+            setRemoteResume(null);
+            persistCfi(cfi, exact);
+          }
           if (exact !== undefined) setProgress(Math.round(exact));
         });
 
@@ -1183,6 +1220,9 @@ export function Reader({ id }: { id: string }) {
   }, [goLeft, goRight, rendered]);
 
   const goToc = (href: string) => {
+    // Choosing a chapter is an explicit reading move, like a page turn.
+    previewingRef.current = false;
+    setRemoteResume(null);
     const rendition = renditionRef.current;
     const epubBook = bookRef.current;
     setTocOpen(false);
@@ -1302,6 +1342,23 @@ export function Reader({ id }: { id: string }) {
             )}
           </nav>
         </>
+      )}
+
+      {remoteResume && (
+        <div className={styles.resumeNotice} role="status">
+          <button onClick={() => {
+            previewingRef.current = true;
+            const target = remoteResume.cfi;
+            setRemoteResume(null);
+            Promise.resolve(renditionRef.current?.display(target)).catch(() => {
+              previewingRef.current = false;
+              announce(t('Could not open the synced position.'));
+            });
+          }}>{t('Resume at {percent} from another device', { percent: `${Math.round(remoteResume.percentage)}%` })}</button>
+          <button onClick={() => setRemoteResume(null)} aria-label={t('Dismiss')}>
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
       )}
 
       {/* Full-book search drawer. The result excerpts are book-controlled text,

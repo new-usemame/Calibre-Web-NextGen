@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Unit tests for /api/v1 reader bookmark endpoints (auth gate + format casing +
-the save/clear write path). DB is mocked; legacy interop (same row, lowercase
-format) is the key invariant pinned here."""
+the save/clear write path). GET contracts use SQLite; write/settings tests use
+mocks. Legacy interop uses the same row and lowercase format."""
 import inspect
 import json
 import flask
@@ -35,28 +35,50 @@ def test_get_bookmark_anonymous_401():
     assert resp[1] == 401
 
 
-@pytest.mark.unit
-def test_get_bookmark_returns_key():
+@pytest.fixture
+def bookmark_client(monkeypatch):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from cps import ub
     from cps.api import reader as mod
-    row = SimpleNamespace(bookmark_key="epubcfi(/6/4!/4/2)")
-    mock_ub = MagicMock()
-    mock_ub.session.query.return_value.filter.return_value.first.return_value = row
-    with _ctx("/api/v1/books/5/bookmark?format=epub"):
-        with patch.object(mod, "current_user", _auth_user()), patch.object(mod, "ub", mock_ub):
-            resp = inspect.unwrap(mod.get_bookmark)(5)
-    assert resp.status_code == 200
-    assert json.loads(resp.get_data())["bookmark"] == "epubcfi(/6/4!/4/2)"
+    # The app session supports in-memory SQLite too; optional carrier failure
+    # must not change the GET contract of the mandatory local store.
+    engine = create_engine('sqlite:///:memory:')
+    ub.Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    monkeypatch.setattr(ub, 'session', session)
+    monkeypatch.setattr(mod, 'current_user', _auth_user())
+    app = flask.Flask(__name__)
+    app.add_url_rule('/api/v1/books/<int:book_id>/bookmark',
+                     view_func=inspect.unwrap(mod.get_bookmark))
+    yield app.test_client(), session
+    session.close()
+    engine.dispose()
 
 
-@pytest.mark.unit
-def test_get_bookmark_none_when_absent():
-    from cps.api import reader as mod
-    mock_ub = MagicMock()
-    mock_ub.session.query.return_value.filter.return_value.first.return_value = None
-    with _ctx("/api/v1/books/5/bookmark"):
-        with patch.object(mod, "current_user", _auth_user()), patch.object(mod, "ub", mock_ub):
-            resp = inspect.unwrap(mod.get_bookmark)(5)
-    assert json.loads(resp.get_data())["bookmark"] is None
+def test_get_bookmark_returns_key(bookmark_client):
+    from cps import ub
+    client, session = bookmark_client
+    session.add(ub.Bookmark(user_id=1, book_id=5, format='epub',
+                           bookmark_key='epubcfi(/6/8)'))
+    session.commit()
+    response = client.get('/api/v1/books/5/bookmark?format=EPUB')
+    assert response.status_code == 200
+    assert response.json == {'bookmark': 'epubcfi(/6/8)', 'resume': None}
+
+
+def test_get_bookmark_none_when_absent(bookmark_client):
+    from cps import ub
+    client, session = bookmark_client
+    session.add_all([
+        ub.Bookmark(user_id=2, book_id=5, format='epub', bookmark_key='other-user'),
+        ub.Bookmark(user_id=1, book_id=6, format='epub', bookmark_key='other-book'),
+        ub.Bookmark(user_id=1, book_id=5, format='pdf', bookmark_key='other-format'),
+    ])
+    session.commit()
+    response = client.get('/api/v1/books/5/bookmark')
+    assert response.status_code == 200
+    assert response.json == {'bookmark': None, 'resume': None}
 
 
 @pytest.mark.unit

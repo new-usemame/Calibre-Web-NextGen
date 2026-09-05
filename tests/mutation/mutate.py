@@ -360,6 +360,7 @@ class IsolatedSweep:
         self.seed_sha = seed_sha
         self.seed_tree = seed_tree
         self._closed = False
+        self._phase_failed = False
 
     @classmethod
     def create(
@@ -426,6 +427,38 @@ class IsolatedSweep:
             "head": head,
             "status_empty": True,
         }
+
+    def run_phase(
+        self,
+        argv: list[str],
+        *,
+        environment: dict[str, str],
+        timeout: float,
+        ownership_contract: str | None = None,
+    ) -> PhaseResult:
+        """Scrub around a completed diagnostic phase, refusing reuse after an error.
+
+        The default rejects arbitrary descendant containment through the runner.
+        If cleanup cannot establish its restricted contract, preserve the tree
+        rather than scrubbing underneath a potentially surviving writer.
+        """
+        if self._phase_failed:
+            raise IsolationError("sweep cannot run another phase after an error")
+        try:
+            self.scrub()
+            result = run_phase_process(
+                argv, cwd=self.root, environment=environment, timeout=timeout,
+                artifacts=self.entry / "artifacts", ownership_contract=ownership_contract,
+            )
+            if result.containment_error:
+                raise IsolationError(result.containment_error)
+            self.scrub()
+            if result.timed_out:
+                raise IsolationError("phase timed out")
+            return result
+        except BaseException:
+            self._phase_failed = True
+            raise
 
     def close(self) -> None:
         if self._closed:

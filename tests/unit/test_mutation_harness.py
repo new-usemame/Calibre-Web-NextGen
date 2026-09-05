@@ -293,6 +293,62 @@ def test_tokenless_detached_child_is_outside_diagnostic_contract(tmp_path):
     assert (tmp_path / "outside").exists(), "the counterexample no longer demonstrates the gap"
     print("LIMITATION tokenless detached child survived diagnostic cleanup; strict mode rejects before launch (Mac/APFS only)")
 
+
+def test_sweep_scrubs_after_cleanup_and_again_before_each_phase(tmp_path, monkeypatch):
+    repo, seed = _committed_repo(tmp_path)
+    events = []
+    terminate = mutate._terminate_phase_processes
+    def observed_cleanup(proc, token):
+        result = terminate(proc, token)
+        events.append("terminated")
+        return result
+    monkeypatch.setattr(mutate, "_terminate_phase_processes", observed_cleanup)
+    with mutate.IsolatedSweep.create(repo, seed, state_root=tmp_path / "state") as sweep:
+        scrub = sweep.scrub
+        def observed_scrub():
+            result = scrub()
+            events.append("scrubbed")
+            return result
+        monkeypatch.setattr(sweep, "scrub", observed_scrub)
+        program = "\n".join([
+            "import os,pathlib",
+            "assert pathlib.Path('victim.py').read_text() == 'VALUE = 1\\n'",
+            "assert not pathlib.Path('between.ignored').exists()",
+            "assert os.getpgrp() == os.getpid()",
+            "pathlib.Path('victim.py').write_text('phase changed it')",
+            "print(os.getpid())",
+        ])
+        leaders = []
+        for _ in range(2):
+            (sweep.root / "between.ignored").write_text("between phases")
+            result = sweep.run_phase(
+                [sys.executable, "-c", program], environment=os.environ.copy(),
+                timeout=5, ownership_contract="inherited-token",
+            )
+            assert result.returncode == 0, result.stderr
+            leaders.append(int(result.stdout))
+            assert (sweep.root / "victim.py").read_text() == "VALUE = 1\n"
+            assert not (sweep.root / "between.ignored").exists()
+        assert leaders[0] != leaders[1]
+        assert events == ["scrubbed", "terminated", "scrubbed"] * 2
+
+
+@pytest.mark.parametrize("failure", ["escape", "timeout"])
+def test_sweep_errors_stop_the_next_phase(tmp_path, failure):
+    repo, seed = _committed_repo(tmp_path)
+    with mutate.IsolatedSweep.create(repo, seed, state_root=tmp_path / "state") as sweep:
+        program = _child_program(detach=failure == "escape", timeout=failure == "timeout")
+        with pytest.raises(mutate.IsolationError, match="escaped|timed out"):
+            sweep.run_phase(
+                [sys.executable, "-c", program], environment=os.environ.copy(),
+                timeout=1 if failure == "timeout" else 5, ownership_contract="inherited-token",
+            )
+        with pytest.raises(mutate.IsolationError, match="after an error"):
+            sweep.run_phase(
+                [sys.executable, "-c", "raise RuntimeError('must not run')"],
+                environment=os.environ.copy(), timeout=5, ownership_contract="inherited-token",
+            )
+
 _POISON_CHANNELS = ("ignored", "tracked", "collateral", "index", "head", "bytecode", "child")
 
 

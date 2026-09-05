@@ -1,0 +1,28 @@
+Mac/APFS only. Five independent invocations each; retries 0, no maxfail.
+Interpreter: absolute pinned venv executable, resolved from cwd.
+COMMAND: "$PY" -m pytest 'tests/unit/test_mutation_harness.py::test_checked_real_outcomes_are_durable_and_unverified[timeout]' -q -o addopts= -p no:rerunfailures -p no:flaky --tb=no
+RUN isolated-timeout 1 EXIT=0
+1 passed in 2.00s
+RUN isolated-timeout 2 EXIT=0
+1 passed in 1.97s
+RUN isolated-timeout 3 EXIT=0
+1 passed in 1.97s
+RUN isolated-timeout 4 EXIT=0
+1 passed in 2.00s
+RUN isolated-timeout 5 EXIT=0
+1 passed in 1.96s
+COMMAND: "$PY" -m pytest 'tests/unit/test_mutation_harness.py' -q -o addopts= -p no:rerunfailures -p no:flaky --tb=no
+RUN full 1 EXIT=1
+FAILED tests/unit/test_mutation_harness.py::test_checked_real_outcomes_are_durable_and_unverified[xfail_notrun]
+1 failed, 130 passed in 152.78s (0:02:32)
+RUN full 2 EXIT=1
+FAILED tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[ignored]
+1 failed, 130 passed in 152.36s (0:02:32)
+RUN full 3 EXIT=1
+FAILED tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[ignored]
+1 failed, 130 passed in 150.39s (0:02:30)
+RUN full 4 EXIT=1
+FAILED tests/unit/test_mutation_harness.py::test_cli_spec_and_provenance_rejection_are_live[spec]
+1 failed, 130 passed in 150.18s (0:02:30)
+RUN full 5 EXIT=0
+131 passed in 154.00s (0:02:34)

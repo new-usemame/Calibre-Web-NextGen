@@ -9,13 +9,18 @@ import tempfile
 
 HERE = Path(__file__).resolve().parent
 source = (HERE / 'mutate.py').read_text()
-needle = '''        os.killpg(pgid, sig)
-    except ProcessLookupError:'''
-replacement = '''        os.killpg(pgid, sig)
+needle = '        os.killpg(pgid, sig)'
+replacement = '        _probe_killpg(pgid, sig)'
+helper = '''
+def _probe_killpg(pgid, sig):
+    try:
+        os.killpg(pgid, sig)
     except PermissionError:
         import inspect
         frame = inspect.currentframe().f_back
-        proc = frame.f_locals.get('proc')
+        while frame is not None and 'proc' not in frame.f_locals:
+            frame = frame.f_back
+        proc = frame.f_locals.get('proc') if frame else None
         table = subprocess.run(['ps', '-axo', 'pid=,pgid=,uid=,state='],
             capture_output=True, text=True, timeout=5)
         members = [line.split() for line in table.stdout.splitlines()
@@ -31,14 +36,14 @@ replacement = '''        os.killpg(pgid, sig)
             direct_child_reaped=(proc.returncode is not None) if proc else 'unknown',
             table_returncode=table.returncode)), flush=True)
         raise
-    except ProcessLookupError:'''
+'''
 assert source.count(needle) == 1
 with tempfile.TemporaryDirectory(prefix='mutation-eperm-probe-') as temp:
     directory = Path(temp)
     for name in ('provenance_probe.py', 'pytest_evidence.py'):
         shutil.copyfile(HERE / name, directory / name)
     harness = directory / 'mutate.py'
-    harness.write_text(source.replace(needle, replacement))
+    harness.write_text(source.replace(needle, replacement) + helper)
     result = subprocess.run([sys.executable, '-m', 'pytest',
         'tests/unit/test_mutation_harness.py::test_checked_real_outcomes_are_durable_and_unverified[timeout]',
         '-q', '-s', '-o', 'addopts=', '-p', 'no:rerunfailures', '-p', 'no:flaky', '--tb=no'],

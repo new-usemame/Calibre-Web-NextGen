@@ -2,6 +2,7 @@
 import inspect
 import sqlite3
 import time
+import threading
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -55,7 +56,7 @@ def test_remote_resume_is_scoped_read_only_and_freshness_ordered(store):
     session.commit()
     assert read(engine)['resume']['mode'] == 'offer'
     assert read(engine)['bookmark'] == 'local-cfi'
-    for clock in (now, now + timedelta(seconds=1), None):
+    for clock in (now, now + timedelta(seconds=1)):
         bookmark.updated_at = clock
         session.commit()
         assert read(engine) == {'bookmark': 'local-cfi', 'resume': None}
@@ -63,7 +64,7 @@ def test_remote_resume_is_scoped_read_only_and_freshness_ordered(store):
     assert bookmark.bookmark_key == 'local-cfi'
 
 
-def test_unusable_or_unavailable_progress_retains_cfi_with_bounded_lock_wait(store):
+def test_unusable_or_unavailable_progress_retains_cfi_with_bounded_lock_wait(store, monkeypatch):
     engine, session = store
     seed(session, local='local-cfi', local_time=datetime(2026, 8, 1))
     for invalid in (-1, 101, float('inf'), 'junk', None):
@@ -73,19 +74,67 @@ def test_unusable_or_unavailable_progress_retains_cfi_with_bounded_lock_wait(sto
     session.execute(text('DROP TABLE kobo_bookmark'))
     session.commit()
     assert read(engine) == {'bookmark': 'local-cfi', 'resume': None}
-    lock = sqlite3.connect(engine.url.database)
-    try:
+    ub.KoboBookmark.__table__.create(engine)
+    session.add(ub.KoboBookmark(
+        kobo_reading_state_id=session.query(ub.KoboReadingState).one().id,
+        progress_percent=37.5, last_modified=datetime(2026, 9, 1)))
+    session.commit()
+    # Contention begins after the mandatory local lookup. The optional reader
+    # must return the already-read CFI while this writer still holds the lock.
+    connect = sqlite3.connect
+    lock = connect(engine.url.database)
+    def locked_optional_connect(*args, **kwargs):
         lock.execute('BEGIN EXCLUSIVE')
-        started = time.monotonic()
-        assert read(engine) == {'bookmark': None, 'resume': None}
-        assert time.monotonic() - started < .5
-    finally:
-        lock.rollback()
-        lock.close()
+        return connect(*args, **kwargs)
+    with monkeypatch.context() as patch:
+        patch.setattr(sqlite3, 'connect', locked_optional_connect)
+        try:
+            started = time.monotonic()
+            assert read(engine) == {'bookmark': 'local-cfi', 'resume': None}
+            assert time.monotonic() - started < .5
+            assert lock.in_transaction
+        finally:
+            lock.rollback()
+            lock.close()
     missing = create_engine('sqlite:///' + engine.url.database + '-absent')
-    assert read(missing) == {'bookmark': None, 'resume': None}
+    assert read(missing) == {'bookmark': 'local-cfi', 'resume': None}
     from pathlib import Path
     assert not Path(missing.url.database).exists()
+    missing.dispose()
+
+
+def test_local_cfi_waits_out_transient_app_database_writer(store):
+    engine, session = store
+    seed(session, local='local-cfi', local_time=datetime(2026, 9, 2))
+    locked = threading.Event()
+    released = threading.Event()
+    def writer():
+        with sqlite3.connect(engine.url.database) as connection:
+            connection.execute('BEGIN EXCLUSIVE')
+            locked.set()
+            time.sleep(.2)
+            connection.rollback()
+            released.set()
+    thread = threading.Thread(target=writer)
+    thread.start()
+    try:
+        assert locked.wait(2)
+        assert read(engine) == {'bookmark': 'local-cfi', 'resume': None}
+        assert released.wait(2)
+    finally:
+        thread.join(2)
+    session.expire_all()
+    assert session.query(ub.Bookmark).one().bookmark_key == 'local-cfi'
+
+
+def test_unknown_local_clock_offers_remote_without_changing_saved_cfi(store):
+    engine, session = store
+    seed(session, local='pre-migration-cfi')
+    assert read(engine) == {'bookmark': 'pre-migration-cfi', 'resume': {
+        'percentage': 37.5, 'synced_at': '2026-09-01T00:00:00+00:00', 'mode': 'offer'}}
+    session.expire_all()
+    saved = session.query(ub.Bookmark).one()
+    assert (saved.bookmark_key, saved.updated_at) == ('pre-migration-cfi', None)
 
 
 def test_migration_preserves_unknown_old_cfi_and_is_repeatable(tmp_path):

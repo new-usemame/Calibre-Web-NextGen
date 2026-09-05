@@ -260,17 +260,25 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
 
 
 def read_resume_position(engine, user_id, book_id, fmt="epub"):
-    """Read an optional portable resume hint without touching the CFI store.
+    """Keep the app session's CFI availability; read remote progress best-effort.
 
-    A separate read-only SQLite connection avoids ORM autoflush and the app
-    connection's multi-second busy timeout. Both reads share a snapshot. If the
-    optional carrier fails, retain the local CFI already read. Pre-migration
-    bookmarks have no trustworthy clock, so cannot be silently superseded.
+    The mandatory local lookup retains the app connection's normal busy timeout.
+    Only the optional carrier uses a separate read-only, zero-timeout connection.
+    Neither read flushes pending changes. Unknown historical local clocks allow
+    an offer, but never an automatic replacement of the saved CFI.
     """
     import sqlite3
     from pathlib import Path
 
-    result = {"bookmark": None, "resume": None}
+    with ub.session.no_autoflush:
+        local = ub.session.query(ub.Bookmark).filter(
+            ub.Bookmark.user_id == user_id,
+            ub.Bookmark.book_id == book_id,
+            ub.Bookmark.format == fmt,
+        ).first()
+        bookmark = local.bookmark_key if local else None
+        local_updated_at = local.updated_at if local else None
+    result = {"bookmark": bookmark, "resume": None}
     connection = None
     try:
         database = engine.url.database
@@ -280,13 +288,6 @@ def read_resume_position(engine, user_id, book_id, fmt="epub"):
             Path(database).resolve().as_uri() + "?mode=ro", uri=True, timeout=0,
         )
         connection.execute("BEGIN")
-        local = connection.execute(
-            "SELECT bookmark_key, updated_at FROM bookmark "
-            "WHERE user_id=? AND book_id=? AND format=? COLLATE NOCASE LIMIT 1",
-            (user_id, book_id, fmt),
-        ).fetchone()
-        if local:
-            result["bookmark"] = local[0]
         if fmt != "epub":
             return result
         remote = connection.execute(
@@ -300,10 +301,10 @@ def read_resume_position(engine, user_id, book_id, fmt="epub"):
         if percentage is None or not remote[1]:
             return result
         def utc(raw):
-            value = datetime.fromisoformat(raw)
+            value = raw if isinstance(raw, datetime) else datetime.fromisoformat(raw)
             return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
         synced_at = utc(remote[1])
-        if result["bookmark"] and (not local[1] or synced_at <= utc(local[1])):
+        if bookmark and local_updated_at is not None and synced_at <= utc(local_updated_at):
             return result
         result["resume"] = {"percentage": percentage,
                             "synced_at": synced_at.isoformat(),

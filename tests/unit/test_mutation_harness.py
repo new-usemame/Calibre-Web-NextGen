@@ -1313,10 +1313,10 @@ def container_backend(monkeypatch, container_module):
         pytest.skip('Docker required for real Linux container boundary tests')
     module = container_module
     try:
-        daemon = module._docker('info', '--format', '{{.OSType}}')
+        daemon = module._docker('info', '--format', '{{.OSType}}', timeout=5)
         if daemon.returncode or daemon.stdout.strip() != b'linux':
             pytest.skip('Reachable Linux Docker daemon required for container tests')
-        image = module._docker('image', 'inspect', 'python:3.12', '--format', '{{.Id}}')
+        image = module._docker('image', 'inspect', 'python:3.12', '--format', '{{.Id}}', timeout=5)
         if image.returncode or not image.stdout.strip():
             pytest.skip('Local python:3.12 image required; run docker pull python:3.12')
     except module.ContainerError as exc:
@@ -1736,3 +1736,17 @@ sys.exit(module.main())
     assert result.returncode == 2, result.stdout + result.stderr
     assert 'ERROR: Docker CLI not found' in result.stdout
     assert 'Traceback' not in result.stderr
+
+
+@pytest.mark.parametrize('operation', ['info', 'image'])
+def test_container_capability_probe_has_short_timeout(container_module, monkeypatch, request, operation):
+    import shutil
+    monkeypatch.setattr(shutil, 'which', lambda name: '/fixture/docker')
+    def wedged(*args, **kwargs):
+        if args[0] == operation:
+            assert kwargs.get('timeout') == 5, 'capability probe must stop within five seconds'
+            raise container_module.ContainerError('wedged daemon')
+        return subprocess.CompletedProcess(args, 0, b'linux\n', b'')
+    monkeypatch.setattr(container_module, '_docker', wedged)
+    with pytest.raises(pytest.skip.Exception, match='wedged daemon'):
+        request.getfixturevalue('container_backend')

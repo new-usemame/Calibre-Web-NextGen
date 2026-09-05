@@ -14,7 +14,12 @@ additional Python packages or system libraries installed in the image.
 
 The container tests also require a reachable Linux Docker daemon and a local `python:3.12`
 image. Run `docker pull python:3.12` before enabling them. They skip when the CLI, daemon,
-or image is unavailable; they never pull an image automatically.
+or image is unavailable; they never pull an image automatically. This guard keeps
+ordinary CI runs from failing when Docker is installed but its daemon or image is
+unavailable. Both capability probes have a five-second timeout. Keep the guard
+when changing these fixtures; a Docker-equipped machine alone does not exercise
+the skip path. The timeout regression simulates a wedged daemon, and
+`verify_linux_harness.py` runs the unit selector in Linux with no Docker CLI.
 
 ## What isolation you get, and why it matters
 

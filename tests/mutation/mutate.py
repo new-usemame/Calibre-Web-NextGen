@@ -91,6 +91,42 @@ class DiagnosticObservation(Mapping):
         return getattr(self, key)
 
 
+@dataclass(frozen=True, slots=True)
+class MutationPlan:
+    relative: str
+    before: bytes
+    after: bytes
+
+
+def _mutation_target(root: pathlib.Path, relative: str) -> pathlib.Path:
+    target = (root / relative).resolve(strict=True)
+    if pathlib.Path(relative).is_absolute() or not target.is_relative_to(root.resolve()) or not target.is_file():
+        raise IsolationError("mutation target is outside the disposable file boundary")
+    return target
+
+
+def prepare_mutation(root: pathlib.Path, relative: str, old: str, new: str) -> MutationPlan:
+    before = _mutation_target(root, relative).read_bytes()
+    anchor = old.encode("utf-8")
+    if not anchor or before.count(anchor) != 1:
+        raise IsolationError("mutation anchor must match exactly once")
+    after = before.replace(anchor, new.encode("utf-8"), 1)
+    if after == before:
+        raise IsolationError("no-op mutation refused before pytest")
+    return MutationPlan(relative, before, after)
+
+
+def apply_mutation(root: pathlib.Path, plan: MutationPlan) -> None:
+    target = _mutation_target(root, plan.relative)
+    if target.read_bytes() != plan.before:
+        raise IsolationError("mutation source changed after preparation")
+    if plan.after == plan.before:
+        raise IsolationError("no-op mutation refused before pytest")
+    target.write_bytes(plan.after)
+    if target.read_bytes() != plan.after:
+        raise IsolationError("mutation write did not produce the requested bytes")
+
+
 # This is an explicit diagnostic contract, not arbitrary descendant containment.
 _TOKEN_CONTRACT = "inherited-token"
 
@@ -539,6 +575,7 @@ class IsolatedSweep:
         environment: dict[str, str],
         timeout: float,
         ownership_contract: str | None = None,
+        mutation: MutationPlan | None = None,
     ) -> PhaseResult:
         """Scrub around a completed diagnostic phase, refusing reuse after an error.
 
@@ -552,6 +589,8 @@ class IsolatedSweep:
             if ownership_contract != _TOKEN_CONTRACT or sys.platform != "darwin":
                 raise IsolationError("arbitrary descendant containment is unavailable")
             self.scrub()
+            if mutation is not None:
+                apply_mutation(self.root, mutation)
             environment = provenance_environment(self.root, environment)
             targets = argv[3:] if len(argv) >= 3 and argv[1:3] == ["-m", "pytest"] else None
             provenance_preflight(

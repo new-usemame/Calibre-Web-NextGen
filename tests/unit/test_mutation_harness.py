@@ -637,3 +637,32 @@ def test_real_cli_observations_never_satisfy_authoritative_gate(tmp_path, observ
     assert 'caught' not in result.stdout and 'SURVIVED' not in result.stdout
     assert victim.read_text() == 'VALUE = 1\n'
     print(f'LABEL real-cli observed_exit={observed_exit} terminal_exit=1 UNVERIFIED (Mac/APFS only)')
+
+
+@pytest.mark.parametrize('source,old,new', [
+    (b'VALUE = 1\n', 'absent', '2'),
+    (b'x x\n', 'x', 'y'),
+    (b'VALUE = 1\n', '1', '1'),
+    (b'', '', 'new'),
+])
+def test_integrity_refuses_invalid_plan_before_execution(tmp_path, source, old, new):
+    target = tmp_path / 'victim.py'
+    target.write_bytes(source)
+    with pytest.raises(mutate.IsolationError):
+        mutate.prepare_mutation(tmp_path, 'victim.py', old, new)
+    assert target.read_bytes() == source
+
+
+def test_integrity_preserves_bytes_and_refuses_stale_or_noop_application(tmp_path):
+    target = tmp_path / 'victim.py'
+    target.write_bytes(b'VALUE = 1\r\n')
+    plan = mutate.prepare_mutation(tmp_path, 'victim.py', '1', '2')
+    assert plan.after == b'VALUE = 2\r\n'
+    target.write_bytes(b'changed after preparation\n')
+    with pytest.raises(mutate.IsolationError):
+        mutate.apply_mutation(tmp_path, plan)
+    target.write_bytes(plan.before)
+    with pytest.raises(mutate.IsolationError):
+        mutate.apply_mutation(tmp_path, mutate.MutationPlan('victim.py', plan.before, plan.before))
+    mutate.apply_mutation(tmp_path, plan)
+    assert target.read_bytes() == plan.after

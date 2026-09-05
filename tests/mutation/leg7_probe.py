@@ -16,10 +16,17 @@ def command(argv, cwd, env=None):
 
 
 def git(repo, *args):
-    result = command(["git", "-c", "user.name=new-usemame",
-        "-c", "user.email=248195428+new-usemame@users.noreply.github.com", *args], repo)
+    # A throwaway fixture repo has no business authoring as a real person. The synthetic
+    # identity also keeps the machine's identity hook out of the way: that hook checks a real
+    # identity against its intended origin, and these repos deliberately have no origin.
+    result = command(["git", "-c", "user.name=Mutation Tests",
+        "-c", "user.email=mutation-tests.invalid", *args], repo)
     if result.returncode:
-        raise RuntimeError("fixture Git command failed")
+        # Include the reason. Swallowing stderr here turns any fixture problem into a
+        # four-probe investigation, which is exactly what it cost once.
+        detail = (result.stderr or result.stdout or "").strip().splitlines()
+        raise RuntimeError("fixture Git command failed: git %s -> %s" % (
+            " ".join(args), " | ".join(detail[-3:]) or "no output"))
     return result.stdout.strip()
 
 

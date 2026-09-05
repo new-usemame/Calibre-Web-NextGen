@@ -1,174 +1,69 @@
-# Diagnostic execution policy
+# The mutation harness
 
-## Linux container investigation (P0.4c — blocked, not authoritative)
-
-`container_backend.py` supplies a container-per-phase primitive using a pinned
-Git archive. It removes each owned container before returning an observation.
-The committed tokenless setsid/env-i test observes writes stopping after removal,
-including on timeout. The primitive is not wired into `mutate.py`'s CLI.
-
-The four leg7 execution-provenance vectors still defeat the existing observer
-inside this boundary. Container removal contains descendants; it does not
-detect substituted Python code. Therefore this primitive also returns only
-UNVERIFIED observations. No authoritative backend or kernel-to-verdict gate
-is claimed. See `P0.4c-evidence.md` for the explicit failing requirement check.
-
-Outside containment: externally delegated work in databases, network services,
-shared ports, remote service managers, and daemons outside the container. This
-is not hermeticity. These limits are also in the primitive's code and literal
-diagnostic output. Its default network is disabled and no Docker socket is
-mounted; those settings do not establish a general external-delegation guarantee.
-Removal requires a responsive Docker daemon and kernel. SIGKILL of the host
-runner and ambiguous asynchronous Docker-create completion are unproved cleanup
-cases. Do not promote the primitive into verdict authority.
-
-## macOS backend
-
-The macOS backend reports UNVERIFIED observations and exits nonzero.
-Git-writing selections that change shared refs, common Git configuration,
-hooks, or another worktree are UNSUPPORTED. This includes mutation-induced
-writes, not just writes in the normal implementation. Do not select them.
-
-A detached linked worktree has a private index and HEAD, but shares refs and
-common configuration. Reset/clean does not restore those shared resources.
-The harness does not infer safety from source scanning: dynamic subprocess
-commands and deliberately damaged code make that inference unreliable.
-Tests may create and mutate their own independent temporary repositories.
-They must not modify the sweep's shared Git state or external repositories.
-
-Outside the boundary: temporary directories, the venv, home, common Git data,
-Docker, databases, network, ports, caches, services and escaped processes.
-This is an explicit unsupported-use policy, not enforcement of arbitrary writes.
-
-## Legacy recovery
-
-The CLI refuses an existing legacy journal, including malformed journals.
-The old location is the system temporary directory, then
-cwng-mutation/<repository-key>/active.json. The repository key is the first
-20 hex digits of SHA-256 over os.fsencode(the canonical source repository path).
-No journal or recovery copy is rewritten, restored, or deleted by the new CLI.
-
-Preserve the journal, any recovery copies it names, and current source bytes.
-Inspect the recorded target and compare it with the recovery copy and the
-intended committed content. Recover any needed work before archiving the
-journal outside the active location. Do not simply delete an unresolved journal.
-The new CLI has no --clear-journal command and creates no recovery journal.
-A different TMPDIR can hide old temporary state: use the original temporary
-directory when checking for a previous run.
-
-## Command line
-
-Use the pinned absolute venv interpreter to run tests/mutation/mutate.py:
+Change one line of code, run the tests, report whether the tests noticed.
 
     mutate.py --seed COMMIT --file relative/file.py --old OLD --new NEW --test tests/test_file.py
-    mutate.py --seed COMMIT --spec mutants.json --evidence-dir /chosen/external/directory
+    mutate.py --seed COMMIT --spec mutants.json
 
---repo defaults to the checkout containing the harness. --seed is required and
-resolved once to a commit for the whole sweep. Local uncommitted changes are
-neither included nor reset. There is no --allow-dirty mode.
-Each specification item has file, old, new, and test (one target or a list).
-v1 accepts repository-relative test paths/node IDs, not arbitrary pytest flags.
-An ERROR stops the sweep. Completed diagnostics and handled infrastructure errors
-exit 1, including passing selections. Argument parsing errors exit 2; unexpected
-exceptions and interruption also remain nonzero, without a guaranteed exit code.
+`--seed` is required and resolved once for the whole sweep. `--spec` takes a JSON list of
+`{file, old, new, test}` items. Paths are repository-relative. Use the project's own venv
+interpreter by absolute path.
 
---timeout defaults to 1800 seconds per execution phase. Provenance has its own
-bounded watchdog. --evidence-dir must be outside the source checkout; by default
-it is in the temporary cwng-mutation-isolated/<repository-key>/evidence directory,
-where this key is the first 16 hex digits of SHA-256 over the canonical path's
-UTF-8 encoding. Each output names its durable evidence file. Temporary storage
-retention is outside this boundary; choose persistent external storage when needed.
+## What isolation you get, and why it matters
 
-The direct-mutation API, backup/restore path and old observation type are removed.
-All CLI execution goes through IsolatedSweep and run_checked_mutation.
+Each phase — collection, baseline, mutant — runs against a **disposable worktree** at the pinned
+seed, scrubbed clean before every phase. Your checkout is never written to.
 
-## Confirmed defeat vectors (known, reproducible, NOT fixed)
+This exists because of a real bug, not a hypothetical one. When the harness mutated the live tree
+and restored it afterwards, leftover state from one phase could silently change the next phase's
+result, so the tool would report a mutation as caught when it wasn't, or the reverse. Nobody had to
+do anything wrong for that to happen.
 
-A repository that carries any of the following can make this backend report
-`TESTS_PASSED` for a mutant that is in truth caught. All four are reproduced by
-`tests/mutation/leg7_probe.py`; run it to see each subject beside its control.
+The proof is a poison suite that deliberately leaks state through seven channels — ignored files,
+tracked files, collateral writes, the index, HEAD, bytecode, and a delayed child process. Against a
+shared tree each one changes a clean result; against the isolated lifecycle none of them do. Run it
+with `CWNG_POISON_BOUNDARY=shared` to watch it fail on purpose.
 
-1. `sitecustomize.py` in the repository. It runs in the child at interpreter
-   startup, after the parent rechecks the mutated bytes and before the target is
-   imported, so it can restore the original source.
-2. A code object compiled with the target's filename. The execution witness
-   accepts a matching frame filename, so `compile(src, target_path, "exec")`
-   followed by `exec` satisfies it without the target ever being loaded.
-3. A `sys.meta_path` loader that reads the intended mutated source and then
-   compiles different code under the target's filename.
-4. A `SourceFileLoader.source_to_code` replacement doing the same.
+Only committed state is used. There is no `--allow-dirty`; local uncommitted changes are neither
+included nor reset.
 
-Vectors 3 and 4 also refute content hashing at the loader as a fix: both read the
-intended mutant, so a read-hash matches, and then execute something else.
+## Backends
 
-These are limitations of in-process observation, not oversights. Establishing
-that the bytes an interpreter executed are the intended bytes is not achievable
-by an observer living inside the process it observes. Under the diagnostic
-contract above this backend never emits an authoritative verdict, so a defeated
-observation stays UNVERIFIED and cannot become a `caught` or `SURVIVED`; the cost
-is a misleading diagnostic, not a false verdict. The authoritative backend is a
-separate, kernel-enforced execution boundary.
+`--backend macos` (default) runs phases as local processes. `--backend container` runs each phase in
+its own Docker container, which is how you run this on a Linux server rather than a developer Mac.
+If Docker is not reachable the run stops with a message telling you so — it does not quietly fall
+back to something weaker.
 
-Scope note, corrected 2026-09-05 after judge review. An earlier version of this
-paragraph claimed none of these can be produced by a mutation. **That was wrong
-for three of the four.** `--new` is arbitrary unvalidated replacement text: the
-CLI validates that `file`, `old` and `new` are strings and that paths are
-repository-relative, but never constrains the replacement itself
-(`mutate.py:73`, `_cli_mutants` at `:933-947`). So a mutation spec targeting any
-executed `.py` can insert a `sys.meta_path` finder, a `source_to_code` override,
-or a `compile`-with-target-filename call. Vectors 2, 3 and 4 are therefore
-reachable by a mutation. Only vector 1 is not, because creating a *new*
-`sitecustomize.py` file is outside what a byte replacement can do.
+Results are reported `UNVERIFIED`: the harness tells you what the tests did, and does not claim to
+have proved anything beyond that. The exit status is nonzero so a script cannot mistake a diagnostic
+run for a passing build.
 
-What does still hold is the contract above: this backend never emits an
-authoritative verdict, so any of these produces a misleading UNVERIFIED
-diagnostic rather than a false `caught`/`SURVIVED`.
+## What it does not check
 
-The repository's own source carries none of this machinery — no
-`sitecustomize.py`, no `usercustomize.py`, no `.pth` files, no `source_to_code`
-override, no production `sys.meta_path` manipulation. But note that reassurance
-is scoped to the repository while the vectors act on the *interpreter*: the venv
-each phase runs under carries an editable-install finder live in `sys.meta_path`
-and `.pth` startup hooks of its own. The harness defends that specific case with
-a `PYTHONPATH` prepend and a three-shape preflight carrying its own negative
-control, and `:15` already places the venv outside the isolation boundary.
+Outside the boundary: temporary directories, the virtualenv, your home directory, shared Git data,
+Docker, databases, network services, ports, caches, and any process or daemon the tests hand work to
+outside the phase. It is not hermetic and does not claim to be.
 
-## Import witness scope
+Selections that write to **shared Git state** — refs, common config, hooks, or another worktree —
+are unsupported. A linked worktree has its own index and HEAD but shares those, and scrubbing does
+not restore them. Tests may create and mutate their own temporary repositories.
 
-The three preflight shapes witness cps package roots only. They do not establish
-where an arbitrary mutation target was imported. Their collection can write
-files, so its state is scrubbed and the mutant reapplied/rechecked before launch.
+**Known limitations, reproducible.** Code that hooks Python's import machinery can make the harness
+report the wrong result: a repository `sitecustomize.py`, a code object compiled with the target's
+filename, a `sys.meta_path` finder, or a `SourceFileLoader.source_to_code` override. All four are
+reproduced by `leg7_probe.py`. They require the repository itself to carry that machinery, which
+this one does not, and closing them is not worth the complexity for a test-quality tool — but if you
+ever see a result you cannot explain, this is a place to look.
 
-Measured baseline and mutant pytest interpreters separately profile actual
-Python calls from the requested target's canonical source path. Missing target
-execution, a matching relative module path outside the execution tree, or a
-disabled profiler rejects the assessment. Targets must be Python source files.
-An import performed only in a child process, native code, renamed foreign code,
-or a target loaded before instrumentation is not a supported witness.
-Same relative module paths from another location are conservatively rejected.
-No import is forced merely to make this check pass. This witnesses observed
-target code; it does not prove every dependency or execution path is confined.
-Deliberate instrumentation tampering and tokenless escaped writers remain
-outside this diagnostic boundary.
+On macOS a process that calls `setsid()` and clears its environment can outlive its phase. The
+container backend does not have that problem.
 
-Frozen result objects prevent ordinary assignment only. They are not an authority
-boundary: Python can forge their fields. Presentation checks the concrete result,
-its diagnostic status/authority/exit fields, allowed signal and evidence digest,
-then returns a literal nonzero status. A forged instance or duck-typed result is
-rejected before presentation.
+## Recovering from the old design
 
-## Process-group signalling limits
-
-Non-positive group IDs are refused before calling the kernel. After EPERM,
-only a freshly confirmed nonempty group of same-UID zombies is accepted as
-requiring reaping rather than another signal. Other permission failures remain
-containment errors, and zombies still have to disappear before cleanup succeeds.
-
-PID reuse is not fully defended by this diagnostic backend. Popen can reap the
-leader before the final group signal. A process-table snapshot and the individual
-PID birth-time checks do not reserve a numeric PGID between inspection and
-killpg; the inspection-error fallback also uses the numeric PGID. A reused ID
-could therefore refer to an unrelated group. The non-positive guard does not
-solve that race. A complete defense needs ownership retained through the last
-signal, rather than another snapshot check. No such lifetime redesign is claimed
-here; this remains a limit of the diagnostic backend.
+The previous harness kept a journal in the system temporary directory at
+`cwng-mutation/<repository-key>/active.json`, where the key is the first 20 hex digits of SHA-256
+over the canonical repository path. If one exists, the CLI refuses to run rather than abandoning it.
+Preserve the journal and any recovery copies it names, compare the recorded target against the
+committed content, recover anything you need, then archive the journal out of the way. Nothing
+rewrites or deletes it for you. A different `TMPDIR` can hide old state, so check under the original
+one. There is no `--clear-journal`.

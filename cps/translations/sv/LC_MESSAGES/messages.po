@@ -2376,7 +2376,7 @@ msgstr "Boken har lagts till i hyllan: %(sname)s"
 
 #: cps/shelf.py
 msgid "You are not allowed to add a book to the shelf"
-msgstr ""
+msgstr "Du har inte behörighet att lägga till en bok på hyllan"
 
 #: cps/shelf.py
 #, python-format
@@ -2419,7 +2419,7 @@ msgstr "Boken har tagits bort från hyllan: %(sname)s"
 
 #: cps/shelf.py
 msgid "Sorry you are not allowed to remove a book from this shelf"
-msgstr ""
+msgstr "Du har inte behörighet att ta bort en bok från den här hyllan"
 
 #: cps/shelf.py
 msgid "Create a Shelf"
@@ -2435,7 +2435,7 @@ msgstr "Redigera en hylla"
 
 #: cps/shelf.py
 msgid "Error deleting Shelf"
-msgstr ""
+msgstr "Fel när hyllan togs bort"
 
 #: cps/shelf.py
 msgid "Shelf successfully deleted"
@@ -2448,7 +2448,7 @@ msgstr "Ändra ordning på hyllan: '%(name)s'"
 
 #: cps/shelf.py
 msgid "Sorry you are not allowed to create a public shelf"
-msgstr ""
+msgstr "Du har inte behörighet att skapa en offentlig hylla"
 
 #: cps/shelf.py
 #, python-format
@@ -2486,15 +2486,15 @@ msgstr "Fel vid öppning av hyllan. Hylla finns inte eller är inte tillgänglig
 #: cps/shelf.py
 #, python-format
 msgid "Invalid order mode: %(mode)s"
-msgstr ""
+msgstr "Ogiltigt sorteringsläge: %(mode)s"
 
 #: cps/shelf.py
 msgid "Invalid payload: 'order' must be a list"
-msgstr ""
+msgstr "Ogiltiga data: 'order' måste vara en lista"
 
 #: cps/shelf.py
 msgid "Could not save order"
-msgstr ""
+msgstr "Det gick inte att spara ordningen"
 
 #: cps/shelf.py cps/templates/layout.html
 msgid "Reorder Shelves"
@@ -2502,92 +2502,94 @@ msgstr "Ordna om hyllor"
 
 #: cps/shelf.py
 msgid "Name (A → Z)"
-msgstr ""
+msgstr "Namn (A → Ö)"
 
 #: cps/shelf.py
 msgid "Name (Z → A)"
-msgstr ""
+msgstr "Namn (Ö → A)"
 
 #: cps/shelf.py
 msgid "Book count (most → fewest)"
-msgstr ""
+msgstr "Antal böcker (flest → minst)"
 
 #: cps/shelf.py
 msgid "Book count (fewest → most)"
-msgstr ""
+msgstr "Antal böcker (minst → flest)"
 
 #: cps/shelf.py
 msgid "Created (newest → oldest)"
-msgstr ""
+msgstr "Skapad (nyast → äldst)"
 
 #: cps/shelf.py
 msgid "Created (oldest → newest)"
-msgstr ""
+msgstr "Skapad (äldst → nyast)"
 
 #: cps/shelf.py
 msgid "Modified (recent → oldest)"
-msgstr ""
+msgstr "Ändrad (senast → äldst)"
 
 #: cps/shelf.py
 msgid "Modified (oldest → recent)"
-msgstr ""
+msgstr "Ändrad (äldst → senast)"
 
 #: cps/shelf.py
 msgid "Manual (drag below)"
-msgstr ""
+msgstr "Manuell (dra nedan)"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{succeeded} added to the shelf; {failed} failed."
-msgstr ""
+msgstr "{succeeded} lades till på hyllan; {failed} misslyckades."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{succeeded} book(s) deleted; {failed} failed."
-msgstr ""
+msgstr "{succeeded} bok/böcker togs bort; {failed} misslyckades."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
 "{succeeded} book(s) permanently deleted from the global library for every "
 "user; {failed} failed."
-msgstr ""
+msgstr "{succeeded} bok/böcker togs bort permanent från det globala biblioteket "
+"för alla användare; {failed} misslyckades."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{succeeded} book(s) removed from your library; {failed} failed."
-msgstr ""
+msgstr "{succeeded} bok/böcker togs bort från ditt bibliotek; {failed} misslyckades."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{succeeded} updated; {failed} failed."
-msgstr ""
+msgstr "{succeeded} uppdaterades; {failed} misslyckades."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Metadata applied to {succeeded}; {failed} failed."
-msgstr ""
+msgstr "Metadata tillämpades på {succeeded}; {failed} misslyckades."
 
 #: cps/spa_strings.py
 msgid "A book must keep at least one format."
-msgstr ""
+msgstr "En bok måste behålla minst ett format."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
 "{succeeded} book(s) permanently deleted; {warnings} deleted with cleanup "
 "warnings; {failed} failed."
-msgstr ""
+msgstr "{succeeded} bok/böcker togs bort permanent; {warnings} togs bort med "
+"rensningsvarningar; {failed} misslyckades."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Cleanup warning for book {id}: {message}"
-msgstr ""
+msgstr "Rensningsvarning för bok {id}: {message}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Book {id}: {message}"
-msgstr ""
+msgstr "Bok {id}: {message}"
 
 #: cps/spa_strings.py
 #, python-brace-format

@@ -4393,99 +4393,101 @@ msgstr "”{name}” finns redan på {count} bok. Vill du slå ihop den här tag
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "“{name}” already exists on {count} books. Merge this tag into it?"
-msgstr ""
+msgstr "”{name}” finns redan på {count} böcker. Vill du slå ihop den här taggen med den?"
 
 #: cps/spa_strings.py
 msgid "begins with"
-msgstr ""
+msgstr "börjar med"
 
 #: cps/spa_strings.py
 msgid "contains"
-msgstr ""
+msgstr "innehåller"
 
 #: cps/spa_strings.py
 msgid "does not contain"
-msgstr ""
+msgstr "innehåller inte"
 
 #: cps/spa_strings.py
 msgid "ends with"
-msgstr ""
+msgstr "slutar med"
 
 #: cps/spa_strings.py
 msgid "in the past N days"
-msgstr ""
+msgstr "under de senaste N dagarna"
 
 #: cps/spa_strings.py
 msgid "is not"
-msgstr ""
+msgstr "är inte"
 
 #: cps/spa_strings.py
 msgid "is"
-msgstr ""
+msgstr "är"
 
 #: cps/spa_strings.py
 msgid "not in the past N days"
-msgstr ""
+msgstr "inte under de senaste N dagarna"
 
 #: cps/spa_strings.py
 msgid "on or after"
-msgstr ""
+msgstr "på eller efter"
 
 #: cps/spa_strings.py
 msgid "on or before"
-msgstr ""
+msgstr "på eller före"
 
 #: cps/spa_strings.py
 msgid "≤"
-msgstr ""
+msgstr "≤"
 
 #: cps/spa_strings.py
 msgid "≥"
-msgstr ""
+msgstr "≥"
 
 #: cps/spa_strings.py
 msgid "(no text captured)"
-msgstr ""
+msgstr "(ingen text fångades)"
 
 #: cps/spa_strings.py
 msgid "(replace cover)"
-msgstr ""
+msgstr "(ersätt omslag)"
 
 #: cps/spa_strings.py
 msgid "1 selected."
-msgstr ""
+msgstr "1 vald."
 
 #: cps/spa_strings.py
 msgid "2:3 (publisher cover — no padding for typical covers)"
-msgstr ""
+msgstr "2:3 (förlagsomslag — ingen utfyllnad för vanliga omslag)"
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "3:4 (generic)"
-msgstr ""
+msgstr "3:4 (allmänt)"
 
 #: cps/spa_strings.py
 msgid ""
 "A duplicate scan is already running. This list updates when it finishes."
-msgstr ""
+msgstr "En dubblettgenomsökning körs redan. Listan uppdateras när den är klar."
 
 #: cps/spa_strings.py
 msgid "A few random picks from your library"
-msgstr ""
+msgstr "Några slumpmässiga val från ditt bibliotek"
 
 #: cps/spa_strings.py
 msgid "A note about the book, not tied to a passage"
-msgstr ""
+msgstr "En anteckning om boken som inte är kopplad till ett stycke"
 
 #: cps/spa_strings.py
 msgid ""
 "A one-time full duplicate scan is needed. Use “Scan for duplicates” above to "
 "run it."
 msgstr ""
+"En fullständig dubblettgenomsökning måste köras en gång. Använd ”Sök efter "
+"dubbletter” ovan för att köra den."
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "API keys"
-msgstr ""
+msgstr "API-nycklar"
 
 #: cps/spa_strings.py cps/templates/layout.html cps/templates/stats.html
 msgid "About"
@@ -4493,112 +4495,112 @@ msgstr "Om"
 
 #: cps/spa_strings.py
 msgid "Account settings"
-msgstr ""
+msgstr "Kontoinställningar"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Account: {name}"
-msgstr ""
+msgstr "Konto: {name}"
 
 #: cps/spa_strings.py
 msgid "Active"
-msgstr ""
+msgstr "Aktiv"
 
 #: cps/spa_strings.py
 msgid "Add identifier"
-msgstr ""
+msgstr "Lägg till identifierare"
 
 #: cps/spa_strings.py
 msgid "Add link"
-msgstr ""
+msgstr "Lägg till länk"
 
 #: cps/spa_strings.py
 msgid "Add note"
-msgstr ""
+msgstr "Lägg till anteckning"
 
 #: cps/spa_strings.py
 msgid "Add or replace this line in the [OneStoreServices] section:"
-msgstr ""
+msgstr "Lägg till eller ersätt den här raden i avsnittet [OneStoreServices]:"
 
 #: cps/spa_strings.py
 msgid "Add to existing"
-msgstr ""
+msgstr "Lägg till i befintlig"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Add to favorites"
-msgstr ""
+msgstr "Lägg till i favoriter"
 
 #: cps/spa_strings.py
 msgid "Admin group"
-msgstr ""
+msgstr "Administratörsgrupp"
 
 #: cps/spa_strings.py
 msgid "Admin navigation"
-msgstr ""
+msgstr "Administratörsnavigering"
 
 #: cps/spa_strings.py
 msgid "Advanced"
-msgstr ""
+msgstr "Avancerat"
 
 #: cps/spa_strings.py
 msgid "Advanced search"
-msgstr ""
+msgstr "Avancerad sökning"
 
 #: cps/spa_strings.py
 msgid "All books"
-msgstr ""
+msgstr "Alla böcker"
 
 #: cps/spa_strings.py
 msgid "All shelves"
-msgstr ""
+msgstr "Alla hyllor"
 
 #: cps/spa_strings.py
 msgid "Allow remote (magic-link) login"
-msgstr ""
+msgstr "Tillåt fjärrinloggning (magisk länk)"
 
 #: cps/spa_strings.py
 msgid "Allowed groups (comma-separated)"
-msgstr ""
+msgstr "Tillåtna grupper (kommaseparerade)"
 
 #: cps/spa_strings.py
 msgid "Annotation pages"
-msgstr ""
+msgstr "Anteckningssidor"
 
 #: cps/spa_strings.py cps/templates/search_form.html
 msgid "Any"
-msgstr ""
+msgstr "Vilken som helst"
 
 #: cps/spa_strings.py
 msgid "Any format"
-msgstr ""
+msgstr "Valfritt format"
 
 #: cps/spa_strings.py
 msgid "Any language"
-msgstr ""
+msgstr "Valfritt språk"
 
 #: cps/spa_strings.py
 msgid "Any series"
-msgstr ""
+msgstr "Valfri serie"
 
 #: cps/spa_strings.py
 msgid "Any tags"
-msgstr ""
+msgstr "Valfria taggar"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid "Apply"
-msgstr ""
+msgstr "Tillämpa"
 
 #: cps/spa_strings.py
 msgid "Apply metadata"
-msgstr ""
+msgstr "Tillämpa metadata"
 
 #: cps/spa_strings.py
 msgid "Apply selected"
-msgstr ""
+msgstr "Tillämpa valda"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Applying…"
-msgstr ""
+msgstr "Tillämpar…"
 
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/duplicates.html cps/templates/kobo_reconcile.html
@@ -4880,108 +4882,112 @@ msgstr "Bekväm"
 
 #: cps/spa_strings.py
 msgid "Compact"
-msgstr ""
+msgstr "Kompakt"
 
 #: cps/spa_strings.py
 msgid "Configuration"
-msgstr ""
+msgstr "Konfiguration"
 
 #: cps/spa_strings.py
 msgid "Configured"
-msgstr ""
+msgstr "Konfigurerad"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Confirm delete tag {name}"
-msgstr ""
+msgstr "Bekräfta borttagning av taggen {name}"
 
 #: cps/spa_strings.py
 msgid "Confirm new password"
-msgstr ""
+msgstr "Bekräfta nytt lösenord"
 
 #: cps/spa_strings.py
 msgid ""
 "Connect the Kobo to a computer and open .kobo/Kobo/Kobo eReader.conf in a "
 "text editor."
 msgstr ""
+"Anslut Kobon till en dator och öppna .kobo/Kobo/Kobo eReader.conf i en "
+"textredigerare."
 
 #: cps/spa_strings.py
 msgid ""
 "Connect this account to an e-reader, then sync once to confirm it reached "
 "your library."
 msgstr ""
+"Anslut det här kontot till en e-boksläsare och synkronisera sedan en gång "
+"för att bekräfta att det nådde ditt bibliotek."
 
 #: cps/spa_strings.py cps/tasks/convert.py
 msgid "Convert"
-msgstr ""
+msgstr "Konvertera"
 
 #: cps/spa_strings.py
 msgid "Convert before sending"
-msgstr ""
+msgstr "Konvertera före sändning"
 
 #: cps/spa_strings.py
 msgid "Convert from"
-msgstr ""
+msgstr "Konvertera från"
 
 #: cps/spa_strings.py
 msgid "Copied"
-msgstr ""
+msgstr "Kopierat"
 
 #: cps/spa_strings.py
 msgid "Copied to clipboard"
-msgstr ""
+msgstr "Kopierat till urklipp"
 
 #: cps/spa_strings.py
 msgid "Copied to clipboard."
-msgstr ""
+msgstr "Kopierat till urklipp."
 
 #: cps/spa_strings.py
 msgid "Copy link"
-msgstr ""
+msgstr "Kopiera länk"
 
 #: cps/spa_strings.py
 msgid "Copy server address"
-msgstr ""
+msgstr "Kopiera serveradress"
 
 #: cps/spa_strings.py
 msgid "Copy sync URL"
-msgstr ""
+msgstr "Kopiera synkroniseringswebbadress"
 
 #: cps/spa_strings.py
 msgid "Could not assign."
-msgstr ""
+msgstr "Kunde inte tilldela."
 
 #: cps/spa_strings.py
 msgid "Could not complete the action."
-msgstr ""
+msgstr "Kunde inte slutföra åtgärden."
 
 #: cps/spa_strings.py
 msgid "Could not copy. Select the address and copy it manually."
-msgstr ""
+msgstr "Kunde inte kopiera. Markera adressen och kopiera den manuellt."
 
 #: cps/spa_strings.py
 msgid "Could not create shelf."
-msgstr ""
+msgstr "Kunde inte skapa hylla."
 
 #: cps/spa_strings.py
 msgid "Could not create the shelf."
-msgstr ""
+msgstr "Kunde inte skapa hyllan."
 
 #: cps/spa_strings.py
 msgid "Could not delete shelf."
-msgstr ""
+msgstr "Kunde inte ta bort hyllan."
 
 #: cps/spa_strings.py
 msgid "Could not delete tag"
-msgstr ""
+msgstr "Kunde inte ta bort tagg"
 
 #: cps/spa_strings.py
 msgid "Could not delete the Kobo sync URL."
-msgstr ""
+msgstr "Kunde inte ta bort Kobo-synkroniseringswebbadressen."
 
 #: cps/spa_strings.py
 msgid "Could not load candidates."
-msgstr ""
+msgstr "Kunde inte läsa in kandidater."
 
 #: cps/spa_strings.py
 msgid "Could not load device annotations."

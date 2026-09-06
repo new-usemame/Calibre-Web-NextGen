@@ -9772,12 +9772,25 @@ msgid ""
 "        <a href=\"https://github.com/crocodilestick/Calibre-Web-Automated/"
 "wiki/Configuration#database-configuration\">see here</a>!"
 msgstr ""
+"NextGen är konfigurerat så att din Calibre-databas (filen <code>metadata.db</"
+"code>) alltid ska finnas någonstans i <code>/calibre-library</code>.\n"
+"        NextGen söker automatiskt igenom den katalog som du har bundit till "
+"<code>/calibre-library</code> i din docker-compose-fil efter befintliga "
+"Calibre\n"
+"        Libraries/metadata.db-filer vid uppstart. Om programmet bara hittar "
+"ett befintligt bibliotek monteras det automatiskt. Om det hittar flera "
+"monteras det största som standard automatiskt, och om det inte hittar något "
+"skapas och monteras ett nytt automatiskt. Mer information finns\n"
+"        <a href=\"https://github.com/crocodilestick/Calibre-Web-Automated/"
+"wiki/Configuration#database-configuration\">här</a>!"
 
 #: cps/templates/config_db.html
 msgid ""
 "Therefore, when configuring your docker-compose file for NextGen, <b>DO NOT "
 "CHANGE THE PATHS IN THE VOLUMES SECTION ON THE RIGHT SIDE OF THE COLONS!</b>"
 msgstr ""
+"När du därför konfigurerar docker-compose-filen för NextGen ska du <b>INTE "
+"ÄNDRA SÖKVÄGARNA I VOLYMAVSNITTET TILL HÖGER OM KOLONTECKNEN!</b>"
 
 #: cps/templates/config_db.html
 msgid ""
@@ -9789,6 +9802,12 @@ msgid ""
 "        library, use the <b>Separate Book Files from Library Option below "
 "and there, enter the path to the rest of the library</b>"
 msgstr ""
+"Dessa sökvägar är enbart interna för NextGen. Du kan ändra vad de binds till "
+"på vänster sida efter behov, men det finns ingen anledning att\n"
+"        ändra sökvägarna på höger sida.<br><br>Om du vill ha filen "
+"<code>metadata.db</code> på en annan plats än resten av\n"
+"        biblioteket använder du <b>alternativet Separera bokfiler från "
+"biblioteket nedan och anger där sökvägen till resten av biblioteket</b>"
 
 #: cps/templates/config_db.html
 msgid ""
@@ -9800,10 +9819,17 @@ msgid ""
 "        once you've checked the <b>Separate Book Files from Library</b> "
 "option."
 msgstr ""
+"Om bibliotekets <code>metadata.db</code>-fil till exempel är bunden någonstans "
+"inom <code>/calibre-library</code> kan du binda katalogen\n"
+"        som innehåller motsvarande bokfiler osv. till exempelvis "
+"<code>/books</code> och ange <code>/books</code> i fältet som visas "
+"nedan\n"
+"        när du har markerat alternativet <b>Separera bokfiler från "
+"biblioteket</b>."
 
 #: cps/templates/config_db.html
 msgid "Split Library Functionality"
-msgstr ""
+msgstr "Dela upp bibliotek"
 
 #: cps/templates/config_db.html
 msgid ""
@@ -9811,6 +9837,9 @@ msgid ""
 "should remain in <code>/calibre-library</code>, however your library files "
 "can be wherever you desire"
 msgstr ""
+"<b>Separera bokfiler från biblioteket</b> – filen <code>metadata.db</code> "
+"ska ligga kvar i <code>/calibre-library</code>, men biblioteksfilerna kan "
+"finnas var du vill"
 
 #: cps/templates/config_db.html
 msgid "Use Google Drive?"
@@ -9843,17 +9872,21 @@ msgid ""
 "book data</b> (reading progress, bookmarks, shelf links, downloads, etc.) in "
 "the app database, but will not affect user accounts or settings."
 msgstr ""
+"Om Calibre-biblioteket är skadat och inte kan öppnas kan du försöka återställa "
+"det från OPF-filerna i biblioteket. Detta <b>raderar alla bokspecifika "
+"data</b> (läsförlopp, bokmärken, hyllkopplingar, hämtningar osv.) i "
+"programmets databas, men påverkar inte användarkonton eller inställningar."
 
 #: cps/templates/config_db.html
 #, python-format
 msgid ""
 "Both databases will be automatically backed up in %(path)s before any "
 "destructive action."
-msgstr ""
+msgstr "Båda databaserna säkerhetskopieras automatiskt till %(path)s före alla förstörande åtgärder."
 
 #: cps/templates/config_db.html
 msgid "A restore log will be saved alongside the backups."
-msgstr ""
+msgstr "En återställningslogg sparas tillsammans med säkerhetskopiorna."
 
 #: cps/templates/config_db.html
 msgid "Are you sure? This cannot be undone."
@@ -10719,11 +10752,11 @@ msgstr "Visa konfiguration"
 
 #: cps/templates/config_view_edit.html
 msgid "The title displayed in the browser tab and navbar."
-msgstr ""
+msgstr "Titeln som visas på webbläsarfliken och i navigeringsfältet."
 
 #: cps/templates/config_view_edit.html
 msgid "Number of books to display per page in list views (1-200)."
-msgstr ""
+msgstr "Antal böcker som visas per sida i listvyer (1–200)."
 
 #: cps/templates/config_view_edit.html
 msgid "No. of Random Books to Display"
@@ -10731,7 +10764,7 @@ msgstr "Antal slumpmässiga böcker att visa"
 
 #: cps/templates/config_view_edit.html
 msgid "Number of random books shown on the home page (1-30)."
-msgstr ""
+msgstr "Antal slumpmässiga böcker som visas på startsidan (1–30)."
 
 #: cps/templates/config_view_edit.html
 msgid "No. of Authors to Display Before Hiding (0=Disable Hiding)"

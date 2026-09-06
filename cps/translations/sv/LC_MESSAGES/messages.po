@@ -2886,7 +2886,8 @@ msgstr "Ange ett giltigt bok-id."
 msgid ""
 "Give {name} their own selection? It starts as a copy of everything they can "
 "see now — nothing changes for them yet."
-msgstr ""
+msgstr "Ge {name} ett eget urval? Det börjar som en kopia av allt personen kan se "
+"nu — ingenting ändras för personen ännu."
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Global Library"
@@ -2940,7 +2941,9 @@ msgid ""
 "Nothing is missing — the whole library is still on the server. What you see "
 "here is your own selection. Add books from the global library; they appear "
 "here and on your e-reader."
-msgstr ""
+msgstr "Inget saknas — hela biblioteket finns fortfarande på servern. Det du ser "
+"här är ditt eget urval. Lägg till böcker från det globala biblioteket; de "
+"visas här och på din e-boksläsare."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Only an administrator can add it back."
@@ -2954,7 +2957,8 @@ msgstr "Endast böckerna som valts för det här kontot."
 msgid ""
 "Only the books you choose. Add them from the global library; remove them any "
 "time."
-msgstr ""
+msgstr "Endast böckerna du väljer. Lägg till dem från det globala biblioteket och "
+"ta bort dem när som helst."
 
 #: cps/spa_strings.py
 msgid "Own selection"
@@ -3074,7 +3078,7 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "It leaves your library and your OPDS feed."
-msgstr ""
+msgstr "Den lämnar ditt bibliotek och ditt OPDS-flöde."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid ""

@@ -42,7 +42,6 @@ DEVICE_HEADERS = {
 
 def create_reader():
     """Create the secondary account these cases authenticate as."""
-    import cps
     from cps import constants, ub
 
     user = ub.User()

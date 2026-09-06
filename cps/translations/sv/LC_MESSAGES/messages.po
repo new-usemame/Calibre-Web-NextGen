@@ -3250,35 +3250,37 @@ msgid ""
 "Merge {n} books into the first selected? The others are removed after their "
 "formats are copied over."
 msgstr ""
+"Slå ihop {n} böcker med den första valda? De övriga tas bort när deras "
+"format har kopierats."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Apply to {n} books"
-msgstr ""
+msgstr "Tillämpa på {n} böcker"
 
 #: cps/spa_strings.py
 msgid "Match condition"
-msgstr ""
+msgstr "Matchningsvillkor"
 
 #: cps/spa_strings.py
 msgid "Rule field"
-msgstr ""
+msgstr "Regelfält"
 
 #: cps/spa_strings.py
 msgid "Rule operator"
-msgstr ""
+msgstr "Regeloperator"
 
 #: cps/spa_strings.py
 msgid "Could not load smart-shelf rules."
-msgstr ""
+msgstr "Kunde inte läsa in regler för smart hylla."
 
 #: cps/spa_strings.py
 msgid "Has Cover"
-msgstr ""
+msgstr "Har omslag"
 
 #: cps/spa_strings.py
 msgid "Series Index"
-msgstr ""
+msgstr "Serieindex"
 
 #: cps/spa_strings.py cps/templates/search_form.html
 msgid "Read Status"
@@ -3286,59 +3288,59 @@ msgstr "Lässtatus"
 
 #: cps/spa_strings.py
 msgid "Has Hardcover ID"
-msgstr ""
+msgstr "Har Hardcover-id"
 
 #: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "In the past N days"
-msgstr ""
+msgstr "Under de senaste N dagarna"
 
 #: cps/spa_strings.py cps/templates/magic_shelf_edit.html
 msgid "Not in the past N days"
-msgstr ""
+msgstr "Inte under de senaste N dagarna"
 
 #: cps/spa_strings.py
 msgid "is before / less than"
-msgstr ""
+msgstr "är före / mindre än"
 
 #: cps/spa_strings.py
 msgid "is on or before / at most"
-msgstr ""
+msgstr "är på eller före / högst"
 
 #: cps/spa_strings.py
 msgid "is after / greater than"
-msgstr ""
+msgstr "är efter / större än"
 
 #: cps/spa_strings.py
 msgid "is on or after / at least"
-msgstr ""
+msgstr "är på eller efter / minst"
 
 #: cps/spa_strings.py
 msgid "is between"
-msgstr ""
+msgstr "är mellan"
 
 #: cps/spa_strings.py
 msgid "is not between"
-msgstr ""
+msgstr "är inte mellan"
 
 #: cps/spa_strings.py
 msgid "does not begin with"
-msgstr ""
+msgstr "börjar inte med"
 
 #: cps/spa_strings.py
 msgid "does not end with"
-msgstr ""
+msgstr "slutar inte med"
 
 #: cps/spa_strings.py
 msgid "is empty"
-msgstr ""
+msgstr "är tomt"
 
 #: cps/spa_strings.py
 msgid "is not empty"
-msgstr ""
+msgstr "är inte tomt"
 
 #: cps/spa_strings.py
 msgid "Appearance"
-msgstr ""
+msgstr "Utseende"
 
 #: cps/spa_strings.py cps/templates/read.html cps/templates/readcbr.html
 #: cps/templates/user_edit.html
@@ -3347,7 +3349,7 @@ msgstr "Tema"
 
 #: cps/spa_strings.py
 msgid "System"
-msgstr ""
+msgstr "System"
 
 #: cps/spa_strings.py cps/templates/read.html cps/templates/readcbr.html
 msgid "Light"
@@ -3359,45 +3361,47 @@ msgstr "Mörkt"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Sepia"
-msgstr ""
+msgstr "Sepia"
 
 #: cps/spa_strings.py
 msgid "High contrast"
-msgstr ""
+msgstr "Hög kontrast"
 
 #: cps/spa_strings.py
 msgid "Midnight (AMOLED)"
-msgstr ""
+msgstr "Midnatt (AMOLED)"
 
 #: cps/spa_strings.py
 msgid "Match your device’s light or dark setting"
-msgstr ""
+msgstr "Följ enhetens ljusa eller mörka inställning"
 
 #: cps/spa_strings.py
 msgid "Theme saved."
-msgstr ""
+msgstr "Temat har sparats."
 
 #: cps/spa_strings.py
 msgid "Could not save theme."
-msgstr ""
+msgstr "Kunde inte spara temat."
 
 #: cps/spa_strings.py
 msgid "Default theme for new accounts"
-msgstr ""
+msgstr "Standardtema för nya konton"
 
 #: cps/spa_strings.py
 msgid ""
 "Applies to accounts created from now on. Everyone picks their own under "
 "Account → Theme."
 msgstr ""
+"Gäller konton som skapas från och med nu. Var och en väljer sitt eget under "
+"Konto → Tema."
 
 #: cps/spa_strings.py
 msgid "Add a format"
-msgstr ""
+msgstr "Lägg till ett format"
 
 #: cps/spa_strings.py
 msgid "Add rule"
-msgstr ""
+msgstr "Lägg till regel"
 
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/listenmp3.html
 #: cps/templates/search.html
@@ -3406,15 +3410,15 @@ msgstr "Lägg till hyllan"
 
 #: cps/spa_strings.py
 msgid "Add your own"
-msgstr ""
+msgstr "Lägg till egen"
 
 #: cps/spa_strings.py
 msgid "App password label"
-msgstr ""
+msgstr "Etikett för applösenord"
 
 #: cps/spa_strings.py
 msgid "App passwords"
-msgstr ""
+msgstr "Applösenord"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/kobo_reconcile.html
@@ -3424,19 +3428,19 @@ msgstr "Författare"
 
 #: cps/spa_strings.py
 msgid "Authors (separate with &)"
-msgstr ""
+msgstr "Författare (separera med &)"
 
 #: cps/spa_strings.py
 msgid "Back to sign in"
-msgstr ""
+msgstr "Tillbaka till inloggning"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Blue"
-msgstr ""
+msgstr "Blå"
 
 #: cps/spa_strings.py
 msgid "Book content"
-msgstr ""
+msgstr "Bokinnehåll"
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Browse"
@@ -3444,7 +3448,7 @@ msgstr "Bläddra"
 
 #: cps/spa_strings.py
 msgid "Change password"
-msgstr ""
+msgstr "Byt lösenord"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/book_table.html cps/templates/cwng_feedback_popup.html
@@ -3456,81 +3460,81 @@ msgstr "Stäng"
 
 #: cps/spa_strings.py
 msgid "Close menu"
-msgstr ""
+msgstr "Stäng menyn"
 
 #: cps/spa_strings.py
 msgid "Contents"
-msgstr ""
+msgstr "Innehåll"
 
 #: cps/spa_strings.py
 msgid "Convert failed."
-msgstr ""
+msgstr "Konverteringen misslyckades."
 
 #: cps/spa_strings.py
 msgid "Convert to"
-msgstr ""
+msgstr "Konvertera till"
 
 #: cps/spa_strings.py
 msgid "Convert to format"
-msgstr ""
+msgstr "Konvertera till format"
 
 #: cps/spa_strings.py cps/templates/cwa_settings.html
 #: cps/templates/update_now_modal.html cps/templates/user_edit.html
 msgid "Copy"
-msgstr ""
+msgstr "Kopiera"
 
 #: cps/spa_strings.py
 msgid "Could not change password."
-msgstr ""
+msgstr "Kunde inte byta lösenord."
 
 #: cps/spa_strings.py
 msgid "Could not create."
-msgstr ""
+msgstr "Kunde inte skapa."
 
 #: cps/spa_strings.py
 msgid "Could not fetch cover."
-msgstr ""
+msgstr "Kunde inte hämta omslag."
 
 #: cps/spa_strings.py
 msgid "Could not load metadata."
-msgstr ""
+msgstr "Kunde inte läsa in metadata."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Could not load the book file ({status})"
-msgstr ""
+msgstr "Kunde inte läsa in bokfilen ({status})"
 
 #: cps/spa_strings.py
 msgid "Could not load your account."
-msgstr ""
+msgstr "Kunde inte läsa in ditt konto."
 
 #: cps/spa_strings.py
 msgid "Could not save."
-msgstr ""
+msgstr "Kunde inte spara."
 
 #: cps/spa_strings.py
 msgid "Cover image URL"
-msgstr ""
+msgstr "Webbadress till omslagsbild"
 
 #: cps/spa_strings.py
 msgid "Cover update failed."
-msgstr ""
+msgstr "Uppdatering av omslag misslyckades."
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Cover updated."
-msgstr ""
+msgstr "Omslaget har uppdaterats."
 
 #: cps/spa_strings.py
 msgid "Create smart shelf"
-msgstr ""
+msgstr "Skapa smart hylla"
 
 #: cps/spa_strings.py
 msgid "Create your account"
-msgstr ""
+msgstr "Skapa ditt konto"
 
 #: cps/spa_strings.py
 msgid "Dark theme"
-msgstr ""
+msgstr "Mörkt tema"
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #: cps/templates/admin.html cps/templates/book_edit.html
@@ -3542,7 +3546,7 @@ msgstr "Ta bort"
 
 #: cps/spa_strings.py
 msgid "Delete book"
-msgstr ""
+msgstr "Ta bort bok"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3550,87 +3554,89 @@ msgid ""
 "Delete \"{title}\"? This permanently removes the book and all its files from "
 "your library. This cannot be undone."
 msgstr ""
+"Ta bort \"{title}\"? Detta tar permanent bort boken och alla dess filer "
+"från ditt bibliotek. Det kan inte ångras."
 
 #: cps/spa_strings.py
 msgid "Deleting…"
-msgstr ""
+msgstr "Tar bort…"
 
 #: cps/spa_strings.py
 msgid "Could not delete this book."
-msgstr ""
+msgstr "Kunde inte ta bort den här boken."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete the {fmt} file? The book stays; only this format is removed."
-msgstr ""
+msgstr "Ta bort filen {fmt}? Boken behålls; endast detta format tas bort."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete {fmt}"
-msgstr ""
+msgstr "Ta bort {fmt}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete {n} book(s)? This cannot be undone."
-msgstr ""
+msgstr "Ta bort {n} bok/böcker? Det kan inte ångras."
 
 #: cps/spa_strings.py
 msgid "Description contains"
-msgstr ""
+msgstr "Beskrivningen innehåller"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Deselect {title}"
-msgstr ""
+msgstr "Avmarkera {title}"
 
 #: cps/spa_strings.py
 msgid "Edit metadata"
-msgstr ""
+msgstr "Redigera metadata"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Edit {title}"
-msgstr ""
+msgstr "Redigera {title}"
 
 #: cps/spa_strings.py
 msgid "Showing your default library view."
-msgstr ""
+msgstr "Visar din standardvy för biblioteket."
 
 #: cps/spa_strings.py
 msgid "Show all books"
-msgstr ""
+msgstr "Visa alla böcker"
 
 #: cps/spa_strings.py
 msgid "Edit default view"
-msgstr ""
+msgstr "Redigera standardvy"
 
 #: cps/spa_strings.py
 msgid "Failed to load books."
-msgstr ""
+msgstr "Det gick inte att läsa in böcker."
 
 #: cps/spa_strings.py
 msgid "Failed to open the book."
-msgstr ""
+msgstr "Det gick inte att öppna boken."
 
 #: cps/spa_strings.py
 msgid "Generate"
-msgstr ""
+msgstr "Generera"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Green"
-msgstr ""
+msgstr "Grön"
 
 #: cps/spa_strings.py
 msgid "Help"
-msgstr ""
+msgstr "Hjälp"
 
 #: cps/spa_strings.py
 msgid "Highlight color"
-msgstr ""
+msgstr "Markeringsfärg"
 
 #: cps/spa_strings.py cps/templates/annotations_view.html
 msgid "Import from Kobo"
-msgstr ""
+msgstr "Importera från Kobo"
 
 #: cps/spa_strings.py
 msgid "Interface language"

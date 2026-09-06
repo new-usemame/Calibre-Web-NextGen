@@ -11783,24 +11783,20 @@ msgid "Mark As Read"
 msgstr "Markera som läst"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Marked as read"
-msgstr "Markera som oläst"
+msgstr "Markerad som läst"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Marked as unread"
-msgstr "Markera som oläst"
+msgstr "Markerad som oläst"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Added to favorites"
-msgstr "Lägg till i arkivet"
+msgstr "Tillagd i favoriter"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Removed from favorites"
-msgstr "Återställ från arkivet"
+msgstr "Borttagen från favoriter"
 
 #: cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Restore from archive"
@@ -11811,9 +11807,8 @@ msgid "Add to archive"
 msgstr "Lägg till i arkivet"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Restored from archive"
-msgstr "Återställ från arkivet"
+msgstr "Återställd från arkivet"
 
 #: cps/templates/detail.html
 msgid "Reloaded metadata from disk"
@@ -11828,9 +11823,8 @@ msgid "Unhide from your library"
 msgstr ""
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Hide from your library"
-msgstr "Sök i bibliotek"
+msgstr "Dölj från ditt bibliotek"
 
 #: cps/templates/detail.html
 msgid "Unhidden"
@@ -11847,14 +11841,12 @@ msgid "It also leaves these shelves: %(shelves)s."
 msgstr ""
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Rating updated"
-msgstr "E-postserverinställningar uppdaterade"
+msgstr "Betyget har uppdaterats"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Rating cleared"
-msgstr "Betyg större än"
+msgstr "Betyget har rensats"
 
 #: cps/templates/detail.html cps/templates/listenmp3.html
 #, python-format
@@ -11890,19 +11882,16 @@ msgid "Description:"
 msgstr "Beskrivning:"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Select eReader Email Addresses"
-msgstr "Kindle"
+msgstr "Välj e-postadresser för e-boksläsare"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Choose email addresses:"
-msgstr "Kindle"
+msgstr "Välj e-postadresser:"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Select All"
-msgstr "Skapa en hylla"
+msgstr "Markera alla"
 
 #: cps/templates/detail.html
 msgid "Other users' eReaders:"
@@ -11925,19 +11914,16 @@ msgid "Enter one or more email addresses separated by commas"
 msgstr ""
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Select format:"
-msgstr "Ta bort format:"
+msgstr "Välj format:"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Failed to update tags"
-msgstr "Det gick inte att skapa sökväg för omslag"
+msgstr "Det gick inte att uppdatera taggarna"
 
 #: cps/templates/detail.html
-#, fuzzy
 msgid "Failed to update shelves"
-msgstr "Det gick inte att skapa sökväg för omslag"
+msgstr "Det gick inte att uppdatera hyllorna"
 
 #: cps/templates/duplicates.html
 msgid "NextGen Duplicates Manager"
@@ -11950,28 +11936,24 @@ msgid ""
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Run Full Duplicate Scan"
-msgstr "Ta bort boken"
+msgstr "Kör fullständig dubblettsökning"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Scan for Duplicates Now"
-msgstr "Visa böcker med bästa betyg"
+msgstr "Sök efter dubbletter nu"
 
 #: cps/templates/duplicates.html
 msgid "Select Duplicates"
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Select None"
-msgstr "Välj"
+msgstr "Avmarkera alla"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Delete Selected"
-msgstr "Slå ihop utvalda böcker"
+msgstr "Ta bort markerade"
 
 #: cps/templates/duplicates.html
 msgid "Duplicate scanning needs a one-time full scan."
@@ -11991,9 +11973,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Duplicate scan is running."
-msgstr "Ta bort boken"
+msgstr "Dubblettsökning pågår."
 
 #: cps/templates/duplicates.html
 msgid "You can keep using CWA while it runs."
@@ -12052,33 +12033,28 @@ msgid "This will permanently delete books. Original files will be backed up to"
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Merge Selected"
-msgstr "Slå ihop utvalda böcker"
+msgstr "Slå ihop markerade"
 
 #: cps/templates/duplicates.html
 msgid "Dismiss this duplicate group"
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "View book details"
-msgstr "Bokdetaljer"
+msgstr "Visa bokdetaljer"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Edit book metadata"
-msgstr "redigera metadata"
+msgstr "Redigera bokmetadata"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Archive/delete book"
-msgstr "Slå ihop utvalda böcker"
+msgstr "Arkivera/ta bort bok"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "No Duplicate Books Found"
-msgstr "Inga resultat hittades"
+msgstr "Inga dubblettböcker hittades"
 
 #: cps/templates/duplicates.html
 msgid "Your library has no books with duplicate title and author combinations."
@@ -12101,33 +12077,28 @@ msgid ""
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "Selected strategy:"
-msgstr "Ta bort format:"
+msgstr "Vald strategi:"
 
 #: cps/templates/duplicates.html
 msgid "This action cannot be undone!"
 msgstr ""
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "The following books will be permanently deleted:"
-msgstr "Boken kommer att tas bort från Calibre-databasen"
+msgstr "Följande böcker kommer att tas bort permanent:"
 
 #: cps/templates/duplicates.html cps/templates/layout.html
-#, fuzzy
 msgid "Merge Books"
-msgstr "Olästa böcker"
+msgstr "Slå ihop böcker"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "The following book will be kept:"
-msgstr "Boken kommer att tas bort från Calibre-databasen"
+msgstr "Följande bok kommer att behållas:"
 
 #: cps/templates/duplicates.html
-#, fuzzy
 msgid "The following books will be merged into it (and then deleted):"
-msgstr "Boken kommer att tas bort från Calibre-databasen"
+msgstr "Följande böcker slås ihop med den (och tas sedan bort):"
 
 #: cps/templates/duplicates.html
 msgid "Note: File formats from source books will be added to the target book."
@@ -12154,19 +12125,16 @@ msgid "Email Account Type"
 msgstr "Välj servertyp"
 
 #: cps/templates/email_edit.html
-#, fuzzy
 msgid "Standard Email Account"
-msgstr "Använd standard e-postkonto"
+msgstr "Standardkonto för e-post"
 
 #: cps/templates/email_edit.html
-#, fuzzy
 msgid "Gmail Account"
-msgstr "Välj servertyp"
+msgstr "Gmail-konto"
 
 #: cps/templates/email_edit.html
-#, fuzzy
 msgid "Setup Gmail Account"
-msgstr "Välj servertyp"
+msgstr "Konfigurera Gmail-konto"
 
 #: cps/templates/email_edit.html
 msgid "Revoke Gmail access? You will need to authorize Gmail again to use it."
@@ -12191,9 +12159,8 @@ msgid "Attachment Size Limit"
 msgstr "Gräns för bilagestorlek"
 
 #: cps/templates/email_edit.html
-#, fuzzy
 msgid "Save and Send Test Email"
-msgstr "Spara inställningarna och skicka test-e-post"
+msgstr "Spara och skicka testmeddelande"
 
 #: cps/templates/email_edit.html
 msgid "Allowed Domains (Whitelist)"
@@ -12224,9 +12191,8 @@ msgstr ""
 "(eller redigera):"
 
 #: cps/templates/generate_kobo_auth_url.html
-#, fuzzy
 msgid "Kobo Token:"
-msgstr "Kobo Sync Token"
+msgstr "Kobo-token:"
 
 #: cps/templates/grid.html
 msgid "List"
@@ -12273,14 +12239,12 @@ msgid ""
 msgstr ""
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "Reject All Pending"
-msgstr "Skapa en hylla"
+msgstr "Avvisa alla väntande"
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "Search Query"
-msgstr "Sökterm:"
+msgstr "Sökfråga"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Candidate Matches"
@@ -12300,27 +12264,24 @@ msgid "Match Reason"
 msgstr ""
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "View on Hardcover"
-msgstr "Visa bok vid Spara"
+msgstr "Visa på Hardcover"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Select This Match"
 msgstr ""
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "Reject All"
-msgstr "Skapa en hylla"
+msgstr "Avvisa alla"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Skip for Now"
 msgstr ""
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "Processing..."
-msgstr "Läser in..."
+msgstr "Bearbetar …"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "✓ Select This Match"
@@ -12331,38 +12292,35 @@ msgid "Failed to apply match"
 msgstr ""
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid ""
 "Are you sure you want to reject all matches for this book? This cannot be "
 "undone."
 msgstr ""
-"Är du säker på att du vill ändra den valda rollen för de valda användarna?"
+"Är du säker på att du vill avvisa alla träffar för den här boken? Detta kan "
+"inte ångras."
 
 #: cps/templates/hardcover_review_matches.html
 msgid "✗ Reject All Matches"
 msgstr ""
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "Failed to reject match"
-msgstr "Det gick inte att skapa sökväg för omslag"
+msgstr "Det gick inte att avvisa träffen"
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid ""
 "Are you sure you want to reject all pending matches? This cannot be undone."
 msgstr ""
-"Är du säker på att du vill ändra den valda rollen för de valda användarna?"
+"Är du säker på att du vill avvisa alla väntande träffar? Detta kan inte "
+"ångras."
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "✗ Reject All Pending"
-msgstr "Skapa en hylla"
+msgstr "✗ Avvisa alla väntande"
 
 #: cps/templates/hardcover_review_matches.html
-#, fuzzy
 msgid "Failed to reject all pending matches"
-msgstr "Det gick inte att skapa sökväg för omslag"
+msgstr "Det gick inte att avvisa alla väntande träffar"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "→ Skip for Now"

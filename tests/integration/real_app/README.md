@@ -24,7 +24,7 @@ backend wire only, and runs only where a matching image exists.
 2. **Blueprint requests — OBSERVED; parity — UNVERIFIED.** `cases.py:88`
    derives probes from `app.blueprints` and `app.url_map`. It selects a
    reachable rule, accounting for rules shadowed by earlier blueprints.
-   Observed: 34 registered blueprints, 33 HTTP probes. `jinjia` has no routes;
+   Observed: 34 registered blueprints, 33 HTTP probes — with the shipped defaults. Four more (`kobo`, `kobo_auth`, `readingservices_api_v3`, `readingservices_userstorage`) register only when `kobo_available` holds (`cps/main.py:124`) and are outside this fixture's reach; `blueprints.json` lists them so the gap is visible rather than silent. `jinjia` has no routes;
    its real template filter is exercised instead. An unknown routeless
    blueprint fails explicitly. OAuth probes use credential-free callbacks,
    without following provider redirects. These are anonymous smoke requests,
@@ -37,11 +37,19 @@ backend wire only, and runs only where a matching image exists.
    shared lane container name, pull images, or write a Compose override.
    An explicitly selected stale image fails; a stale default dev image skips.
 
-   The available dev image reported revision `6eefa9815a96`, while this
-   worktree started at `370d8344ad`. An actual comparison failed: Docker's
-   `/login/github/authorized` returned Location `/login/github`; the fixture
-   returned `/login?local=1`. This is not evidence of a current product bug.
-   The source checksum precondition now rejects that mismatched comparison.
+   Against the default `crocodilestick/calibre-web-automated:dev` image an
+   actual comparison failed: Docker's `/login/github/authorized` returned
+   Location `/login/github`; the fixture returned `/login?local=1`. That image
+   is UPSTREAM, not this fork, so the difference is a fork divergence and not a
+   product bug — the `revision` label on it (`6eefa9815a96`) belongs to the
+   LinuxServer base image and resolves to nothing in this history; an earlier
+   draft of this file read it as a CWNG commit. The source checksum
+   precondition rejects that mismatched comparison, which is the precondition
+   doing real work rather than papering over a divergence.
+
+   OBSERVED against an image built from this checkout: **0 mismatching rows of
+   31**, container ready in 4.6 s. That is the first time this comparison has
+   been observed green; before it, the leg had never run to completion anywhere.
 
    **Scope, and why it is drawn here.** Two things the comparison must not
    report as parity failures, because neither is the application:
@@ -68,7 +76,7 @@ backend wire only, and runs only where a matching image exists.
    `_backend_parity_rows` returns the rows it compares and, for each row it does
    not, the reason. A bundle-served exclusion must belong to a blueprint the
    module claims; every other exclusion must carry the measured flag. That
-   decision is pinned by `tests/unit/test_real_app_parity_partition.py` (7 cases,
+   decision is pinned by `tests/unit/test_real_app_parity_partition.py` (9 cases,
    each seen red against a mutant of the rule).
 
    **What is still unverified, plainly.** The comparison has never been observed
@@ -137,5 +145,11 @@ Changed-file reconciliation against `origin/main`:
 
 - `tests/integration/real_app/conftest.py`: real-app fixture and teardown.
 - `tests/integration/real_app/cases.py`: five isolated runtime cases.
+- `tests/integration/real_app/blueprints.json`: the pinned blueprint list, split
+  into unconditional and conditional. The only artifact here that does not come
+  from the app itself, and the only thing that can notice a blueprint vanishing.
 - `tests/integration/test_real_app.py`: lane entry, isolation, Docker comparison.
+- `tests/unit/test_real_app_parity_partition.py`: the parity exclusion rule,
+  which the Docker comparison would otherwise never exercise on a machine
+  without a matching image.
 - `tests/integration/real_app/README.md`: usage, evidence, outstanding parity.

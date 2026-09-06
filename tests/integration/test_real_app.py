@@ -126,6 +126,14 @@ def test_backend_blueprint_wire_matches_docker(real_app_wire):
 
 BUNDLE_SERVED_BLUEPRINTS = ("spa",)
 
+# The exclusions below are each justified, but an exclusion rule that can grow
+# without limit is a comparison that can quietly stop comparing: flag every row
+# and the loop runs zero times while the test still passes. Two exclusions are
+# expected today -- the bundle row and one address-sensitive route. A third is
+# tolerated for churn; beyond that, look at why coverage is draining rather than
+# raising this number.
+MAX_EXCLUDED_ROWS = 3
+
 
 def _backend_parity_rows(wire, *, bundle_built):
     """Split the probe wire into rows Docker parity can claim, and rows it cannot.
@@ -159,6 +167,11 @@ def _backend_parity_rows(wire, *, bundle_built):
                  if reason == "SPA bundle absent from the checkout"
                  and row["blueprint"] not in BUNDLE_SERVED_BLUEPRINTS]
     assert not unclaimed, unclaimed
+    assert len(excluded) <= MAX_EXCLUDED_ROWS, (
+        "%d of %d rows excluded from the Docker comparison; the comparison is "
+        "draining. Excluded: %s" % (len(excluded), len(wire),
+                                    [(row["path"], reason) for row, reason in excluded]))
+    assert compared, "every row was excluded; nothing would be compared"
     return compared, excluded
 
 

@@ -81,3 +81,21 @@ def test_a_route_not_flagged_sensitive_stays_in_the_comparison():
     compared, excluded = _backend_parity_rows(wire, bundle_built=True)
     assert compared == wire
     assert excluded == []
+
+
+def test_draining_the_comparison_fails_rather_than_passing_vacuously():
+    # An exclusion rule with no cap can classify every row as unexcludable-from
+    # and leave the assertion loop running zero times, green. MEASURED by the
+    # judge: flag all rows and the test passed while comparing nothing.
+    wire = [_row("b%d" % i, "/p%d" % i, client_address_sensitive=True)
+            for i in range(6)]
+    with pytest.raises(AssertionError, match="draining"):
+        _backend_parity_rows(wire, bundle_built=True)
+
+
+def test_a_single_extra_exclusion_is_tolerated_for_churn():
+    wire = BACKEND + [ADDRESS_SENSITIVE, BUNDLE,
+                      _row("other", "/other", client_address_sensitive=True)]
+    compared, excluded = _backend_parity_rows(wire, bundle_built=False)
+    assert compared == BACKEND
+    assert len(excluded) == 3

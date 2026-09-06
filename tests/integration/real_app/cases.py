@@ -159,10 +159,16 @@ def test_blueprint_requests(real_app):
     # this suite green before this check existed. The committed list is the only
     # thing here that does not come from the app itself.
     import pathlib
-    expected = json.loads(pathlib.Path(__file__).with_name("blueprints.json").read_text())
+    pinned = json.loads(pathlib.Path(__file__).with_name("blueprints.json").read_text())
+    expected = pinned["always"]
+    # Conditional blueprints are registered only when their condition holds, and
+    # this fixture boots with the shipped defaults. Their absence is not an error
+    # and their presence is not an error -- they are listed so the gap is visible
+    # rather than silent, and so an unexpected NEW blueprint still fails below.
+    conditional = [name for names in pinned["conditional"].values() for name in names]
     actual = sorted(real_app.blueprints)
     missing = [name for name in expected if name not in actual]
-    added = [name for name in actual if name not in expected]
+    added = [name for name in actual if name not in expected and name not in conditional]
     assert not missing, (
         "blueprint(s) no longer registered: %s. If the removal is intended, delete "
         "them from tests/integration/real_app/blueprints.json in the same commit."

@@ -271,11 +271,16 @@ def test_ownership_resolution_is_stable_across_identical_requests(
     original = readingservices.resolve_entitlement_ownership
 
     def recording(entitlement_id):
+        # Classify here rather than through the product's own labeller: if that
+        # helper ever collapsed UNKNOWN into "unowned", this measurement would
+        # quietly stop being able to see a flapping lookup.
         result = original(entitlement_id)
-        resolutions.append((
-            readingservices._capture_ownership_label(result),
-            getattr(result, "id", None),
-        ))
+        if result is readingservices.OWNERSHIP_UNKNOWN:
+            resolutions.append(("unknown", None))
+        elif result is None:
+            resolutions.append(("unowned", None))
+        else:
+            resolutions.append(("owned", result.id))
         return result
 
     readingservices.resolve_entitlement_ownership = recording

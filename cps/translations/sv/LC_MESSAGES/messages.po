@@ -1362,15 +1362,16 @@ msgstr "Ogiltig lösningsstrategi"
 msgid ""
 "Ingest folder is not writable. Check your /cwa-book-ingest volume "
 "permissions."
-msgstr ""
+msgstr "Inläsningsmappen är inte skrivbar. Kontrollera behörigheterna för volymen "
+"/cwa-book-ingest."
 
 #: cps/editbooks.py
 msgid "Missing or invalid book id for format upload"
-msgstr ""
+msgstr "Bok-id saknas eller är ogiltigt vid uppladdning av format"
 
 #: cps/editbooks.py
 msgid "Cannot upload format: Book no longer exists in library"
-msgstr ""
+msgstr "Det går inte att ladda upp formatet: Boken finns inte längre i biblioteket"
 
 #: cps/api/upload.py cps/editbooks.py cps/templates/book_edit.html
 #: cps/templates/layout.html
@@ -1398,7 +1399,7 @@ msgstr "Det gick inte att konvertera den här boken: %(res)s"
 #: cps/editbooks.py
 #, python-format
 msgid " (book IDs: %(failed_ids)s)"
-msgstr ""
+msgstr " (bok-id:n: %(failed_ids)s)"
 
 #: cps/editbooks.py
 #, python-format
@@ -1407,7 +1408,10 @@ msgid ""
 "%(failure_count)s failed%(failed_ids_message)s. One or more failed books may "
 "have had files renamed before the database update failed; their files and "
 "database entries may now be inconsistent."
-msgstr ""
+msgstr "Massredigeringen slutfördes med fel: %(success_count)s lyckades och "
+"%(failure_count)s misslyckades%(failed_ids_message)s. En eller flera böcker "
+"kan ha fått filer omdöpta innan databasuppdateringen misslyckades; deras "
+"filer och databasposter kan nu vara inkonsekventa."
 
 #: cps/editbooks.py
 msgid "File type isn't allowed to be uploaded to this server"
@@ -1431,11 +1435,11 @@ msgstr ""
 
 #: cps/editbooks.py
 msgid "User has no rights to upload cover"
-msgstr ""
+msgstr "Användaren saknar behörighet att ladda upp omslag"
 
 #: cps/editbooks.py
 msgid "Cover is locked. Unlock it on the cover-picker page first."
-msgstr ""
+msgstr "Omslaget är låst. Lås först upp det på sidan för omslagsval."
 
 #: cps/editbooks.py
 msgid "Identifiers are not Case Sensitive, Overwriting Old Identifier"
@@ -1458,7 +1462,7 @@ msgstr "Metadata uppdaterades"
 #: cps/editbooks.py
 #, python-brace-format
 msgid "Error editing book: {}"
-msgstr ""
+msgstr "Fel vid redigering av bok: {}"
 
 #: cps/editbooks.py cps/templates/kobo_reconcile.html cps/updater.py
 #: cps/uploader.py
@@ -1495,11 +1499,12 @@ msgstr "Boken har tagits bort"
 msgid ""
 "Format metadata was deleted, but file cleanup was incomplete; an "
 "administrator can recover the quarantined file."
-msgstr ""
+msgstr "Formatmetadata togs bort, men filrensningen var inte fullständig; en "
+"administratör kan återställa filen i karantän."
 
 #: cps/editbooks.py
 msgid "You are missing permissions to delete books"
-msgstr ""
+msgstr "Du saknar behörighet att ta bort böcker"
 
 #: cps/editbooks.py
 msgid "edit metadata"
@@ -1508,11 +1513,11 @@ msgstr "redigera metadata"
 #: cps/editbooks.py
 #, python-format
 msgid "Seriesindex: %(seriesindex)s is not a valid number, skipping"
-msgstr ""
+msgstr "Serieindex: %(seriesindex)s är inte ett giltigt tal, hoppar över"
 
 #: cps/editbooks.py
 msgid "User has no rights to upload additional file formats"
-msgstr ""
+msgstr "Användaren saknar behörighet att ladda upp ytterligare filformat"
 
 #: cps/editbooks.py
 #, python-format
@@ -1535,7 +1540,7 @@ msgstr "Boken hittades inte"
 
 #: cps/editbooks.py
 msgid "Book has no file formats on disk to reload from"
-msgstr ""
+msgstr "Boken har inga filformat på disken att läsa in på nytt från"
 
 #: cps/editbooks.py
 #, python-format
@@ -1545,27 +1550,28 @@ msgstr "Bokfilen hittades inte på disken: %(path)s"
 #: cps/editbooks.py
 #, python-format
 msgid "Could not parse metadata from %(format)s file: %(err)s"
-msgstr ""
+msgstr "Det gick inte att tolka metadata från filen %(format)s: %(err)s"
 
 #: cps/editbooks.py
 #, python-format
 msgid ""
 "Could not rename the book folder to match the reloaded metadata: %(err)s"
-msgstr ""
+msgstr "Det gick inte att byta namn på bokmappen så att den matchar de återinlästa "
+"metadata: %(err)s"
 
 #: cps/editbooks.py
 #, python-format
 msgid "Could not save reloaded metadata: %(err)s"
-msgstr ""
+msgstr "Det gick inte att spara återinlästa metadata: %(err)s"
 
 #: cps/editbooks.py
 #, python-format
 msgid "Reloaded %(n)d field(s) from on-disk %(fmt)s"
-msgstr ""
+msgstr "Läste in %(n)d fält från %(fmt)s på disken igen"
 
 #: cps/editbooks.py
 msgid "On-disk metadata matches current — no fields updated"
-msgstr ""
+msgstr "Metadata på disken stämmer med de aktuella — inga fält uppdaterades"
 
 #: cps/gdrive.py
 msgid ""
@@ -1585,12 +1591,12 @@ msgstr ""
 
 #: cps/helper.py cps/spa_strings.py cps/templates/email_edit.html
 msgid "This Email has been sent via Calibre-Web NextGen."
-msgstr ""
+msgstr "Det här e-postmeddelandet har skickats via Calibre-Web NextGen."
 
 #: cps/helper.py
 #, python-format
 msgid "Announcement Email to %(email)s"
-msgstr ""
+msgstr "Meddelande till %(email)s"
 
 #: cps/helper.py
 #, python-format
@@ -1623,7 +1629,7 @@ msgstr "Konverteringen misslyckades för bok-id: %(book)d"
 
 #: cps/helper.py
 msgid "Calibre-Web NextGen Test Email"
-msgstr ""
+msgstr "Calibre-Web NextGen-testmeddelande"
 
 #: cps/helper.py
 msgid "Test Email"

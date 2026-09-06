@@ -7,8 +7,19 @@ import sys
 import pytest
 
 
-@pytest.fixture(scope="session")
-def real_app(tmp_path_factory):
+def _boot_real_app(tmp_path_factory, *, kobo_sync):
+    """Boot one real application in this interpreter and yield it.
+
+    ``kobo_sync`` is written to the stored settings *before* the application
+    factory runs, because ``cps/main.py:124`` registers the ``kobo``,
+    ``kobo_auth``, ``readingservices_api_v3`` and ``readingservices_userstorage``
+    blueprints only when ``config.config_kobo_sync`` is true at registration
+    time (``cps/kobo.py:1164``). A fixture booted with the shipped defaults
+    therefore has no ``/api/v3/content/<id>/annotations`` rule at all, and an
+    authenticated Kobo request against it answers 404 no matter what state the
+    databases hold. ``blueprints.json`` records the same four names as
+    conditional for exactly this reason.
+    """
     assert "cps" not in sys.modules, "Run these cases in a fresh interpreter"
     root = tmp_path_factory.mktemp("real-app")
     for name in ("config", "library", "ingest", "conversion", "tmp"):
@@ -42,6 +53,9 @@ def real_app(tmp_path_factory):
         cps.config_sql.load_configuration(cps.ub.session, key)
         settings = cps.ub.session.query(cps.config_sql._Settings).one()
         settings.config_calibre_dir = str(root / "library")
+        if kobo_sync:
+            settings.config_kobo_sync = True
+            settings.config_kobo_two_way_annotation_sync = True
         cps.ub.session.commit()
 
         assert not cps.updater_thread.is_alive()
@@ -52,6 +66,11 @@ def real_app(tmp_path_factory):
         try:
             app = cps.create_app(cps.config, services)
             register_blueprints(app)
+            # create_app reloads the configuration object from storage, so this
+            # asserts the *effective* switch the blueprint gate reads rather
+            # than the row that was written above.
+            assert bool(cps.config.config_kobo_sync) == kobo_sync
+            app.config["CWA_TEST_ROOT"] = str(root)
             yield app
         finally:
             cps.updater_thread.stop()
@@ -64,3 +83,14 @@ def real_app(tmp_path_factory):
             if scheduler is not None:
                 assert not scheduler.scheduler.running
             print("LIFECYCLE teardown: updater_alive=False scheduler_running=False")
+
+
+@pytest.fixture(scope="session")
+def real_app(tmp_path_factory):
+    yield from _boot_real_app(tmp_path_factory, kobo_sync=False)
+
+
+@pytest.fixture(scope="session")
+def kobo_real_app(tmp_path_factory):
+    """The same real application, booted with the Kobo blueprints registered."""
+    yield from _boot_real_app(tmp_path_factory, kobo_sync=True)

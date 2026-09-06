@@ -12486,33 +12486,35 @@ msgstr ""
 
 #: cps/templates/duplicates.html
 msgid "Keep Oldest - Delete newer copies, keep the earliest added"
-msgstr ""
+msgstr "Behåll äldsta – ta bort nyare kopior, behåll den först tillagda"
 
 #: cps/templates/duplicates.html
 msgid "Merge Formats - Merge formats into the newest book, delete the rest"
-msgstr ""
+msgstr "Slå ihop format – slå ihop format i den nyaste boken, ta bort resten"
 
 #: cps/templates/duplicates.html
 msgid ""
 "Keep Highest Quality Format - Prefer formats based on your Duplicate Format "
 "Priority Ranking"
 msgstr ""
+"Behåll formatet med högst kvalitet – föredra format utifrån din "
+"prioritetsordning för dubblettformat"
 
 #: cps/templates/duplicates.html
 msgid "Keep Most Metadata - Keep book with most complete information"
-msgstr ""
+msgstr "Behåll mest metadata – behåll boken med mest fullständig information"
 
 #: cps/templates/duplicates.html
 msgid "Keep Largest File Size - Keep book with largest total file size"
-msgstr ""
+msgstr "Behåll största filstorlek – behåll boken med största sammanlagda filstorlek"
 
 #: cps/templates/duplicates.html
 msgid "Execute Resolution"
-msgstr ""
+msgstr "Utför lösning"
 
 #: cps/templates/duplicates.html
 msgid "This will permanently delete books. Original files will be backed up to"
-msgstr ""
+msgstr "Detta tar bort böcker permanent. Ursprungliga filer säkerhetskopieras till"
 
 #: cps/templates/duplicates.html
 msgid "Merge Selected"
@@ -12520,7 +12522,7 @@ msgstr "Slå ihop markerade"
 
 #: cps/templates/duplicates.html
 msgid "Dismiss this duplicate group"
-msgstr ""
+msgstr "Avfärda den här dubblettgruppen"
 
 #: cps/templates/duplicates.html
 msgid "View book details"
@@ -12540,23 +12542,27 @@ msgstr "Inga dubblettböcker hittades"
 
 #: cps/templates/duplicates.html
 msgid "Your library has no books with duplicate title and author combinations."
-msgstr ""
+msgstr "Ditt bibliotek har inga böcker med dubblettkombinationer av titel och författare."
 
 #: cps/templates/duplicates.html
 msgid ""
 "This search looks for books with identical titles AND authors to avoid false "
 "positives."
 msgstr ""
+"Sökningen letar efter böcker med identiska titlar OCH författare för att "
+"undvika falska positiva resultat."
 
 #: cps/templates/duplicates.html
 msgid "Execute Auto-Resolution"
-msgstr ""
+msgstr "Utför automatisk lösning"
 
 #: cps/templates/duplicates.html
 msgid ""
 "CWA will resolve duplicate groups using the selected strategy and "
 "permanently delete duplicate books."
 msgstr ""
+"CWA löser dubblettgrupper med den valda strategin och tar permanent bort "
+"dubblettböcker."
 
 #: cps/templates/duplicates.html
 msgid "Selected strategy:"
@@ -12564,7 +12570,7 @@ msgstr "Vald strategi:"
 
 #: cps/templates/duplicates.html
 msgid "This action cannot be undone!"
-msgstr ""
+msgstr "Åtgärden kan inte ångras!"
 
 #: cps/templates/duplicates.html
 msgid "The following books will be permanently deleted:"
@@ -12584,23 +12590,23 @@ msgstr "Följande böcker slås ihop med den (och tas sedan bort):"
 
 #: cps/templates/duplicates.html
 msgid "Note: File formats from source books will be added to the target book."
-msgstr ""
+msgstr "Obs: Filformat från källböcker läggs till i målboken."
 
 #: cps/templates/duplicates.html
 msgid "Resolution Preview"
-msgstr ""
+msgstr "Förhandsvisning av lösning"
 
 #: cps/templates/duplicates.html
 msgid "Success"
-msgstr ""
+msgstr "Lyckades"
 
 #: cps/templates/duplicates.html
 msgid "Selected duplicate books have been deleted successfully!"
-msgstr ""
+msgstr "De valda dubblettböckerna har tagits bort!"
 
 #: cps/templates/duplicates.html
 msgid "An error occurred while processing your request."
-msgstr ""
+msgstr "Ett fel uppstod när din begäran behandlades."
 
 #: cps/templates/email_edit.html
 msgid "Email Account Type"
@@ -12620,7 +12626,7 @@ msgstr "Konfigurera Gmail-konto"
 
 #: cps/templates/email_edit.html
 msgid "Revoke Gmail access? You will need to authorize Gmail again to use it."
-msgstr ""
+msgstr "Återkalla Gmail-åtkomst? Du måste auktorisera Gmail igen för att använda det."
 
 #: cps/templates/email_edit.html
 msgid "Revoke Gmail Access"
@@ -12635,6 +12641,9 @@ msgid ""
 "Message included with books sent to an eReader and in test emails. Sent as "
 "plain text, in any language. Leave blank to use the default."
 msgstr ""
+"Meddelande som inkluderas med böcker som skickas till en e-boksläsare och i "
+"testmeddelanden. Skickas som oformaterad text på valfritt språk. Lämna tomt "
+"för att använda standardvärdet."
 
 #: cps/templates/email_edit.html
 msgid "Attachment Size Limit"
@@ -12662,7 +12671,7 @@ msgstr "Avvisade domäner för registrering"
 
 #: cps/templates/feed.xml
 msgid "(Magic)"
-msgstr ""
+msgstr "(Magisk)"
 
 #: cps/templates/generate_kobo_auth_url.html
 msgid ""
@@ -12678,29 +12687,31 @@ msgstr "Kobo-token:"
 
 #: cps/templates/grid.html
 msgid "List"
-msgstr ""
+msgstr "Lista"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Hardcover Match Review 🔖"
-msgstr ""
+msgstr "Granskning av Hardcover-matchningar 🔖"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "All Caught Up!"
-msgstr ""
+msgstr "Allt är klart!"
 
 #: cps/templates/hardcover_review_matches.html
 msgid ""
 "There are no pending Hardcover matches requiring review. New matches will "
 "appear here when the auto-fetch task runs."
 msgstr ""
+"Det finns inga väntande Hardcover-matchningar som behöver granskas. Nya "
+"matchningar visas här när uppgiften för automatisk hämtning körs."
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Back to Admin Panel"
-msgstr ""
+msgstr "Tillbaka till administrationspanelen"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Review Required"
-msgstr ""
+msgstr "Granskning krävs"
 
 #: cps/templates/hardcover_review_matches.html
 #, python-format
@@ -12708,10 +12719,13 @@ msgid ""
 "%(count)s book(s) have ambiguous Hardcover matches. Please review each match "
 "and select the correct result, or skip/reject if no good match exists."
 msgstr ""
+"%(count)s bok/böcker har tvetydiga Hardcover-matchningar. Granska varje "
+"matchning och välj rätt resultat, eller hoppa över/avvisa om ingen bra "
+"matchning finns."
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Pending Matches"
-msgstr ""
+msgstr "Väntande matchningar"
 
 #: cps/templates/hardcover_review_matches.html
 msgid ""
@@ -12719,6 +12733,9 @@ msgid ""
 "confidence matches are applied automatically; these require manual "
 "verification."
 msgstr ""
+"Granska och godkänn tvetydiga matchningar av Hardcover-id för dina böcker. "
+"Matchningar med hög tillförlitlighet tillämpas automatiskt; dessa kräver "
+"manuell verifiering."
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Reject All Pending"
@@ -12730,20 +12747,20 @@ msgstr "Sökfråga"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Candidate Matches"
-msgstr ""
+msgstr "Kandidatmatchningar"
 
 #: cps/templates/hardcover_review_matches.html
 #, python-format
 msgid "Top %(count)s"
-msgstr ""
+msgstr "Bästa %(count)s"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Confidence"
-msgstr ""
+msgstr "Tillförlitlighet"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Match Reason"
-msgstr ""
+msgstr "Orsak till matchning"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "View on Hardcover"
@@ -12751,7 +12768,7 @@ msgstr "Visa på Hardcover"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Select This Match"
-msgstr ""
+msgstr "Välj denna matchning"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Reject All"
@@ -12759,7 +12776,7 @@ msgstr "Avvisa alla"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Skip for Now"
-msgstr ""
+msgstr "Hoppa över tills vidare"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Processing..."
@@ -12767,11 +12784,11 @@ msgstr "Bearbetar …"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "✓ Select This Match"
-msgstr ""
+msgstr "✓ Välj denna matchning"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Failed to apply match"
-msgstr ""
+msgstr "Kunde inte tillämpa matchning"
 
 #: cps/templates/hardcover_review_matches.html
 msgid ""
@@ -12783,7 +12800,7 @@ msgstr ""
 
 #: cps/templates/hardcover_review_matches.html
 msgid "✗ Reject All Matches"
-msgstr ""
+msgstr "✗ Avvisa alla matchningar"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Failed to reject match"
@@ -12806,11 +12823,11 @@ msgstr "Det gick inte att avvisa alla väntande träffar"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "→ Skip for Now"
-msgstr ""
+msgstr "→ Hoppa över tills vidare"
 
 #: cps/templates/hardcover_review_matches.html
 msgid "Failed to skip match"
-msgstr ""
+msgstr "Kunde inte hoppa över matchning"
 
 #: cps/templates/http_error.html
 msgid ""

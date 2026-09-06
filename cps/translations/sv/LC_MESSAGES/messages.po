@@ -11543,26 +11543,29 @@ msgid ""
 "confidence matches are applied automatically; low-confidence matches are "
 "queued for manual review."
 msgstr ""
+"Sök automatiskt i Hardcover efter böcker utan Hardcover-id. Matchningar med "
+"hög tillförlitlighet tillämpas automatiskt; matchningar med låg tillförlitlighet "
+"köas för manuell granskning."
 
 #: cps/templates/cwa_settings.html
 msgid "Run Schedule:"
-msgstr ""
+msgstr "Körschema:"
 
 #: cps/templates/cwa_settings.html
 msgid "Never (auto-fetch off)"
-msgstr ""
+msgstr "Aldrig (automatisk hämtning av)"
 
 #: cps/templates/cwa_settings.html
 msgid "How often to automatically run the Hardcover ID fetch task"
-msgstr ""
+msgstr "Hur ofta uppgiften för automatisk hämtning av Hardcover-id ska köras"
 
 #: cps/templates/cwa_settings.html
 msgid "Minimum Confidence Threshold:"
-msgstr ""
+msgstr "Lägsta tillförlitlighetströskel:"
 
 #: cps/templates/cwa_settings.html
 msgid "Range: 0.50-1.00 (default: 0.85)"
-msgstr ""
+msgstr "Intervall: 0,50–1,00 (standard: 0,85)"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11570,34 +11573,41 @@ msgid ""
 "applied. Lower scores are queued for manual review. Higher values = fewer "
 "auto-matches but higher accuracy."
 msgstr ""
+"Matchningar med tillförlitlighet över denna tröskel tillämpas automatiskt. "
+"Lägre poäng köas för manuell granskning. Högre värden = färre automatiska "
+"matchningar men högre precision."
 
 #: cps/templates/cwa_settings.html
 msgid "Batch Size:"
-msgstr ""
+msgstr "Batchstorlek:"
 
 #: cps/templates/cwa_settings.html
 msgid "Range: 10-200 books per run (default: 50)"
-msgstr ""
+msgstr "Intervall: 10–200 böcker per körning (standard: 50)"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Number of books to process in each scheduled run. Smaller batches reduce API "
 "load; larger batches process your library faster."
 msgstr ""
+"Antal böcker att bearbeta vid varje schemalagd körning. Mindre batcher "
+"minskar API-belastningen; större batcher bearbetar biblioteket snabbare."
 
 #: cps/templates/cwa_settings.html
 msgid "Rate Limit Delay (seconds):"
-msgstr ""
+msgstr "Fördröjning för hastighetsgräns (sekunder):"
 
 #: cps/templates/cwa_settings.html
 msgid "Range: 0-60 seconds (default: 5.0)"
-msgstr ""
+msgstr "Intervall: 0–60 sekunder (standard: 5,0)"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Delay between API requests to Hardcover. Prevents rate limiting and protects "
 "your API key. Uses exponential backoff on errors."
 msgstr ""
+"Fördröjning mellan API-begäranden till Hardcover. Förhindrar hastighetsgränser "
+"och skyddar din API-nyckel. Använder exponentiell backoff vid fel."
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11605,6 +11615,9 @@ msgid ""
 "at any time. Check the NextGen Stats page to see progress and review queued "
 "matches that need manual approval."
 msgstr ""
+"Du kan när som helst manuellt starta uppgiften för automatisk hämtning från "
+"Hardcover i administrationspanelen. Kontrollera sidan NextGen-statistik för "
+"att se förloppet och granska köade matchningar som behöver manuellt godkännande."
 
 #: cps/templates/cwa_settings.html
 msgid "Web UI Settings"
@@ -11612,13 +11625,15 @@ msgstr "Inställningar för webbgränssnittet"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Update Notifications"
-msgstr ""
+msgstr "Aktivera NextGen-uppdateringsnotiser"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "When active, you will receive notifications in the Web UI when a new version "
 "of NextGen is released"
 msgstr ""
+"När detta är aktivt får du notiser i webbgränssnittet när en ny version av "
+"NextGen släpps"
 
 #: cps/templates/cwa_settings.html
 msgid "Automatic updates"
@@ -11641,7 +11656,7 @@ msgstr ""
 #: cps/templates/cwa_settings.html cps/templates/update_now_modal.html
 #: cps/templates/user_edit.html
 msgid "Copied!"
-msgstr ""
+msgstr "Kopierat!"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11658,7 +11673,7 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Contribute Translations Notifications"
-msgstr ""
+msgstr "Aktivera notiser om översättningsbidrag"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11666,16 +11681,22 @@ msgid ""
 "using a language other than English if the translations for your chosen "
 "language are not complete."
 msgstr ""
+"När detta är inaktiverat får du inte längre notiser i webbgränssnittet när "
+"du använder ett annat språk än engelska och översättningarna för ditt valda "
+"språk inte är kompletta."
 
 #: cps/templates/cwa_settings.html
 msgid "Sync Magic Shelves to Kobo"
-msgstr ""
+msgstr "Synkronisera Magiska hyllor till Kobo"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "When active, your Magic Shelves will be synced to your Kobo device as "
 "collections. Note: You must also enable Kobo Sync in Basic Configuration."
 msgstr ""
+"När detta är aktivt synkroniseras dina Magiska hyllor till Kobo-enheten som "
+"samlingar. Obs: Du måste även aktivera Kobo-synkronisering i Grundläggande "
+"konfiguration."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"

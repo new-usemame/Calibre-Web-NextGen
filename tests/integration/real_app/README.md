@@ -50,9 +50,18 @@ backend wire only, and runs only where a matching image exists.
    OBSERVED by the judge, driving the comparison directly with the
    source-checksum precondition BYPASSED, against a fork-built image 28 of 266
    in-scope files drifted from this checkout: **0 mismatching rows of 31**, ready
-   in 4.6 s. That is the first time the comparison has run to completion at all.
-   **The comparison as shipped, with the precondition satisfied by a CI-built
-   image, has still never run.**
+   in 4.6 s. That was the first time the comparison ran to completion at all,
+   but with the precondition bypassed.
+
+   **The comparison as shipped has since run in CI and passed.** OBSERVED, run
+   34014021079 on the Integration Tests (Docker) lane: `test_real_app.py`
+   contributes no SKIPPED line and both cases report PASSED, so the digest
+   precondition was SATISFIED by the lane's own freshly built image and the
+   comparison genuinely executed. That closes the one link earlier evidence
+   established only by composition — that an image built from a checkout
+   digests identically to it. What a green there does not prove is depth: 26 of
+   the 33 probe rows are `302 -> /login?next=...`, so it mostly says anonymous
+   requests redirect to login on both sides.
 
    **Scope, and why it is drawn here.** Two things the comparison must not
    report as parity failures, because neither is the application:

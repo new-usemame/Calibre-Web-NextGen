@@ -32,7 +32,7 @@ def test_real_application_in_fresh_process(real_app_wire):
     assert real_app_wire
 
 
-def test_backend_blueprint_wire_matches_docker(real_app_wire):
+def test_backend_blueprint_wire_matches_docker(real_app_wire, record_property):
     # A CLI on PATH does not mean the daemon is usable. Probe before requesting
     # a uniquely owned disposable container.
     try:
@@ -74,6 +74,14 @@ def test_backend_blueprint_wire_matches_docker(real_app_wire):
     compared, excluded = _backend_parity_rows(
         real_app_wire, bundle_built=(root / "cps/static/app/index.html").is_file(),
     )
+    # A passing test's stdout is swallowed without -s, which is precisely when a
+    # reader needs to know how much was compared. record_property survives into
+    # the junit XML the lane uploads, so a green run still says what it covered.
+    record_property("docker_parity_compared", len(compared))
+    record_property("docker_parity_total", len(real_app_wire))
+    record_property("docker_parity_excluded",
+                    "; ".join("%s (%s)" % (row["path"], reason) for row, reason in excluded)
+                    or "none")
     for row, reason in excluded:
         print("DOCKER PARITY: not compared -- %s (%s)" % (row["path"], reason))
     print("DOCKER PARITY: comparing %d of %d rows" % (len(compared), len(real_app_wire)))

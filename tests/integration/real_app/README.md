@@ -159,16 +159,19 @@ the conditional Kobo blueprints exist (section 5).
    successful repetitions. Full fast-lane execution on Linux is unverified.
 
 5. **Kobo authority and containment — OBSERVED (P1.kobo).** Three properties
-   of the owned-annotation route were asserted by the code and had never been
-   observed on the route itself. Six earlier attempts reported NOT_RUN or FAIL
-   with the product behaving correctly, and the reason is recorded here so it
-   is not rediscovered a seventh time: **the shipped fixture cannot reach any
-   of them, because with `config_kobo_sync` false `cps/main.py:130` never
-   registers `readingservices_api_v3`, so `/api/v3/content/<id>/annotations`
-   answers 404 whatever the databases hold.** `conftest.py:94`'s
-   `kobo_real_app` writes that switch before the factory runs and asserts the
-   effective value afterwards, so a boot that silently lost the blueprints
-   fails at the fixture rather than in a case.
+   of the owned-annotation route had never been observed on the running
+   application: every prior test of them drives `handle_annotations.__wrapped__`
+   directly, with ownership monkeypatched, the device id assigned by hand and an
+   in-memory session. Six earlier attempts to observe them on the application
+   reported NOT_RUN or FAIL with the product behaving correctly, and the reason
+   is recorded here so it is not rediscovered a seventh time: **the shipped
+   fixture cannot reach any of them, because with `config_kobo_sync` false
+   `cps/main.py:130` never registers `readingservices_api_v3`, so
+   `/api/v3/content/<id>/annotations` answers 404 whatever the databases hold.**
+   `conftest.py:103`'s `kobo_real_app` writes that switch before the factory
+   runs, then asserts the blueprint *and* the URL rule in both directions, so a
+   boot that silently lost the surface fails at the fixture instead of looking,
+   from inside a case, like a product that refused to answer.
 
    `kobo_authority_cases.py` drives an authenticated Kobo GET, against a book
    whose `KoboAnnotationBookState` is `ever_authoritative`, into each of the
@@ -203,6 +206,23 @@ the conditional Kobo blueprints exist (section 5).
    authenticated GETs for one book in one session, `resolve_entitlement_ownership`
    returned the same answer every time — distinct set `[('owned', <book id>)]`,
    all twelve responses 200, zero proxy calls.
+
+   **What the pre-existing suite could and could not see — MEASURED.** Each
+   defect below was planted on `origin/main` and the 436 pre-existing tests that
+   reference `cps/readingservices.py` or
+   `cps/services/kobo_annotation_authority.py` were re-run (clean baseline: all
+   green). Dropping the ETag on the **`answered_locally`** exit is caught — 5
+   failures, all in `test_1923_owned_annotations_local_authority.py`, which
+   reaches that same exit on the *pre-authority* path. Dropping it on the
+   **`answered_from_snapshot`** exit is not: **435 passed, 1 skipped, 0 failed**.
+   Nothing in the old suite names `prepare_authoritative_device_get` or
+   `STICKY_GET_SNAPSHOT`, and nothing constructs an ever-authoritative book whose
+   device proof is missing. So the new value here is uneven and worth stating
+   plainly: for `answered_locally` it is the *real application* (a real login
+   session, the auth decorator, device registration from request headers,
+   metadata.db ownership, the full response pipeline) rather than a new branch;
+   for `answered_from_snapshot` and the exception fallback it is the branch
+   itself.
 
    `test_real_app_kobo.py` pins the expected pass count per module. A case
    that stops being collected, or skips, is a failure there — the specific way

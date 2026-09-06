@@ -2174,7 +2174,6 @@ msgid "Show Top Rated Books"
 msgstr "Visa böcker med bästa betyg"
 
 #: cps/render_template.py
-#, fuzzy
 msgid "Show Read and Unread"
 msgstr "Visa lästa och olästa"
 
@@ -2183,46 +2182,38 @@ msgid "Show unread"
 msgstr "Visa olästa"
 
 #: cps/render_template.py cps/templates/user_table.html
-#, fuzzy
 msgid "Show Category Section"
-msgstr "Visa kategorival"
+msgstr "Visa avsnittet Kategorier"
 
 #: cps/render_template.py cps/templates/user_table.html
-#, fuzzy
 msgid "Show Series Section"
-msgstr "Visa serieval"
+msgstr "Visa avsnittet Serier"
 
 #: cps/render_template.py cps/templates/user_table.html
-#, fuzzy
 msgid "Show Author Section"
-msgstr "Visa författarval"
+msgstr "Visa avsnittet Författare"
 
 #: cps/render_template.py cps/templates/user_table.html
-#, fuzzy
 msgid "Show Publisher Section"
-msgstr "Visa urval av förlag"
+msgstr "Visa avsnittet Förlag"
 
 #: cps/render_template.py cps/templates/user_table.html
-#, fuzzy
 msgid "Show Language Section"
-msgstr "Visa språkval"
+msgstr "Visa avsnittet Språk"
 
 #: cps/render_template.py cps/templates/user_table.html
-#, fuzzy
 msgid "Show Ratings Section"
-msgstr "Visa val av betyg"
+msgstr "Visa avsnittet Betyg"
 
 #: cps/render_template.py cps/templates/user_table.html
-#, fuzzy
 msgid "Show File Formats Section"
-msgstr "Visa val av filformat"
+msgstr "Visa avsnittet Filformat"
 
 #: cps/render_template.py cps/web.py
 msgid "Archived Books"
 msgstr "Arkiverade böcker"
 
 #: cps/render_template.py cps/templates/user_table.html
-#, fuzzy
 msgid "Show Archived Books"
 msgstr "Visa arkiverade böcker"
 
@@ -2247,9 +2238,8 @@ msgid "Duplicates"
 msgstr ""
 
 #: cps/render_template.py
-#, fuzzy
 msgid "Show Duplicate Books"
-msgstr "Visa böcker med bästa betyg"
+msgstr "Visa dubblettböcker"
 
 #: cps/render_template.py
 #, python-format
@@ -2282,9 +2272,9 @@ msgid "Rating >= %(rating)s"
 msgstr "Betyg >= %(rating)s"
 
 #: cps/search.py
-#, fuzzy, python-format
+#, python-format
 msgid "Read Status = '%(status)s'"
-msgstr "Lässtatus = %(status)s"
+msgstr "Lässtatus = '%(status)s'"
 
 #: cps/search.py
 msgid "Error on search for custom columns, please restart Calibre-Web"
@@ -2321,9 +2311,8 @@ msgid "Invalid shelf specified"
 msgstr "Ogiltig hylla specificerad"
 
 #: cps/shelf.py
-#, fuzzy
 msgid "Sorry you are not allowed to add a book to that shelf"
-msgstr "Tyvärr får du inte lägga till en bok på hyllan: %(shelfname)s"
+msgstr "Du har inte behörighet att lägga till en bok på den hyllan"
 
 #: cps/shelf.py
 msgid "Book not found in the visible global library."
@@ -2365,24 +2354,23 @@ msgid "Could not add books to shelf: %(sname)s"
 msgstr "Kunde inte lägga till böcker till hyllan: %(sname)s"
 
 #: cps/shelf.py
-#, fuzzy
 msgid "Invalid series specified"
-msgstr "Ogiltig hylla specificerad"
+msgstr "Ogiltig serie har angetts"
 
 #: cps/shelf.py
-#, fuzzy, python-format
+#, python-format
 msgid "Series has no books you can see: %(name)s"
-msgstr "Kunde inte lägga till böcker till hyllan: %(sname)s"
+msgstr "Serien har inga böcker som du kan se: %(name)s"
 
 #: cps/shelf.py
-#, fuzzy, python-format
+#, python-format
 msgid "All books of series '%(name)s' are already on shelf: %(sname)s"
-msgstr "Böcker är redan en del av hyllan: %(name)s"
+msgstr "Alla böcker i serien '%(name)s' finns redan på hyllan: %(sname)s"
 
 #: cps/shelf.py
-#, fuzzy, python-format
+#, python-format
 msgid "%(count)d books of series '%(name)s' added to shelf: %(sname)s"
-msgstr "Böcker har lagts till hyllan: %(sname)s"
+msgstr "%(count)d böcker i serien '%(name)s' har lagts till på hyllan: %(sname)s"
 
 #: cps/shelf.py
 #, python-format
@@ -2398,10 +2386,8 @@ msgid "Create a Shelf"
 msgstr "Skapa en hylla"
 
 #: cps/shelf.py
-#, fuzzy
 msgid "Sorry you are not allowed to edit this shelf"
-msgstr ""
-"Tyvärr har du inte rätt att ta bort en bok från den här hyllan: %(sname)s"
+msgstr "Du har inte behörighet att redigera den här hyllan"
 
 #: cps/shelf.py
 msgid "Edit a shelf"
@@ -2412,9 +2398,8 @@ msgid "Error deleting Shelf"
 msgstr ""
 
 #: cps/shelf.py
-#, fuzzy
 msgid "Shelf successfully deleted"
-msgstr "Boken har tagits bort"
+msgstr "Hyllan har tagits bort"
 
 #: cps/shelf.py
 #, python-format
@@ -2472,9 +2457,8 @@ msgid "Could not save order"
 msgstr ""
 
 #: cps/shelf.py cps/templates/layout.html
-#, fuzzy
 msgid "Reorder Shelves"
-msgstr "Uteslut hyllor"
+msgstr "Ordna om hyllor"
 
 #: cps/shelf.py
 msgid "Name (A → Z)"
@@ -7948,19 +7932,16 @@ msgid "Language: %(name)s"
 msgstr "Språk: %(name)s"
 
 #: cps/web.py
-#, fuzzy
 msgid "Favorite Books"
-msgstr "Heta böcker"
+msgstr "Favoritböcker"
 
 #: cps/templates/user_edit.html cps/web.py
-#, fuzzy
 msgid "Hidden Books"
-msgstr "Dold bok"
+msgstr "Dolda böcker"
 
 #: cps/web.py
-#, fuzzy
 msgid "Error loading magic shelf"
-msgstr "Fel vid hämtning av omslaget"
+msgstr "Fel när den smarta hyllan lästes in"
 
 #: cps/web.py
 #, python-format
@@ -7981,18 +7962,16 @@ msgid "No rules provided"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Invalid rules format"
-msgstr "Ogiltigt e-postadressformat"
+msgstr "Ogiltigt regel-format"
 
 #: cps/web.py
 msgid "Error processing rules"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Invalid request"
-msgstr "Ogiltig roll"
+msgstr "Ogiltig begäran"
 
 #: cps/web.py
 msgid "Name and rules are required"
@@ -8009,52 +7988,44 @@ msgid ""
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Error creating shelf"
-msgstr "Fel vid hämtning av omslaget"
+msgstr "Fel när hyllan skapades"
 
 #: cps/templates/layout.html cps/web.py
-#, fuzzy
 msgid "Create Magic Shelf"
-msgstr "Skapa en hylla"
+msgstr "Skapa smart hylla"
 
 #: cps/web.py
 msgid "Permission denied to change public status"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Shelf name is required"
-msgstr "Detta fält är obligatoriskt"
+msgstr "Ett hyllnamn krävs"
 
 #: cps/web.py
-#, fuzzy
 msgid "Error updating shelf"
-msgstr "Fel vid hämtning av omslaget"
+msgstr "Fel när hyllan uppdaterades"
 
 #: cps/web.py
-#, fuzzy
 msgid "Edit Magic Shelf"
-msgstr "Redigera en hylla"
+msgstr "Redigera smart hylla"
 
 #: cps/web.py
-#, fuzzy
 msgid "Shelf not found"
-msgstr "Användaren hittades inte"
+msgstr "Hyllan hittades inte"
 
 #: cps/web.py
 msgid "Permission denied"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Shelf duplicated successfully"
-msgstr "{} användare har tagits bort"
+msgstr "Hyllan har duplicerats"
 
 #: cps/web.py
-#, fuzzy
 msgid "Error duplicating shelf"
-msgstr "Fel vid hämtning av omslaget"
+msgstr "Fel när hyllan duplicerades"
 
 #: cps/templates/magic_shelf_edit.html cps/web.py
 msgid ""
@@ -8063,9 +8034,8 @@ msgid ""
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Error deleting shelf"
-msgstr "Fel vid hämtning av omslaget"
+msgstr "Fel när hyllan togs bort"
 
 #: cps/web.py
 msgid ""
@@ -8077,18 +8047,16 @@ msgid "Shelf already hidden"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Error hiding shelf"
-msgstr "Fel vid hämtning av omslaget"
+msgstr "Fel när hyllan doldes"
 
 #: cps/web.py
 msgid "Shelf was not hidden"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Error unhiding shelf"
-msgstr "Fel vid hämtning av omslaget"
+msgstr "Fel när hyllan visades"
 
 #: cps/templates/admin.html cps/web.py
 msgid "Downloads"
@@ -8099,14 +8067,12 @@ msgid "File formats list"
 msgstr "Lista över filformat"
 
 #: cps/web.py
-#, fuzzy
 msgid "Please configure the SMTP mail settings first..."
-msgstr "Konfigurera SMTP-postinställningarna först..."
+msgstr "Konfigurera först SMTP-inställningarna för e-post."
 
 #: cps/web.py
-#, fuzzy
 msgid "Oops! Please update your profile with a valid eReader Email."
-msgstr "Konfigurera din kindle-e-postadress först..."
+msgstr "Uppdatera din profil med en giltig e-postadress för e-boksläsaren."
 
 #: cps/web.py
 #, python-format
@@ -8127,9 +8093,8 @@ msgid "Additional email addresses are disabled for your account."
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Success! Book queued for sending to the selected address(es)!"
-msgstr "Boken är i kö för att skicka till %(eReadermail)s"
+msgstr "Boken har lagts i kö för att skickas till de valda adresserna."
 
 #: cps/web.py
 msgid "Please wait one minute to register next user"
@@ -8141,9 +8106,8 @@ msgid "Register"
 msgstr "Registrera"
 
 #: cps/web.py
-#, fuzzy
 msgid "Connection error to limiter backend, please contact your administrator"
-msgstr "E-postservern är inte konfigurerad, kontakta din administratör!"
+msgstr "Anslutningsfel till begränsningstjänsten. Kontakta administratören."
 
 #: cps/web.py
 msgid ""
@@ -8159,21 +8123,19 @@ msgid "Success! Confirmation Email has been sent."
 msgstr "Bekräftelsemail skickades till ditt e-postkonto."
 
 #: cps/web.py
-#, fuzzy
 msgid ""
 "Authentication loop detected. If you're experiencing login issues, please "
 "contact your administrator."
-msgstr "E-postservern är inte konfigurerad, kontakta din administratör!"
+msgstr "En autentiseringsslinga har upptäckts. Kontakta administratören om du har "
+"problem att logga in."
 
 #: cps/web.py
-#, fuzzy
 msgid ""
 "OAuth authentication is not properly configured. Please contact "
 "administrator."
-msgstr "E-postservern är inte konfigurerad, kontakta din administratör!"
+msgstr "OAuth-autentisering är inte korrekt konfigurerad. Kontakta administratören."
 
 #: cps/web.py
-#, fuzzy
 msgid "Cannot activate LDAP authentication"
 msgstr "Det går inte att aktivera LDAP-autentisering"
 
@@ -8190,23 +8152,24 @@ msgid "Username cannot be empty"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy, python-format
+#, python-format
 msgid "you are now logged in as: '%(nickname)s'"
-msgstr "du är nu inloggad som: \"%(nickname)s\""
+msgstr "du är nu inloggad som: '%(nickname)s'"
 
 #: cps/web.py
-#, fuzzy, python-format
+#, python-format
 msgid ""
 "Welcome! Your account has been automatically created. You are now logged in "
 "as: '%(nickname)s'"
-msgstr "du är nu inloggad som: \"%(nickname)s\""
+msgstr "Välkommen! Ditt konto har skapats automatiskt. Du är nu inloggad som: "
+"'%(nickname)s'"
 
 #: cps/web.py
-#, fuzzy
 msgid ""
 "Authentication successful, but account creation failed. Please contact your "
 "administrator."
-msgstr "E-postservern är inte konfigurerad, kontakta din administratör!"
+msgstr "Autentiseringen lyckades, men kontot kunde inte skapas. Kontakta "
+"administratören."
 
 #: cps/web.py
 msgid ""
@@ -8222,7 +8185,7 @@ msgid ""
 msgstr ""
 
 #: cps/web.py
-#, fuzzy, python-format
+#, python-format
 msgid "Could not login: %(message)s"
 msgstr "Det gick inte att logga in: %(message)s"
 
@@ -8232,34 +8195,29 @@ msgid "Local Login as: '%(nickname)s', LDAP authentication rejected"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Wrong Username or Password"
 msgstr "Fel användarnamn eller lösenord"
 
 #: cps/web.py
-#, fuzzy
 msgid "New Password was sent to your email address"
-msgstr "Nytt lösenord skickades till din e-postadress"
+msgstr "Ett nytt lösenord har skickats till din e-postadress"
 
 #: cps/web.py
-#, fuzzy
 msgid "An unknown error occurred. Please try again later."
 msgstr "Ett okänt fel uppstod. Försök igen senare."
 
 #: cps/web.py
-#, fuzzy
 msgid "Please enter valid username to reset password"
-msgstr "Ange giltigt användarnamn för att återställa lösenordet"
+msgstr "Ange ett giltigt användarnamn för att återställa lösenordet"
 
 #: cps/web.py
-#, fuzzy, python-format
+#, python-format
 msgid "You are now logged in as: '%(nickname)s'"
-msgstr "du är nu inloggad som: \"%(nickname)s\""
+msgstr "Du är nu inloggad som: '%(nickname)s'"
 
 #: cps/web.py
-#, fuzzy
 msgid "Success! Profile Updated"
-msgstr "Profilen uppdaterad"
+msgstr "Profilen har uppdaterats"
 
 #: cps/web.py
 msgid "Oops! An account already exists for this Email."
@@ -8275,9 +8233,8 @@ msgid "App password '%(label)s' revoked."
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Invalid book ID."
-msgstr "Ogiltig roll"
+msgstr "Ogiltigt bok-id."
 
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
@@ -8304,23 +8261,20 @@ msgid "Auto-fetching Hardcover IDs"
 msgstr ""
 
 #: cps/tasks/auto_send.py
-#, fuzzy
 msgid "Preparing to send to eReader..."
-msgstr "Skicka till Kindle"
+msgstr "Förbereder för att skicka till e-boksläsare …"
 
 #: cps/tasks/auto_send.py
 msgid "Checking available formats..."
 msgstr ""
 
 #: cps/tasks/auto_send.py
-#, fuzzy
 msgid "Sending to eReader..."
-msgstr "Skicka till Kindle"
+msgstr "Skickar till e-boksläsare …"
 
 #: cps/tasks/auto_send.py
-#, fuzzy
 msgid "Auto-send completed successfully"
-msgstr "{} användare har tagits bort"
+msgstr "Automatisk sändning har slutförts"
 
 #: cps/tasks/auto_send.py
 msgid "Auto-Send"
@@ -8331,9 +8285,9 @@ msgid "Delete temp folder contents"
 msgstr ""
 
 #: cps/tasks/convert.py
-#, fuzzy, python-format
+#, python-format
 msgid "%(book)s send to E-Reader"
-msgstr "Skicka till Kindle"
+msgstr "%(book)s har skickats till e-boksläsaren"
 
 #: cps/tasks/convert.py
 #, python-format
@@ -8374,18 +8328,16 @@ msgid "Ebook-converter failed: %(error)s"
 msgstr "E-bokkonverteraren misslyckades: %(error)s"
 
 #: cps/tasks/database.py
-#, fuzzy
 msgid "Reconnecting Calibre database"
-msgstr "Plats för Calibre-databasen"
+msgstr "Återansluter Calibre-databasen"
 
 #: cps/tasks/database.py
 msgid "Clean archived book references"
 msgstr ""
 
 #: cps/tasks/duplicate_scan.py
-#, fuzzy
 msgid "Duplicate scan"
-msgstr "Ta bort boken"
+msgstr "Dubblettsökning"
 
 #: cps/tasks/duplicate_scan.py
 msgid "Duplicate scan skipped: import in progress"
@@ -8405,19 +8357,16 @@ msgid "Building duplicate index: no books"
 msgstr ""
 
 #: cps/tasks/duplicate_scan.py
-#, fuzzy
 msgid "Finding duplicate groups"
-msgstr "Ta bort boken"
+msgstr "Söker efter dubblettgrupper"
 
 #: cps/tasks/duplicate_scan.py
-#, fuzzy
 msgid "Updating duplicate cache"
-msgstr "Packar upp uppdateringspaketet"
+msgstr "Uppdaterar dubblettcache"
 
 #: cps/tasks/duplicate_scan.py
-#, fuzzy
 msgid "Duplicate scan pending: manual scan required"
-msgstr "Inga resultat hittades"
+msgstr "Dubblettsökning väntar: manuell sökning krävs"
 
 #: cps/tasks/duplicate_scan.py
 #, python-format
@@ -8439,9 +8388,8 @@ msgid "Syncing shelf additions to Hardcover"
 msgstr ""
 
 #: cps/tasks/hardcover_sync.py
-#, fuzzy
 msgid "Hardcover Sync"
-msgstr "Aktivera Kobo sync"
+msgstr "Hardcover-synkronisering"
 
 #: cps/tasks/kepub_backfill.py
 msgid "Convert Kobo books missing KEPUB"
@@ -8505,23 +8453,20 @@ msgid ""
 msgstr ""
 
 #: cps/tasks/mail.py
-#, fuzzy
 msgid "E-mail"
 msgstr "E-post"
 
 #: cps/tasks/metadata_backup.py
-#, fuzzy
 msgid "Backing up Metadata"
-msgstr "redigera metadata"
+msgstr "Säkerhetskopierar metadata"
 
 #: cps/tasks/ops.py
 msgid "Convert Library – full run"
 msgstr ""
 
 #: cps/tasks/ops.py
-#, fuzzy
 msgid "Convert Library"
-msgstr "I biblioteket"
+msgstr "Konvertera bibliotek"
 
 #: cps/tasks/ops.py
 msgid "EPUB Fixer – full run"
@@ -8552,43 +8497,36 @@ msgid "Clearing cover thumbnail cache"
 msgstr ""
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Book organizer"
-msgstr "Böcker organiserade i hyllor"
+msgstr "Bokorganiserare"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Change sort order"
-msgstr "Ändra lösenord"
+msgstr "Ändra sorteringsordning"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Select multiple books"
-msgstr "Skapa en hylla"
+msgstr "Välj flera böcker"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Display settings"
-msgstr "OAuth-inställningar"
+msgstr "Visningsinställningar"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Cover Settings"
-msgstr "Inställningar"
+msgstr "Omslagsinställningar"
 
 #: cps/templates/_book_organizer.html
 msgid "Hide shelf badges on covers"
 msgstr ""
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Selection actions"
-msgstr "välj ett alternativ"
+msgstr "Åtgärder för markering"
 
 #: cps/templates/_book_organizer.html cps/templates/book_table.html
-#, fuzzy
 msgid "Add to Shelf"
-msgstr "Lägg till hyllan"
+msgstr "Lägg till på hylla"
 
 #: cps/templates/_book_organizer.html cps/templates/detail.html
 #: cps/templates/feed.xml cps/templates/index.html cps/templates/layout.html
@@ -8602,24 +8540,20 @@ msgid "Mark"
 msgstr ""
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Downloads, fewest first"
-msgstr "Hämtningar"
+msgstr "Hämtningar, minst först"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Downloads, most first"
-msgstr "Hämtningar"
+msgstr "Hämtningar, flest först"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Date added, newest first"
-msgstr "Sortera efter bokdatum, nyast först"
+msgstr "Tillagd datum, nyast först"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Date added, oldest first"
-msgstr "Sortera efter bokdatum, äldsta först"
+msgstr "Tillagd datum, äldst först"
 
 #: cps/templates/_book_organizer.html
 msgid "Title A → Z"
@@ -8630,24 +8564,20 @@ msgid "Title Z → A"
 msgstr ""
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Author A → Z"
-msgstr "Författare"
+msgstr "Författare A → Ö"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Author Z → A"
-msgstr "Författare"
+msgstr "Författare Ö → A"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Published, newest first"
-msgstr "Publicerad före "
+msgstr "Publicerad, nyast först"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Published, oldest first"
-msgstr "Publicerad före "
+msgstr "Publicerad, äldst först"
 
 #: cps/templates/_book_organizer.html
 msgid "Series number, ascending"
@@ -8658,28 +8588,24 @@ msgid "Series number, descending"
 msgstr ""
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Added to shelf, newest first"
-msgstr "Sortera efter bokdatum, nyast först"
+msgstr "Tillagd på hylla, nyast först"
 
 #: cps/templates/_book_organizer.html
-#, fuzzy
 msgid "Added to shelf, oldest first"
-msgstr "Sortera efter bokdatum, äldsta först"
+msgstr "Tillagd på hylla, äldst först"
 
 #: cps/templates/admin.html
 msgid "Users&nbsp;&nbsp;👤"
 msgstr ""
 
 #: cps/templates/admin.html
-#, fuzzy
 msgid "Send to eReader Email"
-msgstr "Kindle"
+msgstr "E-postadress för e-boksläsare"
 
 #: cps/templates/admin.html cps/templates/user_edit.html
-#, fuzzy
 msgid "Send to eReader Subject"
-msgstr "Skicka till Kindle"
+msgstr "Ämne vid sändning till e-boksläsare"
 
 #: cps/templates/admin.html
 msgid "View Books"
@@ -8698,9 +8624,8 @@ msgid "Import LDAP Users"
 msgstr "Importera LDAP-användare"
 
 #: cps/templates/admin.html
-#, fuzzy
 msgid "Email Server Settings&nbsp;&nbsp;📬"
-msgstr "Inställningar för SMTP-e-postserver"
+msgstr "E-postserverinställningar&nbsp;&nbsp;📬"
 
 #: cps/templates/admin.html cps/templates/email_edit.html
 msgid "SMTP Hostname"
@@ -8719,7 +8644,6 @@ msgid "From Email"
 msgstr "Från meddelande"
 
 #: cps/templates/admin.html
-#, fuzzy
 msgid "Email Service"
 msgstr "E-posttjänst"
 
@@ -8784,9 +8708,8 @@ msgid "Edit UI Configuration"
 msgstr "Redigera UI-konfiguration"
 
 #: cps/templates/admin.html
-#, fuzzy
 msgid "Edit Calibre Database Configuration"
-msgstr "Redigera grundläggande konfiguration"
+msgstr "Redigera Calibre-databaskonfiguration"
 
 #: cps/templates/admin.html
 msgid "Scheduled Tasks&nbsp;&nbsp;⌛"
@@ -8794,9 +8717,8 @@ msgstr ""
 
 #: cps/templates/admin.html cps/templates/schedule_edit.html
 #: cps/templates/tasks.html
-#, fuzzy
 msgid "Start Time"
-msgstr "Startad"
+msgstr "Starttid"
 
 #: cps/templates/admin.html cps/templates/schedule_edit.html
 msgid "Maximum Duration"
@@ -8811,9 +8733,8 @@ msgid "Generate series cover thumbnails"
 msgstr ""
 
 #: cps/templates/admin.html cps/templates/schedule_edit.html
-#, fuzzy
 msgid "Reconnect Calibre Database"
-msgstr "Plats för Calibre-databasen"
+msgstr "Återanslut Calibre-databasen"
 
 #: cps/templates/admin.html cps/templates/schedule_edit.html
 msgid "Generate Metadata Backup Files"
@@ -8864,9 +8785,8 @@ msgid "Run Hardcover Auto-Fetch"
 msgstr ""
 
 #: cps/templates/admin.html
-#, fuzzy
 msgid "Administration&nbsp;&nbsp;🚀"
-msgstr "Administration"
+msgstr "Administration&nbsp;&nbsp;🚀"
 
 #: cps/templates/admin.html
 msgid ""
@@ -8912,14 +8832,12 @@ msgid "Details"
 msgstr "Detaljer"
 
 #: cps/templates/admin.html
-#, fuzzy
 msgid "Update available"
-msgstr "Uppdateringen misslyckades:"
+msgstr "Uppdatering tillgänglig"
 
 #: cps/templates/admin.html cps/templates/layout.html
-#, fuzzy
 msgid "Update now"
-msgstr "Uppdatera kanal"
+msgstr "Uppdatera nu"
 
 #: cps/templates/admin.html
 msgid "Current Version"

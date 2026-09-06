@@ -8911,9 +8911,8 @@ msgid "different or undated device entries older than server state (skipped)"
 msgstr ""
 
 #: cps/templates/annotations_import.html
-#, fuzzy
 msgid "for books not in this library (skipped)"
-msgstr "Böcker i det här biblioteket"
+msgstr "för böcker som inte finns i det här biblioteket (överhoppade)"
 
 #: cps/templates/annotations_import.html
 msgid "hidden on device (reported, not applied)"
@@ -8945,14 +8944,12 @@ msgid "Uploading..."
 msgstr "Laddar upp..."
 
 #: cps/templates/annotations_import.html
-#, fuzzy
 msgid "Import failed."
-msgstr "Uppdateringen misslyckades:"
+msgstr "Importen misslyckades."
 
 #: cps/templates/annotations_import.html
-#, fuzzy
 msgid "Network error."
-msgstr "Anslutningsfel"
+msgstr "Nätverksfel."
 
 #: cps/templates/annotations_view.html
 msgid "Export Markdown"
@@ -8985,9 +8982,9 @@ msgid "Chapter progress: %(pct)d%%"
 msgstr ""
 
 #: cps/templates/annotations_view.html
-#, fuzzy, python-format
+#, python-format
 msgid "Source: %(s)s"
-msgstr "Serier: %(serie)s"
+msgstr "Källa: %(s)s"
 
 #: cps/templates/annotations_view.html cps/templates/read.html
 msgid "No annotations on this book yet."
@@ -9027,7 +9024,6 @@ msgid "Convert from:"
 msgstr "Konvertera från:"
 
 #: cps/templates/book_edit.html
-#, fuzzy
 msgid "select an option"
 msgstr "välj ett alternativ"
 
@@ -9096,9 +9092,8 @@ msgid "Upload Cover from Local Disk"
 msgstr "Ladda upp omslag från lokal enhet"
 
 #: cps/templates/book_edit.html
-#, fuzzy
 msgid "Hardcover Sync Blacklist"
-msgstr "Aktivera Kobo sync"
+msgstr "Blockeringslista för Hardcover-synkronisering"
 
 #: cps/templates/book_edit.html
 msgid "Blacklist annotations from syncing to Hardcover"
@@ -9121,9 +9116,8 @@ msgid "Keyword"
 msgstr "Sökord"
 
 #: cps/templates/book_edit.html
-#, fuzzy
 msgid "Search keyword"
-msgstr " Sök sökord "
+msgstr "Sökord"
 
 #: cps/templates/book_edit.html
 msgid "Selected metadata fields were applied to the edit form."
@@ -9177,18 +9171,16 @@ msgid " Exchange author & title"
 msgstr ""
 
 #: cps/templates/book_table.html
-#, fuzzy
 msgid "Select all"
-msgstr "Skapa en hylla"
+msgstr "Markera alla"
 
 #: cps/templates/book_table.html
 msgid "Clear all"
 msgstr ""
 
 #: cps/templates/book_table.html
-#, fuzzy
 msgid "Update Title Sort automatically  "
-msgstr "Uppdatera titelsortering automatiskt"
+msgstr "Uppdatera titelsortering automatiskt  "
 
 #: cps/templates/book_table.html
 msgid "Update Author Sort automatically"
@@ -9239,29 +9231,24 @@ msgid "Enter Publishers"
 msgstr "Ange utgivare"
 
 #: cps/templates/book_table.html
-#, fuzzy
 msgid "Enter comments"
-msgstr "Ange domännamn"
+msgstr "Ange kommentarer"
 
 #: cps/templates/book_table.html
-#, fuzzy
 msgid "Comments"
-msgstr "Ange domännamn"
+msgstr "Kommentarer"
 
 #: cps/templates/book_table.html
-#, fuzzy
 msgid "Archived?"
-msgstr "Arkiverad"
+msgstr "Arkiverad?"
 
 #: cps/templates/book_table.html
-#, fuzzy
 msgid "Read?"
-msgstr "Läst"
+msgstr "Läst?"
 
 #: cps/templates/book_table.html
-#, fuzzy
 msgid "Enter "
-msgstr "Identifierare"
+msgstr "Ange "
 
 #: cps/templates/book_table.html cps/templates/duplicates.html
 #: cps/templates/modal_dialogs.html cps/templates/tasks.html
@@ -9311,9 +9298,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/book_table.html
-#, fuzzy
 msgid "Select a Shelf"
-msgstr "Skapa en hylla"
+msgstr "Välj en hylla"
 
 #: cps/templates/book_table.html
 msgid "Please select a shelf to add the selected books to:"
@@ -9324,10 +9310,9 @@ msgid "-- Select a Shelf --"
 msgstr ""
 
 #: cps/templates/broadcast_email.html
-#, fuzzy
 msgid ""
 "The email server is not configured yet, so announcements cannot be sent."
-msgstr "E-postservern är inte konfigurerad, kontakta din administratör!"
+msgstr "E-postservern är ännu inte konfigurerad, så meddelanden kan inte skickas."
 
 #: cps/templates/broadcast_email.html
 msgid ""
@@ -9340,9 +9325,8 @@ msgid "Subject"
 msgstr ""
 
 #: cps/templates/broadcast_email.html cps/templates/tasks.html
-#, fuzzy
 msgid "Message"
-msgstr "Slå samman"
+msgstr "Meddelande"
 
 #: cps/templates/broadcast_email.html
 msgid "Write your announcement here. HTML is allowed (links, bold, lists)."
@@ -9363,9 +9347,8 @@ msgid "Recipients"
 msgstr ""
 
 #: cps/templates/broadcast_email.html
-#, fuzzy
 msgid "Select all users with an email address"
-msgstr "Nytt lösenord skickades till din e-postadress"
+msgstr "Markera alla användare med en e-postadress"
 
 #: cps/templates/broadcast_email.html
 msgid "No users have an email address set, so there is no one to send to yet."
@@ -9376,9 +9359,8 @@ msgid "Send announcement"
 msgstr ""
 
 #: cps/templates/broadcast_email.html
-#, fuzzy
 msgid "Send test to me"
-msgstr "Skicka till Kindle"
+msgstr "Skicka test till mig"
 
 #: cps/templates/broadcast_email.html cps/templates/cwng_feedback_popup.html
 #: cps/templates/email_edit.html cps/templates/layout.html
@@ -9482,9 +9464,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_db.html
-#, fuzzy
 msgid "Location of Calibre Database (metadata.db file)"
-msgstr "Plats för Calibre-databasen"
+msgstr "Plats för Calibre-databasen (filen metadata.db)"
 
 #: cps/templates/config_db.html
 msgid ""
@@ -9562,9 +9543,8 @@ msgid "Revoke"
 msgstr "Återkalla"
 
 #: cps/templates/config_db.html
-#, fuzzy
 msgid "Last Resort: Restore Calibre Database (experimental)"
-msgstr "Plats för Calibre-databasen"
+msgstr "Sista utväg: återställ Calibre-databasen (experimentellt)"
 
 #: cps/templates/config_db.html
 msgid ""
@@ -9586,19 +9566,16 @@ msgid "A restore log will be saved alongside the backups."
 msgstr ""
 
 #: cps/templates/config_db.html
-#, fuzzy
 msgid "Are you sure? This cannot be undone."
-msgstr "Är du säker på att du vill stoppa Calibre-Web?"
+msgstr "Är du säker? Detta kan inte ångras."
 
 #: cps/templates/config_db.html
-#, fuzzy
 msgid "Restore Calibre Database (Last Resort)"
-msgstr "Plats för Calibre-databasen"
+msgstr "Återställ Calibre-databasen (sista utväg)"
 
 #: cps/templates/config_db.html
-#, fuzzy
 msgid "New db location is invalid, please enter valid path"
-msgstr "DB-plats är inte giltig, vänligen ange rätt sökväg"
+msgstr "Den nya databasplatsen är ogiltig. Ange en giltig sökväg."
 
 #: cps/templates/config_edit.html
 msgid "Use Standard Authentication"
@@ -9649,9 +9626,8 @@ msgid "Logfile Configuration"
 msgstr "Loggfil konfiguration"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Location and name of logfile (/dev/stdout for no entry)"
-msgstr "Plats och namn på åtkomstloggfil (access.log för ingen post)"
+msgstr "Loggfilens plats och namn (/dev/stdout för ingen loggfil)"
 
 #: cps/templates/config_edit.html
 msgid "Enable Access Log"
@@ -9662,9 +9638,8 @@ msgid "Location and name of access logfile (access.log for no entry)"
 msgstr "Plats och namn på åtkomstloggfil (access.log för ingen post)"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Feature Configuration"
-msgstr "Serverkonfiguration"
+msgstr "Funktionskonfiguration"
 
 #: cps/templates/config_edit.html
 msgid "Convert non-English characters in title and author while saving to disk"
@@ -9828,9 +9803,8 @@ msgid "Goodreads API Key"
 msgstr "Goodreads API-nyckel"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Enable Hardcover Sync"
-msgstr "Aktivera Kobo sync"
+msgstr "Aktivera Hardcover-synkronisering"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -9874,9 +9848,8 @@ msgid "Token status: valid."
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Token status: rejected or expired."
-msgstr "Token har löpt ut"
+msgstr "Tokenstatus: avvisad eller utgången."
 
 #: cps/templates/config_edit.html
 msgid "Token status: present; validation is temporarily unavailable."
@@ -9887,9 +9860,8 @@ msgid "Expiry: not provided by this token."
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Google Books API Key"
-msgstr "Goodreads API-nyckel"
+msgstr "Google Books API-nyckel"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -10058,9 +10030,8 @@ msgid "OAuth Metadata URL (for auto-discovery)"
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Test Metadata"
-msgstr "Hämta metadata"
+msgstr "Testa metadata"
 
 #: cps/templates/config_edit.html
 msgid "Leave empty to use manual configuration below"
@@ -10077,9 +10048,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Manual Endpoint Configuration"
-msgstr "Redigera UI-konfiguration"
+msgstr "Manuell slutpunktskonfiguration"
 
 #: cps/templates/config_edit.html
 msgid "OAuth Base URL"
@@ -10090,23 +10060,20 @@ msgid "Authorization Endpoint"
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Token Endpoint"
-msgstr "Token hittades inte"
+msgstr "Tokenslutpunkt"
 
 #: cps/templates/config_edit.html
 msgid "UserInfo Endpoint"
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Test Connection"
-msgstr "Anslutningsfel"
+msgstr "Testa anslutning"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "OAuth Scopes"
-msgstr "OAuth-inställningar"
+msgstr "OAuth-omfattningar"
 
 #: cps/templates/config_edit.html
 msgid "Space-separated list of OAuth scopes"
@@ -10130,42 +10097,36 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "OAuth Client Id"
-msgstr "%(provider)s OAuth-klient-id"
+msgstr "OAuth-klient-id"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "OAuth Client Secret"
-msgstr "%(provider)s OAuth-klient-hemlighet"
+msgstr "OAuth-klienthemlighet"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Field Mapping Configuration"
-msgstr "Visa konfiguration"
+msgstr "Konfiguration för fältmappning"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Username Field"
-msgstr "Smeknamn"
+msgstr "Användarnamnsfält"
 
 #: cps/templates/config_edit.html
 msgid "JWT field to extract username from"
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Email Field"
-msgstr "E-posttjänst"
+msgstr "E-postfält"
 
 #: cps/templates/config_edit.html
 msgid "JWT field to extract email from"
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "OAuth Group Claim"
-msgstr "LDAP-gruppnamn"
+msgstr "OAuth-gruppanspråk"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -10205,9 +10166,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Default Permissions for New Generic OAuth Users"
-msgstr "Standardinställningar för nya användare"
+msgstr "Standardbehörigheter för nya generiska OAuth-användare"
 
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
 #: cps/templates/user_edit.html
@@ -10275,28 +10235,24 @@ msgid "External binaries"
 msgstr "Externa binärer"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Path to Calibre Binaries"
-msgstr "Sökväg till calibre e-bokkonverterare"
+msgstr "Sökväg till Calibres binärfiler"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Calibre E-Book Converter Settings"
-msgstr "Inställningar för calibre e-bokkonverterare"
+msgstr "Inställningar för Calibres e-bokskonverterare"
 
 #: cps/templates/config_edit.html
 msgid "Path to Kepubify E-Book Converter"
 msgstr "Sökväg till Kepubify calibre e-bokkonverterare"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Location of Unrar binary"
-msgstr "Plats för UnRar-binär"
+msgstr "Plats för UnRar-binärfil"
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Security Settings"
-msgstr "OAuth-inställningar"
+msgstr "Säkerhetsinställningar"
 
 #: cps/templates/config_edit.html
 msgid "Disable Standard Login (Username/Password)"
@@ -10349,9 +10305,8 @@ msgid "Check if file extensions matches file content on upload"
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "Session protection"
-msgstr "välj ett alternativ"
+msgstr "Sessionsskydd"
 
 #: cps/templates/config_edit.html
 msgid "Basic"
@@ -10362,9 +10317,8 @@ msgid "Strong"
 msgstr ""
 
 #: cps/templates/config_edit.html
-#, fuzzy
 msgid "User Password policy"
-msgstr "Återställ användarlösenordet"
+msgstr "Lösenordspolicy för användare"
 
 #: cps/templates/config_edit.html
 msgid "Minimum password length"

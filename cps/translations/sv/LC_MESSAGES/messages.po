@@ -6874,7 +6874,7 @@ msgstr "Försök igen"
 
 #: cps/spa_strings.py
 msgid "Reverse-proxy header login"
-msgstr ""
+msgstr "Rubrikinloggning via omvänd proxy"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6882,22 +6882,24 @@ msgid ""
 "Revoke the app password \"{label}\"? Any device still using it loses access "
 "immediately, and the password cannot be recovered."
 msgstr ""
+"Återkalla applösenordet \"{label}\"? Enheter som fortfarande använder det "
+"förlorar åtkomsten omedelbart, och lösenordet kan inte återställas."
 
 #: cps/spa_strings.py
 msgid "Rows per load"
-msgstr ""
+msgstr "Rader per inläsning"
 
 #: cps/spa_strings.py
 msgid "Run a sync from the plugin."
-msgstr ""
+msgstr "Kör en synkronisering från insticksmodulen."
 
 #: cps/spa_strings.py
 msgid "Run time"
-msgstr ""
+msgstr "Körtid"
 
 #: cps/spa_strings.py
 msgid "SMTP server"
-msgstr ""
+msgstr "SMTP-server"
 
 #: cps/spa_strings.py cps/templates/email_edit.html
 msgid "SSL/TLS"
@@ -6918,87 +6920,87 @@ msgstr "Spara"
 
 #: cps/spa_strings.py
 msgid "Save email settings"
-msgstr ""
+msgstr "Spara e-postinställningar"
 
 #: cps/spa_strings.py
 msgid "Save name"
-msgstr ""
+msgstr "Spara namn"
 
 #: cps/spa_strings.py
 msgid "Save note"
-msgstr ""
+msgstr "Spara anteckning"
 
 #: cps/spa_strings.py
 msgid "Save security settings"
-msgstr ""
+msgstr "Spara säkerhetsinställningar"
 
 #: cps/spa_strings.py
 msgid "Save settings"
-msgstr ""
+msgstr "Spara inställningar"
 
 #: cps/spa_strings.py
 msgid "Save the file, safely eject the Kobo, then restart it."
-msgstr ""
+msgstr "Spara filen, mata ut Kobon säkert och starta sedan om den."
 
 #: cps/spa_strings.py
 msgid "Saved. Restart the server for the login changes to take effect."
-msgstr ""
+msgstr "Sparat. Starta om servern för att inloggningsändringarna ska börja gälla."
 
 #: cps/spa_strings.py
 msgid "Scan for duplicates"
-msgstr ""
+msgstr "Sök efter dubbletter"
 
 #: cps/spa_strings.py
 msgid "Scheduled tasks"
-msgstr ""
+msgstr "Schemalagda uppgifter"
 
 #: cps/spa_strings.py
 msgid "Scopes"
-msgstr ""
+msgstr "Omfattningar"
 
 #: cps/spa_strings.py
 msgid "Search inside book"
-msgstr ""
+msgstr "Sök i boken"
 
 #: cps/spa_strings.py
 msgid "Search term"
-msgstr ""
+msgstr "Sökterm"
 
 #: cps/spa_strings.py
 msgid "Search this book"
-msgstr ""
+msgstr "Sök i den här boken"
 
 #: cps/spa_strings.py
 msgid "Search title, author…"
-msgstr ""
+msgstr "Sök titel, författare…"
 
 #: cps/spa_strings.py
 msgid "Searching every source…"
-msgstr ""
+msgstr "Söker i alla källor…"
 
 #: cps/spa_strings.py
 msgid "Searching this book…"
-msgstr ""
+msgstr "Söker i den här boken…"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Searching…"
-msgstr ""
+msgstr "Söker…"
 
 #: cps/spa_strings.py
 msgid "Security"
-msgstr ""
+msgstr "Säkerhet"
 
 #: cps/spa_strings.py
 msgid "Security settings saved."
-msgstr ""
+msgstr "Säkerhetsinställningarna har sparats."
 
 #: cps/spa_strings.py
 msgid "See how each cover looks padded for your device"
-msgstr ""
+msgstr "Se hur varje omslag ser ut med utfyllnad för din enhet"
 
 #: cps/spa_strings.py
 msgid "Seeded books"
-msgstr ""
+msgstr "Påfyllda böcker"
 
 #: cps/spa_strings.py cps/templates/modal_dialogs.html
 msgid "Select"
@@ -7006,169 +7008,171 @@ msgstr "Välj"
 
 #: cps/spa_strings.py
 msgid "Select all in group"
-msgstr ""
+msgstr "Markera alla i gruppen"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Select all {n}"
-msgstr ""
+msgstr "Markera alla {n}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Select highlight: {text}"
-msgstr ""
+msgstr "Markera markering: {text}"
 
 #: cps/spa_strings.py
 msgid "Select multiple"
-msgstr ""
+msgstr "Markera flera"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Select note: {text}"
-msgstr ""
+msgstr "Markera anteckning: {text}"
 
 #: cps/spa_strings.py
 msgid "Selected books"
-msgstr ""
+msgstr "Valda böcker"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Send"
-msgstr ""
+msgstr "Skicka"
 
 #: cps/spa_strings.py
 msgid "Send failed."
-msgstr ""
+msgstr "Det gick inte att skicka."
 
 #: cps/spa_strings.py
 msgid "Send to e-reader"
-msgstr ""
+msgstr "Skicka till e-boksläsare"
 
 #: cps/spa_strings.py
 msgid "Send-to-eReader email"
-msgstr ""
+msgstr "E-post för skicka-till-e-boksläsare"
 
 #: cps/spa_strings.py
 msgid "Sending…"
-msgstr ""
+msgstr "Skickar…"
 
 #: cps/spa_strings.py
 msgid "Series index"
-msgstr ""
+msgstr "Serieindex"
 
 #: cps/spa_strings.py
 msgid "Series view"
-msgstr ""
+msgstr "Serievy"
 
 #: cps/spa_strings.py
 msgid "Series — include"
-msgstr ""
+msgstr "Serier — inkludera"
 
 #: cps/spa_strings.py
 msgid "Serve over HTTPS"
-msgstr ""
+msgstr "Tillhandahåll via HTTPS"
 
 #: cps/spa_strings.py
 msgid "Server SSL / HTTPS"
-msgstr ""
+msgstr "Server-SSL / HTTPS"
 
 #: cps/spa_strings.py
 msgid "Server announcement (shown to all users)"
-msgstr ""
+msgstr "Servermeddelande (visas för alla användare)"
 
 #: cps/spa_strings.py
 msgid "Server host"
-msgstr ""
+msgstr "Servervärd"
 
 #: cps/spa_strings.py
 msgid "Server tools"
-msgstr ""
+msgstr "Serververktyg"
 
 #: cps/spa_strings.py
 msgid "Service account (DN)"
-msgstr ""
+msgstr "Tjänstkonto (DN)"
 
 #: cps/spa_strings.py
 msgid "Service password"
-msgstr ""
+msgstr "Tjänstelösenord"
 
 #: cps/spa_strings.py
 msgid "Service password (leave blank to keep)"
-msgstr ""
+msgstr "Tjänstelösenord (lämna tomt för att behålla)"
 
 #: cps/spa_strings.py
 msgid ""
 "Set a metadata URL to auto-fill the endpoints below, or enter them manually."
 msgstr ""
+"Ange en metadatawebbadress för att automatiskt fylla i ändpunkterna nedan, "
+"eller ange dem manuellt."
 
 #: cps/spa_strings.py
 msgid "Set up Kobo sync first — then this preference becomes available."
-msgstr ""
+msgstr "Konfigurera först Kobo-synkronisering — därefter blir den här inställningen tillgänglig."
 
 #: cps/spa_strings.py
 msgid "Setting up…"
-msgstr ""
+msgstr "Konfigurerar…"
 
 #: cps/spa_strings.py
 msgid "Settings saved."
-msgstr ""
+msgstr "Inställningarna har sparats."
 
 #: cps/spa_strings.py
 msgid "Shelf name"
-msgstr ""
+msgstr "Hyllnamn"
 
 #: cps/spa_strings.py
 msgid "Shelf not found."
-msgstr ""
+msgstr "Hyllan hittades inte."
 
 #: cps/spa_strings.py
 msgid "Show Discover section"
-msgstr ""
+msgstr "Visa avsnittet Upptäck"
 
 #: cps/spa_strings.py
 msgid "Show Read now and edit buttons"
-msgstr ""
+msgstr "Visa knapparna Läs nu och Redigera"
 
 #: cps/spa_strings.py
 msgid "Show Table view"
-msgstr ""
+msgstr "Visa tabellvy"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Show all {count} tags"
-msgstr ""
+msgstr "Visa alla {count} taggar"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Show all {items}"
-msgstr ""
+msgstr "Visa alla {items}"
 
 #: cps/spa_strings.py
 msgid "Show annotations assigned to this device"
-msgstr ""
+msgstr "Visa anteckningar som är tilldelade den här enheten"
 
 #: cps/spa_strings.py
 msgid "Show books in language"
-msgstr ""
+msgstr "Visa böcker på språket"
 
 #: cps/spa_strings.py
 msgid "Show device details"
-msgstr ""
+msgstr "Visa enhetsdetaljer"
 
 #: cps/spa_strings.py
 msgid "Show e-reader previews on each candidate"
-msgstr ""
+msgstr "Visa förhandsvisningar på e-boksläsare för varje kandidat"
 
 #: cps/spa_strings.py
 msgid "Show fewer tags"
-msgstr ""
+msgstr "Visa färre taggar"
 
 #: cps/spa_strings.py
 msgid "Show hidden books"
-msgstr ""
+msgstr "Visa dolda böcker"
 
 #: cps/spa_strings.py
 msgid "Show password"
-msgstr ""
+msgstr "Visa lösenord"
 
 #: cps/spa_strings.py
 msgid ""
@@ -7176,6 +7180,9 @@ msgid ""
 "— switch back any time and it is still there. At its next update, your e-"
 "reader syncs the global library."
 msgstr ""
+"Visa det globala biblioteket igen? Ditt urval behålls exakt som du lämnade "
+"det — byt tillbaka när som helst, så finns det kvar. Vid nästa uppdatering "
+"synkroniserar din e-boksläsare det globala biblioteket."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7183,33 +7190,36 @@ msgid ""
 "Show {name} the global library again? Their selection is kept but no longer "
 "used, and their e-reader syncs the global library at the next update."
 msgstr ""
+"Visa det globala biblioteket för {name} igen? Urvalet behålls men används "
+"inte längre, och e-boksläsaren synkroniserar det globala biblioteket vid "
+"nästa uppdatering."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Showing the first {count} matches."
-msgstr ""
+msgstr "Visar de första {count} träffarna."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Showing {shown} of {total} annotations."
-msgstr ""
+msgstr "Visar {shown} av {total} anteckningar."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Showing {shown} of {total} books from the latest device inventory."
-msgstr ""
+msgstr "Visar {shown} av {total} böcker från den senaste enhetsinventeringen."
 
 #: cps/spa_strings.py
 msgid "Shuffle picks"
-msgstr ""
+msgstr "Blanda val"
 
 #: cps/spa_strings.py
 msgid "Sidebar pinned."
-msgstr ""
+msgstr "Sidopanelen är fäst."
 
 #: cps/spa_strings.py
 msgid "Sidebar unpinned."
-msgstr ""
+msgstr "Sidopanelen är lossad."
 
 #: cps/spa_strings.py
 msgid "Sign in with a magic link"

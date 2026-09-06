@@ -7582,49 +7582,51 @@ msgstr "Lossa sidopanel"
 
 #: cps/spa_strings.py
 msgid "Unseeded books"
-msgstr ""
+msgstr "Böcker utan påfyllning"
 
 #: cps/spa_strings.py
 msgid "Untitled"
-msgstr ""
+msgstr "Utan titel"
 
 #: cps/spa_strings.py
 msgid "Update failed."
-msgstr ""
+msgstr "Uppdateringen misslyckades."
 
 #: cps/spa_strings.py
 msgid "Upload a book"
-msgstr ""
+msgstr "Ladda upp en bok"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Upload as cover"
-msgstr ""
+msgstr "Ladda upp som omslag"
 
 #: cps/spa_strings.py
 msgid "Upload books"
-msgstr ""
+msgstr "Ladda upp böcker"
 
 #: cps/spa_strings.py
 msgid "Uploading is not available for your account on this server."
-msgstr ""
+msgstr "Uppladdning är inte tillgänglig för ditt konto på den här servern."
 
 #: cps/spa_strings.py
 msgid "Use my own cover"
-msgstr ""
+msgstr "Använd mitt eget omslag"
 
 #: cps/spa_strings.py
 msgid "Use the library cover"
-msgstr ""
+msgstr "Använd bibliotekets omslag"
 
 #: cps/spa_strings.py
 msgid ""
 "Use these to connect OPDS readers or KOReader sync without your main "
 "password."
 msgstr ""
+"Använd dessa för att ansluta OPDS-läsare eller KOReader-synkronisering utan "
+"ditt huvudsakliga lösenord."
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Use this cover"
-msgstr ""
+msgstr "Använd detta omslag"
 
 #: cps/spa_strings.py cps/templates/tasks.html
 msgid "User"
@@ -7632,19 +7634,19 @@ msgstr "Användare"
 
 #: cps/spa_strings.py
 msgid "User administration"
-msgstr ""
+msgstr "Användaradministration"
 
 #: cps/spa_strings.py
 msgid "User object filter"
-msgstr ""
+msgstr "Användarobjektsfilter"
 
 #: cps/spa_strings.py
 msgid "User restrictions"
-msgstr ""
+msgstr "Användarbegränsningar"
 
 #: cps/spa_strings.py
 msgid "Userinfo URL"
-msgstr ""
+msgstr "Webbadress för användarinformation"
 
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/login.html
 #: cps/templates/register.html cps/templates/user_edit.html
@@ -7654,7 +7656,7 @@ msgstr "Smeknamn"
 
 #: cps/spa_strings.py
 msgid "Username claim"
-msgstr ""
+msgstr "Användarnamnsanspråk"
 
 #: cps/spa_strings.py
 msgid "Users"
@@ -7662,7 +7664,7 @@ msgstr "Användarlista"
 
 #: cps/spa_strings.py
 msgid "Versions"
-msgstr ""
+msgstr "Versioner"
 
 #: cps/spa_strings.py cps/templates/user_table.html
 msgid "View"
@@ -7670,27 +7672,27 @@ msgstr "Visa"
 
 #: cps/spa_strings.py
 msgid "View device library"
-msgstr ""
+msgstr "Visa enhetsbibliotek"
 
 #: cps/spa_strings.py
 msgid "View settings"
-msgstr ""
+msgstr "Visa inställningar"
 
 #: cps/spa_strings.py
 msgid "Viewer"
-msgstr ""
+msgstr "Visare"
 
 #: cps/spa_strings.py
 msgid "Waiting for a Kobo or KOReader to sync with this account."
-msgstr ""
+msgstr "Väntar på att en Kobo eller KOReader ska synkroniseras med det här kontot."
 
 #: cps/spa_strings.py
 msgid "Waiting for you to authorise…"
-msgstr ""
+msgstr "Väntar på att du ska auktorisera…"
 
 #: cps/spa_strings.py
 msgid "Warning: this highlight can’t be shown in the book"
-msgstr ""
+msgstr "Varning: den här markeringen kan inte visas i boken"
 
 #: cps/spa_strings.py
 msgid ""
@@ -7698,6 +7700,9 @@ msgid ""
 "highlighting, try after sync — and if it still doesn’t work, remove the book "
 "from your Kobo and let it download again."
 msgstr ""
+"Vi reparerade den här boken för din Kobo. Om du haft problem med att markera, "
+"prova efter synkronisering — och om det fortfarande inte fungerar, ta bort "
+"boken från din Kobo och låt den hämtas igen."
 
 #: cps/spa_strings.py
 msgid ""
@@ -7706,6 +7711,10 @@ msgid ""
 "from your Kobo and let it download again. If you read it some other way, "
 "download it again to get the repaired copy."
 msgstr ""
+"Vi reparerade den här boken för din Kobo. Om du haft problem med att markera, "
+"prova efter synkronisering — och om det fortfarande inte fungerar, ta bort "
+"boken från din Kobo och låt den hämtas igen. Om du läser den på annat sätt, "
+"hämta den igen för att få den reparerade kopian."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7714,22 +7723,25 @@ msgid ""
 "highlighting, try after sync — and if it still doesn’t work, remove them "
 "from your Kobo and let them download again."
 msgstr ""
+"Vi reparerade {count} böcker för din Kobo. Om du haft problem med att "
+"markera, prova efter synkronisering — och om det fortfarande inte fungerar, "
+"ta bort dem från din Kobo och låt dem hämtas igen."
 
 #: cps/spa_strings.py
 msgid "Web reader"
-msgstr ""
+msgstr "Webbläsarläsare"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "When locked, fetching metadata will not overwrite this cover."
-msgstr ""
+msgstr "När det är låst skriver hämtning av metadata inte över detta omslag."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "When reading progress was first synced"
-msgstr ""
+msgstr "När läsframsteg synkroniserades första gången"
 
 #: cps/spa_strings.py
 msgid "Which books sync?"
-msgstr ""
+msgstr "Vilka böcker synkroniseras?"
 
 #: cps/spa_strings.py
 msgid ""
@@ -7737,20 +7749,25 @@ msgid ""
 "local=1 to the login URL to reach the password form, which keeps working as "
 "long as standard password login is left enabled."
 msgstr ""
+"När automatisk start är på går inloggningssidan direkt till leverantören. "
+"Lägg till ?local=1 i inloggningswebbadressen för att nå lösenordsformuläret, "
+"som fortsätter fungera så länge vanlig lösenordsinloggning är aktiverad."
 
 #: cps/spa_strings.py
 msgid "Write a note"
-msgstr ""
+msgstr "Skriv en anteckning"
 
 #: cps/spa_strings.py
 msgid "Write a note…"
-msgstr ""
+msgstr "Skriv en anteckning…"
 
 #: cps/spa_strings.py
 msgid ""
 "You're probably a long time user of calibre-web. Please let us know your "
 "feedback on this, why or why not this works with your flow."
 msgstr ""
+"Du är troligen en långvarig användare av calibre-web. Berätta gärna vad du "
+"tycker om detta och varför det fungerar, eller inte fungerar, i ditt flöde."
 
 #: cps/spa_strings.py
 msgid ""
@@ -7758,14 +7775,17 @@ msgid ""
 "does nothing on its own. Switch your account to shelf-only syncing to make "
 "it take effect."
 msgstr ""
+"Din Kobo är fortfarande inställd på att synkronisera hela biblioteket, så "
+"att markera den här hyllan gör ingenting i sig. Byt kontot till synkronisering "
+"av endast hyllor för att aktivera det."
 
 #: cps/spa_strings.py
 msgid "Your Library"
-msgstr ""
+msgstr "Ditt bibliotek"
 
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
-msgstr ""
+msgstr "Din webbläsare kan inte spela upp detta ljudformat."
 
 #: cps/spa_strings.py
 msgid ""
@@ -7773,150 +7793,155 @@ msgid ""
 "library cover stays unchanged for everyone else, and administrators manage "
 "it."
 msgstr ""
+"Ditt omslag visas bara för dig och på böcker som levereras till dina "
+"e-boksläsare. Bibliotekets omslag är oförändrat för alla andra, och hanteras "
+"av administratörer."
 
 #: cps/spa_strings.py
 msgid "Your cover was updated."
-msgstr ""
+msgstr "Ditt omslag har uppdaterats."
 
 #: cps/spa_strings.py
 msgid ""
 "Your own cover is private to you and your e-reader deliveries. The library "
 "cover stays unchanged for everyone else."
 msgstr ""
+"Ditt eget omslag är privat för dig och leveranser till dina e-boksläsare. "
+"Bibliotekets omslag är oförändrat för alla andra."
 
 #: cps/spa_strings.py
 msgid "Your personal digital library"
-msgstr ""
+msgstr "Ditt personliga digitala bibliotek"
 
 #: cps/spa_strings.py
 msgid "Your saved e-reader address is shown — change it for this send only."
-msgstr ""
+msgstr "Din sparade e-boksläsaradress visas — ändra den endast för den här sändningen."
 
 #: cps/spa_strings.py
 msgid "all rules"
-msgstr ""
+msgstr "alla regler"
 
 #: cps/spa_strings.py
 msgid "any rule"
-msgstr ""
+msgstr "valfri regel"
 
 #: cps/spa_strings.py
 msgid "books"
-msgstr ""
+msgstr "böcker"
 
 #: cps/spa_strings.py
 msgid "books match"
-msgstr ""
+msgstr "böcker matchar"
 
 #: cps/spa_strings.py
 msgid "copies"
-msgstr ""
+msgstr "kopior"
 
 #: cps/spa_strings.py
 msgid "e-reader"
-msgstr ""
+msgstr "e-boksläsare"
 
 #: cps/spa_strings.py
 msgid "e.g. Unread sci-fi"
-msgstr ""
+msgstr "t.ex. Oläst science fiction"
 
 #: cps/spa_strings.py
 msgid "eReader email subject"
-msgstr ""
+msgstr "E-postämne för e-boksläsare"
 
 #: cps/spa_strings.py
 msgid "shared"
-msgstr ""
+msgstr "delad"
 
 #: cps/spa_strings.py
 msgid "to"
-msgstr ""
+msgstr "till"
 
 #: cps/spa_strings.py
 msgid "type (isbn, amazon, doi…)"
-msgstr ""
+msgstr "typ (isbn, amazon, doi…)"
 
 #: cps/spa_strings.py
 msgid "unknown"
-msgstr ""
+msgstr "okänd"
 
 #: cps/spa_strings.py
 msgid "value"
-msgstr ""
+msgstr "värde"
 
 #: cps/spa_strings.py
 msgid "you"
-msgstr ""
+msgstr "du"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} book"
-msgstr ""
+msgstr "{count} bok"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} books"
-msgstr ""
+msgstr "{count} böcker"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} file queued for import"
-msgstr ""
+msgstr "{count} fil har köats för import"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} file rejected"
-msgstr ""
+msgstr "{count} fil avvisades"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} files queued for import"
-msgstr ""
+msgstr "{count} filer har köats för import"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} files rejected"
-msgstr ""
+msgstr "{count} filer avvisades"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} matches"
-msgstr ""
+msgstr "{count} träffar"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} result"
-msgstr ""
+msgstr "{count} resultat"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} results"
-msgstr ""
+msgstr "{count} resultat"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} results for \"{query}\""
-msgstr ""
+msgstr "{count} resultat för \"{query}\""
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{done} of {total}"
-msgstr ""
+msgstr "{done} av {total}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{field} (comma separated)"
-msgstr ""
+msgstr "{field} (kommaseparerade)"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{free} free of {total}"
-msgstr ""
+msgstr "{free} lediga av {total}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{name} now uses My Library."
-msgstr ""
+msgstr "{name} använder nu Mitt bibliotek."
 
 #: cps/spa_strings.py
 #, python-brace-format

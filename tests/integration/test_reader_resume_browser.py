@@ -27,7 +27,7 @@ pytestmark = [
 ]
 
 
-@pytest.mark.parametrize('carrier', ['koreader', 'kobo', 'kobo-local-name', 'kobo-unresolved'])
+@pytest.mark.parametrize('carrier', ['koreader', 'kobo', 'kobo-local-name', 'kobo-unresolved', 'kobo-pending', 'kobo-index-pending'])
 def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch, tmp_path, epub, carrier):
     """Replay KOReader HTTP into SQLite, then drive the real Reader with Chromium.
 
@@ -105,7 +105,7 @@ def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch, tmp_path, epu
     if carrier.startswith('kobo'):
         app.add_url_rule('/test-state/kobo', 'fixture_sync',
                          lambda: sync_kobo(flask.request.json['value']), methods=['POST'])
-    if carrier == 'kobo-unresolved':
+    if carrier in ('kobo-unresolved', 'kobo-index-pending'):
         @app.after_request
         def unresolved_exact_hint(response):
             # Keep the real API/hash/carrier, but simulate any server CFI that
@@ -115,6 +115,8 @@ def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch, tmp_path, epu
                 payload = response.get_json()
                 if payload and payload.get('resume'):
                     payload['resume']['cfi'] = 'epubcfi(/6/2!/4/2/202[kobo.1.101]/1:0)'
+                    if carrier == 'kobo-index-pending':
+                        payload['resume'].pop('cfi')
                     response.set_data(app.json.dumps(payload))
             return response
     app.add_url_rule('/api/v1/books/<int:book_id>/bookmark', 'get', inspect.unwrap(reader.get_bookmark))
@@ -132,6 +134,8 @@ def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch, tmp_path, epu
         port_probe.bind(('127.0.0.1', 0))
         web_port = port_probe.getsockname()[1]
     env = dict(os.environ, RESUME_API_URL=f'http://127.0.0.1:{server.server_port}', RESUME_WEB_PORT=str(web_port))
+    if carrier == 'kobo-pending':
+        env['RESUME_STALL_RANGE'] = '1'
     log_path = tmp_path / 'vite.log'
     log = log_path.open('w')
     vite = subprocess.Popen(['node', 'node_modules/vite/bin/vite.js', '--config', 'e2e/reader-resume/vite.config.ts'], cwd=root/'frontend', env=env, stdout=log, stderr=subprocess.STDOUT)
@@ -147,6 +151,8 @@ def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch, tmp_path, epu
                 pytest.fail(log_path.read_text())
             time.sleep(.1)
         runner = 'run-fallback.mjs' if carrier.startswith('kobo-') else ('run-kobo.mjs' if carrier == 'kobo' else 'run.mjs')
+        if carrier == 'kobo-index-pending':
+            runner = 'run-index.mjs'
         result = subprocess.run(['node', 'e2e/reader-resume/' + runner], cwd=root/'frontend', text=True, capture_output=True, timeout=120, env=env)
         print(result.stdout)
         assert result.returncode == 0, result.stdout + result.stderr

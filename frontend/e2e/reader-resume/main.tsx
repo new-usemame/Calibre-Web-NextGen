@@ -4,6 +4,10 @@ const bookPrototype = Object.getPrototypeOf(probe);
 const getRange = bookPrototype.getRange;
 (window as any).resolvedRanges = [];
 bookPrototype.getRange = async function (cfi: string) {
+  if (new URLSearchParams(location.search).has('stallRange')) {
+    (window as any).resolvedRanges.push({ cfi, result: 'pending' });
+    return new Promise(() => {});
+  }
   try {
     const range = await getRange.call(this, cfi);
     (window as any).resolvedRanges.push({ cfi, result: range ? 'range' : String(range) });
@@ -17,6 +21,9 @@ const locationsPrototype = Object.getPrototypeOf(probe.locations);
 const generate = locationsPrototype.generate;
 (window as any).locationGenerationMs = [];
 locationsPrototype.generate = async function (...args: any[]) {
+  if (new URLSearchParams(location.search).has('holdLocations')) {
+    await new Promise<void>(resolve => { (window as any).releaseLocations = resolve; });
+  }
   const start = performance.now();
   try { return await generate.apply(this, args); }
   finally { (window as any).locationGenerationMs.push(performance.now() - start); }

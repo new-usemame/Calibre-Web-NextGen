@@ -2822,7 +2822,9 @@ msgid ""
 "Permanently delete {n} selected book(s) from the global library for every "
 "user? The books and all their files will be erased from the server. This "
 "cannot be undone."
-msgstr ""
+msgstr "Ta bort {n} valda bok/böcker permanent från det globala biblioteket för "
+"alla användare? Böckerna och alla deras filer raderas från servern. Detta "
+"kan inte ångras."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -2833,44 +2835,51 @@ msgid ""
 "bookmarks, and reading progress are kept. If you use Kobo's built-in sync, "
 "the books also leave each Kobo device on your account at its next sync; "
 "other e-readers keep downloaded copies."
-msgstr ""
+msgstr "Ta bort {n} valda bok/böcker från ditt bibliotek? De lämnar ditt bibliotek "
+"och ditt OPDS-flöde och tas även bort från vanliga hyllor där du har lagt "
+"dem. Inget tas bort från det globala biblioteket. Markeringar, anteckningar, "
+"bokmärken och läsförlopp behålls. Om du använder Kobos inbyggda "
+"synkronisering lämnar böckerna också alla Kobo-enheter på ditt konto vid "
+"nästa synkronisering; andra e-boksläsare behåller nedladdade kopior."
 
 #: cps/spa_strings.py
 msgid ""
 "The last book cannot be removed unless you can browse the global library."
-msgstr ""
+msgstr "Den sista boken kan inte tas bort om du inte kan bläddra i det globala "
+"biblioteket."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "The server rejected a batch as too large (maximum {max} books)."
-msgstr ""
+msgstr "Servern avvisade gruppen eftersom den är för stor (högst {max} böcker)."
 
 #: cps/spa_strings.py
 msgid "The server rejected a batch as too large."
-msgstr ""
+msgstr "Servern avvisade gruppen eftersom den är för stor."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
 "Delete \"{title}\" from the global library? The book and all its files are "
 "permanently erased for every member. This cannot be undone."
-msgstr ""
+msgstr "Ta bort \"{title}\" från det globala biblioteket? Boken och alla dess filer "
+"raderas permanent för alla medlemmar. Detta kan inte ångras."
 
 #: cps/spa_strings.py
 msgid "Delete from the global library"
-msgstr ""
+msgstr "Ta bort från det globala biblioteket"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Every book here is already in your library."
-msgstr ""
+msgstr "Alla böcker här finns redan i ditt bibliotek."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Everything on the server, including every new book added to it."
-msgstr ""
+msgstr "Allt på servern, inklusive varje ny bok som läggs till där."
 
 #: cps/spa_strings.py
 msgid "Enter a valid book ID."
-msgstr ""
+msgstr "Ange ett giltigt bok-id."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -2881,11 +2890,11 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Global Library"
-msgstr ""
+msgstr "Globalt bibliotek"
 
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/index.html
 msgid "In your library"
-msgstr ""
+msgstr "I ditt bibliotek"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -2901,23 +2910,23 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Library contents"
-msgstr ""
+msgstr "Biblioteksinnehåll"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Library scope"
-msgstr ""
+msgstr "Biblioteksomfattning"
 
 #: cps/spa_strings.py
 msgid "My selection"
-msgstr ""
+msgstr "Mitt urval"
 
 #: cps/spa_strings.py
 msgid "New: your own library"
-msgstr ""
+msgstr "Nytt: ditt eget bibliotek"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Not in your library"
-msgstr ""
+msgstr "Inte i ditt bibliotek"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid ""
@@ -2934,11 +2943,11 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Only an administrator can add it back."
-msgstr ""
+msgstr "Endast en administratör kan lägga tillbaka den."
 
 #: cps/spa_strings.py
 msgid "Only the books chosen for this account."
-msgstr ""
+msgstr "Endast böckerna som valts för det här kontot."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid ""

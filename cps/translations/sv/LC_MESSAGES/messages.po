@@ -11256,6 +11256,14 @@ msgid ""
 "zip containers and are left as-is. Your original download is never modified, "
 "only the copy that gets imported."
 msgstr ""
+"Standarden ComicInfo.xml kräver att filen ligger i arkivets rot; comicapi "
+"(och alla andra läsare vi känner till) tittar bara där. Vissa .cbz-utgåvor "
+"paketerar den i stället en mapp ned, så deras titel/serie/författare/förlag "
+"aldrig hämtas. När funktionen är aktiv skriver importen om en kopia av arkivet "
+"med ComicInfo.xml flyttad till roten före importen – endast när den finns men "
+"ligger fel, och utan att röra en redan korrekt fil. Endast zip-baserade arkiv "
+"(.cbz); .cbr/.cb7/.cbt är inte zip-containrar och lämnas oförändrade. Din "
+"ursprungliga hämtning ändras aldrig, endast kopian som importeras."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Archived Book Cleanup"
@@ -11731,12 +11739,16 @@ msgid ""
 "can), so a small companion called Watchtower does it for you: it watches for "
 "a new image and swaps NextGen in safely, leaving your other containers alone."
 msgstr ""
+"Nya versioner släpps regelbundet – ofta varje vecka. Calibre-Web NextGen kan "
+"inte uppdatera sig självt inifrån containern (inget som körs i en container kan "
+"det), så ett litet komplement som heter Watchtower gör det åt dig: det bevakar "
+"en ny avbild och byter säkert ut NextGen utan att röra dina andra containrar."
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Add these two services to your docker-compose file and run \"docker compose "
 "up -d\". After that you stay up to date automatically — no button to press."
-msgstr ""
+msgstr "Lägg till dessa två tjänster i docker-compose-filen och kör \"docker compose up -d\". Därefter hålls du automatiskt uppdaterad – ingen knapp behöver tryckas."
 
 #: cps/templates/cwa_settings.html cps/templates/update_now_modal.html
 #: cps/templates/user_edit.html
@@ -11748,13 +11760,13 @@ msgid ""
 "The label means Watchtower only ever touches Calibre-Web NextGen. The 86400 "
 "interval checks once a day; \"cleanup\" removes the old image after each "
 "update."
-msgstr ""
+msgstr "Etiketten innebär att Watchtower endast berör Calibre-Web NextGen. Intervallet 86400 kontrollerar en gång om dagen; \"cleanup\" tar bort den gamla avbilden efter varje uppdatering."
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Running under Podman instead? Native \"podman auto-update\" works too — a "
 "setup guide is coming once we have verified it against this image."
-msgstr ""
+msgstr "Kör du Podman i stället? Den inbyggda \"podman auto-update\" fungerar också – en installationsguide kommer när vi har verifierat den med denna avbild."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Contribute Translations Notifications"
@@ -12034,7 +12046,7 @@ msgstr "Lämna tomt för att inaktivera schemalagda sökningar. Exempel:"
 msgid ""
 "If enabled, after-import scans and cron scans can both run. Use “Manual "
 "only” to disable after-import scans while keeping cron schedules."
-msgstr ""
+msgstr "Om funktionen är aktiverad kan både sökningar efter import och cron-sökningar köras. Använd ”Endast manuellt” för att inaktivera sökningar efter import och behålla cron-scheman."
 
 #: cps/templates/cwa_settings.html cps/templates/duplicates.html
 msgid "Next scheduled scan:"
@@ -12541,13 +12553,13 @@ msgid ""
 "CWA now uses a duplicate index to keep duplicate checks fast during imports "
 "and metadata changes. Before incremental scans can run, the index needs an "
 "initial baseline."
-msgstr ""
+msgstr "CWA använder nu ett dubblettindex för att hålla dubblettkontroller snabba vid import och metadataändringar. Innan inkrementella sökningar kan köras behöver indexet en första baslinje."
 
 #: cps/templates/duplicates.html
 msgid ""
 "Click \"Run Full Duplicate Scan\" to build it. This may take several minutes "
 "on large libraries, and you can keep using CWA while it runs."
-msgstr ""
+msgstr "Klicka på \"Kör fullständig dubblettsökning\" för att skapa indexet. Det kan ta flera minuter i stora bibliotek, och du kan fortsätta använda CWA medan det körs."
 
 #: cps/templates/duplicates.html
 msgid "Duplicate scan is running."
@@ -14080,27 +14092,27 @@ msgstr "Öppna fliken Docker i Unraids webbgränssnitt."
 msgid ""
 "Click the Calibre-Web NextGen container icon and choose Force update (check "
 "for updates first if you want to see what changed)."
-msgstr ""
+msgstr "Klicka på Calibre-Web NextGen-containerns ikon och välj Tvinga uppdatering (sök först efter uppdateringar om du vill se vad som har ändrats)."
 
 #: cps/templates/update_now_modal.html
 msgid ""
 "For hands-off updates, install the \"CA Auto Update Applications\" plugin "
 "from Community Applications."
-msgstr ""
+msgstr "För automatiska uppdateringar installerar du insticksmodulen \"CA Auto Update Applications\" från Community Applications."
 
 #: cps/templates/update_now_modal.html
 msgid "Portainer:"
-msgstr ""
+msgstr "Portainer:"
 
 #: cps/templates/update_now_modal.html
 msgid ""
 "Images → pull the image below, then Containers → select Calibre-Web NextGen "
 "→ Recreate with \"Re-pull image\" enabled."
-msgstr ""
+msgstr "Avbilder → hämta avbilden nedan, sedan Containrar → välj Calibre-Web NextGen → Skapa om med \"Hämta avbild igen\" aktiverat."
 
 #: cps/templates/update_now_modal.html
 msgid "Synology Container Manager:"
-msgstr ""
+msgstr "Synology Container Manager:"
 
 #: cps/templates/update_now_modal.html
 msgid ""
@@ -14375,17 +14387,17 @@ msgstr "Manuell ordning används endast när sorteringsläget är inställt på 
 
 #: cps/templates/user_edit.html
 msgid "Magic Shelves Visibility"
-msgstr ""
+msgstr "Synlighet för magiska hyllor"
 
 #: cps/templates/user_edit.html
 msgid ""
 "Uncheck shelves you want to hide from your sidebar. System shelves cannot be "
 "deleted, only hidden. Public shelves from other users can also be hidden."
-msgstr ""
+msgstr "Avmarkera hyllor som du vill dölja från sidopanelen. Systemhyllor kan inte tas bort, endast döljas. Offentliga hyllor från andra användare kan också döljas."
 
 #: cps/templates/user_edit.html
 msgid "Default System Shelves:"
-msgstr ""
+msgstr "Standardsystemhyllor:"
 
 #: cps/templates/user_edit.html
 msgid "Public Shelves:"
@@ -14394,12 +14406,12 @@ msgstr "Offentliga hyllor:"
 #: cps/templates/user_edit.html
 #, python-format
 msgid "%(visible)s of %(total)s default shelves visible"
-msgstr ""
+msgstr "%(visible)s av %(total)s standardhyllor är synliga"
 
 #: cps/templates/user_edit.html
 #, python-format
 msgid "%(visible)s of %(total)s public shelves visible"
-msgstr ""
+msgstr "%(visible)s av %(total)s offentliga hyllor är synliga"
 
 #: cps/templates/user_edit.html cps/templates/user_table.html
 msgid "Delete User"
@@ -14407,7 +14419,7 @@ msgstr "Ta bort den här användaren"
 
 #: cps/templates/user_edit.html
 msgid "App passwords for OPDS / KOReader Sync"
-msgstr ""
+msgstr "Applösenord för OPDS / KOReader-synkronisering"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -14416,6 +14428,10 @@ msgid ""
 "that'll use it, and copy the token shown after creation. You can revoke any "
 "app password at any time without affecting your active web session."
 msgstr ""
+"OPDS-läsare och KOReader kan inte logga in via din IdP – de stöder endast HTTP "
+"Basic-autentisering. Skapa ett applösenord här, märk det för enheten som ska "
+"använda det och kopiera tokenen som visas efter skapandet. Du kan när som helst "
+"återkalla ett applösenord utan att påverka din aktiva webbsession."
 
 #: cps/templates/user_edit.html
 msgid "New app password"
@@ -14425,15 +14441,15 @@ msgstr "Nytt applösenord"
 #, python-format
 msgid ""
 "App password created for '%(label)s'. Copy it now — you won't see it again."
-msgstr ""
+msgstr "Applösenord har skapats för '%(label)s'. Kopiera det nu – du ser det inte igen."
 
 #: cps/templates/user_edit.html
 msgid "New app password (cleartext)"
-msgstr ""
+msgstr "Nytt applösenord (klartext)"
 
 #: cps/templates/user_edit.html
 msgid "e.g. Kobo Forma, KOReader iPad"
-msgstr ""
+msgstr "t.ex. Kobo Forma, KOReader iPad"
 
 #: cps/templates/user_edit.html
 msgid "Create app password"
@@ -14441,7 +14457,7 @@ msgstr "Skapa applösenord"
 
 #: cps/templates/user_edit.html
 msgid "Label"
-msgstr ""
+msgstr "Etikett"
 
 #: cps/templates/user_edit.html
 msgid "Created"
@@ -14449,11 +14465,11 @@ msgstr "Skapad"
 
 #: cps/templates/user_edit.html
 msgid "Last used"
-msgstr ""
+msgstr "Senast använt"
 
 #: cps/templates/user_edit.html
 msgid "Revoke this app password?"
-msgstr ""
+msgstr "Återkalla detta applösenord?"
 
 #: cps/templates/user_edit.html
 msgid "Generate Kobo Auth URL"
@@ -14461,7 +14477,7 @@ msgstr "Skapa Kobo Auth URL"
 
 #: cps/templates/user_edit.html
 msgid "Visible"
-msgstr ""
+msgstr "Synlig"
 
 #: cps/templates/user_table.html
 msgid "Select..."
@@ -14549,11 +14565,11 @@ msgstr "Redigera offentliga hyllor"
 
 #: cps/templates/user_table.html
 msgid "Sync selected Shelves with Kobo"
-msgstr ""
+msgstr "Synkronisera valda hyllor med Kobo"
 
 #: cps/templates/user_table.html
 msgid "Expose selected Shelves to OPDS"
-msgstr ""
+msgstr "Exponera valda hyllor via OPDS"
 
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"

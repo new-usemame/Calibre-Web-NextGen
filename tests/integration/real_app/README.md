@@ -1,6 +1,7 @@
 # Real application integration fixture (P0.1)
 
-Status: fixture and lifecycle exercised; Docker parity is NOT established.
+Status: fixture and lifecycle exercised; Docker parity is claimed for the
+backend wire only, and runs only where a matching image exists.
 
 1. **Fixture — OBSERVED.** `conftest.py:11` supplies a real Flask app from
    `create_app(cps.config, services)` followed by `register_blueprints`.
@@ -41,8 +42,25 @@ Status: fixture and lifecycle exercised; Docker parity is NOT established.
    `/login/github/authorized` returned Location `/login/github`; the fixture
    returned `/login?local=1`. This is not evidence of a current product bug.
    The source checksum precondition now rejects that mismatched comparison.
-   A matching compiled SPA bundle must also exist in the checkout: local
-   `/app/` returned 404 without it. No synthetic shell was supplied.
+
+   **Scope, and why it is drawn here.** `cps/static/app/` is the Vite bundle.
+   It is gitignored, and the Integration Tests lane builds the image from the
+   checkout without building it first (`.github/workflows/tests.yml`, "Build
+   Docker image" then "Run Docker integration tests"), so a CI checkout has no
+   bundle while the image it built does. OBSERVED in a fresh checkout: `/app/`
+   answers 404, one probe row, blueprint `spa`. Requiring the bundle would
+   therefore have reddened that lane on every run while proving nothing about
+   the application — the difference is the frontend build, not the backend.
+   `_backend_parity_rows` compares every row when the checkout has the bundle
+   and otherwise excludes the bundle-served rows, refusing to exclude a
+   blueprint outside `BUNDLE_SERVED_BLUEPRINTS` so a future route cannot leave
+   the comparison unnoticed. That decision is pinned by
+   `tests/unit/test_real_app_parity_partition.py` (4 cases, all four seen red
+   against mutants of the rule: never-exclude, always-exclude, guard removed,
+   backend rows dropped). The comparison itself still runs nowhere on a
+   developer machine without a matching image; the integration lane is the one
+   environment that builds one.
+
    Separately, exploratory `/login/generic` returned 500 with default settings;
    no product change or claim of Docker equivalence was made for that route.
 

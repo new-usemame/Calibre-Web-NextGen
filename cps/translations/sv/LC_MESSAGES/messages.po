@@ -2899,7 +2899,7 @@ msgstr "I ditt bibliotek"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "It also leaves these shelves: {shelves}."
-msgstr ""
+msgstr "Den lämnar även följande hyllor: {shelves}."
 
 #: cps/spa_strings.py
 msgid ""
@@ -2932,7 +2932,8 @@ msgstr "Inte i ditt bibliotek"
 msgid ""
 "Nothing is deleted: the book stays in the global library, and your "
 "highlights, notes and reading progress are kept."
-msgstr ""
+msgstr "Inget tas bort: boken ligger kvar i det globala biblioteket och dina "
+"markeringar, anteckningar och läsförlopp behålls."
 
 #: cps/spa_strings.py
 msgid ""
@@ -2957,42 +2958,42 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Own selection"
-msgstr ""
+msgstr "Eget urval"
 
 #: cps/spa_strings.py
 msgid "Recently added"
-msgstr ""
+msgstr "Nyligen tillagda"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove \"{title}\" from your library?"
-msgstr ""
+msgstr "Ta bort \"{title}\" från ditt bibliotek?"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from my library"
-msgstr ""
+msgstr "Ta bort från mitt bibliotek"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove {title} from my library"
-msgstr ""
+msgstr "Ta bort {title} från mitt bibliotek"
 
 #: cps/spa_strings.py
 msgid "Removed from your library"
-msgstr ""
+msgstr "Borttagen från ditt bibliotek"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Removing…"
-msgstr ""
+msgstr "Tar bort …"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Search the global library for \"{query}\" instead"
-msgstr ""
+msgstr "Sök i det globala biblioteket efter \"{query}\" i stället"
 
 #: cps/spa_strings.py
 msgid "Set up My Library for all users"
-msgstr ""
+msgstr "Konfigurera Mitt bibliotek för alla användare"
 
 #: cps/spa_strings.py
 msgid ""
@@ -3088,7 +3089,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "The whole library"
-msgstr ""
+msgstr "Hela biblioteket"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid ""
@@ -3098,13 +3099,14 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "You can add it back any time from the global library."
-msgstr ""
+msgstr "Du kan lägga tillbaka den när som helst från det globala biblioteket."
 
 #: cps/spa_strings.py
 msgid ""
 "You don't have access to the global library. Ask an administrator to grant "
 "it."
-msgstr ""
+msgstr "Du har inte åtkomst till det globala biblioteket. Be en administratör att "
+"ge dig åtkomst."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid ""

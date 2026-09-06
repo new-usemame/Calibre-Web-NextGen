@@ -7223,59 +7223,59 @@ msgstr "Sidopanelen är lossad."
 
 #: cps/spa_strings.py
 msgid "Sign in with a magic link"
-msgstr ""
+msgstr "Logga in med en magisk länk"
 
 #: cps/spa_strings.py
 msgid "Sign out"
-msgstr ""
+msgstr "Logga ut"
 
 #: cps/spa_strings.py
 msgid "Signing in…"
-msgstr ""
+msgstr "Loggar in…"
 
 #: cps/spa_strings.py
 msgid "Site title"
-msgstr ""
+msgstr "Webbplatsens titel"
 
 #: cps/spa_strings.py
 msgid "Smart shelf not found."
-msgstr ""
+msgstr "Den smarta hyllan hittades inte."
 
 #: cps/spa_strings.py
 msgid "Smart shelves"
-msgstr ""
+msgstr "Smarta hyllor"
 
 #: cps/spa_strings.py
 msgid "Solid: average colour of the cover"
-msgstr ""
+msgstr "Enfärgad: omslagets genomsnittliga färg"
 
 #: cps/spa_strings.py
 msgid "Solid: custom colour"
-msgstr ""
+msgstr "Enfärgad: anpassad färg"
 
 #: cps/spa_strings.py
 msgid "Solid: most-common colour in the cover"
-msgstr ""
+msgstr "Enfärgad: omslagets vanligaste färg"
 
 #: cps/spa_strings.py
 msgid "Some sources need a key for better covers"
-msgstr ""
+msgstr "Vissa källor behöver en nyckel för bättre omslag"
 
 #: cps/spa_strings.py
 msgid "Something went wrong"
-msgstr ""
+msgstr "Något gick fel"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Something went wrong. Try again."
-msgstr ""
+msgstr "Något gick fel. Försök igen."
 
 #: cps/spa_strings.py
 msgid "Sort order"
-msgstr ""
+msgstr "Sorteringsordning"
 
 #: cps/spa_strings.py
 msgid "Source details"
-msgstr ""
+msgstr "Källdetaljer"
 
 #: cps/spa_strings.py
 msgid ""
@@ -7283,18 +7283,21 @@ msgid ""
 "changes until you remove books yourself. Your e-reader keeps the same books "
 "at its next update."
 msgstr ""
+"Starta Mitt bibliotek? Det börjar med allt du kan se nu, så ingenting ändras "
+"förrän du själv tar bort böcker. Din e-boksläsare behåller samma böcker vid "
+"nästa uppdatering."
 
 #: cps/spa_strings.py
 msgid "Start the only OAuth provider automatically"
-msgstr ""
+msgstr "Starta den enda OAuth-leverantören automatiskt"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Started reading"
-msgstr ""
+msgstr "Började läsa"
 
 #: cps/spa_strings.py
 msgid "Starting scan…"
-msgstr ""
+msgstr "Startar genomsökning…"
 
 #: cps/spa_strings.py cps/templates/tasks.html
 msgid "Status"
@@ -7302,24 +7305,24 @@ msgstr "Status"
 
 #: cps/spa_strings.py
 msgid "Stock Kobo"
-msgstr ""
+msgstr "Standard-Kobo"
 
 #: cps/spa_strings.py
 msgid "Stock Kobo sync URL"
-msgstr ""
+msgstr "Standardwebbadress för Kobo-synkronisering"
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Stretch to fill — no border, slight distortion"
-msgstr ""
+msgstr "Sträck ut för att fylla — ingen kant, lätt förvrängning"
 
 #: cps/spa_strings.py
 msgid "Subheading"
-msgstr ""
+msgstr "Underrubrik"
 
 #: cps/spa_strings.py
 msgid "Support on Ko-fi →"
-msgstr ""
+msgstr "Stöd på Ko-fi →"
 
 #: cps/spa_strings.py
 msgid ""
@@ -7327,11 +7330,14 @@ msgid ""
 "chosen — nothing was lost while you saw everything. At its next update, your "
 "e-reader returns to your selection."
 msgstr ""
+"Byt tillbaka till Mitt bibliotek? Ditt bibliotek återgår till böckerna du "
+"valde — inget försvann medan du såg allt. Vid nästa uppdatering återgår din "
+"e-boksläsare till ditt urval."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Switch {name} back to My Library? Their chosen books are restored."
-msgstr ""
+msgstr "Byt tillbaka {name} till Mitt bibliotek? De valda böckerna återställs."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid ""
@@ -7339,22 +7345,25 @@ msgid ""
 "now, so nothing changes for them until they remove books themselves. "
 "Switching back keeps the selection intact but unused."
 msgstr ""
+"När en användare byter till Mitt bibliotek fylls det först med allt som "
+"användaren kan se nu, så ingenting ändras förrän användaren själv tar bort "
+"böcker. Att byta tillbaka bevarar urvalet, men det används inte."
 
 #: cps/spa_strings.py
 msgid "Sync only my selected shelves"
-msgstr ""
+msgstr "Synkronisera endast mina valda hyllor"
 
 #: cps/spa_strings.py
 msgid "Sync only selected shelves to Kobo"
-msgstr ""
+msgstr "Synkronisera endast valda hyllor till Kobo"
 
 #: cps/spa_strings.py
 msgid "Table view"
-msgstr ""
+msgstr "Tabellvy"
 
 #: cps/spa_strings.py
 msgid "Tag"
-msgstr ""
+msgstr "Tagg"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/search_form.html
@@ -7363,20 +7372,20 @@ msgstr "Taggar"
 
 #: cps/spa_strings.py
 msgid "Tags — exclude"
-msgstr ""
+msgstr "Taggar — uteslut"
 
 #: cps/spa_strings.py
 msgid "Tags — include"
-msgstr ""
+msgstr "Taggar — inkludera"
 
 #: cps/spa_strings.py
 msgid "Tap Sync on the Kobo. Your NextGen books should appear."
-msgstr ""
+msgstr "Tryck på Synkronisera på Kobon. Dina NextGen-böcker bör visas."
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Target aspect ratio"
-msgstr ""
+msgstr "Målbildförhållande"
 
 #: cps/spa_strings.py cps/templates/tasks.html
 msgid "Task"
@@ -7389,11 +7398,11 @@ msgstr "Uppgifter"
 
 #: cps/spa_strings.py
 msgid "Technical details"
-msgstr ""
+msgstr "Tekniska detaljer"
 
 #: cps/spa_strings.py
 msgid "That URL is not a usable image."
-msgstr ""
+msgstr "Den webbadressen är inte en användbar bild."
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/modal_dialogs.html
@@ -7401,10 +7410,12 @@ msgid ""
 "The book record, metadata, shelves, and reading state stay available. If "
 "this is the last format, you can add a replacement later."
 msgstr ""
+"Bokposten, metadata, hyllor och lästillstånd finns kvar. Om detta är det "
+"sista formatet kan du lägga till ett ersättningsformat senare."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "The global library"
-msgstr ""
+msgstr "Det globala biblioteket"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid ""
@@ -7412,150 +7423,162 @@ msgid ""
 "Library. Nothing you had is gone. Every book, new arrivals included, is "
 "under Global Library in the menu."
 msgstr ""
+"Biblioteket delas och innehåller varje bok en gång — det du behåller är Mitt "
+"bibliotek. Inget du hade har försvunnit. Alla böcker, även nya tillskott, "
+"finns under Globalt bibliotek i menyn."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid ""
 "The library is shared and holds every book once — what you keep is My "
 "Library. Nothing you had is gone. Your administrator manages what enters it."
 msgstr ""
+"Biblioteket delas och innehåller varje bok en gång — det du behåller är Mitt "
+"bibliotek. Inget du hade har försvunnit. Administratören hanterar vilka "
+"böcker som läggs till där."
 
 #: cps/spa_strings.py
 msgid ""
 "The server-wide option is also off, so nothing can sync yet. An "
 "administrator can enable it in the classic server settings."
 msgstr ""
+"Den serveromfattande inställningen är också av, så inget kan synkroniseras "
+"ännu. En administratör kan aktivera den i de klassiska serverinställningarna."
 
 #: cps/spa_strings.py
 msgid "This device will no longer sync."
-msgstr ""
+msgstr "Den här enheten synkroniseras inte längre."
 
 #: cps/spa_strings.py
 msgid "This e-reader is unavailable or belongs to another account."
-msgstr ""
+msgstr "Den här e-boksläsaren är inte tillgänglig eller tillhör ett annat konto."
 
 #: cps/spa_strings.py
 msgid "This feature is currently disabled at server level."
-msgstr ""
+msgstr "Den här funktionen är för närvarande inaktiverad på servernivå."
 
 #: cps/spa_strings.py
 msgid "This format opens in the full-screen reader."
-msgstr ""
+msgstr "Det här formatet öppnas i helskärmsläsaren."
 
 #: cps/spa_strings.py
 msgid "This highlight has no saved position"
-msgstr ""
+msgstr "Den här markeringen har ingen sparad position"
 
 #: cps/spa_strings.py
 msgid "This magic link can’t be checked. Generate a new one to try again."
-msgstr ""
+msgstr "Den här magiska länken kan inte kontrolleras. Skapa en ny för att försöka igen."
 
 #: cps/spa_strings.py
 msgid "This magic link expired. Generate a new one to try again."
-msgstr ""
+msgstr "Den här magiska länken har upphört. Skapa en ny för att försöka igen."
 
 #: cps/spa_strings.py
 msgid "This page doesn't exist here."
-msgstr ""
+msgstr "Den här sidan finns inte här."
 
 #: cps/spa_strings.py
 msgid ""
 "This page ran into an error and could not be displayed. Your library is fine "
 "— reloading usually fixes it."
 msgstr ""
+"Det uppstod ett fel på sidan och den kunde inte visas. Ditt bibliotek är "
+"intakt — det brukar lösa sig om du läser in sidan igen."
 
 #: cps/spa_strings.py
 msgid "This shelf is empty. Add books from any book's page."
-msgstr ""
+msgstr "Den här hyllan är tom. Lägg till böcker från valfri boksida."
 
 #: cps/spa_strings.py
 msgid "Title A–Z"
-msgstr ""
+msgstr "Titel A–Ö"
 
 #: cps/spa_strings.py
 msgid "Title Z–A"
-msgstr ""
+msgstr "Titel Ö–A"
 
 #: cps/spa_strings.py
 msgid "Title, author, or ISBN"
-msgstr ""
+msgstr "Titel, författare eller ISBN"
 
 #: cps/spa_strings.py
 msgid "Token URL"
-msgstr ""
+msgstr "Tokenwebbadress"
 
 #: cps/spa_strings.py
 msgid ""
 "Too many magic-link checks were made from this network. Generate a new link "
 "or try again later."
 msgstr ""
+"För många kontroller av magiska länkar gjordes från det här nätverket. Skapa "
+"en ny länk eller försök igen senare."
 
 #: cps/spa_strings.py
 msgid "Top Rated"
-msgstr ""
+msgstr "Högst betygsatta"
 
 #: cps/spa_strings.py
 msgid "Trust authentication header"
-msgstr ""
+msgstr "Lita på autentiseringsrubrik"
 
 #: cps/spa_strings.py
 msgid "Try My Library"
-msgstr ""
+msgstr "Prova Mitt bibliotek"
 
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
 msgid "Try again"
-msgstr ""
+msgstr "Försök igen"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Two columns"
-msgstr ""
+msgstr "Två kolumner"
 
 #: cps/spa_strings.py
 msgid "Two-way sync active"
-msgstr ""
+msgstr "Tvåvägssynkronisering är aktiv"
 
 #: cps/spa_strings.py
 msgid "Two-way sync preference saved."
-msgstr ""
+msgstr "Inställningen för tvåvägssynkronisering har sparats."
 
 #: cps/spa_strings.py cps/templates/book_table.html
 msgid "Unarchive"
-msgstr ""
+msgstr "Ta bort från arkiv"
 
 #: cps/spa_strings.py
 msgid "Undo"
-msgstr ""
+msgstr "Ångra"
 
 #: cps/spa_strings.py
 msgid "Undoing…"
-msgstr ""
+msgstr "Ångrar…"
 
 #: cps/spa_strings.py
 msgid "Unhide"
-msgstr ""
+msgstr "Visa igen"
 
 #: cps/spa_strings.py
 msgid "Unknown color"
-msgstr ""
+msgstr "Okänd färg"
 
 #: cps/spa_strings.py
 msgid "Unknown device"
-msgstr ""
+msgstr "Okänd enhet"
 
 #: cps/spa_strings.py
 msgid "Unknown source"
-msgstr ""
+msgstr "Okänd källa"
 
 #: cps/spa_strings.py
 msgid "Unlock the cover above to apply a new one."
-msgstr ""
+msgstr "Lås upp omslaget ovan för att använda ett nytt."
 
 #: cps/spa_strings.py
 msgid "Unlock the cover to change it"
-msgstr ""
+msgstr "Lås upp omslaget för att ändra det"
 
 #: cps/spa_strings.py
 msgid "Unpin sidebar"
-msgstr ""
+msgstr "Lossa sidopanel"
 
 #: cps/spa_strings.py
 msgid "Unseeded books"

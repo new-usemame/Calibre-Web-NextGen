@@ -8677,7 +8677,7 @@ msgstr "Reparera befintliga KEPUB-paket"
 
 #: cps/tasks/kepub_package_repair.py
 msgid "Google Drive KEPUB repair is not supported"
-msgstr ""
+msgstr "Reparation av KEPUB på Google Drive stöds inte"
 
 #: cps/tasks/kepub_package_repair.py
 #, python-format
@@ -8685,17 +8685,21 @@ msgid ""
 "%(clean)d clean, %(repaired)d repaired, %(unsupported)d unsupported, "
 "%(failed)d failed"
 msgstr ""
+"%(clean)d rena, %(repaired)d reparerade, %(unsupported)d stöds inte, "
+"%(failed)d misslyckades"
 
 #: cps/tasks/kepub_package_repair.py
 #, python-format
 msgid "%(count)d KEPUB repair(s) failed"
-msgstr ""
+msgstr "%(count)d KEPUB-reparationer misslyckades"
 
 #: cps/tasks/kepub_package_repair.py
 msgid ""
 "KEPUB repair finished, but the completion marker could not be saved; the "
 "scan will run again"
 msgstr ""
+"KEPUB-reparationen är klar, men slutförandemarkören kunde inte sparas; "
+"genomsökningen körs igen"
 
 #: cps/tasks/mail.py
 msgid "E-mail"
@@ -8707,7 +8711,7 @@ msgstr "Säkerhetskopierar metadata"
 
 #: cps/tasks/ops.py
 msgid "Convert Library – full run"
-msgstr ""
+msgstr "Konvertera bibliotek – fullständig körning"
 
 #: cps/tasks/ops.py
 msgid "Convert Library"
@@ -8715,11 +8719,11 @@ msgstr "Konvertera bibliotek"
 
 #: cps/tasks/ops.py
 msgid "EPUB Fixer – full run"
-msgstr ""
+msgstr "EPUB-reparerare – fullständig körning"
 
 #: cps/tasks/ops.py
 msgid "EPUB Fixer"
-msgstr ""
+msgstr "EPUB-reparerare"
 
 #: cps/tasks/thumbnail.py
 #, python-format
@@ -8727,19 +8731,21 @@ msgid ""
 "%(processed)d/%(total)d processed: %(generated)d generated, %(skipped)d "
 "skipped, %(failed)d failed"
 msgstr ""
+"%(processed)d/%(total)d bearbetade: %(generated)d genererade, %(skipped)d "
+"hoppades över, %(failed)d misslyckades"
 
 #: cps/tasks/thumbnail.py
 msgid "Cover Thumbnails"
-msgstr ""
+msgstr "Omslagsminiatyrer"
 
 #: cps/tasks/thumbnail.py
 #, python-brace-format
 msgid "Generated {0} series thumbnails"
-msgstr ""
+msgstr "Genererade {0} serieminiatyrer"
 
 #: cps/tasks/thumbnail.py
 msgid "Clearing cover thumbnail cache"
-msgstr ""
+msgstr "Rensar cache för omslagsminiatyrer"
 
 #: cps/templates/_book_organizer.html
 msgid "Book organizer"
@@ -8763,7 +8769,7 @@ msgstr "Omslagsinställningar"
 
 #: cps/templates/_book_organizer.html
 msgid "Hide shelf badges on covers"
-msgstr ""
+msgstr "Dölj hyllmärken på omslag"
 
 #: cps/templates/_book_organizer.html
 msgid "Selection actions"
@@ -8782,7 +8788,7 @@ msgstr "(Publik)"
 
 #: cps/templates/_book_organizer.html
 msgid "Mark"
-msgstr ""
+msgstr "Markera"
 
 #: cps/templates/_book_organizer.html
 msgid "Downloads, fewest first"
@@ -8802,11 +8808,11 @@ msgstr "Tillagd datum, äldst först"
 
 #: cps/templates/_book_organizer.html
 msgid "Title A → Z"
-msgstr ""
+msgstr "Titel A → Ö"
 
 #: cps/templates/_book_organizer.html
 msgid "Title Z → A"
-msgstr ""
+msgstr "Titel Ö → A"
 
 #: cps/templates/_book_organizer.html
 msgid "Author A → Z"
@@ -8826,11 +8832,11 @@ msgstr "Publicerad, äldst först"
 
 #: cps/templates/_book_organizer.html
 msgid "Series number, ascending"
-msgstr ""
+msgstr "Serienummer, stigande"
 
 #: cps/templates/_book_organizer.html
 msgid "Series number, descending"
-msgstr ""
+msgstr "Serienummer, fallande"
 
 #: cps/templates/_book_organizer.html
 msgid "Added to shelf, newest first"
@@ -8842,7 +8848,7 @@ msgstr "Tillagd på hylla, äldst först"
 
 #: cps/templates/admin.html
 msgid "Users&nbsp;&nbsp;👤"
-msgstr ""
+msgstr "Användare&nbsp;&nbsp;👤"
 
 #: cps/templates/admin.html
 msgid "Send to eReader Email"
@@ -8862,7 +8868,7 @@ msgstr "Publik hylla"
 
 #: cps/templates/admin.html
 msgid "Manage Profile Pictures"
-msgstr ""
+msgstr "Hantera profilbilder"
 
 #: cps/templates/admin.html
 msgid "Import LDAP Users"
@@ -8898,7 +8904,7 @@ msgstr "Gmail via Oauth2"
 
 #: cps/templates/admin.html
 msgid "Configuration&nbsp;&nbsp;⚙️"
-msgstr ""
+msgstr "Konfiguration&nbsp;&nbsp;⚙️"
 
 #: cps/templates/admin.html
 msgid "Calibre Database Directory"
@@ -8942,7 +8948,7 @@ msgstr "Omvänt proxy rubriknamn"
 
 #: cps/templates/admin.html
 msgid "NextGen Settings"
-msgstr ""
+msgstr "NextGen-inställningar"
 
 #: cps/templates/admin.html
 msgid "Edit Basic Configuration"
@@ -8958,7 +8964,7 @@ msgstr "Redigera Calibre-databaskonfiguration"
 
 #: cps/templates/admin.html
 msgid "Scheduled Tasks&nbsp;&nbsp;⌛"
-msgstr ""
+msgstr "Schemalagda uppgifter&nbsp;&nbsp;⌛"
 
 #: cps/templates/admin.html cps/templates/schedule_edit.html
 #: cps/templates/tasks.html
@@ -8967,15 +8973,15 @@ msgstr "Starttid"
 
 #: cps/templates/admin.html cps/templates/schedule_edit.html
 msgid "Maximum Duration"
-msgstr ""
+msgstr "Maximal varaktighet"
 
 #: cps/templates/admin.html cps/templates/schedule_edit.html
 msgid "Scheduled Thumbnail Refresh"
-msgstr ""
+msgstr "Schemalagd uppdatering av miniatyrer"
 
 #: cps/templates/admin.html
 msgid "Generate series cover thumbnails"
-msgstr ""
+msgstr "Generera miniatyrer för serieomslag"
 
 #: cps/templates/admin.html cps/templates/schedule_edit.html
 msgid "Reconnect Calibre Database"
@@ -8983,51 +8989,51 @@ msgstr "Återanslut Calibre-databasen"
 
 #: cps/templates/admin.html cps/templates/schedule_edit.html
 msgid "Generate Metadata Backup Files"
-msgstr ""
+msgstr "Generera säkerhetskopior av metadata"
 
 #: cps/templates/admin.html
 msgid "Refresh Thumbnail Cache"
-msgstr ""
+msgstr "Uppdatera cache för miniatyrer"
 
 #: cps/templates/admin.html
 msgid "NextGen Admin Functions&nbsp;&nbsp;⚡"
-msgstr ""
+msgstr "NextGen-administrationsfunktioner&nbsp;&nbsp;⚡"
 
 #: cps/templates/admin.html
 msgid "Show NextGen Stats"
-msgstr ""
+msgstr "Visa NextGen-statistik"
 
 #: cps/templates/admin.html
 msgid "Check NextGen Status"
-msgstr ""
+msgstr "Kontrollera NextGen-status"
 
 #: cps/templates/admin.html
 msgid "Setup KOReader Sync"
-msgstr ""
+msgstr "Konfigurera KOReader-synkronisering"
 
 #: cps/templates/admin.html
 msgid "NextGen Library Conversion Service"
-msgstr ""
+msgstr "NextGen-tjänst för bibliotekskonvertering"
 
 #: cps/templates/admin.html
 msgid "NextGen EPUB Fixer Service"
-msgstr ""
+msgstr "NextGen-tjänst för EPUB-reparation"
 
 #: cps/templates/admin.html
 msgid "NextGen Cover & Metadata Enforcement"
-msgstr ""
+msgstr "NextGen-tillämpning av omslag och metadata"
 
 #: cps/templates/admin.html
 msgid "NextGen GitHub"
-msgstr ""
+msgstr "NextGen GitHub"
 
 #: cps/templates/admin.html
 msgid "NextGen Discord Server"
-msgstr ""
+msgstr "NextGen Discord-server"
 
 #: cps/templates/admin.html
 msgid "Run Hardcover Auto-Fetch"
-msgstr ""
+msgstr "Kör automatisk hämtning från Hardcover"
 
 #: cps/templates/admin.html
 msgid "Administration&nbsp;&nbsp;🚀"
@@ -9038,15 +9044,19 @@ msgid ""
 "Sanitized: safe to attach to a public GitHub issue. Passwords, tokens, IPs, "
 "and install paths are scrubbed."
 msgstr ""
+"Rensad: säker att bifoga i ett offentligt GitHub-ärende. Lösenord, token, "
+"IP-adresser och installationssökvägar har tagits bort."
 
 #: cps/templates/admin.html
 msgid "Get Support Pack"
-msgstr ""
+msgstr "Hämta supportpaket"
 
 #: cps/templates/admin.html
 msgid ""
 "Full unredacted pack. Admin/private use only — contains secrets and IPs."
 msgstr ""
+"Fullständigt ocensurerat paket. Endast för administratör/privat användning — "
+"innehåller hemligheter och IP-adresser."
 
 #: cps/templates/admin.html
 msgid "Download Debug Package"
@@ -9066,7 +9076,7 @@ msgstr "Stoppa Calibre-Web"
 
 #: cps/templates/admin.html
 msgid "Version Information&nbsp;&nbsp;📜"
-msgstr ""
+msgstr "Versionsinformation&nbsp;&nbsp;📜"
 
 #: cps/templates/admin.html
 msgid "Version"
@@ -9090,7 +9100,7 @@ msgstr "Aktuell version"
 
 #: cps/templates/admin.html
 msgid "-"
-msgstr ""
+msgstr "-"
 
 #: cps/templates/admin.html
 msgid "Check for Update"
@@ -9124,36 +9134,42 @@ msgid ""
 "note you've made. Highlights for books that exist in this library will be "
 "added to your account; sideloaded books not in the library are skipped."
 msgstr ""
+"Ladda upp filen %(filename)s från din Kobo-enhet för att importera alla "
+"markeringar och anteckningar du gjort. Markeringar för böcker som finns i "
+"det här biblioteket läggs till i ditt konto; sidoladdade böcker som inte finns "
+"i biblioteket hoppas över."
 
 #: cps/templates/annotations_import.html
 msgid ""
 "The file is parsed in-memory and deleted after the import completes. It is "
 "never stored on the server."
 msgstr ""
+"Filen tolkas i minnet och tas bort när importen är klar. Den lagras aldrig "
+"på servern."
 
 #: cps/templates/annotations_import.html cps/templates/kobo_reconcile.html
 msgid "KoboReader.sqlite"
-msgstr ""
+msgstr "KoboReader.sqlite"
 
 #: cps/templates/annotations_import.html
 msgid "Import summary"
-msgstr ""
+msgstr "Importsammanfattning"
 
 #: cps/templates/annotations_import.html
 msgid "new annotations imported"
-msgstr ""
+msgstr "nya anteckningar importerades"
 
 #: cps/templates/annotations_import.html
 msgid "existing annotations updated from a newer device copy"
-msgstr ""
+msgstr "befintliga anteckningar uppdaterades från en nyare enhetskopia"
 
 #: cps/templates/annotations_import.html
 msgid "already imported (skipped)"
-msgstr ""
+msgstr "redan importerad (hoppades över)"
 
 #: cps/templates/annotations_import.html
 msgid "different or undated device entries older than server state (skipped)"
-msgstr ""
+msgstr "andra eller odaterade enhetsposter äldre än serverstatus (hoppades över)"
 
 #: cps/templates/annotations_import.html
 msgid "for books not in this library (skipped)"
@@ -9161,27 +9177,27 @@ msgstr "för böcker som inte finns i det här biblioteket (överhoppade)"
 
 #: cps/templates/annotations_import.html
 msgid "hidden on device (reported, not applied)"
-msgstr ""
+msgstr "dold på enheten (rapporterad, inte tillämpad)"
 
 #: cps/templates/annotations_import.html
 msgid "empty bookmark rows with no annotation content (skipped)"
-msgstr ""
+msgstr "tomma bokmärkesrader utan anteckningsinnehåll (hoppades över)"
 
 #: cps/templates/annotations_import.html
 msgid "invalid bookmark rows (skipped)"
-msgstr ""
+msgstr "ogiltiga bokmärkesrader (hoppades över)"
 
 #: cps/templates/annotations_import.html
 msgid "entries with invalid book positions (skipped)"
-msgstr ""
+msgstr "poster med ogiltiga bokpositioner (hoppades över)"
 
 #: cps/templates/annotations_import.html
 msgid "entries not saved because the import transaction failed"
-msgstr ""
+msgstr "poster sparades inte eftersom importtransaktionen misslyckades"
 
 #: cps/templates/annotations_import.html
 msgid "total entries seen"
-msgstr ""
+msgstr "totalt antal poster"
 
 #: cps/templates/annotations_import.html cps/templates/book_edit.html
 #: cps/templates/layout.html
@@ -9198,33 +9214,33 @@ msgstr "Nätverksfel."
 
 #: cps/templates/annotations_view.html
 msgid "Export Markdown"
-msgstr ""
+msgstr "Exportera Markdown"
 
 #: cps/templates/annotations_view.html
 msgid "Export CSV"
-msgstr ""
+msgstr "Exportera CSV"
 
 #: cps/templates/annotations_view.html
 msgid "Export JSON"
-msgstr ""
+msgstr "Exportera JSON"
 
 #: cps/templates/annotations_view.html
 msgid "Open book"
-msgstr ""
+msgstr "Öppna bok"
 
 #: cps/templates/annotations_view.html
 #, python-format
 msgid "%(count)d highlights"
-msgstr ""
+msgstr "%(count)d markeringar"
 
 #: cps/templates/annotations_view.html cps/templates/cwa_settings.html
 msgid "Note:"
-msgstr ""
+msgstr "Obs:"
 
 #: cps/templates/annotations_view.html
 #, python-format
 msgid "Chapter progress: %(pct)d%%"
-msgstr ""
+msgstr "Kapitelprogress: %(pct)d %%"
 
 #: cps/templates/annotations_view.html
 #, python-format
@@ -9233,7 +9249,7 @@ msgstr "Källa: %(s)s"
 
 #: cps/templates/annotations_view.html cps/templates/read.html
 msgid "No annotations on this book yet."
-msgstr ""
+msgstr "Inga anteckningar för den här boken ännu."
 
 #: cps/templates/author.html
 msgid "via"
@@ -9317,13 +9333,15 @@ msgstr "Lägg till identifierare"
 #: cps/templates/book_edit.html cps/templates/cover_picker.html
 #: cps/templates/detail.html
 msgid "Change cover"
-msgstr ""
+msgstr "Ändra omslag"
 
 #: cps/templates/book_edit.html
 msgid ""
 "Pick a cover from any source, paste a URL, upload a file, or use the "
 "embedded cover."
 msgstr ""
+"Välj ett omslag från en källa, klistra in en webbadress, ladda upp en fil "
+"eller använd det inbäddade omslaget."
 
 #: cps/templates/book_edit.html
 msgid ""
@@ -9342,11 +9360,11 @@ msgstr "Blockeringslista för Hardcover-synkronisering"
 
 #: cps/templates/book_edit.html
 msgid "Blacklist annotations from syncing to Hardcover"
-msgstr ""
+msgstr "Svartlista anteckningar från synkronisering till Hardcover"
 
 #: cps/templates/book_edit.html
 msgid "Blacklist reading progress from syncing to Hardcover"
-msgstr ""
+msgstr "Svartlista läsframsteg från synkronisering till Hardcover"
 
 #: cps/templates/book_edit.html
 msgid "View Book on Save"
@@ -9366,11 +9384,11 @@ msgstr "Sökord"
 
 #: cps/templates/book_edit.html
 msgid "Selected metadata fields were applied to the edit form."
-msgstr ""
+msgstr "De valda metadatafälten har tillämpats på redigeringsformuläret."
 
 #: cps/templates/book_edit.html
 msgid "API Keys"
-msgstr ""
+msgstr "API-nycklar"
 
 #: cps/templates/book_edit.html
 msgid ""
@@ -9378,6 +9396,9 @@ msgid ""
 "quality and unblocks rate-limited services. Keys are stored once for the "
 "whole instance — admins only."
 msgstr ""
+"Vissa metadatakällor behöver en API-nyckel. Att lägga till en nyckel här "
+"förbättrar omslagskvaliteten och låser upp tjänster med hastighetsgräns. "
+"Nycklar lagras en gång för hela instansen — endast administratörer."
 
 #: cps/templates/book_edit.html
 msgid "Loading..."
@@ -9385,19 +9406,19 @@ msgstr "Läser in..."
 
 #: cps/templates/book_edit.html
 msgid "Sort by:"
-msgstr ""
+msgstr "Sortera efter:"
 
 #: cps/templates/book_edit.html
 msgid "Provider order (default)"
-msgstr ""
+msgstr "Leverantörsordning (standard)"
 
 #: cps/templates/book_edit.html
 msgid "Cover size — largest first"
-msgstr ""
+msgstr "Omslagsstorlek — störst först"
 
 #: cps/templates/book_edit.html
 msgid "Cover size — smallest first"
-msgstr ""
+msgstr "Omslagsstorlek — minst först"
 
 #: cps/templates/book_edit.html
 msgid "Search error!"
@@ -9413,7 +9434,7 @@ msgstr "Detta fält är obligatoriskt"
 
 #: cps/templates/book_table.html
 msgid " Exchange author & title"
-msgstr ""
+msgstr " Byt författare och titel"
 
 #: cps/templates/book_table.html
 msgid "Select all"
@@ -9421,7 +9442,7 @@ msgstr "Markera alla"
 
 #: cps/templates/book_table.html
 msgid "Clear all"
-msgstr ""
+msgstr "Rensa alla"
 
 #: cps/templates/book_table.html
 msgid "Update Title Sort automatically  "
@@ -9510,7 +9531,7 @@ msgstr "I bok med titel:"
 
 #: cps/templates/book_table.html
 msgid "The following books will be deleted:"
-msgstr ""
+msgstr "Följande böcker tas bort:"
 
 #: cps/templates/book_table.html
 msgid "The following books will be archived:"

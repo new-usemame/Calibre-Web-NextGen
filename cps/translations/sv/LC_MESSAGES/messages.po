@@ -10742,6 +10742,8 @@ msgid ""
 "Maximum number of authors to show in book details before truncating. Set to "
 "0 to disable."
 msgstr ""
+"Högsta antal författare att visa i bokdetaljer innan visningen förkortas. "
+"Ange 0 för att inaktivera."
 
 #: cps/templates/config_view_edit.html
 msgid "Default Theme"
@@ -10756,6 +10758,8 @@ msgid ""
 "Default theme for new users and anonymous browsing. Users can select their "
 "own preferred theme in their profile."
 msgstr ""
+"Standardtema för nya användare och anonym bläddring. Användare kan välja "
+"eget föredraget tema i sin profil."
 
 #: cps/templates/config_view_edit.html
 msgid "Regular Expression for Ignoring Columns"
@@ -10763,11 +10767,11 @@ msgstr "Reguljärt uttryck för att ignorera kolumner"
 
 #: cps/templates/config_view_edit.html
 msgid "Regex pattern to hide custom columns from being displayed in the UI."
-msgstr ""
+msgstr "Regex-mönster för att dölja anpassade kolumner i gränssnittet."
 
 #: cps/templates/config_view_edit.html cps/templates/shelf_reorder.html
 msgid "Sort by"
-msgstr ""
+msgstr "Sortera efter"
 
 #: cps/templates/config_view_edit.html
 msgid "Link Read/Unread Status to Calibre Column"
@@ -10784,7 +10788,7 @@ msgstr "Visa begränsningar baserade på calibre-kolumnen"
 #: cps/templates/config_view_edit.html
 msgid ""
 "Restrict book visibility based on values in a Calibre text custom column."
-msgstr ""
+msgstr "Begränsa synligheten av böcker baserat på värden i en anpassad Calibre-textkolumn."
 
 #: cps/templates/config_view_edit.html
 msgid "Regular Expression for Title Sorting"
@@ -10795,6 +10799,8 @@ msgid ""
 "Regex to strip prefixes from titles for proper sorting (e.g., \"The\", "
 "\"A\", \"An\")."
 msgstr ""
+"Regex för att ta bort prefix från titlar för korrekt sortering (t.ex. \"The\", "
+"\"A\", \"An\")."
 
 #: cps/templates/config_view_edit.html
 msgid "Site Customization"
@@ -10802,19 +10808,23 @@ msgstr "Anpassning av webbplatsen"
 
 #: cps/templates/config_view_edit.html
 msgid "Server announcement banner"
-msgstr ""
+msgstr "Servermeddelandebanderoll"
 
 #: cps/templates/config_view_edit.html
 msgid ""
 "Leave blank to hide the banner. Shown at the top of every page until each "
 "user dismisses it."
 msgstr ""
+"Lämna tomt för att dölja banderollen. Den visas högst upp på varje sida tills "
+"varje användare avfärdar den."
 
 #: cps/templates/config_view_edit.html
 msgid ""
 "Up to 500 characters. HTML is escaped. Each user dismisses the banner "
 "independently; editing the text re-shows it for everyone."
 msgstr ""
+"Upp till 500 tecken. HTML-escape används. Varje användare avfärdar "
+"banderollen oberoende; när texten redigeras visas den igen för alla."
 
 #: cps/templates/config_view_edit.html
 msgid "Custom CSS"
@@ -10823,13 +10833,15 @@ msgstr "Anpassad CSS"
 #: cps/templates/config_view_edit.html
 #, python-brace-format
 msgid "e.g. .navbar { background: #2b2b2b; }"
-msgstr ""
+msgstr "t.ex. .navbar { background: #2b2b2b; }"
 
 #: cps/templates/config_view_edit.html
 msgid ""
 "Injected into every page as the last stylesheet, so it overrides the built-"
 "in themes. Applies to all users. Leave blank to disable."
 msgstr ""
+"Infogas på varje sida som sista formatmall och åsidosätter därför de inbyggda "
+"temana. Gäller alla användare. Lämna tomt för att inaktivera."
 
 #: cps/templates/config_view_edit.html
 msgid "Default Settings for New Users"
@@ -10837,7 +10849,7 @@ msgstr "Standardinställningar för nya användare"
 
 #: cps/templates/config_view_edit.html
 msgid "These settings will be applied to all newly created user accounts."
-msgstr ""
+msgstr "Dessa inställningar tillämpas på alla nyligen skapade användarkonton."
 
 #: cps/templates/config_view_edit.html
 msgid "Permissions"
@@ -10869,11 +10881,11 @@ msgstr "Standardfilter för bokspråk för nya användare."
 
 #: cps/templates/config_view_edit.html
 msgid "OPDS Default Locale for Anonymous Clients"
-msgstr ""
+msgstr "Standardlokal för OPDS-anonyma klienter"
 
 #: cps/templates/config_view_edit.html
 msgid "(none — fall back to English)"
-msgstr ""
+msgstr "(ingen — använd engelska som reserv)"
 
 #: cps/templates/config_view_edit.html
 msgid ""
@@ -10881,6 +10893,9 @@ msgid ""
 "Accept-Language header and the request does not include a ?lang= override. "
 "Authenticated users keep their own selected locale."
 msgstr ""
+"Används för svar i anonyma OPDS-flöden när klienten inte skickar rubriken "
+"Accept-Language och begäran inte innehåller en ?lang=-åsidosättning. "
+"Autentiserade användare behåller sin valda lokal."
 
 #: cps/templates/config_view_edit.html
 msgid "Default Visibilities for New Users"
@@ -10888,7 +10903,7 @@ msgstr "Standardvisibiliteter för nya användare"
 
 #: cps/templates/config_view_edit.html
 msgid "Choose which sidebar sections are visible by default for new users."
-msgstr ""
+msgstr "Välj vilka sidopanelsavsnitt som visas som standard för nya användare."
 
 #: cps/templates/config_view_edit.html cps/templates/user_edit.html
 #: cps/templates/user_table.html
@@ -10905,7 +10920,7 @@ msgstr "Lägg till tillåtna/avvisade anpassade kolumnvärden"
 
 #: cps/templates/cover_picker.html
 msgid "Use a URL"
-msgstr ""
+msgstr "Använd en webbadress"
 
 #: cps/templates/cover_picker.html
 msgid "Upload a file"
@@ -10917,32 +10932,37 @@ msgid ""
 "quality and unblocks rate-limited services. Keys are stored once for the "
 "whole instance — admins only."
 msgstr ""
+"Vissa metadatakällor behöver en API-nyckel. Att lägga till en nyckel här "
+"förbättrar omslagskvaliteten och låser upp tjänster med hastighetsgräns. "
+"Nycklar lagras en gång för hela instansen — endast administratörer."
 
 #: cps/templates/cover_picker.html
 msgid "Show how each cover would look on your e-reader"
-msgstr ""
+msgstr "Visa hur varje omslag skulle se ut på din e-boksläsare"
 
 #: cps/templates/cover_picker.html
 msgid ""
 "Adjust how covers preview here. Defaults live in Admin → Configuration → "
 "Kobo sync."
 msgstr ""
+"Justera hur omslag förhandsvisas här. Standardvärden finns i Administration "
+"→ Konfiguration → Kobo-synkronisering."
 
 #: cps/templates/cover_picker.html
 msgid "Candidates"
-msgstr ""
+msgstr "Kandidater"
 
 #: cps/templates/cover_picker.html
 msgid "Loading candidates…"
-msgstr ""
+msgstr "Läser in kandidater…"
 
 #: cps/templates/cover_picker.html
 msgid "Replace cover with this candidate?"
-msgstr ""
+msgstr "Ersätt omslaget med den här kandidaten?"
 
 #: cps/templates/cover_picker.html
 msgid "Rendering e-reader previews:"
-msgstr ""
+msgstr "Renderar förhandsvisningar för e-boksläsare:"
 
 #: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
 #: cps/templates/cwa_epub_fixer.html
@@ -10961,19 +10981,19 @@ msgstr "Starta"
 
 #: cps/templates/cwa_convert_library.html cps/templates/cwa_epub_fixer.html
 msgid "Schedule 5m"
-msgstr ""
+msgstr "Schemalägg om 5 min"
 
 #: cps/templates/cwa_convert_library.html cps/templates/cwa_epub_fixer.html
 msgid "Schedule 15m"
-msgstr ""
+msgstr "Schemalägg om 15 min"
 
 #: cps/templates/cwa_convert_library.html
 msgid "Convert Library scheduled successfully"
-msgstr ""
+msgstr "Konvertering av bibliotek har schemalagts"
 
 #: cps/templates/cwa_convert_library.html
 msgid "Error scheduling Convert Library"
-msgstr ""
+msgstr "Fel vid schemaläggning av bibliotekskonvertering"
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid ""

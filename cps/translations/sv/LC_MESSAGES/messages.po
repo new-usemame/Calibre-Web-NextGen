@@ -2907,7 +2907,9 @@ msgid ""
 "Keep your own selection again? Your library goes back to the books you had "
 "chosen — nothing was lost while you saw everything. At its next update, your "
 "e-reader returns to your selection."
-msgstr ""
+msgstr "Behålla ditt eget urval igen? Ditt bibliotek återgår till böckerna du "
+"valde — inget försvann medan du såg allt. Vid nästa uppdatering återgår din "
+"e-boksläsare till ditt urval."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Library contents"

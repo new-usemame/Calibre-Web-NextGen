@@ -3178,11 +3178,11 @@ msgstr "{name} ser nu hela biblioteket igen."
 
 #: cps/spa_strings.py
 msgid "Clear rating"
-msgstr ""
+msgstr "Rensa betyg"
 
 #: cps/spa_strings.py
 msgid "Not rated"
-msgstr ""
+msgstr "Inte betygsatt"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/kobo_reconcile.html cps/templates/search_form.html
@@ -3196,53 +3196,53 @@ msgstr "Nej"
 
 #: cps/spa_strings.py cps/templates/email_edit.html
 msgid "Email Message Body"
-msgstr ""
+msgstr "E-postmeddelandets brödtext"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Rated {rating} out of 5"
-msgstr ""
+msgstr "Betygsatt {rating} av 5"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "More by {name}"
-msgstr ""
+msgstr "Mer av {name}"
 
 #: cps/spa_strings.py
 msgid "Send to device"
-msgstr ""
+msgstr "Skicka till enhet"
 
 #: cps/spa_strings.py
 msgid "Device"
-msgstr ""
+msgstr "Enhet"
 
 #: cps/spa_strings.py
 msgid "Collects on the device's next sync."
-msgstr ""
+msgstr "Hämtas vid enhetens nästa synkronisering."
 
 #: cps/spa_strings.py
 msgid "Choose a device"
-msgstr ""
+msgstr "Välj en enhet"
 
 #: cps/spa_strings.py
 msgid "Queueing…"
-msgstr ""
+msgstr "Köar…"
 
 #: cps/spa_strings.py
 msgid "Book queued for this device"
-msgstr ""
+msgstr "Boken har lagts i kö för den här enheten"
 
 #: cps/spa_strings.py
 msgid "This book is already queued for this device"
-msgstr ""
+msgstr "Boken är redan köad för den här enheten"
 
 #: cps/spa_strings.py
 msgid "This book is already on that device"
-msgstr ""
+msgstr "Boken finns redan på den enheten"
 
 #: cps/spa_strings.py
 msgid "Could not queue this book for the device."
-msgstr ""
+msgstr "Kunde inte lägga boken i kö för enheten."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3640,63 +3640,63 @@ msgstr "Importera från Kobo"
 
 #: cps/spa_strings.py
 msgid "Interface language"
-msgstr ""
+msgstr "Gränssnittsspråk"
 
 #: cps/spa_strings.py
 msgid "Invalid username or password."
-msgstr ""
+msgstr "Ogiltigt användarnamn eller lösenord."
 
 #: cps/spa_strings.py
 msgid "UI body font"
-msgstr ""
+msgstr "Brödtexttypsnitt i gränssnittet"
 
 #: cps/spa_strings.py
 msgid "UI display font"
-msgstr ""
+msgstr "Visningstypsnitt i gränssnittet"
 
 #: cps/spa_strings.py
 msgid "Default (Optima / Sans-Serif)"
-msgstr ""
+msgstr "Standard (Optima / sans serif)"
 
 #: cps/spa_strings.py
 msgid "Default (Bookish Serif)"
-msgstr ""
+msgstr "Standard (bokserif)"
 
 #: cps/spa_strings.py
 msgid "System Sans-Serif"
-msgstr ""
+msgstr "Systemets sans serif"
 
 #: cps/spa_strings.py
 msgid "Bookish Serif"
-msgstr ""
+msgstr "Bokserif"
 
 #: cps/spa_strings.py
 msgid "Monospace"
-msgstr ""
+msgstr "Fast bredd"
 
 #: cps/spa_strings.py
 msgid "Label (e.g. KOReader on phone)"
-msgstr ""
+msgstr "Etikett (t.ex. KOReader på telefon)"
 
 #: cps/spa_strings.py
 msgid "Languages (comma separated)"
-msgstr ""
+msgstr "Språk (kommaseparerade)"
 
 #: cps/spa_strings.py
 msgid "Light theme"
-msgstr ""
+msgstr "Ljust tema"
 
 #: cps/spa_strings.py
 msgid "Login failed."
-msgstr ""
+msgstr "Inloggningen misslyckades."
 
 #: cps/spa_strings.py
 msgid "Mark read"
-msgstr ""
+msgstr "Markera som läst"
 
 #: cps/spa_strings.py
 msgid "Mark unread"
-msgstr ""
+msgstr "Markera som oläst"
 
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/duplicates.html
@@ -3706,58 +3706,58 @@ msgstr "Slå samman"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Metadata applied to {n} book(s)."
-msgstr ""
+msgstr "Metadata har tillämpats på {n} bok/böcker."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "New password for “{label}” — copy it now, it won’t be shown again:"
-msgstr ""
+msgstr "Nytt lösenord för ”{label}” — kopiera det nu, det visas inte igen:"
 
 #: cps/spa_strings.py
 msgid "New passwords do not match."
-msgstr ""
+msgstr "De nya lösenorden stämmer inte överens."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "No books here."
-msgstr ""
+msgstr "Det finns inga böcker här."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "No results for \"{q}\"."
-msgstr ""
+msgstr "Inga resultat för \"{q}\"."
 
 #: cps/spa_strings.py
 msgid "No suggestions"
-msgstr ""
+msgstr "Inga förslag"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "No {filter} books here."
-msgstr ""
+msgstr "Det finns inga {filter}-böcker här."
 
 #: cps/spa_strings.py
 msgid "Password changed."
-msgstr ""
+msgstr "Lösenordet har ändrats."
 
 #: cps/spa_strings.py
 msgid "Paste URL"
-msgstr ""
+msgstr "Klistra in webbadress"
 
 #: cps/spa_strings.py
 msgid "Private shelf"
-msgstr ""
+msgstr "Privat hylla"
 
 #: cps/spa_strings.py
 msgid "Profile"
-msgstr ""
+msgstr "Profil"
 
 #: cps/spa_strings.py
 msgid "Profile saved."
-msgstr ""
+msgstr "Profilen har sparats."
 
 #: cps/spa_strings.py
 msgid "Public shelf"
-msgstr ""
+msgstr "Offentlig hylla"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/detail.html
@@ -3768,7 +3768,7 @@ msgstr "Förlag"
 
 #: cps/spa_strings.py
 msgid "Publishers (comma separated)"
-msgstr ""
+msgstr "Förlag (kommaseparerade)"
 
 #: cps/spa_strings.py cps/templates/image.html cps/templates/listenmp3.html
 msgid "Read"
@@ -3776,65 +3776,65 @@ msgstr "Läst"
 
 #: cps/spa_strings.py cps/templates/image.html
 msgid "Reading"
-msgstr ""
+msgstr "Läser"
 
 #: cps/spa_strings.py
 msgid "Reading progress"
-msgstr ""
+msgstr "Läsförlopp"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Red"
-msgstr ""
+msgstr "Röd"
 
 #: cps/spa_strings.py
 msgid "Registration failed."
-msgstr ""
+msgstr "Registreringen misslyckades."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove {name}"
-msgstr ""
+msgstr "Ta bort {name}"
 
 #: cps/spa_strings.py
 msgid "Request failed."
-msgstr ""
+msgstr "Begäran misslyckades."
 
 #: cps/spa_strings.py
 msgid "Reset"
-msgstr ""
+msgstr "Återställ"
 
 #: cps/spa_strings.py
 msgid "Reset your password"
-msgstr ""
+msgstr "Återställ ditt lösenord"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Revoke {label}"
-msgstr ""
+msgstr "Återkalla {label}"
 
 #: cps/spa_strings.py
 msgid "Save changes"
-msgstr ""
+msgstr "Spara ändringar"
 
 #: cps/spa_strings.py
 msgid "Save failed."
-msgstr ""
+msgstr "Det gick inte att spara."
 
 #: cps/spa_strings.py
 msgid "Save profile"
-msgstr ""
+msgstr "Spara profil"
 
 #: cps/spa_strings.py
 msgid "Saved."
-msgstr ""
+msgstr "Sparat."
 
 #: cps/spa_strings.py cps/templates/shelf_order.html
 msgid "Saving…"
-msgstr ""
+msgstr "Sparar…"
 
 #: cps/spa_strings.py
 msgid "Search failed."
-msgstr ""
+msgstr "Sökningen misslyckades."
 
 #: cps/spa_strings.py
 msgid "Search for metadata"

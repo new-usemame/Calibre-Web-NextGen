@@ -878,25 +878,25 @@ msgstr "Återställning pågår redan."
 
 #: cps/admin.py
 msgid "Restore failed: Calibre library path is not configured."
-msgstr ""
+msgstr "Återställningen misslyckades: Sökvägen till Calibre-biblioteket är inte konfigurerad."
 
 #: cps/admin.py
 #, python-format
 msgid "Restore failed: metadata.db not found at %(path)s"
-msgstr ""
+msgstr "Återställningen misslyckades: metadata.db hittades inte på %(path)s"
 
 #: cps/admin.py
 #, python-format
 msgid "Restore failed: app.db not found at %(path)s"
-msgstr ""
+msgstr "Återställningen misslyckades: app.db hittades inte på %(path)s"
 
 #: cps/admin.py
 msgid "An ingest run is in progress; try again when it finishes."
-msgstr ""
+msgstr "En inläsning pågår; försök igen när den är klar."
 
 #: cps/admin.py
 msgid "Cover enforcement is in progress; try again when it finishes."
-msgstr ""
+msgstr "Omslagskontroll pågår; försök igen när den är klar."
 
 #: cps/admin.py
 #, python-format
@@ -905,18 +905,19 @@ msgstr "Återställningen misslyckades: %(err)s"
 
 #: cps/admin.py
 msgid "Restore completed but app.db cleanup failed. See logs for details."
-msgstr ""
+msgstr "Återställningen slutfördes men rensningen av app.db misslyckades. Se loggarna för detaljer."
 
 #: cps/admin.py
 #, python-format
 msgid ""
 "Restore complete. Backups and restore log saved to %(dir)s. All book-linked "
 "data was reset."
-msgstr ""
+msgstr "Återställningen är klar. Säkerhetskopior och återställningslogg sparades i "
+"%(dir)s. Alla bokkopplade data har återställts."
 
 #: cps/annotations.py cps/templates/annotations_import.html
 msgid "Import Kobo annotations"
-msgstr ""
+msgstr "Importera Kobo-anteckningar"
 
 #: cps/annotations.py
 msgid "No file uploaded."
@@ -924,37 +925,37 @@ msgstr "Ingen fil har laddats upp."
 
 #: cps/annotations.py
 msgid "Uploaded file is not a SQLite database."
-msgstr ""
+msgstr "Den uppladdade filen är inte en SQLite-databas."
 
 #: cps/annotations.py
 msgid "Uploaded database has no readable Kobo Bookmark table."
-msgstr ""
+msgstr "Den uppladdade databasen saknar en läsbar Kobo Bookmark-tabell."
 
 #: cps/annotations.py
 #, python-format
 msgid "File exceeds %(max)d MB."
-msgstr ""
+msgstr "Filen överskrider %(max)d MB."
 
 #: cps/annotations.py cps/templates/annotations_view.html
 #, python-format
 msgid "Annotations: %(title)s"
-msgstr ""
+msgstr "Anteckningar: %(title)s"
 
 #: cps/constants.py
 msgid "Czech"
-msgstr ""
+msgstr "Tjeckiska"
 
 #: cps/constants.py
 msgid "German"
-msgstr ""
+msgstr "Tyska"
 
 #: cps/constants.py
 msgid "Greek"
-msgstr ""
+msgstr "Grekiska"
 
 #: cps/constants.py
 msgid "Spanish"
-msgstr ""
+msgstr "Spanska"
 
 #: cps/constants.py
 msgid "Finnish"
@@ -962,43 +963,43 @@ msgstr "Finska"
 
 #: cps/constants.py
 msgid "French"
-msgstr ""
+msgstr "Franska"
 
 #: cps/constants.py
 msgid "Galician"
-msgstr ""
+msgstr "Galiciska"
 
 #: cps/constants.py
 msgid "Hungarian"
-msgstr ""
+msgstr "Ungerska"
 
 #: cps/constants.py
 msgid "Indonesian"
-msgstr ""
+msgstr "Indonesiska"
 
 #: cps/constants.py
 msgid "Italian"
-msgstr ""
+msgstr "Italienska"
 
 #: cps/constants.py
 msgid "Japanese"
-msgstr ""
+msgstr "Japanska"
 
 #: cps/constants.py
 msgid "Khmer"
-msgstr ""
+msgstr "Khmer"
 
 #: cps/constants.py
 msgid "Korean"
-msgstr ""
+msgstr "Koreanska"
 
 #: cps/constants.py
 msgid "Dutch"
-msgstr ""
+msgstr "Nederländska"
 
 #: cps/constants.py
 msgid "Norwegian"
-msgstr ""
+msgstr "Norska"
 
 #: cps/constants.py
 msgid "Polish"
@@ -1006,47 +1007,47 @@ msgstr "Polska"
 
 #: cps/constants.py
 msgid "Portuguese"
-msgstr ""
+msgstr "Portugisiska"
 
 #: cps/constants.py
 msgid "Portuguese (Brazil)"
-msgstr ""
+msgstr "Portugisiska (Brasilien)"
 
 #: cps/constants.py
 msgid "Russian"
-msgstr ""
+msgstr "Ryska"
 
 #: cps/constants.py
 msgid "Slovak"
-msgstr ""
+msgstr "Slovakiska"
 
 #: cps/constants.py
 msgid "Slovenian"
-msgstr ""
+msgstr "Slovenska"
 
 #: cps/constants.py
 msgid "Swedish"
-msgstr ""
+msgstr "Svenska"
 
 #: cps/constants.py
 msgid "Turkish"
-msgstr ""
+msgstr "Turkiska"
 
 #: cps/constants.py
 msgid "Ukrainian"
-msgstr ""
+msgstr "Ukrainska"
 
 #: cps/constants.py
 msgid "Vietnamese"
-msgstr ""
+msgstr "Vietnamesiska"
 
 #: cps/constants.py
 msgid "Chinese (Simplified, China)"
-msgstr ""
+msgstr "Kinesiska (förenklad, Kina)"
 
 #: cps/constants.py
 msgid "Chinese (Traditional, Taiwan)"
-msgstr ""
+msgstr "Kinesiska (traditionell, Taiwan)"
 
 #: cps/converter.py
 msgid "not installed"

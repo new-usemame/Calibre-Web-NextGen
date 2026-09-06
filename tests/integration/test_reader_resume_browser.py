@@ -49,6 +49,17 @@ def test_koreader_http_to_real_spa_epub_resume(store, monkeypatch, tmp_path, epu
     kosync = sys.modules['cps.progress_syncing.protocols.kosync']
     from cps.services import device_registry
     engine, session = store
+    if carrier == 'kobo':
+        from cps.services import kobo_resume
+        resolve = kobo_resume._resolve
+
+        def slow_resolve(*args):
+            # Every cold conversion deliberately misses the request budget.
+            # The browser must receive the completed result on a later read.
+            time.sleep(kobo_resume.RESUME_TIMEOUT_SECONDS + .1)
+            return resolve(*args)
+
+        monkeypatch.setattr(kobo_resume, '_resolve', slow_resolve)
     root = Path(__file__).resolve().parents[2]
     user = SimpleNamespace(id=7, is_authenticated=True, is_anonymous=False, view_settings={})
     monkeypatch.setattr(reader, 'current_user', user)

@@ -218,6 +218,13 @@ def test_exact_kobo_resume_preserves_offer_and_percentage_fallback(store, tmp_pa
     session.execute(text("UPDATE kobo_bookmark SET location_value='kobo.1.2'"))
     session.commit()
     archive.unlink()
+    # Completed conversions remain usable until expiry; the reader checks the
+    # fingerprint against downloaded bytes. After expiry, missing files fall back.
+    assert read(engine) == offered
+    from cps.services import kobo_resume
+    clock = time.monotonic
+    monkeypatch.setattr(kobo_resume, 'time', SimpleNamespace(
+        monotonic=lambda: clock() + kobo_resume._CACHE_TTL_SECONDS + 1))
     assert read(engine) == fallback
     assert reading_position.read_resume_position(engine, 7, 42, 'pdf') == {'bookmark': None, 'resume': None}
     session.expire_all()
@@ -255,3 +262,118 @@ def test_stalled_conversion_keeps_percentage_response_and_bounded_worker_admissi
         while len(finished) < len(calls) and time.monotonic() < deadline:
             cooperative_sleep(.001)
     assert len(finished) == 2
+
+
+def test_completed_conversion_survives_request_deadline(store, monkeypatch):
+    """A completed late conversion must supply the next read without parsing again."""
+    from cps.services import kobo_resume
+    engine, session = store
+    seed(session)
+    fallback = read(engine)
+    session.execute(text("UPDATE kobo_bookmark SET location_source='late.xhtml', "
+                         "location_type='KoboSpan', location_value='kobo.1.2'"))
+    session.commit()
+    exact = {'cfi': 'epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)', 'epub_sha256': 'a' * 64}
+    release = threading.Event()
+    threads = []
+    calls = []
+    real_thread = threading.Thread
+
+    def tracked_thread(*args, **kwargs):
+        thread = real_thread(*args, **kwargs)
+        threads.append(thread)
+        return thread
+
+    def slow_resolve(*args):
+        calls.append(args)
+        assert release.wait(5), 'test did not release conversion'
+        return exact.copy()
+
+    monkeypatch.setattr(kobo_resume.threading, 'Thread', tracked_thread)
+    monkeypatch.setattr(kobo_resume, '_resolve', slow_resolve)
+    try:
+        assert read(engine) == fallback
+        assert threads[0].is_alive(), 'first read must expire before conversion completes'
+        release.set()
+        threads[0].join(2)
+        assert not threads[0].is_alive()
+        release.clear()  # A fresh parse would miss the budget again, as on slow storage.
+        resumed = read(engine)
+        assert resumed['resume'] == {**fallback['resume'], **exact}
+        assert len(calls) == 1
+    finally:
+        release.set()
+        for thread in threads:
+            thread.join(2)
+
+
+def test_conversion_cache_expires_evicts_and_scopes_positions(monkeypatch):
+    """Hot entries expire, older completions are evicted, and locations/libraries differ."""
+    from collections import OrderedDict
+    from cps import config
+    from cps.services import kobo_resume
+    now = [100.0]
+    calls = []
+    monkeypatch.setattr(kobo_resume, '_CACHE', OrderedDict())
+    monkeypatch.setattr(kobo_resume, '_CACHE_MAX_ENTRIES', 2)
+    monkeypatch.setattr(kobo_resume, 'time', SimpleNamespace(monotonic=lambda: now[0]))
+    monkeypatch.setattr(kobo_resume.threading, 'Thread',
+                        lambda *, target, **kw: SimpleNamespace(start=target))
+
+    def resolve(*args):
+        calls.append(args)
+        return {'cfi': str(args), 'epub_sha256': str(len(calls))}
+
+    monkeypatch.setattr(kobo_resume, '_resolve', resolve)
+    def read_span(book=42, source='chapter.xhtml', value='kobo.1.2'):
+        return kobo_resume.exact_resume(book, source, 'KoboSpan', value)
+
+    first = read_span()
+    first['cfi'] = 'caller mutation'
+    now[0] += kobo_resume._CACHE_TTL_SECONDS - 1
+    assert read_span()['epub_sha256'] == '1'
+    assert read_span()['cfi'] != first['cfi']
+    now[0] += 2
+    assert read_span()['epub_sha256'] == '2'  # Access did not extend expiry.
+    assert read_span(value='kobo.1.3')['epub_sha256'] == '3'
+    assert read_span(source='other.xhtml')['epub_sha256'] == '4'
+    assert read_span()['epub_sha256'] == '5'  # Two-entry capacity evicted it.
+    assert read_span(book=43)['epub_sha256'] == '6'
+    monkeypatch.setattr(config, 'config_calibre_dir', '/different-library', raising=False)
+    assert read_span(book=43)['epub_sha256'] == '7'
+    assert read_span(book=43)['epub_sha256'] == '7'
+
+
+@pytest.mark.parametrize('failure', [None, {}, RuntimeError('unavailable')])
+def test_failed_conversion_is_retried(monkeypatch, failure):
+    from collections import OrderedDict
+    from cps.services import kobo_resume
+    monkeypatch.setattr(kobo_resume, '_CACHE', OrderedDict())
+    monkeypatch.setattr(kobo_resume.threading, 'Thread',
+                        lambda *, target, **kw: SimpleNamespace(start=target))
+    exact = {'cfi': 'exact', 'epub_sha256': 'fingerprint'}
+    outcomes = [failure, exact]
+
+    def resolve(*args):
+        outcome = outcomes.pop(0)
+        if isinstance(outcome, Exception):
+            raise outcome
+        return outcome
+
+    monkeypatch.setattr(kobo_resume, '_resolve', resolve)
+    assert not kobo_resume.exact_resume(42, 'chapter', 'KoboSpan', 'kobo.1.2')
+    assert kobo_resume.exact_resume(42, 'chapter', 'KoboSpan', 'kobo.1.2') == exact
+    assert not outcomes
+
+
+@pytest.mark.parametrize('raw, expected', [
+    (None, .05), ('0.2', .2), ('0', .05), ('-1', .05),
+    ('nan', .05), ('inf', .05), ('invalid', .05),
+])
+def test_resume_budget_configuration(monkeypatch, raw, expected):
+    from cps.services import kobo_resume
+    if raw is None:
+        monkeypatch.delenv('CWA_KOBO_RESUME_TIMEOUT_SECONDS', raising=False)
+    else:
+        monkeypatch.setenv('CWA_KOBO_RESUME_TIMEOUT_SECONDS', raw)
+    assert kobo_resume._resume_timeout() == expected

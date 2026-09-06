@@ -1,9 +1,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Optional Kobo resume conversion: bounded admission, off-hub I/O, no writes."""
 import logging
+import math
+import os
 import sqlite3
 import threading
 import time
+from collections import OrderedDict
 from pathlib import Path
 
 from .parallel import cooperative_sleep
@@ -12,21 +15,69 @@ log = logging.getLogger(__name__)
 # A stalled filesystem can occupy at most two daemon workers. There is no queue,
 # and a timed-out worker retains its permit until it actually finishes.
 _SLOTS = threading.BoundedSemaphore(2)
-RESUME_TIMEOUT_SECONDS = 0.05
+
+
+def _resume_timeout():
+    try:
+        value = float(os.environ.get('CWA_KOBO_RESUME_TIMEOUT_SECONDS', '0.05'))
+        if math.isfinite(value) and value > 0:
+            return value
+    except ValueError:
+        pass
+    log.warning('Invalid CWA_KOBO_RESUME_TIMEOUT_SECONDS; using 0.05 seconds')
+    return 0.05
+
+
+RESUME_TIMEOUT_SECONDS = _resume_timeout()
+_CACHE_MAX_ENTRIES = 256
+_CACHE_TTL_SECONDS = 300
+_CACHE = OrderedDict()
+_CACHE_LOCK = threading.Lock()
 
 
 def exact_resume(book_id, source, kind, value):
+    deadline = time.monotonic() + RESUME_TIMEOUT_SECONDS
     if kind != 'KoboSpan' or not source or not value:
+        return None
+    from .. import config
+    # Only in-memory settings here: no stat, path resolution, or DB lookup on
+    # the hub. Scope by library/storage configuration as well as the full span.
+    key = (getattr(config, 'config_calibre_dir', None),
+           getattr(config, 'config_calibre_split', False),
+           getattr(config, 'config_calibre_split_dir', None),
+           getattr(config, 'config_use_google_drive', False),
+           book_id, source, kind, value)
+    if not _CACHE_LOCK.acquire(blocking=False):
+        return None
+    try:
+        cached = _CACHE.get(key)
+        if cached:
+            expires, exact = cached
+            if time.monotonic() < expires:
+                return exact.copy()
+            del _CACHE[key]
+    finally:
+        _CACHE_LOCK.release()
+    if time.monotonic() >= deadline:
         return None
     if not _SLOTS.acquire(blocking=False):
         return None
     done = threading.Event()
     result = []
-    deadline = time.monotonic() + RESUME_TIMEOUT_SECONDS
 
     def worker():
         try:
-            result.append(_resolve(book_id, source, kind, value))
+            exact = _resolve(book_id, source, kind, value)
+            if exact and exact.get('cfi') and exact.get('epub_sha256'):
+                # Publish even after the requesting greenlet has timed out.
+                # Never hold this lock across I/O. Expiry is from completion,
+                # not last access; hot entries cannot live indefinitely.
+                with _CACHE_LOCK:
+                    _CACHE[key] = (time.monotonic() + _CACHE_TTL_SECONDS, exact.copy())
+                    _CACHE.move_to_end(key)
+                    while len(_CACHE) > _CACHE_MAX_ENTRIES:
+                        _CACHE.popitem(last=False)
+            result.append(exact)
         except Exception:
             log.debug('Could not resolve exact reader resume for book %s', book_id, exc_info=True)
         finally:

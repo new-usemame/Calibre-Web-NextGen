@@ -141,3 +141,58 @@ def test_unsafe_ancestor_assertion_falls_back(epub, ancestor_id):
         for name, raw in contents.items():
             archive.writestr(name, raw)
     assert kobo_position.compute_cfi_point(epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2') is None
+
+
+@pytest.mark.parametrize('encoded_length', [50000, 500])
+def test_repeated_spine_references_bound_path_decoding(epub, monkeypatch, encoded_length):
+    """A tiny EPUB must not multiply href decoding work by its 40,000 itemrefs."""
+    from urllib import parse
+    href = '%41' * encoded_length
+    source = 'OEBPS/chapter.xhtml'
+    with zipfile.ZipFile(epub, 'w', zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr('META-INF/container.xml', CONTAINER_XML)
+        archive.writestr('OEBPS/content.opf', OPF_TEMPLATE.format(
+            book_uuid='fixture-book',
+            manifest_items=f'<item id="chapter" href="{href}" media-type="application/xhtml+xml"/>',
+            spine_items='<itemref idref="chapter"/>' * 40000))
+    assert epub.stat().st_size < 4000
+    decoded_bytes = 0
+    budget = len(source) + len(href)
+    unquote = parse.unquote
+
+    def measured_unquote(value, *args, **kwargs):
+        nonlocal decoded_bytes
+        decoded_bytes += len(value.encode('utf-8'))
+        # Stop a broken implementation promptly; assert outside its fallback
+        # exception handler so swallowing this exception cannot pass the test.
+        if decoded_bytes > budget:
+            raise ValueError('path decode work exceeded one source plus one href')
+        return unquote(value, *args, **kwargs)
+
+    monkeypatch.setattr(parse, 'unquote', measured_unquote)
+    point = kobo_position.compute_cfi_point(epub, source, 'KoboSpan', 'kobo.1.2')
+    print(f'href bytes={len(href)}, decoded bytes={decoded_bytes}, budget={budget}, point={point}')
+    assert decoded_bytes <= budget
+    assert point is None
+
+
+@pytest.mark.parametrize('alias', [
+    'OEBPS/./chapter.xhtml',
+    'OEBPS/extra/../chapter.xhtml',
+    'OEBPS//chapter.xhtml',
+    'OEBPS/chapter.xhtml',
+])
+def test_ambiguous_zip_paths_never_supply_exact_resume(epub, alias):
+    """JSZip may replace the chapter with a later normalized alias despite a matching hash."""
+    chapter = _kobo_chapter_html([('kobo.1.2', 'WRONG CHAPTER TEXT.')])
+    chapter = chapter.replace('<body>', '<body><p>Leading paragraph.</p>')
+    with zipfile.ZipFile(epub, 'a', zipfile.ZIP_DEFLATED) as archive:
+        if alias == 'OEBPS/chapter.xhtml':
+            with pytest.warns(UserWarning, match='Duplicate name'):
+                archive.writestr(alias, chapter)
+        else:
+            archive.writestr(alias, chapter)
+    snapshot = kobo_position._resume_snapshot(
+        epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
+    print(f'alias={alias}, snapshot={snapshot}')
+    assert snapshot is None

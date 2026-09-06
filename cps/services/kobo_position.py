@@ -205,6 +205,7 @@ MAX_RESUME_ARCHIVE_BYTES = 16 * 1024 * 1024
 MAX_RESUME_XML_BYTES = 2 * 1024 * 1024
 MAX_RESUME_DIRECTORY_BYTES = 256 * 1024
 MAX_RESUME_DIRECTORY_ENTRIES = 2048
+MAX_RESUME_HREF_CHARS = 2048
 # Conservative subset that epub.js can consume without assertion escaping.
 # Valid XHTML ids outside this set deliberately retain percentage resume.
 _RESUME_ASSERTION_ID = re.compile(r"[A-Za-z0-9_.-]+")
@@ -326,6 +327,20 @@ def _resume_snapshot(epub_path, source, location_type, value):
             return None
         directory_start = _resume_directory_start(raw)
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            # JSZip resolves dot components before indexing members. Refuse
+            # aliases across the entire directory before selecting any XML;
+            # a matching archive hash cannot prove both readers chose the same
+            # chapter. Permit the trailing slash of canonical directory entries.
+            names = set()
+            for info in archive.infolist():
+                name = info.filename.removesuffix("/")
+                if (not name or name.startswith("/") or "\\" in name
+                        or info.filename != info.orig_filename
+                        or any(part in ("", ".", "..") for part in name.split("/"))
+                        or name in names):
+                    return None
+                names.add(name)
+
             def xml(name):
                 info = archive.getinfo(name)
                 offsets = [item.header_offset for item in archive.infolist()]
@@ -348,16 +363,33 @@ def _resume_snapshot(epub_path, source, location_type, value):
             # The shared highlight walk uses /6; packages with a differently
             # placed spine need their actual element step instead.
             spine_step = _cfi_element_step(spine)
-            manifest = {item.get("id"): item.get("href")
-                        for item in package.findall("opf:manifest/opf:item", _OPF_NS)}
+            # Decode, normalize AND compare once per distinct href. Caching
+            # just the decoded string would still repeat long comparisons for
+            # every itemref in a highly compressed, repetitive spine.
+            decoded_source = unquote(source)
+            opf_dir = posixpath.dirname(opf_path)
+            href_matches = {}
+            manifest = {}
+            for item in package.findall("opf:manifest/opf:item", _OPF_NS):
+                href = item.get("href")
+                if href and len(href) > MAX_RESUME_HREF_CHARS:
+                    return None
+                if href not in href_matches:
+                    member = None
+                    if href and "#" not in href:
+                        decoded_href = unquote(href)
+                        candidate = posixpath.normpath(posixpath.join(opf_dir, decoded_href))
+                        if decoded_source in (candidate, decoded_href):
+                            member = candidate
+                    href_matches[href] = member
+                manifest[item.get("id")] = href_matches[href]
             matches = []
             for index, ref in enumerate(spine.findall("opf:itemref", _OPF_NS)):
-                href = manifest.get(ref.get("idref"))
-                if not href or "#" in href:
-                    continue
-                member = posixpath.normpath(posixpath.join(posixpath.dirname(opf_path), unquote(href)))
-                if unquote(source) in (member, unquote(href)):
+                member = manifest.get(ref.get("idref"))
+                if member is not None:
                     matches.append((index, member))
+                    if len(matches) > 1:
+                        return None
             if len(matches) != 1:
                 return None
             index, member = matches[0]

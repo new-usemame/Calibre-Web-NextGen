@@ -2596,51 +2596,52 @@ msgstr "Bok {id}: {message}"
 msgid ""
 "Failed: {failures}. The failed books remain selected; choose the action "
 "again to retry."
-msgstr ""
+msgstr "Misslyckades: {failures}. De misslyckade böckerna förblir markerade; välj "
+"åtgärden igen för att försöka på nytt."
 
 #: cps/spa_strings.py
 msgid "Could not delete this format."
-msgstr ""
+msgstr "Det gick inte att ta bort det här formatet."
 
 #: cps/spa_strings.py
 msgid "Format deleted."
-msgstr ""
+msgstr "Formatet har tagits bort."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Read now"
-msgstr ""
+msgstr "Läs nu"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Open details for {title}"
-msgstr ""
+msgstr "Öppna detaljer för {title}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Read {title}"
-msgstr ""
+msgstr "Läs {title}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {title}"
-msgstr ""
+msgstr "Fler åtgärder för {title}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Actions for {title}"
-msgstr ""
+msgstr "Åtgärder för {title}"
 
 #: cps/spa_strings.py
 msgid "Standard (username / password)"
-msgstr ""
+msgstr "Standard (användarnamn/lösenord)"
 
 #: cps/spa_strings.py
 msgid "LDAP"
-msgstr ""
+msgstr "LDAP"
 
 #: cps/spa_strings.py
 msgid "OAuth / OpenID Connect"
-msgstr ""
+msgstr "OAuth / OpenID Connect"
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 msgid "Anonymous"
@@ -2652,7 +2653,7 @@ msgstr "Oautentiserad"
 
 #: cps/spa_strings.py
 msgid "Simple (service account)"
-msgstr ""
+msgstr "Enkel (tjänstkonto)"
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 msgid "TLS"
@@ -2664,82 +2665,82 @@ msgstr "SSL"
 
 #: cps/spa_strings.py
 msgid "Series order"
-msgstr ""
+msgstr "Serieordning"
 
 #: cps/spa_strings.py
 msgid "Series order (reverse)"
-msgstr ""
+msgstr "Serieordning (omvänd)"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Add tag"
-msgstr ""
+msgstr "Lägg till tagg"
 
 #: cps/spa_strings.py
 msgid "New tag"
-msgstr ""
+msgstr "Ny tagg"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove tag"
-msgstr ""
+msgstr "Ta bort tagg"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove tag {name}"
-msgstr ""
+msgstr "Ta bort taggen {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Rename tag {name}"
-msgstr ""
+msgstr "Byt namn på taggen {name}"
 
 #: cps/spa_strings.py
 msgid "Tag name"
-msgstr ""
+msgstr "Taggnamn"
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "Tag name cannot be empty"
-msgstr ""
+msgstr "Taggnamnet får inte vara tomt"
 
 #: cps/spa_strings.py
 msgid "Save tag name"
-msgstr ""
+msgstr "Spara taggnamn"
 
 #: cps/spa_strings.py
 msgid "Select format"
-msgstr ""
+msgstr "Välj format"
 
 #: cps/spa_strings.py
 msgid "Could not rename tag"
-msgstr ""
+msgstr "Det gick inte att byta namn på taggen"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Tag renamed to {name}"
-msgstr ""
+msgstr "Taggen har bytt namn till {name}"
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "You must be signed in"
-msgstr ""
+msgstr "Du måste vara inloggad"
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "You are not allowed to edit metadata"
-msgstr ""
+msgstr "Du har inte behörighet att redigera metadata"
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "A tag with that name already exists"
-msgstr ""
+msgstr "Det finns redan en tagg med det namnet"
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "Tag name must be text"
-msgstr ""
+msgstr "Taggnamnet måste vara text"
 
 #: cps/api/browse.py cps/spa_strings.py
 msgid "Tag name cannot contain commas"
-msgstr ""
+msgstr "Taggnamnet får inte innehålla kommatecken"
 
 #: cps/spa_strings.py
 msgid "Enter a valid tag name"
-msgstr ""
+msgstr "Ange ett giltigt taggnamn"
 
 #: cps/spa_strings.py
 msgid "Could not load this page"

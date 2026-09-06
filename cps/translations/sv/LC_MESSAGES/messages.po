@@ -7946,53 +7946,55 @@ msgstr "{name} använder nu Mitt bibliotek."
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{name} removed."
-msgstr ""
+msgstr "{name} har tagits bort."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{name} sees the global library again."
-msgstr ""
+msgstr "{name} ser det globala biblioteket igen."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{name}, {n} highlights and notes"
-msgstr ""
+msgstr "{name}, {n} markeringar och anteckningar"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} assigned to {name}."
-msgstr ""
+msgstr "{n} har tilldelats {name}."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} books in latest inventory"
-msgstr ""
+msgstr "{n} böcker i den senaste inventeringen"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} devices · {m} active"
-msgstr ""
+msgstr "{n} enheter · {m} aktiva"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} failed."
-msgstr ""
+msgstr "{n} misslyckades."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} found"
-msgstr ""
+msgstr "{n} hittades"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} highlights and notes"
-msgstr ""
+msgstr "{n} markeringar och anteckningar"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
 "{n} highlights and notes assigned to this device will become Unknown device."
 msgstr ""
+"{n} markeringar och anteckningar som tilldelats den här enheten får Okänd "
+"enhet."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8000,46 +8002,48 @@ msgid ""
 "{n} highlights and notes were made on this device. They are not deleted. "
 "Their origin history is kept."
 msgstr ""
+"{n} markeringar och anteckningar gjordes på den här enheten. De tas inte bort. "
+"Ursprungshistoriken behålls."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{ok} of {total} assigned to {name}."
-msgstr ""
+msgstr "{ok} av {total} har tilldelats {name}."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{ok} of {total} sources answered"
-msgstr ""
+msgstr "{ok} av {total} källor svarade"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{percent}% read"
-msgstr ""
+msgstr "{percent} % läst"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{seeded} of {total} books seeded"
-msgstr ""
+msgstr "{seeded} av {total} böcker har fyllts på"
 
 #: cps/spa_strings.py
 msgid "…or paste an image URL"
-msgstr ""
+msgstr "…eller klistra in en bildwebbadress"
 
 #: cps/spa_strings.py
 msgid "← Back"
-msgstr ""
+msgstr "← Tillbaka"
 
 #: cps/spa_strings.py
 msgid "← Back to book"
-msgstr ""
+msgstr "← Tillbaka till boken"
 
 #: cps/spa_strings.py
 msgid "← Back to sign in"
-msgstr ""
+msgstr "← Tillbaka till inloggning"
 
 #: cps/spa_strings.py
 msgid "← Library"
-msgstr ""
+msgstr "← Bibliotek"
 
 #: cps/tasks_status.py
 msgid "Waiting"
@@ -8059,11 +8063,11 @@ msgstr "Klar"
 
 #: cps/tasks_status.py
 msgid "Ended"
-msgstr ""
+msgstr "Avslutad"
 
 #: cps/tasks_status.py
 msgid "Cancelled"
-msgstr ""
+msgstr "Avbruten"
 
 #: cps/tasks_status.py
 msgid "Unknown Status"
@@ -8138,7 +8142,7 @@ msgstr "Serier: %(serie)s"
 
 #: cps/web.py
 msgid "Rating: None"
-msgstr ""
+msgstr "Betyg: Inget"
 
 #: cps/web.py
 #, python-format
@@ -8175,20 +8179,20 @@ msgstr "Fel när den smarta hyllan lästes in"
 #: cps/web.py
 #, python-format
 msgid "Magic Shelf&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
-msgstr ""
+msgstr "Magisk hylla&nbsp&nbsp&nbsp—&nbsp&nbsp&nbsp%(icon)s %(name)s"
 
 #: cps/web.py
 msgid "You don't have permission to browse the global library."
-msgstr ""
+msgstr "Du har inte behörighet att bläddra i det globala biblioteket."
 
 #: cps/web.py
 #, python-format
 msgid "Global Library (%(count)s)"
-msgstr ""
+msgstr "Globalt bibliotek (%(count)s)"
 
 #: cps/web.py
 msgid "No rules provided"
-msgstr ""
+msgstr "Inga regler angavs"
 
 #: cps/web.py
 msgid "Invalid rules format"
@@ -8196,7 +8200,7 @@ msgstr "Ogiltigt regel-format"
 
 #: cps/web.py
 msgid "Error processing rules"
-msgstr ""
+msgstr "Fel vid bearbetning av regler"
 
 #: cps/web.py
 msgid "Invalid request"
@@ -8204,17 +8208,20 @@ msgstr "Ogiltig begäran"
 
 #: cps/web.py
 msgid "Name and rules are required"
-msgstr ""
+msgstr "Namn och regler krävs"
 
 #: cps/web.py
 msgid "Shelf name too long (max 100 characters)"
-msgstr ""
+msgstr "Hyllnamnet är för långt (högst 100 tecken)"
 
 #: cps/api/magicshelves.py cps/web.py
 msgid ""
 "Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
 "your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
 msgstr ""
+"Kobo-synkronisering för Magiska hyllor är inaktiverad globalt — den här hyllan "
+"når inte din Kobo förrän ”Synkronisera Magiska hyllor till Kobo” har "
+"aktiverats i CWA-inställningarna."
 
 #: cps/web.py
 msgid "Error creating shelf"
@@ -8226,7 +8233,7 @@ msgstr "Skapa smart hylla"
 
 #: cps/web.py
 msgid "Permission denied to change public status"
-msgstr ""
+msgstr "Behörighet saknas för att ändra offentlig status"
 
 #: cps/web.py
 msgid "Shelf name is required"
@@ -8246,7 +8253,7 @@ msgstr "Hyllan hittades inte"
 
 #: cps/web.py
 msgid "Permission denied"
-msgstr ""
+msgstr "Behörighet nekad"
 
 #: cps/web.py
 msgid "Shelf duplicated successfully"
@@ -8261,6 +8268,8 @@ msgid ""
 "System shelves cannot be deleted. You can hide them in your user profile "
 "settings."
 msgstr ""
+"Systemhyllor kan inte tas bort. Du kan dölja dem i inställningarna för din "
+"användarprofil."
 
 #: cps/web.py
 msgid "Error deleting shelf"
@@ -8270,10 +8279,11 @@ msgstr "Fel när hyllan togs bort"
 msgid ""
 "You cannot hide your own shelves. Delete them instead if you don't want them."
 msgstr ""
+"Du kan inte dölja dina egna hyllor. Ta bort dem i stället om du inte vill ha dem."
 
 #: cps/web.py
 msgid "Shelf already hidden"
-msgstr ""
+msgstr "Hyllan är redan dold"
 
 #: cps/web.py
 msgid "Error hiding shelf"
@@ -8281,7 +8291,7 @@ msgstr "Fel när hyllan doldes"
 
 #: cps/web.py
 msgid "Shelf was not hidden"
-msgstr ""
+msgstr "Hyllan doldes inte"
 
 #: cps/web.py
 msgid "Error unhiding shelf"
@@ -8315,11 +8325,11 @@ msgstr "Det gick inte att skicka den här boken: %(res)s"
 
 #: cps/web.py
 msgid "No email addresses selected"
-msgstr ""
+msgstr "Inga e-postadresser valda"
 
 #: cps/web.py
 msgid "Additional email addresses are disabled for your account."
-msgstr ""
+msgstr "Ytterligare e-postadresser är inaktiverade för ditt konto."
 
 #: cps/web.py
 msgid "Success! Book queued for sending to the selected address(es)!"
@@ -8327,7 +8337,7 @@ msgstr "Boken har lagts i kö för att skickas till de valda adresserna."
 
 #: cps/web.py
 msgid "Please wait one minute to register next user"
-msgstr ""
+msgstr "Vänta en minut innan nästa användare registreras"
 
 #: cps/templates/layout.html cps/templates/login.html
 #: cps/templates/register.html cps/web.py
@@ -8370,15 +8380,15 @@ msgstr "Det går inte att aktivera LDAP-autentisering"
 
 #: cps/web.py
 msgid "Standard login is disabled."
-msgstr ""
+msgstr "Vanlig inloggning är inaktiverad."
 
 #: cps/web.py
 msgid "Please wait one minute before next login"
-msgstr ""
+msgstr "Vänta en minut före nästa inloggning"
 
 #: cps/web.py
 msgid "Username cannot be empty"
-msgstr ""
+msgstr "Användarnamnet får inte vara tomt"
 
 #: cps/web.py
 #, python-format
@@ -8405,6 +8415,8 @@ msgid ""
 "Authentication successful, but no local account found. Please contact your "
 "administrator to create your account."
 msgstr ""
+"Autentiseringen lyckades, men inget lokalt konto hittades. Kontakta "
+"administratören för att skapa ditt konto."
 
 #: cps/web.py
 #, python-format
@@ -8412,6 +8424,8 @@ msgid ""
 "Fallback Login as: '%(nickname)s', LDAP Server not reachable, or user not "
 "known"
 msgstr ""
+"Reservinloggning som: ”%(nickname)s”, LDAP-servern kan inte nås eller "
+"användaren är okänd"
 
 #: cps/web.py
 #, python-format
@@ -8421,7 +8435,7 @@ msgstr "Det gick inte att logga in: %(message)s"
 #: cps/web.py
 #, python-format
 msgid "Local Login as: '%(nickname)s', LDAP authentication rejected"
-msgstr ""
+msgstr "Lokal inloggning som: ”%(nickname)s”, LDAP-autentisering nekades"
 
 #: cps/web.py
 msgid "Wrong Username or Password"
@@ -8454,12 +8468,12 @@ msgstr "Hittade ett befintligt konto för den här e-postadressen"
 
 #: cps/web.py
 msgid "App-password label must be 1-64 characters."
-msgstr ""
+msgstr "Etiketten för applösenord måste innehålla 1–64 tecken."
 
 #: cps/web.py
 #, python-format
 msgid "App password '%(label)s' revoked."
-msgstr ""
+msgstr "Applösenordet ”%(label)s” har återkallats."
 
 #: cps/web.py
 msgid "Invalid book ID."
@@ -8467,11 +8481,11 @@ msgstr "Ogiltigt bok-id."
 
 #: cps/api/browse.py
 msgid "Tag could not be deleted"
-msgstr ""
+msgstr "Taggen kunde inte tas bort"
 
 #: cps/progress_syncing/protocols/kosync.py
 msgid "KOReader Sync Plugin"
-msgstr ""
+msgstr "KOReader Sync-insticksmodul"
 
 #: cps/services/gmail.py
 msgid "Found no valid gmail.json file with OAuth information"
@@ -8479,15 +8493,15 @@ msgstr "Hittade ingen giltig gmail.json-fil med OAuth-information"
 
 #: cps/tasks/annotation_sync.py
 msgid "Syncing annotations to reading services"
-msgstr ""
+msgstr "Synkroniserar anteckningar till lästjänster"
 
 #: cps/tasks/annotation_sync.py
 msgid "Annotation Sync"
-msgstr ""
+msgstr "Synkronisering av anteckningar"
 
 #: cps/tasks/auto_hardcover_id.py
 msgid "Auto-fetching Hardcover IDs"
-msgstr ""
+msgstr "Hämtar Hardcover-id automatiskt"
 
 #: cps/tasks/auto_send.py
 msgid "Preparing to send to eReader..."
@@ -8495,7 +8509,7 @@ msgstr "Förbereder för att skicka till e-boksläsare …"
 
 #: cps/tasks/auto_send.py
 msgid "Checking available formats..."
-msgstr ""
+msgstr "Kontrollerar tillgängliga format…"
 
 #: cps/tasks/auto_send.py
 msgid "Sending to eReader..."
@@ -8507,11 +8521,11 @@ msgstr "Automatisk sändning har slutförts"
 
 #: cps/tasks/auto_send.py
 msgid "Auto-Send"
-msgstr ""
+msgstr "Skicka automatiskt"
 
 #: cps/tasks/clean.py
 msgid "Delete temp folder contents"
-msgstr ""
+msgstr "Ta bort innehållet i den tillfälliga mappen"
 
 #: cps/tasks/convert.py
 #, python-format
@@ -8539,7 +8553,7 @@ msgstr "Kepubify-konverteraren misslyckades: %(error)s"
 
 #: cps/tasks/convert.py
 msgid "Kepubify produced an invalid KEPUB archive"
-msgstr ""
+msgstr "Kepubify skapade ett ogiltigt KEPUB-arkiv"
 
 #: cps/tasks/convert.py
 #, python-format
@@ -8562,7 +8576,7 @@ msgstr "Återansluter Calibre-databasen"
 
 #: cps/tasks/database.py
 msgid "Clean archived book references"
-msgstr ""
+msgstr "Rensa referenser till arkiverade böcker"
 
 #: cps/tasks/duplicate_scan.py
 msgid "Duplicate scan"
@@ -8570,20 +8584,20 @@ msgstr "Dubblettsökning"
 
 #: cps/tasks/duplicate_scan.py
 msgid "Duplicate scan skipped: import in progress"
-msgstr ""
+msgstr "Dubblettgenomsökning hoppades över: import pågår"
 
 #: cps/tasks/duplicate_scan.py
 msgid "Building duplicate index"
-msgstr ""
+msgstr "Bygger dubblettindex"
 
 #: cps/tasks/duplicate_scan.py
 #, python-format
 msgid "Building duplicate index: %(processed)s/%(total)s books"
-msgstr ""
+msgstr "Bygger dubblettindex: %(processed)s/%(total)s böcker"
 
 #: cps/tasks/duplicate_scan.py
 msgid "Building duplicate index: no books"
-msgstr ""
+msgstr "Bygger dubblettindex: inga böcker"
 
 #: cps/tasks/duplicate_scan.py
 msgid "Finding duplicate groups"
@@ -8600,21 +8614,21 @@ msgstr "Dubblettsökning väntar: manuell sökning krävs"
 #: cps/tasks/duplicate_scan.py
 #, python-format
 msgid "Duplicate scan completed: %(count)s groups"
-msgstr ""
+msgstr "Dubblettgenomsökningen är klar: %(count)s grupper"
 
 #: cps/tasks/duplicate_scan.py
 #, python-format
 msgid "Duplicate scan completed: %(count)s new groups"
-msgstr ""
+msgstr "Dubblettgenomsökningen är klar: %(count)s nya grupper"
 
 #: cps/tasks/duplicate_scan.py
 #, python-format
 msgid "Duplicate scan completed: %(count)s groups auto-resolved"
-msgstr ""
+msgstr "Dubblettgenomsökningen är klar: %(count)s grupper löstes automatiskt"
 
 #: cps/tasks/hardcover_sync.py
 msgid "Syncing shelf additions to Hardcover"
-msgstr ""
+msgstr "Synkroniserar tillägg till hyllor med Hardcover"
 
 #: cps/tasks/hardcover_sync.py
 msgid "Hardcover Sync"
@@ -8622,7 +8636,7 @@ msgstr "Hardcover-synkronisering"
 
 #: cps/tasks/kepub_backfill.py
 msgid "Convert Kobo books missing KEPUB"
-msgstr ""
+msgstr "Konvertera Kobo-böcker som saknar KEPUB"
 
 #: cps/tasks/kepub_backfill.py
 #, python-format
@@ -8630,34 +8644,36 @@ msgid ""
 "%(processed)d/%(total)d processed: %(converted)d converted, %(skipped)d "
 "skipped, %(failed)d failed"
 msgstr ""
+"%(processed)d/%(total)d bearbetade: %(converted)d konverterade, %(skipped)d "
+"hoppades över, %(failed)d misslyckades"
 
 #: cps/tasks/kepub_backfill.py
 msgid "Kepubify is not configured"
-msgstr ""
+msgstr "Kepubify är inte konfigurerat"
 
 #: cps/tasks/kepub_backfill.py
 #, python-format
 msgid "%(count)d consecutive Calibre metadata database failures"
-msgstr ""
+msgstr "%(count)d Calibre-databasfel för metadata i följd"
 
 #: cps/tasks/kepub_backfill.py
 #, python-format
 msgid "%(count)d consecutive Calibre metadata probe failures"
-msgstr ""
+msgstr "%(count)d fel vid avsökning av Calibre-metadata i följd"
 
 #: cps/tasks/kepub_backfill.py
 #, python-format
 msgid "KEPUB backfill aborted after %(reason)s; %(status)s"
-msgstr ""
+msgstr "KEPUB-påfyllning avbröts efter %(reason)s; %(status)s"
 
 #: cps/tasks/kepub_backfill.py
 #, python-format
 msgid "KEPUB backfill finished with failures; %(status)s"
-msgstr ""
+msgstr "KEPUB-påfyllning slutfördes med fel; %(status)s"
 
 #: cps/tasks/kepub_package_repair.py
 msgid "Repair existing KEPUB packages"
-msgstr ""
+msgstr "Reparera befintliga KEPUB-paket"
 
 #: cps/tasks/kepub_package_repair.py
 msgid "Google Drive KEPUB repair is not supported"

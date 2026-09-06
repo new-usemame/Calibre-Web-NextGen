@@ -11151,6 +11151,9 @@ msgid ""
 "compatible checksums in metadata.db for progress syncing. Requires the "
 "KOReader plugin on your device."
 msgstr ""
+"När detta är aktiverat exponerar NextGen ändpunkterna /kosync och lagrar "
+"KOReader-kompatibla kontrollsummor i metadata.db för synkronisering av "
+"läsframsteg. Kräver KOReader-insticksmodulen på din enhet."
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11158,20 +11161,26 @@ msgid ""
 "temporarily lock metadata.db. To stop a running backfill, restart the "
 "container after disabling."
 msgstr ""
+"Obs: När detta aktiveras startas en tjänst som fyller på kontrollsummor vid "
+"uppstart, vilket tillfälligt kan låsa metadata.db. Stoppa en pågående "
+"påfyllning genom att starta om containern efter inaktivering."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
-msgstr ""
+msgstr "Aktivera aggressivt EPUB-repareringsläge (mer riskfyllt)"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Aggressive mode applies more invasive fixes and will attempt lower-"
 "confidence encoding conversions. Safe mode is recommended for most libraries."
 msgstr ""
+"Aggressivt läge tillämpar mer ingripande reparationer och försöker med "
+"teckenkodningskonverteringar med lägre tillförlitlighet. Säkert läge "
+"rekommenderas för de flesta bibliotek."
 
 #: cps/templates/cwa_settings.html
 msgid "Move a misplaced ComicInfo.xml to the archive root on ingest"
-msgstr ""
+msgstr "Flytta en felplacerad ComicInfo.xml till arkivroten vid import"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11195,111 +11204,113 @@ msgid ""
 "Removes stale archived book references in app.db when the book no longer "
 "exists in the Calibre library. Helps keep archived counts accurate."
 msgstr ""
+"Tar bort inaktuella referenser till arkiverade böcker i app.db när boken inte "
+"längre finns i Calibre-biblioteket. Hjälper till att hålla arkivräkningen korrekt."
 
 #: cps/templates/cwa_settings.html
 msgid "Cleanup Schedule:"
-msgstr ""
+msgstr "Rensningsschema:"
 
 #: cps/templates/cwa_settings.html
 msgid "Frequent Intervals"
-msgstr ""
+msgstr "Täta intervall"
 
 #: cps/templates/cwa_settings.html
 msgid "Every 15 Minutes"
-msgstr ""
+msgstr "Var 15:e minut"
 
 #: cps/templates/cwa_settings.html
 msgid "Every 30 Minutes"
-msgstr ""
+msgstr "Var 30:e minut"
 
 #: cps/templates/cwa_settings.html
 msgid "Every Hour"
-msgstr ""
+msgstr "Varje timme"
 
 #: cps/templates/cwa_settings.html
 msgid "Every 2 Hours"
-msgstr ""
+msgstr "Varannan timme"
 
 #: cps/templates/cwa_settings.html
 msgid "Every 4 Hours"
-msgstr ""
+msgstr "Var 4:e timme"
 
 #: cps/templates/cwa_settings.html
 msgid "Every 6 Hours"
-msgstr ""
+msgstr "Var 6:e timme"
 
 #: cps/templates/cwa_settings.html
 msgid "Every 12 Hours"
-msgstr ""
+msgstr "Var 12:e timme"
 
 #: cps/templates/cwa_settings.html
 msgid "Daily/Weekly/Monthly"
-msgstr ""
+msgstr "Dagligen/veckovis/månadsvis"
 
 #: cps/templates/cwa_settings.html
 msgid "Daily at Specific Time"
-msgstr ""
+msgstr "Dagligen vid en viss tid"
 
 #: cps/templates/cwa_settings.html
 msgid "Weekly on Specific Day"
-msgstr ""
+msgstr "Veckovis på en viss dag"
 
 #: cps/templates/cwa_settings.html
 msgid "Monthly on Specific Day"
-msgstr ""
+msgstr "Månadsvis på en viss dag"
 
 #: cps/templates/cwa_settings.html
 msgid "Default: daily at 03:00"
-msgstr ""
+msgstr "Standard: dagligen kl. 03.00"
 
 #: cps/templates/cwa_settings.html
 msgid "Day of Week:"
-msgstr ""
+msgstr "Veckodag:"
 
 #: cps/templates/cwa_settings.html
 msgid "Monday"
-msgstr ""
+msgstr "Måndag"
 
 #: cps/templates/cwa_settings.html
 msgid "Tuesday"
-msgstr ""
+msgstr "Tisdag"
 
 #: cps/templates/cwa_settings.html
 msgid "Wednesday"
-msgstr ""
+msgstr "Onsdag"
 
 #: cps/templates/cwa_settings.html
 msgid "Thursday"
-msgstr ""
+msgstr "Torsdag"
 
 #: cps/templates/cwa_settings.html
 msgid "Friday"
-msgstr ""
+msgstr "Fredag"
 
 #: cps/templates/cwa_settings.html
 msgid "Saturday"
-msgstr ""
+msgstr "Lördag"
 
 #: cps/templates/cwa_settings.html
 msgid "Sunday"
-msgstr ""
+msgstr "Söndag"
 
 #: cps/templates/cwa_settings.html
 msgid "Day of Month:"
-msgstr ""
+msgstr "Dag i månaden:"
 
 #: cps/templates/cwa_settings.html
 msgid "(1-28)"
-msgstr ""
+msgstr "(1–28)"
 
 #: cps/templates/cwa_settings.html
 msgid "Time of Day:"
-msgstr ""
+msgstr "Tid på dagen:"
 
 #: cps/templates/cwa_settings.html
 #, python-format
 msgid "(Server timezone: %(tz)s)"
-msgstr ""
+msgstr "(Serverns tidszon: %(tz)s)"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Automatic Metadata Fetching for New Books"

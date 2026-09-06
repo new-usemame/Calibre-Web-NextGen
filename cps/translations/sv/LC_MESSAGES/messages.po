@@ -9535,19 +9535,19 @@ msgstr "Följande böcker tas bort:"
 
 #: cps/templates/book_table.html
 msgid "The following books will be archived:"
-msgstr ""
+msgstr "Följande böcker arkiveras:"
 
 #: cps/templates/book_table.html
 msgid "The following books will be unarchived:"
-msgstr ""
+msgstr "Följande böcker tas bort från arkivet:"
 
 #: cps/templates/book_table.html
 msgid "The following books will be marked read:"
-msgstr ""
+msgstr "Följande böcker markeras som lästa:"
 
 #: cps/templates/book_table.html
 msgid "The following books will be marked unread:"
-msgstr ""
+msgstr "Följande böcker markeras som olästa:"
 
 #: cps/templates/book_table.html cps/templates/detail.html
 msgid "Edit Metadata"
@@ -9555,13 +9555,15 @@ msgstr "Redigera metadata"
 
 #: cps/templates/book_table.html
 msgid "Edit the fields you want changed. Blank fields will be ignored:"
-msgstr ""
+msgstr "Redigera fälten du vill ändra. Tomma fält ignoreras:"
 
 #: cps/templates/book_table.html
 msgid ""
 "Multiple values are supported for Authors, Tags/Categories, Languages, and "
 "Publishers. Use comma-separated values (e.g., \"Name1, Name2\")."
 msgstr ""
+"Flera värden stöds för Författare, Taggar/kategorier, Språk och Förlag. "
+"Använd kommaseparerade värden (t.ex. \"Namn1, Namn2\")."
 
 #: cps/templates/book_table.html
 msgid "Select a Shelf"
@@ -9569,11 +9571,11 @@ msgstr "Välj en hylla"
 
 #: cps/templates/book_table.html
 msgid "Please select a shelf to add the selected books to:"
-msgstr ""
+msgstr "Välj en hylla som de markerade böckerna ska läggas till på:"
 
 #: cps/templates/book_table.html
 msgid "-- Select a Shelf --"
-msgstr ""
+msgstr "-- Välj en hylla --"
 
 #: cps/templates/broadcast_email.html
 msgid ""
@@ -9585,10 +9587,13 @@ msgid ""
 "Compose a message and send it by email to your users. Messages are queued "
 "and sent in the background — check Tasks for delivery status."
 msgstr ""
+"Skriv ett meddelande och skicka det via e-post till dina användare. "
+"Meddelanden köas och skickas i bakgrunden — kontrollera Uppgifter för "
+"leveransstatus."
 
 #: cps/templates/broadcast_email.html
 msgid "Subject"
-msgstr ""
+msgstr "Ämne"
 
 #: cps/templates/broadcast_email.html cps/templates/tasks.html
 msgid "Message"
@@ -9596,21 +9601,23 @@ msgstr "Meddelande"
 
 #: cps/templates/broadcast_email.html
 msgid "Write your announcement here. HTML is allowed (links, bold, lists)."
-msgstr ""
+msgstr "Skriv ditt meddelande här. HTML tillåts (länkar, fetstil, listor)."
 
 #: cps/templates/broadcast_email.html
 msgid ""
 "HTML is allowed for formatting (e.g. links and bold). Recipients on plain-"
 "text mail clients automatically get a text-only version."
 msgstr ""
+"HTML tillåts för formatering (t.ex. länkar och fetstil). Mottagare med "
+"e-postklienter för oformaterad text får automatiskt en textversion."
 
 #: cps/templates/broadcast_email.html
 msgid "Use current announcement banner text"
-msgstr ""
+msgstr "Använd aktuell text i meddelandebanderollen"
 
 #: cps/templates/broadcast_email.html
 msgid "Recipients"
-msgstr ""
+msgstr "Mottagare"
 
 #: cps/templates/broadcast_email.html
 msgid "Select all users with an email address"
@@ -9618,11 +9625,11 @@ msgstr "Markera alla användare med en e-postadress"
 
 #: cps/templates/broadcast_email.html
 msgid "No users have an email address set, so there is no one to send to yet."
-msgstr ""
+msgstr "Inga användare har en e-postadress angiven, så det finns ingen att skicka till ännu."
 
 #: cps/templates/broadcast_email.html
 msgid "Send announcement"
-msgstr ""
+msgstr "Skicka meddelande"
 
 #: cps/templates/broadcast_email.html
 msgid "Send test to me"
@@ -9637,11 +9644,11 @@ msgstr "Tillbaka"
 
 #: cps/templates/broadcast_email.html
 msgid "Send this announcement to __NUM__ recipient(s)?"
-msgstr ""
+msgstr "Skicka detta meddelande till __NUM__ mottagare?"
 
 #: cps/templates/config_db.html
 msgid "Troubleshooting your DB"
-msgstr ""
+msgstr "Felsök databasen"
 
 #: cps/templates/config_db.html
 msgid ""
@@ -9649,15 +9656,18 @@ msgid ""
 "problem mounting your Calibre Database (metadata.db), or less likely, a "
 "problem with your app.db."
 msgstr ""
+"Om du kom till den här sidan efter uppdatering eller migrering uppstod ett "
+"problem när din Calibre-databas (metadata.db) monterades, eller mindre "
+"sannolikt ett problem med app.db."
 
 #: cps/templates/config_db.html
 msgid "Common causes include:"
-msgstr ""
+msgstr "Vanliga orsaker är:"
 
 #: cps/templates/config_db.html
 msgid ""
 "NextGen and Calibre are using the same database or library at the same time."
-msgstr ""
+msgstr "NextGen och Calibre använder samma databas eller bibliotek samtidigt."
 
 #: cps/templates/config_db.html
 #, python-format
@@ -9665,6 +9675,8 @@ msgid ""
 "NextGen, or part of it, is running over a network share without "
 "%(network_share_mode)s enabled in your Docker Compose configuration."
 msgstr ""
+"NextGen, eller en del av det, körs via en nätverksresurs utan att "
+"%(network_share_mode)s är aktiverat i din Docker Compose-konfiguration."
 
 #: cps/templates/config_db.html
 #, python-format
@@ -9672,28 +9684,32 @@ msgid ""
 "NextGen is running on %(unionfs)s or %(mergerfs)s without "
 "%(network_share_mode)s enabled."
 msgstr ""
+"NextGen körs på %(unionfs)s eller %(mergerfs)s utan att %(network_share_mode)s "
+"är aktiverat."
 
 #: cps/templates/config_db.html
 msgid "The path to your Calibre Database changed or is incorrect."
-msgstr ""
+msgstr "Sökvägen till din Calibre-databas har ändrats eller är felaktig."
 
 #: cps/templates/config_db.html
 msgid "The Calibre Database file (metadata.db) is missing or corrupted."
-msgstr ""
+msgstr "Calibre-databasfilen (metadata.db) saknas eller är skadad."
 
 #: cps/templates/config_db.html
 msgid "File permissions prevent access to the Calibre Database."
-msgstr ""
+msgstr "Filbehörigheter förhindrar åtkomst till Calibre-databasen."
 
 #: cps/templates/config_db.html
 msgid "To resolve these issues, make sure that:"
-msgstr ""
+msgstr "Gör följande för att lösa problemen:"
 
 #: cps/templates/config_db.html
 msgid ""
 "No other application, including Calibre, accesses the same Calibre Database "
 "while NextGen is running."
 msgstr ""
+"Ingen annan applikation, inklusive Calibre, har åtkomst till samma Calibre-"
+"databas medan NextGen körs."
 
 #: cps/templates/config_db.html
 #, python-format
@@ -9701,33 +9717,41 @@ msgid ""
 "If you use a network share, unionfs, or mergerfs, enable "
 "%(network_share_mode)s in your Docker Compose configuration."
 msgstr ""
+"Om du använder en nätverksresurs, unionfs eller mergerfs ska du aktivera "
+"%(network_share_mode)s i din Docker Compose-konfiguration."
 
 #: cps/templates/config_db.html
 msgid ""
 "The Calibre Database path (metadata.db) is correct and accessible to NextGen."
-msgstr ""
+msgstr "Sökvägen till Calibre-databasen (metadata.db) är korrekt och åtkomlig för NextGen."
 
 #: cps/templates/config_db.html
 msgid ""
 "The Calibre Database file (metadata.db) exists and is not corrupted. Try "
 "opening it with Calibre to verify its integrity."
 msgstr ""
+"Calibre-databasfilen (metadata.db) finns och är inte skadad. Prova att öppna "
+"den med Calibre för att kontrollera dess integritet."
 
 #: cps/templates/config_db.html
 msgid "NextGen has permission to access the Calibre Database file."
-msgstr ""
+msgstr "NextGen har behörighet att komma åt Calibre-databasfilen."
 
 #: cps/templates/config_db.html
 msgid ""
 "If the problem remains after checking all of the above, restore your Calibre "
 "Database from a backup or create a new one."
 msgstr ""
+"Om problemet kvarstår efter att du kontrollerat allt ovan ska du återställa "
+"Calibre-databasen från en säkerhetskopia eller skapa en ny."
 
 #: cps/templates/config_db.html
 msgid ""
 "You can also use Last Resort Restore at the bottom of this page to try "
 "rebuilding your Calibre Database from the OPF files in your library."
 msgstr ""
+"Du kan också använda Sista utvägens återställning längst ned på sidan för "
+"att försöka återskapa Calibre-databasen från OPF-filerna i ditt bibliotek."
 
 #: cps/templates/config_db.html
 msgid "Location of Calibre Database (metadata.db file)"
@@ -9885,7 +9909,7 @@ msgstr "Ostabil"
 
 #: cps/templates/config_edit.html
 msgid "Trusted Hosts (Comma Separated)"
-msgstr ""
+msgstr "Betrodda värdar (kommaseparerade)"
 
 #: cps/templates/config_edit.html
 msgid "Logfile Configuration"
@@ -9909,13 +9933,15 @@ msgstr "Funktionskonfiguration"
 
 #: cps/templates/config_edit.html
 msgid "Convert non-English characters in title and author while saving to disk"
-msgstr ""
+msgstr "Konvertera icke-engelska tecken i titel och författare vid sparande på disk"
 
 #: cps/templates/config_edit.html
 msgid ""
 "Embed Metadata to Ebook File on Download/Conversion/e-mail (needs Calibre/"
 "Kepubify binaries)"
 msgstr ""
+"Bädda in metadata i e-boksfilen vid hämtning/konvertering/e-post (kräver "
+"Calibre-/Kepubify-binärfiler)"
 
 #: cps/templates/config_edit.html
 msgid "Enable Uploads"
@@ -9923,7 +9949,7 @@ msgstr "Aktivera uppladdning"
 
 #: cps/templates/config_edit.html
 msgid "(Please ensure that users also have upload permissions)"
-msgstr ""
+msgstr "(Kontrollera att användarna även har behörighet att ladda upp)"
 
 #: cps/templates/config_edit.html
 msgid "Allowed Upload Fileformats"
@@ -9947,7 +9973,7 @@ msgstr "Aktivera fjärrinloggning (\"magisk länk\")"
 
 #: cps/templates/config_edit.html
 msgid "Allow users to hide books from their personal library"
-msgstr ""
+msgstr "Tillåt användare att dölja böcker från sitt personliga bibliotek"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -9956,10 +9982,15 @@ msgid ""
 "detail page that drops the book out of their own index/search/OPDS without "
 "affecting other users. Recovery is via the profile page (Hidden Books link)."
 msgstr ""
+"På som standard för nya installationer; ett befintligt sparat val bevaras "
+"vid uppgraderingar. När den är aktiverad får varje användare en dölj-knapp "
+"på bokens detaljsida som tar bort boken från den egna index-/sök-/OPDS-vyn "
+"utan att påverka andra användare. Återställning görs via profilsidan (länken "
+"Dolda böcker)."
 
 #: cps/templates/config_edit.html
 msgid "Allow Kobo two-way annotation sync"
-msgstr ""
+msgstr "Tillåt tvåvägssynkronisering av Kobo-anteckningar"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -9967,12 +9998,18 @@ msgid ""
 "unchanged. This opt-in defaults off and must also be enabled for each user "
 "before a later rollout stage can use local authority."
 msgstr ""
+"Steg 0 registrerar endast exakt bevisning för Kobo-anteckningar. Enhetens "
+"svar förblir oförändrade. Detta deltagande är av som standard och måste även "
+"aktiveras för varje användare innan ett senare utrullningssteg kan använda "
+"lokal auktoritet."
 
 #: cps/templates/config_edit.html
 msgid ""
 "The CWNG_KOBO_TWO_WAY_ANNOTATIONS emergency override currently forces this "
 "feature off."
 msgstr ""
+"Nödåsidossättningen CWNG_KOBO_TWO_WAY_ANNOTATIONS tvingar för närvarande "
+"funktionen att vara avstängd."
 
 #: cps/templates/config_edit.html
 msgid "Proxy unknown requests to Kobo Store"
@@ -9980,27 +10017,31 @@ msgstr "Proxy okänd begäran till Kobo Store"
 
 #: cps/templates/config_edit.html
 msgid "Produce and prefer KEPUB for Kobo delivery"
-msgstr ""
+msgstr "Skapa och föredra KEPUB för Kobo-leverans"
 
 #: cps/templates/config_edit.html
 msgid ""
 "Kepubify was not found. Set its path under External binaries before this "
 "preference can convert books."
 msgstr ""
+"Kepubify hittades inte. Ange sökvägen under Externa binärfiler innan den här "
+"inställningen kan konvertera böcker."
 
 #: cps/templates/config_edit.html
 msgid ""
 "Missing KEPUB files are created for books already delivered to a Kobo. EPUB "
 "remains the source format."
 msgstr ""
+"Saknade KEPUB-filer skapas för böcker som redan levererats till en Kobo. "
+"EPUB förblir källformatet."
 
 #: cps/templates/config_edit.html
 msgid "Convert missing KEPUBs now"
-msgstr ""
+msgstr "Konvertera saknade KEPUB-filer nu"
 
 #: cps/templates/config_edit.html
 msgid "Suppress unchanged Kobo entitlement replays"
-msgstr ""
+msgstr "Undertryck oförändrade upprepningar av Kobo-behörigheter"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -10008,6 +10049,9 @@ msgid ""
 "for every sync-token shape. Use Full Sync or resend to deliberately deliver "
 "them again."
 msgstr ""
+"På som standard. Böcker som redan har bekräftats av samma läsare skyddas för "
+"varje form av synkroniseringstoken. Använd Full synkronisering eller skicka "
+"om för att medvetet leverera dem igen."
 
 #: cps/templates/config_edit.html
 msgid "Server External Port (for port forwarded API calls)"
@@ -10015,11 +10059,11 @@ msgstr "Extern port för server (för port vidarebefordrade API-anrop)"
 
 #: cps/templates/config_edit.html
 msgid "Sync Kobo annotations to Hardcover (Requires API key per user)"
-msgstr ""
+msgstr "Synkronisera Kobo-anteckningar till Hardcover (kräver API-nyckel per användare)"
 
 #: cps/templates/config_edit.html
 msgid "Pad book covers to Kobo screen aspect ratio"
-msgstr ""
+msgstr "Fyll ut bokomslag till Kobos skärmformat"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -10027,38 +10071,41 @@ msgid ""
 "aspect ratio does not match the screen. Padding is applied server-side; "
 "original cover files on disk are unchanged."
 msgstr ""
+"Tar bort de vita brevlådekanter som Kobo-enheter visar på omslag vars "
+"bildförhållande inte passar skärmen. Utfyllnaden läggs till på servern; "
+"ursprungliga omslagsfiler på disken ändras inte."
 
 #: cps/templates/config_edit.html cps/templates/cover_picker.html
 msgid "Kobo Libra Color / Libra 2 (1264x1680)"
-msgstr ""
+msgstr "Kobo Libra Color / Libra 2 (1264x1680)"
 
 #: cps/templates/config_edit.html cps/templates/cover_picker.html
 msgid "Kobo Clara HD / 2E / BW / Colour (1072x1448)"
-msgstr ""
+msgstr "Kobo Clara HD / 2E / BW / Colour (1072x1448)"
 
 #: cps/templates/config_edit.html cps/templates/cover_picker.html
 msgid "2:3 (publisher cover, no padding for typical covers)"
-msgstr ""
+msgstr "2:3 (förlagsomslag, ingen utfyllnad för vanliga omslag)"
 
 #: cps/templates/config_edit.html cps/templates/cover_picker.html
 msgid "Solid: most-common color in the cover"
-msgstr ""
+msgstr "Enfärgad: omslagets vanligaste färg"
 
 #: cps/templates/config_edit.html cps/templates/cover_picker.html
 msgid "Solid: average color of the cover"
-msgstr ""
+msgstr "Enfärgad: omslagets genomsnittliga färg"
 
 #: cps/templates/config_edit.html cps/templates/cover_picker.html
 msgid "Solid: custom color"
-msgstr ""
+msgstr "Enfärgad: anpassad färg"
 
 #: cps/templates/config_edit.html cps/templates/cover_picker.html
 msgid "Custom border color (hex)"
-msgstr ""
+msgstr "Anpassad kantfärg (hex)"
 
 #: cps/templates/config_edit.html
 msgid "Only used when fill style is 'Solid: custom color'. Format: #RRGGBB."
-msgstr ""
+msgstr "Används endast när fyllnadsstilen är ”Enfärgad: anpassad färg”. Format: #RRGGBB."
 
 #: cps/templates/config_edit.html
 msgid "Use Goodreads"
@@ -10075,23 +10122,27 @@ msgstr "Aktivera Hardcover-synkronisering"
 #: cps/templates/config_edit.html
 msgid ""
 "Controls Hardcover auto-fetch and reading-progress sync from one setting."
-msgstr ""
+msgstr "Styr automatisk hämtning från Hardcover och synkronisering av läsframsteg från en inställning."
 
 #: cps/templates/config_edit.html
 msgid ""
 "Managed by HARDCOVER_SYNC_ENABLED; change the environment variable to enable "
 "or disable Hardcover sync."
 msgstr ""
+"Hanteras av HARDCOVER_SYNC_ENABLED; ändra miljövariabeln för att aktivera "
+"eller inaktivera Hardcover-synkronisering."
 
 #: cps/templates/config_edit.html
 msgid "Hardcover API Key"
-msgstr ""
+msgstr "Hardcover API-nyckel"
 
 #: cps/templates/config_edit.html
 msgid ""
 "Free key from https://hardcover.app/account/api — required for Hardcover "
 "metadata results."
 msgstr ""
+"Kostnadsfri nyckel från https://hardcover.app/account/api — krävs för "
+"metadataresultat från Hardcover."
 
 #: cps/templates/config_edit.html
 msgid ""

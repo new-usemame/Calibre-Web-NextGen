@@ -11335,6 +11335,10 @@ msgid ""
 "When disabled, fetched metadata will replace existing data as-is from the "
 "preferred provider."
 msgstr ""
+"När detta är aktiverat ersätter hämtade metadata befintliga data endast om de "
+"verkar vara av bättre kvalitet (t.ex. längre beskrivningar, omslag med högre "
+"upplösning). När det är inaktiverat ersätter hämtade metadata befintliga data "
+"som de är från den föredragna leverantören."
 
 #: cps/templates/cwa_settings.html
 msgid "Metadata Fields to Update"
@@ -11346,10 +11350,13 @@ msgid ""
 "fields will never be modified during automatic metadata fetching, preserving "
 "your existing data."
 msgstr ""
+"Välj vilka metadatafält som ska uppdateras vid automatisk hämtning. Omärkta "
+"fält ändras aldrig under automatisk metadatahämtning, så dina befintliga data "
+"bevaras."
 
 #: cps/templates/cwa_settings.html
 msgid "Tags/Genres"
-msgstr ""
+msgstr "Taggar/genrer"
 
 #: cps/templates/cwa_settings.html
 msgid "Identifiers (ISBN, etc.)"
@@ -11361,7 +11368,7 @@ msgstr "Omslagsbild"
 
 #: cps/templates/cwa_settings.html cps/templates/user_edit.html
 msgid "Tip"
-msgstr ""
+msgstr "Tips"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11369,24 +11376,29 @@ msgid ""
 "Smart mode will additionally apply quality criteria to selected fields, "
 "while Direct mode will replace all selected fields with provider data."
 msgstr ""
+"Dessa fältval gäller både smart och direkt ersättning. Smart läge tillämpar "
+"dessutom kvalitetskriterier på valda fält, medan direkt läge ersätter alla "
+"valda fält med leverantörsdata."
 
 #: cps/templates/cwa_settings.html
 msgid "Cover File Max Size (MB):"
-msgstr ""
+msgstr "Högsta storlek för omslagsfil (MB):"
 
 #: cps/templates/cwa_settings.html
 msgid "Range: 1-200 MB (default: 15)"
-msgstr ""
+msgstr "Intervall: 1–200 MB (standard: 15)"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Limits the maximum size of cover images downloaded from metadata providers "
 "or URLs to prevent slow or stalled saves."
 msgstr ""
+"Begränsar högsta storleken på omslagsbilder som hämtas från metadataleverantörer "
+"eller webbadresser för att undvika långsamma eller fastnade sparningar."
 
 #: cps/templates/cwa_settings.html
 msgid "Ingest Processing Timeout"
-msgstr ""
+msgstr "Tidsgräns för importbearbetning"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11394,18 +11406,21 @@ msgid ""
 "timing out. Files that timeout are moved to the failed backup folder for "
 "investigation."
 msgstr ""
+"Högsta tillåtna tid i minuter för att bearbeta en enskild bok. Filer som "
+"överskrider tidsgränsen flyttas till säkerhetskopieringsmappen för misslyckade "
+"filer för undersökning."
 
 #: cps/templates/cwa_settings.html
 msgid "Timeout (minutes):"
-msgstr ""
+msgstr "Tidsgräns (minuter):"
 
 #: cps/templates/cwa_settings.html
 msgid "Range: 5-120 minutes (default: 15)"
-msgstr ""
+msgstr "Intervall: 5–120 minuter (standard: 15)"
 
 #: cps/templates/cwa_settings.html
 msgid "Stale temp cleanup"
-msgstr ""
+msgstr "Rensa gamla tillfälliga filer"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11413,26 +11428,29 @@ msgid ""
 "after a set age. Setting either value to 0 disables cleanup. Changes apply "
 "on the next cleanup cycle."
 msgstr ""
+"Ignorerade tillfälliga uppladdningsfiler (.uploading, .part osv.) kan rensas "
+"efter en bestämd ålder. Om ett värde sätts till 0 inaktiveras rensningen. "
+"Ändringar gäller vid nästa rensningscykel."
 
 #: cps/templates/cwa_settings.html
 msgid "Stale temp age (minutes):"
-msgstr ""
+msgstr "Ålder för gamla tillfälliga filer (minuter):"
 
 #: cps/templates/cwa_settings.html
 msgid "Range: 0-10080 minutes (default: 120)"
-msgstr ""
+msgstr "Intervall: 0–10080 minuter (standard: 120)"
 
 #: cps/templates/cwa_settings.html
 msgid "Stale temp cleanup interval (seconds):"
-msgstr ""
+msgstr "Rensningsintervall för gamla tillfälliga filer (sekunder):"
 
 #: cps/templates/cwa_settings.html
 msgid "Range: 0-86400 seconds (default: 600)"
-msgstr ""
+msgstr "Intervall: 0–86400 sekunder (standard: 600)"
 
 #: cps/templates/cwa_settings.html
 msgid "Auto-Send Delay for New Books"
-msgstr ""
+msgstr "Fördröjning för automatisk sändning av nya böcker"
 
 #: cps/templates/cwa_settings.html
 msgid ""

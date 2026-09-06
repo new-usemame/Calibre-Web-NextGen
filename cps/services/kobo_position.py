@@ -203,6 +203,88 @@ def compute_cfi_range(epub_path: Path, position: KoboPosition) -> Optional[str]:
 # must run filesystem access off the request thread with a deadline.
 MAX_RESUME_ARCHIVE_BYTES = 16 * 1024 * 1024
 MAX_RESUME_XML_BYTES = 2 * 1024 * 1024
+MAX_RESUME_DIRECTORY_BYTES = 256 * 1024
+MAX_RESUME_DIRECTORY_ENTRIES = 2048
+# Conservative subset that epub.js can consume without assertion escaping.
+# Valid XHTML ids outside this set deliberately retain percentage resume.
+_RESUME_ASSERTION_ID = re.compile(r"[A-Za-z0-9_.-]+")
+
+
+def _resume_directory_start(raw):
+    """Bound actual central-directory records BEFORE ZipFile allocates ZipInfo.
+
+    Accept only a conventional single-disk directory with a matching EOCD.
+    Reject ZIP64 directory overrides, concatenated archives and malformed size
+    claims rather than letting ZipFile reinterpret the bounds we checked.
+    """
+    import struct
+
+    end = raw.rfind(b"PK\x05\x06", max(0, len(raw) - 65557))
+    if end < 0 or end + 22 > len(raw):
+        raise ValueError("missing resume ZIP directory")
+    disk, start_disk, disk_count, count, size, start, comment = struct.unpack_from(
+        "<4H2IH", raw, end + 4)
+    if (disk or start_disk or disk_count != count
+            or count > MAX_RESUME_DIRECTORY_ENTRIES
+            or size > MAX_RESUME_DIRECTORY_BYTES
+            or start + size != end or end + 22 + comment != len(raw)
+            or raw[max(0, end - 20):end - 16] == b"PK\x06\x07"):
+        raise ValueError("unsupported or oversized resume ZIP directory")
+    cursor, actual = start, 0
+    while cursor < end:
+        if cursor + 46 > end or raw[cursor:cursor + 4] != b"PK\x01\x02":
+            raise ValueError("malformed resume ZIP directory record")
+        name, extra, entry_comment = struct.unpack_from("<3H", raw, cursor + 28)
+        cursor += 46 + name + extra + entry_comment
+        actual += 1
+        if cursor > end or actual > MAX_RESUME_DIRECTORY_ENTRIES:
+            raise ValueError("resume ZIP directory exceeds record limit")
+    if actual != count:
+        raise ValueError("resume ZIP directory count mismatch")
+    return start
+
+
+def _resume_member_bytes(raw, directory_start, info):
+    """Decode stored/deflated XML with a cap on ACTUAL output, then check CRC.
+
+    ZipExtFile truncates output to the declared size and may flush without an
+    output limit. Its public read surface cannot prove this bound. Read the
+    compressed bytes from our in-memory snapshot and use zlib's max_length;
+    never flush or continue after exceeding the cap. Other codecs fall back.
+    """
+    import struct
+    import zlib
+
+    if info.file_size > MAX_RESUME_XML_BYTES or info.flag_bits & ~0x80e:
+        raise ValueError("oversized or unsupported resume ZIP member")
+    offset = info.header_offset
+    if offset < 0 or offset + 30 > directory_start or raw[offset:offset + 4] != b"PK\x03\x04":
+        raise ValueError("invalid resume ZIP local header")
+    flags, method = struct.unpack_from("<2H", raw, offset + 6)
+    name_size, extra_size = struct.unpack_from("<2H", raw, offset + 26)
+    name_start = offset + 30
+    start = name_start + name_size + extra_size
+    end = start + info.compress_size
+    if end > directory_start or flags != info.flag_bits or method != info.compress_type:
+        raise ValueError("inconsistent resume ZIP member")
+    name = raw[name_start:name_start + name_size].decode("utf-8" if flags & 0x800 else "cp437")
+    if name != info.orig_filename:
+        raise ValueError("resume ZIP member name mismatch")
+    compressed = memoryview(raw)[start:end]
+    if method == zipfile.ZIP_STORED:
+        if len(compressed) > MAX_RESUME_XML_BYTES:
+            raise ValueError("resume XML exceeds size limit")
+        output = bytes(compressed)
+    elif method == zipfile.ZIP_DEFLATED:
+        inflater = zlib.decompressobj(-15)
+        output = inflater.decompress(compressed, MAX_RESUME_XML_BYTES + 1)
+        if len(output) > MAX_RESUME_XML_BYTES or not inflater.eof or inflater.unused_data:
+            raise ValueError("oversized or incomplete resume deflate stream")
+    else:
+        raise ValueError("unsupported resume ZIP compression")
+    if len(output) != info.file_size or zlib.crc32(output) != info.CRC:
+        raise ValueError("resume ZIP size or CRC mismatch")
+    return output
 
 
 def compute_cfi_point(epub_path, source, location_type, value):
@@ -242,12 +324,16 @@ def _resume_snapshot(epub_path, source, location_type, value):
         if (len(raw) > MAX_RESUME_ARCHIVE_BYTES or identity(before) != identity(after)
                 or identity(after) != identity(path.stat())):
             return None
+        directory_start = _resume_directory_start(raw)
         with zipfile.ZipFile(io.BytesIO(raw)) as archive:
             def xml(name):
                 info = archive.getinfo(name)
-                if info.file_size > MAX_RESUME_XML_BYTES:
-                    raise ValueError("resume XML exceeds size limit")
-                return etree.fromstring(archive.read(info), etree.XMLParser(
+                offsets = [item.header_offset for item in archive.infolist()]
+                if offsets.count(info.header_offset) != 1:
+                    raise ValueError("aliased resume ZIP member")
+                member_end = min([directory_start] + [offset for offset in offsets if offset > info.header_offset])
+                member_bytes = _resume_member_bytes(raw, member_end, info)
+                return etree.fromstring(member_bytes, etree.XMLParser(
                     resolve_entities=False, no_network=True, load_dtd=False))
 
             container = xml("META-INF/container.xml")
@@ -286,7 +372,8 @@ def _resume_snapshot(epub_path, source, location_type, value):
             if body is None or _cfi_element_step(body).split("[")[0] != "/4":
                 return None
             for element in [spine, body, span, *span.iterancestors()]:
-                if any(c in (element.get("id") or "") for c in "[](),;=^!"):
+                element_id = element.get("id")
+                if element_id and not _RESUME_ASSERTION_ID.fullmatch(element_id):
                     return None
             cfi_range = _kepub_range_cfi(tree, f"{spine_step}/{2 * (index + 1)}",
                                         value, value, 0, 0)

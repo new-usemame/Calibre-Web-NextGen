@@ -445,3 +445,59 @@ CI=1 CWNG_PYTEST_TMP_BASE='/Volumes/Crucial X8/agent-scratch/cwng/324-kobo-exact
 ```
 
 The task's external scratch directory and initial baseline's `/tmp/cwng-324-exact-tests` directory were removed and their absence checked. Small evidence logs and the mutation orchestration script remain in `/tmp/324-exact-*`. No protected harness, dependency manifest, migration, licence, or catalogue file was changed; no new external service URL was introduced. Work remained local: no push, PR, merge, tag, issue mutation, or public message.
+
+**OBSERVED — HOLD blockers corrected after `4eb61c8f40` (2026-09-05).** This section supersedes the earlier claim that checking `ZipInfo.file_size` bounded inflation. The installed `ZipExtFile` inflates before truncating to that declared size, and can flush without an output limit. Its public read surface does not establish the required bound. The exact-resume reader now uses `ZipFile` only for metadata after a bounded directory preflight, and decodes selected members directly from the existing in-memory snapshot using standard-library `zlib.decompressobj().decompress(..., max_length=2 MiB + 1)`. It neither flushes nor continues after exceeding the limit. Actual length, stream completion, CRC, local-header consistency and member boundaries are checked. Stored members are size-bounded before copying; other compression methods return the existing percentage fallback. No dependency was added, and the highlight converter contract is unchanged.
+
+**OBSERVED — directory allocation boundary.** Before constructing `ZipFile`, the preflight checks a conventional single-disk EOCD, a maximum 256 KiB central directory, and at most 2,048 actual records. It walks the record lengths without building `ZipInfo` objects and checks the actual count against the declared count. ZIP64 directory overrides, inconsistent offsets, malformed records and excessive directories fall back rather than letting `ZipFile` reinterpret the checked bounds. Both a 2,049-record directory and a 200,000-record directory lying about their record counts were rejected before any `ZipInfo` allocation.
+
+**OBSERVED — assertion allowlist.** Exact resume now allows only ASCII letters, digits, underscore, dot and hyphen in ancestor/package ID assertions. `/` and `:` both return `None`, so no malformed CFI reaches the client. This conservative allowlist also deliberately rejects legitimate non-ASCII IDs such as `café`; those books retain percentage resume rather than receiving a CFI whose assertion syntax has not been established. The existing anchored KoboSpan regex, XPath parameter binding and XML parser security flags remain unchanged.
+
+**OBSERVED — red command against `4eb61c8f40` and actual failure excerpts.** The final test file was retained while a Python `try/finally` saved the edited converter, replaced it with the bytes from `git show 4eb61c8f40:cps/services/kobo_position.py`, ran the following command, and restored the edited converter. Exit status was 1. The earlier test-first run also reproduced the two blockers before any implementation edit (`6 failed, 3 passed in 2.90s`); the final run adds a small forged payload to test length validation independently of the inflation ceiling.
+
+```sh
+CWNG_PYTEST_TMP_BASE='/Volumes/Crucial X8/agent-scratch/cwng/324-fix/pytest' PYTHONDONTWRITEBYTECODE=1 /tmp/kobo-budget-venv/bin/python -m pytest tests/unit/test_kobo_resume_point.py -q -s > /tmp/324-fix-final-red.log 2>&1
+```
+
+```text
+hidden=33554432, largest inflation=33554667, point=epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)
+E   AssertionError: [33554667, 0, 458, 0, 265, 0]
+E   assert 33554667 <= (((2 * 1024) * 1024) + 1)
+hidden=16, largest inflation=458, point=epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)
+E   AssertionError: a false size and prefix CRC must not be accepted
+E   AssertionError: allocated 2049 directory records before rejecting the archive
+E   AssertionError: allocated 200000 directory records before rejecting the archive
+E   AssertionError: assert 'epubcfi(/6/2!/4/2[a/b]/4[kobo.1.2]/1:0)' is None
+E   AssertionError: assert 'epubcfi(/6/2!/4/2[a:9]/4[kobo.1.2]/1:0)' is None
+E   AssertionError: assert 'epubcfi(/6/2!/4/2[café]/4[kobo.1.2]/1:0)' is None
+========================= 7 failed, 3 passed in 2.87s ==========================
+```
+
+**OBSERVED — green commands and actual output.** The final Python command includes the original 11 resume tests, the added resource/ID cases, the existing converter and endpoint suites, and both real SPA browser flows. No test was skipped.
+
+```sh
+CWNG_PYTEST_TMP_BASE='/Volumes/Crucial X8/agent-scratch/cwng/324-fix/pytest' PYTHONDONTWRITEBYTECODE=1 /tmp/kobo-budget-venv/bin/python -m pytest tests/unit/test_kobo_resume_point.py tests/unit/test_reader_resume.py tests/unit/test_kobo_position_converter.py tests/unit/test_api_v1_reader.py tests/integration/test_reader_resume_browser.py -q -s > /tmp/324-fix-final-green.log 2>&1
+# From frontend/:
+node --experimental-strip-types --test unit/*.test.ts tests/unit/readerTarget.test.ts > /tmp/324-fix-frontend-green.log 2>&1
+```
+
+```text
+hidden=33554432, largest inflation=2097153, point=None
+hidden=16, largest inflation=251, point=None
+directory records=2049, ZipInfo allocations=0
+directory records=200000, ZipInfo allocations=0
+Kobo automatic: exact span kobo.1.50 is visible despite 95% carrier; no bookmark written
+Kobo offer: local CFI retained until acceptance; exact kobo.1.20 visible; stored CFI unchanged
+Unresolvable Kobo span: original percentage-only payload and visible 95% resume
+======================= 49 passed, 3 warnings in 52.35s ========================
+
+ℹ tests 63
+ℹ suites 3
+ℹ pass 63
+ℹ fail 0
+ℹ skipped 0
+ℹ duration_ms 3567.19325
+```
+
+**OBSERVED — scope and limits.** Resource evidence measures bytes actually returned by the installed decompressor and actual `ZipInfo` constructions, rather than inferring safety from declared sizes or caller timeouts. Whole-process peak RSS and other Python/decompressor versions were not measured; these local tests target the demonstrated allocation boundaries. No physical device or deployed service was exercised. The two-worker, non-queued admission, worker-finally permit release, request-local results, archive byte cap, file identity checks, fingerprint validation, fallback payload and local-bookmark offer policy were not rewritten. Frontend code, dependency manifests, licences, migrations and the protected autopilot harness were not changed. No new user-facing string or external service URL was added.
+
+**OBSERVED — cleanup.** The task directory `/Volumes/Crucial X8/agent-scratch/cwng/324-fix/` was removed and its absence checked. Small red/green logs remain under `/tmp/324-fix-*`. All changes stayed on the requested branch; nothing was pushed or posted publicly.

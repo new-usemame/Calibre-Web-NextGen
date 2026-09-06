@@ -10149,20 +10149,24 @@ msgid ""
 "A token from the HARDCOVER_TOKEN environment variable is currently active. "
 "It is not shown here; a key entered in this field would override it."
 msgstr ""
+"En token från miljövariabeln HARDCOVER_TOKEN är aktiv. Den visas inte här; "
+"en nyckel som anges i det här fältet skulle åsidosätta den."
 
 #: cps/templates/config_edit.html
 msgid ""
 "A token from the file named by HARDCOVER_TOKEN_FILE is currently active. It "
 "is not shown here; a key entered in this field would override it."
 msgstr ""
+"En token från filen som anges av HARDCOVER_TOKEN_FILE är aktiv. Den visas "
+"inte här; en nyckel som anges i det här fältet skulle åsidosätta den."
 
 #: cps/templates/config_edit.html
 msgid "Token status: not configured."
-msgstr ""
+msgstr "Tokenstatus: inte konfigurerad."
 
 #: cps/templates/config_edit.html
 msgid "Token status: valid."
-msgstr ""
+msgstr "Tokenstatus: giltig."
 
 #: cps/templates/config_edit.html
 msgid "Token status: rejected or expired."
@@ -10170,11 +10174,11 @@ msgstr "Tokenstatus: avvisad eller utgången."
 
 #: cps/templates/config_edit.html
 msgid "Token status: present; validation is temporarily unavailable."
-msgstr ""
+msgstr "Tokenstatus: finns; validering är tillfälligt otillgänglig."
 
 #: cps/templates/config_edit.html
 msgid "Expiry: not provided by this token."
-msgstr ""
+msgstr "Förfallotid: anges inte av denna token."
 
 #: cps/templates/config_edit.html
 msgid "Google Books API Key"
@@ -10187,6 +10191,10 @@ msgid ""
 "at https://console.cloud.google.com — enable the \"Books API\" and create an "
 "API key."
 msgstr ""
+"Valfritt. Utan en nyckel är Google Books begränsad till cirka 1 000 "
+"begäranden per IP-adress och dag, vilket lätt förbrukas på delade servrar "
+"(HTTP 429). Kostnadsfri nyckel finns på https://console.cloud.google.com — "
+"aktivera \"Books API\" och skapa en API-nyckel."
 
 #: cps/templates/config_edit.html
 msgid "Allow Reverse Proxy Authentication"
@@ -10198,20 +10206,25 @@ msgid ""
 "This is an authentication method, distinct from the HTTPS security setting "
 "below."
 msgstr ""
+"Litar på rubriken \"Remote-User\" från en omvänd proxy för autentisering. "
+"Detta är en autentiseringsmetod, skild från HTTPS-säkerhetsinställningen "
+"nedan."
 
 #: cps/templates/config_edit.html
 msgid "Use via HTTPS"
-msgstr ""
+msgstr "Använd via HTTPS"
 
 #: cps/templates/config_edit.html
 msgid ""
 "Enables secure cookie settings (Secure, SameSite=Lax). Enable this ONLY if "
 "you are accessing the server via HTTPS, otherwise you will be locked out."
 msgstr ""
+"Aktiverar säkra cookie-inställningar (Secure, SameSite=Lax). Aktivera detta "
+"ENDAST om du når servern via HTTPS, annars blir du utelåst."
 
 #: cps/templates/config_edit.html
 msgid "Auto-create users from reverse proxy"
-msgstr ""
+msgstr "Skapa användare automatiskt från omvänd proxy"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -10219,6 +10232,9 @@ msgid ""
 "received. Only enable if your reverse proxy authentication is properly "
 "secured."
 msgstr ""
+"Skapa användarkonton automatiskt när giltiga rubriker från omvänd proxy tas "
+"emot. Aktivera endast om autentiseringen i den omvända proxyn är ordentligt "
+"säkrad."
 
 #: cps/templates/config_edit.html
 msgid "Login type"
@@ -10226,7 +10242,7 @@ msgstr "Inloggningstyp"
 
 #: cps/templates/config_edit.html
 msgid "Use OAuth (requires HTTPS)"
-msgstr ""
+msgstr "Använd OAuth (kräver HTTPS)"
 
 #: cps/templates/config_edit.html
 msgid "LDAP Server Host Name or IP Address"
@@ -10288,13 +10304,15 @@ msgstr "LDAP-server är OpenLDAP?"
 
 #: cps/templates/config_edit.html
 msgid "Auto-create users from LDAP"
-msgstr ""
+msgstr "Skapa användare automatiskt från LDAP"
 
 #: cps/templates/config_edit.html
 msgid ""
 "Automatically create user accounts when LDAP authentication succeeds for new "
 "users. Recommended for enterprise environments."
 msgstr ""
+"Skapa användarkonton automatiskt när LDAP-autentisering lyckas för nya "
+"användare. Rekommenderas för företagsmiljöer."
 
 #: cps/templates/config_edit.html
 msgid "Following Settings are Needed For User Import"
@@ -10330,21 +10348,23 @@ msgstr "LDAP-användarfilter för medlemmar"
 
 #: cps/templates/config_edit.html
 msgid "Important:"
-msgstr ""
+msgstr "Viktigt:"
 
 #: cps/templates/config_edit.html
 msgid ""
 "OAuth authentication requires this server to be accessed via HTTPS. If you "
 "are using HTTP, login will fail."
 msgstr ""
+"OAuth-autentisering kräver att den här servern nås via HTTPS. Om du använder "
+"HTTP misslyckas inloggningen."
 
 #: cps/templates/config_edit.html
 msgid "Generic OAuth Provider"
-msgstr ""
+msgstr "Allmän OAuth-leverantör"
 
 #: cps/templates/config_edit.html
 msgid "OAuth Metadata URL (for auto-discovery)"
-msgstr ""
+msgstr "OAuth-metadatawebbadress (för automatisk upptäckt)"
 
 #: cps/templates/config_edit.html
 msgid "Test Metadata"
@@ -10352,17 +10372,19 @@ msgstr "Testa metadata"
 
 #: cps/templates/config_edit.html
 msgid "Leave empty to use manual configuration below"
-msgstr ""
+msgstr "Lämna tomt för att använda manuell konfiguration nedan"
 
 #: cps/templates/config_edit.html
 msgid "Use Manual Endpoint URLs (override auto-discovery)"
-msgstr ""
+msgstr "Använd manuella ändpunktsadresser (åsidosätt automatisk upptäckt)"
 
 #: cps/templates/config_edit.html
 msgid ""
 "Check this to manually configure individual OAuth endpoints instead of using "
 "auto-discovery"
 msgstr ""
+"Markera detta för att manuellt konfigurera enskilda OAuth-ändpunkter i "
+"stället för att använda automatisk upptäckt"
 
 #: cps/templates/config_edit.html
 msgid "Manual Endpoint Configuration"
@@ -10370,11 +10392,11 @@ msgstr "Manuell slutpunktskonfiguration"
 
 #: cps/templates/config_edit.html
 msgid "OAuth Base URL"
-msgstr ""
+msgstr "OAuth-baswebbadress"
 
 #: cps/templates/config_edit.html
 msgid "Authorization Endpoint"
-msgstr ""
+msgstr "Auktoriseringsändpunkt"
 
 #: cps/templates/config_edit.html
 msgid "Token Endpoint"
@@ -10382,7 +10404,7 @@ msgstr "Tokenslutpunkt"
 
 #: cps/templates/config_edit.html
 msgid "UserInfo Endpoint"
-msgstr ""
+msgstr "UserInfo-ändpunkt"
 
 #: cps/templates/config_edit.html
 msgid "Test Connection"
@@ -10394,11 +10416,11 @@ msgstr "OAuth-omfattningar"
 
 #: cps/templates/config_edit.html
 msgid "Space-separated list of OAuth scopes"
-msgstr ""
+msgstr "Mellanslagsseparerad lista över OAuth-omfattningar"
 
 #: cps/templates/config_edit.html
 msgid "OAuth Redirect Host"
-msgstr ""
+msgstr "OAuth-omdirigeringsvärd"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -10406,12 +10428,17 @@ msgid ""
 "URI\" errors. Include protocol (https://). Leave empty to use automatic "
 "detection."
 msgstr ""
+"Ange ett konsekvent värdnamn för OAuth-omdirigeringar för att förhindra fel "
+"med \"ogiltig omdirigerings-URI\". Inkludera protokoll (https://). Lämna "
+"tomt för automatisk identifiering."
 
 #: cps/templates/config_edit.html
 msgid ""
 "Required if: accessing via multiple hostnames, behind reverse proxy, or "
 "getting \"invalid redirect URI\" errors."
 msgstr ""
+"Krävs om: åtkomst sker via flera värdnamn, bakom omvänd proxy eller du får "
+"fel om \"ogiltig omdirigerings-URI\"."
 
 #: cps/templates/config_edit.html
 msgid "OAuth Client Id"
@@ -10431,7 +10458,7 @@ msgstr "Användarnamnsfält"
 
 #: cps/templates/config_edit.html
 msgid "JWT field to extract username from"
-msgstr ""
+msgstr "JWT-fält att hämta användarnamn från"
 
 #: cps/templates/config_edit.html
 msgid "Email Field"
@@ -10439,7 +10466,7 @@ msgstr "E-postfält"
 
 #: cps/templates/config_edit.html
 msgid "JWT field to extract email from"
-msgstr ""
+msgstr "JWT-fält att hämta e-post från"
 
 #: cps/templates/config_edit.html
 msgid "OAuth Group Claim"
@@ -10450,30 +10477,36 @@ msgid ""
 "OIDC claim containing group names. The claim may be a list, or a comma- or "
 "space-separated string."
 msgstr ""
+"OIDC-anspråk som innehåller gruppnamn. Anspråket kan vara en lista eller en "
+"kommaseparerad eller mellanslagsseparerad sträng."
 
 #: cps/templates/config_edit.html
 msgid "Require OAuth Group Membership"
-msgstr ""
+msgstr "Kräv medlemskap i OAuth-grupp"
 
 #: cps/templates/config_edit.html
 msgid ""
 "When enabled, Generic OAuth users must be a member of at least one allowed "
 "group before a user account is created or logged in."
 msgstr ""
+"När funktionen är aktiverad måste allmänna OAuth-användare vara medlemmar i "
+"minst en tillåten grupp innan ett användarkonto skapas eller loggas in."
 
 #: cps/templates/config_edit.html
 msgid "OAuth Allowed Groups"
-msgstr ""
+msgstr "Tillåtna OAuth-grupper"
 
 #: cps/templates/config_edit.html
 msgid ""
 "Comma- or space-separated OAuth groups allowed to log in via Generic OAuth. "
 "Leave empty only if group membership is not required."
 msgstr ""
+"Kommaseparerade eller mellanslagsseparerade OAuth-grupper som får logga in "
+"via allmän OAuth. Lämna tomt endast om gruppmedlemskap inte krävs."
 
 #: cps/templates/config_edit.html
 msgid "OAuth group for Admin"
-msgstr ""
+msgstr "OAuth-grupp för administration"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -10481,6 +10514,9 @@ msgid ""
 "group-based admin management, or use the global setting in Security Settings "
 "for more control."
 msgstr ""
+"Namnet på OAuth-gruppen som ger administratörsbehörighet. Lämna tomt för att "
+"inaktivera gruppbaserad administratörshantering, eller använd den globala "
+"inställningen i Säkerhetsinställningar för mer kontroll."
 
 #: cps/templates/config_edit.html
 msgid "Default Permissions for New Generic OAuth Users"
@@ -10527,6 +10563,10 @@ msgid ""
 "OAuth. Admin group membership still grants admin privileges when OAuth group-"
 "based admin management is enabled. Existing users are not changed."
 msgstr ""
+"Dessa behörigheter tillämpas endast när en ny användare skapas via allmän "
+"OAuth. Medlemskap i administratörsgruppen ger fortfarande "
+"administratörsbehörighet när gruppbaserad administratörshantering för OAuth "
+"är aktiverad. Befintliga användare ändras inte."
 
 #: cps/templates/config_edit.html
 msgid "Login Button Text"

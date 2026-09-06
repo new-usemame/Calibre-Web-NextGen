@@ -2744,11 +2744,11 @@ msgstr "Ange ett giltigt taggnamn"
 
 #: cps/spa_strings.py
 msgid "Could not load this page"
-msgstr ""
+msgstr "Det gick inte att läsa in den här sidan"
 
 #: cps/spa_strings.py
 msgid "Page not found"
-msgstr ""
+msgstr "Sidan hittades inte"
 
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/email_edit.html cps/templates/shelf.html
@@ -2758,63 +2758,63 @@ msgstr "Lägg till"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Add to my library"
-msgstr ""
+msgstr "Lägg till i mitt bibliotek"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Add {title} to my library"
-msgstr ""
+msgstr "Lägg till {title} i mitt bibliotek"
 
 #: cps/spa_strings.py
 msgid "Added to your library"
-msgstr ""
+msgstr "Tillagd i ditt bibliotek"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Added to your library and to {shelf}"
-msgstr ""
+msgstr "Tillagd i ditt bibliotek och på {shelf}"
 
 #: cps/spa_strings.py
 msgid "Adding this book to a shelf also adds it to your library."
-msgstr ""
+msgstr "När du lägger till den här boken på en hylla läggs den även till i ditt bibliotek."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Adding…"
-msgstr ""
+msgstr "Lägger till …"
 
 #: cps/spa_strings.py
 msgid "Add book to this library"
-msgstr ""
+msgstr "Lägg till bok i det här biblioteket"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Added book {book} to {name}."
-msgstr ""
+msgstr "Lade till boken {book} i {name}."
 
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 #: cps/templates/user_edit.html cps/templates/user_table.html
 msgid "Browse global library"
-msgstr ""
+msgstr "Bläddra i det globala biblioteket"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Browse the global library"
-msgstr ""
+msgstr "Bläddra i det globala biblioteket"
 
 #: cps/spa_strings.py
 msgid "Could not add the book."
-msgstr ""
+msgstr "Det gick inte att lägga till boken."
 
 #: cps/spa_strings.py
 msgid "Could not add this book to the shelf."
-msgstr ""
+msgstr "Det gick inte att lägga till boken på hyllan."
 
 #: cps/spa_strings.py
 msgid "Could not add the book. Please try again."
-msgstr ""
+msgstr "Det gick inte att lägga till boken. Försök igen."
 
 #: cps/spa_strings.py
 msgid "Could not remove the book. Please try again."
-msgstr ""
+msgstr "Det gick inte att ta bort boken. Försök igen."
 
 #: cps/spa_strings.py
 #, python-brace-format

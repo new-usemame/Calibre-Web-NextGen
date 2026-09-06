@@ -131,7 +131,11 @@ BUNDLE_SERVED_BLUEPRINTS = ("spa",)
 # and the loop runs zero times while the test still passes. Two exclusions are
 # expected today -- the bundle row and one address-sensitive route. A third is
 # tolerated for churn; beyond that, look at why coverage is draining rather than
-# raising this number.
+# raising this number. In the CI shape -- bundle absent, so the SPA row and the
+# one address-sensitive route are both excluded -- the real wire excludes 2 of
+# 33, so the headroom here is exactly ONE. A second address-sensitive route
+# turns the gating lane red. That is the intended direction, but it is a live
+# tripwire rather than slack: read the message, do not raise the number.
 MAX_EXCLUDED_ROWS = 3
 
 

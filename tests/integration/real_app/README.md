@@ -47,9 +47,12 @@ backend wire only, and runs only where a matching image exists.
    precondition rejects that mismatched comparison, which is the precondition
    doing real work rather than papering over a divergence.
 
-   OBSERVED against an image built from this checkout: **0 mismatching rows of
-   31**, container ready in 4.6 s. That is the first time this comparison has
-   been observed green; before it, the leg had never run to completion anywhere.
+   OBSERVED by the judge, driving the comparison directly with the
+   source-checksum precondition BYPASSED, against a fork-built image 28 of 266
+   in-scope files drifted from this checkout: **0 mismatching rows of 31**, ready
+   in 4.6 s. That is the first time the comparison has run to completion at all.
+   **The comparison as shipped, with the precondition satisfied by a CI-built
+   image, has still never run.**
 
    **Scope, and why it is drawn here.** Two things the comparison must not
    report as parity failures, because neither is the application:

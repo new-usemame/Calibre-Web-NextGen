@@ -4068,107 +4068,107 @@ msgstr "Administratör"
 
 #: cps/spa_strings.py
 msgid "Under the hood"
-msgstr ""
+msgstr "Bakom kulisserna"
 
 #: cps/spa_strings.py
 msgid "Open your library"
-msgstr ""
+msgstr "Öppna ditt bibliotek"
 
 #: cps/spa_strings.py
 msgid "Browse tags"
-msgstr ""
+msgstr "Bläddra bland taggar"
 
 #: cps/spa_strings.py
 msgid "Open the table view"
-msgstr ""
+msgstr "Öppna tabellvyn"
 
 #: cps/spa_strings.py
 msgid "Review duplicates"
-msgstr ""
+msgstr "Granska dubbletter"
 
 #: cps/spa_strings.py
 msgid "Open your shelves"
-msgstr ""
+msgstr "Öppna dina hyllor"
 
 #: cps/spa_strings.py
 msgid "Manage sync & app passwords"
-msgstr ""
+msgstr "Hantera synkronisering och applösenord"
 
 #: cps/spa_strings.py
 msgid "Check your e-reader address"
-msgstr ""
+msgstr "Kontrollera din e-boksläsaradress"
 
 #: cps/spa_strings.py
 msgid "Create an app password"
-msgstr ""
+msgstr "Skapa ett applösenord"
 
 #: cps/spa_strings.py
 msgid "Browse series"
-msgstr ""
+msgstr "Bläddra bland serier"
 
 #: cps/spa_strings.py
 msgid "Browse authors"
-msgstr ""
+msgstr "Bläddra bland författare"
 
 #: cps/spa_strings.py
 msgid "Browse languages"
-msgstr ""
+msgstr "Bläddra bland språk"
 
 #: cps/spa_strings.py
 msgid "Open Table view"
-msgstr ""
+msgstr "Öppna tabellvy"
 
 #: cps/spa_strings.py
 msgid "Open Admin"
-msgstr ""
+msgstr "Öppna administration"
 
 #: cps/spa_strings.py
 msgid "Open account settings"
-msgstr ""
+msgstr "Öppna kontoinställningar"
 
 #: cps/spa_strings.py
 msgid "Browse Discover"
-msgstr ""
+msgstr "Bläddra i Upptäck"
 
 #: cps/spa_strings.py
 msgid "Explore your library"
-msgstr ""
+msgstr "Utforska ditt bibliotek"
 
 #: cps/spa_strings.py
 msgid "Go to Upload"
-msgstr ""
+msgstr "Gå till uppladdning"
 
 #: cps/spa_strings.py
 msgid "Open Tasks"
-msgstr ""
+msgstr "Öppna uppgifter"
 
 #: cps/spa_strings.py
 msgid "Open search"
-msgstr ""
+msgstr "Öppna sökningen"
 
 #: cps/spa_strings.py
 msgid "Editions"
-msgstr ""
+msgstr "Utgåvor"
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Back to New UI"
-msgstr ""
+msgstr "Tillbaka till nya gränssnittet"
 
 #: cps/spa_strings.py
 msgid "Back to results"
-msgstr ""
+msgstr "Tillbaka till resultat"
 
 #: cps/spa_strings.py
 msgid "No editions found for this book."
-msgstr ""
+msgstr "Inga utgåvor hittades för den här boken."
 
 #: cps/spa_strings.py
 msgid "View all details"
-msgstr ""
+msgstr "Visa alla detaljer"
 
 #: cps/spa_strings.py
 msgid "Result details"
-msgstr ""
+msgstr "Resultatdetaljer"
 
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Published"
@@ -4176,7 +4176,7 @@ msgstr "Publicerad"
 
 #: cps/spa_strings.py cps/templates/cwa_settings.html
 msgid "Format"
-msgstr ""
+msgstr "Format"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid "Source"
@@ -4184,134 +4184,138 @@ msgstr "Källa"
 
 #: cps/spa_strings.py
 msgid "Customize"
-msgstr ""
+msgstr "Anpassa"
 
 #: cps/spa_strings.py
 msgid "Customize sidebar"
-msgstr ""
+msgstr "Anpassa sidopanel"
 
 #: cps/spa_strings.py
 msgid "Customize navigation"
-msgstr ""
+msgstr "Anpassa navigering"
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 msgid "Done"
-msgstr ""
+msgstr "Klar"
 
 #: cps/spa_strings.py
 msgid "Reset to default"
-msgstr ""
+msgstr "Återställ till standard"
 
 #: cps/spa_strings.py
 msgid "Always shown"
-msgstr ""
+msgstr "Visas alltid"
 
 #: cps/spa_strings.py
 msgid "Editing sidebar. Reorder or hide sections, then tap Done."
-msgstr ""
+msgstr "Redigerar sidopanelen. Ordna om eller dölj avsnitt och tryck sedan på Klar."
 
 #: cps/spa_strings.py
 msgid "Editing cancelled."
-msgstr ""
+msgstr "Redigeringen avbröts."
 
 #: cps/spa_strings.py
 msgid ""
 "Drag to reorder. Tap ✕ to hide a section. Arrow keys move the focused handle."
 msgstr ""
+"Dra för att ordna om. Tryck på ✕ för att dölja ett avsnitt. Piltangenterna "
+"flyttar det fokuserade handtaget."
 
 #: cps/spa_strings.py
 msgid "Sidebar saved."
-msgstr ""
+msgstr "Sidopanelen har sparats."
 
 #: cps/spa_strings.py
 msgid "Sidebar reset to default."
-msgstr ""
+msgstr "Sidopanelen har återställts till standard."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{label} moved to position {pos} of {total}"
-msgstr ""
+msgstr "{label} flyttades till plats {pos} av {total}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Reorder {label} (position {pos} of {total}). Use arrow keys to move."
-msgstr ""
+msgstr "Ordna om {label} (plats {pos} av {total}). Använd piltangenterna för att flytta."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete {label}"
-msgstr ""
+msgstr "Ta bort {label}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Restore {label}"
-msgstr ""
+msgstr "Återställ {label}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{label} hidden"
-msgstr ""
+msgstr "{label} dolt"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{label} restored"
-msgstr ""
+msgstr "{label} återställt"
 
 #: cps/spa_strings.py
 msgid "Could not save sidebar. Please try again."
-msgstr ""
+msgstr "Kunde inte spara sidopanelen. Försök igen."
 
 #: cps/spa_strings.py
 msgid "Refresh library"
-msgstr ""
+msgstr "Uppdatera bibliotek"
 
 #: cps/spa_strings.py
 msgid "<"
-msgstr ""
+msgstr "<"
 
 #: cps/spa_strings.py
 msgid "="
-msgstr ""
+msgstr "="
 
 #: cps/spa_strings.py
 msgid ">"
-msgstr ""
+msgstr ">"
 
 #: cps/spa_strings.py
 msgid ""
 "A one-time full duplicate scan is needed. Run it from CWA settings, then "
 "return here."
 msgstr ""
+"En fullständig dubblettgenomsökning måste köras en gång. Kör den från "
+"inställningarna för CWA och återvänd sedan hit."
 
 #: cps/spa_strings.py
 msgid "Date Added"
-msgstr ""
+msgstr "Datum tillagt"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete “{name}”? It is removed from {count} book, which is kept."
-msgstr ""
+msgstr "Ta bort ”{name}”? Den tas bort från {count} bok, som behålls."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete “{name}”? It is removed from {count} books, which are kept."
-msgstr ""
+msgstr "Ta bort ”{name}”? Den tas bort från {count} böcker, som behålls."
 
 #: cps/spa_strings.py
 msgid "Dismiss Ko-fi support message"
-msgstr ""
+msgstr "Avfärda Ko-fi-stödmeddelande"
 
 #: cps/spa_strings.py
 msgid "Dismiss help announcement"
-msgstr ""
+msgstr "Avfärda hjälpmeddelande"
 
 #: cps/spa_strings.py
 msgid "Kobo book compatibility repaired"
-msgstr ""
+msgstr "Kompatibiliteten för Kobo-boken har reparerats"
 
 #: cps/spa_strings.py
 msgid "Library notice"
-msgstr ""
+msgstr "Biblioteksmeddelande"
 
 #: cps/spa_strings.py
 msgid "Show affected books"

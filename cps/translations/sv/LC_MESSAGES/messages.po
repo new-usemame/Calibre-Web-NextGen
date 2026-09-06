@@ -4603,7 +4603,7 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/duplicates.html cps/templates/kobo_reconcile.html
 msgid "Archive"
-msgstr ""
+msgstr "Arkiv"
 
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Archived"
@@ -4611,106 +4611,106 @@ msgstr "Arkiverad"
 
 #: cps/spa_strings.py
 msgid "Ask in Discord"
-msgstr ""
+msgstr "Fråga på Discord"
 
 #: cps/spa_strings.py
 msgid "Assign selected to device"
-msgstr ""
+msgstr "Tilldela markerade till enhet"
 
 #: cps/spa_strings.py
 msgid "Assign to device"
-msgstr ""
+msgstr "Tilldela till enhet"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Assigned to {name}."
-msgstr ""
+msgstr "Tilldelad till {name}."
 
 #: cps/spa_strings.py
 msgid "Authentication"
-msgstr ""
+msgstr "Autentisering"
 
 #: cps/spa_strings.py
 msgid "Authentication & security"
-msgstr ""
+msgstr "Autentisering och säkerhet"
 
 #: cps/spa_strings.py
 msgid "Author A–Z"
-msgstr ""
+msgstr "Författare A–Ö"
 
 #: cps/spa_strings.py
 msgid "Author Z–A"
-msgstr ""
+msgstr "Författare Ö–A"
 
 #: cps/spa_strings.py
 msgid "Authorised — signing you in…"
-msgstr ""
+msgstr "Auktoriserad — loggar in dig…"
 
 #: cps/spa_strings.py
 msgid "Authoritative books"
-msgstr ""
+msgstr "Auktoritativa böcker"
 
 #: cps/spa_strings.py
 msgid "Authorize URL"
-msgstr ""
+msgstr "Auktoriseringswebbadress"
 
 #: cps/spa_strings.py
 msgid "Auto-create users"
-msgstr ""
+msgstr "Skapa användare automatiskt"
 
 #: cps/spa_strings.py
 msgid "Auto-create users on first login"
-msgstr ""
+msgstr "Skapa användare automatiskt vid första inloggningen"
 
 #: cps/spa_strings.py
 msgid "Back to formatting"
-msgstr ""
+msgstr "Tillbaka till formatering"
 
 #: cps/spa_strings.py
 msgid "Back to library"
-msgstr ""
+msgstr "Tillbaka till biblioteket"
 
 #: cps/spa_strings.py
 msgid "Base DN"
-msgstr ""
+msgstr "Bas-DN"
 
 #: cps/spa_strings.py
 msgid "Basic settings"
-msgstr ""
+msgstr "Grundläggande inställningar"
 
 #: cps/spa_strings.py
 msgid "Beta"
-msgstr ""
+msgstr "Beta"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Black"
-msgstr ""
+msgstr "Svart"
 
 #: cps/spa_strings.py
 msgid "Bold"
-msgstr ""
+msgstr "Fet"
 
 #: cps/spa_strings.py
 msgid "Book default"
-msgstr ""
+msgstr "Bokens standard"
 
 #: cps/spa_strings.py
 msgid "Book density"
-msgstr ""
+msgstr "Boktäthet"
 
 #: cps/spa_strings.py
 msgid "Book order"
-msgstr ""
+msgstr "Bokordning"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Book {id}"
-msgstr ""
+msgstr "Bok {id}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Book {number}"
-msgstr ""
+msgstr "Bok {number}"
 
 #: cps/spa_strings.py
 msgid "Books"
@@ -4718,41 +4718,43 @@ msgstr "Böcker"
 
 #: cps/spa_strings.py
 msgid "Books awaiting authority"
-msgstr ""
+msgstr "Böcker som väntar på auktoritet"
 
 #: cps/spa_strings.py
 msgid "Books per page"
-msgstr ""
+msgstr "Böcker per sida"
 
 #: cps/spa_strings.py
 msgid "Books seeding"
-msgstr ""
+msgstr "Fyller på böcker"
 
 #: cps/spa_strings.py
 msgid ""
 "Books that are not on a Kobo-sync shelf are then removed from the device on "
 "its next sync. They stay in your library here."
 msgstr ""
+"Böcker som inte finns på en Kobo-synkroniseringshylla tas bort från enheten "
+"vid nästa synkronisering. De finns kvar i ditt bibliotek här."
 
 #: cps/spa_strings.py
 msgid "Built-in providers (leave blank to disable):"
-msgstr ""
+msgstr "Inbyggda leverantörer (lämna tomt för att inaktivera):"
 
 #: cps/spa_strings.py
 msgid "Bulleted list"
-msgstr ""
+msgstr "Punktlista"
 
 #: cps/spa_strings.py
 msgid "CA certificate path"
-msgstr ""
+msgstr "Sökväg till CA-certifikat"
 
 #: cps/spa_strings.py
 msgid "CWA settings"
-msgstr ""
+msgstr "CWA-inställningar"
 
 #: cps/spa_strings.py
 msgid "Can upload books"
-msgstr ""
+msgstr "Kan ladda upp böcker"
 
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/book_edit.html
 #: cps/templates/book_table.html cps/templates/config_db.html
@@ -4769,110 +4771,112 @@ msgstr "Avbryt"
 
 #: cps/spa_strings.py
 msgid "Cancel rename"
-msgstr ""
+msgstr "Avbryt namnbyte"
 
 #: cps/spa_strings.py
 msgid "Cancel title edit"
-msgstr ""
+msgstr "Avbryt titelredigering"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Cancel {task}"
-msgstr ""
+msgstr "Avbryt {task}"
 
 #: cps/spa_strings.py
 msgid "Certificate file path"
-msgstr ""
+msgstr "Sökväg till certifikatfil"
 
 #: cps/spa_strings.py
 msgid "Certificate path"
-msgstr ""
+msgstr "Certifikatsökväg"
 
 #: cps/spa_strings.py
 msgid "Change library cover"
-msgstr ""
+msgstr "Ändra bibliotekets omslag"
 
 #: cps/spa_strings.py
 msgid "Change my cover"
-msgstr ""
+msgstr "Ändra mitt omslag"
 
 #: cps/spa_strings.py
 msgid "Check again"
-msgstr ""
+msgstr "Kontrollera igen"
 
 #: cps/spa_strings.py
 msgid "Checking…"
-msgstr ""
+msgstr "Kontrollerar…"
 
 #: cps/spa_strings.py
 msgid ""
 "Choose Login and sign in with this NextGen account or one of its app "
 "passwords."
 msgstr ""
+"Välj Inloggning och logga in med detta NextGen-konto eller något av dess "
+"applösenord."
 
 #: cps/spa_strings.py
 msgid "Choose a cover"
-msgstr ""
+msgstr "Välj ett omslag"
 
 #: cps/spa_strings.py
 msgid "Choose a cover image to upload"
-msgstr ""
+msgstr "Välj en omslagsbild att ladda upp"
 
 #: cps/spa_strings.py
 msgid "Choose an image…"
-msgstr ""
+msgstr "Välj en bild…"
 
 #: cps/spa_strings.py
 msgid "Choose fields"
-msgstr ""
+msgstr "Välj fält"
 
 #: cps/spa_strings.py
 msgid "Choose your theme"
-msgstr ""
+msgstr "Välj ditt tema"
 
 #: cps/spa_strings.py
 msgid "Classic"
-msgstr ""
+msgstr "Klassisk"
 
 #: cps/spa_strings.py
 msgid "Clear default"
-msgstr ""
+msgstr "Rensa standardvärde"
 
 #: cps/spa_strings.py
 msgid "Clear formatting"
-msgstr ""
+msgstr "Rensa formatering"
 
 #: cps/spa_strings.py
 msgid "Clear selection"
-msgstr ""
+msgstr "Rensa markering"
 
 #: cps/spa_strings.py
 msgid "Client ID"
-msgstr ""
+msgstr "Klient-id"
 
 #: cps/spa_strings.py
 msgid "Client secret"
-msgstr ""
+msgstr "Klienthemlighet"
 
 #: cps/spa_strings.py
 msgid "Client secret (leave blank to keep)"
-msgstr ""
+msgstr "Klienthemlighet (lämna tomt för att behålla)"
 
 #: cps/spa_strings.py
 msgid "Close reader"
-msgstr ""
+msgstr "Stäng läsaren"
 
 #: cps/spa_strings.py
 msgid "Code"
-msgstr ""
+msgstr "Kod"
 
 #: cps/spa_strings.py
 msgid "Columns"
-msgstr ""
+msgstr "Kolumner"
 
 #: cps/spa_strings.py
 msgid "Comfortable"
-msgstr ""
+msgstr "Bekväm"
 
 #: cps/spa_strings.py
 msgid "Compact"

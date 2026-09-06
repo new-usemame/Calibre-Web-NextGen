@@ -6589,38 +6589,40 @@ msgstr "Klistra in den här serveradressen (insticksmodulen lägger själv till 
 
 #: cps/spa_strings.py
 msgid "Paused after a problem"
-msgstr ""
+msgstr "Pausad efter ett problem"
 
 #: cps/spa_strings.py
 msgid "People & devices"
-msgstr ""
+msgstr "Personer och enheter"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid ""
 "Pick a cover from any source we support, paste a URL, upload a file, or use "
 "the cover embedded in the book itself."
 msgstr ""
+"Välj ett omslag från en källa som stöds, klistra in en webbadress, ladda upp "
+"en fil eller använd omslaget som finns inbäddat i själva boken."
 
 #: cps/spa_strings.py
 msgid "Picked"
-msgstr ""
+msgstr "Vald"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Picked up {label}. Drag to reorder, release to drop."
-msgstr ""
+msgstr "Plockade upp {label}. Dra för att ordna om och släpp för att placera."
 
 #: cps/spa_strings.py
 msgid "Pin sidebar"
-msgstr ""
+msgstr "Fäst sidopanel"
 
 #: cps/spa_strings.py
 msgid "Pink"
-msgstr ""
+msgstr "Rosa"
 
 #: cps/spa_strings.py
 msgid "Please give this a try, you can easily undo later."
-msgstr ""
+msgstr "Prova gärna detta, du kan enkelt ångra senare."
 
 #: cps/spa_strings.py cps/templates/admin.html
 msgid "Port"
@@ -6628,20 +6630,20 @@ msgstr "Port"
 
 #: cps/spa_strings.py
 msgid "Position recorded"
-msgstr ""
+msgstr "Positionen har registrerats"
 
 #: cps/spa_strings.py
 msgid "Position repair queued"
-msgstr ""
+msgstr "Positionsreparation har köats"
 
 #: cps/spa_strings.py
 msgid "Preparing your magic link…"
-msgstr ""
+msgstr "Förbereder din magiska länk…"
 
 #: cps/spa_strings.py cps/templates/duplicates.html
 #: cps/templates/kobo_reconcile.html
 msgid "Preview"
-msgstr ""
+msgstr "Förhandsvisa"
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
@@ -6649,7 +6651,7 @@ msgstr "Föregående"
 
 #: cps/spa_strings.py
 msgid "Previous page"
-msgstr ""
+msgstr "Föregående sida"
 
 #: cps/spa_strings.py cps/templates/duplicates.html cps/templates/tasks.html
 msgid "Progress"
@@ -6657,27 +6659,27 @@ msgstr "Förlopp"
 
 #: cps/spa_strings.py
 msgid "Public"
-msgstr ""
+msgstr "Offentlig"
 
 #: cps/spa_strings.py
 msgid "Published after"
-msgstr ""
+msgstr "Publicerad efter"
 
 #: cps/spa_strings.py
 msgid "Published before"
-msgstr ""
+msgstr "Publicerad före"
 
 #: cps/spa_strings.py
 msgid "Quarantined books"
-msgstr ""
+msgstr "Böcker i karantän"
 
 #: cps/spa_strings.py
 msgid "Quote"
-msgstr ""
+msgstr "Citat"
 
 #: cps/spa_strings.py
 msgid "Random books shown"
-msgstr ""
+msgstr "Slumpmässiga böcker visas"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html
@@ -6686,47 +6688,47 @@ msgstr "Betyg"
 
 #: cps/spa_strings.py
 msgid "Rating (stars)"
-msgstr ""
+msgstr "Betyg (stjärnor)"
 
 #: cps/spa_strings.py
 msgid "Read status"
-msgstr ""
+msgstr "Lässtatus"
 
 #: cps/spa_strings.py
 msgid "Read status filter"
-msgstr ""
+msgstr "Filter för lässtatus"
 
 #: cps/spa_strings.py
 msgid "Reader settings saved."
-msgstr ""
+msgstr "Läsarinställningarna har sparats."
 
 #: cps/spa_strings.py
 msgid "Reading appearance"
-msgstr ""
+msgstr "Läsutseende"
 
 #: cps/spa_strings.py
 msgid "Reading positions"
-msgstr ""
+msgstr "Läspositioner"
 
 #: cps/spa_strings.py
 msgid "Recipient(s)"
-msgstr ""
+msgstr "Mottagare"
 
 #: cps/spa_strings.py
 msgid "Redirect host (full URL)"
-msgstr ""
+msgstr "Omdirigeringsvärd (fullständig webbadress)"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html cps/templates/index.html
 msgid "Refresh"
-msgstr ""
+msgstr "Uppdatera"
 
 #: cps/spa_strings.py
 msgid "Registering…"
-msgstr ""
+msgstr "Registrerar…"
 
 #: cps/spa_strings.py
 msgid "Reload"
-msgstr ""
+msgstr "Läs in på nytt"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6735,80 +6737,83 @@ msgid ""
 "series you edited here is replaced by what the file contains. This cannot be "
 "undone."
 msgstr ""
+"Läs in metadata för \"{title}\" från filen på disken igen? Titel, "
+"författare eller serie som du redigerat här ersätts av filens innehåll. Det "
+"kan inte ångras."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Reload metadata from disk"
-msgstr ""
+msgstr "Läs in metadata från disk igen"
 
 #: cps/spa_strings.py
 msgid "Reloading…"
-msgstr ""
+msgstr "Läser in på nytt…"
 
 #: cps/spa_strings.py
 msgid "Remember me"
-msgstr ""
+msgstr "Kom ihåg mig"
 
 #: cps/spa_strings.py
 msgid "Remove device"
-msgstr ""
+msgstr "Ta bort enhet"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
-msgstr ""
+msgstr "Ta bort från favoriter"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from shelf"
-msgstr ""
+msgstr "Ta bort från hylla"
 
 #: cps/spa_strings.py
 msgid "Remove highlight"
-msgstr ""
+msgstr "Ta bort markering"
 
 #: cps/spa_strings.py
 msgid "Remove identifier"
-msgstr ""
+msgstr "Ta bort identifierare"
 
 #: cps/spa_strings.py
 msgid "Remove link"
-msgstr ""
+msgstr "Ta bort länk"
 
 #: cps/spa_strings.py
 msgid "Remove note"
-msgstr ""
+msgstr "Ta bort anteckning"
 
 #: cps/spa_strings.py
 msgid "Remove rule"
-msgstr ""
+msgstr "Ta bort regel"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove {name}?"
-msgstr ""
+msgstr "Ta bort {name}?"
 
 #: cps/spa_strings.py
 msgid "Rename"
-msgstr ""
+msgstr "Byt namn"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Rename {name}"
-msgstr ""
+msgstr "Byt namn på {name}"
 
 #: cps/spa_strings.py
 msgid "Reorder"
-msgstr ""
+msgstr "Ordna om"
 
 #: cps/spa_strings.py
 msgid "Replace cover with this one?"
-msgstr ""
+msgstr "Ersätt omslaget med detta?"
 
 #: cps/spa_strings.py
 msgid "Replace cover?"
-msgstr ""
+msgstr "Ersätt omslag?"
 
 #: cps/spa_strings.py
 msgid "Replace existing"
-msgstr ""
+msgstr "Ersätt befintligt"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6816,27 +6821,29 @@ msgid ""
 "Replace metadata for {n} selected book(s)? Those books will lose their "
 "existing values in every filled field."
 msgstr ""
+"Ersätt metadata för {n} valda böcker? Dessa böcker förlorar sina befintliga "
+"värden i varje ifyllt fält."
 
 #: cps/spa_strings.py
 msgid "Report Issue on Discord"
-msgstr ""
+msgstr "Rapportera problem på Discord"
 
 #: cps/spa_strings.py
 msgid "Report Issue on GitHub"
-msgstr ""
+msgstr "Rapportera problem på GitHub"
 
 #: cps/spa_strings.py
 msgid "Report this problem"
-msgstr ""
+msgstr "Rapportera det här problemet"
 
 #: cps/spa_strings.py
 msgid "Require group membership"
-msgstr ""
+msgstr "Kräv gruppmedlemskap"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Reset password for {name}"
-msgstr ""
+msgstr "Återställ lösenord för {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6844,24 +6851,26 @@ msgid ""
 "Reset password for {name}? Their current password will stop working and a "
 "replacement will be emailed."
 msgstr ""
+"Återställ lösenordet för {name}? Det nuvarande lösenordet slutar fungera och "
+"ett ersättningslösenord skickas via e-post."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Restored the previous library mode for {accounts} accounts."
-msgstr ""
+msgstr "Återställde föregående biblioteksläge för {accounts} konton."
 
 #: cps/spa_strings.py
 msgid "Restoring…"
-msgstr ""
+msgstr "Återställer…"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Resume at {percent} from another device"
-msgstr ""
+msgstr "Fortsätt vid {percent} från en annan enhet"
 
 #: cps/spa_strings.py
 msgid "Retry"
-msgstr ""
+msgstr "Försök igen"
 
 #: cps/spa_strings.py
 msgid "Reverse-proxy header login"

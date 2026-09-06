@@ -6241,19 +6241,19 @@ msgstr "Ny smart hylla"
 
 #: cps/spa_strings.py
 msgid "New user"
-msgstr ""
+msgstr "Ny användare"
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "New: My Library"
-msgstr ""
+msgstr "Nytt: Mitt bibliotek"
 
 #: cps/spa_strings.py
 msgid "Newest"
-msgstr ""
+msgstr "Nyast"
 
 #: cps/spa_strings.py
 msgid "Newest published"
-msgstr ""
+msgstr "Senast publicerade"
 
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
 #: cps/templates/feed.xml cps/templates/layout.html
@@ -6262,151 +6262,153 @@ msgstr "Nästa"
 
 #: cps/spa_strings.py
 msgid "Next page"
-msgstr ""
+msgstr "Nästa sida"
 
 #: cps/spa_strings.py
 msgid "No books are ready yet — they appear here as they become ready."
-msgstr ""
+msgstr "Inga böcker är klara ännu — de visas här när de blir klara."
 
 #: cps/spa_strings.py
 msgid "No books match this smart shelf right now."
-msgstr ""
+msgstr "Inga böcker matchar den här smarta hyllan just nu."
 
 #: cps/spa_strings.py
 msgid "No books match those criteria."
-msgstr ""
+msgstr "Inga böcker matchar dessa kriterier."
 
 #: cps/spa_strings.py
 msgid "No books were reported in the latest device inventory."
-msgstr ""
+msgstr "Inga böcker rapporterades i den senaste enhetsinventeringen."
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "No candidates found yet. Try a different search or refresh."
-msgstr ""
+msgstr "Inga kandidater hittades ännu. Prova en annan sökning eller uppdatera."
 
 #: cps/spa_strings.py
 msgid "No contents found."
-msgstr ""
+msgstr "Inget innehåll hittades."
 
 #: cps/spa_strings.py
 msgid "No duplicate groups found."
-msgstr ""
+msgstr "Inga dubblettgrupper hittades."
 
 #: cps/spa_strings.py
 msgid "No e-readers yet."
-msgstr ""
+msgstr "Inga e-boksläsare ännu."
 
 #: cps/spa_strings.py
 msgid "No excluded tags"
-msgstr ""
+msgstr "Inga undantagna taggar"
 
 #: cps/spa_strings.py
 msgid "No highlights yet. Select text in the book to make one."
-msgstr ""
+msgstr "Inga markeringar ännu. Markera text i boken för att skapa en."
 
 #: cps/spa_strings.py
 msgid "No matches found in this book."
-msgstr ""
+msgstr "Inga träffar hittades i den här boken."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "No matching {items} for \"{query}\"."
-msgstr ""
+msgstr "Inga matchande {items} för \"{query}\"."
 
 #: cps/spa_strings.py
 msgid "No new device check-in yet."
-msgstr ""
+msgstr "Ingen ny enhetsincheckning ännu."
 
 #: cps/spa_strings.py
 msgid "No pages found in this comic."
-msgstr ""
+msgstr "Inga sidor hittades i den här serien."
 
 #: cps/spa_strings.py
 msgid "No reading positions from this device yet."
-msgstr ""
+msgstr "Inga läspositioner från den här enheten ännu."
 
 #: cps/spa_strings.py
 msgid "No registered devices."
-msgstr ""
+msgstr "Inga registrerade enheter."
 
 #: cps/spa_strings.py
 msgid "No shelves yet — create one below."
-msgstr ""
+msgstr "Inga hyllor ännu — skapa en nedan."
 
 #: cps/spa_strings.py
 msgid "No shelves yet. Create one above to start collecting books."
-msgstr ""
+msgstr "Inga hyllor ännu. Skapa en ovan för att börja samla böcker."
 
 #: cps/spa_strings.py
 msgid "No sources need a key."
-msgstr ""
+msgstr "Inga källor behöver en nyckel."
 
 #: cps/spa_strings.py
 msgid "No tasks running."
-msgstr ""
+msgstr "Inga uppgifter körs."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "No {items} yet."
-msgstr ""
+msgstr "Inga {items} ännu."
 
 #: cps/spa_strings.py
 msgid "Not assigned"
-msgstr ""
+msgstr "Inte tilldelad"
 
 #: cps/spa_strings.py
 msgid "Not configured"
-msgstr ""
+msgstr "Inte konfigurerad"
 
 #: cps/spa_strings.py
 msgid "Not in current file"
-msgstr ""
+msgstr "Inte i aktuell fil"
 
 #: cps/spa_strings.py
 msgid "Not matched to this library"
-msgstr ""
+msgstr "Matchar inte det här biblioteket"
 
 #: cps/spa_strings.py
 msgid "Not picked"
-msgstr ""
+msgstr "Inte vald"
 
 #: cps/spa_strings.py
 msgid "Not seen lately"
-msgstr ""
+msgstr "Inte sedd nyligen"
 
 #: cps/spa_strings.py
 msgid "Not set"
-msgstr ""
+msgstr "Inte angiven"
 
 #: cps/spa_strings.py
 msgid "Not set up yet"
-msgstr ""
+msgstr "Inte konfigurerad ännu"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Note"
-msgstr ""
+msgstr "Anteckning"
 
 #: cps/spa_strings.py
 msgid "Note removed"
-msgstr ""
+msgstr "Anteckningen har tagits bort"
 
 #: cps/spa_strings.py
 msgid "Note saved"
-msgstr ""
+msgstr "Anteckningen har sparats"
 
 #: cps/spa_strings.py
 msgid "Notes"
-msgstr ""
+msgstr "Anteckningar"
 
 #: cps/spa_strings.py
 msgid ""
 "Nothing here yet. Highlight or write a note while reading, or import from a "
 "Kobo device."
 msgstr ""
+"Det finns inget här ännu. Markera eller skriv en anteckning medan du läser, "
+"eller importera från en Kobo-enhet."
 
 #: cps/spa_strings.py
 msgid "Nothing in this category yet."
-msgstr ""
+msgstr "Det finns inget i den här kategorin ännu."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid ""
@@ -6414,146 +6416,163 @@ msgid ""
 "here is your selection in My Library. Add books from the global library; "
 "they appear here and on your e-reader."
 msgstr ""
+"Inget saknas — det globala biblioteket finns kvar på servern. Det du ser här "
+"är ditt urval i Mitt bibliotek. Lägg till böcker från det globala biblioteket; "
+"de visas här och på din e-boksläsare."
 
 #: cps/spa_strings.py
 msgid "Nothing to preview yet."
-msgstr ""
+msgstr "Det finns inget att förhandsvisa ännu."
 
 #: cps/spa_strings.py
 msgid "Numbered list"
-msgstr ""
+msgstr "Numrerad lista"
 
 #: cps/spa_strings.py
 msgid ""
 "Off by default. While in beta, opting in only records your preference and "
 "recovery evidence — it does not change what your Kobo receives yet."
 msgstr ""
+"Av som standard. Under betan registrerar deltagande bara dina inställningar "
+"och återställningsuppgifter — det ändrar ännu inte vad din Kobo tar emot."
 
 #: cps/spa_strings.py
 msgid "Oldest"
-msgstr ""
+msgstr "Äldst"
 
 #: cps/spa_strings.py
 msgid "Oldest published"
-msgstr ""
+msgstr "Tidigast publicerade"
 
 #: cps/spa_strings.py
 msgid ""
 "On another device where you’re already signed in, scan this code or open the "
 "link below to authorise this device."
 msgstr ""
+"Skanna den här koden på en annan enhet där du redan är inloggad, eller öppna "
+"länken nedan för att auktorisera den här enheten."
 
 #: cps/spa_strings.py
 msgid "On this device"
-msgstr ""
+msgstr "På den här enheten"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "One column"
-msgstr ""
+msgstr "En kolumn"
 
 #: cps/spa_strings.py
 msgid ""
 "Only the books you pick below sync. Switching here starts from none picked — "
 "you choose each book yourself."
 msgstr ""
+"Endast böckerna du väljer nedan synkroniseras. När du byter hit är inga "
+"böcker valda från början — du väljer varje bok själv."
 
 #: cps/spa_strings.py
 msgid "Open Account"
-msgstr ""
+msgstr "Öppna konto"
 
 #: cps/spa_strings.py
 msgid ""
 "Open NextGen using an address your e-reader can reach before copying these "
 "settings. Localhost only points back to the device itself."
 msgstr ""
+"Öppna NextGen via en adress som din e-boksläsare kan nå innan du kopierar "
+"dessa inställningar. Localhost pekar endast tillbaka till enheten själv."
 
 #: cps/spa_strings.py
 msgid "Open administration"
-msgstr ""
+msgstr "Öppna administration"
 
 #: cps/spa_strings.py
 msgid "Open classic reader"
-msgstr ""
+msgstr "Öppna klassisk läsare"
 
 #: cps/spa_strings.py
 msgid "Open navigation"
-msgstr ""
+msgstr "Öppna navigering"
 
 #: cps/spa_strings.py
 msgid "Open reader"
-msgstr ""
+msgstr "Öppna läsare"
 
 #: cps/spa_strings.py
 msgid "Open the classic interface"
-msgstr ""
+msgstr "Öppna det klassiska gränssnittet"
 
 #: cps/spa_strings.py
 msgid "Open the link below on your signed-in device."
-msgstr ""
+msgstr "Öppna länken nedan på den enhet där du är inloggad."
 
 #: cps/spa_strings.py
 msgid "OpenLDAP server"
-msgstr ""
+msgstr "OpenLDAP-server"
 
 #: cps/spa_strings.py
 msgid ""
 "Opens a prefilled report on GitHub. Nothing is sent until you post it, and "
 "you can edit it first."
 msgstr ""
+"Öppnar en ifylld rapport på GitHub. Inget skickas förrän du publicerar den, "
+"och du kan redigera den först."
 
 #: cps/spa_strings.py
 msgid "Opens in classic view"
-msgstr ""
+msgstr "Öppnas i klassisk vy"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Opt in to Kobo two-way annotation sync"
-msgstr ""
+msgstr "Aktivera tvåvägssynkronisering av Kobo-anteckningar"
 
 #: cps/spa_strings.py
 msgid ""
 "Opting in does not sync a book straight away. Each book is set up and "
 "checked first — its real state is shown here."
 msgstr ""
+"Aktivering synkroniserar inte en bok direkt. Varje bok konfigureras och "
+"kontrolleras först — dess faktiska status visas här."
 
 #: cps/spa_strings.py
 msgid ""
 "Organize your library, your way. Checkout books from the Global Library to "
 "bring them into My Library."
 msgstr ""
+"Organisera ditt bibliotek på ditt sätt. Lägg till böcker från det globala "
+"biblioteket i Mitt bibliotek."
 
 #: cps/spa_strings.py
 msgid "PDF reader"
-msgstr ""
+msgstr "PDF-läsare"
 
 #: cps/spa_strings.py
 msgid "Page margins"
-msgstr ""
+msgstr "Sidmarginaler"
 
 #: cps/spa_strings.py
 msgid "Page theme"
-msgstr ""
+msgstr "Sidtema"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Page {number}"
-msgstr ""
+msgstr "Sida {number}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Page {page} of {pages}"
-msgstr ""
+msgstr "Sida {page} av {pages}"
 
 #: cps/spa_strings.py
 msgid "Pair a Kobo or KOReader"
-msgstr ""
+msgstr "Parkoppla en Kobo eller KOReader"
 
 #: cps/spa_strings.py
 msgid "Pair an e-reader"
-msgstr ""
+msgstr "Parkoppla en e-boksläsare"
 
 #: cps/spa_strings.py
 msgid "Partially seeded books"
-msgstr ""
+msgstr "Delvis påfyllda böcker"
 
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/login.html
 #: cps/templates/user_edit.html
@@ -6562,11 +6581,11 @@ msgstr "Lösenord"
 
 #: cps/spa_strings.py
 msgid "Password (leave blank to keep)"
-msgstr ""
+msgstr "Lösenord (lämna tomt för att behålla)"
 
 #: cps/spa_strings.py
 msgid "Paste this server address (the plugin adds /kosync itself):"
-msgstr ""
+msgstr "Klistra in den här serveradressen (insticksmodulen lägger själv till /kosync):"
 
 #: cps/spa_strings.py
 msgid "Paused after a problem"

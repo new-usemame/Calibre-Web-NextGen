@@ -74,9 +74,9 @@ def test_backend_blueprint_wire_matches_docker(real_app_wire):
     compared, excluded = _backend_parity_rows(
         real_app_wire, bundle_built=(root / "cps/static/app/index.html").is_file(),
     )
-    if excluded:
-        print("DOCKER PARITY: backend rows only; SPA bundle absent, excluded "
-              + ", ".join(row["path"] for row in excluded))
+    for row, reason in excluded:
+        print("DOCKER PARITY: not compared -- %s (%s)" % (row["path"], reason))
+    print("DOCKER PARITY: comparing %d of %d rows" % (len(compared), len(real_app_wire)))
     created = subprocess.run(
         ["docker", "run", "--detach", "--pull=never",
          "--publish", "127.0.0.1::8083", "--env", "NETWORK_SHARE_MODE=false",
@@ -89,16 +89,23 @@ def test_backend_blueprint_wire_matches_docker(real_app_wire):
         port = subprocess.run(["docker", "port", container, "8083/tcp"],
                               capture_output=True, text=True, timeout=10, check=True)
         base = "http://" + port.stdout.strip()
-        deadline = time.monotonic() + 120
+        # tests/conftest.py:938 records why /login is not a readiness signal: it can
+        # answer while the configured database and critical services are still
+        # unavailable. Comparing a byte-exact wire against a half-started app would
+        # produce differences that are timing, not behaviour. Use the same endpoint
+        # and the same budget as the shared Docker fixture.
+        budget = int(os.environ.get("CWA_TEST_START_TIMEOUT", "600"))
+        deadline = time.monotonic() + budget
         while True:
             try:
-                ready = requests.get(base + "/login", timeout=2)
-                if ready.status_code == 200 and "csrf_token" in ready.text:
+                if requests.get(base + "/health", timeout=2).status_code == 200:
                     break
             except requests.RequestException:
                 pass
             if time.monotonic() >= deadline:
-                pytest.fail("Disposable Docker application did not become ready in 120s")
+                pytest.fail(
+                    "Disposable Docker application did not become ready in %ds "
+                    "(raise CWA_TEST_START_TIMEOUT on a slow runner)" % budget)
             time.sleep(0.5)
         for row in compared:
             response = requests.request(row["method"], base + row["path"],
@@ -123,20 +130,35 @@ BUNDLE_SERVED_BLUEPRINTS = ("spa",)
 def _backend_parity_rows(wire, *, bundle_built):
     """Split the probe wire into rows Docker parity can claim, and rows it cannot.
 
-    Returns ``(compared, excluded)``. With the Vite bundle present both the
-    checkout and the image serve the compiled shell, so nothing is excluded.
-    Without it the checkout answers 404 where the image answers 200, and that
-    gap is the frontend build rather than the backend. Excluding it silently
-    would let a future bundle-served blueprint drop out of the comparison
-    unnoticed, so the exclusion is held to the blueprints the bundle governs.
+    Returns ``(compared, excluded)``, where each excluded row carries the reason
+    it cannot be compared. Two things are not the application and must not be
+    reported as parity failures:
+
+    * The Vite bundle under ``cps/static/app/``, which is gitignored and which no
+      lane builds before this job. Without it the checkout answers 404 where the
+      image serves the compiled shell -- a difference in the frontend build.
+    * A route whose answer depends on the client's source address. Werkzeug's
+      test client presents ``REMOTE_ADDR`` 127.0.0.1; a request through a
+      container's published port arrives from the bridge gateway. ``cases.py``
+      asks each route directly whether it answers a stranger differently, so this
+      set is measured rather than maintained by hand.
+
+    Excluding silently would let coverage drain away unnoticed, so a bundle-served
+    row must belong to a blueprint this module claims, and every other exclusion
+    must carry the measured flag that justifies it.
     """
-    if bundle_built:
-        return list(wire), []
-    excluded = [row for row in wire if row["path"].startswith("/app")]
-    unclaimed = [row for row in excluded
-                 if row["blueprint"] not in BUNDLE_SERVED_BLUEPRINTS]
+    compared, excluded = [], []
+    for row in wire:
+        if row.get("client_address_sensitive"):
+            excluded.append((row, "answers a non-loopback client differently"))
+        elif not bundle_built and row["path"].startswith("/app"):
+            excluded.append((row, "SPA bundle absent from the checkout"))
+        else:
+            compared.append(row)
+    unclaimed = [row for row, reason in excluded
+                 if reason == "SPA bundle absent from the checkout"
+                 and row["blueprint"] not in BUNDLE_SERVED_BLUEPRINTS]
     assert not unclaimed, unclaimed
-    compared = [row for row in wire if not row["path"].startswith("/app")]
     return compared, excluded
 
 

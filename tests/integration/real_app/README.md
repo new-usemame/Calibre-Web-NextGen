@@ -43,23 +43,46 @@ backend wire only, and runs only where a matching image exists.
    returned `/login?local=1`. This is not evidence of a current product bug.
    The source checksum precondition now rejects that mismatched comparison.
 
-   **Scope, and why it is drawn here.** `cps/static/app/` is the Vite bundle.
-   It is gitignored, and the Integration Tests lane builds the image from the
-   checkout without building it first (`.github/workflows/tests.yml`, "Build
-   Docker image" then "Run Docker integration tests"), so a CI checkout has no
-   bundle while the image it built does. OBSERVED in a fresh checkout: `/app/`
-   answers 404, one probe row, blueprint `spa`. Requiring the bundle would
-   therefore have reddened that lane on every run while proving nothing about
-   the application — the difference is the frontend build, not the backend.
-   `_backend_parity_rows` compares every row when the checkout has the bundle
-   and otherwise excludes the bundle-served rows, refusing to exclude a
-   blueprint outside `BUNDLE_SERVED_BLUEPRINTS` so a future route cannot leave
-   the comparison unnoticed. That decision is pinned by
-   `tests/unit/test_real_app_parity_partition.py` (4 cases, all four seen red
-   against mutants of the rule: never-exclude, always-exclude, guard removed,
-   backend rows dropped). The comparison itself still runs nowhere on a
-   developer machine without a matching image; the integration lane is the one
-   environment that builds one.
+   **Scope, and why it is drawn here.** Two things the comparison must not
+   report as parity failures, because neither is the application:
+
+   *The compiled SPA bundle.* `cps/static/app/` is gitignored, and the
+   Integration Tests lane builds the image from the checkout without building it
+   first (`.github/workflows/tests.yml`, "Build Docker image" then "Run Docker
+   integration tests"), so a CI checkout has no bundle while the image it built
+   does. OBSERVED in a fresh checkout: `/app/` answers 404, one probe row,
+   blueprint `spa`. Asserting the bundle exists would have failed that lane on
+   every run.
+
+   *A route that reads the client's source address.* Werkzeug's test client
+   presents `REMOTE_ADDR` 127.0.0.1; a request through a container's published
+   port arrives from the bridge gateway. OBSERVED, exactly one route differs for
+   this reason: `/cwa-internal/duplicate-scan-status` returns 200 to loopback and
+   500 to anyone else (`cps/cwa_functions.py:478-493` aborts 403 and the bare
+   `except Exception` re-emits it as a 500 — a product defect recorded separately,
+   not fixed here). `cases.py` asks every route directly, from a documentation
+   -range address (RFC 5737), so this exclusion set is MEASURED on each run rather
+   than maintained by hand: a route that stops caring rejoins the comparison, and
+   one that starts caring leaves it, without anyone editing a list.
+
+   `_backend_parity_rows` returns the rows it compares and, for each row it does
+   not, the reason. A bundle-served exclusion must belong to a blueprint the
+   module claims; every other exclusion must carry the measured flag. That
+   decision is pinned by `tests/unit/test_real_app_parity_partition.py` (7 cases,
+   each seen red against a mutant of the rule).
+
+   **What is still unverified, plainly.** The comparison has never been observed
+   green. It skips on a developer machine without a matching image. The one
+   environment that builds a matching image is the Integration Tests lane, and
+   there `CWA_TEST_IMAGE` is set (`tests.yml:369`), which turns the digest
+   mismatch from a skip into a hard failure — so that lane, not a developer, is
+   where this leg first proves or disproves itself. A change under
+   `tests/integration/` sets `build: true` in `scripts/ci_path_classification.py`,
+   which makes that lane gating rather than advisory. The remaining risk is not
+   provisioning: it is that a matching image may expose divergences this
+   28-file-drifted comparison could not, since the digest covers first-party
+   source only and not the dependency graph, the Python version, or runtime
+   config.
 
    Separately, exploratory `/login/generic` returned 500 with default settings;
    no product change or claim of Docker equivalence was made for that route.
@@ -86,9 +109,9 @@ backend wire only, and runs only where a matching image exists.
 4. **Lane and repetitions — OBSERVED locally, not a Linux CI execution.**
    Existing `integration-tests` runs `pytest tests/docker/ tests/integration/`.
    The new outer module declares only `integration`. No workflow edit is
-   needed for discovery. To finish parity, supply the current integration
-   image and matching checkout SPA build artifact; workflow provisioning
-   changes remain with the operator. No CI/workflow file was edited.
+   needed for discovery. Parity is not finished by provisioning: see the
+   scope note above for what actually stands in the way. No CI/workflow file
+   was edited.
 
    Commands below abbreviate the mandated absolute interpreter as `$PY`;
    every recorded run used Python 3.12.7 / pytest 9.0.3 from that interpreter.
@@ -98,7 +121,7 @@ backend wire only, and runs only where a matching image exists.
    collected 2 items / 2 deselected / 0 selected
 
    $PY -m pytest -m 'smoke or unit' --collect-only -q
-   8806/8929 tests collected (123 deselected) in 16.41s
+   8813/8936 tests collected (123 deselected) in 6.32s
 
    $PY -m pytest tests/integration/test_real_app.py tests/unit/test_application_factory.py -q -s -rs --tb=short
    Run 1: child 5 passed in 3.09s; outer 18 passed, 1 skipped in 7.36s

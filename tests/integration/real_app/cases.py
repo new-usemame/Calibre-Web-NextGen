@@ -134,9 +134,44 @@ def test_blueprint_requests(real_app):
                "status": response.status_code, "mimetype": response.mimetype,
                "location": response.headers.get("Location"),
                "json": response.get_json(silent=True)}
+        # Werkzeug's test client presents REMOTE_ADDR 127.0.0.1; a request through
+        # a container's published port arrives from the bridge gateway. A route that
+        # reads the client address therefore answers differently through the two
+        # probes for a reason that is not a difference in the application. Ask each
+        # route directly, from a documentation-range address (RFC 5737), so the
+        # Docker comparison can exclude exactly the routes that demonstrably care
+        # rather than a hand-maintained list. No assertion here: a route is entitled
+        # to refuse a stranger, and this probe only classifies.
+        stranger = real_app.test_client().open(
+            path, method=method, environ_base={"REMOTE_ADDR": "192.0.2.10"})
+        row["client_address_sensitive"] = (
+            stranger.status_code != row["status"]
+            or stranger.mimetype != row["mimetype"]
+            or stranger.headers.get("Location") != row["location"]
+            or stranger.get_json(silent=True) != row["json"])
         rows.append(row)
         print("BLUEPRINT", name, method, path, response.status_code, response.mimetype)
     assert len(rows) == len(real_app.blueprints) - 1
+
+    # Comparing the app to its own enumeration cannot notice a blueprint that
+    # stopped being registered: the loop simply gets shorter and every remaining
+    # answer still holds. MEASURED -- deleting the OPDS registration outright left
+    # this suite green before this check existed. The committed list is the only
+    # thing here that does not come from the app itself.
+    import pathlib
+    expected = json.loads(pathlib.Path(__file__).with_name("blueprints.json").read_text())
+    actual = sorted(real_app.blueprints)
+    missing = [name for name in expected if name not in actual]
+    added = [name for name in actual if name not in expected]
+    assert not missing, (
+        "blueprint(s) no longer registered: %s. If the removal is intended, delete "
+        "them from tests/integration/real_app/blueprints.json in the same commit."
+        % missing)
+    assert not added, (
+        "new blueprint(s) not in the pinned list: %s. Add them to "
+        "tests/integration/real_app/blueprints.json so a later disappearance is a diff."
+        % added)
+
     print("REAL_APP_WIRE=" + json.dumps(rows, sort_keys=True))
 
 

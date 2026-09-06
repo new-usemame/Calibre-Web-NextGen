@@ -4991,276 +4991,276 @@ msgstr "Kunde inte läsa in kandidater."
 
 #: cps/spa_strings.py
 msgid "Could not load device annotations."
-msgstr ""
+msgstr "Kunde inte läsa in enhetsanteckningar."
 
 #: cps/spa_strings.py
 msgid "Could not load duplicates."
-msgstr ""
+msgstr "Kunde inte läsa in dubbletter."
 
 #: cps/spa_strings.py
 msgid "Could not load e-readers."
-msgstr ""
+msgstr "Kunde inte läsa in e-boksläsare."
 
 #: cps/spa_strings.py
 msgid "Could not load highlights and notes."
-msgstr ""
+msgstr "Kunde inte läsa in markeringar och anteckningar."
 
 #: cps/spa_strings.py
 msgid "Could not load pairing details."
-msgstr ""
+msgstr "Kunde inte läsa in parkopplingsdetaljer."
 
 #: cps/spa_strings.py
 msgid "Could not load reading positions."
-msgstr ""
+msgstr "Kunde inte läsa in läspositioner."
 
 #: cps/spa_strings.py
 msgid "Could not load stats."
-msgstr ""
+msgstr "Kunde inte läsa in statistik."
 
 #: cps/spa_strings.py
 msgid "Could not load tasks."
-msgstr ""
+msgstr "Kunde inte läsa in uppgifter."
 
 #: cps/spa_strings.py
 msgid "Could not load the device board."
-msgstr ""
+msgstr "Kunde inte läsa in enhetsöversikten."
 
 #: cps/spa_strings.py
 msgid "Could not load this device library."
-msgstr ""
+msgstr "Kunde inte läsa in det här enhetsbiblioteket."
 
 #: cps/spa_strings.py
 msgid "Could not load this text file."
-msgstr ""
+msgstr "Kunde inte läsa in den här textfilen."
 
 #: cps/spa_strings.py
 msgid "Could not load users."
-msgstr ""
+msgstr "Kunde inte läsa in användare."
 
 #: cps/spa_strings.py
 msgid "Could not open that highlight."
-msgstr ""
+msgstr "Kunde inte öppna den markeringen."
 
 #: cps/spa_strings.py
 msgid "Could not open that search result."
-msgstr ""
+msgstr "Kunde inte öppna det sökresultatet."
 
 #: cps/spa_strings.py
 msgid "Could not open the synced position."
-msgstr ""
+msgstr "Kunde inte öppna den synkroniserade positionen."
 
 #: cps/spa_strings.py
 msgid "Could not read this comic archive."
-msgstr ""
+msgstr "Kunde inte läsa detta seriearkiv."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Could not reload metadata"
-msgstr ""
+msgstr "Kunde inte läsa in metadata på nytt"
 
 #: cps/spa_strings.py
 msgid "Could not rename shelf."
-msgstr ""
+msgstr "Kunde inte byta namn på hyllan."
 
 #: cps/spa_strings.py
 msgid "Could not request deletion from this device."
-msgstr ""
+msgstr "Kunde inte begära borttagning från den här enheten."
 
 #: cps/spa_strings.py
 msgid "Could not reset password."
-msgstr ""
+msgstr "Kunde inte återställa lösenordet."
 
 #: cps/spa_strings.py cps/templates/shelf_reorder.html
 msgid "Could not save order."
-msgstr ""
+msgstr "Kunde inte spara ordningen."
 
 #: cps/spa_strings.py
 msgid "Could not save reader settings."
-msgstr ""
+msgstr "Kunde inte spara läsarinställningar."
 
 #: cps/spa_strings.py
 msgid "Could not save that note."
-msgstr ""
+msgstr "Kunde inte spara den anteckningen."
 
 #: cps/spa_strings.py
 msgid "Could not save the default library filter."
-msgstr ""
+msgstr "Kunde inte spara standardfiltret för biblioteket."
 
 #: cps/spa_strings.py
 msgid "Could not save the shelf."
-msgstr ""
+msgstr "Kunde inte spara hyllan."
 
 #: cps/spa_strings.py
 msgid "Could not save title."
-msgstr ""
+msgstr "Kunde inte spara titeln."
 
 #: cps/spa_strings.py
 msgid "Could not save your reading position."
-msgstr ""
+msgstr "Kunde inte spara din läsposition."
 
 #: cps/spa_strings.py
 msgid "Could not search this book."
-msgstr ""
+msgstr "Kunde inte söka i den här boken."
 
 #: cps/spa_strings.py
 msgid "Could not start the duplicate scan."
-msgstr ""
+msgstr "Kunde inte starta dubblettgenomsökningen."
 
 #: cps/spa_strings.py
 msgid "Could not update pairing details."
-msgstr ""
+msgstr "Kunde inte uppdatera parkopplingsdetaljer."
 
 #: cps/spa_strings.py
 msgid "Could not update shelf."
-msgstr ""
+msgstr "Kunde inte uppdatera hyllan."
 
 #: cps/spa_strings.py
 msgid "Could not update your account setting."
-msgstr ""
+msgstr "Kunde inte uppdatera din kontoinställning."
 
 #: cps/spa_strings.py
 msgid "Couldn’t start a magic link. Please try again."
-msgstr ""
+msgstr "Kunde inte starta en magisk länk. Försök igen."
 
 #: cps/spa_strings.py
 msgid "Cover locked"
-msgstr ""
+msgstr "Omslaget är låst"
 
 #: cps/spa_strings.py
 msgid "Cover not reachable"
-msgstr ""
+msgstr "Omslaget går inte att nå"
 
 #: cps/spa_strings.py
 msgid "Cover updated from the selected result."
-msgstr ""
+msgstr "Omslaget har uppdaterats från det valda resultatet."
 
 #: cps/spa_strings.py
 msgid "Create"
-msgstr ""
+msgstr "Skapa"
 
 #: cps/spa_strings.py
 msgid "Create account"
-msgstr ""
+msgstr "Skapa konto"
 
 #: cps/spa_strings.py
 msgid "Create an account"
-msgstr ""
+msgstr "Skapa ett konto"
 
 #: cps/spa_strings.py
 msgid "Create failed."
-msgstr ""
+msgstr "Det gick inte att skapa."
 
 #: cps/spa_strings.py
 msgid "Create shelf and add book"
-msgstr ""
+msgstr "Skapa hylla och lägg till bok"
 
 #: cps/spa_strings.py
 msgid "Create user"
-msgstr ""
+msgstr "Skapa användare"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Created {name}."
-msgstr ""
+msgstr "{name} har skapats."
 
 #: cps/spa_strings.py
 msgid "Creating…"
-msgstr ""
+msgstr "Skapar…"
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Crop to fill — no border, trims the edges"
-msgstr ""
+msgstr "Beskär för att fylla — ingen kant, beskär kanterna"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current"
-msgstr ""
+msgstr "Aktuell"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Current cover"
-msgstr ""
+msgstr "Aktuellt omslag"
 
 #: cps/spa_strings.py
 msgid "Current password"
-msgstr ""
+msgstr "Nuvarande lösenord"
 
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/image.html
 #: cps/templates/index.html
 msgid "Currently reading"
-msgstr ""
+msgstr "Läser just nu"
 
 #: cps/spa_strings.py
 msgid "Custom border colour"
-msgstr ""
+msgstr "Anpassad kantfärg"
 
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
-msgstr ""
+msgstr "Anpassade kolumner"
 
 #: cps/spa_strings.py
 msgid "Data hoarder? This will help users organize their accounts!"
-msgstr ""
+msgstr "Datasamlare? Detta hjälper användare att organisera sina konton!"
 
 #: cps/spa_strings.py
 msgid "Database path"
-msgstr ""
+msgstr "Databassökväg"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Date added"
-msgstr ""
+msgstr "Datum tillagt"
 
 #: cps/spa_strings.py
 msgid "Default (System Sans-Serif)"
-msgstr ""
+msgstr "Standard (systemets sans serif)"
 
 #: cps/spa_strings.py
 msgid "Default book language"
-msgstr ""
+msgstr "Standardspråk för böcker"
 
 #: cps/spa_strings.py
 msgid "Default interface language"
-msgstr ""
+msgstr "Standardgränssnittsspråk"
 
 #: cps/spa_strings.py
 msgid "Default library filter cleared."
-msgstr ""
+msgstr "Standardfiltret för biblioteket har rensats."
 
 #: cps/spa_strings.py
 msgid "Default library filter saved."
-msgstr ""
+msgstr "Standardfiltret för biblioteket har sparats."
 
 #: cps/spa_strings.py
 msgid "Default roles for new OAuth users:"
-msgstr ""
+msgstr "Standardroller för nya OAuth-användare:"
 
 #: cps/spa_strings.py
 msgid "Defaults live in Admin → Configuration → Kobo sync."
-msgstr ""
+msgstr "Standardvärden finns i Administration → Konfiguration → Kobo-synkronisering."
 
 #: cps/spa_strings.py
 msgid "Delete books"
-msgstr ""
+msgstr "Ta bort böcker"
 
 #: cps/spa_strings.py
 msgid "Delete failed."
-msgstr ""
+msgstr "Borttagningen misslyckades."
 
 #: cps/spa_strings.py
 msgid "Delete from device"
-msgstr ""
+msgstr "Ta bort från enhet"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete shelf \"{name}\"? This cannot be undone."
-msgstr ""
+msgstr "Ta bort hyllan \"{name}\"? Det kan inte ångras."
 
 #: cps/spa_strings.py
 msgid "Delete sync URL"
-msgstr ""
+msgstr "Ta bort synkroniseringswebbadress"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete tag {name}"
-msgstr ""
+msgstr "Ta bort taggen {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5268,53 +5268,57 @@ msgid ""
 "Delete the {fmt} file? The book record, metadata, shelves, and reading state "
 "stay available."
 msgstr ""
+"Ta bort filen {fmt}? Bokposten, metadata, hyllor och lästillstånd finns "
+"kvar."
 
 #: cps/spa_strings.py
 msgid ""
 "Delete this Kobo sync URL? The current URL will stop working on every paired "
 "Kobo."
 msgstr ""
+"Ta bort den här Kobo-synkroniseringswebbadressen? Den aktuella adressen "
+"slutar fungera på varje parkopplad Kobo."
 
 #: cps/spa_strings.py
 msgid "Delete this smart shelf? Your books are not affected."
-msgstr ""
+msgstr "Ta bort den här smarta hyllan? Dina böcker påverkas inte."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete user \"{name}\"? Their shelves and reading data are removed too."
-msgstr ""
+msgstr "Ta bort användaren \"{name}\"? Användarens hyllor och läsdata tas också bort."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete {name}"
-msgstr ""
+msgstr "Ta bort {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete {path} from {name} on its next sync?"
-msgstr ""
+msgstr "Ta bort {path} från {name} vid nästa synkronisering?"
 
 #: cps/spa_strings.py
 msgid "Deleted device"
-msgstr ""
+msgstr "Borttagen enhet"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Deleted tag {name}"
-msgstr ""
+msgstr "Tog bort taggen {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Deleted {name}."
-msgstr ""
+msgstr "Tog bort {name}."
 
 #: cps/spa_strings.py
 msgid "Deletion requested"
-msgstr ""
+msgstr "Borttagning har begärts"
 
 #: cps/spa_strings.py
 msgid "Dense"
-msgstr ""
+msgstr "Tät"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/search_form.html
@@ -5323,15 +5327,15 @@ msgstr "Beskrivning"
 
 #: cps/spa_strings.py
 msgid "Description formatting"
-msgstr ""
+msgstr "Formatering av beskrivning"
 
 #: cps/spa_strings.py
 msgid "Device administration"
-msgstr ""
+msgstr "Enhetsadministration"
 
 #: cps/spa_strings.py
 msgid "Device data"
-msgstr ""
+msgstr "Enhetsdata"
 
 #: cps/spa_strings.py
 msgid "Device library"

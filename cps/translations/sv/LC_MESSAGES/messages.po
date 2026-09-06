@@ -11036,6 +11036,11 @@ msgid ""
 "NextGen Automatic Cover & Metadata Enforcement Service toggled in CWA "
 "Settings."
 msgstr ""
+"Den här tjänsten skriver om omslagen och metadata som lagras i själva "
+"e-boksfilerna för varje bok i biblioteket, så att filerna på disken alltid "
+"motsvarar det du ser i Calibre-Web. Den är den biblioteksomfattande versionen "
+"av tjänsten NextGen Automatic Cover & Metadata Enforcement, som aktiveras i "
+"CWA-inställningar."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid ""
@@ -11043,6 +11048,9 @@ msgid ""
 "Cover & Metadata Enforcement service either here in the Web UI or through "
 "the CLI, you will see the output of the most recent previous run below."
 msgstr ""
+"När du läser in den här sidan visas resultatet av den senaste körningen nedan, "
+"om du tidigare har startat NextGen Cover & Metadata Enforcement-tjänsten här "
+"i webbgränssnittet eller via CLI."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid ""
@@ -11051,40 +11059,43 @@ msgid ""
 "still in progress, simply press the Cancel button above and the run will "
 "terminate ASAP."
 msgstr ""
+"När du har startat en körning kan du lämna sidan och återvända när du vill för "
+"att kontrollera förloppet. Om du vill avbryta en körning som fortfarande pågår "
+"trycker du bara på knappen Avbryt ovan, så avslutas körningen snarast möjligt."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "Bulk Processing"
-msgstr ""
+msgstr "Massbearbetning"
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid ""
 "No current or previous run to display. Press the Start button above to "
 "initiate a run."
-msgstr ""
+msgstr "Ingen aktuell eller tidigare körning att visa. Tryck på knappen Starta ovan för att påbörja en körning."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "Lost contact with the server, retrying..."
-msgstr ""
+msgstr "Kontakten med servern bröts, försöker igen …"
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "The request failed."
-msgstr ""
+msgstr "Begäran misslyckades."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "Starting..."
-msgstr ""
+msgstr "Startar …"
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "Cancelling..."
-msgstr ""
+msgstr "Avbryter …"
 
 #: cps/templates/cwa_epub_fixer.html
 msgid "Run on a single book"
-msgstr ""
+msgstr "Kör för en enskild bok"
 
 #: cps/templates/cwa_epub_fixer.html
 msgid "Search by title/author"
-msgstr ""
+msgstr "Sök efter titel/författare"
 
 #: cps/templates/cwa_epub_fixer.html
 msgid "Run on selected book"
@@ -11128,7 +11139,7 @@ msgstr "Aktivera/inaktivera Calibre-Web NextGen-tjänster"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Auto-Convert"
-msgstr ""
+msgstr "Aktivera NextGen Auto-Convert"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11137,10 +11148,14 @@ msgid ""
 "        <em>EXCEPT</em> those you have specifically told NextGen to ignore "
 "below."
 msgstr ""
+"Aktiverad som standard. När den är aktiv konverteras alla importerade böcker "
+"automatiskt till målformatet som anges nedan (epub som standard), \n"
+"        <em>utom</em> de som du särskilt har angett att NextGen ska ignorera "
+"nedan."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Automatic Cover & Metadata Enforcement Service"
-msgstr ""
+msgstr "Aktivera tjänsten NextGen Automatic Cover & Metadata Enforcement"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11152,10 +11167,16 @@ msgid ""
 "themselves. This feature currently only supports files in EPUB \n"
 "        or AZW3 format."
 msgstr ""
+"Aktiverad som standard. När den är aktiv tillämpar NextGen Metadata "
+"Enforcement-tjänsten ändringar direkt i e-boksfilerna när metadata och/eller "
+"omslagsbilden redigeras i webbgränssnittet. I vanliga CW eller när inställningen "
+"är inaktiverad tillämpas ändringar endast på det som visas i webbgränssnittet, "
+"inte i själva e-boksfilerna. Funktionen har för närvarande endast stöd för "
+"filer i EPUB- eller AZW3-format."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
-msgstr ""
+msgstr "Aktivera NextGen Kindle EPUB Fixer"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11166,6 +11187,11 @@ msgid ""
 "devices and have experienced issues with \n"
 "        file rejections or formatting problems."
 msgstr ""
+"När funktionen är aktiv kontrolleras och korrigeras bland annat kodningen i "
+"alla EPUB-filer som bearbetas av NextGen för att säkerställa maximal "
+"kompatibilitet med Amazons Send-to-Kindle-tjänst. Funktionen är särskilt "
+"användbar för användare som ofta skickar EPUB-filer till sina Kindle-enheter "
+"och har upplevt avvisade filer eller formateringsproblem."
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11173,10 +11199,13 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
+"Detta verktyg har anpassats från verktyget <a href=\"https://kindle-epub-fix.netlify.app/"
+"\">kindle-epub-fix.netlify.app</a> som skapats av <a href=\"https://github.com/"
+"innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
-msgstr ""
+msgstr "Aktivera KOReader-synkronisering (NextGen-insticksmodul)"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11347,7 +11376,7 @@ msgstr "(Serverns tidszon: %(tz)s)"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Automatic Metadata Fetching for New Books"
-msgstr ""
+msgstr "Aktivera automatisk metadatahämtning för nya böcker"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11356,10 +11385,14 @@ msgid ""
 "configured metadata provider hierarchy. This helps improve the quality of "
 "book information, especially for books with poor or missing metadata."
 msgstr ""
+"När funktionen är aktiv försöker NextGen automatiskt hämta och tillämpa "
+"metadata (titel, författare, beskrivning, omslag osv.) för nyligen importerade "
+"böcker med den konfigurerade leverantörsordningen. Det bidrar till bättre "
+"bokinformation, särskilt för böcker med bristfälliga eller saknade metadata."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Smart Metadata Application"
-msgstr ""
+msgstr "Aktivera smart tillämpning av metadata"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11951,7 +11984,7 @@ msgstr "Endast äldre SQL (experimentellt)"
 msgid ""
 "Hybrid mode uses a fast SQL pre-filter to narrow candidates, then applies "
 "the robust Python logic for final results."
-msgstr ""
+msgstr "Hybridläget använder ett snabbt SQL-förfilter för att begränsa kandidaterna och tillämpar sedan robust Python-logik för slutresultatet."
 
 #: cps/templates/cwa_settings.html
 msgid "Automatic Duplicate Scanning"
@@ -11961,41 +11994,41 @@ msgstr "Automatisk dubblettsökning"
 msgid ""
 "Configure background duplicate scans. These run automatically without "
 "blocking the UI."
-msgstr ""
+msgstr "Konfigurera dubblettsökningar i bakgrunden. De körs automatiskt utan att blockera gränssnittet."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable automatic duplicate scans"
-msgstr ""
+msgstr "Aktivera automatiska dubblettsökningar"
 
 #: cps/templates/cwa_settings.html
 msgid "After import scans"
-msgstr ""
+msgstr "Sökningar efter import"
 
 #: cps/templates/cwa_settings.html
 msgid "Run after each import (debounced)"
-msgstr ""
+msgstr "Kör efter varje import (med fördröjning)"
 
 #: cps/templates/cwa_settings.html
 msgid "Manual only"
-msgstr ""
+msgstr "Endast manuellt"
 
 #: cps/templates/cwa_settings.html
 msgid "After import debounce (seconds)"
-msgstr ""
+msgstr "Fördröjning efter import (sekunder)"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Wait this many seconds after the last import before starting a background "
 "scan."
-msgstr ""
+msgstr "Vänta så här många sekunder efter den senaste importen innan en bakgrundssökning startas."
 
 #: cps/templates/cwa_settings.html
 msgid "Scheduled scans (cron expression)"
-msgstr ""
+msgstr "Schemalagda sökningar (cron-uttryck)"
 
 #: cps/templates/cwa_settings.html
 msgid "Leave blank to disable scheduled scans. Example:"
-msgstr ""
+msgstr "Lämna tomt för att inaktivera schemalagda sökningar. Exempel:"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -12443,19 +12476,19 @@ msgstr "Andra användares e-boksläsare:"
 
 #: cps/templates/detail.html
 msgid "Additional email addresses:"
-msgstr ""
+msgstr "Ytterligare e-postadresser:"
 
 #: cps/templates/detail.html
 msgid "Enter additional email addresses (separated by commas):"
-msgstr ""
+msgstr "Ange ytterligare e-postadresser (separerade med kommatecken):"
 
 #: cps/templates/detail.html
 msgid "example@domain.com, another@domain.com"
-msgstr ""
+msgstr "exempel@domän.se, annan@domän.se"
 
 #: cps/templates/detail.html
 msgid "Enter one or more email addresses separated by commas"
-msgstr ""
+msgstr "Ange en eller flera e-postadresser separerade med kommatecken"
 
 #: cps/templates/detail.html
 msgid "Select format:"
@@ -12471,13 +12504,13 @@ msgstr "Det gick inte att uppdatera hyllorna"
 
 #: cps/templates/duplicates.html
 msgid "NextGen Duplicates Manager"
-msgstr ""
+msgstr "NextGen dubbletthanterare"
 
 #: cps/templates/duplicates.html
 msgid ""
 "Books with matching titles, authors, and languages. Books in different "
 "languages are not considered duplicates."
-msgstr ""
+msgstr "Böcker med matchande titlar, författare och språk. Böcker på olika språk betraktas inte som dubbletter."
 
 #: cps/templates/duplicates.html
 msgid "Run Full Duplicate Scan"
@@ -12489,7 +12522,7 @@ msgstr "Sök efter dubbletter nu"
 
 #: cps/templates/duplicates.html
 msgid "Select Duplicates"
-msgstr ""
+msgstr "Välj dubbletter"
 
 #: cps/templates/duplicates.html
 msgid "Select None"
@@ -12501,7 +12534,7 @@ msgstr "Ta bort markerade"
 
 #: cps/templates/duplicates.html
 msgid "Duplicate scanning needs a one-time full scan."
-msgstr ""
+msgstr "Dubblettsökning behöver en fullständig engångssökning."
 
 #: cps/templates/duplicates.html
 msgid ""
@@ -12522,15 +12555,15 @@ msgstr "Dubblettsökning pågår."
 
 #: cps/templates/duplicates.html
 msgid "You can keep using CWA while it runs."
-msgstr ""
+msgstr "Du kan fortsätta använda CWA medan sökningen körs."
 
 #: cps/templates/duplicates.html
 msgid "View Background Tasks"
-msgstr ""
+msgstr "Visa bakgrundsuppgifter"
 
 #: cps/templates/duplicates.html
 msgid "Auto-Resolve Duplicates"
-msgstr ""
+msgstr "Lös dubbletter automatiskt"
 
 #: cps/templates/duplicates.html
 msgid ""

@@ -21,8 +21,19 @@ const waitPoint = async (cfi, id) => {
   }
   assert.ok(await page.evaluate(cfi => window.displayTargets.includes(cfi), cfi));
 };
+// Each API read remains bounded. A late conversion must become available on
+// subsequent reads before exercising the real browser's exact-span contract.
+const exactWire = async () => {
+  let wire;
+  await expect.poll(async () => {
+    wire = await json('/api/v1/books/42/bookmark');
+    return Boolean(wire.resume?.cfi && wire.resume?.epub_sha256);
+  }, {timeout:30000, message:'Completed Kobo conversion must supply CFI and fingerprint'}).toBe(true);
+  assert.match(wire.resume.epub_sha256, /^[a-f0-9]{64}$/);
+  return wire;
+};
 try {
-  const wire = await json('/api/v1/books/42/bookmark');
+  const wire = await exactWire();
   assert.ok(wire.resume.cfi, JSON.stringify(wire));
   assert.equal(wire.resume.mode, 'automatic');
   assert.equal(wire.resume.percentage, 95);
@@ -34,7 +45,7 @@ try {
   await expect.poll(async () => (await json('/api/v1/books/42/bookmark')).bookmark, {timeout:15000}).not.toBeNull();
   const local = (await json('/api/v1/books/42/bookmark')).bookmark;
   await json('/test-state/kobo', {method:'POST', data:{value:'kobo.1.20'}});
-  const offer = await json('/api/v1/books/42/bookmark');
+  const offer = await exactWire();
   assert.equal(offer.resume.mode, 'offer');
   assert.equal(offer.bookmark, local);
   await page.reload();

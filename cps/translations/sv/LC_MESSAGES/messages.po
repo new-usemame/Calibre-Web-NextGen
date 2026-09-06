@@ -12025,6 +12025,8 @@ msgid ""
 "Configure how you are notified about duplicate books and optionally enable "
 "automatic resolution."
 msgstr ""
+"Konfigurera hur du får notiser om dubblettböcker och aktivera vid behov "
+"automatisk lösning."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Duplicate Notifications"
@@ -12036,6 +12038,9 @@ msgid ""
 "users with edit rights will see a badge on the Duplicates sidebar button and "
 "a notification popup when they login."
 msgstr ""
+"Visa popupnotiser när olösta dubbletter identifieras. Administratörer och "
+"användare med redigeringsbehörighet ser ett märke på sidopanelsknappen "
+"Dubbletter och en notis när de loggar in."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Automatic Duplicate Resolution"
@@ -12043,33 +12048,35 @@ msgstr "Aktivera automatisk dubbletthantering"
 
 #: cps/templates/cwa_settings.html cps/templates/duplicates.html
 msgid "Warning:"
-msgstr ""
+msgstr "Varning:"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "This will automatically delete books based on the strategy below. Original "
 "files will be backed up to"
 msgstr ""
+"Detta tar automatiskt bort böcker baserat på strategin nedan. Ursprungliga "
+"filer säkerhetskopieras till"
 
 #: cps/templates/cwa_settings.html
 msgid "Auto-Resolution Strategy"
-msgstr ""
+msgstr "Strategi för automatisk lösning"
 
 #: cps/templates/cwa_settings.html
 msgid "Keep Newest"
-msgstr ""
+msgstr "Behåll nyaste"
 
 #: cps/templates/cwa_settings.html
 msgid "Delete older copies, keep the most recently added book"
-msgstr ""
+msgstr "Ta bort äldre kopior, behåll den senast tillagda boken"
 
 #: cps/templates/cwa_settings.html
 msgid "Keep Oldest"
-msgstr ""
+msgstr "Behåll äldsta"
 
 #: cps/templates/cwa_settings.html
 msgid "Delete newer copies, keep the earliest added"
-msgstr ""
+msgstr "Ta bort nyare kopior, behåll den först tillagda"
 
 #: cps/templates/cwa_settings.html
 msgid "Merge Formats"
@@ -12077,15 +12084,15 @@ msgstr "Slå samman format"
 
 #: cps/templates/cwa_settings.html
 msgid "Merge formats into the newest book, delete the rest"
-msgstr ""
+msgstr "Slå ihop format i den nyaste boken, ta bort resten"
 
 #: cps/templates/cwa_settings.html
 msgid "Keep Highest Quality Format"
-msgstr ""
+msgstr "Behåll formatet med högst kvalitet"
 
 #: cps/templates/cwa_settings.html
 msgid "Prefer formats based on your Duplicate Format Priority Ranking"
-msgstr ""
+msgstr "Föredra format baserat på din prioritetsordning för dubblettformat"
 
 #: cps/templates/cwa_settings.html
 msgid "Keep Most Metadata"
@@ -12093,19 +12100,19 @@ msgstr "Behåll mest metadata"
 
 #: cps/templates/cwa_settings.html
 msgid "Keep book with most complete information"
-msgstr ""
+msgstr "Behåll boken med mest fullständig information"
 
 #: cps/templates/cwa_settings.html
 msgid "Keep Largest File Size"
-msgstr ""
+msgstr "Behåll största filstorlek"
 
 #: cps/templates/cwa_settings.html
 msgid "Keep book with largest total file size"
-msgstr ""
+msgstr "Behåll boken med största sammanlagda filstorlek"
 
 #: cps/templates/cwa_settings.html
 msgid "Choose which book to keep when duplicates are automatically resolved."
-msgstr ""
+msgstr "Välj vilken bok som ska behållas när dubbletter löses automatiskt."
 
 #: cps/templates/cwa_settings.html
 msgid "Rate Limiting"
@@ -12113,114 +12120,122 @@ msgstr "Hastighetsbegränsning"
 
 #: cps/templates/cwa_settings.html
 msgid "Cooldown Period (minutes)"
-msgstr ""
+msgstr "Nedkylningsperiod (minuter)"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Minimum time between automatic resolutions (0 to disable). Prevents rapid-"
 "fire deletions during batch imports."
 msgstr ""
+"Minsta tid mellan automatiska lösningar (0 för att inaktivera). Förhindrar "
+"snabba borttagningar vid batchimporter."
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Auto-resolution runs after duplicate scans detect new duplicates. Dismissed "
 "duplicate groups are never auto-resolved."
 msgstr ""
+"Automatisk lösning körs när dubblettgenomsökningar identifierar nya dubbletter. "
+"Avfärdade dubblettgrupper löses aldrig automatiskt."
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Reset every CWA setting to its default? All of your current CWA settings "
 "will be permanently lost."
 msgstr ""
+"Återställ alla CWA-inställningar till standardvärden? Alla dina aktuella "
+"CWA-inställningar går permanent förlorade."
 
 #: cps/templates/cwa_settings.html
 msgid "Reset All CWA Settings"
-msgstr ""
+msgstr "Återställ alla CWA-inställningar"
 
 #: cps/templates/cwa_stats.html cps/templates/cwa_stats_system.html
 #, python-format
 msgid "Review %(count)s Pending Match(es)"
-msgstr ""
+msgstr "Granska %(count)s väntande matchningar"
 
 #: cps/templates/cwa_stats.html cps/templates/cwa_stats_system.html
 msgid "Click to See More"
-msgstr ""
+msgstr "Klicka för att se mer"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Before you go — what made you switch back?"
-msgstr ""
+msgstr "Innan du går — varför bytte du tillbaka?"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid ""
 "Optional, and completely anonymous. It helps us make the new interface "
 "better."
-msgstr ""
+msgstr "Valfritt och helt anonymt. Det hjälper oss att förbättra det nya gränssnittet."
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Something was broken or glitchy"
-msgstr ""
+msgstr "Något var trasigt eller buggigt"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "I prefer the classic look"
-msgstr ""
+msgstr "Jag föredrar det klassiska utseendet"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "A feature I use was missing"
-msgstr ""
+msgstr "En funktion jag använder saknades"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Too different / hard to find things"
-msgstr ""
+msgstr "För annorlunda / svårt att hitta saker"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "It felt slow"
-msgstr ""
+msgstr "Det kändes långsamt"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "No thanks"
-msgstr ""
+msgstr "Nej tack"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Anything you’d like to add?"
-msgstr ""
+msgstr "Vill du lägga till något?"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Optional — a sentence or two is plenty."
-msgstr ""
+msgstr "Valfritt — en eller två meningar räcker."
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "What would have kept you on the new interface?"
-msgstr ""
+msgstr "Vad skulle ha fått dig att stanna kvar i det nya gränssnittet?"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Send feedback"
-msgstr ""
+msgstr "Skicka återkoppling"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Thank you"
-msgstr ""
+msgstr "Tack"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Your feedback was sent anonymously. We read every note."
-msgstr ""
+msgstr "Din återkoppling skickades anonymt. Vi läser varje anteckning."
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Couldn’t send just now"
-msgstr ""
+msgstr "Kunde inte skicka just nu"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid ""
 "No problem — your feedback wasn’t saved anywhere. You can close this or try "
 "again."
 msgstr ""
+"Ingen fara — din återkoppling sparades inte någonstans. Du kan stänga detta "
+"eller försöka igen."
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Anonymize my feedback"
-msgstr ""
+msgstr "Anonymisera min återkoppling"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "No account, name, IP address, version or device info is sent or stored."
-msgstr ""
+msgstr "Inget konto, namn, IP-adress, versions- eller enhetsinformation skickas eller lagras."
 
 #: cps/templates/cwng_feedback_popup.html
 msgid ""
@@ -12228,12 +12243,18 @@ msgid ""
 "unmarked mail. The network edge briefly sees your IP to stop spam; we only "
 "use a one-way hash of it for about a minute and never store it."
 msgstr ""
+"Skickas över HTTPS till en server som vi driver och sparas endast som din "
+"återkoppling — som omärkt post. Nätverkskanten ser kort din IP-adress för att "
+"stoppa spam; vi använder bara en envägshash av den i ungefär en minut och "
+"lagrar den aldrig."
 
 #: cps/templates/cwng_feedback_popup.html
 msgid ""
 "Because you turned off anonymizing, your app version will be included to "
 "help us reproduce issues."
 msgstr ""
+"Eftersom du stängde av anonymisering inkluderas appversionen för att hjälpa "
+"oss att återskapa problem."
 
 #: cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Mark As Unread"

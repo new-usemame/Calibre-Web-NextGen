@@ -74,6 +74,10 @@ def test_unknown_ownership_is_contained_at_the_check_for_changes_boundary(
     # route that never ran.
     resolved = readingservices.resolve_entitlement_ownership(UNOWNED_CONTENT_ID)
     assert resolved is readingservices.OWNERSHIP_UNKNOWN, resolved
+    # The outage is the whole lookup, not something about this one id: the book
+    # that resolved a moment ago is now equally undecidable.
+    assert readingservices.resolve_entitlement_ownership(
+        owned_book.uuid) is readingservices.OWNERSHIP_UNKNOWN
 
     with fixture.stubbed_kobo_proxy(echo=True) as proxied:
         outage = _post_check_for_changes(client, [UNOWNED_CONTENT_ID])

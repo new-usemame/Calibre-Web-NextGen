@@ -70,6 +70,15 @@ def _boot_real_app(tmp_path_factory, *, kobo_sync):
             # asserts the *effective* switch the blueprint gate reads rather
             # than the row that was written above.
             assert bool(cps.config.config_kobo_sync) == kobo_sync
+            # And assert the surface, not only the switch. A Kobo boot whose
+            # reading-services blueprint failed to register answers 404 to every
+            # annotation request no matter what the databases hold, which is
+            # indistinguishable, from inside a case, from a product that refused
+            # to answer. Fail here instead.
+            assert ("readingservices_api_v3" in app.blueprints) == kobo_sync, sorted(
+                app.blueprints)
+            assert any(rule.rule == "/api/v3/content/<entitlement_id>/annotations"
+                       for rule in app.url_map.iter_rules()) == kobo_sync
             app.config["CWA_TEST_ROOT"] = str(root)
             yield app
         finally:

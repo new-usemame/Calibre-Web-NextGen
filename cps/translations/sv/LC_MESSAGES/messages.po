@@ -11492,18 +11492,22 @@ msgid ""
 "complete before sending. Only applies to users who have enabled auto-send in "
 "their profile."
 msgstr ""
+"Fördröjning (i minuter) innan nyligen importerade böcker automatiskt skickas "
+"till e-boksläsare. Detta ger tid för hämtning av metadata och annan "
+"bearbetning att slutföras före utskick. Gäller endast användare som har "
+"aktiverat automatiskt utskick i sin profil."
 
 #: cps/templates/cwa_settings.html
 msgid "Delay (minutes):"
-msgstr ""
+msgstr "Fördröjning (minuter):"
 
 #: cps/templates/cwa_settings.html
 msgid "Range: 1-60 minutes (default: 5)"
-msgstr ""
+msgstr "Intervall: 1–60 minuter (standard: 5)"
 
 #: cps/templates/cwa_settings.html
 msgid "Auto Metadata Fetch Provider Hierarchy"
-msgstr ""
+msgstr "Leverantörsordning för automatisk metadatahämtning"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11511,18 +11515,21 @@ msgid ""
 "automatically fetching metadata for new books. Drag and drop to reorder "
 "providers. Only enabled providers will be used."
 msgstr ""
+"Ställ in i vilken ordning metadata-leverantörer ska sökas igenom när metadata "
+"för nya böcker hämtas automatiskt. Dra och släpp för att ändra ordningen. "
+"Endast aktiverade leverantörer används."
 
 #: cps/templates/cwa_settings.html
 msgid "Providers are tried in order from top to bottom. Drag to reorder."
-msgstr ""
+msgstr "Leverantörerna provas i ordning uppifrån och ned. Dra för att ändra ordningen."
 
 #: cps/templates/cwa_settings.html
 msgid "Enabled Metadata Providers"
-msgstr ""
+msgstr "Aktiverade metadata-leverantörer"
 
 #: cps/templates/cwa_settings.html
 msgid "Unchecked providers are disabled globally."
-msgstr ""
+msgstr "Omarkerade leverantörer är inaktiverade globalt."
 
 #: cps/templates/cwa_settings.html
 msgid "Hardcover Auto-Fetch Settings"
@@ -11534,10 +11541,13 @@ msgid ""
 "Hardcover IDs enable reading progress sync and annotation sync with "
 "Hardcover.app when using compatible eReaders."
 msgstr ""
+"Hämta automatiskt och tilldela Hardcover-ID:n till böcker i biblioteket. "
+"Hardcover-ID:n möjliggör synkronisering av läsförlopp och anteckningar med "
+"Hardcover.app när kompatibla e-boksläsare används."
 
 #: cps/templates/cwa_settings.html
 msgid "Hardcover Token Required"
-msgstr ""
+msgstr "Hardcover-token krävs"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11545,17 +11555,21 @@ msgid ""
 "docker-compose environment variables or configure a global token in Basic "
 "Configuration. Without a valid token, this feature will remain disabled."
 msgstr ""
+"För att aktivera automatisk hämtning från Hardcover måste du ange en giltig "
+"HARDCOVER_TOKEN i miljövariablerna för docker-compose eller konfigurera en "
+"global token i grundkonfigurationen. Utan en giltig token förblir funktionen "
+"inaktiverad."
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Hardcover auto-fetch is off. Reading-progress and annotation sync are "
 "unaffected."
-msgstr ""
+msgstr "Automatisk hämtning från Hardcover är av. Synkronisering av läsförlopp och anteckningar påverkas inte."
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Hardcover sync is enabled. The schedule below controls automatic ID fetching."
-msgstr ""
+msgstr "Hardcover-synkronisering är aktiverad. Schemat nedan styr automatisk hämtning av ID:n."
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11563,12 +11577,17 @@ msgid ""
 "separately in Basic Configuration when you want reading-progress or "
 "annotation sync."
 msgstr ""
+"Hardcover-synkronisering är inaktiverad och automatisk hämtning är av. Aktivera "
+"Hardcover-synkronisering separat i grundkonfigurationen när du vill "
+"synkronisera läsförlopp eller anteckningar."
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Hardcover sync is disabled, so auto-fetch, reading-progress sync, and "
 "annotation sync are off."
 msgstr ""
+"Hardcover-synkronisering är inaktiverad, så automatisk hämtning samt "
+"synkronisering av läsförlopp och anteckningar är av."
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11733,13 +11752,15 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Blurred Backgrounds on Mobile (&lt;768px)"
-msgstr ""
+msgstr "Aktivera suddiga bakgrunder på mobila enheter (&lt;768 px)"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "When active, the blurred cover background effect is also rendered on small "
 "screens. Disable if you notice scrolling or animation lag."
 msgstr ""
+"När funktionen är aktiv visas den suddiga omslagsbakgrunden även på små "
+"skärmar. Inaktivera den om rullning eller animeringar blir långsamma."
 
 #: cps/templates/cwa_settings.html
 msgid "Automatic Backup Settings"
@@ -11747,35 +11768,35 @@ msgstr "Inställningar för automatisk säkerhetskopiering"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Import Auto-Backup"
-msgstr ""
+msgstr "Aktivera automatisk säkerhetskopiering vid NextGen-import"
 
 #: cps/templates/cwa_settings.html
 msgid "When active, a copy of all imported files will be stored in"
-msgstr ""
+msgstr "När funktionen är aktiv lagras en kopia av alla importerade filer i"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Conversion Auto-Backup"
-msgstr ""
+msgstr "Aktivera automatisk säkerhetskopiering vid NextGen-konvertering"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "When active, the originals of ingested files that undergo conversion will be "
 "stored in"
-msgstr ""
+msgstr "När funktionen är aktiv lagras originalen för importerade filer som konverteras i"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen EPUB Fixer Auto-Backup"
-msgstr ""
+msgstr "Aktivera automatisk säkerhetskopiering för NextGen EPUB Fixer"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "When active, the originals of EPUBs processed by the NextGen Kindle EPUB "
 "Fixer service will be stored in"
-msgstr ""
+msgstr "När funktionen är aktiv lagras originalen för EPUB-filer som bearbetas av tjänsten NextGen Kindle EPUB Fixer i"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Auto-Zip Backups"
-msgstr ""
+msgstr "Aktivera automatiska zip-säkerhetskopior för NextGen"
 
 #: cps/templates/cwa_settings.html
 msgid ""

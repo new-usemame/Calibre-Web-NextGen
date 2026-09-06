@@ -245,7 +245,61 @@ def _resume_directory_start(raw):
     return start
 
 
-def _resume_member_bytes(raw, directory_start, info):
+def _resume_member_bounds(raw, member_end, info):
+    """Prove that Python and JSZip index the same local member, without inflating it.
+
+    JSZip reads local names, defaults to UTF-8 (zipfile uses CP437), honors
+    Unicode-path overrides and turns directory attributes into trailing slashes.
+    Accept only names both readers interpret identically. All extra fields here
+    come from the already capped central directory; local extras are skipped by
+    both readers. ZIP64 overrides are outside the conventional snapshot subset.
+    """
+    import struct
+    import zlib
+
+    if (info.flag_bits & ~0x80e
+            or info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)
+            or (not info.flag_bits & 0x800 and not info.orig_filename.isascii())):
+        raise ValueError("unsupported resume ZIP member encoding")
+    is_directory = (info.external_attr & 0x10
+                    or (info.create_system == 3 and (info.external_attr >> 16) & 0x4000))
+    if is_directory and not info.is_dir():
+        raise ValueError("resume ZIP directory name mismatch")
+    expected_name = info.orig_filename.encode("utf-8" if info.flag_bits & 0x800 else "ascii")
+    cursor = 0
+    while cursor < len(info.extra):
+        if cursor + 4 > len(info.extra):
+            raise ValueError("incomplete resume ZIP extra field")
+        kind, size = struct.unpack_from("<HH", info.extra, cursor)
+        cursor += 4
+        end = cursor + size
+        if end > len(info.extra) or kind == 1:
+            raise ValueError("unsupported resume ZIP extra field")
+        if kind == 0x7075:
+            # Do not rely on whether this Python version applies Unicode path
+            # fields. JSZip must not obtain an alternate name from any of them.
+            data = info.extra[cursor:end]
+            if (len(data) < 5 or data[0] != 1
+                    or struct.unpack_from("<I", data, 1)[0] != zlib.crc32(expected_name)
+                    or data[5:].decode("utf-8") != info.orig_filename):
+                raise ValueError("ambiguous resume ZIP Unicode path")
+        cursor = end
+    offset = info.header_offset
+    if offset < 0 or offset + 30 > member_end or raw[offset:offset + 4] != b"PK\x03\x04":
+        raise ValueError("invalid resume ZIP local header")
+    flags, method = struct.unpack_from("<2H", raw, offset + 6)
+    name_size, extra_size = struct.unpack_from("<2H", raw, offset + 26)
+    name_start = offset + 30
+    start = name_start + name_size + extra_size
+    end = start + info.compress_size
+    if end > member_end or flags != info.flag_bits or method != info.compress_type:
+        raise ValueError("inconsistent resume ZIP member")
+    if name_size != len(expected_name) or raw[name_start:name_start + name_size] != expected_name:
+        raise ValueError("resume ZIP member name mismatch")
+    return start, end
+
+
+def _resume_member_bytes(raw, bounds, info):
     """Decode stored/deflated XML with a cap on ACTUAL output, then check CRC.
 
     ZipExtFile truncates output to the declared size and may flush without an
@@ -253,24 +307,12 @@ def _resume_member_bytes(raw, directory_start, info):
     compressed bytes from our in-memory snapshot and use zlib's max_length;
     never flush or continue after exceeding the cap. Other codecs fall back.
     """
-    import struct
     import zlib
 
-    if info.file_size > MAX_RESUME_XML_BYTES or info.flag_bits & ~0x80e:
-        raise ValueError("oversized or unsupported resume ZIP member")
-    offset = info.header_offset
-    if offset < 0 or offset + 30 > directory_start or raw[offset:offset + 4] != b"PK\x03\x04":
-        raise ValueError("invalid resume ZIP local header")
-    flags, method = struct.unpack_from("<2H", raw, offset + 6)
-    name_size, extra_size = struct.unpack_from("<2H", raw, offset + 26)
-    name_start = offset + 30
-    start = name_start + name_size + extra_size
-    end = start + info.compress_size
-    if end > directory_start or flags != info.flag_bits or method != info.compress_type:
-        raise ValueError("inconsistent resume ZIP member")
-    name = raw[name_start:name_start + name_size].decode("utf-8" if flags & 0x800 else "cp437")
-    if name != info.orig_filename:
-        raise ValueError("resume ZIP member name mismatch")
+    if info.is_dir() or info.file_size > MAX_RESUME_XML_BYTES:
+        raise ValueError("oversized or non-file resume XML member")
+    start, end = bounds
+    method = info.compress_type
     compressed = memoryview(raw)[start:end]
     if method == zipfile.ZIP_STORED:
         if len(compressed) > MAX_RESUME_XML_BYTES:
@@ -341,13 +383,18 @@ def _resume_snapshot(epub_path, source, location_type, value):
                     return None
                 names.add(name)
 
+            # Check EVERY local header, including unused chapters and images.
+            # Adjacent offsets bound each member and reject shared/overlapping
+            # local records. Sorting replaces repeated offset scans per XML.
+            entries = sorted(archive.infolist(), key=lambda info: info.header_offset)
+            bounds = {}
+            for index, info in enumerate(entries):
+                member_end = entries[index + 1].header_offset if index + 1 < len(entries) else directory_start
+                bounds[info.filename] = _resume_member_bounds(raw, member_end, info)
+
             def xml(name):
                 info = archive.getinfo(name)
-                offsets = [item.header_offset for item in archive.infolist()]
-                if offsets.count(info.header_offset) != 1:
-                    raise ValueError("aliased resume ZIP member")
-                member_end = min([directory_start] + [offset for offset in offsets if offset > info.header_offset])
-                member_bytes = _resume_member_bytes(raw, member_end, info)
+                member_bytes = _resume_member_bytes(raw, bounds[name], info)
                 return etree.fromstring(member_bytes, etree.XMLParser(
                     resolve_entities=False, no_network=True, load_dtd=False))
 

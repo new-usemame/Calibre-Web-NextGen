@@ -38,3 +38,27 @@ test('exact resume belongs to the archive actually opened, including concurrent 
   const fallback = { percentage: 37.5, mode: 'offer' as const, synced_at: '' };
   assert.equal(await resumeForArchive(fallback, archive), fallback);
 });
+
+for (const failure of ['null', 'undefined', 'throw'] as const) {
+  test(`an exact CFI resolving to ${failure} retains percentage resume in both modes`, async () => {
+    const { resumeForArchive } = await import('../src/lib/readerResume.ts');
+    const archive = new TextEncoder().encode('same EPUB bytes').buffer;
+    const digest = await crypto.subtle.digest('SHA-256', archive);
+    const epub_sha256 = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+    for (const mode of ['automatic', 'offer'] as const) {
+      const hint = { cfi: 'epubcfi(/6/2!/4/2/999/1:0)', epub_sha256, percentage: 95, mode, synced_at: '' };
+      const resolved: string[] = [];
+      const result = await resumeForArchive(hint, archive, async cfi => {
+        resolved.push(cfi);
+        if (failure === 'throw') throw new Error('CFI cannot resolve');
+        return failure === 'null' ? null : undefined;
+      });
+      assert.equal(resumeCfi({ cfiFromPercentage: p => `percentage:${p}` }, result), 'percentage:0.95');
+      assert.deepEqual(resolved, [hint.cfi]);
+      assert.equal(result?.mode, mode);
+      assert.equal(hint.cfi, 'epubcfi(/6/2!/4/2/999/1:0)', 'do not mutate the saved response');
+      const valid = await resumeForArchive(hint, archive, async () => ({} as Range));
+      assert.equal(valid, hint, 'a resolved range retains exactness');
+    }
+  });
+}

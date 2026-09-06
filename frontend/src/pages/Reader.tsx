@@ -1045,7 +1045,10 @@ export function Reader({ id }: { id: string }) {
         let locationsReady: Promise<unknown> | undefined;
         const generateLocations = () => locationsReady ??= epubBook.ready
           .then(() => epubBook.locations.generate(1600));
-        const resume = await resumeForArchive(savedBookmark?.resume, buf);
+        const resume = await resumeForArchive(savedBookmark?.resume, buf, async cfi => {
+          await epubBook.ready;
+          return epubBook.getRange(cfi);
+        });
         if (cancelled) return;
         // epub.js may emit delayed layout relocations after display resolves.
         // Treat opening with a synced hint as a preview until a real page turn,

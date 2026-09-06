@@ -6,8 +6,19 @@ const base = `http://127.0.0.1:${process.env.RESUME_WEB_PORT}`;
 const json = async (path, options) => (await page.request.fetch(base + path, options)).json();
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
+const readerResponses = [];
+page.on('response', async response => {
+  if (response.url().includes('/bookmark?')) readerResponses.push(await response.json());
+});
 const waitPoint = async (cfi, id) => {
-  await expect.poll(() => page.evaluate(([cfi, id]) => window.pointVisible?.(cfi, id), [cfi, id]), {timeout:30000}).toBe(true);
+  try {
+    await expect.poll(() => page.evaluate(([cfi, id]) => window.pointVisible?.(cfi, id), [cfi, id]), {timeout:30000}).toBe(true);
+  } catch (error) {
+    console.log('Exact resume diagnostic ' + JSON.stringify({cfi, id, readerResponses,
+      reader: await page.evaluate(() => ({targets: window.displayTargets,
+        resolved: window.resolvedRanges.slice(0, 8), visible: window.visiblePercentageRange()}))}));
+    throw error;
+  }
   assert.ok(await page.evaluate(cfi => window.displayTargets.includes(cfi), cfi));
 };
 try {

@@ -196,3 +196,109 @@ def test_ambiguous_zip_paths_never_supply_exact_resume(epub, alias):
         epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
     print(f'alias={alias}, snapshot={snapshot}')
     assert snapshot is None
+
+
+def _add_selection_difference(epub, difference, chapter=None):
+    """An unused member must not change the browser's interpretation of the ZIP."""
+    import struct
+    if difference == 'selected-directory':
+        with zipfile.ZipFile(epub) as archive:
+            contents = {name: archive.read(name) for name in archive.namelist()}
+        contents['META-INF/container.xml'] = contents['META-INF/container.xml'].replace(b'content.opf', b'content.opf/')
+        contents['OEBPS/content.opf/'] = contents.pop('OEBPS/content.opf').replace(b'chapter.xhtml', b'../chapter.xhtml')
+        with zipfile.ZipFile(epub, 'w', zipfile.ZIP_DEFLATED) as archive:
+            for name, raw in contents.items():
+                archive.writestr(name, raw)
+        return
+    name = 'OEBPS/another.xhtml'
+    info = zipfile.ZipInfo(name)
+    info.compress_type = zipfile.ZIP_DEFLATED
+    if difference == 'zip64-extra':
+        info.extra = struct.pack('<HH', 1, 0)
+    elif difference == 'legacy-name':
+        info.filename = 'OEBPS/café.xhtml'
+    elif difference == 'dos-directory':
+        info.external_attr = 0x10
+    elif difference == 'unix-directory':
+        info.create_system = 3
+        info.external_attr = 0o40755 << 16
+    with zipfile.ZipFile(epub, 'a') as archive:
+        archive.writestr(info, chapter or _kobo_chapter_html([
+            ('kobo.1.2', 'WRONG CHAPTER TEXT.')]).replace('<body>', '<body><p>Leading paragraph.</p>'))
+    raw = bytearray(epub.read_bytes())
+    with zipfile.ZipFile(epub) as archive:
+        member = archive.infolist()[-1]
+        local = member.header_offset
+        central = archive.start_dir
+        for entry in archive.infolist()[:-1]:
+            n, e, c = struct.unpack_from('<3H', raw, central + 28)
+            central += 46 + n + e + c
+    if difference == 'local-name':
+        raw[local + 30:local + 30 + len(name)] = b'OEBPS/chapter.xhtml'
+    elif difference == 'legacy-name':
+        for offset in (local + 6, central + 8):
+            flags = struct.unpack_from('<H', raw, offset)[0]
+            struct.pack_into('<H', raw, offset, flags & ~0x800)
+    elif difference == 'local-flags':
+        struct.pack_into('<H', raw, local + 6, 0x800)
+    elif difference == 'local-method':
+        struct.pack_into('<H', raw, local + 8, zipfile.ZIP_STORED)
+    elif difference == 'local-bounds':
+        struct.pack_into('<H', raw, local + 28, 65535)
+    epub.write_bytes(raw)
+
+
+@pytest.mark.parametrize('difference', [
+    'local-name', 'legacy-name', 'dos-directory',
+    'unix-directory', 'local-flags', 'local-method', 'local-bounds',
+    'zip64-extra', 'selected-directory',
+])
+def test_all_members_have_one_browser_selection(epub, difference):
+    """Issue #324: validating only selected XML cannot establish archive identity."""
+    _add_selection_difference(epub, difference)
+    snapshot = kobo_position._resume_snapshot(epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
+    print(f'difference={difference}, snapshot={snapshot}')
+    assert snapshot is None, f'{difference} must retain percentage resume'
+
+
+def test_overlong_manifest_href_is_rejected_before_decoding(epub, monkeypatch):
+    """Pin the href guard independently of repeated-spine ambiguity or XML errors."""
+    from urllib import parse
+    with zipfile.ZipFile(epub) as archive:
+        contents = {name: archive.read(name) for name in archive.namelist()}
+    href = '%41' * 683  # 2049 encoded characters; an unused manifest item.
+    contents['OEBPS/content.opf'] = contents['OEBPS/content.opf'].replace(
+        b'</manifest>', f'<item id="unused" href="{href}"/></manifest>'.encode())
+    with zipfile.ZipFile(epub, 'w', zipfile.ZIP_DEFLATED) as archive:
+        for name, raw in contents.items():
+            archive.writestr(name, raw)
+    decoded = []
+    unquote = parse.unquote
+    def measured(value, *args, **kwargs):
+        decoded.append(len(value))
+        return unquote(value, *args, **kwargs)
+    monkeypatch.setattr(parse, 'unquote', measured)
+    point = kobo_position.compute_cfi_point(epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
+    print(f'href={len(href)}, decoded lengths={decoded}, point={point}')
+    assert max(decoded) <= 2048, 'oversized href reached path decoding'
+    assert point is None
+
+
+@pytest.mark.parametrize('field', ['size', 'crc'])
+def test_member_integrity_is_checked_after_bounded_inflation(epub, field):
+    """Valid XML with false metadata must fail the final check, not the XML parser."""
+    import struct
+    raw = bytearray(epub.read_bytes())
+    with zipfile.ZipFile(epub) as archive:
+        info = archive.getinfo('META-INF/container.xml')
+        central = archive.start_dir
+    if field == 'size':
+        struct.pack_into('<I', raw, info.header_offset + 22, info.file_size + 1)
+        struct.pack_into('<I', raw, central + 24, info.file_size + 1)
+    else:
+        struct.pack_into('<I', raw, info.header_offset + 14, info.CRC ^ 1)
+        struct.pack_into('<I', raw, central + 16, info.CRC ^ 1)
+    epub.write_bytes(raw)
+    snapshot = kobo_position._resume_snapshot(epub, 'OEBPS/chapter.xhtml', 'KoboSpan', 'kobo.1.2')
+    print(f'false {field}, snapshot={snapshot}')
+    assert snapshot is None, f'valid XML must not bypass the final {field} check'

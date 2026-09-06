@@ -13,13 +13,15 @@ export function resumeCfi(locations: { cfiFromPercentage: (fraction: number) => 
   return locations.cfiFromPercentage(percentage / 100) || undefined;
 }
 
-/** Never apply a source-document CFI to a different/replaced EPUB archive. */
-export async function resumeForArchive(resume: ReaderBookmark['resume'], archive: ArrayBuffer): Promise<ReaderBookmark['resume']> {
+/** Exact resume requires the same archive and a CFI that resolves in the reader. */
+export async function resumeForArchive(resume: ReaderBookmark['resume'], archive: ArrayBuffer,
+  resolveRange?: (cfi: string) => Promise<Range | null | undefined>): Promise<ReaderBookmark['resume']> {
   if (!resume?.cfi) return resume;
   try {
     const digest = await crypto.subtle.digest('SHA-256', archive);
     const fingerprint = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
-    if (fingerprint === resume.epub_sha256) return resume;
-  } catch { /* An unavailable digest must not prevent percentage resume. */ }
+    if (fingerprint === resume.epub_sha256
+      && (!resolveRange || await resolveRange(resume.cfi))) return resume;
+  } catch { /* An unavailable digest or unresolvable CFI must retain percentage resume. */ }
   return { ...resume, cfi: undefined };
 }

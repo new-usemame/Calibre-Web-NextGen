@@ -338,3 +338,166 @@ git diff --name-only ac20f830d5 HEAD -- scripts/autopilot-tick.sh scripts/lib sc
 ```
 
 OBSERVED — task database scratch was monitored and cleared before broader validation (42 MB at the last pre-cleanup measurement). Existing installed tools were reused; no large scratch allocation was needed. The task-owned temporary database directory, temporary frontend symlink, generated app build, and small correction scripts/logs were removed after recording the evidence here. Final SHA and clean status are supplied in the handoff because the report is part of that commit.
+
+**OBSERVED — exact Kobo resume follow-up, 2026-09-05, branch `feat/324-kobo-exact-resume`, base `b7337af831`.**
+
+The recorded progress carrier is `Location = {Source: <chapter href>, Type: "KoboSpan", Value: "kobo.X.Y"}`. It identifies the start of a span, without a character offset. The new converter surface resolves that point using the existing highlight converter's `_kepub_range_cfi` DOM walk and collapses its coincident start/end into a point CFI. The existing `compute_cfi_range` contract is unchanged. Its permissive chapter-basename lookup, context approximation, and plain-EPUB highlight fallback are unsuitable for claiming an exact reading point, so the new surface requires a unique manifest chapter and a real text node. Chrome resolved and displayed the emitted point through the actual SPA Reader and epub.js.
+
+**OBSERVED — final behavior.** `read_resume_position` retains the original percentage/freshness query and payload, then reads the location fields in the same read-only, zero-timeout SQLite snapshot. It closes that snapshot before conversion. Only successful conversion adds `resume.cfi` and `resume.epub_sha256`; failures leave the existing payload unchanged. A local bookmark continues to mean `offer`, including an unknown historical timestamp. The frontend verifies the archive fingerprint and lets the exact CFI win over the percentage. The browser fixture deliberately reports 95% while targeting `kobo.1.50` and then `kobo.1.20`; it verifies the target text node, visible CFI interval, actual `display` argument, and absence of unwanted bookmark writes.
+
+**OBSERVED — file identity and availability.** Metadata lookup uses its own read-only, zero-timeout SQLite connection, scoped to the requested book's EPUB format. It does not substitute another format's KEPUB. Conversion reads a stable snapshot, caps the compressed archive at 16 MiB and each parsed XML member at 2 MiB, and disables external entity resolution/network access. The browser checks SHA-256 against the archive it actually downloaded, so replacement or serving repaired bytes invalidates the optional exact target. Missing, malformed, unsupported, oversized, and unresolved sources retain percentage resume. There is no shared ORM session in the worker and no conversion cache to become stale.
+
+**OBSERVED — latency boundary; ASSUMED — interpretation of the requested invariant.** Optional conversion has a 50 ms cooperative waiting budget and at most two daemon workers, with no queued backlog. A timed-out worker holds its admission slot until it finishes. This protects the request thread from filesystem waits and bounds admitted work; it does **not** mean zero added latency. The implementation assumes that a capped optional wait satisfies the intended availability discipline. A clarification offering this interpretation versus browser-side canonicalization was sent during the task; no answer was received before this note was written. No claim of a literal zero-cost operation or an OS scheduling deadline is made. Existing mandatory bookmark reads retain their pre-existing app-connection timeout.
+
+**OBSERVED — red evidence and exact commands.** The original backend/converter baseline on `b7337af831` passed 35 tests. The original Node percentage test passed. No pre-existing red suite was found in that baseline.
+
+```sh
+CWNG_PYTEST_TMP_BASE=/tmp/cwng-324-exact-tests PYTHONDONTWRITEBYTECODE=1 /tmp/kobo-budget-venv/bin/python -m pytest tests/unit/test_reader_resume.py tests/unit/test_api_v1_reader.py tests/unit/test_kobo_position_converter.py -q > /tmp/324-exact-baseline.log 2>&1
+```
+
+```text
+============================= 35 passed in 12.13s ==============================
+```
+
+For the corrected server red run, a Python `try/finally` saved the edited service, replaced only `cps/services/reading_position.py` with `git show b7337af831:cps/services/reading_position.py`, ran the following command, and restored the edited bytes. Tests remained in place. The first attempt had stopped at a missing test-config attribute; that fixture error was corrected before this behavioral red run.
+
+```sh
+CWNG_PYTEST_TMP_BASE='/Volumes/Crucial X8/agent-scratch/cwng/324-kobo-exact-resume/pytest' PYTHONDONTWRITEBYTECODE=1 /tmp/kobo-budget-venv/bin/python -m pytest tests/unit/test_reader_resume.py -q
+# From frontend/, before adding exact-CFI preference:
+node --experimental-strip-types --test unit/readerResume.test.ts > /tmp/324-exact-node-red.log 2>&1
+```
+
+```text
+assert exact['resume']['cfi'] == 'epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)'
+E   KeyError: 'cfi'
+FAILED tests/unit/test_reader_resume.py::test_exact_kobo_resume_preserves_offer_and_percentage_fallback
+========================= 1 failed, 6 passed in 9.89s ==========================
+
+✖ an exact point wins over a materially different percentage in automatic and offer modes
+  + actual - expected
+  + 'approximate'
+  - 'epubcfi(/6/2!/4/2/2[kobo.1.1]/1:0)'
+ℹ tests 2
+ℹ pass 1
+ℹ fail 1
+```
+
+**OBSERVED — mutation evidence.** `python3 /tmp/324-exact-probes.py deadline size offer seek` applied each mutation below independently, invoked pytest, required exit 1, and restored the original edited file in `finally`. No mutant remains. Each command used the same `CWNG_PYTEST_TMP_BASE` and `PYTHONDONTWRITEBYTECODE` values as the corrected server red run.
+
+```sh
+/tmp/kobo-budget-venv/bin/python -m pytest tests/unit/test_reader_resume.py::test_stalled_conversion_keeps_percentage_response_and_bounded_worker_admission -q -s
+/tmp/kobo-budget-venv/bin/python -m pytest tests/unit/test_kobo_resume_point.py::test_oversized_compressed_chapter_falls_back_without_parsing -q -s
+/tmp/kobo-budget-venv/bin/python -m pytest tests/unit/test_reader_resume.py::test_exact_kobo_resume_preserves_offer_and_percentage_fallback -q -s
+/tmp/kobo-budget-venv/bin/python -m pytest 'tests/integration/test_reader_resume_browser.py::test_koreader_http_to_real_spa_epub_resume[kobo]' -q -s
+```
+
+| Mutation | Actual failure excerpt | Actual result |
+| --- | --- | --- |
+| Return `_resolve(...)` directly from `exact_resume`, bypassing off-thread admission/deadline | `assert (81355.503808625 - 81354.538784125) < 0.25` | `1 failed in 1.82s` |
+| Replace the XML size guard with `if False` | `assert 'epubcfi(/6/2!/4/2/2[kobo.1.2]/1:0)' is None` | `1 failed in 0.39s` |
+| Always emit `mode: automatic` | `{'mode': 'automatic'} != {'mode': 'offer'}` | `1 failed in 1.06s` |
+| Remove exact-CFI preference from `resumeCfi` | `Expected: true`, `Received: false`, `Timeout 30000ms exceeded while waiting on the predicate` for the exact span's visibility | Exit 1; browser did not display the requested point |
+
+**OBSERVED — browser fixture corrections.** During development, the new fixture's state-update URL was moved under the existing Vite `/test-state` proxy, its visibility probe was made to wait for `currentLocation` to exist, and its simulated remote clock was changed from local wall time to UTC. These were failures in newly added test setup, not failures attributed to `origin/main`. The original KOReader browser flow passed throughout the combined run. The Kobo fixture starts at the persisted carrier seam, using the recorded Location shape; it does not replay a physical Kobo PUT through authentication.
+
+**OBSERVED — final green commands and actual output.** Commands ran from the repository root, except the frontend block, which ran in `frontend/`. Logs are small local evidence files under `/tmp/324-exact-*`; all heavy test scratch used the external task directory.
+
+```sh
+CWNG_PYTEST_TMP_BASE='/Volumes/Crucial X8/agent-scratch/cwng/324-kobo-exact-resume/pytest' PYTHONDONTWRITEBYTECODE=1 /tmp/kobo-budget-venv/bin/python -m pytest tests/unit/test_reader_resume.py tests/unit/test_api_v1_reader.py tests/unit/test_kobo_resume_point.py tests/unit/test_kobo_position_converter.py tests/unit/test_324_web_reader_progress_writeback.py tests/unit/test_1366_web_reader_to_koreader.py tests/unit/test_1942_device_reading_position.py tests/unit/test_bookmark_format_sync.py tests/unit/test_migrate_bookmark_format_lowercase.py tests/unit/test_kobo_bookmark_created_at.py tests/unit/test_f6f9187_kosync_bookmark_mirror_arbitration.py tests/unit/test_translations_compile.py tests/integration/test_reader_resume_browser.py -q -s > /tmp/324-exact-final-green.log 2>&1
+```
+
+```text
+Kobo automatic: exact span kobo.1.50 is visible despite 95% carrier; no bookmark written
+Kobo offer: local CFI retained until acceptance; exact kobo.1.20 visible; stored CFI unchanged
+Unresolvable Kobo span: original percentage-only payload and visible 95% resume
+============ 174 passed, 1 skipped, 5 warnings in 69.07s (0:01:09) =============
+```
+
+The skipped test is the existing local guard `test_msgfmt_is_available_when_running_in_ci`: it deliberately skips when `CI` is unset. The actual catalogue compilation cases ran successfully, including de/fr/nl. No new user-facing application string was added.
+
+```sh
+node node_modules/typescript/bin/tsc -p tsconfig.e2e.json --noEmit && node --experimental-strip-types --test unit/*.test.ts tests/unit/readerTarget.test.ts > /tmp/324-exact-frontend-final.log 2>&1 && node node_modules/typescript/bin/tsc -b && node node_modules/vite/bin/vite.js build > /tmp/324-exact-build.log 2>&1
+```
+
+```text
+TypeScript checks: exit 0, no output
+ℹ tests 63
+ℹ suites 3
+ℹ pass 63
+ℹ fail 0
+ℹ skipped 0
+vite v5.4.21 building for production...
+✓ built in 12.68s
+```
+
+The build also emitted the existing >500 kB chunk-size advisory.
+
+**OBSERVED — remaining boundaries and outside-slice findings.** The fixture exercises real SQLite, the actual bookmark HTTP handler, React Reader, and epub.js in Chrome. Authentication, the Calibre catalogue fixture, and the Kobo carrier producer are fixture boundaries. No physical Kobo, household library, deployed server, Safari/WebKit, or network-filesystem stall was exercised. Timed-out work is not cancelled; admission remains occupied until its worker exits. Archives outside the resource limits intentionally retain percentage resume. Browser SHA-256 availability is required to accept the exact point; unavailable Web Crypto keeps percentage resume. A separate KEPUB's span cannot be assumed to exist in the SPA's EPUB. The classic reader's source-vs-rendered-DOM highlight caveat remains outside this slice; the new point was independently resolved in the SPA browser test. This does not implement KOReader xpointer canonicalization or alter progress arbitration.
+
+**OBSERVED — CI guard and cleanup.** The otherwise-skipped availability guard was also run explicitly:
+
+```sh
+CI=1 CWNG_PYTEST_TMP_BASE='/Volumes/Crucial X8/agent-scratch/cwng/324-kobo-exact-resume/pytest' /tmp/kobo-budget-venv/bin/python -m pytest tests/unit/test_translations_compile.py::test_msgfmt_is_available_when_running_in_ci -q > /tmp/324-exact-msgfmt-green.log 2>&1
+```
+
+```text
+============================== 1 passed in 0.50s ===============================
+```
+
+The task's external scratch directory and initial baseline's `/tmp/cwng-324-exact-tests` directory were removed and their absence checked. Small evidence logs and the mutation orchestration script remain in `/tmp/324-exact-*`. No protected harness, dependency manifest, migration, licence, or catalogue file was changed; no new external service URL was introduced. Work remained local: no push, PR, merge, tag, issue mutation, or public message.
+
+**OBSERVED — HOLD blockers corrected after `4eb61c8f40` (2026-09-05).** This section supersedes the earlier claim that checking `ZipInfo.file_size` bounded inflation. The installed `ZipExtFile` inflates before truncating to that declared size, and can flush without an output limit. Its public read surface does not establish the required bound. The exact-resume reader now uses `ZipFile` only for metadata after a bounded directory preflight, and decodes selected members directly from the existing in-memory snapshot using standard-library `zlib.decompressobj().decompress(..., max_length=2 MiB + 1)`. It neither flushes nor continues after exceeding the limit. Actual length, stream completion, CRC, local-header consistency and member boundaries are checked. Stored members are size-bounded before copying; other compression methods return the existing percentage fallback. No dependency was added, and the highlight converter contract is unchanged.
+
+**OBSERVED — directory allocation boundary.** Before constructing `ZipFile`, the preflight checks a conventional single-disk EOCD, a maximum 256 KiB central directory, and at most 2,048 actual records. It walks the record lengths without building `ZipInfo` objects and checks the actual count against the declared count. ZIP64 directory overrides, inconsistent offsets, malformed records and excessive directories fall back rather than letting `ZipFile` reinterpret the checked bounds. Both a 2,049-record directory and a 200,000-record directory lying about their record counts were rejected before any `ZipInfo` allocation.
+
+**OBSERVED — assertion allowlist.** Exact resume now allows only ASCII letters, digits, underscore, dot and hyphen in ancestor/package ID assertions. `/` and `:` both return `None`, so no malformed CFI reaches the client. This conservative allowlist also deliberately rejects legitimate non-ASCII IDs such as `café`; those books retain percentage resume rather than receiving a CFI whose assertion syntax has not been established. The existing anchored KoboSpan regex, XPath parameter binding and XML parser security flags remain unchanged.
+
+**OBSERVED — red command against `4eb61c8f40` and actual failure excerpts.** The final test file was retained while a Python `try/finally` saved the edited converter, replaced it with the bytes from `git show 4eb61c8f40:cps/services/kobo_position.py`, ran the following command, and restored the edited converter. Exit status was 1. The earlier test-first run also reproduced the two blockers before any implementation edit (`6 failed, 3 passed in 2.90s`); the final run adds a small forged payload to test length validation independently of the inflation ceiling.
+
+```sh
+CWNG_PYTEST_TMP_BASE='/Volumes/Crucial X8/agent-scratch/cwng/324-fix/pytest' PYTHONDONTWRITEBYTECODE=1 /tmp/kobo-budget-venv/bin/python -m pytest tests/unit/test_kobo_resume_point.py -q -s > /tmp/324-fix-final-red.log 2>&1
+```
+
+```text
+hidden=33554432, largest inflation=33554667, point=epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)
+E   AssertionError: [33554667, 0, 458, 0, 265, 0]
+E   assert 33554667 <= (((2 * 1024) * 1024) + 1)
+hidden=16, largest inflation=458, point=epubcfi(/6/2!/4/2/4[kobo.1.2]/1:0)
+E   AssertionError: a false size and prefix CRC must not be accepted
+E   AssertionError: allocated 2049 directory records before rejecting the archive
+E   AssertionError: allocated 200000 directory records before rejecting the archive
+E   AssertionError: assert 'epubcfi(/6/2!/4/2[a/b]/4[kobo.1.2]/1:0)' is None
+E   AssertionError: assert 'epubcfi(/6/2!/4/2[a:9]/4[kobo.1.2]/1:0)' is None
+E   AssertionError: assert 'epubcfi(/6/2!/4/2[café]/4[kobo.1.2]/1:0)' is None
+========================= 7 failed, 3 passed in 2.87s ==========================
+```
+
+**OBSERVED — green commands and actual output.** The final Python command includes the original 11 resume tests, the added resource/ID cases, the existing converter and endpoint suites, and both real SPA browser flows. No test was skipped.
+
+```sh
+CWNG_PYTEST_TMP_BASE='/Volumes/Crucial X8/agent-scratch/cwng/324-fix/pytest' PYTHONDONTWRITEBYTECODE=1 /tmp/kobo-budget-venv/bin/python -m pytest tests/unit/test_kobo_resume_point.py tests/unit/test_reader_resume.py tests/unit/test_kobo_position_converter.py tests/unit/test_api_v1_reader.py tests/integration/test_reader_resume_browser.py -q -s > /tmp/324-fix-final-green.log 2>&1
+# From frontend/:
+node --experimental-strip-types --test unit/*.test.ts tests/unit/readerTarget.test.ts > /tmp/324-fix-frontend-green.log 2>&1
+```
+
+```text
+hidden=33554432, largest inflation=2097153, point=None
+hidden=16, largest inflation=251, point=None
+directory records=2049, ZipInfo allocations=0
+directory records=200000, ZipInfo allocations=0
+Kobo automatic: exact span kobo.1.50 is visible despite 95% carrier; no bookmark written
+Kobo offer: local CFI retained until acceptance; exact kobo.1.20 visible; stored CFI unchanged
+Unresolvable Kobo span: original percentage-only payload and visible 95% resume
+======================= 49 passed, 3 warnings in 52.35s ========================
+
+ℹ tests 63
+ℹ suites 3
+ℹ pass 63
+ℹ fail 0
+ℹ skipped 0
+ℹ duration_ms 3567.19325
+```
+
+**OBSERVED — scope and limits.** Resource evidence measures bytes actually returned by the installed decompressor and actual `ZipInfo` constructions, rather than inferring safety from declared sizes or caller timeouts. Whole-process peak RSS and other Python/decompressor versions were not measured; these local tests target the demonstrated allocation boundaries. No physical device or deployed service was exercised. The two-worker, non-queued admission, worker-finally permit release, request-local results, archive byte cap, file identity checks, fingerprint validation, fallback payload and local-bookmark offer policy were not rewritten. Frontend code, dependency manifests, licences, migrations and the protected autopilot harness were not changed. No new user-facing string or external service URL was added.
+
+**OBSERVED — cleanup.** The task directory `/Volumes/Crucial X8/agent-scratch/cwng/324-fix/` was removed and its absence checked. Small red/green logs remain under `/tmp/324-fix-*`. All changes stayed on the requested branch; nothing was pushed or posted publicly.

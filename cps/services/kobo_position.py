@@ -197,6 +197,274 @@ def compute_cfi_range(epub_path: Path, position: KoboPosition) -> Optional[str]:
     return f"epubcfi({spine_step}!{start_step}:{position.start_offset},{end_step}:{position.end_offset})"
 
 
+# Reading progress has only a chapter and span id, with no highlight end or
+# character offset. Resolve its span START, and never use the context fallback.
+# These limits bound optional work, including compressed XML bombs. The caller
+# must run filesystem access off the request thread with a deadline.
+MAX_RESUME_ARCHIVE_BYTES = 16 * 1024 * 1024
+MAX_RESUME_XML_BYTES = 2 * 1024 * 1024
+MAX_RESUME_DIRECTORY_BYTES = 256 * 1024
+MAX_RESUME_DIRECTORY_ENTRIES = 2048
+MAX_RESUME_HREF_CHARS = 2048
+# Conservative subset that epub.js can consume without assertion escaping.
+# Valid XHTML ids outside this set deliberately retain percentage resume.
+_RESUME_ASSERTION_ID = re.compile(r"[A-Za-z0-9_.-]+")
+
+
+def _resume_directory_start(raw):
+    """Bound actual central-directory records BEFORE ZipFile allocates ZipInfo.
+
+    Accept only a conventional single-disk directory with a matching EOCD.
+    Reject ZIP64 directory overrides, concatenated archives and malformed size
+    claims rather than letting ZipFile reinterpret the bounds we checked.
+    """
+    import struct
+
+    end = raw.rfind(b"PK\x05\x06", max(0, len(raw) - 65557))
+    if end < 0 or end + 22 > len(raw):
+        raise ValueError("missing resume ZIP directory")
+    disk, start_disk, disk_count, count, size, start, comment = struct.unpack_from(
+        "<4H2IH", raw, end + 4)
+    if (disk or start_disk or disk_count != count
+            or count > MAX_RESUME_DIRECTORY_ENTRIES
+            or size > MAX_RESUME_DIRECTORY_BYTES
+            or start + size != end or end + 22 + comment != len(raw)
+            or raw[max(0, end - 20):end - 16] == b"PK\x06\x07"):
+        raise ValueError("unsupported or oversized resume ZIP directory")
+    cursor, actual = start, 0
+    while cursor < end:
+        if cursor + 46 > end or raw[cursor:cursor + 4] != b"PK\x01\x02":
+            raise ValueError("malformed resume ZIP directory record")
+        name, extra, entry_comment = struct.unpack_from("<3H", raw, cursor + 28)
+        cursor += 46 + name + extra + entry_comment
+        actual += 1
+        if cursor > end or actual > MAX_RESUME_DIRECTORY_ENTRIES:
+            raise ValueError("resume ZIP directory exceeds record limit")
+    if actual != count:
+        raise ValueError("resume ZIP directory count mismatch")
+    return start
+
+
+def _resume_member_bounds(raw, member_end, info):
+    """Prove that Python and JSZip index the same local member, without inflating it.
+
+    JSZip reads local names, defaults to UTF-8 (zipfile uses CP437), honors
+    Unicode-path overrides and turns directory attributes into trailing slashes.
+    Accept only names both readers interpret identically. All extra fields here
+    come from the already capped central directory; local extras are skipped by
+    both readers. ZIP64 overrides are outside the conventional snapshot subset.
+    """
+    import struct
+    import zlib
+
+    if (info.flag_bits & ~0x80e
+            or info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)
+            or (not info.flag_bits & 0x800 and not info.orig_filename.isascii())):
+        raise ValueError("unsupported resume ZIP member encoding")
+    is_directory = (info.external_attr & 0x10
+                    or (info.create_system == 3 and (info.external_attr >> 16) & 0x4000))
+    if is_directory and not info.is_dir():
+        raise ValueError("resume ZIP directory name mismatch")
+    expected_name = info.orig_filename.encode("utf-8" if info.flag_bits & 0x800 else "ascii")
+    cursor = 0
+    while cursor < len(info.extra):
+        if cursor + 4 > len(info.extra):
+            raise ValueError("incomplete resume ZIP extra field")
+        kind, size = struct.unpack_from("<HH", info.extra, cursor)
+        cursor += 4
+        end = cursor + size
+        if end > len(info.extra) or kind == 1:
+            raise ValueError("unsupported resume ZIP extra field")
+        if kind == 0x7075:
+            # Do not rely on whether this Python version applies Unicode path
+            # fields. JSZip must not obtain an alternate name from any of them.
+            data = info.extra[cursor:end]
+            if (len(data) < 5 or data[0] != 1
+                    or struct.unpack_from("<I", data, 1)[0] != zlib.crc32(expected_name)
+                    or data[5:].decode("utf-8") != info.orig_filename):
+                raise ValueError("ambiguous resume ZIP Unicode path")
+        cursor = end
+    offset = info.header_offset
+    if offset < 0 or offset + 30 > member_end or raw[offset:offset + 4] != b"PK\x03\x04":
+        raise ValueError("invalid resume ZIP local header")
+    flags, method = struct.unpack_from("<2H", raw, offset + 6)
+    name_size, extra_size = struct.unpack_from("<2H", raw, offset + 26)
+    name_start = offset + 30
+    start = name_start + name_size + extra_size
+    end = start + info.compress_size
+    if end > member_end or flags != info.flag_bits or method != info.compress_type:
+        raise ValueError("inconsistent resume ZIP member")
+    if name_size != len(expected_name) or raw[name_start:name_start + name_size] != expected_name:
+        raise ValueError("resume ZIP member name mismatch")
+    return start, end
+
+
+def _resume_member_bytes(raw, bounds, info):
+    """Decode stored/deflated XML with a cap on ACTUAL output, then check CRC.
+
+    ZipExtFile truncates output to the declared size and may flush without an
+    output limit. Its public read surface cannot prove this bound. Read the
+    compressed bytes from our in-memory snapshot and use zlib's max_length;
+    never flush or continue after exceeding the cap. Other codecs fall back.
+    """
+    import zlib
+
+    if info.is_dir() or info.file_size > MAX_RESUME_XML_BYTES:
+        raise ValueError("oversized or non-file resume XML member")
+    start, end = bounds
+    method = info.compress_type
+    compressed = memoryview(raw)[start:end]
+    if method == zipfile.ZIP_STORED:
+        if len(compressed) > MAX_RESUME_XML_BYTES:
+            raise ValueError("resume XML exceeds size limit")
+        output = bytes(compressed)
+    elif method == zipfile.ZIP_DEFLATED:
+        inflater = zlib.decompressobj(-15)
+        output = inflater.decompress(compressed, MAX_RESUME_XML_BYTES + 1)
+        if len(output) > MAX_RESUME_XML_BYTES or not inflater.eof or inflater.unused_data:
+            raise ValueError("oversized or incomplete resume deflate stream")
+    else:
+        raise ValueError("unsupported resume ZIP compression")
+    if len(output) != info.file_size or zlib.crc32(output) != info.CRC:
+        raise ValueError("resume ZIP size or CRC mismatch")
+    return output
+
+
+def compute_cfi_point(epub_path, source, location_type, value):
+    """Resolve a Kobo progress span to a source-document point, or None.
+
+    Uses the same DOM-to-CFI walk as highlights, but requires an unambiguous
+    chapter and an actual text node. No basename guessing, context matching,
+    highlight-range passthrough, or separate KEPUB substitution is allowed.
+    """
+    snapshot = _resume_snapshot(epub_path, source, location_type, value)
+    return snapshot[0] if snapshot else None
+
+
+def _resume_snapshot(epub_path, source, location_type, value):
+    """Return (point, archive SHA256) from one bounded, stable file snapshot."""
+    import hashlib
+    import io
+    import os
+    import posixpath
+    import stat
+    from urllib.parse import unquote
+    from lxml import etree
+
+    if (location_type != "KoboSpan" or not isinstance(source, str)
+            or not source or len(source) > 2048 or not isinstance(value, str)
+            or len(value) > 128 or not re.fullmatch(r"kobo\.[0-9]+\.[0-9]+", value)):
+        return None
+    try:
+        path = Path(epub_path)
+        with path.open("rb") as stream:
+            before = os.fstat(stream.fileno())
+            if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_RESUME_ARCHIVE_BYTES:
+                return None
+            raw = stream.read(MAX_RESUME_ARCHIVE_BYTES + 1)
+            after = os.fstat(stream.fileno())
+        identity = lambda st: (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns, st.st_ctime_ns)
+        if (len(raw) > MAX_RESUME_ARCHIVE_BYTES or identity(before) != identity(after)
+                or identity(after) != identity(path.stat())):
+            return None
+        directory_start = _resume_directory_start(raw)
+        with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+            # JSZip resolves dot components before indexing members. Refuse
+            # aliases across the entire directory before selecting any XML;
+            # a matching archive hash cannot prove both readers chose the same
+            # chapter. Permit the trailing slash of canonical directory entries.
+            names = set()
+            for info in archive.infolist():
+                name = info.filename.removesuffix("/")
+                if (not name or name.startswith("/") or "\\" in name
+                        or info.filename != info.orig_filename
+                        or any(part in ("", ".", "..") for part in name.split("/"))
+                        or name in names):
+                    return None
+                names.add(name)
+
+            # Check EVERY local header, including unused chapters and images.
+            # Adjacent offsets bound each member and reject shared/overlapping
+            # local records. Sorting replaces repeated offset scans per XML.
+            entries = sorted(archive.infolist(), key=lambda info: info.header_offset)
+            bounds = {}
+            for index, info in enumerate(entries):
+                member_end = entries[index + 1].header_offset if index + 1 < len(entries) else directory_start
+                bounds[info.filename] = _resume_member_bounds(raw, member_end, info)
+
+            def xml(name):
+                info = archive.getinfo(name)
+                member_bytes = _resume_member_bytes(raw, bounds[name], info)
+                return etree.fromstring(member_bytes, etree.XMLParser(
+                    resolve_entities=False, no_network=True, load_dtd=False))
+
+            container = xml("META-INF/container.xml")
+            rootfile = container.find(".//c:rootfile", _CONTAINER_NS)
+            if rootfile is None:
+                return None
+            opf_path = rootfile.get("full-path")
+            package = xml(opf_path)
+            spine = package.find("opf:spine", _OPF_NS)
+            if spine is None:
+                return None
+            # The shared highlight walk uses /6; packages with a differently
+            # placed spine need their actual element step instead.
+            spine_step = _cfi_element_step(spine)
+            # Decode, normalize AND compare once per distinct href. Caching
+            # just the decoded string would still repeat long comparisons for
+            # every itemref in a highly compressed, repetitive spine.
+            decoded_source = unquote(source)
+            opf_dir = posixpath.dirname(opf_path)
+            href_matches = {}
+            manifest = {}
+            for item in package.findall("opf:manifest/opf:item", _OPF_NS):
+                href = item.get("href")
+                if href and len(href) > MAX_RESUME_HREF_CHARS:
+                    return None
+                if href not in href_matches:
+                    member = None
+                    if href and "#" not in href:
+                        decoded_href = unquote(href)
+                        candidate = posixpath.normpath(posixpath.join(opf_dir, decoded_href))
+                        if decoded_source in (candidate, decoded_href):
+                            member = candidate
+                    href_matches[href] = member
+                manifest[item.get("id")] = href_matches[href]
+            matches = []
+            for index, ref in enumerate(spine.findall("opf:itemref", _OPF_NS)):
+                member = manifest.get(ref.get("idref"))
+                if member is not None:
+                    matches.append((index, member))
+                    if len(matches) > 1:
+                        return None
+            if len(matches) != 1:
+                return None
+            index, member = matches[0]
+            tree = xml(member)
+            spans = tree.xpath("//*[@id=$v]", v=value)
+            if len(spans) != 1 or not spans[0].text:
+                return None
+            span = spans[0]
+            # The shared walk anchors the body as /4. Validate that convention
+            # and avoid assertion delimiters the highlight walk does not escape.
+            body = next((e for e in span.iterancestors() if etree.QName(e).localname == "body"), None)
+            if body is None or _cfi_element_step(body).split("[")[0] != "/4":
+                return None
+            for element in [spine, body, span, *span.iterancestors()]:
+                element_id = element.get("id")
+                if element_id and not _RESUME_ASSERTION_ID.fullmatch(element_id):
+                    return None
+            cfi_range = _kepub_range_cfi(tree, f"{spine_step}/{2 * (index + 1)}",
+                                        value, value, 0, 0)
+            if not cfi_range:
+                return None
+            common, start, _end = cfi_range[8:-1].split(",")
+            return f"epubcfi({common}{start})", hashlib.sha256(raw).hexdigest()
+    except Exception:
+        log.debug("Could not resolve Kobo reading point", exc_info=True)
+        return None
+
+
 @lru_cache(maxsize=64)
 def _get_spine(cache_key: tuple, epub_path_arg: Path) -> list[str]:
     """Cache-keyed wrapper over :func:`parse_spine`. ``cache_key``

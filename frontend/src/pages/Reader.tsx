@@ -1,4 +1,4 @@
-import { resumeCfi } from "../lib/readerResume";
+import { resumeCfi, resumeForArchive, withResumeTimeout } from "../lib/readerResume";
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'wouter';
 import ePub from 'epubjs';
@@ -1045,15 +1045,22 @@ export function Reader({ id }: { id: string }) {
         let locationsReady: Promise<unknown> | undefined;
         const generateLocations = () => locationsReady ??= epubBook.ready
           .then(() => epubBook.locations.generate(1600));
-        const resume = savedBookmark?.resume;
+        const resume = await resumeForArchive(savedBookmark?.resume, buf, async cfi => {
+          await epubBook.ready;
+          return epubBook.getRange(cfi);
+        });
+        if (cancelled) return;
         // epub.js may emit delayed layout relocations after display resolves.
         // Treat opening with a synced hint as a preview until a real page turn,
         // or those layout events would stamp the local CFI newer than the hint.
         previewingRef.current = !!resume;
         let initialTarget = savedCfiRef.current || undefined;
         if (!initialTarget && resume?.mode === 'automatic') {
+          // A validated exact target remains usable even if indexing stalls.
+          initialTarget = resume.cfi;
           try {
-            await generateLocations();
+            // epub.js can leave archive requests pending instead of rejecting.
+            await withResumeTimeout(generateLocations);
             if (cancelled) return;
             initialTarget = resumeCfi(epubBook.locations, resume);
           } catch { /* Keep opening the book when its index cannot be generated. */ }
@@ -1081,8 +1088,20 @@ export function Reader({ id }: { id: string }) {
 
         // Lazily generate locations for a progress percentage.
         generateLocations()
-          .then(() => {
+          .then(async () => {
             if (cancelled) return;
+            // A slow index may finish after first display. Still apply the
+            // percentage hint unless the reader has already chosen a position.
+            if (!readerMoved && previewingRef.current && !savedCfiRef.current && !initialTarget && resume?.mode === 'automatic') {
+              const cfi = resumeCfi(epubBook.locations, resume);
+              if (cfi) {
+                await rendition.display(cfi);
+                // As with the initial target, typography may reflow this spread.
+                await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+                if (cancelled || readerMoved || !previewingRef.current) return;
+                await rendition.display(cfi);
+              }
+            }
             if (!readerMoved && savedCfiRef.current && resume?.mode === 'offer') {
               const cfi = resumeCfi(epubBook.locations, resume);
               if (cfi) setRemoteResume({ cfi, percentage: resume.percentage });

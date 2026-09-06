@@ -12331,11 +12331,11 @@ msgid "Failed to skip match"
 msgstr ""
 
 #: cps/templates/http_error.html
-#, fuzzy
 msgid ""
 "Calibre-Web NextGen Instance is unconfigured, please contact your "
 "administrator"
-msgstr "E-postservern är inte konfigurerad, kontakta din administratör!"
+msgstr "Calibre-Web NextGen-instansen är inte konfigurerad. Kontakta "
+"administratören."
 
 #: cps/templates/http_error.html
 msgid ""
@@ -12352,9 +12352,8 @@ msgid "Return to Home"
 msgstr "Tillbaka till hemmet"
 
 #: cps/templates/http_error.html
-#, fuzzy
 msgid "Logout User"
-msgstr "Logga ut"
+msgstr "Logga ut användare"
 
 #: cps/templates/index.html
 msgid "Dismiss library introduction"
@@ -12377,9 +12376,8 @@ msgid "Refresh shelf to update with latest changes"
 msgstr ""
 
 #: cps/templates/index.html
-#, fuzzy
 msgid "Edit shelf rules"
-msgstr "Redigera en hylla"
+msgstr "Redigera hyllregler"
 
 #: cps/templates/index.html
 msgid "Hide this shelf from your sidebar"
@@ -12390,19 +12388,16 @@ msgid "Show this shelf in your sidebar"
 msgstr ""
 
 #: cps/templates/index.html
-#, fuzzy
 msgid "Show Shelf"
-msgstr "Visa alla"
+msgstr "Visa hylla"
 
 #: cps/templates/index.html
-#, fuzzy
 msgid "Hide Shelf"
-msgstr "Publik hylla"
+msgstr "Dölj hylla"
 
 #: cps/templates/index.html
-#, fuzzy
 msgid "Add Series to Shelf"
-msgstr "Lägg till hyllan"
+msgstr "Lägg till serie på hyllan"
 
 #: cps/templates/index.html
 #, python-format
@@ -12585,9 +12580,8 @@ msgid "Search Library"
 msgstr "Sök i bibliotek"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Switch to the new Calibre-Web NextGen interface"
-msgstr "Calibre-Web e-bokkatalog"
+msgstr "Byt till det nya Calibre-Web NextGen-gränssnittet"
 
 #: cps/templates/layout.html
 msgid "Logout"
@@ -12598,14 +12592,12 @@ msgid "Support Calibre-Web NextGen"
 msgstr ""
 
 #: cps/templates/layout.html cps/templates/read.html cps/templates/readcbr.html
-#, fuzzy
 msgid "Settings"
 msgstr "Inställningar"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Refresh Library"
-msgstr "Sök i bibliotek"
+msgstr "Uppdatera bibliotek"
 
 #: cps/templates/layout.html
 msgid "Support"
@@ -12616,9 +12608,8 @@ msgid "See Changelog"
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Open Duplicates"
-msgstr "Ta bort boken"
+msgstr "Öppna dubbletter"
 
 #: cps/templates/layout.html
 msgid "Contribute here!"
@@ -12629,9 +12620,8 @@ msgid "Please do not refresh the page"
 msgstr "Vänligen uppdatera inte sidan"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Create Shelf"
-msgstr "Skapa en hylla"
+msgstr "Skapa hylla"
 
 #: cps/templates/layout.html
 msgid "Magic Shelves ✨"
@@ -12642,19 +12632,16 @@ msgid "Book Details"
 msgstr "Bokdetaljer"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "This cannot be undone."
-msgstr "Är du säker på att du vill stoppa Calibre-Web?"
+msgstr "Detta kan inte ångras."
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Will be deleted"
-msgstr "Slå ihop utvalda böcker"
+msgstr "Kommer att tas bort"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Formats:"
-msgstr "Ladda upp format"
+msgstr "Format:"
 
 #: cps/templates/layout.html
 msgid "Will be kept"
@@ -12665,27 +12652,24 @@ msgid "Format conflicts — choose what to do:"
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Result will have formats:"
-msgstr "Ta bort format:"
+msgstr "Resultatet får formaten:"
 
 #: cps/templates/layout.html
 msgid "Merge &amp; Delete Source"
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Duplicate Books Detected"
-msgstr "Ta bort boken"
+msgstr "Dubblettböcker har upptäckts"
 
 #: cps/templates/layout.html
 msgid "You have unresolved duplicate books in your library"
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Duplicate Groups Found"
-msgstr "Inga resultat hittades"
+msgstr "Dubblettgrupper hittades"
 
 #: cps/templates/layout.html
 msgid "Remind Me Later"
@@ -12696,23 +12680,21 @@ msgid "View & Resolve Duplicates"
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Scroll to top"
-msgstr "Skala till bäst"
+msgstr "Rulla längst upp"
 
 #: cps/templates/layout.html
 msgid "Top"
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Confirm"
-msgstr "Konfiguration"
+msgstr "Bekräfta"
 
 #: cps/templates/layout.html
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Added {n} books to {shelf}"
-msgstr "Lägg till hyllan"
+msgstr "Lade till {n} böcker på {shelf}"
 
 #: cps/templates/layout.html
 #, python-brace-format
@@ -12725,24 +12707,23 @@ msgid "All {n} book(s) were already on {shelf}."
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Marked {n} books as read"
-msgstr "Slå ihop utvalda böcker"
+msgstr "Markerade {n} böcker som lästa"
 
 #: cps/templates/layout.html
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Marked {n} books as unread"
-msgstr "Markera som oläst"
+msgstr "Markerade {n} böcker som olästa"
 
 #: cps/templates/layout.html
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Deleted {n} books"
-msgstr "Ta bort boken"
+msgstr "Tog bort {n} böcker"
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Delete books?"
-msgstr "Ta bort boken"
+msgstr "Ta bort böcker?"
 
 #: cps/templates/layout.html
 #, python-brace-format
@@ -12752,14 +12733,13 @@ msgid ""
 msgstr ""
 
 #: cps/templates/layout.html
-#, fuzzy
 msgid "Select at least one book first."
-msgstr "Skapa en hylla"
+msgstr "Markera minst en bok först."
 
 #: cps/templates/layout.html
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Request failed: {err}"
-msgstr "Anslutningsfel"
+msgstr "Begäran misslyckades: {err}"
 
 #: cps/templates/list.html
 msgid "Filter by initial"
@@ -12770,9 +12750,8 @@ msgid "Grid"
 msgstr ""
 
 #: cps/templates/login.html
-#, fuzzy
 msgid "Show Password"
-msgstr "SMTP-lösenord"
+msgstr "Visa lösenord"
 
 #: cps/templates/login.html
 msgid "Remember Me"
@@ -12783,16 +12762,15 @@ msgid "Forgot Password?"
 msgstr "Glömt lösenord?"
 
 #: cps/templates/login.html
-#, fuzzy
 msgid ""
 "Log in with Magic\n"
 "      Link"
-msgstr "Logga in med magisk länk"
+msgstr "Logga in med magisk\n"
+"      länk"
 
 #: cps/templates/login.html
-#, fuzzy
 msgid "Log in with SSO"
-msgstr "Logga in med magisk länk"
+msgstr "Logga in med SSO"
 
 #: cps/templates/login.html
 msgid ""
@@ -12804,9 +12782,8 @@ msgid "Show Calibre-Web Log: "
 msgstr "Visa Calibre-Web-logg: "
 
 #: cps/templates/logviewer.html
-#, fuzzy
 msgid "Calibre-Web Log: "
-msgstr "Visa Calibre-Web-logg: "
+msgstr "Calibre-Web-logg: "
 
 #: cps/templates/logviewer.html
 msgid "Stream output, can't be displayed"
@@ -12833,9 +12810,8 @@ msgid "This is a pre-configured template shelf. You can edit it freely."
 msgstr ""
 
 #: cps/templates/magic_shelf_edit.html
-#, fuzzy
 msgid "Share with Everyone (Public)"
-msgstr "Dela med alla"
+msgstr "Dela med alla (offentligt)"
 
 #: cps/templates/magic_shelf_edit.html
 msgid ""
@@ -12915,14 +12891,12 @@ msgid "Ok"
 msgstr "Ok"
 
 #: cps/templates/osd.xml
-#, fuzzy
 msgid "Calibre-Web NextGen eBook Catalog"
-msgstr "Calibre-Web e-bokkatalog"
+msgstr "Calibre-Web NextGen e-bokkatalog"
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "epub Reader"
-msgstr "PDF-läsare"
+msgstr "EPUB-läsare"
 
 #: cps/templates/read.html
 msgid "Annotations"
@@ -12937,18 +12911,16 @@ msgid "Font Sizes"
 msgstr ""
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "Text margin"
-msgstr "Nästa sida"
+msgstr "Textmarginal"
 
 #: cps/templates/read.html
 msgid "Font"
 msgstr ""
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "Default"
-msgstr "Ta bort"
+msgstr "Standard"
 
 #: cps/templates/read.html
 msgid "Yahei"
@@ -12959,19 +12931,16 @@ msgid "SimSun"
 msgstr ""
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "KaiTi"
-msgstr "Väntar"
+msgstr "KaiTi"
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "Arial"
-msgstr "Vertikal"
+msgstr "Arial"
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "Spread"
-msgstr "Läst"
+msgstr "Uppslag"
 
 #: cps/templates/read.html
 msgid "Reflow text when sidebars are open."
@@ -12986,9 +12955,8 @@ msgid "Select within a paragraph to highlight."
 msgstr ""
 
 #: cps/templates/readcbr.html
-#, fuzzy
 msgid "Comic Reader"
-msgstr "PDF-läsare"
+msgstr "Serieläsare"
 
 #: cps/templates/readcbr.html
 msgid "Keyboard Shortcuts"
@@ -13003,9 +12971,8 @@ msgid "Next Page"
 msgstr "Nästa sida"
 
 #: cps/templates/readcbr.html
-#, fuzzy
 msgid "Single Page Display"
-msgstr "Administrationssida"
+msgstr "Ensidig visning"
 
 #: cps/templates/readcbr.html
 msgid "Long Strip Display"
@@ -13040,9 +13007,8 @@ msgid "Flip Image"
 msgstr "Vänd bilden"
 
 #: cps/templates/readcbr.html
-#, fuzzy
 msgid "Single Page"
-msgstr "Administrationssida"
+msgstr "En sida"
 
 #: cps/templates/readcbr.html
 msgid "Long Strip"
@@ -13085,9 +13051,8 @@ msgid "Vertical"
 msgstr "Vertikal"
 
 #: cps/templates/readcbr.html
-#, fuzzy
 msgid "Direction"
-msgstr "Beskrivning"
+msgstr "Riktning"
 
 #: cps/templates/readcbr.html
 msgid "Left to Right"
@@ -13098,23 +13063,20 @@ msgid "Right to Left"
 msgstr "Höger till vänster"
 
 #: cps/templates/readcbr.html
-#, fuzzy
 msgid "Reset to Top"
-msgstr "Tillbaka till hemmet"
+msgstr "Återställ till början"
 
 #: cps/templates/readcbr.html
-#, fuzzy
 msgid "Remember Position"
-msgstr "Kom ihåg mig"
+msgstr "Kom ihåg position"
 
 #: cps/templates/readcbr.html
 msgid "Scrollbar"
 msgstr ""
 
 #: cps/templates/readcbr.html
-#, fuzzy
 msgid "Show"
-msgstr "Visa alla"
+msgstr "Visa"
 
 #: cps/templates/readdjvu.html
 #, fuzzy

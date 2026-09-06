@@ -3838,87 +3838,87 @@ msgstr "Sökningen misslyckades."
 
 #: cps/spa_strings.py
 msgid "Search for metadata"
-msgstr ""
+msgstr "Sök efter metadata"
 
 #: cps/spa_strings.py
 msgid "Metadata providers"
-msgstr ""
+msgstr "Metadataleverantörer"
 
 #: cps/spa_strings.py
 msgid "Loading providers…"
-msgstr ""
+msgstr "Läser in leverantörer…"
 
 #: cps/spa_strings.py
 msgid "Could not load providers."
-msgstr ""
+msgstr "Kunde inte läsa in leverantörer."
 
 #: cps/spa_strings.py
 msgid "Could not update provider."
-msgstr ""
+msgstr "Kunde inte uppdatera leverantör."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{provider}: {state}"
-msgstr ""
+msgstr "{provider}: {state}"
 
 #: cps/spa_strings.py
 msgid "On"
-msgstr ""
+msgstr "På"
 
 #: cps/spa_strings.py
 msgid "Off"
-msgstr ""
+msgstr "Av"
 
 #: cps/spa_strings.py cps/templates/shelf.html
 msgid "Search results"
-msgstr ""
+msgstr "Sökresultat"
 
 #: cps/spa_strings.py
 msgid "Search the library"
-msgstr ""
+msgstr "Sök i biblioteket"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Select {title}"
-msgstr ""
+msgstr "Välj {title}"
 
 #: cps/spa_strings.py
 msgid "Sepia theme"
-msgstr ""
+msgstr "Sepiatema"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Series position {n}"
-msgstr ""
+msgstr "Plats {n} i serien"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{series} #{n}"
-msgstr ""
+msgstr "{series} nr {n}"
 
 #: cps/spa_strings.py
 msgid "Sign in"
-msgstr ""
+msgstr "Logga in"
 
 #: cps/spa_strings.py
 msgid "Sign in failed. Please try again."
-msgstr ""
+msgstr "Inloggningen misslyckades. Försök igen."
 
 #: cps/spa_strings.py
 msgid "Skip to content"
-msgstr ""
+msgstr "Hoppa till innehåll"
 
 #: cps/spa_strings.py
 msgid "Some fields could not be saved."
-msgstr ""
+msgstr "Vissa fält kunde inte sparas."
 
 #: cps/spa_strings.py
 msgid "Table of contents"
-msgstr ""
+msgstr "Innehållsförteckning"
 
 #: cps/spa_strings.py
 msgid "Tags (comma separated)"
-msgstr ""
+msgstr "Taggar (kommaseparerade)"
 
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/config_view_edit.html cps/templates/cwa_settings.html
@@ -3928,11 +3928,11 @@ msgstr "Titel"
 
 #: cps/spa_strings.py
 msgid "Unread"
-msgstr ""
+msgstr "Oläst"
 
 #: cps/spa_strings.py
 msgid "Update password"
-msgstr ""
+msgstr "Uppdatera lösenord"
 
 #: cps/spa_strings.py cps/tasks/upload.py cps/templates/admin.html
 #: cps/templates/layout.html cps/templates/user_table.html
@@ -3941,121 +3941,123 @@ msgstr "Ladda upp"
 
 #: cps/spa_strings.py
 msgid "Choose books to upload"
-msgstr ""
+msgstr "Välj böcker att ladda upp"
 
 #: cps/spa_strings.py
 msgid "Upload failed."
-msgstr ""
+msgstr "Uppladdningen misslyckades."
 
 #: cps/spa_strings.py
 msgid "Upload image"
-msgstr ""
+msgstr "Ladda upp bild"
 
 #: cps/spa_strings.py
 msgid "Uploading…"
-msgstr ""
+msgstr "Laddar upp…"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Yellow"
-msgstr ""
+msgstr "Gul"
 
 #: cps/spa_strings.py
 msgid "e.g. MOBI"
-msgstr ""
+msgstr "t.ex. MOBI"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{format} reader"
-msgstr ""
+msgstr "{format}-läsare"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{name} API key"
-msgstr ""
+msgstr "API-nyckel för {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} book(s) added to the shelf."
-msgstr ""
+msgstr "{n} bok/böcker har lagts till på hyllan."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} book(s) deleted."
-msgstr ""
+msgstr "{n} bok/böcker har tagits bort."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} book(s) permanently deleted from the global library for every user."
-msgstr ""
+msgstr "{n} bok/böcker har tagits bort permanent från det globala biblioteket för alla användare."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} book(s) removed from your library."
-msgstr ""
+msgstr "{n} bok/böcker har tagits bort från ditt bibliotek."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} marked as read."
-msgstr ""
+msgstr "{n} har markerats som läst."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} marked as unread."
-msgstr ""
+msgstr "{n} har markerats som oläst."
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #, python-brace-format
 msgid "{n} selected"
-msgstr ""
+msgstr "{n} valda"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{pct}% read"
-msgstr ""
+msgstr "{pct} % läst"
 
 #: cps/spa_strings.py
 msgid "What's new"
-msgstr ""
+msgstr "Nyheter"
 
 #: cps/spa_strings.py
 msgid "Help — new updates available"
-msgstr ""
+msgstr "Hjälp — nya uppdateringar finns"
 
 #: cps/spa_strings.py
 msgid "The latest features and fixes in Calibre-Web NextGen — newest first."
-msgstr ""
+msgstr "De senaste funktionerna och korrigeringarna i Calibre-Web NextGen — nyast först."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} update"
-msgstr ""
+msgstr "{n} uppdatering"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} updates"
-msgstr ""
+msgstr "{n} uppdateringar"
 
 #: cps/spa_strings.py
 msgid "No release notes yet — check back after the next update."
-msgstr ""
+msgstr "Det finns inga versionsanteckningar ännu — titta igen efter nästa uppdatering."
 
 #: cps/spa_strings.py
 msgid ""
 "The interface is translated into your language; these update notes are "
 "written in English."
 msgstr ""
+"Gränssnittet är översatt till ditt språk, men dessa uppdateringsanteckningar "
+"är skrivna på engelska."
 
 #: cps/spa_strings.py
 msgid "Grid view"
-msgstr ""
+msgstr "Rutnätsvy"
 
 #: cps/spa_strings.py
 msgid "List view"
-msgstr ""
+msgstr "Listvy"
 
 #: cps/spa_strings.py
 msgid "Sync"
-msgstr ""
+msgstr "Synkronisera"
 
 #: cps/spa_strings.py cps/templates/layout.html cps/templates/user_edit.html
 msgid "Account"
@@ -4319,72 +4321,74 @@ msgstr "Biblioteksmeddelande"
 
 #: cps/spa_strings.py
 msgid "Show affected books"
-msgstr ""
+msgstr "Visa berörda böcker"
 
 #: cps/spa_strings.py
 msgid "Untitled book"
-msgstr ""
+msgstr "Bok utan titel"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} notices dismissed permanently."
-msgstr ""
+msgstr "{count} meddelanden har avfärdats permanent."
 
 #: cps/spa_strings.py
 msgid "There is new information about your library."
-msgstr ""
+msgstr "Det finns ny information om ditt bibliotek."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Dismiss all {count} notices permanently"
-msgstr ""
+msgstr "Avfärda alla {count} meddelanden permanent"
 
 #: cps/spa_strings.py
 msgid "Dismiss all"
-msgstr ""
+msgstr "Avfärda alla"
 
 #: cps/spa_strings.py
 msgid "There is new information about this book."
-msgstr ""
+msgstr "Det finns ny information om den här boken."
 
 #: cps/spa_strings.py
 msgid "Notice dismissed permanently."
-msgstr ""
+msgstr "Meddelandet har avfärdats permanent."
 
 #: cps/spa_strings.py
 msgid "Dismiss permanently"
-msgstr ""
+msgstr "Avfärda permanent"
 
 #: cps/spa_strings.py
 msgid "Could not dismiss the notices. Please try again."
-msgstr ""
+msgstr "Kunde inte avfärda meddelandena. Försök igen."
 
 #: cps/spa_strings.py
 msgid "Could not dismiss the notice. Please try again."
-msgstr ""
+msgstr "Kunde inte avfärda meddelandet. Försök igen."
 
 #: cps/spa_strings.py
 msgid "Open Ko-fi →"
-msgstr ""
+msgstr "Öppna Ko-fi →"
 
 #: cps/spa_strings.py cps/templates/cwa_settings.html
 msgid "Publication Date"
-msgstr ""
+msgstr "Publiceringsdatum"
 
 #: cps/spa_strings.py
 msgid "Support us on Ko-fi!"
-msgstr ""
+msgstr "Stöd oss på Ko-fi!"
 
 #: cps/spa_strings.py
 msgid ""
 "These open the full configuration pages. Changes there apply to the whole "
 "server."
 msgstr ""
+"Dessa öppnar de fullständiga konfigurationssidorna. Ändringar där gäller för "
+"hela servern."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "“{name}” already exists on {count} book. Merge this tag into it?"
-msgstr ""
+msgstr "”{name}” finns redan på {count} bok. Vill du slå ihop den här taggen med den?"
 
 #: cps/spa_strings.py
 #, python-brace-format

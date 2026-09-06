@@ -3008,6 +3008,10 @@ msgid ""
 "downloaded. Users can curate from there by removing books. Accounts already "
 "set up are never reseeded."
 msgstr ""
+"Konfigurera Mitt bibliotek för varje icke-anonymt konto? Varje konto börjar "
+"med alla böcker som det för närvarande kan se — inte bara böcker som lagts "
+"på hyllor, lästs eller hämtats. Användare kan sedan kurera urvalet genom att "
+"ta bort böcker. Konton som redan konfigurerats fylls aldrig på igen."
 
 #: cps/spa_strings.py
 msgid ""
@@ -3017,11 +3021,16 @@ msgid ""
 "controls to set up a curated public library. Accounts set up before are "
 "never reseeded."
 msgstr ""
+"Konfigurera Mitt bibliotek för varje icke-anonym användare? Varje konto "
+"byter till sitt eget urval efter att det har fyllts med allt som kontot "
+"för närvarande kan se. Anonyma konton som Gäst lämnas oförändrade; använd "
+"deras inställningar per användare för att skapa ett kurerat offentligt "
+"bibliotek. Konton som redan konfigurerats fylls aldrig på igen."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Set up {accounts} accounts with {books} books. {errors} errors."
-msgstr ""
+msgstr "Konfigurera {accounts} konton med {books} böcker. {errors} fel."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3029,6 +3038,8 @@ msgid ""
 "Left anonymous accounts unchanged: {accounts}. Use their per-user controls "
 "to set up a curated public library."
 msgstr ""
+"Lämnade anonyma konton oförändrade: {accounts}. Använd deras inställningar "
+"per användare för att skapa ett kurerat offentligt bibliotek."
 
 #: cps/spa_strings.py
 msgid ""
@@ -3036,6 +3047,9 @@ msgid ""
 "— switch back any time and it is still there. At its next update, your e-"
 "reader syncs the whole library."
 msgstr ""
+"Visa hela biblioteket igen? Ditt urval behålls exakt som du lämnade det — "
+"byt tillbaka när som helst, så finns det kvar. Vid nästa uppdatering "
+"synkroniserar din e-boksläsare hela biblioteket."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3043,6 +3057,9 @@ msgid ""
 "Show {name} the whole library again? Their selection is kept but no longer "
 "used, and their e-reader syncs the whole library at the next update."
 msgstr ""
+"Visa hela biblioteket för {name} igen? Urvalet behålls men används inte "
+"längre, och e-boksläsaren synkroniserar hela biblioteket vid nästa "
+"uppdatering."
 
 #: cps/spa_strings.py
 msgid ""
@@ -3050,12 +3067,16 @@ msgid ""
 "nothing changes until you remove books yourself. Your e-reader keeps the "
 "same books at its next update."
 msgstr ""
+"Starta ditt eget urval? Det börjar med allt du kan se nu, så ingenting "
+"ändras förrän du själv tar bort böcker. Din e-boksläsare behåller samma "
+"böcker vid nästa uppdatering."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid ""
 "Switch {name} back to their own selection? Their chosen books are restored."
 msgstr ""
+"Byt tillbaka {name} till det egna urvalet? De valda böckerna återställs."
 
 #: cps/spa_strings.py
 msgid ""
@@ -3063,6 +3084,9 @@ msgid ""
 "can see now, so nothing changes for them until they remove books themselves. "
 "Switching back keeps the selection intact but unused."
 msgstr ""
+"När en användare byter till sitt eget urval fylls det först med allt som "
+"användaren kan se nu, så ingenting ändras förrän användaren själv tar bort "
+"böcker. Att byta tillbaka bevarar urvalet, men det används inte."
 
 #: cps/spa_strings.py
 msgid ""
@@ -3070,6 +3094,9 @@ msgid ""
 "selection. Nothing you had is gone. Every book, new arrivals included, is "
 "under Global Library in the menu."
 msgstr ""
+"Biblioteket delas och innehåller varje bok en gång — det du behåller är ditt "
+"eget urval. Inget du hade har försvunnit. Alla böcker, även nya tillskott, "
+"finns under Globalt bibliotek i menyn."
 
 #: cps/spa_strings.py
 msgid ""
@@ -3077,6 +3104,9 @@ msgid ""
 "selection. Nothing you had is gone. Your administrator manages what enters "
 "your selection."
 msgstr ""
+"Biblioteket delas och innehåller varje bok en gång — det du behåller är ditt "
+"eget urval. Inget du hade har försvunnit. Administratören hanterar vilka "
+"böcker som läggs till i ditt urval."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "It leaves your library and your OPDS feed."
@@ -3088,10 +3118,13 @@ msgid ""
 "Other e-readers keep downloaded copies, and KOReader progress sync keeps "
 "working."
 msgstr ""
+"Om du använder Kobos inbyggda synkronisering försvinner den också från din "
+"Kobo vid nästa synkronisering. Andra e-boksläsare behåller hämtade kopior, "
+"och synkronisering av läsframsteg i KOReader fortsätter fungera."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "The whole archive. Add books to your library from here."
-msgstr ""
+msgstr "Hela arkivet. Lägg till böcker i ditt bibliotek härifrån."
 
 #: cps/spa_strings.py
 msgid "The whole library"
@@ -3102,6 +3135,8 @@ msgid ""
 "Without the global-browse role, only an administrator can add books to this "
 "user's library."
 msgstr ""
+"Utan rollen för global bläddring kan endast en administratör lägga till "
+"böcker i den här användarens bibliotek."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "You can add it back any time from the global library."
@@ -3119,24 +3154,27 @@ msgid ""
 "Your administrator chooses which books are in your library. Ask them to add "
 "books, or to let you browse the global library."
 msgstr ""
+"Administratören väljer vilka böcker som finns i ditt bibliotek. Be "
+"administratören lägga till böcker eller låta dig bläddra i det globala "
+"biblioteket."
 
 #: cps/spa_strings.py cps/templates/user_edit.html cps/web.py
 msgid "Your library contents are managed by an administrator."
-msgstr ""
+msgstr "Innehållet i ditt bibliotek hanteras av en administratör."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Your library is empty"
-msgstr ""
+msgstr "Ditt bibliotek är tomt"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{name} now keeps their own selection."
-msgstr ""
+msgstr "{name} behåller nu sitt eget urval."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{name} sees the whole library again."
-msgstr ""
+msgstr "{name} ser nu hela biblioteket igen."
 
 #: cps/spa_strings.py
 msgid "Clear rating"

@@ -8,6 +8,7 @@ way test_real_app.py runs the shared fixture's cases.
 """
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -15,7 +16,28 @@ import pytest
 
 pytestmark = pytest.mark.integration
 
-CASE_MODULES = ("kobo_authority_cases.py", "kobo_containment_cases.py")
+# The count is pinned per module rather than merely "greater than zero". This
+# slice exists because six earlier attempts to observe the sticky Kobo state
+# reported a result that had asserted nothing: a module that collects fewer
+# cases, or skips one, still exits 0. An expected count turns that into a
+# failure. Update it in the same commit as any added or removed case.
+EXPECTED_PASSES = {
+    "kobo_authority_cases.py": 4,
+    "kobo_containment_cases.py": 1,
+}
+
+_OUTCOME = re.compile(r"(\d+) (passed|failed|skipped|error|errors|xfailed|xpassed)")
+
+
+def _outcomes(stdout):
+    """Parse pytest's own final summary line into a counted mapping."""
+    summary = [line for line in stdout.splitlines()
+               if re.search(r"=+ .*(passed|failed|error|no tests ran).* =+", line)]
+    assert summary, "the case run printed no pytest summary line"
+    counts = {}
+    for number, name in _OUTCOME.findall(summary[-1]):
+        counts[name.rstrip("s")] = int(number)
+    return counts
 
 
 def _run_cases(module_name):
@@ -31,17 +53,15 @@ def _run_cases(module_name):
     print(result.stdout)
     print(result.stderr[-4000:])
     assert result.returncode == 0, result.stdout + result.stderr
-    # A case module that collected nothing exits 5, not 0, but a module whose
-    # cases were all skipped exits 0 with nothing observed. This slice exists
-    # because six earlier attempts reported a result that had asserted nothing,
-    # so an empty or skipped run is a failure here rather than a pass.
-    assert " skipped" not in result.stdout.splitlines()[-1], result.stdout
     return result.stdout
 
 
-@pytest.mark.parametrize("module_name", CASE_MODULES)
-def test_kobo_authority_cases_in_fresh_process(module_name, record_property):
-    stdout = _run_cases(module_name)
-    passed = [line for line in stdout.splitlines() if " PASSED" in line]
-    record_property("kobo_cases_passed", len(passed))
-    assert passed, stdout
+@pytest.mark.parametrize("module_name", sorted(EXPECTED_PASSES))
+def test_kobo_cases_in_fresh_process(module_name, record_property):
+    counts = _outcomes(_run_cases(module_name))
+    record_property("kobo_case_outcomes", "%s %r" % (module_name, counts))
+    assert counts == {"passed": EXPECTED_PASSES[module_name]}, (
+        "%s reported %r; anything other than exactly %d passed -- a skip, an "
+        "error, a case that stopped being collected -- means the observation "
+        "this slice exists for did not happen"
+        % (module_name, counts, EXPECTED_PASSES[module_name]))

@@ -1212,38 +1212,38 @@ msgstr "Calibre-Web NextGen – fullständig EPUB-reparationshistorik (med sökv
 
 #: cps/cwa_functions.py
 msgid "✅ All Monitoring Services are running as intended! 👍"
-msgstr ""
+msgstr "✅ Alla övervakningstjänster fungerar som avsett! 👍"
 
 #: cps/cwa_functions.py
 msgid ""
 "🔴 The Ingest Service is running but the Metadata Change Detector is not"
-msgstr ""
+msgstr "🔴 Inläsningstjänsten körs men Metadata Change Detector körs inte"
 
 #: cps/cwa_functions.py
 msgid ""
 "🔴 The Metadata Change Detector is running but the Ingest Service is not"
-msgstr ""
+msgstr "🔴 Metadata Change Detector körs men inläsningstjänsten körs inte"
 
 #: cps/cwa_functions.py
 msgid ""
 "⛔ Neither the Ingest Service or the Metadata Change Detector are running"
-msgstr ""
+msgstr "⛔ Varken inläsningstjänsten eller Metadata Change Detector körs"
 
 #: cps/cwa_functions.py
 msgid "An Error has occurred"
-msgstr ""
+msgstr "Ett fel har inträffat"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - Convert Library"
-msgstr ""
+msgstr "Calibre-Web NextGen – konvertera bibliotek"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - EPUB Fixer Service"
-msgstr ""
+msgstr "Calibre-Web NextGen – EPUB-reparationstjänst"
 
 #: cps/cwa_functions.py
 msgid "Single-book EPUB Fixer is not supported with Google Drive libraries."
-msgstr ""
+msgstr "EPUB-reparation av en enskild bok stöds inte för Google Drive-bibliotek."
 
 #: cps/cwa_functions.py
 msgid "Invalid book selection."
@@ -1251,7 +1251,7 @@ msgstr "Ogiltigt bokval."
 
 #: cps/cwa_functions.py cps/spa_strings.py
 msgid "Book not found."
-msgstr ""
+msgstr "Boken hittades inte."
 
 #: cps/cwa_functions.py
 msgid "Selected book has no EPUB format."
@@ -1267,43 +1267,43 @@ msgstr "EPUB-reparation har startats för den valda boken."
 
 #: cps/cwa_functions.py
 msgid "Failed to start EPUB Fixer for selected book."
-msgstr ""
+msgstr "Det gick inte att starta EPUB-reparation för den valda boken."
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - Cover & Metadata Enforcement"
-msgstr ""
+msgstr "Calibre-Web NextGen – omslags- och metadatakontroll"
 
 #: cps/cwa_functions.py
 msgid "An enforcement run is already in progress."
-msgstr ""
+msgstr "En kontrollkörning pågår redan."
 
 #: cps/cwa_functions.py
 msgid "Could not start the enforcement run."
-msgstr ""
+msgstr "Det gick inte att starta kontrollkörningen."
 
 #: cps/cwa_functions.py
 msgid "You must be an admin to access this page."
-msgstr ""
+msgstr "Du måste vara administratör för att komma åt den här sidan."
 
 #: cps/cwa_functions.py
 msgid "Both username and image data are required."
-msgstr ""
+msgstr "Både användarnamn och bilddata krävs."
 
 #: cps/cwa_functions.py
 msgid "Invalid image data format. Must be a valid image."
-msgstr ""
+msgstr "Ogiltigt bilddataformat. Det måste vara en giltig bild."
 
 #: cps/cwa_functions.py
 msgid "Unsupported image type. Only PNG and JPEG are allowed."
-msgstr ""
+msgstr "Bildtypen stöds inte. Endast PNG och JPEG tillåts."
 
 #: cps/cwa_functions.py
 msgid "Image is too large. Please use an image smaller than 500KB."
-msgstr ""
+msgstr "Bilden är för stor. Använd en bild som är mindre än 500 kB."
 
 #: cps/cwa_functions.py
 msgid "Invalid Base64 image data."
-msgstr ""
+msgstr "Ogiltiga Base64-bilddata."
 
 #: cps/cwa_functions.py
 msgid "Invalid image data format."
@@ -1311,7 +1311,7 @@ msgstr "Ogiltigt bilddataformat."
 
 #: cps/cwa_functions.py
 msgid "Error validating image data."
-msgstr ""
+msgstr "Fel vid validering av bilddata."
 
 #: cps/cwa_functions.py
 msgid "Profile picture updated successfully."
@@ -1319,7 +1319,7 @@ msgstr "Profilbilden har uppdaterats."
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen Profile Picture Management (WIP)"
-msgstr ""
+msgstr "Calibre-Web NextGen – hantering av profilbild (pågående arbete)"
 
 #: cps/db.py cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/config_view_edit.html cps/templates/email_edit.html cps/web.py
@@ -1332,7 +1332,7 @@ msgstr "Dubblettböcker"
 
 #: cps/duplicates.py
 msgid "Duplicate group already dismissed"
-msgstr ""
+msgstr "Dubblettgruppen har redan avfärdats"
 
 #: cps/duplicates.py
 msgid "Duplicate group dismissed"
@@ -1344,7 +1344,7 @@ msgstr "Dubblettgruppen har återställts"
 
 #: cps/duplicates.py
 msgid "Duplicate group was not dismissed"
-msgstr ""
+msgstr "Dubblettgruppen avfärdades inte"
 
 #: cps/duplicates.py
 msgid "Duplicate scan queued"
@@ -1352,7 +1352,7 @@ msgstr "Dubblettsökning har lagts i kö"
 
 #: cps/duplicates.py
 msgid "Duplicate scan completed (fallback)"
-msgstr ""
+msgstr "Dubblettsökning slutförd (reservläge)"
 
 #: cps/duplicates.py
 msgid "Invalid resolution strategy"

@@ -87,8 +87,14 @@ def redact_headers(headers):
     return redacted
 
 
-def proxy_to_kobo_reading_services(data=None, capture_session=None):
-    """Proxy the request to Kobo's reading services API."""
+def proxy_to_kobo_reading_services(data=None, capture_session=None,
+                                   drop_request_headers=()):
+    """Proxy the request to Kobo's reading services API.
+
+    ``drop_request_headers`` withholds named request headers from the upstream
+    leg. It exists for conditional-request headers on a CWNG-owned book, where
+    a 304 from Kobo is destructive rather than merely uninformative.
+    """
     try:
         kobo_url = KOBO_READING_SERVICES_URL + request.path
         if request.query_string:
@@ -103,6 +109,8 @@ def proxy_to_kobo_reading_services(data=None, capture_session=None):
         outgoing_headers.remove("Host")
         # Remove CWA session cookie - Kobo doesn't need it and it causes issues
         outgoing_headers.pop("Cookie", None)
+        for header_name in drop_request_headers:
+            outgoing_headers.pop(header_name, None)
         if data is not None:
             # requests must calculate this again for a filtered request body.
             outgoing_headers.pop("Content-Length", None)
@@ -645,13 +653,19 @@ def _record_annotation_decision(capture_session, ownership, action, entitlement_
     )
 
 
-def _proxy_annotation_request(capture_session, ownership, entitlement_id):
+def _proxy_annotation_request(capture_session, ownership, entitlement_id,
+                              drop_request_headers=()):
     _record_annotation_decision(
         capture_session, ownership, "proxied", entitlement_id,
     )
-    if capture_session is None:
-        return proxy_to_kobo_reading_services()
-    return proxy_to_kobo_reading_services(capture_session=capture_session)
+    # Keep the call shape byte-identical when there is nothing to withhold, so
+    # the unowned-book proxy contract is untouched by this option.
+    kwargs = {}
+    if capture_session is not None:
+        kwargs["capture_session"] = capture_session
+    if drop_request_headers:
+        kwargs["drop_request_headers"] = tuple(drop_request_headers)
+    return proxy_to_kobo_reading_services(**kwargs)
 
 
 def _owned_annotation_patch_ack(capture_session, ownership, entitlement_id):
@@ -732,6 +746,25 @@ def _owned_annotation_page_limit():
         return None
 
 
+# Preconditions that let Kobo answer a proxied owned GET without a usable body:
+# 304 from either cache validator, 412 from either precondition -- all bodyless.
+# Nickel repopulates a book's annotation rows from this response, so any of them
+# destroys the book's device annotations.  MEASURED 2026-09-06 across 52 captured
+# annotation exchanges with a Kobo Clara: If-None-Match appears in 49 of them and
+# none of the other four appears at all.  They are withheld anyway, so a firmware
+# that starts sending a date validator cannot reopen the same wipe -- and note
+# RFC 9110 has a server ignore If-Modified-Since while If-None-Match is present,
+# so dropping only the ETag validator would have UNMASKED the date one.  Range/If-Range
+# are deliberately absent: a range is a request for content, not a revalidation,
+# and withholding it would change the reply shape the device asked for.
+_OWNED_GET_WITHHELD_VALIDATORS = (
+    "If-None-Match",
+    "If-Modified-Since",
+    "If-Match",
+    "If-Unmodified-Since",
+)
+
+
 def _proxy_owned_annotation_get(capture_session, ownership, entitlement_id):
     """Proxy one owned GET and best-effort feed its response to M2 seeding."""
     seed_capture_id = None
@@ -755,8 +788,18 @@ def _proxy_owned_annotation_get(capture_session, ownership, entitlement_id):
             exc_info=True,
         )
 
+    # MEASURED 2026-09-06 on a Kobo Clara: forwarding the device's
+    # If-None-Match here made Kobo answer 304 with a zero-length body. Nickel
+    # empties a book's rows for the download and repopulates them from this
+    # response, so it lost all 8 of that book's device annotations; and seeding
+    # rejects a non-2xx status outright, so the capture failed
+    # seed_response_invalid, leaving the book unseeded and exposed to the very
+    # same wipe on the next re-download. A proxied owned GET is a request for
+    # content, not a cache revalidation: CWNG is this book's authority and the
+    # device's validators belong to Kobo, so they are not ours to forward.
     response = _proxy_annotation_request(
         capture_session, ownership, entitlement_id,
+        drop_request_headers=_OWNED_GET_WITHHELD_VALIDATORS,
     )
     if seed_capture_id is not None:
         try:
@@ -782,7 +825,12 @@ def _proxy_owned_annotation_get(capture_session, ownership, entitlement_id):
 
 
 def _owned_annotation_get_response(capture_session, ownership, entitlement_id):
-    """Return one complete eligible local page, otherwise proxy unchanged."""
+    """Return one complete eligible local page, otherwise proxy upstream.
+
+    The proxy leg is deliberately not byte-transparent: an owned book's GET
+    withholds the device's cache validators, because a bodyless Kobo reply
+    empties that book's annotations on the device.
+    """
     sticky = False
     authority_history_known = False
     page_limit = _owned_annotation_page_limit()
@@ -1271,7 +1319,9 @@ def handle_annotations(entitlement_id):
     """Handle annotation requests for a specific book.
 
     GET: fully seeded owned books are answered from CWNG's complete visible
-    set; unseeded and unowned books retain the byte-transparent Kobo proxy.
+    set; unowned books retain the byte-transparent Kobo proxy.  An unseeded
+    owned book is proxied too, but without the device's cache validators: a
+    bodyless reply would empty that book's annotations on the device.
     PATCH: persist locally (source='kobo'), then dispatch through
     each registered + enabled annotation_sync handler (Hardcover today; future
     Readwise / Notion / etc.). All DB writes happen in the dispatcher; this

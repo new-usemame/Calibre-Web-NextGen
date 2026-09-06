@@ -14070,11 +14070,11 @@ msgstr ""
 msgid ""
 "Registry → download the image below (tag: latest), then stop the container → "
 "Action → Reset to recreate it."
-msgstr ""
+msgstr "Register → hämta avbilden nedan (tagg: latest), stoppa sedan containern → Åtgärd → Återställ för att skapa om den."
 
 #: cps/templates/update_now_modal.html
 msgid "Set up automatic updates"
-msgstr ""
+msgstr "Ställ in automatiska uppdateringar"
 
 #: cps/templates/user_edit.html
 msgid "Your Profile"
@@ -14086,12 +14086,12 @@ msgstr "Användarinställningar"
 
 #: cps/templates/user_edit.html
 msgid "Account Information"
-msgstr ""
+msgstr "Kontoinformation"
 
 #: cps/templates/user_edit.html
 msgid ""
 "If you need to change your email address or password, you can do so here."
-msgstr ""
+msgstr "Om du behöver ändra din e-postadress eller ditt lösenord kan du göra det här."
 
 #: cps/templates/user_edit.html
 msgid "Reset user Password"
@@ -14107,17 +14107,17 @@ msgstr "Skicka till e-postadress för e-boksläsare"
 
 #: cps/templates/user_edit.html
 msgid "Use comma to separate multiple addresses"
-msgstr ""
+msgstr "Använd kommatecken för att skilja flera adresser åt"
 
 #: cps/templates/user_edit.html
 msgid ""
 "Email address(es) for your eReader devices. Separate multiple addresses with "
 "commas."
-msgstr ""
+msgstr "E-postadress(er) för dina e-boksläsare. Separera flera adresser med kommatecken."
 
 #: cps/templates/user_edit.html
 msgid "Enable Send-to-eReader Pop-up Modal"
-msgstr ""
+msgstr "Aktivera popupfönster för Skicka till e-boksläsare"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -14125,26 +14125,29 @@ msgid ""
 "enter extra email addresses and only send to a selection of saved addresses "
 "when sending to eReader."
 msgstr ""
+"Aktiverar eller inaktiverar popupfönstret Skicka till e-boksläsare, där "
+"användare kan ange extra e-postadresser och endast skicka till ett urval av "
+"sparade adresser vid utskick till e-boksläsare."
 
 #: cps/templates/user_edit.html
 msgid ""
 "When disabled, emails will be sent to all configured eReader addresses "
 "without prompting."
-msgstr ""
+msgstr "När funktionen är inaktiverad skickas e-post till alla konfigurerade e-boksläsaradresser utan fråga."
 
 #: cps/templates/user_edit.html
 msgid "Automatically send new books to my eReader(s)"
-msgstr ""
+msgstr "Skicka automatiskt nya böcker till mina e-boksläsare"
 
 #: cps/templates/user_edit.html
 msgid ""
 "When enabled, newly ingested books will be automatically sent to all "
 "configured eReader email addresses above."
-msgstr ""
+msgstr "När funktionen är aktiverad skickas nyligen importerade böcker automatiskt till alla konfigurerade e-boksläsaradresser ovan."
 
 #: cps/templates/user_edit.html
 msgid "Language & Theme Preferences"
-msgstr ""
+msgstr "Språk- och temainställningar"
 
 #: cps/templates/user_edit.html
 msgid "Interface Language"
@@ -14156,7 +14159,7 @@ msgstr "Visa böcker med språk"
 
 #: cps/templates/user_edit.html
 msgid "Filter the library to only show books in a specific language."
-msgstr ""
+msgstr "Filtrera biblioteket så att endast böcker på ett visst språk visas."
 
 #: cps/templates/user_edit.html
 msgid "Book Language Filter"
@@ -14164,7 +14167,7 @@ msgstr "Filter för bokspråk"
 
 #: cps/templates/user_edit.html
 msgid "OAuth & API Integrations"
-msgstr ""
+msgstr "OAuth- och API-integrationer"
 
 #: cps/templates/user_edit.html
 msgid "OAuth Settings"
@@ -14180,11 +14183,11 @@ msgstr "Koppla bort"
 
 #: cps/templates/user_edit.html
 msgid "Hardcover API Token"
-msgstr ""
+msgstr "Hardcover API-token"
 
 #: cps/templates/user_edit.html
 msgid "API token for Hardcover metadata provider integration."
-msgstr ""
+msgstr "API-token för integrationen med metadata-leverantören Hardcover."
 
 #: cps/templates/user_edit.html
 msgid "Kobo Sync Token"
@@ -14196,35 +14199,35 @@ msgstr "Skapa/Visa"
 
 #: cps/templates/user_edit.html
 msgid "Force full kobo sync"
-msgstr ""
+msgstr "Tvinga fullständig Kobo-synkronisering"
 
 #: cps/templates/user_edit.html
 msgid "Resend one book to this Kobo"
-msgstr ""
+msgstr "Skicka en bok igen till denna Kobo"
 
 #: cps/templates/user_edit.html
 msgid "Resend"
-msgstr ""
+msgstr "Skicka igen"
 
 #: cps/templates/user_edit.html
 msgid ""
 "Clears the sync record for one book so the device re-downloads it on next "
 "sync. Find the book ID in the book detail page URL."
-msgstr ""
+msgstr "Rensar synkroniseringsposten för en bok så att enheten hämtar den igen vid nästa synkronisering. Bok-ID:t finns i URL:en på sidan med bokdetaljer."
 
 #: cps/templates/user_edit.html
 msgid "Reconcile books deleted before Kobo archival tracking"
-msgstr ""
+msgstr "Stäm av böcker som tagits bort före Kobo-arkiveringsspårningen"
 
 #: cps/templates/user_edit.html
 msgid ""
 "Upload this user's KoboReader.sqlite, then select only books you know this "
 "server delivered and that are no longer in the library."
-msgstr ""
+msgstr "Ladda upp användarens KoboReader.sqlite och välj sedan endast böcker som du vet att denna server levererade och som inte längre finns i biblioteket."
 
 #: cps/templates/user_edit.html
 msgid "Sync only books in selected shelves with Kobo"
-msgstr ""
+msgstr "Synkronisera endast böcker på valda hyllor med Kobo"
 
 #: cps/templates/user_edit.html
 msgid ""
@@ -14232,14 +14235,17 @@ msgid ""
 "annotations returned to your Kobo. The administrator must separately enable "
 "the instance-level opt-in."
 msgstr ""
+"Av som standard. Steg 0 samlar endast återställningsunderlag och ändrar inte "
+"anteckningar som returneras till din Kobo. Administratören måste separat "
+"aktivera samtycke på instansnivå."
 
 #: cps/templates/user_edit.html
 msgid "OPDS Shelf Exposure"
-msgstr ""
+msgstr "OPDS-exponering av hyllor"
 
 #: cps/templates/user_edit.html
 msgid "Expose only books in selected shelves to OPDS"
-msgstr ""
+msgstr "Exponera endast böcker på valda hyllor via OPDS"
 
 #: cps/templates/user_edit.html
 msgid "Sidebar Display Settings"
@@ -14247,7 +14253,7 @@ msgstr "Visningsinställningar för sidofältet"
 
 #: cps/templates/user_edit.html
 msgid "Choose which sections to display in your sidebar navigation."
-msgstr ""
+msgstr "Välj vilka avsnitt som ska visas i sidopanelens navigering."
 
 #: cps/templates/user_edit.html
 msgid "Add allowed/Denied Custom Column Values"
@@ -14255,67 +14261,69 @@ msgstr "Lägg till tillåtna/avvisade anpassade kolumnvärden"
 
 #: cps/templates/user_edit.html
 msgid "OPDS Catalog Order"
-msgstr ""
+msgstr "OPDS-katalogordning"
 
 #: cps/templates/user_edit.html
 msgid ""
 "Reorder the OPDS root catalog by listing entry IDs in the order you want. "
 "Unknown IDs are ignored and missing entries are appended automatically."
 msgstr ""
+"Ordna om OPDS-rotkatalogen genom att lista post-ID:n i den ordning du vill "
+"ha dem. Okända ID:n ignoreras och saknade poster läggs till automatiskt."
 
 #: cps/templates/user_edit.html
 msgid ""
 "Drag to reorder OPDS root entries. Missing entries are appended "
 "automatically."
-msgstr ""
+msgstr "Dra för att ordna om OPDS-rotposter. Saknade poster läggs till automatiskt."
 
 #: cps/templates/user_edit.html
 msgid "User Permissions"
-msgstr ""
+msgstr "Användarbehörigheter"
 
 #: cps/templates/user_edit.html
 msgid "Configure what actions this user is allowed to perform."
-msgstr ""
+msgstr "Ställ in vilka åtgärder användaren har behörighet att utföra."
 
 #: cps/templates/user_edit.html
 msgid "Magic Shelves Order"
-msgstr ""
+msgstr "Ordning för magiska hyllor"
 
 #: cps/templates/user_edit.html
 msgid "Choose how your magic shelves are ordered in the sidebar."
-msgstr ""
+msgstr "Välj hur dina magiska hyllor ska ordnas i sidopanelen."
 
 #: cps/templates/user_edit.html
 msgid "Order Mode"
-msgstr ""
+msgstr "Sorteringsläge"
 
 #: cps/templates/user_edit.html
 msgid "Manual (drag to reorder)"
-msgstr ""
+msgstr "Manuellt (dra för att ändra ordning)"
 
 #: cps/templates/user_edit.html
 msgid "Name (A-Z)"
-msgstr ""
+msgstr "Namn (A–Ö)"
 
 #: cps/templates/user_edit.html
 msgid "Name (Z-A)"
-msgstr ""
+msgstr "Namn (Ö–A)"
 
 #: cps/templates/user_edit.html
 msgid "Book count (high to low)"
-msgstr ""
+msgstr "Antal böcker (högst till lägst)"
 
 #: cps/templates/user_edit.html
 msgid "Book count (low to high)"
-msgstr ""
+msgstr "Antal böcker (lägst till högst)"
 
 #: cps/templates/user_edit.html
 msgid "Created (newest first)"
-msgstr ""
+msgstr "Skapad (nyast först)"
 
 #: cps/templates/user_edit.html
 msgid "Created (oldest first)"
-msgstr ""
+msgstr "Skapad (äldst först)"
 
 #: cps/templates/user_edit.html
 msgid "Recently modified"
@@ -14323,11 +14331,11 @@ msgstr "Nyligen ändrade"
 
 #: cps/templates/user_edit.html
 msgid "Least recently modified"
-msgstr ""
+msgstr "Minst nyligen ändrad"
 
 #: cps/templates/user_edit.html
 msgid "Manual order is used only when the order mode is set to Manual."
-msgstr ""
+msgstr "Manuell ordning används endast när sorteringsläget är inställt på Manuellt."
 
 #: cps/templates/user_edit.html
 msgid "Magic Shelves Visibility"

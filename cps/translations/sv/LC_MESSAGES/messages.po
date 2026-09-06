@@ -1637,7 +1637,7 @@ msgstr "Testa e-post"
 
 #: cps/helper.py
 msgid "Get Started with Calibre-Web NextGen"
-msgstr ""
+msgstr "Kom igång med Calibre-Web NextGen"
 
 #: cps/helper.py
 #, python-format
@@ -1666,7 +1666,7 @@ msgstr "Den begärda filen kunde inte läsas. Kanske fel behörigheter?"
 #: cps/helper.py
 #, python-brace-format
 msgid "Read status could not set: {}"
-msgstr ""
+msgstr "Det gick inte att ange lässtatus: {}"
 
 #: cps/helper.py
 #, python-format
@@ -1715,7 +1715,7 @@ msgstr "Boksökvägen %(path)s hittades inte på Google Drive"
 
 #: cps/helper.py
 msgid "Found an existing account for this Email address"
-msgstr ""
+msgstr "Ett befintligt konto hittades för den här e-postadressen"
 
 #: cps/helper.py
 msgid "This username is already taken"
@@ -1727,12 +1727,12 @@ msgstr "Ogiltigt format för e-postadress"
 
 #: cps/helper.py
 msgid "Password doesn't comply with password validation rules"
-msgstr ""
+msgstr "Lösenordet uppfyller inte reglerna för lösenordsvalidering"
 
 #: cps/helper.py
 msgid ""
 "Python module 'advocate' is not installed but is needed for cover uploads"
-msgstr ""
+msgstr "Python-modulen 'advocate' är inte installerad men krävs för uppladdning av omslag"
 
 #: cps/helper.py
 msgid "Error Downloading Cover"
@@ -1741,7 +1741,7 @@ msgstr "Fel vid hämtning av omslaget"
 #: cps/helper.py
 #, python-format
 msgid "Cover image exceeds maximum size of %(size)s MB"
-msgstr ""
+msgstr "Omslagsbilden överskrider maximal storlek på %(size)s MB"
 
 #: cps/helper.py
 msgid "Cover Format Error"
@@ -1751,7 +1751,7 @@ msgstr "Fel på omslagsformat"
 msgid ""
 "You are not allowed to access localhost or the local network for cover "
 "uploads"
-msgstr ""
+msgstr "Du får inte använda localhost eller det lokala nätverket för uppladdning av omslag"
 
 #: cps/helper.py
 msgid "Failed to create path for cover"
@@ -1759,7 +1759,7 @@ msgstr "Det gick inte att skapa sökväg för omslag"
 
 #: cps/helper.py cps/spa_strings.py
 msgid "Cover"
-msgstr ""
+msgstr "Omslag"
 
 #: cps/helper.py
 msgid "UnRar binary file not found"
@@ -1774,15 +1774,15 @@ msgstr "Fel vid körning av UnRar"
 msgid ""
 "Unsupported architecture detected: %(arch)s. Calibre-Web NextGen is "
 "optimized for x86_64 and aarch64."
-msgstr ""
+msgstr "Arkitekturen %(arch)s stöds inte. Calibre-Web NextGen är optimerat för x86_64 och aarch64."
 
 #: cps/helper.py
 msgid "Could not find the specified directory"
-msgstr ""
+msgstr "Det gick inte att hitta den angivna katalogen"
 
 #: cps/helper.py
 msgid "Please specify a directory, not a file"
-msgstr ""
+msgstr "Ange en katalog, inte en fil"
 
 #: cps/helper.py
 msgid "Calibre binaries not viable"
@@ -1791,7 +1791,7 @@ msgstr "Calibres binärfiler kan inte användas"
 #: cps/helper.py
 #, python-format
 msgid "Missing calibre binaries: %(missing)s"
-msgstr ""
+msgstr "Calibres binärfiler saknas: %(missing)s"
 
 #: cps/helper.py
 #, python-format
@@ -1804,13 +1804,14 @@ msgstr "Fel vid körning av Calibre"
 
 #: cps/helper.py cps/templates/admin.html
 msgid "Queue all books for metadata backup"
-msgstr ""
+msgstr "Lägg alla böcker i kö för säkerhetskopiering av metadata"
 
 #: cps/kobo_auth.py
 msgid ""
 "Please access Calibre-Web NextGen from non localhost to get valid "
 "api_endpoint for kobo device"
-msgstr ""
+msgstr "Öppna Calibre-Web NextGen från en annan värd än localhost för att få en "
+"giltig api_endpoint för Kobo-enheten"
 
 #: cps/kobo_auth.py
 msgid "Kobo Setup"
@@ -1818,23 +1819,23 @@ msgstr "Kobo-installation"
 
 #: cps/magic_shelf.py cps/spa_strings.py
 msgid "Recently Added"
-msgstr ""
+msgstr "Nyligen tillagda"
 
 #: cps/magic_shelf.py cps/spa_strings.py
 msgid "Highly Rated"
-msgstr ""
+msgstr "Högt betygsatta"
 
 #: cps/magic_shelf.py cps/opds.py cps/spa_strings.py
 msgid "Currently Reading"
-msgstr ""
+msgstr "Läser just nu"
 
 #: cps/magic_shelf.py cps/spa_strings.py
 msgid "Yet to Read"
-msgstr ""
+msgstr "Inte lästa ännu"
 
 #: cps/magic_shelf.py cps/spa_strings.py
 msgid "Recent Publications"
-msgstr ""
+msgstr "Nya utgåvor"
 
 #: cps/oauth_bb.py
 #, python-format
@@ -1846,17 +1847,21 @@ msgid ""
 "Login failed: OAuth token validation error. This may be due to scope "
 "configuration mismatch. Please check your OAuth scopes configuration or "
 "contact your administrator."
-msgstr ""
+msgstr "Inloggningen misslyckades: Fel vid validering av OAuth-token. Det kan bero "
+"på en felaktig konfiguration av omfattningar. Kontrollera OAuth-"
+"omfattningarna eller kontakta administratören."
 
 #: cps/oauth_bb.py
 msgid "Login failed: OAuth token expired. Please try logging in again."
-msgstr ""
+msgstr "Inloggningen misslyckades: OAuth-tokenen har löpt ut. Försök logga in igen."
 
 #: cps/oauth_bb.py
 msgid ""
 "Login failed: Could not connect to the OAuth provider's user info endpoint. "
 "Please try again or contact your administrator."
-msgstr ""
+msgstr "Inloggningen misslyckades: Det gick inte att ansluta till OAuth-"
+"leverantörens slutpunkt för användarinformation. Försök igen eller kontakta "
+"administratören."
 
 #: cps/oauth_bb.py
 msgid ""
@@ -1871,25 +1876,27 @@ msgid ""
 "Login failed: OAuth provider response is missing required fields: "
 "%(fields)s. Please check your OAuth configuration or contact your "
 "administrator."
-msgstr ""
+msgstr "Inloggningen misslyckades: OAuth-leverantörens svar saknar obligatoriska "
+"fält: %(fields)s. Kontrollera OAuth-konfigurationen eller kontakta "
+"administratören."
 
 #: cps/oauth_bb.py
 msgid "Failed to link OAuth account. Please try again."
-msgstr ""
+msgstr "Det gick inte att länka OAuth-kontot. Försök igen."
 
 #: cps/oauth_bb.py
 msgid "Login failed: your account is not allowed to access this application."
-msgstr ""
+msgstr "Inloggningen misslyckades: ditt konto har inte behörighet till programmet."
 
 #: cps/oauth_bb.py
 msgid ""
 "OAuth error: Provider returned invalid user information. Please try again."
-msgstr ""
+msgstr "OAuth-fel: Leverantören returnerade ogiltig användarinformation. Försök igen."
 
 #: cps/oauth_bb.py
 #, python-format
 msgid "This %(oauth)s account is already linked to a different user"
-msgstr ""
+msgstr "Det här %(oauth)s-kontot är redan länkat till en annan användare"
 
 #: cps/oauth_bb.py cps/remotelogin.py
 #, python-format

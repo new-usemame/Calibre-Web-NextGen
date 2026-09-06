@@ -223,7 +223,9 @@ msgstr "Inställningsdatabasen är inte skrivbar"
 msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
-msgstr ""
+msgstr "Titelsorteringsregeln sparades, men det gick inte att ändra ordningen i "
+"det befintliga biblioteket — böcker kan behålla sin tidigare ordning tills "
+"du försöker igen eller redigerar dem."
 
 #: cps/admin.py
 msgid "Invalid Read Column"
@@ -641,7 +643,7 @@ msgstr "Uppdateringsfilen kunde inte sparas i den tillfälliga katalogen"
 
 #: cps/admin.py
 msgid "Files could not be replaced during update"
-msgstr ""
+msgstr "Filer kunde inte ersättas under uppdateringen"
 
 #: cps/admin.py
 msgid "Failed to extract at least One LDAP User"
@@ -671,7 +673,7 @@ msgstr "{} användare har importerats"
 
 #: cps/admin.py
 msgid "Books path not valid"
-msgstr ""
+msgstr "Boksökvägen är ogiltig"
 
 #: cps/admin.py
 msgid "DB Location is not Valid, Please Enter Correct Path"
@@ -693,33 +695,37 @@ msgstr "Certfile-platsen är inte giltig, vänligen ange rätt sökväg"
 msgid ""
 "Auto-create users cannot be enabled without enabling reverse proxy "
 "authentication"
-msgstr ""
+msgstr "Automatisk kontoskapning kan inte aktiveras utan autentisering via omvänd "
+"proxy"
 
 #: cps/admin.py
 msgid "Auto-create users requires a valid reverse proxy header name"
-msgstr ""
+msgstr "Automatisk kontoskapning kräver ett giltigt huvudnamn för omvänd proxy"
 
 #: cps/admin.py
 msgid ""
 "Invalid OAuth Redirect Host format. Please include the full URL with "
 "protocol (e.g., https://your-domain.com)"
-msgstr ""
+msgstr "Ogiltigt format för OAuth-omdirigeringsvärd. Ange hela URL:en med protokoll "
+"(till exempel https://din-domän.se)."
 
 #: cps/admin.py
 msgid ""
 "OAuth Redirect Host should not include a path. Use only the base URL (e.g., "
 "https://your-domain.com)"
-msgstr ""
+msgstr "OAuth-omdirigeringsvärden får inte innehålla en sökväg. Använd endast "
+"bas-URL:en (till exempel https://din-domän.se)."
 
 #: cps/admin.py
 msgid "Password length has to be between 1 and 40"
-msgstr ""
+msgstr "Lösenordets längd måste vara mellan 1 och 40"
 
 #: cps/admin.py
 msgid ""
 "KEPUB conversion was not queued. Check that the preference and Kepubify path "
 "are enabled."
-msgstr ""
+msgstr "KEPUB-konvertering lades inte i kö. Kontrollera att inställningen och "
+"sökvägen till Kepubify är aktiverade."
 
 #: cps/admin.py
 msgid "Database Settings updated"
@@ -765,11 +771,11 @@ msgstr "Ingen adminstratörsanvändare kvar, kan inte ta bort användaren"
 
 #: cps/admin.py cps/web.py
 msgid "Invalid library mode"
-msgstr ""
+msgstr "Ogiltigt biblioteksläge"
 
 #: cps/admin.py cps/web.py
 msgid "Email can't be empty and has to be a valid Email"
-msgstr ""
+msgstr "E-postadressen får inte vara tom och måste vara giltig"
 
 #: cps/admin.py
 #, python-format
@@ -780,35 +786,40 @@ msgstr "Användaren '%(nick)s' uppdaterad"
 #, python-format
 msgid ""
 "Connection successful! OIDC discovery endpoint is accessible.%(endpoints)s"
-msgstr ""
+msgstr "Anslutningen lyckades! OIDC-identifieringsslutpunkten är tillgänglig."
+"%(endpoints)s"
 
 #: cps/admin.py
 msgid ""
 "Connection failed: OIDC discovery endpoint not found (404). Check if the "
 "base URL is correct."
-msgstr ""
+msgstr "Anslutningen misslyckades: OIDC-identifieringsslutpunkten hittades inte "
+"(404). Kontrollera att bas-URL:en är korrekt."
 
 #: cps/admin.py
 #, python-format
 msgid "Connection failed: Server returned status code %(code)s"
-msgstr ""
+msgstr "Anslutningen misslyckades: Servern returnerade statuskoden %(code)s"
 
 #: cps/admin.py
 msgid ""
 "Connection failed: Could not connect to server. Check the URL and network "
 "connectivity."
-msgstr ""
+msgstr "Anslutningen misslyckades: Det gick inte att ansluta till servern. "
+"Kontrollera URL:en och nätverksanslutningen."
 
 #: cps/admin.py
 msgid ""
 "Connection failed: Request timed out. The server may be slow or unreachable."
-msgstr ""
+msgstr "Anslutningen misslyckades: Tidsgränsen för begäran överskreds. Servern "
+"kan vara långsam eller otillgänglig."
 
 #: cps/admin.py
 msgid ""
 "Connection failed: Server returned invalid JSON. This may not be an OIDC "
 "endpoint."
-msgstr ""
+msgstr "Anslutningen misslyckades: Servern returnerade ogiltig JSON. Det här är "
+"kanske inte en OIDC-slutpunkt."
 
 #: cps/admin.py
 #, python-format
@@ -820,12 +831,13 @@ msgstr "Anslutningen misslyckades: %(error)s"
 msgid ""
 "Metadata is missing required OIDC fields: %(fields)s. This may not be a "
 "valid OIDC metadata endpoint."
-msgstr ""
+msgstr "Metadata saknar obligatoriska OIDC-fält: %(fields)s. Det här är kanske "
+"inte en giltig OIDC-metadataslutpunkt."
 
 #: cps/admin.py
 #, python-format
 msgid "Metadata URL is valid! Found %(count)s OAuth endpoints."
-msgstr ""
+msgstr "Metadata-URL:en är giltig! Hittade %(count)s OAuth-slutpunkter."
 
 #: cps/admin.py
 msgid " User info endpoint is available."
@@ -834,25 +846,27 @@ msgstr " Slutpunkten för användarinformation är tillgänglig."
 #: cps/admin.py
 msgid ""
 " Note: User info endpoint not found - this may cause authentication issues."
-msgstr ""
+msgstr " Obs: Slutpunkten för användarinformation hittades inte. Detta kan orsaka "
+"autentiseringsproblem."
 
 #: cps/admin.py
 msgid "Metadata URL not found (404). Please check the URL is correct."
-msgstr ""
+msgstr "Metadata-URL:en hittades inte (404). Kontrollera att URL:en är korrekt."
 
 #: cps/admin.py
 msgid ""
 "Connection failed: Could not connect to metadata URL. Check the URL and "
 "network connectivity."
-msgstr ""
+msgstr "Anslutningen misslyckades: Det gick inte att ansluta till metadata-URL:en. "
+"Kontrollera URL:en och nätverksanslutningen."
 
 #: cps/admin.py
 msgid "Connection failed: Request timed out."
-msgstr ""
+msgstr "Anslutningen misslyckades: Tidsgränsen för begäran överskreds."
 
 #: cps/admin.py
 msgid "Connection failed: Invalid JSON in response."
-msgstr ""
+msgstr "Anslutningen misslyckades: Ogiltig JSON i svaret."
 
 #: cps/admin.py
 msgid "An unknown error occurred."

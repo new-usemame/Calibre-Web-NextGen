@@ -11751,10 +11751,14 @@ msgid ""
 "from that day. This helps keep the backup subdirectories organised and "
 "minimises disk space usage."
 msgstr ""
+"När detta är aktivt skapar tjänsten cwa-auto-zipper zip-arkiv strax före "
+"midnatt varje dag med alla säkerhetskopierade konverterade, importerade och "
+"misslyckade filer från den dagen. Det hjälper till att hålla underkatalogerna "
+"för säkerhetskopior organiserade och minimerar diskutrymmesanvändningen."
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Auto-Conversion Target Format - EPUB by Default"
-msgstr ""
+msgstr "NextGen-målformat för automatisk konvertering – EPUB som standard"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11762,6 +11766,9 @@ msgid ""
 "automatically converted to the format chosen here (except those formats "
 "selected in the ignore list below)"
 msgstr ""
+"När automatisk konvertering är aktiv konverteras alla importerade böcker "
+"automatiskt till formatet som väljs här (utom format som är valda i "
+"undantagslistan nedan)"
 
 #: cps/templates/cwa_settings.html
 msgid "Choose a target format:"
@@ -11773,20 +11780,24 @@ msgid ""
 "in either EPUB and AZW3 format. Files in other formats will simply be "
 "ignored by the service"
 msgstr ""
+"Obs: NextGens tjänst för metadatatillämpning kan för närvarande endast stödja "
+"filer i EPUB- eller AZW3-format. Filer i andra format ignoreras av tjänsten"
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Auto-Convert - Ignored Formats"
-msgstr ""
+msgstr "NextGen automatisk konvertering – undantagna format"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "The formats selected here will be ignored by NextGen's Auto-Conversion "
 "feature when it's active, meaning they will be imported as is."
 msgstr ""
+"Format som väljs här ignoreras av NextGens automatiska konvertering när den "
+"är aktiv, vilket innebär att de importeras som de är."
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Auto-Convert - Retained Formats"
-msgstr ""
+msgstr "NextGen automatisk konvertering – behållna format"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11795,40 +11806,46 @@ msgid ""
 "the \"NextGen Auto-Ingest - Ignored Formats\" list, it will not be imported. "
 "Note that the target format is always retained."
 msgstr ""
+"Format som väljs här läggs alltid till i biblioteket, även efter att de har "
+"konverterats till målformatet. Om formatet däremot finns i listan \"NextGen "
+"automatisk import – undantagna format\" importeras det inte. Observera att "
+"målformatet alltid behålls."
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Auto-Ingest Automerge"
-msgstr ""
+msgstr "NextGen automatisk import – automatisk sammanslagning"
 
 #: cps/templates/cwa_settings.html
 msgid "Calibre can detect Duplicate Book Titles on Import and depending on the"
-msgstr ""
+msgstr "Calibre kan identifiera dubbletttitlar vid import och beroende på"
 
 #: cps/templates/cwa_settings.html
 msgid "automerge"
-msgstr ""
+msgstr "automatisk sammanslagning"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "setting. It can be set to delete either instance of a duplicated book or "
 "keep both (default)."
 msgstr ""
+"inställningen kan den ställas in på att ta bort någon av instanserna av en "
+"dubblettbok eller behålla båda (standard)."
 
 #: cps/templates/cwa_settings.html
 msgid "Discards duplicate import, keeps library copy"
-msgstr ""
+msgstr "Kastar bort dubblettimporten, behåller bibliotekskopian"
 
 #: cps/templates/cwa_settings.html
 msgid "Overwrites library copy with newly imported file"
-msgstr ""
+msgstr "Skriver över bibliotekskopian med den nyligen importerade filen"
 
 #: cps/templates/cwa_settings.html
 msgid "Creates a duplicate record, keeping both copies"
-msgstr ""
+msgstr "Skapar en dubblettpost och behåller båda kopiorna"
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Auto-Ingest - Ignored Formats"
-msgstr ""
+msgstr "NextGen automatisk import – undantagna format"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11836,16 +11853,21 @@ msgid ""
 "meaning files in these formats won't be added to the library by NextGen "
 "during the ingest process"
 msgstr ""
+"Format som väljs här ignoreras av NextGens automatiska import, vilket innebär "
+"att filer i dessa format inte läggs till i biblioteket av NextGen under "
+"importprocessen"
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Duplicate Detection System"
-msgstr ""
+msgstr "NextGens dubblettidentifieringssystem"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Enable or disable the duplicate detection system. When disabled, duplicate "
 "scanning will not run and no notifications will be shown."
 msgstr ""
+"Aktivera eller inaktivera dubblettidentifieringssystemet. När det är "
+"inaktiverat körs ingen dubblettgenomsökning och inga notiser visas."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Duplicate Detection"
@@ -11853,23 +11875,23 @@ msgstr "Aktivera dubblettidentifiering"
 
 #: cps/templates/cwa_settings.html
 msgid "When enabled, NextGen will scan for duplicate books after each import"
-msgstr ""
+msgstr "När detta är aktiverat söker NextGen efter dubblettböcker efter varje import"
 
 #: cps/templates/cwa_settings.html
 msgid "Duplicate Detection Method"
-msgstr ""
+msgstr "Metod för dubblettidentifiering"
 
 #: cps/templates/cwa_settings.html
 msgid "Hybrid (SQL prefilter + Python validation)"
-msgstr ""
+msgstr "Hybrid (SQL-förfilter + Python-validering)"
 
 #: cps/templates/cwa_settings.html
 msgid "Python only (slowest, most robust)"
-msgstr ""
+msgstr "Endast Python (långsammast, mest robust)"
 
 #: cps/templates/cwa_settings.html
 msgid "Legacy SQL only (experimental)"
-msgstr ""
+msgstr "Endast äldre SQL (experimentellt)"
 
 #: cps/templates/cwa_settings.html
 msgid ""

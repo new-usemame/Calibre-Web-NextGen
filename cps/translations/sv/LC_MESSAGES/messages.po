@@ -1914,11 +1914,13 @@ msgid ""
 "Login failed: No user account is linked to your %(provider)s account. Please "
 "contact your administrator to create an account or link your existing "
 "account."
-msgstr ""
+msgstr "Inloggningen misslyckades: Inget användarkonto är länkat till ditt "
+"%(provider)s-konto. Kontakta administratören för att skapa ett konto eller "
+"länka ditt befintliga konto."
 
 #: cps/oauth_bb.py
 msgid "OAuth authentication failed. Please try again or contact administrator."
-msgstr ""
+msgstr "OAuth-autentiseringen misslyckades. Försök igen eller kontakta administratören."
 
 #: cps/oauth_bb.py
 msgid "OAuth system error. Please contact administrator."
@@ -1961,20 +1963,23 @@ msgstr "Det gick inte att logga in med generisk OAuth."
 
 #: cps/oauth_bb.py
 msgid "OAuth authentication failed: Token validation error. Please try again."
-msgstr ""
+msgstr "OAuth-autentiseringen misslyckades: Fel vid tokenvalidering. Försök igen."
 
 #: cps/oauth_bb.py
 msgid ""
 "OAuth authentication failed due to an unexpected error. Please contact "
 "administrator."
-msgstr ""
+msgstr "OAuth-autentiseringen misslyckades på grund av ett oväntat fel. Kontakta "
+"administratören."
 
 #: cps/oauth_bb.py
 msgid ""
 "OAuth error: Invalid redirect URI. If you're experiencing this error "
 "repeatedly, please configure the 'OAuth Redirect Host' setting in Admin > "
 "Basic Configuration > OAuth."
-msgstr ""
+msgstr "OAuth-fel: Ogiltig omdirigerings-URI. Om du får det här felet upprepade "
+"gånger ska du konfigurera 'OAuth Redirect Host' under Administration > "
+"Grundläggande konfiguration > OAuth."
 
 #: cps/oauth_bb.py
 msgid "GitHub Oauth error, please retry later."
@@ -2170,16 +2175,17 @@ msgstr "Lyckades! Vänligen återvänd till din enhet"
 msgid ""
 "Duplicate scanning needs a one-time full scan before fast duplicate checks "
 "can run after imports and metadata changes. "
-msgstr ""
+msgstr "Dubblettsökning kräver en fullständig engångssökning innan snabba "
+"dubblettkontroller kan köras efter importer och metadataändringar. "
 
 #: cps/render_template.py cps/spa_strings.py cps/templates/user_edit.html
 #: cps/templates/user_table.html
 msgid "My Library"
-msgstr ""
+msgstr "Mitt bibliotek"
 
 #: cps/render_template.py cps/spa_strings.py
 msgid "Library"
-msgstr ""
+msgstr "Bibliotek"
 
 #: cps/render_template.py
 msgid "Show recent books"
@@ -2247,11 +2253,11 @@ msgstr "Visa arkiverade böcker"
 
 #: cps/render_template.py cps/spa_strings.py
 msgid "Favorites"
-msgstr ""
+msgstr "Favoriter"
 
 #: cps/render_template.py
 msgid "Show Favorites"
-msgstr ""
+msgstr "Visa favoriter"
 
 #: cps/render_template.py cps/web.py
 msgid "Books List"
@@ -2263,7 +2269,7 @@ msgstr "Visa boklista"
 
 #: cps/render_template.py cps/spa_strings.py
 msgid "Duplicates"
-msgstr ""
+msgstr "Dubbletter"
 
 #: cps/render_template.py
 msgid "Show Duplicate Books"
@@ -2272,14 +2278,15 @@ msgstr "Visa dubblettböcker"
 #: cps/render_template.py
 #, python-format
 msgid "Calibre-Web NextGen %(latest)s is available — you're on %(current)s."
-msgstr ""
+msgstr "Calibre-Web NextGen %(latest)s är tillgängligt — du använder %(current)s."
 
 #: cps/render_template.py
 #, python-format
 msgid ""
 "Help improve Calibre-Web NextGen's %(language)s translations — %(count)s "
 "strings in your language still need translating."
-msgstr ""
+msgstr "Hjälp till att förbättra Calibre-Web NextGens %(language)ska "
+"översättningar — %(count)s strängar på ditt språk återstår att översätta."
 
 #: cps/search.py
 msgid "Published after "
@@ -2306,7 +2313,7 @@ msgstr "Lässtatus = '%(status)s'"
 
 #: cps/search.py
 msgid "Error on search for custom columns, please restart Calibre-Web"
-msgstr ""
+msgstr "Fel vid sökning i anpassade kolumner. Starta om Calibre-Web."
 
 #: cps/search.py cps/templates/layout.html
 msgid "Advanced Search"
@@ -2316,23 +2323,27 @@ msgstr "Avancerad sökning"
 msgid ""
 "This book is not in your library. Ask an administrator to add it to My "
 "Library before adding it to a shelf."
-msgstr ""
+msgstr "Den här boken finns inte i ditt bibliotek. Be en administratör att lägga "
+"till den i Mitt bibliotek innan den läggs på en hylla."
 
 #: cps/shelf.py
 msgid ""
 "This book is not in the shelf owner's library. The shelf owner cannot browse "
 "the global library; an administrator must add it to their My Library first."
-msgstr ""
+msgstr "Den här boken finns inte i hyllans ägares bibliotek. Hyllans ägare kan "
+"inte bläddra i det globala biblioteket; en administratör måste först lägga "
+"till den i personens Mitt bibliotek."
 
 #: cps/shelf.py
 msgid "This book cannot be added to this shelf. Ask an administrator for help."
-msgstr ""
+msgstr "Den här boken kan inte läggas till på hyllan. Be en administratör om hjälp."
 
 #: cps/shelf.py
 msgid ""
 "This shelf has an invalid owner. Ask an administrator to repair it before "
 "adding books."
-msgstr ""
+msgstr "Den här hyllan har en ogiltig ägare. Be en administratör att reparera den "
+"innan böcker läggs till."
 
 #: cps/shelf.py
 msgid "Invalid shelf specified"
@@ -2344,7 +2355,7 @@ msgstr "Du har inte behörighet att lägga till en bok på den hyllan"
 
 #: cps/shelf.py
 msgid "Book not found in the visible global library."
-msgstr ""
+msgstr "Boken hittades inte i det synliga globala biblioteket."
 
 #: cps/shelf.py
 #, python-format
@@ -2355,7 +2366,8 @@ msgstr "Boken är redan en del av hyllan: %(shelfname)s"
 msgid ""
 "This book is not in your library. Add it to My Library before adding it to a "
 "shelf."
-msgstr ""
+msgstr "Den här boken finns inte i ditt bibliotek. Lägg till den i Mitt bibliotek "
+"innan den läggs på en hylla."
 
 #: cps/shelf.py
 #, python-format

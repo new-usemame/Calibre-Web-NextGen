@@ -988,7 +988,67 @@ jobs:
           CI: 'true'
           E2E_BASE_URL: http://localhost:8083
           E2E_SERVER_STATE: '1'
-        run: npx playwright test --project=server-state-chromium
+        run: |
+          # The workflow comes from the PR merge commit, but this job intentionally
+          # checks out the PR head. Inspect that checked-out tree before naming a
+          # project which a stale branch may not have yet.
+          if python3 - <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+
+          config_path = Path("playwright.config.ts")
+          source = config_path.read_text(encoding="utf-8") if config_path.exists() else ""
+          project_defined = re.search(
+              r"\bname\s*:\s*(['\"])server-state-chromium\1", source
+          )
+          if project_defined:
+              sys.exit(0)
+
+          # SERVER_STATE_SPECS in the checked-out Playwright config remains the
+          # only source of truth for lane ownership. Interpret its regex literals
+          # against the checked-out e2e tree; do not duplicate filenames here.
+          declaration = re.search(
+              r"\bconst\s+SERVER_STATE_SPECS\s*=\s*\[(.*?)\]\s*;", source, re.DOTALL
+          )
+          patterns = []
+          if declaration:
+              for literal in re.findall(r"/((?:\\.|[^/])*)/[dgimsuvy]*", declaration.group(1)):
+                  try:
+                      patterns.append(re.compile(literal))
+                  except re.error as error:
+                      print(f"::error::Cannot interpret SERVER_STATE_SPECS pattern /{literal}/: {error}")
+                      sys.exit(1)
+
+          owned_specs = sorted(
+              path.as_posix()
+              for path in Path("e2e").rglob("*")
+              if path.is_file() and any(pattern.search(path.as_posix()) for pattern in patterns)
+          )
+          if owned_specs:
+              print(
+                  "::error::The checked-out tree contains server-state specs "
+                  f"({', '.join(owned_specs)}) but does not define the "
+                  "server-state-chromium Playwright project."
+              )
+              sys.exit(1)
+
+          print(
+              "::notice::Skipping the server-state E2E lane because the checked-out tree "
+              "predates the server-state E2E lane: it defines neither the "
+              "server-state-chromium project nor any specs owned by SERVER_STATE_SPECS."
+          )
+          sys.exit(78)
+          PY
+          then
+            npx playwright test --project=server-state-chromium
+          else
+            status=$?
+            if [[ "$status" -eq 78 ]]; then
+              exit 0
+            fi
+            exit "$status"
+          fi
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v7

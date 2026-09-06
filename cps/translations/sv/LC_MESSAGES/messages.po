@@ -13198,12 +13198,12 @@ msgstr "Lade till {n} böcker på {shelf}"
 #: cps/templates/layout.html
 #, python-brace-format
 msgid "Added {ok} of {n} books to {shelf} (rest were already there)"
-msgstr ""
+msgstr "Lade till {ok} av {n} böcker på {shelf} (resten fanns redan där)"
 
 #: cps/templates/layout.html
 #, python-brace-format
 msgid "All {n} book(s) were already on {shelf}."
-msgstr ""
+msgstr "Alla {n} bok/böcker fanns redan på {shelf}."
 
 #: cps/templates/layout.html
 #, python-brace-format
@@ -13230,6 +13230,8 @@ msgid ""
 "This will permanently delete {n} book(s) from your library. This cannot be "
 "undone."
 msgstr ""
+"Detta tar permanent bort {n} bok/böcker från ditt bibliotek. Det kan inte "
+"ångras."
 
 #: cps/templates/layout.html
 msgid "Select at least one book first."
@@ -13242,11 +13244,11 @@ msgstr "Begäran misslyckades: {err}"
 
 #: cps/templates/list.html
 msgid "Filter by initial"
-msgstr ""
+msgstr "Filtrera efter begynnelsebokstav"
 
 #: cps/templates/list.html
 msgid "Grid"
-msgstr ""
+msgstr "Rutnät"
 
 #: cps/templates/login.html
 msgid "Show Password"
@@ -13274,7 +13276,7 @@ msgstr "Logga in med SSO"
 #: cps/templates/login.html
 msgid ""
 "Standard login is disabled. Please use one of the alternative login methods."
-msgstr ""
+msgstr "Vanlig inloggning är inaktiverad. Använd en av de alternativa inloggningsmetoderna."
 
 #: cps/templates/logviewer.html
 msgid "Show Calibre-Web Log: "
@@ -13302,11 +13304,11 @@ msgstr "Hämta åtkomstlogg"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "System Template"
-msgstr ""
+msgstr "Systemmall"
 
 #: cps/templates/magic_shelf_edit.html
 msgid "This is a pre-configured template shelf. You can edit it freely."
-msgstr ""
+msgstr "Det här är en förkonfigurerad mallhylla. Du kan redigera den fritt."
 
 #: cps/templates/magic_shelf_edit.html
 msgid "Share with Everyone (Public)"
@@ -13317,6 +13319,8 @@ msgid ""
 "Other users can view this shelf. Users with \"Edit Public Shelves\" "
 "permission can edit/delete it."
 msgstr ""
+"Andra användare kan visa den här hyllan. Användare med behörigheten \"Redigera "
+"offentliga hyllor\" kan redigera eller ta bort den."
 
 #: cps/templates/modal_dialogs.html
 msgid "Select Allowed/Denied Tags"
@@ -13360,10 +13364,13 @@ msgid ""
 "next time they sync. If that update cannot be recorded, the book may remain "
 "on a device."
 msgstr ""
+"När boken tas bort försöker programmet även arkivera kopian på parkopplade "
+"Kobo-enheter vid nästa synkronisering. Om uppdateringen inte kan registreras "
+"kan boken bli kvar på en enhet."
 
 #: cps/templates/modal_dialogs.html
 msgid "It disappears from every member's library and e-reader."
-msgstr ""
+msgstr "Den försvinner från varje medlems bibliotek och e-boksläsare."
 
 #: cps/templates/modal_dialogs.html
 msgid "Choose File Location"
@@ -13399,15 +13406,15 @@ msgstr "EPUB-läsare"
 
 #: cps/templates/read.html
 msgid "Annotations"
-msgstr ""
+msgstr "Anteckningar"
 
 #: cps/templates/read.html
 msgid "Open annotations page"
-msgstr ""
+msgstr "Öppna sidan med anteckningar"
 
 #: cps/templates/read.html
 msgid "Font Sizes"
-msgstr ""
+msgstr "Teckenstorlekar"
 
 #: cps/templates/read.html
 msgid "Text margin"
@@ -13415,7 +13422,7 @@ msgstr "Textmarginal"
 
 #: cps/templates/read.html
 msgid "Font"
-msgstr ""
+msgstr "Typsnitt"
 
 #: cps/templates/read.html
 msgid "Default"
@@ -13423,11 +13430,11 @@ msgstr "Standard"
 
 #: cps/templates/read.html
 msgid "Yahei"
-msgstr ""
+msgstr "Yahei"
 
 #: cps/templates/read.html
 msgid "SimSun"
-msgstr ""
+msgstr "SimSun"
 
 #: cps/templates/read.html
 msgid "KaiTi"
@@ -13447,11 +13454,11 @@ msgstr "Fyll i texten igen när sidofält är öppna."
 
 #: cps/templates/read.html
 msgid "Add a note (optional)"
-msgstr ""
+msgstr "Lägg till en anteckning (valfritt)"
 
 #: cps/templates/read.html
 msgid "Select within a paragraph to highlight."
-msgstr ""
+msgstr "Markera i ett stycke för att skapa en markering."
 
 #: cps/templates/readcbr.html
 msgid "Comic Reader"
@@ -13475,7 +13482,7 @@ msgstr "Ensidig visning"
 
 #: cps/templates/readcbr.html
 msgid "Long Strip Display"
-msgstr ""
+msgstr "Visning med lång remsa"
 
 #: cps/templates/readcbr.html
 msgid "Scale to Best"
@@ -13511,7 +13518,7 @@ msgstr "En sida"
 
 #: cps/templates/readcbr.html
 msgid "Long Strip"
-msgstr ""
+msgstr "Lång remsa"
 
 #: cps/templates/readcbr.html
 msgid "Scale"
@@ -13571,7 +13578,7 @@ msgstr "Kom ihåg position"
 
 #: cps/templates/readcbr.html
 msgid "Scrollbar"
-msgstr ""
+msgstr "Rullningslist"
 
 #: cps/templates/readcbr.html
 msgid "Show"
@@ -13622,10 +13629,12 @@ msgid ""
 "Automatically refresh all thumbnails during scheduled maintenance. "
 "Thumbnails are always generated on-demand regardless of this setting."
 msgstr ""
+"Uppdatera automatiskt alla miniatyrer vid schemalagt underhåll. Miniatyrer "
+"genereras alltid vid behov oavsett denna inställning."
 
 #: cps/templates/schedule_edit.html
 msgid "Generate Series Cover Thumbnails"
-msgstr ""
+msgstr "Generera miniatyrer för serieomslag"
 
 #: cps/templates/search.html
 msgid "No Results Found"
@@ -13638,7 +13647,7 @@ msgstr "Sökterm:"
 #: cps/templates/search.html
 #, python-format
 msgid "Search the global library for \"%(query)s\" instead"
-msgstr ""
+msgstr "Sök efter \"%(query)s\" i det globala biblioteket i stället"
 
 #: cps/templates/search.html
 msgid "Results for:"
@@ -13654,7 +13663,7 @@ msgstr "Publiceringsdatum till"
 
 #: cps/templates/search_form.html
 msgid "Empty"
-msgstr ""
+msgstr "Tom"
 
 #: cps/templates/search_form.html
 msgid "Exclude Tags"
@@ -13690,11 +13699,11 @@ msgstr "Betyg mindre än"
 
 #: cps/templates/search_form.html
 msgid "From:"
-msgstr ""
+msgstr "Från:"
 
 #: cps/templates/search_form.html
 msgid "To:"
-msgstr ""
+msgstr "Till:"
 
 #: cps/templates/shelf.html
 msgid "Delete this Shelf"
@@ -13740,7 +13749,7 @@ msgstr "Finns redan på den här hyllan"
 
 #: cps/templates/shelf.html
 msgid "Could not add the books. Please try again."
-msgstr ""
+msgstr "Kunde inte lägga till böckerna. Försök igen."
 
 #: cps/templates/shelf.html
 msgid "Add books to"
@@ -13760,32 +13769,32 @@ msgstr "Dela med alla"
 
 #: cps/templates/shelf_edit.html
 msgid "Sync this shelf with Kobo device"
-msgstr ""
+msgstr "Synkronisera den här hyllan med Kobo-enhet"
 
 #: cps/templates/shelf_edit.html
 msgid "Expose this shelf in my OPDS feed"
-msgstr ""
+msgstr "Exponera den här hyllan i mitt OPDS-flöde"
 
 #: cps/templates/shelf_order.html
 msgid "Drag a cover to its new spot — the order saves automatically."
-msgstr ""
+msgstr "Dra ett omslag till sin nya plats — ordningen sparas automatiskt."
 
 #: cps/templates/shelf_order.html
 msgid "Keyboard: focus a cover with Tab, then move it with the arrow keys."
-msgstr ""
+msgstr "Tangentbord: fokusera ett omslag med Tab och flytta det sedan med piltangenterna."
 
 #: cps/templates/shelf_order.html
 msgid "Order saved"
-msgstr ""
+msgstr "Ordningen har sparats"
 
 #: cps/templates/shelf_order.html
 msgid "Could not save the order — click here to retry"
-msgstr ""
+msgstr "Kunde inte spara ordningen — klicka här för att försöka igen"
 
 #: cps/templates/shelf_order.html
 #, python-format
 msgid "Moved to position %(num)s of %(total)s"
-msgstr ""
+msgstr "Flyttades till plats %(num)s av %(total)s"
 
 #: cps/templates/shelf_order.html
 msgid "Shelf order"
@@ -13797,15 +13806,15 @@ msgstr "Dold bok"
 
 #: cps/templates/shelf_reorder.html
 msgid "You do not have any shelves to reorder yet."
-msgstr ""
+msgstr "Du har inga hyllor att ordna om ännu."
 
 #: cps/templates/shelf_reorder.html
 msgid "Drag to rearrange the order of your shelves in the sidebar."
-msgstr ""
+msgstr "Dra för att ändra ordningen på dina hyllor i sidopanelen."
 
 #: cps/templates/shelf_reorder.html
 msgid "Order saved. The sidebar reflects the new order on next page load."
-msgstr ""
+msgstr "Ordningen har sparats. Sidopanelen visar den nya ordningen när sidan läses in nästa gång."
 
 #: cps/templates/stats.html
 msgid "Library Statistics"
@@ -13841,7 +13850,7 @@ msgstr "Installerad version"
 
 #: cps/templates/tasks.html
 msgid "Background Tasks Overview"
-msgstr ""
+msgstr "Översikt över bakgrundsuppgifter"
 
 #: cps/templates/tasks.html
 msgid "Run Time"
@@ -13849,15 +13858,15 @@ msgstr "Drifttid"
 
 #: cps/templates/tasks.html
 msgid "Actions"
-msgstr ""
+msgstr "Åtgärder"
 
 #: cps/templates/tasks.html
 msgid "Upcoming scheduled sends"
-msgstr ""
+msgstr "Kommande schemalagda sändningar"
 
 #: cps/templates/tasks.html
 msgid "Scheduled Time"
-msgstr ""
+msgstr "Schemalagd tid"
 
 #: cps/templates/tasks.html
 msgid "State"

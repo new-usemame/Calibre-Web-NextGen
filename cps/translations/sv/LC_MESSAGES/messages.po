@@ -12536,15 +12536,15 @@ msgstr ""
 msgid ""
 "Automatically resolve all duplicate groups by keeping one book and deleting "
 "others based on a strategy."
-msgstr ""
+msgstr "Lös automatiskt alla dubblettgrupper genom att behålla en bok och ta bort övriga enligt en strategi."
 
 #: cps/templates/duplicates.html
 msgid "Strategy:"
-msgstr ""
+msgstr "Strategi:"
 
 #: cps/templates/duplicates.html
 msgid "Keep Newest - Delete older copies, keep the most recently added"
-msgstr ""
+msgstr "Behåll den nyaste – ta bort äldre kopior och behåll den senast tillagda"
 
 #: cps/templates/duplicates.html
 msgid "Keep Oldest - Delete newer copies, keep the earliest added"
@@ -12902,7 +12902,7 @@ msgstr "Calibre-Web NextGen-instansen är inte konfigurerad. Kontakta "
 msgid ""
 "Report this — the details are filled in for you, and nothing is sent until "
 "you post it:"
-msgstr ""
+msgstr "Rapportera detta – uppgifterna fylls i åt dig och inget skickas förrän du publicerar rapporten:"
 
 #: cps/templates/http_error.html
 msgid "Create Issue"
@@ -12918,23 +12918,23 @@ msgstr "Logga ut användare"
 
 #: cps/templates/index.html
 msgid "Dismiss library introduction"
-msgstr ""
+msgstr "Stäng bibliotekets introduktion"
 
 #: cps/templates/index.html
 msgid "Mobile Notice"
-msgstr ""
+msgstr "Mobilnotis"
 
 #: cps/templates/index.html
 msgid "Magic shelf editing works best on desktop or tablet devices."
-msgstr ""
+msgstr "Redigering av magiska hyllor fungerar bäst på stationära datorer eller surfplattor."
 
 #: cps/templates/index.html
 msgid "Search the global library"
-msgstr ""
+msgstr "Sök i det globala biblioteket"
 
 #: cps/templates/index.html
 msgid "Refresh shelf to update with latest changes"
-msgstr ""
+msgstr "Uppdatera hyllan med de senaste ändringarna"
 
 #: cps/templates/index.html
 msgid "Edit shelf rules"
@@ -12942,11 +12942,11 @@ msgstr "Redigera hyllregler"
 
 #: cps/templates/index.html
 msgid "Hide this shelf from your sidebar"
-msgstr ""
+msgstr "Dölj den här hyllan från sidopanelen"
 
 #: cps/templates/index.html
 msgid "Show this shelf in your sidebar"
-msgstr ""
+msgstr "Visa den här hyllan i sidopanelen"
 
 #: cps/templates/index.html
 msgid "Show Shelf"
@@ -12963,13 +12963,13 @@ msgstr "Lägg till serie på hyllan"
 #: cps/templates/index.html
 #, python-format
 msgid "Add %(title)s to my library"
-msgstr ""
+msgstr "Lägg till %(title)s i mitt bibliotek"
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
 "Upload this user's KoboReader.sqlite to find device books whose UUID no "
 "longer exists in this library."
-msgstr ""
+msgstr "Ladda upp användarens KoboReader.sqlite för att hitta enhetsböcker vars UUID inte längre finns i detta bibliotek."
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
@@ -13214,11 +13214,11 @@ msgstr "Format:"
 
 #: cps/templates/layout.html
 msgid "Will be kept"
-msgstr ""
+msgstr "Behålls"
 
 #: cps/templates/layout.html
 msgid "Format conflicts — choose what to do:"
-msgstr ""
+msgstr "Formatkonflikter – välj vad som ska göras:"
 
 #: cps/templates/layout.html
 msgid "Result will have formats:"
@@ -13226,7 +13226,7 @@ msgstr "Resultatet får formaten:"
 
 #: cps/templates/layout.html
 msgid "Merge &amp; Delete Source"
-msgstr ""
+msgstr "Slå samman och ta bort källa"
 
 #: cps/templates/layout.html
 msgid "Duplicate Books Detected"
@@ -13234,7 +13234,7 @@ msgstr "Dubblettböcker har upptäckts"
 
 #: cps/templates/layout.html
 msgid "You have unresolved duplicate books in your library"
-msgstr ""
+msgstr "Du har olösta dubblettböcker i ditt bibliotek"
 
 #: cps/templates/layout.html
 msgid "Duplicate Groups Found"
@@ -13242,11 +13242,11 @@ msgstr "Dubblettgrupper hittades"
 
 #: cps/templates/layout.html
 msgid "Remind Me Later"
-msgstr ""
+msgstr "Påminn mig senare"
 
 #: cps/templates/layout.html
 msgid "View & Resolve Duplicates"
-msgstr ""
+msgstr "Visa och lös dubbletter"
 
 #: cps/templates/layout.html
 msgid "Scroll to top"
@@ -13254,7 +13254,7 @@ msgstr "Rulla längst upp"
 
 #: cps/templates/layout.html
 msgid "Top"
-msgstr ""
+msgstr "Överst"
 
 #: cps/templates/layout.html
 msgid "Confirm"
@@ -13946,32 +13946,32 @@ msgstr "Status"
 msgid ""
 "Upcoming sends are persisted and will enqueue as tasks at the scheduled "
 "time. You can cancel a pending send before it runs."
-msgstr ""
+msgstr "Kommande utskick sparas och läggs i kö som uppgifter vid den schemalagda tidpunkten. Du kan avbryta ett väntande utskick innan det körs."
 
 #: cps/templates/tasks.html
 msgid "Upcoming scheduled operations"
-msgstr ""
+msgstr "Kommande schemalagda åtgärder"
 
 #: cps/templates/tasks.html
 msgid "Type"
-msgstr ""
+msgstr "Typ"
 
 #: cps/templates/tasks.html
 msgid ""
 "Convert Library and EPUB Fixer runs scheduled here will persist across "
 "restarts. Cancel to prevent them from triggering."
-msgstr ""
+msgstr "Körningar av Konvertera bibliotek och EPUB Fixer som schemaläggs här finns kvar mellan omstarter. Avbryt för att förhindra att de utlöses."
 
 #: cps/templates/tasks.html
 msgid ""
 "This task will be cancelled. Any progress made by this task will be saved."
-msgstr ""
+msgstr "Den här uppgiften kommer att avbrytas. Alla framsteg som uppgiften har gjort sparas."
 
 #: cps/templates/tasks.html
 msgid ""
 "If this is a scheduled task, it will be re-ran during the next scheduled "
 "time."
-msgstr ""
+msgstr "Om detta är en schemalagd uppgift körs den igen vid nästa schemalagda tidpunkt."
 
 #: cps/templates/tasks.html
 msgid "Scheduled item cancelled successfully"
@@ -13979,7 +13979,7 @@ msgstr "Det schemalagda objektet har avbrutits"
 
 #: cps/templates/tasks.html
 msgid "Error cancelling scheduled item"
-msgstr ""
+msgstr "Fel vid avbrott av schemalagd post"
 
 #: cps/templates/update_now_modal.html
 msgid "Update Calibre-Web NextGen"
@@ -13991,54 +13991,57 @@ msgid ""
 "your library, settings and reading progress are safe — they live in your "
 "mounted volumes, not in the container."
 msgstr ""
+"Uppdateringen hämtar den nya avbilden och skapar om containern. Det går "
+"snabbt, och biblioteket, inställningarna och läsförloppet är säkra – de finns "
+"i dina monterade volymer, inte i containern."
 
 #: cps/templates/update_now_modal.html
 msgid "How do you run Calibre-Web NextGen?"
-msgstr ""
+msgstr "Hur kör du Calibre-Web NextGen?"
 
 #: cps/templates/update_now_modal.html
 msgid "Setup type"
-msgstr ""
+msgstr "Installationstyp"
 
 #: cps/templates/update_now_modal.html
 msgid "Docker Compose"
-msgstr ""
+msgstr "Docker Compose"
 
 #: cps/templates/update_now_modal.html
 msgid "docker run"
-msgstr ""
+msgstr "docker run"
 
 #: cps/templates/update_now_modal.html
 msgid "Unraid"
-msgstr ""
+msgstr "Unraid"
 
 #: cps/templates/update_now_modal.html
 msgid "Portainer / Synology"
-msgstr ""
+msgstr "Portainer / Synology"
 
 #: cps/templates/update_now_modal.html
 msgid "Run this from the folder that holds your compose file:"
-msgstr ""
+msgstr "Kör detta från mappen som innehåller din compose-fil:"
 
 #: cps/templates/update_now_modal.html
 msgid "Replace calibre-web-nextgen with your service name if it differs."
-msgstr ""
+msgstr "Ersätt calibre-web-nextgen med tjänstens namn om det skiljer sig."
 
 #: cps/templates/update_now_modal.html
 msgid ""
 "Pull the new image, then recreate your container with the same options you "
 "started it with:"
-msgstr ""
+msgstr "Hämta den nya avbilden och skapa sedan om containern med samma alternativ som du startade den med:"
 
 #: cps/templates/update_now_modal.html
 msgid ""
 "Then stop and remove the old container and start a new one with your usual "
 "docker run command. Your mounted volumes keep all data."
-msgstr ""
+msgstr "Stoppa och ta bort den gamla containern och starta en ny med ditt vanliga docker run-kommando. Dina monterade volymer behåller alla data."
 
 #: cps/templates/update_now_modal.html
 msgid "Open the Docker tab in the Unraid web UI."
-msgstr ""
+msgstr "Öppna fliken Docker i Unraids webbgränssnitt."
 
 #: cps/templates/update_now_modal.html
 msgid ""

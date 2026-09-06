@@ -28,14 +28,12 @@ msgid "Calibre database unavailable. Please reconfigure the library path."
 msgstr "Calibre-databasen är inte tillgänglig. Konfigurera om sökvägen till biblioteket."
 
 #: cps/admin.py
-#, fuzzy
 msgid "Server restarted, please reload page."
-msgstr "Server startas om, vänligen uppdatera sidan"
+msgstr "Servern har startats om. Ladda om sidan."
 
 #: cps/admin.py
-#, fuzzy
 msgid "Performing Server shutdown, please close window."
-msgstr "Stänger servern, vänligen stäng fönstret"
+msgstr "Servern stängs av. Stäng fönstret."
 
 #: cps/admin.py
 msgid "Success! Database Reconnected"
@@ -46,12 +44,11 @@ msgid "Unknown command"
 msgstr "Okänt kommando"
 
 #: cps/admin.py
-#, fuzzy
 msgid ""
 "Success! Books queued for Metadata Backup, please check Tasks for result"
 msgstr ""
-"Testa e-post i kö för att skicka till %(email)s, vänligen kontrollera "
-"Uppgifter för resultat"
+"Böcker har lagts i kö för säkerhetskopiering av metadata. Kontrollera "
+"Uppgifter för resultatet."
 
 #: cps/admin.py
 msgid ""
@@ -91,9 +88,8 @@ msgid "Error loading review queue: %(error)s"
 msgstr "Fel när granskningskön lästes in: %(error)s"
 
 #: cps/admin.py
-#, fuzzy
 msgid "Hardcover ID applied successfully"
-msgstr "{} användare har tagits bort"
+msgstr "Hardcover-id har tillämpats"
 
 #: cps/admin.py
 #, python-format
@@ -131,9 +127,8 @@ msgid "Admin page"
 msgstr "Administrationssida"
 
 #: cps/admin.py
-#, fuzzy
 msgid "Hardcover token expires"
-msgstr "OAuth-inställningar"
+msgstr "Hardcover-tokenen löper ut"
 
 #: cps/admin.py
 msgid "Basic Configuration"
@@ -144,9 +139,9 @@ msgid "UI Configuration"
 msgstr "Användargränssnitt konfiguration"
 
 #: cps/admin.py cps/db.py cps/search.py cps/web.py
-#, fuzzy, python-format
+#, python-format
 msgid "Custom Column No.%(column)d does not exist in calibre database"
-msgstr "Anpassad kolumn n.%(column)d finns inte i calibre-databasen"
+msgstr "Anpassad kolumn nr %(column)d finns inte i calibre-databasen"
 
 #: cps/admin.py cps/templates/admin.html
 msgid "Edit Users"
@@ -231,9 +226,8 @@ msgid ""
 msgstr ""
 
 #: cps/admin.py
-#, fuzzy
 msgid "Invalid Read Column"
-msgstr "Ogiltig roll"
+msgstr "Ogiltig läskolumn"
 
 #: cps/admin.py
 msgid "Invalid Restricted Column"
@@ -291,23 +285,21 @@ msgstr ""
 "valda användarna?"
 
 #: cps/admin.py
-#, fuzzy
 msgid ""
 "Are you sure you want to change shelf sync behavior for the selected user(s)?"
 msgstr ""
-"Är du säker på att du vill ändra den valda rollen för de valda användarna?"
+"Är du säker på att du vill ändra hyllsynkroniseringen för de valda användarna?"
 
 #: cps/admin.py
-#, fuzzy
 msgid ""
 "Are you sure you want to change OPDS shelf exposure for the selected user(s)?"
 msgstr ""
-"Är du säker på att du vill ändra den valda rollen för de valda användarna?"
+"Är du säker på att du vill ändra OPDS-exponeringen av hyllor för de valda "
+"användarna?"
 
 #: cps/admin.py
-#, fuzzy
 msgid "Are you sure you want to change Calibre library location?"
-msgstr "Är du säker på att du vill stoppa Calibre-Web?"
+msgstr "Är du säker på att du vill ändra platsen för Calibre-biblioteket?"
 
 #: cps/admin.py
 msgid ""
@@ -339,9 +331,9 @@ msgid "{} sync entries deleted"
 msgstr "{} synkroniseringsposter har tagits bort"
 
 #: cps/admin.py
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "Book {} not found"
-msgstr "Token hittades inte"
+msgstr "Boken {} hittades inte"
 
 #: cps/admin.py
 #, python-brace-format
@@ -421,9 +413,8 @@ msgstr ""
 "Vänligen ange en LDAP-leverantör, port, DN och användarobjektidentifierare"
 
 #: cps/admin.py
-#, fuzzy
 msgid "Please Enter a LDAP Service Account and Password"
-msgstr "Ange giltigt användarnamn för att återställa lösenordet"
+msgstr "Ange ett LDAP-tjänstkonto och lösenord"
 
 #: cps/admin.py
 msgid "Please Enter a LDAP Service Account"
@@ -504,15 +495,13 @@ msgid "Email Server Settings updated"
 msgstr "E-postserverinställningar uppdaterade"
 
 #: cps/admin.py cps/templates/admin.html
-#, fuzzy
 msgid "Email Your Users"
-msgstr "Redigera användare"
+msgstr "Skicka e-post till dina användare"
 
 #: cps/admin.py
-#, fuzzy
 msgid ""
 "Please configure the email server under Edit Email Server Settings first."
-msgstr "Konfigurera SMTP-postinställningarna först..."
+msgstr "Konfigurera först e-postservern under Redigera e-postserverinställningar."
 
 #: cps/admin.py
 msgid "Please enter a subject for the announcement email."
@@ -523,35 +512,33 @@ msgid "Please enter a message body for the announcement email."
 msgstr "Ange meddelandetext för e-postmeddelandet med tillkännagivandet."
 
 #: cps/admin.py
-#, fuzzy
 msgid "Please set an email address on your own account first..."
-msgstr "Vänligen konfigurera din e-postadress först..."
+msgstr "Ange först en e-postadress för ditt eget konto."
 
 #: cps/admin.py
-#, fuzzy
 msgid "Please select at least one recipient."
-msgstr "Nytt lösenord skickades till din e-postadress"
+msgstr "Välj minst en mottagare."
 
 #: cps/admin.py
 msgid "No valid recipients — nothing was sent."
 msgstr "Det finns inga giltiga mottagare — inget skickades."
 
 #: cps/admin.py
-#, fuzzy, python-format
+#, python-format
 msgid ""
 "Test announcement email queued to %(email)s — check Tasks for the result."
 msgstr ""
-"Testa e-post i kö för att skicka till %(email)s, vänligen kontrollera "
-"Uppgifter för resultat"
+"Testmeddelande har lagts i kö för %(email)s — kontrollera Uppgifter för "
+"resultatet."
 
 #: cps/admin.py
-#, fuzzy, python-format
+#, python-format
 msgid ""
 "Announcement email queued for %(num)s recipient(s) — check Tasks for "
 "delivery."
 msgstr ""
-"Testa e-post i kö för att skicka till %(email)s, vänligen kontrollera "
-"Uppgifter för resultat"
+"Meddelande har lagts i kö för %(num)s mottagare — kontrollera Uppgifter "
+"för leveransen."
 
 #: cps/admin.py
 #, python-format
@@ -579,9 +566,8 @@ msgid "Oops! An unknown error occurred. Please try again later."
 msgstr "Ett okänt fel uppstod. Försök igen senare."
 
 #: cps/admin.py cps/opds.py cps/web.py
-#, fuzzy
 msgid "title"
-msgstr "Titel"
+msgstr "titel"
 
 #: cps/admin.py
 #, python-format
@@ -589,14 +575,13 @@ msgid "Edit User %(nick)s"
 msgstr "Redigera användaren %(nick)s"
 
 #: cps/admin.py
-#, fuzzy, python-format
+#, python-format
 msgid "Success! Password for user %(user)s reset"
-msgstr "Lösenord för användaren %(user)s återställd"
+msgstr "Lösenordet för användaren %(user)s har återställts"
 
 #: cps/admin.py
-#, fuzzy
 msgid "Oops! Please configure the SMTP mail settings."
-msgstr "Konfigurera SMTP-postinställningarna först..."
+msgstr "Konfigurera SMTP-inställningarna för e-post."
 
 #: cps/admin.py
 msgid "Logfile viewer"
@@ -651,18 +636,16 @@ msgid "General error"
 msgstr "Allmänt fel"
 
 #: cps/admin.py
-#, fuzzy
 msgid "Update file could not be saved in temp dir"
-msgstr "Uppdateringsfilen kunde inte sparas i Temp Dir"
+msgstr "Uppdateringsfilen kunde inte sparas i den tillfälliga katalogen"
 
 #: cps/admin.py
 msgid "Files could not be replaced during update"
 msgstr ""
 
 #: cps/admin.py
-#, fuzzy
 msgid "Failed to extract at least One LDAP User"
-msgstr "Det gick inte att skapa minst en LDAP-användare"
+msgstr "Det gick inte att hämta minst en LDAP-användare"
 
 #: cps/admin.py
 msgid "Failed to Create at Least One LDAP User"
@@ -739,14 +722,12 @@ msgid ""
 msgstr ""
 
 #: cps/admin.py
-#, fuzzy
 msgid "Database Settings updated"
-msgstr "E-postserverinställningar uppdaterade"
+msgstr "Databasinställningarna har uppdaterats"
 
 #: cps/admin.py
-#, fuzzy
 msgid "Database Configuration"
-msgstr "Funktion konfiguration"
+msgstr "Databaskonfiguration"
 
 #: cps/admin.py cps/web.py
 msgid "Oops! Please complete all fields."
@@ -830,9 +811,9 @@ msgid ""
 msgstr ""
 
 #: cps/admin.py
-#, fuzzy, python-format
+#, python-format
 msgid "Connection failed: %(error)s"
-msgstr "Anslutningsfel"
+msgstr "Anslutningen misslyckades: %(error)s"
 
 #: cps/admin.py
 #, python-format
@@ -847,9 +828,8 @@ msgid "Metadata URL is valid! Found %(count)s OAuth endpoints."
 msgstr ""
 
 #: cps/admin.py
-#, fuzzy
 msgid " User info endpoint is available."
-msgstr "Ingen versionsinformation tillgänglig"
+msgstr " Slutpunkten för användarinformation är tillgänglig."
 
 #: cps/admin.py
 msgid ""
@@ -875,14 +855,12 @@ msgid "Connection failed: Invalid JSON in response."
 msgstr ""
 
 #: cps/admin.py
-#, fuzzy
 msgid "An unknown error occurred."
-msgstr "Ett okänt fel uppstod. Försök igen senare."
+msgstr "Ett okänt fel uppstod."
 
 #: cps/admin.py
-#, fuzzy
 msgid "Restore already in progress."
-msgstr "Anslutningsfel"
+msgstr "Återställning pågår redan."
 
 #: cps/admin.py
 msgid "Restore failed: Calibre library path is not configured."
@@ -907,9 +885,9 @@ msgid "Cover enforcement is in progress; try again when it finishes."
 msgstr ""
 
 #: cps/admin.py
-#, fuzzy, python-format
+#, python-format
 msgid "Restore failed: %(err)s"
-msgstr "Anslutningsfel"
+msgstr "Återställningen misslyckades: %(err)s"
 
 #: cps/admin.py
 msgid "Restore completed but app.db cleanup failed. See logs for details."
@@ -927,9 +905,8 @@ msgid "Import Kobo annotations"
 msgstr ""
 
 #: cps/annotations.py
-#, fuzzy
 msgid "No file uploaded."
-msgstr "Filen %(file)s uppladdad"
+msgstr "Ingen fil har laddats upp."
 
 #: cps/annotations.py
 msgid "Uploaded file is not a SQLite database."
@@ -966,9 +943,8 @@ msgid "Spanish"
 msgstr ""
 
 #: cps/constants.py
-#, fuzzy
 msgid "Finnish"
-msgstr "Klar"
+msgstr "Finska"
 
 #: cps/constants.py
 msgid "French"
@@ -1011,9 +987,8 @@ msgid "Norwegian"
 msgstr ""
 
 #: cps/constants.py
-#, fuzzy
 msgid "Polish"
-msgstr "Förlag"
+msgstr "Polska"
 
 #: cps/constants.py
 msgid "Portuguese"
@@ -1093,9 +1068,8 @@ msgid "This book doesn't have an embedded cover we can extract."
 msgstr ""
 
 #: cps/cover_picker.py
-#, fuzzy
 msgid "Unknown cover source."
-msgstr "Anslutningsfel"
+msgstr "Okänd omslagskälla."
 
 #: cps/cover_picker.py
 msgid "Could not save lock state."
@@ -1150,23 +1124,20 @@ msgid "Book Title"
 msgstr "Boktitel"
 
 #: cps/cwa_functions.py
-#, fuzzy
 msgid "Book Author"
-msgstr "Författare"
+msgstr "Bokens författare"
 
 #: cps/cwa_functions.py
 msgid "Trigger Type"
 msgstr ""
 
 #: cps/cwa_functions.py
-#, fuzzy
 msgid "Filepath"
-msgstr "Filformat"
+msgstr "Filsökväg"
 
 #: cps/cwa_functions.py
-#, fuzzy
 msgid "Filename"
-msgstr "namn"
+msgstr "Filnamn"
 
 #: cps/cwa_functions.py
 msgid "Manual?"
@@ -1189,14 +1160,12 @@ msgid "Original Format"
 msgstr ""
 
 #: cps/cwa_functions.py
-#, fuzzy
 msgid "End Format"
-msgstr "Ladda upp format"
+msgstr "Slutformat"
 
 #: cps/cwa_functions.py
-#, fuzzy
 msgid "Unknown User"
-msgstr "Okänd"
+msgstr "Okänd användare"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen Stats & Activity"
@@ -1262,28 +1231,24 @@ msgid "Single-book EPUB Fixer is not supported with Google Drive libraries."
 msgstr ""
 
 #: cps/cwa_functions.py
-#, fuzzy
 msgid "Invalid book selection."
-msgstr "Ogiltig roll"
+msgstr "Ogiltigt bokval."
 
 #: cps/cwa_functions.py cps/spa_strings.py
 msgid "Book not found."
 msgstr ""
 
 #: cps/cwa_functions.py
-#, fuzzy
 msgid "Selected book has no EPUB format."
-msgstr "Slå ihop utvalda böcker"
+msgstr "Den valda boken saknar EPUB-format."
 
 #: cps/cwa_functions.py
-#, fuzzy
 msgid "EPUB file not found on disk."
-msgstr "%(format)s-format hittades inte på disken"
+msgstr "EPUB-filen hittades inte på disken."
 
 #: cps/cwa_functions.py
-#, fuzzy
 msgid "EPUB Fixer started for selected book."
-msgstr "Slå ihop utvalda böcker"
+msgstr "EPUB-reparation har startats för den valda boken."
 
 #: cps/cwa_functions.py
 msgid "Failed to start EPUB Fixer for selected book."
@@ -1326,18 +1291,16 @@ msgid "Invalid Base64 image data."
 msgstr ""
 
 #: cps/cwa_functions.py
-#, fuzzy
 msgid "Invalid image data format."
-msgstr "Ogiltigt e-postadressformat"
+msgstr "Ogiltigt bilddataformat."
 
 #: cps/cwa_functions.py
 msgid "Error validating image data."
 msgstr ""
 
 #: cps/cwa_functions.py
-#, fuzzy
 msgid "Profile picture updated successfully."
-msgstr "{} användare har tagits bort"
+msgstr "Profilbilden har uppdaterats."
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen Profile Picture Management (WIP)"
@@ -1349,41 +1312,36 @@ msgid "None"
 msgstr "Ingen"
 
 #: cps/duplicates.py
-#, fuzzy
 msgid "Duplicate Books"
-msgstr "Ta bort boken"
+msgstr "Dubblettböcker"
 
 #: cps/duplicates.py
 msgid "Duplicate group already dismissed"
 msgstr ""
 
 #: cps/duplicates.py
-#, fuzzy
 msgid "Duplicate group dismissed"
-msgstr "Ta bort boken"
+msgstr "Dubblettgruppen har avfärdats"
 
 #: cps/duplicates.py
-#, fuzzy
 msgid "Duplicate group restored"
-msgstr "Ta bort boken"
+msgstr "Dubblettgruppen har återställts"
 
 #: cps/duplicates.py
 msgid "Duplicate group was not dismissed"
 msgstr ""
 
 #: cps/duplicates.py
-#, fuzzy
 msgid "Duplicate scan queued"
-msgstr "Inga resultat hittades"
+msgstr "Dubblettsökning har lagts i kö"
 
 #: cps/duplicates.py
 msgid "Duplicate scan completed (fallback)"
 msgstr ""
 
 #: cps/duplicates.py
-#, fuzzy
 msgid "Invalid resolution strategy"
-msgstr "Ogiltig roll"
+msgstr "Ogiltig lösningsstrategi"
 
 #: cps/editbooks.py
 msgid ""
@@ -1405,9 +1363,8 @@ msgid "Upload done, processing, please wait..."
 msgstr "Uppladdning klar, bearbetning, vänligen vänta ..."
 
 #: cps/editbooks.py
-#, fuzzy
 msgid "Failed to queue upload for processing"
-msgstr "Det gick inte att skapa sökväg för omslag"
+msgstr "Det gick inte att lägga uppladdningen i kö för bearbetning"
 
 #: cps/editbooks.py
 msgid "Source or destination format for conversion missing"
@@ -1438,9 +1395,8 @@ msgid ""
 msgstr ""
 
 #: cps/editbooks.py
-#, fuzzy
 msgid "File type isn't allowed to be uploaded to this server"
-msgstr "Filändelsen '%(ext)s' får inte laddas upp till den här servern"
+msgstr "Filtypen får inte laddas upp till den här servern"
 
 #: cps/editbooks.py
 #, python-format
@@ -1472,9 +1428,9 @@ msgstr ""
 "Identifierare är inte skiftlägeskänsliga, skriver över gammal identifierare"
 
 #: cps/editbooks.py
-#, fuzzy, python-format
+#, python-format
 msgid "'%(langname)s' is not a valid language"
-msgstr "%(langname)s är inte ett giltigt språk"
+msgstr "'%(langname)s' är inte ett giltigt språk"
 
 #: cps/editbooks.py cps/helper.py
 msgid "Cover-file is not a valid image file, or could not be stored"
@@ -1559,18 +1515,17 @@ msgid "File format %(ext)s added to %(book)s"
 msgstr "Filformatet %(ext)s lades till %(book)s"
 
 #: cps/editbooks.py cps/helper.py
-#, fuzzy
 msgid "Book not found"
-msgstr "Token hittades inte"
+msgstr "Boken hittades inte"
 
 #: cps/editbooks.py
 msgid "Book has no file formats on disk to reload from"
 msgstr ""
 
 #: cps/editbooks.py
-#, fuzzy, python-format
+#, python-format
 msgid "Book file not found on disk: %(path)s"
-msgstr "%(format)s-format hittades inte på disken"
+msgstr "Bokfilen hittades inte på disken: %(path)s"
 
 #: cps/editbooks.py
 #, python-format
@@ -1638,52 +1593,50 @@ msgid "%(format)s not found: %(fn)s"
 msgstr "%(format)s hittades inte: %(fn)s"
 
 #: cps/helper.py cps/templates/detail.html
-#, fuzzy
 msgid "Send to eReader"
-msgstr "Skicka till Kindle"
+msgstr "Skicka till e-boksläsare"
 
 #: cps/helper.py
-#, fuzzy, python-format
+#, python-format
 msgid "Conversion timed out for book id: %(book)d"
-msgstr "%(format)s formatet hittades inte för bok-id: %(book)d"
+msgstr "Tidsgränsen överskreds vid konvertering av bok-id: %(book)d"
 
 #: cps/helper.py
-#, fuzzy, python-format
+#, python-format
 msgid "Conversion failed for book id: %(book)d"
-msgstr "%(format)s formatet hittades inte för bok-id: %(book)d"
+msgstr "Konverteringen misslyckades för bok-id: %(book)d"
 
 #: cps/helper.py
 msgid "Calibre-Web NextGen Test Email"
 msgstr ""
 
 #: cps/helper.py
-#, fuzzy
 msgid "Test Email"
-msgstr "Test e-post"
+msgstr "Testa e-post"
 
 #: cps/helper.py
 msgid "Get Started with Calibre-Web NextGen"
 msgstr ""
 
 #: cps/helper.py
-#, fuzzy, python-format
+#, python-format
 msgid "Registration Email for user: %(name)s"
-msgstr "Registrera e-post för användare: %(name)s"
+msgstr "Registreringsmeddelande för användaren %(name)s"
 
 #: cps/helper.py
-#, fuzzy, python-format
+#, python-format
 msgid "Convert %(orig)s to %(format)s and send to eReader"
-msgstr "Konvertera %(orig)s till %(format)s och skicka till Kindle"
+msgstr "Konvertera %(orig)s till %(format)s och skicka till e-boksläsare"
 
 #: cps/helper.py
-#, fuzzy, python-format
+#, python-format
 msgid "Send %(format)s to eReader"
-msgstr "Skicka %(format)s till Kindle"
+msgstr "Skicka %(format)s till e-boksläsare"
 
 #: cps/helper.py
-#, fuzzy, python-format
+#, python-format
 msgid "%(book)s send to eReader"
-msgstr "Skicka till Kindle"
+msgstr "%(book)s har skickats till e-boksläsare"
 
 #: cps/helper.py
 msgid "The requested file could not be read. Maybe wrong permissions?"
@@ -1708,18 +1661,18 @@ msgid "Deleting book %(id)s failed: %(message)s"
 msgstr "Borttagning av boken %(id)s misslyckades: %(message)s"
 
 #: cps/helper.py
-#, fuzzy, python-format
+#, python-format
 msgid ""
 "Deleting book %(id)s from database only, book path in database not valid: "
 "%(path)s"
-msgstr "Borttagning av boken %(id)s, boksökväg inte giltig: %(path)s"
+msgstr "Tar endast bort boken %(id)s ur databasen; boksökvägen är inte giltig: %(path)s"
 
 #: cps/helper.py
-#, fuzzy, python-format
+#, python-format
 msgid ""
 "Rename author from: '%(src)s' to '%(dest)s' failed with error: %(error)s"
 msgstr ""
-"Byt namn på titel från: \"%(src)s\" till \"%(dest)s\" misslyckades med fel: "
+"Byte av författarnamn från \"%(src)s\" till \"%(dest)s\" misslyckades med fel: "
 "%(error)s"
 
 #: cps/helper.py
@@ -1748,9 +1701,8 @@ msgid "This username is already taken"
 msgstr "Detta användarnamn är redan taget"
 
 #: cps/helper.py
-#, fuzzy
 msgid "Invalid Email address format"
-msgstr "Ogiltigt e-postadressformat"
+msgstr "Ogiltigt format för e-postadress"
 
 #: cps/helper.py
 msgid "Password doesn't comply with password validation rules"
@@ -1793,7 +1745,6 @@ msgid "UnRar binary file not found"
 msgstr "UnRar binär fil hittades inte"
 
 #: cps/helper.py
-#, fuzzy
 msgid "Error executing UnRar"
 msgstr "Fel vid körning av UnRar"
 
@@ -1813,9 +1764,8 @@ msgid "Please specify a directory, not a file"
 msgstr ""
 
 #: cps/helper.py
-#, fuzzy
 msgid "Calibre binaries not viable"
-msgstr "DB är inte skrivbar"
+msgstr "Calibres binärfiler kan inte användas"
 
 #: cps/helper.py
 #, python-format
@@ -1823,14 +1773,13 @@ msgid "Missing calibre binaries: %(missing)s"
 msgstr ""
 
 #: cps/helper.py
-#, fuzzy, python-format
+#, python-format
 msgid "Missing executable permissions: %(missing)s"
-msgstr "Körningstillstånd saknas"
+msgstr "Körbehörighet saknas: %(missing)s"
 
 #: cps/helper.py
-#, fuzzy
 msgid "Error executing Calibre"
-msgstr "Fel vid körning av UnRar"
+msgstr "Fel vid körning av Calibre"
 
 #: cps/helper.py cps/templates/admin.html
 msgid "Queue all books for metadata backup"
@@ -1889,11 +1838,11 @@ msgid ""
 msgstr ""
 
 #: cps/oauth_bb.py
-#, fuzzy
 msgid ""
 "Login failed: The OAuth provider returned invalid user profile data. Please "
 "contact your administrator."
-msgstr "E-postservern är inte konfigurerad, kontakta din administratör!"
+msgstr "Inloggningen misslyckades: OAuth-leverantören returnerade ogiltiga "
+"användarprofildata. Kontakta administratören."
 
 #: cps/oauth_bb.py
 #, python-format
@@ -1944,9 +1893,8 @@ msgid "OAuth authentication failed. Please try again or contact administrator."
 msgstr ""
 
 #: cps/oauth_bb.py
-#, fuzzy
 msgid "OAuth system error. Please contact administrator."
-msgstr "E-postservern är inte konfigurerad, kontakta din administratör!"
+msgstr "OAuth-systemfel. Kontakta administratören."
 
 #: cps/oauth_bb.py
 #, python-format
@@ -1980,9 +1928,8 @@ msgid "Failed to fetch user info from Google."
 msgstr "Det gick inte att hämta användarinformation från Google."
 
 #: cps/oauth_bb.py
-#, fuzzy
 msgid "Failed to log in with Generic OAuth."
-msgstr "Det gick inte att logga in med GitHub."
+msgstr "Det gick inte att logga in med generisk OAuth."
 
 #: cps/oauth_bb.py
 msgid "OAuth authentication failed: Token validation error. Please try again."
@@ -2020,9 +1967,9 @@ msgid "Google Oauth error: {}"
 msgstr "Google Oauth-fel: {}"
 
 #: cps/oauth_bb.py
-#, fuzzy, python-brace-format
+#, python-brace-format
 msgid "OAuth error: {}"
-msgstr "GitHub Oauth-fel: {}"
+msgstr "OAuth-fel: {}"
 
 #: cps/opds.py
 msgid "Alphabetical Books"
@@ -2049,9 +1996,8 @@ msgid "Popular publications from this catalog based on Rating."
 msgstr "Populära publikationer från den här katalogen baserad på betyg."
 
 #: cps/opds.py
-#, fuzzy
 msgid "Recently added Books"
-msgstr "Hämtade böcker"
+msgstr "Nyligen tillagda böcker"
 
 #: cps/opds.py
 msgid "The latest Books"
@@ -2070,9 +2016,8 @@ msgid "Read Books"
 msgstr "Lästa böcker"
 
 #: cps/opds.py
-#, fuzzy
 msgid "Books currently being read"
-msgstr "Aktuell version"
+msgstr "Böcker som läses just nu"
 
 #: cps/opds.py cps/render_template.py cps/web.py
 msgid "Unread Books"
@@ -2153,19 +2098,16 @@ msgid "Books organized in shelves"
 msgstr "Böcker organiserade i hyllor"
 
 #: cps/opds.py cps/templates/config_view_edit.html
-#, fuzzy
 msgid "Magic Shelves"
-msgstr "Redigera publika hyllor"
+msgstr "Smarta hyllor"
 
 #: cps/opds.py
-#, fuzzy
 msgid "Books organized in magic shelves"
-msgstr "Böcker organiserade i hyllor"
+msgstr "Böcker ordnade i smarta hyllor"
 
 #: cps/opds.py
-#, fuzzy
 msgid "description"
-msgstr "Beskrivning"
+msgstr "beskrivning"
 
 #: cps/opds.py
 #, python-brace-format

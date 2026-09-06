@@ -10570,7 +10570,7 @@ msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Login Button Text"
-msgstr ""
+msgstr "Text på inloggningsknapp"
 
 #: cps/templates/config_edit.html
 #, python-format
@@ -10613,17 +10613,20 @@ msgstr "Säkerhetsinställningar"
 
 #: cps/templates/config_edit.html
 msgid "Disable Standard Login (Username/Password)"
-msgstr ""
+msgstr "Inaktivera vanlig inloggning (användarnamn/lösenord)"
 
 #: cps/templates/config_edit.html
 msgid ""
 "Hides the standard login form. Users must log in via OAuth or LDAP. Ensure "
 "you have a working alternative login method before enabling."
 msgstr ""
+"Döljer det vanliga inloggningsformuläret. Användare måste logga in via OAuth "
+"eller LDAP. Säkerställ att du har en fungerande alternativ inloggningsmetod "
+"innan du aktiverar detta."
 
 #: cps/templates/config_edit.html
 msgid "Automatically forward to the only OAuth provider"
-msgstr ""
+msgstr "Skicka automatiskt vidare till den enda OAuth-leverantören"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -10632,10 +10635,15 @@ msgid ""
 "normal login page instead. That page still accepts a username and password "
 "only while the setting above is left off."
 msgstr ""
+"När detta är aktiverat och exakt en OAuth-leverantör är aktiv startas den "
+"automatiskt när inloggningssidan öppnas. Lägg till ?local=1 i "
+"inloggningswebbadressen för att öppna den vanliga inloggningssidan i stället. "
+"Den sidan tar fortfarande emot användarnamn och lösenord endast när "
+"inställningen ovan är avstängd."
 
 #: cps/templates/config_edit.html
 msgid "Enable OAuth Group-Based Admin Role Management"
-msgstr ""
+msgstr "Aktivera gruppbaserad hantering av administratörsroller för OAuth"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -10644,22 +10652,26 @@ msgid ""
 "user management panel, preventing OAuth logins from overriding local role "
 "assignments."
 msgstr ""
+"När detta är aktiverat ges eller återkallas administratörsbehörighet "
+"automatiskt utifrån medlemskap i OAuth-grupp. Inaktivera detta för att "
+"hantera administratörsroller manuellt i användarhanteringspanelen och "
+"förhindra att OAuth-inloggningar åsidosätter lokala rolltilldelningar."
 
 #: cps/templates/config_edit.html
 msgid "Limit failed login attempts"
-msgstr ""
+msgstr "Begränsa misslyckade inloggningsförsök"
 
 #: cps/templates/config_edit.html
 msgid "Configure Backend for Limiter"
-msgstr ""
+msgstr "Konfigurera bakände för begränsare"
 
 #: cps/templates/config_edit.html
 msgid "Options for Limiter Backend"
-msgstr ""
+msgstr "Alternativ för begränsarens bakände"
 
 #: cps/templates/config_edit.html
 msgid "Check if file extensions matches file content on upload"
-msgstr ""
+msgstr "Kontrollera att filtillägget matchar filinnehållet vid uppladdning"
 
 #: cps/templates/config_edit.html
 msgid "Session protection"
@@ -10667,11 +10679,11 @@ msgstr "Sessionsskydd"
 
 #: cps/templates/config_edit.html
 msgid "Basic"
-msgstr ""
+msgstr "Grundläggande"
 
 #: cps/templates/config_edit.html
 msgid "Strong"
-msgstr ""
+msgstr "Stark"
 
 #: cps/templates/config_edit.html
 msgid "User Password policy"
@@ -10679,27 +10691,27 @@ msgstr "Lösenordspolicy för användare"
 
 #: cps/templates/config_edit.html
 msgid "Minimum password length"
-msgstr ""
+msgstr "Minsta lösenordslängd"
 
 #: cps/templates/config_edit.html
 msgid "Enforce number"
-msgstr ""
+msgstr "Kräv siffra"
 
 #: cps/templates/config_edit.html
 msgid "Enforce lowercase characters"
-msgstr ""
+msgstr "Kräv gemener"
 
 #: cps/templates/config_edit.html
 msgid "Enforce uppercase characters"
-msgstr ""
+msgstr "Kräv versaler"
 
 #: cps/templates/config_edit.html
 msgid "Enforce characters (needed For Chinese/Japanese/Korean Characters)"
-msgstr ""
+msgstr "Kräv tecken (behövs för kinesiska/japanska/koreanska tecken)"
 
 #: cps/templates/config_edit.html
 msgid "Enforce special characters"
-msgstr ""
+msgstr "Kräv specialtecken"
 
 #: cps/templates/config_view_edit.html
 msgid "View Configuration"

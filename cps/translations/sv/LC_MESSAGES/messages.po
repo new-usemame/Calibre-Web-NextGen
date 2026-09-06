@@ -13079,19 +13079,16 @@ msgid "Show"
 msgstr "Visa"
 
 #: cps/templates/readdjvu.html
-#, fuzzy
 msgid "DJVU Reader"
-msgstr "PDF-läsare"
+msgstr "DjVu-läsare"
 
 #: cps/templates/readpdf.html
-#, fuzzy
 msgid "PDF Reader"
 msgstr "PDF-läsare"
 
 #: cps/templates/readtxt.html
-#, fuzzy
 msgid "txt Reader"
-msgstr "PDF-läsare"
+msgstr "TXT-läsare"
 
 #: cps/templates/register.html
 msgid "Register New Account"
@@ -13209,9 +13206,8 @@ msgid "Edit Shelf Properties"
 msgstr "Redigera hyllegenskaper"
 
 #: cps/templates/shelf.html
-#, fuzzy
 msgid "Add Books"
-msgstr "Dold bok"
+msgstr "Lägg till böcker"
 
 #: cps/templates/shelf.html
 msgid "Arrange books manually"
@@ -13226,43 +13222,38 @@ msgid "Enable Change order"
 msgstr "Aktivera ändring av ordning"
 
 #: cps/templates/shelf.html
-#, fuzzy, python-format
+#, python-format
 msgid "%(count)s selected"
-msgstr "Slå ihop utvalda böcker"
+msgstr "%(count)s valda"
 
 #: cps/templates/shelf.html
-#, fuzzy, python-format
+#, python-format
 msgid "Add %(count)s"
-msgstr "Konto"
+msgstr "Lägg till %(count)s"
 
 #: cps/templates/shelf.html
-#, fuzzy
 msgid "No books found."
-msgstr "Token hittades inte"
+msgstr "Inga böcker hittades."
 
 #: cps/templates/shelf.html
-#, fuzzy
 msgid "Already on this shelf"
-msgstr "Ta bort den här hyllan"
+msgstr "Finns redan på den här hyllan"
 
 #: cps/templates/shelf.html
 msgid "Could not add the books. Please try again."
 msgstr ""
 
 #: cps/templates/shelf.html
-#, fuzzy
 msgid "Add books to"
-msgstr "Lägg till hyllan"
+msgstr "Lägg till böcker på"
 
 #: cps/templates/shelf.html
-#, fuzzy
 msgid "Search your library…"
-msgstr "Sök i bibliotek"
+msgstr "Sök i ditt bibliotek …"
 
 #: cps/templates/shelf.html
-#, fuzzy
 msgid "Search your library"
-msgstr "Sök i bibliotek"
+msgstr "Sök i ditt bibliotek"
 
 #: cps/templates/shelf_edit.html
 msgid "Share with Everyone"
@@ -13298,9 +13289,8 @@ msgid "Moved to position %(num)s of %(total)s"
 msgstr ""
 
 #: cps/templates/shelf_order.html
-#, fuzzy
 msgid "Shelf order"
-msgstr "Användaren hittades inte"
+msgstr "Hyllordning"
 
 #: cps/templates/shelf_order.html
 msgid "Hidden Book"
@@ -13343,9 +13333,8 @@ msgid "System Statistics"
 msgstr "Systemstatistik"
 
 #: cps/templates/stats.html
-#, fuzzy
 msgid "Program"
-msgstr "Förlopp"
+msgstr "Program"
 
 #: cps/templates/stats.html
 msgid "Installed Version"
@@ -13372,9 +13361,8 @@ msgid "Scheduled Time"
 msgstr ""
 
 #: cps/templates/tasks.html
-#, fuzzy
 msgid "State"
-msgstr "Rotera"
+msgstr "Status"
 
 #: cps/templates/tasks.html
 msgid ""
@@ -13408,18 +13396,16 @@ msgid ""
 msgstr ""
 
 #: cps/templates/tasks.html
-#, fuzzy
 msgid "Scheduled item cancelled successfully"
-msgstr "{} användare har tagits bort"
+msgstr "Det schemalagda objektet har avbrutits"
 
 #: cps/templates/tasks.html
 msgid "Error cancelling scheduled item"
 msgstr ""
 
 #: cps/templates/update_now_modal.html
-#, fuzzy
 msgid "Update Calibre-Web NextGen"
-msgstr "Calibre-Web e-bokkatalog"
+msgstr "Uppdatera Calibre-Web NextGen"
 
 #: cps/templates/update_now_modal.html
 msgid ""
@@ -13513,14 +13499,12 @@ msgid "Set up automatic updates"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Your Profile"
-msgstr "Din e-postadress"
+msgstr "Din profil"
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "User Settings"
-msgstr "Inställningar"
+msgstr "Användarinställningar"
 
 #: cps/templates/user_edit.html
 msgid "Account Information"
@@ -13536,14 +13520,12 @@ msgid "Reset user Password"
 msgstr "Återställ användarlösenordet"
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "eReader Configuration"
-msgstr "Serverkonfiguration"
+msgstr "Konfiguration för e-boksläsare"
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Send to eReader Email Address"
-msgstr "Kindle"
+msgstr "Skicka till e-postadress för e-boksläsare"
 
 #: cps/templates/user_edit.html
 msgid "Use comma to separate multiple addresses"
@@ -13587,9 +13569,8 @@ msgid "Language & Theme Preferences"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Interface Language"
-msgstr "Ange språk"
+msgstr "Gränssnittsspråk"
 
 #: cps/templates/user_edit.html
 msgid "Language of Books"
@@ -13600,9 +13581,8 @@ msgid "Filter the library to only show books in a specific language."
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Book Language Filter"
-msgstr "Inget giltigt bokspråk anges"
+msgstr "Filter för bokspråk"
 
 #: cps/templates/user_edit.html
 msgid "OAuth & API Integrations"
@@ -13684,9 +13664,8 @@ msgid "Expose only books in selected shelves to OPDS"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Sidebar Display Settings"
-msgstr "OAuth-inställningar"
+msgstr "Visningsinställningar för sidofältet"
 
 #: cps/templates/user_edit.html
 msgid "Choose which sections to display in your sidebar navigation."
@@ -13761,9 +13740,8 @@ msgid "Created (oldest first)"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Recently modified"
-msgstr "Senaste tillagda böcker"
+msgstr "Nyligen ändrade"
 
 #: cps/templates/user_edit.html
 msgid "Least recently modified"
@@ -13788,9 +13766,8 @@ msgid "Default System Shelves:"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Public Shelves:"
-msgstr "Redigera publika hyllor"
+msgstr "Offentliga hyllor:"
 
 #: cps/templates/user_edit.html
 #, python-format
@@ -13819,9 +13796,8 @@ msgid ""
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "New app password"
-msgstr "Ändra lösenord"
+msgstr "Nytt applösenord"
 
 #: cps/templates/user_edit.html
 #, python-format
@@ -13838,18 +13814,16 @@ msgid "e.g. Kobo Forma, KOReader iPad"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Create app password"
-msgstr "Ändra lösenord"
+msgstr "Skapa applösenord"
 
 #: cps/templates/user_edit.html
 msgid "Label"
 msgstr ""
 
 #: cps/templates/user_edit.html
-#, fuzzy
 msgid "Created"
-msgstr "Skapa/Visa"
+msgstr "Skapad"
 
 #: cps/templates/user_edit.html
 msgid "Last used"
@@ -13884,29 +13858,24 @@ msgid "Enter Username"
 msgstr "Ange användarnamn"
 
 #: cps/templates/user_table.html
-#, fuzzy
 msgid "Enter Email"
-msgstr "Test e-post"
+msgstr "Ange e-postadress"
 
 #: cps/templates/user_table.html
-#, fuzzy
 msgid "Enter eReader Email"
-msgstr "Kindle"
+msgstr "Ange e-postadress för e-boksläsare"
 
 #: cps/templates/user_table.html
-#, fuzzy
 msgid "eReader Email"
-msgstr "Test e-post"
+msgstr "E-postadress för e-boksläsare"
 
 #: cps/templates/user_table.html
-#, fuzzy
 msgid "Enter eReader Email Subject"
-msgstr "Kindle"
+msgstr "Ange ämne för e-boksläsarens e-post"
 
 #: cps/templates/user_table.html
-#, fuzzy
 msgid "eReader Email Subject"
-msgstr "Test e-post"
+msgstr "Ämne för e-boksläsarens e-post"
 
 #: cps/templates/user_table.html
 msgid "Locale"
@@ -13945,18 +13914,16 @@ msgid "Edit Denied Column Values"
 msgstr "Redigera avvisade kolumnvärden"
 
 #: cps/templates/user_table.html
-#, fuzzy
 msgid "Denied Column Values"
-msgstr "Avvisade kolumnvärden"
+msgstr "Nekade kolumnvärden"
 
 #: cps/templates/user_table.html
 msgid "Change Password"
 msgstr "Ändra lösenord"
 
 #: cps/templates/user_table.html
-#, fuzzy
 msgid "Edit Public Shelves"
-msgstr "Redigera publika hyllor"
+msgstr "Redigera offentliga hyllor"
 
 #: cps/templates/user_table.html
 msgid "Sync selected Shelves with Kobo"
@@ -13967,9 +13934,8 @@ msgid "Expose selected Shelves to OPDS"
 msgstr ""
 
 #: cps/templates/user_table.html
-#, fuzzy
 msgid "Show Read/Unread Section"
-msgstr "Visa läst/oläst val"
+msgstr "Visa avsnittet Läst/oläst"
 
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr "Endast jpg/jpeg/png/webp/bmp-filer stöds som omslagsfil"

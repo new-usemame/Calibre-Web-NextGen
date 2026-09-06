@@ -1,9 +1,11 @@
-# Real application integration fixture (P0.1)
+# Real application integration fixture (P0.1, extended by P1.kobo)
 
 Status: fixture and lifecycle exercised; Docker parity is claimed for the
-backend wire only, and runs only where a matching image exists.
+backend wire only, and runs only where a matching image exists. The fixture
+now boots in two shapes — with the shipped defaults, and with Kobo sync on so
+the conditional Kobo blueprints exist (section 5).
 
-1. **Fixture — OBSERVED.** `conftest.py:11` supplies a real Flask app from
+1. **Fixture — OBSERVED.** `conftest.py:10` supplies a real Flask app from
    `create_app(cps.config, services)` followed by `register_blueprints`.
    Storage uses the shipped empty Calibre schema and production settings models.
    No updater, scheduler, CSRF, middleware, service, or blueprint is stubbed.
@@ -18,13 +20,16 @@ backend wire only, and runs only where a matching image exists.
    existing unit collection's process-global stubs. Inside it, tests receive
    the actual app, not an HTTP proxy or serialized substitute. Add further
    real-app cases to `cases.py`, requesting `real_app` and using
-   `real_app.test_client()`. The child has five tests; the outer process has
-   two tests. `cases.py` deliberately does not match automatic discovery.
+   `real_app.test_client()`; cases that need the Kobo blueprints request
+   `kobo_real_app` instead and live in their own module (section 5), because
+   `cps` refuses a second boot in one interpreter. The `cases.py` child has
+   five tests; its outer process has two tests. Neither case module matches
+   automatic discovery: each is named explicitly by its outer module.
 
 2. **Blueprint requests — OBSERVED; parity — UNVERIFIED.** `cases.py:88`
    derives probes from `app.blueprints` and `app.url_map`. It selects a
    reachable rule, accounting for rules shadowed by earlier blueprints.
-   Observed: 34 registered blueprints, 33 HTTP probes — with the shipped defaults. Four more (`kobo`, `kobo_auth`, `readingservices_api_v3`, `readingservices_userstorage`) register only when `kobo_available` holds (`cps/main.py:124`) and are outside this fixture's reach; `blueprints.json` lists them so the gap is visible rather than silent. `jinjia` has no routes;
+   Observed: 34 registered blueprints, 33 HTTP probes — with the shipped defaults. Four more (`kobo`, `kobo_auth`, `readingservices_api_v3`, `readingservices_userstorage`) register only when `kobo_available` holds (`cps/main.py:124`), so they are outside *this* boot's reach; `blueprints.json` lists them so the gap is visible rather than silent, and the second boot in section 5 reaches them. `jinjia` has no routes;
    its real template filter is exercised instead. An unknown routeless
    blueprint fails explicitly. OAuth probes use credential-free callbacks,
    without following provider redirects. These are anonymous smoke requests,
@@ -153,10 +158,69 @@ backend wire only, and runs only where a matching image exists.
    unavailable daemon. Earlier exploratory failures were not counted as
    successful repetitions. Full fast-lane execution on Linux is unverified.
 
+5. **Kobo authority and containment — OBSERVED (P1.kobo).** Three properties
+   of the owned-annotation route were asserted by the code and had never been
+   observed on the route itself. Six earlier attempts reported NOT_RUN or FAIL
+   with the product behaving correctly, and the reason is recorded here so it
+   is not rediscovered a seventh time: **the shipped fixture cannot reach any
+   of them, because with `config_kobo_sync` false `cps/main.py:130` never
+   registers `readingservices_api_v3`, so `/api/v3/content/<id>/annotations`
+   answers 404 whatever the databases hold.** `conftest.py:94`'s
+   `kobo_real_app` writes that switch before the factory runs and asserts the
+   effective value afterwards, so a boot that silently lost the blueprints
+   fails at the fixture rather than in a case.
+
+   `kobo_authority_cases.py` drives an authenticated Kobo GET, against a book
+   whose `KoboAnnotationBookState` is `ever_authoritative`, into each of the
+   three ETag-emitting sticky exits of `_owned_annotation_get_response`. Each
+   case reads the gate *before* asserting on the response, and each exit is
+   identified by behaviour rather than by a line number:
+
+   | Exit | How it is forced | How it is told apart | ETag observed |
+   |---|---|---|---|
+   | `answered_from_snapshot` (`readingservices.py:849`) | a GET with no device id, so `prepare_authoritative_device_get` matches no `Device` row and answers `STICKY_GET_SNAPSHOT` | the body is the stored snapshot and omits a highlight added after it; `authority_revision` and `last_served_body_sha256` do not move | `cwng_revision`, equal to the stored `last_served_etag` |
+   | `answered_locally` (`readingservices.py:905`) | a GET with the registered device id plus one accepted `routing_only` seed capture | the body carries the live row and the render is committed: `etag_kind`, `current_etag`, `last_served_*` all advance | `cwng_revision`, freshly built by `_commit_complete_render` |
+   | sticky exception fallback (`readingservices.py:948`) | a book with no durable snapshot, so the control request 503s, then the pre-serve proof raises | a 200 is only reachable through the route's `except`; the collected log record carries that exact exception | `cwng_revision`, rebuilt live |
+
+   All three produced the **durable** `cwng_revision` form. The transient form
+   (`kobo_annotation_authority.py:326`) was NOT exercised: it needs
+   `_book_state` to fail or to reject the content id, which an owned book with
+   a healthy app.db does not do.
+
+   `kobo_containment_cases.py` observes the second property at the trigger
+   boundary rather than by calling the predicate. `handle_check_for_changes`
+   is driven twice with the same id: with the library readable the id is
+   provably not ours and is forwarded (1 proxy call, and it comes back in the
+   device's change list); with `metadata.db` emptied the same id resolves to
+   `OWNERSHIP_UNKNOWN` and is suppressed (0 proxy calls, `[]` returned). That
+   is `_check_for_changes_ownership_is_filtered` (`readingservices.py:515`)
+   treating UNKNOWN as owned so a database outage cannot let Nickel's
+   replacement-set GET delete the reader's only copy of a highlight. That
+   module runs in its own interpreter because the outage is process-wide and
+   the calibre engine does not come back from it cleanly.
+
+   The third property is reported as a measurement: over **12** identical
+   authenticated GETs for one book in one session, `resolve_entitlement_ownership`
+   returned the same answer every time — distinct set `[('owned', <book id>)]`,
+   all twelve responses 200, zero proxy calls.
+
+   `test_real_app_kobo.py` pins the expected pass count per module. A case
+   that stops being collected, or skips, is a failure there — the specific way
+   the earlier attempts reported a result without observing anything.
+
 Changed-file reconciliation against `origin/main`:
 
-- `tests/integration/real_app/conftest.py`: real-app fixture and teardown.
+- `tests/integration/real_app/conftest.py`: real-app fixture and teardown, in
+  two boots (shipped defaults, and Kobo sync on) sharing one boot recipe.
 - `tests/integration/real_app/cases.py`: five isolated runtime cases.
+- `tests/integration/real_app/kobo_fixture.py`: synthetic seeding helpers for
+  the Kobo cases, and the CWNG ETag shape.
+- `tests/integration/real_app/kobo_authority_cases.py`: the three sticky ETag
+  exits and the ownership-determinism measurement.
+- `tests/integration/real_app/kobo_containment_cases.py`: the check-for-changes
+  containment of `OWNERSHIP_UNKNOWN`, in its own interpreter.
+- `tests/integration/test_real_app_kobo.py`: lane entry and per-module
+  expected pass counts for the two Kobo case modules.
 - `tests/integration/real_app/blueprints.json`: the pinned blueprint list, split
   into unconditional and conditional. The only artifact here that does not come
   from the app itself, and the only thing that can notice a blueprint vanishing.

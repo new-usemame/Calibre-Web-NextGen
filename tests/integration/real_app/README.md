@@ -212,8 +212,18 @@ the conditional Kobo blueprints exist (section 5).
    reference `cps/readingservices.py` or
    `cps/services/kobo_annotation_authority.py` were re-run (clean baseline: all
    green). Dropping the ETag on the **`answered_locally`** exit is caught — 5
-   failures, all in `test_1923_owned_annotations_local_authority.py`, which
-   reaches that same exit on the *pre-authority* path. Dropping it on the
+   failures, split across **two** files that reach that same exit on the
+   *pre-authority* path: two in `test_1923_owned_annotations_local_authority.py`
+   (`test_owned_get_is_full_200_raw_exact_if_none_match_ignored_and_etag_moves`,
+   `test_owned_get_survives_normalized_book_state_insert_integrity_error`) and
+   three in `test_1942_seed_pipeline.py`
+   (`test_local_get_ignores_if_none_match_and_never_returns_304`,
+   `test_prior_cwng_etag_on_authoritative_book_returns_current_local_set_200_never_proxy`,
+   `test_dual_live_query_failure_serves_exact_last_complete_snapshot`). The node
+   ids come from a `-rf` run; an earlier revision of this paragraph attributed
+   all five to `test_1923` alone, which was inferred from a failure *count*
+   rather than read from a FAILED list, and was wrong. Anyone minimising this
+   suite must treat all five as guards on that exit. Dropping it on the
    **`answered_from_snapshot`** exit is not: **435 passed, 1 skipped, 0 failed**.
    Nothing in the old suite names `prepare_authoritative_device_get` or
    `STICKY_GET_SNAPSHOT`, and nothing constructs an ever-authoritative book whose

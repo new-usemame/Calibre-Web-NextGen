@@ -12005,11 +12005,11 @@ msgstr ""
 
 #: cps/templates/cwa_settings.html cps/templates/duplicates.html
 msgid "Next scheduled scan:"
-msgstr ""
+msgstr "Nästa schemalagda genomsökning:"
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Duplicate Detection Criteria"
-msgstr ""
+msgstr "Kriterier för dubblettdetektering i NextGen"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -12017,40 +12017,43 @@ msgid ""
 "duplicates. Books must match ALL selected criteria to be considered "
 "duplicates."
 msgstr ""
+"Ställ in vilka metadatafält som används för att avgöra om böcker är "
+"dubbletter. Böcker måste matcha ALLA valda kriterier för att räknas som "
+"dubbletter."
 
 #: cps/templates/cwa_settings.html
 msgid "Consider book titles when detecting duplicates"
-msgstr ""
+msgstr "Ta hänsyn till boktitlar vid dubblettdetektering"
 
 #: cps/templates/cwa_settings.html
 msgid "Consider book authors when detecting duplicates"
-msgstr ""
+msgstr "Ta hänsyn till bokförfattare vid dubblettdetektering"
 
 #: cps/templates/cwa_settings.html
 msgid "Consider book language when detecting duplicates"
-msgstr ""
+msgstr "Ta hänsyn till bokspråk vid dubblettdetektering"
 
 #: cps/templates/cwa_settings.html
 msgid "Consider book series when detecting duplicates"
-msgstr ""
+msgstr "Ta hänsyn till bokserier vid dubblettdetektering"
 
 #: cps/templates/cwa_settings.html
 msgid "Consider book publisher when detecting duplicates"
-msgstr ""
+msgstr "Ta hänsyn till bokförlag vid dubblettdetektering"
 
 #: cps/templates/cwa_settings.html
 msgid "Consider file format when detecting duplicates"
-msgstr ""
+msgstr "Ta hänsyn till filformat vid dubblettdetektering"
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "At least one criterion must be selected. Title and Author are recommended as "
 "core criteria."
-msgstr ""
+msgstr "Minst ett kriterium måste väljas. Titel och författare rekommenderas som grundkriterier."
 
 #: cps/templates/cwa_settings.html
 msgid "Duplicate Format Priority Ranking"
-msgstr ""
+msgstr "Prioritetsordning för dubblettformat"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -12058,10 +12061,13 @@ msgid ""
 "Format\" auto-resolution strategy. Drag and drop to reorder formats by "
 "priority (higher = better)."
 msgstr ""
+"Ställ in vilka filformat som föredras vid användning av strategin \"Format med "
+"högst kvalitet\" för automatisk lösning. Dra och släpp för att ändra formatens "
+"prioritetsordning (högre = bättre)."
 
 #: cps/templates/cwa_settings.html
 msgid "Tip:"
-msgstr ""
+msgstr "Tips:"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -12069,10 +12075,12 @@ msgid ""
 "with higher-ranked formats will be kept. Lower priority formats will be "
 "deleted."
 msgstr ""
+"När dubbletter löses med strategin \"Format med högst kvalitet\" behålls böcker "
+"med högre rankade format. Format med lägre prioritet tas bort."
 
 #: cps/templates/cwa_settings.html
 msgid "Duplicate Notifications & Auto-Resolution"
-msgstr ""
+msgstr "Dubblettnotiser och automatisk lösning"
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -12348,15 +12356,15 @@ msgstr "Återställd från arkivet"
 
 #: cps/templates/detail.html
 msgid "Reloaded metadata from disk"
-msgstr ""
+msgstr "Läste in metadata från disk igen"
 
 #: cps/templates/detail.html
 msgid "On-disk metadata matches — nothing to update"
-msgstr ""
+msgstr "Metadata på disken matchar – inget att uppdatera"
 
 #: cps/templates/detail.html
 msgid "Unhide from your library"
-msgstr ""
+msgstr "Visa i ditt bibliotek igen"
 
 #: cps/templates/detail.html
 msgid "Hide from your library"
@@ -12364,17 +12372,17 @@ msgstr "Dölj från ditt bibliotek"
 
 #: cps/templates/detail.html
 msgid "Unhidden"
-msgstr ""
+msgstr "Visas igen"
 
 #: cps/templates/detail.html
 #, python-format
 msgid "Remove \"%(title)s\" from your library?"
-msgstr ""
+msgstr "Ta bort \"%(title)s\" från ditt bibliotek?"
 
 #: cps/templates/detail.html
 #, python-format
 msgid "It also leaves these shelves: %(shelves)s."
-msgstr ""
+msgstr "Den lämnar även dessa hyllor: %(shelves)s."
 
 #: cps/templates/detail.html
 msgid "Rating updated"
@@ -12387,31 +12395,31 @@ msgstr "Betyget har rensats"
 #: cps/templates/detail.html cps/templates/listenmp3.html
 #, python-format
 msgid "Book %(index)s of %(range)s"
-msgstr ""
+msgstr "Bok %(index)s av %(range)s"
 
 #: cps/templates/detail.html
 msgid "ID"
-msgstr ""
+msgstr "ID"
 
 #: cps/templates/detail.html
 msgid "UUID"
-msgstr ""
+msgstr "UUID"
 
 #: cps/templates/detail.html
 msgid "UUID copied to clipboard"
-msgstr ""
+msgstr "UUID har kopierats till urklipp"
 
 #: cps/templates/detail.html
 msgid "Unable to copy UUID"
-msgstr ""
+msgstr "Det gick inte att kopiera UUID"
 
 #: cps/templates/detail.html
 msgid "Copy UUID"
-msgstr ""
+msgstr "Kopiera UUID"
 
 #: cps/templates/detail.html
 msgid "File sizes"
-msgstr ""
+msgstr "Filstorlekar"
 
 #: cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Description:"
@@ -12431,7 +12439,7 @@ msgstr "Markera alla"
 
 #: cps/templates/detail.html
 msgid "Other users' eReaders:"
-msgstr ""
+msgstr "Andra användares e-boksläsare:"
 
 #: cps/templates/detail.html
 msgid "Additional email addresses:"

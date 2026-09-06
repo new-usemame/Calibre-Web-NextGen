@@ -12975,7 +12975,7 @@ msgstr ""
 msgid ""
 "Preview and sample entries are excluded automatically when Kobo marks them "
 "with Accessibility -1."
-msgstr ""
+msgstr "Förhandsvisnings- och provposter undantas automatiskt när Kobo markerar dem med Accessibility -1."
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
@@ -12983,150 +12983,158 @@ msgid ""
 "books may appear in the preview, and the evidence shown is not proof that "
 "this server delivered a book."
 msgstr ""
+"Inget äkta Kobo Store-köp fanns tillgängligt för validering. Kobo Store-böcker "
+"kan visas i förhandsvisningen, och underlaget som visas är inget bevis för att "
+"den här servern levererade en bok."
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
 "Select only books you know came from this server. Selecting a book schedules "
 "its device copy for archival on the next sync."
 msgstr ""
+"Välj endast böcker som du vet kommer från den här servern. När du väljer en bok "
+"schemaläggs dess enhetskopia för arkivering vid nästa synkronisering."
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
 "Recorded sync means this server retained a UUID-bearing delivery record. No "
 "does not prove the book was never delivered by an older version."
 msgstr ""
+"Registrerad synkronisering innebär att den här servern har behållit en "
+"leveranspost med UUID. Nej bevisar inte att boken aldrig levererades av en "
+"äldre version."
 
 #: cps/templates/kobo_reconcile.html
 msgid "The uploaded database is deleted as soon as the preview is built."
-msgstr ""
+msgstr "Den uppladdade databasen raderas så snart förhandsvisningen har skapats."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid ""
 "%(count)d deleted books were scheduled to be archived the next time this "
 "user's Kobo syncs."
-msgstr ""
+msgstr "%(count)d borttagna böcker har schemalagts för arkivering nästa gång användarens Kobo synkroniseras."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "%(count)d were already scheduled."
-msgstr ""
+msgstr "%(count)d var redan schemalagda."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "%(count)d are currently in the library and were not changed."
-msgstr ""
+msgstr "%(count)d finns för närvarande i biblioteket och ändrades inte."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "%(count)d could not be verified and were not changed."
-msgstr ""
+msgstr "%(count)d kunde inte verifieras och ändrades inte."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "%(count)d device books are not in the library and require your review."
-msgstr ""
+msgstr "%(count)d enhetsböcker finns inte i biblioteket och behöver granskas av dig."
 
 #: cps/templates/kobo_reconcile.html
 msgid "Device title"
-msgstr ""
+msgstr "Enhetstitel"
 
 #: cps/templates/kobo_reconcile.html
 msgid "ISBN"
-msgstr ""
+msgstr "ISBN"
 
 #: cps/templates/kobo_reconcile.html
 msgid "Recorded sync"
-msgstr ""
+msgstr "Registrerad synkronisering"
 
 #: cps/templates/kobo_reconcile.html
 msgid "File size"
-msgstr ""
+msgstr "Filstorlek"
 
 #: cps/templates/kobo_reconcile.html
 msgid "Book UUID"
-msgstr ""
+msgstr "Bok-UUID"
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "Archive %(title)s"
-msgstr ""
+msgstr "Arkivera %(title)s"
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "%(count)d bytes"
-msgstr ""
+msgstr "%(count)d byte"
 
 #: cps/templates/kobo_reconcile.html
 msgid "Archive the selected books on the next Kobo sync?"
-msgstr ""
+msgstr "Arkivera de valda böckerna vid nästa Kobo-synkronisering?"
 
 #: cps/templates/kobo_reconcile.html
 msgid "Archive selected books on the next Kobo sync"
-msgstr ""
+msgstr "Arkivera valda böcker vid nästa Kobo-synkronisering"
 
 #: cps/templates/kobo_reconcile.html
 msgid "Excluded from this action"
-msgstr ""
+msgstr "Undantagen från denna åtgärd"
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "%(count)d preview or sample entries were excluded."
-msgstr ""
+msgstr "%(count)d förhandsvisnings- eller provposter undantogs."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid ""
 "%(count)d device entries could not be classified because Accessibility was "
 "unavailable."
-msgstr ""
+msgstr "%(count)d enhetsposter kunde inte klassificeras eftersom Accessibility inte var tillgängligt."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "%(count)d device volume rows had no usable UUID."
-msgstr ""
+msgstr "%(count)d rader för enhetsvolymer saknade användbara UUID:n."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "%(count)d books are still in the library."
-msgstr ""
+msgstr "%(count)d böcker finns fortfarande i biblioteket."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "%(count)d library lookups could not be completed."
-msgstr ""
+msgstr "%(count)d biblioteksuppslag kunde inte slutföras."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "%(count)d books were already scheduled for archival."
-msgstr ""
+msgstr "%(count)d böcker var redan schemalagda för arkivering."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "Maximum file size: %(max)d MB."
-msgstr ""
+msgstr "Största filstorlek: %(max)d MB."
 
 #: cps/templates/kobo_reconcile.html
 msgid "Build preview"
-msgstr ""
+msgstr "Skapa förhandsvisning"
 
 #: cps/templates/kosync_plugin.html
 msgid "KOReader Sync is disabled."
-msgstr ""
+msgstr "KOReader-synkronisering är inaktiverad."
 
 #: cps/templates/kosync_plugin.html
 msgid ""
 "Enable it in NextGen Settings to activate the /kosync endpoints and checksum "
 "generation."
-msgstr ""
+msgstr "Aktivera den i NextGen-inställningar för att aktivera /kosync-slutpunkterna och kontrollsummegenerering."
 
 #: cps/templates/kosync_plugin.html
 msgid "Open NextGen Settings"
-msgstr ""
+msgstr "Öppna NextGen-inställningar"
 
 #: cps/templates/kosync_plugin.html
 msgid "Download is available after enabling KOReader Sync in NextGen Settings."
-msgstr ""
+msgstr "Hämtning är tillgänglig efter att KOReader-synkronisering har aktiverats i NextGen-inställningar."
 
 #: cps/templates/layout.html cps/templates/login.html
 msgid "Home"
@@ -13150,7 +13158,7 @@ msgstr "Logga ut"
 
 #: cps/templates/layout.html
 msgid "Support Calibre-Web NextGen"
-msgstr ""
+msgstr "Stöd Calibre-Web NextGen"
 
 #: cps/templates/layout.html cps/templates/read.html cps/templates/readcbr.html
 msgid "Settings"
@@ -13162,11 +13170,11 @@ msgstr "Uppdatera bibliotek"
 
 #: cps/templates/layout.html
 msgid "Support"
-msgstr ""
+msgstr "Stöd"
 
 #: cps/templates/layout.html
 msgid "See Changelog"
-msgstr ""
+msgstr "Visa ändringsloggen"
 
 #: cps/templates/layout.html
 msgid "Open Duplicates"
@@ -13174,7 +13182,7 @@ msgstr "Öppna dubbletter"
 
 #: cps/templates/layout.html
 msgid "Contribute here!"
-msgstr ""
+msgstr "Bidra här!"
 
 #: cps/templates/layout.html
 msgid "Please do not refresh the page"
@@ -13186,7 +13194,7 @@ msgstr "Skapa hylla"
 
 #: cps/templates/layout.html
 msgid "Magic Shelves ✨"
-msgstr ""
+msgstr "Magiska hyllor ✨"
 
 #: cps/templates/layout.html
 msgid "Book Details"

@@ -1059,28 +1059,28 @@ msgstr "Körningstillstånd saknas"
 
 #: cps/cover_picker.py cps/spa_strings.py
 msgid "Back to edit metadata"
-msgstr ""
+msgstr "Tillbaka till redigering av metadata"
 
 #: cps/cover_picker.py cps/spa_strings.py cps/templates/book_edit.html
 msgid "Back to book"
-msgstr ""
+msgstr "Tillbaka till boken"
 
 #: cps/cover_picker.py
 #, python-format
 msgid "Change cover — %(title)s"
-msgstr ""
+msgstr "Ändra omslag — %(title)s"
 
 #: cps/cover_picker.py
 msgid "This book's cover is locked. Unlock it first."
-msgstr ""
+msgstr "Den här bokens omslag är låst. Lås upp det först."
 
 #: cps/cover_picker.py
 msgid "Provide a cover URL."
-msgstr ""
+msgstr "Ange en URL till omslaget."
 
 #: cps/cover_picker.py
 msgid "This book doesn't have an embedded cover we can extract."
-msgstr ""
+msgstr "Den här boken har inget inbäddat omslag som kan extraheras."
 
 #: cps/cover_picker.py
 msgid "Unknown cover source."
@@ -1088,50 +1088,50 @@ msgstr "Okänd omslagskälla."
 
 #: cps/cover_picker.py
 msgid "Could not save lock state."
-msgstr ""
+msgstr "Det gick inte att spara låsstatusen."
 
 #: cps/cover_picker.py
 msgid "Only http(s) URLs can be previewed."
-msgstr ""
+msgstr "Endast http(s)-URL:er kan förhandsvisas."
 
 #: cps/cover_picker.py
 msgid "Could not render the e-reader preview."
-msgstr ""
+msgstr "Det gick inte att återge förhandsvisningen för e-boksläsaren."
 
 #: cps/cover_picker.py
 msgid "Could not load a source image to preview."
-msgstr ""
+msgstr "Det gick inte att läsa in en källbild för förhandsvisning."
 
 #: cps/cover_picker.py cps/spa_strings.py
 msgid "Cover save failed."
-msgstr ""
+msgstr "Det gick inte att spara omslaget."
 
 #: cps/cwa_functions.py
 msgid "Theme switching is temporarily disabled until v5.0.0"
-msgstr ""
+msgstr "Temabyte är tillfälligt inaktiverat fram till v5.0.0"
 
 #: cps/cwa_functions.py
 msgid ""
 "Library Refresh 🔄 Checking for any books that may have been missed, please "
 "wait..."
-msgstr ""
+msgstr "Biblioteksuppdatering 🔄 Kontrollerar om några böcker har missats. Vänta …"
 
 #: cps/cwa_functions.py
 msgid "Invalid cron expression for duplicate scans. Changes were not saved."
-msgstr ""
+msgstr "Ogiltigt cron-uttryck för dubblettsökningar. Ändringarna sparades inte."
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen User Settings"
-msgstr ""
+msgstr "Calibre-Web NextGen-användarinställningar"
 
 #: cps/cwa_functions.py
 msgid "Timestamp"
-msgstr ""
+msgstr "Tidsstämpel"
 
 #: cps/cwa_functions.py cps/spa_strings.py cps/templates/tasks.html
 #: cps/templates/user_edit.html
 msgid "Book ID"
-msgstr ""
+msgstr "Bok-id"
 
 #: cps/cwa_functions.py cps/templates/book_edit.html
 #: cps/templates/search_form.html
@@ -1144,7 +1144,7 @@ msgstr "Bokens författare"
 
 #: cps/cwa_functions.py
 msgid "Trigger Type"
-msgstr ""
+msgstr "Utlösartyp"
 
 #: cps/cwa_functions.py
 msgid "Filepath"
@@ -1156,23 +1156,23 @@ msgstr "Filnamn"
 
 #: cps/cwa_functions.py
 msgid "Manual?"
-msgstr ""
+msgstr "Manuell?"
 
 #: cps/cwa_functions.py
 msgid "No. Fixes"
-msgstr ""
+msgstr "Antal korrigeringar"
 
 #: cps/cwa_functions.py
 msgid "Original Backed Up?"
-msgstr ""
+msgstr "Original säkerhetskopierat?"
 
 #: cps/cwa_functions.py
 msgid "Fixes Applied"
-msgstr ""
+msgstr "Korrigeringar tillämpade"
 
 #: cps/cwa_functions.py
 msgid "Original Format"
-msgstr ""
+msgstr "Originalformat"
 
 #: cps/cwa_functions.py
 msgid "End Format"
@@ -1184,31 +1184,31 @@ msgstr "Okänd användare"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen Stats & Activity"
-msgstr ""
+msgstr "Calibre-Web NextGen-statistik och aktivitet"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - Full Enforcement History"
-msgstr ""
+msgstr "Calibre-Web NextGen – fullständig kontrollhistorik"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - Full Enforcement History (w/ Paths)"
-msgstr ""
+msgstr "Calibre-Web NextGen – fullständig kontrollhistorik (med sökvägar)"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - Full Import History"
-msgstr ""
+msgstr "Calibre-Web NextGen – fullständig importhistorik"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - Full Conversion History"
-msgstr ""
+msgstr "Calibre-Web NextGen – fullständig konverteringshistorik"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - Full EPUB Fixer History (w/out Paths & Fixes)"
-msgstr ""
+msgstr "Calibre-Web NextGen – fullständig EPUB-reparationshistorik (utan sökvägar och korrigeringar)"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - Full EPUB Fixer History (w/ Paths & Fixes)"
-msgstr ""
+msgstr "Calibre-Web NextGen – fullständig EPUB-reparationshistorik (med sökvägar och korrigeringar)"
 
 #: cps/cwa_functions.py
 msgid "✅ All Monitoring Services are running as intended! 👍"

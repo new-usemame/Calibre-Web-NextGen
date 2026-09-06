@@ -5641,60 +5641,62 @@ msgstr "Typsnittsfamilj"
 
 #: cps/spa_strings.py
 msgid "Font size"
-msgstr ""
+msgstr "Teckenstorlek"
 
 #: cps/spa_strings.py
 msgid "Forgot password?"
-msgstr ""
+msgstr "Glömt lösenordet?"
 
 #: cps/spa_strings.py
 msgid "Format queued — it will appear once processed."
-msgstr ""
+msgstr "Formatet har köats — det visas när det har bearbetats."
 
 #: cps/spa_strings.py
 msgid "Formats"
-msgstr ""
+msgstr "Format"
 
 #: cps/spa_strings.py
 msgid "Formats — exclude"
-msgstr ""
+msgstr "Format — uteslut"
 
 #: cps/spa_strings.py
 msgid "Formats — include"
-msgstr ""
+msgstr "Format — inkludera"
 
 #: cps/spa_strings.py
 msgid "Formatting is kept where the book page supports it."
-msgstr ""
+msgstr "Formateringen bevaras där boksidan stöder den."
 
 #: cps/spa_strings.py
 msgid "From address"
-msgstr ""
+msgstr "Från-adress"
 
 #: cps/spa_strings.py
 msgid "Full screen"
-msgstr ""
+msgstr "Helskärm"
 
 #: cps/spa_strings.py
 msgid "Generate a new link"
-msgstr ""
+msgstr "Skapa en ny länk"
 
 #: cps/spa_strings.py
 msgid ""
 "Generate a private sync URL for this account. You can delete it at any time."
 msgstr ""
+"Skapa en privat synkroniseringswebbadress för det här kontot. Du kan ta bort "
+"den när som helst."
 
 #: cps/spa_strings.py
 msgid "Generate sync URL"
-msgstr ""
+msgstr "Skapa synkroniseringswebbadress"
 
 #: cps/spa_strings.py
 msgid "Generating…"
-msgstr ""
+msgstr "Skapar…"
 
 #: cps/spa_strings.py
 msgid "Give your smart shelf a name."
-msgstr ""
+msgstr "Ge din smarta hylla ett namn."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5702,140 +5704,142 @@ msgid ""
 "Give {name} My Library? It starts as a copy of everything they can see now — "
 "nothing changes for them yet."
 msgstr ""
+"Ge {name} Mitt bibliotek? Det börjar som en kopia av allt som användaren kan "
+"se nu — ingenting ändras för användaren ännu."
 
 #: cps/spa_strings.py
 msgid "Go to this highlight"
-msgstr ""
+msgstr "Gå till den här markeringen"
 
 #: cps/spa_strings.py
 msgid "Go to your library"
-msgstr ""
+msgstr "Gå till ditt bibliotek"
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
 msgid "Gradient — palette-matched top/bottom blend"
-msgstr ""
+msgstr "Gradient — palettanpassad blandning upptill/nedtill"
 
 #: cps/spa_strings.py
 msgid "Grey"
-msgstr ""
+msgstr "Grå"
 
 #: cps/spa_strings.py
 msgid "Group by"
-msgstr ""
+msgstr "Gruppera efter"
 
 #: cps/spa_strings.py
 msgid "Group claim"
-msgstr ""
+msgstr "Gruppanspråk"
 
 #: cps/spa_strings.py
 msgid "Group members field"
-msgstr ""
+msgstr "Fält för gruppmedlemmar"
 
 #: cps/spa_strings.py
 msgid "Group name"
-msgstr ""
+msgstr "Gruppnamn"
 
 #: cps/spa_strings.py
 msgid "Group object filter"
-msgstr ""
+msgstr "Gruppobjektsfilter"
 
 #: cps/spa_strings.py
 msgid "Has pen or drawing notes"
-msgstr ""
+msgstr "Har penn- eller ritanteckningar"
 
 #: cps/spa_strings.py
 msgid "Header name"
-msgstr ""
+msgstr "Rubriknamn"
 
 #: cps/spa_strings.py
 msgid "Heading"
-msgstr ""
+msgstr "Rubrik"
 
 #: cps/spa_strings.py
 msgid "Help & support"
-msgstr ""
+msgstr "Hjälp och support"
 
 #: cps/spa_strings.py
 msgid "Help menu"
-msgstr ""
+msgstr "Hjälpmeny"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Hidden"
-msgstr ""
+msgstr "Dold"
 
 #: cps/spa_strings.py cps/templates/readcbr.html
 msgid "Hide"
-msgstr ""
+msgstr "Dölj"
 
 #: cps/spa_strings.py
 msgid "Hide Discover section"
-msgstr ""
+msgstr "Dölj avsnittet Upptäck"
 
 #: cps/spa_strings.py
 msgid "Hide device details"
-msgstr ""
+msgstr "Dölj enhetsdetaljer"
 
 #: cps/spa_strings.py
 msgid "Hide device library"
-msgstr ""
+msgstr "Dölj enhetsbiblioteket"
 
 #: cps/spa_strings.py
 msgid "Hide fields"
-msgstr ""
+msgstr "Dölj fält"
 
 #: cps/spa_strings.py
 msgid "Hide password"
-msgstr ""
+msgstr "Dölj lösenord"
 
 #: cps/spa_strings.py
 msgid "Highlight"
-msgstr ""
+msgstr "Markering"
 
 #: cps/spa_strings.py
 msgid "Highlight saved"
-msgstr ""
+msgstr "Markeringen har sparats"
 
 #: cps/spa_strings.py
 msgid "Highlights"
-msgstr ""
+msgstr "Markeringar"
 
 #: cps/spa_strings.py
 msgid "Highlights and notes"
-msgstr ""
+msgstr "Markeringar och anteckningar"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Highlights, {count} saved annotations"
-msgstr ""
+msgstr "Markeringar, {count} sparade anteckningar"
 
 #: cps/spa_strings.py
 msgid "Hot"
-msgstr ""
+msgstr "Populärt"
 
 #: cps/spa_strings.py
 msgid "Hot — Most Downloaded"
-msgstr ""
+msgstr "Populärt — Mest hämtat"
 
 #: cps/spa_strings.py
 msgid "How should multi-value fields be applied?"
-msgstr ""
+msgstr "Hur ska fält med flera värden tillämpas?"
 
 #: cps/spa_strings.py
 msgid "How switching between the global library and My Library works"
-msgstr ""
+msgstr "Så här fungerar växling mellan det globala biblioteket och Mitt bibliotek"
 
 #: cps/spa_strings.py
 msgid "Icon"
-msgstr ""
+msgstr "Ikon"
 
 #: cps/spa_strings.py
 msgid "Identifier type"
-msgstr ""
+msgstr "Identifierartyp"
 
 #: cps/spa_strings.py
 msgid "Identifier value"
-msgstr ""
+msgstr "Identifierarvärde"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 msgid "Identifiers"
@@ -5844,75 +5848,79 @@ msgstr "Identifierare"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Image from {source}"
-msgstr ""
+msgstr "Bild från {source}"
 
 #: cps/spa_strings.py cps/templates/annotations_import.html
 msgid "Import"
-msgstr ""
+msgstr "Importera"
 
 #: cps/spa_strings.py
 msgid "Import and export"
-msgstr ""
+msgstr "Import och export"
 
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/detail.html
 msgid "Imported as"
-msgstr ""
+msgstr "Importerad som"
 
 #: cps/spa_strings.py
 msgid "In KOReader, open NextGen Progress Sync and choose Set NextGen Server."
-msgstr ""
+msgstr "Öppna NextGen Progress Sync i KOReader och välj Ange NextGen-server."
 
 #: cps/spa_strings.py
 msgid "In your book"
-msgstr ""
+msgstr "I din bok"
 
 #: cps/spa_strings.py
 msgid ""
 "In-browser reading currently supports EPUB. Use download or the classic "
 "reader for other formats."
 msgstr ""
+"Läsning i webbläsaren stöder för närvarande EPUB. Använd hämtning eller den "
+"klassiska läsaren för andra format."
 
 #: cps/spa_strings.py
 msgid "Inactive"
-msgstr ""
+msgstr "Inaktiv"
 
 #: cps/spa_strings.py
 msgid "Included"
-msgstr ""
+msgstr "Inkluderad"
 
 #: cps/spa_strings.py
 msgid "Install or update the NextGen Sync plugin."
-msgstr ""
+msgstr "Installera eller uppdatera insticksmodulen NextGen Sync."
 
 #: cps/spa_strings.py
 msgid ""
 "Instead of forcing all of your books on friends, they can pick which ones "
 "they want!"
 msgstr ""
+"I stället för att tvinga alla dina böcker på vänner kan de välja vilka de "
+"vill ha!"
 
 #: cps/spa_strings.py
 msgid "Issuer / base URL"
-msgstr ""
+msgstr "Utfärdare / baswebbadress"
 
 #: cps/spa_strings.py
 msgid "It may have moved, or it might still live in the classic interface."
-msgstr ""
+msgstr "Den kan ha flyttats eller fortfarande finnas i det klassiska gränssnittet."
 
 #: cps/spa_strings.py
 msgid "Italic"
-msgstr ""
+msgstr "Kursiv"
 
 #: cps/spa_strings.py
 msgid "KOReader"
-msgstr ""
+msgstr "KOReader"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "KOReader Progress"
-msgstr ""
+msgstr "KOReader-läsförlopp"
 
 #: cps/spa_strings.py
 msgid "Key file path"
-msgstr ""
+msgstr "Sökväg till nyckelfil"
 
 #: cps/spa_strings.py
 msgid "Key path"

@@ -5924,48 +5924,48 @@ msgstr "Sökväg till nyckelfil"
 
 #: cps/spa_strings.py
 msgid "Key path"
-msgstr ""
+msgstr "Nyckelsökväg"
 
 #: cps/spa_strings.py
 msgid "Kind"
-msgstr ""
+msgstr "Typ"
 
 #: cps/spa_strings.py
 msgid "Kobo"
-msgstr ""
+msgstr "Kobo"
 
 #: cps/spa_strings.py
 msgid "Kobo Clara HD / 2E / BW / Colour (1072×1448)"
-msgstr ""
+msgstr "Kobo Clara HD / 2E / BW / Colour (1072×1448)"
 
 #: cps/spa_strings.py
 msgid "Kobo Libra Color / Libra 2 (1264×1680)"
-msgstr ""
+msgstr "Kobo Libra Color / Libra 2 (1264×1680)"
 
 #: cps/spa_strings.py
 msgid "Kobo sync URL deleted."
-msgstr ""
+msgstr "Kobo-synkroniseringswebbadressen har tagits bort."
 
 #: cps/spa_strings.py
 msgid "Kobo sync URL ready."
-msgstr ""
+msgstr "Kobo-synkroniseringswebbadressen är klar."
 
 #: cps/spa_strings.py
 msgid "Kobo sync is not enabled on this server."
-msgstr ""
+msgstr "Kobo-synkronisering är inte aktiverad på den här servern."
 
 #: cps/spa_strings.py
 msgid "Kobo sync on"
-msgstr ""
+msgstr "Kobo-synkronisering på"
 
 #: cps/spa_strings.py
 msgid "Kobo two-way annotation sync"
-msgstr ""
+msgstr "Tvåvägssynkronisering av Kobo-anteckningar"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Kobo two-way sync: {state}"
-msgstr ""
+msgstr "Kobo-tvåvägssynkronisering: {state}"
 
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/cwa_settings.html cps/templates/listenmp3.html
@@ -5974,268 +5974,270 @@ msgstr "Språk"
 
 #: cps/spa_strings.py
 msgid "Languages — include"
-msgstr ""
+msgstr "Språk — inkludera"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Last modified"
-msgstr ""
+msgstr "Senast ändrad"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Last seen {when}"
-msgstr ""
+msgstr "Senast sedd {when}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Last seen: {when}"
-msgstr ""
+msgstr "Senast sedd: {when}"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Last synced"
-msgstr ""
+msgstr "Senast synkroniserad"
 
 #: cps/spa_strings.py
 msgid "Library settings"
-msgstr ""
+msgstr "Biblioteksinställningar"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Line height"
-msgstr ""
+msgstr "Radhöjd"
 
 #: cps/spa_strings.py
 msgid "Link address"
-msgstr ""
+msgstr "Länkadress"
 
 #: cps/spa_strings.py
 msgid "Load more"
-msgstr ""
+msgstr "Läs in fler"
 
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/config_db.html
 #: cps/templates/config_edit.html cps/templates/cwa_settings.html
 #: cps/templates/read.html
 msgid "Loading"
-msgstr ""
+msgstr "Läser in"
 
 #: cps/spa_strings.py
 msgid "Loading device annotations…"
-msgstr ""
+msgstr "Läser in enhetsanteckningar…"
 
 #: cps/spa_strings.py
 msgid "Loading device library…"
-msgstr ""
+msgstr "Läser in enhetsbibliotek…"
 
 #: cps/spa_strings.py
 msgid "Loading new Discover picks."
-msgstr ""
+msgstr "Läser in nya val i Upptäck."
 
 #: cps/spa_strings.py
 msgid "Loading pairing details…"
-msgstr ""
+msgstr "Läser in parkopplingsdetaljer…"
 
 #: cps/spa_strings.py
 msgid "Loading reading positions…"
-msgstr ""
+msgstr "Läser in läspositioner…"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Loading…"
-msgstr ""
+msgstr "Läser in…"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Lock cover"
-msgstr ""
+msgstr "Lås omslag"
 
 #: cps/spa_strings.py
 msgid "Login button text"
-msgstr ""
+msgstr "Text på inloggningsknapp"
 
 #: cps/spa_strings.py
 msgid "Login method"
-msgstr ""
+msgstr "Inloggningsmetod"
 
 #: cps/spa_strings.py
 msgid "Login with"
-msgstr ""
+msgstr "Logga in med"
 
 #: cps/spa_strings.py
 msgid "Logs"
-msgstr ""
+msgstr "Loggar"
 
 #: cps/spa_strings.py
 msgid "Looks good"
-msgstr ""
+msgstr "Ser bra ut"
 
 #: cps/spa_strings.py
 msgid "Low-res"
-msgstr ""
+msgstr "Låg upplösning"
 
 #: cps/spa_strings.py
 msgid "Magic link"
-msgstr ""
+msgstr "Magisk länk"
 
 #: cps/spa_strings.py
 msgid "Magic link QR code"
-msgstr ""
+msgstr "QR-kod för magisk länk"
 
 #: cps/spa_strings.py
 msgid "Make private"
-msgstr ""
+msgstr "Gör privat"
 
 #: cps/spa_strings.py
 msgid "Make public"
-msgstr ""
+msgstr "Gör offentlig"
 
 #: cps/spa_strings.py
 msgid "Make this my default library view"
-msgstr ""
+msgstr "Gör detta till min standardvy för biblioteket"
 
 #: cps/spa_strings.py
 msgid "Manage admin role from OAuth group"
-msgstr ""
+msgstr "Hantera administratörsroll från OAuth-grupp"
 
 #: cps/spa_strings.py
 msgid "Manage e-readers"
-msgstr ""
+msgstr "Hantera e-boksläsare"
 
 #: cps/spa_strings.py
 msgid "Manage shelves"
-msgstr ""
+msgstr "Hantera hyllor"
 
 #: cps/spa_strings.py
 msgid "Manual order"
-msgstr ""
+msgstr "Manuell ordning"
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #: cps/templates/book_table.html
 msgid "Mark as read"
-msgstr ""
+msgstr "Markera som läst"
 
 #: cps/spa_strings.py cps/templates/_book_organizer.html
 #: cps/templates/book_table.html
 msgid "Mark as unread"
-msgstr ""
+msgstr "Markera som oläst"
 
 #: cps/spa_strings.py
 msgid "Match"
-msgstr ""
+msgstr "Matcha"
 
 #: cps/spa_strings.py
 msgid "Max"
-msgstr ""
+msgstr "Max"
 
 #: cps/spa_strings.py
 msgid "Max authors shown"
-msgstr ""
+msgstr "Högsta antal visade författare"
 
 #: cps/spa_strings.py
 msgid "Maximum rating"
-msgstr ""
+msgstr "Högsta betyg"
 
 #: cps/spa_strings.py
 msgid "Member user filter"
-msgstr ""
+msgstr "Användarfilter för medlemmar"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Merge into {name}"
-msgstr ""
+msgstr "Slå ihop med {name}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Merged into {name}"
-msgstr ""
+msgstr "Slogs ihop med {name}"
 
 #: cps/spa_strings.py
 msgid "Metadata URL (OIDC auto-discovery)"
-msgstr ""
+msgstr "Metadatawebbadress (automatisk OIDC-upptäckt)"
 
 #: cps/spa_strings.py
 msgid "Min"
-msgstr ""
+msgstr "Min"
 
 #: cps/spa_strings.py
 msgid "Minimum rating"
-msgstr ""
+msgstr "Lägsta betyg"
 
 #: cps/spa_strings.py
 msgid "Model"
-msgstr ""
+msgstr "Modell"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {name}"
-msgstr ""
+msgstr "Fler åtgärder för {name}"
 
 #: cps/spa_strings.py
 msgid "More cover options (search providers, e-reader preview)"
-msgstr ""
+msgstr "Fler omslagsalternativ (sök leverantörer, förhandsvisning på e-boksläsare)"
 
 #: cps/spa_strings.py
 msgid "Move down"
-msgstr ""
+msgstr "Flytta ned"
 
 #: cps/spa_strings.py
 msgid "Move up"
-msgstr ""
+msgstr "Flytta upp"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "My Library is now on for {accounts} accounts."
-msgstr ""
+msgstr "Mitt bibliotek är nu aktiverat för {accounts} konton."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
-msgstr ""
+msgstr "Mitt bibliotek är aktiverat för {accounts} konton; {errors} konton misslyckades."
 
 #: cps/spa_strings.py
 msgid "My account"
-msgstr ""
+msgstr "Mitt konto"
 
 #: cps/spa_strings.py
 msgid "Name"
-msgstr ""
+msgstr "Namn"
 
 #: cps/spa_strings.py
 msgid "Need to report an issue? Try the new"
-msgstr ""
+msgstr "Behöver du rapportera ett problem? Prova den nya"
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Never"
-msgstr ""
+msgstr "Aldrig"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "New"
-msgstr ""
+msgstr "Ny"
 
 #: cps/spa_strings.py
 msgid "New Feature!"
-msgstr ""
+msgstr "Ny funktion!"
 
 #: cps/spa_strings.py
 msgid ""
 "New authors, tags, publishers, and languages will be added after each book's "
 "existing values. Filled single-value fields will be replaced."
 msgstr ""
+"Nya författare, taggar, förlag och språk läggs till efter varje boks "
+"befintliga värden. Ifyllda fält med ett värde ersätts."
 
 #: cps/spa_strings.py
 msgid "New password"
-msgstr ""
+msgstr "Nytt lösenord"
 
 #: cps/spa_strings.py
 msgid "New shelf name"
-msgstr ""
+msgstr "Nytt hyllnamn"
 
 #: cps/spa_strings.py
 msgid "New shelf name…"
-msgstr ""
+msgstr "Nytt hyllnamn…"
 
 #: cps/spa_strings.py
 msgid "New shelf…"
-msgstr ""
+msgstr "Ny hylla…"
 
 #: cps/spa_strings.py
 msgid "New smart shelf"
-msgstr ""
+msgstr "Ny smart hylla"
 
 #: cps/spa_strings.py
 msgid "New user"

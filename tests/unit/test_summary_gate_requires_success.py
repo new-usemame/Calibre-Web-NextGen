@@ -23,6 +23,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 # Same convention as test_workflow_safety_invariants.py.
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -46,17 +47,26 @@ def _summary_shell():
 
 def _render(shell, *, event, ref, fast, build, integration, e2e,
             is_frontend_pr="false", is_tier2="false", is_build_pr="false",
-            is_concurrency_pr="false", changed_paths="success"):
+            is_concurrency_pr="false", changed_paths="success", impact_map="success"):
     subs = {
         "needs.fast-tests.result": fast,
         "needs.frontend-build.result": build,
         "needs.integration-tests.result": integration,
         "needs.e2e-tests.result": e2e,
         "needs.changed_paths.result": changed_paths,
+        "needs.impact-map.result": impact_map,
         "github.event_name": event,
         "github.ref": ref,
     }
+    # GitHub only exposes results for jobs declared in this job's needs.
+    # Executing with that context makes the positive control catch a missing
+    # dependency even if the shell's success predicate itself is correct.
+    dependencies = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))["jobs"]["test-summary"]["needs"]
+    if isinstance(dependencies, str):
+        dependencies = [dependencies]
     for key, value in subs.items():
+        if key.startswith("needs.") and key.split(".")[1] not in dependencies:
+            value = ""
         shell = shell.replace("${{ " + key + " }}", value)
     # Any residual GitHub expression is a boolean we are not exercising.
     shell = re.sub(r"\$\{\{[^}]*\}\}", "false", shell)
@@ -78,6 +88,26 @@ def _run(**kwargs):
 
 
 MAIN_PUSH = dict(event="push", ref="refs/heads/main")
+
+
+@pytest.mark.parametrize("event,ref", [
+    ("pull_request", "refs/pull/1/merge"),
+    ("push", "refs/heads/main"),
+    ("push", "refs/heads/dev"),
+    ("push", "refs/tags/v1.0.0"),
+    ("workflow_dispatch", "refs/heads/main"),
+])
+@pytest.mark.parametrize("result", ["success", "failure", "skipped", "cancelled"])
+def test_summary_requires_impact_map_success_on_every_trigger(event, ref, result):
+    """Intent: real generation errors block the required gate; successful advisory staleness can pass."""
+    rc, out = _run(
+        event=event, ref=ref, fast="success", build="success",
+        integration="success", e2e="success", impact_map=result,
+    )
+    expected = 0 if result == "success" else 1
+    assert rc == expected, f"{event} with impact-map={result}: expected exit {expected}, got {rc}\n{out}"
+    if result != "success":
+        assert "Impact map" in out and result in out
 
 
 def test_positive_control_all_success_passes():

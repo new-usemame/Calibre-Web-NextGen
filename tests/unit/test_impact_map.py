@@ -310,6 +310,92 @@ def test_refresh_refuses_to_overwrite_committed_inputs(history_repo, tmp_path):
     assert (history_repo / impact_map.DEFAULT_MAP).read_bytes() == before
 
 
+@pytest.mark.parametrize("destination,alias", [
+    *[(name, "direct") for name in (
+        "committed-map", "committed-recall", "oracle", "cases", "source",
+        "generated-map", "generated-recall", "currency",
+    )],
+    ("committed-map", "symlink"), ("currency", "symlink"),
+    ("cases", "hardlink"), ("generated-map", "hardlink"),
+    ("currency", "absent"),
+])
+def test_refresh_rejects_summary_aliases_before_any_write(history_repo, tmp_path, destination, alias):
+    """Intent: an aliased summary must fail before replacing evidence or appending to an input."""
+    repo, output = history_repo, tmp_path / "artifacts"
+    assert refresh(repo, output, tmp_path / "summary.md").returncode == 0
+    protected = {
+        "committed-map": repo / impact_map.DEFAULT_MAP,
+        "committed-recall": repo / impact_map.DEFAULT_RECALL,
+        "oracle": repo / impact_map.DEFAULT_ORACLE,
+        "cases": repo / impact_map.DEFAULT_CASES,
+        "source": repo / "cps/app.py",
+        "generated-map": output / impact_map.DEFAULT_MAP.name,
+        "generated-recall": output / impact_map.DEFAULT_RECALL.name,
+        "currency": output / "impact-map-currency.json",
+    }
+    summary = protected[destination]
+    if alias == "symlink":
+        summary = tmp_path / "summary-link"
+        summary.symlink_to(protected[destination])
+    elif alias == "hardlink":
+        summary = tmp_path / "summary-link"
+        summary.hardlink_to(protected[destination])
+    elif alias == "absent":
+        shutil.rmtree(output)
+    # A late rejection would replace the old graph with this changed source.
+    write(repo / "cps/new.py", "def added():\n    return 1\n")
+    before = {path: path.read_bytes() if path.exists() else None for path in protected.values()}
+
+    result = refresh(repo, output, summary)
+
+    after = {path: path.read_bytes() if path.exists() else None for path in protected.values()}
+    assert after == before, "summary collision changed protected bytes before rejection"
+    assert result.returncode != 0, result.stdout
+    assert "summary destination aliases" in result.stderr
+    if alias == "absent":
+        assert not output.exists(), "collision rejection must precede output creation"
+
+
+@pytest.mark.parametrize("failure", ["missing-history", "invalid-cases", "invalid-oracle"])
+def test_failed_refresh_invalidates_previous_currency(history_repo, tmp_path, failure):
+    """Intent: a failed second revision must never leave a successful first-revision currency label."""
+    repo, output, summary = history_repo, tmp_path / "artifacts", tmp_path / "summary.md"
+    assert refresh(repo, output, summary).returncode == 0
+    currency = output / "impact-map-currency.json"
+    previous = impact_map.load_json(currency)
+    assert previous["status"] == "current"
+    write(repo / "cps/new.py", "def added():\n    return 1\n")
+    git(repo, "add", "cps/new.py")
+    git(repo, "commit", "-m", "Advance synthetic source revision")
+    assert git(repo, "rev-parse", "HEAD:cps") != previous["current_cps_tree_sha"]
+    case_path, oracle_path = repo / impact_map.DEFAULT_CASES, repo / impact_map.DEFAULT_ORACLE
+    cases, oracle = case_path.read_bytes(), oracle_path.read_bytes()
+    if failure == "missing-history":
+        invalid = json.loads(cases)
+        invalid["cases"][0]["commit"] = "0" * 40
+        impact_map.write_json(case_path, invalid)
+    elif failure == "invalid-cases":
+        write(case_path, "invalid JSON\n")
+    else:
+        write(oracle_path, "invalid JSON\n")
+    previous_summary = summary.read_bytes()
+
+    result = refresh(repo, output, summary)
+
+    assert result.returncode != 0
+    assert not currency.exists(), "failed refresh retained a successful currency label from the previous revision"
+    assert summary.read_bytes() == previous_summary
+    # A later valid attempt can publish a coherent set in the same directory.
+    case_path.write_bytes(cases)
+    oracle_path.write_bytes(oracle)
+    assert refresh(repo, output, summary).returncode == 0
+    recovered = impact_map.load_json(currency)
+    fresh = impact_map.load_json(output / impact_map.DEFAULT_MAP.name)
+    assert recovered["current_cps_tree_sha"] == git(repo, "rev-parse", "HEAD:cps")
+    assert fresh["generated_from"]["cps_tree_sha"] == recovered["current_cps_tree_sha"]
+    assert recovered["status"] == "stale"
+
+
 def test_committed_recall_report_is_reproducible_and_keeps_misses():
     """Intent: acceptance evidence comes from real available commits and never hides misses."""
     data = impact_map.load_json(ROOT / "state/modernization/impact-map.json")

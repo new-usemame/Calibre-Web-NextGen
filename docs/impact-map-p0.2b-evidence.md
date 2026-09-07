@@ -1351,3 +1351,148 @@ exit code: 0
 
 OBSERVED: `git status --short` showed only this evidence document changed;
 build and recall reproduced both committed artifacts without a diff.
+
+
+### Two consecutive complete impact-map runs
+
+OBSERVED: after the fixes, two consecutive invocations of
+`python3 -m pytest tests/unit/test_impact_map.py -p no:randomly` completed with
+all 27 cases passing and no skips or deselections. The source and tests were
+unchanged between these runs; only evidence documentation was committed.
+
+First run:
+
+```text
+pytest temp base: $TMPDIR/cwng-pytest ($TMPDIR is mounted and writable)
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- $VENV/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 27 items
+
+tests/unit/test_impact_map.py::test_generator_separates_exact_bindings_from_attribute_guesses PASSED [  3%]
+tests/unit/test_impact_map.py::test_route_query_reaches_handler_and_reports_module_blindness PASSED [  7%]
+tests/unit/test_impact_map.py::test_runtime_only_route_is_live_but_has_no_invented_handler PASSED [ 11%]
+tests/unit/test_impact_map.py::test_reconciliation_static_only_route_is_not_claimed_live PASSED [ 14%]
+tests/unit/test_impact_map.py::test_same_inputs_generate_byte_identical_json PASSED [ 18%]
+tests/unit/test_impact_map.py::test_fresh_build_conserves_calls_and_keeps_coarse_edges_blind PASSED [ 22%]
+tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates PASSED [ 25%]
+tests/unit/test_impact_map.py::test_refresh_rejects_unavailable_recall_history PASSED [ 29%]
+tests/unit/test_impact_map.py::test_refresh_refuses_to_overwrite_committed_inputs PASSED [ 33%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-direct] PASSED [ 37%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-recall-direct] PASSED [ 40%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[oracle-direct] PASSED [ 44%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-direct] PASSED [ 48%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[source-direct] PASSED [ 51%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-direct] PASSED [ 55%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-recall-direct] PASSED [ 59%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-direct] PASSED [ 62%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-symlink] PASSED [ 66%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-symlink] PASSED [ 70%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-hardlink] PASSED [ 74%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-hardlink] PASSED [ 77%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-absent] PASSED [ 81%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history] PASSED [ 85%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-cases] PASSED [ 88%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle] PASSED [ 92%]
+tests/unit/test_impact_map.py::test_committed_recall_report_is_reproducible_and_keeps_misses PASSED [ 96%]
+tests/unit/test_impact_map.py::test_committed_map_has_nonempty_queryable_blind_spots_and_route_anchor PASSED [100%]
+
+============================= slowest 10 durations =============================
+5.40s call     tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates
+3.09s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-absent]
+3.02s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[source-direct]
+2.50s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-direct]
+2.49s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-recall-direct]
+2.28s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-hardlink]
+2.23s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history]
+2.19s setup    tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates
+2.13s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-hardlink]
+2.04s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-symlink]
+======================== 27 passed in 65.21s (0:01:05) =========================
+
+exit code: 0
+```
+
+Second consecutive run:
+
+```text
+pytest temp base: $TMPDIR/cwng-pytest ($TMPDIR is mounted and writable)
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- $VENV/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 27 items
+
+tests/unit/test_impact_map.py::test_generator_separates_exact_bindings_from_attribute_guesses PASSED [  3%]
+tests/unit/test_impact_map.py::test_route_query_reaches_handler_and_reports_module_blindness PASSED [  7%]
+tests/unit/test_impact_map.py::test_runtime_only_route_is_live_but_has_no_invented_handler PASSED [ 11%]
+tests/unit/test_impact_map.py::test_reconciliation_static_only_route_is_not_claimed_live PASSED [ 14%]
+tests/unit/test_impact_map.py::test_same_inputs_generate_byte_identical_json PASSED [ 18%]
+tests/unit/test_impact_map.py::test_fresh_build_conserves_calls_and_keeps_coarse_edges_blind PASSED [ 22%]
+tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates PASSED [ 25%]
+tests/unit/test_impact_map.py::test_refresh_rejects_unavailable_recall_history PASSED [ 29%]
+tests/unit/test_impact_map.py::test_refresh_refuses_to_overwrite_committed_inputs PASSED [ 33%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-direct] PASSED [ 37%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-recall-direct] PASSED [ 40%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[oracle-direct] PASSED [ 44%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-direct] PASSED [ 48%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[source-direct] PASSED [ 51%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-direct] PASSED [ 55%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-recall-direct] PASSED [ 59%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-direct] PASSED [ 62%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-symlink] PASSED [ 66%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-symlink] PASSED [ 70%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-hardlink] PASSED [ 74%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-hardlink] PASSED [ 77%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-absent] PASSED [ 81%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history] PASSED [ 85%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-cases] PASSED [ 88%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle] PASSED [ 92%]
+tests/unit/test_impact_map.py::test_committed_recall_report_is_reproducible_and_keeps_misses PASSED [ 96%]
+tests/unit/test_impact_map.py::test_committed_map_has_nonempty_queryable_blind_spots_and_route_anchor PASSED [100%]
+
+============================= slowest 10 durations =============================
+5.99s call     tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates
+3.35s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history]
+2.67s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle]
+2.51s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-absent]
+2.50s setup    tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history]
+2.39s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-cases]
+2.20s call     tests/unit/test_impact_map.py::test_committed_recall_report_is_reproducible_and_keeps_misses
+2.16s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-recall-direct]
+2.10s setup    tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates
+2.05s setup    tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle]
+======================== 27 passed in 62.52s (0:01:02) =========================
+
+exit code: 0
+```
+
+### Changelog and workflow validation
+
+OBSERVED: `scripts/` remains non-exempt. The fragment at
+`changelog.d/impact-map-currency.md:3` now describes the required error gate,
+summary collision rejection, and removal of obsolete currency metadata.
+`docs/impact-map.md:56` describes the required gate and `:69` explains destination
+protection and the local invalidation protocol.
+
+OBSERVED: `python3 scripts/check_changelog_diff.py origin/main HEAD`:
+
+```text
+CHANGELOG integrity guard passed: the entry requirement is satisfied or every changed path is non-shipping, and no PR-authored release structure was lost.
+
+exit code: 0
+```
+
+OBSERVED: `actionlint .github/workflows/tests.yml` produced no output;
+**exit code: 0**. `git diff --check` also exited 0 after trimming trailing
+whitespace in the copied pytest output. No runtime dependency was added.
+
+Not done in this review-fix pass: no cps implementation changes, case/oracle
+changes, mutation rerun, application/UI/container testing, deliberately failing
+hosted CI run, merge, or release. The original mutation observations remain
+historical evidence; they are not presented as a new measurement. Reused output
+directories are invalidated on failure, not replaced atomically. Concurrent
+refreshes must use separate directories.

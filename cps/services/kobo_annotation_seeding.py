@@ -20,6 +20,7 @@ from sqlalchemy.exc import IntegrityError
 
 from cps import ub
 from cps.services import kobo_annotation_stage0
+from cps.services.annotation_types import to_storage_type
 
 
 LOCAL_PAGE_CAPACITY = 100
@@ -802,6 +803,16 @@ def _reconcile_and_promote(capture_id, *, book, user, device_id, log):
             if baseline is None:
                 raise ValueError("captured annotation has no server baseline")
             applied = False
+            if equivalent_before and annotation.annotation_type is None:
+                native_type = to_storage_type(payload.get("type"))
+                if native_type is not None and len(native_type) <= 32:
+                    # Compatibility is not a write no-op: retain the captured
+                    # classification in generic storage too. Only fill absence;
+                    # every other field already agrees. Do not apply the whole
+                    # payload or let an older device clock suppress this proof.
+                    annotation.annotation_type = native_type
+                    annotation.content_revision = (annotation.content_revision or 1) + 1
+                    annotation.server_modified_at = _now()
             if not equivalent_before and _baseline_allows_insert(
                 baseline, annotation,
             ):

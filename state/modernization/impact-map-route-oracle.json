@@ -1,0 +1,5499 @@
+{
+  "oracle_id": "4143112e",
+  "reconciliation": {
+    "methodology": "static: ast-parsed @<blueprint_var>.route(...) and .add_url_rule(...) call sites under cps/, blueprint_var mapped to (flask blueprint name, url_prefix) via each module's `X = Blueprint('name', __name__[, url_prefix=...])` call site (verified by grep, listed in var_to_blueprint), rule joined with url_prefix using flask's own BlueprintSetupState.add_url_rule join rule. runtime: union of (rule,endpoint) pairs across the 4 DISTINCT manifest shapes (kobo x oauth; proxy and anon proven byte-identical to their peers -- see matrix-summary.json) at SHA 4813d2f71efbf7fbb7b8f79ac5cb2291087fec7d.",
+    "runtime_only": [
+      {
+        "endpoint": "generic.login",
+        "rule": "/login/generic",
+        "seen_in_shapes": [
+          "proxy_direct-kobo_off-oauth_on-anon_off",
+          "proxy_direct-kobo_on-oauth_on-anon_off"
+        ]
+      },
+      {
+        "endpoint": "generic.authorized",
+        "rule": "/login/generic/authorized",
+        "seen_in_shapes": [
+          "proxy_direct-kobo_off-oauth_on-anon_off",
+          "proxy_direct-kobo_on-oauth_on-anon_off"
+        ]
+      },
+      {
+        "endpoint": "github.login",
+        "rule": "/login/github",
+        "seen_in_shapes": [
+          "proxy_direct-kobo_off-oauth_on-anon_off",
+          "proxy_direct-kobo_on-oauth_on-anon_off"
+        ]
+      },
+      {
+        "endpoint": "github.authorized",
+        "rule": "/login/github/authorized",
+        "seen_in_shapes": [
+          "proxy_direct-kobo_off-oauth_on-anon_off",
+          "proxy_direct-kobo_on-oauth_on-anon_off"
+        ]
+      },
+      {
+        "endpoint": "google.login",
+        "rule": "/login/google",
+        "seen_in_shapes": [
+          "proxy_direct-kobo_off-oauth_on-anon_off",
+          "proxy_direct-kobo_on-oauth_on-anon_off"
+        ]
+      },
+      {
+        "endpoint": "google.authorized",
+        "rule": "/login/google/authorized",
+        "seen_in_shapes": [
+          "proxy_direct-kobo_off-oauth_on-anon_off",
+          "proxy_direct-kobo_on-oauth_on-anon_off"
+        ]
+      },
+      {
+        "endpoint": "static",
+        "rule": "/static/<path:filename>",
+        "seen_in_shapes": [
+          "proxy_direct-kobo_off-oauth_off-anon_off",
+          "proxy_direct-kobo_off-oauth_on-anon_off",
+          "proxy_direct-kobo_on-oauth_off-anon_off",
+          "proxy_direct-kobo_on-oauth_on-anon_off"
+        ]
+      }
+    ],
+    "runtime_union_distinct_keys": 528,
+    "static_distinct_keys": 521,
+    "static_only": [],
+    "static_total_records": 521,
+    "unmapped_static_records": [],
+    "var_to_blueprint": {
+      "about": {
+        "name": "about",
+        "url_prefix": null
+      },
+      "admi": {
+        "name": "admin",
+        "url_prefix": null
+      },
+      "annotations_bp": {
+        "name": "annotations",
+        "url_prefix": null
+      },
+      "api_v1": {
+        "name": "api_v1",
+        "url_prefix": "/api/v1"
+      },
+      "convert_library": {
+        "name": "convert_library",
+        "url_prefix": null
+      },
+      "cover_enforcer_ui": {
+        "name": "cover_enforcer_ui",
+        "url_prefix": null
+      },
+      "cover_picker": {
+        "name": "cover_picker",
+        "url_prefix": null
+      },
+      "cover_preview_bp": {
+        "name": "cover_preview_bp",
+        "url_prefix": null
+      },
+      "cwa_check_status": {
+        "name": "cwa_check_status",
+        "url_prefix": null
+      },
+      "cwa_internal": {
+        "name": "cwa_internal",
+        "url_prefix": null
+      },
+      "cwa_logs": {
+        "name": "cwa_logs",
+        "url_prefix": null
+      },
+      "cwa_settings": {
+        "name": "cwa_settings",
+        "url_prefix": null
+      },
+      "cwa_stats": {
+        "name": "cwa_stats",
+        "url_prefix": null
+      },
+      "duplicates": {
+        "name": "duplicates",
+        "url_prefix": null
+      },
+      "editbook": {
+        "name": "edit-book",
+        "url_prefix": null
+      },
+      "epub_fixer": {
+        "name": "epub_fixer",
+        "url_prefix": null
+      },
+      "gdrive": {
+        "name": "gdrive",
+        "url_prefix": "/gdrive"
+      },
+      "jinjia": {
+        "name": "jinjia",
+        "url_prefix": null
+      },
+      "kobo": {
+        "name": "kobo",
+        "url_prefix": "/kobo/<auth_token>"
+      },
+      "kobo_auth": {
+        "name": "kobo_auth",
+        "url_prefix": "/kobo_auth"
+      },
+      "kosync": {
+        "name": "kosync",
+        "url_prefix": null
+      },
+      "library_refresh": {
+        "name": "library_refresh",
+        "url_prefix": null
+      },
+      "meta": {
+        "name": "metadata",
+        "url_prefix": null
+      },
+      "oauth": {
+        "name": "oauth",
+        "url_prefix": null
+      },
+      "opds": {
+        "name": "opds",
+        "url_prefix": null
+      },
+      "profile_pictures": {
+        "name": "profile_pictures",
+        "url_prefix": null
+      },
+      "readingservices_api_v3": {
+        "name": "readingservices_api_v3",
+        "url_prefix": "/api/v3"
+      },
+      "readingservices_userstorage": {
+        "name": "readingservices_userstorage",
+        "url_prefix": "/api/UserStorage"
+      },
+      "remotelogin": {
+        "name": "remotelogin",
+        "url_prefix": null
+      },
+      "search": {
+        "name": "search",
+        "url_prefix": null
+      },
+      "shelf": {
+        "name": "shelf",
+        "url_prefix": null
+      },
+      "spa": {
+        "name": "spa",
+        "url_prefix": null
+      },
+      "switch_theme": {
+        "name": "switch_theme",
+        "url_prefix": null
+      },
+      "tasks": {
+        "name": "tasks",
+        "url_prefix": null
+      },
+      "web": {
+        "name": "web",
+        "url_prefix": null
+      }
+    }
+  },
+  "schema_version": 1,
+  "source_repo_sha": "4813d2f71efbf7fbb7b8f79ac5cb2291087fec7d",
+  "static_routes": {
+    "count": 521,
+    "errors": [],
+    "records": [
+      {
+        "blueprint_var": "about",
+        "file": "cps/about.py",
+        "func": "package_versions",
+        "line": 51,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/package-versions"
+      },
+      {
+        "blueprint_var": "about",
+        "file": "cps/about.py",
+        "func": "stats",
+        "line": 62,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/stats"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "shutdown",
+        "line": 211,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shutdown"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "queue_metadata_backup",
+        "line": 240,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/metadata_backup"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "trigger_hardcover_auto_fetch",
+        "line": 251,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/hardcover_auto_fetch"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "hardcover_review_matches",
+        "line": 304,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/hardcover/review-matches"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "hardcover_review_action",
+        "line": 350,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/hardcover/review-action"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "hardcover_review_reject_all",
+        "line": 454,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/hardcover/review-reject-all"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "reconnect",
+        "line": 499,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/reconnect"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "update_thumbnails",
+        "line": 509,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/updateThumbnails"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "admin",
+        "line": 623,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/view"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "db_configuration",
+        "line": 649,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/admin/dbconfig"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "configuration",
+        "line": 658,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/config"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "ajax_config",
+        "line": 681,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/ajaxconfig"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "ajax_db_config",
+        "line": 688,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/ajaxdbconfig"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "calibreweb_alive",
+        "line": 695,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/alive"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "view_configuration",
+        "line": 702,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/viewconfig"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "edit_user_table",
+        "line": 719,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/usertable"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "list_users",
+        "line": 762,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/listusers"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "delete_user",
+        "line": 813,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/deleteuser"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "table_get_locale",
+        "line": 848,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/getlocale"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "table_get_default_lang",
+        "line": 860,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/getdefaultlanguage"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "edit_list_user",
+        "line": 872,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/editlistusers/<param>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "update_table_settings",
+        "line": 1012,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/user_table_settings"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "update_view_configuration",
+        "line": 1029,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/viewconfig"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "load_dialogtexts",
+        "line": 1099,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/loaddialogtexts/<element_id>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "edit_domain",
+        "line": 1137,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/editdomain/<int:allow>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "add_domain",
+        "line": 1156,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/adddomain/<int:allow>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "delete_domain",
+        "line": 1170,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/deletedomain"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "list_domain",
+        "line": 1188,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/domainlist/<int:allow>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "edit_restriction",
+        "line": 1200,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/editrestriction/<int:res_type>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "edit_restriction",
+        "line": 1201,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/editrestriction/<int:res_type>/<int:user_id>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "add_user_0_restriction",
+        "line": 1267,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/addrestriction/<int:res_type>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "add_restriction",
+        "line": 1274,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/addrestriction/<int:res_type>/<int:user_id>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "delete_user_0_restriction",
+        "line": 1318,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/deleterestriction/<int:res_type>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "delete_restriction",
+        "line": 1325,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/deleterestriction/<int:res_type>/<int:user_id>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "list_restriction",
+        "line": 1370,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/listrestriction/<int:res_type>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "list_restriction",
+        "line": 1371,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/listrestriction/<int:res_type>/<int:user_id>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "ajax_self_fullsync",
+        "line": 1415,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/fullsync"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "ajax_fullsync",
+        "line": 1421,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/fullsync/<int:userid>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "ajax_pathchooser",
+        "line": 1428,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/pathchooser/"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "ajax_kobo_resend",
+        "line": 1456,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/kobo_resend/<int:userid>/<int:bookid>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "kobo_reconcile",
+        "line": 1588,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/admin/user/<int:user_id>/kobo-reconcile"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "kobo_reconcile_confirm",
+        "line": 1630,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/user/<int:user_id>/kobo-reconcile/confirm"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "simulatedbchange",
+        "line": 2102,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/simulatedbchange"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "new_user",
+        "line": 2110,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/admin/user/new"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "edit_mailsettings",
+        "line": 2140,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/mailsettings"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "update_mailsettings",
+        "line": 2149,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/mailsettings"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "broadcast_email",
+        "line": 2255,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/broadcast"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "send_broadcast",
+        "line": 2262,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/broadcast"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "edit_scheduledtasks",
+        "line": 2319,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/scheduledtasks"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "update_scheduledtasks",
+        "line": 2340,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/scheduledtasks"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "edit_user",
+        "line": 2441,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/admin/user/<int:user_id>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "reset_user_password",
+        "line": 2507,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/resetpassword/<int:user_id>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "view_logfile",
+        "line": 2525,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/logfile"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "send_logfile",
+        "line": 2539,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/log/<int:logtype>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "download_log",
+        "line": 2555,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/logdownload/<int:logtype>"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "download_debug",
+        "line": 2570,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/debug"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "download_support_pack",
+        "line": 2577,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/debug/support-pack"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "get_update_status",
+        "line": 2587,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/get_update_status"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "get_updater_status",
+        "line": 2598,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/get_updater_status"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "import_ldap_users",
+        "line": 2697,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/import_ldap_users"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "cancel_task",
+        "line": 2752,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/canceltask"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "test_oidc",
+        "line": 3512,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/test_oidc"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "test_metadata",
+        "line": 3563,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/test_metadata"
+      },
+      {
+        "blueprint_var": "admi",
+        "file": "cps/admin.py",
+        "func": "restore_calibre_db",
+        "line": 3672,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/restore_calibre_db"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotation_devices_list",
+        "line": 881,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/api/annotations/devices"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotation_device_annotations",
+        "line": 963,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/api/annotations/devices/<public_id>/annotations"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotation_device_summary",
+        "line": 1059,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/api/annotations/devices/<public_id>/summary"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotation_device_positions",
+        "line": 1094,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/api/annotations/devices/<public_id>/positions"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotation_admin_devices",
+        "line": 1160,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/api/admin/devices"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotation_device_inventory",
+        "line": 1208,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/api/annotations/devices/<public_id>/inventory"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotation_device_inventory_delete",
+        "line": 1299,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/api/annotations/devices/<public_id>/inventory/<int:item_id>/delete"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotation_device_rename",
+        "line": 1350,
+        "methods": [
+          "PATCH"
+        ],
+        "rule": "/api/annotations/devices/<public_id>"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotation_device_delete_preflight",
+        "line": 1368,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/api/annotations/devices/<public_id>/delete-preflight"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotation_device_delete",
+        "line": 1382,
+        "methods": [
+          "DELETE"
+        ],
+        "rule": "/api/annotations/devices/<public_id>"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotation_device_restore",
+        "line": 1399,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/api/annotations/devices/<public_id>/restore"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotations_import_form",
+        "line": 1417,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/annotations/import"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotations_import_submit",
+        "line": 1428,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/annotations/import"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotations_data",
+        "line": 2207,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/annotations/<int:book_id>/data.json"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotations_view",
+        "line": 2246,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/annotations/<int:book_id>"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotations_export_markdown",
+        "line": 2265,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/annotations/<int:book_id>/export.md"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotations_export_csv",
+        "line": 2279,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/annotations/<int:book_id>/export.csv"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotations_export_json",
+        "line": 2293,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/annotations/<int:book_id>/export.json"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotations_create",
+        "line": 2709,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/annotations/<int:book_id>"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotations_edit",
+        "line": 2742,
+        "methods": [
+          "PATCH"
+        ],
+        "rule": "/annotations/<int:book_id>/<annotation_id>"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotation_assignments_bulk",
+        "line": 2800,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/api/annotations/assignments/bulk"
+      },
+      {
+        "blueprint_var": "annotations_bp",
+        "file": "cps/annotations.py",
+        "func": "annotations_delete",
+        "line": 2817,
+        "methods": [
+          "DELETE"
+        ],
+        "rule": "/annotations/<int:book_id>/<annotation_id>"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/__init__.py",
+        "func": "health",
+        "line": 182,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/health"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/account.py",
+        "func": "get_account",
+        "line": 115,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/account"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/account.py",
+        "func": "update_library_mode",
+        "line": 124,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/account/library-mode"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/account.py",
+        "func": "dismiss_my_library_intro",
+        "line": 153,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/account/my-library-intro/dismiss"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/account.py",
+        "func": "update_profile",
+        "line": 163,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/account/profile"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/account.py",
+        "func": "change_password",
+        "line": 246,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/account/password"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/account.py",
+        "func": "create_app_password",
+        "line": 277,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/account/app-passwords"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/account.py",
+        "func": "revoke_app_password",
+        "line": 302,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/account/app-passwords/<int:app_password_id>/delete"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/account.py",
+        "func": "update_sidebar",
+        "line": 322,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/account/sidebar"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/account.py",
+        "func": "update_named_preferences",
+        "line": 397,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/account/preferences"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/actions.py",
+        "func": "get_my_book_cover",
+        "line": 74,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/books/<int:book_id>/my-cover"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/actions.py",
+        "func": "get_my_book_cover_image",
+        "line": 88,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/books/<int:book_id>/my-cover/image"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/actions.py",
+        "func": "set_my_book_cover",
+        "line": 103,
+        "methods": [
+          "PUT"
+        ],
+        "rule": "/books/<int:book_id>/my-cover"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/actions.py",
+        "func": "clear_my_book_cover",
+        "line": 176,
+        "methods": [
+          "DELETE"
+        ],
+        "rule": "/books/<int:book_id>/my-cover"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/actions.py",
+        "func": "toggle_book_favorite",
+        "line": 198,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/<int:book_id>/favorite"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/actions.py",
+        "func": "add_book_to_my_library",
+        "line": 219,
+        "methods": [
+          "PUT"
+        ],
+        "rule": "/books/<int:book_id>/my-library"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/actions.py",
+        "func": "my_library_removal_impact",
+        "line": 233,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/books/<int:book_id>/my-library"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/actions.py",
+        "func": "remove_book_from_my_library",
+        "line": 248,
+        "methods": [
+          "DELETE"
+        ],
+        "rule": "/books/<int:book_id>/my-library"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/actions.py",
+        "func": "batch_my_library_membership",
+        "line": 271,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/my-library/batch"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/actions.py",
+        "func": "toggle_book_archived",
+        "line": 368,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/<int:book_id>/archived"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/actions.py",
+        "func": "toggle_book_hidden",
+        "line": 382,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/<int:book_id>/hidden"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/actions.py",
+        "func": "send_book_to_ereader",
+        "line": 420,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/<int:book_id>/send"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/actions.py",
+        "func": "queue_book_for_device",
+        "line": 461,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/<int:book_id>/device-deliveries"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_list_users",
+        "line": 87,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/users"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_migrate_my_library",
+        "line": 101,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/my-library/migrate"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_my_library_intro_state",
+        "line": 151,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/my-library/intro"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_my_library_intro_enable",
+        "line": 161,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/my-library/intro/enable"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_my_library_intro_undo",
+        "line": 178,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/my-library/intro/undo"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_my_library_intro_dismiss",
+        "line": 192,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/my-library/intro/dismiss"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_add_book_to_user_library",
+        "line": 206,
+        "methods": [
+          "PUT"
+        ],
+        "rule": "/admin/users/<int:user_id>/my-library/<int:book_id>"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_reset_user_password",
+        "line": 232,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/users/<int:user_id>/reset-password"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_get_mail",
+        "line": 293,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/mailsettings"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_update_mail",
+        "line": 303,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/mailsettings"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_get_config",
+        "line": 337,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/config"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_update_config",
+        "line": 347,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/config"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_create_user",
+        "line": 379,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/users"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_update_user",
+        "line": 450,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/users/<int:user_id>"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin.py",
+        "func": "admin_delete_user",
+        "line": 535,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/users/<int:user_id>/delete"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin_security.py",
+        "func": "admin_get_security",
+        "line": 188,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/security"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/admin_security.py",
+        "func": "admin_update_security",
+        "line": 215,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/security"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/auth.py",
+        "func": "auth_csrf",
+        "line": 163,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/auth/csrf"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/auth.py",
+        "func": "auth_me",
+        "line": 250,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/auth/me"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/auth.py",
+        "func": "auth_login",
+        "line": 269,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/auth/login"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/auth.py",
+        "func": "auth_logout",
+        "line": 346,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/auth/logout"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/auth.py",
+        "func": "auth_config",
+        "line": 352,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/auth/config"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/auth.py",
+        "func": "auth_magic_link_start",
+        "line": 398,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/auth/magic-link/start"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/auth.py",
+        "func": "auth_magic_link_poll",
+        "line": 429,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/auth/magic-link/poll"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/auth.py",
+        "func": "auth_register",
+        "line": 472,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/auth/register"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/auth.py",
+        "func": "auth_forgot",
+        "line": 534,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/auth/forgot"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/books.py",
+        "func": "list_books",
+        "line": 239,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/books"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/books.py",
+        "func": "list_global_library",
+        "line": 405,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/library/global"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/books.py",
+        "func": "book_detail",
+        "line": 484,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/books/<int:book_id>"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/books.py",
+        "func": "toggle_book_read",
+        "line": 582,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/<int:book_id>/read"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/browse.py",
+        "func": "list_authors",
+        "line": 16,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/authors"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/browse.py",
+        "func": "list_series",
+        "line": 30,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/series"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/browse.py",
+        "func": "list_tags",
+        "line": 44,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/tags"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/browse.py",
+        "func": "rename_tag",
+        "line": 67,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/tags/<int:tag_id>"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/browse.py",
+        "func": "delete_tag",
+        "line": 153,
+        "methods": [
+          "DELETE"
+        ],
+        "rule": "/tags/<int:tag_id>"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/browse.py",
+        "func": "list_publishers",
+        "line": 190,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/publishers"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/browse.py",
+        "func": "list_languages",
+        "line": 204,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/languages"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/browse.py",
+        "func": "list_ratings",
+        "line": 213,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ratings"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/browse.py",
+        "func": "list_formats",
+        "line": 229,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/formats"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/comic.py",
+        "func": "comic_info",
+        "line": 69,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/books/<int:book_id>/comic"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/comic.py",
+        "func": "comic_page",
+        "line": 86,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/books/<int:book_id>/comic/<int:page>"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/duplicates.py",
+        "func": "list_duplicates",
+        "line": 36,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/duplicates"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/duplicates.py",
+        "func": "trigger_duplicate_scan",
+        "line": 81,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/duplicates/scan"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/edit.py",
+        "func": "get_metadata",
+        "line": 373,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/books/<int:book_id>/metadata"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/edit.py",
+        "func": "metadata_typeahead",
+        "line": 424,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/metadata/typeahead/<field>"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/edit.py",
+        "func": "update_metadata",
+        "line": 441,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/<int:book_id>/metadata"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/edit.py",
+        "func": "delete_book",
+        "line": 532,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/<int:book_id>/delete"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/edit.py",
+        "func": "delete_format",
+        "line": 550,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/<int:book_id>/formats/<fmt>/delete"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/edit.py",
+        "func": "convert_format",
+        "line": 564,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/<int:book_id>/convert"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/edit.py",
+        "func": "set_cover",
+        "line": 594,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/<int:book_id>/cover"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/i18n.py",
+        "func": "i18n_catalog",
+        "line": 107,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/i18n/<locale>.json"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/info.py",
+        "func": "about_info",
+        "line": 19,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/about"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/info.py",
+        "func": "tasks_list",
+        "line": 86,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/tasks"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/info.py",
+        "func": "cancel_task_api",
+        "line": 95,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/tasks/<task_id>/cancel"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/kobo_pairing.py",
+        "func": "get_kobo_sync_token",
+        "line": 73,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/account/kobo-sync-token"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/kobo_pairing.py",
+        "func": "get_kobo_sync_token",
+        "line": 74,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/users/<int:user_id>/kobo-sync-token"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/kobo_pairing.py",
+        "func": "create_kobo_sync_token",
+        "line": 82,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/account/kobo-sync-token"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/kobo_pairing.py",
+        "func": "create_kobo_sync_token",
+        "line": 83,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/users/<int:user_id>/kobo-sync-token"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/kobo_pairing.py",
+        "func": "delete_kobo_sync_token",
+        "line": 97,
+        "methods": [
+          "DELETE"
+        ],
+        "rule": "/account/kobo-sync-token"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/kobo_pairing.py",
+        "func": "delete_kobo_sync_token",
+        "line": 98,
+        "methods": [
+          "DELETE"
+        ],
+        "rule": "/admin/users/<int:user_id>/kobo-sync-token"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/kobo_two_way.py",
+        "func": "get_kobo_two_way_annotations",
+        "line": 129,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/account/kobo-two-way-annotations"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/kobo_two_way.py",
+        "func": "update_kobo_two_way_annotations",
+        "line": 137,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/account/kobo-two-way-annotations"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/kobo_two_way.py",
+        "func": "update_kobo_two_way_book",
+        "line": 192,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/account/kobo-two-way-annotations/books"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/kobo_two_way.py",
+        "func": "retry_quarantined_kobo_two_way_book",
+        "line": 247,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/account/kobo-two-way-annotations/books/retry"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/magicshelves.py",
+        "func": "list_magic_shelves",
+        "line": 58,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/magicshelves"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/magicshelves.py",
+        "func": "magic_shelf_rule_schema",
+        "line": 80,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/magicshelves/rule-schema"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/magicshelves.py",
+        "func": "magic_shelf_books",
+        "line": 87,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/magicshelf/<int:shelf_id>"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/magicshelves.py",
+        "func": "set_magic_shelf_kobo_sync",
+        "line": 124,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/magicshelf/<int:shelf_id>/kobo-sync"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/notices.py",
+        "func": "active_notices",
+        "line": 23,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/notices"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/notices.py",
+        "func": "dismiss_one_notice",
+        "line": 41,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/notices/<int:notice_id>/dismiss"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/notices.py",
+        "func": "dismiss_many_notices",
+        "line": 55,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/notices/dismiss"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/reader.py",
+        "func": "get_bookmark",
+        "line": 42,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/books/<int:book_id>/bookmark"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/reader.py",
+        "func": "save_bookmark",
+        "line": 54,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/<int:book_id>/bookmark"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/reader.py",
+        "func": "get_reader_settings",
+        "line": 117,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/reader/settings"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/reader.py",
+        "func": "save_reader_settings",
+        "line": 128,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/reader/settings"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/search.py",
+        "func": "search_options",
+        "line": 61,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/search/options"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/search.py",
+        "func": "advanced_search",
+        "line": 93,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/search/advanced"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/shelves.py",
+        "func": "list_shelves",
+        "line": 67,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/shelves"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/shelves.py",
+        "func": "shelf_detail",
+        "line": 89,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/shelves/<int:shelf_id>"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/shelves.py",
+        "func": "book_shelf_membership",
+        "line": 125,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/books/<int:book_id>/shelves"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/shelves.py",
+        "func": "create_shelf_api",
+        "line": 145,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shelves"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/shelves.py",
+        "func": "update_shelf_api",
+        "line": 174,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shelves/<int:shelf_id>"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/shelves.py",
+        "func": "delete_shelf_api",
+        "line": 227,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shelves/<int:shelf_id>/delete"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/shelves.py",
+        "func": "add_book_to_shelf_api",
+        "line": 246,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shelves/<int:shelf_id>/books/<int:book_id>"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/shelves.py",
+        "func": "remove_book_from_shelf_api",
+        "line": 290,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shelves/<int:shelf_id>/books/<int:book_id>/delete"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/shelves.py",
+        "func": "reorder_shelf_books_api",
+        "line": 312,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shelves/<int:shelf_id>/order"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/shelves.py",
+        "func": "add_series_to_shelf_api",
+        "line": 356,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shelves/<int:shelf_id>/series/<int:series_id>"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/upload.py",
+        "func": "upload_books",
+        "line": 62,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/upload"
+      },
+      {
+        "blueprint_var": "api_v1",
+        "file": "cps/api/upload.py",
+        "func": "add_format",
+        "line": 118,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/<int:book_id>/formats"
+      },
+      {
+        "blueprint_var": "cover_picker",
+        "file": "cps/cover_picker.py",
+        "func": "cover_picker_page",
+        "line": 140,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/book/<int:book_id>/cover"
+      },
+      {
+        "blueprint_var": "cover_picker",
+        "file": "cps/cover_picker.py",
+        "func": "cover_picker_state",
+        "line": 173,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/book/<int:book_id>/cover/state"
+      },
+      {
+        "blueprint_var": "cover_picker",
+        "file": "cps/cover_picker.py",
+        "func": "cover_picker_candidates",
+        "line": 193,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/book/<int:book_id>/cover/candidates"
+      },
+      {
+        "blueprint_var": "cover_picker",
+        "file": "cps/cover_picker.py",
+        "func": "cover_picker_preview",
+        "line": 231,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/book/<int:book_id>/cover/preview"
+      },
+      {
+        "blueprint_var": "cover_picker",
+        "file": "cps/cover_picker.py",
+        "func": "cover_picker_extract",
+        "line": 244,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/book/<int:book_id>/cover/extract"
+      },
+      {
+        "blueprint_var": "cover_picker",
+        "file": "cps/cover_picker.py",
+        "func": "cover_picker_apply",
+        "line": 263,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/book/<int:book_id>/cover/apply"
+      },
+      {
+        "blueprint_var": "cover_picker",
+        "file": "cps/cover_picker.py",
+        "func": "cover_picker_lock",
+        "line": 304,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/book/<int:book_id>/cover/lock"
+      },
+      {
+        "blueprint_var": "cover_picker",
+        "file": "cps/cover_picker.py",
+        "func": "cover_picker_ereader_preview",
+        "line": 337,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/book/<int:book_id>/cover/ereader-preview"
+      },
+      {
+        "blueprint_var": "cover_picker",
+        "file": "cps/cover_picker.py",
+        "func": "cover_picker_kobo_preview_legacy",
+        "line": 411,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/book/<int:book_id>/cover/kobo-preview"
+      },
+      {
+        "blueprint_var": "cover_preview_bp",
+        "file": "cps/cover_preview_blueprint.py",
+        "func": "set_my_preview_defaults",
+        "line": 110,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/me/cover/preview-defaults"
+      },
+      {
+        "blueprint_var": "cover_preview_bp",
+        "file": "cps/cover_preview_blueprint.py",
+        "func": "set_book_preview_settings",
+        "line": 138,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/book/<int:book_id>/cover/preview-settings"
+      },
+      {
+        "blueprint_var": "cover_preview_bp",
+        "file": "cps/cover_preview_blueprint.py",
+        "func": "toggle_book_preview_lock",
+        "line": 182,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/book/<int:book_id>/cover/preview-lock"
+      },
+      {
+        "blueprint_var": "cover_preview_bp",
+        "file": "cps/cover_preview_blueprint.py",
+        "func": "apply_preview_to_all",
+        "line": 217,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/me/cover/preview-apply-to-all"
+      },
+      {
+        "blueprint_var": "cover_preview_bp",
+        "file": "cps/cover_preview_blueprint.py",
+        "func": "bulk_apply_preview",
+        "line": 279,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/books/cover/preview-bulk-apply"
+      },
+      {
+        "blueprint_var": "cover_preview_bp",
+        "file": "cps/cover_preview_blueprint.py",
+        "func": "serve_cover_preview",
+        "line": 420,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cover/<int:book_id>/preview"
+      },
+      {
+        "blueprint_var": "switch_theme",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_switch_theme",
+        "line": 183,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/cwa-switch-theme"
+      },
+      {
+        "blueprint_var": "library_refresh",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_library_refresh",
+        "line": 296,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/cwa-library-refresh"
+      },
+      {
+        "blueprint_var": "library_refresh",
+        "file": "cps/cwa_functions.py",
+        "func": "get_library_refresh_messages",
+        "line": 311,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-library-refresh/messages"
+      },
+      {
+        "blueprint_var": "cwa_internal",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_internal_schedule_auto_send",
+        "line": 331,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/cwa-internal/schedule-auto-send"
+      },
+      {
+        "blueprint_var": "cwa_internal",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_internal_queue_duplicate_scan",
+        "line": 414,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/cwa-internal/queue-duplicate-scan"
+      },
+      {
+        "blueprint_var": "cwa_internal",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_internal_run_duplicate_scan",
+        "line": 438,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/cwa-internal/run-duplicate-scan"
+      },
+      {
+        "blueprint_var": "cwa_internal",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_internal_duplicate_scan_status",
+        "line": 479,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/cwa-internal/duplicate-scan-status"
+      },
+      {
+        "blueprint_var": "cwa_internal",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_internal_schedule_convert_library",
+        "line": 556,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/cwa-internal/schedule-convert-library"
+      },
+      {
+        "blueprint_var": "cwa_internal",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_internal_schedule_epub_fixer",
+        "line": 617,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/cwa-internal/schedule-epub-fixer"
+      },
+      {
+        "blueprint_var": "cwa_internal",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_internal_reconnect_db",
+        "line": 676,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/cwa-internal/reconnect-db"
+      },
+      {
+        "blueprint_var": "cwa_stats",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_scheduled_cancel",
+        "line": 709,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/cwa-scheduled/cancel"
+      },
+      {
+        "blueprint_var": "cwa_settings",
+        "file": "cps/cwa_functions.py",
+        "func": "set_cwa_settings",
+        "line": 755,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/cwa-settings"
+      },
+      {
+        "blueprint_var": "cwa_stats",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_stats_show",
+        "line": 1220,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/cwa-stats-show"
+      },
+      {
+        "blueprint_var": "cwa_stats",
+        "file": "cps/cwa_functions.py",
+        "func": "export_stats_csv",
+        "line": 1474,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-stats-export-csv/<tab_name>"
+      },
+      {
+        "blueprint_var": "cwa_stats",
+        "file": "cps/cwa_functions.py",
+        "func": "debug_stats_data",
+        "line": 1688,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-stats-debug"
+      },
+      {
+        "blueprint_var": "cwa_stats",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_scheduled_upcoming",
+        "line": 1778,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-scheduled/upcoming"
+      },
+      {
+        "blueprint_var": "cwa_stats",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_scheduled_upcoming_ops",
+        "line": 1792,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-scheduled/upcoming-ops"
+      },
+      {
+        "blueprint_var": "cwa_stats",
+        "file": "cps/cwa_functions.py",
+        "func": "show_full_enforcement",
+        "line": 1809,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/cwa-stats-show/full-enforcement"
+      },
+      {
+        "blueprint_var": "cwa_stats",
+        "file": "cps/cwa_functions.py",
+        "func": "show_full_enforcement_path",
+        "line": 1818,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/cwa-stats-show/full-enforcement-with-paths"
+      },
+      {
+        "blueprint_var": "cwa_stats",
+        "file": "cps/cwa_functions.py",
+        "func": "show_full_imports",
+        "line": 1827,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/cwa-stats-show/full-imports"
+      },
+      {
+        "blueprint_var": "cwa_stats",
+        "file": "cps/cwa_functions.py",
+        "func": "show_full_conversions",
+        "line": 1836,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/cwa-stats-show/full-conversions"
+      },
+      {
+        "blueprint_var": "cwa_stats",
+        "file": "cps/cwa_functions.py",
+        "func": "show_full_epub_fixer",
+        "line": 1845,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/cwa-stats-show/full-epub-fixer"
+      },
+      {
+        "blueprint_var": "cwa_stats",
+        "file": "cps/cwa_functions.py",
+        "func": "show_full_epub_fixer_with_paths_fixes",
+        "line": 1854,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/cwa-stats-show/full-epub-fixer-with-paths-fixes"
+      },
+      {
+        "blueprint_var": "cwa_check_status",
+        "file": "cps/cwa_functions.py",
+        "func": "cwa_flash_status",
+        "line": 1869,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/cwa-check-monitoring"
+      },
+      {
+        "blueprint_var": "cwa_logs",
+        "file": "cps/cwa_functions.py",
+        "func": "download_log",
+        "line": 1896,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-logs/download/<log_filename>"
+      },
+      {
+        "blueprint_var": "cwa_logs",
+        "file": "cps/cwa_functions.py",
+        "func": "read_log",
+        "line": 1922,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-logs/read/<log_filename>"
+      },
+      {
+        "blueprint_var": "convert_library",
+        "file": "cps/cwa_functions.py",
+        "func": "show_convert_library_page",
+        "line": 2059,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-convert-library-overview"
+      },
+      {
+        "blueprint_var": "convert_library",
+        "file": "cps/cwa_functions.py",
+        "func": "schedule_convert_library",
+        "line": 2066,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-convert-library/schedule/<int:delay>"
+      },
+      {
+        "blueprint_var": "convert_library",
+        "file": "cps/cwa_functions.py",
+        "func": "show_convert_library_logs",
+        "line": 2085,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-convert-library/log-archive"
+      },
+      {
+        "blueprint_var": "convert_library",
+        "file": "cps/cwa_functions.py",
+        "func": "download_current_log",
+        "line": 2094,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-convert-library/download-current-log/<log_filename>"
+      },
+      {
+        "blueprint_var": "convert_library",
+        "file": "cps/cwa_functions.py",
+        "func": "start_conversion",
+        "line": 2122,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-convert-library-start"
+      },
+      {
+        "blueprint_var": "convert_library",
+        "file": "cps/cwa_functions.py",
+        "func": "cancel_convert_library",
+        "line": 2143,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/convert-library-cancel"
+      },
+      {
+        "blueprint_var": "convert_library",
+        "file": "cps/cwa_functions.py",
+        "func": "get_status",
+        "line": 2151,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/convert-library-status"
+      },
+      {
+        "blueprint_var": "epub_fixer",
+        "file": "cps/cwa_functions.py",
+        "func": "show_epub_fixer_page",
+        "line": 2213,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-epub-fixer-overview"
+      },
+      {
+        "blueprint_var": "epub_fixer",
+        "file": "cps/cwa_functions.py",
+        "func": "schedule_epub_fixer",
+        "line": 2219,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-epub-fixer/schedule/<int:delay>"
+      },
+      {
+        "blueprint_var": "epub_fixer",
+        "file": "cps/cwa_functions.py",
+        "func": "show_epub_fixer_logs",
+        "line": 2237,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-epub-fixer/log-archive"
+      },
+      {
+        "blueprint_var": "epub_fixer",
+        "file": "cps/cwa_functions.py",
+        "func": "download_current_log",
+        "line": 2246,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-epub-fixer/download-current-log/<log_filename>"
+      },
+      {
+        "blueprint_var": "epub_fixer",
+        "file": "cps/cwa_functions.py",
+        "func": "start_epub_fixer",
+        "line": 2274,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-epub-fixer-start"
+      },
+      {
+        "blueprint_var": "epub_fixer",
+        "file": "cps/cwa_functions.py",
+        "func": "run_epub_fixer_for_book",
+        "line": 2296,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/cwa-epub-fixer/run-book"
+      },
+      {
+        "blueprint_var": "epub_fixer",
+        "file": "cps/cwa_functions.py",
+        "func": "cancel_epub_fixer",
+        "line": 2344,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/epub-fixer-cancel"
+      },
+      {
+        "blueprint_var": "epub_fixer",
+        "file": "cps/cwa_functions.py",
+        "func": "get_status",
+        "line": 2360,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/epub-fixer-status"
+      },
+      {
+        "blueprint_var": "cover_enforcer_ui",
+        "file": "cps/cwa_functions.py",
+        "func": "show_cover_enforcer_page",
+        "line": 2621,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-cover-enforcer-overview"
+      },
+      {
+        "blueprint_var": "cover_enforcer_ui",
+        "file": "cps/cwa_functions.py",
+        "func": "show_cover_enforcer_logs",
+        "line": 2627,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-cover-enforcer/log-archive"
+      },
+      {
+        "blueprint_var": "cover_enforcer_ui",
+        "file": "cps/cwa_functions.py",
+        "func": "download_current_log",
+        "line": 2636,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cwa-cover-enforcer/download-current-log/<log_filename>"
+      },
+      {
+        "blueprint_var": "cover_enforcer_ui",
+        "file": "cps/cwa_functions.py",
+        "func": "start_cover_enforcer",
+        "line": 2669,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/cwa-cover-enforcer-start"
+      },
+      {
+        "blueprint_var": "cover_enforcer_ui",
+        "file": "cps/cwa_functions.py",
+        "func": "cancel_cover_enforcer",
+        "line": 2710,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/cover-enforcer-cancel"
+      },
+      {
+        "blueprint_var": "cover_enforcer_ui",
+        "file": "cps/cwa_functions.py",
+        "func": "get_status",
+        "line": 2723,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cover-enforcer-status"
+      },
+      {
+        "blueprint_var": "profile_pictures",
+        "file": "cps/cwa_functions.py",
+        "func": "user_profiles_json",
+        "line": 2756,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/user_profiles.json"
+      },
+      {
+        "blueprint_var": "profile_pictures",
+        "file": "cps/cwa_functions.py",
+        "func": "set_profile_picture",
+        "line": 2761,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/me/profile-picture"
+      },
+      {
+        "blueprint_var": "duplicates",
+        "file": "cps/duplicates.py",
+        "func": "show_duplicates",
+        "line": 573,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/duplicates"
+      },
+      {
+        "blueprint_var": "duplicates",
+        "file": "cps/duplicates.py",
+        "func": "get_duplicate_status",
+        "line": 1135,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/duplicates/status"
+      },
+      {
+        "blueprint_var": "duplicates",
+        "file": "cps/duplicates.py",
+        "func": "dismiss_duplicate_scan_setup_notice",
+        "line": 1272,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/duplicates/dismiss-setup-notice"
+      },
+      {
+        "blueprint_var": "duplicates",
+        "file": "cps/duplicates.py",
+        "func": "dismiss_duplicate_group",
+        "line": 1308,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/duplicates/dismiss/<group_hash>"
+      },
+      {
+        "blueprint_var": "duplicates",
+        "file": "cps/duplicates.py",
+        "func": "undismiss_duplicate_group",
+        "line": 1377,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/duplicates/undismiss/<group_hash>"
+      },
+      {
+        "blueprint_var": "duplicates",
+        "file": "cps/duplicates.py",
+        "func": "invalidate_cache",
+        "line": 1429,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/duplicates/invalidate-cache"
+      },
+      {
+        "blueprint_var": "duplicates",
+        "file": "cps/duplicates.py",
+        "func": "trigger_scan",
+        "line": 1450,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/duplicates/trigger-scan"
+      },
+      {
+        "blueprint_var": "duplicates",
+        "file": "cps/duplicates.py",
+        "func": "preview_resolution",
+        "line": 1582,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/duplicates/preview-resolution"
+      },
+      {
+        "blueprint_var": "duplicates",
+        "file": "cps/duplicates.py",
+        "func": "execute_resolution",
+        "line": 1630,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/duplicates/execute-resolution"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "delete_book_from_details",
+        "line": 80,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/delete/<int:book_id>"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "delete_book_ajax",
+        "line": 86,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/delete/<int:book_id>"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "delete_book_ajax",
+        "line": 87,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/delete/<int:book_id>/<string:book_format>"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "show_edit_book",
+        "line": 93,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/admin/book/<int:book_id>"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "edit_book",
+        "line": 100,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/book/<int:book_id>"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "upload",
+        "line": 107,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/upload"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "convert_bookformat",
+        "line": 212,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/book/convert/<int:book_id>"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "table_get_custom_enum",
+        "line": 237,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/getcustomenum/<int:c_id>"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "edit_list_book",
+        "line": 250,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/editbooks/<param>"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "edit_selected_books",
+        "line": 257,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/editselectedbooks"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "get_sorted_entry",
+        "line": 789,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/sort_value/<field>/<int:bookid>"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "simulate_merge_list_book",
+        "line": 810,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/simulatemerge"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "display_selected_books",
+        "line": 826,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/displayselectedbooks"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "archive_selected_books",
+        "line": 838,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/archiveselectedbooks"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "delete_selected_books",
+        "line": 853,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/deleteselectedbooks"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "read_selected_books",
+        "line": 865,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/readselectedbooks"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "merge_list_book",
+        "line": 884,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/mergebooks"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "table_xchange_author_title",
+        "line": 958,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/xchange"
+      },
+      {
+        "blueprint_var": "editbook",
+        "file": "cps/editbooks.py",
+        "func": "reload_metadata_from_disk",
+        "line": 2678,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/admin/book/<int:book_id>/reload_metadata"
+      },
+      {
+        "blueprint_var": "gdrive",
+        "file": "cps/gdrive.py",
+        "func": "authenticate_google_drive",
+        "line": 36,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/authenticate"
+      },
+      {
+        "blueprint_var": "gdrive",
+        "file": "cps/gdrive.py",
+        "func": "google_drive_callback",
+        "line": 49,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/callback"
+      },
+      {
+        "blueprint_var": "gdrive",
+        "file": "cps/gdrive.py",
+        "func": "watch_gdrive",
+        "line": 63,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/watch/subscribe"
+      },
+      {
+        "blueprint_var": "gdrive",
+        "file": "cps/gdrive.py",
+        "func": "revoke_watch_gdrive",
+        "line": 89,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/watch/revoke"
+      },
+      {
+        "blueprint_var": "gdrive",
+        "file": "cps/gdrive.py",
+        "func": "on_received_watch_confirmation",
+        "line": 107,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/watch/callback"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "<add_url_rule>",
+        "line": 2790,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/v1/library/sync"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleMetadataRequest",
+        "line": 2855,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/v1/library/<book_uuid>/metadata"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleTagCreate",
+        "line": 3275,
+        "methods": [
+          "DELETE",
+          "POST"
+        ],
+        "rule": "/v1/library/tags"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleTagUpdate",
+        "line": 3315,
+        "methods": [
+          "DELETE",
+          "PUT"
+        ],
+        "rule": "/v1/library/tags/<tag_id>"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleTagAddItem",
+        "line": 3386,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/v1/library/tags/<tag_id>/items"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleTagRemoveItem",
+        "line": 3417,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/v1/library/tags/<tag_id>/items/delete"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleStateRequest",
+        "line": 3581,
+        "methods": [
+          "GET",
+          "PUT"
+        ],
+        "rule": "/v1/library/<book_uuid>/state"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleCoverImageRequest",
+        "line": 4070,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/<book_uuid>/<width>/<height>/<isGreyscale>/image.jpg"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleCoverImageRequest",
+        "line": 4071,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/<book_uuid>/<width>/<height>/<Quality>/<isGreyscale>/image.jpg"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "TopLevelEndpoint",
+        "line": 4139,
+        "methods": [
+          "GET"
+        ],
+        "rule": ""
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleBookDeletionRequest",
+        "line": 4145,
+        "methods": [
+          "DELETE"
+        ],
+        "rule": "/v1/library/<book_uuid>"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleUnimplementedRequest",
+        "line": 4177,
+        "methods": [
+          "DELETE",
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/library/<dummy>"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleUnimplementedRequest",
+        "line": 4178,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/v1/library/<dummy>/preview"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleUserRequest",
+        "line": 4188,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/user/loyalty/<dummy>"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleUserRequest",
+        "line": 4189,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/user/profile"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleUserRequest",
+        "line": 4190,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/user/wishlist"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleUserRequest",
+        "line": 4191,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/user/recommendations"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleUserRequest",
+        "line": 4192,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/analytics/<dummy>"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleUserRequest",
+        "line": 4193,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/v1/assets"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "handle_benefits",
+        "line": 4202,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/v1/user/loyalty/benefits"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "handle_getests",
+        "line": 4211,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/analytics/gettests"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4221,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/products/<dummy>/prices"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4222,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/products/<dummy>/recommendations"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4223,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/products/<dummy>/nextread"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4224,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/products/<dummy>/reviews"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4225,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/products/featured/<dummy>"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4226,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/products/featured/"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4227,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/products/books/external/<dummy>"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4228,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/products/books/series/<dummy>"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4229,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/products/books/<dummy>"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4230,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/products/books/<dummy>/"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4231,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/products/dailydeal"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4232,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/products/deals"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4233,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/v1/products/featuredforkoboplus/"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4234,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/products"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4235,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/affiliate"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4236,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/deals"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4237,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/categories/<dummy>"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4238,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/v1/categories/<dummy>/featured"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleProductsRequest",
+        "line": 4239,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/v1/categories/<dummy>/products"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleAuthRequest",
+        "line": 4288,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/v1/auth/device"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleOidcDiscovery",
+        "line": 4302,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/oauth/.well-known/openid-configuration"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleOauthRequest",
+        "line": 4320,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/oauth/token"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleOauthRequest",
+        "line": 4321,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/oauth/authorize"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleOauthRequest",
+        "line": 4322,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/oauth/refresh"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleOauthRequest",
+        "line": 4323,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/oauth/<path:subpath>"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "HandleInitRequest",
+        "line": 4330,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/v1/initialization"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "download_book",
+        "line": 4461,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/download/<book_id>/<book_format>"
+      },
+      {
+        "blueprint_var": "kobo",
+        "file": "cps/kobo.py",
+        "func": "redirect_download_book",
+        "line": 4468,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/redirect_download/<book_id>/<book_format>"
+      },
+      {
+        "blueprint_var": "kobo_auth",
+        "file": "cps/kobo_auth.py",
+        "func": "generate_auth_token",
+        "line": 109,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/generate_auth_token/<int:user_id>"
+      },
+      {
+        "blueprint_var": "kobo_auth",
+        "file": "cps/kobo_auth.py",
+        "func": "delete_auth_token",
+        "line": 140,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/deleteauthtoken/<int:user_id>"
+      },
+      {
+        "blueprint_var": "oauth",
+        "file": "cps/oauth_bb.py",
+        "func": "github_login",
+        "line": 1198,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/link/github"
+      },
+      {
+        "blueprint_var": "oauth",
+        "file": "cps/oauth_bb.py",
+        "func": "github_login_unlink",
+        "line": 1224,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/unlink/github"
+      },
+      {
+        "blueprint_var": "oauth",
+        "file": "cps/oauth_bb.py",
+        "func": "google_login",
+        "line": 1230,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/link/google"
+      },
+      {
+        "blueprint_var": "oauth",
+        "file": "cps/oauth_bb.py",
+        "func": "google_login_unlink",
+        "line": 1284,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/unlink/google"
+      },
+      {
+        "blueprint_var": "oauth",
+        "file": "cps/oauth_bb.py",
+        "func": "generic_login",
+        "line": 1290,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/link/generic"
+      },
+      {
+        "blueprint_var": "oauth",
+        "file": "cps/oauth_bb.py",
+        "func": "generic_login_unlink",
+        "line": 1325,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/unlink/generic"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_index",
+        "line": 553,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_index",
+        "line": 554,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_osd",
+        "line": 561,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/osd"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_cc_search",
+        "line": 585,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/search/<path:query>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_normal_search",
+        "line": 600,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/search"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_booksindex",
+        "line": 606,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/books"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_letter_books",
+        "line": 612,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/books/letter/<book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_new",
+        "line": 627,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/new"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_discover",
+        "line": 639,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/discover"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_best_rated",
+        "line": 651,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/rated"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_hot",
+        "line": 664,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/hot"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_authorindex",
+        "line": 688,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/author"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_letter_author",
+        "line": 696,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/author/letter/<book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_author",
+        "line": 714,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/author/<int:book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_publisherindex",
+        "line": 720,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/publisher"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_publisher",
+        "line": 737,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/publisher/<int:book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_categoryindex",
+        "line": 743,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/category"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_letter_category",
+        "line": 751,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/category/letter/<book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_category",
+        "line": 771,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/category/<int:book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_seriesindex",
+        "line": 777,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/series"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_letter_series",
+        "line": 785,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/series/letter/<book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_series",
+        "line": 805,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/series/<int:book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_ratingindex",
+        "line": 818,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/ratings"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_ratings",
+        "line": 840,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/ratings/<book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_formatindex",
+        "line": 846,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/formats"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_format",
+        "line": 864,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/formats/<book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_languagesindex",
+        "line": 877,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/language"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_languagesindex",
+        "line": 878,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/language/"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_languages",
+        "line": 901,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/language/<int:book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_shelfindex",
+        "line": 929,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/shelfindex"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_magic_shelfindex",
+        "line": 942,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/magicshelfindex"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_shelf",
+        "line": 967,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/shelf/<int:book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_magic_shelf",
+        "line": 1004,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/magicshelf/<int:shelf_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "opds_download_link",
+        "line": 1042,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/download/<book_id>/<book_format>/"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "get_metadata_calibre_companion",
+        "line": 1052,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/book/<string:uuid>/<library>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "get_metadata_calibre_companion",
+        "line": 1053,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/book/<string:uuid>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "get_database_stats",
+        "line": 1068,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/stats"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_get_cover",
+        "line": 1087,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/thumb_240_240/<book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_get_cover",
+        "line": 1088,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/cover_240_240/<book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_get_cover",
+        "line": 1089,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/cover_90_90/<book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_get_cover",
+        "line": 1090,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/cover/<book_id>"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_read_books",
+        "line": 1097,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/readbooks"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_currently_reading",
+        "line": 1110,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/currentlyreading"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "feed_unread_books",
+        "line": 1144,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/unreadbooks"
+      },
+      {
+        "blueprint_var": "opds",
+        "file": "cps/opds.py",
+        "func": "_opds_feed_not_found",
+        "line": 1198,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/opds/<path:_unknown>"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/koreader_annotations.py",
+        "func": "pull_annotations",
+        "line": 274,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/kosync/syncs/annotations/<document>"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/koreader_annotations.py",
+        "func": "push_annotations",
+        "line": 330,
+        "methods": [
+          "PUT"
+        ],
+        "rule": "/kosync/syncs/annotations"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "kosync_plugin_page",
+        "line": 867,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/kosync"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "auth_user",
+        "line": 890,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/kosync/users/auth"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "get_progress",
+        "line": 920,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/kosync/syncs/progress/<document>"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "update_inventory",
+        "line": 1066,
+        "methods": [
+          "PUT"
+        ],
+        "rule": "/kosync/syncs/inventory"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "claim_delivery",
+        "line": 1262,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/kosync/syncs/deliveries/claim"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "refuse_device_delivery",
+        "line": 1340,
+        "methods": [
+          "PUT"
+        ],
+        "rule": "/kosync/syncs/deliveries/refuse"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "claim_device_deletion",
+        "line": 1392,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/kosync/syncs/deletions/claim"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "complete_device_deletion",
+        "line": 1417,
+        "methods": [
+          "PUT"
+        ],
+        "rule": "/kosync/syncs/deletions/complete"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "get_device_collections",
+        "line": 1448,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/kosync/syncs/collections"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "complete_device_collections",
+        "line": 1472,
+        "methods": [
+          "PUT"
+        ],
+        "rule": "/kosync/syncs/collections/complete"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "complete_device_delivery",
+        "line": 1497,
+        "methods": [
+          "PUT"
+        ],
+        "rule": "/kosync/syncs/deliveries/complete"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "download_device_delivery",
+        "line": 1564,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/kosync/syncs/deliveries/<int:delivery_id>/download"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "export_progress",
+        "line": 1724,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/kosync/export"
+      },
+      {
+        "blueprint_var": "kosync",
+        "file": "cps/progress_syncing/protocols/kosync.py",
+        "func": "update_progress",
+        "line": 1922,
+        "methods": [
+          "PUT"
+        ],
+        "rule": "/kosync/syncs/progress"
+      },
+      {
+        "blueprint_var": "readingservices_api_v3",
+        "file": "cps/readingservices.py",
+        "func": "handle_annotations",
+        "line": 1268,
+        "methods": [
+          "GET",
+          "PATCH"
+        ],
+        "rule": "/content/<entitlement_id>/annotations"
+      },
+      {
+        "blueprint_var": "readingservices_api_v3",
+        "file": "cps/readingservices.py",
+        "func": "handle_check_for_changes",
+        "line": 1507,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/content/checkforchanges"
+      },
+      {
+        "blueprint_var": "readingservices_userstorage",
+        "file": "cps/readingservices.py",
+        "func": "handle_user_storage",
+        "line": 1581,
+        "methods": [
+          "DELETE",
+          "GET",
+          "PATCH",
+          "POST",
+          "PUT"
+        ],
+        "rule": "/<path:subpath>"
+      },
+      {
+        "blueprint_var": "readingservices_api_v3",
+        "file": "cps/readingservices.py",
+        "func": "handle_unknown_reading_service_request",
+        "line": 1594,
+        "methods": [
+          "DELETE",
+          "GET",
+          "PATCH",
+          "POST",
+          "PUT"
+        ],
+        "rule": "/<path:subpath>"
+      },
+      {
+        "blueprint_var": "remotelogin",
+        "file": "cps/remotelogin.py",
+        "func": "remote_login",
+        "line": 52,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/remote/login"
+      },
+      {
+        "blueprint_var": "remotelogin",
+        "file": "cps/remotelogin.py",
+        "func": "verify_token",
+        "line": 85,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/verify/<token>"
+      },
+      {
+        "blueprint_var": "remotelogin",
+        "file": "cps/remotelogin.py",
+        "func": "token_verified",
+        "line": 116,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/verify_token"
+      },
+      {
+        "blueprint_var": "search",
+        "file": "cps/search.py",
+        "func": "simple_search",
+        "line": 30,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/search"
+      },
+      {
+        "blueprint_var": "search",
+        "file": "cps/search.py",
+        "func": "advanced_search",
+        "line": 58,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/advsearch"
+      },
+      {
+        "blueprint_var": "search",
+        "file": "cps/search.py",
+        "func": "advanced_search_form",
+        "line": 70,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/advsearch"
+      },
+      {
+        "blueprint_var": "meta",
+        "file": "cps/search_metadata.py",
+        "func": "metadata_keys",
+        "line": 204,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/metadata/keys"
+      },
+      {
+        "blueprint_var": "meta",
+        "file": "cps/search_metadata.py",
+        "func": "metadata_cover_preview",
+        "line": 226,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/metadata/cover/preview"
+      },
+      {
+        "blueprint_var": "meta",
+        "file": "cps/search_metadata.py",
+        "func": "metadata_keys_save",
+        "line": 238,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/metadata/keys/<prov_id>"
+      },
+      {
+        "blueprint_var": "meta",
+        "file": "cps/search_metadata.py",
+        "func": "metadata_provider",
+        "line": 262,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/metadata/provider"
+      },
+      {
+        "blueprint_var": "meta",
+        "file": "cps/search_metadata.py",
+        "func": "metadata_change_active_provider",
+        "line": 284,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/metadata/provider"
+      },
+      {
+        "blueprint_var": "meta",
+        "file": "cps/search_metadata.py",
+        "func": "metadata_change_active_provider",
+        "line": 285,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/metadata/provider/<prov_name>"
+      },
+      {
+        "blueprint_var": "meta",
+        "file": "cps/search_metadata.py",
+        "func": "metadata_search",
+        "line": 419,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/metadata/search"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "add_to_shelf",
+        "line": 330,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shelf/add/<int:shelf_id>/<int:book_id>"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "search_to_shelf",
+        "line": 419,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shelf/massadd/<int:shelf_id>"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "add_series_to_shelf",
+        "line": 472,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shelf/add_series/<int:shelf_id>/<int:series_id>"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "remove_from_shelf",
+        "line": 546,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shelf/remove/<int:shelf_id>/<int:book_id>"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "create_shelf",
+        "line": 599,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/shelf/create"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "edit_shelf",
+        "line": 606,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/shelf/edit/<int:shelf_id>"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "delete_shelf",
+        "line": 616,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shelf/delete/<int:shelf_id>"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "show_simpleshelf",
+        "line": 632,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/simpleshelf/<int:shelf_id>"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "show_shelf",
+        "line": 638,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/shelf/<int:shelf_id>"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "show_shelf",
+        "line": 639,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/shelf/<int:shelf_id>/<sort_param>"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "show_shelf",
+        "line": 640,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/shelf/<int:shelf_id>/<sort_param>/<int:page>"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "order_shelf",
+        "line": 646,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/shelf/order/<int:shelf_id>"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "add_selected_to_shelf",
+        "line": 935,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/shelf/add_selected_to_shelf"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "shelf_available_books",
+        "line": 1025,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/shelf/<int:shelf_id>/available_books"
+      },
+      {
+        "blueprint_var": "shelf",
+        "file": "cps/shelf.py",
+        "func": "reorder_shelves",
+        "line": 1259,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/shelf/reorder"
+      },
+      {
+        "blueprint_var": "spa",
+        "file": "cps/spa.py",
+        "func": "spa_shell",
+        "line": 389,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/app"
+      },
+      {
+        "blueprint_var": "spa",
+        "file": "cps/spa.py",
+        "func": "spa_shell",
+        "line": 390,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/app/"
+      },
+      {
+        "blueprint_var": "spa",
+        "file": "cps/spa.py",
+        "func": "spa_shell",
+        "line": 391,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/app/<path:path>"
+      },
+      {
+        "blueprint_var": "tasks",
+        "file": "cps/tasks_status.py",
+        "func": "get_email_status_json",
+        "line": 26,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/emailstat"
+      },
+      {
+        "blueprint_var": "tasks",
+        "file": "cps/tasks_status.py",
+        "func": "get_tasks_status",
+        "line": 33,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/tasks"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "get_email_status_json",
+        "line": 269,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/emailstat"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "set_bookmark",
+        "line": 276,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/bookmark/<int:book_id>/<book_format>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "toggle_read",
+        "line": 342,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/toggleread/<int:book_id>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "toggle_archived",
+        "line": 352,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/togglearchived/<int:book_id>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "toggle_favorite",
+        "line": 364,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/togglefavorite/<int:book_id>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "add_to_my_library",
+        "line": 380,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/mylibrary/<int:book_id>/add"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "remove_from_my_library",
+        "line": 391,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/mylibrary/<int:book_id>/remove"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "my_library_removal_impact",
+        "line": 407,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/mylibrary/<int:book_id>/removal-impact"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "toggle_hidden",
+        "line": 429,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/togglehidden/<int:book_id>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "update_view",
+        "line": 467,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/view"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "get_authors_json",
+        "line": 533,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/get_authors_json"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "get_publishers_json",
+        "line": 539,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/get_publishers_json"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "get_tags_json",
+        "line": 545,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/get_tags_json"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "get_series_json",
+        "line": 551,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/get_series_json"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "get_languages_json",
+        "line": 557,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/get_languages_json"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "get_matching_tags",
+        "line": 571,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/get_matching_tags"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "render_magic_shelf",
+        "line": 1225,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/magicshelf/<int:shelf_id>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "render_magic_shelf",
+        "line": 1226,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/magicshelf/<int:shelf_id>/<sort_param>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "render_magic_shelf",
+        "line": 1227,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/magicshelf/<int:shelf_id>/<sort_param>/<int:page>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "health_check",
+        "line": 1514,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/health"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "index",
+        "line": 1562,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "index",
+        "line": 1563,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/page/<int:page>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "global_library",
+        "line": 1593,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/global-library"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "global_library",
+        "line": 1594,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/global-library/<sort_param>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "global_library",
+        "line": 1595,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/global-library/<sort_param>/<int:page>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "books_list",
+        "line": 1639,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/<data>/<sort_param>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "books_list",
+        "line": 1640,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/<data>/<sort_param>/"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "books_list",
+        "line": 1641,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/<data>/<sort_param>/<book_id>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "books_list",
+        "line": 1642,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/<data>/<sort_param>/<book_id>/<int:page>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "hidden_books_redirect",
+        "line": 1648,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/hidden"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "preview_magic_shelf",
+        "line": 1657,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/magicshelf/preview"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "create_magic_shelf",
+        "line": 1701,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/magicshelf"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "edit_magic_shelf",
+        "line": 1805,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/magicshelf/<int:shelf_id>/edit"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "duplicate_magic_shelf",
+        "line": 1933,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/magicshelf/<int:shelf_id>/duplicate"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "delete_magic_shelf",
+        "line": 1985,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/magicshelf/<int:shelf_id>/delete"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "hide_magic_shelf",
+        "line": 2022,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/magicshelf/<int:shelf_id>/hide"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "unhide_magic_shelf",
+        "line": 2062,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/magicshelf/<int:shelf_id>/unhide"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "books_table",
+        "line": 2085,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/table"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "list_books",
+        "line": 2094,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ajax/listbooks"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "update_table_settings",
+        "line": 2191,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/ajax/table_settings"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "author_list",
+        "line": 2207,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/author"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "download_list",
+        "line": 2227,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/downloadlist"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "publisher_list",
+        "line": 2248,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/publisher"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "series_list",
+        "line": 2289,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/series"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "ratings_list",
+        "line": 2334,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/ratings"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "formats_list",
+        "line": 2373,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/formats"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "language_overview",
+        "line": 2400,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/language"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "category_list",
+        "line": 2413,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/category"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "get_cover",
+        "line": 2446,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cover/<int:book_id>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "get_cover",
+        "line": 2447,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/cover/<int:book_id>/<string:resolution>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "get_series_cover",
+        "line": 2460,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/series_cover/<int:series_id>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "get_series_cover",
+        "line": 2461,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/series_cover/<int:series_id>/<string:resolution>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "get_robots",
+        "line": 2475,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/robots.txt"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "serve_book",
+        "line": 2578,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/show/<int:book_id>/<book_format>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "serve_book",
+        "line": 2579,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/show/<int:book_id>/<book_format>/<anyname>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "download_link",
+        "line": 2646,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/download/<int:book_id>/<book_format>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "download_link",
+        "line": 2647,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/download/<int:book_id>/<book_format>/<anyname>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "send_to_ereader",
+        "line": 2655,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/send/<int:book_id>/<book_format>/<int:convert>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "send_to_selected_ereaders",
+        "line": 2694,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/send_selected/<int:book_id>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "register_post",
+        "line": 2775,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/register"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "register",
+        "line": 2843,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/register"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "login",
+        "line": 2920,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/login"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "login_post",
+        "line": 2998,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/login"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "logout",
+        "line": 3166,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/logout"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "profile",
+        "line": 3502,
+        "methods": [
+          "GET",
+          "POST"
+        ],
+        "rule": "/me"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "app_password_create",
+        "line": 3623,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/me/app-passwords"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "app_password_revoke",
+        "line": 3650,
+        "methods": [
+          "POST"
+        ],
+        "rule": "/me/app-passwords/<int:app_password_id>/revoke"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "read_book",
+        "line": 3670,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/read/<int:book_id>/<book_format>"
+      },
+      {
+        "blueprint_var": "web",
+        "file": "cps/web.py",
+        "func": "show_book",
+        "line": 3867,
+        "methods": [
+          "GET"
+        ],
+        "rule": "/book/<int:book_id>"
+      }
+    ]
+  }
+}

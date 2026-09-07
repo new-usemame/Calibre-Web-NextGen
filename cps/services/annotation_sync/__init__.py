@@ -152,10 +152,17 @@ def _book_uuid(book):
 
 
 def _kobo_payload_matches_row(annotation, payload, span, normalized_content_id):
-    """True only when applying the payload would leave every stored field unchanged."""
+    """Whether the payload agrees with the row's known content.
+
+    A legacy NULL type is absence of classification, not a competing claim.
+    Reconciliation separately stores the captured classification. Callers that
+    need a strict write no-op must also check for type enrichment.
+    """
     def supplied(mapping, key, current):
         return mapping.get(key) if key in mapping else current
 
+    local_type = getattr(annotation, "annotation_type", None)
+    incoming_type = to_storage_type(supplied(payload, "type", local_type))
     chapter_progress = span.get("chapterProgress")
     next_context = annotation.context_string
     if "contextString" in span or "context" in span:
@@ -163,7 +170,7 @@ def _kobo_payload_matches_row(annotation, payload, span, normalized_content_id):
     current = (
         annotation.highlighted_text, annotation.note_text,
         to_storage_color(annotation.highlight_color),
-        to_storage_type(getattr(annotation, "annotation_type", None)),
+        incoming_type if local_type is None else to_storage_type(local_type),
         annotation.chapter_progress, annotation.content_id,
         annotation.start_container_path, annotation.end_container_path,
         annotation.start_offset, annotation.end_offset,
@@ -177,9 +184,7 @@ def _kobo_payload_matches_row(annotation, payload, span, normalized_content_id):
         # changes nothing must not be counted as a change just because the
         # stored spelling is older than the wire one.
         to_storage_color(supplied(payload, "highlightColor", annotation.highlight_color)),
-        to_storage_type(supplied(
-            payload, "type", getattr(annotation, "annotation_type", None),
-        )),
+        incoming_type,
         chapter_progress if chapter_progress is not None else annotation.chapter_progress,
         normalized_content_id or annotation.content_id,
         supplied(span, "startPath", annotation.start_container_path),
@@ -319,7 +324,15 @@ def _upsert_annotation(
             # no-op, but a real edit can share the same second and must not be
             # eaten merely because its clock ties. Equal-clock divergent
             # payloads therefore use arrival order as the deterministic tie.
-            if _kobo_payload_matches_row(ann, payload, span, normalized_content_id):
+            # Compatibility permits an unknown local type, but a live PATCH
+            # can still teach us that type. Preserve that write (and its raw
+            # sidecar) rather than dropping new classification as a retry.
+            stored_type = to_storage_type(getattr(ann, "annotation_type", None))
+            payload_type = to_storage_type(payload.get("type", stored_type))
+            if (
+                stored_type == payload_type
+                and _kobo_payload_matches_row(ann, payload, span, normalized_content_id)
+            ):
                 return None
     created = ann is None
     if created:

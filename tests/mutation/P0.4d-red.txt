@@ -1,0 +1,92 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- repo virtualenv Python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 173 items / 164 deselected / 9 selected
+
+tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[Z\n-0--True] FAILED
+tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[-1--True] FAILED
+tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[S\n-0--False] FAILED
+tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[-1-ps failed-False] FAILED
+tests/unit/test_mutation_harness.py::test_phase_token_gap_cannot_hide_inspectable_contamination[False-size] FAILED
+tests/unit/test_mutation_harness.py::test_phase_token_gap_cannot_hide_inspectable_contamination[False-data] FAILED
+tests/unit/test_mutation_harness.py::test_phase_token_gap_cannot_hide_inspectable_contamination[True-size] FAILED
+tests/unit/test_mutation_harness.py::test_phase_token_gap_cannot_hide_inspectable_contamination[True-data] FAILED
+tests/unit/test_mutation_harness.py::test_inconclusive_probe_is_preserved_through_phase_and_evidence FAILED
+
+=================================== FAILURES ===================================
+______ test_darwin_process_exit_between_table_and_arguments[Z\n-0--True] _______
+tests/unit/test_mutation_harness.py:1596: in test_darwin_process_exit_between_table_and_arguments
+    result = mutate._has_phase_token(123, 'test-token')
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/mutation/mutate.py:137: in _has_phase_token
+    state = subprocess.run(["ps", "-p", str(pid), "-o", "state="],
+tests/unit/test_mutation_harness.py:1593: in forbidden
+    pytest.fail('ps must not adjudicate an unreadable environment')
+E   Failed: ps must not adjudicate an unreadable environment
+________ test_darwin_process_exit_between_table_and_arguments[-1--True] ________
+tests/unit/test_mutation_harness.py:1596: in test_darwin_process_exit_between_table_and_arguments
+    result = mutate._has_phase_token(123, 'test-token')
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/mutation/mutate.py:137: in _has_phase_token
+    state = subprocess.run(["ps", "-p", str(pid), "-o", "state="],
+tests/unit/test_mutation_harness.py:1593: in forbidden
+    pytest.fail('ps must not adjudicate an unreadable environment')
+E   Failed: ps must not adjudicate an unreadable environment
+______ test_darwin_process_exit_between_table_and_arguments[S\n-0--False] ______
+tests/unit/test_mutation_harness.py:1596: in test_darwin_process_exit_between_table_and_arguments
+    result = mutate._has_phase_token(123, 'test-token')
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/mutation/mutate.py:137: in _has_phase_token
+    state = subprocess.run(["ps", "-p", str(pid), "-o", "state="],
+tests/unit/test_mutation_harness.py:1593: in forbidden
+    pytest.fail('ps must not adjudicate an unreadable environment')
+E   Failed: ps must not adjudicate an unreadable environment
+___ test_darwin_process_exit_between_table_and_arguments[-1-ps failed-False] ___
+tests/unit/test_mutation_harness.py:1596: in test_darwin_process_exit_between_table_and_arguments
+    result = mutate._has_phase_token(123, 'test-token')
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/mutation/mutate.py:137: in _has_phase_token
+    state = subprocess.run(["ps", "-p", str(pid), "-o", "state="],
+tests/unit/test_mutation_harness.py:1593: in forbidden
+    pytest.fail('ps must not adjudicate an unreadable environment')
+E   Failed: ps must not adjudicate an unreadable environment
+____ test_phase_token_gap_cannot_hide_inspectable_contamination[False-size] ____
+tests/unit/test_mutation_harness.py:1623: in test_phase_token_gap_cannot_hide_inspectable_contamination
+    assert isinstance(unreadable, mutate.UninspectableProcess)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'mutate' has no attribute 'UninspectableProcess'
+____ test_phase_token_gap_cannot_hide_inspectable_contamination[False-data] ____
+tests/unit/test_mutation_harness.py:1623: in test_phase_token_gap_cannot_hide_inspectable_contamination
+    assert isinstance(unreadable, mutate.UninspectableProcess)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'mutate' has no attribute 'UninspectableProcess'
+____ test_phase_token_gap_cannot_hide_inspectable_contamination[True-size] _____
+tests/unit/test_mutation_harness.py:1623: in test_phase_token_gap_cannot_hide_inspectable_contamination
+    assert isinstance(unreadable, mutate.UninspectableProcess)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'mutate' has no attribute 'UninspectableProcess'
+____ test_phase_token_gap_cannot_hide_inspectable_contamination[True-data] _____
+tests/unit/test_mutation_harness.py:1623: in test_phase_token_gap_cannot_hide_inspectable_contamination
+    assert isinstance(unreadable, mutate.UninspectableProcess)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'mutate' has no attribute 'UninspectableProcess'
+_______ test_inconclusive_probe_is_preserved_through_phase_and_evidence ________
+tests/unit/test_mutation_harness.py:1655: in test_inconclusive_probe_is_preserved_through_phase_and_evidence
+    gap = mutate.UninspectableProcess(123, 5)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   AttributeError: module 'mutate' has no attribute 'UninspectableProcess'
+=========================== short test summary info ============================
+FAILED tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[Z\n-0--True]
+FAILED tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[-1--True]
+FAILED tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[S\n-0--False]
+FAILED tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[-1-ps failed-False]
+FAILED tests/unit/test_mutation_harness.py::test_phase_token_gap_cannot_hide_inspectable_contamination[False-size]
+FAILED tests/unit/test_mutation_harness.py::test_phase_token_gap_cannot_hide_inspectable_contamination[False-data]
+FAILED tests/unit/test_mutation_harness.py::test_phase_token_gap_cannot_hide_inspectable_contamination[True-size]
+FAILED tests/unit/test_mutation_harness.py::test_phase_token_gap_cannot_hide_inspectable_contamination[True-data]
+FAILED tests/unit/test_mutation_harness.py::test_inconclusive_probe_is_preserved_through_phase_and_evidence
+====================== 9 failed, 164 deselected in 3.64s =======================
+
+exit: 1

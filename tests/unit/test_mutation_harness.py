@@ -1589,13 +1589,114 @@ def test_darwin_process_exit_between_table_and_arguments(monkeypatch, state, ret
     from types import SimpleNamespace
     monkeypatch.setattr(mutate.ctypes, 'CDLL', lambda *a, **k: SimpleNamespace(sysctl=lambda *a: -1))
     monkeypatch.setattr(mutate.ctypes, 'get_errno', lambda: 5)
+    def forbidden(*a, **k):
+        pytest.fail('ps must not adjudicate an unreadable environment')
+    monkeypatch.setattr(mutate.subprocess, 'run', forbidden)
+    # None of the old ps outcomes can establish what sysctl could not read.
+    result = mutate._has_phase_token(123, 'test-token')
+    assert isinstance(result, mutate.UninspectableProcess)
+    assert (result.pid, result.error) == (123, 5)
+    with pytest.raises(TypeError, match='explicit'):
+        bool(result)
+
+
+@pytest.mark.parametrize('failed_read', ['size', 'data'])
+@pytest.mark.parametrize('contaminated', [False, True])
+def test_phase_token_gap_cannot_hide_inspectable_contamination(monkeypatch, failed_read, contaminated):
+    import ctypes
+    from types import SimpleNamespace
+    token = 'test-token'
+    marker = f'CWNG_MUTATION_PHASE_TOKEN={token if contaminated else "other-token"}'.encode()
+    data = (1).to_bytes(4, sys.byteorder) + b'/synthetic\0\0arg\0' + marker + b'\0'
+
+    def sysctl(mib, count, buffer, size, *args):
+        if mib[2] == 123 and (failed_read == 'size' or buffer is not None):
+            return -1
+        ctypes.cast(size, ctypes.POINTER(ctypes.c_size_t))[0] = len(data)
+        if buffer is not None:
+            ctypes.memmove(buffer, data, len(data))
+        return 0
+
+    monkeypatch.setattr(mutate.ctypes, 'CDLL', lambda *a, **k: SimpleNamespace(sysctl=sysctl))
+    monkeypatch.setattr(mutate.ctypes, 'get_errno', lambda: 5)
+    unreadable = mutate._has_phase_token(123, token)
+    assert isinstance(unreadable, mutate.UninspectableProcess)
+    assert mutate._has_phase_token(456, token) is contaminated
+    tables = iter(['123 900 S\n456 900 S\n', ''])
     monkeypatch.setattr(mutate.subprocess, 'run', lambda *a, **k:
-                        subprocess.CompletedProcess(a, returncode, state, stderr))
-    if finished:
-        assert mutate._has_phase_token(123, 'test-token') is False
+                        subprocess.CompletedProcess(a, 0, next(tables), ''))
+    identities = iter([(1, 2), (1, 2), None])
+    monkeypatch.setattr(mutate, '_process_identity', lambda pid: next(identities))
+    killed = []
+    monkeypatch.setattr(mutate.os, 'kill', lambda pid, sig: killed.append(pid))
+    monkeypatch.setattr(mutate, '_signal_group', lambda *a: pytest.fail('foreign group signalled'))
+    proc = SimpleNamespace(pid=800, returncode=0, poll=lambda: 0, wait=lambda **k: 0)
+    escaped, error, gaps = mutate._terminate_phase_processes(proc, token)
+    assert gaps == (unreadable,)
+    assert escaped == ((456,) if contaminated else ())
+    assert killed == ([456] if contaminated else [])
+    if contaminated:
+        assert 'escaped its process group' in error
+        phase = mutate.PhaseResult((), 0, '', '', False, error, escaped, inspection_gaps=gaps)
+        with pytest.raises(mutate.IsolationError, match='failed containment'):
+            mutate._check_report(phase, {})
     else:
-        with pytest.raises(mutate.IsolationError, match='errno 5'):
-            mutate._has_phase_token(123, 'test-token')
+        assert error is None
+    print(f'PROBE unreadable=INCONCLUSIVE inspected={contaminated} '
+          f'containment={"REJECTED" if contaminated else "no observed escape"}')
+
+
+def test_inconclusive_probe_is_preserved_through_phase_and_evidence(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    import dataclasses
+    repo, seed = _committed_repo(tmp_path)
+    console = tmp_path / 'cps-console'
+    console.touch()
+    gap = mutate.UninspectableProcess(123, 5)
+    # Exercise real runner/preflight/sweep/evidence logic; only OS boundaries and
+    # the child import witness are supplied by this portable fixture.
+    monkeypatch.setattr(mutate, 'sys', SimpleNamespace(**{**vars(sys), 'platform': 'darwin'}))
+    class Process:
+        pid = 800
+        returncode = 0
+        def __init__(self, argv, **kwargs):
+            shape = argv[-1]
+            if shape in ('pytest', 'child', 'console'):
+                witness = {'shape': shape, 'inside': True,
+                           'paths': ['cps/__init__.py', 'cps/main.py', 'cps/main.py']}
+                kwargs['stdout'].write(('CWNG_PROVENANCE ' + json.dumps(witness) + '\n').encode())
+        def wait(self, **kwargs): return 0
+        def poll(self): return 0
+    monkeypatch.setattr(mutate.subprocess, 'Popen', Process)
+    snapshots = iter([({}, (gap,)), ({}, ()), ({}, ()), ({}, ())])
+    monkeypatch.setattr(mutate, '_phase_members', lambda *a: next(snapshots))
+    preflight = mutate.provenance_preflight
+    def with_console(*a, **kwargs):
+        return preflight(*a, **kwargs, console=console)
+    monkeypatch.setattr(mutate, 'provenance_preflight', with_console)
+    # This sweep needs no Git mutation: the fixture root is already disposable.
+    sweep = mutate.IsolatedSweep(repo, tmp_path / 'state', tmp_path / 'entry', seed, 'tree')
+    sweep.root = repo
+    monkeypatch.setattr(sweep, 'scrub', lambda: {})
+    phase = sweep.run_phase(['synthetic'], environment={}, timeout=5,
+                            ownership_contract='inherited-token')
+    assert phase.containment_error is None and not phase.timed_out
+    assert phase.inspection_gaps == (gap,)
+    assert phase.status == 'UNVERIFIED' and phase.authoritative is False
+    assert not sweep._phase_failed
+    def assessment(*args):
+        args[-1].append(('mutant', phase, {}))
+        return SimpleNamespace(signal='TESTS_PASSED')
+    monkeypatch.setattr(mutate, '_assess_mutation', assessment)
+    monkeypatch.setattr(mutate.fcntl, 'fcntl', lambda *a: 0)
+    result = mutate.run_checked_mutation(sweep, 'victim.py', '1', '2', ['test_probe.py'],
+        environment={}, timeout=5, evidence_dir=tmp_path / 'evidence')
+    payload = json.loads(result.evidence.read_text())
+    assert payload['phases'][0]['inspection_gaps'] == [dataclasses.asdict(gap)]
+    assert 'INCONCLUSIVE' in payload['detail']
+    assert payload['status'] == 'UNVERIFIED' and payload['authoritative'] is False
+    assert result.exit_code == 1
+    print('PROBE INCONCLUSIVE: preflight + phase + durable evidence; UNVERIFIED exit=1')
 
 
 def test_container_scratch_does_not_follow_pytest_tmp_path(tmp_path, request, monkeypatch):

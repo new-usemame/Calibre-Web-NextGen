@@ -1,0 +1,285 @@
+Captured pytest output; local paths redacted; startup warnings and repeated assertion object representations omitted.
+
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- repo virtualenv/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 179 items
+
+tests/unit/test_mutation_harness.py::test_isolated_sweep_scrubs_the_full_tree_to_an_immutable_seed PASSED
+tests/unit/test_mutation_harness.py::test_startup_reaps_a_dead_tool_owned_sweep PASSED
+tests/unit/test_mutation_harness.py::test_startup_does_not_reap_a_live_sweep PASSED
+tests/unit/test_mutation_harness.py::test_phase_exit_kills_a_child_that_would_write_later PASSED
+tests/unit/test_mutation_harness.py::test_phase_escape_is_terminated_and_is_an_error PASSED
+tests/unit/test_mutation_harness.py::test_phase_timeout_is_not_a_process_leak PASSED
+tests/unit/test_mutation_harness.py::test_strict_containment_is_rejected_before_launch PASSED
+tests/unit/test_mutation_harness.py::test_process_inspection_failure_is_an_error_and_still_kills_group PASSED
+tests/unit/test_mutation_harness.py::test_interruption_still_terminates_phase_group PASSED
+tests/unit/test_mutation_harness.py::test_launch_failure_does_not_leak_descriptors PASSED
+tests/unit/test_mutation_harness.py::test_tokenless_detached_child_is_outside_diagnostic_contract LIMITATION tokenless detached child survived diagnostic cleanup; strict mode rejects before launch (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_sweep_scrubs_after_cleanup_and_again_before_each_phase PASSED
+tests/unit/test_mutation_harness.py::test_sweep_errors_stop_the_next_phase[escape] PASSED
+tests/unit/test_mutation_harness.py::test_sweep_errors_stop_the_next_phase[timeout] PASSED
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[ignored] ORACLE boundary=isolated-diagnostic channel=ignored clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[tracked] ORACLE boundary=isolated-diagnostic channel=tracked clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[collateral] ORACLE boundary=isolated-diagnostic channel=collateral clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[index] ORACLE boundary=isolated-diagnostic channel=index clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[head] ORACLE boundary=isolated-diagnostic channel=head clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[bytecode] ORACLE boundary=isolated-diagnostic channel=bytecode clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[child] ORACLE boundary=isolated-diagnostic channel=child clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_old_direct_mutation_route_is_removed PASSED
+tests/unit/test_mutation_harness.py::test_isolated_invalid_anchor_preserves_source[NOT PRESENT-VALUE = 1\n] PASSED
+tests/unit/test_mutation_harness.py::test_isolated_invalid_anchor_preserves_source[1-VALUE = 1 + 1\n] PASSED
+tests/unit/test_mutation_harness.py::test_isolated_passing_mutant_preserves_dirty_source PASSED
+tests/unit/test_mutation_harness.py::test_provenance_environment_pins_root_without_mutating_input PASSED
+tests/unit/test_mutation_harness.py::test_real_cps_provenance_all_three_shapes PROVENANCE shape=pytest path=cps/__init__.py ACCEPTED (Mac/APFS only)
+PROVENANCE shape=child path=cps/__init__.py ACCEPTED (Mac/APFS only)
+PROVENANCE shape=console path=cps/__init__.py ACCEPTED (Mac/APFS only)
+PROVENANCE installed-checkout negative control: provenance REJECTED: child resolved outside disposable root (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_provenance_rejects_each_outside_import[pytest] PROVENANCE negative shape=pytest: provenance REJECTED: pytest resolved outside disposable root (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_provenance_rejects_each_outside_import[child] PROVENANCE negative shape=child: provenance REJECTED: child resolved outside disposable root (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_provenance_rejects_each_outside_import[console] PROVENANCE negative shape=console: provenance REJECTED: console resolved outside disposable root (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_provenance_rejection_prevents_phase_execution PASSED
+tests/unit/test_mutation_harness.py::test_diagnostic_labels_reject_normal_assignment[0] PASSED
+tests/unit/test_mutation_harness.py::test_diagnostic_labels_reject_normal_assignment[1] PASSED
+tests/unit/test_mutation_harness.py::test_phase_result_rejects_normal_authority_assignment PASSED
+tests/unit/test_mutation_harness.py::test_terminal_cannot_promote_diagnostic_results[caught] PASSED
+tests/unit/test_mutation_harness.py::test_terminal_cannot_promote_diagnostic_results[SURVIVED] PASSED
+tests/unit/test_mutation_harness.py::test_real_cli_observations_never_satisfy_authoritative_gate[0] UNVERIFIED diagnostic backend; committed seed only; shared Git writes UNSUPPORTED
+Outside boundary: temporary directories, venv, home, common Git data, Docker, databases, network, ports, caches, services and escaped processes
+UNVERIFIED seed=<pinned-seed>
+UNVERIFIED TESTS_PASSED: execution checks passed; authority remains unverified
+UNVERIFIED observation=1 evidence=37cb7a3267454ce1ad5fc48d08240cc2.json
+CLI isolated phases=3 observed_exit=0 terminal_exit=1 source-preserved (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_real_cli_observations_never_satisfy_authoritative_gate[1] UNVERIFIED diagnostic backend; committed seed only; shared Git writes UNSUPPORTED
+Outside boundary: temporary directories, venv, home, common Git data, Docker, databases, network, ports, caches, services and escaped processes
+UNVERIFIED seed=<pinned-seed>
+UNVERIFIED TEST_FAILURE: execution checks passed; authority remains unverified
+UNVERIFIED observation=1 evidence=c5db86d640724d82ba6487713453c54a.json
+CLI isolated phases=3 observed_exit=1 terminal_exit=1 source-preserved (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_integrity_refuses_invalid_plan_before_execution[VALUE = 1\n-absent-2] PASSED
+tests/unit/test_mutation_harness.py::test_integrity_refuses_invalid_plan_before_execution[x x\n-x-y] PASSED
+tests/unit/test_mutation_harness.py::test_integrity_refuses_invalid_plan_before_execution[VALUE = 1\n-1-1] PASSED
+tests/unit/test_mutation_harness.py::test_integrity_refuses_invalid_plan_before_execution[--new] PASSED
+tests/unit/test_mutation_harness.py::test_integrity_preserves_bytes_and_refuses_stale_or_noop_application PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[empty] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[fake_node] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[missing_file] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[duplicate] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[count] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[numerator] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[denominator] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[collection_error] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[exit] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[missing_summary] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[malformed_summary] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[incomplete] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[missing_report] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[setup_error] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[numerator_only] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_rejects_unsound_selection[schema_version] PASSED
+tests/unit/test_mutation_harness.py::test_collection_accounting_accepts_selected_numerator PASSED
+tests/unit/test_mutation_harness.py::test_collection_real_pytest_selected_numerator ACCOUNTING real pytest: 2/3 tests collected; selected=2 ACCEPTED (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_execution_rejects_infrastructure_exit_codes[2] PASSED
+tests/unit/test_mutation_harness.py::test_execution_rejects_infrastructure_exit_codes[3] PASSED
+tests/unit/test_mutation_harness.py::test_execution_rejects_infrastructure_exit_codes[4] PASSED
+tests/unit/test_mutation_harness.py::test_execution_rejects_infrastructure_exit_codes[5] PASSED
+tests/unit/test_mutation_harness.py::test_execution_rejects_infrastructure_exit_codes[6] PASSED
+tests/unit/test_mutation_harness.py::test_execution_rejects_infrastructure_exit_codes[-9] PASSED
+tests/unit/test_mutation_harness.py::test_execution_rejects_infrastructure_exit_codes[255] PASSED
+tests/unit/test_mutation_harness.py::test_execution_summary_and_reality_guards[missing_summary] PASSED
+tests/unit/test_mutation_harness.py::test_execution_summary_and_reality_guards[malformed_summary] PASSED
+tests/unit/test_mutation_harness.py::test_execution_summary_and_reality_guards[wrong_count] PASSED
+tests/unit/test_mutation_harness.py::test_execution_summary_and_reality_guards[duplicate_summary] PASSED
+tests/unit/test_mutation_harness.py::test_execution_summary_and_reality_guards[exit_one_without_failure] PASSED
+tests/unit/test_mutation_harness.py::test_execution_summary_and_reality_guards[exit_zero_with_failure] PASSED
+tests/unit/test_mutation_harness.py::test_execution_summary_and_reality_guards[summary_not_actual] PASSED
+tests/unit/test_mutation_harness.py::test_execution_summary_and_reality_guards[missing_selected] PASSED
+tests/unit/test_mutation_harness.py::test_execution_summary_and_reality_guards[missing_call] PASSED
+tests/unit/test_mutation_harness.py::test_execution_summary_and_reality_guards[duplicate_call] PASSED
+tests/unit/test_mutation_harness.py::test_execution_summary_and_reality_guards[foreign_report] PASSED
+tests/unit/test_mutation_harness.py::test_execution_summary_and_reality_guards[baseline_failure] PASSED
+tests/unit/test_mutation_harness.py::test_execution_real_broken_baseline_stops_mutant PASSED
+tests/unit/test_mutation_harness.py::test_execution_real_clean_baseline_and_visible_mutation SOUNDNESS clean baseline=0 mutant=1 actual_failures=1 UNVERIFIED (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_execution_all_xfailed_has_no_outcome[False] PASSED
+tests/unit/test_mutation_harness.py::test_execution_all_xfailed_has_no_outcome[True] PASSED
+tests/unit/test_mutation_harness.py::test_execution_xfail_notrun_is_not_a_body_execution PASSED
+tests/unit/test_mutation_harness.py::test_durable_evidence_precedes_return_and_presentation PASSED
+tests/unit/test_mutation_harness.py::test_durability_failure_does_not_present_a_result PASSED
+tests/unit/test_mutation_harness.py::test_evidence_cannot_be_disposable_or_changed_before_presentation PASSED
+tests/unit/test_mutation_harness.py::test_checked_real_outcomes_are_durable_and_unverified[xfail_notrun] SOUNDNESS real xfail_notrun: ERROR UNVERIFIED durable (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_checked_real_outcomes_are_durable_and_unverified[xfail_run] SOUNDNESS real xfail_run: ERROR UNVERIFIED durable (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_checked_real_outcomes_are_durable_and_unverified[setup_error] SOUNDNESS real setup_error: ERROR UNVERIFIED durable (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_checked_real_outcomes_are_durable_and_unverified[timeout] SOUNDNESS real timeout: ERROR UNVERIFIED durable (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_checked_real_outcomes_are_durable_and_unverified[noop] SOUNDNESS real noop: ERROR UNVERIFIED durable (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_checked_real_outcomes_are_durable_and_unverified[pass] SOUNDNESS real pass: TESTS_PASSED UNVERIFIED durable (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_noop_is_refused_before_any_pytest_collection PASSED
+tests/unit/test_mutation_harness.py::test_integrity_detects_incomplete_write PASSED
+tests/unit/test_mutation_harness.py::test_git_writing_policy_names_shared_state_and_demonstrates_limit POLICY shared refs/common config survive scrub: UNSUPPORTED (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_cli_refuses_legacy_journal_without_changing_it[{}] PASSED
+tests/unit/test_mutation_harness.py::test_cli_refuses_legacy_journal_without_changing_it[not json] PASSED
+tests/unit/test_mutation_harness.py::test_cli_has_no_clear_journal_option usage: mutate.py [-h] [--file FILE] [--old OLD] [--new NEW] [--test TEST]
+                 [--spec SPEC] [--name NAME] [--repo REPO] --seed SEED
+                 [--backend {macos,container}] [--image IMAGE]
+                 [--scratch-dir SCRATCH_DIR] [--evidence-dir EVIDENCE_DIR]
+                 [--timeout TIMEOUT]
+mutate.py: error: unrecognized arguments: --clear-journal
+PASSED
+tests/unit/test_mutation_harness.py::test_cli_spec_and_provenance_rejection_are_live[spec] CLI spec: UNVERIFIED exit=1 evidence-count=2 (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_cli_spec_and_provenance_rejection_are_live[provenance_reject] CLI provenance_reject: UNVERIFIED exit=1 evidence-count=1 (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_cli_invalid_spec_never_allocates_sweep[empty] PASSED
+tests/unit/test_mutation_harness.py::test_cli_invalid_spec_never_allocates_sweep[malformed] PASSED
+tests/unit/test_mutation_harness.py::test_cli_invalid_spec_never_allocates_sweep[traversal] PASSED
+tests/unit/test_mutation_harness.py::test_cli_invalid_spec_never_allocates_sweep[option] PASSED
+tests/unit/test_mutation_harness.py::test_review_preflight_cannot_erase_measured_mutant REVIEW1 DIRECT_EXIT=1 HARNESS_EXIT=1 SIGNAL=TEST_FAILURE PHASE_RETURNCODES=[0, 0, 1] (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_review_post_preflight_boundary_rejects_contamination[scrub] PASSED
+tests/unit/test_mutation_harness.py::test_review_post_preflight_boundary_rejects_contamination[verification] PASSED
+tests/unit/test_mutation_harness.py::test_review_actual_target_import_must_be_local REVIEW2 IMPORTED_FROM=SOURCE_CHECKOUT SIGNAL=ERROR HARNESS_EXIT=1 (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_review_unobserved_target_is_not_a_passing_mutation PASSED
+tests/unit/test_mutation_harness.py::test_review_target_witness_accepts_real_local_execution[victim.py] PASSED
+tests/unit/test_mutation_harness.py::test_review_target_witness_accepts_real_local_execution[cps/__init__.py] PASSED
+tests/unit/test_mutation_harness.py::test_review_forged_authority_cannot_exit_zero[setattr] REVIEW3 shape=setattr PRESENT=REJECTED (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_review_forged_authority_cannot_exit_zero[duck] REVIEW3 shape=duck PRESENT=REJECTED (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_review_matrix_driver_is_diagnostic_and_nonzero UNVERIFIED equivalent_integer_bound: NO_TEST_FAILURE; 49 passed, 130 deselected in 16.08s (Mac/APFS only)
+REVIEW4 EXIT=1 (Mac/APFS only)
+PASSED
+tests/unit/test_mutation_harness.py::test_platform_partition_retains_native_coverage PASSED
+tests/unit/test_mutation_harness.py::test_cleanup_preserves_unrelated_absent_worktree[create] PASSED
+tests/unit/test_mutation_harness.py::test_cleanup_preserves_unrelated_absent_worktree[close] PASSED
+tests/unit/test_mutation_harness.py::test_cleanup_preserves_unrelated_absent_worktree[failed_add] PASSED
+tests/unit/test_mutation_harness.py::test_git_timeout_is_a_handled_isolation_error PASSED
+tests/unit/test_mutation_harness.py::test_group_signal_handles_confirmed_zombie_only_eperm PASSED
+tests/unit/test_mutation_harness.py::test_group_signal_does_not_hide_unconfirmed_permission_errors[123 501 S\n-0] PASSED
+tests/unit/test_mutation_harness.py::test_group_signal_does_not_hide_unconfirmed_permission_errors[123 501 Z\n123 501 S\n-0] PASSED
+tests/unit/test_mutation_harness.py::test_group_signal_does_not_hide_unconfirmed_permission_errors[123 502 Z\n-0] PASSED
+tests/unit/test_mutation_harness.py::test_group_signal_does_not_hide_unconfirmed_permission_errors[-0] PASSED
+tests/unit/test_mutation_harness.py::test_group_signal_does_not_hide_unconfirmed_permission_errors[malformed\n-0] PASSED
+tests/unit/test_mutation_harness.py::test_group_signal_does_not_hide_unconfirmed_permission_errors[123 501 Z\n-1] PASSED
+tests/unit/test_mutation_harness.py::test_group_signal_refuses_nonpositive_ids_before_kernel[0] PASSED
+tests/unit/test_mutation_harness.py::test_group_signal_refuses_nonpositive_ids_before_kernel[-1] PASSED
+tests/unit/test_mutation_harness.py::test_group_signal_refuses_nonpositive_ids_before_kernel[-123] PASSED
+tests/unit/test_mutation_harness.py::test_container_tokenless_writes_stop_after_phase[exit] CONTAINMENT exit: alive_writes=4 after_removal_writes=0 containers=0
+PASSED
+tests/unit/test_mutation_harness.py::test_container_tokenless_writes_stop_after_phase[timeout] CONTAINMENT timeout: alive_writes=21 after_removal_writes=0 containers=0
+PASSED
+tests/unit/test_mutation_harness.py::test_container_tokenless_writes_stop_after_phase[failure] CONTAINMENT failure: alive_writes=4 after_removal_writes=0 containers=0
+PASSED
+tests/unit/test_mutation_harness.py::test_container_phases_copy_pinned_seed_and_discard_damage PASSED
+tests/unit/test_mutation_harness.py::test_container_setup_failure_removes_owned_container PASSED
+tests/unit/test_mutation_harness.py::test_container_leg7_execution_provenance_limit[clean_control] LINUX PROBE clean_control: exit=1 seen=True active=True signal=TEST_FAILURE authority=False
+PASSED
+tests/unit/test_mutation_harness.py::test_container_leg7_execution_provenance_limit[absent_control] LINUX PROBE absent_control: exit=0 seen=False active=True signal=TESTS_PASSED authority=False
+PASSED
+tests/unit/test_mutation_harness.py::test_container_leg7_execution_provenance_limit[startup_rewrite] LINUX PROBE startup_rewrite: exit=0 seen=True active=True signal=TESTS_PASSED authority=False
+PASSED
+tests/unit/test_mutation_harness.py::test_container_leg7_execution_provenance_limit[frame_forge] LINUX PROBE frame_forge: exit=0 seen=True active=True signal=TESTS_PASSED authority=False
+PASSED
+tests/unit/test_mutation_harness.py::test_container_leg7_execution_provenance_limit[meta_transform] LINUX PROBE meta_transform: exit=0 seen=True active=True signal=TESTS_PASSED authority=False
+PASSED
+tests/unit/test_mutation_harness.py::test_container_leg7_execution_provenance_limit[loader_transform] LINUX PROBE loader_transform: exit=0 seen=True active=True signal=TESTS_PASSED authority=False
+PASSED
+tests/unit/test_mutation_harness.py::test_container_output_names_external_delegation_limits UNVERIFIED Linux container phase observation. Outside containment: externally delegated work in databases, network services, shared ports, remote service managers, and daemons outside the container. Not hermetic. Execution provenance is UNVERIFIED.
+PASSED
+tests/unit/test_mutation_harness.py::test_container_presentation_rejects_forged_authority[setattr] PASSED
+tests/unit/test_mutation_harness.py::test_container_presentation_rejects_forged_authority[subclass] PASSED
+tests/unit/test_mutation_harness.py::test_container_presentation_rejects_forged_authority[duck] PASSED
+tests/unit/test_mutation_harness.py::test_container_cli_runs_real_sweep[caught] CONTAINER seed=2237325565285a0e91cd095f717b8988b25db0ec
+caught mutation=1 file=victim.py: 1 test(s) ran; 1 failed; evidence=f264aa818028418c9284b327e917d835.json
+PASSED
+tests/unit/test_mutation_harness.py::test_container_cli_runs_real_sweep[survived] CONTAINER seed=04d7ebb84fece6df022901b001641602f0692e36
+SURVIVED mutation=1 file=victim.py: 1 test(s) ran; 0 failed; evidence=745cd39f4da444948882bb1c4dee27a9.json
+PASSED
+tests/unit/test_mutation_harness.py::test_container_cli_runs_real_sweep[baseline_error] CONTAINER seed=7a481f4147138a1179fab79a0b76b6113e9bffde
+ERROR mutation=1 file=victim.py: clean baseline did not pass; evidence=f10641f444cd4d81bc1ec5e816e22874.json
+PASSED
+tests/unit/test_mutation_harness.py::test_container_cli_runs_real_sweep[spec] CONTAINER seed=809a8c1ee53c272a02f87c689d0a326bd58febc4
+caught mutation=1 file=victim.py: 1 test(s) ran; 1 failed; evidence=8b14b86a806d4d6693a709ef8a63ba32.json
+caught mutation=2 file=victim.py: 1 test(s) ran; 1 failed; evidence=7670abcd953d438f8408cdf8ad4f5c67.json
+PASSED
+tests/unit/test_mutation_harness.py::test_container_cli_docker_errors_are_actionable[missing-Docker CLI not found. Install Docker] ERROR: Docker CLI not found. Install Docker and put docker on PATH, then retry --backend container.
+PASSED
+tests/unit/test_mutation_harness.py::test_container_cli_docker_errors_are_actionable[daemon-Cannot reach the Docker daemon. Start Docker] ERROR: Cannot reach the Docker daemon. Start Docker and check your Docker context with docker info, then retry.
+PASSED
+tests/unit/test_mutation_harness.py::test_container_cli_docker_errors_are_actionable[image-not available locally. Pull or build it first] ERROR: Docker image 'python:3.12' is not available locally. Pull or build it first, or select an installed image with --image.
+PASSED
+tests/unit/test_mutation_harness.py::test_container_cli_docker_errors_are_actionable[create-Docker could not create the phase container. Check free resources] CONTAINER seed=1b8b85161a4a12b736155992afa16c2f79d21b71
+ERROR mutation=1 file=victim.py: Docker could not create the phase container. Check free resources and Docker access to --scratch-dir; try a shared directory such as /tmp.; evidence=0002adfe3a414820af23106f34078e8c.json
+PASSED
+tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[size-ESRCH] EXIT RACE size: EIO -> 3; confirmed disappearance
+PASSED
+tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[size-EINVAL] EXIT RACE size: EIO -> 22; confirmed disappearance
+PASSED
+tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[data-ESRCH] EXIT RACE data: EIO -> 3; confirmed disappearance
+PASSED
+tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[data-EINVAL] EXIT RACE data: EIO -> 22; confirmed disappearance
+PASSED
+tests/unit/test_mutation_harness.py::test_darwin_unresolved_process_has_bounded_inspection[size] PASSED
+tests/unit/test_mutation_harness.py::test_darwin_unresolved_process_has_bounded_inspection[data] PASSED
+tests/unit/test_mutation_harness.py::test_phase_token_gap_cannot_hide_inspectable_contamination[False-size] PROBE unreadable=INCONCLUSIVE inspected=False containment=no observed escape
+PASSED
+tests/unit/test_mutation_harness.py::test_phase_token_gap_cannot_hide_inspectable_contamination[False-data] PROBE unreadable=INCONCLUSIVE inspected=False containment=no observed escape
+PASSED
+tests/unit/test_mutation_harness.py::test_phase_token_gap_cannot_hide_inspectable_contamination[True-size] PROBE unreadable=INCONCLUSIVE inspected=True containment=REJECTED
+PASSED
+tests/unit/test_mutation_harness.py::test_phase_token_gap_cannot_hide_inspectable_contamination[True-data] PROBE unreadable=INCONCLUSIVE inspected=True containment=REJECTED
+PASSED
+tests/unit/test_mutation_harness.py::test_unreadable_only_escape_prevents_containment_acceptance SOLE ESCAPE unreadable + unrelated readable PID: INCONCLUSIVE, acceptance blocked
+PASSED
+tests/unit/test_mutation_harness.py::test_pending_gap_that_becomes_readable_and_contaminated_is_rejected PENDING GAP -> readable matching token: REJECTED and signalled
+PASSED
+tests/unit/test_mutation_harness.py::test_inspected_escape_stays_rejected_if_identity_disappears INSPECTED ESCAPE -> identity disappeared, other gap unresolved: still REJECTED
+PASSED
+tests/unit/test_mutation_harness.py::test_inconclusive_probe_is_preserved_through_phase_and_evidence PREFLIGHT INCONCLUSIVE: no next phase or scrub; evidence durable; tree preserved
+PASSED
+tests/unit/test_mutation_harness.py::test_preflight_gap_that_resolves_does_not_taint_clean_phase PREFLIGHT gap -> confirmed disappearance: no gap, no INCONCLUSIVE, clean phase runs
+PASSED
+tests/unit/test_mutation_harness.py::test_container_scratch_does_not_follow_pytest_tmp_path PASSED
+tests/unit/test_mutation_harness.py::test_container_unshareable_scratch_fails_fast Docker could not create the phase container within 5 seconds. The scratch directory may not be shared. Use --scratch-dir /tmp or share the directory in Docker Desktop.
+PASSED
+tests/unit/test_mutation_harness.py::test_container_create_timeout_removes_container_if_created PASSED
+tests/unit/test_mutation_harness.py::test_container_scratch_timeout_message_with_real_wait Simulated stalled create: 5.01s; Docker could not create the phase container within 5 seconds. The scratch directory may not be shared. Use --scratch-dir /tmp or share the directory in Docker Desktop.
+PASSED
+tests/unit/test_mutation_harness.py::test_container_is_default_off_macos[linux] CONTAINER selected by platform default
+PASSED
+tests/unit/test_mutation_harness.py::test_container_is_default_off_macos[win32] CONTAINER selected by platform default
+PASSED
+tests/unit/test_mutation_harness.py::test_container_missing_report_keeps_output CONTAINER seed=58613828ced4e0aec202d4bf7c55ae6c0fd093a1
+ERROR mutation=1 file=victim.py: collection could not run pytest; use --image with Python 3.12+ and the test dependencies installed; evidence=f0a3883515334e6b936b839032b5e4db.json
+PASSED
+tests/unit/test_mutation_harness.py::test_container_cli_loaded_by_location_without_sibling_imports PASSED
+tests/unit/test_mutation_harness.py::test_container_capability_probe_has_short_timeout[info] PASSED
+tests/unit/test_mutation_harness.py::test_container_capability_probe_has_short_timeout[image] PASSED
+
+======================= 179 passed in 729.02s (0:12:09) ========================
+
+exit: 0

@@ -1,0 +1,88 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- repo virtualenv/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 177 items / 168 deselected / 9 selected
+
+tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[size-ESRCH] FAILED
+tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[size-EINVAL] FAILED
+tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[data-ESRCH] FAILED
+tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[data-EINVAL] FAILED
+tests/unit/test_mutation_harness.py::test_darwin_unresolved_process_has_bounded_inspection[size] FAILED
+tests/unit/test_mutation_harness.py::test_darwin_unresolved_process_has_bounded_inspection[data] FAILED
+tests/unit/test_mutation_harness.py::test_unreadable_only_escape_prevents_containment_acceptance FAILED
+tests/unit/test_mutation_harness.py::test_inconclusive_probe_is_preserved_through_phase_and_evidence FAILED
+tests/unit/test_mutation_harness.py::test_preflight_gap_that_resolves_does_not_taint_clean_phase FAILED
+
+=================================== FAILURES ===================================
+_______ test_darwin_process_exit_between_table_and_arguments[size-ESRCH] _______
+tests/unit/test_mutation_harness.py:1602: in test_darwin_process_exit_between_table_and_arguments
+    assert mutate._has_phase_token(123, 'test-token') is False
+E   AssertionError: assert UninspectableProcess(pid=123, error=5) is False
+E    +  where UninspectableProcess(pid=123, error=5) = <function _has_phase_token at 0x11088cb80>(123, 'test-token')
+E    +    where <function _has_phase_token at 0x11088cb80> = mutate._has_phase_token
+______ test_darwin_process_exit_between_table_and_arguments[size-EINVAL] _______
+tests/unit/test_mutation_harness.py:1602: in test_darwin_process_exit_between_table_and_arguments
+    assert mutate._has_phase_token(123, 'test-token') is False
+E   AssertionError: assert UninspectableProcess(pid=123, error=5) is False
+E    +  where UninspectableProcess(pid=123, error=5) = <function _has_phase_token at 0x11088cb80>(123, 'test-token')
+E    +    where <function _has_phase_token at 0x11088cb80> = mutate._has_phase_token
+_______ test_darwin_process_exit_between_table_and_arguments[data-ESRCH] _______
+tests/unit/test_mutation_harness.py:1602: in test_darwin_process_exit_between_table_and_arguments
+    assert mutate._has_phase_token(123, 'test-token') is False
+E   AssertionError: assert UninspectableProcess(pid=123, error=5) is False
+E    +  where UninspectableProcess(pid=123, error=5) = <function _has_phase_token at 0x11088cb80>(123, 'test-token')
+E    +    where <function _has_phase_token at 0x11088cb80> = mutate._has_phase_token
+______ test_darwin_process_exit_between_table_and_arguments[data-EINVAL] _______
+tests/unit/test_mutation_harness.py:1602: in test_darwin_process_exit_between_table_and_arguments
+    assert mutate._has_phase_token(123, 'test-token') is False
+E   AssertionError: assert UninspectableProcess(pid=123, error=5) is False
+E    +  where UninspectableProcess(pid=123, error=5) = <function _has_phase_token at 0x11088cb80>(123, 'test-token')
+E    +    where <function _has_phase_token at 0x11088cb80> = mutate._has_phase_token
+_________ test_darwin_unresolved_process_has_bounded_inspection[size] __________
+tests/unit/test_mutation_harness.py:1623: in test_darwin_unresolved_process_has_bounded_inspection
+    assert 2 <= len(calls) // (2 if failed_read == 'data' else 1) <= 3
+E   assert 2 <= (1 // 1)
+E    +  where 1 = len([False])
+_________ test_darwin_unresolved_process_has_bounded_inspection[data] __________
+tests/unit/test_mutation_harness.py:1623: in test_darwin_unresolved_process_has_bounded_inspection
+    assert 2 <= len(calls) // (2 if failed_read == 'data' else 1) <= 3
+E   assert 2 <= (2 // 2)
+E    +  where 2 = len([False, True])
+_________ test_unreadable_only_escape_prevents_containment_acceptance __________
+tests/unit/test_mutation_harness.py:1714: in test_unreadable_only_escape_prevents_containment_acceptance
+    assert result.signal == 'INCONCLUSIVE', 'an unreadable sole escape was accepted'
+E   AssertionError: an unreadable sole escape was accepted
+E   assert 'TESTS_PASSED' == 'INCONCLUSIVE'
+E     
+E     - INCONCLUSIVE
+E     + TESTS_PASSED
+_______ test_inconclusive_probe_is_preserved_through_phase_and_evidence ________
+tests/unit/test_mutation_harness.py:1781: in test_inconclusive_probe_is_preserved_through_phase_and_evidence
+    assert result.signal == 'INCONCLUSIVE'
+E   AssertionError: assert 'TESTS_PASSED' == 'INCONCLUSIVE'
+E     
+E     - INCONCLUSIVE
+E     + TESTS_PASSED
+_________ test_preflight_gap_that_resolves_does_not_taint_clean_phase __________
+tests/unit/test_mutation_harness.py:1808: in test_preflight_gap_that_resolves_does_not_taint_clean_phase
+    assert 'INCONCLUSIVE' not in payload['detail']
+E   AssertionError: assert 'INCONCLUSIVE' not in 'execution c...ection_gaps)'
+E     
+E     'INCONCLUSIVE' is contained here:
+E       execution checks passed; authority remains unverified; phase-token inspection INCONCLUSIVE (see inspection_gaps)
+E     ?                                                                               ++++++++++++
+=========================== short test summary info ============================
+FAILED tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[size-ESRCH]
+FAILED tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[size-EINVAL]
+FAILED tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[data-ESRCH]
+FAILED tests/unit/test_mutation_harness.py::test_darwin_process_exit_between_table_and_arguments[data-EINVAL]
+FAILED tests/unit/test_mutation_harness.py::test_darwin_unresolved_process_has_bounded_inspection[size]
+FAILED tests/unit/test_mutation_harness.py::test_darwin_unresolved_process_has_bounded_inspection[data]
+FAILED tests/unit/test_mutation_harness.py::test_unreadable_only_escape_prevents_containment_acceptance
+FAILED tests/unit/test_mutation_harness.py::test_inconclusive_probe_is_preserved_through_phase_and_evidence
+FAILED tests/unit/test_mutation_harness.py::test_preflight_gap_that_resolves_does_not_taint_clean_phase
+====================== 9 failed, 168 deselected in 4.50s =======================
+
+exit: 1

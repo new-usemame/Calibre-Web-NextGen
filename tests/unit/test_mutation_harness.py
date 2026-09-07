@@ -233,7 +233,7 @@ def _cleanup_fault_for_red_run(monkeypatch):
     pending = []
     def disabled(proc, token):
         pending.append((proc, token))
-        return (), None
+        return (), None, ()
     monkeypatch.setattr(mutate, "_terminate_phase_processes", disabled)
     try:
         yield
@@ -1080,6 +1080,7 @@ def test_review_post_preflight_boundary_rejects_contamination(tmp_path, monkeypa
         plan = mutate.prepare_mutation(sweep.root, 'victim.py', '1', '2')
         def poison(*a, **k):
             if fault == 'scrub': (sweep.root / 'collateral.py').write_text('poison')
+            return ()
         monkeypatch.setattr(mutate, 'provenance_preflight', poison)
         if fault == 'verification':
             original = mutate.apply_mutation
@@ -1689,6 +1690,7 @@ def test_inconclusive_probe_is_preserved_through_phase_and_evidence(tmp_path, mo
         return SimpleNamespace(signal='TESTS_PASSED')
     monkeypatch.setattr(mutate, '_assess_mutation', assessment)
     monkeypatch.setattr(mutate.fcntl, 'fcntl', lambda *a: 0)
+    monkeypatch.setattr(mutate.fcntl, 'F_FULLFSYNC', 51, raising=False)
     result = mutate.run_checked_mutation(sweep, 'victim.py', '1', '2', ['test_probe.py'],
         environment={}, timeout=5, evidence_dir=tmp_path / 'evidence')
     payload = json.loads(result.evidence.read_text())

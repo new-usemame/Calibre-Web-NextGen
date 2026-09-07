@@ -13,7 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 import fcntl
 import hashlib
 import importlib.util
@@ -40,6 +40,17 @@ class IsolationError(RuntimeError):
 
 
 @dataclass(frozen=True, slots=True)
+class UninspectableProcess:
+    """No token observation was possible; neither presence nor absence is known."""
+
+    pid: int
+    error: int
+
+    def __bool__(self):
+        raise TypeError("an uninspectable process requires explicit handling")
+
+
+@dataclass(frozen=True, slots=True)
 class PhaseResult:
     argv: tuple[str, ...]
     returncode: int | None
@@ -48,6 +59,7 @@ class PhaseResult:
     timed_out: bool
     containment_error: str | None
     escaped_pids: tuple[int, ...]
+    inspection_gaps: tuple[UninspectableProcess, ...] = ()
     status: str = field(default="UNVERIFIED", init=False)
     authoritative: bool = field(default=False, init=False)
 
@@ -118,7 +130,7 @@ def _process_identity(pid: int) -> tuple[int, int] | None:
     raise IsolationError(f"cannot inspect identity of process {pid}: errno {error}")
 
 
-def _has_phase_token(pid: int, token: str) -> bool:
+def _has_phase_token(pid: int, token: str) -> bool | UninspectableProcess:
     """Read Darwin's exec environment without logging arguments or environment."""
     library = ctypes.CDLL(None, use_errno=True)
     mib = (ctypes.c_int * 3)(1, 49, pid)  # CTL_KERN, KERN_PROCARGS2
@@ -131,17 +143,9 @@ def _has_phase_token(pid: int, token: str) -> bool:
                 # Kernel tasks / exited processes have no inspectable exec args.
                 return False
             if error == errno.EIO:
-                # The process may have exited since the process-table snapshot.
-                # A fresh absent/zombie result needs no environment inspection.
-                try:
-                    state = subprocess.run(["ps", "-p", str(pid), "-o", "state="],
-                                           capture_output=True, text=True, timeout=5)
-                except (OSError, subprocess.TimeoutExpired):
-                    pass
-                else:
-                    if ((state.returncode == 1 and not state.stdout.strip() and not state.stderr.strip())
-                            or (state.returncode == 0 and state.stdout.strip().startswith("Z"))):
-                        return False
+                # A failed read says nothing about token ownership. Do not ask
+                # ps to adjudicate it, or reinterpret it as absence/contamination.
+                return UninspectableProcess(pid, error)
             raise IsolationError(f"cannot inspect process environment: errno {error}")
     data = buffer.raw[:size.value]
     argc = int.from_bytes(data[:4], sys.byteorder, signed=True)
@@ -159,7 +163,9 @@ def _has_phase_token(pid: int, token: str) -> bool:
     return marker in data[offset:].split(b"\0")
 
 
-def _phase_members(pgid: int, token: str) -> dict[int, tuple[int, bool]]:
+def _phase_members(
+    pgid: int, token: str,
+) -> tuple[dict[int, tuple[int, bool]], tuple[UninspectableProcess, ...]]:
     """Inspect group and visible inherited-token processes, retaining zombies.
 
     Clearing a token, changing credentials, and uninspectable exec environments
@@ -175,15 +181,22 @@ def _phase_members(pgid: int, token: str) -> dict[int, tuple[int, bool]]:
     if result.returncode:
         raise IsolationError("cannot inspect phase process table")
     members = {}
+    gaps = []
     for line in result.stdout.splitlines():
         fields = line.split()
         if len(fields) != 3 or not fields[0].isdigit() or not fields[1].isdigit():
             raise IsolationError("malformed process table")
         pid, group = int(fields[0]), int(fields[1])
         zombie = fields[2].startswith("Z")
-        if group == pgid or (not zombie and _has_phase_token(pid, token)):
+        if group == pgid:
             members[pid] = (group, zombie)
-    return members
+        elif not zombie:
+            observation = _has_phase_token(pid, token)
+            if isinstance(observation, UninspectableProcess):
+                gaps.append(observation)
+            elif observation is True:
+                members[pid] = (group, zombie)
+    return members, tuple(gaps)
 
 
 def _group_is_zombie_only(pgid: int) -> bool:
@@ -224,7 +237,9 @@ def _signal_group(pgid: int, sig: signal.Signals) -> None:
     # All other permission and inspection errors remain containment errors.
 
 
-def _terminate_phase_processes(proc, token: str) -> tuple[tuple[int, ...], str | None]:
+def _terminate_phase_processes(
+    proc, token: str,
+) -> tuple[tuple[int, ...], str | None, tuple[UninspectableProcess, ...]]:
     """Kill and observe disappearance under the inherited-token diagnostic contract.
 
     The direct child is reaped by Popen; orphan descendants are reaped by the OS.
@@ -233,11 +248,13 @@ def _terminate_phase_processes(proc, token: str) -> tuple[tuple[int, ...], str |
     escaped = set()
     known = {}
     errors = []
+    gaps = set()
     deadline = time.monotonic() + 3
     while True:
         proc.poll()  # reap the leader before checking the process group
         try:
-            members = _phase_members(proc.pid, token)
+            members, uninspectable = _phase_members(proc.pid, token)
+            gaps.update(uninspectable)
             for pid, (group, zombie) in members.items():
                 identity = _process_identity(pid)
                 if identity is not None:
@@ -281,7 +298,8 @@ def _terminate_phase_processes(proc, token: str) -> tuple[tuple[int, ...], str |
         errors.append("phase leader survived termination")
     if escaped:
         errors.append(f"phase process escaped its process group: {sorted(escaped)}")
-    return tuple(sorted(escaped)), "; ".join(errors) or None
+    return (tuple(sorted(escaped)), "; ".join(errors) or None,
+            tuple(sorted(gaps, key=lambda gap: (gap.pid, gap.error))))
 
 
 def run_phase_process(
@@ -324,10 +342,11 @@ def run_phase_process(
         except subprocess.TimeoutExpired:
             timed_out = True
         finally:
-            escaped, containment_error = _terminate_phase_processes(proc, token)
+            escaped, containment_error, gaps = _terminate_phase_processes(proc, token)
     return PhaseResult(
         tuple(argv), proc.returncode, stdout_path.read_text(errors="replace"),
         stderr_path.read_text(errors="replace"), timed_out, containment_error, escaped,
+        inspection_gaps=gaps,
     )
 
 
@@ -404,6 +423,7 @@ def provenance_preflight(
             path = pathlib.Path(relative)
             if path.is_absolute() or not (root / path).resolve(strict=True).is_relative_to(root):
                 raise IsolationError(f"provenance REJECTED: {shape} path outside disposable root")
+        record["inspection_gaps"] = [asdict(gap) for gap in result.inspection_gaps]
         records.append(record)
     return tuple(records)
 
@@ -618,6 +638,7 @@ def _safe_trace(trace):
         phases.append({"phase": name, "returncode": phase.returncode, "summary": summary,
                        "stdout_sha256": hashlib.sha256(phase.stdout.encode()).hexdigest(),
                        "stderr_sha256": hashlib.sha256(phase.stderr.encode()).hexdigest(),
+                       "inspection_gaps": [asdict(gap) for gap in phase.inspection_gaps],
                        "report": report})
     return phases
 
@@ -632,6 +653,8 @@ def run_checked_mutation(sweep, relative, old, new, targets, *, environment, tim
         signal_name, detail = check.signal, "execution checks passed; authority remains unverified"
     except (IsolationError, OSError, ValueError) as exc:
         signal_name, detail = "ERROR", str(exc) if isinstance(exc, IsolationError) else type(exc).__name__
+    if any(phase.inspection_gaps for _, phase, _ in trace):
+        detail += "; phase-token inspection INCONCLUSIVE (see inspection_gaps)"
     for root, replacement in ((sweep.root, "<execution-root>"), (sweep.source_repo, "<source-root>"),
                               (sweep.entry, "<sweep>")):
         detail = detail.replace(str(root), replacement)
@@ -888,7 +911,7 @@ class IsolatedSweep:
             targets = pytest_targets
             if targets is None and len(argv) >= 3 and argv[1:3] == ["-m", "pytest"]:
                 targets = argv[3:]
-            provenance_preflight(
+            provenance = provenance_preflight(
                 self.root, environment=environment, artifacts=self.entry / "provenance",
                 pytest_targets=targets,
             )
@@ -905,6 +928,14 @@ class IsolatedSweep:
             )
             if result.containment_error:
                 raise IsolationError(result.containment_error)
+            # Preflight observations belong to this phase too. Unreadable token
+            # environments stay inconclusive under the UNVERIFIED contract;
+            # observed escapes and other cleanup errors still reject above.
+            gaps = set(result.inspection_gaps)
+            for record in provenance:
+                gaps.update(UninspectableProcess(**gap) for gap in record["inspection_gaps"])
+            result = replace(result, inspection_gaps=tuple(sorted(
+                gaps, key=lambda gap: (gap.pid, gap.error))))
             self.scrub()
             if result.timed_out:
                 raise IsolationError("phase timed out")

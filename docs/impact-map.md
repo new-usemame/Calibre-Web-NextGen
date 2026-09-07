@@ -119,7 +119,25 @@ the portable input.
 `impact-map-recall-cases.json` contains ten distinct historical commits selected
 by inspecting their function-context diffs. `impact-map-recall.json` is the
 regenerable result and records the evaluated map SHA. The current report found
-8 of 10 affected sites: **80.00% recall**.
+8 of 10 affected sites: 80.00%.
+
+**Do not quote that 80.00% as a measurement.** The map was built and queried on
+the eight symbols that became the eight hits *before* this case file was written,
+and the two misses are the two symbols that were not in that batch — so the ratio
+is constructed, and `selection_method` in the case file says so. The figure that
+carries evidentiary weight is an independent replication on mechanically-selected
+held-out commits, the author's ten excluded and the map never consulted during
+selection: **65/81 = 80.25%** at depth 2 and 4, and **907/1157 = 78.39%** across
+all pairs.
+
+Both numbers describe caller/consumer pairs where **both ends are module-level
+Python symbols**. Raw co-change recall across all changed symbols is **12.49%**,
+with 37% of changed symbols getting nothing named at all, so the honest range is
+**[12.5%, 80%]** and which end applies depends on the target. `SKILL.md` carries
+that qualifier because it is what an agent loads; it is repeated here because
+this is the file maintainers open when they update the case set, and updating a
+case set while believing 80.00% was measured is exactly how the constructed
+figure would get re-blessed.
 
 The two misses are retained in the report:
 

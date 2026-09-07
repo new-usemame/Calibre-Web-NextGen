@@ -1,0 +1,18 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- repo virtualenv/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+collecting ... collected 1 item
+
+tests/unit/test_mutation_process_probe.py::test_diagnostic_probe_counts_uninspectable_processes FAILED
+
+=================================== FAILURES ===================================
+_____________ test_diagnostic_probe_counts_uninspectable_processes _____________
+tests/unit/test_mutation_process_probe.py:28: in test_diagnostic_probe_counts_uninspectable_processes
+    assert 'INCONCLUSIVE pid=123 errno=5' in output
+E   AssertionError: assert 'INCONCLUSIVE pid=123 errno=5' in 'OBSERVED scans=1 probes=1 EIO=0 (Mac/APFS only)\n'
+=========================== short test summary info ============================
+FAILED tests/unit/test_mutation_process_probe.py::test_diagnostic_probe_counts_uninspectable_processes
+============================== 1 failed in 0.42s ===============================
+
+exit: 1

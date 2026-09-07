@@ -1654,8 +1654,8 @@ def test_inconclusive_probe_is_preserved_through_phase_and_evidence(tmp_path, mo
     console = tmp_path / 'cps-console'
     console.touch()
     gap = mutate.UninspectableProcess(123, 5)
-    # Exercise real runner/preflight/sweep/evidence logic; only OS boundaries and
-    # the child import witness are supplied by this portable fixture.
+    # Exercise runner/preflight/sweep/evidence propagation; child execution,
+    # inspection, scrubbing, assessment and platform full-sync are stubbed.
     monkeypatch.setattr(mutate, 'sys', SimpleNamespace(**{**vars(sys), 'platform': 'darwin'}))
     class Process:
         pid = 800

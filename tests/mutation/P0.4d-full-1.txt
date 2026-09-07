@@ -1,0 +1,91 @@
+Captured pytest output; local paths redacted and startup dependency warnings omitted.
+
+pytest temp base: $TMPDIR
+..........LIMITATION tokenless detached child survived diagnostic cleanup; strict mode rejects before launch (Mac/APFS only)
+....ORACLE boundary=isolated-diagnostic channel=ignored clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+.ORACLE boundary=isolated-diagnostic channel=tracked clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+.ORACLE boundary=isolated-diagnostic channel=collateral clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+.ORACLE boundary=isolated-diagnostic channel=index clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+.ORACLE boundary=isolated-diagnostic channel=head clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+.ORACLE boundary=isolated-diagnostic channel=bytecode clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+.ORACLE boundary=isolated-diagnostic channel=child clean=0 baseline=0 mutant=0 CLEAN (Mac/APFS only)
+......PROVENANCE shape=pytest path=cps/__init__.py ACCEPTED (Mac/APFS only)
+PROVENANCE shape=child path=cps/__init__.py ACCEPTED (Mac/APFS only)
+PROVENANCE shape=console path=cps/__init__.py ACCEPTED (Mac/APFS only)
+PROVENANCE installed-checkout negative control: provenance REJECTED: child resolved outside disposable root (Mac/APFS only)
+.PROVENANCE negative shape=pytest: provenance REJECTED: pytest resolved outside disposable root (Mac/APFS only)
+.PROVENANCE negative shape=child: provenance REJECTED: child resolved outside disposable root (Mac/APFS only)
+.PROVENANCE negative shape=console: provenance REJECTED: console resolved outside disposable root (Mac/APFS only)
+.......UNVERIFIED diagnostic backend; committed seed only; shared Git writes UNSUPPORTED
+Outside boundary: temporary directories, venv, home, common Git data, Docker, databases, network, ports, caches, services and escaped processes
+UNVERIFIED seed=<pinned-seed>
+UNVERIFIED TESTS_PASSED: execution checks passed; authority remains unverified
+UNVERIFIED observation=1 evidence=be25d008f5294f11805e993c516540be.json
+CLI isolated phases=3 observed_exit=0 terminal_exit=1 source-preserved (Mac/APFS only)
+.UNVERIFIED diagnostic backend; committed seed only; shared Git writes UNSUPPORTED
+Outside boundary: temporary directories, venv, home, common Git data, Docker, databases, network, ports, caches, services and escaped processes
+UNVERIFIED seed=<pinned-seed>
+UNVERIFIED TEST_FAILURE: execution checks passed; authority remains unverified
+UNVERIFIED observation=1 evidence=7462e79ae1ba469fa9bb2a82c5c6ddec.json
+CLI isolated phases=3 observed_exit=1 terminal_exit=1 source-preserved (Mac/APFS only)
+.......................ACCOUNTING real pytest: 2/3 tests collected; selected=2 ACCEPTED (Mac/APFS only)
+.....................SOUNDNESS clean baseline=0 mutant=1 actual_failures=1 UNVERIFIED (Mac/APFS only)
+.......SOUNDNESS real xfail_notrun: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real xfail_run: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real setup_error: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real timeout: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real noop: ERROR UNVERIFIED durable (Mac/APFS only)
+.SOUNDNESS real pass: TESTS_PASSED UNVERIFIED durable (Mac/APFS only)
+...POLICY shared refs/common config survive scrub: UNSUPPORTED (Mac/APFS only)
+...usage: mutate.py [-h] [--file FILE] [--old OLD] [--new NEW] [--test TEST]
+                 [--spec SPEC] [--name NAME] [--repo REPO] --seed SEED
+                 [--backend {macos,container}] [--image IMAGE]
+                 [--scratch-dir SCRATCH_DIR] [--evidence-dir EVIDENCE_DIR]
+                 [--timeout TIMEOUT]
+mutate.py: error: unrecognized arguments: --clear-journal
+.CLI spec: UNVERIFIED exit=1 evidence-count=2 (Mac/APFS only)
+.CLI provenance_reject: UNVERIFIED exit=1 evidence-count=1 (Mac/APFS only)
+.....REVIEW1 DIRECT_EXIT=1 HARNESS_EXIT=1 SIGNAL=TEST_FAILURE PHASE_RETURNCODES=[0, 0, 1] (Mac/APFS only)
+...REVIEW2 IMPORTED_FROM=SOURCE_CHECKOUT SIGNAL=ERROR HARNESS_EXIT=1 (Mac/APFS only)
+....REVIEW3 shape=setattr PRESENT=REJECTED (Mac/APFS only)
+.REVIEW3 shape=duck PRESENT=REJECTED (Mac/APFS only)
+.UNVERIFIED equivalent_integer_bound: NO_TEST_FAILURE; 49 passed, 124 deselected in 10.09s (Mac/APFS only)
+REVIEW4 EXIT=1 (Mac/APFS only)
+................CONTAINMENT exit: alive_writes=4 after_removal_writes=0 containers=0
+.CONTAINMENT timeout: alive_writes=22 after_removal_writes=0 containers=0
+.CONTAINMENT failure: alive_writes=4 after_removal_writes=0 containers=0
+...LINUX PROBE clean_control: exit=1 seen=True active=True signal=TEST_FAILURE authority=False
+.LINUX PROBE absent_control: exit=0 seen=False active=True signal=TESTS_PASSED authority=False
+.LINUX PROBE startup_rewrite: exit=0 seen=True active=True signal=TESTS_PASSED authority=False
+.LINUX PROBE frame_forge: exit=0 seen=True active=True signal=TESTS_PASSED authority=False
+.LINUX PROBE meta_transform: exit=0 seen=True active=True signal=TESTS_PASSED authority=False
+.LINUX PROBE loader_transform: exit=0 seen=True active=True signal=TESTS_PASSED authority=False
+.UNVERIFIED Linux container phase observation. Outside containment: externally delegated work in databases, network services, shared ports, remote service managers, and daemons outside the container. Not hermetic. Execution provenance is UNVERIFIED.
+....CONTAINER seed=89a38440e51cb3e5735f9275c82835ca0609b91c
+caught mutation=1 file=victim.py: 1 test(s) ran; 1 failed; evidence=2ca91a84dfb946e295a137851f7fcfe3.json
+.CONTAINER seed=2c451361b3c331dd3bea1a715e24a7ad41b269a0
+SURVIVED mutation=1 file=victim.py: 1 test(s) ran; 0 failed; evidence=0ce4c45e0f894e7a9bd5be3f3ae3ff82.json
+.CONTAINER seed=ae3b5191904440fbf6558b387b7c653e4ad91a35
+ERROR mutation=1 file=victim.py: clean baseline did not pass; evidence=2aaf3d1b88cc4ba7979c509412197016.json
+.CONTAINER seed=334f9fee3ee013f8b6731604aafbb7b9c6235b54
+caught mutation=1 file=victim.py: 1 test(s) ran; 1 failed; evidence=7be087d3a44141debfd03662adae306f.json
+caught mutation=2 file=victim.py: 1 test(s) ran; 1 failed; evidence=db2219aa57c9441f83cdca6cd012993d.json
+.ERROR: Docker CLI not found. Install Docker and put docker on PATH, then retry --backend container.
+.ERROR: Cannot reach the Docker daemon. Start Docker and check your Docker context with docker info, then retry.
+.ERROR: Docker image 'python:3.12' is not available locally. Pull or build it first, or select an installed image with --image.
+.CONTAINER seed=01348993752a969f7e93bdbc71c4fd32bf5886ea
+ERROR mutation=1 file=victim.py: Docker could not create the phase container. Check free resources and Docker access to --scratch-dir; try a shared directory such as /tmp.; evidence=792613f46667472f804dc971b46f287c.json
+.....PROBE unreadable=INCONCLUSIVE inspected=False containment=no observed escape
+.PROBE unreadable=INCONCLUSIVE inspected=False containment=no observed escape
+.PROBE unreadable=INCONCLUSIVE inspected=True containment=REJECTED
+.PROBE unreadable=INCONCLUSIVE inspected=True containment=REJECTED
+.PROBE INCONCLUSIVE: preflight + phase + durable evidence; UNVERIFIED exit=1
+..Docker could not create the phase container within 5 seconds. The scratch directory may not be shared. Use --scratch-dir /tmp or share the directory in Docker Desktop.
+..Simulated stalled create: 5.02s; Docker could not create the phase container within 5 seconds. The scratch directory may not be shared. Use --scratch-dir /tmp or share the directory in Docker Desktop.
+.CONTAINER selected by platform default
+.CONTAINER selected by platform default
+.CONTAINER seed=b9a372baca085fc60bdf3a2e8d83d08402437be0
+ERROR mutation=1 file=victim.py: collection could not run pytest; use --image with Python 3.12+ and the test dependencies installed; evidence=9e549a3f632141099f11954845be3d17.json
+....
+173 passed in 686.75s (0:11:26)
+exit: 0

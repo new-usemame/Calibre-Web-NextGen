@@ -41,5 +41,28 @@ python3 scripts/impact_map.py build
 python3 scripts/impact_map.py recall
 ```
 
+## Two limits you must state when you use this
+
+**1. The map stops at Python. It has zero nodes outside `cps/*.py`** — no
+templates, no frontend. Measured over the last 400 `cps`-touching commits, **35%
+also changed `cps/templates/*` (10%) or `frontend/src/*` (29%)**. So for roughly
+a third of real changes the map structurally cannot name a consumer that exists.
+If you change a serializer, a route's response shape, or anything a page renders,
+the React or Jinja consumer will not appear — its absence is not evidence.
+
+**2. Recall depends entirely on what you ask about.** The headline historical
+figure is ~80%, and that is measured on caller/consumer pairs where both ends are
+module-level Python symbols. Raw co-change recall across all changed symbols is
+**12.49%**, with 37% of changed symbols getting nothing named at all. The honest
+range is therefore **[12.5%, 80%]**, and which end you are at depends on your
+target.
+
+You do not have to guess which: **every query prints the matched module's
+unresolved-call count and reasons**, and that number is informative rather than
+constant — across the 168 modules with 20 or more call sites it ranges from 0.000
+to 0.870 (p10 0.262, median 0.440, p90 0.658). A module reported at 87%
+unresolved is telling you the answer is thin; one at 15% is telling you it is
+solid. Read that number every time and report it alongside the result.
+
 Read `docs/impact-map.md` only when updating the generator, route oracle,
 confidence taxonomy, or historical case set.

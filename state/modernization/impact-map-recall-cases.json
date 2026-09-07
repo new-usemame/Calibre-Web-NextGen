@@ -84,5 +84,5 @@
       "summary": "Public-shelf visibility propagated through an instance method and a keyword flag."
     }
   ],
-  "selection_method": "Distinct real commits were inspected with git show --function-context. Each case records a changed cps function and a caller/consumer changed with it, including two known static-analysis blind spots."
+  "selection_method": "Distinct real commits were inspected with git show --function-context. Each case records a changed cps function and a caller/consumer changed with it, including two known static-analysis blind spots. HOW THIS SET WAS PRODUCED, stated because it bears on how much the headline ratio is worth: the map was built and queried on the eight symbols that became the eight HITS BEFORE this file was written, and the two MISSES are the two symbols that were not in that batch. The cases were not retuned afterwards. The 80.00% here is therefore a CONSTRUCTED ratio, not a blind measurement, and must not be quoted as one. The independent evidence for it is an external replication on 81 mechanically-selected held-out commits (author's ten excluded, map never consulted during selection): 65/81 = 80.25%, and 907/1157 = 78.39% across all pairs. Quote those figures, or quote this one together with this note."
 }

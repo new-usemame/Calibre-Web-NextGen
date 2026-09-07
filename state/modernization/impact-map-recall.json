@@ -1,0 +1,281 @@
+{
+  "artifact_kind": "historical_recall_evaluation",
+  "case_set": "p0.2-real-history-v1",
+  "hit_rate": 0.8,
+  "hit_rate_percent": 80.0,
+  "hits": 8,
+  "map_repo_sha": "149d77a886ed71f8b03e4957f3f9872ae6405b79",
+  "misses": 2,
+  "results": [
+    {
+      "affected_site": "cps.api.reader:get_bookmark",
+      "changed_symbol": "cps.services.reading_position:read_resume_position",
+      "commit": "92f851e3afeab8cea4c78214d4e49234594e7964",
+      "commit_exists": true,
+      "declared_evidence_paths": [
+        "cps/api/reader.py",
+        "cps/services/reading_position.py"
+      ],
+      "evidence": "The commit added read_resume_position and changed the SPA bookmark handler to call it.",
+      "evidence_paths_present": true,
+      "hit": true,
+      "max_depth": 2,
+      "miss_reason": null,
+      "path": [
+        {
+          "confidence": "exact_import_module_attribute",
+          "kind": "call",
+          "location": {
+            "column": 20,
+            "file": "cps/api/reader.py",
+            "line": 52
+          },
+          "source": "symbol:cps.api.reader:get_bookmark",
+          "target": "symbol:cps.services.reading_position:read_resume_position"
+        }
+      ],
+      "summary": "Reader resume arbitration had to be wired into the SPA bookmark endpoint."
+    },
+    {
+      "affected_site": "cps.services.reading_position:read_resume_position",
+      "changed_symbol": "cps.services.kobo_resume:exact_resume",
+      "commit": "057ce66935ec9fb1fecf6bc3d9b2aaa84816d308",
+      "commit_exists": true,
+      "declared_evidence_paths": [
+        "cps/services/kobo_resume.py",
+        "cps/services/reading_position.py"
+      ],
+      "evidence": "The commit introduced exact_resume and changed read_resume_position to call it for an exact device span.",
+      "evidence_paths_present": true,
+      "hit": true,
+      "max_depth": 2,
+      "miss_reason": null,
+      "path": [
+        {
+          "confidence": "exact_import_symbol",
+          "kind": "call",
+          "location": {
+            "column": 25,
+            "file": "cps/services/reading_position.py",
+            "line": 326
+          },
+          "source": "symbol:cps.services.reading_position:read_resume_position",
+          "target": "symbol:cps.services.kobo_resume:exact_resume"
+        }
+      ],
+      "summary": "Exact device resume conversion had to be consumed by reader-position arbitration."
+    },
+    {
+      "affected_site": "cps.web:render_magic_shelf",
+      "changed_symbol": "cps.custom_column_sort:resolve_magic_shelf_sort",
+      "commit": "d1628a3a94745ef97fc2f9c87a9b30f1fc7744fa",
+      "commit_exists": true,
+      "declared_evidence_paths": [
+        "cps/custom_column_sort.py",
+        "cps/web.py"
+      ],
+      "evidence": "The commit introduced custom sort resolution and changed the classic magic-shelf handler to consume it.",
+      "evidence_paths_present": true,
+      "hit": true,
+      "max_depth": 2,
+      "miss_reason": null,
+      "path": [
+        {
+          "confidence": "exact_import_symbol",
+          "kind": "call",
+          "location": {
+            "column": 21,
+            "file": "cps/web.py",
+            "line": 1267
+          },
+          "source": "symbol:cps.web:render_magic_shelf",
+          "target": "symbol:cps.custom_column_sort:resolve_magic_shelf_sort"
+        }
+      ],
+      "summary": "Custom-column sort resolution had to reach the classic magic-shelf handler."
+    },
+    {
+      "affected_site": "cps.api.shelves:add_book_to_shelf_api",
+      "changed_symbol": "cps.shelf:prepare_user_shelf_add",
+      "commit": "ef8291114dc97d0f2e4108c8df2ea54c5cf04163",
+      "commit_exists": true,
+      "declared_evidence_paths": [
+        "cps/api/shelves.py",
+        "cps/shelf.py"
+      ],
+      "evidence": "The helper signature gained the shelf argument and the API shelf-add handler changed its call.",
+      "evidence_paths_present": true,
+      "hit": true,
+      "max_depth": 2,
+      "miss_reason": null,
+      "path": [
+        {
+          "confidence": "exact_import_symbol",
+          "kind": "call",
+          "location": {
+            "column": 29,
+            "file": "cps/api/shelves.py",
+            "line": 282
+          },
+          "source": "symbol:cps.api.shelves:add_book_to_shelf_api",
+          "target": "symbol:cps.shelf:prepare_user_shelf_add"
+        }
+      ],
+      "summary": "Shelf-owner membership preparation required its API caller to change."
+    },
+    {
+      "affected_site": "cps.api.books:book_detail",
+      "changed_symbol": "cps.annotations:count_user_annotations",
+      "commit": "59b45c8270b628d5f753c91c211e99243442f378",
+      "commit_exists": true,
+      "declared_evidence_paths": [
+        "cps/annotations.py",
+        "cps/api/books.py"
+      ],
+      "evidence": "The commit added count_user_annotations and changed book_detail to include its result in serialization.",
+      "evidence_paths_present": true,
+      "hit": true,
+      "max_depth": 2,
+      "miss_reason": null,
+      "path": [
+        {
+          "confidence": "exact_import_symbol",
+          "kind": "call",
+          "location": {
+            "column": 28,
+            "file": "cps/api/books.py",
+            "line": 531
+          },
+          "source": "symbol:cps.api.books:book_detail",
+          "target": "symbol:cps.annotations:count_user_annotations"
+        }
+      ],
+      "summary": "The annotation count helper had to feed the SPA book-detail response."
+    },
+    {
+      "affected_site": "cps.kobo:HandleStateRequest",
+      "changed_symbol": "cps.helper:set_custom_read_column_value",
+      "commit": "4b5e99dd873f81eb3f0166a79542d436e3a04ad9",
+      "commit_exists": true,
+      "declared_evidence_paths": [
+        "cps/helper.py",
+        "cps/kobo.py"
+      ],
+      "evidence": "The commit added the custom-column setter and changed the device state handler to call it.",
+      "evidence_paths_present": true,
+      "hit": true,
+      "max_depth": 2,
+      "miss_reason": null,
+      "path": [
+        {
+          "confidence": "exact_import_module_attribute",
+          "kind": "call",
+          "location": {
+            "column": 33,
+            "file": "cps/kobo.py",
+            "line": 3749
+          },
+          "source": "symbol:cps.kobo:HandleStateRequest",
+          "target": "symbol:cps.helper:set_custom_read_column_value"
+        }
+      ],
+      "summary": "Configured read-status writes had to be wired into the device state handler."
+    },
+    {
+      "affected_site": "cps.cwa_functions:set_cwa_settings",
+      "changed_symbol": "cps.schedule:resolve_hardcover_auto_fetch_schedule",
+      "commit": "d8ca3fbd84af77fb931f884e6dfef1992e240df1",
+      "commit_exists": true,
+      "declared_evidence_paths": [
+        "cps/cwa_functions.py",
+        "cps/schedule.py"
+      ],
+      "evidence": "The commit introduced schedule resolution and changed the settings handler to validate through it.",
+      "evidence_paths_present": true,
+      "hit": true,
+      "max_depth": 2,
+      "miss_reason": null,
+      "path": [
+        {
+          "confidence": "exact_import_symbol",
+          "kind": "call",
+          "location": {
+            "column": 26,
+            "file": "cps/cwa_functions.py",
+            "line": 862
+          },
+          "source": "symbol:cps.cwa_functions:set_cwa_settings",
+          "target": "symbol:cps.schedule:resolve_hardcover_auto_fetch_schedule"
+        }
+      ],
+      "summary": "Schedule normalization had to be shared by settings persistence and scheduling."
+    },
+    {
+      "affected_site": "cps.progress_syncing.protocols.kosync:update_progress",
+      "changed_symbol": "cps.services.device_registry:register_koreader_device_best_effort",
+      "commit": "a6599265934fa9f869a96dca7595d08cf891bb28",
+      "commit_exists": true,
+      "declared_evidence_paths": [
+        "cps/progress_syncing/protocols/kosync.py",
+        "cps/services/device_registry.py"
+      ],
+      "evidence": "The commit changed device registration and wired progress-only updates into that helper.",
+      "evidence_paths_present": true,
+      "hit": true,
+      "max_depth": 2,
+      "miss_reason": null,
+      "path": [
+        {
+          "confidence": "exact_import_symbol",
+          "kind": "call",
+          "location": {
+            "column": 17,
+            "file": "cps/progress_syncing/protocols/kosync.py",
+            "line": 2109
+          },
+          "source": "symbol:cps.progress_syncing.protocols.kosync:update_progress",
+          "target": "symbol:cps.services.device_registry:register_koreader_device_best_effort"
+        }
+      ],
+      "summary": "Progress-only device observation had to reach the shared device registry."
+    },
+    {
+      "affected_site": "frontend/src/pages/Shelf.tsx",
+      "changed_symbol": "cps.api.shelves:shelf_detail",
+      "commit": "430601d6a58012dc5e8017431feed25f1b0fe38c",
+      "commit_exists": true,
+      "declared_evidence_paths": [
+        "cps/api/shelves.py",
+        "frontend/src/pages/Shelf.tsx"
+      ],
+      "evidence": "The backend response and the TypeScript shelf page changed together to expose and render sort options.",
+      "evidence_paths_present": true,
+      "expected_miss_reason": "The map is intentionally scoped to cps Python and cannot name a frontend consumer.",
+      "hit": false,
+      "max_depth": 3,
+      "miss_reason": "affected_site_not_present_in_current_map",
+      "path": [],
+      "summary": "A backend shelf response change required a TypeScript consumer change."
+    },
+    {
+      "affected_site": "cps.api.shelves:shelf_detail",
+      "changed_symbol": "cps.db:public_shelf_book_filter",
+      "commit": "9dc72ed57e328855b9d19653d831eeee7abea08b",
+      "commit_exists": true,
+      "declared_evidence_paths": [
+        "cps/api/shelves.py",
+        "cps/db.py"
+      ],
+      "evidence": "The API handler began passing a public-shelf flag into an instance method that conditionally calls the new filter.",
+      "evidence_paths_present": true,
+      "expected_miss_reason": "The dependency crosses an instance-method call and keyword-controlled branch; methods are folded into a class node and the receiver call is unresolved.",
+      "hit": false,
+      "max_depth": 4,
+      "miss_reason": "The dependency crosses an instance-method call and keyword-controlled branch; methods are folded into a class node and the receiver call is unresolved.",
+      "path": [],
+      "summary": "Public-shelf visibility propagated through an instance method and a keyword flag."
+    }
+  ],
+  "schema_version": 1,
+  "total": 10
+}

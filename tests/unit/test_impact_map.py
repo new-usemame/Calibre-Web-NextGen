@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
+import re
 import shutil
 import subprocess
 import sys
@@ -308,6 +310,172 @@ def test_refresh_refuses_to_overwrite_committed_inputs(history_repo, tmp_path):
     assert result.returncode != 0
     assert "output directory would overwrite committed artifacts" in result.stderr
     assert (history_repo / impact_map.DEFAULT_MAP).read_bytes() == before
+
+
+@pytest.mark.parametrize("change", ["module-to-package", "remove-modules"])
+def test_refresh_reports_current_path_mismatches_as_misses(history_repo, tmp_path, change):
+    """Intent: current file layout must not turn frozen historical evidence into a contributor gate."""
+    repo = history_repo
+    if change == "module-to-package":
+        (repo / "cps/provider").mkdir()
+        git(repo, "mv", "cps/provider.py", "cps/provider/__init__.py")
+    else:
+        git(repo, "rm", "cps/app.py", "cps/provider.py")
+    git(repo, "commit", "-m", "Refactor synthetic modules")
+    before = {path: (repo / path).read_bytes() for path in (impact_map.DEFAULT_MAP, impact_map.DEFAULT_RECALL)}
+
+    result = refresh(repo, tmp_path / "artifacts", tmp_path / "summary.md")
+
+    assert result.returncode == 0, result.stderr
+    report = impact_map.load_json(tmp_path / "artifacts" / impact_map.DEFAULT_RECALL.name)
+    mismatches = [case for case in report["results"] if not case["evidence_paths_present"]]
+    assert mismatches, "fixture must exercise the historical/current path mismatch"
+    assert all(case["commit_exists"] and not case["hit"] for case in mismatches)
+    assert all(case["miss_reason"] == "historical_diff_does_not_touch_declared_sites" for case in mismatches)
+    assert "historical_diff_does_not_touch_declared_sites" in result.stdout
+    assert impact_map.load_json(tmp_path / "artifacts/impact-map-currency.json")["status"] == "stale"
+    assert all((repo / path).read_bytes() == contents for path, contents in before.items())
+
+
+@pytest.mark.parametrize("output_name,target,alias", [
+    ("impact-map.json", impact_map.DEFAULT_MAP, "symlink"),
+    ("impact-map-recall.json", impact_map.DEFAULT_ORACLE, "symlink"),
+    ("impact-map-currency.json", impact_map.DEFAULT_CASES, "symlink"),
+    ("impact-map.json", impact_map.DEFAULT_RECALL, "hardlink"),
+])
+def test_refresh_rejects_output_aliases_before_writes(history_repo, tmp_path, output_name, target, alias):
+    """Intent: a generated output must never overwrite an input through a filesystem alias."""
+    output = tmp_path / "artifacts"
+    output.mkdir()
+    destination = output / output_name
+    getattr(destination, "symlink_to" if alias == "symlink" else "hardlink_to")(history_repo / target)
+    write(history_repo / "cps/new.py", "def added():\n    return 1\n")
+    before = (history_repo / target).read_bytes()
+
+    result = refresh(history_repo, output, tmp_path / "summary.md")
+
+    unchanged = (history_repo / target).read_bytes() == before
+    assert unchanged, "generated output overwrote a protected input"
+    assert result.returncode != 0, "an output alias was accepted"
+    assert "output destination aliases" in result.stderr
+    assert not (tmp_path / "summary.md").exists()
+    assert set(output.iterdir()) == {destination}, "preflight must precede publication"
+
+
+@pytest.mark.parametrize("target", ["scripts/impact_map.py", "tests/unit/test_impact_map.py"])
+def test_refresh_rejects_summary_aliases_to_repository_files(history_repo, tmp_path, target):
+    """Intent: the generator and tests are protected inputs even though the map only parses cps."""
+    script = history_repo / "scripts/impact_map.py"
+    write(script, SCRIPT.read_text(encoding="utf-8"))
+    write(history_repo / "tests/unit/test_impact_map.py", "def test_example():\n    assert True\n")
+    git(history_repo, "add", "scripts", "tests")
+    destination = history_repo / target
+    before = destination.read_bytes()
+
+    result = subprocess.run(
+        [sys.executable, str(script), "refresh", "--output-dir", str(tmp_path / "artifacts"),
+         "--summary", target], cwd=history_repo, capture_output=True, text=True, timeout=30,
+    )
+
+    unchanged = destination.read_bytes() == before
+    assert unchanged, "summary appended to a repository source file"
+    assert result.returncode != 0
+    assert "summary destination aliases" in result.stderr
+    assert not (tmp_path / "artifacts").exists()
+
+
+@pytest.mark.parametrize("destination", ["map", "summary"])
+def test_refresh_rechecks_aliases_at_write_time(history_repo, tmp_path, monkeypatch, destination):
+    """Intent: a link introduced during generation cannot bypass destination preflight."""
+    output, summary = tmp_path / "artifacts", tmp_path / "summary.md"
+    target = history_repo / impact_map.DEFAULT_ORACLE
+    before = target.read_bytes()
+    build = impact_map.build_map
+
+    def build_then_link(*args):
+        data = build(*args)
+        output.mkdir()
+        link = output / impact_map.DEFAULT_MAP.name if destination == "map" else summary
+        link.symlink_to(target)
+        return data
+
+    monkeypatch.setattr(impact_map, "build_map", build_then_link)
+    with pytest.raises(ValueError, match="destination aliases"):
+        impact_map.refresh_artifacts(history_repo, output, summary)
+    assert target.read_bytes() == before
+    assert not (output / "impact-map-currency.json").exists()
+
+
+@pytest.mark.parametrize("alias", ["symlink", "hardlink"])
+def test_write_json_does_not_follow_links(tmp_path, alias):
+    """Intent: the JSON writer replaces its destination without writing through to another file."""
+    target, destination = tmp_path / "input.json", tmp_path / "output.json"
+    target.write_text('{"input": true}\n', encoding="utf-8")
+    getattr(destination, "symlink_to" if alias == "symlink" else "hardlink_to")(target)
+    impact_map.write_json(destination, {"output": True})
+    assert target.read_text(encoding="utf-8") == '{"input": true}\n'
+    assert impact_map.load_json(destination) == {"output": True}
+    assert not destination.samefile(target)
+
+
+def test_skill_refresh_recipe_publishes_and_queries_fresh_map(history_repo, tmp_path):
+    """Intent: an agent can execute the skill's refresh recipe and query new code without editing snapshots."""
+    skill = (ROOT / ".agents/skills/cwng-impact-map/SKILL.md").read_text(encoding="utf-8")
+    recipes = [block for block in re.findall(r"```bash\n(.*?)```", skill, re.S)
+               if "scripts/impact_map.py refresh" in block]
+    assert recipes, "skill provides no executable refresh recipe"
+    write(history_repo / "scripts/impact_map.py", SCRIPT.read_text(encoding="utf-8"))
+    write(history_repo / "cps/new.py", "def added():\n    return 1\n")
+    git(history_repo, "add", "cps/new.py")
+    git(history_repo, "commit", "-m", "Add a synthetic query target")
+    before = (history_repo / impact_map.DEFAULT_MAP).read_bytes()
+    result = subprocess.run(
+        ["bash", "-e", "-c", 'python3() { command "$IMPACT_PYTHON" "$@"; }\n' + recipes[0]],
+        cwd=history_repo, capture_output=True, text=True, timeout=30,
+        env={**os.environ, "IMPACT_PYTHON": sys.executable, "TMPDIR": str(tmp_path),
+             "TARGET": "cps.new:added"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert "symbol:cps.new:added" in result.stdout
+    currency = impact_map.load_json(tmp_path / "impact-map/impact-map-currency.json")
+    assert currency["status"] == "stale"
+    assert currency["current_cps_tree_sha"] == git(history_repo, "rev-parse", "HEAD:cps")
+    assert (history_repo / impact_map.DEFAULT_MAP).read_bytes() == before
+
+
+def test_committed_recall_gate_rejects_collapse_and_accepts_improvement(monkeypatch):
+    """Intent: regenerating a matching report cannot launder total graph loss past the recall floor."""
+    load = impact_map.load_json
+    original = load(ROOT / impact_map.DEFAULT_MAP)
+    cases = load(ROOT / impact_map.DEFAULT_CASES)
+    data = {**original, "edges": [edge for edge in original["edges"] if edge["kind"] != "call"]}
+    report = impact_map.evaluate_recall(data, cases, ROOT)
+    assert report["hits"] == 0
+
+    def load_replacement(path):
+        if path == ROOT / impact_map.DEFAULT_MAP:
+            return data
+        if path == ROOT / impact_map.DEFAULT_RECALL:
+            return report
+        return load(path)
+
+    monkeypatch.setattr(impact_map, "load_json", load_replacement)
+    with pytest.raises(AssertionError, match="committed recall fell below"):
+        test_committed_recall_report_is_reproducible_and_keeps_misses()
+
+    # Exercise a real ninth path, with all cases and historical checks retained.
+    data = {**original, "edges": list(original["edges"])}
+    case = cases["cases"][-1]
+    affected = next(node for node in data["nodes"] if impact_map.node_matches(node, case["affected_site"]))
+    changed = next(node for node in data["nodes"] if impact_map.node_matches(node, case["changed_symbol"]))
+    data["edges"].append({
+        "source": affected["id"], "target": changed["id"], "kind": "call",
+        "confidence": "exact_import_symbol",
+        "location": {"file": affected["file"], "line": affected["line"], "column": 0},
+    })
+    report = impact_map.evaluate_recall(data, cases, ROOT)
+    assert report["hits"] == 9
+    test_committed_recall_report_is_reproducible_and_keeps_misses()
 
 
 @pytest.mark.parametrize("destination,alias", [

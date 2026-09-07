@@ -18,6 +18,8 @@ executes it under substituted job results.
 Includes a POSITIVE CONTROL (all-success must exit 0). Without one, a harness
 that rejects everything would look like a perfect gate.
 """
+import json
+import os
 import re
 import subprocess
 from pathlib import Path
@@ -88,6 +90,44 @@ def _run(**kwargs):
 
 
 MAIN_PUSH = dict(event="push", ref="refs/heads/main")
+
+
+@pytest.mark.parametrize("summary_failed", [False, True])
+def test_impact_map_failure_never_authorizes_auto_revert(tmp_path, summary_failed):
+    """Intent: an impact-map failure and its propagated summary failure cannot revert an innocent commit."""
+    workflow = yaml.safe_load((REPO_ROOT / ".github/workflows/auto-revert.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["revert-on-red"]["steps"]
+    triage = next(step["run"] for step in steps if step.get("id") == "triage")
+    suite = yaml.safe_load(WORKFLOW.read_text(encoding="utf-8"))
+    jobs = [{"name": job["name"], "conclusion": "success"}
+            for job in suite["jobs"].values() if "name" in job]
+    impact_name = suite["jobs"]["impact-map"]["name"]
+    for job in jobs:
+        if job["name"] == impact_name or (summary_failed and job["name"] == "Test Suite Summary"):
+            job["conclusion"] = "failure"
+
+    def decide(job_list):
+        output = tmp_path / "github-output"
+        output.write_text("", encoding="utf-8")
+        # Execute the entire triage shell and real jq; only external reads are stubbed.
+        stubs = 'git() { printf "%s\\n" "cps/annotations.py"; }\ngh() { printf "%s\\n" "$JOBS_JSON"; }\n'
+        result = subprocess.run(
+            ["bash", "-c", stubs + triage], capture_output=True, text=True,
+            env={**os.environ, "JOBS_JSON": json.dumps({"jobs": job_list}),
+                 "GITHUB_OUTPUT": str(output), "RUN_ID": "1", "HEAD_SHA": "fixture",
+                 "GITHUB_REPOSITORY": "fixture/project"},
+        )
+        assert result.returncode == 0, result.stderr
+        return output.read_text(encoding="utf-8").strip(), result.stdout
+
+    decision, out = decide(jobs)
+    assert decision == "revert=false", out
+    # Preserve the existing SPA exclusion and real product-failure signals.
+    decision, out = decide([*jobs, {"name": "E2E Tests (SPA)", "conclusion": "failure"}])
+    assert decision == "revert=false", out
+    for name in ("Fast Tests (Smoke + Unit)", "Frontend Build", "Integration Tests"):
+        decision, out = decide([*jobs, {"name": name, "conclusion": "failure"}])
+        assert decision == "revert=true", out
 
 
 @pytest.mark.parametrize("event,ref", [

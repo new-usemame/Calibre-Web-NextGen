@@ -125,7 +125,8 @@ def test_impact_map_failure_never_authorizes_auto_revert(tmp_path, summary_faile
     # Preserve the existing SPA exclusion and real product-failure signals.
     decision, out = decide([*jobs, {"name": "E2E Tests (SPA)", "conclusion": "failure"}])
     assert decision == "revert=false", out
-    for name in ("Fast Tests (Smoke + Unit)", "Frontend Build", "Integration Tests"):
+    for job_id in ("fast-tests", "frontend-build", "integration-tests"):
+        name = suite["jobs"][job_id]["name"]
         decision, out = decide([*jobs, {"name": name, "conclusion": "failure"}])
         assert decision == "revert=true", out
 

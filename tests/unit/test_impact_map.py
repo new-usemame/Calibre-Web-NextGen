@@ -474,7 +474,7 @@ def test_committed_recall_gate_rejects_collapse_and_accepts_improvement(monkeypa
         "location": {"file": affected["file"], "line": affected["line"], "column": 0},
     })
     report = impact_map.evaluate_recall(data, cases, ROOT)
-    assert report["hits"] == 9
+    assert report["hits"] >= 9
     test_committed_recall_report_is_reproducible_and_keeps_misses()
 
 

@@ -1724,6 +1724,26 @@ def test_unreadable_only_escape_prevents_containment_acceptance(tmp_path, monkey
     print('SOLE ESCAPE unreadable + unrelated readable PID: INCONCLUSIVE, acceptance blocked')
 
 
+def test_pending_gap_that_becomes_readable_and_contaminated_is_rejected(monkeypatch):
+    from types import SimpleNamespace
+    gap = mutate.UninspectableProcess(123, 5)
+    snapshots = iter([({}, (gap,)), ({}, ())])
+    monkeypatch.setattr(mutate, '_phase_members', lambda *a: next(snapshots))
+    monkeypatch.setattr(mutate, '_has_phase_token', lambda *a: True)
+    identities = iter([(1, 2), (1, 2), None])
+    monkeypatch.setattr(mutate, '_process_identity', lambda *a: next(identities))
+    killed = []
+    monkeypatch.setattr(mutate.os, 'kill', lambda pid, sig: killed.append(pid))
+    proc = SimpleNamespace(pid=800, returncode=0, poll=lambda: 0, wait=lambda **k: 0)
+    escaped, error, gaps = mutate._terminate_phase_processes(proc, 'phase-token')
+    assert escaped == (123,), 'a newly inspectable matching token was not rejected'
+    assert killed == [123] and gaps == ()
+    assert 'escaped its process group' in error
+    phase = mutate.PhaseResult((), 0, '', '', False, error, escaped, inspection_gaps=gaps)
+    assert phase.containment_verdict == 'REJECTED'
+    print('PENDING GAP -> readable matching token: REJECTED and signalled')
+
+
 @pytest.fixture
 def preflight_gap_case(tmp_path, monkeypatch):
     from types import SimpleNamespace

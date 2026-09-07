@@ -58,6 +58,15 @@ The legacy macOS output retains `UNVERIFIED`: its cleanup cannot guarantee that 
 children stop writing after a phase. That backend still exits nonzero. Container results
 omit this label because ordinary test outcomes already say what a reader needs.
 
+Within the restricted macOS diagnostic contract, containment is `ESTABLISHED`,
+`REJECTED`, or `INCONCLUSIVE`. EIO during token inspection gets bounded sysctl
+reinspection; confirmed disappearance clears the gap, and a readable matching
+token enters escape detection. Unresolved ownership produces `UNVERIFIED
+INCONCLUSIVE`, exits 1, and stops validation and further phases. Evidence records
+the unresolved PIDs. The disposable tree is preserved with a
+`containment-inconclusive` metadata state and excluded from automatic stale-sweep
+removal; its writers must be accounted for before manually removing it.
+
 Container scratch defaults to `/tmp`, independently of pytest's external-volume scratch.
 Override it with `--scratch-dir DIR` (CLI) or `CWNG_DOCKER_SCRATCH` (CLI and tests), choosing
 a writable directory shared with Docker. An unresponsive create fails after five seconds

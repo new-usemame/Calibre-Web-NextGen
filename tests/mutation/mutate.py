@@ -13,7 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
-from dataclasses import asdict, dataclass, field, replace
+from dataclasses import asdict, dataclass, field
 import fcntl
 import hashlib
 import importlib.util
@@ -62,6 +62,31 @@ class PhaseResult:
     inspection_gaps: tuple[UninspectableProcess, ...] = ()
     status: str = field(default="UNVERIFIED", init=False)
     authoritative: bool = field(default=False, init=False)
+
+    @property
+    def containment_verdict(self) -> str:
+        """Verdict for the restricted diagnostic contract, never authority."""
+        if self.containment_error or self.escaped_pids:
+            return "REJECTED"
+        if self.inspection_gaps:
+            return "INCONCLUSIVE"
+        return "ESTABLISHED"
+
+
+class ContainmentInconclusive(IsolationError):
+    """Ownership remains unresolved; no clean or contaminated verdict is known."""
+
+    def __init__(self, phase: PhaseResult):
+        self.phase = phase
+        super().__init__("containment INCONCLUSIVE: unresolved phase-token inspection "
+                         f"for processes {[gap.pid for gap in phase.inspection_gaps]}")
+
+
+def _require_phase_containment(phase: PhaseResult) -> None:
+    if phase.containment_verdict == "REJECTED":
+        raise IsolationError(phase.containment_error or "phase process escaped its process group")
+    if phase.containment_verdict == "INCONCLUSIVE":
+        raise ContainmentInconclusive(phase)
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +156,15 @@ def _process_identity(pid: int) -> tuple[int, int] | None:
 
 
 def _has_phase_token(pid: int, token: str) -> bool | UninspectableProcess:
+    """Bounded sysctl reinspection resolves exit races without consulting ps."""
+    for _ in range(3):
+        observation = _read_phase_token(pid, token)
+        if not isinstance(observation, UninspectableProcess):
+            return observation
+    return observation
+
+
+def _read_phase_token(pid: int, token: str) -> bool | UninspectableProcess:
     """Read Darwin's exec environment without logging arguments or environment."""
     library = ctypes.CDLL(None, use_errno=True)
     mib = (ctypes.c_int * 3)(1, 49, pid)  # CTL_KERN, KERN_PROCARGS2
@@ -248,13 +282,28 @@ def _terminate_phase_processes(
     escaped = set()
     known = {}
     errors = []
-    gaps = set()
+    gaps = {}
     deadline = time.monotonic() + 3
     while True:
         proc.poll()  # reap the leader before checking the process group
         try:
             members, uninspectable = _phase_members(proc.pid, token)
-            gaps.update(uninspectable)
+            gaps.update((gap.pid, gap) for gap in uninspectable)
+            # A missing entry in ps is not evidence of disappearance. Reinspect
+            # pending PIDs through sysctl before accepting the cleanup boundary.
+            for pid in list(gaps):
+                observation = _has_phase_token(pid, token)
+                if isinstance(observation, UninspectableProcess):
+                    gaps[pid] = observation
+                    continue
+                del gaps[pid]
+                if observation is True:
+                    # Gaps originate outside the leader's process group. A
+                    # newly readable token is an escape, not a cleared gap.
+                    escaped.add(pid)
+                    identity = _process_identity(pid)
+                    if identity is not None:
+                        known[pid] = identity
             for pid, (group, zombie) in members.items():
                 identity = _process_identity(pid)
                 if identity is not None:
@@ -299,7 +348,7 @@ def _terminate_phase_processes(
     if escaped:
         errors.append(f"phase process escaped its process group: {sorted(escaped)}")
     return (tuple(sorted(escaped)), "; ".join(errors) or None,
-            tuple(sorted(gaps, key=lambda gap: (gap.pid, gap.error))))
+            tuple(gaps[pid] for pid in sorted(gaps)))
 
 
 def run_phase_process(
@@ -423,6 +472,7 @@ def provenance_preflight(
             path = pathlib.Path(relative)
             if path.is_absolute() or not (root / path).resolve(strict=True).is_relative_to(root):
                 raise IsolationError(f"provenance REJECTED: {shape} path outside disposable root")
+        _require_phase_containment(result)
         record["inspection_gaps"] = [asdict(gap) for gap in result.inspection_gaps]
         records.append(record)
     return tuple(records)
@@ -431,6 +481,7 @@ def provenance_preflight(
 def _check_report(phase: PhaseResult, report: dict) -> None:
     if phase.timed_out or phase.containment_error:
         raise IsolationError("pytest phase timed out or failed containment")
+    _require_phase_containment(phase)
     if (not isinstance(report, dict) or type(report.get("version")) is not int
             or report["version"] != 1 or report.get("complete") is not True
             or report.get("exitstatus") != phase.returncode):
@@ -639,6 +690,7 @@ def _safe_trace(trace):
                        "stdout_sha256": hashlib.sha256(phase.stdout.encode()).hexdigest(),
                        "stderr_sha256": hashlib.sha256(phase.stderr.encode()).hexdigest(),
                        "inspection_gaps": [asdict(gap) for gap in phase.inspection_gaps],
+                       "containment_verdict": phase.containment_verdict,
                        "report": report})
     return phases
 
@@ -650,11 +702,16 @@ def run_checked_mutation(sweep, relative, old, new, targets, *, environment, tim
     trace = []
     try:
         check = _assess_mutation(sweep, relative, old, new, targets, environment, timeout, trace)
+        for _, phase, _ in trace:
+            _require_phase_containment(phase)
         signal_name, detail = check.signal, "execution checks passed; authority remains unverified"
+    except ContainmentInconclusive as exc:
+        sweep._mark_containment_inconclusive()
+        if not any(phase is exc.phase for _, phase, _ in trace):
+            trace.append(("containment", exc.phase, None))
+        signal_name, detail = "INCONCLUSIVE", str(exc)
     except (IsolationError, OSError, ValueError) as exc:
         signal_name, detail = "ERROR", str(exc) if isinstance(exc, IsolationError) else type(exc).__name__
-    if any(phase.inspection_gaps for _, phase, _ in trace):
-        detail += "; phase-token inspection INCONCLUSIVE (see inspection_gaps)"
     for root, replacement in ((sweep.root, "<execution-root>"), (sweep.source_repo, "<source-root>"),
                               (sweep.entry, "<sweep>")):
         detail = detail.replace(str(root), replacement)
@@ -674,7 +731,7 @@ def present_checked_result(result: CheckedResult) -> int:
             or result.authoritative is not False or type(result.exit_code) is not int
             or result.exit_code != 1):
         raise IsolationError("diagnostic authority fields are invalid")
-    if result.signal not in ("ERROR", "TEST_FAILURE", "TESTS_PASSED"):
+    if result.signal not in ("ERROR", "INCONCLUSIVE", "TEST_FAILURE", "TESTS_PASSED"):
         raise IsolationError("unsupported diagnostic signal")
     try:
         digest = _digest(result.evidence)
@@ -782,7 +839,7 @@ def _reap_stale_sweeps(repo: pathlib.Path, state_root: pathlib.Path) -> list[pat
             owner = int(metadata["owner_pid"])
         except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
             continue
-        if not valid or _is_live_pid(owner):
+        if not valid or metadata.get("state") == "containment-inconclusive" or _is_live_pid(owner):
             continue
         removal = subprocess.run(
             ["git", "-C", str(repo), "worktree", "remove", "--force", str(worktree)],
@@ -816,6 +873,7 @@ class IsolatedSweep:
         self.seed_tree = seed_tree
         self._closed = False
         self._phase_failed = False
+        self._containment_inconclusive = False
 
     @classmethod
     def create(
@@ -911,7 +969,7 @@ class IsolatedSweep:
             targets = pytest_targets
             if targets is None and len(argv) >= 3 and argv[1:3] == ["-m", "pytest"]:
                 targets = argv[3:]
-            provenance = provenance_preflight(
+            provenance_preflight(
                 self.root, environment=environment, artifacts=self.entry / "provenance",
                 pytest_targets=targets,
             )
@@ -926,28 +984,33 @@ class IsolatedSweep:
                 argv, cwd=self.root, environment=environment, timeout=timeout,
                 artifacts=self.entry / "artifacts", ownership_contract=ownership_contract,
             )
-            if result.containment_error:
-                raise IsolationError(result.containment_error)
-            # Preflight observations belong to this phase too. Unreadable token
-            # environments stay inconclusive under the UNVERIFIED contract;
-            # observed escapes and other cleanup errors still reject above.
-            gaps = set(result.inspection_gaps)
-            for record in provenance:
-                gaps.update(UninspectableProcess(**gap) for gap in record["inspection_gaps"])
-            result = replace(result, inspection_gaps=tuple(sorted(
-                gaps, key=lambda gap: (gap.pid, gap.error))))
+            _require_phase_containment(result)
             self.scrub()
             if result.timed_out:
                 raise IsolationError("phase timed out")
             return result
+        except ContainmentInconclusive:
+            self._mark_containment_inconclusive()
+            raise
         except BaseException:
             self._phase_failed = True
             raise
+
+    def _mark_containment_inconclusive(self) -> None:
+        self._phase_failed = True
+        self._containment_inconclusive = True
+        metadata_path = self.entry / "metadata.json"
+        if metadata_path.exists():
+            metadata = json.loads(metadata_path.read_text())
+            metadata["state"] = "containment-inconclusive"
+            _write_json(metadata_path, metadata)
 
     def close(self) -> None:
         if self._closed:
             return
         self._closed = True
+        if self._containment_inconclusive:
+            return  # Preserve the tree; an unreadable writer may still own it.
         removal = subprocess.run(
             [
                 "git",
@@ -1088,7 +1151,7 @@ def main():
                 )
                 present_checked_result(result)
                 print(f"UNVERIFIED observation={index} evidence={result.evidence.name}", flush=True)
-                if result.signal == "ERROR":
+                if result.signal in ("ERROR", "INCONCLUSIVE"):
                     break
         return 1
     except (IsolationError, OSError, ValueError) as exc:

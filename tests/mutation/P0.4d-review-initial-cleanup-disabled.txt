@@ -1,0 +1,30 @@
+Captured pytest output; local paths redacted; startup warnings and repeated assertion object representations omitted.
+
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- repo virtualenv/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 178 items / 176 deselected / 2 selected
+
+tests/unit/test_mutation_harness.py::test_phase_exit_kills_a_child_that_would_write_later FAILED
+tests/unit/test_mutation_harness.py::test_phase_escape_is_terminated_and_is_an_error FAILED
+
+=================================== FAILURES ===================================
+_____________ test_phase_exit_kills_a_child_that_would_write_later _____________
+tests/unit/test_mutation_harness.py:194: in test_phase_exit_kills_a_child_that_would_write_later
+    _assert_child_gone(tmp_path)
+tests/unit/test_mutation_harness.py:181: in _assert_child_gone
+    assert not (root / "late-write").exists(), "child invalidated the boundary after exit"
+E   AssertionError: child invalidated the boundary after exit
+E   assert not True
+_______________ test_phase_escape_is_terminated_and_is_an_error ________________
+tests/unit/test_mutation_harness.py:206: in test_phase_escape_is_terminated_and_is_an_error
+    assert int((tmp_path / "ready").read_text()) in result.escaped_pids
+E   assert 81014 in ()
+=========================== short test summary info ============================
+FAILED tests/unit/test_mutation_harness.py::test_phase_exit_kills_a_child_that_would_write_later
+FAILED tests/unit/test_mutation_harness.py::test_phase_escape_is_terminated_and_is_an_error
+====================== 2 failed, 176 deselected in 8.62s =======================
+
+exit: 1

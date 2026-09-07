@@ -2343,6 +2343,11 @@ def create_annotation(payload, *, user_id, book, session, commit,
     request context — mirrors :func:`ingest_bookmarks`. Raises ``ValueError``
     on a payload with no usable anchor.
     """
+    # An explicitly empty note is learned; an omitted note remains unknown.
+    note_text = payload.get("note_text")
+    if "note_text" in payload and note_text is None:
+        note_text = ""
+
     # The reader sends a palette NAME; the column speaks canonical hex. Accept
     # the name (unchanged UI contract), store the hex.
     color_name = (payload.get("highlight_color") or "yellow").strip().lower()
@@ -2444,7 +2449,7 @@ def create_annotation(payload, *, user_id, book, session, commit,
             last_editor_device_id=origin_device_id,
             highlighted_text=payload.get("highlighted_text"),
             highlight_color=color,
-            note_text=payload.get("note_text"),
+            note_text=note_text,
             content_id=content_id,
             cfi_range=cfi_range,
             position_type="cfi",
@@ -2476,7 +2481,7 @@ def create_annotation(payload, *, user_id, book, session, commit,
         last_editor_device_id=origin_device_id,
         highlighted_text=payload.get("highlighted_text"),
         highlight_color=color,
-        note_text=payload.get("note_text"),
+        note_text=note_text,
         content_id=content_id,
         start_container_path="span#" + start_span,
         start_container_child_index=-99,
@@ -2541,7 +2546,9 @@ def edit_annotation(annotation_id, *, user_id, book_id, session, commit,
         # Validate the name the reader sent, store the canonical hex.
         row.highlight_color = to_storage_color(normalized)
     if note is not _UNSET:
-        row.note_text = note
+        # Explicit clears (including legacy reader JSON null) are known empty.
+        # Omission keeps _UNSET, preserving NULL for notes never learned.
+        row.note_text = "" if note is None else note
     if editor_device_id is not None:
         row.last_editor_device_id = editor_device_id
     now = datetime.now(timezone.utc)

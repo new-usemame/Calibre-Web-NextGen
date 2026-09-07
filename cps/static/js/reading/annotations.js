@@ -417,7 +417,7 @@
                     end_kobospan: anchor.end_kobospan, end_offset: anchor.end_offset,
                     chapter_filename: anchor.chapter_filename,
                     highlighted_text: anchor.highlighted_text,
-                    highlight_color: chosen.color, note_text: note.value || null
+                    highlight_color: chosen.color, note_text: note.value
                 })
                 .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
                 .then(function (row) {
@@ -471,7 +471,7 @@
         save.type = "button"; save.className = "cwa-ann-save"; save.textContent = t("save", "Save");
         save.addEventListener("click", function () {
             save.disabled = true;
-            var patch = { note_text: note.value || null };
+            var patch = { note_text: note.value };
             if (chosen.picked) { patch.highlight_color = chosen.color; }
             apiFetch("PATCH", apiBase() + "/" + encodeURIComponent(row.annotation_id), patch)
             .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })

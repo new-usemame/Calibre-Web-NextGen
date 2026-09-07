@@ -223,7 +223,7 @@ def _fallback_object(annotation, entitlement_id):
         "location": common["location"],
         "type": common["type"],
     }
-    if annotation.note_text is not None:
+    if annotation.note_text:
         result["noteText"] = annotation.note_text
 
     if native_type == "note":

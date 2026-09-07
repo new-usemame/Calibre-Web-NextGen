@@ -44,7 +44,10 @@ while time.monotonic() < deadline and not any(row[1] == errno.EIO for row in obs
     scans += 1
     for value in table.split():
         try:
-            module._has_phase_token(int(value), 'probe-only-no-signalling')
+            observation = module._has_phase_token(int(value), 'probe-only-no-signalling')
+            if isinstance(observation, module.UninspectableProcess):
+                observations.append((observation.pid, observation.error))
+                print(f'INCONCLUSIVE pid={observation.pid} errno={observation.error}', flush=True)
         except module.IsolationError:
             pass
         probes += 1

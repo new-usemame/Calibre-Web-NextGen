@@ -2428,3 +2428,325 @@ git rm cps/cwa_functions.py cps/schedule.py
 The collapse keeps `edge["kind"] == "import"`, writes the modified map, runs
 `python3 scripts/impact_map.py recall`, then runs the complete unit file. It does
 not alter the map's declared counts or tune cases to manufacture a hit rate.
+
+
+### Final regeneration and consecutive full runs of both changed files
+
+OBSERVED: `python3 scripts/impact_map.py build`, then
+`python3 scripts/impact_map.py recall`, on the supplied worktree:
+
+```text
+wrote $ROOT/state/modernization/impact-map.json: 3396 nodes, 9475 edges, 15299 blind spots
+
+exit code: 0
+```
+
+```text
+historical recall: 8/10 (80.00%); misses=2
+
+exit code: 0
+```
+
+OBSERVED: neither committed artifact changed. The current snapshot remains
+8/10 at cps tree `769be5deb55520e94165317132e91af3b38794c6`; the deliberately
+refactored and corrupted artifacts above exist only in the disposable clone.
+
+OBSERVED: two consecutive complete invocations of this command, with source
+and test code unchanged between them:
+
+```bash
+python3 -m pytest tests/unit/test_impact_map.py tests/unit/test_summary_gate_requires_success.py -p no:randomly
+```
+
+Each run includes all 41 impact-map cases and all 41 summary/revert cases:
+82 total, no skips or deselections. First complete run:
+
+```text
+pytest temp base: $TMPDIR/cwng-pytest ($TMPDIR is mounted and writable)
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- $VENV/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 82 items
+
+tests/unit/test_impact_map.py::test_generator_separates_exact_bindings_from_attribute_guesses PASSED [  1%]
+tests/unit/test_impact_map.py::test_route_query_reaches_handler_and_reports_module_blindness PASSED [  2%]
+tests/unit/test_impact_map.py::test_runtime_only_route_is_live_but_has_no_invented_handler PASSED [  3%]
+tests/unit/test_impact_map.py::test_reconciliation_static_only_route_is_not_claimed_live PASSED [  4%]
+tests/unit/test_impact_map.py::test_same_inputs_generate_byte_identical_json PASSED [  6%]
+tests/unit/test_impact_map.py::test_fresh_build_conserves_calls_and_keeps_coarse_edges_blind PASSED [  7%]
+tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates PASSED [  8%]
+tests/unit/test_impact_map.py::test_refresh_rejects_unavailable_recall_history PASSED [  9%]
+tests/unit/test_impact_map.py::test_refresh_refuses_to_overwrite_committed_inputs PASSED [ 10%]
+tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[module-to-package] PASSED [ 12%]
+tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[remove-modules] PASSED [ 13%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink] PASSED [ 14%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-recall.json-target1-symlink] PASSED [ 15%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink] PASSED [ 17%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink] PASSED [ 18%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[scripts/impact_map.py] PASSED [ 19%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[tests/unit/test_impact_map.py] PASSED [ 20%]
+tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[map] PASSED [ 21%]
+tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[summary] PASSED [ 23%]
+tests/unit/test_impact_map.py::test_write_json_does_not_follow_links[symlink] PASSED [ 24%]
+tests/unit/test_impact_map.py::test_write_json_does_not_follow_links[hardlink] PASSED [ 25%]
+tests/unit/test_impact_map.py::test_skill_refresh_recipe_publishes_and_queries_fresh_map PASSED [ 26%]
+tests/unit/test_impact_map.py::test_committed_recall_gate_rejects_collapse_and_accepts_improvement PASSED [ 28%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-direct] PASSED [ 29%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-recall-direct] PASSED [ 30%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[oracle-direct] PASSED [ 31%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-direct] PASSED [ 32%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[source-direct] PASSED [ 34%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-direct] PASSED [ 35%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-recall-direct] PASSED [ 36%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-direct] PASSED [ 37%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-symlink] PASSED [ 39%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-symlink] PASSED [ 40%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-hardlink] PASSED [ 41%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-hardlink] PASSED [ 42%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-absent] PASSED [ 43%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history] PASSED [ 45%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-cases] PASSED [ 46%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle] PASSED [ 47%]
+tests/unit/test_impact_map.py::test_committed_recall_report_is_reproducible_and_keeps_misses PASSED [ 48%]
+tests/unit/test_impact_map.py::test_committed_map_has_nonempty_queryable_blind_spots_and_route_anchor PASSED [ 50%]
+tests/unit/test_summary_gate_requires_success.py::test_impact_map_failure_never_authorizes_auto_revert[False] PASSED [ 51%]
+tests/unit/test_summary_gate_requires_success.py::test_impact_map_failure_never_authorizes_auto_revert[True] PASSED [ 52%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[success-pull_request-refs/pull/1/merge] PASSED [ 53%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[success-push-refs/heads/main] PASSED [ 54%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[success-push-refs/heads/dev] PASSED [ 56%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[success-push-refs/tags/v1.0.0] PASSED [ 57%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[success-workflow_dispatch-refs/heads/main] PASSED [ 58%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[failure-pull_request-refs/pull/1/merge] PASSED [ 59%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[failure-push-refs/heads/main] PASSED [ 60%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[failure-push-refs/heads/dev] PASSED [ 62%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[failure-push-refs/tags/v1.0.0] PASSED [ 63%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[failure-workflow_dispatch-refs/heads/main] PASSED [ 64%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[skipped-pull_request-refs/pull/1/merge] PASSED [ 65%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[skipped-push-refs/heads/main] PASSED [ 67%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[skipped-push-refs/heads/dev] PASSED [ 68%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[skipped-push-refs/tags/v1.0.0] PASSED [ 69%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[skipped-workflow_dispatch-refs/heads/main] PASSED [ 70%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[cancelled-pull_request-refs/pull/1/merge] PASSED [ 71%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[cancelled-push-refs/heads/main] PASSED [ 73%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[cancelled-push-refs/heads/dev] PASSED [ 74%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[cancelled-push-refs/tags/v1.0.0] PASSED [ 75%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[cancelled-workflow_dispatch-refs/heads/main] PASSED [ 76%]
+tests/unit/test_summary_gate_requires_success.py::test_positive_control_all_success_passes PASSED [ 78%]
+tests/unit/test_summary_gate_requires_success.py::test_main_push_requires_e2e_success_not_merely_absence_of_failure[failure] PASSED [ 79%]
+tests/unit/test_summary_gate_requires_success.py::test_main_push_requires_e2e_success_not_merely_absence_of_failure[skipped] PASSED [ 80%]
+tests/unit/test_summary_gate_requires_success.py::test_main_push_requires_e2e_success_not_merely_absence_of_failure[cancelled] PASSED [ 81%]
+tests/unit/test_summary_gate_requires_success.py::test_main_push_requires_the_other_hard_gated_lanes_too[fast-tests-kwargs0] PASSED [ 82%]
+tests/unit/test_summary_gate_requires_success.py::test_main_push_requires_the_other_hard_gated_lanes_too[frontend-build-kwargs1] PASSED [ 84%]
+tests/unit/test_summary_gate_requires_success.py::test_integration_stays_advisory_on_main PASSED [ 85%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_fast_tests_success[failure] PASSED [ 86%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_fast_tests_success[skipped] PASSED [ 87%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_fast_tests_success[cancelled] PASSED [ 89%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_frontend_build_success[failure] PASSED [ 90%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_frontend_build_success[skipped] PASSED [ 91%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_frontend_build_success[cancelled] PASSED [ 92%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_changed_paths_success[skipped] PASSED [ 93%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_changed_paths_success[cancelled] PASSED [ 95%]
+tests/unit/test_summary_gate_requires_success.py::test_non_frontend_pr_still_passes_with_e2e_skipped PASSED [ 96%]
+tests/unit/test_summary_gate_requires_success.py::test_concurrency_pr_requires_e2e_success[failure] PASSED [ 97%]
+tests/unit/test_summary_gate_requires_success.py::test_concurrency_pr_requires_e2e_success[skipped] PASSED [ 98%]
+tests/unit/test_summary_gate_requires_success.py::test_concurrency_pr_requires_e2e_success[cancelled] PASSED [100%]
+
+============================= slowest 10 durations =============================
+7.78s call     tests/unit/test_impact_map.py::test_committed_recall_gate_rejects_collapse_and_accepts_improvement
+5.96s call     tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates
+3.43s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history]
+3.30s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-cases]
+3.10s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle]
+2.95s call     tests/unit/test_impact_map.py::test_committed_recall_report_is_reproducible_and_keeps_misses
+2.72s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-direct]
+2.71s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-absent]
+2.65s setup    tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[summary]
+2.64s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-recall-direct]
+======================== 82 passed in 125.58s (0:02:05) ========================
+
+exit code: 0
+```
+
+Second consecutive complete run:
+
+```text
+pytest temp base: $TMPDIR/cwng-pytest ($TMPDIR is mounted and writable)
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- $VENV/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 82 items
+
+tests/unit/test_impact_map.py::test_generator_separates_exact_bindings_from_attribute_guesses PASSED [  1%]
+tests/unit/test_impact_map.py::test_route_query_reaches_handler_and_reports_module_blindness PASSED [  2%]
+tests/unit/test_impact_map.py::test_runtime_only_route_is_live_but_has_no_invented_handler PASSED [  3%]
+tests/unit/test_impact_map.py::test_reconciliation_static_only_route_is_not_claimed_live PASSED [  4%]
+tests/unit/test_impact_map.py::test_same_inputs_generate_byte_identical_json PASSED [  6%]
+tests/unit/test_impact_map.py::test_fresh_build_conserves_calls_and_keeps_coarse_edges_blind PASSED [  7%]
+tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates PASSED [  8%]
+tests/unit/test_impact_map.py::test_refresh_rejects_unavailable_recall_history PASSED [  9%]
+tests/unit/test_impact_map.py::test_refresh_refuses_to_overwrite_committed_inputs PASSED [ 10%]
+tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[module-to-package] PASSED [ 12%]
+tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[remove-modules] PASSED [ 13%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink] PASSED [ 14%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-recall.json-target1-symlink] PASSED [ 15%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink] PASSED [ 17%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink] PASSED [ 18%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[scripts/impact_map.py] PASSED [ 19%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[tests/unit/test_impact_map.py] PASSED [ 20%]
+tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[map] PASSED [ 21%]
+tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[summary] PASSED [ 23%]
+tests/unit/test_impact_map.py::test_write_json_does_not_follow_links[symlink] PASSED [ 24%]
+tests/unit/test_impact_map.py::test_write_json_does_not_follow_links[hardlink] PASSED [ 25%]
+tests/unit/test_impact_map.py::test_skill_refresh_recipe_publishes_and_queries_fresh_map PASSED [ 26%]
+tests/unit/test_impact_map.py::test_committed_recall_gate_rejects_collapse_and_accepts_improvement PASSED [ 28%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-direct] PASSED [ 29%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-recall-direct] PASSED [ 30%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[oracle-direct] PASSED [ 31%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-direct] PASSED [ 32%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[source-direct] PASSED [ 34%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-direct] PASSED [ 35%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-recall-direct] PASSED [ 36%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-direct] PASSED [ 37%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-symlink] PASSED [ 39%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-symlink] PASSED [ 40%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-hardlink] PASSED [ 41%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-hardlink] PASSED [ 42%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-absent] PASSED [ 43%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history] PASSED [ 45%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-cases] PASSED [ 46%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle] PASSED [ 47%]
+tests/unit/test_impact_map.py::test_committed_recall_report_is_reproducible_and_keeps_misses PASSED [ 48%]
+tests/unit/test_impact_map.py::test_committed_map_has_nonempty_queryable_blind_spots_and_route_anchor PASSED [ 50%]
+tests/unit/test_summary_gate_requires_success.py::test_impact_map_failure_never_authorizes_auto_revert[False] PASSED [ 51%]
+tests/unit/test_summary_gate_requires_success.py::test_impact_map_failure_never_authorizes_auto_revert[True] PASSED [ 52%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[success-pull_request-refs/pull/1/merge] PASSED [ 53%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[success-push-refs/heads/main] PASSED [ 54%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[success-push-refs/heads/dev] PASSED [ 56%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[success-push-refs/tags/v1.0.0] PASSED [ 57%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[success-workflow_dispatch-refs/heads/main] PASSED [ 58%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[failure-pull_request-refs/pull/1/merge] PASSED [ 59%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[failure-push-refs/heads/main] PASSED [ 60%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[failure-push-refs/heads/dev] PASSED [ 62%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[failure-push-refs/tags/v1.0.0] PASSED [ 63%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[failure-workflow_dispatch-refs/heads/main] PASSED [ 64%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[skipped-pull_request-refs/pull/1/merge] PASSED [ 65%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[skipped-push-refs/heads/main] PASSED [ 67%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[skipped-push-refs/heads/dev] PASSED [ 68%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[skipped-push-refs/tags/v1.0.0] PASSED [ 69%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[skipped-workflow_dispatch-refs/heads/main] PASSED [ 70%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[cancelled-pull_request-refs/pull/1/merge] PASSED [ 71%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[cancelled-push-refs/heads/main] PASSED [ 73%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[cancelled-push-refs/heads/dev] PASSED [ 74%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[cancelled-push-refs/tags/v1.0.0] PASSED [ 75%]
+tests/unit/test_summary_gate_requires_success.py::test_summary_requires_impact_map_success_on_every_trigger[cancelled-workflow_dispatch-refs/heads/main] PASSED [ 76%]
+tests/unit/test_summary_gate_requires_success.py::test_positive_control_all_success_passes PASSED [ 78%]
+tests/unit/test_summary_gate_requires_success.py::test_main_push_requires_e2e_success_not_merely_absence_of_failure[failure] PASSED [ 79%]
+tests/unit/test_summary_gate_requires_success.py::test_main_push_requires_e2e_success_not_merely_absence_of_failure[skipped] PASSED [ 80%]
+tests/unit/test_summary_gate_requires_success.py::test_main_push_requires_e2e_success_not_merely_absence_of_failure[cancelled] PASSED [ 81%]
+tests/unit/test_summary_gate_requires_success.py::test_main_push_requires_the_other_hard_gated_lanes_too[fast-tests-kwargs0] PASSED [ 82%]
+tests/unit/test_summary_gate_requires_success.py::test_main_push_requires_the_other_hard_gated_lanes_too[frontend-build-kwargs1] PASSED [ 84%]
+tests/unit/test_summary_gate_requires_success.py::test_integration_stays_advisory_on_main PASSED [ 85%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_fast_tests_success[failure] PASSED [ 86%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_fast_tests_success[skipped] PASSED [ 87%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_fast_tests_success[cancelled] PASSED [ 89%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_frontend_build_success[failure] PASSED [ 90%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_frontend_build_success[skipped] PASSED [ 91%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_frontend_build_success[cancelled] PASSED [ 92%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_changed_paths_success[skipped] PASSED [ 93%]
+tests/unit/test_summary_gate_requires_success.py::test_pull_request_requires_changed_paths_success[cancelled] PASSED [ 95%]
+tests/unit/test_summary_gate_requires_success.py::test_non_frontend_pr_still_passes_with_e2e_skipped PASSED [ 96%]
+tests/unit/test_summary_gate_requires_success.py::test_concurrency_pr_requires_e2e_success[failure] PASSED [ 97%]
+tests/unit/test_summary_gate_requires_success.py::test_concurrency_pr_requires_e2e_success[skipped] PASSED [ 98%]
+tests/unit/test_summary_gate_requires_success.py::test_concurrency_pr_requires_e2e_success[cancelled] PASSED [100%]
+
+============================= slowest 10 durations =============================
+9.40s call     tests/unit/test_impact_map.py::test_committed_recall_gate_rejects_collapse_and_accepts_improvement
+7.34s call     tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates
+6.07s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle]
+4.81s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[source-direct]
+4.49s setup    tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle]
+4.43s setup    tests/unit/test_impact_map.py::test_skill_refresh_recipe_publishes_and_queries_fresh_map
+4.39s call     tests/unit/test_impact_map.py::test_committed_recall_report_is_reproducible_and_keeps_misses
+4.28s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-hardlink]
+3.28s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-direct]
+3.13s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[oracle-direct]
+======================== 82 passed in 149.15s (0:02:29) ========================
+
+exit code: 0
+```
+
+OBSERVED additional regression check of the existing auto-revert confirmation
+suite: `python3 -m pytest tests/unit/test_auto_revert_confirms_before_reverting.py -p no:randomly`:
+
+```text
+pytest temp base: $TMPDIR/cwng-pytest ($TMPDIR is mounted and writable)
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- $VENV/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 7 items
+
+tests/unit/test_auto_revert_confirms_before_reverting.py::test_a_single_failure_does_not_revert PASSED [ 14%]
+tests/unit/test_auto_revert_confirms_before_reverting.py::test_a_single_failure_triggers_a_rerun_of_the_same_tree PASSED [ 28%]
+tests/unit/test_auto_revert_confirms_before_reverting.py::test_a_failure_that_reproduces_is_reverted PASSED [ 42%]
+tests/unit/test_auto_revert_confirms_before_reverting.py::test_the_second_attempt_does_not_rerun_again PASSED [ 57%]
+tests/unit/test_auto_revert_confirms_before_reverting.py::test_a_rerun_that_cannot_be_requested_fails_closed PASSED [ 71%]
+tests/unit/test_auto_revert_confirms_before_reverting.py::test_the_revert_pr_step_is_gated_on_confirmation PASSED [ 85%]
+tests/unit/test_auto_revert_confirms_before_reverting.py::test_confirmation_does_not_widen_workflow_permissions PASSED [100%]
+
+============================= slowest 10 durations =============================
+0.25s call     tests/unit/test_auto_revert_confirms_before_reverting.py::test_a_single_failure_does_not_revert
+0.24s call     tests/unit/test_auto_revert_confirms_before_reverting.py::test_a_rerun_that_cannot_be_requested_fails_closed
+0.22s call     tests/unit/test_auto_revert_confirms_before_reverting.py::test_a_single_failure_triggers_a_rerun_of_the_same_tree
+0.09s setup    tests/unit/test_auto_revert_confirms_before_reverting.py::test_a_single_failure_does_not_revert
+0.04s call     tests/unit/test_auto_revert_confirms_before_reverting.py::test_the_second_attempt_does_not_rerun_again
+0.04s call     tests/unit/test_auto_revert_confirms_before_reverting.py::test_a_failure_that_reproduces_is_reverted
+0.03s call     tests/unit/test_auto_revert_confirms_before_reverting.py::test_confirmation_does_not_widen_workflow_permissions
+0.02s call     tests/unit/test_auto_revert_confirms_before_reverting.py::test_the_revert_pr_step_is_gated_on_confirmation
+
+(2 durations < 0.005s hidden.  Use -vv to show these durations.)
+============================== 7 passed in 1.27s ===============================
+
+exit code: 0
+```
+
+### Final changelog and workflow lint
+
+OBSERVED: the revised fragment at `changelog.d/impact-map-currency.md:3`
+describes advisory source-layout misses, the required error gate, the automatic
+revert exclusion, guarded publication, and the retained recall floor. The broad
+contributor guarantee was removed. Both `scripts/` and `.agents/` are non-exempt;
+the fragment is required and retained.
+
+`python3 scripts/check_changelog_diff.py origin/main HEAD`:
+
+```text
+CHANGELOG integrity guard passed: the entry requirement is satisfied or every changed path is non-shipping, and no PR-authored release structure was lost.
+
+exit code: 0
+```
+
+OBSERVED: `actionlint .github/workflows/tests.yml .github/workflows/auto-revert.yml`
+produced no output and exited **0**. The first lint run on auto-revert reported an
+existing `SC2086` unquoted filename-list expansion in its logging path. The
+quoted print/indent pipeline at `.github/workflows/auto-revert.yml:116` resolves
+that warning without suppressing lint or changing the revert decision.
+`git diff --check` also exits 0.
+
+OBSERVED scope: the code/tests, skill, usage documentation, evidence, changelog,
+and PR description were updated for the five HOLD findings. No existing test
+or assertion from the prior head was removed or weakened. No runtime dependency
+was added; test execution and reproduction history use no network.
+
+Not done: no new held-out recall study, no generator-mutation harness rerun,
+no application/UI/container testing, no deliberately failing hosted workflow,
+no live automatic revert, merge, release, or upstream push. The earlier mutation
+observations remain historical, not new measurements. This pass demonstrates
+the named refactors and write failures; it does not claim that every possible
+cps change, generator failure, or infrastructure failure will pass CI. Individual
+file replacement is not an atomic directory transaction or a concurrency lock.

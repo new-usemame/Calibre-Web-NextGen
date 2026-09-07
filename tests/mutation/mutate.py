@@ -202,8 +202,9 @@ def _phase_members(
 ) -> tuple[dict[int, tuple[int, bool]], tuple[UninspectableProcess, ...]]:
     """Inspect group and visible inherited-token processes, retaining zombies.
 
-    Clearing a token, changing credentials, and uninspectable exec environments
-    are outside this diagnostic contract. This is not a complete ownership proof.
+    Uninspectable exec environments are returned as gaps that block acceptance.
+    Clearing a token and changing credentials remain outside this diagnostic
+    contract. This is not a complete ownership proof.
     """
     try:
         result = subprocess.run(

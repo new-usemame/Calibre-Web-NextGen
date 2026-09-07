@@ -1,0 +1,28 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- repo virtualenv/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 179 items / 178 deselected / 1 selected
+
+tests/unit/test_mutation_harness.py::test_inspected_escape_stays_rejected_if_identity_disappears FAILED
+
+=================================== FAILURES ===================================
+_________ test_inspected_escape_stays_rejected_if_identity_disappears __________
+tests/unit/test_mutation_harness.py:1760: in test_inspected_escape_stays_rejected_if_identity_disappears
+    assert escaped == (456,), 'identity disappearance erased an observed escape'
+E   AssertionError: identity disappearance erased an observed escape
+E   assert () == (456,)
+E     
+E     Right contains one more item: 456
+E     
+E     Full diff:
+E     + ()
+E     - (
+E     -     456,
+E     - )
+=========================== short test summary info ============================
+FAILED tests/unit/test_mutation_harness.py::test_inspected_escape_stays_rejected_if_identity_disappears
+====================== 1 failed, 178 deselected in 1.05s =======================
+
+exit: 1

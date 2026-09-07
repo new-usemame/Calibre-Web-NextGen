@@ -1744,6 +1744,26 @@ def test_pending_gap_that_becomes_readable_and_contaminated_is_rejected(monkeypa
     print('PENDING GAP -> readable matching token: REJECTED and signalled')
 
 
+def test_inspected_escape_stays_rejected_if_identity_disappears(monkeypatch):
+    from types import SimpleNamespace
+    gap = mutate.UninspectableProcess(123, 5)
+    # PID 456 matched the token outside the group, then exited before the
+    # identity read. PID 123 is independently unreadable throughout cleanup.
+    snapshots = iter([({456: (900, False)}, (gap,)), ({}, (gap,))])
+    monkeypatch.setattr(mutate, '_phase_members', lambda *a: next(snapshots))
+    monkeypatch.setattr(mutate, '_has_phase_token', lambda *a: gap)
+    monkeypatch.setattr(mutate, '_process_identity', lambda *a: None)
+    monkeypatch.setattr(mutate.os, 'kill', lambda *a: pytest.fail('exited PID signalled'))
+    proc = SimpleNamespace(pid=800, returncode=0, poll=lambda: 0, wait=lambda **k: 0)
+    escaped, error, gaps = mutate._terminate_phase_processes(proc, 'phase-token')
+    phase = mutate.PhaseResult((), 0, '', '', False, error, escaped, inspection_gaps=gaps)
+    assert escaped == (456,), 'identity disappearance erased an observed escape'
+    assert phase.containment_verdict == 'REJECTED'
+    with pytest.raises(mutate.IsolationError, match='failed containment'):
+        mutate._check_report(phase, {})
+    print('INSPECTED ESCAPE -> identity disappeared, other gap unresolved: still REJECTED')
+
+
 @pytest.fixture
 def preflight_gap_case(tmp_path, monkeypatch):
     from types import SimpleNamespace

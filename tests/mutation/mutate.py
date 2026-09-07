@@ -305,11 +305,11 @@ def _terminate_phase_processes(
                     if identity is not None:
                         known[pid] = identity
             for pid, (group, zombie) in members.items():
+                if group != proc.pid:
+                    escaped.add(pid)
                 identity = _process_identity(pid)
                 if identity is not None:
                     known[pid] = identity
-                    if group != proc.pid:
-                        escaped.add(pid)
             # Kill immediately: a grace period permits further forks and writes.
             # This snapshot avoids signalling an absent group, but does not pin
             # its identity against reuse between inspection and the syscall.

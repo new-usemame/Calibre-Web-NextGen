@@ -1,0 +1,31 @@
+Temporary mutation: gaps.update(UninspectableProcess(**gap) for gap in record["inspection_gaps"])
+Replaced with: gaps.update(())
+
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- repo virtualenv/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 173 items / 172 deselected / 1 selected
+
+tests/unit/test_mutation_harness.py::test_inconclusive_probe_is_preserved_through_phase_and_evidence FAILED
+
+=================================== FAILURES ===================================
+_______ test_inconclusive_probe_is_preserved_through_phase_and_evidence ________
+tests/unit/test_mutation_harness.py:1685: in test_inconclusive_probe_is_preserved_through_phase_and_evidence
+    assert phase.inspection_gaps == (gap,)
+E   AssertionError: assert () == (Uninspectabl...23, error=5),)
+E     
+E     Right contains one more item: UninspectableProcess(pid=123, error=5)
+E     
+E     Full diff:
+E     + ()
+E     - (
+E     -     UninspectableProcess(...
+E     
+E     ...Full output truncated (4 lines hidden), use '-vv' to show
+=========================== short test summary info ============================
+FAILED tests/unit/test_mutation_harness.py::test_inconclusive_probe_is_preserved_through_phase_and_evidence
+====================== 1 failed, 172 deselected in 2.72s =======================
+
+exit: 1

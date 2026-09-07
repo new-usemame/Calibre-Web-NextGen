@@ -54,7 +54,10 @@ outputs separately; it does not push commits or open update PRs. The committed
 files remain a snapshot, and their refresh is a maintainer's task. Download the
 fresh CI map (query with `--map`) or regenerate locally before using a stale
 snapshot. Generator, input, and historical-evidence errors still fail the job;
-there is no blanket `continue-on-error` hiding them.
+the required **Test Suite Summary** waits for this job and rejects every result
+other than success, including failure, cancellation, or a skipped job. There is
+no blanket `continue-on-error` hiding errors. Advisory staleness still passes
+that gate.
 
 To reproduce the job locally, use a separate output directory:
 
@@ -62,6 +65,20 @@ To reproduce the job locally, use a separate output directory:
 python3 scripts/impact_map.py refresh \
   --output-dir "$TMPDIR/impact-map" --summary "$TMPDIR/impact-map-summary.md"
 ```
+
+The summary must be separate from the committed map, recall report, route
+oracle, recall cases, parsed Python sources, and all three generated outputs.
+Refresh rejects aliases of these files before writing anything, including
+symbolic links, hard links, and paths to outputs that do not exist yet.
+
+Repeated refreshes can reuse the output directory. After validating destination
+paths, refresh removes the previous currency file before reading or generating
+evidence and publishes a new currency file last, after successful validation and
+summary writing. A failed attempt may leave diagnostic map/recall files, but
+without `impact-map-currency.json` the directory is incomplete and must not be
+treated as validated evidence. Repair the error and rerun refresh. This is an
+invalidation protocol, not an atomic directory replacement; use separate output
+directories for concurrent refreshes.
 
 Currency compares the complete regenerated map and recall report, not only the
 `cps` SHA. Generator and route-oracle changes can therefore show drift even

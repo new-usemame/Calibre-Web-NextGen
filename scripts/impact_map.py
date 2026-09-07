@@ -1258,6 +1258,26 @@ def refresh_artifacts(repo_root: Path, output_dir: Path, summary_path: Path | No
     output_dir = output_dir.resolve()
     if output_dir == (repo_root / DEFAULT_MAP.parent).resolve():
         raise ValueError("output directory would overwrite committed artifacts")
+    currency_path = output_dir / "impact-map-currency.json"
+    if summary_path is not None:
+        protected_paths = [
+            *(repo_root / path for path in (DEFAULT_MAP, DEFAULT_RECALL, DEFAULT_ORACLE, DEFAULT_CASES)),
+            *iter_python_files(repo_root),
+            output_dir / DEFAULT_MAP.name,
+            output_dir / DEFAULT_RECALL.name,
+            currency_path,
+        ]
+        # Resolve missing outputs too; samefile additionally catches hard links.
+        # Validate before invalidation or publication can change any bytes.
+        summary_destination = summary_path.resolve()
+        for protected in protected_paths:
+            if summary_destination == protected.resolve() or (
+                summary_path.exists() and protected.exists() and summary_path.samefile(protected)
+            ):
+                raise ValueError("summary destination aliases a protected input or generated output")
+    # A failed repeated refresh must not retain the previous success label.
+    # Diagnostic map/recall files may remain; currency is published last.
+    currency_path.unlink(missing_ok=True)
     committed_map = load_json(repo_root / DEFAULT_MAP) if (repo_root / DEFAULT_MAP).exists() else {}
     committed_recall = load_json(repo_root / DEFAULT_RECALL) if (repo_root / DEFAULT_RECALL).exists() else {}
     data = build_map(repo_root, repo_root / DEFAULT_ORACLE)
@@ -1278,7 +1298,6 @@ def refresh_artifacts(repo_root: Path, output_dir: Path, summary_path: Path | No
         "committed_cps_tree_sha": committed_map.get("generated_from", {}).get("cps_tree_sha"),
         "drift": drift,
     }
-    write_json(output_dir / "impact-map-currency.json", currency)
     summary = "\n".join([
         "## Impact map currency",
         "",
@@ -1300,6 +1319,7 @@ def refresh_artifacts(repo_root: Path, output_dir: Path, summary_path: Path | No
     if summary_path is not None:
         with summary_path.open("a", encoding="utf-8") as stream:
             stream.write(summary)
+    write_json(currency_path, currency)
     print(summary, end="")
     return currency
 

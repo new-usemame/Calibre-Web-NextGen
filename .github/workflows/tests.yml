@@ -1073,13 +1073,13 @@ jobs:
         run: docker rm -f cwn-e2e || true
 
   # ============================================================================
-  # Summary Job (Optional)
-  # Shows overall status in GitHub UI
+  # Required Summary Job
+  # Enforces the completed hard gates for branch protection
   # ============================================================================
   test-summary:
     name: Test Suite Summary
     runs-on: ubuntu-latest
-    needs: [fast-tests, frontend-build, integration-tests, e2e-tests, changed_paths]
+    needs: [fast-tests, frontend-build, impact-map, integration-tests, e2e-tests, changed_paths]
     if: always()
 
     # The unified gate that branch protection requires. auto-merge.yml
@@ -1113,6 +1113,7 @@ jobs:
         run: |
           echo "Fast Tests:        ${{ needs.fast-tests.result }}"
           echo "Frontend Build:    ${{ needs.frontend-build.result }}"
+          echo "Impact map:        ${{ needs.impact-map.result }}"
           echo "Integration Tests: ${{ needs.integration-tests.result }}"
           echo "E2E Tests:         ${{ needs.e2e-tests.result }}"
           echo "Is tier-2 PR:      $IS_TIER2_PR"
@@ -1126,7 +1127,7 @@ jobs:
           # later broken job condition silently turns coverage off while this
           # required check stays green.
           #
-          # `fast-tests` and `frontend-build` carry no `if:`, so they run on
+          # `fast-tests`, `frontend-build`, and `impact-map` carry no `if:`, so they run on
           # EVERY trigger of this workflow. Any result other than success means
           # the lane vouched for nothing, and neither can this summary.
           #
@@ -1150,6 +1151,14 @@ jobs:
           if [[ "${{ needs.frontend-build.result }}" != "success" ]]; then
             echo "❌ Frontend build did not succeed"
             echo "   Actual result: ${{ needs.frontend-build.result }}"
+            exit 1
+          fi
+
+          # Staleness is a successful refresh. Generation/evidence errors,
+          # cancellation, or a skipped job cannot vouch for a usable map.
+          if [[ "${{ needs.impact-map.result }}" != "success" ]]; then
+            echo "❌ Impact map did not succeed"
+            echo "   Actual result: ${{ needs.impact-map.result }}"
             exit 1
           fi
 

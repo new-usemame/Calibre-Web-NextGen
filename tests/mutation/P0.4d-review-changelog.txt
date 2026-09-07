@@ -1,0 +1,6 @@
+Command: python3 scripts/check_changelog_diff.py origin/main HEAD
+Interpreter: repo virtualenv
+
+CHANGELOG integrity guard passed: the entry requirement is satisfied or every changed path is non-shipping, and no PR-authored release structure was lost.
+
+exit: 0

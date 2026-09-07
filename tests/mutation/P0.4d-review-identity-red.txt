@@ -13,9 +13,9 @@ tests/unit/test_mutation_harness.py:1760: in test_inspected_escape_stays_rejecte
     assert escaped == (456,), 'identity disappearance erased an observed escape'
 E   AssertionError: identity disappearance erased an observed escape
 E   assert () == (456,)
-E     
+E
 E     Right contains one more item: 456
-E     
+E
 E     Full diff:
 E     + ()
 E     - (

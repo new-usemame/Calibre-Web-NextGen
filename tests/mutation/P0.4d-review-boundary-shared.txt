@@ -1,0 +1,73 @@
+Captured pytest output; local paths redacted; startup warnings and repeated assertion object representations omitted.
+Command: CWNG_POISON_BOUNDARY=shared "$PYTHON" -m pytest tests/unit/test_mutation_harness.py -o addopts= -p no:rerunfailures -p no:flaky -p no:cacheprovider -v -s --tb=short -k test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one
+
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- repo virtualenv/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 179 items / 172 deselected / 7 selected
+
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[ignored] ORACLE boundary=shared channel=ignored clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+FAILED
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[tracked] ORACLE boundary=shared channel=tracked clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+FAILED
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[collateral] ORACLE boundary=shared channel=collateral clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+FAILED
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[index] ORACLE boundary=shared channel=index clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+FAILED
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[head] ORACLE boundary=shared channel=head clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+FAILED
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[bytecode] ORACLE boundary=shared channel=bytecode clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+FAILED
+tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[child] CHILD_BOUNDARY shared tree scrubbed clean before mutant releases writer (Mac/APFS only)
+ORACLE boundary=shared channel=child clean=0 baseline=0 mutant=1 CONTAMINATING (Mac/APFS only)
+FAILED
+
+=================================== FAILURES ===================================
+_ test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[ignored] _
+tests/unit/test_mutation_harness.py:471: in test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one
+    assert mutant.returncode == clean.returncode, f"CONTAMINATING: {channel} changed the verdict"
+E   AssertionError: CONTAMINATING: ignored changed the verdict
+E   assert 1 == 0
+_ test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[tracked] _
+tests/unit/test_mutation_harness.py:471: in test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one
+    assert mutant.returncode == clean.returncode, f"CONTAMINATING: {channel} changed the verdict"
+E   AssertionError: CONTAMINATING: tracked changed the verdict
+E   assert 1 == 0
+_ test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[collateral] _
+tests/unit/test_mutation_harness.py:471: in test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one
+    assert mutant.returncode == clean.returncode, f"CONTAMINATING: {channel} changed the verdict"
+E   AssertionError: CONTAMINATING: collateral changed the verdict
+E   assert 1 == 0
+_ test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[index] _
+tests/unit/test_mutation_harness.py:471: in test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one
+    assert mutant.returncode == clean.returncode, f"CONTAMINATING: {channel} changed the verdict"
+E   AssertionError: CONTAMINATING: index changed the verdict
+E   assert 1 == 0
+_ test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[head] _
+tests/unit/test_mutation_harness.py:471: in test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one
+    assert mutant.returncode == clean.returncode, f"CONTAMINATING: {channel} changed the verdict"
+E   AssertionError: CONTAMINATING: head changed the verdict
+E   assert 1 == 0
+_ test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[bytecode] _
+tests/unit/test_mutation_harness.py:471: in test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one
+    assert mutant.returncode == clean.returncode, f"CONTAMINATING: {channel} changed the verdict"
+E   AssertionError: CONTAMINATING: bytecode changed the verdict
+E   assert 1 == 0
+_ test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[child] _
+tests/unit/test_mutation_harness.py:471: in test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one
+    assert mutant.returncode == clean.returncode, f"CONTAMINATING: {channel} changed the verdict"
+E   AssertionError: CONTAMINATING: child changed the verdict
+E   assert 1 == 0
+=========================== short test summary info ============================
+FAILED tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[ignored]
+FAILED tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[tracked]
+FAILED tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[collateral]
+FAILED tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[index]
+FAILED tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[head]
+FAILED tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[bytecode]
+FAILED tests/unit/test_mutation_harness.py::test_poison_suite_changes_a_shared_tree_verdict_but_not_an_isolated_one[child]
+====================== 7 failed, 172 deselected in 35.19s ======================
+
+exit: 1

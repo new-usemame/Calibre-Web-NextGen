@@ -55,21 +55,21 @@ tests/unit/test_mutation_harness.py:1714: in test_unreadable_only_escape_prevent
     assert result.signal == 'INCONCLUSIVE', 'an unreadable sole escape was accepted'
 E   AssertionError: an unreadable sole escape was accepted
 E   assert 'TESTS_PASSED' == 'INCONCLUSIVE'
-E     
+E
 E     - INCONCLUSIVE
 E     + TESTS_PASSED
 _______ test_inconclusive_probe_is_preserved_through_phase_and_evidence ________
 tests/unit/test_mutation_harness.py:1781: in test_inconclusive_probe_is_preserved_through_phase_and_evidence
     assert result.signal == 'INCONCLUSIVE'
 E   AssertionError: assert 'TESTS_PASSED' == 'INCONCLUSIVE'
-E     
+E
 E     - INCONCLUSIVE
 E     + TESTS_PASSED
 _________ test_preflight_gap_that_resolves_does_not_taint_clean_phase __________
 tests/unit/test_mutation_harness.py:1808: in test_preflight_gap_that_resolves_does_not_taint_clean_phase
     assert 'INCONCLUSIVE' not in payload['detail']
 E   AssertionError: assert 'INCONCLUSIVE' not in 'execution c...ection_gaps)'
-E     
+E
 E     'INCONCLUSIVE' is contained here:
 E       execution checks passed; authority remains unverified; phase-token inspection INCONCLUSIVE (see inspection_gaps)
 E     ?                                                                               ++++++++++++

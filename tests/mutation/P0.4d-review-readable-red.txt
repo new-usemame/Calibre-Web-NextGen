@@ -13,9 +13,9 @@ tests/unit/test_mutation_harness.py:1739: in test_pending_gap_that_becomes_reada
     assert escaped == (123,), 'a newly inspectable matching token was not rejected'
 E   AssertionError: a newly inspectable matching token was not rejected
 E   assert () == (123,)
-E     
+E
 E     Right contains one more item: 123
-E     
+E
 E     Full diff:
 E     + ()
 E     - (

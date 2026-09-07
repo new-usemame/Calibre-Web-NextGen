@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -46,7 +48,10 @@ def miniature_repo(tmp_path: Path) -> tuple[Path, Path]:
         "    return 'ok'\n\n"
         "def dynamic(receiver, callback):\n"
         "    receiver.guessed()\n"
-        "    return callback()\n",
+        "    return callback()\n\n"
+        "def accounting():\n"
+        "    len([])\n"
+        "    provider.Worker.run()\n",
     )
     oracle = repo / "oracle.json"
     oracle.write_text(
@@ -167,6 +172,140 @@ def test_same_inputs_generate_byte_identical_json(tmp_path: Path, monkeypatch: p
     second = impact_map.stable_json(impact_map.build_map(repo, oracle))
 
     assert first == second
+
+
+def test_fresh_build_conserves_calls_and_keeps_coarse_edges_blind(miniature_map):
+    """Intent: dropping builtins or coarse-call blind records must fail before artifact regeneration."""
+    counts = miniature_map["counts"]
+    summary = miniature_map["blind_spot_summary"]
+    assert counts["call_sites"] == (
+        counts["exact_internal_call_edges"]
+        + counts["known_out_of_scope_calls"]
+        + summary["unresolved_calls"]
+    )
+    assert summary["known_out_of_scope_calls"]["by_reason"]["builtin_call"] == 1
+    coarse = [edge for edge in miniature_map["edges"] if edge["confidence"] == "class_member_coarse"]
+    assert len(coarse) == 1
+    for edge in miniature_map["edges"]:
+        if edge["confidence"] in {"attribute_name_guess", "class_member_coarse"}:
+            assert any(
+                spot["kind"] == "unresolved_call"
+                and all(spot[key] == value for key, value in edge["location"].items())
+                and edge["target"] in spot["candidate_targets"]
+                for spot in miniature_map["blind_spots"]
+            ), edge
+    assert sum(module["call_sites"] for module in summary["by_module"].values()) == counts["call_sites"]
+    assert sum(module["unresolved_calls"] for module in summary["by_module"].values()) == summary["unresolved_calls"]
+
+
+def git(repo: Path, *args: str) -> str:
+    return subprocess.check_output(
+        ["git", "-c", "user.name=fixture", "-c",
+         "user.email=fixture@example.invalid", *args],
+        cwd=repo, text=True, stderr=subprocess.PIPE,
+    ).strip()
+
+
+@pytest.fixture
+def history_repo(tmp_path: Path):
+    repo, oracle = miniature_repo(tmp_path)
+    write(repo / impact_map.DEFAULT_ORACLE, oracle.read_text(encoding="utf-8"))
+    git(repo, "init")
+    git(repo, "add", "cps")
+    git(repo, "commit", "-m", "Seed synthetic callers and providers")
+    commit = git(repo, "rev-parse", "HEAD")
+    cases = {"case_set": "synthetic", "cases": [
+        {"commit": commit, "affected_site": "cps.app:entry",
+         "changed_symbol": "cps.provider:imported"},
+        {"commit": commit, "affected_site": "cps.app:dynamic",
+         "changed_symbol": "cps.provider:Worker"},
+    ]}
+    impact_map.write_json(repo / impact_map.DEFAULT_CASES, cases)
+    data = impact_map.build_map(repo, repo / impact_map.DEFAULT_ORACLE)
+    impact_map.write_json(repo / impact_map.DEFAULT_MAP, data, compact=True)
+    impact_map.write_json(repo / impact_map.DEFAULT_RECALL, impact_map.evaluate_recall(data, cases, repo))
+    return repo
+
+
+def refresh(repo: Path, output: Path, summary: Path):
+    return subprocess.run(
+        [sys.executable, str(SCRIPT), "--repo-root", str(repo), "refresh",
+         "--output-dir", str(output), "--summary", str(summary)],
+        capture_output=True, text=True, timeout=30,
+    )
+
+
+def test_refresh_publishes_currency_without_requiring_contributor_updates(history_repo, tmp_path):
+    """Intent: real source drift regenerates evidence, returns success, and leaves contributor files alone."""
+    repo = history_repo
+    output, summary = tmp_path / "artifacts", tmp_path / "summary.md"
+    original = {path: (repo / path).read_bytes() for path in (impact_map.DEFAULT_MAP, impact_map.DEFAULT_RECALL)}
+    result = refresh(repo, output, summary)
+    assert result.returncode == 0, result.stderr
+    currency = impact_map.load_json(output / "impact-map-currency.json")
+    assert currency["status"] == "current"
+
+    write(repo / "cps/new.py", "def added():\n    return len([])\n")
+    git(repo, "add", "cps/new.py")
+    git(repo, "commit", "-m", "Add a synthetic module without regenerating artifacts")
+    result = refresh(repo, output, summary)
+    assert result.returncode == 0, result.stderr
+    currency = impact_map.load_json(output / "impact-map-currency.json")
+    assert currency["status"] == "stale"
+    assert currency["current_cps_tree_sha"] == git(repo, "rev-parse", "HEAD:cps")
+    assert currency["committed_cps_tree_sha"] != currency["current_cps_tree_sha"]
+    assert currency["drift"] == {"impact-map.json": True, "impact-map-recall.json": True}
+    for path, content in original.items():
+        assert (repo / path).read_bytes() == content
+    fresh = impact_map.load_json(output / "impact-map.json")
+    assert any(node["id"] == "symbol:cps.new:added" for node in fresh["nodes"])
+    report = impact_map.load_json(output / "impact-map-recall.json")
+    assert (report["hits"], report["misses"]) == (1, 1)
+    assert report["results"][1]["miss_reason"] == "no_static_call_path"
+    text = summary.read_text(encoding="utf-8")
+    assert "stale" in text and currency["current_cps_tree_sha"] in text
+    assert "1/2" in text and "no_static_call_path" in text
+
+    for name in currency["drift"]:
+        shutil.copyfile(output / name, repo / impact_map.DEFAULT_MAP.parent / name)
+    assert refresh(repo, output, summary).returncode == 0
+    assert impact_map.load_json(output / "impact-map-currency.json")["status"] == "current"
+
+    # A matching cps fingerprint cannot hide generator/oracle/report drift.
+    for path in (impact_map.DEFAULT_MAP, impact_map.DEFAULT_RECALL):
+        original_bytes = (repo / path).read_bytes()
+        changed = json.loads(original_bytes)
+        if path == impact_map.DEFAULT_MAP:
+            changed["counts"]["call_sites"] += 1
+        else:
+            changed["hits"] += 1
+        impact_map.write_json(repo / path, changed)
+        assert refresh(repo, output, summary).returncode == 0
+        assert impact_map.load_json(output / "impact-map-currency.json")["drift"][path.name]
+        (repo / path).unlink()
+        assert refresh(repo, output, summary).returncode == 0
+        assert impact_map.load_json(output / "impact-map-currency.json")["drift"][path.name]
+        (repo / path).write_bytes(original_bytes)
+
+
+def test_refresh_rejects_unavailable_recall_history(history_repo, tmp_path):
+    """Intent: missing history is an evaluation failure, not a measured recall miss or mere staleness."""
+    path = history_repo / impact_map.DEFAULT_CASES
+    cases = impact_map.load_json(path)
+    cases["cases"][0]["commit"] = "0" * 40
+    impact_map.write_json(path, cases)
+    result = refresh(history_repo, tmp_path / "artifacts", tmp_path / "summary.md")
+    assert result.returncode != 0
+    assert "recall evidence unavailable" in result.stderr
+
+
+def test_refresh_refuses_to_overwrite_committed_inputs(history_repo, tmp_path):
+    """Intent: a mistaken output directory must not erase the evidence used to measure staleness."""
+    before = (history_repo / impact_map.DEFAULT_MAP).read_bytes()
+    result = refresh(history_repo, history_repo / impact_map.DEFAULT_MAP.parent, tmp_path / "summary.md")
+    assert result.returncode != 0
+    assert "output directory would overwrite committed artifacts" in result.stderr
+    assert (history_repo / impact_map.DEFAULT_MAP).read_bytes() == before
 
 
 def test_committed_recall_report_is_reproducible_and_keeps_misses():

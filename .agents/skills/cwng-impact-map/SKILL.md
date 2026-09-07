@@ -32,9 +32,35 @@ static evidence. Treat `class_member_coarse` and `attribute_name_guess` as
 leads that require source inspection. Never turn absence from the result into a
 claim of no impact.
 
-Compare `generated_from.cps_tree_sha` with `git rev-parse HEAD:cps`. If those
-differ, regenerate and run the historical check before querying (a differing
-checkout SHA alone may just be the tooling commit that contains the map):
+Before relying on a snapshot, refresh into a separate output directory. Set
+`TARGET` to the file, symbol, or route being investigated, then run from a clean
+checkout with the repo virtualenv:
+
+```bash
+python3 scripts/impact_map.py refresh \
+  --output-dir "$TMPDIR/impact-map" --summary "$TMPDIR/impact-map-summary.md"
+python3 scripts/impact_map.py query "$TARGET" \
+  --map "$TMPDIR/impact-map/impact-map.json"
+```
+
+Read the currency summary's checked commit, current/committed cps tree SHAs,
+drift flags, recall number, and every miss. Compare `generated_from.cps_tree_sha`
+with `git rev-parse HEAD:cps`; a different checkout SHA alone may only identify a
+tooling commit. Refresh compares complete artifacts, so matching cps SHAs do not
+rule out generator or oracle drift. CI publishes the same three files as the
+`impact-map-<checked SHA>` download; a PR artifact can describe a merge candidate.
+
+Stale snapshots and misses caused by current symbols moving or disappearing are
+advisory results, including historical/current path mismatches. Contributors do
+not need to commit regenerated JSON for these results. Missing historical
+commits, malformed inputs, and generation errors fail refresh: resolve the
+reported error before using its outputs. A failed accepted attempt removes old
+currency metadata; a directory without `impact-map-currency.json` is incomplete.
+Use separate directories for concurrent attempts and keep summary/output paths
+separate from repository inputs and each other.
+
+Refreshing the committed snapshots is a maintainer action. When that is the
+intended task, run:
 
 ```bash
 python3 scripts/impact_map.py build

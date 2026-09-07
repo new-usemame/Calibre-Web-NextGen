@@ -573,6 +573,7 @@ def test_committed_recall_report_is_reproducible_and_keeps_misses():
     observed = impact_map.evaluate_recall(data, cases, ROOT)
 
     assert observed == committed
+    assert observed["hits"] >= 8, "committed recall fell below the eight-case floor"
     assert observed["total"] >= 8
     assert observed["total"] == len(cases["cases"]) == len(observed["results"])
     assert [result["commit"] for result in observed["results"]] == [case["commit"] for case in cases["cases"]]

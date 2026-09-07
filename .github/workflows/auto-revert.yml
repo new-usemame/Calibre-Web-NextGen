@@ -69,6 +69,11 @@ jobs:
       # `Test Suite Summary` is excluded too, because it fails as a CONSEQUENCE of
       # e2e failing; treating it as an independent signal would re-admit exactly
       # the case being excluded.
+      # Impact Map is excluded too: snapshot drift and recall misses are advisory,
+      # while unavailable history or generator/input failures mean the measurement
+      # could not complete. Those do not establish a product regression caused by
+      # this commit. Keep them visible in the required summary without reverting
+      # an innocent cps refactor to repair a tooling or infrastructure failure.
       - name: Decide whether this failure is revert-worthy
         id: triage
         env:
@@ -108,7 +113,7 @@ jobs:
             echo "no file list for $HEAD_SHA; falling through to job triage"
           elif ! printf '%s\n' "$files" | grep -qvE "$INERT_RE"; then
             echo "$HEAD_SHA touches only test-inert paths:"
-            printf '  %s\n' $files
+            printf '%s\n' "$files" | sed 's/^/  /'
             echo "It cannot have caused ANY test failure, whatever the cause is."
             echo "revert=false" >> "$GITHUB_OUTPUT"
             exit 0
@@ -136,16 +141,16 @@ jobs:
           other=$(jq -r '
             [.jobs[]
              | select(.conclusion=="failure")
-             | select(.name != "E2E Tests (SPA)" and .name != "Test Suite Summary")
+             | select(.name != "E2E Tests (SPA)" and .name != "Test Suite Summary"
+                      and .name != "Impact Map (regeneration + currency)")
              | .name] | join("|")' <<<"$jobs_json")
 
           if [ -n "$other" ]; then
             echo "revert-worthy failure(s): $other"
             echo "revert=true" >> "$GITHUB_OUTPUT"
           else
-            echo "Only the SPA e2e lane failed. Not reverting — an e2e breakage is"
-            echo "usually pre-existing and would revert an innocent commit while"
-            echo "leaving main just as red. Fix the spec instead."
+            echo "Only excluded lanes failed. Not reverting; inspect their evidence."
+            echo "These failures do not establish a product regression caused by this commit."
             echo "revert=false" >> "$GITHUB_OUTPUT"
           fi
       # ── Guard 3: did the failure REPRODUCE? ────────────────────────────────

@@ -212,6 +212,7 @@ def history_repo(tmp_path: Path):
     repo, oracle = miniature_repo(tmp_path)
     write(repo / impact_map.DEFAULT_ORACLE, oracle.read_text(encoding="utf-8"))
     git(repo, "init")
+    git(repo, "commit", "--allow-empty", "-m", "Start synthetic history")
     git(repo, "add", "cps")
     git(repo, "commit", "-m", "Seed synthetic callers and providers")
     commit = git(repo, "rev-parse", "HEAD")

@@ -352,6 +352,15 @@ class TestConversionBudgetIsSharedAcrossStages:
 
     def test_second_stage_gets_less_than_the_first(self, monkeypatch):
         monkeypatch.setenv("CWA_CONVERSION_DEADLINE_SECONDS", "600")
+        # Pin the clock before the FIRST measurement too. Leaving it unpinned
+        # meant `first` used the real import-time anchor, so a worker that had
+        # already outlived the 600s budget got `first` clamped to the 0.1 floor
+        # and the comparison below inverted. Not hypothetical and not flaky:
+        # OBSERVED on main in a 756s suite leg as `assert 199.99999687499803
+        # < 0.1`. Pinning an unspent budget also makes `first` an assertable
+        # value rather than whatever the schedule happened to leave.
+        monkeypatch.setattr(ingest_processor, "_PROCESS_START_MONOTONIC",
+                            time.monotonic())
         first = ingest_processor.conversion_budget_remaining()
         # Simulate the first conversion having burned real time. Anchored to
         # now, not to the import-time value: the suite's own runtime counts
@@ -360,6 +369,9 @@ class TestConversionBudgetIsSharedAcrossStages:
                             time.monotonic() - 400)
         second = ingest_processor.conversion_budget_remaining()
 
+        assert first == pytest.approx(600, abs=5), (
+            "an unspent budget is the whole allowance"
+        )
         assert second < first, "the second stage must not get a fresh full budget"
         assert second == pytest.approx(200, abs=5), (
             "after 400s of a 600s budget, ~200s must remain"

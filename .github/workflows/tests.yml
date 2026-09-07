@@ -38,6 +38,41 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  # Regenerate on PRs and after every merge. Drift is visible in the summary
+  # and downloadable artifacts, without requiring contributors to commit JSON.
+  impact-map:
+    name: Impact Map (regeneration + currency)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code and recall history
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+
+      - name: Regenerate impact map and report currency
+        run: |
+          python3 scripts/impact_map.py refresh \
+            --output-dir "$RUNNER_TEMP/impact-map" \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload regenerated map, recall, and currency
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: impact-map-${{ github.sha }}
+          path: ${{ runner.temp }}/impact-map/
+          if-no-files-found: error
+          retention-days: 14
+
   # ============================================================================
   # JOB 1: Fast Tests (Smoke + Unit)
   # Runs on: Every push, every PR

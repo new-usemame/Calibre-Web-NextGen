@@ -33,6 +33,49 @@ stable when a later tooling-only commit contains the generated file. The
 generator parses source with the standard-library AST and never imports or
 executes `cps`.
 
+## Currency is measured in CI
+
+The **Impact Map (regeneration + currency)** job in the Test Suite workflow
+rebuilds the map and re-evaluates recall on every PR, main/dev push (including
+merges), version tag, and manual run. It uses full Git history for the historical
+evidence check and only the Python standard library for regeneration.
+
+The job summary reports the checked commit, the current and committed `cps`
+tree fingerprints, whether each generated file differs, and the new recall
+number with every miss. Its `impact-map-<checked SHA>` download contains
+`impact-map.json`, `impact-map-recall.json`, and `impact-map-currency.json`.
+Artifacts are retained for 14 days; a manual Test Suite run produces another
+copy when needed. On PRs the checked SHA is the checkout's merge candidate,
+so use the summary's SHA when identifying the tree that was evaluated.
+
+**Staleness returns success.** Contributors can change `cps/` without committing
+generated JSON. CI has read-only repository permission and publishes fresh
+outputs separately; it does not push commits or open update PRs. The committed
+files remain a snapshot, and their refresh is a maintainer's task. Download the
+fresh CI map (query with `--map`) or regenerate locally before using a stale
+snapshot. Generator, input, and historical-evidence errors still fail the job;
+there is no blanket `continue-on-error` hiding them.
+
+To reproduce the job locally, use a separate output directory:
+
+```bash
+python3 scripts/impact_map.py refresh \
+  --output-dir "$TMPDIR/impact-map" --summary "$TMPDIR/impact-map-summary.md"
+```
+
+Currency compares the complete regenerated map and recall report, not only the
+`cps` SHA. Generator and route-oracle changes can therefore show drift even
+when `cps` is unchanged. Missing generated snapshots count as stale; missing
+historical commits or invalid evidence paths are evaluation errors. Like
+`build`, this command should run on a clean checkout: the source is read from
+disk while Git supplies its committed provenance.
+
+The unit suite separately builds a miniature graph to check call conservation
+and that guessed/coarse edges retain their blind records. This catches a
+generator regression while the committed JSON is still unchanged. The committed
+recall test checks reproducibility, complete case retention, historical evidence,
+and hit/miss accounting; it deliberately imposes no fixed hit rate or miss count.
+
 ## Graph and confidence
 
 Nodes represent `cps` modules, module-level functions/classes, and routes.

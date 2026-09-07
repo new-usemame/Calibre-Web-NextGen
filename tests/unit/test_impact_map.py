@@ -50,8 +50,9 @@ def miniature_repo(tmp_path: Path) -> tuple[Path, Path]:
         "    receiver.guessed()\n"
         "    return callback()\n\n"
         "def accounting():\n"
+        "    from .provider import Worker\n"
         "    len([])\n"
-        "    provider.Worker.run()\n",
+        "    Worker.run()\n",
     )
     oracle = repo / "oracle.json"
     oracle.write_text(
@@ -318,9 +319,15 @@ def test_committed_recall_report_is_reproducible_and_keeps_misses():
 
     assert observed == committed
     assert observed["total"] >= 8
-    assert observed["hits"] == 8
-    assert observed["misses"] == 2
-    assert observed["hit_rate"] == 0.8
+    assert observed["total"] == len(cases["cases"]) == len(observed["results"])
+    assert [result["commit"] for result in observed["results"]] == [case["commit"] for case in cases["cases"]]
+    assert len({case["commit"] for case in cases["cases"]}) == observed["total"]
+    hits = sum(result["hit"] for result in observed["results"])
+    assert observed["hits"] == hits
+    assert observed["misses"] == observed["total"] - hits
+    assert observed["hit_rate"] == round(hits / observed["total"], 6)
+    assert observed["hit_rate_percent"] == round(100 * hits / observed["total"], 2)
+    assert all(result["miss_reason"] for result in observed["results"] if not result["hit"])
     assert all(result["commit_exists"] for result in observed["results"])
     assert all(result["evidence_paths_present"] for result in observed["results"])
 

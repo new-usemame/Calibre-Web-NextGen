@@ -1253,6 +1253,57 @@ def resolve_path(repo_root: Path, path: Path) -> Path:
     return path if path.is_absolute() else repo_root / path
 
 
+def refresh_artifacts(repo_root: Path, output_dir: Path, summary_path: Path | None) -> dict[str, Any]:
+    """Publish fresh CI evidence; artifact drift is advisory, evaluation errors are not."""
+    output_dir = output_dir.resolve()
+    if output_dir == (repo_root / DEFAULT_MAP.parent).resolve():
+        raise ValueError("output directory would overwrite committed artifacts")
+    committed_map = load_json(repo_root / DEFAULT_MAP) if (repo_root / DEFAULT_MAP).exists() else {}
+    committed_recall = load_json(repo_root / DEFAULT_RECALL) if (repo_root / DEFAULT_RECALL).exists() else {}
+    data = build_map(repo_root, repo_root / DEFAULT_ORACLE)
+    report = evaluate_recall(data, load_json(repo_root / DEFAULT_CASES), repo_root)
+    write_json(output_dir / DEFAULT_MAP.name, data, compact=True)
+    write_json(output_dir / DEFAULT_RECALL.name, report)
+    if not report["results"] or any(
+        not result["commit_exists"] or not result["evidence_paths_present"]
+        for result in report["results"]
+    ):
+        raise ValueError("recall evidence unavailable: fetch full history and check declared evidence paths")
+    drift = {DEFAULT_MAP.name: committed_map != data, DEFAULT_RECALL.name: committed_recall != report}
+    currency = {
+        "schema_version": SCHEMA_VERSION,
+        "status": "stale" if any(drift.values()) else "current",
+        "checked_repo_sha": git_object_sha(repo_root, "HEAD"),
+        "current_cps_tree_sha": data["generated_from"]["cps_tree_sha"],
+        "committed_cps_tree_sha": committed_map.get("generated_from", {}).get("cps_tree_sha"),
+        "drift": drift,
+    }
+    write_json(output_dir / "impact-map-currency.json", currency)
+    summary = "\n".join([
+        "## Impact map currency",
+        "",
+        f"Committed artifacts: **{currency['status']}**. Fresh artifacts are attached to this CI run.",
+        "Staleness is advisory; contributors do not need to regenerate or commit these files.",
+        "",
+        f"Checked commit: `{currency['checked_repo_sha']}`",
+        f"Current cps tree: `{currency['current_cps_tree_sha']}`",
+        f"Committed map cps tree: `{currency['committed_cps_tree_sha']}`",
+        "",
+        *[f"- `{name}`: {'differs or missing' if differs else 'current'}" for name, differs in drift.items()],
+        "",
+        f"Curated recall: **{report['hits']}/{report['total']} ({report['hit_rate_percent']:.2f}%)**; "
+        f"misses={report['misses']}. This constructed case set is not an independent measurement.",
+        *[f"- Miss `{result['commit']}`: `{result['affected_site']}` → `{result['changed_symbol']}`: "
+          f"{result['miss_reason']}" for result in report["results"] if not result["hit"]],
+        "",
+    ])
+    if summary_path is not None:
+        with summary_path.open("a", encoding="utf-8") as stream:
+            stream.write(summary)
+    print(summary, end="")
+    return currency
+
+
 def parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
@@ -1261,6 +1312,10 @@ def parser() -> argparse.ArgumentParser:
     build = sub.add_parser("build", help="generate impact-map.json from cps")
     build.add_argument("--oracle", type=Path, default=DEFAULT_ORACLE)
     build.add_argument("--output", type=Path, default=DEFAULT_MAP)
+
+    refresh = sub.add_parser("refresh", help="publish fresh map/recall and advisory currency evidence for CI")
+    refresh.add_argument("--output-dir", type=Path, required=True)
+    refresh.add_argument("--summary", type=Path, help="append a Markdown summary (for GITHUB_STEP_SUMMARY)")
 
     pin = sub.add_parser("pin-routes", help="copy validated route/reconciliation data into a portable oracle")
     pin.add_argument("--static-routes", type=Path, required=True)
@@ -1286,6 +1341,12 @@ def parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = parser().parse_args(argv)
     repo_root = args.repo_root.resolve()
+    if args.command == "refresh":
+        refresh_artifacts(
+            repo_root, resolve_path(repo_root, args.output_dir),
+            resolve_path(repo_root, args.summary) if args.summary else None,
+        )
+        return 0
     if args.command == "pin-routes":
         data = pin_route_oracle(
             args.static_routes.resolve(), args.reconciliation.resolve(),

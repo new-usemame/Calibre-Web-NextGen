@@ -13,6 +13,15 @@ failed repeated refresh, or merge blocking for generation errors. Those three
 claims are corrected explicitly below and in the review-fix evidence section.
 The earlier hosted success proves publication for that run only.
 
+HOLD correction: the earlier unqualified contributor-safety claim was false.
+At `4a5f972752`, a module relocation or removal could make a historical/current
+path mismatch fatal, propagate through the required summary, and authorize an
+automatic revert. The committed recall test also lacked a lower bound, and the
+write guards did not cover output aliases or repository files outside cps.
+The HOLD section at the end records the reproductions and the narrower,
+corrected guarantees for B1, B2, B3, F1, and F3. Older passing runs below are
+historical observations and did not establish those guarantees.
+
 ## 1. Regenerated map and recall
 
 OBSERVED: `python3 scripts/impact_map.py build`, followed by
@@ -55,11 +64,13 @@ repeated refresh could also retain the previous successful currency label beside
 new map/recall files. The initial tests below did not exercise these paths. See
 review fixes 1–3 for the corrected guarantees and their observed RED/green tests.
 
-This shape satisfies the contributor constraint: a cps-only PR does not need to
-commit generated JSON. Every run publishes its own fresh graph/report and visible
-currency; committed snapshots remain a maintainer responsibility. CI never pushes
-or opens automated update PRs. Read the checked SHA in the summary when using a PR
-artifact, because the PR checkout can be a merge candidate.
+The original source-addition test showed advisory drift for that fixture. It did
+not establish the contributor constraint for file relocation or removal; both
+were later observed to fail on current/historical path mismatches. The HOLD B1
+fix below makes those results advisory too. Successful runs publish a fresh
+graph/report and visible currency; committed snapshots remain a maintainer
+responsibility. CI does not push or open update PRs. Read the checked SHA in a PR
+artifact's summary, because the checkout can be a merge candidate.
 
 OBSERVED behavioural test: `tests/unit/test_impact_map.py:240` creates real local Git
 history, runs the CLI while current, commits a source addition without updating
@@ -154,7 +165,10 @@ Hosted workflow scheduling and artifact download are not established by this loc
 OBSERVED code: `tests/unit/test_impact_map.py:313` retains report reproducibility,
 at least eight distinct historical commits, all declared cases in order, hit/miss
 and percentage accounting, reasons for misses, commit availability, and evidence paths.
-It imposes no fixed recall percentage or miss count.
+That replacement removed both the upper pin and the lower bound. Preserving
+case retention and self-consistency was insufficient: the later HOLD reproduction
+passed all 27 tests at 0/10 after regenerating a matching report. B3 restores an
+eight-hit minimum while accepting improvements; see the HOLD evidence below.
 
 OBSERVED RED/GREEN: an in-memory probe added one hypothetical resolved edge to the
 last historical case and evaluated the same ten cases. The existing acceptance test
@@ -534,8 +548,11 @@ fixed source at `a737b01b0d` unless a historical revision is explicitly named.
 
 ### 1. Reject summary aliases before any write
 
-OBSERVED code: `scripts/impact_map.py:1262` protects the committed map/recall,
-route oracle, historical cases, parsed Python inputs, and all three output files.
+OBSERVED at the earlier revision: `scripts/impact_map.py:1262` rejected a
+summary alias of the committed map/recall, route oracle, historical cases, parsed
+Python inputs, or output files. That was summary-only protection; it did not
+reject output links or summary destinations naming repository files outside cps.
+The HOLD F1 fix below extends both preflight and the writer.
 Resolved destination comparison catches path and symbolic-link aliases, including
 missing outputs; `Path.samefile` also catches hard links (`:1272`). Rejection
 precedes currency invalidation and any publication (`:1277`).
@@ -840,7 +857,10 @@ fi
 
 OBSERVED: the executable gate now returns failure for impact-map failure,
 cancellation, or skipping. Previously these states returned success, so branch
-protection relying on Test Suite Summary could merge them. Advisory staleness
+protection relying on Test Suite Summary could merge them. This new gate also
+exposed the B1 classification bug: a current/historical path mismatch could now
+block a refactor, and the Impact Map failure could trigger automatic revert.
+The HOLD B1/B2 fixes below correct those paths. Advisory staleness
 continues to exit zero in `scripts/impact_map.py:1369` and pass the gate.
 
 OBSERVED behavioural test: `tests/unit/test_summary_gate_requires_success.py:101`
@@ -1496,3 +1516,915 @@ hosted CI run, merge, or release. The original mutation observations remain
 historical evidence; they are not presented as a new measurement. Reused output
 directories are invalidated on failure, not replaced atomically. Concurrent
 refreshes must use separate directories.
+
+
+## HOLD fixes — B1, B2, B3, F1, and F3
+
+OBSERVED: `811ffbe582` records the new tests before fixes. All sixteen new
+parameter cases were seen RED. `c691a5a822` implements the fixes; `b8441b65ae`
+keeps the improvement control open to higher recall and uses workflow-derived
+job names in the positive revert controls. Existing tests and assertions from
+`4a5f972752` are retained, with the eight-hit floor added. Code references in
+this section refer to `b8441b65ae` unless a different revision is stated.
+Commands use the repo virtualenv; all test/reproduction Git history is local.
+Local paths, temporary usernames, and the clone's origin setting are normalized;
+trailing whitespace in captured output is trimmed.
+
+### B1. Current/historical path mismatches are measured misses
+
+OBSERVED code: `scripts/impact_map.py:1323` rejects an empty case set and
+`:1325` rejects an unavailable historical commit. It no longer raises for
+`evidence_paths_present: false`. Evaluation retains the false predicate and
+`historical_diff_does_not_touch_declared_sites` miss reason; publication reports
+them in the summary. The unchanged required summary still rejects a failed job
+(`.github/workflows/tests.yml:1159`), but these evaluated misses now exit zero.
+
+OBSERVED test: `tests/unit/test_impact_map.py:316` commits a module-to-package
+move or removes both modules named in a synthetic historical case. It requires
+false evidence-path predicates, available commits, miss reasons in the report
+and summary, exit zero, stale currency, and unchanged committed snapshots.
+Both cases were RED on the prior implementation and GREEN after the fix.
+The existing unavailable-history test (`:295`) remains fatal and passing.
+
+OBSERVED full-tree reproductions: a local sparse clone of `4a5f972752` shared
+read-only Git objects with the supplied worktree. Each scenario reset only that
+disposable clone to the base, then committed exactly the stated cps move/removal.
+The fixed phase copied the revised generator/tests/skill into that clone; the
+source changes, case set, oracle, and committed map were otherwise unchanged.
+No cps file in the supplied worktree was changed. The commands below include the
+exact `git mv` and `git rm`, refresh outputs, miss details, and exit codes.
+
+Both baseline scenarios exited 1 at 7/10. Both fixed scenarios exit 0 at 7/10,
+with the added miss caused by the current/historical path mismatch. The source
+relocation is reported as a measurement result, not a shallow-clone error.
+These are bounded observed refactor cases; the prior unqualified statement that
+any cps-only PR could never be blocked was false and is withdrawn.
+
+### B2. Impact Map never authorizes an automatic revert
+
+OBSERVED code: `.github/workflows/auto-revert.yml:145` adds the exact job name
+to the existing exclusion predicate:
+
+```jq
+| select(.name != "E2E Tests (SPA)" and .name != "Test Suite Summary"
+         and .name != "Impact Map (regeneration + currency)")
+```
+
+The reason is documented at `:72`: advisory drift/misses are measurements;
+unavailable history or generator/input failures mean the measurement did not
+complete. They do not establish a product regression caused by the commit.
+The required summary still exposes those failures, while auto-revert must not
+undo an application refactor to repair tooling or infrastructure.
+
+OBSERVED test: `tests/unit/test_summary_gate_requires_success.py:96` executes
+the complete triage shell and its real jq, using job names read from the Test
+Suite workflow. Only external Git/GitHub reads are stubbed. Impact Map failure,
+with or without a consequent summary failure, previously emitted `revert=true`;
+both now emit `revert=false`. The same tests retain the SPA exclusion and require
+`revert=true` for the actual fast-test, frontend-build, and integration job names.
+No live revert PR was opened and no hosted failure was injected.
+
+### B3. A matching report cannot hide collapsed committed recall
+
+OBSERVED code: `tests/unit/test_impact_map.py:576` restores the one-sided floor:
+
+```python
+assert observed["hits"] >= 8, "committed recall fell below the eight-case floor"
+```
+
+Reproducibility, retained cases, historical availability, miss reasons, and
+accounting remain checked. This floor applies to the committed map and report,
+not the freshly measured source tree of a contributor PR. That distinction is
+why B1 can report 7/10 and succeed while a gutted committed map fails the suite.
+
+OBSERVED test: `tests/unit/test_impact_map.py:446` removes call edges and
+regenerates a matching report in memory, then invokes the actual committed-report
+test. Before the floor it failed with `DID NOT RAISE`; after the floor it checks
+that collapse is rejected and that an additional valid path passes at at least
+nine hits. The improvement control has no upper bound.
+
+OBSERVED judge-style collapse: retaining only imports reduces edges from 9,475
+to exactly 1,355. `recall` regenerates a matching committed report at 0/10. The
+old file still passed all 27 tests. With the fix, the complete file is RED:
+`assert 0 >= 8` fails the committed-report test. The improvement control also
+fails because adding one edge to the already-gutted graph only recovers one hit.
+Both failures describe the corrupted artifact; this is not a harness error.
+The unmodified supplied-worktree artifact remains 8/10 and is used for the final
+consecutive GREEN runs below.
+
+### F1. Guard outputs and repository inputs at publication
+
+OBSERVED code: `scripts/impact_map.py:1296` enumerates tracked repository files,
+including the generator/tests, alongside explicit evidence inputs, parsed cps
+files, and the executing generator. `:1305` protects each destination from the
+inputs, peer outputs, and summary. All destinations are checked before any
+currency invalidation or publication.
+
+The writer at `scripts/impact_map.py:128` repeats alias checks at publication
+and writes a temporary sibling before replacing the destination. JSON writes
+therefore do not follow symbolic/hard links into another file even outside
+refresh; the shared summary writer uses the same checks. Individual-file
+replacement does not make the whole directory atomic or coordinate writers.
+
+OBSERVED tests: output aliases (`tests/unit/test_impact_map.py:346`), generator
+and test-file summary destinations (`:366`), aliases installed during generation
+so preflight cannot see them (`:388`), and direct JSON-writer symbolic/hard links
+(`:410`) were all RED before the fix and GREEN after it. The output-alias test
+was strengthened with a source addition and rerun RED so overwriting the map
+visibly changes protected bytes rather than writing identical bytes.
+
+### F3. Execute the skill's refresh-and-query procedure
+
+OBSERVED code: `.agents/skills/cwng-impact-map/SKILL.md:35` now describes refresh,
+its separate output directory, currency/error interpretation, CI downloads, and
+querying the generated map. It keeps committed regeneration as a maintainer task.
+
+OBSERVED test: `tests/unit/test_impact_map.py:421` extracts the documented shell
+recipe, executes it with the repo virtualenv against local synthetic history,
+and queries a new symbol absent from the committed snapshot. It requires stale
+currency with the current tree, a successful query through the fresh map, and
+unchanged committed bytes. Before the skill change it was RED because no recipe
+existed; afterward the complete procedure is GREEN. This executes the commands
+and checks their effects; the presence of a source string alone cannot pass it.
+
+### All new tests: RED, then GREEN
+
+OBSERVED command before any fixes:
+`python3 -m pytest tests/unit/test_impact_map.py tests/unit/test_summary_gate_requires_success.py -p no:randomly -k 'current_path_mismatches or output_aliases or repository_files or rechecks_aliases or does_not_follow_links or skill_refresh or gate_rejects_collapse or never_authorizes_auto_revert' --tb=short`:
+
+```text
+pytest temp base: $TMPDIR/cwng-pytest ($TMPDIR is mounted and writable)
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- $VENV/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 82 items / 66 deselected / 16 selected
+
+tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[module-to-package] FAILED [  6%]
+tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[remove-modules] FAILED [ 12%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink] FAILED [ 18%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-recall.json-target1-symlink] FAILED [ 25%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink] FAILED [ 31%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink] FAILED [ 37%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[scripts/impact_map.py] FAILED [ 43%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[tests/unit/test_impact_map.py] FAILED [ 50%]
+tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[map] FAILED [ 56%]
+tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[summary] FAILED [ 62%]
+tests/unit/test_impact_map.py::test_write_json_does_not_follow_links[symlink] FAILED [ 68%]
+tests/unit/test_impact_map.py::test_write_json_does_not_follow_links[hardlink] FAILED [ 75%]
+tests/unit/test_impact_map.py::test_skill_refresh_recipe_publishes_and_queries_fresh_map FAILED [ 81%]
+tests/unit/test_impact_map.py::test_committed_recall_gate_rejects_collapse_and_accepts_improvement FAILED [ 87%]
+tests/unit/test_summary_gate_requires_success.py::test_impact_map_failure_never_authorizes_auto_revert[False] FAILED [ 93%]
+tests/unit/test_summary_gate_requires_success.py::test_impact_map_failure_never_authorizes_auto_revert[True] FAILED [100%]
+
+=================================== FAILURES ===================================
+__ test_refresh_reports_current_path_mismatches_as_misses[module-to-package] ___
+tests/unit/test_impact_map.py:329: in test_refresh_reports_current_path_mismatches_as_misses
+    assert result.returncode == 0, result.stderr
+E   AssertionError: Traceback (most recent call last):
+E       File "$ROOT/scripts/impact_map.py", line 1413, in <module>
+E         raise SystemExit(main())
+E                          ^^^^^^
+E       File "$ROOT/scripts/impact_map.py", line 1365, in main
+E         refresh_artifacts(
+E       File "$ROOT/scripts/impact_map.py", line 1291, in refresh_artifacts
+E         raise ValueError("recall evidence unavailable: fetch full history and check declared evidence paths")
+E     ValueError: recall evidence unavailable: fetch full history and check declared evidence paths
+E
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['$VENV/bin/python', '$ROOT/scripts/impact_map.py', '--repo-root', '$TMPDIR/cwng-pytest/1024/pytest-of-fixture-user/pytest-0/test_refresh_reports_current_p0/repo', 'refresh', '--output-dir', '$TMPDIR/cwng-pytest/1024/pytest-of-fixture-user/pytest-0/test_refresh_reports_current_p0/artifacts', '--summary', '$TMPDIR/cwng-pytest/1024/pytest-of-fixture-user/pytest-0/test_refresh_reports_current_p0/summary.md'], returncode=1, stdout='', stderr='Traceback (most recent call last):\n  File "$ROOT/scripts/impact_map.py", line 1413, in <module>\n    raise SystemExit(main())\n                     ^^^^^^\n  File "$ROOT/scripts/impact_map.py", line 1365, in main\n    refresh_artifacts(\n  File "$ROOT/scripts/impact_map.py", line 1291, in refresh_artifacts\n    raise ValueError("recall evidence unavailable: fetch full history and check declared evidence paths")\nValueError: recall evidence unavailable: fetch full history and check declared evidence paths\n').returncode
+____ test_refresh_reports_current_path_mismatches_as_misses[remove-modules] ____
+tests/unit/test_impact_map.py:329: in test_refresh_reports_current_path_mismatches_as_misses
+    assert result.returncode == 0, result.stderr
+E   AssertionError: Traceback (most recent call last):
+E       File "$ROOT/scripts/impact_map.py", line 1413, in <module>
+E         raise SystemExit(main())
+E                          ^^^^^^
+E       File "$ROOT/scripts/impact_map.py", line 1365, in main
+E         refresh_artifacts(
+E       File "$ROOT/scripts/impact_map.py", line 1291, in refresh_artifacts
+E         raise ValueError("recall evidence unavailable: fetch full history and check declared evidence paths")
+E     ValueError: recall evidence unavailable: fetch full history and check declared evidence paths
+E
+E   assert 1 == 0
+E    +  where 1 = CompletedProcess(args=['$VENV/bin/python', '$ROOT/scripts/impact_map.py', '--repo-root', '$TMPDIR/cwng-pytest/1024/pytest-of-fixture-user/pytest-0/test_refresh_reports_current_p1/repo', 'refresh', '--output-dir', '$TMPDIR/cwng-pytest/1024/pytest-of-fixture-user/pytest-0/test_refresh_reports_current_p1/artifacts', '--summary', '$TMPDIR/cwng-pytest/1024/pytest-of-fixture-user/pytest-0/test_refresh_reports_current_p1/summary.md'], returncode=1, stdout='', stderr='Traceback (most recent call last):\n  File "$ROOT/scripts/impact_map.py", line 1413, in <module>\n    raise SystemExit(main())\n                     ^^^^^^\n  File "$ROOT/scripts/impact_map.py", line 1365, in main\n    refresh_artifacts(\n  File "$ROOT/scripts/impact_map.py", line 1291, in refresh_artifacts\n    raise ValueError("recall evidence unavailable: fetch full history and check declared evidence paths")\nValueError: recall evidence unavailable: fetch full history and check declared evidence paths\n').returncode
+_ test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink] _
+tests/unit/test_impact_map.py:358: in test_refresh_rejects_output_aliases_before_writes
+    assert result.returncode != 0, "an output alias was accepted"
+E   AssertionError: an output alias was accepted
+E   assert 0 != 0
+E    +  where 0 = CompletedProcess(args=['$VENV/bin/python', '$ROOT/scripts/impact_map.py', '--repo-root', '$TMPDIR/cwng-pytest/1024/pytest-of-fixture-user/pytest-0/test_refresh_rejects_output_al0/repo', 'refresh', '--output-dir', '$TMPDIR/cwng-pytest/1024/pytest-of-fixture-user/pytest-0/test_refresh_rejects_output_al0/artifacts', '--summary', '$TMPDIR/cwng-pytest/1024/pytest-of-fixture-user/pytest-0/test_refresh_rejects_output_al0/summary.md'], returncode=0, stdout='## Impact map currency\n\nCommitted artifacts: **current**. Fresh artifacts are attached to this CI run.\nStaleness is advisory; contributors do not need to regenerate or commit these files.\n\nChecked commit: `a84c1e20f1b011ca4efa7982a9d2e4e009c30812`\nCurrent cps tree: `ed6985b391228938c8d434a8792e08f5024cd0bf`\nCommitted map cps tree: `ed6985b391228938c8d434a8792e08f5024cd0bf`\n\n- `impact-map.json`: current\n- `impact-map-recall.json`: current\n\nCurated recall: **1/2 (50.00%)**; misses=1. This constructed case set is not an independent measurement.\n- Miss `a84c1e20f1b011ca4efa7982a9d2e4e009c30812`: `cps.app:dynamic` → `cps.provider:Worker`: no_static_call_path\n', stderr='').returncode
+_ test_refresh_rejects_output_aliases_before_writes[impact-map-recall.json-target1-symlink] _
+tests/unit/test_impact_map.py:357: in test_refresh_rejects_output_aliases_before_writes
+    assert unchanged, "generated output overwrote a protected input"
+E   AssertionError: generated output overwrote a protected input
+E   assert False
+_ test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink] _
+tests/unit/test_impact_map.py:358: in test_refresh_rejects_output_aliases_before_writes
+    assert result.returncode != 0, "an output alias was accepted"
+E   AssertionError: an output alias was accepted
+E   assert 0 != 0
+E    +  where 0 = CompletedProcess(args=['$VENV/bin/python', '$ROOT/scripts/impact_map.py', '--repo-root', '$TMPDIR/cwng-pytest/1024/pytest-of-fixture-user/pytest-0/test_refresh_rejects_output_al2/repo', 'refresh', '--output-dir', '$TMPDIR/cwng-pytest/1024/pytest-of-fixture-user/pytest-0/test_refresh_rejects_output_al2/artifacts', '--summary', '$TMPDIR/cwng-pytest/1024/pytest-of-fixture-user/pytest-0/test_refresh_rejects_output_al2/summary.md'], returncode=0, stdout='## Impact map currency\n\nCommitted artifacts: **current**. Fresh artifacts are attached to this CI run.\nStaleness is advisory; contributors do not need to regenerate or commit these files.\n\nChecked commit: `5f3e4b2f1af51478c45d91e9a19faeccc4d7d5f9`\nCurrent cps tree: `ed6985b391228938c8d434a8792e08f5024cd0bf`\nCommitted map cps tree: `ed6985b391228938c8d434a8792e08f5024cd0bf`\n\n- `impact-map.json`: current\n- `impact-map-recall.json`: current\n\nCurated recall: **1/2 (50.00%)**; misses=1. This constructed case set is not an independent measurement.\n- Miss `5f3e4b2f1af51478c45d91e9a19faeccc4d7d5f9`: `cps.app:dynamic` → `cps.provider:Worker`: no_static_call_path\n', stderr='').returncode
+_ test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink] _
+tests/unit/test_impact_map.py:357: in test_refresh_rejects_output_aliases_before_writes
+    assert unchanged, "generated output overwrote a protected input"
+E   AssertionError: generated output overwrote a protected input
+E   assert False
+_ test_refresh_rejects_summary_aliases_to_repository_files[scripts/impact_map.py] _
+tests/unit/test_impact_map.py:380: in test_refresh_rejects_summary_aliases_to_repository_files
+    assert unchanged, "summary appended to a repository source file"
+E   AssertionError: summary appended to a repository source file
+E   assert False
+_ test_refresh_rejects_summary_aliases_to_repository_files[tests/unit/test_impact_map.py] _
+tests/unit/test_impact_map.py:380: in test_refresh_rejects_summary_aliases_to_repository_files
+    assert unchanged, "summary appended to a repository source file"
+E   AssertionError: summary appended to a repository source file
+E   assert False
+_______________ test_refresh_rechecks_aliases_at_write_time[map] _______________
+tests/unit/test_impact_map.py:402: in test_refresh_rechecks_aliases_at_write_time
+    with pytest.raises(ValueError, match="destination aliases"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'ValueError'>
+----------------------------- Captured stdout call -----------------------------
+## Impact map currency
+
+Committed artifacts: **current**. Fresh artifacts are attached to this CI run.
+Staleness is advisory; contributors do not need to regenerate or commit these files.
+
+Checked commit: `9a53dced22f90a654f89651b1d744feeff39b742`
+Current cps tree: `ed6985b391228938c8d434a8792e08f5024cd0bf`
+Committed map cps tree: `ed6985b391228938c8d434a8792e08f5024cd0bf`
+
+- `impact-map.json`: current
+- `impact-map-recall.json`: current
+
+Curated recall: **1/2 (50.00%)**; misses=1. This constructed case set is not an independent measurement.
+- Miss `9a53dced22f90a654f89651b1d744feeff39b742`: `cps.app:dynamic` → `cps.provider:Worker`: no_static_call_path
+_____________ test_refresh_rechecks_aliases_at_write_time[summary] _____________
+tests/unit/test_impact_map.py:402: in test_refresh_rechecks_aliases_at_write_time
+    with pytest.raises(ValueError, match="destination aliases"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'ValueError'>
+----------------------------- Captured stdout call -----------------------------
+## Impact map currency
+
+Committed artifacts: **current**. Fresh artifacts are attached to this CI run.
+Staleness is advisory; contributors do not need to regenerate or commit these files.
+
+Checked commit: `6df6e2c7cfd51d16d145fc2af3c08d07d9b7bc01`
+Current cps tree: `ed6985b391228938c8d434a8792e08f5024cd0bf`
+Committed map cps tree: `ed6985b391228938c8d434a8792e08f5024cd0bf`
+
+- `impact-map.json`: current
+- `impact-map-recall.json`: current
+
+Curated recall: **1/2 (50.00%)**; misses=1. This constructed case set is not an independent measurement.
+- Miss `6df6e2c7cfd51d16d145fc2af3c08d07d9b7bc01`: `cps.app:dynamic` → `cps.provider:Worker`: no_static_call_path
+________________ test_write_json_does_not_follow_links[symlink] ________________
+tests/unit/test_impact_map.py:415: in test_write_json_does_not_follow_links
+    assert target.read_text(encoding="utf-8") == '{"input": true}\n'
+E   assert '{\n  "output": true\n}\n' == '{"input": true}\n'
+E
+E     - {"input": true}
+E     + {
+E     +   "output": true
+E     + }
+_______________ test_write_json_does_not_follow_links[hardlink] ________________
+tests/unit/test_impact_map.py:415: in test_write_json_does_not_follow_links
+    assert target.read_text(encoding="utf-8") == '{"input": true}\n'
+E   assert '{\n  "output": true\n}\n' == '{"input": true}\n'
+E
+E     - {"input": true}
+E     + {
+E     +   "output": true
+E     + }
+__________ test_skill_refresh_recipe_publishes_and_queries_fresh_map ___________
+tests/unit/test_impact_map.py:425: in test_skill_refresh_recipe_publishes_and_queries_fresh_map
+    assert recipes, "skill provides no executable refresh recipe"
+E   AssertionError: skill provides no executable refresh recipe
+E   assert []
+_____ test_committed_recall_gate_rejects_collapse_and_accepts_improvement ______
+tests/unit/test_impact_map.py:462: in test_committed_recall_gate_rejects_collapse_and_accepts_improvement
+    with pytest.raises(AssertionError, match="committed recall fell below"):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   Failed: DID NOT RAISE <class 'AssertionError'>
+_________ test_impact_map_failure_never_authorizes_auto_revert[False] __________
+tests/unit/test_summary_gate_requires_success.py:124: in test_impact_map_failure_never_authorizes_auto_revert
+    assert decision == "revert=false", out
+E   AssertionError: failed jobs: Impact Map (regeneration + currency)
+E     revert-worthy failure(s): Impact Map (regeneration + currency)
+E
+E   assert 'revert=true' == 'revert=false'
+E
+E     - revert=false
+E     + revert=true
+__________ test_impact_map_failure_never_authorizes_auto_revert[True] __________
+tests/unit/test_summary_gate_requires_success.py:124: in test_impact_map_failure_never_authorizes_auto_revert
+    assert decision == "revert=false", out
+E   AssertionError: failed jobs: Impact Map (regeneration + currency)|Test Suite Summary
+E     revert-worthy failure(s): Impact Map (regeneration + currency)
+E
+E   assert 'revert=true' == 'revert=false'
+E
+E     - revert=false
+E     + revert=true
+============================= slowest 10 durations =============================
+14.30s setup    tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[remove-modules]
+12.78s setup    tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[module-to-package]
+10.47s call     tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[module-to-package]
+7.97s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink]
+7.72s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[scripts/impact_map.py]
+6.10s call     tests/unit/test_impact_map.py::test_committed_recall_gate_rejects_collapse_and_accepts_improvement
+5.18s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink]
+5.13s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-recall.json-target1-symlink]
+4.13s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink]
+3.98s call     tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[remove-modules]
+=========================== short test summary info ============================
+FAILED tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[module-to-package]
+FAILED tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[remove-modules]
+FAILED tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink]
+FAILED tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-recall.json-target1-symlink]
+FAILED tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink]
+FAILED tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink]
+FAILED tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[scripts/impact_map.py]
+FAILED tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[tests/unit/test_impact_map.py]
+FAILED tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[map]
+FAILED tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[summary]
+FAILED tests/unit/test_impact_map.py::test_write_json_does_not_follow_links[symlink]
+FAILED tests/unit/test_impact_map.py::test_write_json_does_not_follow_links[hardlink]
+FAILED tests/unit/test_impact_map.py::test_skill_refresh_recipe_publishes_and_queries_fresh_map
+FAILED tests/unit/test_impact_map.py::test_committed_recall_gate_rejects_collapse_and_accepts_improvement
+FAILED tests/unit/test_summary_gate_requires_success.py::test_impact_map_failure_never_authorizes_auto_revert[False]
+FAILED tests/unit/test_summary_gate_requires_success.py::test_impact_map_failure_never_authorizes_auto_revert[True]
+================ 16 failed, 66 deselected in 110.48s (0:01:50) =================
+
+exit code: 1
+```
+
+OBSERVED strengthened output-alias RED, still before the writer fix:
+`python3 -m pytest tests/unit/test_impact_map.py -p no:randomly -k output_aliases --tb=short`:
+
+```text
+pytest temp base: $TMPDIR/cwng-pytest ($TMPDIR is mounted and writable)
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- $VENV/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 41 items / 37 deselected / 4 selected
+
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink] FAILED [ 25%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-recall.json-target1-symlink] FAILED [ 50%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink] FAILED [ 75%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink] FAILED [100%]
+
+=================================== FAILURES ===================================
+_ test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink] _
+tests/unit/test_impact_map.py:358: in test_refresh_rejects_output_aliases_before_writes
+    assert unchanged, "generated output overwrote a protected input"
+E   AssertionError: generated output overwrote a protected input
+E   assert False
+_ test_refresh_rejects_output_aliases_before_writes[impact-map-recall.json-target1-symlink] _
+tests/unit/test_impact_map.py:358: in test_refresh_rejects_output_aliases_before_writes
+    assert unchanged, "generated output overwrote a protected input"
+E   AssertionError: generated output overwrote a protected input
+E   assert False
+_ test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink] _
+tests/unit/test_impact_map.py:359: in test_refresh_rejects_output_aliases_before_writes
+    assert result.returncode != 0, "an output alias was accepted"
+E   AssertionError: an output alias was accepted
+E   assert 0 != 0
+E    +  where 0 = CompletedProcess(args=['$VENV/bin/python', '$ROOT/scripts/impact_map.py', '--repo-root', '$TMPDIR/cwng-pytest/14869/pytest-of-fixture-user/pytest-0/test_refresh_rejects_output_al2/repo', 'refresh', '--output-dir', '$TMPDIR/cwng-pytest/14869/pytest-of-fixture-user/pytest-0/test_refresh_rejects_output_al2/artifacts', '--summary', '$TMPDIR/cwng-pytest/14869/pytest-of-fixture-user/pytest-0/test_refresh_rejects_output_al2/summary.md'], returncode=0, stdout='## Impact map currency\n\nCommitted artifacts: **stale**. Fresh artifacts are attached to this CI run.\nStaleness is advisory; contributors do not need to regenerate or commit these files.\n\nChecked commit: `f21b3441e88d147716bbd37ed45a31954f5365b8`\nCurrent cps tree: `ed6985b391228938c8d434a8792e08f5024cd0bf`\nCommitted map cps tree: `ed6985b391228938c8d434a8792e08f5024cd0bf`\n\n- `impact-map.json`: differs or missing\n- `impact-map-recall.json`: current\n\nCurated recall: **1/2 (50.00%)**; misses=1. This constructed case set is not an independent measurement.\n- Miss `f21b3441e88d147716bbd37ed45a31954f5365b8`: `cps.app:dynamic` → `cps.provider:Worker`: no_static_call_path\n', stderr='').returncode
+_ test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink] _
+tests/unit/test_impact_map.py:358: in test_refresh_rejects_output_aliases_before_writes
+    assert unchanged, "generated output overwrote a protected input"
+E   AssertionError: generated output overwrote a protected input
+E   assert False
+============================= slowest 10 durations =============================
+3.51s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-recall.json-target1-symlink]
+3.20s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink]
+2.75s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink]
+2.66s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink]
+1.10s call     tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink]
+0.90s call     tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink]
+0.85s call     tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-recall.json-target1-symlink]
+0.75s call     tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink]
+
+(2 durations < 0.005s hidden.  Use -vv to show these durations.)
+=========================== short test summary info ============================
+FAILED tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink]
+FAILED tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-recall.json-target1-symlink]
+FAILED tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink]
+FAILED tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink]
+====================== 4 failed, 37 deselected in 16.44s =======================
+
+exit code: 1
+```
+
+OBSERVED GREEN for all sixteen new cases, using the first command above:
+
+```text
+pytest temp base: $TMPDIR/cwng-pytest ($TMPDIR is mounted and writable)
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- $VENV/bin/python
+rootdir: $ROOT
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 82 items / 66 deselected / 16 selected
+
+tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[module-to-package] PASSED [  6%]
+tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[remove-modules] PASSED [ 12%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink] PASSED [ 18%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-recall.json-target1-symlink] PASSED [ 25%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink] PASSED [ 31%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink] PASSED [ 37%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[scripts/impact_map.py] PASSED [ 43%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[tests/unit/test_impact_map.py] PASSED [ 50%]
+tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[map] PASSED [ 56%]
+tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[summary] PASSED [ 62%]
+tests/unit/test_impact_map.py::test_write_json_does_not_follow_links[symlink] PASSED [ 68%]
+tests/unit/test_impact_map.py::test_write_json_does_not_follow_links[hardlink] PASSED [ 75%]
+tests/unit/test_impact_map.py::test_skill_refresh_recipe_publishes_and_queries_fresh_map PASSED [ 81%]
+tests/unit/test_impact_map.py::test_committed_recall_gate_rejects_collapse_and_accepts_improvement PASSED [ 87%]
+tests/unit/test_summary_gate_requires_success.py::test_impact_map_failure_never_authorizes_auto_revert[False] PASSED [ 93%]
+tests/unit/test_summary_gate_requires_success.py::test_impact_map_failure_never_authorizes_auto_revert[True] PASSED [100%]
+
+============================= slowest 10 durations =============================
+8.31s call     tests/unit/test_impact_map.py::test_committed_recall_gate_rejects_collapse_and_accepts_improvement
+3.26s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink]
+3.25s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink]
+3.01s setup    tests/unit/test_impact_map.py::test_skill_refresh_recipe_publishes_and_queries_fresh_map
+2.86s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink]
+2.68s setup    tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[module-to-package]
+2.52s setup    tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[remove-modules]
+2.52s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[scripts/impact_map.py]
+2.49s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[tests/unit/test_impact_map.py]
+2.46s setup    tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[map]
+====================== 16 passed, 66 deselected in 49.07s ======================
+
+exit code: 0
+```
+
+### Full-tree baseline and fixed reproductions
+
+OBSERVED initial baseline reproduction of both B1 cases and a call-edge collapse:
+
+```text
+$ git sparse-checkout set cps scripts state tests .agents docs
+exit code: 0
+$ git checkout --quiet
+exit code: 0
+$ git remote set-url origin $ORIGIN
+exit code: 0
+$ git reset --hard 4a5f972752d8fa595def4f783f5ed7b9e1d349ef
+HEAD is now at 4a5f972752 docs(impact-map): record consecutive full passes and final validation
+exit code: 0
+B1 baseline: relocation
+$ git mv cps/web.py cps/web/__init__.py
+exit code: 0
+$ git -c user.name=new-usemame -c user.email=248195428+new-usemame@users.noreply.github.com commit -m Exercise relocation against frozen recall evidence
+[mod/p0.2b-impact-map-ci 018baa47e3] Exercise relocation against frozen recall evidence
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename cps/{web.py => web/__init__.py} (100%)
+exit code: 0
+$ $VENV/bin/python scripts/impact_map.py refresh --output-dir $ROOT/tmp/p0.2b/hold/real-tree/tmp/hold-baseline-relocation
+Traceback (most recent call last):
+  File "$ROOT/tmp/p0.2b/hold/real-tree/scripts/impact_map.py", line 1413, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "$ROOT/tmp/p0.2b/hold/real-tree/scripts/impact_map.py", line 1365, in main
+    refresh_artifacts(
+  File "$ROOT/tmp/p0.2b/hold/real-tree/scripts/impact_map.py", line 1291, in refresh_artifacts
+    raise ValueError("recall evidence unavailable: fetch full history and check declared evidence paths")
+ValueError: recall evidence unavailable: fetch full history and check declared evidence paths
+exit code: 1
+{
+  "hits": 7,
+  "total": 10,
+  "misses": [
+    {
+      "commit": "d1628a3a94745ef97fc2f9c87a9b30f1fc7744fa",
+      "affected_site": "cps.web:render_magic_shelf",
+      "changed_symbol": "cps.custom_column_sort:resolve_magic_shelf_sort",
+      "evidence_paths_present": false,
+      "miss_reason": "historical_diff_does_not_touch_declared_sites"
+    },
+    {
+      "commit": "430601d6a58012dc5e8017431feed25f1b0fe38c",
+      "affected_site": "frontend/src/pages/Shelf.tsx",
+      "changed_symbol": "cps.api.shelves:shelf_detail",
+      "evidence_paths_present": true,
+      "miss_reason": "affected_site_not_present_in_current_map"
+    },
+    {
+      "commit": "9dc72ed57e328855b9d19653d831eeee7abea08b",
+      "affected_site": "cps.api.shelves:shelf_detail",
+      "changed_symbol": "cps.db:public_shelf_book_filter",
+      "evidence_paths_present": true,
+      "miss_reason": "The dependency crosses an instance-method call and keyword-controlled branch; methods are folded into a class node and the receiver call is unresolved."
+    }
+  ]
+}
+$ git reset --hard 4a5f972752d8fa595def4f783f5ed7b9e1d349ef
+HEAD is now at 4a5f972752 docs(impact-map): record consecutive full passes and final validation
+exit code: 0
+B1 baseline: removal
+$ git rm cps/cwa_functions.py cps/schedule.py
+rm 'cps/cwa_functions.py'
+rm 'cps/schedule.py'
+exit code: 0
+$ git -c user.name=new-usemame -c user.email=248195428+new-usemame@users.noreply.github.com commit -m Exercise removal against frozen recall evidence
+[mod/p0.2b-impact-map-ci 611999a4c8] Exercise removal against frozen recall evidence
+ 2 files changed, 3321 deletions(-)
+ delete mode 100755 cps/cwa_functions.py
+ delete mode 100755 cps/schedule.py
+exit code: 0
+$ $VENV/bin/python scripts/impact_map.py refresh --output-dir $ROOT/tmp/p0.2b/hold/real-tree/tmp/hold-baseline-removal
+Traceback (most recent call last):
+  File "$ROOT/tmp/p0.2b/hold/real-tree/scripts/impact_map.py", line 1413, in <module>
+    raise SystemExit(main())
+                     ^^^^^^
+  File "$ROOT/tmp/p0.2b/hold/real-tree/scripts/impact_map.py", line 1365, in main
+    refresh_artifacts(
+  File "$ROOT/tmp/p0.2b/hold/real-tree/scripts/impact_map.py", line 1291, in refresh_artifacts
+    raise ValueError("recall evidence unavailable: fetch full history and check declared evidence paths")
+ValueError: recall evidence unavailable: fetch full history and check declared evidence paths
+exit code: 1
+{
+  "hits": 7,
+  "total": 10,
+  "misses": [
+    {
+      "commit": "d8ca3fbd84af77fb931f884e6dfef1992e240df1",
+      "affected_site": "cps.cwa_functions:set_cwa_settings",
+      "changed_symbol": "cps.schedule:resolve_hardcover_auto_fetch_schedule",
+      "evidence_paths_present": false,
+      "miss_reason": "historical_diff_does_not_touch_declared_sites"
+    },
+    {
+      "commit": "430601d6a58012dc5e8017431feed25f1b0fe38c",
+      "affected_site": "frontend/src/pages/Shelf.tsx",
+      "changed_symbol": "cps.api.shelves:shelf_detail",
+      "evidence_paths_present": true,
+      "miss_reason": "affected_site_not_present_in_current_map"
+    },
+    {
+      "commit": "9dc72ed57e328855b9d19653d831eeee7abea08b",
+      "affected_site": "cps.api.shelves:shelf_detail",
+      "changed_symbol": "cps.db:public_shelf_book_filter",
+      "evidence_paths_present": true,
+      "miss_reason": "The dependency crosses an instance-method call and keyword-controlled branch; methods are folded into a class node and the receiver call is unresolved."
+    }
+  ]
+}
+$ git reset --hard 4a5f972752d8fa595def4f783f5ed7b9e1d349ef
+HEAD is now at 4a5f972752 docs(impact-map): record consecutive full passes and final validation
+exit code: 0
+B3 baseline: collapsed map with regenerated matching recall
+edges: 9475 -> 1875
+$ $VENV/bin/python scripts/impact_map.py recall
+historical recall: 0/10 (0.00%); misses=10
+exit code: 0
+$ $VENV/bin/python -m pytest tests/unit/test_impact_map.py -p no:randomly --tb=short
+pytest temp base: $TMPDIR/cwng-pytest ($TMPDIR is mounted and writable)
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- $VENV/bin/python
+rootdir: $ROOT/tmp/p0.2b/hold/real-tree
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 27 items
+
+tests/unit/test_impact_map.py::test_generator_separates_exact_bindings_from_attribute_guesses PASSED [  3%]
+tests/unit/test_impact_map.py::test_route_query_reaches_handler_and_reports_module_blindness PASSED [  7%]
+tests/unit/test_impact_map.py::test_runtime_only_route_is_live_but_has_no_invented_handler PASSED [ 11%]
+tests/unit/test_impact_map.py::test_reconciliation_static_only_route_is_not_claimed_live PASSED [ 14%]
+tests/unit/test_impact_map.py::test_same_inputs_generate_byte_identical_json PASSED [ 18%]
+tests/unit/test_impact_map.py::test_fresh_build_conserves_calls_and_keeps_coarse_edges_blind PASSED [ 22%]
+tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates PASSED [ 25%]
+tests/unit/test_impact_map.py::test_refresh_rejects_unavailable_recall_history PASSED [ 29%]
+tests/unit/test_impact_map.py::test_refresh_refuses_to_overwrite_committed_inputs PASSED [ 33%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-direct] PASSED [ 37%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-recall-direct] PASSED [ 40%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[oracle-direct] PASSED [ 44%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-direct] PASSED [ 48%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[source-direct] PASSED [ 51%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-direct] PASSED [ 55%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-recall-direct] PASSED [ 59%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-direct] PASSED [ 62%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-symlink] PASSED [ 66%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-symlink] PASSED [ 70%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-hardlink] PASSED [ 74%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-hardlink] PASSED [ 77%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-absent] PASSED [ 81%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history] PASSED [ 85%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-cases] PASSED [ 88%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle] PASSED [ 92%]
+tests/unit/test_impact_map.py::test_committed_recall_report_is_reproducible_and_keeps_misses PASSED [ 96%]
+tests/unit/test_impact_map.py::test_committed_map_has_nonempty_queryable_blind_spots_and_route_anchor PASSED [100%]
+
+============================= slowest 10 durations =============================
+7.88s call     tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates
+5.92s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history]
+4.55s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-absent]
+4.45s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-hardlink]
+4.20s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-recall-direct]
+4.14s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[source-direct]
+4.12s setup    tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history]
+4.00s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[oracle-direct]
+3.92s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-symlink]
+3.87s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-direct]
+======================== 27 passed in 114.02s (0:01:54) ========================
+exit code: 0
+
+exit code: 0
+```
+
+The initial collapse retained route-handler edges (1,875 remaining). To match
+the judge's count exactly, the next run retained only imports (1,355 remaining):
+
+```text
+$ git reset --hard 4a5f972752d8fa595def4f783f5ed7b9e1d349ef
+HEAD is now at 4a5f972752 docs(impact-map): record consecutive full passes and final validation
+exit code: 0
+B3 baseline: collapsed map with regenerated matching recall
+edges: 9475 -> 1355
+$ $VENV/bin/python scripts/impact_map.py recall
+historical recall: 0/10 (0.00%); misses=10
+exit code: 0
+$ $VENV/bin/python -m pytest tests/unit/test_impact_map.py -p no:randomly --tb=short
+pytest temp base: $TMPDIR/cwng-pytest ($TMPDIR is mounted and writable)
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- $VENV/bin/python
+rootdir: $ROOT/tmp/p0.2b/hold/real-tree
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 27 items
+
+tests/unit/test_impact_map.py::test_generator_separates_exact_bindings_from_attribute_guesses PASSED [  3%]
+tests/unit/test_impact_map.py::test_route_query_reaches_handler_and_reports_module_blindness PASSED [  7%]
+tests/unit/test_impact_map.py::test_runtime_only_route_is_live_but_has_no_invented_handler PASSED [ 11%]
+tests/unit/test_impact_map.py::test_reconciliation_static_only_route_is_not_claimed_live PASSED [ 14%]
+tests/unit/test_impact_map.py::test_same_inputs_generate_byte_identical_json PASSED [ 18%]
+tests/unit/test_impact_map.py::test_fresh_build_conserves_calls_and_keeps_coarse_edges_blind PASSED [ 22%]
+tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates PASSED [ 25%]
+tests/unit/test_impact_map.py::test_refresh_rejects_unavailable_recall_history PASSED [ 29%]
+tests/unit/test_impact_map.py::test_refresh_refuses_to_overwrite_committed_inputs PASSED [ 33%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-direct] PASSED [ 37%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-recall-direct] PASSED [ 40%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[oracle-direct] PASSED [ 44%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-direct] PASSED [ 48%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[source-direct] PASSED [ 51%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-direct] PASSED [ 55%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-recall-direct] PASSED [ 59%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-direct] PASSED [ 62%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-symlink] PASSED [ 66%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-symlink] PASSED [ 70%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-hardlink] PASSED [ 74%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-hardlink] PASSED [ 77%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-absent] PASSED [ 81%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history] PASSED [ 85%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-cases] PASSED [ 88%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle] PASSED [ 92%]
+tests/unit/test_impact_map.py::test_committed_recall_report_is_reproducible_and_keeps_misses PASSED [ 96%]
+tests/unit/test_impact_map.py::test_committed_map_has_nonempty_queryable_blind_spots_and_route_anchor PASSED [100%]
+
+============================= slowest 10 durations =============================
+5.88s call     tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates
+3.73s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle]
+3.45s setup    tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates
+3.34s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-direct]
+3.30s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-cases]
+3.16s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history]
+2.97s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[oracle-direct]
+2.92s call     tests/unit/test_impact_map.py::test_committed_recall_report_is_reproducible_and_keeps_misses
+2.69s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-recall-direct]
+2.61s setup    tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-hardlink]
+======================== 27 passed in 77.79s (0:01:17) =========================
+exit code: 0
+
+exit code: 0
+```
+
+OBSERVED fixed phase: both B1 cases exit zero; the exact B3 collapse makes the
+complete impact-map test file RED. The wrapper exits zero because it explicitly
+requires those expected child exit codes; the suite's own exit code is 1.
+
+```text
+$ git reset --hard 4a5f972752d8fa595def4f783f5ed7b9e1d349ef
+HEAD is now at 4a5f972752 docs(impact-map): record consecutive full passes and final validation
+exit code: 0
+B1 fixed: relocation
+$ git mv cps/web.py cps/web/__init__.py
+exit code: 0
+$ git -c user.name=new-usemame -c user.email=248195428+new-usemame@users.noreply.github.com commit -m Exercise relocation against frozen recall evidence
+[mod/p0.2b-impact-map-ci 19d0ae65bb] Exercise relocation against frozen recall evidence
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename cps/{web.py => web/__init__.py} (100%)
+exit code: 0
+$ $VENV/bin/python scripts/impact_map.py refresh --output-dir $ROOT/tmp/p0.2b/hold/real-tree/tmp/hold-fixed-relocation
+## Impact map currency
+
+Committed artifacts: **stale**. Fresh artifacts are attached to this CI run.
+Staleness is advisory; contributors do not need to regenerate or commit these files.
+
+Checked commit: `19d0ae65bb6efb8136b0f78b7a4f2d11e494cf8e`
+Current cps tree: `5d29199110c7ba283b4b156fb37b00aa14dda6e0`
+Committed map cps tree: `769be5deb55520e94165317132e91af3b38794c6`
+
+- `impact-map.json`: differs or missing
+- `impact-map-recall.json`: differs or missing
+
+Curated recall: **7/10 (70.00%)**; misses=3. This constructed case set is not an independent measurement.
+- Miss `d1628a3a94745ef97fc2f9c87a9b30f1fc7744fa`: `cps.web:render_magic_shelf` → `cps.custom_column_sort:resolve_magic_shelf_sort`: historical_diff_does_not_touch_declared_sites
+- Miss `430601d6a58012dc5e8017431feed25f1b0fe38c`: `frontend/src/pages/Shelf.tsx` → `cps.api.shelves:shelf_detail`: affected_site_not_present_in_current_map
+- Miss `9dc72ed57e328855b9d19653d831eeee7abea08b`: `cps.api.shelves:shelf_detail` → `cps.db:public_shelf_book_filter`: The dependency crosses an instance-method call and keyword-controlled branch; methods are folded into a class node and the receiver call is unresolved.
+exit code: 0
+{
+  "hits": 7,
+  "total": 10,
+  "misses": [
+    {
+      "commit": "d1628a3a94745ef97fc2f9c87a9b30f1fc7744fa",
+      "affected_site": "cps.web:render_magic_shelf",
+      "changed_symbol": "cps.custom_column_sort:resolve_magic_shelf_sort",
+      "evidence_paths_present": false,
+      "miss_reason": "historical_diff_does_not_touch_declared_sites"
+    },
+    {
+      "commit": "430601d6a58012dc5e8017431feed25f1b0fe38c",
+      "affected_site": "frontend/src/pages/Shelf.tsx",
+      "changed_symbol": "cps.api.shelves:shelf_detail",
+      "evidence_paths_present": true,
+      "miss_reason": "affected_site_not_present_in_current_map"
+    },
+    {
+      "commit": "9dc72ed57e328855b9d19653d831eeee7abea08b",
+      "affected_site": "cps.api.shelves:shelf_detail",
+      "changed_symbol": "cps.db:public_shelf_book_filter",
+      "evidence_paths_present": true,
+      "miss_reason": "The dependency crosses an instance-method call and keyword-controlled branch; methods are folded into a class node and the receiver call is unresolved."
+    }
+  ]
+}
+$ git reset --hard 4a5f972752d8fa595def4f783f5ed7b9e1d349ef
+HEAD is now at 4a5f972752 docs(impact-map): record consecutive full passes and final validation
+exit code: 0
+B1 fixed: removal
+$ git rm cps/cwa_functions.py cps/schedule.py
+rm 'cps/cwa_functions.py'
+rm 'cps/schedule.py'
+exit code: 0
+$ git -c user.name=new-usemame -c user.email=248195428+new-usemame@users.noreply.github.com commit -m Exercise removal against frozen recall evidence
+[mod/p0.2b-impact-map-ci 9cafb242fe] Exercise removal against frozen recall evidence
+ 2 files changed, 3321 deletions(-)
+ delete mode 100755 cps/cwa_functions.py
+ delete mode 100755 cps/schedule.py
+exit code: 0
+$ $VENV/bin/python scripts/impact_map.py refresh --output-dir $ROOT/tmp/p0.2b/hold/real-tree/tmp/hold-fixed-removal
+## Impact map currency
+
+Committed artifacts: **stale**. Fresh artifacts are attached to this CI run.
+Staleness is advisory; contributors do not need to regenerate or commit these files.
+
+Checked commit: `9cafb242fe25266d20b6b6d2f7017d29b2299cfc`
+Current cps tree: `8dffaef8d1daff1a7383bcffe031fe4fe39180ba`
+Committed map cps tree: `769be5deb55520e94165317132e91af3b38794c6`
+
+- `impact-map.json`: differs or missing
+- `impact-map-recall.json`: differs or missing
+
+Curated recall: **7/10 (70.00%)**; misses=3. This constructed case set is not an independent measurement.
+- Miss `d8ca3fbd84af77fb931f884e6dfef1992e240df1`: `cps.cwa_functions:set_cwa_settings` → `cps.schedule:resolve_hardcover_auto_fetch_schedule`: historical_diff_does_not_touch_declared_sites
+- Miss `430601d6a58012dc5e8017431feed25f1b0fe38c`: `frontend/src/pages/Shelf.tsx` → `cps.api.shelves:shelf_detail`: affected_site_not_present_in_current_map
+- Miss `9dc72ed57e328855b9d19653d831eeee7abea08b`: `cps.api.shelves:shelf_detail` → `cps.db:public_shelf_book_filter`: The dependency crosses an instance-method call and keyword-controlled branch; methods are folded into a class node and the receiver call is unresolved.
+exit code: 0
+{
+  "hits": 7,
+  "total": 10,
+  "misses": [
+    {
+      "commit": "d8ca3fbd84af77fb931f884e6dfef1992e240df1",
+      "affected_site": "cps.cwa_functions:set_cwa_settings",
+      "changed_symbol": "cps.schedule:resolve_hardcover_auto_fetch_schedule",
+      "evidence_paths_present": false,
+      "miss_reason": "historical_diff_does_not_touch_declared_sites"
+    },
+    {
+      "commit": "430601d6a58012dc5e8017431feed25f1b0fe38c",
+      "affected_site": "frontend/src/pages/Shelf.tsx",
+      "changed_symbol": "cps.api.shelves:shelf_detail",
+      "evidence_paths_present": true,
+      "miss_reason": "affected_site_not_present_in_current_map"
+    },
+    {
+      "commit": "9dc72ed57e328855b9d19653d831eeee7abea08b",
+      "affected_site": "cps.api.shelves:shelf_detail",
+      "changed_symbol": "cps.db:public_shelf_book_filter",
+      "evidence_paths_present": true,
+      "miss_reason": "The dependency crosses an instance-method call and keyword-controlled branch; methods are folded into a class node and the receiver call is unresolved."
+    }
+  ]
+}
+$ git reset --hard 4a5f972752d8fa595def4f783f5ed7b9e1d349ef
+HEAD is now at 4a5f972752 docs(impact-map): record consecutive full passes and final validation
+exit code: 0
+B3 fixed: collapsed map with regenerated matching recall
+edges: 9475 -> 1355
+$ $VENV/bin/python scripts/impact_map.py recall
+historical recall: 0/10 (0.00%); misses=10
+exit code: 0
+$ $VENV/bin/python -m pytest tests/unit/test_impact_map.py -p no:randomly --tb=short
+pytest temp base: $TMPDIR/cwng-pytest ($TMPDIR is mounted and writable)
+============================= test session starts ==============================
+platform darwin -- Python 3.12.7, pytest-9.0.3, pluggy-1.6.0 -- $VENV/bin/python
+rootdir: $ROOT/tmp/p0.2b/hold/real-tree
+configfile: pytest.ini
+plugins: mock-3.15.1, Faker-40.15.0, flask-1.3.0, cov-7.1.0, xdist-3.8.0, timeout-2.4.0, Flask-Dance-7.1.0, requests-mock-1.12.1, anyio-4.13.0
+collecting ... collected 41 items
+
+tests/unit/test_impact_map.py::test_generator_separates_exact_bindings_from_attribute_guesses PASSED [  2%]
+tests/unit/test_impact_map.py::test_route_query_reaches_handler_and_reports_module_blindness PASSED [  4%]
+tests/unit/test_impact_map.py::test_runtime_only_route_is_live_but_has_no_invented_handler PASSED [  7%]
+tests/unit/test_impact_map.py::test_reconciliation_static_only_route_is_not_claimed_live PASSED [  9%]
+tests/unit/test_impact_map.py::test_same_inputs_generate_byte_identical_json PASSED [ 12%]
+tests/unit/test_impact_map.py::test_fresh_build_conserves_calls_and_keeps_coarse_edges_blind PASSED [ 14%]
+tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates PASSED [ 17%]
+tests/unit/test_impact_map.py::test_refresh_rejects_unavailable_recall_history PASSED [ 19%]
+tests/unit/test_impact_map.py::test_refresh_refuses_to_overwrite_committed_inputs PASSED [ 21%]
+tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[module-to-package] PASSED [ 24%]
+tests/unit/test_impact_map.py::test_refresh_reports_current_path_mismatches_as_misses[remove-modules] PASSED [ 26%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink] PASSED [ 29%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-recall.json-target1-symlink] PASSED [ 31%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink] PASSED [ 34%]
+tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink] PASSED [ 36%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[scripts/impact_map.py] PASSED [ 39%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_to_repository_files[tests/unit/test_impact_map.py] PASSED [ 41%]
+tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[map] PASSED [ 43%]
+tests/unit/test_impact_map.py::test_refresh_rechecks_aliases_at_write_time[summary] PASSED [ 46%]
+tests/unit/test_impact_map.py::test_write_json_does_not_follow_links[symlink] PASSED [ 48%]
+tests/unit/test_impact_map.py::test_write_json_does_not_follow_links[hardlink] PASSED [ 51%]
+tests/unit/test_impact_map.py::test_skill_refresh_recipe_publishes_and_queries_fresh_map PASSED [ 53%]
+tests/unit/test_impact_map.py::test_committed_recall_gate_rejects_collapse_and_accepts_improvement FAILED [ 56%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-direct] PASSED [ 58%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-recall-direct] PASSED [ 60%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[oracle-direct] PASSED [ 63%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-direct] PASSED [ 65%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[source-direct] PASSED [ 68%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-direct] PASSED [ 70%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-recall-direct] PASSED [ 73%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-direct] PASSED [ 75%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[committed-map-symlink] PASSED [ 78%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-symlink] PASSED [ 80%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[cases-hardlink] PASSED [ 82%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[generated-map-hardlink] PASSED [ 85%]
+tests/unit/test_impact_map.py::test_refresh_rejects_summary_aliases_before_any_write[currency-absent] PASSED [ 87%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history] PASSED [ 90%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-cases] PASSED [ 92%]
+tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle] PASSED [ 95%]
+tests/unit/test_impact_map.py::test_committed_recall_report_is_reproducible_and_keeps_misses FAILED [ 97%]
+tests/unit/test_impact_map.py::test_committed_map_has_nonempty_queryable_blind_spots_and_route_anchor PASSED [100%]
+
+=================================== FAILURES ===================================
+_____ test_committed_recall_gate_rejects_collapse_and_accepts_improvement ______
+tests/unit/test_impact_map.py:477: in test_committed_recall_gate_rejects_collapse_and_accepts_improvement
+    assert report["hits"] >= 9
+E   assert 1 >= 9
+________ test_committed_recall_report_is_reproducible_and_keeps_misses _________
+tests/unit/test_impact_map.py:576: in test_committed_recall_report_is_reproducible_and_keeps_misses
+    assert observed["hits"] >= 8, "committed recall fell below the eight-case floor"
+E   AssertionError: committed recall fell below the eight-case floor
+E   assert 0 >= 8
+============================= slowest 10 durations =============================
+8.75s call     tests/unit/test_impact_map.py::test_committed_recall_gate_rejects_collapse_and_accepts_improvement
+8.10s call     tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates
+3.34s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[missing-history]
+2.76s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-cases]
+2.71s setup    tests/unit/test_impact_map.py::test_skill_refresh_recipe_publishes_and_queries_fresh_map
+2.64s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target3-hardlink]
+2.62s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map-currency.json-target2-symlink]
+2.57s call     tests/unit/test_impact_map.py::test_failed_refresh_invalidates_previous_currency[invalid-oracle]
+2.54s setup    tests/unit/test_impact_map.py::test_refresh_rejects_output_aliases_before_writes[impact-map.json-target0-symlink]
+2.41s setup    tests/unit/test_impact_map.py::test_refresh_publishes_currency_without_requiring_contributor_updates
+=========================== short test summary info ============================
+FAILED tests/unit/test_impact_map.py::test_committed_recall_gate_rejects_collapse_and_accepts_improvement
+FAILED tests/unit/test_impact_map.py::test_committed_recall_report_is_reproducible_and_keeps_misses
+=================== 2 failed, 39 passed in 113.78s (0:01:53) ===================
+exit code: 1
+
+exit code: 0
+```
+
+Reproduction mechanics (executed in the disposable clone):
+
+```bash
+git mv cps/web.py cps/web/__init__.py
+# Commit the move, then run refresh with a separate output directory.
+# Reset only the disposable clone before the independent removal scenario.
+git rm cps/cwa_functions.py cps/schedule.py
+# Commit the removal, then run refresh again.
+```
+
+The collapse keeps `edge["kind"] == "import"`, writes the modified map, runs
+`python3 scripts/impact_map.py recall`, then runs the complete unit file. It does
+not alter the map's declared counts or tune cases to manufacture a hit rate.

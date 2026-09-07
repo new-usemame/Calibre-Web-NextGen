@@ -521,6 +521,20 @@ Behind multiple proxies (e.g. Cloudflare Tunnel then nginx then CWA), set the pr
 - TRUSTED_PROXY_COUNT=2
 ```
 
+Set `TRUSTED_PROXY_COUNT` to the number of trusted proxy hops: for
+HAProxy → traefik → container, use `2`. With `X-Forwarded-Proto: https, http`,
+the default of `1` selects the inner hop's `http`; `2` selects the browser-facing
+`https`. If headers have different chain lengths, use the per-header overrides below.
+
+The New UI's API Origin guard accepts a same-host HTTPS origin even when the
+proxy-derived URL is HTTP, so upstream TLS termination does not block writes.
+The reverse direction (HTTP origin against an HTTPS-derived URL) is still rejected.
+For a `Rejected cross-site` warning, check `TRUSTED_PROXY_COUNT` and the forwarded
+headers. If the proxy rewrites Host without preserving the public host in
+`X-Forwarded-Host`, set `CWNG_TRUSTED_ORIGINS` to your public origin
+(comma-separated for multiple origins). Correct proxy configuration is still
+needed for generated URLs and other scheme-sensitive behavior.
+
 Without this, CWA may see different client IPs across requests and trigger Session Protection warnings, forcing re-login on every page load. It can also mistake an externally secure OIDC callback for plain HTTP. Default is `1`.
 
 `TRUSTED_PROXY_COUNT` applies one trust depth to `X-Forwarded-For`,

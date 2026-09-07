@@ -133,7 +133,10 @@ def _reject_cross_site_mutation():
     untrusted origin and 401 for a trusted one, disclosing which origins are trusted.
 
     Host comparison uses request.host_url, which ProxyFix has already rewritten from
-    X-Forwarded-Host/Proto, so this holds behind a reverse proxy and on a subpath. The
+    X-Forwarded-Host/Proto. A same-host HTTPS origin also passes when host_url is
+    HTTP: TLS may have terminated upstream of the trusted hop (#2180). The reverse
+    direction remains rejected: an HTTP caller against an HTTPS expected origin is
+    a downgrade, not this TLS-termination shape. Ports remain deliberately ignored. The
     setup it cannot infer is a proxy that rewrites Host and forwards no
     X-Forwarded-Host (or sends only the standardised `Forwarded:` header, which
     neither ProxyFix nor ReverseProxied consumes) — there request.host_url is the
@@ -152,13 +155,19 @@ def _reject_cross_site_mutation():
     if stated_key is None:
         accepted = False        # stated but unusable ("null", malformed) — never our SPA
     else:
-        accepted = stated_key == _origin_key(request.host_url) or any(
-            stated_key == _origin_key(extra) for extra in _EXTRA_TRUSTED_ORIGINS)
+        expected_key = _origin_key(request.host_url)
+        accepted = (
+            stated_key == expected_key
+            or (stated_key[0] == "https" and expected_key == ("http", stated_key[1]))
+            or any(stated_key == _origin_key(extra) for extra in _EXTRA_TRUSTED_ORIGINS)
+        )
     if accepted:
         return None
     # Bounded: the value is attacker-controlled and this runs before the per-route
     # rate limits, so an unbounded %r would let a caller size our log lines.
-    log.warning("Rejected cross-site %s %s (stated origin %.128r, expected %.128r)",
+    log.warning("Rejected cross-site %s %.128s (stated origin %.128r, expected %.128r). "
+                "Check TRUSTED_PROXY_COUNT for your proxy hops; if the proxy rewrites Host, "
+                "set CWNG_TRUSTED_ORIGINS to the public origin.",
                 request.method, request.path, stated, request.host_url)
     return jsonify({"error": {"code": "cross_site_request",
                               "message": "Cross-site request rejected"}}), 403

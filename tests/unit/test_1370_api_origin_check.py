@@ -144,8 +144,8 @@ def test_default_port_is_not_a_mismatch():
 
 
 @pytest.mark.unit
-def test_scheme_mismatch_is_rejected():
-    """Same host over a different scheme is a different origin."""
+def test_scheme_downgrade_is_rejected():
+    """An HTTP caller against an HTTPS deployment is not TLS termination."""
     verdict = _gate("/api/v1/tags/1", "POST",
                     {"Origin": "http://cwng.local"},
                     base="https://cwng.local/")
@@ -228,56 +228,72 @@ def test_real_proxyfix_forwarded_host_deployment_passes(fwd_host):
 
 
 @pytest.mark.unit
-def test_tls_terminating_proxy_that_forwards_no_proto_is_rejected():
-    """Pin the one deployment this hook does NOT infer, so it is a documented
-    behaviour rather than a surprise 403 in someone's logs.
-
-    A proxy can forward the public host correctly and still leave Flask believing
-    the request arrived over HTTP, because it sends no X-Forwarded-Proto (and no
-    X-Scheme, and PROXY_SCHEME is unset). host_url is then http://books.example.com
-    while the browser states https://books.example.com, the schemes differ, and
-    every write is refused.
-
-    Scheme is deliberately kept in the comparison — it is a real origin boundary,
-    unlike the port. Such a deployment is already visibly wrong today (url_for
-    emits http:// links for it, per the note at cps/__init__.py:86), and it has
-    three fixes: forward X-Forwarded-Proto, set PROXY_SCHEME, or name the public
-    address in CWNG_TRUSTED_ORIGINS. The CHANGELOG entry says so.
-    """
+@pytest.mark.parametrize("forwarded_proto,stated_scheme,expected_scheme,accepted", [
+    ("https, http", "https", "http", True),  # HAProxy -> traefik -> container
+    (None, "https", "http", True),  # TLS terminator omits forwarded proto
+    ("http, https", "http", "https", False),  # reverse direction stays rejected
+])
+def test_tls_proxy_scheme_direction(forwarded_proto, stated_scheme, expected_scheme, accepted):
+    """#2180: the inner hop's scheme must not block a same-host HTTPS write."""
     from werkzeug.middleware.proxy_fix import ProxyFix
-    from cps.api import api_v1
-    app = flask.Flask(__name__)
-    app.testing = True
-    app.config["WTF_CSRF_ENABLED"] = False
-    app.config["SECRET_KEY"] = "test"
-    app.config["RATELIMIT_ENABLED"] = False
+    app = _app()
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
-    app.register_blueprint(api_v1)
+    path = "/api/v1/books/66/delete"
+    endpoint, _ = app.url_map.bind("").match(path, method="POST")
+    reached = []
 
+    def view(book_id):
+        reached.append(book_id)
+        return flask.jsonify(expected=flask.request.host_url)
+
+    app.view_functions[endpoint] = view
+    headers = {"Origin": f"{stated_scheme}://ebooks.MYDOMAIN.com",
+               "X-Forwarded-Host": "ebooks.MYDOMAIN.com"}
+    if forwarded_proto is not None:
+        headers["X-Forwarded-Proto"] = forwarded_proto
     with patch("cps.api.current_user") as cu, patch("cps.api.config") as cfg:
         cu.is_authenticated = True
         cfg.config_allow_reverse_proxy_header_login = False
         cfg.config_anonbrowse = 0
-        resp = app.test_client().post(
-            "/api/v1/tags/1",
-            headers={"Origin": "https://books.example.com",
-                     "X-Forwarded-Host": "books.example.com"},   # no -Proto
-            base_url="http://calibre-web:8083/")
-    assert resp.status_code == 403
+        resp = app.test_client().post(path, headers=headers,
+                                      base_url="http://calibre-web:8083/")
+    if accepted:
+        assert resp.status_code == 200, resp.get_json()
+        assert reached == [66]
+        assert resp.get_json()["expected"].lower() == f"{expected_scheme}://ebooks.mydomain.com/"
+    else:
+        assert resp.status_code == 403
+        assert resp.get_json()["error"]["code"] == "cross_site_request"
+        assert reached == []
 
-    # And the documented remedy actually clears it.
-    with patch("cps.api.current_user") as cu, patch("cps.api.config") as cfg, \
-            patch("cps.api._EXTRA_TRUSTED_ORIGINS", ("https://books.example.com",)):
-        cu.is_authenticated = True
-        cfg.config_allow_reverse_proxy_header_login = False
-        cfg.config_anonbrowse = 0
-        resp = app.test_client().post(
-            "/api/v1/tags/1",
-            headers={"Origin": "https://books.example.com",
-                     "X-Forwarded-Host": "books.example.com"},
-            base_url="http://calibre-web:8083/")
-    assert resp.status_code != 403, (
-        "CWNG_TRUSTED_ORIGINS did not rescue the no-X-Forwarded-Proto deployment")
+
+@pytest.mark.unit
+@pytest.mark.parametrize("origin", [
+    "https://ebooks.MYDOMAIN.com.evil.example",
+    "https://ebooks.MYDOMAIN.com@evil.example",
+    "https://ebooks.MYDOMAIN.com:notaport",
+    "null",
+])
+def test_tls_proxy_exception_still_rejects_hostile_origins(origin):
+    verdict = _gate("/api/v1/books/66/delete", "POST", {"Origin": origin},
+                    base="http://ebooks.MYDOMAIN.com/")
+    assert verdict is not None
+    assert verdict[1] == 403
+
+
+@pytest.mark.unit
+def test_rejection_log_gives_bounded_proxy_remedies():
+    origin = "https://evil.example/" + "x" * 4096
+    with patch("cps.api.log.warning") as warning:
+        verdict = _gate("/api/v1/books/66/delete", "POST", {"Origin": origin})
+    assert verdict[1] == 403
+    fmt, *args = warning.call_args.args
+    message = fmt % tuple(args)
+    assert "TRUSTED_PROXY_COUNT" in message
+    assert "CWNG_TRUSTED_ORIGINS" in message
+    assert origin not in message
+    assert "x" * 129 not in message
+    assert len(message) < 600
 
 
 @pytest.mark.unit

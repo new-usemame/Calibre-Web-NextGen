@@ -2113,3 +2113,108 @@ def test_unknown_type_does_not_mask_other_content_conflicts():
     assert not annotation_sync.kobo_payload_matches_annotation(
         row, payload, SimpleNamespace(id=BOOK_ID, uuid=OWNED),
     )
+
+
+@pytest.mark.parametrize("stored_clock", [
+    datetime(2026, 8, 29, 1, 0, 0), datetime(2035, 1, 1),
+])
+@pytest.mark.parametrize("unknown_type", [False, True])
+@pytest.mark.parametrize("local_text,incoming_text,incoming_type,compatible", [
+    (None, "", "dogear", True),
+    (None, "captured passage", "highlight", True),
+    (None, None, "highlight", True),
+    ("local passage", "competing passage", "highlight", False),
+    ("", "captured passage", "highlight", False),
+    ("local passage", "", "dogear", False),
+    ("local passage", None, "highlight", False),
+    ("same passage", "same passage", "highlight", True),
+])
+def test_seed_text_absence_enriches_but_disagreement_quarantines(
+    app, session, monkeypatch, stored_clock, local_text, incoming_text,
+    incoming_type, compatible, unknown_type,
+):
+    _book(monkeypatch).uuid = OWNED
+    _device(session, DEVICE_A)
+    state = _state(session, status="unseeded", ever=False, content_id=OWNED)
+    row = _annotation_row(
+        "legacy-text", highlighted_text=local_text,
+        annotation_type=None if unknown_type else incoming_type,
+        client_modified_at=stored_clock,
+    )
+    session.add(row)
+    session.commit()
+    payload = _wire_annotation("legacy-text")
+    payload.update(highlightedText=incoming_text, type=incoming_type)
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_k: _upstream_response([payload]),
+    )
+
+    with _request(app):
+        g.annotation_origin_device_id = DEVICE_A
+        response = rs.handle_annotations.__wrapped__(OWNED)
+
+    assert response.status_code == 200
+    session.refresh(state)
+    capture = session.query(ub.KoboAnnotationSeedCapture).one()
+    assert state.authority_status == ("authoritative" if compatible else "quarantined")
+    assert capture.reconciliation_conflict_count == (0 if compatible else 1)
+    session.refresh(row)
+    text_enriched = compatible and local_text is None and incoming_text is not None
+    enriched = text_enriched or (compatible and unknown_type)
+    assert row.highlighted_text == (incoming_text if text_enriched else local_text)
+    assert row.annotation_type == (None if unknown_type and not compatible else incoming_type)
+    assert row.content_revision == (2 if enriched else 1)
+    assert row.client_modified_at == stored_clock
+    materialization = session.query(ub.KoboAnnotationMaterialization).one_or_none()
+    if compatible:
+        assert materialization.serveable is True
+        assert materialization.materialization_revision == row.content_revision
+        assert json.loads(materialization.raw_annotation_json)["highlightedText"] == incoming_text
+        with _request(app):
+            g.annotation_origin_device_id = DEVICE_A
+            rendered = rs.handle_annotations.__wrapped__(OWNED)
+        assert rendered.status_code == 200
+        assert json.loads(rendered.get_data())["annotations"][0]["highlightedText"] == incoming_text
+    else:
+        assert capture.failure_reason == "seed_row_conflict_unresolved"
+        assert materialization is None
+
+
+@pytest.mark.parametrize("incoming_text", ["", "captured passage", None])
+def test_equal_clock_patch_text_enrichment_and_retry(session, incoming_text):
+    from cps.services import annotation_sync
+
+    row = _annotation_row("equal-clock-text", highlighted_text=None)
+    session.add(row)
+    session.commit()
+    payload = _wire_annotation("equal-clock-text")
+    payload["highlightedText"] = incoming_text
+    book = SimpleNamespace(id=BOOK_ID, uuid=OWNED)
+    user = SimpleNamespace(id=USER_ID)
+    result = annotation_sync._upsert_annotation(session, payload, book, user)
+    assert (result is not None) is (incoming_text is not None)
+    session.commit()
+    session.refresh(row)
+    assert row.highlighted_text == incoming_text
+    assert row.content_revision == (2 if incoming_text is not None else 1)
+    assert annotation_sync._upsert_annotation(session, payload, book, user) is None
+
+
+@pytest.mark.parametrize("local_text", [None, "known passage", ""])
+def test_omitted_highlighted_text_is_noop(session, local_text):
+    from cps.services import annotation_sync
+
+    row = _annotation_row("omitted-text", highlighted_text=local_text)
+    session.add(row)
+    session.commit()
+    payload = _wire_annotation("omitted-text")
+    del payload["highlightedText"]
+    book = SimpleNamespace(id=BOOK_ID, uuid=OWNED)
+    assert annotation_sync.kobo_payload_matches_annotation(row, payload, book)
+    assert annotation_sync._upsert_annotation(
+        session, payload, book, SimpleNamespace(id=USER_ID),
+    ) is None
+    session.refresh(row)
+    assert row.highlighted_text == local_text
+    assert row.content_revision == 1

@@ -295,14 +295,21 @@ class TestConversionDeadline:
             raise subprocess.TimeoutExpired(cmd, 1234)
 
         monkeypatch.setattr(ingest_processor, "_run_converter_streaming", _fake_run)
+        # Anchor the budget clock the way the sibling budget tests do. It is
+        # measured from module import, so an unpinned assertion is really
+        # asserting how early this test happens to run inside its xdist worker
+        # -- which any PR that adds tests can change. Pinning a known 100s spend
+        # also makes the subtraction observable: with nothing elapsed, "what is
+        # LEFT of the budget" and "the raw total" are indistinguishable.
+        monkeypatch.setattr(ingest_processor, "_PROCESS_START_MONOTONIC",
+                            time.monotonic() - 100)
         nbp = _conversion_processor(tmp_path)
         ok, out = nbp.convert_book()
 
         # The converter receives what is LEFT of the budget, not the raw total,
-        # so two stages can't each spend the whole thing. In a unit test almost
-        # nothing has elapsed, so it lands just under the total.
-        assert captured.get("timeout") == pytest.approx(1234, abs=60)
-        assert captured.get("timeout") <= 1234
+        # so two stages can't each spend the whole thing.
+        assert captured.get("timeout") == pytest.approx(1134, abs=5)
+        assert captured.get("timeout") < 1234
         assert (ok, out) == (False, ""), (
             "a deadline overrun must be reported as an ordinary conversion "
             "failure so main() imports the original"

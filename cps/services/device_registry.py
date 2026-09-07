@@ -14,6 +14,7 @@ from sqlalchemy.orm import sessionmaker
 
 log = logging.getLogger(__name__)
 SCHEME = "kobo-header-hmac-sha256-v1"
+KOBO_SESSION_DEVICE_KEY = "_kobo_device_public_id"
 KOREADER_SCHEME = "koreader-client-hmac-sha256-v1"
 WEBREADER_SCHEME = "webreader-cookie-hmac-sha256-v2"
 WEBREADER_SCHEME_PREFIX = "webreader-cookie-hmac-sha256-"
@@ -273,16 +274,36 @@ def upsert_kobo_device(session, *, user_id, headers, secret_key, seen_at=None):
     return device
 
 
-def register_kobo_device_best_effort(*, user_id, headers, secret_key=None, return_internal=False):
-    """Observe in an isolated transaction; surface only the intentional cap."""
+def register_kobo_device_best_effort(*, user_id, headers, secret_key=None, return_internal=False,
+                                   allow_session_fallback=False):
+    """Resolve the request's Kobo, retaining identity across its login session.
+
+    Reading Services uses the login cookie and need not repeat the store API's
+    hardware header. Retain only the public registry id in that signed cookie;
+    a headerless upload must still resolve an active Kobo owned by this user.
+    An explicit hardware header always takes precedence, even if invalid.
+    Fallback is opt-in for attribution; download authority keeps its existing
+    header-only device resolution.
+    """
     owned = None
     try:
-        from flask import current_app
+        from flask import current_app, has_request_context, session as login_session
         from cps import ub
+        in_request = has_request_context()
+        if headers.get("x-kobo-deviceid") is None and not allow_session_fallback:
+            return None
+        previous_id = login_session.pop(KOBO_SESSION_DEVICE_KEY, None) if in_request else None
         key = secret_key if secret_key is not None else current_app.secret_key
         owned = sessionmaker(bind=ub.session.get_bind())()
-        device = upsert_kobo_device(owned, user_id=user_id, headers=headers, secret_key=key)
+        if headers.get("x-kobo-deviceid") is None and previous_id is not None:
+            device = owned.query(ub.Device).filter_by(
+                public_id=previous_id, user_id=user_id, kind="kobo", active=True,
+            ).first()
+        else:
+            device = upsert_kobo_device(owned, user_id=user_id, headers=headers, secret_key=key)
         owned.commit()
+        if in_request and device is not None and device.active:
+            login_session[KOBO_SESSION_DEVICE_KEY] = device.public_id
         return (device.id if return_internal else device.public_id) if device else None
     except KoboDeviceLimitReached:
         if owned is not None:

@@ -227,6 +227,16 @@ def requires_reading_services_auth_and_config(f):
                     g.annotation_origin_device_id = register_kobo_device_best_effort(
                         user_id=current_user.id, headers=request.headers, return_internal=True,
                     )
+                    if request.method == "PATCH" and _is_annotation_path(request.path):
+                        # Authority gates use the header-only identity above. A
+                        # cookie may attribute an upload without changing which
+                        # replacement set or acknowledgement the device receives.
+                        g.annotation_upload_device_id = g.annotation_origin_device_id
+                        if request.headers.get("x-kobo-deviceid") is None:
+                            g.annotation_upload_device_id = register_kobo_device_best_effort(
+                                user_id=current_user.id, headers=request.headers,
+                                return_internal=True, allow_session_fallback=True,
+                            )
                 except KoboDeviceLimitReached as error:
                     return make_response(jsonify({"error": str(error)}), 409)
                 except Exception:
@@ -1015,7 +1025,9 @@ def _stage_patch_for_recovery(raw_body, entitlement_id):
             raw_body=raw_body,
             entitlement_id=entitlement_id,
             user_id=getattr(current_user, "id", None),
-            origin_device_id=getattr(g, "annotation_origin_device_id", None),
+            origin_device_id=getattr(
+                g, "annotation_upload_device_id", getattr(g, "annotation_origin_device_id", None),
+            ),
         )
     except Exception:
         log.error(
@@ -1471,7 +1483,9 @@ def handle_annotations(entitlement_id):
                                 annotation_count=len(updated),
                             )
                 dispatch_kwargs = {
-                    "origin_device_id": getattr(g, "annotation_origin_device_id", None),
+                    "origin_device_id": getattr(
+                        g, "annotation_upload_device_id", getattr(g, "annotation_origin_device_id", None),
+                    ),
                 }
                 if raw_materializations is not None:
                     dispatch_kwargs.update(

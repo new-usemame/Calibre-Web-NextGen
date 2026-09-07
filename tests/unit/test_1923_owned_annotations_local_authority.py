@@ -723,3 +723,81 @@ def test_owned_get_row_render_exception_keeps_every_identity_and_text(
     assert errors[0][3] == 2
     assert "row_render_RuntimeError" in repr(errors[0])
     assert "private render text" not in repr(errors[0])
+
+
+def test_owned_seeding_proxy_withholds_the_devices_cache_validators(
+    app, session, monkeypatch,
+):
+    """A proxied owned GET must fetch a body, never inherit the device's 304.
+
+    MEASURED 2026-09-06 on a Kobo Clara: an unseeded owned book's re-download
+    proxied the device's ``If-None-Match`` (Kobo's own manifest ETag, cached
+    from an earlier proxied GET) upstream.  Kobo answered ``304`` with a
+    zero-length body, CWNG passed it through, and Nickel -- which empties a
+    book's rows for the download and repopulates them from the response -- was
+    left with nothing: all 8 device annotation rows were lost.
+
+    That same response is why the book could never escape: seeding captures it
+    and rejects any non-2xx status outright, so the capture ends
+    ``seed_response_invalid``.  The book cannot reach ``authoritative``, and
+    therefore never gets the local-answer path that refuses to 304 -- the wipe
+    and the deadlock are the same 304.
+
+    Kobo can answer bodilessly for more than one reason: a 304 from either cache
+    validator, a 412 from either precondition.  All four are withheld, so a
+    firmware that starts sending a date validator cannot reopen this wipe.
+
+    An owned GET we are proxying is a request for content, not a cache
+    revalidation: CWNG is the authority for the book and the device's validator
+    belongs to Kobo, so it must not be forwarded.
+    """
+    book = SimpleNamespace(id=BOOK_ID, uuid=OWNED, title="Flatland", identifiers=[])
+    monkeypatch.setattr(rs, "resolve_entitlement_ownership", lambda _content_id: book)
+    # No KoboAnnotationBookState row: the book is unseeded, so the GET proxies.
+    session.commit()
+
+    seen = {}
+    body = b'{"annotations":[],"nextPageOffsetToken":null}'
+
+    class _Upstream:
+        status_code = 200
+        content = body
+
+        def __init__(self):
+            self.headers = rs.requests.structures.CaseInsensitiveDict(
+                {"Content-Type": "application/json"}
+            )
+
+    def fake_request(**kwargs):
+        seen["headers"] = kwargs.get("headers")
+        return _Upstream()
+
+    monkeypatch.setattr(rs.requests, "request", fake_request)
+
+    with app.test_request_context(
+        f"/api/v3/content/{OWNED}/annotations?limit=100",
+        method="GET",
+        headers={
+            "If-None-Match": 'W/"A:1408092558-kobo-manifest-etag"',
+            "If-Modified-Since": "Sat, 06 Sep 2026 12:00:00 GMT",
+            "If-Match": 'W/"A:1408092558-kobo-manifest-etag"',
+            "If-Unmodified-Since": "Sat, 06 Sep 2026 12:00:00 GMT",
+            "Authorization": "Bearer device-token",
+        },
+    ):
+        g.annotation_origin_device_id = DEVICE_ID
+        response = rs.handle_annotations.__wrapped__(OWNED)
+
+    assert response.status_code == 200
+    forwarded = {str(name).lower() for name in seen["headers"].keys()}
+    leaked = forwarded & {
+        "if-none-match", "if-modified-since", "if-match", "if-unmodified-since",
+    }
+    assert not leaked, (
+        f"the device's cache validators {sorted(leaked)} were forwarded to Kobo; "
+        "a bodyless reply empties the device's annotations for this book and "
+        "starves the seed capture"
+    )
+    assert "authorization" in forwarded, (
+        "withholding the validators must not strip the rest of the request"
+    )

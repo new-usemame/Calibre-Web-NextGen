@@ -6,8 +6,14 @@
   "refs": [
     "#1947"
   ],
+  "resolution": {
+    "commit": "00f6a07b54",
+    "date": "2026-09-08",
+    "note": "Root cause confirmed as open shelf overlay obscuring live targets, same class as F-63f65c. Deterministic desktop axe/mobile download geometry tests seen red, both green with inline expanding disclosure; Escape restores focus.",
+    "release": ""
+  },
   "severity": "test",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Mobile My Library accessibility gate reports an intermittent undersized download target"
 }

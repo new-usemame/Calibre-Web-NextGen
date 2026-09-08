@@ -6,8 +6,14 @@
   "refs": [
     "#2126"
   ],
+  "resolution": {
+    "commit": "00f6a07b54",
+    "date": "2026-09-08",
+    "note": "Shared library revision resets query pages, restored snapshots and mounted accumulators after membership/mode changes. Both original same-document failures seen red; desktop/mobile navigation and pagination pass. Independent lost-response transport regression also red then green.",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Catalog snapshots resurrect removed books and the previous whole-library view"
 }

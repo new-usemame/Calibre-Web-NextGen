@@ -47,7 +47,12 @@ test('a public shelf offers reading and downloads without adding personal member
     await page.getByRole('link', { name: 'Read now', exact: true }).click();
     await expect(page).toHaveURL(/\/read\//);
     await expect(page.locator('iframe').first()).toBeVisible();
-    await expect(page.frameLocator('iframe').first().locator('body')).not.toBeEmpty();
+    // An EPUB may open on an image-only cover. Require rendered text or a
+    // successfully decoded image, not text alone or merely an empty iframe.
+    await expect.poll(() => page.frameLocator('iframe').first().locator('body').evaluate(body =>
+      Boolean(body.textContent?.trim()) || [...body.querySelectorAll('img')]
+        .some(image => image.complete && image.naturalWidth > 0),
+    )).toBe(true);
     const detail = await (await page.request.get(`/api/v1/books/${selected.id}`)).json();
     expect(detail.in_my_library).toBe(false);
     expect(detail.accessible_via_public_shelf).toBe(true);

@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import { snapshotReaderFrameForAxe } from './readerAxeSnapshot';
 
 const isPhoneProject = () => test.info().project.name === 'mobile';
 
@@ -25,13 +26,13 @@ const KNOWN: Record<string, string> = {};
 // zero durations, and axeScan asserts the context option reached the page.
 test.use({ contextOptions: { reducedMotion: 'reduce' } });
 
-async function axeScan(page: Page, label: string) {
+async function axeScan(page: Page, label: string, themes: readonly ('dark' | 'light')[] = ['dark', 'light']) {
   await page.waitForLoadState('networkidle');
   expect(
     await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
     'the a11y harness must disable transitions before comparing theme endpoints',
   ).toBe(true);
-  for (const theme of ['dark', 'light'] as const) {
+  for (const theme of themes) {
     await page.evaluate((slug) => document.documentElement.setAttribute('data-theme', slug), theme);
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -111,14 +112,23 @@ for (const [label, path] of [
   });
 }
 
-test('reader: TOC traps focus + Escape, named progressbar, no critical/serious', async ({ page }) => {
+// Exercise the real reader independently in each palette before taking its
+// static accessibility snapshot. The reader has its own persisted theme.
+for (const theme of ['dark', 'light'] as const) {
+test(`reader/${theme}: TOC traps focus + Escape, named progressbar, no critical/serious`, async ({ page }) => {
   if (isPhoneProject()) test.skip();
-  // Find a book that offers the in-browser (epub) reader.
-  await page.goto('/app');
-  await page.locator('a[href*="/book/"]').first().click();
-  const readLink = page.locator('a[href*="/read/"]').first();
-  const hasReader = await readLink.isVisible().catch(() => false);
-  test.skip(!hasReader, 'no epub reader available in this library');
+  await page.addInitScript((value) => localStorage.setItem('cwng.reader.theme', value), theme);
+  // The seeded rig requires a readable EPUB. Await its detail query instead
+  // of checking isVisible immediately after navigation and silently skipping
+  // a still-loading reader link.
+  const response = await page.request.get('/api/v1/books?per_page=200&sort=new');
+  expect(response.ok()).toBeTruthy();
+  const book = (await response.json()).items.find((item: { formats: string[] }) =>
+    item.formats.some(format => format.toLowerCase() === 'epub'));
+  expect(book, 'the seeded a11y rig must contain an EPUB').toBeTruthy();
+  await page.goto(`/app/book/${book.id}`);
+  const readLink = page.getByRole('link', { name: 'Read now', exact: true });
+  await expect(readLink).toBeVisible();
   await readLink.click();
   await page.getByRole('button', { name: /table of contents/i }).waitFor({ state: 'visible', timeout: 30_000 });
 
@@ -133,8 +143,12 @@ test('reader: TOC traps focus + Escape, named progressbar, no critical/serious',
   await page.keyboard.press('Escape');
   await expect(toc).toBeHidden();
 
-  await axeScan(page, 'reader');
+  const frames = page.locator('iframe:visible');
+  await expect(frames.first(), 'the seeded EPUB must actually render').toBeVisible();
+  for (const frame of await frames.all()) await snapshotReaderFrameForAxe(frame);
+  await axeScan(page, 'reader', [theme]);
 });
+}
 
 test.describe('login (unauthenticated)', () => {
   test.use({ storageState: { cookies: [], origins: [] } });

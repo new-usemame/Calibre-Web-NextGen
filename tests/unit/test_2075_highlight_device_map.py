@@ -44,10 +44,12 @@ def test_payload_includes_unreferenced_assignable_devices_and_excludes_other_use
         assert "foreign" not in body["devices"]
         if has_annotation:
             assert body["annotations"][0]["origin_device_id"] == "origin"
-        # Even with more devices than fit, assignable devices take precedence
-        # in registry order and the existing response bound still applies.
+        # At capacity, existing attribution must survive; unreferenced
+        # assignment choices only use the remaining space.
         monkeypatch.setattr(ann, "MAX_DEVICE_LIST_LIMIT", 1)
         with app.test_request_context("/annotations/223/data.json"):
             bounded = ann.annotations_data.__wrapped__(223).get_json()
-        assert list(bounded["devices"]) == ["assignable"]
+        assert list(bounded["devices"]) == (["origin"] if has_annotation else ["assignable"])
+        if has_annotation:
+            assert bounded["annotations"][0]["origin_device_id"] == "origin"
     engine.dispose()

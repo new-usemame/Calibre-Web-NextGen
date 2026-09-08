@@ -146,7 +146,8 @@ export function Annotations({ id }: { id: string }) {
 
   const applyBulk = async (next: string | null, ids = [...selected]) => {
     if (!ids.length) return;
-    const previous = Object.fromEntries(annotations.filter((row) => ids.includes(row.annotation_id)).map((row) => [row.annotation_id, overrideOf(row)]));
+    const selectedIds = new Set(ids);
+    const previous = Object.fromEntries(annotations.filter((row) => selectedIds.has(row.annotation_id)).map((row) => [row.annotation_id, overrideOf(row)]));
     setBusy(true); setProgress({ done: 0, total: ids.length }); setFailed(new Set());
     setAssignments((current) => ({ ...current, ...Object.fromEntries(ids.map((annotationId) => [annotationId, next])) }));
     const failures = new Set<string>();

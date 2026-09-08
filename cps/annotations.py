@@ -2193,8 +2193,10 @@ def _annotation_device_payload(user_id, session, device_ids=None, include_assign
         referenced = ub.Device.id.in_(tuple(device_ids))
         query = query.filter(or_(referenced, ub.Device.active.is_(True)) if include_assignable else referenced)
     if include_assignable:
-        # Match the active registry's ordering before using remaining capacity
-        # for referenced retired devices. Unreferenced choices need labels too.
+        # Preserve referenced attribution first; assignment choices take the
+        # remaining capacity in the active registry's order.
+        if device_ids is not None:
+            query = query.order_by(referenced.desc())
         query = query.order_by(ub.Device.active.desc(), ub.Device.display_name, ub.Device.id)
     else:
         query = query.order_by(ub.Device.id)

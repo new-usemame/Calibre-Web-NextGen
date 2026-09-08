@@ -6,8 +6,14 @@
   "refs": [
     "#2078"
   ],
+  "resolution": {
+    "commit": "04bbc96a33",
+    "date": "2026-09-08",
+    "note": "Explicit public-shelf continuation through filtered detail, cover, browser reader and web/OPDS acquisition; private content, role and selected-shelf gates retained. Real SQLite HTTP red/green flow and 492 adjacent tests passed. See docs/shared-book-and-smart-shelf-audit-verification.md; frontend combined verification remains with release audit.",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Public shelf entries advertise resources unavailable to personal-library viewers"
 }

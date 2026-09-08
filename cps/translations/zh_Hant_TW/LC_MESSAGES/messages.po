@@ -7998,7 +7998,7 @@ msgstr "權限不足"
 #: cps/web.py
 #, fuzzy
 msgid "Shelf duplicated successfully"
-msgstr "成功刪除 {} 個用戶"
+msgstr "書架已成功複製"
 
 #: cps/web.py
 #, fuzzy
@@ -10719,7 +10719,7 @@ msgstr "合併選中的書籍"
 #: cps/templates/cwa_epub_fixer.html
 #, fuzzy
 msgid "EPUB Fixer scheduled successfully"
-msgstr "成功刪除 {} 個用戶"
+msgstr "EPUB 修復工具已成功排程"
 
 #: cps/templates/cwa_epub_fixer.html
 #, fuzzy
@@ -13505,7 +13505,7 @@ msgstr ""
 #: cps/templates/tasks.html
 #, fuzzy
 msgid "Scheduled item cancelled successfully"
-msgstr "成功刪除 {} 個用戶"
+msgstr "排程項目已成功取消"
 
 #: cps/templates/tasks.html
 msgid "Error cancelling scheduled item"

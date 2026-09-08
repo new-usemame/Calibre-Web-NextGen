@@ -4,8 +4,14 @@
   "created": "2026-08-30",
   "id": "F-63f65c",
   "refs": [],
+  "resolution": {
+    "commit": "00f6a07b54",
+    "date": "2026-09-08",
+    "note": "Inline expanding shelf disclosure reserves layout space, so background controls remain visible and operable. Geometry oracle proves no overlap and axe target-size passes on desktop/mobile; Escape returns focus. Chose non-overlapping layout rather than modal inert background.",
+    "release": ""
+  },
   "severity": "ux",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Add-to-shelf popover overlays live controls without making them inert, failing SC 2.5.8 on mobile"
 }

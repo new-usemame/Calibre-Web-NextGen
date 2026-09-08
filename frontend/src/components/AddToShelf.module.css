@@ -1,6 +1,14 @@
 .wrap {
   position: relative;
   display: inline-block;
+  max-width: 100%;
+}
+
+/* The picker stays open for multiple choices. Reserve its space instead of
+   covering live book actions or metadata targets underneath an overlay. */
+.expanded {
+  flex-basis: 100%;
+  width: 100%;
 }
 
 .trigger {
@@ -23,12 +31,11 @@
 }
 
 .panel {
-  position: absolute;
-  top: calc(100% + var(--sp-2));
-  left: 0;
-  z-index: var(--z-overlay);
-  min-width: 240px;
-  max-width: 300px;
+  position: relative;
+  margin-top: var(--sp-2);
+  width: 300px;
+  max-width: 100%;
+  box-sizing: border-box;
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
   border-radius: var(--r-md);

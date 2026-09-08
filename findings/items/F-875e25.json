@@ -6,8 +6,14 @@
   "refs": [
     "#2012"
   ],
+  "resolution": {
+    "commit": "959dd5a4c4",
+    "date": "2026-09-08",
+    "note": "Both LDAP success exits clear evaluated failure buckets. Real limiter regression uses failures before/after provisioning, 42 successful logins, and failed-bind throttling. Seen red on base and with only the new-user reset removed; 63 auth tests pass restored. Not released.",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "Successful LDAP sign-ins exhaust SPA failure rate limits"
 }

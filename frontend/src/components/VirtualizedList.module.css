@@ -5,10 +5,12 @@
   min-height: 240px;
   height: min(68vh, 760px);
   scrollbar-gutter: stable;
+  overflow-anchor: none;
 }
 
 .canvas { position: relative; width: 100%; }
-.row { position: absolute; inset: 0 0 auto; width: 100%; }
+/* Include child margins in the measured border box. */
+.row { display: flow-root; position: absolute; inset: 0 0 auto; width: 100%; }
 
 @media (max-width: 600px) {
   .viewport { height: calc(100dvh - 240px); min-height: 320px; }

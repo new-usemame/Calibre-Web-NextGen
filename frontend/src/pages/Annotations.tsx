@@ -287,7 +287,7 @@ export function Annotations({ id }: { id: string }) {
       {error ? <EmptyState message={error instanceof Error ? error.message : t('Could not load highlights and notes.')} /> : !annotations.length ?
         <EmptyState message={t('Nothing here yet. Highlight or write a note while reading, or import from a Kobo device.')} /> :
         <VirtualizedList items={entries} itemKey={(entry) => entry.kind === 'group' ? `group-${entry.id}` : entry.annotation.annotation_id}
-          rowHeight={78} ariaLabel={t('Highlights and notes')} renderItem={(entry) => entry.kind === 'group' ? (
+          ariaLabel={t('Highlights and notes')} renderItem={(entry) => entry.kind === 'group' ? (
             <div className={styles.groupHeader}><strong>{entry.label}</strong><span>{entry.count}</span>
               {selecting && <button type="button" onClick={() => setSelected((current) => new Set([...current, ...filtered.filter((row) => assignmentOf(row) === entry.id).map((row) => row.annotation_id)]))}>{t('Select all in group')}</button>}
             </div>

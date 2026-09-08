@@ -36,10 +36,9 @@ wraps. This is a heuristic for the #429 edit defect, not a general semantic
 validator or a ban on repeated words within a translation.
 """
 
-import ast
+import codecs
 from difflib import SequenceMatcher
 import glob
-from itertools import islice
 import os
 import re
 import unicodedata
@@ -50,74 +49,121 @@ import pytest
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 TRANSLATIONS_DIR = os.path.join(REPO_ROOT, "cps", "translations")
 
-# msgid / msgid_plural / msgstr / msgstr[N] with non-empty quoted content.
-_KEYWORD_NONEMPTY = re.compile(r'^(msgid|msgid_plural|msgstr(?:\[\d+\])?) "(.+)"\s*$')
-# A bare continuation string line.
-_CONTINUATION = re.compile(r'^"')
-
-
+# Capture whole C strings, allowing indentation and arbitrary keyword spacing.
+_QUOTED = r'"(?:[^"\\]|\\.)*"'
+_KEYWORD = re.compile(
+    rf'^\s*(?:msgid|msgid_plural|msgstr(?:\[\d+\])?)\s+({_QUOTED})\s*$'
+)
+_CONTINUATION = re.compile(rf'^\s*({_QUOTED})\s*$')
+_C_ESCAPE = re.compile(r'\\([0-7]{1,3}|x[0-9a-fA-F]+|.)')
+_SIMPLE_ESCAPES = {
+    'a': 7, 'b': 8, 'f': 12, 'n': 10, 'r': 13, 't': 9, 'v': 11,
+    '\\': 92, '"': 34, "'": 39, '?': 63,
+}
 DUPLICATION_THRESHOLD = 0.80
 
 
-def wrapped_content_similarities(lines):
-    """Yield (line number, source line, ratio) for non-empty wrapped fields.
+def decode_po_bytes(quoted):
+    """Decode C escapes to bytes before interpreting the catalog's UTF-8."""
+    content = quoted[1:-1]
+    result = bytearray()
+    offset = 0
+    for match in _C_ESCAPE.finditer(content):
+        result.extend(content[offset:match.start()].encode("utf-8"))
+        escape = match.group(1)
+        if escape[0] in '01234567':
+            value = int(escape, 8)
+        elif escape.startswith('x'):
+            value = int(escape[1:], 16)
+        else:
+            value = _SIMPLE_ESCAPES[escape]
+        result.append(value)
+        offset = match.end()
+    result.extend(content[offset:].encode("utf-8"))
+    return bytes(result)
 
-    Decode PO escapes before comparing the first string with *all* adjacent
-    continuation strings joined in gettext order. Strip boundary whitespace
-    so an extra space or newline cannot hide a duplicated message.
+
+def scan_po_fields(lines):
+    """Yield decoded chunks as (physical line number, source line, text).
+
+    Blank lines are lexical whitespace, not field boundaries. A new keyword
+    or comment ends the preceding field; obsolete/commented strings are not
+    active fields. Decode incrementally so escaped UTF-8 bytes can also span
+    chunks. A character belongs to the chunk starting its byte sequence, so
+    a boundary inside a UTF-8 character is not mistaken for a word seam.
     """
-    for i, line in enumerate(lines):
-        match = _KEYWORD_NONEMPTY.match(line)
-        if not match:
+    chunks = []
+    pending_owner = None
+    decoder = codecs.getincrementaldecoder("utf-8")()
+    for number, line in enumerate(lines, 1):
+        if not line.strip():
             continue
-        continuation = []
-        for following in islice(lines, i + 1, None):
-            if not _CONTINUATION.match(following):
-                break
-            continuation.append(ast.literal_eval(following.strip()))
-        if continuation:
-            first = ast.literal_eval('"' + match.group(2) + '"').strip()
-            rest = "".join(continuation).strip()
-            if first and rest:
-                ratio = SequenceMatcher(None, first, rest, autojunk=False).ratio()
-                yield i + 1, line.rstrip(), ratio
+        keyword = _KEYWORD.fullmatch(line)
+        continuation = _CONTINUATION.fullmatch(line)
+        if keyword or not continuation:
+            if chunks:
+                decoder.decode(b"", final=True)
+                yield chunks
+            chunks = []
+            pending_owner = None
+            decoder = codecs.getincrementaldecoder("utf-8")()
+        if keyword or (continuation and chunks):
+            quoted = (keyword or continuation).group(1)
+            text = decoder.decode(decode_po_bytes(quoted))
+            if pending_owner is not None and text:
+                owner_number, owner_line, owner_text = chunks[pending_owner]
+                chunks[pending_owner] = (owner_number, owner_line, owner_text + text[0])
+                text = text[1:]
+                pending_owner = None
+            if decoder.getstate()[0] and pending_owner is None:
+                pending_owner = len(chunks)
+            chunks.append((number, line.rstrip(), text))
+    if chunks:
+        decoder.decode(b"", final=True)
+        yield chunks
 
 
-def find_duplicated_wrapped_strings(lines):
+def wrapped_content_similarities(fields):
+    """Compare first strings with all continuations, stripping boundary space."""
+    for chunks in fields:
+        number, line, first = chunks[0]
+        first = first.strip()
+        rest = "".join(text for _, _, text in chunks[1:]).strip()
+        if first and rest:
+            ratio = SequenceMatcher(None, first, rest, autojunk=False).ratio()
+            yield number, line, ratio
+
+
+def find_duplicated_wrapped_strings(fields):
     """Return [(line_no, line)] for first strings restated by continuations."""
     return [
         (number, line)
-        for number, line, ratio in wrapped_content_similarities(lines)
+        for number, line, ratio in wrapped_content_similarities(fields)
         if ratio >= DUPLICATION_THRESHOLD
     ]
 
 
-def find_missing_seam_spaces(lines):
+def find_missing_seam_spaces(fields):
     """Report the right-hand line of every seam joining two Latin letters."""
     violations = []
-    previous = ""
-    for number, line in enumerate(lines, 1):
-        match = re.match(r'^(?:msgid|msgid_plural|msgstr(?:\[\d+\])?) (".*")\s*$', line)
-        if match:
-            previous = ast.literal_eval(match.group(1))
-        elif _CONTINUATION.match(line):
-            current = ast.literal_eval(line.strip())
+    for chunks in fields:
+        previous = ""
+        for number, line, current in chunks:
             if previous and current and all(
                 char.isalpha() and "LATIN" in unicodedata.name(char, "")
                 for char in (previous[-1], current[0])
             ):
-                violations.append((number, line.rstrip()))
+                violations.append((number, line))
             # Empty chunks insert no separator, so preserve the last character.
             previous += current
-        else:
-            previous = ""
     return violations
 
 
 def find_wrapped_content_defects(lines):
-    """Return offending lines for duplication (#429) or seam glue (#1264)."""
+    """Parse once; report duplication (#429) or seam glue (#1264)."""
+    fields = list(scan_po_fields(lines))
     return sorted(set(
-        find_duplicated_wrapped_strings(lines) + find_missing_seam_spaces(lines)
+        find_duplicated_wrapped_strings(fields) + find_missing_seam_spaces(fields)
     ))
 
 
@@ -239,3 +285,48 @@ def test_detector_checks_later_seams_and_accented_latin_letters():
     lines = ['msgstr ""\n', '"Déplacez le livre "\n',
              '"ici"\n', '"également."\n']
     assert find_wrapped_content_defects(lines) == [(4, lines[3].rstrip())]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("lines,offending_line", [
+    (['msgstr  "Hello."\n', '"Hello."\n'], 1),
+    (['  msgstr "Hello."\n', '  "Hello."\n'], 1),
+    (['msgstr "Hello."\n', '\n', '"Hello."\n'], 1),
+    (['msgstr ""\n', '"Le caf\\303\\251"\n', '"ferme."\n'], 3),
+], ids=["extra_space", "indentation", "blank_line", "octal_utf8"])
+def test_detector_flags_parser_bypasses(lines, offending_line):
+    assert find_wrapped_content_defects(lines) == [
+        (offending_line, lines[offending_line - 1].rstrip())
+    ]
+
+
+@pytest.mark.unit
+def test_detector_accepts_correct_indented_catalog():
+    lines = [
+        '  msgid\t"The café is "\n',
+        '\n',
+        '  "closed."\n',
+        '  msgstr  "Le café "\n',
+        '  "est fermé."\n',
+    ]
+    assert find_wrapped_content_defects(lines) == []
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("chunks", [
+    ['"Le caf\\xC3\\xA9"\n', '"ferme."\n'],
+    ['"Le caf\\303"\n', '"\\251"\n', '"ferme."\n'],
+])
+def test_detector_flags_utf8_byte_escapes(chunks):
+    lines = ['msgstr ""\n'] + chunks
+    assert find_wrapped_content_defects(lines) == [(len(lines), lines[-1].rstrip())]
+
+
+@pytest.mark.unit
+def test_detector_accepts_escaped_separators_and_quotes():
+    lines = [
+        'msgstr "Le \\"café\\"\\t"\n',
+        '"est fermé.\\n"\n',
+        '"Chemin C:\\\\livres"\n',
+    ]
+    assert find_wrapped_content_defects(lines) == []

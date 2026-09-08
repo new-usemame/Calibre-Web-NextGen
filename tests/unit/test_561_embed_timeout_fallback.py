@@ -15,6 +15,7 @@ of four callers crash with TypeError when handed (None, None).
 from __future__ import annotations
 
 import ast
+from contextlib import nullcontext
 import importlib.util
 import subprocess
 import sys
@@ -69,6 +70,9 @@ def _load_embed_helper(monkeypatch_modules=None):
     plugins_mod.apply_to_env = lambda env: None
     services_pkg.calibre_user_plugins = plugins_mod
 
+    lock_mod = types.ModuleType("cps.services.calibre_db_lock")
+    lock_mod.metadata_db_write_lock = lambda **kw: nullcontext()
+
     shims = {
         "cps": cps_pkg,
         "cps.logger": logger_mod,
@@ -77,6 +81,7 @@ def _load_embed_helper(monkeypatch_modules=None):
         "cps.subproc_wrapper": subproc_mod,
         "cps.services": services_pkg,
         "cps.services.calibre_user_plugins": plugins_mod,
+        "cps.services.calibre_db_lock": lock_mod,
     }
     if monkeypatch_modules:
         shims.update(monkeypatch_modules)

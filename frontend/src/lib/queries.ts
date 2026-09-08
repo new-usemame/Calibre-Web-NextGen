@@ -347,11 +347,9 @@ export function useAddToMyLibrary() {
         qc.setQueryData(['book', String(bookId)], context.previousDetail);
       }
     },
-    onSuccess: () => refreshLibraryViews(qc),
-    onSettled: () => {
-      void qc.invalidateQueries({ queryKey: ['global-library'] });
-      void qc.invalidateQueries({ queryKey: ['books'] });
-    },
+    // A transport error may follow a committed write. Reconcile after the
+    // optimistic rollback too, including catalog scroll snapshots.
+    onSettled: () => refreshLibraryViews(qc),
   });
 }
 
@@ -387,13 +385,9 @@ export function useRemoveFromMyLibrary() {
         qc.setQueryData(['book', String(bookId)], context.previousDetail);
       }
     },
-    onSuccess: () => refreshLibraryViews(qc),
-    onSettled: () => {
-      void qc.invalidateQueries({ queryKey: ['books'] });
-      void qc.invalidateQueries({ queryKey: ['global-library'] });
-      void qc.invalidateQueries({ queryKey: ['shelves'] });
-      void qc.invalidateQueries({ queryKey: ['shelf'] });
-    },
+    // Unknown outcomes still require a new catalog revision: the server
+    // may have removed the book before its response connection was lost.
+    onSettled: () => refreshLibraryViews(qc),
   });
 }
 

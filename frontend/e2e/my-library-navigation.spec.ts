@@ -65,3 +65,32 @@ test('switching from whole library to a saved selection clears earlier catalog c
   expect((await catalog(page)).map(book => book.id)).not.toContain(book.id);
   await expect(card(page, book.title)).toHaveCount(0);
 });
+
+test('a lost single-removal response cannot resurrect the committed removal on Back', async ({ page: admin, secondaryUser }) => {
+  const page = secondaryUser.page;
+  expect((await admin.request.post(`/api/v1/admin/users/${secondaryUser.id}`, {
+    headers: await csrf(admin),
+    data: { roles: { browse_global: true }, library_mode: 'personal_library' },
+  })).ok()).toBeTruthy();
+  await page.goto('/app');
+  const books = await catalog(page);
+  expect(books.length).toBeGreaterThan(1);
+  const book = books[0];
+  await card(page, book.title).click();
+  let committed = false;
+  await page.route(`**/api/v1/books/${book.id}/my-library`, async route => {
+    if (route.request().method() !== 'DELETE') return route.continue();
+    const response = await route.fetch();
+    expect(response.ok()).toBeTruthy();
+    committed = true;
+    await route.abort('failed');
+  });
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Remove from my library', exact: true }).click();
+  await expect.poll(() => committed).toBe(true);
+  await expect(page.getByText('Could not remove the book. Please try again.', { exact: true })).toBeAttached();
+  await expect(page.getByText('Removed from your library', { exact: true })).toHaveCount(0);
+  await page.getByRole('link', { name: '← Library', exact: true }).click();
+  expect((await catalog(page)).map(book => book.id)).not.toContain(book.id);
+  await expect(card(page, book.title)).toHaveCount(0);
+});

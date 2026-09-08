@@ -359,6 +359,10 @@ Users, settings, and shelves carry over. The first launch takes a few extra seco
 
 [Shelfmark](https://github.com/calibrain/shelfmark) by @calibrain is a self-hosted book search and request interface. Users search across torrent, usenet, IRC, and direct sources from a single UI; Shelfmark hands the download to your client of choice and drops the finished file straight into the CWA ingest folder, where this build picks it up automatically. Multi-user requests are built in, so you can share an instance with household readers and approve their picks.
 
+This release does not include a built-in Store / Discover page or an Anna's Archive download provider. Configure acquisition sources in the separate Shelfmark service.
+
+**With My Library enabled:** files delivered through the shared ingest folder enter the global library. The folder does not identify the Shelfmark requester, so the import does not automatically add the book to that person's selection. Readers with Global Library access can find and add it there; an administrator can add it for a managed account. Accounts using the whole-library mode continue to see permitted imports automatically.
+
 Add it alongside `calibre-web` in the same compose file:
 
 ```yaml

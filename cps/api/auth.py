@@ -302,6 +302,7 @@ def auth_login():
                 login_result, error = services.ldap.bind_user(user.name, password)
                 if login_result:
                     login_user(user, remember=bool(data.get("remember")))
+                    _clear_current_rate_limits()
                     return jsonify(_me_payload(user))
                 if error is not None:
                     log.error("LDAP bind error for '%s': %s", username, error)
@@ -317,7 +318,7 @@ def auth_login():
                 if login_result:
                     ldap_user_details = services.ldap.get_object_details(username)
                     if ldap_user_details:
-                        from . import admin as admin_mod
+                        from .. import admin as admin_mod
                         create_result, error_msg = admin_mod.ldap_import_create_user(
                             username, ldap_user_details)
                         if create_result:
@@ -327,6 +328,7 @@ def auth_login():
                                 log.info("LDAP auto-created user '%s' via SPA login",
                                          username)
                                 login_user(user, remember=bool(data.get("remember")))
+                                _clear_current_rate_limits()
                                 return jsonify(_me_payload(user))
                     log.warning("LDAP auth succeeded but user creation failed for '%s'",
                                 username)

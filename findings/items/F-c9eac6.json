@@ -1,0 +1,19 @@
+{
+  "area": "ingest",
+  "body": "The full release Docker run repeatedly left newly arrived books pending after cleanup and ignored-format cases. The bind mount exposed fresh directory entries while directory stat retained old mtime and size, so the polling optimization never refreshed file state. A bounded monotonic full reconciliation now detects nested arrivals and replacements while preserving fired-event markers. Two real-loop file regressions failed before the fix and pass after it; final ordered container verification is recorded with PR #2208.",
+  "created": "2026-09-08",
+  "id": "F-c9eac6",
+  "refs": [
+    "#2208"
+  ],
+  "resolution": {
+    "commit": "03c89317dc",
+    "date": "2026-09-08",
+    "note": "Periodic full reconciliation bounds stale-directory metadata blindness to 30 monotonic seconds. Two real-loop nested-arrival and replacement scenarios seen red then green; all 16 polling watcher tests pass. Independent review found no introduced regression. Combined runtime release gate is tracked in PR #2208.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Cached directory metadata can indefinitely starve polling ingest"
+}

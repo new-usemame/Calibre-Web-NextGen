@@ -3717,7 +3717,7 @@ def test_full_sync_clears_only_target_users_entitlement_ledger(
     assert {
         row.device_id for row in
         sync_harness.session.query(ub.KoboDeviceEntitlementSeed)
-    } == {other_device.id}
+    } == {sync_harness.device.id, second_target_device.id, other_device.id}
 
     replay = sync_harness.sync(first.headers[sync_harness.token_header])
     replay_envelopes = _entitlements(replay)

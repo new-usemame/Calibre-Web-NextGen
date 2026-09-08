@@ -1646,8 +1646,8 @@ def HandleSyncRequest():
             response_mode="ledger_seed_failed",
             capture_session=capture_session,
         )
-    # Pre-ack rows prove only a committed server emission. Clear them once
-    # before they can hide an uncertain book from the recovery arm below.
+    # Audit legacy seed guesses once, retaining device-specific emissions and
+    # acknowledgments before the missing-ledger recovery query runs.
     if (requesting_device_id
             and not _migrate_device_entitlement_classification(current_user.id)):
         return _abort_sync_with_observability(

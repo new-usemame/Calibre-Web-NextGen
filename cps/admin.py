@@ -1447,9 +1447,17 @@ def do_full_kobo_sync(userid):
     ub.session.query(ub.KoboDeviceDeletedEntitlement).filter(
         ub.KoboDeviceDeletedEntitlement.device_id.in_(device_ids),
     ).delete(synchronize_session=False)
-    ub.session.query(ub.KoboDeviceEntitlementSeed).filter(
-        ub.KoboDeviceEntitlementSeed.device_id.in_(device_ids),
-    ).delete(synchronize_session=False)
+    # An explicit reset has already made the New/Changed decision. Keep a
+    # current boundary so historical position evidence cannot repopulate the
+    # deliberately emptied delivery ledger on the next request.
+    from .kobo import ENTITLEMENT_CLASSIFICATION_VERSION
+    kobo_ids = [row.id for row in ub.session.query(ub.Device.id).filter(
+        ub.Device.user_id == userid, ub.Device.kind == "kobo",
+    ).all()]
+    kobo_sync_status.mark_device_entitlement_ledgers_seeded(kobo_ids)
+    kobo_sync_status.mark_device_entitlement_classification(
+        kobo_ids, ENTITLEMENT_CLASSIFICATION_VERSION,
+    )
     ub.session.query(ub.KoboDevicePendingSyncPage).filter(
         ub.KoboDevicePendingSyncPage.device_id.in_(device_ids),
     ).delete(synchronize_session=False)
@@ -1470,47 +1478,20 @@ def ajax_kobo_resend(userid, bookid):
 
 
 def do_kobo_resend(userid, bookid):
-    # Force re-delivery of one book to one user's Kobo on the next sync.
-    #
-    # Three writes across the two databases, and only the timestamp bump does
-    # what it says on its own:
-    #
-    #   * bump Books.last_modified, so the sync filter
-    #     (Books.last_modified > sync_token.books_last_modified) picks the book
-    #     up regardless of where the device's cursor sits;
-    #   * clear the (user_id, book_id) row from kobo_synced_books;
-    #   * clear every per-device entitlement fingerprint for this user/book,
-    #     otherwise Layer 2 can suppress the requested replay as an exact
-    #     match even though last_modified selected it for delivery.
-    #
-    # ⚠️ This comment used to say the deletion is what makes the sync emit
-    # NewEntitlement. It is not, and believing so is what made the only
-    # regression test for this helper assert a causal chain the code cannot
-    # perform (F-cc5efb). get_kobo_created_ts (cps/kobo.py) derives the
-    # NewEntitlement / ChangedEntitlement choice from Books.timestamp and the
-    # joined date_added ONLY — it never reads kobo_synced_books, and the sync
-    # query deliberately does not filter on that table either because it is
-    # user-keyed and doing so would break multi-device sync (cps/kobo.py, see
-    # the comments around the changed-book query).
-    #
-    # The deletion still matters, by a different route: HandleSyncRequest resets
-    # the WHOLE sync token — books_last_created included — to datetime.min when
-    # the user has no kobo_synced_books rows left at all (cps/kobo.py, "if no
-    # books synced don't respect sync_token"). So removing the user's LAST row
-    # does produce NewEntitlement, which is the single-book case anyone would
-    # test by hand and is presumably how the wrong explanation survived. With
-    # any other synced row remaining, this emits ChangedEntitlement.
-    #
-    # 🚨 Whether a Kobo re-downloads the file on a ChangedEntitlement is
-    # UNOBSERVED (F-3e383a). The success message below tells the requester the
-    # device "will re-receive the book"; that claim is only established for the
-    # empty-table case above. Do not strengthen it without measuring on
-    # hardware.
+    # Classify old evidence before clearing the requested book. Otherwise a
+    # first-sync upgrade could recreate its ledger from a saved position and
+    # turn this deliberate New delivery into Changed. Unrelated books retain
+    # the ordinary conservative upgrade policy.
+    from .kobo import (_seed_existing_device_entitlement_ledgers,
+                       _migrate_device_entitlement_classification)
     book = calibre_db.session.query(db.Books).filter(db.Books.id == bookid).first()
     if book is None:
         message = _("Book {} not found").format(bookid)
         return Response(json.dumps([{"type": "danger", "message": message}]),
                         mimetype='application/json')
+    if (not _seed_existing_device_entitlement_ledgers(userid)
+            or not _migrate_device_entitlement_classification(userid)):
+        abort(503)
     device_ids = ub.session.query(ub.Device.id).filter(
         ub.Device.user_id == userid,
     ).scalar_subquery()

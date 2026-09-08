@@ -1,25 +1,30 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""Source pins for #573 — the new UI's series view had no way to sort books by
-their metadata series position, and the position wasn't shown on the card unless
-duplicated in the title.
+"""#573 — the new UI's series view had no way to sort by series position, and
+the position wasn't shown on the card unless duplicated in the title.
 
-The fix wires three things, guarded here against silent removal:
-  1. Backend: a stateless series_index sort ("seriesasc"/"seriesdesc") in the
-     /api/v1/books SORT_MAP, mirroring web.py's get_sort_function.
-  2. Frontend: the series view offers "Series order" sort options and defaults to
-     ascending series order.
-  3. Frontend: the book card renders the series position (showSeriesIndex).
+The user-visible half of that fix now has real coverage in
+``frontend/e2e/series-sort-order.spec.ts``: it seeds a series whose ascending
+order differs from the library's newest-first order and then drives the actual
+SPA — the sort control's options, the order the view opens in, and the position
+badge on each card.
 
-Behavioural coverage is the live Playwright series-view test; these guard the
-wiring. (See tests/unit/test_578_scroll_restore.py for the source-pin pattern.)
+Five source-text assertions used to stand in for that here (``'seriesasc' in
+src``, ``sortOptions.map(`` and friends). They were deleted when the e2e spec
+landed. A string in a .tsx file cannot tell a removed feature from a renamed
+variable: on PR #2115 a refactor that preserved every one of these behaviours
+built a superset list and rendered ``activeSortOptions.map(``, and the pin
+reported that series sorting had disappeared. ``~/.claude/TESTING-STRATEGY.md``
+forbids source-text pins for exactly that reason.
+
+What remains here is what a browser cannot see: the server-side sort map,
+asserted against the real objects, and the msgid anchors, which are a fact about
+the translation toolchain rather than about anything rendered.
 """
 import pathlib
-import re
 
 import pytest
 
 _ROOT = pathlib.Path(__file__).resolve().parents[2]
-_FE = _ROOT / "frontend" / "src"
 _CPS = _ROOT / "cps"
 
 
@@ -40,64 +45,14 @@ def test_backend_sort_map_has_series_index():
 
 
 @pytest.mark.unit
-def test_catalog_offers_series_order_options():
-    """The series view exposes the two series-order sort options."""
-    src = (_FE / "pages" / "Catalog.tsx").read_text()
-    assert "SERIES_SORT_OPTIONS" in src
-    assert "'seriesasc'" in src
-    assert "'seriesdesc'" in src
-    # The options are only added for a series view, and the dropdown renders the
-    # context-aware list (not the fixed base list).
-    assert "isSeries ? [...SERIES_SORT_OPTIONS" in src
-    assert "sortOptions.map(" in src
-
-
-@pytest.mark.unit
-def test_catalog_defaults_to_series_order_in_series_view():
-    """A series opens in ascending series order, not newest-first (the reporter's
-    core complaint), matching web.py's series-page default."""
-    src = (_FE / "pages" / "Catalog.tsx").read_text()
-    assert "const isSeries = entityKind === 'series'" in src
-    assert "defaultSort = isSeries ? 'seriesasc' : 'new'" in src
-    # The sort state seeds from defaultSort, falling back through the snapshot
-    # and (plain-library only, #640) the persisted choice. A scoped view must
-    # never read the persisted library sort, and 'seriesasc' is not a library
-    # option so it can never round-trip through the persisted key.
-    assert "snap?.sort" in src
-    assert "?? (isPlainLibrary ? readStoredChoice(LIBRARY_SORT_KEY, LIBRARY_SORT_VALUES) : undefined)" in src
-    assert "?? defaultSort" in src
-    assert "const LIBRARY_SORT_VALUES = SORT_OPTIONS.map((o) => o.value)" in src
-
-
-@pytest.mark.unit
-def test_catalog_shows_series_index_on_card_in_series_view():
-    """The catalog tells the card to show the series position when, and only
-    when, viewing a series."""
-    src = (_FE / "pages" / "Catalog.tsx").read_text()
-    assert re.search(r"showSeriesIndex=\{isSeries\}", src)
-
-
-@pytest.mark.unit
-def test_bookcard_renders_series_position():
-    """The card renders the series position from book.series_index when asked."""
-    src = (_FE / "components" / "BookCard.tsx").read_text()
-    assert "showSeriesIndex" in src
-    assert "formatSeriesIndex" in src
-    assert "book.series_index" in src
-    assert "seriesBadge" in src
-
-
-@pytest.mark.unit
-def test_bookcard_series_badge_styled():
-    """The series badge has a style so it isn't an unstyled overlay."""
-    css = (_FE / "components" / "BookCard.module.css").read_text()
-    assert ".seriesBadge" in css
-
-
-@pytest.mark.unit
 def test_series_sort_msgids_anchored():
     """SPA-only msgids must be anchored in spa_strings.py or the auto-translation
-    job strips them (babel doesn't scan .tsx)."""
+    job strips them (babel doesn't scan .tsx).
+
+    Not a source pin on the feature: the subject IS spa_strings.py's anchor list,
+    which is the input to the translation job. No amount of browser driving can
+    observe a string that the extractor dropped before the catalogs were built.
+    """
     src = (_CPS / "spa_strings.py").read_text()
     assert '_("Series order")' in src
     assert '_("Series order (reverse)")' in src

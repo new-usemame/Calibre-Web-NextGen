@@ -172,9 +172,19 @@ export default defineConfig({
       // desktop makes each project clobber the other's writes — a race, not a
       // defect. Desktop owns it until the harness can hand each project its own
       // account; it passes standalone at 375px.
+      //
+      // series-sort-order and table-inline-title are the same trade one level
+      // out: they rewrite CATALOG metadata (a probe series, one book title) and
+      // restore it, so two projects running them at once race on each other's
+      // fixture rather than on the product. The seed is too small to partition
+      // a series plus an editable book per project. Neither spec is about
+      // layout — the sort control, the position badge and the inline editor are
+      // the same DOM at 375px — so desktop owning them costs no coverage.
       testIgnore: [
         /subpath\.spec\.ts/,
         /default-library-view\.spec\.ts/,
+        /series-sort-order\.spec\.ts/,
+        /table-inline-title\.spec\.ts/,
         WEBKIT_READER_SPEC,
         VISUAL_REGRESSION_SPEC,
         ...CATALOG_LAYOUT_SPECS,

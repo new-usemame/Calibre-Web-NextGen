@@ -8,7 +8,7 @@ import datetime
 import inspect
 import json
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 import flask
 import pytest
@@ -136,3 +136,18 @@ def test_anonymous_book_detail_returns_zero_without_querying_annotations(app_db)
 
     with patch.object(books_mod.ub.session, "query", side_effect=reject_annotation_query):
         assert _detail_payload(anonymous)["annotation_count"] == 0
+
+
+@pytest.fixture(autouse=True)
+def no_public_shelf_in_presentation_fixture(monkeypatch):
+    """These detail fixtures model unshared books; SQL authorization is covered
+    by test_1939_public_shelf_listing and test_shared_book_continuation.
+    Keep the new Calibre access lookup separate from the app-state query mocks.
+    """
+    from cps.api import books
+    from sqlalchemy import false
+
+    monkeypatch.setattr(books.db, "public_shelf_book_filter", lambda *_: false())
+    session = MagicMock()
+    session.query.return_value.filter.return_value.first.return_value = None
+    monkeypatch.setattr(books.calibre_db, "session", session)

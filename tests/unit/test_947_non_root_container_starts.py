@@ -26,6 +26,7 @@ existing.
 import os
 import re
 import stat
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -88,7 +89,7 @@ def test_helper_runs_the_command_directly_when_not_root(tmp_path):
 
     marker = tmp_path / "ran"
     result = subprocess.run(
-        [str(HELPER), "/bin/sh", "-c", f"id -u > {marker}"],
+        [str(HELPER), "/bin/sh", "-c", f"id -u > {shlex.quote(str(marker))}"],
         capture_output=True,
         text=True,
         timeout=30,
@@ -115,7 +116,7 @@ def test_helper_still_drops_to_abc_when_root(tmp_path):
 
     (stub_dir / "id").write_text("#!/bin/sh\necho 0\n")
     out = tmp_path / "dropped"
-    (stub_dir / "s6-setuidgid").write_text(f'#!/bin/sh\necho "$@" > {out}\n')
+    (stub_dir / "s6-setuidgid").write_text(f'#!/bin/sh\necho "$@" > {shlex.quote(str(out))}\n')
     for stub in stub_dir.iterdir():
         stub.chmod(0o755)
 

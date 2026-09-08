@@ -98,3 +98,18 @@ def test_bookdetail_renders_progress():
     src = (_ROOT / "frontend" / "src" / "pages" / "BookDetail.tsx").read_text()
     assert "book.kosync_progress != null" in src
     assert "KOReader Progress" in src  # aligned to the classic, translatable msgid
+
+
+@pytest.fixture(autouse=True)
+def no_public_shelf_in_presentation_fixture(monkeypatch):
+    """These detail fixtures model unshared books; SQL authorization is covered
+    by test_1939_public_shelf_listing and test_shared_book_continuation.
+    Keep the new Calibre access lookup separate from the app-state query mocks.
+    """
+    from cps.api import books
+    from sqlalchemy import false
+
+    monkeypatch.setattr(books.db, "public_shelf_book_filter", lambda *_: false())
+    session = MagicMock()
+    session.query.return_value.filter.return_value.first.return_value = None
+    monkeypatch.setattr(books.calibre_db, "session", session)

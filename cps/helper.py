@@ -1875,6 +1875,7 @@ def get_book_cover(book_id, resolution=None):
         allow_show_archived=True,
         allow_show_hidden=True,
         allow_show_global=allow_show_global,
+        allow_public_shelf_books=True,
     )
     return get_book_cover_internal(book, resolution=resolution)
 
@@ -2939,13 +2940,16 @@ def check_valid_domain(domain_text):
     return not len(ub.session.query(ub.Registration).from_statement(text(sql)).params(domain=domain_text).all())
 
 
-def get_download_link(book_id, book_format, client):
+def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=False):
     book_format = book_format.split(".")[0]
     # Try filtered view first to respect user restrictions.
     # allow_show_hidden=True: a user's own hidden book is still downloadable
     # through Send-to-eReader and OPDS — hidden hides from listings, not from
     # the user's own access (#319 pushback).
-    book = calibre_db.get_filtered_book(book_id, allow_show_archived=True, allow_show_hidden=True)
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_hidden=True,
+        allow_public_shelf_books=allow_public_shelf_books,
+    )
 
     # If not found but user is admin, fall back to unfiltered direct lookup
     if not book and getattr(current_user, 'role_admin', lambda: False)():

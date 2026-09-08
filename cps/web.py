@@ -2615,7 +2615,8 @@ def serve_book(book_id, book_format, anyname):
     book_format = book_format.split(".")[0]
     # allow_show_hidden=True: the user can download their own hidden books
     # from the detail page; the serve flow must mirror that (#319 pushback).
-    book = calibre_db.get_filtered_book(book_id, allow_show_hidden=True)
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_hidden=True, allow_public_shelf_books=True)
     if not book:
         return "File not in Database"
     data = calibre_db.get_book_format(book_id, book_format.upper())
@@ -2681,7 +2682,8 @@ def serve_book(book_id, book_format, anyname):
 @download_required
 def download_link(book_id, book_format, anyname):
     client = "kobo" if "Kobo" in request.headers.get('User-Agent', "") else ""
-    return get_download_link(book_id, book_format, client)
+    return get_download_link(
+        book_id, book_format, client, allow_public_shelf_books=True)
 
 
 @web.route('/send/<int:book_id>/<book_format>/<int:convert>', methods=["POST"])
@@ -3706,7 +3708,8 @@ def read_book(book_id, book_format):
     # allow_show_hidden=True: a user can read their own hidden book — the
     # detail page's reading icon must not bounce with "unavailable" just
     # because the book is on the user's hide list (#319 pushback @droM4X).
-    book = calibre_db.get_filtered_book(book_id, allow_show_hidden=True)
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_hidden=True, allow_public_shelf_books=True)
 
     if not book:
         flash(_("Oops! Selected book is unavailable. File does not exist or is not accessible"),
@@ -3911,7 +3914,8 @@ def show_book(book_id):
     # this the detail route 404s for hidden books and recovery is impossible
     # (issue #319).
     entries = calibre_db.get_book_read_archived(book_id, config.config_read_column,
-                                                allow_show_archived=True, allow_show_hidden=True)
+                                                allow_show_archived=True, allow_show_hidden=True,
+                                                allow_public_shelf_books=True)
     if entries:
         read_book = entries[1]
         archived_book = entries[2]

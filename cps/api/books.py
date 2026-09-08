@@ -492,11 +492,19 @@ def book_detail(book_id):
         book_id, config.config_read_column,
         allow_show_archived=True, allow_show_hidden=True,
         allow_show_global=allow_show_global,
+        allow_public_shelf_books=True,
     )
     if not result:
         return jsonify({"error": {"code": "not_found", "message": "Book not found"}}), 404
 
     book, read_status, is_archived = result
+
+    # The detail lookup already applied every content restriction. Only a
+    # book on a currently public shelf can extend access beyond membership.
+    accessible_via_public_shelf = calibre_db.session.query(db.Books.id).filter(
+        db.Books.id == book_id,
+        db.public_shelf_book_filter(ub.session, calibre_db.session),
+    ).first() is not None
 
     personal_library = (
         user_library.mode_for_user(current_user)
@@ -520,7 +528,7 @@ def book_detail(book_id):
     kosync_progress = None
     kosync_progress_timestamp = None
     kosync_progress_created_at = None
-    if in_my_library and current_user.is_authenticated and not current_user.is_anonymous:
+    if current_user.is_authenticated and not current_user.is_anonymous:
         uid = int(current_user.id)
         favorited = (ub.session.query(ub.FavoriteBook)
                      .filter(ub.FavoriteBook.user_id == uid, ub.FavoriteBook.book_id == book_id)
@@ -545,7 +553,7 @@ def book_detail(book_id):
     # With a custom read column, get_book_read_archived returns the column's value
     # (truthy = read); otherwise the built-in ub.ReadBook.read_status. Match the
     # list badge's logic (fork #579) so both surfaces agree.
-    read = in_my_library and (
+    read = (
         bool(read_status) if config.config_read_column
         else read_status == ub.ReadBook.STATUS_FINISHED
     )
@@ -553,7 +561,7 @@ def book_detail(book_id):
     # page renders this marker off read_status_raw == STATUS_IN_PROGRESS; the SPA
     # book page never received the flag, so the badge was missing in the new UI.
     # Derive it from the shared helper so both surfaces stay in agreement.
-    in_progress = in_my_library and book_is_in_progress(
+    in_progress = book_is_in_progress(
         book_id, read_status, config.config_read_column, current_user)
     body = serialize_book_detail(
         book,
@@ -568,6 +576,7 @@ def book_detail(book_id):
         cover_override=user_cover.override_for_user(_real_user_id(), book_id),
     )
     body["in_my_library"] = in_my_library
+    body["accessible_via_public_shelf"] = accessible_via_public_shelf
     source_formats, target_formats = get_convert_options(book)
     body["convert_options"] = {
         "sources": source_formats,

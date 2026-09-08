@@ -452,10 +452,11 @@ def authorize_opds_entity(entity, user=None, entity_type=None):
     return entity
 
 
-def get_opds_restricted_common_filter(user=None):
+def get_opds_restricted_common_filter(user=None, *, allow_public_shelf_books=False):
     return calibre_db.common_filters(
         user=user,
         extra_filter=get_opds_book_filter(user),
+        allow_public_shelf_books=allow_public_shelf_books,
     )
 
 
@@ -520,7 +521,7 @@ def is_opds_book_exposed(book_id, user=None):
         return False
     entry = calibre_db.session.query(db.Books.id).filter(
         db.Books.id == normalized_book_id,
-        get_opds_restricted_common_filter(user),
+        get_opds_restricted_common_filter(user, allow_public_shelf_books=True),
     ).first()
     return entry is not None
 
@@ -1046,7 +1047,8 @@ def opds_download_link(book_id, book_format):
         return abort(401)
     abort_unless_opds_book_exposed(book_id)
     client = "kobo" if "Kobo" in request.headers.get('User-Agent', "") else ""
-    return get_download_link(book_id, book_format.lower(), client)
+    return get_download_link(
+        book_id, book_format.lower(), client, allow_public_shelf_books=True)
 
 
 @opds.route("/ajax/book/<string:uuid>/<library>")

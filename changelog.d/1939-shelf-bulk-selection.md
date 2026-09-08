@@ -1,1 +1,3 @@
 Regular and smart shelves in the New UI now have Select mode and the same bulk actions as the catalog. Personal Library users can remove several shelved books from their library at once. Selection survives loading more books, successful changes refresh the grid, and failed books stay selected for retry. Shelf reordering and the individual Remove from shelf action remain available. Addresses iroQuai’s feedback on fork issue #1939.
+
+Long shelf names wrap on narrow screens so the floating bulk actions stay visible and reachable on phones.

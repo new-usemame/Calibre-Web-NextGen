@@ -2,6 +2,24 @@ import { test, expect } from './fixtures';
 import AxeBuilder from '@axe-core/playwright';
 import type { Page } from '@playwright/test';
 
+async function expectBulkActionsReachable(page: Page) {
+  // Check the visible phone viewport, not IntersectionObserver's potentially
+  // expanded layout viewport. Every action must fit and receive a real click.
+  const viewport = page.viewportSize()!;
+  const bar = page.getByRole('region', { name: '2 selected', exact: true });
+  await expect(bar).toBeVisible();
+  for (const button of await bar.getByRole('button').all()) {
+    const bounds = await button.boundingBox();
+    expect(bounds).not.toBeNull();
+    expect(bounds!.x).toBeGreaterThanOrEqual(0);
+    expect(bounds!.y).toBeGreaterThanOrEqual(0);
+    expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(viewport.width);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport.height);
+    // A smart-shelf account may have no regular shelf to add books to.
+    if (await button.isEnabled()) await button.click({ trial: true });
+  }
+}
+
 async function headers(page: Page) {
   const response = await page.request.get('/api/v1/auth/csrf');
   expect(response.ok()).toBeTruthy();
@@ -37,7 +55,9 @@ for (const kind of ['shelf', 'magic'] as const) {
       const added = await page.request.put(`/api/v1/books/${book.id}/my-library`, { headers: userHeaders });
       expect(added.ok(), await added.text()).toBeTruthy();
     }
-    const name = `Bulk ${kind} ${secondaryUser.username}`;
+    // A long unbroken name must not widen the mobile layout viewport and
+    // displace the fixed bulk controls. System-font metrics differ in CI.
+    const name = `Bulk ${kind} ${secondaryUser.username} ${'W'.repeat(24)}`;
     const created = await page.request.post(kind === 'shelf' ? '/api/v1/shelves' : '/magicshelf', {
       headers: userHeaders,
       data: kind === 'shelf' ? { name } : {
@@ -86,6 +106,7 @@ for (const kind of ['shelf', 'magic'] as const) {
       }
       const bar = page.getByRole('region', { name: '2 selected', exact: true });
       await expect(bar).toBeVisible();
+      await expectBulkActionsReachable(page);
       const accessibility = await new AxeBuilder({ page }).include('main').analyze();
       expect(accessibility.violations.filter(item => ['critical', 'serious'].includes(item.impact ?? ''))).toEqual([]);
       await page.screenshot({ path: test.info().outputPath(`${kind}-bulk-selected.jpg`), type: 'jpeg', quality: 70 });
@@ -134,7 +155,7 @@ test('shelf: bulk read, reorder, route reuse and reversible per-card removal coe
   const shelves: Array<{ id: number; name: string }> = [];
   try {
     for (const suffix of ['A', 'B']) {
-      const name = `Bulk modes ${secondaryUser.username} ${suffix}`;
+      const name = `Bulk modes ${secondaryUser.username} ${suffix} ${'W'.repeat(24)}`;
       const created = await page.request.post('/api/v1/shelves', { headers: userHeaders, data: { name } });
       expect(created.ok(), await created.text()).toBeTruthy();
       const { id } = await created.json();
@@ -159,6 +180,7 @@ test('shelf: bulk read, reorder, route reuse and reversible per-card removal coe
     }
     const bar = page.getByRole('region', { name: '2 selected', exact: true });
     await expect(bar.getByRole('button', { name: 'Remove from my library' })).toHaveCount(0);
+    await expectBulkActionsReachable(page);
     await bar.getByRole('button', { name: 'Mark read', exact: true }).click();
     await expect(page.locator('[aria-live="polite"]')).toHaveText('2 marked as read.');
     await expect(page.getByRole('img', { name: 'Read', exact: true })).toHaveCount(2);

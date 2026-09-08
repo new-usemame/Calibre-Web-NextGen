@@ -37,6 +37,10 @@
 }
 
 .title {
+  /* An unbroken shelf name must not expand the mobile layout viewport: fixed
+     bulk controls would then be positioned beyond the visible phone screen. */
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-family: var(--font-display);
   font-size: var(--fs-xl);
   color: var(--text);

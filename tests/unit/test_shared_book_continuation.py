@@ -226,3 +226,35 @@ def test_public_shelf_does_not_grant_reader_or_download_roles(shared_books):
     assert env.client.get('/download/1/epub').status_code == 403
     assert env.client.get('/opds/download/1/epub/').status_code == 401
     assert env.client.get('/show/1/pdf').status_code == 403
+
+
+@pytest.mark.parametrize('access', ['global_only', 'public_shelf', 'member'])
+def test_detail_personal_state_requires_membership_or_current_sharing(shared_books, access):
+    """A curator's metadata access must not resurrect removed-book state;
+    active shared readers and members still see their own saved progress.
+    """
+    env = shared_books
+    env.viewer.role |= constants.ROLE_BROWSE_GLOBAL
+    env.public.is_public = int(access == 'public_shelf')
+    if access == 'member':
+        env.session.add(ub.UserLibraryBook(user_id=env.viewer.id, book_id=1))
+    env.session.add(ub.ReadBook(user_id=env.viewer.id, book_id=1,
+                               read_status=ub.ReadBook.STATUS_FINISHED))
+    env.session.add(ub.FavoriteBook(user_id=env.viewer.id, book_id=1))
+    state = ub.KoboReadingState(user_id=env.viewer.id, book_id=1)
+    state.current_bookmark = ub.KoboBookmark(progress_percent=75,
+        created_at=datetime(2026, 9, 1), last_modified=datetime(2026, 9, 2))
+    env.session.add(state)
+    env.session.commit()
+
+    response = env.client.get('/api/v1/books/1')
+    assert response.status_code == 200, response.data
+    allowed = access != 'global_only'
+    assert response.json['read'] is allowed
+    assert response.json['favorited'] is allowed
+    assert response.json['kosync_progress'] == (75 if allowed else None)
+    assert bool(response.json['kosync_progress_timestamp']) is allowed
+    assert response.json['in_my_library'] is (access == 'member')
+    # Hiding the DTO is not destructive; re-adding/sharing recovers stored state.
+    assert env.session.query(ub.ReadBook).one().read_status == ub.ReadBook.STATUS_FINISHED
+    assert env.session.query(ub.KoboBookmark).one().progress_percent == 75

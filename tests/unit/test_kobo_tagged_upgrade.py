@@ -19,7 +19,7 @@ def tagged_render_settings(monkeypatch):
     # The tagged snapshot emitted bare cover IDs. Config-writing tests may
     # reload the live default (padding enabled) into the process-wide config;
     # that is a real payload change, not an unchanged upgrade replay.
-    monkeypatch.setattr(kobo.config, 'config_kobo_cover_padding_enabled', False)
+    monkeypatch.setattr(kobo.config, 'config_kobo_cover_padding_enabled', False, raising=False)
 
 
 

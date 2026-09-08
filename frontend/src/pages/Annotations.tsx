@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ChevronLeft, Download, Highlighter, MoreHorizontal, Upload as UploadIcon } from 'lucide-react';
@@ -6,6 +6,7 @@ import { apiGet, apiPatch, apiPost, apiUrl } from '../lib/api';
 import { useBook, useMe, useKoboTwoWayAnnotations, selectKoboTwoWayBook } from '../lib/queries';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { authorityLabel, opaqueLabel } from '../lib/koboTwoWay';
+import { assignmentOverride, effectiveDevice, annotationDeviceLabel, assignmentToastReducer, type AssignmentToast } from '../lib/annotationDevices';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { BulkSelectionBar } from '../components/BulkBar';
@@ -71,7 +72,8 @@ export function Annotations({ id }: { id: string }) {
   const [failed, setFailed] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [toast, setToast] = useState<{ text: string; failed?: number; undo?: Record<string, string | null>; target?: string | null } | null>(null);
+  const [toast, dispatchToast] = useReducer(assignmentToastReducer, null);
+  const setToast = (next: AssignmentToast | null) => dispatchToast(next ? { type: 'show', toast: next } : { type: 'dismiss' });
   const filterFirstRef = useRef<HTMLButtonElement>(null);
   const selectAllRef = useRef<HTMLButtonElement>(null);
   const longPressRef = useRef<{ timer: ReturnType<typeof setTimeout>; annotationId: string } | null>(null);
@@ -92,14 +94,18 @@ export function Annotations({ id }: { id: string }) {
   }, [selecting]);
 
   const annotations = data?.annotations ?? [];
-  const devices = data?.devices ?? {};
+  const devices = useMemo(() => ({
+    ...data?.devices,
+    ...Object.fromEntries((registry?.devices ?? []).map((device) => [device.public_id, device])),
+  }), [data?.devices, registry?.devices]);
   const activeDevices = registry?.devices ?? [];
-  const assignmentOf = (row: Annotation) => assignments[row.annotation_id] ?? null;
-  const deviceLabel = (deviceId: string | null) => deviceId ? devices[deviceId]?.label || t('Deleted device') : t('Unknown device');
+  const overrideOf = (row: Annotation) => assignmentOverride(row, assignments);
+  const assignmentOf = (row: Annotation) => effectiveDevice(row, overrideOf(row));
+  const deviceLabel = (deviceId: string | null) => annotationDeviceLabel(deviceId, devices, t('Unknown device'), t('Deleted device'));
   const counts = useMemo(() => {
     const result = new Map<string, number>();
     annotations.forEach((row) => {
-      const key = assignments[row.annotation_id] || 'unknown';
+      const key = assignmentOf(row) || 'unknown';
       result.set(key, (result.get(key) || 0) + 1);
     });
     return result;
@@ -125,11 +131,11 @@ export function Annotations({ id }: { id: string }) {
   }, [filtered, group, assignments, devices]);
 
   const setOneAssignment = async (row: Annotation, next: string | null) => {
-    const previous = assignmentOf(row);
+    const previous = overrideOf(row);
     setAssignments((current) => ({ ...current, [row.annotation_id]: next }));
     try {
       await apiPatch(`/annotations/${id}/${encodeURIComponent(row.annotation_id)}`, { assigned_device_id: next });
-      const label = deviceLabel(next);
+      const label = deviceLabel(effectiveDevice(row, next));
       setToast({ text: t('Assigned to {name}.', { name: label }), undo: { [row.annotation_id]: previous } });
       announce(t('Assigned to {name}.', { name: label }));
     } catch {
@@ -140,7 +146,7 @@ export function Annotations({ id }: { id: string }) {
 
   const applyBulk = async (next: string | null, ids = [...selected]) => {
     if (!ids.length) return;
-    const previous = Object.fromEntries(ids.map((annotationId) => [annotationId, assignments[annotationId] ?? null]));
+    const previous = Object.fromEntries(annotations.filter((row) => ids.includes(row.annotation_id)).map((row) => [row.annotation_id, overrideOf(row)]));
     setBusy(true); setProgress({ done: 0, total: ids.length }); setFailed(new Set());
     setAssignments((current) => ({ ...current, ...Object.fromEntries(ids.map((annotationId) => [annotationId, next])) }));
     const failures = new Set<string>();
@@ -159,13 +165,16 @@ export function Annotations({ id }: { id: string }) {
     setSelected(new Set(failures)); setFailed(failures); setBusy(false); setProgress(null);
     const succeeded = ids.length - failures.size;
     const label = deviceLabel(next);
+    const message = next === null
+      ? (failures.size ? t('Original device attribution restored for {ok} of {total}.', { ok: succeeded, total: ids.length }) : t('Original device attribution restored for {n}.', { n: succeeded }))
+      : (failures.size ? t('{ok} of {total} assigned to {name}.', { ok: succeeded, total: ids.length, name: label }) : t('{n} assigned to {name}.', { n: succeeded, name: label }));
     setToast({
-      text: failures.size ? t('{ok} of {total} assigned to {name}.', { ok: succeeded, total: ids.length, name: label }) : t('{n} assigned to {name}.', { n: succeeded, name: label }),
+      text: message,
       failed: failures.size,
       target: next,
       undo: Object.fromEntries(Object.entries(previous).filter(([annotationId]) => !failures.has(annotationId))),
     });
-    announce(failures.size ? t('{n} failed.', { n: failures.size }) : t('{n} assigned to {name}.', { n: succeeded, name: label }));
+    announce(failures.size ? t('{n} failed.', { n: failures.size }) : message);
   };
 
   const undo = async () => {
@@ -269,7 +278,7 @@ export function Annotations({ id }: { id: string }) {
         <button ref={selectAllRef} type="button" onClick={() => setSelected(new Set(filtered.map((row) => row.annotation_id)))}>{t('Select all {n}', { n: filtered.length })}</button>
         <select aria-label={t('Assign selected to device')} disabled={!selected.size || busy} defaultValue=""
           onChange={(event) => { const value = event.target.value; if (value !== '') void applyBulk(value === 'unknown' ? null : value); event.currentTarget.value = ''; }}>
-          <option value="" disabled>{t('Assign to device')}</option><option value="unknown">{t('Unknown device')}</option>
+          <option value="" disabled>{t('Assign to device')}</option><option value="unknown">{t('Use original devices')}</option>
           {activeDevices.map((device) => <option key={device.public_id} value={device.public_id}>{device.label}</option>)}
         </select>
         {progress && <span>{t('{done} of {total}', { done: progress.done, total: progress.total })}</span>}
@@ -315,10 +324,12 @@ export function Annotations({ id }: { id: string }) {
               <div className={styles.body}>
                 {!unanchored && <blockquote className={styles.quote}>{row.highlighted_text}</blockquote>}{row.note_text && <p className={styles.note}>{row.note_text}</p>}
                 <div className={styles.meta}><span>{sourceLabel(row.source)}</span><span aria-hidden="true">·</span>
-                  {group === 'device' ? <span>{deviceLabel(current)}</span> : <select className={!current ? styles.unknown : ''} value={current || 'unknown'}
+                  {group === 'device' ? <span>{deviceLabel(current)}</span> : <select className={!current ? styles.unknown : ''} value={overrideOf(row) ?? 'unknown'}
                     aria-label={t('Device: {name}', { name: current ? deviceLabel(current) : t('unknown') })}
                     onClick={(event) => event.stopPropagation()} onChange={(event) => void setOneAssignment(row, event.target.value === 'unknown' ? null : event.target.value)}>
-                    <option value="unknown">{t('Unknown device')}</option>{activeDevices.map((device) => <option key={device.public_id} value={device.public_id}>{device.label} — {device.model}</option>)}</select>}
+                    <option value="unknown">{row.origin_device_id ? t('Use original device: {name}', { name: deviceLabel(row.origin_device_id) }) : t('Unknown device')}</option>
+                    {current && !activeDevices.some((device) => device.public_id === current) && overrideOf(row) !== null && <option value={current} disabled>{deviceLabel(current)}</option>}
+                    {activeDevices.map((device) => <option key={device.public_id} value={device.public_id}>{device.label} — {device.model}</option>)}</select>}
                   {row.chapter_progress != null && <><span aria-hidden="true">·</span><span>{Math.round(row.chapter_progress * 100)}%</span></>}
                   {row.anchor_status === 'unresolved' && <><span aria-hidden="true">·</span><span className={styles.anchorWarning}
                     aria-label={t("Warning: this highlight can’t be shown in the book")}><AlertTriangle size={13} aria-hidden="true" focusable={false} />{t('Not in current file')}</span></>}
@@ -328,6 +339,7 @@ export function Annotations({ id }: { id: string }) {
             </div>;
           })()} />}
       {toast && <div className={styles.toast} role="status"><span>{toast.text}</span>{toast.failed ? <span>{t('{n} failed.', { n: toast.failed })}</span> : null}
+        <button type="button" onClick={() => dispatchToast({ type: 'dismiss' })}>{t('Dismiss')}</button>
         {toast.undo && Object.keys(toast.undo).length > 0 && <button type="button" onClick={() => void undo()}>{t('Undo')}</button>}
         {toast.failed ? <button type="button" onClick={() => void applyBulk(toast.target ?? null)}>{t('Retry')}</button> : null}
       </div>}

@@ -2184,14 +2184,21 @@ def _data_json_row(r, cfi, pdf_quad, device_public_ids=None, anchor_status=None)
     }
 
 
-def _annotation_device_payload(user_id, session, device_ids=None):
-    """Return a bounded internal→public lookup for referenced devices only."""
-    if device_ids is not None and not device_ids:
+def _annotation_device_payload(user_id, session, device_ids=None, include_assignable=False):
+    """Return an owned, bounded lookup, optionally including assignment choices."""
+    if device_ids is not None and not device_ids and not include_assignable:
         return {}, {}
     query = session.query(ub.Device).filter(ub.Device.user_id == user_id)
     if device_ids is not None:
-        query = query.filter(ub.Device.id.in_(tuple(device_ids)))
-    devices = query.order_by(ub.Device.id).limit(MAX_DEVICE_LIST_LIMIT).all()
+        referenced = ub.Device.id.in_(tuple(device_ids))
+        query = query.filter(or_(referenced, ub.Device.active.is_(True)) if include_assignable else referenced)
+    if include_assignable:
+        # Match the active registry's ordering before using remaining capacity
+        # for referenced retired devices. Unreferenced choices need labels too.
+        query = query.order_by(ub.Device.active.desc(), ub.Device.display_name, ub.Device.id)
+    else:
+        query = query.order_by(ub.Device.id)
+    devices = query.limit(MAX_DEVICE_LIST_LIMIT).all()
     public_ids = {device.id: device.public_id for device in devices}
     payload = {
         device.public_id: {
@@ -2224,7 +2231,7 @@ def annotations_data(book_id):
         if device_id is not None
     }
     device_public_ids, devices = _annotation_device_payload(
-        current_user.id, ub.session, device_ids=referenced_device_ids,
+        current_user.id, ub.session, device_ids=referenced_device_ids, include_assignable=True,
     )
     out = []
     for r in rows:

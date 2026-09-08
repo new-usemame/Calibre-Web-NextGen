@@ -1,0 +1,13 @@
+{
+  "area": "my-library",
+  "body": "P2. cps/user_library.py:345-346 returns no work when status enabled, but per-account exceptions still reach final status enabled at395. Inject transient seed failure; retry after restoring seed routine returns [] and leaves reader monolibrary. A real seed commit then ordinary exception can persist browse_global=True while mode=False despite rollback. UI reports errors but offers only Undo/Close, not retry. Undo then enable is a workaround. Need resumable partial operation preserving original snapshot and retrying only failures. Independent in-memory and file-backed SQLite probes confirmed. Main1ec1bfe677 audit2026-09-08.",
+  "created": "2026-09-08",
+  "id": "F-e95ca6",
+  "refs": [
+    "#2093"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "My Library bulk enable records completion despite failed accounts and cannot retry them"
+}

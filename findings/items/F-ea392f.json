@@ -1,0 +1,13 @@
+{
+  "area": "spa",
+  "body": "P2. Live container built from main1ec1bfe677. (1) Open catalog, click first book, Remove from my library, click Library backlink: server/API excludes ID, card still exists after10s. (2) Remove book from personal selection, switch to whole library and view catalog, navigate through account menu and choose saved MyLibrary, return by sidebar: server excludes ID, previous whole-library card remains. Both repeat with control: before reload1 card, after reload0. queries.ts:344 removal and391 mode hooks leave scrollCache; Catalog.tsx:471 resetKey lacks membership generation,573-584 dedupAppend cannot remove missing IDs. Existing e2e uses page.goto and misses same-document continuation. Repair query, snapshot and page accumulator coherently without breaking loaded pages or public shelf visibility.",
+  "created": "2026-09-08",
+  "id": "F-ea392f",
+  "refs": [
+    "#2126"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Catalog snapshots resurrect removed books and the previous whole-library view"
+}

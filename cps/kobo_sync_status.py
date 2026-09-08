@@ -208,6 +208,24 @@ def get_unseeded_kobo_device_ids(user_id):
     return sorted(device_ids - seeded)
 
 
+def count_user_kobo_devices(user_id):
+    """How many physical Kobos this user has paired.
+
+    The pre-#2025 upgrade seed copied the user-wide flat delivery history
+    onto every Kobo it marked, so the count decides whether those rows can
+    describe one device or must be treated as a household union.
+
+    Retired readers are counted deliberately: device removal is a soft delete
+    (``active = False``), and a reader retired after that copy still leaves
+    its history mixed into the survivor's ledger.  Do not add an ``active``
+    filter here.
+    """
+    return ub.session.query(ub.Device.id).filter(
+        ub.Device.user_id == int(user_id),
+        ub.Device.kind == "kobo",
+    ).count()
+
+
 def user_has_completed_entitlement_seed(user_id):
     """Whether this user's upgrade boundary has already been crossed."""
     return ub.session.query(ub.KoboDeviceEntitlementSeed.device_id).join(

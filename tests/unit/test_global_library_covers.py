@@ -81,6 +81,7 @@ def test_non_member_global_cover_url_resolves_to_real_cover(monkeypatch):
         "allow_show_archived": True,
         "allow_show_hidden": True,
         "allow_show_global": True,
+        "allow_public_shelf_books": True,
     })]
 
 
@@ -106,6 +107,7 @@ def test_cover_lookup_does_not_bypass_membership_without_global_role(monkeypatch
         "allow_show_archived": True,
         "allow_show_hidden": True,
         "allow_show_global": False,
+        "allow_public_shelf_books": True,
     })]
 
 
@@ -143,5 +145,6 @@ def test_non_member_detail_does_not_turn_its_format_url_into_download_access(mon
     assert filtered == [(42, {
         "allow_show_archived": True,
         "allow_show_hidden": True,
+        "allow_public_shelf_books": False,
     })]
     assert raw_lookup == []

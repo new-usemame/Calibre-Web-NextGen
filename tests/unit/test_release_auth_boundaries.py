@@ -68,3 +68,28 @@ def test_native_kobo_download_does_not_inherit_public_shelf_permission(shared_bo
     assert denied.status_code == 404
     assert b'epub-bytes' not in denied.data
     assert h.session.query(ub.UserLibraryBook).count() == 0
+
+
+def test_shared_nonmember_annotation_archive_and_export_remain_private(shared_books, monkeypatch):
+    import inspect
+    from cps import annotations
+    h = shared_books
+    monkeypatch.setattr(annotations, 'current_user', h.viewer)
+    monkeypatch.setattr(annotations, 'calibre_db', h.cdb)
+    for suffix, handler in [('data.json', annotations.annotations_data),
+                            ('export.json', annotations.annotations_export_json)]:
+        h.app.add_url_rule('/annotations/<int:book_id>/' + suffix, suffix, inspect.unwrap(handler))
+    for user, text in [(h.owner, 'OWNER-PRIVATE-HIGHLIGHT'), (h.viewer, 'VIEWER-HIGHLIGHT')]:
+        h.session.add(ub.Annotation(user_id=user.id, book_id=1, annotation_id='highlight-' + str(user.id),
+            source='webreader', highlighted_text=text, cfi_range='epubcfi(/6/2)', position_type='cfi'))
+    h.session.commit()
+    for suffix in ['data.json', 'export.json']:
+        response = h.client.get('/annotations/1/' + suffix)
+        assert response.status_code == 200, response.data
+        assert b'VIEWER-HIGHLIGHT' in response.data
+        assert b'OWNER-PRIVATE-HIGHLIGHT' not in response.data
+    assert h.session.query(ub.UserLibraryBook).count() == 0
+    h.viewer.denied_tags = 'tag-1'
+    h.session.commit()
+    for suffix in ['data.json', 'export.json']:
+        assert h.client.get('/annotations/1/' + suffix).status_code == 404

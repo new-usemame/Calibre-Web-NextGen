@@ -6,8 +6,14 @@
   "refs": [
     "#1939"
   ],
+  "resolution": {
+    "commit": "04bbc96a33",
+    "date": "2026-09-08",
+    "note": "Smart-shelf IDs reevaluate live rules and account policy; unchanged Kobo membership generations preserve timestamps without rewrites. Real SQLite warm-cache removal/add/mode/content-policy red/green tests and independent second-lens reproduction passed. See docs/shared-book-and-smart-shelf-audit-verification.md.",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "My Library changes leave persistent Magic Shelf membership stale for thirty minutes"
 }

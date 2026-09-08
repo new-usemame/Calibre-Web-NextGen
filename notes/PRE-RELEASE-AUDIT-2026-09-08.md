@@ -1,5 +1,6 @@
 # Pre-release audit — 2026-09-08
 
+This document preserves the original audit baseline before corrective implementation. Subsequent fixes and combined verification are tracked in draft PR #2208; the original red results below are retained as regression evidence, not the current branch status.
 **Verdict: do not cut this candidate yet.** The audit found seven new reproducible correctness/recovery defects, plus an unresolved intermittent accessibility failure. A separately tracked Kobo upgrade regression is also present in main. Existing focused tests and many live user flows pass, but those results do not support a regression-free release claim.
 
 ## Audited subject and scope

@@ -359,14 +359,9 @@ export function useAddToMyLibrary() {
         qc.setQueryData(['book', String(bookId)], context.previousDetail);
       }
     },
-    // Success changes the selection boundary: refreshLibraryViews cancels
-    // in-flight catalog pages, advances the library revision and refetches
-    // every membership view (a superset of the visibility views). A failed
-    // write still refetches the visibility views to undo any optimistic drift.
-    onSuccess: () => refreshLibraryViews(qc),
-    onSettled: (_data, error) => {
-      if (error) invalidateBookVisibilityViews(qc);
-    },
+    // A transport error may follow a committed write. Reconcile after the
+    // optimistic rollback too, including catalog scroll snapshots.
+    onSettled: () => refreshLibraryViews(qc),
   });
 }
 
@@ -402,14 +397,9 @@ export function useRemoveFromMyLibrary() {
         qc.setQueryData(['book', String(bookId)], context.previousDetail);
       }
     },
-    // Success changes the selection boundary: refreshLibraryViews cancels
-    // in-flight catalog pages, advances the library revision and refetches
-    // every membership view (a superset of the visibility views). A failed
-    // write still refetches the visibility views to undo any optimistic drift.
-    onSuccess: () => refreshLibraryViews(qc),
-    onSettled: (_data, error) => {
-      if (error) invalidateBookVisibilityViews(qc);
-    },
+    // Unknown outcomes still require a new catalog revision: the server
+    // may have removed the book before its response connection was lost.
+    onSettled: () => refreshLibraryViews(qc),
   });
 }
 

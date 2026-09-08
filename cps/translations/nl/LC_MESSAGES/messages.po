@@ -14529,6 +14529,25 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Use original device: {name}"
+msgstr "Oorspronkelijk apparaat gebruiken: {name}"
+
+#: cps/spa_strings.py
+msgid "Use original devices"
+msgstr "Oorspronkelijke apparaten gebruiken"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Original device attribution restored for {n}."
+msgstr "Toewijzing aan het oorspronkelijke apparaat hersteld voor {n}."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Original device attribution restored for {ok} of {total}."
+msgstr "Toewijzing aan het oorspronkelijke apparaat hersteld voor {ok} van {total}."
+
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr ""
 #~ "Alleen jpg/jpeg/png/webp/bmp bestanden worden ondersteund als omslag"

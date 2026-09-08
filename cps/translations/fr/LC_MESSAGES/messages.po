@@ -14874,6 +14874,25 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Use original device: {name}"
+msgstr "Utiliser l'appareil d'origine : {name}"
+
+#: cps/spa_strings.py
+msgid "Use original devices"
+msgstr "Utiliser les appareils d'origine"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Original device attribution restored for {n}."
+msgstr "Attribution à l'appareil d'origine rétablie pour {n}."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Original device attribution restored for {ok} of {total}."
+msgstr "Attribution à l'appareil d'origine rétablie pour {ok} sur {total}."
+
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr ""
 #~ "Seuls les fichiers jpg/jpeg/png/webp/bmp sont supportés comme fichier de "

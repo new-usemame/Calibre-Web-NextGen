@@ -523,12 +523,13 @@ def book_detail(book_id):
 
     # Per-user favorite + hidden state (presence-based rows). Anonymous/guest
     # sessions have no real id, so they simply read back as not-favorited/hidden.
+    show_personal_state = in_my_library or accessible_via_public_shelf
     favorited = hidden = False
     annotation_count = 0
     kosync_progress = None
     kosync_progress_timestamp = None
     kosync_progress_created_at = None
-    if current_user.is_authenticated and not current_user.is_anonymous:
+    if show_personal_state and current_user.is_authenticated and not current_user.is_anonymous:
         uid = int(current_user.id)
         favorited = (ub.session.query(ub.FavoriteBook)
                      .filter(ub.FavoriteBook.user_id == uid, ub.FavoriteBook.book_id == book_id)
@@ -553,7 +554,7 @@ def book_detail(book_id):
     # With a custom read column, get_book_read_archived returns the column's value
     # (truthy = read); otherwise the built-in ub.ReadBook.read_status. Match the
     # list badge's logic (fork #579) so both surfaces agree.
-    read = (
+    read = show_personal_state and (
         bool(read_status) if config.config_read_column
         else read_status == ub.ReadBook.STATUS_FINISHED
     )
@@ -561,7 +562,7 @@ def book_detail(book_id):
     # page renders this marker off read_status_raw == STATUS_IN_PROGRESS; the SPA
     # book page never received the flag, so the badge was missing in the new UI.
     # Derive it from the shared helper so both surfaces stay in agreement.
-    in_progress = book_is_in_progress(
+    in_progress = show_personal_state and book_is_in_progress(
         book_id, read_status, config.config_read_column, current_user)
     body = serialize_book_detail(
         book,

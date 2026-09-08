@@ -18,6 +18,8 @@ interface BookCardProps {
   /** Selection mode: render as a toggle (not a link), with a checkbox overlay. */
   selectable?: boolean;
   selected?: boolean;
+  /** Keep an in-flight bulk operation attached to its selection. */
+  selectionDisabled?: boolean;
   onToggleSelect?: (book: Book) => void;
   /** When true, show the book's position within its series (#573) — used by the
    *  series view so the reading order is visible without duplicating it in titles. */
@@ -59,7 +61,7 @@ function formatSeriesIndex(idx: number | null | undefined): string | null {
 
 function BookCardInner({
   book, style, onRemove, removeLabel = 'Remove',
-  selectable = false, selected = false, onToggleSelect,
+  selectable = false, selected = false, selectionDisabled = false, onToggleSelect,
   showSeriesIndex = false,
   quickEdit = false,
   hideActions = false,
@@ -209,6 +211,7 @@ function BookCardInner({
         <button
           type="button"
           className={selected ? styles.cardSelected : styles.card}
+          disabled={selectionDisabled}
           aria-pressed={selected}
           aria-label={
             selected

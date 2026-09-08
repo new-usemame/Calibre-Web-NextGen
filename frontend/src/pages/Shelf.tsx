@@ -3,12 +3,13 @@ import { Link, useLocation } from 'wouter';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import {
   ChevronLeft, Globe, Lock, Pencil, Trash2, Check, X, ArrowUpDown, ArrowUp, ArrowDown, Smartphone,
-  Info,
+  Info, ListChecks,
 } from 'lucide-react';
 import {
   useShelf, useUpdateShelf, useDeleteShelf, useShelfMembership, useReorderShelfBooks, useMe,
   useUpdateProfile,
 } from '../lib/queries';
+import { BulkBar } from '../components/BulkBar';
 import { BookCard } from '../components/BookCard';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
@@ -47,11 +48,33 @@ export function Shelf({ id }: { id: string }) {
   const t = useT();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const clearSelection = () => {
+    setSelected(new Set());
+    setSelecting(false);
+  };
+  const toggleSelect = (book: Book) => setSelected((previous) => {
+    const next = new Set(previous);
+    if (next.has(book.id)) next.delete(book.id);
+    else next.add(book.id);
+    return next;
+  });
+  const refreshAfterBulk = (changedIds: number[]) => {
+    // Successful books leave selection; partial failures remain retryable.
+    const changed = new Set(changedIds);
+    setSelected((previous) => new Set([...previous].filter((bookId) => !changed.has(bookId))));
+    setBooks([]);
+    setPage(1);
+    setRevision((value) => value + 1);
+  };
   const [books, setBooks] = useState<Book[]>([]);
   const [sort, setSort] = useState(() => readShelfSort(id));
   const accKeyRef = useRef<string>('');
 
-  const { data, isLoading, isFetching, isPlaceholderData, error } = useShelf(id, page, sort);
+  const { data, isLoading, isFetching, isPlaceholderData, error } = useShelf(id, page, sort, revision);
   const updateShelf = useUpdateShelf(id);
   const deleteShelf = useDeleteShelf();
   const reorder = useReorderShelfBooks(id);
@@ -67,6 +90,8 @@ export function Shelf({ id }: { id: string }) {
   // Route reuse (/shelf/A -> /shelf/B keeps this component mounted): reset
   // paging and per-shelf UI modes when the shelf changes (#612).
   useEffect(() => {
+    setSelected(new Set());
+    setSelecting(false);
     setSort(readShelfSort(id));
     setPage(1);
     setBooks([]);
@@ -86,14 +111,14 @@ export function Shelf({ id }: { id: string }) {
   // that settle out of order while a new request is in flight (#2059).
   useEffect(() => {
     if (!data || isPlaceholderData) return;
-    const key = `${id}:${sort}`;
-    if (key !== accKeyRef.current) {
+    const key = `${id}:${sort}:${revision}`;
+    if (key !== accKeyRef.current || data.page === 1) {
       setBooks(data.items);
       accKeyRef.current = key;
     } else {
       setBooks((prev) => dedupAppend(prev, data.items));
     }
-  }, [data, id, isPlaceholderData, sort]);
+  }, [data, id, isPlaceholderData, sort, revision]);
 
   const changeSort = (nextSort: string) => {
     const safeSort = SHELF_SORT_VALUES.has(nextSort) ? nextSort : 'stored';
@@ -221,7 +246,7 @@ export function Shelf({ id }: { id: string }) {
   };
 
   return (
-    <main className={styles.container}>
+    <main className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`}>
       <Link href="/shelves" className={styles.back}>
         <ChevronLeft size={16} /> {t('All shelves')}
       </Link>
@@ -273,11 +298,21 @@ export function Shelf({ id }: { id: string }) {
               ? t('{count} book', { count: total })
               : t('{count} books', { count: total })}
           </span>
+          <button type="button"
+            className={selecting ? styles.manageBtnActive : styles.manageBtn}
+            aria-pressed={selecting} disabled={bulkBusy} title={t('Select multiple')}
+            onClick={() => {
+              setSelecting((value) => !value);
+              setSelected(new Set());
+              setReordering(false);
+            }}>
+            <ListChecks size={15} aria-hidden="true" /> {selecting ? t('Done') : t('Select')}
+          </button>
           <select
             className={styles.sortSelect}
             value={sort}
             onChange={(event) => changeSort(event.target.value)}
-            aria-label={t('Sort order')}
+            aria-label={t('Sort order')} disabled={bulkBusy}
           >
             {SHELF_SORT_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
@@ -306,7 +341,8 @@ export function Shelf({ id }: { id: string }) {
               )}
               {sort === 'stored' && books.length > 1 && !hasMore && (
                 <button className={reordering ? styles.manageBtnActive : styles.manageBtn}
-                  onClick={() => setReordering((v) => !v)}>
+                  disabled={bulkBusy}
+                  onClick={() => { clearSelection(); setReordering((v) => !v); }}>
                   <ArrowUpDown size={14} /> {reordering ? t('Done reordering') : t('Reorder')}
                 </button>
               )}
@@ -375,8 +411,11 @@ export function Shelf({ id }: { id: string }) {
               <BookCard
                 key={book.id}
                 book={book}
+                selectable={selecting} selectionDisabled={bulkBusy}
+                selected={selected.has(book.id)}
+                onToggleSelect={toggleSelect}
                 style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }}
-                onRemove={canEdit ? onRemoveBook : undefined}
+                onRemove={canEdit && !selecting ? onRemoveBook : undefined}
                 removeLabel={t('Remove from shelf')}
                 canRead={!!me?.role?.viewer}
                 hideActions={cardActionsHidden}
@@ -394,6 +433,13 @@ export function Shelf({ id }: { id: string }) {
             </div>
           )}
         </>
+      )}
+      {selecting && selected.size > 0 && (
+        <BulkBar key={id} ids={[...selected]}
+          personalLibrary={me?.library_mode === 'personal_library'}
+          onClear={clearSelection}
+          onRetryable={(failedIds) => setSelected(new Set(failedIds))}
+          onChanged={refreshAfterBulk} onBusyChange={setBulkBusy} />
       )}
     </main>
   );

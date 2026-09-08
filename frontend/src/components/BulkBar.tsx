@@ -22,13 +22,14 @@ interface BulkBarProps {
   onClear: () => void;
   /** Keep only failed ids selected so invoking the same action retries them. */
   onRetryable: (failedIds: number[]) => void;
-  /** Called after a mutation that changes what the catalog should show
-   *  (read state / membership / deletion), so the grid can refresh. */
-  onChanged?: () => void;
+  /** Successfully changed ids, including deletions with cleanup warnings.
+   *  Pages can refresh their results and retain only retryable selections. */
+  onChanged?: (changedIds: number[]) => void;
+  onBusyChange?: (busy: boolean) => void;
 }
 
-export function BulkSelectionBar({ count, onClear, children, sticky = false }: {
-  count: number; onClear: () => void; children: React.ReactNode; sticky?: boolean;
+export function BulkSelectionBar({ count, onClear, children, sticky = false, busy = false }: {
+  count: number; onClear: () => void; children: React.ReactNode; sticky?: boolean; busy?: boolean;
 }) {
   const t = useT();
   const barRef = useRef<HTMLDivElement>(null);
@@ -64,7 +65,7 @@ export function BulkSelectionBar({ count, onClear, children, sticky = false }: {
       aria-label={t('{n} selected', { n: count })}>
       <span className={styles.count}>{t('{n} selected', { n: count })}</span>
       <div className={styles.actions}>{children}</div>
-      <button className={styles.clear} onClick={onClear} aria-label={t('Clear selection')}>
+      <button className={styles.clear} onClick={onClear} disabled={busy} aria-label={t('Clear selection')}>
         <X size={18} aria-hidden="true" focusable={false} />
       </button>
     </div>
@@ -74,7 +75,7 @@ export function BulkSelectionBar({ count, onClear, children, sticky = false }: {
 /** Floating action bar for the catalog's multi-select mode. Uses per-book
  *  accounting whether the server receives individual requests or bounded
  *  membership batches. */
-export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged }: BulkBarProps) {
+export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged, onBusyChange }: BulkBarProps) {
   const t = useT();
   const announce = useAnnouncer();
   const me = useMe().data;
@@ -109,6 +110,10 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged 
   const busy = markRead.isPending || addToShelf.isPending || deleteBooks.isPending
     || removeFromMyLibrary.isPending
     || setMetadata.isPending || mergeBooks.isPending;
+  useEffect(() => {
+    onBusyChange?.(busy);
+  }, [busy, onBusyChange]);
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
   const count = ids.length;
 
   const reportAccounting = (
@@ -147,7 +152,7 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged 
   const onMerge = () => {
     if (count < 2) return;
     if (!window.confirm(t('Merge {n} books into the first selected? The others are removed after their formats are copied over.', { n: count }))) return;
-    mergeBooks.mutate(ids, { onSuccess: () => { onChanged?.(); onClear(); } });
+    mergeBooks.mutate(ids, { onSuccess: () => { onChanged?.(ids); onClear(); } });
   };
 
   const onDelete = () => {
@@ -171,7 +176,7 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged 
           });
         }
         reportAccounting(result, message, { assertive: warnings > 0 });
-        if (succeeded || warnings) onChanged?.();
+        if (succeeded || warnings) onChanged?.([...result.succeededIds, ...result.warningIds]);
         if (!failed) onClear();
       },
     });
@@ -200,7 +205,7 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged 
             ? tooLargeReason
             : bulkRemovalFailureReason(failure, t);
         reportAccounting(result, message, { failureReasonFor });
-        if (succeeded) onChanged?.();
+        if (succeeded) onChanged?.(result.succeededIds);
         if (!failed) onClear();
       },
     });
@@ -214,7 +219,7 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged 
         reportAccounting(result, failed
           ? t('{succeeded} updated; {failed} failed.', { succeeded, failed })
           : (read ? t('{n} marked as read.', { n: succeeded }) : t('{n} marked as unread.', { n: succeeded })));
-        if (succeeded) onChanged?.();
+        if (succeeded) onChanged?.(result.succeededIds);
       },
     });
 
@@ -226,7 +231,7 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged 
         reportAccounting(result, failed
           ? t('{succeeded} added to the shelf; {failed} failed.', { succeeded, failed })
           : t('{n} book(s) added to the shelf.', { n: succeeded }));
-        if (succeeded) onChanged?.();
+        if (succeeded) onChanged?.(result.succeededIds);
       },
     });
     setShelfOpen(false);
@@ -255,7 +260,7 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged 
         reportAccounting(result, failed
           ? t('Metadata applied to {succeeded}; {failed} failed.', { succeeded, failed })
           : t('Metadata applied to {n} book(s).', { n: succeeded }));
-        if (succeeded) onChanged?.();
+        if (succeeded) onChanged?.(result.succeededIds);
         if (!failed) {
           setMetaOpen(false);
           setListMode('add');
@@ -306,7 +311,7 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged 
         </button>
       </div>
     )}
-    <BulkSelectionBar count={count} onClear={onClear}>
+    <BulkSelectionBar count={count} onClear={onClear} busy={busy}>
         {personalLibrary && (
           <button type="button" className={styles.actionPrimary} disabled={busy}
             onClick={onRemoveFromMyLibrary}>

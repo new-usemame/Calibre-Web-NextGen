@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
-import { ChevronLeft, Copy, Trash2, Pencil, Smartphone, Info } from 'lucide-react';
+import { ChevronLeft, Copy, Trash2, Pencil, Smartphone, Info, ListChecks } from 'lucide-react';
 import {
   useMagicShelfBooks, useDeleteMagicShelf, useDuplicateMagicShelf,
   useToggleMagicShelfKoboSync, useMe, useUpdateProfile,
 } from '../lib/queries';
+import { BulkBar } from '../components/BulkBar';
 import { BookCard } from '../components/BookCard';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
@@ -43,6 +44,28 @@ export function MagicShelfView({ id }: { id: string }) {
   const t = useT();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const clearSelection = () => {
+    setSelected(new Set());
+    setSelecting(false);
+  };
+  const toggleSelect = (book: Book) => setSelected((previous) => {
+    const next = new Set(previous);
+    if (next.has(book.id)) next.delete(book.id);
+    else next.add(book.id);
+    return next;
+  });
+  const refreshAfterBulk = (changedIds: number[]) => {
+    // Successful books leave selection; partial failures remain retryable.
+    const changed = new Set(changedIds);
+    setSelected((previous) => new Set([...previous].filter((bookId) => !changed.has(bookId))));
+    setBooks([]);
+    setPage(1);
+    setRevision((value) => value + 1);
+  };
   const [sortState, setSortState] = useState(() => ({
     shelfId: id,
     value: savedMagicShelfSort(id),
@@ -54,7 +77,7 @@ export function MagicShelfView({ id }: { id: string }) {
   const [books, setBooks] = useState<Book[]>([]);
   const accKey = useRef('');
   const { data, isLoading, isFetching, isPlaceholderData, error } = useMagicShelfBooks(
-    id, page, sort,
+    id, page, sort, revision,
   );
   const del = useDeleteMagicShelf();
   const dup = useDuplicateMagicShelf();
@@ -67,6 +90,10 @@ export function MagicShelfView({ id }: { id: string }) {
   // Route reuse: reset paging when the shelf id changes (#612).
   useEffect(() => {
     setPage(1);
+    setSelected(new Set());
+    setSelecting(false);
+    setBooks([]);
+    accKey.current = '';
   }, [id]);
 
   // Keep sort state paired with its shelf so the old value is never written
@@ -102,10 +129,10 @@ export function MagicShelfView({ id }: { id: string }) {
   // rows under the new id would mix both shelves' books (#612, see Shelf.tsx).
   useEffect(() => {
     if (!data || isPlaceholderData) return;
-    const key = `${id}:${sort}`;
-    if (key !== accKey.current) { setBooks(data.items); accKey.current = key; }
+    const key = `${id}:${sort}:${revision}`;
+    if (key !== accKey.current || data.page === 1) { setBooks(data.items); accKey.current = key; }
     else setBooks((p) => dedupAppend(p, data.items));
-  }, [data, id, sort, isPlaceholderData]);
+  }, [data, id, sort, isPlaceholderData, revision]);
 
   // Infinite-scroll sentinel. Called before the conditional early returns below
   // so the hook order stays stable across the loading→loaded transition; `data`
@@ -169,7 +196,7 @@ export function MagicShelfView({ id }: { id: string }) {
   };
 
   return (
-    <main className={styles.container}>
+    <main className={`${styles.container} ${selecting && selected.size > 0 ? styles.containerBulkActive : ''}`}>
       <Link href="/" className={styles.back}><ChevronLeft size={16} /> {t('Library')}</Link>
       <div className={styles.header}>
         <div className={styles.titleRow}>
@@ -177,6 +204,15 @@ export function MagicShelfView({ id }: { id: string }) {
         </div>
         <div className={styles.subRow}>
           <span className={styles.count}>{total} {t('books')}</span>
+          <button type="button"
+            className={selecting ? styles.manageBtnActive : styles.manageBtn}
+            aria-pressed={selecting} disabled={bulkBusy} title={t('Select multiple')}
+            onClick={() => {
+              setSelecting((value) => !value);
+              setSelected(new Set());
+            }}>
+            <ListChecks size={15} aria-hidden="true" /> {selecting ? t('Done') : t('Select')}
+          </button>
           <select
             className={styles.manageBtn}
             value={sort}
@@ -184,7 +220,7 @@ export function MagicShelfView({ id }: { id: string }) {
               setPage(1);
               setSortState({ shelfId: id, value: event.target.value, persist: true });
             }}
-            aria-label={t('Sort order')}
+            aria-label={t('Sort order')} disabled={bulkBusy}
           >
             {sortOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -257,7 +293,9 @@ export function MagicShelfView({ id }: { id: string }) {
         <>
           <div className={styles.grid}>
             {books.map((b, i) => (
-              <BookCard key={b.id} book={b} hideActions={cardActionsHidden} canRead={!!me?.role?.viewer}
+              <BookCard key={b.id} book={b}
+                selectable={selecting} selectionDisabled={bulkBusy} selected={selected.has(b.id)} onToggleSelect={toggleSelect}
+                hideActions={cardActionsHidden} canRead={!!me?.role?.viewer}
                 style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }} />
             ))}
           </div>
@@ -267,6 +305,13 @@ export function MagicShelfView({ id }: { id: string }) {
             </div>
           )}
         </>
+      )}
+      {selecting && selected.size > 0 && (
+        <BulkBar key={id} ids={[...selected]}
+          personalLibrary={me?.library_mode === 'personal_library'}
+          onClear={clearSelection}
+          onRetryable={(failedIds) => setSelected(new Set(failedIds))}
+          onChanged={refreshAfterBulk} onBusyChange={setBulkBusy} />
       )}
     </main>
   );

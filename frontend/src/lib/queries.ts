@@ -567,9 +567,11 @@ export function useShelves(options?: { enabled?: boolean }) {
   });
 }
 
-export function useShelf(id: string | number | undefined, page = 1, sort = 'stored') {
+// A new revision starts a fresh result set after bulk changes. Do not reuse
+// pre-mutation pages in the local accumulator; pages already skip placeholders.
+export function useShelf(id: string | number | undefined, page = 1, sort = 'stored', revision = 0) {
   return useQuery<ShelfDetail>({
-    queryKey: ['shelf', String(id), sort, page],
+    queryKey: ['shelf', String(id), sort, page, revision],
     queryFn: () => {
       const params = new URLSearchParams({
         page: String(page),
@@ -925,6 +927,8 @@ export function useBulkActions() {
     void qc.invalidateQueries({ queryKey: ['global-library'] });
     void qc.invalidateQueries({ queryKey: ['shelves'] });
     void qc.invalidateQueries({ queryKey: ['shelf'] });
+    void qc.invalidateQueries({ queryKey: ['magicshelf'] });
+    void qc.invalidateQueries({ queryKey: ['magicshelves'] });
   };
   const markRead = useMutation({
     mutationFn: (v: { ids: number[]; read: boolean }) =>
@@ -1585,13 +1589,13 @@ export interface MagicShelfSortOption {
   label: string;
 }
 
-export function useMagicShelfBooks(id: string | number, page = 1, sort = 'new') {
+export function useMagicShelfBooks(id: string | number, page = 1, sort = 'new', revision = 0) {
   return useQuery<MagicShelfItem & BooksPage & {
     sort: string;
     sort_persistable?: boolean;
     custom_sort_options?: MagicShelfSortOption[];
   }>({
-    queryKey: ['magicshelf', String(id), page, sort],
+    queryKey: ['magicshelf', String(id), page, sort, revision],
     queryFn: () => apiGet(
       `/api/v1/magicshelf/${id}?page=${page}&sort=${encodeURIComponent(sort)}`,
     ),

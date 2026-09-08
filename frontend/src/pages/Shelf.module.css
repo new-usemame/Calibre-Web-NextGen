@@ -9,6 +9,11 @@
   padding: var(--sp-6) var(--sp-5);
 }
 
+/* Match the catalog: leave room for the floating bar at its measured height. */
+.containerBulkActive {
+  padding-bottom: calc(var(--bulk-bar-h, 56px) + var(--sp-5) + var(--sp-2));
+}
+
 .back {
   display: inline-flex;
   align-items: center;

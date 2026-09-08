@@ -1,0 +1,13 @@
+{
+  "area": "magic-shelf",
+  "body": "P2. user_library mutations invalidate request-local filters but never persistent MagicShelfCache. magic_shelf.py:962 trusts cached IDs and hydration lacks current membership intersection. Two independent real SQLite/rule probes warm [1,2], remove1 through actual remove_book, new request still returns[1,2]; bypass_cache returns[2]. Classic smart shelves use this helper. Scope mode switches/add/removal and user-filter changes when repairing invalidation. Do not claim Kobo retains removed books: its separate membership intersection at kobo.py:1662 protects removal. Main1ec1bfe677 audit2026-09-08.",
+  "created": "2026-09-08",
+  "id": "F-7d3396",
+  "refs": [
+    "#1939"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "My Library changes leave persistent Magic Shelf membership stale for thirty minutes"
+}

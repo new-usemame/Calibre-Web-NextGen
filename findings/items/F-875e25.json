@@ -1,0 +1,13 @@
+{
+  "area": "auth",
+  "body": "P2. cps/api/auth.py:299-301 and325-326 return after LDAP success without _clear_current_rate_limits, unlike local login at340. Real Flask API with memory-backed limiter and successful LDAP responses returned [200,200,200,429] for four correct logins. Declared40/day bucket is affected by same missing reset, not separately time-tested. Preserve failed-bind throttling while clearing evaluated buckets after LDAP success. Seen with existing directory user; prospective new-user success path shares omission. Audit2026-09-08 main1ec1bfe677.",
+  "created": "2026-09-08",
+  "id": "F-875e25",
+  "refs": [
+    "#2012"
+  ],
+  "severity": "correctness",
+  "source": "audit",
+  "status": "open",
+  "title": "Successful LDAP sign-ins exhaust SPA failure rate limits"
+}

@@ -1,0 +1,13 @@
+{
+  "area": "spa",
+  "body": "Unresolved observation, not classified as deterministic product regression. Live main1ec1bfe677 build, existing my-library.spec.ts mobile shelf-controls test reported axe target-size violation at a[download=\"\"][rel=\"noopener\"][target=\"_blank\"]:nth-child(8) after adding membership and shelving. Main MyLibrary matrix21pass1fail1skip. Isolated repeat of same case passed; original failure is retained, not overwritten by repeat. Broad a11y run25pass10skip. Investigate async popover/toast/transition and target geometry at exact state; do not silence axe or certify clean from repeat. BookDetail.tsx:632 format action renders implicated target. Audit2026-09-08.",
+  "created": "2026-09-08",
+  "id": "F-c949c9",
+  "refs": [
+    "#1947"
+  ],
+  "severity": "test",
+  "source": "audit",
+  "status": "open",
+  "title": "Mobile My Library accessibility gate reports an intermittent undersized download target"
+}

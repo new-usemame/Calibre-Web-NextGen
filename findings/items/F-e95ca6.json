@@ -6,8 +6,14 @@
   "refs": [
     "#2093"
   ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-08",
+    "note": "Fixed by durable incomplete status, pending/failed account payload and retry of incomplete entries only, preserving completed curated selections. Partial failure before/after seed commit and partial Undo tests green; original recovery tests seen red on 1c4f7c52ab. Parent UI integration consumes new retry state.",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "My Library bulk enable records completion despite failed accounts and cannot retry them"
 }

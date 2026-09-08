@@ -663,7 +663,8 @@ class MyLibraryAdminIntro(Base):
     administrator and must survive sessions, so it lives in app.db rather than
     per-user rows or browser storage. ``snapshot_json`` holds the pre-enable
     restore point — {user_id: {"browse_global": bool, "has_own_library": bool}}
-    for every account the enable action touched — so Undo is a true restore
+    for every account the enable action touched, plus a completion receipt and
+    any last error for resumable setup — so Undo is a true restore
     rather than a re-derivation. Membership rows and the seed-once fence are
     deliberately NOT part of the snapshot: undo leaves each selection dormant
     (the keep-dormant guarantee), exactly like a per-user mode switch back to
@@ -672,6 +673,7 @@ class MyLibraryAdminIntro(Base):
     __tablename__ = 'my_library_admin_intro'
 
     STATUS_NOT_ENABLED = 'not_enabled'
+    STATUS_INCOMPLETE = 'incomplete'
     STATUS_ENABLED = 'enabled'
 
     id = Column(Integer, primary_key=True)

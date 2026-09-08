@@ -337,7 +337,7 @@ msgstr ""
 #: cps/admin.py cps/templates/kobo_reconcile.html
 #, python-format
 msgid "Reconcile deleted Kobo books for %(user)s"
-msgstr "協調 %(user)s 已刪除的 Kobo 書籍"
+msgstr "核對 %(user)s 已刪除的 Kobo 書籍"
 
 #: cps/admin.py
 msgid "Choose a KoboReader.sqlite file."
@@ -1119,7 +1119,7 @@ msgstr "手動？"
 
 #: cps/cwa_functions.py
 msgid "No. Fixes"
-msgstr "修復編號"
+msgstr "修復數量"
 
 #: cps/cwa_functions.py
 msgid "Original Backed Up?"
@@ -4715,11 +4715,11 @@ msgstr "Client ID"
 
 #: cps/spa_strings.py
 msgid "Client secret"
-msgstr "Client secret"
+msgstr "用戶端密碼"
 
 #: cps/spa_strings.py
 msgid "Client secret (leave blank to keep)"
-msgstr "Client secret（留空以保留）"
+msgstr "用戶端密碼（留空以保留）"
 
 #: cps/spa_strings.py
 msgid "Close reader"
@@ -5205,7 +5205,7 @@ msgstr "裝置已還原。"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Device seen: {name}, last synced {when}. Pairing is working."
-msgstr "裝置已識別：{name}，上次同步 {when}。配對運作正常。"
+msgstr "已偵測到裝置：{name}，上次同步於 {when}。配對運作正常。"
 
 #: cps/spa_strings.py
 msgid "Device summary"
@@ -5817,12 +5817,12 @@ msgstr "上次修改"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Last seen {when}"
-msgstr "上次識別 {when}"
+msgstr "上次連線 {when}"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Last seen: {when}"
-msgstr "上次識別：{when}"
+msgstr "上次連線：{when}"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Last synced"
@@ -6147,7 +6147,7 @@ msgstr "找不到符合「{query}」的 {items}。"
 
 #: cps/spa_strings.py
 msgid "No new device check-in yet."
-msgstr "尚無新的裝置簽到。"
+msgstr "尚無新的裝置連線回報。"
 
 #: cps/spa_strings.py
 msgid "No pages found in this comic."
@@ -6204,7 +6204,7 @@ msgstr "未精選"
 
 #: cps/spa_strings.py
 msgid "Not seen lately"
-msgstr "最近未識別"
+msgstr "最近未連線"
 
 #: cps/spa_strings.py
 msgid "Not set"
@@ -10132,7 +10132,7 @@ msgstr "OAuth 用戶端 ID"
 #: cps/templates/config_edit.html
 #, fuzzy
 msgid "OAuth Client Secret"
-msgstr "OAuth 用戶端密鑰"
+msgstr "OAuth 用戶端密碼"
 
 #: cps/templates/config_edit.html
 #, fuzzy
@@ -12615,7 +12615,7 @@ msgstr ""
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "%(count)d device volume rows had no usable UUID."
-msgstr "%(count)d 個裝置書卷列沒有可用的 UUID。"
+msgstr "%(count)d 筆裝置磁碟區記錄沒有可用的 UUID。"
 
 #: cps/templates/kobo_reconcile.html
 #, python-format

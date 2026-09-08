@@ -49,7 +49,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
-  workers: isCI ? 2 : undefined,
+  // Every test in the dedicated server-state invocation mutates the same
+  // all-account setup state. Separating the invocation from broad tests is
+  // insufficient if its own scenarios can still run on two CI workers.
+  workers: serverStateEnabled ? 1 : isCI ? 2 : undefined,
   timeout: 45_000,
   expect: {
     timeout: 10_000,

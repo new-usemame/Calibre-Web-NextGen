@@ -253,6 +253,8 @@ export interface BookDetail {
   /** Membership for personal-library detail deep links. Older servers omit it,
    *  which preserves the historical whole-library behavior. */
   in_my_library?: boolean;
+  /** Read/download access through a public shelf without personal membership. */
+  accessible_via_public_shelf?: boolean;
   /** Sync-driven "currently reading" tri-state (fork #634) — true when KOReader/
    *  Kobo reports the book as in progress (read_status IN_PROGRESS) and it isn't
    *  marked read. Distinct from `read`; matches the classic detail page marker. */
@@ -516,9 +518,11 @@ export interface LibraryModePayload {
 /** Server-wide state of the admin "Try My Library" intro card — shared by all
  *  administrators and persisted in app.db, so it survives sessions and browsers. */
 export interface MyLibraryIntroState {
-  status: 'not_enabled' | 'enabled';
+  status: 'not_enabled' | 'incomplete' | 'enabled';
   dismissed: boolean;
   snapshot_accounts: number;
+  pending_accounts: number;
+  failed_accounts: Array<{ user_id: number; name: string; error: string }>;
 }
 
 export interface GlobalLibraryPage extends BooksPage {

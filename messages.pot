@@ -13903,3 +13903,13 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+#, python-brace-format
+msgid ""
+"My Library setup is incomplete for {accounts} account(s). You can retry or "
+"undo."
+msgstr ""
+
+msgid ""
+"Retry finishes the remaining accounts without changing completed selections."
+" Undo restores the settings from before setup began."
+msgstr ""

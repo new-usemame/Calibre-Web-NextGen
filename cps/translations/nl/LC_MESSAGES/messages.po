@@ -15287,3 +15287,18 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#, python-brace-format
+msgid ""
+"My Library setup is incomplete for {accounts} account(s). You can retry or "
+"undo."
+msgstr ""
+"Het instellen van Mijn bibliotheek is onvolledig voor {accounts} account(s)."
+" Je kunt het opnieuw proberen of ongedaan maken."
+
+msgid ""
+"Retry finishes the remaining accounts without changing completed selections."
+" Undo restores the settings from before setup began."
+msgstr ""
+"Opnieuw proberen voltooit de resterende accounts zonder voltooide selecties "
+"te wijzigen. Ongedaan maken herstelt de instellingen van vóór het instellen."

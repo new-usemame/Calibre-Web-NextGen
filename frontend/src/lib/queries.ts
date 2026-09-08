@@ -8,6 +8,7 @@ import {
 } from './api';
 import { removeBookFromCache, applyBookEditToCache } from './scrollCache';
 import { replaceCachedIdentity } from './identityCache';
+import { advanceLibraryRevision, useLibraryRevision } from './libraryRevision';
 import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
 import { createEntityListQueryOptions } from './entityListQueryOptions';
 import { dismissNoticeIdsInBatches } from './noticeDismissal';
@@ -230,6 +231,8 @@ export function useLogout() {
 }
 
 export function useBooks(q: BooksQuery) {
+  const revision = useLibraryRevision();
+  const me = useMe().data;
   const {
     page, perPage = 24, search = '', sort = 'new', readFilter = 'all',
     entityKind, entityId, view, showHidden = false, enabled = true,
@@ -263,7 +266,7 @@ export function useBooks(q: BooksQuery) {
   }
   return useQuery<BooksPage>({
     queryKey: ['books', page, perPage, search, sort, readFilter,
-      entityKind ?? '', entityId ?? '', view ?? '', showHidden],
+      entityKind ?? '', entityId ?? '', view ?? '', showHidden, me?.id, me?.library_mode, revision],
     queryFn: () => apiGet<BooksPage>(`/api/v1/books?${params.toString()}`),
     placeholderData: (prev) => prev,
     enabled,
@@ -290,6 +293,23 @@ export function useGlobalLibrary(q: GlobalLibraryQuery) {
     placeholderData: keepPreviousData,
     retry: false,
   });
+}
+
+const LIBRARY_VIEW_QUERIES = new Set([
+  'books', 'adv-search', 'global-library', 'book', 'book-shelves',
+  'shelf', 'shelves', 'magicshelf', 'magicshelves', 'entities',
+  'discover-strip', 'account', 'me', 'about',
+]);
+
+async function refreshLibraryViews(qc: QueryClient): Promise<void> {
+  const catalogQuery = (query: { queryKey: readonly unknown[] }) =>
+    query.queryKey[0] === 'books' || query.queryKey[0] === 'adv-search';
+  // Cancel before changing revision: an old request must not land beside the
+  // new membership. The next catalog render fetches page 1 under its new key.
+  await qc.cancelQueries({ predicate: catalogQuery });
+  advanceLibraryRevision();
+  await qc.invalidateQueries({ predicate: (query) =>
+    LIBRARY_VIEW_QUERIES.has(String(query.queryKey[0])) });
 }
 
 function setGlobalMembership(qc: QueryClient, bookId: number, owned: boolean) {
@@ -327,6 +347,7 @@ export function useAddToMyLibrary() {
         qc.setQueryData(['book', String(bookId)], context.previousDetail);
       }
     },
+    onSuccess: () => refreshLibraryViews(qc),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['global-library'] });
       void qc.invalidateQueries({ queryKey: ['books'] });
@@ -366,6 +387,7 @@ export function useRemoveFromMyLibrary() {
         qc.setQueryData(['book', String(bookId)], context.previousDetail);
       }
     },
+    onSuccess: () => refreshLibraryViews(qc),
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ['books'] });
       void qc.invalidateQueries({ queryKey: ['global-library'] });
@@ -393,11 +415,10 @@ export function useUpdateLibraryMode() {
   return useMutation({
     mutationFn: (mode: LibraryModePayload['library_mode']) =>
       apiPost<LibraryModePayload>('/api/v1/account/library-mode', { mode }),
-    onSuccess: (payload) => {
+    onSuccess: async (payload) => {
       qc.setQueryData<Me | null>(['me'], (me) => me ? { ...me, ...payload } : me);
       qc.setQueryData<Account>(['account'], (account) => account ? { ...account, ...payload } : account);
-      qc.removeQueries({ queryKey: ['books'] });
-      qc.removeQueries({ queryKey: ['global-library'] });
+      await refreshLibraryViews(qc);
       void qc.invalidateQueries({ queryKey: ['me'] });
     },
   });
@@ -851,22 +872,26 @@ export function useMyLibraryIntro() {
   });
 }
 
-function useIntroMutation<TExtra extends object>(path: string) {
+function useIntroMutation<TExtra extends object>(path: string, changesLibrary = true) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => apiPost<MyLibraryIntroState & TExtra>(path, {}),
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       // Store only the state shape; the action summaries (results, counts)
       // travel to the caller through the mutation's own onSuccess data.
       qc.setQueryData<MyLibraryIntroState>(['admin-my-library-intro'], {
         status: data.status,
         dismissed: data.dismissed,
         snapshot_accounts: data.snapshot_accounts,
+        pending_accounts: data.pending_accounts,
+        failed_accounts: data.failed_accounts,
       });
       // Enable/undo change every account's roles + mode; the user cards and
       // the caller's own mode (sidebar My Library/Global Library split) move.
-      void qc.invalidateQueries({ queryKey: ['admin-users'] });
-      void qc.invalidateQueries({ queryKey: ['me'] });
+      if (changesLibrary) {
+        void qc.invalidateQueries({ queryKey: ['admin-users'] });
+        await refreshLibraryViews(qc);
+      }
     },
   });
 }
@@ -892,7 +917,7 @@ export function useUndoMyLibraryIntro() {
 
 export function useDismissMyLibraryAdminIntro() {
   return useIntroMutation<Record<string, never>>(
-    '/api/v1/admin/my-library/intro/dismiss',
+    '/api/v1/admin/my-library/intro/dismiss', false,
   );
 }
 
@@ -994,7 +1019,9 @@ export function useBulkActions() {
         failureDetails,
       };
     }),
-    onSuccess: refresh,
+    // A lost response can hide a committed removal. Refresh even when all
+    // outcomes are unknown; the result still preserves failed selection IDs.
+    onSuccess: () => refreshLibraryViews(qc),
   });
   // Bulk metadata: apply the same partial field set and explicit relationship
   // mode to every selected book via the per-book metadata endpoint.
@@ -1454,8 +1481,10 @@ export function useSearchOptions() {
  *  library passes its measured grid size when a saved default view drives it
  *  (#928), so filtered rows fill the grid exactly like unfiltered ones. */
 export function useAdvancedSearch(params: AdvancedSearchParams | null, page: number, perPage = 24) {
+  const revision = useLibraryRevision();
+  const me = useMe().data;
   return useQuery<AdvSearchResult>({
-    queryKey: ['adv-search', params, page, perPage],
+    queryKey: ['adv-search', params, page, perPage, me?.id, me?.library_mode, revision],
     queryFn: () => apiPost<AdvSearchResult>('/api/v1/search/advanced', { ...params, page, per_page: perPage }),
     enabled: params !== null,
     placeholderData: (prev) => prev,

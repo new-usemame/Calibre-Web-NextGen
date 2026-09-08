@@ -5,6 +5,7 @@
   Google Drive cover. After a successful metadata commit, local covers publish
   with an atomic rename and existing Drive covers update on the same file ID;
   publication failures trigger metadata compensation.
-- A process death between the metadata commit and cover publication can still
+- **An interrupted cover publication is cleaned up on the next startup.** A
+  process death between the metadata commit and cover publication can still
   leave metadata claiming a cover that was not published. On the next startup,
   the orphan stage is logged and removed without guessing whether to publish it.

@@ -35,6 +35,7 @@ Project preamble.
 
 
 def _workspace(tmp_path: Path, changelog: str = BASE_CHANGELOG) -> tuple[Path, Path]:
+    tmp_path.mkdir(parents=True, exist_ok=True)
     changelog_path = tmp_path / "CHANGELOG.md"
     fragments = tmp_path / "changelog.d"
     fragments.mkdir()
@@ -254,3 +255,39 @@ def test_current_repository_changelog_shape_accepts_a_fragment(tmp_path: Path) -
         encoding="utf-8"
     )
     assert not fragment.exists()
+
+
+def test_every_fragment_in_the_repository_can_actually_be_assembled(
+    tmp_path: Path,
+) -> None:
+    """The gates above this one only ever parse fragments the test itself wrote.
+
+    ``check_changelog_diff.py`` makes a PR prove it *added* a correctly *named*
+    fragment; nothing made it prove the fragment *parses*. So a malformed body
+    merges green and is not discovered until the release train tries to drain
+    the directory -- which is where v4.1.44 found ten unshippable fragments at
+    once, 11 days and 251 commits after the previous release. Assembly is the
+    only consumer of these files, so assembly is the gate.
+
+    Each fragment is assembled alone so one bad file names itself instead of
+    masking the rest behind the assembler's first error.
+    """
+    staged = [
+        path
+        for path in sorted((ROOT / "changelog.d").glob("*.md"))
+        if path.name != "README.md"
+    ]
+
+    broken = []
+    for index, path in enumerate(staged):
+        changelog, fragments = _workspace(tmp_path / f"probe{index}")
+        (fragments / path.name).write_bytes(path.read_bytes())
+        result = _run(changelog, fragments)
+        if result.returncode != 0:
+            broken.append(f"  {path.name}: {result.stderr.strip()}")
+
+    assert not broken, (
+        f"{len(broken)} of {len(staged)} fragment(s) in changelog.d/ cannot be "
+        "assembled, so the release train cannot drain the directory:\n"
+        + "\n".join(broken)
+    )

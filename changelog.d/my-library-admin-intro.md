@@ -20,5 +20,5 @@
   two modes are now selectable cards (the same checked-tint idiom as the
   Account page), and the longer explanation of how switching works sits one tap
   behind an info toggle instead of always occupying the card.
-- The "Set up My Library for all users" header button is removed; the intro
+- **The "Set up My Library for all users" header button is removed.** The intro
   card's Try/Undo flow is the one place that bulk action lives.

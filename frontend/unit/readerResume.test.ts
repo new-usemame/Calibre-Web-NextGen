@@ -128,3 +128,78 @@ test('a stalled archive digest also releases exact resume to its percentage', { 
   });
   assert.deepEqual(result, { ...hint, cfi: undefined });
 });
+
+test('exact resume is retained when crypto.subtle is unavailable on plain HTTP', async t => {
+  const { resumeForArchive } = await import('../src/lib/readerResume.ts');
+  t.mock.getter(globalThis, 'crypto', () => ({} as Crypto));
+  const hint = Object.freeze({ cfi: 'epubcfi(/6/2!/4/2/1:0)',
+    epub_sha256: 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    percentage: 95, mode: 'automatic' as const, synced_at: '' });
+  const result = await resumeForArchive(hint, new TextEncoder().encode('abc').buffer, async () => ({} as Range));
+  assert.equal(result?.cfi, hint.cfi, 'plain HTTP must retain the validated exact position');
+  assert.equal(result, hint);
+});
+
+for (const failure of ['throw', 'reject', 'missing crypto'] as const) {
+  test(`native digest ${failure} uses fallback without weakening archive or range validation`, async t => {
+    const { resumeForArchive } = await import('../src/lib/readerResume.ts');
+    if (failure === 'missing crypto') t.mock.getter(globalThis, 'crypto', () => undefined as unknown as Crypto);
+    else t.mock.method(crypto.subtle, 'digest', () => {
+      if (failure === 'throw') throw new Error('unavailable');
+      return Promise.reject(new Error('unavailable'));
+    });
+    const archive = new TextEncoder().encode('abc').buffer;
+    for (const mode of ['automatic', 'offer'] as const) {
+      const hint = Object.freeze({ cfi: 'epubcfi(/6/2!/4/2/1:0)',
+        epub_sha256: 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+        percentage: 95, mode, synced_at: '' });
+      assert.equal(await resumeForArchive(hint, archive, async () => ({} as Range)), hint);
+      assert.deepEqual(await resumeForArchive(hint, new ArrayBuffer(0), async () => {
+        assert.fail('mismatch must not resolve a range');
+      }), { ...hint, cfi: undefined });
+      for (const resolve of [async () => null, async () => undefined,
+        async () => { throw new Error('bad range'); }]) {
+        assert.deepEqual(await resumeForArchive(hint, archive, resolve), { ...hint, cfi: undefined });
+      }
+    }
+  });
+}
+
+test('available Web Crypto remains the fingerprint path', async t => {
+  const { resumeForArchive } = await import('../src/lib/readerResume.ts');
+  // A sentinel digest distinguishes native use from recomputing in JavaScript.
+  const digest = t.mock.method(crypto.subtle, 'digest', async () => new Uint8Array(32).fill(0xab).buffer);
+  const archive = new ArrayBuffer(0);
+  const hint = { cfi: 'exact', epub_sha256: 'ab'.repeat(32), percentage: 95,
+    mode: 'automatic' as const, synced_at: '' };
+  assert.equal(await resumeForArchive(hint, archive), hint);
+  assert.deepEqual(digest.mock.calls[0].arguments, ['SHA-256', archive]);
+  assert.equal(digest.mock.callCount(), 1);
+});
+
+test('500 ms watchdog wins during fallback hashing on a busy event loop', async t => {
+  const { resumeForArchive } = await import('../src/lib/readerResume.ts');
+  const { createHash } = await import('node:crypto');
+  t.mock.getter(globalThis, 'crypto', () => ({} as Crypto));
+  const realTimeout = globalThis.setTimeout;
+  // Model a busy browser's delayed task scheduling; keep the watchdog real.
+  // A synchronous hash never schedules these yields and would wrongly retain CFI.
+  t.mock.method(globalThis, 'setTimeout', (callback: () => void, ms?: number) =>
+    realTimeout(callback, ms === 0 ? 20 : ms));
+  const archive = new ArrayBuffer(16 * 1024 * 1024);
+  const hint = Object.freeze({ cfi: 'exact', epub_sha256: createHash('sha256').update(new Uint8Array(archive)).digest('hex'),
+    percentage: 95, mode: 'automatic' as const, synced_at: '' });
+  let resolved = false;
+  const started = performance.now();
+  const result = await resumeForArchive(hint, archive, async () => {
+    resolved = true;
+    return {} as Range;
+  });
+  const elapsed = performance.now() - started;
+  assert.deepEqual(result, { ...hint, cfi: undefined });
+  assert.ok(elapsed >= 450 && elapsed < 1000, `watchdog returned in ${elapsed} ms`);
+  // Let the paused fallback observe cancellation; no unhandled rejection or range call.
+  await delay(40);
+  assert.equal(resolved, false, 'timed-out hashing cannot validate a range');
+  t.diagnostic(`16 MiB, yields delayed 20 ms: watchdog returned in ${elapsed.toFixed(1)} ms`);
+});

@@ -1,3 +1,5 @@
+import { sha256Fallback } from './sha256.ts';
+
 /** Portable positions use 0–100 on the wire, epub.js uses a 0–1 fraction. */
 export interface ReaderBookmark {
   bookmark: string | null;
@@ -17,17 +19,19 @@ export function resumeCfi(locations: { cfiFromPercentage: (fraction: number) => 
 // leaves room for local archive work on a busy device without a long blank page.
 const RESUME_TIMEOUT_MS = 500;
 
-export async function withResumeTimeout<T>(work: () => Promise<T>): Promise<T> {
+export async function withResumeTimeout<T>(work: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       new Promise<never>((_, reject) => {
         timer = setTimeout(() => reject(new Error('Resume timed out')), RESUME_TIMEOUT_MS);
       }),
-      work(),
+      work(controller.signal),
     ]);
   } finally {
     clearTimeout(timer);
+    controller.abort();
   }
 }
 
@@ -37,8 +41,14 @@ export async function resumeForArchive(resume: ReaderBookmark['resume'], archive
   if (!resume?.cfi) return resume;
   try {
     const cfi = resume.cfi;
-    const exact = await withResumeTimeout(async () => {
-      const digest = await crypto.subtle.digest('SHA-256', archive);
+    const exact = await withResumeTimeout(async signal => {
+      let digest: ArrayBuffer;
+      try {
+        digest = await globalThis.crypto.subtle.digest('SHA-256', archive);
+      } catch {
+        digest = await sha256Fallback(archive, signal);
+      }
+      signal.throwIfAborted();
       const fingerprint = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
       return fingerprint === resume.epub_sha256
         && (!resolveRange || !!await resolveRange(cfi));

@@ -483,19 +483,27 @@ def _migrate_device_entitlement_classification(user_id):
     """Stamp the one-time v0 audit, keeping a device-scoped ledger intact.
 
     A pre-#2025 install already carries per-device rows written by the shipped
-    v4.1.43 seed and by its own acknowledged deliveries.  Deleting them costs
+    v4.1.43 seed and by its own emitted deliveries.  Deleting them costs
     the entire library: the cursor-independent recovery arm below reselects
     every book, and against an empty ledger every one of them classifies as
     ``NewEntitlement``, which Nickel treats as "not downloaded" (#1925).  That
     is a whole-library re-download with reading position lost, once, on every
     existing Kobo -- far larger than the ambiguity the delete was clearing.
 
-    The rows are kept only while they can describe one device.  That seed
-    copied the user-wide ``KoboSyncedBooks`` history onto *every* Kobo left
-    unseeded at the upgrade boundary, so with a second paired Kobo the copy
-    provably over-claims for at least one of them and stays untrusted.  With a
-    single paired Kobo the user-wide history is that device's history, and the
-    rows stand.
+    The v4.1.43 seed copied the user-wide history onto every known Kobo,
+    but it stamped ``seeded_at`` only AFTER staging those guessed rows.
+    A row updated strictly after that marker came from this device's own
+    emitted page (or a later acknowledged page), not that shared seed. Keep
+    such rows even in a multi-reader household, including retired devices.
+    Book timestamps and token watermarks cannot establish this provenance.
+    Equal timestamps are ambiguous and are never treated as post-seed proof.
+    A non-null change_basis is independent modern acknowledgment provenance:
+    the v4.1.43 schema did not have it and migration adds it as NULL.
+
+    A single Kobo also retains its shipped book seed for compatibility. Seeded
+    deletion hashes are different: the old seed copied outstanding tombstones
+    without sending them. Clear those guesses for every household size so a
+    pending hard deletion cannot be suppressed forever.
 
     Deliberately accepted, and unchanged from v4.1.43: a legacy
     ``ChangedEntitlement`` that an empty Kobo dropped (#1735) still wrote a
@@ -525,27 +533,32 @@ def _migrate_device_entitlement_classification(user_id):
         preserved = 0
         device_proven = 0
         for device_id in device_ids:
-            ledger_book_ids = set()
-            if ledger_is_device_scoped:
-                ledger_book_ids = {
-                    row.book_id for row in ub.session.query(
-                        ub.KoboDeviceBookEntitlement.book_id,
-                    ).filter(
-                        ub.KoboDeviceBookEntitlement.device_id == int(device_id),
-                    ).all()
-                }
-                preserved += len(ledger_book_ids)
-            else:
+            seed = ub.session.get(ub.KoboDeviceEntitlementSeed, int(device_id))
+            if not ledger_is_device_scoped:
                 removed += ub.session.query(
                     ub.KoboDeviceBookEntitlement,
                 ).filter(
                     ub.KoboDeviceBookEntitlement.device_id == int(device_id),
+                    ub.KoboDeviceBookEntitlement.updated_at <= seed.seeded_at,
+                    ub.KoboDeviceBookEntitlement.change_basis.is_(None),
                 ).delete(synchronize_session=False)
-                removed += ub.session.query(
-                    ub.KoboDeviceDeletedEntitlement,
+            # The shipped seed copied even *undelivered* hard-delete events.
+            # Post-seed emissions or modern acknowledgments are valid guards.
+            removed += ub.session.query(
+                ub.KoboDeviceDeletedEntitlement,
+            ).filter(
+                ub.KoboDeviceDeletedEntitlement.device_id == int(device_id),
+                ub.KoboDeviceDeletedEntitlement.updated_at <= seed.seeded_at,
+                ub.KoboDeviceDeletedEntitlement.change_basis.is_(None),
+            ).delete(synchronize_session=False)
+            ledger_book_ids = {
+                row.book_id for row in ub.session.query(
+                    ub.KoboDeviceBookEntitlement.book_id,
                 ).filter(
-                    ub.KoboDeviceDeletedEntitlement.device_id == int(device_id),
-                ).delete(synchronize_session=False)
+                    ub.KoboDeviceBookEntitlement.device_id == int(device_id),
+                ).all()
+            }
+            preserved += len(ledger_book_ids)
             proven_book_ids = {
                 row.book_id for row in ub.session.query(
                     ub.DeviceReadingPosition.book_id,

@@ -4819,17 +4819,13 @@ def test_v4_1_43_install_upgrading_is_not_told_its_whole_library_is_new(
     )
 
 
-def test_v4_1_43_install_with_a_second_kobo_is_still_reannounced(
+def test_upgrade_preserves_acknowledged_pages_when_a_second_kobo_is_added(
     sync_harness, monkeypatch,
 ):
-    """A household ledger cannot describe one device, so it stays untrusted.
+    """Adding a household reader cannot erase another reader's real history.
 
-    v4.1.43's seed copied the user-wide ``KoboSyncedBooks`` history onto every
-    Kobo left unseeded at the upgrade boundary.  With a second paired reader
-    that copy provably over-claims for at least one of them, so the audit must
-    still clear the rows and reannounce rather than suppress against another
-    device's history.  Same fixture and same upgrade as the single-Kobo case
-    above; only the household size differs.
+    These rows are built by actual acknowledged pages after their seed stamp;
+    they are not the ambiguous user-wide guesses the old seed used to copy.
     """
     from cps import kobo, ub
 
@@ -4871,11 +4867,11 @@ def test_v4_1_43_install_with_a_second_kobo_is_still_reannounced(
         )
         token = response.headers[sync_harness.token_header]
 
-    assert upgrade_pages == [100, 100, 18, 0], (
-        "a two-Kobo household's copied ledger must not suppress against "
-        f"another device's history; pages {upgrade_pages}"
+    assert upgrade_pages == [0, 0, 0, 0], (
+        "adding another Kobo must preserve this device's own delivered pages; "
+        f"pages {upgrade_pages}"
     )
-    assert kinds == {"New"}
+    assert kinds == set()
 
 
 def test_v4_1_43_upgrade_keeps_a_held_row_over_the_position_sentinel(

@@ -4794,3 +4794,163 @@ def test_v4_1_43_install_upgrading_is_not_told_its_whole_library_is_new(
         f"{sum(upgrade_pages)} of its 218 already-downloaded books "
         f"across pages {upgrade_pages}"
     )
+
+
+def test_v4_1_43_install_with_a_second_kobo_is_still_reannounced(
+    sync_harness, monkeypatch,
+):
+    """A household ledger cannot describe one device, so it stays untrusted.
+
+    v4.1.43's seed copied the user-wide ``KoboSyncedBooks`` history onto every
+    Kobo left unseeded at the upgrade boundary.  With a second paired reader
+    that copy provably over-claims for at least one of them, so the audit must
+    still clear the rows and reannounce rather than suppress against another
+    device's history.  Same fixture and same upgrade as the single-Kobo case
+    above; only the household size differs.
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    _seed_legacy_install(sync_harness, record_flat=False)
+
+    token = kobo.SyncToken.SyncToken().build_sync_token()
+    for _page in range(4):
+        response = sync_harness.sync(token)
+        token = response.headers[sync_harness.token_header]
+    assert sync_harness.session.query(
+        ub.KoboDeviceBookEntitlement,
+    ).count() == 218
+
+    sync_harness.session.add(ub.Device(
+        user_id=sync_harness.user.id,
+        kind="kobo",
+        display_name="Second Household Kobo",
+        model="Kobo Libra Colour",
+        active=True,
+        created_by="auto",
+    ))
+    seed = sync_harness.session.get(
+        ub.KoboDeviceEntitlementSeed, sync_harness.device.id,
+    )
+    seed.classification_version = 0
+    sync_harness.session.commit()
+
+    upgrade_pages = []
+    kinds = set()
+    for _page in range(4):
+        response = sync_harness.sync(token)
+        items = _entitlements(response)
+        upgrade_pages.append(len(items))
+        kinds.update(
+            "New" if "NewEntitlement" in item else "Changed" for item in items
+        )
+        token = response.headers[sync_harness.token_header]
+
+    assert upgrade_pages == [100, 100, 18, 0], (
+        "a two-Kobo household's copied ledger must not suppress against "
+        f"another device's history; pages {upgrade_pages}"
+    )
+    assert kinds == {"New"}
+
+
+def test_v4_1_43_upgrade_keeps_a_held_row_over_the_position_sentinel(
+    sync_harness, monkeypatch,
+):
+    """A kept row already proves delivery; the sentinel must not clobber it.
+
+    The reading-position sentinel exists for books the device demonstrably
+    holds but that have no ledger row.  Writing it over a row that survived
+    the audit would force a pointless ChangedEntitlement for exactly the
+    books whose delivery is best evidenced.
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    delivered = _seed_legacy_install(sync_harness, count=3, record_flat=False)
+
+    token = kobo.SyncToken.SyncToken().build_sync_token()
+    for _page in range(2):
+        response = sync_harness.sync(token)
+        token = response.headers[sync_harness.token_header]
+    assert sync_harness.session.query(
+        ub.KoboDeviceBookEntitlement,
+    ).count() == 3
+
+    position = sync_harness.session.query(ub.DeviceReadingPosition).filter_by(
+        device_id=sync_harness.device.id, book_id=delivered[0].id,
+    ).one_or_none()
+    if position is None:
+        position = ub.DeviceReadingPosition(
+            device_id=sync_harness.device.id,
+            book_id=delivered[0].id,
+            server_modified_at=delivered[0].last_modified,
+        )
+        sync_harness.session.add(position)
+    position.client_modified_at = delivered[0].last_modified
+    seed = sync_harness.session.get(
+        ub.KoboDeviceEntitlementSeed, sync_harness.device.id,
+    )
+    seed.classification_version = 0
+    sync_harness.session.commit()
+    before = {
+        row.book_id: row.fingerprint
+        for row in sync_harness.session.query(ub.KoboDeviceBookEntitlement)
+    }
+
+    response = sync_harness.sync(token)
+    assert _entitlements(response) == []
+    after = {
+        row.book_id: row.fingerprint
+        for row in sync_harness.session.query(ub.KoboDeviceBookEntitlement)
+    }
+    assert after == before
+
+
+def test_v4_1_43_upgrade_still_delivers_a_book_the_ledger_never_recorded(
+    sync_harness, monkeypatch,
+):
+    """Keeping the ledger must not suppress a book that is not in it.
+
+    The live under-delivery reports (#1735, #2201) are libraries where only
+    part of the collection ever reached the reader.  Those books have no
+    ledger row, so the cursor-independent recovery arm must still announce
+    them New across the upgrade -- keeping the rows for the delivered books
+    may not cost the undelivered ones their repair.
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    delivered = _seed_legacy_install(sync_harness, count=3, record_flat=False)
+
+    token = kobo.SyncToken.SyncToken().build_sync_token()
+    for _page in range(2):
+        response = sync_harness.sync(token)
+        token = response.headers[sync_harness.token_header]
+    assert sync_harness.session.query(
+        ub.KoboDeviceBookEntitlement,
+    ).count() == 3
+
+    # This book never physically arrived, so the ledger has no row for it.
+    never_arrived = delivered[-1]
+    sync_harness.session.query(ub.KoboDeviceBookEntitlement).filter_by(
+        device_id=sync_harness.device.id, book_id=never_arrived.id,
+    ).delete(synchronize_session=False)
+    seed = sync_harness.session.get(
+        ub.KoboDeviceEntitlementSeed, sync_harness.device.id,
+    )
+    seed.classification_version = 0
+    sync_harness.session.commit()
+
+    response = sync_harness.sync(token)
+    items = _entitlements(response)
+    assert [sorted(item) for item in items] == [["NewEntitlement"]], items
+    assert (
+        items[0]["NewEntitlement"]["BookEntitlement"]["Id"]
+        == str(never_arrived.uuid)
+    )

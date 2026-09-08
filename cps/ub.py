@@ -997,9 +997,11 @@ class KoboDeviceEntitlementSeed(Base):
     seeded_at = Column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
     )
-    # Version 1 means the per-device rows were audited against the legacy
-    # New/Changed classifier.  Version 0 rows predate #1735 and may include
-    # fingerprints for ChangedEntitlements a device could not apply.
+    # Version 1 means the one-time pre-#2025 audit has run for this device.
+    # Version 0 rows were written by the shipped v4.1.43 seed, which copied
+    # the user-wide flat history onto every Kobo it marked: sound for a single
+    # paired reader, a household union for two or more.  The audit therefore
+    # keeps a single reader's rows and clears a household's.
     classification_version = Column(
         Integer, nullable=False, default=0, server_default="0",
     )

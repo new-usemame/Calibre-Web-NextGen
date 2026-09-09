@@ -64,6 +64,16 @@ test('editing removes a restored book from old-title search results', async ({ p
 
   const newTitle = `#744 edited title ${Date.now()}`;
   await page.route(`**/api/v1/books/${id}/metadata`, async (route) => {
+    if (route.request().method() === 'GET') {
+      // Keep metadata reads consistent with this test's search snapshot: other
+      // parallel specs temporarily rename the shared seed book.
+      const response = await route.fetch();
+      const metadata = await response.json();
+      await route.fulfill({ response, json: {
+        ...metadata, title: afterEdit ? newTitle : oldTitle,
+      } });
+      return;
+    }
     if (route.request().method() !== 'POST') return route.continue();
     afterEdit = true;
     await route.fulfill({ contentType: 'application/json', body: JSON.stringify({ title: newTitle }) });

@@ -59,6 +59,7 @@ from .ui_themes import config_theme_code
 from .cw_babel import (get_available_locale,
                        get_user_locale_language, sanitize_locale_for_write)
 from . import debug_info
+from . import content_server
 from .string_helper import strip_whitespaces
 from .sqlite_utils import copy_sqlite_database
 from .custom_column_sort import load_eligible_columns, persist_configured_columns
@@ -2855,6 +2856,7 @@ def _db_configuration_update_helper():
 
 def _configuration_update_helper():
     reboot_required = False
+    content_server_changed = False
     to_save = request.form.to_dict()
     prev_hardcover_sync = config.hardcover_sync_enabled()
     prev_kobo_prefer_kepub = bool(config.config_kobo_prefer_kepub)
@@ -3039,6 +3041,20 @@ def _configuration_update_helper():
         reboot_required |= _config_string(to_save, "config_limiter_uri")
         reboot_required |= _config_string(to_save, "config_limiter_options")
 
+        # Calibre content server configuration
+        server_username = to_save.get("config_calibre_server_username", config.config_calibre_server_username)
+        server_password = to_save.get("config_calibre_server_password_e") or config.config_calibre_server_password_e
+        if (to_save.get("config_calibre_server_enabled") == "on"
+                and to_save.get("config_calibre_server_anonymous_writes") != "on"
+                and not (server_username and server_password)):
+            return _configuration_result(_('Please enter a content server username and password, or allow anonymous writes'))
+        content_server_changed |= _config_checkbox(to_save, "config_calibre_server_enabled")
+        content_server_changed |= _config_int(to_save, "config_calibre_server_port")
+        content_server_changed |= _config_checkbox(to_save, "config_calibre_server_anonymous_writes")
+        content_server_changed |= _config_string(to_save, "config_calibre_server_username")
+        if to_save.get("config_calibre_server_password_e") and not config.config_calibre_server_password_e:
+            content_server_changed |= _config_string(to_save, "config_calibre_server_password_e")
+
         # Rarfile Content configuration
         _config_string(to_save, "config_rarfile_location")
         unrar_warning = None
@@ -3053,6 +3069,11 @@ def _configuration_update_helper():
         _configuration_result(_("Oops! Database Error: %(error)s.", error=e.orig))
 
     config.save()
+    if content_server_changed:
+        if config.config_calibre_server_enabled:
+            content_server.start()
+        else:
+            content_server.stop()
     if queue_kepub_backfill:
         from .tasks.kepub_backfill import enqueue_kepub_backfill
         if not enqueue_kepub_backfill(current_user.name):
@@ -3073,6 +3094,17 @@ def _configuration_update_helper():
     return _configuration_result(None, reboot_required, " ".join(filter(None, [unrar_warning, arch_warning])))
 
 
+@admi.route("/admin/config/clear_calibre_server_password", methods=['POST'])
+@user_login_required
+@admin_required
+def clear_calibre_server_password():
+    config.config_calibre_server_password_e = ""
+    config.save()
+    if config.config_calibre_server_enabled:
+        content_server.start()
+    return _configuration_result()
+
+
 def _configuration_result(error_flash=None, reboot=False, warning_flash=None):
     resp = {}
     if error_flash:
@@ -3087,6 +3119,8 @@ def _configuration_result(error_flash=None, reboot=False, warning_flash=None):
             resp['result'].append({'type': "warning", 'message': warning_flash})
     resp['reboot'] = reboot
     resp['config_upload'] = config.config_upload_formats
+    resp['calibre_server_password_set'] = bool(config.config_calibre_server_password_e)
+    resp['calibre_server_password_env'] = config.config_calibre_server_env['password']
     return Response(json.dumps(resp), mimetype='application/json')
 
 

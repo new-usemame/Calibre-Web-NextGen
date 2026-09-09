@@ -5,7 +5,7 @@
  */
 export function observeReaderSelections(rendition, host = window) {
     let stopped = false, timer = null, candidate = null, delivered = null, stableSince = 0;
-    const same = (a, b) => a && b && a.contents === b.contents
+    const same = (a, b) => a && b && a.contents === b.contents && a.sourceRange === b.sourceRange
         && a.range.startContainer === b.range.startContainer && a.range.startOffset === b.range.startOffset
         && a.range.endContainer === b.range.endContainer && a.range.endOffset === b.range.endOffset;
     function selection(contents) {
@@ -13,7 +13,9 @@ export function observeReaderSelections(rendition, host = window) {
         if (!selected || selected.isCollapsed || !selected.rangeCount) return null;
         const range = selected.getRangeAt(0);
         if (!range.toString().trim()) return null;
-        return { contents, range: range.cloneRange() };
+        // A new gesture can select the same endpoints between polls. Its source
+        // Range is new; retaining that identity distinguishes it from no change.
+        return { contents, sourceRange: range, range: range.cloneRange() };
     }
     function remember(_cfi, contents) {
         try { delivered = selection(contents); candidate = null; } catch { /* disposed frame */ }

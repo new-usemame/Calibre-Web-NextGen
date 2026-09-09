@@ -1,0 +1,19 @@
+{
+  "area": "kobo",
+  "body": "The converter compared native ZIP-relative chapter names to package-relative manifest hrefs, then searched the archive independently for the DOM. Nested OPF directories and escaped filenames could fail valid anchors or select a different same-named chapter. The fix resolves manifest URIs at the OPF boundary, chooses one unambiguous canonical member, and reads that same member. The classic reader now uses complete-spine chapter identity for overlays and navigation. Tests demonstrate pre-fix failures, exact selected-text round trips, duplicate-name refusal, escaped-name boundaries, and selection creation. Fixed in the candidate for #2208; public release remains pending.",
+  "created": "2026-09-09",
+  "id": "F-1f8cda",
+  "refs": [
+    "#2208"
+  ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-09",
+    "note": "Implemented and independently verified in the #2208 candidate; not yet released.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Native Kobo highlights can resolve a spine index and DOM from different chapter paths"
+}

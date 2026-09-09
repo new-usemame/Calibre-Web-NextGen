@@ -27,6 +27,8 @@ export interface Device {
   first_seen: string | null;
   last_seen: string | null;
   annotation_count: number;
+  origin_annotation_count?: number | null;
+  browser_identity?: 'identified' | 'unidentified' | null;
   highlights?: number;
   notes?: number;
   dogears?: number;
@@ -100,6 +102,8 @@ export function DeviceInventory({ device }: { device: Device }) {
     ? t('Loading device library…')
     : error
       ? t('Could not load this device library.')
+      : !data?.observed_at
+        ? t('This device has not reported its inventory yet.')
       : books.length === 0
         ? t('No books were reported in the latest device inventory.')
         : t('Showing {shown} of {total} books from the latest device inventory.', {

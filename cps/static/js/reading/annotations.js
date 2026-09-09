@@ -122,28 +122,51 @@
         return { node: node, offset: node.nodeValue.length };
     }
 
-    // Does this annotation's chapter (from content_id "<uuid>!!<file>")
-    // match the rendered section's href? Tolerant of OEBPS/ prefixes the
-    // way the server-side spine resolver is.
-    function chapterMatches(contentId, sectionHref) {
-        if (!contentId || !sectionHref) { return true; } // no info → don't exclude
-        var bang = contentId.indexOf("!!");
-        if (bang < 0) { return true; }
-        var chap = contentId.slice(bang + 2);
-        if (!chap) { return true; }
-        if (chap === sectionHref) { return true; }
-        if (sectionHref.indexOf("/") >= 0 && sectionHref.split("/").pop() === chap.split("/").pop()) { return true; }
-        return sectionHref.indexOf(chap) >= 0 || chap.indexOf(sectionHref) >= 0;
+    // Resolve against the complete reading order. KoboSpan IDs repeat across
+    // chapters, so pairwise basename matching can paint the wrong page.
+    function normalizedMember(path) {
+        if (!path || path.charAt(0) === "/" || /[\\\x00]/.test(path) || /^[a-z][a-z0-9+.-]*:/i.test(path)) { return null; }
+        var parts = [];
+        var input = path.split("/");
+        for (var i = 0; i < input.length; i++) {
+            if (!input[i] || input[i] === ".") { continue; }
+            if (input[i] === "..") {
+                if (!parts.length) { return null; }
+                parts.pop();
+            } else { parts.push(input[i]); }
+        }
+        return parts.length ? parts.join("/") : null;
     }
 
+    function chapterSection(contentId) {
+        if (!contentId || contentId.indexOf("!!") < 0 || !reader.book || !reader.book.spine) { return null; }
+        var chapter = contentId.slice(contentId.indexOf("!!") + 2);
+        var candidates = [normalizedMember(chapter)];
+        try { candidates.push(normalizedMember(decodeURIComponent(chapter))); } catch (e) { /* retain raw name */ }
+        candidates = candidates.filter(function (value) { return value !== null; });
+        var directory = reader.book.path && reader.book.path.directory || "";
+        directory = directory.replace(/^\//, "");
+        var sections = reader.book.spine.spineItems || [];
+        var exact = [], shortened = [];
+        sections.forEach(function (section) {
+            if (!section.href || /[?#]/.test(section.href) || /^[a-z][a-z0-9+.-]*:/i.test(section.href) || section.href.charAt(0) === "/") { return; }
+            var member;
+            try { member = normalizedMember(directory + decodeURIComponent(section.href)); } catch (e) { return; }
+            if (!member) { return; }
+            if (candidates.indexOf(member) >= 0) { exact.push(section); }
+            else if (candidates.some(function (value) { return member.slice(-(value.length + 1)) === "/" + value; })) { shortened.push(section); }
+        });
+        var matches = exact.length ? exact : shortened;
+        return matches.length === 1 ? matches[0] : null;
+    }
+
+    // New selections already belong to a rendered section; preserve its
+    // package-relative href in the creation payload.
     function sectionHrefForContents(contents) {
         try {
-            if (contents && reader.book && reader.book.spine && typeof reader.book.spine.get === "function") {
-                var sec = reader.book.spine.get(contents.sectionIndex);
-                if (sec && sec.href) { return sec.href; }
-            }
-        } catch (e) { /* fall through */ }
-        return null;
+            var section = reader.book.spine.get(contents.sectionIndex);
+            return section && section.href || null;
+        } catch (e) { return null; }
     }
 
     var appliedIds = {};   // annotation_id -> true once overlaid
@@ -156,12 +179,12 @@
         if (!contents || !contents.document || typeof contents.cfiFromRange !== "function") { return; }
         if (!reader.rendition || !reader.rendition.annotations) { return; }
         var doc = contents.document;
-        var sectionHref = sectionHrefForContents(contents);
 
         allRows.forEach(function (row) {
             if (appliedIds[row.annotation_id]) { return; }
             if (!row.start_kobospan) { return; } // sidebar-only (no anchor)
-            if (!chapterMatches(row.content_id, sectionHref)) { return; }
+            var section = chapterSection(row.content_id);
+            if (!section || section.index !== contents.sectionIndex) { return; }
 
             var startSpan = doc.getElementById(row.start_kobospan);
             var endSpan = doc.getElementById(row.end_kobospan || row.start_kobospan);
@@ -247,12 +270,14 @@
     // rendered yet, display its chapter first, then re-resolve.
     function jumpToAnnotation(row) {
         if (!row.start_kobospan) { return false; }
+        var section = chapterSection(row.content_id);
+        if (!section) { return false; }
         var contentsList;
         try { contentsList = reader.rendition.getContents() || []; } catch (e) { contentsList = []; }
         for (var i = 0; i < contentsList.length; i++) {
             var c = contentsList[i];
             var el = c.document && c.document.getElementById(row.start_kobospan);
-            if (el && chapterMatches(row.content_id, sectionHrefForContents(c))) {
+            if (el && section.index === c.sectionIndex) {
                 try {
                     var loc = locateOffset(c.document, el, row.start_offset || 0);
                     var range = c.document.createRange();
@@ -265,9 +290,7 @@
         }
         // Section not rendered — jump to the chapter; the rendered hook
         // overlays the highlight once it loads.
-        if (row.content_id && row.content_id.indexOf("!!") >= 0) {
-            try { reader.rendition.display(row.content_id.split("!!")[1]); return true; } catch (e) { /* ignore */ }
-        }
+        try { reader.rendition.display(section.href); return true; } catch (e) { /* ignore */ }
         return false;
     }
 

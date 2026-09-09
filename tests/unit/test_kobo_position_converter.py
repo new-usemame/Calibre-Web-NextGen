@@ -29,11 +29,23 @@ Test surface:
 from __future__ import annotations
 
 import time
+import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
 
 from tests.fixtures.kepub_fixture import build_synthetic_kepub, build_minimal_epub
+
+# This converter is pure; loading it directly keeps unrelated mail/OAuth
+# integrations out of parser tests.
+_spec = importlib.util.spec_from_file_location(
+    "_kobo_position_converter_under_test",
+    Path(__file__).resolve().parents[2] / "cps/services/kobo_position.py",
+)
+kobo_position = importlib.util.module_from_spec(_spec)
+sys.modules[_spec.name] = kobo_position
+_spec.loader.exec_module(kobo_position)
 
 
 @pytest.fixture
@@ -51,7 +63,6 @@ def _clear_position_caches():
     """The module-level lru_caches survive across tests. Reset them
     between cases so each test sees a clean fixture state — required
     for the mtime-invalidation test below."""
-    from cps.services import kobo_position
     kobo_position._get_spine.cache_clear()
     kobo_position._get_chapter_dom.cache_clear()
     yield
@@ -65,7 +76,7 @@ def _clear_position_caches():
 @pytest.mark.unit
 class TestSpineParse:
     def test_spine_returns_chapters_in_order(self, synthetic_kepub):
-        from cps.services.kobo_position import parse_spine
+        from _kobo_position_converter_under_test import parse_spine
 
         spine = parse_spine(synthetic_kepub)
         assert spine == [
@@ -75,7 +86,7 @@ class TestSpineParse:
         ]
 
     def test_spine_empty_for_nonexistent_file(self, tmp_path):
-        from cps.services.kobo_position import parse_spine
+        from _kobo_position_converter_under_test import parse_spine
 
         bogus = tmp_path / "does-not-exist.epub"
         with pytest.raises(Exception):
@@ -85,22 +96,123 @@ class TestSpineParse:
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("chapter", [
+    "OEBPS/Text/first chapter.xhtml",
+    "OEBPS/Text/first%20chapter.xhtml",
+    "Text/first%20chapter.xhtml",
+])
+def test_nested_package_highlight_resolves_to_exact_source_text(tmp_path, chapter):
+    """Native ZIP-relative chapters and package-relative aliases find the same
+    span, including URI-escaped spaces; the returned CFI selects the saved text.
+    This reproduces the false unresolved highlight from the household Kobo.
+    """
+    import zipfile
+    from lxml import html
+    from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
+    from tests.fixtures.kepub_fixture import CONTAINER_XML, OPF_TEMPLATE, _kobo_chapter_html
+
+    text = "Earlier days, and more vulnerable years my father gave me some advice."
+    selected = "and more vulnerable years my father gave me some"
+    start = text.index(selected)
+    source = _kobo_chapter_html([("kobo.15.1", text)])
+    opf = OPF_TEMPLATE.format(
+        book_uuid="nested-package",
+        manifest_items='<item id="cover" href="cover.xhtml"/>'
+                       '<item id="chapter" href="Text/./first%20chapter.xhtml"/>',
+        spine_items='<itemref idref="cover"/><itemref idref="chapter"/>',
+    )
+    book = tmp_path / "nested.kepub"
+    with zipfile.ZipFile(book, "w") as archive:
+        archive.writestr("META-INF/container.xml", CONTAINER_XML)
+        archive.writestr("OEBPS/content.opf", opf)
+        archive.writestr("OEBPS/cover.xhtml", _kobo_chapter_html([("kobo.1.1", "Cover")]))
+        archive.writestr("OEBPS/Text/first chapter.xhtml", source)
+    position = KoboPosition("nested-package!!" + chapter, "span#kobo\\.15\\.1", None,
+                            start, "span#kobo\\.15\\.1", None, start + len(selected))
+    cfi = compute_cfi_range(book, position)
+    assert cfi is not None, "A matching native span must not be marked unresolved"
+    common, begin, end = cfi[8:-1].split(",")
+    assert common.split("!")[0] == "/6/4", "Keep the package reading order"
+    span = _walk_cfi_element_path(html.fromstring(source.encode("utf-8")), common.split("!")[1])
+    assert span.text[int(begin.split(":")[1]):int(end.split(":")[1])] == selected
+
+
+@pytest.mark.unit
+def test_ambiguous_chapter_alias_does_not_anchor_to_first_matching_file(tmp_path):
+    """Repeated filenames and span IDs are normal across chapters. A missing
+    directory must never silently select whichever ZIP member was written first.
+    """
+    import zipfile
+    from dataclasses import replace
+    from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
+    from tests.fixtures.kepub_fixture import CONTAINER_XML, OPF_TEMPLATE, _kobo_chapter_html
+
+    book = tmp_path / "ambiguous.kepub"
+    opf = OPF_TEMPLATE.format(
+        book_uuid="ambiguous",
+        manifest_items='<item id="a" href="a/chapter.xhtml"/>'
+                       '<item id="b" href="b/chapter.xhtml"/>',
+        spine_items='<itemref idref="a"/><itemref idref="b"/>',
+    )
+    with zipfile.ZipFile(book, "w") as archive:
+        archive.writestr("META-INF/container.xml", CONTAINER_XML)
+        archive.writestr("OEBPS/content.opf", opf)
+        for directory in ("a", "b"):
+            archive.writestr(f"OEBPS/{directory}/chapter.xhtml",
+                             _kobo_chapter_html([("kobo.1.1", directory * 20)]))
+    position = KoboPosition("ambiguous!!chapter.xhtml", "span#kobo\\.1\\.1", None,
+                            0, "span#kobo\\.1\\.1", None, 10)
+    assert compute_cfi_range(book, position) is None
+    exact = compute_cfi_range(book, replace(position, content_id="ambiguous!!OEBPS/b/chapter.xhtml"))
+    assert exact is not None and exact.startswith("epubcfi(/6/4!"), "An exact path stays resolvable"
+
+
+@pytest.mark.unit
+def test_native_raw_and_escaped_chapter_paths_never_choose_between_two_members(tmp_path):
+    """Native paths may be raw ZIP names or URI escaped. Preserve literal #,
+    but refuse a percent spelling that names two different existing chapters.
+    """
+    import zipfile
+    from dataclasses import replace
+    from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
+    from tests.fixtures.kepub_fixture import CONTAINER_XML, OPF_TEMPLATE, _kobo_chapter_html
+    book = tmp_path / "literal-names.kepub"
+    opf = OPF_TEMPLATE.format(
+        book_uuid="literal-names",
+        manifest_items='<item id="percent" href="first%2520chapter.xhtml"/>'
+                       '<item id="space" href="first%20chapter.xhtml"/>'
+                       '<item id="hash" href="ch%23x.xhtml"/>',
+        spine_items='<itemref idref="percent"/><itemref idref="space"/><itemref idref="hash"/>',
+    )
+    with zipfile.ZipFile(book, "w") as archive:
+        archive.writestr("META-INF/container.xml", CONTAINER_XML)
+        archive.writestr("OEBPS/content.opf", opf)
+        for member in ("first%20chapter.xhtml", "first chapter.xhtml", "ch#x.xhtml"):
+            archive.writestr("OEBPS/" + member, _kobo_chapter_html([("kobo.1.1", member)]))
+    position = KoboPosition("names!!OEBPS/ch#x.xhtml", "span#kobo\\.1\\.1", None,
+                            0, "span#kobo\\.1\\.1", None, 2)
+    cfi = compute_cfi_range(book, position)
+    assert cfi is not None and cfi.startswith("epubcfi(/6/6!")
+    assert compute_cfi_range(book, replace(position, content_id="names!!OEBPS/first%20chapter.xhtml")) is None
+
+
+@pytest.mark.unit
 class TestExtractKoboSpanId:
     def test_unescapes_dots(self):
-        from cps.services.kobo_position import _extract_kobospan_id
+        from _kobo_position_converter_under_test import _extract_kobospan_id
 
         assert _extract_kobospan_id("span#kobo\\.4\\.1") == "kobo.4.1"
 
     def test_three_digit_suffix(self):
         """The prototype regex sometimes ate the third digit when the
         kepub had spans like ``kobo.4.11``. Pin the production helper."""
-        from cps.services.kobo_position import _extract_kobospan_id
+        from _kobo_position_converter_under_test import _extract_kobospan_id
 
         assert _extract_kobospan_id("span#kobo\\.4\\.11") == "kobo.4.11"
         assert _extract_kobospan_id("span#kobo\\.4\\.13") == "kobo.4.13"
 
     def test_no_fragment_returns_none(self):
-        from cps.services.kobo_position import _extract_kobospan_id
+        from _kobo_position_converter_under_test import _extract_kobospan_id
 
         assert _extract_kobospan_id("OEBPS/chapter6.html") is None
         assert _extract_kobospan_id("") is None
@@ -117,7 +229,7 @@ class TestComputeCfiRangeKepub:
         """Span boundaries are identical (start_id == end_id) — the
         most common case (~60% of highlights per design doc §3.6
         finding 4)."""
-        from cps.services.kobo_position import KoboPosition, compute_cfi_range
+        from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
 
         pos = KoboPosition(
             content_id="00000000-0000-0000-0000-deadbeefcafe!!OEBPS/chapter1.html",
@@ -144,7 +256,7 @@ class TestComputeCfiRangeKepub:
         path on child_index == -99 meant every live-captured kepub
         highlight resolved to None and never rendered as a web-reader
         overlay."""
-        from cps.services.kobo_position import KoboPosition, compute_cfi_range
+        from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
 
         pos = KoboPosition(
             content_id="00000000-0000-0000-0000-deadbeefcafe!!chapter1.html",
@@ -165,7 +277,7 @@ class TestComputeCfiRangeKepub:
         """Highlight spans two consecutive KoboSpans — about 40% of
         real highlights (design doc §3.6 finding 4). Pin that the CFI
         carries the terminal span id, not the start id."""
-        from cps.services.kobo_position import KoboPosition, compute_cfi_range
+        from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
 
         pos = KoboPosition(
             content_id="00000000-0000-0000-0000-deadbeefcafe!!chapter1.html",
@@ -186,7 +298,7 @@ class TestComputeCfiRangeKepub:
         """The "Comrade Napoleon" example from design doc §3.6 — start
         offset 90 into a single span — pins that the offset round-trips
         without truncation."""
-        from cps.services.kobo_position import KoboPosition, compute_cfi_range
+        from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
 
         pos = KoboPosition(
             content_id="00000000-0000-0000-0000-deadbeefcafe!!chapter2.html",
@@ -205,7 +317,7 @@ class TestComputeCfiRangeKepub:
         """The prototype's 0.7% failure was on three-digit span ids —
         regex extraction sometimes ate the third digit. Pin that the
         lxml port handles ``kobo.4.11`` cleanly."""
-        from cps.services.kobo_position import KoboPosition, compute_cfi_range
+        from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
         from tests.fixtures.kepub_fixture import _kobo_chapter_html, OPF_TEMPLATE, CONTAINER_XML
         import zipfile
 
@@ -278,7 +390,7 @@ class TestCfiRoundTrip:
     updating only the expected-string constant."""
 
     def test_single_span_roundtrip(self, synthetic_kepub):
-        from cps.services.kobo_position import (
+        from _kobo_position_converter_under_test import (
             KoboPosition, compute_cfi_range, _get_chapter_dom,
         )
 
@@ -302,7 +414,7 @@ class TestCfiRoundTrip:
         assert span.text[0:15] == "Four legs good."
 
     def test_multi_span_roundtrip(self, synthetic_kepub):
-        from cps.services.kobo_position import (
+        from _kobo_position_converter_under_test import (
             KoboPosition, compute_cfi_range, _get_chapter_dom,
         )
 
@@ -342,7 +454,7 @@ class TestComputeCfiRangePlainEpub:
         """chapter3 in the fixture has no KoboSpan IDs. Kobo would
         emit a non-selector path + a real (non-sentinel) child index.
         The converter should produce a CFI with even-step elements."""
-        from cps.services.kobo_position import KoboPosition, compute_cfi_range
+        from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
 
         pos = KoboPosition(
             content_id="00000000-0000-0000-0000-deadbeefcafe!!chapter3.html",
@@ -366,7 +478,7 @@ class TestComputeCfiRangePlainEpub:
 @pytest.mark.unit
 class TestComputeCfiRangeEdgeCases:
     def test_malformed_content_id_returns_none(self, synthetic_kepub):
-        from cps.services.kobo_position import KoboPosition, compute_cfi_range
+        from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
 
         pos = KoboPosition(
             content_id="no-double-bang-here",
@@ -380,7 +492,7 @@ class TestComputeCfiRangeEdgeCases:
         assert compute_cfi_range(synthetic_kepub, pos) is None
 
     def test_chapter_not_in_spine_returns_none(self, synthetic_kepub):
-        from cps.services.kobo_position import KoboPosition, compute_cfi_range
+        from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
 
         pos = KoboPosition(
             content_id="00000000!!nonexistent_chapter.html",
@@ -394,7 +506,7 @@ class TestComputeCfiRangeEdgeCases:
         assert compute_cfi_range(synthetic_kepub, pos) is None
 
     def test_missing_epub_returns_none(self, tmp_path):
-        from cps.services.kobo_position import KoboPosition, compute_cfi_range
+        from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
 
         pos = KoboPosition(
             content_id="x!!chapter1.html",
@@ -410,7 +522,7 @@ class TestComputeCfiRangeEdgeCases:
     def test_bare_basename_chapter_match(self, minimal_epub):
         """The minimal_epub fixture has chapter hrefs without OEBPS/
         prefix — pin that ``_resolve_spine_index`` finds them."""
-        from cps.services.kobo_position import KoboPosition, compute_cfi_range
+        from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
 
         pos = KoboPosition(
             content_id="aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa!!ch1.html",
@@ -436,7 +548,7 @@ class TestCacheInvalidation:
         """A user re-uploading a book must invalidate the spine cache.
         The lru_cache is keyed on (path, mtime_ns) so replacing the
         file with different content should produce a fresh parse."""
-        from cps.services.kobo_position import parse_spine, _get_spine
+        from _kobo_position_converter_under_test import parse_spine, _get_spine
 
         epub = tmp_path / "book.kepub"
         build_synthetic_kepub(epub)
@@ -460,13 +572,13 @@ class TestCacheInvalidation:
         os.utime(epub, ns=(new_mtime, new_mtime))
 
         spine_v2 = parse_spine(epub)
-        assert spine_v2 == ["ch1.html"]
+        assert spine_v2 == ["OEBPS/ch1.html"]
         # Cache must reflect the new mtime — calling through the wrapper
         # with the new key yields the new spine.
         cached = _get_spine(
             (str(epub), epub.stat().st_mtime_ns), epub
         )
-        assert cached == ["ch1.html"]
+        assert cached == ["OEBPS/ch1.html"]
 
 
 # ---------------------------------------------------------------------------
@@ -480,7 +592,7 @@ class TestContextStringFallback:
         """When neither the KoboSpan id nor a valid child index is
         usable, fall back to searching the chapter text for the
         ``context_string`` and producing a degraded offset-based CFI."""
-        from cps.services.kobo_position import KoboPosition, compute_cfi_range
+        from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
 
         # No KoboSpan id (path doesn't end in #...), no child index
         # (None on both ends). Must fall through to context.
@@ -501,7 +613,7 @@ class TestContextStringFallback:
         assert cfi.startswith("epubcfi(/6/2!/4:")
 
     def test_fallback_returns_none_when_no_context(self, synthetic_kepub):
-        from cps.services.kobo_position import KoboPosition, compute_cfi_range
+        from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
 
         pos = KoboPosition(
             content_id="00000000-0000-0000-0000-deadbeefcafe!!chapter1.html",
@@ -516,7 +628,7 @@ class TestContextStringFallback:
         assert compute_cfi_range(synthetic_kepub, pos) is None
 
     def test_fallback_returns_none_when_context_not_in_chapter(self, synthetic_kepub):
-        from cps.services.kobo_position import KoboPosition, compute_cfi_range
+        from _kobo_position_converter_under_test import KoboPosition, compute_cfi_range
 
         pos = KoboPosition(
             content_id="00000000-0000-0000-0000-deadbeefcafe!!chapter1.html",

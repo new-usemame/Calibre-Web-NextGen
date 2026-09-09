@@ -8,6 +8,42 @@ const device = {
   annotation_count: 312, active: true,
 };
 
+test('reader sources separate browsers and distinguish missing from empty inventory', async ({ page }) => {
+  const physical = { ...device, origin_annotation_count: 19, annotation_count: 0,
+    inventory_count: 0, inventory_observed: null };
+  const browser = { ...physical, public_id: 'browser-1', type: 'webreader', kind: 'webreader',
+    label: 'My browser', model: 'CWNG web reader', browser_identity: 'identified',
+    origin_annotation_count: 2 };
+  const fallback = { ...browser, public_id: 'browser-2', label: 'Custom source name',
+    browser_identity: 'unidentified' };
+  await page.route('**/api/annotations/devices?*', route => route.fulfill({ json: {
+    devices: [physical, browser, fallback], total: 3, limit: 100, offset: 0,
+  } }));
+  let observed = false;
+  await page.route('**/api/annotations/devices/device-1/inventory?*', route => route.fulfill({ json: {
+    books: [], total: 0, limit: 200, offset: 0,
+    observed_at: observed ? '2026-09-08T12:00:00Z' : null,
+  } }));
+  await page.goto('/app/account/devices');
+  const browsers = page.getByRole('region', { name: 'Browser reading sources' });
+  await expect(browsers.getByRole('link', { name: 'My browser', exact: true })).toBeVisible();
+  await expect(browsers.getByText('Unidentified browser source', { exact: true })).toBeVisible();
+  await expect(browsers.getByRole('button', { name: 'View device library' })).toHaveCount(0);
+  await expect(browsers.getByText(/books in latest inventory/)).toHaveCount(0);
+  const clara = page.getByRole('listitem').filter({ has: page.getByRole('link', { name: device.label, exact: true }) });
+  await expect(clara.getByText('19 annotations from this source', { exact: true })).toBeVisible();
+  await expect(clara.getByText('Inventory not reported', { exact: true })).toBeVisible();
+  await clara.getByRole('button', { name: 'View device library' }).click();
+  await expect(clara.getByRole('status')).toHaveText('This device has not reported its inventory yet.');
+  observed = true;
+  await page.reload();
+  await clara.getByRole('button', { name: 'View device library' }).click();
+  await expect(clara.getByRole('status')).toHaveText('No books were reported in the latest device inventory.');
+  await assertNoHorizontalOverflow(page);
+  const scan = await new AxeBuilder({ page }).include('main').analyze();
+  expect(scan.violations.filter(v => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
+});
+
 async function stubDevices(page: import('@playwright/test').Page) {
   let current = { ...device };
   let restored = 0;
@@ -134,7 +170,7 @@ test('device manager renames and removes only through counted confirmation, then
   const calls = await stubDevices(page);
   await page.goto('/app/account/devices');
   await expect(page.getByRole('heading', { name: 'E-readers' })).toBeVisible();
-  await expect(page.getByText('312 highlights and notes')).toBeVisible();
+  await expect(page.getByText('312 annotations assigned to this source')).toBeVisible();
 
   await page.getByRole('button', { name: 'Rename Libra Colour' }).click();
   const input = page.getByRole('textbox', { name: 'Device name' });
@@ -145,8 +181,8 @@ test('device manager renames and removes only through counted confirmation, then
   await page.getByRole('button', { name: 'More actions for Travel Kobo' }).click();
   await page.getByRole('button', { name: 'Remove device' }).click();
   const dialog = page.getByRole('alertdialog', { name: 'Remove Travel Kobo?' });
-  await expect(dialog).toContainText('4 highlights and notes were made on this device');
-  await expect(dialog).toContainText('2 highlights and notes assigned to this device');
+  await expect(dialog).toContainText('4 annotations were made on this source');
+  await expect(dialog).toContainText('2 annotations assigned to this source');
   await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
   await dialog.getByRole('button', { name: 'Remove device' }).click();
   await expect(page.getByText('Travel Kobo removed.')).toBeVisible();
@@ -222,7 +258,7 @@ test('account summary makes the e-reader manager discoverable', async ({ page })
   await stubDevices(page);
   await page.goto('/app/account');
   const card = page.getByRole('region', { name: 'E-readers' });
-  await expect(card).toContainText('Libra Colour · 312 highlights and notes');
+  await expect(card).toContainText('Libra Colour · 312 annotations assigned to this source');
   await expect(card.getByRole('link', { name: 'Manage e-readers' })).toHaveAttribute('href', '/app/account/devices');
 });
 

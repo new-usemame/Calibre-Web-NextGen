@@ -31,11 +31,76 @@
 
 .cardTitle svg { color: var(--accent); }
 
-.deviceSummary { margin: 0 0 var(--sp-3); padding-left: var(--sp-5); color: var(--text-muted); }
-.deviceSummary li + li { margin-top: var(--sp-1); }
 .muted { margin: 0 0 var(--sp-3); color: var(--text-muted); }
-.deviceLinks { display: flex; flex-wrap: wrap; gap: 0 var(--sp-4); }
-.manageDevices { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); font-weight: var(--fw-medium); }
+
+/* Devices and browsers: one row per reading source, icon first, long custom
+   labels wrap under the name rather than pushing the count out. */
+.sourceList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-4);
+  padding: 0;
+}
+
+.sourceRow {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-2, var(--bg));
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.sourceIcon { color: var(--accent); flex-shrink: 0; margin-top: 2px; }
+
+.sourceLine {
+  margin: 0;
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.sourceLine strong { color: var(--text); font-weight: var(--fw-medium); }
+
+/* Actions: one filled primary destination (manage), one quiet secondary
+   (pairing) — the two intents read as different weights at a glance. */
+.deviceActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2) var(--sp-3);
+}
+
+.manageLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-1);
+  min-height: 38px;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: var(--fw-semi);
+  border-radius: var(--r-md);
+  text-decoration: none;
+  transition: background var(--dur-fast) var(--ease);
+}
+.manageLink:hover { background: var(--accent-hover); }
+.manageLink svg { flex-shrink: 0; }
+
+.pairLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--accent-text);
+  font-weight: var(--fw-medium);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  transition: color var(--dur-fast) var(--ease);
+}
+.pairLink:hover { color: var(--accent-hover); }
 
 /* Identity */
 .identity {

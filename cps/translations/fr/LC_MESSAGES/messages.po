@@ -15871,6 +15871,10 @@ msgid "Devices and browsers"
 msgstr "Appareils et navigateurs"
 
 #: cps/spa_strings.py
+msgid "Loading devices and browsers…"
+msgstr "Chargement des appareils et des navigateurs…"
+
+#: cps/spa_strings.py
 msgid "Could not load devices and browsers."
 msgstr "Impossible de charger les appareils et les navigateurs."
 

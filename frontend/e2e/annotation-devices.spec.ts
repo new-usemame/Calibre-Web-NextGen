@@ -254,11 +254,21 @@ test('device inventory renders one bounded window and reports the true total', a
 });
 
 test('account summary makes the e-reader manager discoverable', async ({ page }) => {
-  await stubDevices(page);
+  await page.route('**/api/annotations/devices?*', route => route.fulfill({ json: {
+    devices: [device, { ...device, public_id: 'browser-1', label: 'Browser', type: 'webreader',
+      origin_annotation_count: 7, annotation_count: 0 }], total: 2, limit: 100, offset: 0,
+  } }));
   await page.goto('/app/account');
   const card = page.getByRole('region', { name: 'Devices and browsers' });
-  await expect(card).toContainText('Libra Colour · 312 annotations assigned to this source');
-  await expect(card.getByRole('link', { name: 'Manage devices and browsers' })).toHaveAttribute('href', '/app/account/devices');
+  const physical = card.getByRole('listitem').filter({ hasText: 'Libra Colour' });
+  await expect(physical).toContainText('312 annotations assigned to this source');
+  const browser = card.getByRole('listitem').filter({ hasText: 'Browser' });
+  await expect(browser).toContainText('7 annotations from this source');
+  await expect(card.getByRole('link')).toHaveCount(2);
+  await card.getByRole('link', { name: 'Manage devices and browsers' }).click();
+  await expect(page).toHaveURL(/\/app\/account\/devices$/);
+  await expect(page.getByRole('heading', { name: 'Devices and browsers', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Browser', exact: true })).toBeVisible();
 });
 
 test('device manager owns pairing instead of sending users to the classic account page', async ({ page }) => {

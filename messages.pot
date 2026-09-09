@@ -14014,3 +14014,7 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Manage devices and browsers"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Loading devices and browsers…"
+msgstr ""

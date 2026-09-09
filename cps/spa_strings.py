@@ -1414,6 +1414,7 @@ _("Warning: the saved highlight could not be located in the current book. Its te
 # Account-wide browser reading source.
 _("Browser")
 _("Devices and browsers")
+_("Loading devices and browsers…")
 _("Could not load devices and browsers.")
 _("No devices or browser reading data yet.")
 _("Devices appear after their first sync. Browser appears after saving reading progress or annotations.")

@@ -15365,6 +15365,10 @@ msgid "Devices and browsers"
 msgstr "Apparaten en browsers"
 
 #: cps/spa_strings.py
+msgid "Loading devices and browsers…"
+msgstr "Apparaten en browsers laden…"
+
+#: cps/spa_strings.py
 msgid "Could not load devices and browsers."
 msgstr "Apparaten en browsers konden niet worden geladen."
 

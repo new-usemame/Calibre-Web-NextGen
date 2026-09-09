@@ -337,7 +337,7 @@
         return fetch(url, {
             method: method,
             credentials: "same-origin",
-            headers: window.webreaderDeviceHeaders({ "Content-Type": "application/json", "X-CSRFToken": csrfToken() }),
+            headers: new Headers({ "Content-Type": "application/json", "X-CSRFToken": csrfToken() }),
             body: body ? JSON.stringify(body) : undefined
         });
     }

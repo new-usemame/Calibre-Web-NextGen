@@ -1410,3 +1410,14 @@ _('All annotations')
 
 _("Location unavailable")
 _("Warning: the saved highlight could not be located in the current book. Its text is preserved.")
+
+# Account-wide browser reading source.
+_("Browser")
+_("Devices and browsers")
+_("Could not load devices and browsers.")
+_("No devices or browser reading data yet.")
+_("Devices appear after their first sync. Browser appears after saving reading progress or annotations.")
+_("Browser reading source")
+_("All browsers and computers signed in to your account share one Browser reading source.")
+_("Reading data is kept. Browser reappears when you next save reading progress or annotations.")
+_("Manage devices and browsers")

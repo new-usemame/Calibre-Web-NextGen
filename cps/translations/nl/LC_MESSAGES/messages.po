@@ -15354,3 +15354,40 @@ msgstr "Locatie niet beschikbaar"
 #: cps/spa_strings.py
 msgid "Warning: the saved highlight could not be located in the current book. Its text is preserved."
 msgstr "Waarschuwing: de opgeslagen markering kon niet worden gevonden in het huidige boek. De tekst blijft bewaard."
+
+
+#: cps/spa_strings.py
+msgid "Browser"
+msgstr "Browser"
+
+#: cps/spa_strings.py
+msgid "Devices and browsers"
+msgstr "Apparaten en browsers"
+
+#: cps/spa_strings.py
+msgid "Could not load devices and browsers."
+msgstr "Apparaten en browsers konden niet worden geladen."
+
+#: cps/spa_strings.py
+msgid "No devices or browser reading data yet."
+msgstr "Nog geen apparaten of leesgegevens uit de browser."
+
+#: cps/spa_strings.py
+msgid "Devices appear after their first sync. Browser appears after saving reading progress or annotations."
+msgstr "Apparaten verschijnen na hun eerste synchronisatie. Browser verschijnt na het opslaan van leesvoortgang of annotaties."
+
+#: cps/spa_strings.py
+msgid "Browser reading source"
+msgstr "Leesbron van de browser"
+
+#: cps/spa_strings.py
+msgid "All browsers and computers signed in to your account share one Browser reading source."
+msgstr "Alle browsers en computers waarop je bent aangemeld bij je account delen één leesbron Browser."
+
+#: cps/spa_strings.py
+msgid "Reading data is kept. Browser reappears when you next save reading progress or annotations."
+msgstr "Leesgegevens blijven behouden. Browser verschijnt opnieuw wanneer je leesvoortgang of annotaties opslaat."
+
+#: cps/spa_strings.py
+msgid "Manage devices and browsers"
+msgstr "Apparaten en browsers beheren"

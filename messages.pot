@@ -13977,3 +13977,40 @@ msgid ""
 "Warning: the saved highlight could not be located in the current book. "
 "Its text is preserved."
 msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Browser"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Devices and browsers"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load devices and browsers."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No devices or browser reading data yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Devices appear after their first sync. Browser appears after saving reading progress or annotations."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Browser reading source"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "All browsers and computers signed in to your account share one Browser reading source."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reading data is kept. Browser reappears when you next save reading progress or annotations."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Manage devices and browsers"
+msgstr ""

@@ -15860,3 +15860,40 @@ msgstr "Emplacement indisponible"
 #: cps/spa_strings.py
 msgid "Warning: the saved highlight could not be located in the current book. Its text is preserved."
 msgstr "Avertissement : l’annotation enregistrée n’a pas pu être localisée dans le livre actuel. Son texte est conservé."
+
+
+#: cps/spa_strings.py
+msgid "Browser"
+msgstr "Navigateur"
+
+#: cps/spa_strings.py
+msgid "Devices and browsers"
+msgstr "Appareils et navigateurs"
+
+#: cps/spa_strings.py
+msgid "Could not load devices and browsers."
+msgstr "Impossible de charger les appareils et les navigateurs."
+
+#: cps/spa_strings.py
+msgid "No devices or browser reading data yet."
+msgstr "Aucun appareil ni donnée de lecture dans le navigateur pour le moment."
+
+#: cps/spa_strings.py
+msgid "Devices appear after their first sync. Browser appears after saving reading progress or annotations."
+msgstr "Les appareils apparaissent après leur première synchronisation. Le navigateur apparaît après l’enregistrement de la progression de lecture ou d’annotations."
+
+#: cps/spa_strings.py
+msgid "Browser reading source"
+msgstr "Source de lecture du navigateur"
+
+#: cps/spa_strings.py
+msgid "All browsers and computers signed in to your account share one Browser reading source."
+msgstr "Tous les navigateurs et ordinateurs connectés à votre compte partagent une seule source de lecture Navigateur."
+
+#: cps/spa_strings.py
+msgid "Reading data is kept. Browser reappears when you next save reading progress or annotations."
+msgstr "Les données de lecture sont conservées. Le navigateur réapparaît au prochain enregistrement de la progression de lecture ou d’annotations."
+
+#: cps/spa_strings.py
+msgid "Manage devices and browsers"
+msgstr "Gérer les appareils et les navigateurs"

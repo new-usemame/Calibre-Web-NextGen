@@ -232,15 +232,15 @@ export function Account() {
       <h1 className={styles.title}>{t('Account')}</h1>
 
       <section className={styles.card} aria-labelledby="account-ereaders-title">
-        <h2 id="account-ereaders-title" className={styles.cardTitle}><Smartphone size={16} aria-hidden="true" focusable={false} /> {t('E-readers')}</h2>
-        {devices.data?.devices.some(device => device.type !== 'webreader') ? (
+        <h2 id="account-ereaders-title" className={styles.cardTitle}><Smartphone size={16} aria-hidden="true" focusable={false} /> {t('Devices and browsers')}</h2>
+        {!!devices.data?.devices.length ? (
           <ul className={styles.deviceSummary}>
-            {devices.data.devices.filter(device => device.type !== 'webreader').map((device) => <li key={device.public_id}>{device.label} · {device.origin_annotation_count != null ? t('{n} annotations from this source', { n: device.origin_annotation_count }) : t('{n} annotations assigned to this source', { n: device.annotation_count })}</li>)}
+            {devices.data!.devices.map((device) => <li key={device.public_id}>{device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label} · {device.origin_annotation_count != null ? t('{n} annotations from this source', { n: device.origin_annotation_count }) : t('{n} annotations assigned to this source', { n: device.annotation_count })}</li>)}
           </ul>
-        ) : <p className={styles.muted}>{devices.isError ? t('Could not load e-readers.') : t('No e-readers yet.')}</p>}
+        ) : <p className={styles.muted}>{devices.isError ? t('Could not load devices and browsers.') : t('No devices or browser reading data yet.')}</p>}
         <div className={styles.deviceLinks}>
-          {devices.data?.devices.some(device => device.type === 'webreader') && <Link href="/account/devices#browser-reading-sources" className={styles.manageDevices}>{t('Browser reading sources')}</Link>}
-          <Link href="/account/devices" className={styles.manageDevices}>{t('Manage e-readers')}</Link>
+          {devices.data?.devices.some(device => device.type === 'webreader') && <Link href="/account/devices#browser-reading-sources" className={styles.manageDevices}>{t('Browser reading source')}</Link>}
+          <Link href="/account/devices" className={styles.manageDevices}>{t('Manage devices and browsers')}</Link>
           <Link href="/account/devices#kobo-pairing" className={styles.manageDevices}>
             {t('Pair a Kobo or KOReader')}
           </Link>

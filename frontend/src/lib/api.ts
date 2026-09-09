@@ -1,7 +1,5 @@
 /* Typed fetch helpers — same-origin, credentials included. */
 
-import { webreaderDeviceHeaders } from './deviceIdentity';
-
 declare global {
   interface Window { __CWNG_PREFIX__?: string; }
 }
@@ -621,8 +619,6 @@ export function navigateToLogout(): void {
 
 export interface ApiRequestOptions {
   auth?: 'protected' | 'public';
-  /** Attribute a reading-data mutation to this browser installation. */
-  webreaderDevice?: boolean;
 }
 
 function isProtected(options?: ApiRequestOptions): boolean {
@@ -805,14 +801,11 @@ export async function apiPost<T>(
   requestOptions?: Pick<RequestInit, 'keepalive'> & ApiRequestOptions,
 ): Promise<T> {
   const doPost = async (csrf: string): Promise<Response> => {
-    const { auth: _auth, webreaderDevice: _device, ...fetchOptions } = requestOptions ?? {};
+    const { auth: _auth, ...fetchOptions } = requestOptions ?? {};
     return classifiedFetch(path, {
       method: 'POST',
       credentials: 'include',
-      headers: requestOptions?.webreaderDevice ? webreaderDeviceHeaders({
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrf,
-      }) : {
+      headers: {
         'Content-Type': 'application/json',
         'X-CSRFToken': csrf,
       },
@@ -885,9 +878,7 @@ export async function apiDelete<T>(path: string, options?: ApiRequestOptions): P
     classifiedFetch(path, {
       method: 'DELETE',
       credentials: 'include',
-      headers: options?.webreaderDevice
-        ? webreaderDeviceHeaders({ 'X-CSRFToken': csrf })
-        : { 'X-CSRFToken': csrf },
+      headers: { 'X-CSRFToken': csrf },
     }, options);
 
   let csrf = await getCsrf(options);
@@ -925,10 +916,7 @@ export async function apiPatch<T>(path: string, body?: unknown, options?: ApiReq
     classifiedFetch(path, {
       method: 'PATCH',
       credentials: 'include',
-      headers: options?.webreaderDevice ? webreaderDeviceHeaders({
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrf,
-      }) : {
+      headers: {
         'Content-Type': 'application/json',
         'X-CSRFToken': csrf,
       },

@@ -122,7 +122,7 @@ for (const classic of [false, true]) {
       await dialog.getByRole('button', { name: 'Yellow', exact: true }).click();
     }
     await expect.poll(() => writes.length).toBe(1);
-    expect(writes[0].installation).toBe(installation);
+    expect(writes[0].installation).toBeUndefined();
     expect(writes[0].body.highlighted_text).toBe('Select');
     if (classic) {
       expect(writes[0].body).toMatchObject({ chapter_filename: 'part0/chapter.xhtml', start_kobospan: 'kobo.1.1', end_kobospan: 'kobo.1.1', start_offset: 0, end_offset: 6 });

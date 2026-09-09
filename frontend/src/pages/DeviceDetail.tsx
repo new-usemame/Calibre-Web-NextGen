@@ -283,7 +283,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
       </Link>
       <header className={styles.header}>
         <Smartphone aria-hidden="true" focusable={false} />
-        <div><h1>{device.label}</h1><p>{device.browser_identity === 'unidentified' ? t('Unidentified browser source') : device.kind_label || device.type}</p></div>
+        <div><h1>{device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label}</h1><p>{device.type === 'webreader' ? t('Browser reading source') : device.kind_label || device.type}</p></div>
       </header>
       <section className={styles.summary} aria-label={t('Device summary')}>
         <DeviceSummary device={{

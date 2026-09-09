@@ -1,5 +1,4 @@
 import { expect, test } from '@playwright/test';
-import { webreaderInstallationId } from '../src/lib/deviceIdentity';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../src/lib/safeStorage';
 import { DEFAULT_THEME, resolveTheme } from '../src/lib/themes';
 
@@ -12,7 +11,7 @@ test.describe('theme logic', () => {
     expect(resolveTheme('not-a-theme')).toBe(DEFAULT_THEME);
   });
 
-  test('storage SecurityError degrades reader preferences and identity safely', () => {
+  test('storage SecurityError degrades reader preferences safely', () => {
     const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
     Object.defineProperty(globalThis, 'window', {
       configurable: true,
@@ -27,7 +26,6 @@ test.describe('theme logic', () => {
     try {
       expect(safeLocalStorageGet('cwng.reader.theme')).toBeNull();
       expect(safeLocalStorageSet('cwng.reader.font', '100')).toBe(false);
-      expect(webreaderInstallationId()).toBeNull();
     } finally {
       if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow);
       else delete (globalThis as { window?: unknown }).window;

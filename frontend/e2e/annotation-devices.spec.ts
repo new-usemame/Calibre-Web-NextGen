@@ -12,12 +12,10 @@ test('reader sources separate browsers and distinguish missing from empty invent
   const physical = { ...device, origin_annotation_count: 19, annotation_count: 0,
     inventory_count: 0, inventory_observed: null };
   const browser = { ...physical, public_id: 'browser-1', type: 'webreader', kind: 'webreader',
-    label: 'My browser', model: 'CWNG web reader', browser_identity: 'identified',
+    label: 'Browser', model: 'CWNG web reader', browser_identity: 'account',
     origin_annotation_count: 2 };
-  const fallback = { ...browser, public_id: 'browser-2', label: 'Custom source name',
-    browser_identity: 'unidentified' };
   await page.route('**/api/annotations/devices?*', route => route.fulfill({ json: {
-    devices: [physical, browser, fallback], total: 3, limit: 100, offset: 0,
+    devices: [physical, browser], total: 2, limit: 100, offset: 0,
   } }));
   let observed = false;
   await page.route('**/api/annotations/devices/device-1/inventory?*', route => route.fulfill({ json: {
@@ -25,9 +23,10 @@ test('reader sources separate browsers and distinguish missing from empty invent
     observed_at: observed ? '2026-09-08T12:00:00Z' : null,
   } }));
   await page.goto('/app/account/devices');
-  const browsers = page.getByRole('region', { name: 'Browser reading sources' });
-  await expect(browsers.getByRole('link', { name: 'My browser', exact: true })).toBeVisible();
-  await expect(browsers.getByText('Unidentified browser source', { exact: true })).toBeVisible();
+  const browsers = page.getByRole('region', { name: 'Browser reading source' });
+  await expect(browsers.getByRole('link', { name: 'Browser', exact: true })).toBeVisible();
+  await expect(browsers.getByRole('listitem')).toHaveCount(1);
+  await expect(browsers).toContainText('All browsers and computers signed in to your account share one Browser reading source.');
   await expect(browsers.getByRole('button', { name: 'View device library' })).toHaveCount(0);
   await expect(browsers.getByText(/books in latest inventory/)).toHaveCount(0);
   const clara = page.getByRole('listitem').filter({ has: page.getByRole('link', { name: device.label, exact: true }) });
@@ -88,7 +87,7 @@ test('device actions menu dismisses on an outside pointer press', async ({ page 
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await expect(remove).toBeVisible();
 
-  const heading = page.getByRole('heading', { name: 'E-readers' });
+  const heading = page.getByRole('heading', { name: 'Devices and browsers' });
   const box = await heading.boundingBox();
   expect(box).not.toBeNull();
   await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
@@ -169,7 +168,7 @@ test('touch dismissal does not activate the control beneath the press', async ({
 test('device manager renames and removes only through counted confirmation, then restores', async ({ page }) => {
   const calls = await stubDevices(page);
   await page.goto('/app/account/devices');
-  await expect(page.getByRole('heading', { name: 'E-readers' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Devices and browsers' })).toBeVisible();
   await expect(page.getByText('312 annotations assigned to this source')).toBeVisible();
 
   await page.getByRole('button', { name: 'Rename Libra Colour' }).click();
@@ -195,7 +194,7 @@ test('device manager is axe-clean and has no 390px overflow', async ({ page }, t
   await stubDevices(page);
   if (testInfo.project.name === 'desktop') await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app/account/devices');
-  await expect(page.getByRole('heading', { name: 'E-readers' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Devices and browsers' })).toBeVisible();
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze();
   expect(results.violations.filter((v) => ['critical', 'serious'].includes(v.impact || ''))).toEqual([]);
   await assertNoHorizontalOverflow(page);
@@ -257,9 +256,9 @@ test('device inventory renders one bounded window and reports the true total', a
 test('account summary makes the e-reader manager discoverable', async ({ page }) => {
   await stubDevices(page);
   await page.goto('/app/account');
-  const card = page.getByRole('region', { name: 'E-readers' });
+  const card = page.getByRole('region', { name: 'Devices and browsers' });
   await expect(card).toContainText('Libra Colour · 312 annotations assigned to this source');
-  await expect(card.getByRole('link', { name: 'Manage e-readers' })).toHaveAttribute('href', '/app/account/devices');
+  await expect(card.getByRole('link', { name: 'Manage devices and browsers' })).toHaveAttribute('href', '/app/account/devices');
 });
 
 test('device manager owns pairing instead of sending users to the classic account page', async ({ page }) => {

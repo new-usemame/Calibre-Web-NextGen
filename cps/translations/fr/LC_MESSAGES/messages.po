@@ -15901,3 +15901,11 @@ msgstr "Les données de lecture sont conservées. Le navigateur réapparaît au 
 #: cps/spa_strings.py
 msgid "Manage devices and browsers"
 msgstr "Gérer les appareils et les navigateurs"
+
+#: cps/spa_strings.py
+msgid "1 annotation from this source"
+msgstr "1 annotation provenant de cette source"
+
+#: cps/spa_strings.py
+msgid "1 annotation assigned to this source"
+msgstr "1 annotation attribuée à cette source"

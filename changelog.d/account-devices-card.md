@@ -7,3 +7,5 @@
   redundant jump to the browser section is gone. The card also no longer claims
   there is no reading data while it is still loading, and the empty state
   explains when devices and the browser source appear.
+
+  Single annotations use the singular count label.

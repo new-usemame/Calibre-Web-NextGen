@@ -15395,3 +15395,11 @@ msgstr "Leesgegevens blijven behouden. Browser verschijnt opnieuw wanneer je lee
 #: cps/spa_strings.py
 msgid "Manage devices and browsers"
 msgstr "Apparaten en browsers beheren"
+
+#: cps/spa_strings.py
+msgid "1 annotation from this source"
+msgstr "1 annotatie uit deze bron"
+
+#: cps/spa_strings.py
+msgid "1 annotation assigned to this source"
+msgstr "1 annotatie toegewezen aan deze bron"

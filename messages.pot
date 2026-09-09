@@ -14018,3 +14018,11 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Loading devices and browsers…"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "1 annotation from this source"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "1 annotation assigned to this source"
+msgstr ""

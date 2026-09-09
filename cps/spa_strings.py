@@ -1422,3 +1422,7 @@ _("Browser reading source")
 _("All browsers and computers signed in to your account share one Browser reading source.")
 _("Reading data is kept. Browser reappears when you next save reading progress or annotations.")
 _("Manage devices and browsers")
+
+_("1 annotation from this source")
+
+_("1 annotation assigned to this source")

@@ -248,8 +248,12 @@ export function Account() {
                   <strong>{device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label}</strong>
                   {' · '}
                   {device.origin_annotation_count != null
-                    ? t('{n} annotations from this source', { n: device.origin_annotation_count })
-                    : t('{n} annotations assigned to this source', { n: device.annotation_count })}
+                    ? (device.origin_annotation_count === 1
+                      ? t('1 annotation from this source')
+                      : t('{n} annotations from this source', { n: device.origin_annotation_count }))
+                    : (device.annotation_count === 1
+                      ? t('1 annotation assigned to this source')
+                      : t('{n} annotations assigned to this source', { n: device.annotation_count }))}
                 </p>
               </li>
             ))}

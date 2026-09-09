@@ -310,7 +310,7 @@
 }
 
 .menuItemDanger {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 .menuItemDanger:hover,
@@ -319,7 +319,7 @@
 }
 
 .menuItemDanger .menuItemIcon {
-  color: var(--danger);
+  color: var(--danger-text);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -259,6 +259,16 @@ export default defineConfig({
       dependencies: ['setup'],
     },
 
+    ...[
+      { name: 'topbar-webkit', profile: devices['Desktop Safari'] },
+      { name: 'topbar-webkit-mobile', profile: devices['iPhone 13'] },
+    ].map(({ name, profile }) => ({
+      name,
+      testMatch: /topbar-menu-interaction\.spec\.ts/,
+      use: { ...profile, storageState: STORAGE },
+      dependencies: ['setup'],
+    })),
+
     // 8. Sub-path reverse proxy (opt-in: set E2E_SUBPATH_URL to the nginx rig).
     //    Guards Class 1 subpath breakage (v4.1.1 reader 404, #571 white page).
     ...(SUBPATH_URL

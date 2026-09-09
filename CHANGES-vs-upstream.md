@@ -68,6 +68,7 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ### Bug fixes
 
+- **Account and Help disclosures pin correctly after hover then click.** Toggle the pinned state and cancel delayed closure, preserving touch and keyboard dismissal. Dark/sepia Sign out text remains readable on focused menu surfaces. Behavioral coverage includes both menus, browser engines and all palettes. | SHA `TBD` | release `TBD`.
 - **Safari text selection opens highlight controls in both web readers.** Shared focused-frame selection observation preserves the script-disabled book sandbox and native-event deduplication. Desktop mouse and mobile DOM-selection browser contracts cover creation and embedded-script isolation. | SHA `TBD` | release `TBD`.
 - **Clearing a note now agrees in the classic and new readers.** Explicit web-reader clears store an empty string; omitted notes and existing NULLs stay unknown. Kobo column rendering treats either empty representation as no note. No migration. | SHA `TBD` | release `TBD`.
 

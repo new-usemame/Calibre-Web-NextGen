@@ -9,3 +9,4 @@
 - **Selecting text opens highlight controls in Safari in both web readers.** A shared parent-side selection observer handles sandboxed books while keeping embedded book scripts disabled and avoiding duplicate controls in other browsers. Canceling and immediately selecting the same passage again also reopens the controls.
 - **Clicking an Account or Help menu that opened on hover now keeps it open.** Clicking again closes it; touch, keyboard, Escape and outside-click dismissal remain supported.
 - **Sign out text remains readable in dark and sepia account menus**, including keyboard focus.
+- **Opening a saved highlight or synced reading position lands on the correct page immediately.** Font and spacing are applied before the destination is measured, and selected margins remain consistent when opening chapters or resizing the reader.

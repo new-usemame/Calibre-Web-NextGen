@@ -1,6 +1,7 @@
 // Run the production popup callbacks with a minimal DOM and capture fetch.
 const fs = require('node:fs');
 const vm = require('node:vm');
+const path = require('node:path');
 const elements = [];
 function element(tag) {
     const el = {tag, style: {}, children: [], value: '',
@@ -14,13 +15,15 @@ const document = {readyState: 'loading', body: element('body'),
     createElement: element, addEventListener() {},
     querySelector() { return null; }, getElementById() { return null; }};
 const calibre = {annotationsApiBase: '/annotations/1'};
-const context = {document, calibre, window: {calibre, innerWidth: 1000, innerHeight: 800},
+const context = {document, calibre, Headers, window: {calibre, innerWidth: 1000, innerHeight: 800},
     fetch(url, options) {
         process.stdout.write(options.body);
         // Keep post-save rendering outside this payload contract.
         return new Promise(() => {});
     }};
 vm.createContext(context);
+// Match read.html's script dependencies; keep the real fallback/header logic.
+vm.runInContext(fs.readFileSync(path.join(path.dirname(process.argv[2]), 'device-identity.js'), 'utf8'), context);
 let source = fs.readFileSync(process.argv[2], 'utf8');
 // Expose the closure's entry points without replacing any production logic.
 const end = source.lastIndexOf('})();');

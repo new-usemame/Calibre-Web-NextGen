@@ -1,16 +1,32 @@
-.container { max-width: 860px; margin: 0 auto; padding: var(--sp-6) var(--sp-5); color: var(--text); }
-.back { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--text-muted); font-size: var(--fs-sm); margin-bottom: var(--sp-3); transition: color var(--dur-fast) var(--ease); }
+/* Devices & browsers — the same card language as the Account page: quiet
+   display-font title, surface-1 cards, accent-tinted section icons, muted
+   supporting text, one clearly primary action per surface. */
+.container { max-width: 720px; margin: 0 auto; padding: var(--sp-6) var(--sp-5); color: var(--text); }
+.back { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--text-muted); font-size: var(--fs-sm); margin-bottom: var(--sp-2); transition: color var(--dur-fast) var(--ease); }
 .back:hover { color: var(--accent); }
-.heading { display: flex; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-4); }
-.heading svg { color: var(--accent); }
-.heading h1, .card h2, .empty h2 { margin: 0; }
+.title { margin: 0 0 var(--sp-5); font-family: var(--font-display); font-size: var(--fs-xl); color: var(--text); }
+
+/* Group sections (E-readers / Browser reading source): a labelled landmark
+   per group so the two kinds of reading source stay distinguishable. */
+.section { margin-bottom: var(--sp-5); }
+.sectionTitle {
+  display: flex; align-items: center; gap: var(--sp-2);
+  margin: 0 0 var(--sp-3);
+  font-family: var(--font-display); font-size: var(--fs-md); color: var(--text);
+}
+.sectionTitle svg { color: var(--accent); flex-shrink: 0; }
+.sectionHint { margin: calc(-1 * var(--sp-1)) 0 var(--sp-3); color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-base); }
+
 .list { list-style: none; display: grid; gap: var(--sp-3); margin: 0; padding: 0; }
+
 .pagination { display: flex; align-items: center; justify-content: center; gap: var(--sp-3); margin-top: var(--sp-4); }
 .pagination button { min-height: 44px; padding: 0 var(--sp-4); border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text); transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
 .pagination button:not(:disabled):hover { background: var(--surface-2); border-color: var(--border-strong); }
 .pagination button:disabled { opacity: .55; cursor: default; }
 .pagination span { color: var(--text-muted); font-size: var(--fs-sm); }
 
+/* Only rendered once there is more than one page — a "Page 1 of 1" line is
+   noise, not status. */
 .countLine { margin: 0 0 var(--sp-3); color: var(--text-muted); font-size: var(--fs-sm); }
 
 /* DeviceInventory status line — the same quiet register as the page count line
@@ -23,13 +39,11 @@
   border-radius: var(--r-md);
 }
 
-/* Device card — name, then the stats that answer "is this reader alive?":
-   annotation count + last-seen first, inventory/storage quiet below. */
+/* Device card — header row (icon, linked name, model/firmware, actions), then
+   the stats that answer "is this reader alive?": annotation counts + last-seen
+   as one wrapping line, inventory/storage quiet below. */
 .card {
   position: relative;
-  display: flex;
-  justify-content: space-between;
-  gap: var(--sp-3);
   padding: var(--sp-4) var(--sp-5);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
@@ -38,13 +52,33 @@
   transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 .card:hover { border-color: var(--border-strong); }
-.cardMain { min-width: 0; flex: 1; }
-.cardMain h2 { font-size: var(--fs-md); line-height: var(--lh-snug); }
-.cardMain h2 a { color: var(--text); transition: color var(--dur-fast) var(--ease); }
-.cardMain h2 a:hover { color: var(--accent-text); }
+
+.cardHead { display: flex; align-items: flex-start; gap: var(--sp-3); }
+.cardIcon { flex-shrink: 0; margin-top: 2px; color: var(--accent); }
+.cardTitleWrap { min-width: 0; flex: 1; }
+.cardName { margin: 0; font-size: var(--fs-md); line-height: var(--lh-snug); }
+.cardName a { color: var(--text); overflow-wrap: anywhere; transition: color var(--dur-fast) var(--ease); }
+.cardName a:hover { color: var(--accent-text); }
+
 .deviceMeta { color: var(--text-muted); font-size: var(--fs-sm); margin: var(--sp-1) 0 0; overflow-wrap: anywhere; }
 .deviceMeta:empty { display: none; }
-.deviceStats { color: var(--text); font-size: var(--fs-sm); font-weight: var(--fw-medium); margin: var(--sp-2) 0 0; overflow-wrap: anywhere; }
+
+/* Stats read as one sentence. The middot is generated content leading each
+   follow-up stat (never its own flex item), so a wrapped line can never leave
+   a separator dangling at the end — it travels with its stat to the new line.
+   Screen readers don't hear it; they already get the stat text itself. */
+.deviceStats {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-1) var(--sp-2);
+  margin: var(--sp-2) 0 0;
+  color: var(--text); font-size: var(--fs-sm); font-weight: var(--fw-medium);
+  overflow-wrap: anywhere;
+}
+.deviceStats > span + span:not(.stalePill)::before {
+  content: '·';
+  margin-right: var(--sp-2);
+  color: var(--text-faint);
+  font-weight: var(--fw-normal);
+}
 .stalePill {
   display: inline-block;
   font-size: var(--fs-xs);
@@ -56,8 +90,9 @@
   padding: 1px var(--sp-2);
   white-space: nowrap;
 }
-.storage { display: flex; flex-direction: column; gap: var(--sp-1); margin: var(--sp-2) 0 0; color: var(--text-muted); font-size: var(--fs-sm); }
-.storageMeter { display: block; width: min(240px, 100%); height: 6px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
+
+.storage { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); margin: var(--sp-2) 0 0; color: var(--text-muted); font-size: var(--fs-sm); }
+.storageMeter { flex: 0 1 180px; min-width: 120px; height: 6px; border-radius: var(--r-full); background: var(--surface-3); overflow: hidden; }
 .storageMeter > span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
 
 .inventoryToggle { min-height: 44px; margin-top: var(--sp-2); color: var(--accent-text); font-weight: var(--fw-medium); text-decoration: underline; text-underline-offset: 3px; }
@@ -76,7 +111,10 @@
 .inventoryDelete:disabled { opacity: .65; cursor: default; }
 .onDevice { display: block; color: var(--text-muted); font-size: var(--fs-xs); }
 .unmatched { display: block; color: var(--text-muted); font-size: var(--fs-xs); font-style: italic; }
-.cardActions { display: flex; align-items: flex-start; position: relative; }
+
+/* Card corner actions: quiet 44px icon buttons; destructive removal stays
+   behind the overflow menu so it is never the loudest thing on the card. */
+.cardActions { display: flex; align-items: flex-start; position: relative; flex-shrink: 0; }
 .cardActions > button, .renameForm button { min-width: 44px; min-height: 44px; border-radius: var(--r-md); color: var(--text-muted); transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .cardActions > button:hover { background: var(--surface-2); color: var(--text); }
 .menuDismissLayer { position: fixed; z-index: calc(var(--z-overlay) + 1); inset: 0; }
@@ -84,23 +122,37 @@
 .menu { position: absolute; z-index: calc(var(--z-overlay) + 2); right: 0; top: 46px; min-width: 160px; padding: var(--sp-1); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); box-shadow: var(--elev-2); }
 .menu button { width: 100%; min-height: 44px; text-align: left; padding: 0 var(--sp-3); border-radius: var(--r-sm); color: var(--danger); }
 .menu button:hover { background: var(--danger-soft); }
+
 .renameForm { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .renameForm input { min-width: min(260px, 100%); min-height: 44px; border: 1px solid var(--border); border-radius: var(--r-md); padding: 0 var(--sp-3); background: var(--surface-3); color: var(--text); }
 .renameForm input:focus { border-color: var(--accent); }
 .renameForm button { padding: 0 var(--sp-3); border: 1px solid var(--border); color: var(--text); }
 .renameForm button[type='submit'] { color: var(--accent-text); background: var(--accent-soft); }
 .renameForm button:disabled { opacity: .55; cursor: default; }
+
+/* Empty state: same card surface as everything else, one clear next step. */
 .empty { margin-top: var(--sp-5); padding: var(--sp-5); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); }
+.emptyTitle { margin: 0 0 var(--sp-2); font-family: var(--font-display); font-size: var(--fs-md); }
 .empty p { color: var(--text-muted); }
 .empty a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent-text); font-weight: var(--fw-medium); text-decoration: underline; text-underline-offset: 3px; }
 .empty a:hover { color: var(--accent-hover); }
+
+/* Kobo / KOReader pairing: a full card with the Account cardTitle treatment,
+   two sub-panels for the two pairing paths, and a status bar that turns
+   success-tinted once a device checks in. */
 .pairing {
-  margin-top: var(--sp-5); padding: var(--sp-5); border: 1px solid var(--border);
+  margin-top: var(--sp-4); padding: var(--sp-5); border: 1px solid var(--border);
   border-radius: var(--r-lg); background: var(--surface-1);
 }
-.pairing h2 { margin: 0; }
+.pairingTitle {
+  display: flex; align-items: center; gap: var(--sp-2);
+  margin: 0 0 var(--sp-2);
+  font-family: var(--font-display); font-size: var(--fs-md); color: var(--text);
+}
+.pairingTitle svg { color: var(--accent); flex-shrink: 0; }
 .pairing h3 { margin: 0 0 var(--sp-2); font-size: var(--fs-md); }
 .pairingIntro, .pairingStart p { color: var(--text-muted); line-height: var(--lh-base); }
+.pairingIntro { margin-top: 0; }
 .pairingStatus { color: var(--text-muted); }
 .pairingAlert {
   padding: var(--sp-3) var(--sp-4); color: var(--text); background: var(--danger-soft);
@@ -117,17 +169,20 @@
 .primaryButton:disabled, .deleteTokenButton:disabled { opacity: .6; cursor: default; }
 .pairingUrlBlock { margin-top: var(--sp-4); }
 .pairingLabel { margin: 0 0 var(--sp-2); font-weight: var(--fw-bold); }
-.pairingUrlRow { display: flex; align-items: stretch; gap: var(--sp-2); min-width: 0; }
+/* URL gets the full panel width; the copy control tucks right-aligned beneath
+   it. In the ~270px pairing panels a side-by-side row left the URL a sliver
+   that wrapped one character per line. */
+.pairingUrlRow { display: flex; flex-wrap: wrap; gap: var(--sp-2); min-width: 0; }
 .pairingUrlRow code, .configLine {
   display: block; min-width: 0; padding: var(--sp-3); color: var(--text);
   background: var(--surface-3); border: 1px solid var(--border); border-radius: var(--r-md);
   overflow-wrap: anywhere; user-select: all;
 }
-.pairingUrlRow code { flex: 1; }
-.pairingUrlRow button { flex: 0 0 auto; }
-.pairingColumns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); margin-top: var(--sp-5); }
-.pairingColumns > div { min-width: 0; padding: var(--sp-4); background: var(--surface-2); border-radius: var(--r-md); }
-.pairingColumns ol { margin: var(--sp-2) 0; padding-left: var(--sp-5); color: var(--text-muted); line-height: var(--lh-relaxed); }
+.pairingUrlRow code { flex: 1 1 100%; }
+.pairingUrlRow button { flex: 0 0 auto; margin-left: auto; }
+.pairingColumns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); margin-top: var(--sp-4); }
+.pairingColumns > div { min-width: 0; padding: var(--sp-4); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); }
+.pairingColumns ol { list-style: decimal; margin: var(--sp-2) 0; padding-left: var(--sp-5); color: var(--text-muted); line-height: var(--lh-relaxed); }
 .pairingColumns li + li { margin-top: var(--sp-2); }
 .pairingColumns a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; }
 .configLine { margin: var(--sp-3) 0; }
@@ -140,15 +195,20 @@
 .deleteTokenButton:hover { background: var(--danger-soft); border-color: var(--danger); }
 .deviceSeen, .deviceWaiting {
   display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
-  gap: var(--sp-3); margin-top: var(--sp-5); padding: var(--sp-4);
+  gap: var(--sp-3); margin-top: var(--sp-4); padding: var(--sp-4);
   border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2);
 }
 .deviceSeen { border-color: var(--success-border); background: var(--success-soft); }
 .deviceSeen > svg { color: var(--success); }
-.deviceSeen p, .deviceWaiting p { margin: 0; line-height: var(--lh-base); }
+/* The "Device seen: {name}…" line interpolates a free-form device label —
+   a 60-char no-space name must wrap inside its grid track, not overflow it. */
+.deviceSeen p, .deviceWaiting p { margin: 0; line-height: var(--lh-base); overflow-wrap: anywhere; }
 .copyError { min-height: 1.5em; margin: var(--sp-2) 0 0; color: var(--danger); font-size: var(--fs-sm); }
+
 .scrim { position: fixed; z-index: calc(var(--z-overlay) + 3); inset: 0; display: grid; place-items: center; padding: var(--sp-4); background: var(--overlay-backdrop); }
-.dialog { width: min(520px, 100%); padding: var(--sp-5); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); box-shadow: var(--elev-3); }
+/* overflow-wrap anywhere: the dialog title interpolates the device label, so a
+   long no-space name wraps instead of pushing past the 320px viewport. */
+.dialog { width: min(520px, 100%); padding: var(--sp-5); border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface-1); box-shadow: var(--elev-3); overflow-wrap: anywhere; }
 .dialog h2 { font-size: var(--fs-lg); }
 .dialog p { color: var(--text-muted); line-height: var(--lh-base); margin-top: var(--sp-2); }
 .dialogActions { display: flex; justify-content: flex-end; gap: var(--sp-2); margin-top: var(--sp-4); }
@@ -161,19 +221,34 @@
 .toast { position: fixed; z-index: calc(var(--z-overlay) + 4); left: 50%; bottom: var(--sp-5); transform: translateX(-50%); display: flex; align-items: center; gap: var(--sp-4); min-width: min(420px, calc(100vw - 32px)); padding: var(--sp-3) var(--sp-4); background: var(--surface-2); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--r-md); box-shadow: var(--elev-3); }
 .toast button { margin-left: auto; min-height: 44px; color: var(--accent-text); font-weight: var(--fw-bold); }
 .toast button:hover { color: var(--accent-hover); }
+
 @media (max-width: 600px) {
   .container { padding: var(--sp-4) var(--sp-3); }
   .card { padding: var(--sp-4); }
-  .cardActions { flex-direction: column; }
+  .storageMeter { flex-basis: 100%; }
   .inventoryRow { flex-direction: column; }
   .dialogActions { flex-direction: column-reverse; }
   .dialogActions button { width: 100%; }
   .pagination { justify-content: space-between; }
   .pairing { padding: var(--sp-4); }
   .pairingColumns { grid-template-columns: 1fr; }
-  .pairingUrlRow { flex-direction: column; }
   .pairingUrlRow button { width: 100%; }
   .deviceSeen, .deviceWaiting { grid-template-columns: auto minmax(0, 1fr); }
   .deviceSeen button, .deviceWaiting button { grid-column: 1 / -1; width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+
+/* Action recovery remains next to the control that failed. */
+.loadError { padding: var(--sp-5); margin-bottom: var(--sp-4); border: 1px solid var(--danger-border); border-radius: var(--r-lg); background: var(--surface-1); }
+.loadError p { margin: 0 0 var(--sp-3); color: var(--text); }
+.renameError { flex-basis: 100%; color: var(--text); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.menuError { margin: 0; padding: var(--sp-2) var(--sp-3); color: var(--text); font-size: var(--fs-sm); overflow-wrap: anywhere; }
+.renameError:empty, .menuError:empty, .undoError:empty { display: none; }
+.cardActions > button:disabled, .dialogActions button:disabled, .toast button:disabled, .menu button:disabled { opacity: .6; cursor: default; }
+.renameForm input { width: 100%; min-width: 0; }
+.renameForm input:disabled { opacity: .7; }
+.toast { flex-wrap: wrap; width: min(420px, calc(100vw - 32px)); min-width: 0; }
+.toast > span:first-child { min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.undoError { flex-basis: 100%; font-size: var(--fs-sm); }
+.deviceWaiting { grid-template-columns: minmax(0, 1fr) auto; }
+@media (max-width: 600px) { .deviceWaiting { grid-template-columns: minmax(0, 1fr); } }

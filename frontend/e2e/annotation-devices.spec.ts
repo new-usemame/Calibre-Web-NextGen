@@ -8,6 +8,29 @@ const device = {
   annotation_count: 312, active: true,
 };
 
+test('device manager keeps its heading while loading and can retry a failed list', async ({ page }) => {
+  let release!: () => void;
+  const ready = new Promise<void>(resolve => { release = resolve; });
+  let recovered = false;
+  await page.route('**/api/annotations/devices?*', async route => {
+    await ready;
+    if (!recovered) await route.fulfill({ status: 503, json: { error: 'unavailable' } });
+    else await route.fulfill({ json: { devices: [device], total: 1, limit: 100, offset: 0 } });
+  });
+  try {
+    await page.goto('/app/account/devices');
+    await expect(page.getByRole('heading', { name: 'Devices and browsers', exact: true })).toBeVisible();
+    await expect(page.getByRole('status', { name: 'Loading' })).toBeVisible();
+    await expect(page.getByText('No devices or browser reading data yet.')).toHaveCount(0);
+    release();
+    await expect(page.getByRole('alert').filter({ hasText: 'Could not load devices and browsers.' })).toBeVisible({ timeout: 15000 });
+    recovered = true;
+    await page.getByRole('button', { name: 'Try again', exact: true }).click();
+    await expect(page.getByRole('link', { name: device.label, exact: true })).toBeVisible();
+    await expect(page.getByText('Could not load devices and browsers.', { exact: true })).toHaveCount(0);
+  } finally { release(); }
+});
+
 test('reader sources separate browsers and distinguish missing from empty inventory', async ({ page }) => {
   const physical = { ...device, origin_annotation_count: 19, annotation_count: 0,
     inventory_count: 0, inventory_observed: null };
@@ -43,8 +66,8 @@ test('reader sources separate browsers and distinguish missing from empty invent
   expect(scan.violations.filter(v => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
 });
 
-async function stubDevices(page: import('@playwright/test').Page) {
-  let current = { ...device };
+async function stubDevices(page: import('@playwright/test').Page, fixture = device) {
+  let current = { ...fixture };
   let restored = 0;
   let deletePreflights = 0;
   await page.route('**/api/annotations/devices?*', async (route) => {
@@ -250,9 +273,79 @@ test('canceling a device removal returns keyboard focus to its surviving action'
   await expect(trigger).toBeFocused();
 });
 
-test('device manager is axe-clean and has no 390px overflow', async ({ page }, testInfo) => {
-  await stubDevices(page);
-  if (testInfo.project.name === 'desktop') await page.setViewportSize({ width: 390, height: 844 });
+test('slow device changes cannot be restarted or leak an undo error to another source', async ({ page }) => {
+  let rows = [{ ...device }, { ...device, public_id: 'device-2', label: 'Second Kobo' }];
+  let finishRename!: () => void;
+  let finishRemove!: () => void;
+  const renameReady = new Promise<void>(resolve => { finishRename = resolve; });
+  const removeReady = new Promise<void>(resolve => { finishRemove = resolve; });
+  let patches = 0;
+  let deletes = 0;
+  await page.route('**/api/annotations/devices?*', route => route.fulfill({ json: {
+    devices: rows, total: rows.length, limit: 100, offset: 0,
+  } }));
+  await page.route('**/api/annotations/devices/*/delete-preflight', route => route.fulfill({ json: { origin_count: 0, assigned_count: 0 } }));
+  await page.route('**/api/annotations/devices/*/restore', route => route.fulfill({ status: 503, json: { error: 'unavailable' } }));
+  await page.route('**/api/annotations/devices/device-*', async route => {
+    const id = new URL(route.request().url()).pathname.split('/').at(-1)!;
+    if (route.request().method() === 'PATCH') {
+      patches++;
+      await renameReady;
+      rows = rows.map(row => row.public_id === id ? { ...row, label: 'Travel Kobo' } : row);
+      await route.fulfill({ json: rows.find(row => row.public_id === id) });
+    } else if (route.request().method() === 'DELETE') {
+      deletes++;
+      if (id === 'device-1') await removeReady;
+      rows = rows.filter(row => row.public_id !== id);
+      await route.fulfill({ json: {} });
+    } else await route.fallback();
+  });
+  try {
+    await page.goto('/app/account/devices');
+    const rename = page.getByRole('button', { name: 'Rename Libra Colour', exact: true });
+    await rename.click();
+    const input = page.getByRole('textbox', { name: 'Device name' });
+    await input.fill('Travel Kobo');
+    await input.press('Enter');
+    await expect.poll(() => patches).toBe(1);
+    await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeDisabled();
+    await expect(rename).toBeDisabled();
+    await page.keyboard.press('Escape');
+    await expect(input).toBeVisible();
+    finishRename();
+    await expect(page.getByRole('heading', { name: 'Travel Kobo', exact: true })).toBeVisible();
+    const travelRename = page.getByRole('button', { name: 'Rename Travel Kobo', exact: true });
+    await expect(travelRename).toBeFocused();
+    await travelRename.click();
+    await input.press('Escape');
+    await expect(travelRename).toBeFocused();
+
+    await page.getByRole('button', { name: 'More actions for Travel Kobo' }).click();
+    await page.getByRole('button', { name: 'Remove device', exact: true }).click();
+    const dialog = page.getByRole('alertdialog');
+    await dialog.getByRole('button', { name: 'Remove device', exact: true }).click();
+    await expect.poll(() => deletes).toBe(1);
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'More actions for Second Kobo' })).toBeDisabled();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeVisible();
+    finishRemove();
+    await expect(page.getByRole('button', { name: 'Undo' })).toBeFocused();
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByRole('alert').filter({ hasText: 'Could not restore' })).toBeVisible();
+    await page.getByRole('button', { name: 'More actions for Second Kobo' }).click();
+    await page.getByRole('button', { name: 'Remove device', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Remove device', exact: true }).click();
+    await expect(page.getByText('Second Kobo removed.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('alert').filter({ hasText: 'Could not restore' })).toHaveCount(0);
+    expect(patches).toBe(1);
+    expect(deletes).toBe(2);
+  } finally { finishRename(); finishRemove(); }
+});
+
+test('device manager keeps long source names readable without narrow-screen overflow', async ({ page }, testInfo) => {
+  await stubDevices(page, { ...device, label: 'ReadingCompanion'.repeat(4) });
+  if (testInfo.project.name === 'desktop') await page.setViewportSize({ width: 320, height: 844 });
   await page.goto('/app/account/devices');
   await expect(page.getByRole('heading', { name: 'Devices and browsers' })).toBeVisible();
   await expect(page.getByRole('main')).toHaveCount(1);

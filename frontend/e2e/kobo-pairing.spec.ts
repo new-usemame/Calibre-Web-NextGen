@@ -53,6 +53,12 @@ test('user generates settings, copies them, and confirms the first device check-
   await expect(pairing.getByText(syncUrl, { exact: true })).toBeVisible();
   await expect(pairing.getByText(`api_endpoint=${syncUrl}`, { exact: true })).toBeVisible();
   await expect(pairing.getByText(serverUrl, { exact: true })).toBeVisible();
+  // A copy button must not squeeze the settings into a few characters per
+  // line inside the desktop pairing columns. This also protects translations.
+  for (const address of [syncUrl, serverUrl]) {
+    const box = await pairing.getByText(address, { exact: true }).boundingBox();
+    expect(box?.width, `readable address width for ${address}`).toBeGreaterThanOrEqual(160);
+  }
   await expect(pairing).toContainText('.kobo/Kobo/Kobo eReader.conf');
   await expect(pairing).toContainText('the plugin adds /kosync itself');
   await expect(pairing.getByRole('link', { name: 'Install or update the NextGen Sync plugin.' }))

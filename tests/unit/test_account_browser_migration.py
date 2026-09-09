@@ -195,3 +195,12 @@ def test_deleted_account_annotation_history_cannot_block_upgrade(db):
     with engine.connect() as conn:
         assert _snapshot(conn, "annotation") == before
         assert conn.execute(text("SELECT COUNT(*) FROM device")).scalar() == 0
+
+
+def test_first_browser_source_is_not_committed_before_its_outer_transaction(db):
+    from cps.services.device_registry import upsert_webreader_device
+    engine, session = db
+    upsert_webreader_device(session, user_id=7)
+    session.rollback()
+    with engine.connect() as observer:
+        assert observer.execute(text("SELECT COUNT(*) FROM device")).scalar() == 0

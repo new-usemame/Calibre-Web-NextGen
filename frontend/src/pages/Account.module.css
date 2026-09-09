@@ -339,3 +339,9 @@
 .stateInfo { background: var(--accent-soft); }
 .stateOk { background: var(--success-soft); border-color: var(--success-border); }
 .stateWarn { background: var(--danger-soft); border-color: var(--danger-border); }
+
+@media (max-width: 600px) {
+  /* Native dropdowns need a full row on phones; paired fields can otherwise
+     overflow their narrow columns in Safari and truncate selected values. */
+  .row { flex-direction: column; }
+}

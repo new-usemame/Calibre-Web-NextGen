@@ -116,6 +116,69 @@
   text-decoration-color: currentColor;
 }
 
+/* ---- Notice variant (help announcements, incl. the My Library intro) ----
+   The Account/Devices register carried into the strip: the gradient stays
+   full-width, but the content sits in the pages' own 720px centered measure,
+   left-aligned, with the accent icon leading a title row and the body capped
+   at a comfortable reading width — instead of a centred wall of copy with the
+   icon and dismiss stranded at opposite screen edges. */
+.noticeBanner {
+  text-align: left;
+  /* the 3px edge tick was painted at the screen's left edge, detached from the
+     measured column; the accent icon carries the identity now */
+  box-shadow: none;
+}
+
+.noticeBanner .bannerSurface {
+  justify-content: flex-start;
+  align-items: flex-start;
+  max-width: 720px;
+  /* Keep the expanded dismiss target inside even a one-line Help notice. */
+  min-height: calc(var(--sp-3) + 40px);
+  margin-inline: auto;
+  /* 52px on the right still reserves the dismiss button's lane */
+  padding: var(--sp-3) 52px var(--sp-3) var(--sp-4);
+}
+
+.noticeBanner .text {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: var(--lh-base);
+}
+
+/* Semantic title/body grouping: the headline is its own line in the quiet
+   display register (Account .cardTitle), the body a measured paragraph. */
+.headline {
+  display: block;
+  margin-bottom: 2px;
+  font-family: var(--font-display);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semi);
+  line-height: var(--lh-snug);
+  color: var(--hb-strong);
+}
+
+.bodyCopy {
+  display: block;
+  max-width: 68ch;
+  overflow-wrap: break-word;
+}
+
+/* Optical alignment with the headline's first line (Devices .cardIcon). */
+.noticeBanner .iconWrap {
+  margin-top: 1px;
+}
+
+/* Park the dismiss at the content column's top corner — a card corner action,
+   not a speck at the screen's edge. max() keeps it at the strip edge on
+   viewports narrower than the 720px measure. */
+.noticeBanner .close {
+  top: var(--sp-3);
+  right: max(var(--sp-3), calc((100% - 720px) / 2 + var(--sp-3)));
+  transform: none;
+}
+
 /* Lives on a WRAPPER element, never on the icon itself. A keyframe animation
    whose target is an SVG element does not get a compositor layer (measured in
    Chrome), so it falls back to the main thread for as long as it is mounted --
@@ -179,7 +242,11 @@
    only 37px tall there, so a full 44px of vertical target cannot fit without
    reaching either into the top bar (which steals the hit, as above) or below the
    banner into page content (which would steal hits FROM that content — a worse
-   defect than the 4px). Do not "fix" the 40 by growing this inset. */
+   defect than the 4px). Do not "fix" the 40 by growing this inset.
+
+   The notice variant (.noticeBanner) is taller and parks the button at the
+   content column's top corner, so its hit area lands fully inside the strip;
+   the 37px bound above describes the compact support strip. */
 .close::before {
   content: '';
   position: absolute;
@@ -193,9 +260,16 @@
     font-size: var(--fs-xs);
     line-height: var(--lh-snug);
   }
-  /* the icon is decorative; drop it on phones so the centered message keeps the
-     most room and stays on one or two tidy lines */
-  .iconWrap { display: none; }
+
+  /* The notice keeps its icon on phones — it leads the title row, marking the
+     strip as a product notice — and keeps the base font size and line-height:
+     a left-aligned measured paragraph, not a dense centred one. */
+  .noticeBanner .bannerSurface {
+    gap: var(--sp-2);
+    padding: var(--sp-3) 44px var(--sp-3) var(--sp-3);
+    font-size: var(--fs-sm);
+    line-height: var(--lh-base);
+  }
 
   .supportBanner .bannerSurface {
     gap: var(--sp-2);

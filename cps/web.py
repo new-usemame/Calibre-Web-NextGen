@@ -196,15 +196,12 @@ def add_security_headers(resp):
 #
 # They were not cached at all. Flask's SEND_FILE_MAX_AGE_DEFAULT is None, which
 # makes send_file emit `Cache-Control: no-cache`, so a ~640 KB bundle was
-# revalidated on every single page load. The app does ship a cache-buster
-# (cache_buster.init_cache_busting) that would let us cache more broadly, but
-# it is only installed under FLASK_DEBUG and it only rewrites url_for('static')
-# links — the SPA's asset URLs are baked into the built index.html and never go
-# through url_for. So the rule below is deliberately narrow: ONLY the paths that
-# carry a content hash in the filename. Everything else under /static (js/, css/,
-# the fonts and images the classic UI references by fixed name) keeps
-# revalidating, because an upgrade changes those bytes WITHOUT changing their
-# URL and a long-lived copy would pin a user to the previous release's assets.
+# revalidated on every single page load. The app's cache-buster adds content
+# query hashes to url_for('static') links in every environment. The SPA's asset
+# URLs are baked into the built index.html and never go through url_for.
+# The rule below remains deliberately narrow: ONLY paths carrying a content
+# hash in the filename get immutable caching. Other /static paths can still be
+# requested without a query hash, so they keep revalidating after upgrades.
 _HASHED_ASSET_PREFIX = '/static/app/assets/'
 _HASHED_ASSET_RE = re.compile(r'-[A-Za-z0-9_-]{8}\.[A-Za-z0-9]+$')
 IMMUTABLE_ASSET_CACHE_CONTROL = 'public, max-age=31536000, immutable'

@@ -33,7 +33,12 @@ async function axeScan(page: Page, label: string, themes: readonly ('dark' | 'li
     'the a11y harness must disable transitions before comparing theme endpoints',
   ).toBe(true);
   for (const theme of themes) {
-    await page.evaluate((slug) => document.documentElement.setAttribute('data-theme', slug), theme);
+    await page.evaluate(async (slug) => {
+      document.documentElement.setAttribute('data-theme', slug);
+      // WebKit can expose a new surface color before descendants have painted
+      // their inherited text color. Scan the settled palette, not that frame.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    }, theme);
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
       .analyze();

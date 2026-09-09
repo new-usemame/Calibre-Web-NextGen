@@ -818,7 +818,9 @@ def feed_cc_category(column_id, category_path):
             db.Books,
             getattr(db.Books, 'custom_column_' + str(column_id)).any(
                 calibre_db.hierarchical_cc_filter(column_id, path)),
-            [db.Books.timestamp.desc()],
+            # Shared map entry, tiebreaker included (#1331) — an inline
+            # [db.Books.timestamp.desc()] here paged plan-dependently.
+            BOOK_SORT_ORDERS["new"],
             True, config.config_read_column)
         return render_xml_template('feed.xml', entries=entries,
                                    pagination=pagination, cc=cc)

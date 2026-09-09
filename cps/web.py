@@ -2527,7 +2527,11 @@ def render_cc_category(page, col_id, path, order):
             page, 0,
             db.Books,
             cc_rel.any(calibre_db.hierarchical_cc_filter(col_id, path)),
-            [order[0][0], db.Series.name, db.Books.series_index],
+            # The FULL shared ORDER BY, tiebreaker included (#1331). Slicing
+            # order[0][0] out of it dropped Books.id and made paging inside a
+            # node plan-dependent; series context is already inside the
+            # collated authaz/authza orders, so no call-site splice is needed.
+            order[0],
             True, config.config_read_column,
             db.books_series_link,
             db.Books.id == db.books_series_link.c.book,

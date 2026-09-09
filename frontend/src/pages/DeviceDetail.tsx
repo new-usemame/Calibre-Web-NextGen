@@ -5,6 +5,7 @@ import { ChevronLeft, Smartphone } from 'lucide-react';
 import { apiGet } from '../lib/api';
 import { clampOffset, clampPage } from '../lib/pagination';
 import { useT } from '../lib/i18n';
+import { annotationDeviceLabel } from '../lib/annotationDevices';
 import { DeviceInventory, type Device } from '../components/DeviceInventory';
 import { DeviceSummary } from '../components/DeviceSummary';
 import { EmptyState } from '../components/EmptyState';
@@ -65,6 +66,7 @@ interface PositionRow {
 }
 
 interface PositionsPayload {
+  device?: Device;
   positions: PositionRow[];
   limit: number;
   offset: number;
@@ -125,8 +127,7 @@ function AnnotationList({ payload, loading, error }: {
             {row.note_text && <p>{row.note_text}</p>}
             <small>
               {[
-                (row.origin_device_id && payload?.devices[row.origin_device_id]?.label)
-                  || row.source,
+                annotationDeviceLabel(row.origin_device_id, payload?.devices ?? {}, row.source ?? '', row.source ?? '', t('Browser')),
                 row.chapter_progress == null
                 ? null
                 : `${Math.round(row.chapter_progress * 100)}%`,
@@ -231,9 +232,12 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
     if (stalePositionPage) setPositionOffset(correctedPositionOffset);
   }, [correctedPositionOffset, stalePositionPage]);
   const resolvedDevice = useMemo(
-    () => registry.data?.devices.find((candidate) => candidate.public_id === publicId)
-      || (annotations.data?.device.public_id === publicId ? annotations.data.device : undefined),
-    [annotations.data, publicId, registry.data],
+    // Detail responses belong to this requested publicId's query keys. A
+    // migrated alias legitimately returns the canonical device's public id.
+    // Positions also resolves the device while the inventory tab disables annotations.
+    () => positions.data?.device || annotations.data?.device
+      || registry.data?.devices.find((candidate) => candidate.public_id === publicId),
+    [annotations.data, positions.data, publicId, registry.data],
   );
   useEffect(() => {
     if (resolvedDevice) setRetainedDevice({ publicId, device: resolvedDevice });
@@ -266,7 +270,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
     buttons[next]?.focus();
   };
 
-  if (registry.isLoading || (annotations.isLoading && !device)) return <SpinnerCentered size={40} />;
+  if (!device && (registry.isLoading || positions.isLoading || annotations.isLoading)) return <SpinnerCentered size={40} />;
   if (!device) {
     return (
       <main className={styles.container}>

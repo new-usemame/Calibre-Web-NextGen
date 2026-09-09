@@ -287,7 +287,7 @@ test('slow device changes cannot be restarted or leak an undo error to another s
   await page.route('**/api/annotations/devices/*/delete-preflight', route => route.fulfill({ json: { origin_count: 0, assigned_count: 0 } }));
   await page.route('**/api/annotations/devices/*/restore', route => route.fulfill({ status: 503, json: { error: 'unavailable' } }));
   await page.route('**/api/annotations/devices/device-*', async route => {
-    const id = new URL(route.request().url()).pathname.split('/').at(-1)!;
+    const id = new URL(route.request().url()).pathname.split('/').pop()!;
     if (route.request().method() === 'PATCH') {
       patches++;
       await renameReady;

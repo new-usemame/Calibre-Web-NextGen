@@ -1,6 +1,6 @@
 import { observeReaderSelections } from '../../../cps/static/js/reading/selection-observer.js';
 import { resumeCfi, resumeForArchive, withResumeTimeout } from "../lib/readerResume";
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useId } from 'react';
 import { Link } from 'wouter';
 import ePub from 'epubjs';
 import {
@@ -245,6 +245,8 @@ export function Reader({ id }: { id: string }) {
   // Highlights & notes drawer (#325) — the in-reader counterpart to the
   // standalone Highlights page, which until now you had to leave the book for.
   const annRef = useRef<HTMLElement>(null);
+  const annotationDescriptionId = useId();
+  const annTriggerRef = useRef<HTMLButtonElement>(null);
   // The element that goes fullscreen: the whole reader, not just the book, so
   // the top bar and page-turn zones come with it.
   const shellRef = useRef<HTMLDivElement>(null);
@@ -301,6 +303,15 @@ export function Reader({ id }: { id: string }) {
    * because at that point the reader really is reading there.
    */
   const previewingRef = useRef(false);
+  // Appearance changes retain the passage explicitly chosen for a preview,
+  // which may differ from the first word on its containing page.
+  const previewTargetRef = useRef<string | undefined>(undefined);
+  const appearanceAnchorRef = useRef<string | undefined>(undefined);
+  const captureReadingAnchor = useCallback((): string | undefined => {
+    if (previewingRef.current && previewTargetRef.current) return previewTargetRef.current;
+    const rendition = renditionRef.current;
+    return rendition?.manager?.isRendered() ? rendition.currentLocation()?.start?.cfi : undefined;
+  }, []);
 
   const [rendered, setRendered] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
@@ -328,14 +339,16 @@ export function Reader({ id }: { id: string }) {
     preferredAnnotation.current.clear();
   }, [id]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsOpenRef = useRef(settingsOpen);
+  settingsOpenRef.current = settingsOpen;
+  useEffect(() => {
+    if (!settingsOpen) appearanceAnchorRef.current = undefined;
+  }, [settingsOpen]);
   const [theme, setTheme] = useState<ReaderTheme>(loadTheme);
   const [fontPct, setFontPct] = useState(loadFont);
   const [fontFamily, setFontFamily] = useState<ReaderSettings['font']>('default');
   const [margin, setMargin] = useState(16);
   const [lineHeight, setLineHeight] = useState(150);
-  // Section hooks outlive individual renders; new chapters use today's choices.
-  const appearanceRef = useRef({ theme, fontPct, fontFamily, margin, lineHeight });
-  appearanceRef.current = { theme, fontPct, fontFamily, margin, lineHeight };
   /*
    * One column or two, persisted per user (#325).
    *
@@ -350,6 +363,9 @@ export function Reader({ id }: { id: string }) {
    * sane on a phone instead of forcing columns onto a 320px screen.
    */
   const [spread, setSpread] = useState<ReaderSettings['spread']>('spread');
+  // Section hooks outlive individual renders; new chapters use today's choices.
+  const appearanceRef = useRef({ theme, fontPct, fontFamily, margin, lineHeight, spread });
+  appearanceRef.current = { theme, fontPct, fontFamily, margin, lineHeight, spread };
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [progress, setProgress] = useState(0);
   // Pending text selection awaiting a highlight-color choice.
@@ -368,6 +384,7 @@ export function Reader({ id }: { id: string }) {
     cfiRange: string;
     text: string;
     annotationId?: string;
+    unanchored?: boolean;
     // A string, not HiliteColor: 'create' and 'standalone' seed it from the
     // four the palette offers, but 'edit' carries whatever the existing
     // highlight already is, which for an imported one can be pink or grey.
@@ -544,9 +561,9 @@ export function Reader({ id }: { id: string }) {
   // className (4th arg) make tapping the highlight open the editor (#782).
   //
   // A highlight carrying a note is drawn with a dashed outline as well as the
-  // fill (#325). epub.js paints into an SVG layer *inside the book iframe*, so
-  // Reader.module.css cannot reach it — the distinction has to travel as inline
-  // SVG attributes here. It is a shape difference, not a hue one, so it survives
+  // fill (#325). epub.js paints into a parent-document SVG layer beside the
+  // book iframe. Pass the distinction as SVG attributes through its paint API.
+  // It is a shape difference, not a hue one, so it survives
   // SC 1.4.1 and reads on the light, sepia and dark page themes alike.
   const paintHighlight = useCallback((
     cfiRange: string, color: string, annotationId: string, hasNote = false,
@@ -597,6 +614,7 @@ export function Reader({ id }: { id: string }) {
   const repaintHighlight = useCallback((
     cfiRange: string, color: string, annotationId: string, hasNote: boolean,
   ) => {
+    if (!cfiRange) return; // Unresolved and standalone rows can still be edited.
     try { renditionRef.current?.annotations?.remove(cfiRange, 'highlight'); } catch { /* noop */ }
     paintHighlight(cfiRange, color, annotationId, hasNote);
   }, [paintHighlight]);
@@ -670,6 +688,24 @@ export function Reader({ id }: { id: string }) {
     setComposer({ mode: 'standalone', cfiRange: '', text: '', color: 'yellow', note: '' });
   }, []);
 
+  // Editing does not require a resolved location or an event from the book
+  // iframe. Keep the painted text transparent to native text selection.
+  const editAnnotation = useCallback((row: AnnRow) => {
+    // The drawer row unmounts; give the next focus trap a persistent return target.
+    annTriggerRef.current?.focus();
+    setAnnOpen(false);
+    setPendingSel(null);
+    setActiveHl(null);
+    setComposer(null);
+    if (row.position_type === 'unanchored') {
+      setComposer({ mode: 'edit', unanchored: true, annotationId: row.annotation_id,
+        cfiRange: '', text: '', color: row.highlight_color ?? '', note: row.note_text ?? '' });
+    } else {
+      setActiveHl({ cfiRange: row.cfi_range ?? '', id: row.annotation_id,
+        color: row.highlight_color ?? '', note: row.note_text ?? '' });
+    }
+  }, []);
+
   // "Note" on an existing highlight — prefill from what we already hold.
   const startNoteForHighlight = useCallback(() => {
     const hl = activeHl;
@@ -725,6 +761,14 @@ export function Reader({ id }: { id: string }) {
     }
     if (!c.annotationId) return;
     try {
+      if (c.unanchored && !note) {
+        // An unanchored row has no passage to retain after its note is removed.
+        await apiDelete(`/annotations/${id}/${c.annotationId}`, { webreaderDevice: true });
+        notesRef.current.delete(c.annotationId);
+        setAnnList((rows) => rows.filter((row) => row.annotation_id !== c.annotationId));
+        announce(t('Note removed'));
+        return;
+      }
       await apiPatch(`/annotations/${id}/${c.annotationId}`, { note_text: note },
         { webreaderDevice: true });
       if (note) notesRef.current.set(c.annotationId, note);
@@ -756,6 +800,7 @@ export function Reader({ id }: { id: string }) {
     // Set BEFORE display(): epub.js can report the relocation synchronously, so
     // arming the flag afterwards would arm it too late to suppress anything.
     previewingRef.current = true;
+    previewTargetRef.current = row.cfi_range;
     try {
       Promise.resolve(renditionRef.current?.display(row.cfi_range)).catch(() => {
         // The jump never happened, so the book is still where the reader left
@@ -785,6 +830,7 @@ export function Reader({ id }: { id: string }) {
      * mark the book finished.
      */
     previewingRef.current = true;
+    previewTargetRef.current = cfi;
     try {
       Promise.resolve(renditionRef.current?.display(cfi)).catch(() => {
         previewingRef.current = false;
@@ -1018,12 +1064,14 @@ export function Reader({ id }: { id: string }) {
   const applyTypography = useCallback(() => {
     const rendition = renditionRef.current;
     if (!rendition) return;
-    // The paginator owns page padding and reapplies it after resize. Give it
-    // the requested gutter so its column geometry and visible margins agree.
-    if (rendition.manager && rendition.manager.settings.gap !== margin * 2) {
-      rendition.manager.settings.gap = margin * 2;
-      rendition.manager.updateLayout();
-    }
+    const currentCfi = appearanceAnchorRef.current || captureReadingAnchor();
+    // A sequence of slider changes is one appearance adjustment. Keep its
+    // original anchor while cleared views load and page boundaries move.
+    if (settingsOpenRef.current && currentCfi) appearanceAnchorRef.current = currentCfi;
+    // WebKit can retain old multicolumn geometry and SVG positions when an
+    // existing frame's gutter changes. Recreate the section through epub.js's
+    // normal lifecycle, retaining the book, annotations and reading anchor.
+    if (currentCfi) rendition.clear();
     rendition.themes.fontSize(`${fontPct}%`);
     if (fontFamily === 'default') rendition.themes.font('initial');
     else rendition.themes.font(FONT_FAMILY[fontFamily]);
@@ -1033,7 +1081,16 @@ export function Reader({ id }: { id: string }) {
         applyDocumentTypography(c.document, { fontPct, fontFamily, margin, lineHeight });
       });
     } catch { /* same-origin blob content; guard regardless */ }
-  }, [fontPct, fontFamily, margin, lineHeight]);
+    // Recalculate the paginator after all typography changes, then keep the
+    // original reading location. Retaining a pixel offset across a changed
+    // gutter can silently move the passage off-screen, especially on Safari.
+    rendition.settings.gap = margin * 2;
+    if (rendition.manager) rendition.manager.settings.gap = margin * 2;
+    rendition.spread(spread === 'nonespread' ? 'none' : 'auto');
+    if (currentCfi) {
+      Promise.resolve(rendition.display(currentCfi)).catch(() => { /* disposed rendition */ });
+    }
+  }, [fontPct, fontFamily, margin, lineHeight, spread, captureReadingAnchor]);
 
   // A page turn is the reader moving themselves, so it ends any preview: from
   // here on the relocations are theirs and the position saves again. This is the
@@ -1061,6 +1118,8 @@ export function Reader({ id }: { id: string }) {
     let stopSelectionObserver: (() => void) | undefined;
     setRendered(false);
     setRenderError(null);
+    previewTargetRef.current = undefined;
+    appearanceAnchorRef.current = undefined;
     // Clear rather than carry: wouter reuses this component across an :id
     // change, so a stale RTL flag would invert the next book's page turns.
     setRtl(false);
@@ -1082,7 +1141,7 @@ export function Reader({ id }: { id: string }) {
           height: '100%',
           flow: 'paginated',
           gap: appearanceRef.current.margin * 2,
-          spread: spread === 'nonespread' ? 'none' : 'auto',
+          spread: appearanceRef.current.spread === 'nonespread' ? 'none' : 'auto',
         };
         const rendition = epubBook.renderTo(viewerRef.current!, renditionOptions);
         renditionRef.current = rendition;
@@ -1141,6 +1200,7 @@ export function Reader({ id }: { id: string }) {
             initialTarget = resumeCfi(epubBook.locations, resume);
           } catch { /* Keep opening the book when its index cannot be generated. */ }
         }
+        previewTargetRef.current = initialTarget;
         await rendition.display(initialTarget);
         if (cancelled) return;
         // display() resolves only after the package document is parsed, so the
@@ -1163,6 +1223,7 @@ export function Reader({ id }: { id: string }) {
             if (!readerMoved && previewingRef.current && !savedCfiRef.current && !initialTarget && resume?.mode === 'automatic') {
               const cfi = resumeCfi(epubBook.locations, resume);
               if (cfi) {
+                previewTargetRef.current = cfi;
                 await rendition.display(cfi);
                 if (cancelled) return;
               }
@@ -1298,6 +1359,12 @@ export function Reader({ id }: { id: string }) {
   // Arrow-key navigation (the iframe also forwards keys via rendition).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Controls own their arrow keys (including a range input's keyup).
+      // Use closest rather than instanceof: book events come from an iframe.
+      const target = e.target as Element | null;
+      if (e.defaultPrevented || target?.closest?.(
+        'input, select, textarea, [contenteditable]:not([contenteditable="false"]), [role="dialog"]',
+      )) return;
       // Arrow keys follow the same physical convention as the zones: left is
       // forward in an RTL book.
       if (e.key === 'ArrowLeft') goLeft();
@@ -1386,7 +1453,7 @@ export function Reader({ id }: { id: string }) {
           <button className={styles.iconBtn} onClick={() => {
             setTocOpen(false); closeSearch(); setAnnOpen((o) => !o);
           }}
-            aria-label={t('Highlights and notes')} aria-expanded={annOpen} title={t('Highlights and notes')}>
+            ref={annTriggerRef} aria-label={t('Highlights and notes')} aria-expanded={annOpen} title={t('Highlights and notes')}>
             <Highlighter size={19} aria-hidden="true" focusable={false} />
             {annList.length > 0 && (
               <span className={styles.annCount} aria-hidden="true">{annList.length}</span>
@@ -1407,7 +1474,11 @@ export function Reader({ id }: { id: string }) {
                 : <Maximize size={19} aria-hidden="true" focusable={false} />}
             </button>
           )}
-          <button className={styles.iconBtn} onClick={() => { closeSearch(); setSettingsOpen((o) => !o); }}
+          <button className={styles.iconBtn} onClick={() => {
+            closeSearch();
+            if (!settingsOpen) appearanceAnchorRef.current = captureReadingAnchor();
+            setSettingsOpen((o) => !o);
+          }}
             aria-label={t('Reading appearance')} aria-expanded={settingsOpen} title={t('Reading appearance')}>
             <SlidersHorizontal size={19} aria-hidden="true" focusable={false} />
           </button>
@@ -1445,6 +1516,7 @@ export function Reader({ id }: { id: string }) {
           <button onClick={() => {
             previewingRef.current = true;
             const target = remoteResume.cfi;
+            previewTargetRef.current = target;
             setRemoteResume(null);
             Promise.resolve(renditionRef.current?.display(target)).catch(() => {
               previewingRef.current = false;
@@ -1533,7 +1605,7 @@ export function Reader({ id }: { id: string }) {
               </p>
             ) : (
               <ul role="list">
-                {annList.map((row) => {
+                {annList.map((row, index) => {
                   const colour = HILITE_FILL[row.highlight_color ?? ''] ?? UNKNOWN_FILL;
                   /*
                    * A standalone note is a note ABOUT the book, with no passage
@@ -1563,7 +1635,7 @@ export function Reader({ id }: { id: string }) {
                         {!unanchored && (
                           <span className={styles.annBar} style={{ background: colour }} aria-hidden="true" />
                         )}
-                        <span className={styles.annBody}>
+                        <span className={styles.annBody} id={`${annotationDescriptionId}-${index}`}>
                           {!unanchored && (
                             <span className={styles.annQuote}>
                               {row.highlighted_text || t('(no text captured)')}
@@ -1596,6 +1668,11 @@ export function Reader({ id }: { id: string }) {
                             return shown ? <span className={styles.annSource}>{shown}</span> : null;
                           })()}
                         </span>
+                      </button>
+                      <button type="button" className={styles.annEdit}
+                        aria-describedby={`${annotationDescriptionId}-${index}`}
+                        onClick={() => editAnnotation(row)}>
+                        {t('Edit')}
                       </button>
                     </li>
                   );
@@ -1646,12 +1723,6 @@ export function Reader({ id }: { id: string }) {
                     onClick={() => {
                       setSpread(value);
                       persistSetting('spread', value);
-                      // Re-layout the open book immediately rather than on the
-                      // next load — epub.js recalculates its columns in place,
-                      // so the reader sees the change while looking at it.
-                      try {
-                        renditionRef.current?.spread(value === 'nonespread' ? 'none' : 'auto');
-                      } catch { /* older epub.js builds ignore a live change */ }
                     }}>
                     {label}
                   </button>
@@ -1792,7 +1863,7 @@ export function Reader({ id }: { id: string }) {
               if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveNote(); }
             }} />
           <div className={styles.noteActions}>
-            {composer.mode === 'edit' && composer.note.trim() !== '' && (
+            {composer.mode === 'edit' && (composer.unanchored || composer.note.trim() !== '') && (
               <button className={styles.hiliteRemove} onClick={removeNote} title={t('Remove note')}>
                 <Trash2 size={15} aria-hidden="true" focusable={false} />
                 <span>{t('Remove note')}</span>

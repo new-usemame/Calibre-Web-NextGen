@@ -1,0 +1,19 @@
+{
+  "area": "reader",
+  "body": "The SPA's existing annotation editor could be reached only through a click forwarded from the book iframe. WebKit blocks those callbacks in script-disabled frames, so real mouse/touch activation failed despite a correctly visible highlight. Unresolved highlights and standalone book notes also lacked a usable in-reader editing path.\n\nEvery drawer row now has a native Edit control with a descriptive accessible name context and a 44px target. It opens the existing editor by annotation identity independently of its display location. Keyboard Escape returns to the persistent drawer trigger. Standalone notes save through PATCH and are deleted when removed; clearing a note attached to a highlight retains that highlight. Painted text remains pointer-transparent and embedded book scripts remain disabled.\n\nTwo permanent behavioral scenarios were seen red on the previous interface and green across Chromium/WebKit desktop/mobile (eight cases, no retries). They check trusted mobile taps, keyboard focus, axe, target size, ID-only edits and deletion semantics. This verifies the explicit drawer path; direct tapping of painted text remains an unsupported shortcut in WebKit's script-disabled frames.",
+  "created": "2026-09-09",
+  "id": "F-799d86",
+  "refs": [
+    "#2208"
+  ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-09",
+    "note": "Resolved in candidate, not released: explicit accessible drawer Edit controls; original missing-control RED then eight Chromium/WebKit desktop/mobile CRUD, keyboard, tap and axe cases pass. Direct painted-text tapping remains unsupported in WebKit script-disabled frames; the explicit controls are the reliable editing path.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Saved annotations need an edit action independent of book-frame events"
+}

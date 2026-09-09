@@ -10,3 +10,5 @@
 - **Clicking an Account or Help menu that opened on hover now keeps it open.** Clicking again closes it; touch, keyboard, Escape and outside-click dismissal remain supported.
 - **Sign out text remains readable in dark and sepia account menus**, including keyboard focus.
 - **Opening a saved highlight or synced reading position lands on the correct page immediately.** Font and spacing are applied before the destination is measured, and selected margins remain consistent when opening chapters or resizing the reader.
+- **Every saved highlight and book note has an Edit action in the reader drawer.** Editing works with keyboard and touch even when the passage cannot be located or Safari cannot forward clicks from the book. Removing a standalone note removes its empty row; removing a note attached to a highlight keeps the highlight.
+- Preserve the reading passage through font, margin, line-height and column changes; appearance sliders no longer turn book pages when used with arrow keys.

@@ -78,13 +78,11 @@ test('native highlight maps into the existing EPUB, preserving web highlights an
   await expect(mark.locator('rect').first()).toBeInViewport();
   expect(await mark.getAttribute('data-epubcfi')).not.toBe(foreignCfi);
   expect(fixture.bytesRequested).toEqual([`/show/${fixture.id}/epub`]);
-  // An actual click on the mapped overlay must update the original annotation,
-  // never send the display-only EPUB CFI back as its Kobo source position.
-  // epub.js makes SVG marks pointer-transparent and forwards iframe clicks.
-  // Use trusted input at the visible mark, as a person would click the text.
-  const bounds = await mark.locator('rect').first().boundingBox();
-  expect(bounds).not.toBeNull();
-  await page.mouse.click(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
+  // Editing uses a native drawer control, so it also works with Safari's
+  // script-disabled book frames. The native source CFI must stay unchanged.
+  await page.getByRole('button', { name: 'Highlights and notes', exact: true }).click();
+  const nativeRow = page.getByRole('listitem').filter({ has: jump });
+  await nativeRow.getByRole('button', { name: 'Edit', exact: true }).click();
   await page.getByRole('button', { name: 'Green', exact: true }).click();
   await expect.poll(() => fixture.edits.length).toBe(1);
   expect(fixture.edits).toEqual([{ highlight_color: 'green' }]);
@@ -237,12 +235,180 @@ test('changed appearance reaches a new chapter and live margins preserve the vis
     return { fontSize: style.fontSize, padding: style.paddingInlineStart,
       lineHeight: style.lineHeight, background: style.backgroundColor };
   });
-  expect(observed).toEqual({ fontSize: '24px', padding: '64px',
-    lineHeight: '45.6px', background: 'rgb(21, 17, 12)' });
+  expect(observed).toMatchObject({ fontSize: '24px', padding: '64px', background: 'rgb(21, 17, 12)' });
+  expect(parseFloat(observed.lineHeight)).toBeCloseTo(45.6, 3);
   // The passage must remain visible through live reflow without another jump.
   await page.getByRole('button', { name: 'Reading appearance', exact: true }).click();
   await appearance.getByLabel('Page margins').fill('16');
   await appearance.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(body).toHaveCSS('padding-inline-start', '16px');
   await expect(rect).toBeInViewport();
+  // Check the actual text and its paint independently: a stale SVG can hide a
+  // correct position, while an off-page passage can have perfectly aligned paint.
+  await expect.poll(() => page.evaluate(quote => {
+    const iframe = document.querySelector('iframe[title="Book content"]') as HTMLIFrameElement;
+    const doc = iframe?.contentDocument;
+    const paragraph = doc && Array.from(doc.querySelectorAll('p')).find(p => p.textContent?.includes(quote));
+    if (!doc || !paragraph) return { visible: false, aligned: false };
+    const walker = doc.createTreeWalker(paragraph, NodeFilter.SHOW_TEXT);
+    const nodes: Text[] = [];
+    while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+    const text = nodes.map(node => node.textContent).join('');
+    const start = text.indexOf(quote), end = start + quote.length;
+    const range = doc.createRange();
+    let offset = 0;
+    for (const node of nodes) {
+      const next = offset + node.length;
+      if (start >= offset && start < next) range.setStart(node, start - offset);
+      if (end > offset && end <= next) range.setEnd(node, end - offset);
+      offset = next;
+    }
+    const frameBox = iframe.getBoundingClientRect();
+    const actual = Array.from(range.getClientRects()).filter(r => r.width > 0).map(r => ({
+      x: r.x + frameBox.x, y: r.y + frameBox.y, width: r.width, height: r.height,
+    }));
+    const overlay = Array.from(document.querySelectorAll('[data-id="native"] rect'))
+      .map(element => element.getBoundingClientRect());
+    const clip = document.querySelector('.epub-container')!.getBoundingClientRect();
+    const visible = actual.length > 0 && actual.every(r => r.x >= clip.left - 2
+      && r.x + r.width <= clip.right + 2 && r.y >= clip.top - 2 && r.y + r.height <= clip.bottom + 2);
+    const matches = (a: { x: number; y: number; width: number; height: number }, b: DOMRect) =>
+      Math.abs(a.x - b.x) < 2 && Math.abs(a.y - b.y) < 2
+      && Math.abs(a.width - b.width) < 2 && Math.abs(a.height - b.height) < 2;
+    const aligned = actual.every(a => overlay.some(b => matches(a, b)))
+      && overlay.every(b => actual.some(a => matches(a, b)));
+    return { visible, aligned };
+  }, quote), { message: 'Preview text stays inside the reader and its highlight follows the text' })
+    .toEqual({ visible: true, aligned: true });
+});
+
+test('appearance slider arrow keys change spacing without turning the book page', async ({ page }) => {
+  await page.route('**/api/v1/reader/settings', route => route.fulfill({ json: { reader: {
+    theme: 'lightTheme', font: 'Arial', fontSize: 100, margin: 16,
+    lineHeight: 150, spread: 'nonespread', reflow: false,
+  } } }));
+  const fixture = await openFixture(page, false, false, true);
+  await page.getByRole('button', { name: 'Reading appearance', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Reading appearance', exact: true });
+  const slider = dialog.getByLabel('Page margins');
+  await slider.focus();
+  await page.keyboard.down('ArrowRight');
+  await expect(slider).toHaveValue('20');
+  const body = page.frameLocator('iframe[title="Book content"]').locator('body');
+  await expect(body).toHaveCSS('padding-inline-start', '20px');
+  await expect(body).toContainText('Existing web passage remains.');
+  // Release only after the requested reflow has completed, isolating the
+  // document keyup listener from the slider's legitimate keydown behavior.
+  await page.keyboard.up('ArrowRight');
+  await page.waitForTimeout(1000);
+  await expect(body).toContainText('Existing web passage remains.');
+  for (const write of fixture.bookmarkWrites) {
+    expect((write as { bookmark: string }).bookmark.split('!')[0])
+      .toBe(initialBookmark.split('!')[0]);
+  }
+});
+
+test('ordinary saved reading position survives rapid appearance and columns', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+
+  let settings = {
+    theme: 'lightTheme', font: 'Arial', fontSize: 130, margin: 48,
+    lineHeight: 150, spread: 'nonespread', reflow: false,
+  };
+  await page.route('**/api/v1/reader/settings', (route) => {
+    if (route.request().method() === 'POST') {
+      settings = { ...settings, ...route.request().postDataJSON() };
+    }
+    return route.fulfill({ json: { reader: settings } });
+  });
+  await openFixture(page, false, false, true);
+
+  let previousBookmark = '';
+  const turn = async () => {
+    const saved = page.waitForRequest((request) =>
+      request.url().includes('/bookmark')
+      && request.method() === 'POST'
+      && request.postDataJSON()?.bookmark?.includes('/6/4!')
+      && request.postDataJSON().bookmark !== previousBookmark,
+    );
+    await page.getByRole('button', { name: 'Next page', exact: true }).click();
+    previousBookmark = (await saved).postDataJSON().bookmark;
+    return previousBookmark;
+  };
+  await turn();
+  const captured = await turn();
+
+  // The public bookmark names a paragraph/text offset in this deliberately simple
+  // fixture. Decode only that fixture shape, failing explicitly on another shape.
+  const match = captured.match(/^epubcfi\(\/6\/4!\/4\/(\d+)\/1:(\d+)\)$/);
+  expect(match).not.toBeNull();
+  const paragraphIndex = Number(match![1]) / 2 - 1;
+  const offset = Number(match![2]);
+  const visible = () => page.locator('iframe[title="Book content"]').evaluate((iframe, args) => {
+    const frame = iframe as HTMLIFrameElement;
+    const paragraph = frame.contentDocument!.querySelectorAll('p')[args.paragraphIndex];
+    const node = paragraph?.firstChild;
+    if (!node || node.nodeType !== Node.TEXT_NODE || args.offset > (node.textContent?.length ?? 0)) {
+      return false;
+    }
+    const range = frame.contentDocument!.createRange();
+    range.setStart(node, args.offset);
+    range.collapse(true);
+    const rect = range.getBoundingClientRect();
+    const frameBox = frame.getBoundingClientRect();
+    const clip = document.querySelector('.epub-container')!.getBoundingClientRect();
+    const x = rect.x + frameBox.x;
+    const y = rect.y + frameBox.y;
+    return x >= clip.left - 2 && x <= clip.right + 2
+      && y >= clip.top - 2 && y + rect.height <= clip.bottom + 2;
+  }, { paragraphIndex, offset });
+  await expect.poll(visible, {
+    message: 'Saved ordinary bookmark must be visible before changes',
+  }).toBe(true);
+
+  await page.getByRole('button', { name: 'Reading appearance', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'Reading appearance', exact: true });
+  await dialog.getByLabel('Font size').fill('150');
+  await dialog.getByLabel('Page margins').fill('16');
+  await dialog.getByLabel('Line height').fill('190');
+  await dialog.getByLabel('Font size').fill('140');
+
+  const applied = () => page.locator('iframe[title="Book content"]').evaluate((iframe) => {
+    const style = getComputedStyle((iframe as HTMLIFrameElement).contentDocument!.body);
+    return {
+      font: parseFloat(style.fontSize),
+      margin: parseFloat(style.paddingLeft),
+      line: Math.round(parseFloat(style.lineHeight) * 100) / 100,
+    };
+  });
+  await expect.poll(applied).toEqual({ font: 22.4, margin: 16, line: 42.56 });
+  await expect.poll(visible, {
+    message: 'Rapid typography must retain saved ordinary position',
+  }).toBe(true);
+
+  const previousColumnWidth = await page.locator('iframe[title="Book content"]').evaluate((iframe) =>
+    parseFloat(getComputedStyle((iframe as HTMLIFrameElement).contentDocument!.body).columnWidth),
+  );
+  const spreadSaved = page.waitForResponse((response) =>
+    response.url().includes('/api/v1/reader/settings')
+    && response.request().method() === 'POST'
+    && response.request().postDataJSON()?.spread === 'spread',
+  );
+  await dialog.getByRole('button', { name: 'Two columns', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+  await spreadSaved;
+  if (await page.locator('.epub-container').evaluate((element) => element.clientWidth) >= 800) {
+    await expect.poll(() => page.locator('iframe[title="Book content"]').evaluate((iframe) =>
+      parseFloat(getComputedStyle((iframe as HTMLIFrameElement).contentDocument!.body).columnWidth),
+    )).toBeLessThan(previousColumnWidth);
+  }
+  await page.evaluate(() => new Promise((resolve) =>
+    requestAnimationFrame(() => requestAnimationFrame(resolve)),
+  ));
+  await expect.poll(applied).toEqual({ font: 22.4, margin: 16, line: 42.56 });
+  await expect.poll(visible, {
+    message: 'Column change must retain ordinary reading position',
+  }).toBe(true);
+  expect(errors).toEqual([]);
 });

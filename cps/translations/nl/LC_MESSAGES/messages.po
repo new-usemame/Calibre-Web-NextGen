@@ -15302,3 +15302,55 @@ msgid ""
 msgstr ""
 "Opnieuw proberen voltooit de resterende accounts zonder voltooide selecties "
 "te wijzigen. Ongedaan maken herstelt de instellingen van vóór het instellen."
+
+#: cps/spa_strings.py
+msgid "Browser reading sources"
+msgstr "Leesbronnen in de browser"
+
+#: cps/spa_strings.py
+msgid "Browsers appear after saving reading progress or annotations. Different browsers or profiles can appear separately."
+msgstr "Browsers verschijnen na het opslaan van leesvoortgang of annotaties. Verschillende browsers of profielen kunnen afzonderlijk verschijnen."
+
+#: cps/spa_strings.py
+msgid "Unidentified browser source"
+msgstr "Niet-geïdentificeerde browserbron"
+
+#: cps/spa_strings.py
+msgid "{n} annotations from this source"
+msgstr "{n} annotaties uit deze bron"
+
+#: cps/spa_strings.py
+msgid "{n} annotations assigned to this source"
+msgstr "{n} annotaties toegewezen aan deze bron"
+
+#: cps/spa_strings.py
+msgid "Inventory not reported"
+msgstr "Inventaris niet gemeld"
+
+#: cps/spa_strings.py
+msgid "This device has not reported its inventory yet."
+msgstr "Dit apparaat heeft zijn inventaris nog niet gemeld."
+
+#: cps/spa_strings.py
+msgid "Reading data is kept. Future browser saves can appear under an unidentified browser source."
+msgstr "Leesgegevens blijven bewaard. Toekomstige opslagacties in de browser kunnen onder een niet-geïdentificeerde browserbron verschijnen."
+
+#: cps/spa_strings.py
+msgid "{n} annotations were made on this source. They are not deleted. Their origin history is kept."
+msgstr "{n} annotaties zijn op deze bron gemaakt. Ze worden niet verwijderd. Hun oorspronkelijke herkomst blijft bewaard."
+
+#: cps/spa_strings.py
+msgid "{n} annotations assigned to this source will become Unknown device."
+msgstr "{n} annotaties die aan deze bron zijn toegewezen, krijgen de aanduiding Onbekend apparaat."
+
+#: cps/spa_strings.py
+msgid "All annotations"
+msgstr "Alle annotaties"
+
+#: cps/spa_strings.py
+msgid "Location unavailable"
+msgstr "Locatie niet beschikbaar"
+
+#: cps/spa_strings.py
+msgid "Warning: the saved highlight could not be located in the current book. Its text is preserved."
+msgstr "Waarschuwing: de opgeslagen markering kon niet worden gevonden in het huidige boek. De tekst blijft bewaard."

@@ -12,7 +12,7 @@ import { SpinnerCentered } from '../components/Spinner';
 import styles from './DeviceDetail.module.css';
 
 type AnnotationType = 'highlight' | 'note' | 'dogear';
-type Tab = AnnotationType | 'inventory';
+type Tab = AnnotationType | 'all' | 'inventory';
 
 interface DeviceAnnotation {
   annotation_id: string;
@@ -85,6 +85,7 @@ const HIGHLIGHT_COLORS: Record<string, string> = {
 };
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'all', label: 'All annotations' },
   { id: 'highlight', label: 'Highlights' },
   { id: 'note', label: 'Notes' },
   { id: 'dogear', label: 'Dog-ears' },
@@ -186,7 +187,7 @@ function PositionList({ data, loading, error }: {
 
 export function DeviceDetail({ publicId }: { publicId: string }) {
   const t = useT();
-  const [tab, setTab] = useState<Tab>('highlight');
+  const [tab, setTab] = useState<Tab>('all');
   const [role, setRole] = useState<'origin' | 'assigned'>('origin');
   const [page, setPage] = useState(1);
   const [positionOffset, setPositionOffset] = useState(0);
@@ -211,7 +212,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
   const annotations = useQuery<AnnotationPayload>({
     queryKey: ['device-annotations', publicId, tab, role, page],
     queryFn: () => apiGet(
-      `/api/annotations/devices/${publicId}/annotations?type=${tab}&role=${role}&page=${page}`,
+      `/api/annotations/devices/${publicId}/annotations?${tab === 'all' ? '' : `type=${tab}&`}role=${role}&page=${page}`,
     ),
     enabled: tab !== 'inventory',
   });
@@ -243,6 +244,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
   const device = resolvedDevice
     || (retainedDevice?.publicId === publicId ? retainedDevice.device : undefined);
 
+  const availableTabs = TABS.filter(item => device?.type !== 'webreader' || item.id !== 'inventory');
   const selectTab = (next: Tab) => {
     setTab(next);
     setPage(1);
@@ -254,13 +256,13 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
     const current = buttons.indexOf(event.target as HTMLButtonElement);
     if (current < 0) return;
     let next = current;
-    if (event.key === 'ArrowRight') next = (current + 1) % TABS.length;
-    else if (event.key === 'ArrowLeft') next = (current - 1 + TABS.length) % TABS.length;
+    if (event.key === 'ArrowRight') next = (current + 1) % availableTabs.length;
+    else if (event.key === 'ArrowLeft') next = (current - 1 + availableTabs.length) % availableTabs.length;
     else if (event.key === 'Home') next = 0;
-    else if (event.key === 'End') next = TABS.length - 1;
+    else if (event.key === 'End') next = availableTabs.length - 1;
     else return;
     event.preventDefault();
-    selectTab(TABS[next].id);
+    selectTab(availableTabs[next].id);
     buttons[next]?.focus();
   };
 
@@ -281,7 +283,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
       </Link>
       <header className={styles.header}>
         <Smartphone aria-hidden="true" focusable={false} />
-        <div><h1>{device.label}</h1><p>{device.kind_label || device.type}</p></div>
+        <div><h1>{device.label}</h1><p>{device.browser_identity === 'unidentified' ? t('Unidentified browser source') : device.kind_label || device.type}</p></div>
       </header>
       <section className={styles.summary} aria-label={t('Device summary')}>
         <DeviceSummary device={{
@@ -305,7 +307,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
         <span>{t('Show annotations assigned to this device')}</span>
       </label>
       <div className={styles.tabs} role="tablist" aria-label={t('Device data')} onKeyDown={onTabKeyDown}>
-        {TABS.map((item) => (
+        {availableTabs.map((item) => (
           <button
             key={item.id}
             id={`device-tab-${item.id}`}

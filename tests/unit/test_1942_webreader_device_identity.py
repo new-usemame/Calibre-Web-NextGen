@@ -106,6 +106,27 @@ def test_same_installation_is_stable_and_two_browsers_are_separate(registry):
     assert registry.query(ub.DeviceIdentity).count() == 2
 
 
+def test_unidentified_browser_heartbeat_advances_without_regressing_or_writing_every_save(registry):
+    """Headerless clients remain one source whose last-seen reflects later
+    activity, with the same coarse heartbeat used for identified browsers.
+    """
+    from cps import ub
+    from cps.services.device_registry import _ensure_legacy_webreader_device, LAST_SEEN_WRITE_INTERVAL
+    first = datetime(2026, 9, 1, tzinfo=timezone.utc)
+    device = _ensure_legacy_webreader_device(registry, ub, user_id=7, seen_at=first)
+    registry.commit()
+    for seen in (first - timedelta(days=1), first + timedelta(seconds=1)):
+        same = _ensure_legacy_webreader_device(registry, ub, user_id=7, seen_at=seen)
+        assert same.id == device.id
+        assert same.last_seen_at.replace(tzinfo=timezone.utc) == first
+    later = first + LAST_SEEN_WRITE_INTERVAL
+    same = _ensure_legacy_webreader_device(registry, ub, user_id=7, seen_at=later)
+    registry.commit()
+    registry.expire_all()
+    assert same.last_seen_at.replace(tzinfo=timezone.utc) == later
+    assert registry.query(ub.Device).count() == 1
+
+
 def test_same_browser_profile_is_domain_separated_between_users(registry):
     from cps import ub
     from cps.services.device_registry import ensure_webreader_device_best_effort

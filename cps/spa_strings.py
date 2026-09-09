@@ -1393,3 +1393,20 @@ _("← Back to book")
 _("← Back to sign in")
 _("← Library")
 # ==== END AUTOGEN ====
+
+# Reading sources and observed inventory state.
+_('Browser reading sources')
+_('Browsers appear after saving reading progress or annotations. Different browsers or profiles can appear separately.')
+_('Unidentified browser source')
+_('{n} annotations from this source')
+_('{n} annotations assigned to this source')
+_('Inventory not reported')
+_('This device has not reported its inventory yet.')
+_('Reading data is kept. Future browser saves can appear under an unidentified browser source.')
+_('{n} annotations were made on this source. They are not deleted. Their origin history is kept.')
+_('{n} annotations assigned to this source will become Unknown device.')
+
+_('All annotations')
+
+_("Location unavailable")
+_("Warning: the saved highlight could not be located in the current book. Its text is preserved.")

@@ -15808,3 +15808,55 @@ msgstr ""
 "Réessayer termine la configuration des comptes restants sans modifier les "
 "sélections déjà terminées. Annuler restaure les paramètres précédant la "
 "configuration."
+
+#: cps/spa_strings.py
+msgid "Browser reading sources"
+msgstr "Sources de lecture dans le navigateur"
+
+#: cps/spa_strings.py
+msgid "Browsers appear after saving reading progress or annotations. Different browsers or profiles can appear separately."
+msgstr "Les navigateurs apparaissent après l’enregistrement de la progression de lecture ou d’annotations. Chaque navigateur ou profil peut apparaître séparément."
+
+#: cps/spa_strings.py
+msgid "Unidentified browser source"
+msgstr "Source de navigateur non identifiée"
+
+#: cps/spa_strings.py
+msgid "{n} annotations from this source"
+msgstr "{n} annotations provenant de cette source"
+
+#: cps/spa_strings.py
+msgid "{n} annotations assigned to this source"
+msgstr "{n} annotations attribuées à cette source"
+
+#: cps/spa_strings.py
+msgid "Inventory not reported"
+msgstr "Inventaire non communiqué"
+
+#: cps/spa_strings.py
+msgid "This device has not reported its inventory yet."
+msgstr "Cet appareil n’a pas encore communiqué son inventaire."
+
+#: cps/spa_strings.py
+msgid "Reading data is kept. Future browser saves can appear under an unidentified browser source."
+msgstr "Les données de lecture sont conservées. Les prochains enregistrements du navigateur peuvent apparaître sous une source de navigateur non identifiée."
+
+#: cps/spa_strings.py
+msgid "{n} annotations were made on this source. They are not deleted. Their origin history is kept."
+msgstr "{n} annotations ont été créées sur cette source. Elles ne sont pas supprimées. Leur historique d’origine est conservé."
+
+#: cps/spa_strings.py
+msgid "{n} annotations assigned to this source will become Unknown device."
+msgstr "{n} annotations attribuées à cette source seront associées à Appareil inconnu."
+
+#: cps/spa_strings.py
+msgid "All annotations"
+msgstr "Toutes les annotations"
+
+#: cps/spa_strings.py
+msgid "Location unavailable"
+msgstr "Emplacement indisponible"
+
+#: cps/spa_strings.py
+msgid "Warning: the saved highlight could not be located in the current book. Its text is preserved."
+msgstr "Avertissement : l’annotation enregistrée n’a pas pu être localisée dans le livre actuel. Son texte est conservé."

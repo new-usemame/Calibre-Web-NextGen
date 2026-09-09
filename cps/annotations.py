@@ -214,7 +214,8 @@ def _empty_authority_rollup():
 def _device_json(device, annotation_count=0, inventory_report=None, storage_snapshot=None,
                  annotation_counts=None, authority_rollup=None, seeded_books=0,
                  unseeded_books=0, inventory_count=None, books_with_position=0,
-                 last_position_at=None):
+                 last_position_at=None, origin_annotation_count=None,
+                 browser_identity=None):
     annotation_counts = annotation_counts or {}
     return {
         "public_id": device.public_id,
@@ -227,6 +228,8 @@ def _device_json(device, annotation_count=0, inventory_report=None, storage_snap
         "first_seen": _device_timestamp_json(device.first_seen_at),
         "last_seen": _device_timestamp_json(device.last_seen_at),
         "annotation_count": int(annotation_count),
+        "origin_annotation_count": origin_annotation_count,
+        "browser_identity": browser_identity,
         "highlights": int(annotation_counts.get("highlight", 0)),
         "notes": int(annotation_counts.get("note", 0)),
         "dogears": int(annotation_counts.get("dogear", 0)),
@@ -516,6 +519,14 @@ def _aggregate_device_rows(*, devices, owners_by_id, scopes, session):
     device_id_set = set(device_ids)
 
     assigned_counts = {device_id: 0 for device_id in device_ids}
+    origin_totals = {device_id: 0 for device_id in device_ids}
+    from .services.device_registry import WEBREADER_SCHEME_PREFIX
+    identified_browsers = {
+        device_id for (device_id,) in session.query(ub.DeviceIdentity.device_id).filter(
+            ub.DeviceIdentity.device_id.in_(device_ids),
+            ub.DeviceIdentity.scheme.like(f"{WEBREADER_SCHEME_PREFIX}%"),
+        ).distinct().all()
+    }
     origin_counts = {
         device_id: {kind: 0 for kind in DEVICE_ANNOTATION_TYPES}
         for device_id in device_ids
@@ -540,6 +551,8 @@ def _aggregate_device_rows(*, devices, owners_by_id, scopes, session):
         ub.Annotation.annotation_type,
     ).all()
     for origin_id, assigned_id, annotation_type, count in annotation_groups:
+        if origin_id in origin_totals:
+            origin_totals[origin_id] += int(count)
         if assigned_id in assigned_counts:
             assigned_counts[assigned_id] += int(count)
         if origin_id in origin_counts and annotation_type in DEVICE_ANNOTATION_TYPES:
@@ -740,6 +753,10 @@ def _aggregate_device_rows(*, devices, owners_by_id, scopes, session):
             inventory_count=inventory_counts.get(device.id, 0),
             books_with_position=books_with_position,
             last_position_at=last_position,
+            origin_annotation_count=origin_totals[device.id],
+            browser_identity=(
+                "identified" if device.id in identified_browsers else "unidentified"
+            ) if device.kind == "webreader" else None,
         ))
     return rows
 

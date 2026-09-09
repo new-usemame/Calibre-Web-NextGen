@@ -16,7 +16,8 @@ const device = {
   active: true,
 };
 
-async function stubDeviceDetail(page: Page) {
+async function stubDeviceDetail(page: Page, deviceOverride = device) {
+  const device = deviceOverride;
   const annotationRequests: URL[] = [];
   let releaseNotes = () => {};
   const notesPending = new Promise<void>((resolve) => { releaseNotes = resolve; });
@@ -56,7 +57,11 @@ async function stubDeviceDetail(page: Page) {
         chapter_progress: 0.42, source: 'kobo', created_at: '2026-08-29T12:00:00',
         origin_device_id: 'device-1', assigned_device_id: 'device-1',
         book: { id: 5, title: 'A Test Book' },
-      }],
+      }, ...(!url.searchParams.has('type') ? [{
+        annotation_id: 'historical-1', book_id: 5, annotation_type: null,
+        highlighted_text: 'A historical untyped annotation', note_text: null,
+        book: { id: 5, title: 'A Test Book' },
+      }] : [])],
       devices: { 'device-1': { label: device.label, model: device.model, type: device.type } },
       page: 1, pages: 1, page_size: 50, total: 1,
       role: url.searchParams.get('role'), type,
@@ -104,6 +109,39 @@ test('device detail exposes typed tabs, assignment view, inventory, and position
   expect(results.violations.filter((violation) => (
     ['critical', 'serious'].includes(violation.impact || '')
   ))).toEqual([]);
+});
+
+test('browser source detail keeps annotations and keyboard navigation without hardware controls', async ({ page }) => {
+  const { releaseNotes } = await stubDeviceDetail(page, {
+    ...device, type: 'webreader', kind: 'webreader', kind_label: 'Web reader', label: 'My browser',
+  });
+  await page.goto('/app/account/devices/device-1');
+  await expect(page.getByRole('heading', { name: 'My browser', exact: true })).toBeVisible();
+  await expect(page.getByText('A highlighted passage')).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Device library' })).toHaveCount(0);
+  await expect(page.getByText('Seeded books', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('Authoritative books', { exact: true })).toHaveCount(0);
+  await page.getByRole('tab', { name: 'Highlights' }).focus();
+  await page.keyboard.press('End');
+  await expect(page.getByRole('tab', { name: 'Dog-ears' })).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'All annotations' })).toBeFocused();
+  releaseNotes();
+  const scan = await new AxeBuilder({ page }).analyze();
+  expect(scan.violations.filter(v => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
+});
+
+test('all source annotations includes historical rows without an annotation type', async ({ page }) => {
+  const { requests } = await stubDeviceDetail(page);
+  await page.goto('/app/account/devices/device-1');
+  await expect(page.getByRole('tab', { name: 'All annotations' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByText('A historical untyped annotation')).toBeVisible();
+  expect(requests[0].searchParams.has('type')).toBe(false);
+  await page.getByRole('tab', { name: 'Highlights' }).click();
+  await expect(page.getByText('A historical untyped annotation')).toBeHidden();
+  await expect(page.getByText('A highlighted passage')).toBeVisible();
+  await page.getByRole('tab', { name: 'All annotations' }).click();
+  await expect(page.getByText('A historical untyped annotation')).toBeVisible();
 });
 
 test('admin device board reuses the device summaries', async ({ page }) => {

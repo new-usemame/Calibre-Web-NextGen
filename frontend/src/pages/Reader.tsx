@@ -24,6 +24,7 @@ import {
 import { chapterLabelForHref, splitSearchExcerpt } from '../lib/reader/searchUi';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/safeStorage';
 import { getReaderContentUrl } from '../lib/readerTarget';
+import { hasNativeAnchor, resolveNativeAnnotations } from '../lib/reader/nativeAnnotations';
 import styles from './Reader.module.css';
 
 // Highlight colors as ARIA/label keys (SC 1.4.1: a color must never be conveyed
@@ -57,6 +58,11 @@ interface TocItem {
 interface AnnRow {
   annotation_id: string;
   cfi_range: string | null;
+  start_kobospan?: string | null;
+  end_kobospan?: string | null;
+  content_id?: string | null;
+  start_offset?: number | null;
+  end_offset?: number | null;
   highlighted_text: string | null;
   note_text: string | null;
   highlight_color: string | null;
@@ -295,6 +301,11 @@ export function Reader({ id }: { id: string }) {
   // Every saved highlight for this book, kept in step locally on each write so
   // the drawer never needs a refetch to look right.
   const [annList, setAnnList] = useState<AnnRow[]>([]);
+  const preferredAnnotation = useRef(new Map<string, string>());
+  useEffect(() => {
+    setAnnList([]);
+    preferredAnnotation.current.clear();
+  }, [id]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [theme, setTheme] = useState<ReaderTheme>(loadTheme);
   const [fontPct, setFontPct] = useState(loadFont);
@@ -518,6 +529,9 @@ export function Reader({ id }: { id: string }) {
   ) => {
     const fill = HILITE_FILL[color] || UNKNOWN_FILL;
     try {
+      // epub.js keys paint by CFI, not our annotation ID. Replacing a paint
+      // must remove its old SVG/listeners before registering the new owner.
+      renditionRef.current?.annotations?.remove(cfiRange, 'highlight');
       renditionRef.current?.annotations?.highlight(
         cfiRange,
         { id: annotationId, color, hasNote },
@@ -534,6 +548,25 @@ export function Reader({ id }: { id: string }) {
       );
     } catch { /* epub.js throws on a stale/foreign CFI — ignore */ }
   }, [openHighlightEditor]);
+
+  useEffect(() => {
+    const rendition = renditionRef.current;
+    const paints = new Map<string, AnnRow>();
+    for (const row of annList) {
+      if (row.cfi_range && (!paints.has(row.cfi_range)
+        || preferredAnnotation.current.get(row.cfi_range) === row.annotation_id)) {
+        paints.set(row.cfi_range, row);
+      }
+    }
+    paints.forEach((row) => paintHighlight(
+      row.cfi_range!, row.highlight_color ?? '', row.annotation_id, !!row.note_text?.trim(),
+    ));
+    return () => {
+      paints.forEach((row) => {
+        try { rendition?.annotations?.remove(row.cfi_range, 'highlight'); } catch { /* disposed */ }
+      });
+    };
+  }, [annList, paintHighlight]);
 
   // epub.js keys an annotation by (cfiRange + type), so changing how one is
   // drawn means removing the old paint and re-adding it.
@@ -691,6 +724,10 @@ export function Reader({ id }: { id: string }) {
    */
   const goToAnnotation = useCallback((row: AnnRow) => {
     if (!row.cfi_range) return;
+    // Two devices can highlight the same passage. Their rows remain separate;
+    // the drawer entry the user chose owns the shared overlay's edit action.
+    preferredAnnotation.current.set(row.cfi_range, row.annotation_id);
+    paintHighlight(row.cfi_range, row.highlight_color ?? '', row.annotation_id, !!row.note_text?.trim());
     setAnnOpen(false);
     // Set BEFORE display(): epub.js can report the relocation synchronously, so
     // arming the flag afterwards would arm it too late to suppress anything.
@@ -707,7 +744,7 @@ export function Reader({ id }: { id: string }) {
       previewingRef.current = false;
       announce(t('Could not open that highlight.'));
     }
-  }, [announce, t]);
+  }, [announce, t, paintHighlight]);
 
   const goToSearchResult = useCallback((cfi: string) => {
     closeSearch();
@@ -1142,7 +1179,7 @@ export function Reader({ id }: { id: string }) {
         // epub.js data param so a later tap can target the right row (#782).
         fetch(apiUrl(`/annotations/${id}/data.json`), { credentials: 'include' })
           .then((r) => (r.ok ? r.json() : null))
-          .then((d) => {
+          .then(async (d) => {
             if (cancelled || !d) return;
             notesRef.current.clear();
             /*
@@ -1157,14 +1194,24 @@ export function Reader({ id }: { id: string }) {
              * highlight the reader made.
              */
             setDevices((d.devices || {}) as Record<string, { label?: string }>);
-            setAnnList((d.annotations || []) as AnnRow[]);
-            (d.annotations || []).forEach((a: any) => {
+            const sourceRows = (d.annotations || []) as AnnRow[];
+            // Never paint or jump using a KEPUB CFI in the original EPUB.
+            // These display copies are session-local; updates still identify
+            // the original annotation and preserve its native source anchor.
+            const displayRows = sourceRows.map((row) => hasNativeAnchor(row)
+              ? { ...row, cfi_range: null } : row);
+            setAnnList(displayRows);
+            displayRows.forEach((a) => {
               const note = (a.note_text || '').trim();
               if (note && a.annotation_id) notesRef.current.set(a.annotation_id, note);
-              if (a.cfi_range) {
-                paintHighlight(a.cfi_range, a.highlight_color ?? '', a.annotation_id, !!note);
-              }
             });
+            const mapped = await resolveNativeAnnotations(epubBook as any, sourceRows, () => cancelled);
+            if (cancelled) return;
+            setAnnList((current) => current.map((row) => {
+              const cfi = mapped.get(row.annotation_id);
+              if (!cfi) return row;
+              return { ...row, cfi_range: cfi };
+            }));
           })
           .catch(() => { /* highlights are best-effort */ });
 
@@ -1478,6 +1525,7 @@ export function Reader({ id }: { id: string }) {
                         disabled={!jumpable}
                         title={jumpable ? t('Go to this highlight')
                           : unanchored ? t('A note about the book, not tied to a passage')
+                          : hasNativeAnchor(row) ? t('Location unavailable')
                           : t('This highlight has no saved position')}
                       >
                         {/* No colour bar on an unanchored note: there is no

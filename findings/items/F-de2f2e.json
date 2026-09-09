@@ -1,0 +1,19 @@
+{
+  "area": "devices",
+  "body": "Physical readers and browser identities shared inventory presentation, and an assignment-only count was labeled as a highlight total. Source registration without an installation identity also looked like another ordinary browser. The device page now separates browser reading sources, identifies an unidentified source explicitly, preserves the assignment count contract, and adds owner/book-scoped origin totals covering untyped historical records. Hardware inventory distinguishes no report from a reported empty inventory. Detail pages expose all annotation types and omit hardware inventory for browsers; account summaries list physical readers separately. Active unidentified sources now update their coarse last-seen heartbeat. Backend ownership/count/heartbeat tests and desktop/mobile accessible device flows passed. Fixed in the candidate for #2208; public release remains pending.",
+  "created": "2026-09-09",
+  "id": "F-de2f2e",
+  "refs": [
+    "#2208"
+  ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-09",
+    "note": "Implemented and independently verified in the #2208 candidate; not yet released.",
+    "release": ""
+  },
+  "severity": "ux",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Browser reading sources display hardware inventory and misleading annotation totals"
+}

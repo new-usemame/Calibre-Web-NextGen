@@ -8,6 +8,7 @@ import {
   useKoboTwoWayAnnotations, useUpdateKoboTwoWayAnnotations, useSetKoboTwoWayBook,
   useUpdateLibraryMode,
 } from '../lib/queries';
+import type { Device } from '../components/DeviceInventory';
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { SpinnerCentered } from '../components/Spinner';
@@ -46,7 +47,7 @@ export function Account() {
   const changePassword = useChangePassword();
   const createAppPw = useCreateAppPassword();
   const revokeAppPw = useRevokeAppPassword();
-  const devices = useQuery<{ devices: { public_id: string; label: string; annotation_count: number }[] }>({
+  const devices = useQuery<{ devices: Device[] }>({
     queryKey: ['annotation-devices'], queryFn: () => apiGet('/api/annotations/devices?active=true'),
   });
   const updateLibraryMode = useUpdateLibraryMode();
@@ -232,12 +233,13 @@ export function Account() {
 
       <section className={styles.card} aria-labelledby="account-ereaders-title">
         <h2 id="account-ereaders-title" className={styles.cardTitle}><Smartphone size={16} aria-hidden="true" focusable={false} /> {t('E-readers')}</h2>
-        {devices.data?.devices.length ? (
+        {devices.data?.devices.some(device => device.type !== 'webreader') ? (
           <ul className={styles.deviceSummary}>
-            {devices.data.devices.map((device) => <li key={device.public_id}>{device.label} · {t('{n} highlights and notes', { n: device.annotation_count })}</li>)}
+            {devices.data.devices.filter(device => device.type !== 'webreader').map((device) => <li key={device.public_id}>{device.label} · {device.origin_annotation_count != null ? t('{n} annotations from this source', { n: device.origin_annotation_count }) : t('{n} annotations assigned to this source', { n: device.annotation_count })}</li>)}
           </ul>
         ) : <p className={styles.muted}>{devices.isError ? t('Could not load e-readers.') : t('No e-readers yet.')}</p>}
         <div className={styles.deviceLinks}>
+          {devices.data?.devices.some(device => device.type === 'webreader') && <Link href="/account/devices#browser-reading-sources" className={styles.manageDevices}>{t('Browser reading sources')}</Link>}
           <Link href="/account/devices" className={styles.manageDevices}>{t('Manage e-readers')}</Link>
           <Link href="/account/devices#kobo-pairing" className={styles.manageDevices}>
             {t('Pair a Kobo or KOReader')}

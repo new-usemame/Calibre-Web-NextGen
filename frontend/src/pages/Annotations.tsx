@@ -333,7 +333,7 @@ export function Annotations({ id }: { id: string }) {
                     {activeDevices.map((device) => <option key={device.public_id} value={device.public_id}>{device.label} — {device.model}</option>)}</select>}
                   {row.chapter_progress != null && <><span aria-hidden="true">·</span><span>{Math.round(row.chapter_progress * 100)}%</span></>}
                   {row.anchor_status === 'unresolved' && <><span aria-hidden="true">·</span><span className={styles.anchorWarning}
-                    aria-label={t("Warning: this highlight can’t be shown in the book")}><AlertTriangle size={13} aria-hidden="true" focusable={false} />{t('Not in current file')}</span></>}
+                    title={t("Warning: the saved highlight could not be located in the current book. Its text is preserved.")} aria-label={t("Warning: the saved highlight could not be located in the current book. Its text is preserved.")}><AlertTriangle size={13} aria-hidden="true" focusable={false} />{t('Location unavailable')}</span></>}
                   {failed.has(row.annotation_id) && <span className={styles.failure}>{t('Not assigned')}</span>}
                 </div>
               </div>

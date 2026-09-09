@@ -1,0 +1,1 @@
+- **One Browser source per account:** Reading in different browsers or computers now uses the same source. Upgrades consolidate existing browser sources while preserving annotations, notes, shared bookmarks, device assignments, and old source links. Physical e-readers remain separate.

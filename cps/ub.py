@@ -1270,6 +1270,8 @@ class Device(Base):
     __table_args__ = (
         Index('ix_device_user_active_last_seen', 'user_id', 'active', 'last_seen_at'),
         Index('ix_device_user_display_name', 'user_id', 'display_name'),
+        Index('uq_device_account_browser', 'user_id', unique=True,
+              sqlite_where=text("kind = 'webreader' AND created_by = 'account-browser'")),
     )
 
 
@@ -4946,6 +4948,8 @@ def migrate_Database(_session):
     migrate_device_reading_position_slice(engine, _session)
     migrate_kobo_annotation_seed_pipeline(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
+    from .services.browser_source import migrate_account_browser_source
+    migrate_account_browser_source(engine)
     migrate_book_cover_preview_table(engine, _session)
     migrate_user_book_cover_table(engine, _session)
     migrate_notice_tables(engine, _session)

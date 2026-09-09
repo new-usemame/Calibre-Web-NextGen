@@ -178,16 +178,18 @@ def _device_inventory_pagination():
 
 
 def _owned_device(public_id, user_id, session):
-    return session.query(ub.Device).filter(
+    from .services.browser_source import canonical_browser
+    device = session.query(ub.Device).filter(
         ub.Device.public_id == public_id, ub.Device.user_id == user_id,
     ).first()
+    return canonical_browser(device, session, ub)
 
 
 def _device_kind_label(kind):
     return {
         "kobo": "Kobo",
         "koreader": "KOReader",
-        "webreader": "Web reader",
+        "webreader": "Browser",
     }.get(kind, "E-reader")
 
 
@@ -520,13 +522,6 @@ def _aggregate_device_rows(*, devices, owners_by_id, scopes, session):
 
     assigned_counts = {device_id: 0 for device_id in device_ids}
     origin_totals = {device_id: 0 for device_id in device_ids}
-    from .services.device_registry import WEBREADER_SCHEME_PREFIX
-    identified_browsers = {
-        device_id for (device_id,) in session.query(ub.DeviceIdentity.device_id).filter(
-            ub.DeviceIdentity.device_id.in_(device_ids),
-            ub.DeviceIdentity.scheme.like(f"{WEBREADER_SCHEME_PREFIX}%"),
-        ).distinct().all()
-    }
     origin_counts = {
         device_id: {kind: 0 for kind in DEVICE_ANNOTATION_TYPES}
         for device_id in device_ids
@@ -754,9 +749,7 @@ def _aggregate_device_rows(*, devices, owners_by_id, scopes, session):
             books_with_position=books_with_position,
             last_position_at=last_position,
             origin_annotation_count=origin_totals[device.id],
-            browser_identity=(
-                "identified" if device.id in identified_browsers else "unidentified"
-            ) if device.kind == "webreader" else None,
+            browser_identity="account" if device.kind == "webreader" else None,
         ))
     return rows
 
@@ -765,7 +758,9 @@ def list_annotation_devices(*, user_id, session, active_only=False,
                             limit=DEFAULT_DEVICE_LIST_LIMIT, offset=0,
                             return_total=False):
     """List one bounded page with SQL-aggregated, owner-filtered counts."""
-    query = session.query(ub.Device).filter(ub.Device.user_id == user_id)
+    query = session.query(ub.Device).filter(
+        ub.Device.user_id == user_id, ub.Device.created_by != "browser-alias",
+    )
     if active_only:
         query = query.filter(ub.Device.active.is_(True))
     total = query.count()
@@ -1186,10 +1181,12 @@ def annotation_admin_devices():
         if error_response is not None:
             return error_response, error_status
         limit, offset = pagination
-        total = ub.session.query(func.count(ub.Device.id)).scalar() or 0
+        total = ub.session.query(func.count(ub.Device.id)).filter(
+            ub.Device.created_by != "browser-alias",
+        ).scalar() or 0
         page = ub.session.query(ub.Device, ub.User).outerjoin(
             ub.User, ub.User.id == ub.Device.user_id,
-        ).order_by(
+        ).filter(ub.Device.created_by != "browser-alias").order_by(
             ub.User.name, ub.User.id, ub.Device.display_name, ub.Device.id,
         ).offset(offset).limit(limit).all()
         devices = [device for device, _owner in page]
@@ -2205,7 +2202,9 @@ def _annotation_device_payload(user_id, session, device_ids=None, include_assign
     """Return an owned, bounded lookup, optionally including assignment choices."""
     if device_ids is not None and not device_ids and not include_assignable:
         return {}, {}
-    query = session.query(ub.Device).filter(ub.Device.user_id == user_id)
+    query = session.query(ub.Device).filter(
+        ub.Device.user_id == user_id, ub.Device.created_by != "browser-alias",
+    )
     if device_ids is not None:
         referenced = ub.Device.id.in_(tuple(device_ids))
         query = query.filter(or_(referenced, ub.Device.active.is_(True)) if include_assignable else referenced)
@@ -2722,7 +2721,7 @@ def _fanout_to_sync_targets(row, book):
 
 
 def _observe_webreader_request_device():
-    """Resolve this browser without ever exposing its installation id."""
+    """Attribute browser edits to the authenticated account’s shared source."""
     try:
         from .services.device_registry import (
             WEBREADER_INSTALLATION_ID_HEADER,

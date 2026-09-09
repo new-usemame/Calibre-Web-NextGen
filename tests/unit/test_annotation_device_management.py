@@ -172,8 +172,8 @@ def test_source_cards_distinguish_origin_assignment_and_browser_identity(session
     assert rows[kobo.public_id]["origin_annotation_count"] == 3
     assert rows[kobo.public_id]["annotation_count"] == 2, "Preserve legacy assignment-count contract"
     assert rows[browser.public_id]["origin_annotation_count"] == 1
-    assert rows[browser.public_id]["browser_identity"] == "identified"
-    assert rows[fallback.public_id]["browser_identity"] == "unidentified"
+    assert rows[browser.public_id]["browser_identity"] == "account"
+    assert rows[fallback.public_id]["browser_identity"] == "account"
     assert rows[kobo.public_id]["browser_identity"] is None
     assert rows[kobo.public_id]["inventory_observed"] is None
 
@@ -950,7 +950,7 @@ def test_admin_device_board_is_gated_filtered_and_never_invents_null_origin_devi
     board = {row["public_id"]: row for row in payload["devices"]}
     assert board[first.public_id]["highlights"] == 1
     assert board[first.public_id]["dogears"] == 0
-    assert board[first.public_id]["kind_label"] == "Web reader"
+    assert board[first.public_id]["kind_label"] == "Browser"
     assert board[second.public_id]["notes"] == 1
     serialized = str(payload).lower()
     assert "fingerprint" not in serialized

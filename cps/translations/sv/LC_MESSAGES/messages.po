@@ -6752,12 +6752,12 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Original device attribution restored for {n}."
-msgstr ""
+msgstr "Enhetens ursprungliga tillskrivning har återställts för {n}."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Original device attribution restored for {ok} of {total}."
-msgstr ""
+msgstr "Enhetens ursprungliga tillskrivning har återställts för {ok} av {total}."
 
 #: cps/spa_strings.py
 msgid "PDF reader"
@@ -7858,11 +7858,11 @@ msgstr "Använd mitt eget omslag"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Use original device: {name}"
-msgstr ""
+msgstr "Använd ursprunglig enhet: {name}"
 
 #: cps/spa_strings.py
 msgid "Use original devices"
-msgstr ""
+msgstr "Använd ursprungliga enheter"
 
 #: cps/spa_strings.py
 msgid "Use the library cover"

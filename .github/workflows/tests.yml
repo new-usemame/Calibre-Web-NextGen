@@ -126,6 +126,12 @@ jobs:
         working-directory: frontend
         run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
 
+      # Playwright downloads its own browsers; no test uses the runner's Chrome
+      # apt feed. Chrome now writes .sources, which the runner image's cleanup
+      # of the legacy .list misses. Keep all apt signature/hash checks enabled.
+      - name: Disable unused Google Chrome apt feed
+        run: sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -350,6 +356,12 @@ jobs:
           # pbs-cache mirror; falls back to GITHUB_TOKEN where the PAT
           # secret isn't in scope.
           password: ${{ secrets.GH_PAT || secrets.GITHUB_TOKEN }}
+
+      # Playwright downloads its own browsers; no test uses the runner's Chrome
+      # apt feed. Chrome now writes .sources, which the runner image's cleanup
+      # of the legacy .list misses. Keep all apt signature/hash checks enabled.
+      - name: Disable unused Google Chrome apt feed
+        run: sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
 
       - name: Install system dependencies
         run: |
@@ -969,6 +981,12 @@ jobs:
         timeout-minutes: 10
         working-directory: frontend
         run: npm ci --prefer-offline --no-audit --no-fund --loglevel=error
+
+      # Playwright downloads its own browsers; no test uses the runner's Chrome
+      # apt feed. Chrome now writes .sources, which the runner image's cleanup
+      # of the legacy .list misses. Keep all apt signature/hash checks enabled.
+      - name: Disable unused Google Chrome apt feed
+        run: sudo rm -f /etc/apt/sources.list.d/google-chrome.list /etc/apt/sources.list.d/google-chrome.sources
 
       - name: Install Playwright browsers
         timeout-minutes: 10

@@ -1426,3 +1426,9 @@ _("Manage devices and browsers")
 _("1 annotation from this source")
 
 _("1 annotation assigned to this source")
+
+# Devices page action recovery.
+_("Could not rename this source. Try again.")
+_("Could not load removal details. Try again.")
+_("Could not remove this source. Try again.")
+_("Could not restore this source. Try again.")

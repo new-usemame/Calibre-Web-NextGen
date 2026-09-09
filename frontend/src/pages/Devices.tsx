@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { ChevronLeft, MoreHorizontal, Pencil, Smartphone } from 'lucide-react';
@@ -7,6 +7,7 @@ import { useMe } from '../lib/queries';
 import { clampOffset } from '../lib/pagination';
 import { parseApiTimestamp, relativeWhen } from '../lib/relativeTime';
 import { useAnnouncer } from '../lib/a11y/announcer';
+import { useFocusTrap } from '../lib/a11y/useFocusTrap';
 import { useT } from '../lib/i18n';
 import { EmptyState } from '../components/EmptyState';
 import { SpinnerCentered } from '../components/Spinner';
@@ -31,30 +32,17 @@ function isDeviceStale(lastSeen: string | null): boolean {
   return timestamp !== null && Date.now() - timestamp > 30 * 86400000;
 }
 
-function RemoveDialog({ device, counts, onCancel, onRemove }: {
+function RemoveDialog({ device, counts, onCancel, onRemove, pending, error }: {
   device: Device; counts: Counts; onCancel: () => void; onRemove: () => void;
+  pending: boolean; error: boolean;
 }) {
   const t = useT();
-  const cancelRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    cancelRef.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onCancel();
-      if (event.key !== 'Tab' || !dialogRef.current) return;
-      const controls = [...dialogRef.current.querySelectorAll<HTMLElement>('button:not([disabled])')];
-      if (!controls.length) return;
-      const first = controls[0]; const last = controls[controls.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [onCancel]);
+  useFocusTrap(dialogRef, { onClose: onCancel });
   const descriptionId = `remove-device-${device.public_id}`;
   return (
     <div className={styles.scrim}>
-      <div ref={dialogRef} className={styles.dialog} role="alertdialog" aria-modal="true"
+      <div ref={dialogRef} className={styles.dialog} role="alertdialog" aria-modal="true" tabIndex={-1}
         aria-labelledby={`${descriptionId}-title`} aria-describedby={descriptionId}>
         <h2 id={`${descriptionId}-title`}>{t('Remove {name}?', { name: device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label })}</h2>
         <div id={descriptionId}>
@@ -64,9 +52,10 @@ function RemoveDialog({ device, counts, onCancel, onRemove }: {
             ? t('Reading data is kept. Browser reappears when you next save reading progress or annotations.')
             : t('This device will no longer sync.')}</p>
         </div>
+        <p role="alert" className={error ? styles.inventoryAlert : undefined}>{error ? t('Could not remove this source. Try again.') : ''}</p>
         <div className={styles.dialogActions}>
-          <button ref={cancelRef} type="button" className={styles.button} onClick={onCancel}>{t('Cancel')}</button>
-          <button type="button" className={styles.dangerButton} onClick={onRemove}>{t('Remove device')}</button>
+          <button type="button" className={styles.button} onClick={onCancel}>{t('Cancel')}</button>
+          <button type="button" className={styles.dangerButton} disabled={pending} onClick={onRemove}>{pending ? t('Removing…') : t('Remove device')}</button>
         </div>
       </div>
     </div>
@@ -85,7 +74,11 @@ export function Devices() {
   const [removing, setRemoving] = useState<{ device: Device; counts: Counts } | null>(null);
   const [undoDevice, setUndoDevice] = useState<Device | null>(null);
   const [deviceOffset, setDeviceOffset] = useState(0);
-  const invokerRef = useRef<HTMLButtonElement | null>(null);
+  const [preflightError, setPreflightError] = useState(false);
+  const [preflightPending, setPreflightPending] = useState(false);
+  const preflightRef = useRef(false);
+  const undoRef = useRef<HTMLButtonElement>(null);
+  const renameInvokerRef = useRef<HTMLButtonElement | null>(null);
   const menuInvokerRef = useRef<HTMLButtonElement | null>(null);
   const menuDismissLayerRef = useRef<HTMLDivElement | null>(null);
   const { data, isLoading, error } = useQuery<DevicePage>({
@@ -125,33 +118,45 @@ export function Devices() {
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['annotation-devices'] });
   const rename = useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) => apiPatch(`/api/annotations/devices/${id}`, { label: name }),
-    onSuccess: () => { setEditing(null); refresh(); announce(t('Device renamed.')); },
+    onSuccess: () => { setEditing(null); refresh(); announce(t('Device renamed.')); renameInvokerRef.current?.focus(); },
   });
   const remove = useMutation({
     mutationFn: (device: Device) => apiDelete(`/api/annotations/devices/${device.public_id}`),
     onSuccess: (_result, device) => {
       setRemoving(null); setUndoDevice(device); refresh();
       announce(t('{name} removed.', { name: device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label }));
-      invokerRef.current?.focus();
+      requestAnimationFrame(() => undoRef.current?.focus());
     },
   });
   const restore = useMutation({
     mutationFn: (device: Device) => apiPost(`/api/annotations/devices/${device.public_id}/restore`),
-    onSuccess: () => { setUndoDevice(null); refresh(); announce(t('Device restored.')); },
+    onSuccess: async () => {
+      setUndoDevice(null); await refresh(); announce(t('Device restored.'));
+      document.getElementById('main')?.focus();
+    },
   });
 
-  const openRemove = async (device: Device, invoker: HTMLButtonElement) => {
-    invokerRef.current = invoker;
-    const counts = await apiGet<Counts>(`/api/annotations/devices/${device.public_id}/delete-preflight`);
-    setMenu(null); setRemoving({ device, counts });
+  const cancelRemoval = useCallback(() => { setRemoving(null); }, []);
+  const openRemove = async (device: Device) => {
+    if (preflightRef.current) return;
+    preflightRef.current = true; setPreflightPending(true); setPreflightError(false); remove.reset();
+    try {
+      const counts = await apiGet<Counts>(`/api/annotations/devices/${device.public_id}/delete-preflight`);
+      // The disclosure's Remove button disappears when the dialog opens. Capture
+      // the surviving trigger for the shared trap's focus restoration instead.
+      menuInvokerRef.current?.focus();
+      setMenu(null); setRemoving({ device, counts });
+    } catch { setPreflightError(true); }
+    finally { preflightRef.current = false; setPreflightPending(false); }
   };
 
   if (isLoading || staleDevicePage) return <SpinnerCentered size={40} />;
   const devices = data?.devices ?? [];
   return (
-    <main className={styles.container}>
+    <div className={styles.container}>
       <Link href="/account" className={styles.back}><ChevronLeft size={16} aria-hidden="true" focusable={false} /> {t('Account')}</Link>
       <div className={styles.heading}><Smartphone aria-hidden="true" focusable={false} /><h1>{t('Devices and browsers')}</h1></div>
+      <p role="alert" className={preflightError ? styles.inventoryAlert : undefined}>{preflightError ? t('Could not load removal details. Try again.') : ''}</p>
       {error ? <EmptyState message={t('Could not load devices and browsers.')} /> : devices.length === 0 ? (
         <section className={styles.empty}>
           <h2>{t('No devices or browser reading data yet.')}</h2>
@@ -177,12 +182,14 @@ export function Devices() {
             <li key={device.public_id} className={styles.card}>
               <div className={styles.cardMain}>
                 {editing === device.public_id ? (
-                  <form onSubmit={(event) => { event.preventDefault(); rename.mutate({ id: device.public_id, name: label }); }} className={styles.renameForm}>
+                  <form onSubmit={(event) => { event.preventDefault(); if (!rename.isPending && label.trim()) rename.mutate({ id: device.public_id, name: label }); }} className={styles.renameForm}>
                     <input autoFocus aria-label={t('Device name')} value={label} maxLength={60}
+                      aria-invalid={rename.isError || undefined} aria-describedby={rename.isError ? `rename-error-${device.public_id}` : undefined}
                       onChange={(event) => setLabel(event.target.value)}
                       onKeyDown={(event) => { if (event.key === 'Escape') setEditing(null); }} />
                     <button type="submit" disabled={!label.trim() || rename.isPending}>{t('Save')}</button>
-                    <button type="button" onClick={() => setEditing(null)}>{t('Cancel')}</button>
+                    <button type="button" onClick={() => { setEditing(null); renameInvokerRef.current?.focus(); }}>{t('Cancel')}</button>
+                    <span id={`rename-error-${device.public_id}`} role="alert">{rename.isError ? t('Could not rename this source. Try again.') : ''}</span>
                   </form>
                 ) : <h2><Link href={`/account/devices/${device.public_id}`}>{device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label}</Link></h2>}
                 <p className={styles.deviceMeta}>{[device.model, device.firmware && `FW ${device.firmware}`].filter(Boolean).join(' · ')}</p>
@@ -223,7 +230,7 @@ export function Devices() {
               </div>
               <div className={styles.cardActions}>
                 <button type="button" aria-label={t('Rename {name}', { name: device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label })}
-                  onClick={() => { setEditing(device.public_id); setLabel(device.label); }}><Pencil size={17} aria-hidden="true" focusable={false} /></button>
+                  onClick={(event) => { renameInvokerRef.current = event.currentTarget; rename.reset(); setEditing(device.public_id); setLabel(device.label); }}><Pencil size={17} aria-hidden="true" focusable={false} /></button>
                 <button type="button" aria-label={t('More actions for {name}', { name: device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label })}
                   aria-expanded={menu === device.public_id}
                   className={menu === device.public_id ? styles.menuTriggerOpen : undefined}
@@ -242,7 +249,7 @@ export function Devices() {
                       setMenu(null);
                     }} />
                   <div className={styles.menu}>
-                    <button type="button" onClick={(event) => void openRemove(device, event.currentTarget)}>{t('Remove device')}</button>
+                    <button type="button" disabled={preflightPending} onClick={() => void openRemove(device)}>{preflightPending ? t('Loading…') : t('Remove device')}</button>
                   </div>
                 </>}
               </div>
@@ -278,11 +285,12 @@ export function Devices() {
       <KoboPairing devices={devices} enabled={!!me?.features?.kobo_sync} />
       {undoDevice && <div className={styles.toast} role="status">
         <span>{t('{name} removed.', { name: undoDevice.label })}</span>
-        <button type="button" onClick={() => restore.mutate(undoDevice)}>{t('Undo')}</button>
+        <button ref={undoRef} type="button" disabled={restore.isPending} onClick={() => restore.mutate(undoDevice)}>{t('Undo')}</button>
+        <span role="alert">{restore.isError ? t('Could not restore this source. Try again.') : ''}</span>
       </div>}
       {removing && <RemoveDialog device={removing.device} counts={removing.counts}
-        onCancel={() => { setRemoving(null); invokerRef.current?.focus(); }}
-        onRemove={() => remove.mutate(removing.device)} />}
-    </main>
+        onCancel={cancelRemoval} pending={remove.isPending} error={remove.isError}
+        onRemove={() => { if (!remove.isPending) remove.mutate(removing.device); }} />}
+    </div>
   );
 }

@@ -15403,3 +15403,15 @@ msgstr "1 annotatie uit deze bron"
 #: cps/spa_strings.py
 msgid "1 annotation assigned to this source"
 msgstr "1 annotatie toegewezen aan deze bron"
+
+msgid "Could not rename this source. Try again."
+msgstr "Kan deze bron niet hernoemen. Probeer het opnieuw."
+
+msgid "Could not load removal details. Try again."
+msgstr "Kan de verwijderingsdetails niet laden. Probeer het opnieuw."
+
+msgid "Could not remove this source. Try again."
+msgstr "Kan deze bron niet verwijderen. Probeer het opnieuw."
+
+msgid "Could not restore this source. Try again."
+msgstr "Kan deze bron niet herstellen. Probeer het opnieuw."

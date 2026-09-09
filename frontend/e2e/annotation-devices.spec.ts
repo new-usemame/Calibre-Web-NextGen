@@ -190,11 +190,72 @@ test('device manager renames and removes only through counted confirmation, then
   expect(calls.restored()).toBe(1);
 });
 
+test('failed device changes explain the failure and retain a working retry', async ({ page }) => {
+  await stubDevices(page);
+  // Fail each wire operation once; the original handlers provide the retry.
+  for (const [path, method] of [
+    ['device-1', 'PATCH'], ['device-1/delete-preflight', 'GET'],
+    ['device-1', 'DELETE'], ['device-1/restore', 'POST'],
+  ]) {
+    let failed = false;
+    await page.route(`**/api/annotations/devices/${path}`, async route => {
+      if (!failed && route.request().method() === method) {
+        failed = true;
+        await route.fulfill({ status: 503, json: { error: 'Temporarily unavailable' } });
+      } else await route.fallback();
+    });
+  }
+  await page.goto('/app/account/devices');
+  await page.getByRole('button', { name: 'Rename Libra Colour' }).click();
+  const input = page.getByRole('textbox', { name: 'Device name' });
+  await input.fill('Travel Kobo');
+  await input.press('Enter');
+  await expect(page.getByRole('alert').filter({ hasText: 'Could not rename' })).toBeVisible();
+  await expect(input).toHaveValue('Travel Kobo');
+  await input.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Travel Kobo' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'More actions for Travel Kobo' }).click();
+  await page.getByRole('button', { name: 'Remove device', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Could not load removal details' })).toBeVisible();
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Remove device', exact: true }).click();
+  const dialog = page.getByRole('alertdialog');
+  await dialog.getByRole('button', { name: 'Remove device', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Could not remove');
+  await expect(page.getByRole('heading', { name: 'Travel Kobo', exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Remove device', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Could not restore' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Travel Kobo', exact: true })).toBeVisible();
+});
+
+test('canceling a device removal returns keyboard focus to its surviving action', async ({ page }) => {
+  await stubDevices(page);
+  await page.goto('/app/account/devices');
+  const trigger = page.getByRole('button', { name: 'More actions for Libra Colour' });
+  await trigger.click();
+  await page.getByRole('button', { name: 'Remove device', exact: true }).click();
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(dialog.getByRole('button', { name: 'Remove device', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
 test('device manager is axe-clean and has no 390px overflow', async ({ page }, testInfo) => {
   await stubDevices(page);
   if (testInfo.project.name === 'desktop') await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/app/account/devices');
   await expect(page.getByRole('heading', { name: 'Devices and browsers' })).toBeVisible();
+  await expect(page.getByRole('main')).toHaveCount(1);
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze();
   expect(results.violations.filter((v) => ['critical', 'serious'].includes(v.impact || ''))).toEqual([]);
   await assertNoHorizontalOverflow(page);

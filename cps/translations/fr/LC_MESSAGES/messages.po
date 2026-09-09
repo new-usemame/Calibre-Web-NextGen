@@ -15909,3 +15909,15 @@ msgstr "1 annotation provenant de cette source"
 #: cps/spa_strings.py
 msgid "1 annotation assigned to this source"
 msgstr "1 annotation attribuée à cette source"
+
+msgid "Could not rename this source. Try again."
+msgstr "Impossible de renommer cette source. Réessayez."
+
+msgid "Could not load removal details. Try again."
+msgstr "Impossible de charger les détails de suppression. Réessayez."
+
+msgid "Could not remove this source. Try again."
+msgstr "Impossible de supprimer cette source. Réessayez."
+
+msgid "Could not restore this source. Try again."
+msgstr "Impossible de restaurer cette source. Réessayez."

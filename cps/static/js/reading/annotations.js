@@ -256,9 +256,12 @@
             // stored cfi_range only if there's no anchor.
             li.style.cursor = "pointer";
             li.addEventListener("click", function () {
-                if (jumpToAnnotation(row)) { return; }
+                if (row.start_kobospan) {
+                    jumpToAnnotation(row);
+                    return; // An unresolved native anchor cannot trust its stored CFI.
+                }
                 if (row.cfi_range) {
-                    try { reader.rendition.display(row.cfi_range); } catch (e) { /* unresolvable — ignore */ }
+                    try { ignoreRejectedDisplay(reader.rendition.display(row.cfi_range)); } catch (e) { /* unresolvable — ignore */ }
                 }
             });
             ol.appendChild(li);
@@ -268,10 +271,13 @@
     // Navigate the reader to an annotation by resolving its start KoboSpan
     // in whichever section currently holds it. If that section isn't
     // rendered yet, display its chapter first, then re-resolve.
-    function jumpToAnnotation(row) {
-        if (!row.start_kobospan) { return false; }
-        var section = chapterSection(row.content_id);
-        if (!section) { return false; }
+    function ignoreRejectedDisplay(displayed) {
+        if (displayed && typeof displayed.catch === "function") {
+            displayed.catch(function () { /* unavailable location */ });
+        }
+    }
+
+    function jumpWithinRenderedSection(row, section) {
         var contentsList;
         try { contentsList = reader.rendition.getContents() || []; } catch (e) { contentsList = []; }
         for (var i = 0; i < contentsList.length; i++) {
@@ -284,14 +290,30 @@
                     range.setStart(loc.node, loc.offset);
                     range.setEnd(loc.node, loc.offset);
                     var cfi = c.cfiFromRange(range);
-                    if (cfi) { reader.rendition.display(cfi); return true; }
+                    if (cfi) { ignoreRejectedDisplay(reader.rendition.display(cfi)); return true; }
                 } catch (e) { /* fall through */ }
             }
         }
-        // Section not rendered — jump to the chapter; the rendered hook
-        // overlays the highlight once it loads.
-        try { reader.rendition.display(section.href); return true; } catch (e) { /* ignore */ }
         return false;
+    }
+
+    function jumpToAnnotation(row) {
+        if (!row.start_kobospan) { return false; }
+        var section = chapterSection(row.content_id);
+        if (!section) { return false; }
+        if (jumpWithinRenderedSection(row, section)) { return true; }
+        // Loading a chapter alone can leave the passage several pages away.
+        // Resolve its live span after display completes, without recursively
+        // retrying a missing span or trusting a source-document CFI.
+        try {
+            var displayed = reader.rendition.display(section.href);
+            if (displayed && typeof displayed.then === "function") {
+                displayed.then(function () {
+                    jumpWithinRenderedSection(row, section);
+                }).catch(function () { /* unavailable chapter */ });
+            }
+            return true;
+        } catch (e) { return false; }
     }
 
     // --- Phase 1: create / edit / delete -----------------------------------
@@ -315,7 +337,7 @@
         return fetch(url, {
             method: method,
             credentials: "same-origin",
-            headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
+            headers: window.webreaderDeviceHeaders({ "Content-Type": "application/json", "X-CSRFToken": csrfToken() }),
             body: body ? JSON.stringify(body) : undefined
         });
     }
@@ -612,6 +634,12 @@
             return;
         }
 
+        // SidebarController switches tabs through the named panel controller.
+        // The Annotations tab is supplied by this extension, not reader.min.js.
+        reader.AnnotationsController = {
+            show: function () { $("#annotationsView").show(); },
+            hide: function () { $("#annotationsView").hide(); }
+        };
         injectStyles();
         // Clicking the parent chrome (outside the popup) dismisses it. Clicks
         // inside the iframe are handled by the select/relocate hooks.

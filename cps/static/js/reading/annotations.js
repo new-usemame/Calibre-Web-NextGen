@@ -654,11 +654,15 @@
             .then(function (payload) {
                 allRows = (payload && payload.annotations) || [];
                 renderSidebarList(allRows);
-                attachRenderHook();
                 applyToRenderedContents();
             })
             .catch(function (err) {
                 if (window.console) { console.warn("annotations fetch failed:", err); }
+            })
+            .finally(function () {
+                // Finish the initial snapshot before accepting new annotations.
+                attachRenderHook();
+                window.observeReaderSelections(reader.rendition);
             });
     }
 

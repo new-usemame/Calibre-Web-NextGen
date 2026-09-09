@@ -68,6 +68,7 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ### Bug fixes
 
+- **Safari text selection opens highlight controls in both web readers.** Shared focused-frame selection observation preserves the script-disabled book sandbox and native-event deduplication. Desktop mouse and mobile DOM-selection browser contracts cover creation and embedded-script isolation. | SHA `TBD` | release `TBD`.
 - **Clearing a note now agrees in the classic and new readers.** Explicit web-reader clears store an empty string; omitted notes and existing NULLs stay unknown. Kobo column rendering treats either empty representation as no note. No migration. | SHA `TBD` | release `TBD`.
 
 - **Hardcover's automatic ID crawler can now be turned off without disabling reading-progress or annotation sync** (fork issue [#2103](https://github.com/new-usemame/Calibre-Web-NextGen/issues/2103)). The CWA settings schedule has an explicit `Never (auto-fetch off)` value; refreshing the schedule removes only the recurring Hardcover crawler job and leaves the canonical `config_hardcover_sync` setting untouched. Unknown persisted schedule values are diagnosed and fall back to the backward-compatible weekly default, while invalid form submissions retain the prior stored value. Fork-original. | SHA `TBD` | release `TBD`.

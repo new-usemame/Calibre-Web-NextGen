@@ -5911,6 +5911,10 @@ msgid "Looks good"
 msgstr "看起來不錯"
 
 #: cps/spa_strings.py
+msgid "Using the image behind that Google link"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Low-res"
 msgstr "低解析度"
 

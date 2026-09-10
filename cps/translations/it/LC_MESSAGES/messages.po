@@ -6254,6 +6254,10 @@ msgid "Looks good"
 msgstr "Sembra corretto"
 
 #: cps/spa_strings.py
+msgid "Using the image behind that Google link"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Low-res"
 msgstr "Bassa risulozuone"
 

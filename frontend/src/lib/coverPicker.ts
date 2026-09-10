@@ -57,6 +57,10 @@ export interface UrlValidation {
   size_bytes: number | null;
   width: number | null;
   height: number | null;
+  /** The URL the server will actually download when it differs from the typed
+   *  one (a Google Images results link unwrapped to the image behind it).
+   *  `url` stays the typed text so the stale-response guard keeps working. */
+  resolved_url?: string | null;
 }
 
 export interface CoverState {

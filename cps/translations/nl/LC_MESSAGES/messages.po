@@ -6158,6 +6158,10 @@ msgid "Looks good"
 msgstr "Ziet er goed uit"
 
 #: cps/spa_strings.py
+msgid "Using the image behind that Google link"
+msgstr "De afbeelding achter die Google-link wordt gebruikt"
+
+#: cps/spa_strings.py
 msgid "Low-res"
 msgstr "Lage resolutie"
 

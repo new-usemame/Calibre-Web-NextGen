@@ -219,8 +219,10 @@ def stage_url(user_id: int, book_id: int, updated_at: datetime, url: str):
     max_bytes, _max_mb = helper._get_cover_download_limit()
     response = None
     try:
+        from .cover_url_validator import cover_fetch_headers
         response = cw_advocate.get(
-            url, timeout=(10, 30), allow_redirects=True, stream=True)
+            url, timeout=(10, 30), allow_redirects=True, stream=True,
+            headers=cover_fetch_headers())
         response.raise_for_status()
         content_type = (response.headers.get("content-type") or "").split(";", 1)[0].lower()
         if content_type and content_type not in _SUPPORTED_UPLOAD_TYPES:

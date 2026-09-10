@@ -440,28 +440,41 @@ function UrlTab({ id, locked, personal, onApplied, onError }: {
   const t = useT();
   const [url, setUrl] = useState('');
   const [valid, setValid] = useState<UrlValidation | null>(null);
+  // The check itself failed (non-2xx, network): shown in the same red line as
+  // a refusal, because a silently disabled button reads as "nothing happened".
+  const [checkError, setCheckError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [applying, setApplying] = useState(false);
   const seq = useRef(0); // ignore stale validation responses that resolve out of order
 
   useEffect(() => {
     const v = url.trim();
-    if (!v) { setValid(null); setChecking(false); return; }
+    if (!v) { setValid(null); setCheckError(null); setChecking(false); return; }
     setChecking(true);
     const mySeq = ++seq.current;
     const h = setTimeout(async () => {
-      try { const r = await coverApi.validate(id, v, personal); if (mySeq === seq.current) setValid(r); }
-      catch { if (mySeq === seq.current) setValid(null); }
-      finally { if (mySeq === seq.current) setChecking(false); }
+      try {
+        const r = await coverApi.validate(id, v, personal);
+        if (mySeq === seq.current) { setValid(r); setCheckError(null); }
+      } catch (e) {
+        if (mySeq === seq.current) {
+          setValid(null);
+          setCheckError((e instanceof ApiError && e.message) || t('That URL is not a usable image.'));
+        }
+      } finally { if (mySeq === seq.current) setChecking(false); }
     }, 400);
     return () => clearTimeout(h);
-  }, [url, id, personal]);
+  }, [url, id, personal, t]);
+
+  // A Google Images results link validates as the image behind it; apply that
+  // one, while the stale-response guard keeps comparing `url` to the typed text.
+  const applyUrl = valid?.resolved_url ?? valid?.url;
 
   const apply = async () => {
     // Guard against applying a URL that's no longer the one shown/validated.
-    if (!valid?.valid || checking || valid?.url !== url.trim() || locked) return;
+    if (!valid?.valid || !applyUrl || checking || valid?.url !== url.trim() || locked) return;
     setApplying(true);
-    try { const r = await coverApi.applyUrl(id, valid.url, personal); onApplied(r.cover_url); setUrl(''); setValid(null); }
+    try { const r = await coverApi.applyUrl(id, applyUrl, personal); onApplied(r.cover_url); setUrl(''); setValid(null); }
     catch (e) { onError(e); }
     finally { setApplying(false); }
   };
@@ -471,15 +484,19 @@ function UrlTab({ id, locked, personal, onApplied, onError }: {
       <input className={styles.input} value={url} onChange={(e) => setUrl(e.target.value)}
              placeholder="https://…" inputMode="url" aria-label={t('Cover image URL')} />
       {checking && <div className={styles.feedbackMuted}>{t('Checking…')}</div>}
+      {!checking && !valid && checkError && (
+        <div className={styles.feedbackErr} role="alert">{checkError}</div>
+      )}
       {!checking && valid && !valid.valid && (
-        <div className={styles.feedbackErr}>{valid.error_message || t('That URL is not a usable image.')}</div>
+        <div className={styles.feedbackErr} role="alert">{valid.error_message || t('That URL is not a usable image.')}</div>
       )}
       {!checking && valid?.valid && (
         <div className={styles.urlOk}>
-          <img src={valid.url} alt="" className={styles.urlThumb} />
+          <img src={applyUrl} alt="" className={styles.urlThumb} />
           <div className={styles.urlMeta}>
             <span className={styles.feedbackOk}><Check size={13} /> {t('Looks good')}</span>
             {valid.width && valid.height ? <span>{valid.width}×{valid.height}</span> : null}
+            {valid.resolved_url ? <span className={styles.feedbackMuted}>{t('Using the image behind that Google link')}</span> : null}
           </div>
         </div>
       )}

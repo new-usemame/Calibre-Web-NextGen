@@ -16,7 +16,7 @@ from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
 from ..helper import send_mail, valid_email
 from ..kobo_sync_status import change_archived_books, remove_synced_book
-from ..services import cover_extract, device_delivery, user_cover
+from ..services import cover_extract, cover_url_validator, device_delivery, user_cover
 
 BATCH_MEMBERSHIP_LIMIT = 200
 
@@ -125,6 +125,7 @@ def set_my_book_cover(book_id):
             url = (body.get("url") or "").strip()
             if not url:
                 return _err("invalid_request", "Provide a cover URL", 400)
+            url = cover_url_validator.resolve_pasted_cover_url(url)
             staged, message = user_cover.stage_url(
                 current_user.id, book_id, updated_at, url)
         elif kind == "embedded":

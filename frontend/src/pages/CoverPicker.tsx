@@ -3,13 +3,14 @@ import { Link } from 'wouter';
 import {
   ChevronLeft, Lock, Unlock, Upload as UploadIcon, Link2, RefreshCw, Check, X,
   Image as ImageIcon, AlertTriangle, KeyRound, Smartphone, Loader2, Sparkles, Search as SearchIcon,
+  Palette,
 } from 'lucide-react';
 import { useBook } from '../lib/queries';
 import {
   useCoverState, useCandidates, useProviderKeys, coverApi,
   EREADER_ASPECTS, EREADER_FILL_MODES,
   type CoverCandidate, type ProviderStatus, type UrlValidation,
-  type EreaderOptions, type ProviderKey,
+  type EreaderOptions, type ProviderKey, type DesignerCatalogue,
 } from '../lib/coverPicker';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/Button';
@@ -139,6 +140,10 @@ export function CoverPicker({ id }: { id: string }) {
         <section className={styles.main}>
           {state?.ereader_enabled && (
             <EreaderPanel onChange={setEreaderState} value={ereaderState} />
+          )}
+          {state?.designer?.available && (
+            <DesignerPanel id={id} catalogue={state.designer} locked={locked} personal={personal}
+                           onApplied={onApplied} onError={onError} />
           )}
           {!personal && <ApiKeysPanel />}
 
@@ -292,6 +297,163 @@ function useEreaderPreviews(id: string, candidates: CoverCandidate[], s: Ereader
   }, [id, s.enabled, settingsKey, candidates, personal]);
 
   return s.enabled ? previews : {};
+}
+
+
+// ============================================================================
+// "Design a cover" — server-rendered typographic cover from the book's own text
+// ============================================================================
+
+/** The designer sends design ids and shows what the server rendered. There is
+ *  deliberately no client-side canvas: the preview and the applied cover come
+ *  from the same server renderer, so what you see is what gets stored. */
+function DesignerPanel({ id, catalogue, locked, personal, onApplied, onError }: {
+  id: string; catalogue: DesignerCatalogue; locked: boolean; personal: boolean;
+  onApplied: (url?: string) => void; onError: (e: unknown) => void;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const first = catalogue.presets.find((p) => p.id === catalogue.default_preset) ?? catalogue.presets[0];
+  const [scheme, setScheme] = useState(first?.scheme ?? '');
+  const [font, setFont] = useState(first?.font ?? '');
+  const [layout, setLayout] = useState(first?.layout ?? '');
+  const [preview, setPreview] = useState<string | null>(null);
+  const [rendering, setRendering] = useState(false);
+  const [renderError, setRenderError] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
+  const seq = useRef(0); // a slow render must not overwrite a newer one
+
+  // A preset is a name for a combination, not a mode you are in. Deriving it
+  // from the three values means the chip tells the truth in both directions:
+  // diverging from Classic un-lights Classic, and rebuilding Ember's exact
+  // triple by hand lights Ember. No lit chip means "custom", which is honest.
+  const activePreset = catalogue.presets.find(
+    (p) => p.scheme === scheme && p.font === font && p.layout === layout,
+  )?.id ?? '';
+
+  const choosePreset = (next: string) => {
+    const entry = catalogue.presets.find((p) => p.id === next);
+    if (!entry) return;
+    setScheme(entry.scheme); setFont(entry.font); setLayout(entry.layout);
+  };
+
+  const swatchFor = (schemeId: string) => {
+    const found = catalogue.schemes.find((o) => o.id === schemeId)?.swatch ?? [];
+    return `linear-gradient(135deg, ${found[0] ?? 'transparent'} 50%, ${found[1] ?? 'transparent'} 50%)`;
+  };
+
+  // Rendering costs a subprocess on the server, so nothing is rendered until the
+  // panel is actually open, and changes are debounced.
+  useEffect(() => {
+    if (!open || !scheme || !font || !layout) return;
+    const mySeq = ++seq.current;
+    setRendering(true);
+    const h = setTimeout(async () => {
+      try {
+        const r = await coverApi.designPreview(id, { scheme, font, layout }, personal);
+        if (mySeq === seq.current) { setPreview(r.data_url); setRenderError(null); }
+      } catch (e) {
+        if (mySeq === seq.current) {
+          setPreview(null);
+          setRenderError((e instanceof ApiError && e.message) || t('Could not design a cover for this book.'));
+        }
+      } finally { if (mySeq === seq.current) setRendering(false); }
+    }, 250);
+    return () => clearTimeout(h);
+  }, [open, id, scheme, font, layout, personal, t]);
+
+  const apply = async () => {
+    if (locked || applying || !preview) return;
+    setApplying(true);
+    try {
+      const r = await coverApi.applyGenerated(id, { scheme, font, layout }, personal);
+      if (r.ok !== false) onApplied(r.cover_url);
+      else onError(new ApiError(400, r.error_message || t('Cover save failed.')));
+    } catch (e) { onError(e); }
+    finally { setApplying(false); }
+  };
+
+  return (
+    <details className={styles.panel} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
+      <summary className={styles.panelSummary}>
+        <Palette size={15} aria-hidden="true" focusable={false} /> {t('Design a cover')}
+        <span className={styles.panelHint}>{t("Make one from the book's title and author")}</span>
+      </summary>
+      <div className={styles.panelBody}>
+        <div className={styles.designerLayout}>
+          <div className={styles.designerPreview}>
+            <div className={styles.designerFrame} aria-busy={rendering}>
+              {preview
+                ? <img src={preview} className={styles.designerImg}
+                       alt={t('Preview of the designed cover')} />
+                : <div className={styles.currentFallback}>
+                    {rendering ? <span className={styles.spin}><Loader2 size={22} /></span> : <Palette size={26} />}
+                  </div>}
+              {/* Re-render feedback where the eye already is: the outgoing cover
+                  dims (via aria-busy in the CSS, so the two never drift) and a
+                  spinner rides over it. First render keeps the fallback above.
+                  Decorative — the role=status caption carries the announcement. */}
+              {rendering && preview && (
+                <div className={styles.designerBusy} aria-hidden="true">
+                  <span className={styles.spin}><Loader2 size={18} /></span>
+                </div>
+              )}
+            </div>
+            <p className={styles.panelNote} role="status">
+              {rendering ? t('Drawing the cover…')
+                : renderError ? '' : t('The server draws this cover; nothing is saved until you apply it.')}
+            </p>
+            {renderError && <p className={styles.feedbackErr} role="alert">{renderError}</p>}
+          </div>
+
+          <div className={styles.designerControls}>
+            <fieldset className={styles.presetSet}>
+              <legend className={styles.cardLabel}>{t('Presets')}</legend>
+              <div className={styles.presetChips}>
+                {catalogue.presets.map((p) => (
+                  <label key={p.id} className={activePreset === p.id ? styles.presetChipOn : styles.presetChip}>
+                    <input type="radio" name="cp-design-preset" value={p.id} checked={activePreset === p.id}
+                           className={styles.presetRadio} onChange={() => choosePreset(p.id)} />
+                    <span className={styles.presetSwatch} aria-hidden="true"
+                          style={{ background: swatchFor(p.scheme) }} />
+                    <span>{t(p.label)}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <div className={styles.ereaderGrid}>
+              <label className={styles.field}>
+                <span>{t('Colour scheme')}</span>
+                <select value={scheme} onChange={(e) => setScheme(e.target.value)}>
+                  {catalogue.schemes.map((o) => <option key={o.id} value={o.id}>{t(o.label)}</option>)}
+                </select>
+              </label>
+              <label className={styles.field}>
+                <span>{t('Lettering')}</span>
+                <select value={font} onChange={(e) => setFont(e.target.value)}>
+                  {catalogue.fonts.map((o) => <option key={o.id} value={o.id}>{t(o.label)}</option>)}
+                </select>
+              </label>
+              <label className={styles.field}>
+                <span>{t('Arrangement')}</span>
+                <select value={layout} onChange={(e) => setLayout(e.target.value)}>
+                  {catalogue.layouts.map((o) => <option key={o.id} value={o.id}>{t(o.label)}</option>)}
+                </select>
+              </label>
+            </div>
+
+            {/* Its own verb and icon: "Use this cover" already appears twice on
+                this page, and a leading check mark reads as "already applied". */}
+            <Button onClick={apply} disabled={locked || applying || !preview || rendering} className={styles.fullBtn}>
+              {applying ? <span className={styles.spin}><Loader2 size={14} /></span> : <Sparkles size={14} />} {t('Use this design')}
+            </Button>
+            {locked && <p className={styles.lockedHint}>{t('Unlock the cover above to apply a new one.')}</p>}
+          </div>
+        </div>
+      </div>
+    </details>
+  );
 }
 
 // ============================================================================

@@ -675,7 +675,23 @@ def configuration():
                                      in {"0", "false", "off", "no"}
                                  ),
                                  hardcover_token_status=hardcover_status,
+                                 cover_generator=cover_generator_choices(),
                                  title=_("Basic Configuration"), page="config")
+
+
+def cover_generator_choices():
+    """Preset list + renderer availability for the "Design a cover" settings.
+
+    Built from the renderer's own catalogue so the admin page can never offer a
+    preset the renderer does not have, and so an installation without Calibre
+    and without Pillow says so instead of advertising a feature that will fail.
+    """
+    from .services import cover_generator
+    return {
+        "presets": cover_generator.catalogue()["presets"],
+        "availability": cover_generator.renderer_availability(
+            getattr(config, "config_binariesdir", "") or ""),
+    }
 
 
 @admi.route("/admin/ajaxconfig", methods=["POST"])
@@ -2876,6 +2892,17 @@ def _configuration_update_helper():
         # Per-user hide-books feature flag (fork #319 SethMilliken). Off
         # by default — the hide button is hidden until admin opts in.
         _config_checkbox_int(to_save, "config_user_hide_enabled")
+
+        # "Design a cover" defaults (cps/services/cover_generator.py). An
+        # unknown preset id is not stored: the value reaches the renderer for
+        # every automatically generated cover, and resolve_spec would silently
+        # fall back, leaving the admin page showing a choice nothing honours.
+        if "config_cover_generator_default_preset" in to_save:
+            from .services import cover_generator
+            if to_save["config_cover_generator_default_preset"] not in cover_generator.PRESETS:
+                to_save["config_cover_generator_default_preset"] = cover_generator.DEFAULT_PRESET
+        _config_string(to_save, "config_cover_generator_default_preset")
+        _config_checkbox_int(to_save, "config_cover_generator_auto_enabled")
         # Reboot on config_anonbrowse with enabled ldap, as decoraters are changed in this case
         reboot_required |= (_config_checkbox_int(to_save, "config_anonbrowse")
                             and config.config_login_type == constants.LOGIN_LDAP)

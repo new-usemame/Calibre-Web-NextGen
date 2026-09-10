@@ -41,7 +41,10 @@ from flask_babel import get_locale
 from . import calibre_db, config, helper, kobo_sync_status, logger, ub
 from .cw_login import current_user
 from .render_template import render_title_template
-from .services import cover_extract, cover_preview, cover_picker as cover_picker_svc, cover_url_validator
+from .services import (
+    cover_extract, cover_generator, cover_preview,
+    cover_picker as cover_picker_svc, cover_url_validator,
+)
 from .usermanagement import user_login_required
 
 
@@ -188,7 +191,30 @@ def cover_picker_state(book_id):
             "fill_mode": config.config_kobo_cover_padding_fill_mode or "edge_mirror",
             "color": config.config_kobo_cover_padding_color or "",
         },
+        "designer": designer_state(),
     })
+
+
+def designer_state() -> dict:
+    """The "Design a cover" vocabulary plus whether this box can render at all.
+
+    Shared with the personal-cover payload in cps/api/actions.py so both pickers
+    offer exactly the same designs. ``available`` is false on an installation
+    with neither Calibre nor Pillow, and the panel stays hidden rather than
+    offering a button that can only fail.
+    """
+    availability = cover_generator.renderer_availability(
+        getattr(config, "config_binariesdir", "") or "")
+    catalogue = cover_generator.catalogue()
+    catalogue["default_preset"] = (
+        getattr(config, "config_cover_generator_default_preset", None)
+        or cover_generator.DEFAULT_PRESET
+    )
+    if catalogue["default_preset"] not in cover_generator.PRESETS:
+        catalogue["default_preset"] = cover_generator.DEFAULT_PRESET
+    catalogue["available"] = availability["available"]
+    catalogue["renderer"] = availability["renderer"]
+    return catalogue
 
 
 @cover_picker.route("/book/<int:book_id>/cover/candidates", methods=["POST"])
@@ -303,7 +329,97 @@ def cover_picker_apply(book_id):
         staged_cover, message = _apply_bytes(book, extracted.data, extracted.extension)
         return _apply_response(staged_cover, message, book)
 
+    if kind == "generated":
+        # The body carries design *ids* only. The cover is re-rendered here from
+        # the book's own stored metadata, so an image the client fabricated (or a
+        # preview that has since drifted from the book's title) can never become
+        # the stored cover.
+        try:
+            spec = _spec_from_body(body, cover_generator.APPLY_WIDTH, cover_generator.APPLY_HEIGHT)
+            rendered = cover_preview._run_in_pool(
+                cover_generator.render, _book_cover_meta(book), spec,
+                getattr(config, "config_binariesdir", "") or "",
+            )
+        except cover_generator.CoverGenerationError as error:
+            return _json_error(*_designer_error(error))
+        staged_cover, message = _apply_bytes(book, rendered.data, ".jpg")
+        return _apply_response(staged_cover, message, book)
+
     return _json_error("bad_kind", _(u"Unknown cover source."), 400)
+
+
+@cover_picker.route("/book/<int:book_id>/cover/design-preview", methods=["POST"])
+@user_login_required
+@cover_source_required
+def cover_picker_design_preview(book_id):
+    """Render a designed cover and return it as a data URL.
+
+    Read-only: nothing is written until the user applies. The preview renders at
+    half the applied size so the round trip stays interactive; the design is
+    identical, only the pixel count differs.
+
+    Body: ``{"preset": "classic", "scheme": "ink", "font": "serif",
+    "layout": "blocks"}`` — every field optional, the preset supplying whatever
+    is not overridden.
+    """
+    book = _load_book(book_id)
+    body = request.get_json(silent=True) or {}
+    try:
+        spec = _spec_from_body(body, cover_generator.PREVIEW_WIDTH, cover_generator.PREVIEW_HEIGHT)
+        data_url, renderer = cover_preview._run_in_pool(
+            cover_generator.render_data_url, _book_cover_meta(book), spec,
+            getattr(config, "config_binariesdir", "") or "",
+        )
+    except cover_generator.CoverGenerationError as error:
+        return _json_error(*_designer_error(error))
+    return jsonify({"ok": True, "data_url": data_url, "renderer": renderer,
+                    "resolved": spec.to_dict()})
+
+
+def _spec_from_body(body: dict, width: int, height: int):
+    """Resolve the design ids in a request body. Raises CoverGenerationError."""
+    return cover_generator.resolve_spec(
+        preset=(body.get("preset") or None),
+        scheme=(body.get("scheme") or None),
+        font=(body.get("font") or None),
+        layout=(body.get("layout") or None),
+        width=width,
+        height=height,
+    )
+
+
+def _designer_error(error):
+    """Map a renderer failure onto (code, user-facing message, HTTP status).
+
+    The renderer's own message quotes the helper's stderr, which carries server
+    paths and Calibre internals. It is logged here and never returned: every
+    caller — this blueprint and the personal-cover route in cps/api/actions.py —
+    sends the user one of these three sentences instead.
+    """
+    log.warning("cover designer render failed: %s: %s", error.code, error.message)
+    if error.code in ("unknown_scheme", "unknown_font", "unknown_layout"):
+        return error.code, _(u"That cover design is not one we offer."), 400
+    if error.code == "unavailable":
+        return error.code, _(u"This server can't design covers — no renderer is installed."), 503
+    return error.code, _(u"Could not design a cover for this book."), 502
+
+
+def _book_cover_meta(book):
+    """The book's own text, as the renderer's input."""
+    series = None
+    series_index = None
+    if getattr(book, "series", None):
+        series = book.series[0].name
+        try:
+            series_index = float(book.series_index) if book.series_index is not None else None
+        except (TypeError, ValueError):
+            series_index = None
+    return cover_generator.BookCoverMeta(
+        title=book.title or "",
+        authors=[a.name for a in (book.authors or [])],
+        series=series,
+        series_index=series_index,
+    )
 
 
 @cover_picker.route("/book/<int:book_id>/cover/lock", methods=["POST"])

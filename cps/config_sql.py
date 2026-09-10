@@ -154,6 +154,13 @@ class _Settings(_Base):
 
     config_kobo_proxy = Column(Boolean, default=False)
 
+    # "Design a cover" — the generated-cover renderer (cps/services/
+    # cover_generator.py). The default preset is what the designer panel opens
+    # on and what automatic generation uses; auto-generation is off by default
+    # because it writes a cover file into a book folder without being asked.
+    config_cover_generator_default_preset = Column(String, default="classic")
+    config_cover_generator_auto_enabled = Column(Boolean, default=False)
+
     # Kobo cover aspect-ratio padding. Pads server-side so the device shows
     # full-screen artwork instead of letterboxing tall publisher covers.
     # Defaults: ON when kobo_sync is enabled (auto-applied on the kobo_sync

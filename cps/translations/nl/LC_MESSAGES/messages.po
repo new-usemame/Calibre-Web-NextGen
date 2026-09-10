@@ -14564,6 +14564,108 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Expose selected Shelves to OPDS"
 msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 
+msgid "Meadow"
+msgstr "Weide"
+
+msgid "Ember"
+msgstr "Sintel"
+
+msgid "Slate"
+msgstr "Leisteen"
+
+msgid "Plum"
+msgstr "Pruim"
+
+msgid "Ink on cream"
+msgstr "Inkt op crème"
+
+msgid "Meadow green"
+msgstr "Weidegroen"
+
+msgid "Ember red"
+msgstr "Sintelrood"
+
+msgid "Slate grey"
+msgstr "Leigrijs"
+
+msgid "Plum violet"
+msgstr "Pruimpaars"
+
+msgid "Serif"
+msgstr "Met schreef"
+
+msgid "Sans-serif"
+msgstr "Schreefloos"
+
+msgid "Blocks — title above, authors on a colour band"
+msgstr "Blokken — titel bovenaan, auteurs op een gekleurde band"
+
+msgid "Banner — title on a ribbon near the top"
+msgstr "Banier — titel op een lint bovenin"
+
+msgid "Ornamental — title inside a decorative frame"
+msgstr "Sierlijk — titel in een decoratief kader"
+
+msgid "Arrangement"
+msgstr "Indeling"
+
+msgid "Colour scheme"
+msgstr "Kleurenschema"
+
+msgid "Could not design a cover for this book."
+msgstr "Kon geen omslag ontwerpen voor dit boek."
+
+msgid "Design"
+msgstr "Ontwerp"
+
+msgid "Design a cover"
+msgstr "Een omslag ontwerpen"
+
+msgid "Drawing the cover…"
+msgstr "De omslag wordt getekend…"
+
+msgid "Lettering"
+msgstr "Letters"
+
+msgid "Make one from the title and author when no cover exists"
+msgstr "Maak er een van de titel en auteur als er geen omslag is"
+
+msgid "Preview of the designed cover"
+msgstr "Voorbeeld van de ontworpen omslag"
+
+msgid "The server draws this cover; nothing is saved until you apply it."
+msgstr "De server tekent deze omslag; er wordt niets opgeslagen tot u ze toepast."
+
+msgid "Default cover design"
+msgstr "Standaard omslagontwerp"
+
+msgid "The design the cover designer opens on, and the one used for covers generated automatically."
+msgstr "Het ontwerp waarmee de omslagontwerper opent, en het ontwerp dat wordt gebruikt voor automatisch gegenereerde omslagen."
+
+msgid "Design a cover for books that arrive without one"
+msgstr "Een omslag ontwerpen voor boeken die zonder omslag binnenkomen"
+
+msgid "New books imported without a cover get a generated cover in the default design instead of the grey placeholder. Books that already have a cover are never touched."
+msgstr "Nieuwe boeken die zonder omslag worden geïmporteerd, krijgen een gegenereerde omslag in het standaardontwerp in plaats van de grijze tijdelijke afbeelding. Boeken die al een omslag hebben, blijven ongemoeid."
+
+msgid "No cover renderer is available on this installation, so no cover can be generated."
+msgstr "Op deze installatie is geen omslagrenderer beschikbaar, dus er kan geen omslag worden gegenereerd."
+
+msgid "That cover design is not one we offer."
+msgstr "Dat omslagontwerp bieden we niet aan."
+
+msgid "This server can't design covers — no renderer is installed."
+msgstr "Deze server kan geen omslagen ontwerpen — er is geen renderer geïnstalleerd."
+
+msgid "Presets"
+msgstr "Voorinstellingen"
+
+msgid "Use this design"
+msgstr "Dit ontwerp gebruiken"
+
+msgid "Make one from the book's title and author"
+msgstr "Maak er een van de titel en auteur van het boek"
+
 #: cps/templates/user_table.html
 #, fuzzy
 msgid "Show Read/Unread Section"

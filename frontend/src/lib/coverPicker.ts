@@ -67,6 +67,37 @@ export interface CoverState {
   locked: boolean;
   ereader_enabled: boolean;
   ereader_defaults: { aspect: string; fill_mode: string; color: string };
+  /** "Design a cover" vocabulary; absent on a server that predates it. */
+  designer?: DesignerCatalogue;
+}
+
+/** The designs the server can render, plus whether it can render at all.
+ *  Mirrors cps/services/cover_generator.catalogue(). Labels are English source
+ *  strings translated through the same catalogue as the rest of the SPA. */
+export interface DesignerCatalogue {
+  available: boolean;
+  renderer: string | null;
+  default_preset: string;
+  presets: { id: string; label: string; scheme: string; font: string; layout: string }[];
+  schemes: { id: string; label: string; swatch: string[] }[];
+  fonts: { id: string; label: string }[];
+  layouts: { id: string; label: string }[];
+}
+
+/** What the client sends: design ids only. The server re-renders from the
+ *  book's own metadata, so there is deliberately no way to send pixels. */
+export interface DesignOptions {
+  preset?: string;
+  scheme?: string;
+  font?: string;
+  layout?: string;
+}
+
+export interface DesignPreview {
+  ok: boolean;
+  data_url: string;
+  renderer: string;
+  resolved: { scheme: string; font: string; layout: string; width: number; height: number };
 }
 
 export interface ApplyResult { ok: boolean; cover_url?: string; error_message?: string }
@@ -180,6 +211,12 @@ export const coverApi = {
     return cpUpload<ApplyResult>(personal ? 'PUT' : 'POST',
       personal ? personalBase(id) : `${base(id)}/apply`, fd);
   },
+  designPreview: (id: string | number, options: DesignOptions, personal = false) =>
+    cpPostJson<DesignPreview>(sourcePath(id, 'design-preview', personal), options),
+  applyGenerated: (id: string | number, options: DesignOptions, personal = false) =>
+    personal
+      ? cpJson<ApplyResult>('PUT', personalBase(id), { kind: 'generated', ...options })
+      : cpPostJson<ApplyResult>(`${base(id)}/apply`, { kind: 'generated', ...options }),
   setLock: (id: string | number, locked: boolean) =>
     cpPostJson<{ locked: boolean }>(`${base(id)}/lock`, { locked }),
   ereaderPreview: (

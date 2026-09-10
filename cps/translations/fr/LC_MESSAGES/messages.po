@@ -14909,6 +14909,108 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Expose selected Shelves to OPDS"
 msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 
+msgid "Meadow"
+msgstr "Prairie"
+
+msgid "Ember"
+msgstr "Braise"
+
+msgid "Slate"
+msgstr "Ardoise"
+
+msgid "Plum"
+msgstr "Prune"
+
+msgid "Ink on cream"
+msgstr "Encre sur crème"
+
+msgid "Meadow green"
+msgstr "Vert prairie"
+
+msgid "Ember red"
+msgstr "Rouge braise"
+
+msgid "Slate grey"
+msgstr "Gris ardoise"
+
+msgid "Plum violet"
+msgstr "Violet prune"
+
+msgid "Serif"
+msgstr "Avec empattements"
+
+msgid "Sans-serif"
+msgstr "Sans empattements"
+
+msgid "Blocks — title above, authors on a colour band"
+msgstr "Blocs — titre en haut, auteurs sur un bandeau coloré"
+
+msgid "Banner — title on a ribbon near the top"
+msgstr "Bannière — titre sur un ruban près du haut"
+
+msgid "Ornamental — title inside a decorative frame"
+msgstr "Ornemental — titre dans un cadre décoratif"
+
+msgid "Arrangement"
+msgstr "Disposition"
+
+msgid "Colour scheme"
+msgstr "Palette de couleurs"
+
+msgid "Could not design a cover for this book."
+msgstr "Impossible de créer une couverture pour ce livre."
+
+msgid "Design"
+msgstr "Modèle"
+
+msgid "Design a cover"
+msgstr "Créer une couverture"
+
+msgid "Drawing the cover…"
+msgstr "Création de la couverture…"
+
+msgid "Lettering"
+msgstr "Typographie"
+
+msgid "Make one from the title and author when no cover exists"
+msgstr "En créer une à partir du titre et de l’auteur lorsqu’il n’y en a pas"
+
+msgid "Preview of the designed cover"
+msgstr "Aperçu de la couverture créée"
+
+msgid "The server draws this cover; nothing is saved until you apply it."
+msgstr "Le serveur dessine cette couverture ; rien n’est enregistré tant que vous ne l’appliquez pas."
+
+msgid "Default cover design"
+msgstr "Modèle de couverture par défaut"
+
+msgid "The design the cover designer opens on, and the one used for covers generated automatically."
+msgstr "Le modèle proposé d’emblée par le créateur de couvertures, et celui utilisé pour les couvertures générées automatiquement."
+
+msgid "Design a cover for books that arrive without one"
+msgstr "Créer une couverture pour les livres qui arrivent sans"
+
+msgid "New books imported without a cover get a generated cover in the default design instead of the grey placeholder. Books that already have a cover are never touched."
+msgstr "Les nouveaux livres importés sans couverture reçoivent une couverture créée selon le modèle par défaut au lieu de l’image grise générique. Les livres qui ont déjà une couverture ne sont jamais modifiés."
+
+msgid "No cover renderer is available on this installation, so no cover can be generated."
+msgstr "Aucun moteur de rendu de couverture n’est disponible sur cette installation : aucune couverture ne peut être créée."
+
+msgid "That cover design is not one we offer."
+msgstr "Ce modèle de couverture n’est pas proposé."
+
+msgid "This server can't design covers — no renderer is installed."
+msgstr "Ce serveur ne peut pas créer de couvertures — aucun moteur de rendu n’est installé."
+
+msgid "Presets"
+msgstr "Préréglages"
+
+msgid "Use this design"
+msgstr "Utiliser ce modèle"
+
+msgid "Make one from the book's title and author"
+msgstr "En créer une à partir du titre et de l’auteur du livre"
+
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"

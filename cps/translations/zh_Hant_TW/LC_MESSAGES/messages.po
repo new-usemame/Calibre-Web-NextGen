@@ -1696,6 +1696,18 @@ msgstr "您無法存取本機主機或本機網路進行封面上傳"
 msgid "Failed to create path for cover"
 msgstr "創建封面路徑失敗"
 
+#: cps/helper.py
+#, python-format
+msgid ""
+"Cover could not be stored: the server has no permission to write into the "
+"book folder %(folder)s (folder owner uid %(owner)s, server uid %(uid)s)."
+msgstr ""
+
+#: cps/helper.py
+#, python-format
+msgid "Cover could not be stored: %(reason)s"
+msgstr ""
+
 #: cps/helper.py cps/spa_strings.py
 msgid "Cover"
 msgstr "封面"

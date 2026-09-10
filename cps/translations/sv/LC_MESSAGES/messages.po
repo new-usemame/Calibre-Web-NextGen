@@ -25,7 +25,9 @@ msgstr "Statistik"
 
 #: cps/admin.py
 msgid "Calibre database unavailable. Please reconfigure the library path."
-msgstr "Calibre-databasen är inte tillgänglig. Konfigurera om sökvägen till biblioteket."
+msgstr ""
+"Calibre-databasen är inte tillgänglig. Konfigurera om sökvägen till "
+"biblioteket."
 
 #: cps/admin.py
 msgid "Server restarted, please reload page."
@@ -70,8 +72,8 @@ msgstr ""
 msgid ""
 "Success! Hardcover auto-fetch task started. Check Tasks panel for progress."
 msgstr ""
-"Den automatiska hämtningen från Hardcover har startats. Kontrollera "
-"panelen Uppgifter för förloppet."
+"Den automatiska hämtningen från Hardcover har startats. Kontrollera panelen "
+"Uppgifter för förloppet."
 
 #: cps/admin.py
 #, python-format
@@ -223,9 +225,10 @@ msgstr "Inställningsdatabasen är inte skrivbar"
 msgid ""
 "The title-sort rule was saved, but reordering the existing library failed — "
 "books may keep their previous order until you retry or edit them."
-msgstr "Titelsorteringsregeln sparades, men det gick inte att ändra ordningen i "
-"det befintliga biblioteket — böcker kan behålla sin tidigare ordning tills "
-"du försöker igen eller redigerar dem."
+msgstr ""
+"Titelsorteringsregeln sparades, men det gick inte att ändra ordningen i det "
+"befintliga biblioteket — böcker kan behålla sin tidigare ordning tills du "
+"försöker igen eller redigerar dem."
 
 #: cps/admin.py
 msgid "Invalid Read Column"
@@ -290,7 +293,8 @@ msgstr ""
 msgid ""
 "Are you sure you want to change shelf sync behavior for the selected user(s)?"
 msgstr ""
-"Är du säker på att du vill ändra hyllsynkroniseringen för de valda användarna?"
+"Är du säker på att du vill ändra hyllsynkroniseringen för de valda "
+"användarna?"
 
 #: cps/admin.py
 msgid ""
@@ -343,8 +347,8 @@ msgid ""
 "Cleared sync state for book {0} (user {1}); the device will re-receive the "
 "book on next sync"
 msgstr ""
-"Synkroniseringstillståndet för bok {0} (användare {1}) har rensats. "
-"Enheten tar emot boken igen vid nästa synkronisering."
+"Synkroniseringstillståndet för bok {0} (användare {1}) har rensats. Enheten "
+"tar emot boken igen vid nästa synkronisering."
 
 #: cps/admin.py
 #, python-brace-format
@@ -375,7 +379,9 @@ msgstr "Filen är större än %(max)d MB."
 
 #: cps/admin.py
 msgid "This preview is invalid or expired. Upload the device database again."
-msgstr "Den här förhandsvisningen är ogiltig eller har upphört att gälla. Ladda upp enhetens databas igen."
+msgstr ""
+"Den här förhandsvisningen är ogiltig eller har upphört att gälla. Ladda upp "
+"enhetens databas igen."
 
 #: cps/admin.py
 msgid "Select at least one book to archive."
@@ -503,7 +509,8 @@ msgstr "Skicka e-post till dina användare"
 #: cps/admin.py
 msgid ""
 "Please configure the email server under Edit Email Server Settings first."
-msgstr "Konfigurera först e-postservern under Redigera e-postserverinställningar."
+msgstr ""
+"Konfigurera först e-postservern under Redigera e-postserverinställningar."
 
 #: cps/admin.py
 msgid "Please enter a subject for the announcement email."
@@ -539,13 +546,14 @@ msgid ""
 "Announcement email queued for %(num)s recipient(s) — check Tasks for "
 "delivery."
 msgstr ""
-"Meddelande har lagts i kö för %(num)s mottagare — kontrollera Uppgifter "
-"för leveransen."
+"Meddelande har lagts i kö för %(num)s mottagare — kontrollera Uppgifter för "
+"leveransen."
 
 #: cps/admin.py
 #, python-format
 msgid "%(num)s address(es) were skipped as invalid or duplicate."
-msgstr "%(num)s adress(er) hoppades över eftersom de är ogiltiga eller dubbletter."
+msgstr ""
+"%(num)s adress(er) hoppades över eftersom de är ogiltiga eller dubbletter."
 
 #: cps/admin.py cps/templates/admin.html
 msgid "Edit Scheduled Tasks Settings"
@@ -695,7 +703,8 @@ msgstr "Certfile-platsen är inte giltig, vänligen ange rätt sökväg"
 msgid ""
 "Auto-create users cannot be enabled without enabling reverse proxy "
 "authentication"
-msgstr "Automatisk kontoskapning kan inte aktiveras utan autentisering via omvänd "
+msgstr ""
+"Automatisk kontoskapning kan inte aktiveras utan autentisering via omvänd "
 "proxy"
 
 #: cps/admin.py
@@ -706,15 +715,17 @@ msgstr "Automatisk kontoskapning kräver ett giltigt huvudnamn för omvänd prox
 msgid ""
 "Invalid OAuth Redirect Host format. Please include the full URL with "
 "protocol (e.g., https://your-domain.com)"
-msgstr "Ogiltigt format för OAuth-omdirigeringsvärd. Ange hela URL:en med protokoll "
+msgstr ""
+"Ogiltigt format för OAuth-omdirigeringsvärd. Ange hela URL:en med protokoll "
 "(till exempel https://your-domain.com)."
 
 #: cps/admin.py
 msgid ""
 "OAuth Redirect Host should not include a path. Use only the base URL (e.g., "
 "https://your-domain.com)"
-msgstr "OAuth-omdirigeringsvärden får inte innehålla en sökväg. Använd endast "
-"bas-URL:en (till exempel https://your-domain.com)."
+msgstr ""
+"OAuth-omdirigeringsvärden får inte innehålla en sökväg. Använd endast bas-"
+"URL:en (till exempel https://your-domain.com)."
 
 #: cps/admin.py
 msgid "Password length has to be between 1 and 40"
@@ -724,7 +735,8 @@ msgstr "Lösenordets längd måste vara mellan 1 och 40"
 msgid ""
 "KEPUB conversion was not queued. Check that the preference and Kepubify path "
 "are enabled."
-msgstr "KEPUB-konvertering lades inte i kö. Kontrollera att inställningen och "
+msgstr ""
+"KEPUB-konvertering lades inte i kö. Kontrollera att inställningen och "
 "sökvägen till Kepubify är aktiverade."
 
 #: cps/admin.py
@@ -786,14 +798,16 @@ msgstr "Användaren '%(nick)s' uppdaterad"
 #, python-format
 msgid ""
 "Connection successful! OIDC discovery endpoint is accessible.%(endpoints)s"
-msgstr "Anslutningen lyckades! OIDC-identifieringsslutpunkten är tillgänglig."
+msgstr ""
+"Anslutningen lyckades! OIDC-identifieringsslutpunkten är tillgänglig."
 "%(endpoints)s"
 
 #: cps/admin.py
 msgid ""
 "Connection failed: OIDC discovery endpoint not found (404). Check if the "
 "base URL is correct."
-msgstr "Anslutningen misslyckades: OIDC-identifieringsslutpunkten hittades inte "
+msgstr ""
+"Anslutningen misslyckades: OIDC-identifieringsslutpunkten hittades inte "
 "(404). Kontrollera att bas-URL:en är korrekt."
 
 #: cps/admin.py
@@ -805,20 +819,23 @@ msgstr "Anslutningen misslyckades: Servern returnerade statuskoden %(code)s"
 msgid ""
 "Connection failed: Could not connect to server. Check the URL and network "
 "connectivity."
-msgstr "Anslutningen misslyckades: Det gick inte att ansluta till servern. "
+msgstr ""
+"Anslutningen misslyckades: Det gick inte att ansluta till servern. "
 "Kontrollera URL:en och nätverksanslutningen."
 
 #: cps/admin.py
 msgid ""
 "Connection failed: Request timed out. The server may be slow or unreachable."
-msgstr "Anslutningen misslyckades: Tidsgränsen för begäran överskreds. Servern "
-"kan vara långsam eller otillgänglig."
+msgstr ""
+"Anslutningen misslyckades: Tidsgränsen för begäran överskreds. Servern kan "
+"vara långsam eller otillgänglig."
 
 #: cps/admin.py
 msgid ""
 "Connection failed: Server returned invalid JSON. This may not be an OIDC "
 "endpoint."
-msgstr "Anslutningen misslyckades: Servern returnerade ogiltig JSON. Det här är "
+msgstr ""
+"Anslutningen misslyckades: Servern returnerade ogiltig JSON. Det här är "
 "kanske inte en OIDC-slutpunkt."
 
 #: cps/admin.py
@@ -831,8 +848,9 @@ msgstr "Anslutningen misslyckades: %(error)s"
 msgid ""
 "Metadata is missing required OIDC fields: %(fields)s. This may not be a "
 "valid OIDC metadata endpoint."
-msgstr "Metadata saknar obligatoriska OIDC-fält: %(fields)s. Det här är kanske "
-"inte en giltig OIDC-metadataslutpunkt."
+msgstr ""
+"Metadata saknar obligatoriska OIDC-fält: %(fields)s. Det här är kanske inte "
+"en giltig OIDC-metadataslutpunkt."
 
 #: cps/admin.py
 #, python-format
@@ -846,18 +864,21 @@ msgstr " Slutpunkten för användarinformation är tillgänglig."
 #: cps/admin.py
 msgid ""
 " Note: User info endpoint not found - this may cause authentication issues."
-msgstr " Obs: Slutpunkten för användarinformation hittades inte. Detta kan orsaka "
+msgstr ""
+" Obs: Slutpunkten för användarinformation hittades inte. Detta kan orsaka "
 "autentiseringsproblem."
 
 #: cps/admin.py
 msgid "Metadata URL not found (404). Please check the URL is correct."
-msgstr "Metadata-URL:en hittades inte (404). Kontrollera att URL:en är korrekt."
+msgstr ""
+"Metadata-URL:en hittades inte (404). Kontrollera att URL:en är korrekt."
 
 #: cps/admin.py
 msgid ""
 "Connection failed: Could not connect to metadata URL. Check the URL and "
 "network connectivity."
-msgstr "Anslutningen misslyckades: Det gick inte att ansluta till metadata-URL:en. "
+msgstr ""
+"Anslutningen misslyckades: Det gick inte att ansluta till metadata-URL:en. "
 "Kontrollera URL:en och nätverksanslutningen."
 
 #: cps/admin.py
@@ -878,7 +899,9 @@ msgstr "Återställning pågår redan."
 
 #: cps/admin.py
 msgid "Restore failed: Calibre library path is not configured."
-msgstr "Återställningen misslyckades: Sökvägen till Calibre-biblioteket är inte konfigurerad."
+msgstr ""
+"Återställningen misslyckades: Sökvägen till Calibre-biblioteket är inte "
+"konfigurerad."
 
 #: cps/admin.py
 #, python-format
@@ -905,14 +928,17 @@ msgstr "Återställningen misslyckades: %(err)s"
 
 #: cps/admin.py
 msgid "Restore completed but app.db cleanup failed. See logs for details."
-msgstr "Återställningen slutfördes men rensningen av app.db misslyckades. Se loggarna för detaljer."
+msgstr ""
+"Återställningen slutfördes men rensningen av app.db misslyckades. Se "
+"loggarna för detaljer."
 
 #: cps/admin.py
 #, python-format
 msgid ""
 "Restore complete. Backups and restore log saved to %(dir)s. All book-linked "
 "data was reset."
-msgstr "Återställningen är klar. Säkerhetskopior och återställningslogg sparades i "
+msgstr ""
+"Återställningen är klar. Säkerhetskopior och återställningslogg sparades i "
 "%(dir)s. Alla bokkopplade data har återställts."
 
 #: cps/annotations.py cps/templates/annotations_import.html
@@ -1114,11 +1140,13 @@ msgstr "Temabyte är tillfälligt inaktiverat fram till v5.0.0"
 msgid ""
 "Library Refresh 🔄 Checking for any books that may have been missed, please "
 "wait..."
-msgstr "Biblioteksuppdatering 🔄 Kontrollerar om några böcker har missats. Vänta …"
+msgstr ""
+"Biblioteksuppdatering 🔄 Kontrollerar om några böcker har missats. Vänta …"
 
 #: cps/cwa_functions.py
 msgid "Invalid cron expression for duplicate scans. Changes were not saved."
-msgstr "Ogiltigt cron-uttryck för dubblettsökningar. Ändringarna sparades inte."
+msgstr ""
+"Ogiltigt cron-uttryck för dubblettsökningar. Ändringarna sparades inte."
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen User Settings"
@@ -1204,11 +1232,15 @@ msgstr "Calibre-Web NextGen – fullständig konverteringshistorik"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - Full EPUB Fixer History (w/out Paths & Fixes)"
-msgstr "Calibre-Web NextGen – fullständig EPUB-reparationshistorik (utan sökvägar och korrigeringar)"
+msgstr ""
+"Calibre-Web NextGen – fullständig EPUB-reparationshistorik (utan sökvägar "
+"och korrigeringar)"
 
 #: cps/cwa_functions.py
 msgid "Calibre-Web NextGen - Full EPUB Fixer History (w/ Paths & Fixes)"
-msgstr "Calibre-Web NextGen – fullständig EPUB-reparationshistorik (med sökvägar och korrigeringar)"
+msgstr ""
+"Calibre-Web NextGen – fullständig EPUB-reparationshistorik (med sökvägar och "
+"korrigeringar)"
 
 #: cps/cwa_functions.py
 msgid "✅ All Monitoring Services are running as intended! 👍"
@@ -1243,7 +1275,8 @@ msgstr "Calibre-Web NextGen – EPUB-reparationstjänst"
 
 #: cps/cwa_functions.py
 msgid "Single-book EPUB Fixer is not supported with Google Drive libraries."
-msgstr "EPUB-reparation av en enskild bok stöds inte för Google Drive-bibliotek."
+msgstr ""
+"EPUB-reparation av en enskild bok stöds inte för Google Drive-bibliotek."
 
 #: cps/cwa_functions.py
 msgid "Invalid book selection."
@@ -1362,8 +1395,9 @@ msgstr "Ogiltig lösningsstrategi"
 msgid ""
 "Ingest folder is not writable. Check your /cwa-book-ingest volume "
 "permissions."
-msgstr "Inläsningsmappen är inte skrivbar. Kontrollera behörigheterna för volymen "
-"/cwa-book-ingest."
+msgstr ""
+"Inläsningsmappen är inte skrivbar. Kontrollera behörigheterna för volymen /"
+"cwa-book-ingest."
 
 #: cps/editbooks.py
 msgid "Missing or invalid book id for format upload"
@@ -1371,7 +1405,8 @@ msgstr "Bok-id saknas eller är ogiltigt vid uppladdning av format"
 
 #: cps/editbooks.py
 msgid "Cannot upload format: Book no longer exists in library"
-msgstr "Det går inte att ladda upp formatet: Boken finns inte längre i biblioteket"
+msgstr ""
+"Det går inte att ladda upp formatet: Boken finns inte längre i biblioteket"
 
 #: cps/api/upload.py cps/editbooks.py cps/templates/book_edit.html
 #: cps/templates/layout.html
@@ -1408,7 +1443,8 @@ msgid ""
 "%(failure_count)s failed%(failed_ids_message)s. One or more failed books may "
 "have had files renamed before the database update failed; their files and "
 "database entries may now be inconsistent."
-msgstr "Massredigeringen slutfördes med fel: %(success_count)s lyckades och "
+msgstr ""
+"Massredigeringen slutfördes med fel: %(success_count)s lyckades och "
 "%(failure_count)s misslyckades%(failed_ids_message)s. En eller flera böcker "
 "kan ha fått filer omdöpta innan databasuppdateringen misslyckades; deras "
 "filer och databasposter kan nu vara inkonsekventa."
@@ -1499,7 +1535,8 @@ msgstr "Boken har tagits bort"
 msgid ""
 "Format metadata was deleted, but file cleanup was incomplete; an "
 "administrator can recover the quarantined file."
-msgstr "Formatmetadata togs bort, men filrensningen var inte fullständig; en "
+msgstr ""
+"Formatmetadata togs bort, men filrensningen var inte fullständig; en "
 "administratör kan återställa filen i karantän."
 
 #: cps/editbooks.py
@@ -1556,7 +1593,8 @@ msgstr "Det gick inte att tolka metadata från filen %(format)s: %(err)s"
 #, python-format
 msgid ""
 "Could not rename the book folder to match the reloaded metadata: %(err)s"
-msgstr "Det gick inte att byta namn på bokmappen så att den matchar de återinlästa "
+msgstr ""
+"Det gick inte att byta namn på bokmappen så att den matchar de återinlästa "
 "metadata: %(err)s"
 
 #: cps/editbooks.py
@@ -1686,15 +1724,17 @@ msgstr "Borttagning av boken %(id)s misslyckades: %(message)s"
 msgid ""
 "Deleting book %(id)s from database only, book path in database not valid: "
 "%(path)s"
-msgstr "Tar endast bort boken %(id)s ur databasen; boksökvägen är inte giltig: %(path)s"
+msgstr ""
+"Tar endast bort boken %(id)s ur databasen; boksökvägen är inte giltig: "
+"%(path)s"
 
 #: cps/helper.py
 #, python-format
 msgid ""
 "Rename author from: '%(src)s' to '%(dest)s' failed with error: %(error)s"
 msgstr ""
-"Byte av författarnamn från \"%(src)s\" till \"%(dest)s\" misslyckades med fel: "
-"%(error)s"
+"Byte av författarnamn från \"%(src)s\" till \"%(dest)s\" misslyckades med "
+"fel: %(error)s"
 
 #: cps/helper.py
 #, python-format
@@ -1732,7 +1772,9 @@ msgstr "Lösenordet uppfyller inte reglerna för lösenordsvalidering"
 #: cps/helper.py
 msgid ""
 "Python module 'advocate' is not installed but is needed for cover uploads"
-msgstr "Python-modulen 'advocate' är inte installerad men krävs för uppladdning av omslag"
+msgstr ""
+"Python-modulen 'advocate' är inte installerad men krävs för uppladdning av "
+"omslag"
 
 #: cps/helper.py
 msgid "Error Downloading Cover"
@@ -1751,11 +1793,25 @@ msgstr "Fel på omslagsformat"
 msgid ""
 "You are not allowed to access localhost or the local network for cover "
 "uploads"
-msgstr "Du får inte använda localhost eller det lokala nätverket för uppladdning av omslag"
+msgstr ""
+"Du får inte använda localhost eller det lokala nätverket för uppladdning av "
+"omslag"
 
 #: cps/helper.py
 msgid "Failed to create path for cover"
 msgstr "Det gick inte att skapa sökväg för omslag"
+
+#: cps/helper.py
+#, python-format
+msgid ""
+"Cover could not be stored: the server has no permission to write into the "
+"book folder %(folder)s (folder owner uid %(owner)s, server uid %(uid)s)."
+msgstr ""
+
+#: cps/helper.py
+#, python-format
+msgid "Cover could not be stored: %(reason)s"
+msgstr ""
 
 #: cps/helper.py cps/spa_strings.py
 msgid "Cover"
@@ -1774,7 +1830,9 @@ msgstr "Fel vid körning av UnRar"
 msgid ""
 "Unsupported architecture detected: %(arch)s. Calibre-Web NextGen is "
 "optimized for x86_64 and aarch64."
-msgstr "Arkitekturen %(arch)s stöds inte. Calibre-Web NextGen är optimerat för x86_64 och aarch64."
+msgstr ""
+"Arkitekturen %(arch)s stöds inte. Calibre-Web NextGen är optimerat för "
+"x86_64 och aarch64."
 
 #: cps/helper.py
 msgid "Could not find the specified directory"
@@ -1810,7 +1868,8 @@ msgstr "Lägg alla böcker i kö för säkerhetskopiering av metadata"
 msgid ""
 "Please access Calibre-Web NextGen from non localhost to get valid "
 "api_endpoint for kobo device"
-msgstr "Öppna Calibre-Web NextGen från en annan värd än localhost för att få en "
+msgstr ""
+"Öppna Calibre-Web NextGen från en annan värd än localhost för att få en "
 "giltig api_endpoint för Kobo-enheten"
 
 #: cps/kobo_auth.py
@@ -1847,19 +1906,22 @@ msgid ""
 "Login failed: OAuth token validation error. This may be due to scope "
 "configuration mismatch. Please check your OAuth scopes configuration or "
 "contact your administrator."
-msgstr "Inloggningen misslyckades: Fel vid validering av OAuth-token. Det kan bero "
+msgstr ""
+"Inloggningen misslyckades: Fel vid validering av OAuth-token. Det kan bero "
 "på en felaktig konfiguration av omfattningar. Kontrollera OAuth-"
 "omfattningarna eller kontakta administratören."
 
 #: cps/oauth_bb.py
 msgid "Login failed: OAuth token expired. Please try logging in again."
-msgstr "Inloggningen misslyckades: OAuth-tokenen har löpt ut. Försök logga in igen."
+msgstr ""
+"Inloggningen misslyckades: OAuth-tokenen har löpt ut. Försök logga in igen."
 
 #: cps/oauth_bb.py
 msgid ""
 "Login failed: Could not connect to the OAuth provider's user info endpoint. "
 "Please try again or contact your administrator."
-msgstr "Inloggningen misslyckades: Det gick inte att ansluta till OAuth-"
+msgstr ""
+"Inloggningen misslyckades: Det gick inte att ansluta till OAuth-"
 "leverantörens slutpunkt för användarinformation. Försök igen eller kontakta "
 "administratören."
 
@@ -1867,7 +1929,8 @@ msgstr "Inloggningen misslyckades: Det gick inte att ansluta till OAuth-"
 msgid ""
 "Login failed: The OAuth provider returned invalid user profile data. Please "
 "contact your administrator."
-msgstr "Inloggningen misslyckades: OAuth-leverantören returnerade ogiltiga "
+msgstr ""
+"Inloggningen misslyckades: OAuth-leverantören returnerade ogiltiga "
 "användarprofildata. Kontakta administratören."
 
 #: cps/oauth_bb.py
@@ -1876,7 +1939,8 @@ msgid ""
 "Login failed: OAuth provider response is missing required fields: "
 "%(fields)s. Please check your OAuth configuration or contact your "
 "administrator."
-msgstr "Inloggningen misslyckades: OAuth-leverantörens svar saknar obligatoriska "
+msgstr ""
+"Inloggningen misslyckades: OAuth-leverantörens svar saknar obligatoriska "
 "fält: %(fields)s. Kontrollera OAuth-konfigurationen eller kontakta "
 "administratören."
 
@@ -1886,12 +1950,14 @@ msgstr "Det gick inte att länka OAuth-kontot. Försök igen."
 
 #: cps/oauth_bb.py
 msgid "Login failed: your account is not allowed to access this application."
-msgstr "Inloggningen misslyckades: ditt konto har inte behörighet till programmet."
+msgstr ""
+"Inloggningen misslyckades: ditt konto har inte behörighet till programmet."
 
 #: cps/oauth_bb.py
 msgid ""
 "OAuth error: Provider returned invalid user information. Please try again."
-msgstr "OAuth-fel: Leverantören returnerade ogiltig användarinformation. Försök igen."
+msgstr ""
+"OAuth-fel: Leverantören returnerade ogiltig användarinformation. Försök igen."
 
 #: cps/oauth_bb.py
 #, python-format
@@ -1914,13 +1980,16 @@ msgid ""
 "Login failed: No user account is linked to your %(provider)s account. Please "
 "contact your administrator to create an account or link your existing "
 "account."
-msgstr "Inloggningen misslyckades: Inget användarkonto är länkat till ditt "
+msgstr ""
+"Inloggningen misslyckades: Inget användarkonto är länkat till ditt "
 "%(provider)s-konto. Kontakta administratören för att skapa ett konto eller "
 "länka ditt befintliga konto."
 
 #: cps/oauth_bb.py
 msgid "OAuth authentication failed. Please try again or contact administrator."
-msgstr "OAuth-autentiseringen misslyckades. Försök igen eller kontakta administratören."
+msgstr ""
+"OAuth-autentiseringen misslyckades. Försök igen eller kontakta "
+"administratören."
 
 #: cps/oauth_bb.py
 msgid "OAuth system error. Please contact administrator."
@@ -1963,13 +2032,15 @@ msgstr "Det gick inte att logga in med generisk OAuth."
 
 #: cps/oauth_bb.py
 msgid "OAuth authentication failed: Token validation error. Please try again."
-msgstr "OAuth-autentiseringen misslyckades: Fel vid tokenvalidering. Försök igen."
+msgstr ""
+"OAuth-autentiseringen misslyckades: Fel vid tokenvalidering. Försök igen."
 
 #: cps/oauth_bb.py
 msgid ""
 "OAuth authentication failed due to an unexpected error. Please contact "
 "administrator."
-msgstr "OAuth-autentiseringen misslyckades på grund av ett oväntat fel. Kontakta "
+msgstr ""
+"OAuth-autentiseringen misslyckades på grund av ett oväntat fel. Kontakta "
 "administratören."
 
 #: cps/oauth_bb.py
@@ -1977,7 +2048,8 @@ msgid ""
 "OAuth error: Invalid redirect URI. If you're experiencing this error "
 "repeatedly, please configure the 'OAuth Redirect Host' setting in Admin > "
 "Basic Configuration > OAuth."
-msgstr "OAuth-fel: Ogiltig omdirigerings-URI. Om du får det här felet upprepade "
+msgstr ""
+"OAuth-fel: Ogiltig omdirigerings-URI. Om du får det här felet upprepade "
 "gånger ska du konfigurera 'OAuth Redirect Host' under Administration > "
 "Grundläggande konfiguration > OAuth."
 
@@ -2175,7 +2247,8 @@ msgstr "Lyckades! Vänligen återvänd till din enhet"
 msgid ""
 "Duplicate scanning needs a one-time full scan before fast duplicate checks "
 "can run after imports and metadata changes. "
-msgstr "Dubblettsökning kräver en fullständig engångssökning innan snabba "
+msgstr ""
+"Dubblettsökning kräver en fullständig engångssökning innan snabba "
 "dubblettkontroller kan köras efter importer och metadataändringar. "
 
 #: cps/render_template.py cps/spa_strings.py cps/templates/user_edit.html
@@ -2278,15 +2351,17 @@ msgstr "Visa dubblettböcker"
 #: cps/render_template.py
 #, python-format
 msgid "Calibre-Web NextGen %(latest)s is available — you're on %(current)s."
-msgstr "Calibre-Web NextGen %(latest)s är tillgängligt — du använder %(current)s."
+msgstr ""
+"Calibre-Web NextGen %(latest)s är tillgängligt — du använder %(current)s."
 
 #: cps/render_template.py
 #, python-format
 msgid ""
 "Help improve Calibre-Web NextGen's %(language)s translations — %(count)s "
 "strings in your language still need translating."
-msgstr "Hjälp till att förbättra Calibre-Web NextGens %(language)ska "
-"översättningar — %(count)s strängar på ditt språk återstår att översätta."
+msgstr ""
+"Hjälp till att förbättra Calibre-Web NextGens %(language)ska översättningar "
+"— %(count)s strängar på ditt språk återstår att översätta."
 
 #: cps/search.py
 msgid "Published after "
@@ -2323,26 +2398,30 @@ msgstr "Avancerad sökning"
 msgid ""
 "This book is not in your library. Ask an administrator to add it to My "
 "Library before adding it to a shelf."
-msgstr "Den här boken finns inte i ditt bibliotek. Be en administratör att lägga "
+msgstr ""
+"Den här boken finns inte i ditt bibliotek. Be en administratör att lägga "
 "till den i Mitt bibliotek innan den läggs på en hylla."
 
 #: cps/shelf.py
 msgid ""
 "This book is not in the shelf owner's library. The shelf owner cannot browse "
 "the global library; an administrator must add it to their My Library first."
-msgstr "Den här boken finns inte i hyllans ägares bibliotek. Hyllans ägare kan "
-"inte bläddra i det globala biblioteket; en administratör måste först lägga "
-"till den i personens Mitt bibliotek."
+msgstr ""
+"Den här boken finns inte i hyllans ägares bibliotek. Hyllans ägare kan inte "
+"bläddra i det globala biblioteket; en administratör måste först lägga till "
+"den i personens Mitt bibliotek."
 
 #: cps/shelf.py
 msgid "This book cannot be added to this shelf. Ask an administrator for help."
-msgstr "Den här boken kan inte läggas till på hyllan. Be en administratör om hjälp."
+msgstr ""
+"Den här boken kan inte läggas till på hyllan. Be en administratör om hjälp."
 
 #: cps/shelf.py
 msgid ""
 "This shelf has an invalid owner. Ask an administrator to repair it before "
 "adding books."
-msgstr "Den här hyllan har en ogiltig ägare. Be en administratör att reparera den "
+msgstr ""
+"Den här hyllan har en ogiltig ägare. Be en administratör att reparera den "
 "innan böcker läggs till."
 
 #: cps/shelf.py
@@ -2366,7 +2445,8 @@ msgstr "Boken är redan en del av hyllan: %(shelfname)s"
 msgid ""
 "This book is not in your library. Add it to My Library before adding it to a "
 "shelf."
-msgstr "Den här boken finns inte i ditt bibliotek. Lägg till den i Mitt bibliotek "
+msgstr ""
+"Den här boken finns inte i ditt bibliotek. Lägg till den i Mitt bibliotek "
 "innan den läggs på en hylla."
 
 #: cps/shelf.py
@@ -2410,7 +2490,8 @@ msgstr "Alla böcker i serien '%(name)s' finns redan på hyllan: %(sname)s"
 #: cps/shelf.py
 #, python-format
 msgid "%(count)d books of series '%(name)s' added to shelf: %(sname)s"
-msgstr "%(count)d böcker i serien '%(name)s' har lagts till på hyllan: %(sname)s"
+msgstr ""
+"%(count)d böcker i serien '%(name)s' har lagts till på hyllan: %(sname)s"
 
 #: cps/shelf.py
 #, python-format
@@ -2551,13 +2632,15 @@ msgstr "{succeeded} bok/böcker togs bort; {failed} misslyckades."
 msgid ""
 "{succeeded} book(s) permanently deleted from the global library for every "
 "user; {failed} failed."
-msgstr "{succeeded} bok/böcker togs bort permanent från det globala biblioteket "
-"för alla användare; {failed} misslyckades."
+msgstr ""
+"{succeeded} bok/böcker togs bort permanent från det globala biblioteket för "
+"alla användare; {failed} misslyckades."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{succeeded} book(s) removed from your library; {failed} failed."
-msgstr "{succeeded} bok/böcker togs bort från ditt bibliotek; {failed} misslyckades."
+msgstr ""
+"{succeeded} bok/böcker togs bort från ditt bibliotek; {failed} misslyckades."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -2578,7 +2661,8 @@ msgstr "En bok måste behålla minst ett format."
 msgid ""
 "{succeeded} book(s) permanently deleted; {warnings} deleted with cleanup "
 "warnings; {failed} failed."
-msgstr "{succeeded} bok/böcker togs bort permanent; {warnings} togs bort med "
+msgstr ""
+"{succeeded} bok/böcker togs bort permanent; {warnings} togs bort med "
 "rensningsvarningar; {failed} misslyckades."
 
 #: cps/spa_strings.py
@@ -2596,7 +2680,8 @@ msgstr "Bok {id}: {message}"
 msgid ""
 "Failed: {failures}. The failed books remain selected; choose the action "
 "again to retry."
-msgstr "Misslyckades: {failures}. De misslyckade böckerna förblir markerade; välj "
+msgstr ""
+"Misslyckades: {failures}. De misslyckade böckerna förblir markerade; välj "
 "åtgärden igen för att försöka på nytt."
 
 #: cps/spa_strings.py
@@ -2776,7 +2861,9 @@ msgstr "Tillagd i ditt bibliotek och på {shelf}"
 
 #: cps/spa_strings.py
 msgid "Adding this book to a shelf also adds it to your library."
-msgstr "När du lägger till den här boken på en hylla läggs den även till i ditt bibliotek."
+msgstr ""
+"När du lägger till den här boken på en hylla läggs den även till i ditt "
+"bibliotek."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid "Adding…"
@@ -2822,9 +2909,10 @@ msgid ""
 "Permanently delete {n} selected book(s) from the global library for every "
 "user? The books and all their files will be erased from the server. This "
 "cannot be undone."
-msgstr "Ta bort {n} valda bok/böcker permanent från det globala biblioteket för "
-"alla användare? Böckerna och alla deras filer raderas från servern. Detta "
-"kan inte ångras."
+msgstr ""
+"Ta bort {n} valda bok/böcker permanent från det globala biblioteket för alla "
+"användare? Böckerna och alla deras filer raderas från servern. Detta kan "
+"inte ångras."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -2835,7 +2923,8 @@ msgid ""
 "bookmarks, and reading progress are kept. If you use Kobo's built-in sync, "
 "the books also leave each Kobo device on your account at its next sync; "
 "other e-readers keep downloaded copies."
-msgstr "Ta bort {n} valda bok/böcker från ditt bibliotek? De lämnar ditt bibliotek "
+msgstr ""
+"Ta bort {n} valda bok/böcker från ditt bibliotek? De lämnar ditt bibliotek "
 "och ditt OPDS-flöde och tas även bort från vanliga hyllor där du har lagt "
 "dem. Inget tas bort från det globala biblioteket. Markeringar, anteckningar, "
 "bokmärken och läsförlopp behålls. Om du använder Kobos inbyggda "
@@ -2845,13 +2934,15 @@ msgstr "Ta bort {n} valda bok/böcker från ditt bibliotek? De lämnar ditt bibl
 #: cps/spa_strings.py
 msgid ""
 "The last book cannot be removed unless you can browse the global library."
-msgstr "Den sista boken kan inte tas bort om du inte kan bläddra i det globala "
+msgstr ""
+"Den sista boken kan inte tas bort om du inte kan bläddra i det globala "
 "biblioteket."
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "The server rejected a batch as too large (maximum {max} books)."
-msgstr "Servern avvisade gruppen eftersom den är för stor (högst {max} böcker)."
+msgstr ""
+"Servern avvisade gruppen eftersom den är för stor (högst {max} böcker)."
 
 #: cps/spa_strings.py
 msgid "The server rejected a batch as too large."
@@ -2862,7 +2953,8 @@ msgstr "Servern avvisade gruppen eftersom den är för stor."
 msgid ""
 "Delete \"{title}\" from the global library? The book and all its files are "
 "permanently erased for every member. This cannot be undone."
-msgstr "Ta bort \"{title}\" från det globala biblioteket? Boken och alla dess filer "
+msgstr ""
+"Ta bort \"{title}\" från det globala biblioteket? Boken och alla dess filer "
 "raderas permanent för alla medlemmar. Detta kan inte ångras."
 
 #: cps/spa_strings.py
@@ -2886,8 +2978,9 @@ msgstr "Ange ett giltigt bok-id."
 msgid ""
 "Give {name} their own selection? It starts as a copy of everything they can "
 "see now — nothing changes for them yet."
-msgstr "Ge {name} ett eget urval? Det börjar som en kopia av allt personen kan se "
-"nu — ingenting ändras för personen ännu."
+msgstr ""
+"Ge {name} ett eget urval? Det börjar som en kopia av allt personen kan se nu "
+"— ingenting ändras för personen ännu."
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Global Library"
@@ -2907,9 +3000,10 @@ msgid ""
 "Keep your own selection again? Your library goes back to the books you had "
 "chosen — nothing was lost while you saw everything. At its next update, your "
 "e-reader returns to your selection."
-msgstr "Behålla ditt eget urval igen? Ditt bibliotek återgår till böckerna du "
-"valde — inget försvann medan du såg allt. Vid nästa uppdatering återgår din "
-"e-boksläsare till ditt urval."
+msgstr ""
+"Behålla ditt eget urval igen? Ditt bibliotek återgår till böckerna du valde "
+"— inget försvann medan du såg allt. Vid nästa uppdatering återgår din e-"
+"boksläsare till ditt urval."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "Library contents"
@@ -2935,7 +3029,8 @@ msgstr "Inte i ditt bibliotek"
 msgid ""
 "Nothing is deleted: the book stays in the global library, and your "
 "highlights, notes and reading progress are kept."
-msgstr "Inget tas bort: boken ligger kvar i det globala biblioteket och dina "
+msgstr ""
+"Inget tas bort: boken ligger kvar i det globala biblioteket och dina "
 "markeringar, anteckningar och läsförlopp behålls."
 
 #: cps/spa_strings.py
@@ -2943,9 +3038,10 @@ msgid ""
 "Nothing is missing — the whole library is still on the server. What you see "
 "here is your own selection. Add books from the global library; they appear "
 "here and on your e-reader."
-msgstr "Inget saknas — hela biblioteket finns fortfarande på servern. Det du ser "
-"här är ditt eget urval. Lägg till böcker från det globala biblioteket; de "
-"visas här och på din e-boksläsare."
+msgstr ""
+"Inget saknas — hela biblioteket finns fortfarande på servern. Det du ser här "
+"är ditt eget urval. Lägg till böcker från det globala biblioteket; de visas "
+"här och på din e-boksläsare."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Only an administrator can add it back."
@@ -2959,8 +3055,9 @@ msgstr "Endast böckerna som valts för det här kontot."
 msgid ""
 "Only the books you choose. Add them from the global library; remove them any "
 "time."
-msgstr "Endast böckerna du väljer. Lägg till dem från det globala biblioteket och "
-"ta bort dem när som helst."
+msgstr ""
+"Endast böckerna du väljer. Lägg till dem från det globala biblioteket och ta "
+"bort dem när som helst."
 
 #: cps/spa_strings.py
 msgid "Own selection"
@@ -3022,10 +3119,10 @@ msgid ""
 "never reseeded."
 msgstr ""
 "Konfigurera Mitt bibliotek för varje icke-anonym användare? Varje konto "
-"byter till sitt eget urval efter att det har fyllts med allt som kontot "
-"för närvarande kan se. Anonyma konton som Gäst lämnas oförändrade; använd "
-"deras inställningar per användare för att skapa ett kurerat offentligt "
-"bibliotek. Konton som redan konfigurerats fylls aldrig på igen."
+"byter till sitt eget urval efter att det har fyllts med allt som kontot för "
+"närvarande kan se. Anonyma konton som Gäst lämnas oförändrade; använd deras "
+"inställningar per användare för att skapa ett kurerat offentligt bibliotek. "
+"Konton som redan konfigurerats fylls aldrig på igen."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -3146,8 +3243,9 @@ msgstr "Du kan lägga tillbaka den när som helst från det globala biblioteket.
 msgid ""
 "You don't have access to the global library. Ask an administrator to grant "
 "it."
-msgstr "Du har inte åtkomst till det globala biblioteket. Be en administratör att "
-"ge dig åtkomst."
+msgstr ""
+"Du har inte åtkomst till det globala biblioteket. Be en administratör att ge "
+"dig åtkomst."
 
 #: cps/spa_strings.py cps/templates/index.html
 msgid ""
@@ -3554,8 +3652,8 @@ msgid ""
 "Delete \"{title}\"? This permanently removes the book and all its files from "
 "your library. This cannot be undone."
 msgstr ""
-"Ta bort \"{title}\"? Detta tar permanent bort boken och alla dess filer "
-"från ditt bibliotek. Det kan inte ångras."
+"Ta bort \"{title}\"? Detta tar permanent bort boken och alla dess filer från "
+"ditt bibliotek. Det kan inte ångras."
 
 #: cps/spa_strings.py
 msgid "Deleting…"
@@ -3986,7 +4084,9 @@ msgstr "{n} bok/böcker har tagits bort."
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} book(s) permanently deleted from the global library for every user."
-msgstr "{n} bok/böcker har tagits bort permanent från det globala biblioteket för alla användare."
+msgstr ""
+"{n} bok/böcker har tagits bort permanent från det globala biblioteket för "
+"alla användare."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4023,7 +4123,9 @@ msgstr "Hjälp — nya uppdateringar finns"
 
 #: cps/spa_strings.py
 msgid "The latest features and fixes in Calibre-Web NextGen — newest first."
-msgstr "De senaste funktionerna och korrigeringarna i Calibre-Web NextGen — nyast först."
+msgstr ""
+"De senaste funktionerna och korrigeringarna i Calibre-Web NextGen — nyast "
+"först."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4037,7 +4139,9 @@ msgstr "{n} uppdateringar"
 
 #: cps/spa_strings.py
 msgid "No release notes yet — check back after the next update."
-msgstr "Det finns inga versionsanteckningar ännu — titta igen efter nästa uppdatering."
+msgstr ""
+"Det finns inga versionsanteckningar ännu — titta igen efter nästa "
+"uppdatering."
 
 #: cps/spa_strings.py
 msgid ""
@@ -4210,7 +4314,8 @@ msgstr "Visas alltid"
 
 #: cps/spa_strings.py
 msgid "Editing sidebar. Reorder or hide sections, then tap Done."
-msgstr "Redigerar sidopanelen. Ordna om eller dölj avsnitt och tryck sedan på Klar."
+msgstr ""
+"Redigerar sidopanelen. Ordna om eller dölj avsnitt och tryck sedan på Klar."
 
 #: cps/spa_strings.py
 msgid "Editing cancelled."
@@ -4239,7 +4344,9 @@ msgstr "{label} flyttades till plats {pos} av {total}"
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Reorder {label} (position {pos} of {total}). Use arrow keys to move."
-msgstr "Ordna om {label} (plats {pos} av {total}). Använd piltangenterna för att flytta."
+msgstr ""
+"Ordna om {label} (plats {pos} av {total}). Använd piltangenterna för att "
+"flytta."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -4388,12 +4495,15 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "“{name}” already exists on {count} book. Merge this tag into it?"
-msgstr "”{name}” finns redan på {count} bok. Vill du slå ihop den här taggen med den?"
+msgstr ""
+"”{name}” finns redan på {count} bok. Vill du slå ihop den här taggen med den?"
 
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "“{name}” already exists on {count} books. Merge this tag into it?"
-msgstr "”{name}” finns redan på {count} böcker. Vill du slå ihop den här taggen med den?"
+msgstr ""
+"”{name}” finns redan på {count} böcker. Vill du slå ihop den här taggen med "
+"den?"
 
 #: cps/spa_strings.py
 msgid "begins with"
@@ -5234,7 +5344,8 @@ msgstr "Standardroller för nya OAuth-användare:"
 
 #: cps/spa_strings.py
 msgid "Defaults live in Admin → Configuration → Kobo sync."
-msgstr "Standardvärden finns i Administration → Konfiguration → Kobo-synkronisering."
+msgstr ""
+"Standardvärden finns i Administration → Konfiguration → Kobo-synkronisering."
 
 #: cps/spa_strings.py
 msgid "Delete books"
@@ -5268,8 +5379,7 @@ msgid ""
 "Delete the {fmt} file? The book record, metadata, shelves, and reading state "
 "stay available."
 msgstr ""
-"Ta bort filen {fmt}? Bokposten, metadata, hyllor och lästillstånd finns "
-"kvar."
+"Ta bort filen {fmt}? Bokposten, metadata, hyllor och lästillstånd finns kvar."
 
 #: cps/spa_strings.py
 msgid ""
@@ -5286,7 +5396,8 @@ msgstr "Ta bort den här smarta hyllan? Dina böcker påverkas inte."
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete user \"{name}\"? Their shelves and reading data are removed too."
-msgstr "Ta bort användaren \"{name}\"? Användarens hyllor och läsdata tas också bort."
+msgstr ""
+"Ta bort användaren \"{name}\"? Användarens hyllor och läsdata tas också bort."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5356,7 +5467,8 @@ msgstr "Enheten har återställts."
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "Device seen: {name}, last synced {when}. Pairing is working."
-msgstr "Enhet hittad: {name}, senast synkroniserad {when}. Parkopplingen fungerar."
+msgstr ""
+"Enhet hittad: {name}, senast synkroniserad {when}. Parkopplingen fungerar."
 
 #: cps/spa_strings.py
 msgid "Device summary"
@@ -5462,8 +5574,8 @@ msgid ""
 "Each account starts with every book it can currently see—not only books it "
 "has shelved, read, or downloaded."
 msgstr ""
-"Varje konto börjar med alla böcker som det för närvarande kan se — inte "
-"bara böcker som lagts på hyllor, lästs eller hämtats."
+"Varje konto börjar med alla böcker som det för närvarande kan se — inte bara "
+"böcker som lagts på hyllor, lästs eller hämtats."
 
 #: cps/spa_strings.py
 msgid "Each type (isbn, amazon, google, doi…) may appear once."
@@ -5827,7 +5939,8 @@ msgstr "Hur ska fält med flera värden tillämpas?"
 
 #: cps/spa_strings.py
 msgid "How switching between the global library and My Library works"
-msgstr "Så här fungerar växling mellan det globala biblioteket och Mitt bibliotek"
+msgstr ""
+"Så här fungerar växling mellan det globala biblioteket och Mitt bibliotek"
 
 #: cps/spa_strings.py
 msgid "Icon"
@@ -5904,7 +6017,8 @@ msgstr "Utfärdare / baswebbadress"
 
 #: cps/spa_strings.py
 msgid "It may have moved, or it might still live in the classic interface."
-msgstr "Den kan ha flyttats eller fortfarande finnas i det klassiska gränssnittet."
+msgstr ""
+"Den kan ha flyttats eller fortfarande finnas i det klassiska gränssnittet."
 
 #: cps/spa_strings.py
 msgid "Italic"
@@ -6167,7 +6281,8 @@ msgstr "Fler åtgärder för {name}"
 
 #: cps/spa_strings.py
 msgid "More cover options (search providers, e-reader preview)"
-msgstr "Fler omslagsalternativ (sök leverantörer, förhandsvisning på e-boksläsare)"
+msgstr ""
+"Fler omslagsalternativ (sök leverantörer, förhandsvisning på e-boksläsare)"
 
 #: cps/spa_strings.py
 msgid "Move down"
@@ -6185,7 +6300,9 @@ msgstr "Mitt bibliotek är nu aktiverat för {accounts} konton."
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
-msgstr "Mitt bibliotek är aktiverat för {accounts} konton; {errors} konton misslyckades."
+msgstr ""
+"Mitt bibliotek är aktiverat för {accounts} konton; {errors} konton "
+"misslyckades."
 
 #: cps/spa_strings.py
 msgid "My account"
@@ -6417,8 +6534,8 @@ msgid ""
 "they appear here and on your e-reader."
 msgstr ""
 "Inget saknas — det globala biblioteket finns kvar på servern. Det du ser här "
-"är ditt urval i Mitt bibliotek. Lägg till böcker från det globala biblioteket; "
-"de visas här och på din e-boksläsare."
+"är ditt urval i Mitt bibliotek. Lägg till böcker från det globala "
+"biblioteket; de visas här och på din e-boksläsare."
 
 #: cps/spa_strings.py
 msgid "Nothing to preview yet."
@@ -6595,7 +6712,9 @@ msgstr "Lösenord (lämna tomt för att behålla)"
 
 #: cps/spa_strings.py
 msgid "Paste this server address (the plugin adds /kosync itself):"
-msgstr "Klistra in den här serveradressen (insticksmodulen lägger själv till /kosync):"
+msgstr ""
+"Klistra in den här serveradressen (insticksmodulen lägger själv till /"
+"kosync):"
 
 #: cps/spa_strings.py
 msgid "Paused after a problem"
@@ -6747,9 +6866,9 @@ msgid ""
 "series you edited here is replaced by what the file contains. This cannot be "
 "undone."
 msgstr ""
-"Läs in metadata för \"{title}\" från filen på disken igen? Titel, "
-"författare eller serie som du redigerat här ersätts av filens innehåll. Det "
-"kan inte ångras."
+"Läs in metadata för \"{title}\" från filen på disken igen? Titel, författare "
+"eller serie som du redigerat här ersätts av filens innehåll. Det kan inte "
+"ångras."
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Reload metadata from disk"
@@ -6954,7 +7073,8 @@ msgstr "Spara filen, mata ut Kobon säkert och starta sedan om den."
 
 #: cps/spa_strings.py
 msgid "Saved. Restart the server for the login changes to take effect."
-msgstr "Sparat. Starta om servern för att inloggningsändringarna ska börja gälla."
+msgstr ""
+"Sparat. Starta om servern för att inloggningsändringarna ska börja gälla."
 
 #: cps/spa_strings.py
 msgid "Scan for duplicates"
@@ -7116,7 +7236,9 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Set up Kobo sync first — then this preference becomes available."
-msgstr "Konfigurera först Kobo-synkronisering — därefter blir den här inställningen tillgänglig."
+msgstr ""
+"Konfigurera först Kobo-synkronisering — därefter blir den här inställningen "
+"tillgänglig."
 
 #: cps/spa_strings.py
 msgid "Setting up…"
@@ -7460,7 +7582,8 @@ msgstr "Den här enheten synkroniseras inte längre."
 
 #: cps/spa_strings.py
 msgid "This e-reader is unavailable or belongs to another account."
-msgstr "Den här e-boksläsaren är inte tillgänglig eller tillhör ett annat konto."
+msgstr ""
+"Den här e-boksläsaren är inte tillgänglig eller tillhör ett annat konto."
 
 #: cps/spa_strings.py
 msgid "This feature is currently disabled at server level."
@@ -7476,7 +7599,9 @@ msgstr "Den här markeringen har ingen sparad position"
 
 #: cps/spa_strings.py
 msgid "This magic link can’t be checked. Generate a new one to try again."
-msgstr "Den här magiska länken kan inte kontrolleras. Skapa en ny för att försöka igen."
+msgstr ""
+"Den här magiska länken kan inte kontrolleras. Skapa en ny för att försöka "
+"igen."
 
 #: cps/spa_strings.py
 msgid "This magic link expired. Generate a new one to try again."
@@ -7703,7 +7828,8 @@ msgstr "Visare"
 
 #: cps/spa_strings.py
 msgid "Waiting for a Kobo or KOReader to sync with this account."
-msgstr "Väntar på att en Kobo eller KOReader ska synkroniseras med det här kontot."
+msgstr ""
+"Väntar på att en Kobo eller KOReader ska synkroniseras med det här kontot."
 
 #: cps/spa_strings.py
 msgid "Waiting for you to authorise…"
@@ -7719,9 +7845,9 @@ msgid ""
 "highlighting, try after sync — and if it still doesn’t work, remove the book "
 "from your Kobo and let it download again."
 msgstr ""
-"Vi reparerade den här boken för din Kobo. Om du haft problem med att markera, "
-"prova efter synkronisering — och om det fortfarande inte fungerar, ta bort "
-"boken från din Kobo och låt den hämtas igen."
+"Vi reparerade den här boken för din Kobo. Om du haft problem med att "
+"markera, prova efter synkronisering — och om det fortfarande inte fungerar, "
+"ta bort boken från din Kobo och låt den hämtas igen."
 
 #: cps/spa_strings.py
 msgid ""
@@ -7730,10 +7856,10 @@ msgid ""
 "from your Kobo and let it download again. If you read it some other way, "
 "download it again to get the repaired copy."
 msgstr ""
-"Vi reparerade den här boken för din Kobo. Om du haft problem med att markera, "
-"prova efter synkronisering — och om det fortfarande inte fungerar, ta bort "
-"boken från din Kobo och låt den hämtas igen. Om du läser den på annat sätt, "
-"hämta den igen för att få den reparerade kopian."
+"Vi reparerade den här boken för din Kobo. Om du haft problem med att "
+"markera, prova efter synkronisering — och om det fortfarande inte fungerar, "
+"ta bort boken från din Kobo och låt den hämtas igen. Om du läser den på "
+"annat sätt, hämta den igen för att få den reparerade kopian."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -7795,8 +7921,8 @@ msgid ""
 "it take effect."
 msgstr ""
 "Din Kobo är fortfarande inställd på att synkronisera hela biblioteket, så "
-"att markera den här hyllan gör ingenting i sig. Byt kontot till synkronisering "
-"av endast hyllor för att aktivera det."
+"att markera den här hyllan gör ingenting i sig. Byt kontot till "
+"synkronisering av endast hyllor för att aktivera det."
 
 #: cps/spa_strings.py
 msgid "Your Library"
@@ -7812,8 +7938,8 @@ msgid ""
 "library cover stays unchanged for everyone else, and administrators manage "
 "it."
 msgstr ""
-"Ditt omslag visas bara för dig och på böcker som levereras till dina "
-"e-boksläsare. Bibliotekets omslag är oförändrat för alla andra, och hanteras "
+"Ditt omslag visas bara för dig och på böcker som levereras till dina e-"
+"boksläsare. Bibliotekets omslag är oförändrat för alla andra, och hanteras "
 "av administratörer."
 
 #: cps/spa_strings.py
@@ -7834,7 +7960,9 @@ msgstr "Ditt personliga digitala bibliotek"
 
 #: cps/spa_strings.py
 msgid "Your saved e-reader address is shown — change it for this send only."
-msgstr "Din sparade e-boksläsaradress visas — ändra den endast för den här sändningen."
+msgstr ""
+"Din sparade e-boksläsaradress visas — ändra den endast för den här "
+"sändningen."
 
 #: cps/spa_strings.py
 msgid "all rules"
@@ -8021,8 +8149,8 @@ msgid ""
 "{n} highlights and notes were made on this device. They are not deleted. "
 "Their origin history is kept."
 msgstr ""
-"{n} markeringar och anteckningar gjordes på den här enheten. De tas inte bort. "
-"Ursprungshistoriken behålls."
+"{n} markeringar och anteckningar gjordes på den här enheten. De tas inte "
+"bort. Ursprungshistoriken behålls."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8238,8 +8366,8 @@ msgid ""
 "Kobo sync for Magic Shelves is disabled globally — this shelf won't reach "
 "your Kobo until 'Sync Magic Shelves to Kobo' is enabled in CWA Settings."
 msgstr ""
-"Kobo-synkronisering för Magiska hyllor är inaktiverad globalt — den här hyllan "
-"når inte din Kobo förrän ”Synkronisera Magiska hyllor till Kobo” har "
+"Kobo-synkronisering för Magiska hyllor är inaktiverad globalt — den här "
+"hyllan når inte din Kobo förrän ”Synkronisera Magiska hyllor till Kobo” har "
 "aktiverats i CWA-inställningarna."
 
 #: cps/web.py
@@ -8298,7 +8426,8 @@ msgstr "Fel när hyllan togs bort"
 msgid ""
 "You cannot hide your own shelves. Delete them instead if you don't want them."
 msgstr ""
-"Du kan inte dölja dina egna hyllor. Ta bort dem i stället om du inte vill ha dem."
+"Du kan inte dölja dina egna hyllor. Ta bort dem i stället om du inte vill ha "
+"dem."
 
 #: cps/web.py
 msgid "Shelf already hidden"
@@ -8384,14 +8513,16 @@ msgstr "Bekräftelsemail skickades till ditt e-postkonto."
 msgid ""
 "Authentication loop detected. If you're experiencing login issues, please "
 "contact your administrator."
-msgstr "En autentiseringsslinga har upptäckts. Kontakta administratören om du har "
+msgstr ""
+"En autentiseringsslinga har upptäckts. Kontakta administratören om du har "
 "problem att logga in."
 
 #: cps/web.py
 msgid ""
 "OAuth authentication is not properly configured. Please contact "
 "administrator."
-msgstr "OAuth-autentisering är inte korrekt konfigurerad. Kontakta administratören."
+msgstr ""
+"OAuth-autentisering är inte korrekt konfigurerad. Kontakta administratören."
 
 #: cps/web.py
 msgid "Cannot activate LDAP authentication"
@@ -8419,14 +8550,16 @@ msgstr "du är nu inloggad som: '%(nickname)s'"
 msgid ""
 "Welcome! Your account has been automatically created. You are now logged in "
 "as: '%(nickname)s'"
-msgstr "Välkommen! Ditt konto har skapats automatiskt. Du är nu inloggad som: "
+msgstr ""
+"Välkommen! Ditt konto har skapats automatiskt. Du är nu inloggad som: "
 "'%(nickname)s'"
 
 #: cps/web.py
 msgid ""
 "Authentication successful, but account creation failed. Please contact your "
 "administrator."
-msgstr "Autentiseringen lyckades, men kontot kunde inte skapas. Kontakta "
+msgstr ""
+"Autentiseringen lyckades, men kontot kunde inte skapas. Kontakta "
 "administratören."
 
 #: cps/web.py
@@ -9063,8 +9196,8 @@ msgid ""
 "Sanitized: safe to attach to a public GitHub issue. Passwords, tokens, IPs, "
 "and install paths are scrubbed."
 msgstr ""
-"Rensad: säker att bifoga i ett offentligt GitHub-ärende. Lösenord, token, "
-"IP-adresser och installationssökvägar har tagits bort."
+"Rensad: säker att bifoga i ett offentligt GitHub-ärende. Lösenord, token, IP-"
+"adresser och installationssökvägar har tagits bort."
 
 #: cps/templates/admin.html
 msgid "Get Support Pack"
@@ -9155,8 +9288,8 @@ msgid ""
 msgstr ""
 "Ladda upp filen %(filename)s från din Kobo-enhet för att importera alla "
 "markeringar och anteckningar du gjort. Markeringar för böcker som finns i "
-"det här biblioteket läggs till i ditt konto; sidoladdade böcker som inte finns "
-"i biblioteket hoppas över."
+"det här biblioteket läggs till i ditt konto; sidoladdade böcker som inte "
+"finns i biblioteket hoppas över."
 
 #: cps/templates/annotations_import.html
 msgid ""
@@ -9188,7 +9321,8 @@ msgstr "redan importerad (hoppades över)"
 
 #: cps/templates/annotations_import.html
 msgid "different or undated device entries older than server state (skipped)"
-msgstr "andra eller odaterade enhetsposter äldre än serverstatus (hoppades över)"
+msgstr ""
+"andra eller odaterade enhetsposter äldre än serverstatus (hoppades över)"
 
 #: cps/templates/annotations_import.html
 msgid "for books not in this library (skipped)"
@@ -9599,7 +9733,8 @@ msgstr "-- Välj en hylla --"
 #: cps/templates/broadcast_email.html
 msgid ""
 "The email server is not configured yet, so announcements cannot be sent."
-msgstr "E-postservern är ännu inte konfigurerad, så meddelanden kan inte skickas."
+msgstr ""
+"E-postservern är ännu inte konfigurerad, så meddelanden kan inte skickas."
 
 #: cps/templates/broadcast_email.html
 msgid ""
@@ -9627,8 +9762,8 @@ msgid ""
 "HTML is allowed for formatting (e.g. links and bold). Recipients on plain-"
 "text mail clients automatically get a text-only version."
 msgstr ""
-"HTML tillåts för formatering (t.ex. länkar och fetstil). Mottagare med "
-"e-postklienter för oformaterad text får automatiskt en textversion."
+"HTML tillåts för formatering (t.ex. länkar och fetstil). Mottagare med e-"
+"postklienter för oformaterad text får automatiskt en textversion."
 
 #: cps/templates/broadcast_email.html
 msgid "Use current announcement banner text"
@@ -9644,7 +9779,9 @@ msgstr "Markera alla användare med en e-postadress"
 
 #: cps/templates/broadcast_email.html
 msgid "No users have an email address set, so there is no one to send to yet."
-msgstr "Inga användare har en e-postadress angiven, så det finns ingen att skicka till ännu."
+msgstr ""
+"Inga användare har en e-postadress angiven, så det finns ingen att skicka "
+"till ännu."
 
 #: cps/templates/broadcast_email.html
 msgid "Send announcement"
@@ -9703,8 +9840,8 @@ msgid ""
 "NextGen is running on %(unionfs)s or %(mergerfs)s without "
 "%(network_share_mode)s enabled."
 msgstr ""
-"NextGen körs på %(unionfs)s eller %(mergerfs)s utan att %(network_share_mode)s "
-"är aktiverat."
+"NextGen körs på %(unionfs)s eller %(mergerfs)s utan att "
+"%(network_share_mode)s är aktiverat."
 
 #: cps/templates/config_db.html
 msgid "The path to your Calibre Database changed or is incorrect."
@@ -9742,7 +9879,9 @@ msgstr ""
 #: cps/templates/config_db.html
 msgid ""
 "The Calibre Database path (metadata.db) is correct and accessible to NextGen."
-msgstr "Sökvägen till Calibre-databasen (metadata.db) är korrekt och åtkomlig för NextGen."
+msgstr ""
+"Sökvägen till Calibre-databasen (metadata.db) är korrekt och åtkomlig för "
+"NextGen."
 
 #: cps/templates/config_db.html
 msgid ""
@@ -9838,11 +9977,10 @@ msgid ""
 "        once you've checked the <b>Separate Book Files from Library</b> "
 "option."
 msgstr ""
-"Om bibliotekets <code>metadata.db</code>-fil till exempel är bunden någonstans "
-"inom <code>/calibre-library</code> kan du binda katalogen\n"
-"        som innehåller motsvarande bokfiler osv. till exempelvis "
-"<code>/books</code> och ange <code>/books</code> i fältet som visas "
-"nedan\n"
+"Om bibliotekets <code>metadata.db</code>-fil till exempel är bunden "
+"någonstans inom <code>/calibre-library</code> kan du binda katalogen\n"
+"        som innehåller motsvarande bokfiler osv. till exempelvis <code>/"
+"books</code> och ange <code>/books</code> i fältet som visas nedan\n"
 "        när du har markerat alternativet <b>Separera bokfiler från "
 "biblioteket</b>."
 
@@ -9891,17 +10029,20 @@ msgid ""
 "book data</b> (reading progress, bookmarks, shelf links, downloads, etc.) in "
 "the app database, but will not affect user accounts or settings."
 msgstr ""
-"Om Calibre-biblioteket är skadat och inte kan öppnas kan du försöka återställa "
-"det från OPF-filerna i biblioteket. Detta <b>raderar alla bokspecifika "
-"data</b> (läsförlopp, bokmärken, hyllkopplingar, hämtningar osv.) i "
-"programmets databas, men påverkar inte användarkonton eller inställningar."
+"Om Calibre-biblioteket är skadat och inte kan öppnas kan du försöka "
+"återställa det från OPF-filerna i biblioteket. Detta <b>raderar alla "
+"bokspecifika data</b> (läsförlopp, bokmärken, hyllkopplingar, hämtningar "
+"osv.) i programmets databas, men påverkar inte användarkonton eller "
+"inställningar."
 
 #: cps/templates/config_db.html
 #, python-format
 msgid ""
 "Both databases will be automatically backed up in %(path)s before any "
 "destructive action."
-msgstr "Båda databaserna säkerhetskopieras automatiskt till %(path)s före alla förstörande åtgärder."
+msgstr ""
+"Båda databaserna säkerhetskopieras automatiskt till %(path)s före alla "
+"förstörande åtgärder."
 
 #: cps/templates/config_db.html
 msgid "A restore log will be saved alongside the backups."
@@ -9985,7 +10126,8 @@ msgstr "Funktionskonfiguration"
 
 #: cps/templates/config_edit.html
 msgid "Convert non-English characters in title and author while saving to disk"
-msgstr "Konvertera icke-engelska tecken i titel och författare vid sparande på disk"
+msgstr ""
+"Konvertera icke-engelska tecken i titel och författare vid sparande på disk"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -10111,7 +10253,9 @@ msgstr "Extern port för server (för port vidarebefordrade API-anrop)"
 
 #: cps/templates/config_edit.html
 msgid "Sync Kobo annotations to Hardcover (Requires API key per user)"
-msgstr "Synkronisera Kobo-anteckningar till Hardcover (kräver API-nyckel per användare)"
+msgstr ""
+"Synkronisera Kobo-anteckningar till Hardcover (kräver API-nyckel per "
+"användare)"
 
 #: cps/templates/config_edit.html
 msgid "Pad book covers to Kobo screen aspect ratio"
@@ -10157,7 +10301,9 @@ msgstr "Anpassad kantfärg (hex)"
 
 #: cps/templates/config_edit.html
 msgid "Only used when fill style is 'Solid: custom color'. Format: #RRGGBB."
-msgstr "Används endast när fyllnadsstilen är ”Enfärgad: anpassad färg”. Format: #RRGGBB."
+msgstr ""
+"Används endast när fyllnadsstilen är ”Enfärgad: anpassad färg”. Format: "
+"#RRGGBB."
 
 #: cps/templates/config_edit.html
 msgid "Use Goodreads"
@@ -10174,7 +10320,9 @@ msgstr "Aktivera Hardcover-synkronisering"
 #: cps/templates/config_edit.html
 msgid ""
 "Controls Hardcover auto-fetch and reading-progress sync from one setting."
-msgstr "Styr automatisk hämtning från Hardcover och synkronisering av läsframsteg från en inställning."
+msgstr ""
+"Styr automatisk hämtning från Hardcover och synkronisering av läsframsteg "
+"från en inställning."
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -10689,8 +10837,8 @@ msgid ""
 msgstr ""
 "När detta är aktiverat och exakt en OAuth-leverantör är aktiv startas den "
 "automatiskt när inloggningssidan öppnas. Lägg till ?local=1 i "
-"inloggningswebbadressen för att öppna den vanliga inloggningssidan i stället. "
-"Den sidan tar fortfarande emot användarnamn och lösenord endast när "
+"inloggningswebbadressen för att öppna den vanliga inloggningssidan i "
+"stället. Den sidan tar fortfarande emot användarnamn och lösenord endast när "
 "inställningen ovan är avstängd."
 
 #: cps/templates/config_edit.html
@@ -10840,7 +10988,9 @@ msgstr "Visa begränsningar baserade på calibre-kolumnen"
 #: cps/templates/config_view_edit.html
 msgid ""
 "Restrict book visibility based on values in a Calibre text custom column."
-msgstr "Begränsa synligheten av böcker baserat på värden i en anpassad Calibre-textkolumn."
+msgstr ""
+"Begränsa synligheten av böcker baserat på värden i en anpassad Calibre-"
+"textkolumn."
 
 #: cps/templates/config_view_edit.html
 msgid "Regular Expression for Title Sorting"
@@ -10851,8 +11001,8 @@ msgid ""
 "Regex to strip prefixes from titles for proper sorting (e.g., \"The\", "
 "\"A\", \"An\")."
 msgstr ""
-"Regex för att ta bort prefix från titlar för korrekt sortering (t.ex. \"The\", "
-"\"A\", \"An\")."
+"Regex för att ta bort prefix från titlar för korrekt sortering (t.ex. "
+"\"The\", \"A\", \"An\")."
 
 #: cps/templates/config_view_edit.html
 msgid "Site Customization"
@@ -10867,8 +11017,8 @@ msgid ""
 "Leave blank to hide the banner. Shown at the top of every page until each "
 "user dismisses it."
 msgstr ""
-"Lämna tomt för att dölja banderollen. Den visas högst upp på varje sida tills "
-"varje användare avfärdar den."
+"Lämna tomt för att dölja banderollen. Den visas högst upp på varje sida "
+"tills varje användare avfärdar den."
 
 #: cps/templates/config_view_edit.html
 msgid ""
@@ -10892,8 +11042,8 @@ msgid ""
 "Injected into every page as the last stylesheet, so it overrides the built-"
 "in themes. Applies to all users. Leave blank to disable."
 msgstr ""
-"Infogas på varje sida som sista formatmall och åsidosätter därför de inbyggda "
-"temana. Gäller alla användare. Lämna tomt för att inaktivera."
+"Infogas på varje sida som sista formatmall och åsidosätter därför de "
+"inbyggda temana. Gäller alla användare. Lämna tomt för att inaktivera."
 
 #: cps/templates/config_view_edit.html
 msgid "Default Settings for New Users"
@@ -11055,11 +11205,11 @@ msgid ""
 "NextGen Automatic Cover & Metadata Enforcement Service toggled in CWA "
 "Settings."
 msgstr ""
-"Den här tjänsten skriver om omslagen och metadata som lagras i själva "
-"e-boksfilerna för varje bok i biblioteket, så att filerna på disken alltid "
-"motsvarar det du ser i Calibre-Web. Den är den biblioteksomfattande versionen "
-"av tjänsten NextGen Automatic Cover & Metadata Enforcement, som aktiveras i "
-"CWA-inställningar."
+"Den här tjänsten skriver om omslagen och metadata som lagras i själva e-"
+"boksfilerna för varje bok i biblioteket, så att filerna på disken alltid "
+"motsvarar det du ser i Calibre-Web. Den är den biblioteksomfattande "
+"versionen av tjänsten NextGen Automatic Cover & Metadata Enforcement, som "
+"aktiveras i CWA-inställningar."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid ""
@@ -11067,9 +11217,9 @@ msgid ""
 "Cover & Metadata Enforcement service either here in the Web UI or through "
 "the CLI, you will see the output of the most recent previous run below."
 msgstr ""
-"När du läser in den här sidan visas resultatet av den senaste körningen nedan, "
-"om du tidigare har startat NextGen Cover & Metadata Enforcement-tjänsten här "
-"i webbgränssnittet eller via CLI."
+"När du läser in den här sidan visas resultatet av den senaste körningen "
+"nedan, om du tidigare har startat NextGen Cover & Metadata Enforcement-"
+"tjänsten här i webbgränssnittet eller via CLI."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid ""
@@ -11078,9 +11228,10 @@ msgid ""
 "still in progress, simply press the Cancel button above and the run will "
 "terminate ASAP."
 msgstr ""
-"När du har startat en körning kan du lämna sidan och återvända när du vill för "
-"att kontrollera förloppet. Om du vill avbryta en körning som fortfarande pågår "
-"trycker du bara på knappen Avbryt ovan, så avslutas körningen snarast möjligt."
+"När du har startat en körning kan du lämna sidan och återvända när du vill "
+"för att kontrollera förloppet. Om du vill avbryta en körning som fortfarande "
+"pågår trycker du bara på knappen Avbryt ovan, så avslutas körningen snarast "
+"möjligt."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "Bulk Processing"
@@ -11090,7 +11241,9 @@ msgstr "Massbearbetning"
 msgid ""
 "No current or previous run to display. Press the Start button above to "
 "initiate a run."
-msgstr "Ingen aktuell eller tidigare körning att visa. Tryck på knappen Starta ovan för att påbörja en körning."
+msgstr ""
+"Ingen aktuell eller tidigare körning att visa. Tryck på knappen Starta ovan "
+"för att påbörja en körning."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "Lost contact with the server, retrying..."
@@ -11188,10 +11341,10 @@ msgid ""
 msgstr ""
 "Aktiverad som standard. När den är aktiv tillämpar NextGen Metadata "
 "Enforcement-tjänsten ändringar direkt i e-boksfilerna när metadata och/eller "
-"omslagsbilden redigeras i webbgränssnittet. I vanliga CW eller när inställningen "
-"är inaktiverad tillämpas ändringar endast på det som visas i webbgränssnittet, "
-"inte i själva e-boksfilerna. Funktionen har för närvarande endast stöd för "
-"filer i EPUB- eller AZW3-format."
+"omslagsbilden redigeras i webbgränssnittet. I vanliga CW eller när "
+"inställningen är inaktiverad tillämpas ändringar endast på det som visas i "
+"webbgränssnittet, inte i själva e-boksfilerna. Funktionen har för närvarande "
+"endast stöd för filer i EPUB- eller AZW3-format."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Kindle EPUB Fixer"
@@ -11218,9 +11371,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Detta verktyg har anpassats från verktyget <a href=\"https://kindle-epub-fix.netlify.app/"
-"\">kindle-epub-fix.netlify.app</a> som skapats av <a href=\"https://github.com/"
-"innocenat\">innocenat</a>."
+"Detta verktyg har anpassats från verktyget <a href=\"https://kindle-epub-fix."
+"netlify.app/\">kindle-epub-fix.netlify.app</a> som skapats av <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -11278,11 +11431,12 @@ msgstr ""
 "Standarden ComicInfo.xml kräver att filen ligger i arkivets rot; comicapi "
 "(och alla andra läsare vi känner till) tittar bara där. Vissa .cbz-utgåvor "
 "paketerar den i stället en mapp ned, så deras titel/serie/författare/förlag "
-"aldrig hämtas. När funktionen är aktiv skriver importen om en kopia av arkivet "
-"med ComicInfo.xml flyttad till roten före importen – endast när den finns men "
-"ligger fel, och utan att röra en redan korrekt fil. Endast zip-baserade arkiv "
-"(.cbz); .cbr/.cb7/.cbt är inte zip-containrar och lämnas oförändrade. Din "
-"ursprungliga hämtning ändras aldrig, endast kopian som importeras."
+"aldrig hämtas. När funktionen är aktiv skriver importen om en kopia av "
+"arkivet med ComicInfo.xml flyttad till roten före importen – endast när den "
+"finns men ligger fel, och utan att röra en redan korrekt fil. Endast zip-"
+"baserade arkiv (.cbz); .cbr/.cb7/.cbt är inte zip-containrar och lämnas "
+"oförändrade. Din ursprungliga hämtning ändras aldrig, endast kopian som "
+"importeras."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Archived Book Cleanup"
@@ -11293,8 +11447,9 @@ msgid ""
 "Removes stale archived book references in app.db when the book no longer "
 "exists in the Calibre library. Helps keep archived counts accurate."
 msgstr ""
-"Tar bort inaktuella referenser till arkiverade böcker i app.db när boken inte "
-"längre finns i Calibre-biblioteket. Hjälper till att hålla arkivräkningen korrekt."
+"Tar bort inaktuella referenser till arkiverade böcker i app.db när boken "
+"inte längre finns i Calibre-biblioteket. Hjälper till att hålla "
+"arkivräkningen korrekt."
 
 #: cps/templates/cwa_settings.html
 msgid "Cleanup Schedule:"
@@ -11413,9 +11568,10 @@ msgid ""
 "book information, especially for books with poor or missing metadata."
 msgstr ""
 "När funktionen är aktiv försöker NextGen automatiskt hämta och tillämpa "
-"metadata (titel, författare, beskrivning, omslag osv.) för nyligen importerade "
-"böcker med den konfigurerade leverantörsordningen. Det bidrar till bättre "
-"bokinformation, särskilt för böcker med bristfälliga eller saknade metadata."
+"metadata (titel, författare, beskrivning, omslag osv.) för nyligen "
+"importerade böcker med den konfigurerade leverantörsordningen. Det bidrar "
+"till bättre bokinformation, särskilt för böcker med bristfälliga eller "
+"saknade metadata."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Smart Metadata Application"
@@ -11428,10 +11584,10 @@ msgid ""
 "When disabled, fetched metadata will replace existing data as-is from the "
 "preferred provider."
 msgstr ""
-"När detta är aktiverat ersätter hämtade metadata befintliga data endast om de "
-"verkar vara av bättre kvalitet (t.ex. längre beskrivningar, omslag med högre "
-"upplösning). När det är inaktiverat ersätter hämtade metadata befintliga data "
-"som de är från den föredragna leverantören."
+"När detta är aktiverat ersätter hämtade metadata befintliga data endast om "
+"de verkar vara av bättre kvalitet (t.ex. längre beskrivningar, omslag med "
+"högre upplösning). När det är inaktiverat ersätter hämtade metadata "
+"befintliga data som de är från den föredragna leverantören."
 
 #: cps/templates/cwa_settings.html
 msgid "Metadata Fields to Update"
@@ -11444,8 +11600,8 @@ msgid ""
 "your existing data."
 msgstr ""
 "Välj vilka metadatafält som ska uppdateras vid automatisk hämtning. Omärkta "
-"fält ändras aldrig under automatisk metadatahämtning, så dina befintliga data "
-"bevaras."
+"fält ändras aldrig under automatisk metadatahämtning, så dina befintliga "
+"data bevaras."
 
 #: cps/templates/cwa_settings.html
 msgid "Tags/Genres"
@@ -11486,8 +11642,9 @@ msgid ""
 "Limits the maximum size of cover images downloaded from metadata providers "
 "or URLs to prevent slow or stalled saves."
 msgstr ""
-"Begränsar högsta storleken på omslagsbilder som hämtas från metadataleverantörer "
-"eller webbadresser för att undvika långsamma eller fastnade sparningar."
+"Begränsar högsta storleken på omslagsbilder som hämtas från "
+"metadataleverantörer eller webbadresser för att undvika långsamma eller "
+"fastnade sparningar."
 
 #: cps/templates/cwa_settings.html
 msgid "Ingest Processing Timeout"
@@ -11500,8 +11657,8 @@ msgid ""
 "investigation."
 msgstr ""
 "Högsta tillåtna tid i minuter för att bearbeta en enskild bok. Filer som "
-"överskrider tidsgränsen flyttas till säkerhetskopieringsmappen för misslyckade "
-"filer för undersökning."
+"överskrider tidsgränsen flyttas till säkerhetskopieringsmappen för "
+"misslyckade filer för undersökning."
 
 #: cps/templates/cwa_settings.html
 msgid "Timeout (minutes):"
@@ -11575,13 +11732,15 @@ msgid ""
 "automatically fetching metadata for new books. Drag and drop to reorder "
 "providers. Only enabled providers will be used."
 msgstr ""
-"Ställ in i vilken ordning metadata-leverantörer ska sökas igenom när metadata "
-"för nya böcker hämtas automatiskt. Dra och släpp för att ändra ordningen. "
-"Endast aktiverade leverantörer används."
+"Ställ in i vilken ordning metadata-leverantörer ska sökas igenom när "
+"metadata för nya böcker hämtas automatiskt. Dra och släpp för att ändra "
+"ordningen. Endast aktiverade leverantörer används."
 
 #: cps/templates/cwa_settings.html
 msgid "Providers are tried in order from top to bottom. Drag to reorder."
-msgstr "Leverantörerna provas i ordning uppifrån och ned. Dra för att ändra ordningen."
+msgstr ""
+"Leverantörerna provas i ordning uppifrån och ned. Dra för att ändra "
+"ordningen."
 
 #: cps/templates/cwa_settings.html
 msgid "Enabled Metadata Providers"
@@ -11624,12 +11783,16 @@ msgstr ""
 msgid ""
 "Hardcover auto-fetch is off. Reading-progress and annotation sync are "
 "unaffected."
-msgstr "Automatisk hämtning från Hardcover är av. Synkronisering av läsförlopp och anteckningar påverkas inte."
+msgstr ""
+"Automatisk hämtning från Hardcover är av. Synkronisering av läsförlopp och "
+"anteckningar påverkas inte."
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Hardcover sync is enabled. The schedule below controls automatic ID fetching."
-msgstr "Hardcover-synkronisering är aktiverad. Schemat nedan styr automatisk hämtning av ID:n."
+msgstr ""
+"Hardcover-synkronisering är aktiverad. Schemat nedan styr automatisk "
+"hämtning av ID:n."
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11637,8 +11800,8 @@ msgid ""
 "separately in Basic Configuration when you want reading-progress or "
 "annotation sync."
 msgstr ""
-"Hardcover-synkronisering är inaktiverad och automatisk hämtning är av. Aktivera "
-"Hardcover-synkronisering separat i grundkonfigurationen när du vill "
+"Hardcover-synkronisering är inaktiverad och automatisk hämtning är av. "
+"Aktivera Hardcover-synkronisering separat i grundkonfigurationen när du vill "
 "synkronisera läsförlopp eller anteckningar."
 
 #: cps/templates/cwa_settings.html
@@ -11656,8 +11819,8 @@ msgid ""
 "queued for manual review."
 msgstr ""
 "Sök automatiskt i Hardcover efter böcker utan Hardcover-id. Matchningar med "
-"hög tillförlitlighet tillämpas automatiskt; matchningar med låg tillförlitlighet "
-"köas för manuell granskning."
+"hög tillförlitlighet tillämpas automatiskt; matchningar med låg "
+"tillförlitlighet köas för manuell granskning."
 
 #: cps/templates/cwa_settings.html
 msgid "Run Schedule:"
@@ -11718,8 +11881,9 @@ msgid ""
 "Delay between API requests to Hardcover. Prevents rate limiting and protects "
 "your API key. Uses exponential backoff on errors."
 msgstr ""
-"Fördröjning mellan API-begäranden till Hardcover. Förhindrar hastighetsgränser "
-"och skyddar din API-nyckel. Använder exponentiell backoff vid fel."
+"Fördröjning mellan API-begäranden till Hardcover. Förhindrar "
+"hastighetsgränser och skyddar din API-nyckel. Använder exponentiell backoff "
+"vid fel."
 
 #: cps/templates/cwa_settings.html
 msgid ""
@@ -11729,7 +11893,8 @@ msgid ""
 msgstr ""
 "Du kan när som helst manuellt starta uppgiften för automatisk hämtning från "
 "Hardcover i administrationspanelen. Kontrollera sidan NextGen-statistik för "
-"att se förloppet och granska köade matchningar som behöver manuellt godkännande."
+"att se förloppet och granska köade matchningar som behöver manuellt "
+"godkännande."
 
 #: cps/templates/cwa_settings.html
 msgid "Web UI Settings"
@@ -11759,15 +11924,19 @@ msgid ""
 "a new image and swaps NextGen in safely, leaving your other containers alone."
 msgstr ""
 "Nya versioner släpps regelbundet – ofta varje vecka. Calibre-Web NextGen kan "
-"inte uppdatera sig självt inifrån containern (inget som körs i en container kan "
-"det), så ett litet komplement som heter Watchtower gör det åt dig: det bevakar "
-"en ny avbild och byter säkert ut NextGen utan att röra dina andra containrar."
+"inte uppdatera sig självt inifrån containern (inget som körs i en container "
+"kan det), så ett litet komplement som heter Watchtower gör det åt dig: det "
+"bevakar en ny avbild och byter säkert ut NextGen utan att röra dina andra "
+"containrar."
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Add these two services to your docker-compose file and run \"docker compose "
 "up -d\". After that you stay up to date automatically — no button to press."
-msgstr "Lägg till dessa två tjänster i docker-compose-filen och kör \"docker compose up -d\". Därefter hålls du automatiskt uppdaterad – ingen knapp behöver tryckas."
+msgstr ""
+"Lägg till dessa två tjänster i docker-compose-filen och kör \"docker compose "
+"up -d\". Därefter hålls du automatiskt uppdaterad – ingen knapp behöver "
+"tryckas."
 
 #: cps/templates/cwa_settings.html cps/templates/update_now_modal.html
 #: cps/templates/user_edit.html
@@ -11779,13 +11948,18 @@ msgid ""
 "The label means Watchtower only ever touches Calibre-Web NextGen. The 86400 "
 "interval checks once a day; \"cleanup\" removes the old image after each "
 "update."
-msgstr "Etiketten innebär att Watchtower endast berör Calibre-Web NextGen. Intervallet 86400 kontrollerar en gång om dagen; \"cleanup\" tar bort den gamla avbilden efter varje uppdatering."
+msgstr ""
+"Etiketten innebär att Watchtower endast berör Calibre-Web NextGen. "
+"Intervallet 86400 kontrollerar en gång om dagen; \"cleanup\" tar bort den "
+"gamla avbilden efter varje uppdatering."
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Running under Podman instead? Native \"podman auto-update\" works too — a "
 "setup guide is coming once we have verified it against this image."
-msgstr "Kör du Podman i stället? Den inbyggda \"podman auto-update\" fungerar också – en installationsguide kommer när vi har verifierat den med denna avbild."
+msgstr ""
+"Kör du Podman i stället? Den inbyggda \"podman auto-update\" fungerar också "
+"– en installationsguide kommer när vi har verifierat den med denna avbild."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Contribute Translations Notifications"
@@ -11846,7 +12020,9 @@ msgstr "Aktivera automatisk säkerhetskopiering vid NextGen-konvertering"
 msgid ""
 "When active, the originals of ingested files that undergo conversion will be "
 "stored in"
-msgstr "När funktionen är aktiv lagras originalen för importerade filer som konverteras i"
+msgstr ""
+"När funktionen är aktiv lagras originalen för importerade filer som "
+"konverteras i"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen EPUB Fixer Auto-Backup"
@@ -11856,7 +12032,9 @@ msgstr "Aktivera automatisk säkerhetskopiering för NextGen EPUB Fixer"
 msgid ""
 "When active, the originals of EPUBs processed by the NextGen Kindle EPUB "
 "Fixer service will be stored in"
-msgstr "När funktionen är aktiv lagras originalen för EPUB-filer som bearbetas av tjänsten NextGen Kindle EPUB Fixer i"
+msgstr ""
+"När funktionen är aktiv lagras originalen för EPUB-filer som bearbetas av "
+"tjänsten NextGen Kindle EPUB Fixer i"
 
 #: cps/templates/cwa_settings.html
 msgid "Enable NextGen Auto-Zip Backups"
@@ -11871,8 +12049,9 @@ msgid ""
 msgstr ""
 "När detta är aktivt skapar tjänsten cwa-auto-zipper zip-arkiv strax före "
 "midnatt varje dag med alla säkerhetskopierade konverterade, importerade och "
-"misslyckade filer från den dagen. Det hjälper till att hålla underkatalogerna "
-"för säkerhetskopior organiserade och minimerar diskutrymmesanvändningen."
+"misslyckade filer från den dagen. Det hjälper till att hålla "
+"underkatalogerna för säkerhetskopior organiserade och minimerar "
+"diskutrymmesanvändningen."
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Auto-Conversion Target Format - EPUB by Default"
@@ -11898,8 +12077,9 @@ msgid ""
 "in either EPUB and AZW3 format. Files in other formats will simply be "
 "ignored by the service"
 msgstr ""
-"Obs: NextGens tjänst för metadatatillämpning kan för närvarande endast stödja "
-"filer i EPUB- eller AZW3-format. Filer i andra format ignoreras av tjänsten"
+"Obs: NextGens tjänst för metadatatillämpning kan för närvarande endast "
+"stödja filer i EPUB- eller AZW3-format. Filer i andra format ignoreras av "
+"tjänsten"
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Auto-Convert - Ignored Formats"
@@ -11971,9 +12151,9 @@ msgid ""
 "meaning files in these formats won't be added to the library by NextGen "
 "during the ingest process"
 msgstr ""
-"Format som väljs här ignoreras av NextGens automatiska import, vilket innebär "
-"att filer i dessa format inte läggs till i biblioteket av NextGen under "
-"importprocessen"
+"Format som väljs här ignoreras av NextGens automatiska import, vilket "
+"innebär att filer i dessa format inte läggs till i biblioteket av NextGen "
+"under importprocessen"
 
 #: cps/templates/cwa_settings.html
 msgid "NextGen Duplicate Detection System"
@@ -11993,7 +12173,8 @@ msgstr "Aktivera dubblettidentifiering"
 
 #: cps/templates/cwa_settings.html
 msgid "When enabled, NextGen will scan for duplicate books after each import"
-msgstr "När detta är aktiverat söker NextGen efter dubblettböcker efter varje import"
+msgstr ""
+"När detta är aktiverat söker NextGen efter dubblettböcker efter varje import"
 
 #: cps/templates/cwa_settings.html
 msgid "Duplicate Detection Method"
@@ -12015,7 +12196,9 @@ msgstr "Endast äldre SQL (experimentellt)"
 msgid ""
 "Hybrid mode uses a fast SQL pre-filter to narrow candidates, then applies "
 "the robust Python logic for final results."
-msgstr "Hybridläget använder ett snabbt SQL-förfilter för att begränsa kandidaterna och tillämpar sedan robust Python-logik för slutresultatet."
+msgstr ""
+"Hybridläget använder ett snabbt SQL-förfilter för att begränsa kandidaterna "
+"och tillämpar sedan robust Python-logik för slutresultatet."
 
 #: cps/templates/cwa_settings.html
 msgid "Automatic Duplicate Scanning"
@@ -12025,7 +12208,9 @@ msgstr "Automatisk dubblettsökning"
 msgid ""
 "Configure background duplicate scans. These run automatically without "
 "blocking the UI."
-msgstr "Konfigurera dubblettsökningar i bakgrunden. De körs automatiskt utan att blockera gränssnittet."
+msgstr ""
+"Konfigurera dubblettsökningar i bakgrunden. De körs automatiskt utan att "
+"blockera gränssnittet."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable automatic duplicate scans"
@@ -12051,7 +12236,9 @@ msgstr "Fördröjning efter import (sekunder)"
 msgid ""
 "Wait this many seconds after the last import before starting a background "
 "scan."
-msgstr "Vänta så här många sekunder efter den senaste importen innan en bakgrundssökning startas."
+msgstr ""
+"Vänta så här många sekunder efter den senaste importen innan en "
+"bakgrundssökning startas."
 
 #: cps/templates/cwa_settings.html
 msgid "Scheduled scans (cron expression)"
@@ -12065,7 +12252,10 @@ msgstr "Lämna tomt för att inaktivera schemalagda sökningar. Exempel:"
 msgid ""
 "If enabled, after-import scans and cron scans can both run. Use “Manual "
 "only” to disable after-import scans while keeping cron schedules."
-msgstr "Om funktionen är aktiverad kan både sökningar efter import och cron-sökningar köras. Använd ”Endast manuellt” för att inaktivera sökningar efter import och behålla cron-scheman."
+msgstr ""
+"Om funktionen är aktiverad kan både sökningar efter import och cron-"
+"sökningar köras. Använd ”Endast manuellt” för att inaktivera sökningar efter "
+"import och behålla cron-scheman."
 
 #: cps/templates/cwa_settings.html cps/templates/duplicates.html
 msgid "Next scheduled scan:"
@@ -12113,7 +12303,9 @@ msgstr "Ta hänsyn till filformat vid dubblettdetektering"
 msgid ""
 "At least one criterion must be selected. Title and Author are recommended as "
 "core criteria."
-msgstr "Minst ett kriterium måste väljas. Titel och författare rekommenderas som grundkriterier."
+msgstr ""
+"Minst ett kriterium måste väljas. Titel och författare rekommenderas som "
+"grundkriterier."
 
 #: cps/templates/cwa_settings.html
 msgid "Duplicate Format Priority Ranking"
@@ -12125,9 +12317,9 @@ msgid ""
 "Format\" auto-resolution strategy. Drag and drop to reorder formats by "
 "priority (higher = better)."
 msgstr ""
-"Ställ in vilka filformat som föredras vid användning av strategin \"Format med "
-"högst kvalitet\" för automatisk lösning. Dra och släpp för att ändra formatens "
-"prioritetsordning (högre = bättre)."
+"Ställ in vilka filformat som föredras vid användning av strategin \"Format "
+"med högst kvalitet\" för automatisk lösning. Dra och släpp för att ändra "
+"formatens prioritetsordning (högre = bättre)."
 
 #: cps/templates/cwa_settings.html
 msgid "Tip:"
@@ -12139,8 +12331,8 @@ msgid ""
 "with higher-ranked formats will be kept. Lower priority formats will be "
 "deleted."
 msgstr ""
-"När dubbletter löses med strategin \"Format med högst kvalitet\" behålls böcker "
-"med högre rankade format. Format med lägre prioritet tas bort."
+"När dubbletter löses med strategin \"Format med högst kvalitet\" behålls "
+"böcker med högre rankade format. Format med lägre prioritet tas bort."
 
 #: cps/templates/cwa_settings.html
 msgid "Duplicate Notifications & Auto-Resolution"
@@ -12261,16 +12453,16 @@ msgid ""
 "Auto-resolution runs after duplicate scans detect new duplicates. Dismissed "
 "duplicate groups are never auto-resolved."
 msgstr ""
-"Automatisk lösning körs när dubblettgenomsökningar identifierar nya dubbletter. "
-"Avfärdade dubblettgrupper löses aldrig automatiskt."
+"Automatisk lösning körs när dubblettgenomsökningar identifierar nya "
+"dubbletter. Avfärdade dubblettgrupper löses aldrig automatiskt."
 
 #: cps/templates/cwa_settings.html
 msgid ""
 "Reset every CWA setting to its default? All of your current CWA settings "
 "will be permanently lost."
 msgstr ""
-"Återställ alla CWA-inställningar till standardvärden? Alla dina aktuella "
-"CWA-inställningar går permanent förlorade."
+"Återställ alla CWA-inställningar till standardvärden? Alla dina aktuella CWA-"
+"inställningar går permanent förlorade."
 
 #: cps/templates/cwa_settings.html
 msgid "Reset All CWA Settings"
@@ -12293,7 +12485,9 @@ msgstr "Innan du går — varför bytte du tillbaka?"
 msgid ""
 "Optional, and completely anonymous. It helps us make the new interface "
 "better."
-msgstr "Valfritt och helt anonymt. Det hjälper oss att förbättra det nya gränssnittet."
+msgstr ""
+"Valfritt och helt anonymt. Det hjälper oss att förbättra det nya "
+"gränssnittet."
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "Something was broken or glitchy"
@@ -12361,7 +12555,9 @@ msgstr "Anonymisera min återkoppling"
 
 #: cps/templates/cwng_feedback_popup.html
 msgid "No account, name, IP address, version or device info is sent or stored."
-msgstr "Inget konto, namn, IP-adress, versions- eller enhetsinformation skickas eller lagras."
+msgstr ""
+"Inget konto, namn, IP-adress, versions- eller enhetsinformation skickas "
+"eller lagras."
 
 #: cps/templates/cwng_feedback_popup.html
 msgid ""
@@ -12370,9 +12566,9 @@ msgid ""
 "use a one-way hash of it for about a minute and never store it."
 msgstr ""
 "Skickas över HTTPS till en server som vi driver och sparas endast som din "
-"återkoppling — som omärkt post. Nätverkskanten ser kort din IP-adress för att "
-"stoppa spam; vi använder bara en envägshash av den i ungefär en minut och "
-"lagrar den aldrig."
+"återkoppling — som omärkt post. Nätverkskanten ser kort din IP-adress för "
+"att stoppa spam; vi använder bara en envägshash av den i ungefär en minut "
+"och lagrar den aldrig."
 
 #: cps/templates/cwng_feedback_popup.html
 msgid ""
@@ -12541,7 +12737,9 @@ msgstr "NextGen dubbletthanterare"
 msgid ""
 "Books with matching titles, authors, and languages. Books in different "
 "languages are not considered duplicates."
-msgstr "Böcker med matchande titlar, författare och språk. Böcker på olika språk betraktas inte som dubbletter."
+msgstr ""
+"Böcker med matchande titlar, författare och språk. Böcker på olika språk "
+"betraktas inte som dubbletter."
 
 #: cps/templates/duplicates.html
 msgid "Run Full Duplicate Scan"
@@ -12572,13 +12770,19 @@ msgid ""
 "CWA now uses a duplicate index to keep duplicate checks fast during imports "
 "and metadata changes. Before incremental scans can run, the index needs an "
 "initial baseline."
-msgstr "CWA använder nu ett dubblettindex för att hålla dubblettkontroller snabba vid import och metadataändringar. Innan inkrementella sökningar kan köras behöver indexet en första baslinje."
+msgstr ""
+"CWA använder nu ett dubblettindex för att hålla dubblettkontroller snabba "
+"vid import och metadataändringar. Innan inkrementella sökningar kan köras "
+"behöver indexet en första baslinje."
 
 #: cps/templates/duplicates.html
 msgid ""
 "Click \"Run Full Duplicate Scan\" to build it. This may take several minutes "
 "on large libraries, and you can keep using CWA while it runs."
-msgstr "Klicka på \"Kör fullständig dubblettsökning\" för att skapa indexet. Det kan ta flera minuter i stora bibliotek, och du kan fortsätta använda CWA medan det körs."
+msgstr ""
+"Klicka på \"Kör fullständig dubblettsökning\" för att skapa indexet. Det kan "
+"ta flera minuter i stora bibliotek, och du kan fortsätta använda CWA medan "
+"det körs."
 
 #: cps/templates/duplicates.html
 msgid "Duplicate scan is running."
@@ -12600,7 +12804,9 @@ msgstr "Lös dubbletter automatiskt"
 msgid ""
 "Automatically resolve all duplicate groups by keeping one book and deleting "
 "others based on a strategy."
-msgstr "Lös automatiskt alla dubblettgrupper genom att behålla en bok och ta bort övriga enligt en strategi."
+msgstr ""
+"Lös automatiskt alla dubblettgrupper genom att behålla en bok och ta bort "
+"övriga enligt en strategi."
 
 #: cps/templates/duplicates.html
 msgid "Strategy:"
@@ -12608,7 +12814,8 @@ msgstr "Strategi:"
 
 #: cps/templates/duplicates.html
 msgid "Keep Newest - Delete older copies, keep the most recently added"
-msgstr "Behåll den nyaste – ta bort äldre kopior och behåll den senast tillagda"
+msgstr ""
+"Behåll den nyaste – ta bort äldre kopior och behåll den senast tillagda"
 
 #: cps/templates/duplicates.html
 msgid "Keep Oldest - Delete newer copies, keep the earliest added"
@@ -12632,7 +12839,8 @@ msgstr "Behåll mest metadata – behåll boken med mest fullständig informatio
 
 #: cps/templates/duplicates.html
 msgid "Keep Largest File Size - Keep book with largest total file size"
-msgstr "Behåll största filstorlek – behåll boken med största sammanlagda filstorlek"
+msgstr ""
+"Behåll största filstorlek – behåll boken med största sammanlagda filstorlek"
 
 #: cps/templates/duplicates.html
 msgid "Execute Resolution"
@@ -12640,7 +12848,8 @@ msgstr "Utför lösning"
 
 #: cps/templates/duplicates.html
 msgid "This will permanently delete books. Original files will be backed up to"
-msgstr "Detta tar bort böcker permanent. Ursprungliga filer säkerhetskopieras till"
+msgstr ""
+"Detta tar bort böcker permanent. Ursprungliga filer säkerhetskopieras till"
 
 #: cps/templates/duplicates.html
 msgid "Merge Selected"
@@ -12668,7 +12877,9 @@ msgstr "Inga dubblettböcker hittades"
 
 #: cps/templates/duplicates.html
 msgid "Your library has no books with duplicate title and author combinations."
-msgstr "Ditt bibliotek har inga böcker med dubblettkombinationer av titel och författare."
+msgstr ""
+"Ditt bibliotek har inga böcker med dubblettkombinationer av titel och "
+"författare."
 
 #: cps/templates/duplicates.html
 msgid ""
@@ -12752,7 +12963,8 @@ msgstr "Konfigurera Gmail-konto"
 
 #: cps/templates/email_edit.html
 msgid "Revoke Gmail access? You will need to authorize Gmail again to use it."
-msgstr "Återkalla Gmail-åtkomst? Du måste auktorisera Gmail igen för att använda det."
+msgstr ""
+"Återkalla Gmail-åtkomst? Du måste auktorisera Gmail igen för att använda det."
 
 #: cps/templates/email_edit.html
 msgid "Revoke Gmail Access"
@@ -12959,14 +13171,16 @@ msgstr "Kunde inte hoppa över matchning"
 msgid ""
 "Calibre-Web NextGen Instance is unconfigured, please contact your "
 "administrator"
-msgstr "Calibre-Web NextGen-instansen är inte konfigurerad. Kontakta "
-"administratören."
+msgstr ""
+"Calibre-Web NextGen-instansen är inte konfigurerad. Kontakta administratören."
 
 #: cps/templates/http_error.html
 msgid ""
 "Report this — the details are filled in for you, and nothing is sent until "
 "you post it:"
-msgstr "Rapportera detta – uppgifterna fylls i åt dig och inget skickas förrän du publicerar rapporten:"
+msgstr ""
+"Rapportera detta – uppgifterna fylls i åt dig och inget skickas förrän du "
+"publicerar rapporten:"
 
 #: cps/templates/http_error.html
 msgid "Create Issue"
@@ -12990,7 +13204,9 @@ msgstr "Mobilnotis"
 
 #: cps/templates/index.html
 msgid "Magic shelf editing works best on desktop or tablet devices."
-msgstr "Redigering av magiska hyllor fungerar bäst på stationära datorer eller surfplattor."
+msgstr ""
+"Redigering av magiska hyllor fungerar bäst på stationära datorer eller "
+"surfplattor."
 
 #: cps/templates/index.html
 msgid "Search the global library"
@@ -13033,13 +13249,17 @@ msgstr "Lägg till %(title)s i mitt bibliotek"
 msgid ""
 "Upload this user's KoboReader.sqlite to find device books whose UUID no "
 "longer exists in this library."
-msgstr "Ladda upp användarens KoboReader.sqlite för att hitta enhetsböcker vars UUID inte längre finns i detta bibliotek."
+msgstr ""
+"Ladda upp användarens KoboReader.sqlite för att hitta enhetsböcker vars UUID "
+"inte längre finns i detta bibliotek."
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
 "Preview and sample entries are excluded automatically when Kobo marks them "
 "with Accessibility -1."
-msgstr "Förhandsvisnings- och provposter undantas automatiskt när Kobo markerar dem med Accessibility -1."
+msgstr ""
+"Förhandsvisnings- och provposter undantas automatiskt när Kobo markerar dem "
+"med Accessibility -1."
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
@@ -13047,17 +13267,17 @@ msgid ""
 "books may appear in the preview, and the evidence shown is not proof that "
 "this server delivered a book."
 msgstr ""
-"Inget äkta Kobo Store-köp fanns tillgängligt för validering. Kobo Store-böcker "
-"kan visas i förhandsvisningen, och underlaget som visas är inget bevis för att "
-"den här servern levererade en bok."
+"Inget äkta Kobo Store-köp fanns tillgängligt för validering. Kobo Store-"
+"böcker kan visas i förhandsvisningen, och underlaget som visas är inget "
+"bevis för att den här servern levererade en bok."
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
 "Select only books you know came from this server. Selecting a book schedules "
 "its device copy for archival on the next sync."
 msgstr ""
-"Välj endast böcker som du vet kommer från den här servern. När du väljer en bok "
-"schemaläggs dess enhetskopia för arkivering vid nästa synkronisering."
+"Välj endast böcker som du vet kommer från den här servern. När du väljer en "
+"bok schemaläggs dess enhetskopia för arkivering vid nästa synkronisering."
 
 #: cps/templates/kobo_reconcile.html
 msgid ""
@@ -13070,14 +13290,17 @@ msgstr ""
 
 #: cps/templates/kobo_reconcile.html
 msgid "The uploaded database is deleted as soon as the preview is built."
-msgstr "Den uppladdade databasen raderas så snart förhandsvisningen har skapats."
+msgstr ""
+"Den uppladdade databasen raderas så snart förhandsvisningen har skapats."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid ""
 "%(count)d deleted books were scheduled to be archived the next time this "
 "user's Kobo syncs."
-msgstr "%(count)d borttagna böcker har schemalagts för arkivering nästa gång användarens Kobo synkroniseras."
+msgstr ""
+"%(count)d borttagna böcker har schemalagts för arkivering nästa gång "
+"användarens Kobo synkroniseras."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
@@ -13097,7 +13320,8 @@ msgstr "%(count)d kunde inte verifieras och ändrades inte."
 #: cps/templates/kobo_reconcile.html
 #, python-format
 msgid "%(count)d device books are not in the library and require your review."
-msgstr "%(count)d enhetsböcker finns inte i biblioteket och behöver granskas av dig."
+msgstr ""
+"%(count)d enhetsböcker finns inte i biblioteket och behöver granskas av dig."
 
 #: cps/templates/kobo_reconcile.html
 msgid "Device title"
@@ -13151,7 +13375,9 @@ msgstr "%(count)d förhandsvisnings- eller provposter undantogs."
 msgid ""
 "%(count)d device entries could not be classified because Accessibility was "
 "unavailable."
-msgstr "%(count)d enhetsposter kunde inte klassificeras eftersom Accessibility inte var tillgängligt."
+msgstr ""
+"%(count)d enhetsposter kunde inte klassificeras eftersom Accessibility inte "
+"var tillgängligt."
 
 #: cps/templates/kobo_reconcile.html
 #, python-format
@@ -13190,7 +13416,9 @@ msgstr "KOReader-synkronisering är inaktiverad."
 msgid ""
 "Enable it in NextGen Settings to activate the /kosync endpoints and checksum "
 "generation."
-msgstr "Aktivera den i NextGen-inställningar för att aktivera /kosync-slutpunkterna och kontrollsummegenerering."
+msgstr ""
+"Aktivera den i NextGen-inställningar för att aktivera /kosync-slutpunkterna "
+"och kontrollsummegenerering."
 
 #: cps/templates/kosync_plugin.html
 msgid "Open NextGen Settings"
@@ -13198,7 +13426,9 @@ msgstr "Öppna NextGen-inställningar"
 
 #: cps/templates/kosync_plugin.html
 msgid "Download is available after enabling KOReader Sync in NextGen Settings."
-msgstr "Hämtning är tillgänglig efter att KOReader-synkronisering har aktiverats i NextGen-inställningar."
+msgstr ""
+"Hämtning är tillgänglig efter att KOReader-synkronisering har aktiverats i "
+"NextGen-inställningar."
 
 #: cps/templates/layout.html cps/templates/login.html
 msgid "Home"
@@ -13400,7 +13630,8 @@ msgstr "Glömt lösenord?"
 msgid ""
 "Log in with Magic\n"
 "      Link"
-msgstr "Logga in med magisk\n"
+msgstr ""
+"Logga in med magisk\n"
 "      länk"
 
 #: cps/templates/login.html
@@ -13410,7 +13641,9 @@ msgstr "Logga in med SSO"
 #: cps/templates/login.html
 msgid ""
 "Standard login is disabled. Please use one of the alternative login methods."
-msgstr "Vanlig inloggning är inaktiverad. Använd en av de alternativa inloggningsmetoderna."
+msgstr ""
+"Vanlig inloggning är inaktiverad. Använd en av de alternativa "
+"inloggningsmetoderna."
 
 #: cps/templates/logviewer.html
 msgid "Show Calibre-Web Log: "
@@ -13453,8 +13686,8 @@ msgid ""
 "Other users can view this shelf. Users with \"Edit Public Shelves\" "
 "permission can edit/delete it."
 msgstr ""
-"Andra användare kan visa den här hyllan. Användare med behörigheten \"Redigera "
-"offentliga hyllor\" kan redigera eller ta bort den."
+"Andra användare kan visa den här hyllan. Användare med behörigheten "
+"\"Redigera offentliga hyllor\" kan redigera eller ta bort den."
 
 #: cps/templates/modal_dialogs.html
 msgid "Select Allowed/Denied Tags"
@@ -13915,7 +14148,9 @@ msgstr "Dra ett omslag till sin nya plats — ordningen sparas automatiskt."
 
 #: cps/templates/shelf_order.html
 msgid "Keyboard: focus a cover with Tab, then move it with the arrow keys."
-msgstr "Tangentbord: fokusera ett omslag med Tab och flytta det sedan med piltangenterna."
+msgstr ""
+"Tangentbord: fokusera ett omslag med Tab och flytta det sedan med "
+"piltangenterna."
 
 #: cps/templates/shelf_order.html
 msgid "Order saved"
@@ -13948,7 +14183,9 @@ msgstr "Dra för att ändra ordningen på dina hyllor i sidopanelen."
 
 #: cps/templates/shelf_reorder.html
 msgid "Order saved. The sidebar reflects the new order on next page load."
-msgstr "Ordningen har sparats. Sidopanelen visar den nya ordningen när sidan läses in nästa gång."
+msgstr ""
+"Ordningen har sparats. Sidopanelen visar den nya ordningen när sidan läses "
+"in nästa gång."
 
 #: cps/templates/stats.html
 msgid "Library Statistics"
@@ -14010,7 +14247,9 @@ msgstr "Status"
 msgid ""
 "Upcoming sends are persisted and will enqueue as tasks at the scheduled "
 "time. You can cancel a pending send before it runs."
-msgstr "Kommande utskick sparas och läggs i kö som uppgifter vid den schemalagda tidpunkten. Du kan avbryta ett väntande utskick innan det körs."
+msgstr ""
+"Kommande utskick sparas och läggs i kö som uppgifter vid den schemalagda "
+"tidpunkten. Du kan avbryta ett väntande utskick innan det körs."
 
 #: cps/templates/tasks.html
 msgid "Upcoming scheduled operations"
@@ -14024,18 +14263,24 @@ msgstr "Typ"
 msgid ""
 "Convert Library and EPUB Fixer runs scheduled here will persist across "
 "restarts. Cancel to prevent them from triggering."
-msgstr "Körningar av Konvertera bibliotek och EPUB Fixer som schemaläggs här finns kvar mellan omstarter. Avbryt för att förhindra att de utlöses."
+msgstr ""
+"Körningar av Konvertera bibliotek och EPUB Fixer som schemaläggs här finns "
+"kvar mellan omstarter. Avbryt för att förhindra att de utlöses."
 
 #: cps/templates/tasks.html
 msgid ""
 "This task will be cancelled. Any progress made by this task will be saved."
-msgstr "Den här uppgiften kommer att avbrytas. Alla framsteg som uppgiften har gjort sparas."
+msgstr ""
+"Den här uppgiften kommer att avbrytas. Alla framsteg som uppgiften har gjort "
+"sparas."
 
 #: cps/templates/tasks.html
 msgid ""
 "If this is a scheduled task, it will be re-ran during the next scheduled "
 "time."
-msgstr "Om detta är en schemalagd uppgift körs den igen vid nästa schemalagda tidpunkt."
+msgstr ""
+"Om detta är en schemalagd uppgift körs den igen vid nästa schemalagda "
+"tidpunkt."
 
 #: cps/templates/tasks.html
 msgid "Scheduled item cancelled successfully"
@@ -14056,8 +14301,8 @@ msgid ""
 "mounted volumes, not in the container."
 msgstr ""
 "Uppdateringen hämtar den nya avbilden och skapar om containern. Det går "
-"snabbt, och biblioteket, inställningarna och läsförloppet är säkra – de finns "
-"i dina monterade volymer, inte i containern."
+"snabbt, och biblioteket, inställningarna och läsförloppet är säkra – de "
+"finns i dina monterade volymer, inte i containern."
 
 #: cps/templates/update_now_modal.html
 msgid "How do you run Calibre-Web NextGen?"
@@ -14095,13 +14340,17 @@ msgstr "Ersätt calibre-web-nextgen med tjänstens namn om det skiljer sig."
 msgid ""
 "Pull the new image, then recreate your container with the same options you "
 "started it with:"
-msgstr "Hämta den nya avbilden och skapa sedan om containern med samma alternativ som du startade den med:"
+msgstr ""
+"Hämta den nya avbilden och skapa sedan om containern med samma alternativ "
+"som du startade den med:"
 
 #: cps/templates/update_now_modal.html
 msgid ""
 "Then stop and remove the old container and start a new one with your usual "
 "docker run command. Your mounted volumes keep all data."
-msgstr "Stoppa och ta bort den gamla containern och starta en ny med ditt vanliga docker run-kommando. Dina monterade volymer behåller alla data."
+msgstr ""
+"Stoppa och ta bort den gamla containern och starta en ny med ditt vanliga "
+"docker run-kommando. Dina monterade volymer behåller alla data."
 
 #: cps/templates/update_now_modal.html
 msgid "Open the Docker tab in the Unraid web UI."
@@ -14111,13 +14360,17 @@ msgstr "Öppna fliken Docker i Unraids webbgränssnitt."
 msgid ""
 "Click the Calibre-Web NextGen container icon and choose Force update (check "
 "for updates first if you want to see what changed)."
-msgstr "Klicka på Calibre-Web NextGen-containerns ikon och välj Tvinga uppdatering (sök först efter uppdateringar om du vill se vad som har ändrats)."
+msgstr ""
+"Klicka på Calibre-Web NextGen-containerns ikon och välj Tvinga uppdatering "
+"(sök först efter uppdateringar om du vill se vad som har ändrats)."
 
 #: cps/templates/update_now_modal.html
 msgid ""
 "For hands-off updates, install the \"CA Auto Update Applications\" plugin "
 "from Community Applications."
-msgstr "För automatiska uppdateringar installerar du insticksmodulen \"CA Auto Update Applications\" från Community Applications."
+msgstr ""
+"För automatiska uppdateringar installerar du insticksmodulen \"CA Auto "
+"Update Applications\" från Community Applications."
 
 #: cps/templates/update_now_modal.html
 msgid "Portainer:"
@@ -14127,7 +14380,9 @@ msgstr "Portainer:"
 msgid ""
 "Images → pull the image below, then Containers → select Calibre-Web NextGen "
 "→ Recreate with \"Re-pull image\" enabled."
-msgstr "Avbilder → hämta avbilden nedan, sedan Containrar → välj Calibre-Web NextGen → Skapa om med \"Hämta avbild igen\" aktiverat."
+msgstr ""
+"Avbilder → hämta avbilden nedan, sedan Containrar → välj Calibre-Web NextGen "
+"→ Skapa om med \"Hämta avbild igen\" aktiverat."
 
 #: cps/templates/update_now_modal.html
 msgid "Synology Container Manager:"
@@ -14137,7 +14392,9 @@ msgstr "Synology Container Manager:"
 msgid ""
 "Registry → download the image below (tag: latest), then stop the container → "
 "Action → Reset to recreate it."
-msgstr "Register → hämta avbilden nedan (tagg: latest), stoppa sedan containern → Åtgärd → Återställ för att skapa om den."
+msgstr ""
+"Register → hämta avbilden nedan (tagg: latest), stoppa sedan containern → "
+"Åtgärd → Återställ för att skapa om den."
 
 #: cps/templates/update_now_modal.html
 msgid "Set up automatic updates"
@@ -14158,7 +14415,8 @@ msgstr "Kontoinformation"
 #: cps/templates/user_edit.html
 msgid ""
 "If you need to change your email address or password, you can do so here."
-msgstr "Om du behöver ändra din e-postadress eller ditt lösenord kan du göra det här."
+msgstr ""
+"Om du behöver ändra din e-postadress eller ditt lösenord kan du göra det här."
 
 #: cps/templates/user_edit.html
 msgid "Reset user Password"
@@ -14180,7 +14438,9 @@ msgstr "Använd kommatecken för att skilja flera adresser åt"
 msgid ""
 "Email address(es) for your eReader devices. Separate multiple addresses with "
 "commas."
-msgstr "E-postadress(er) för dina e-boksläsare. Separera flera adresser med kommatecken."
+msgstr ""
+"E-postadress(er) för dina e-boksläsare. Separera flera adresser med "
+"kommatecken."
 
 #: cps/templates/user_edit.html
 msgid "Enable Send-to-eReader Pop-up Modal"
@@ -14200,7 +14460,9 @@ msgstr ""
 msgid ""
 "When disabled, emails will be sent to all configured eReader addresses "
 "without prompting."
-msgstr "När funktionen är inaktiverad skickas e-post till alla konfigurerade e-boksläsaradresser utan fråga."
+msgstr ""
+"När funktionen är inaktiverad skickas e-post till alla konfigurerade e-"
+"boksläsaradresser utan fråga."
 
 #: cps/templates/user_edit.html
 msgid "Automatically send new books to my eReader(s)"
@@ -14210,7 +14472,9 @@ msgstr "Skicka automatiskt nya böcker till mina e-boksläsare"
 msgid ""
 "When enabled, newly ingested books will be automatically sent to all "
 "configured eReader email addresses above."
-msgstr "När funktionen är aktiverad skickas nyligen importerade böcker automatiskt till alla konfigurerade e-boksläsaradresser ovan."
+msgstr ""
+"När funktionen är aktiverad skickas nyligen importerade böcker automatiskt "
+"till alla konfigurerade e-boksläsaradresser ovan."
 
 #: cps/templates/user_edit.html
 msgid "Language & Theme Preferences"
@@ -14280,7 +14544,9 @@ msgstr "Skicka igen"
 msgid ""
 "Clears the sync record for one book so the device re-downloads it on next "
 "sync. Find the book ID in the book detail page URL."
-msgstr "Rensar synkroniseringsposten för en bok så att enheten hämtar den igen vid nästa synkronisering. Bok-ID:t finns i URL:en på sidan med bokdetaljer."
+msgstr ""
+"Rensar synkroniseringsposten för en bok så att enheten hämtar den igen vid "
+"nästa synkronisering. Bok-ID:t finns i URL:en på sidan med bokdetaljer."
 
 #: cps/templates/user_edit.html
 msgid "Reconcile books deleted before Kobo archival tracking"
@@ -14290,7 +14556,9 @@ msgstr "Stäm av böcker som tagits bort före Kobo-arkiveringsspårningen"
 msgid ""
 "Upload this user's KoboReader.sqlite, then select only books you know this "
 "server delivered and that are no longer in the library."
-msgstr "Ladda upp användarens KoboReader.sqlite och välj sedan endast böcker som du vet att denna server levererade och som inte längre finns i biblioteket."
+msgstr ""
+"Ladda upp användarens KoboReader.sqlite och välj sedan endast böcker som du "
+"vet att denna server levererade och som inte längre finns i biblioteket."
 
 #: cps/templates/user_edit.html
 msgid "Sync only books in selected shelves with Kobo"
@@ -14342,7 +14610,8 @@ msgstr ""
 msgid ""
 "Drag to reorder OPDS root entries. Missing entries are appended "
 "automatically."
-msgstr "Dra för att ordna om OPDS-rotposter. Saknade poster läggs till automatiskt."
+msgstr ""
+"Dra för att ordna om OPDS-rotposter. Saknade poster läggs till automatiskt."
 
 #: cps/templates/user_edit.html
 msgid "User Permissions"
@@ -14402,7 +14671,8 @@ msgstr "Minst nyligen ändrad"
 
 #: cps/templates/user_edit.html
 msgid "Manual order is used only when the order mode is set to Manual."
-msgstr "Manuell ordning används endast när sorteringsläget är inställt på Manuellt."
+msgstr ""
+"Manuell ordning används endast när sorteringsläget är inställt på Manuellt."
 
 #: cps/templates/user_edit.html
 msgid "Magic Shelves Visibility"
@@ -14412,7 +14682,10 @@ msgstr "Synlighet för magiska hyllor"
 msgid ""
 "Uncheck shelves you want to hide from your sidebar. System shelves cannot be "
 "deleted, only hidden. Public shelves from other users can also be hidden."
-msgstr "Avmarkera hyllor som du vill dölja från sidopanelen. Systemhyllor kan inte tas bort, endast döljas. Offentliga hyllor från andra användare kan också döljas."
+msgstr ""
+"Avmarkera hyllor som du vill dölja från sidopanelen. Systemhyllor kan inte "
+"tas bort, endast döljas. Offentliga hyllor från andra användare kan också "
+"döljas."
 
 #: cps/templates/user_edit.html
 msgid "Default System Shelves:"
@@ -14447,10 +14720,11 @@ msgid ""
 "that'll use it, and copy the token shown after creation. You can revoke any "
 "app password at any time without affecting your active web session."
 msgstr ""
-"OPDS-läsare och KOReader kan inte logga in via din IdP – de stöder endast HTTP "
-"Basic-autentisering. Skapa ett applösenord här, märk det för enheten som ska "
-"använda det och kopiera tokenen som visas efter skapandet. Du kan när som helst "
-"återkalla ett applösenord utan att påverka din aktiva webbsession."
+"OPDS-läsare och KOReader kan inte logga in via din IdP – de stöder endast "
+"HTTP Basic-autentisering. Skapa ett applösenord här, märk det för enheten "
+"som ska använda det och kopiera tokenen som visas efter skapandet. Du kan "
+"när som helst återkalla ett applösenord utan att påverka din aktiva "
+"webbsession."
 
 #: cps/templates/user_edit.html
 msgid "New app password"
@@ -14460,7 +14734,9 @@ msgstr "Nytt applösenord"
 #, python-format
 msgid ""
 "App password created for '%(label)s'. Copy it now — you won't see it again."
-msgstr "Applösenord har skapats för '%(label)s'. Kopiera det nu – du ser det inte igen."
+msgstr ""
+"Applösenord har skapats för '%(label)s'. Kopiera det nu – du ser det inte "
+"igen."
 
 #: cps/templates/user_edit.html
 msgid "New app password (cleartext)"

@@ -1749,6 +1749,18 @@ msgstr "لا يُسمح لك بالوصول إلى localhost أو الشبكة �
 msgid "Failed to create path for cover"
 msgstr "فشل في إنشاء مسار الغلاف"
 
+#: cps/helper.py
+#, python-format
+msgid ""
+"Cover could not be stored: the server has no permission to write into the "
+"book folder %(folder)s (folder owner uid %(owner)s, server uid %(uid)s)."
+msgstr ""
+
+#: cps/helper.py
+#, python-format
+msgid "Cover could not be stored: %(reason)s"
+msgstr ""
+
 #: cps/helper.py cps/spa_strings.py
 msgid "Cover"
 msgstr "الغلاف"

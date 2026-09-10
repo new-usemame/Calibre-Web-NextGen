@@ -1718,6 +1718,18 @@ msgstr "표지 업로드를 위해 로컬 호스트나 로컬 네트워크에 �
 msgid "Failed to create path for cover"
 msgstr "표지 경로 생성에 실패했습니다."
 
+#: cps/helper.py
+#, python-format
+msgid ""
+"Cover could not be stored: the server has no permission to write into the "
+"book folder %(folder)s (folder owner uid %(owner)s, server uid %(uid)s)."
+msgstr ""
+
+#: cps/helper.py
+#, python-format
+msgid "Cover could not be stored: %(reason)s"
+msgstr ""
+
 #: cps/helper.py cps/spa_strings.py
 msgid "Cover"
 msgstr "표지"

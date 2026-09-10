@@ -58,7 +58,9 @@ test('a failed validation call shows its reason instead of a silently disabled b
   const input = await openUrlPanel(page);
   await input.fill('https://example.test/cover.jpg');
 
-  const alert = page.getByRole('alert');
+  // Scoped to the URL panel: the page can carry another live region (the
+  // banner), and a strict role query across the whole page resolves both.
+  const alert = page.getByRole('tabpanel').getByRole('alert');
   await expect(alert).toBeVisible();
   await expect(alert).toHaveText('Cover check crashed');
   await expect(page.getByRole('button', { name: 'Use this cover' })).toBeDisabled();

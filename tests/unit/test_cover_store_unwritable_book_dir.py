@@ -180,3 +180,23 @@ def test_undecodable_upload_into_unwritable_dir_is_an_invalid_image_not_a_permis
         assert _stage_files(library.temp_dir) == []
     finally:
         _restore(library.book_dir)
+
+
+def test_symlinked_cover_in_unwritable_dir_is_refused_not_written_through(library, tmp_path):
+    """The rename path replaced a symlink itself; the in-place path must not
+    follow it and rewrite whatever it points at."""
+    from cps import helper
+
+    elsewhere = tmp_path / "elsewhere.bin"
+    elsewhere.write_bytes(OLD_COVER)
+    cover = library.book_dir / "cover.jpg"
+    cover.symlink_to(elsewhere)
+    _deny_new_entries(library.book_dir)
+    try:
+        staged, message = helper.save_cover(_storage(), library.book_path)
+        assert staged is None
+        assert "permission" in str(message).lower()
+        assert elsewhere.read_bytes() == OLD_COVER
+        assert _stage_files(library.temp_dir) == []
+    finally:
+        _restore(library.book_dir)

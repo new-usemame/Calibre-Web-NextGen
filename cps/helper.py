@@ -2368,7 +2368,10 @@ class InPlaceStagedCoverWrite(StagedCoverWrite):
                 content = staged_file.read()
             # No O_CREAT: creating the file would need the directory permission
             # this path exists to do without, and it must fail loudly instead.
-            fd = os.open(self.target_path, os.O_WRONLY | os.O_TRUNC)
+            fd = os.open(
+                self.target_path,
+                os.O_WRONLY | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0),
+            )
             try:
                 _write_all(fd, content)
                 os.fsync(fd)
@@ -2509,7 +2512,10 @@ def _open_cover_stage(filepath, saved_filename):
         fd, staged_path = tempfile.mkstemp(prefix=prefix, suffix=".stage", dir=filepath)
         return fd, staged_path, False
     except PermissionError as ex:
-        if not (os.path.isfile(target) and os.access(target, os.W_OK)):
+        # A symlinked target is never rewritten in place: the rename path
+        # replaced the link itself, and following it here would write through
+        # to wherever the link points.
+        if os.path.islink(target) or not (os.path.isfile(target) and os.access(target, os.W_OK)):
             raise
         log.warning(
             "Book folder %s refuses new entries (owner uid %s, server uid %s): %s. "

@@ -491,8 +491,7 @@ def create_app(config=None, services=None):
         application.wsgi_app = ReverseProxied(application.wsgi_app)
         application.extensions["cps_reverse_proxy_registered"] = True
 
-    if os.environ.get('FLASK_DEBUG'):
-        cache_buster.init_cache_busting(application)
+    cache_buster.init_cache_busting(application)
     log.info('Starting Calibre Web...')
     Principal(application)
     app_login_manager.init_app(application)

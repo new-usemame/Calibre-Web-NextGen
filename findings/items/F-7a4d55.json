@@ -1,0 +1,17 @@
+{
+  "area": "download",
+  "body": "Final release audit reproduced two simultaneous browser downloads of the same EPUB: one returned an error after Calibre rejected overlapping exports. Successful exports also renamed unique artifacts onto a shared client basename. Fixed in cb25b58f73 using the existing process-shared Calibre lock, failure fallback, and unique staging names. Four new tests seen red then green, actual desktop/mobile concurrent shared reading/download now passes.",
+  "created": "2026-09-08",
+  "id": "F-7a4d55",
+  "refs": [],
+  "resolution": {
+    "commit": "cb25b58f73",
+    "date": "2026-09-08",
+    "note": "Four behavioral cases seen red; lock coordination, export fallback, and unique staged artifact tests pass. Real desktop/mobile downloads of the same shared EPUB succeed concurrently, with actual reader page turns and role-denial controls.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Concurrent downloads collide during metadata export and shared staging cleanup"
+}

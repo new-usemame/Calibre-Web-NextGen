@@ -61,6 +61,9 @@ if [[ "${1:-}" == "clone" ]]; then
     dest="${!#}"
     mkdir -p "$dest"
     "$REAL_GIT" init --quiet "$dest"
+    # Test commits must not inherit developer machine hooks or signing policy.
+    "$REAL_GIT" -C "$dest" config core.hooksPath /dev/null
+    "$REAL_GIT" -C "$dest" config commit.gpgSign false
     "$REAL_GIT" -C "$dest" config user.email test@example.invalid
     "$REAL_GIT" -C "$dest" config user.name test
     if [[ -n "${SHIPPED_DIR:-}" && -d "${SHIPPED_DIR:-}" ]]; then

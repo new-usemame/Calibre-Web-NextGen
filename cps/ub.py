@@ -663,7 +663,8 @@ class MyLibraryAdminIntro(Base):
     administrator and must survive sessions, so it lives in app.db rather than
     per-user rows or browser storage. ``snapshot_json`` holds the pre-enable
     restore point — {user_id: {"browse_global": bool, "has_own_library": bool}}
-    for every account the enable action touched — so Undo is a true restore
+    for every account the enable action touched, plus a completion receipt and
+    any last error for resumable setup — so Undo is a true restore
     rather than a re-derivation. Membership rows and the seed-once fence are
     deliberately NOT part of the snapshot: undo leaves each selection dormant
     (the keep-dormant guarantee), exactly like a per-user mode switch back to
@@ -672,6 +673,7 @@ class MyLibraryAdminIntro(Base):
     __tablename__ = 'my_library_admin_intro'
 
     STATUS_NOT_ENABLED = 'not_enabled'
+    STATUS_INCOMPLETE = 'incomplete'
     STATUS_ENABLED = 'enabled'
 
     id = Column(Integer, primary_key=True)
@@ -997,9 +999,12 @@ class KoboDeviceEntitlementSeed(Base):
     seeded_at = Column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
     )
-    # Version 1 means the per-device rows were audited against the legacy
-    # New/Changed classifier.  Version 0 rows predate #1735 and may include
-    # fingerprints for ChangedEntitlements a device could not apply.
+    # Version 1 means the one-time pre-#2025 audit has run for this device.
+    # Version 0 rows were written by the shipped v4.1.43 seed, which copied
+    # the user-wide flat history onto every Kobo it marked: sound for a single
+    # paired reader, a household union for two or more.  The audit therefore
+    # keeps a single reader's book rows and removes only household guesses;
+    # post-seed device emissions and modern acknowledgments remain evidence.
     classification_version = Column(
         Integer, nullable=False, default=0, server_default="0",
     )
@@ -1265,6 +1270,8 @@ class Device(Base):
     __table_args__ = (
         Index('ix_device_user_active_last_seen', 'user_id', 'active', 'last_seen_at'),
         Index('ix_device_user_display_name', 'user_id', 'display_name'),
+        Index('uq_device_account_browser', 'user_id', unique=True,
+              sqlite_where=text("kind = 'webreader' AND created_by = 'account-browser'")),
     )
 
 
@@ -4941,6 +4948,8 @@ def migrate_Database(_session):
     migrate_device_reading_position_slice(engine, _session)
     migrate_kobo_annotation_seed_pipeline(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
+    from .services.browser_source import migrate_account_browser_source
+    migrate_account_browser_source(engine)
     migrate_book_cover_preview_table(engine, _session)
     migrate_user_book_cover_table(engine, _session)
     migrate_notice_tables(engine, _session)

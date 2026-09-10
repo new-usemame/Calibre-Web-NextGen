@@ -3717,7 +3717,7 @@ def test_full_sync_clears_only_target_users_entitlement_ledger(
     assert {
         row.device_id for row in
         sync_harness.session.query(ub.KoboDeviceEntitlementSeed)
-    } == {other_device.id}
+    } == {sync_harness.device.id, second_target_device.id, other_device.id}
 
     replay = sync_harness.sync(first.headers[sync_harness.token_header])
     replay_envelopes = _entitlements(replay)
@@ -4460,4 +4460,516 @@ def test_sync_summary_handles_store_min_and_nullable_cursor_shapes(
     )
     assert kobo._sync_cursor_summary(nullable) == (
         None, None, datetime.min, None, datetime.min, None, None, datetime.min,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Stranded-fix investigation (state/release/v4.1.44/BRIEF-kobo-stranded-fix.md)
+# ---------------------------------------------------------------------------
+
+
+def _legacy_classification_replay(books, page_size):
+    """Replay the pre-#2025 New/Changed state machine over a book list.
+
+    The legacy handler emitted ``NewEntitlement`` when a book's created clock
+    exceeded the INCOMING token's ``books_last_created``, and set the outgoing
+    token to that page's maximum. Reproduced here from
+    ``cps/kobo.py`` at 0e3b86005a^ lines 1129-1131 and 1176 so the test states
+    its own premise instead of assuming it.
+    """
+    ordered = sorted(books, key=lambda book: (book.last_modified, book.id))
+    new_ids = set()
+    watermark = datetime.min
+    for offset in range(0, len(ordered), page_size):
+        page = ordered[offset:offset + page_size]
+        page_max = watermark
+        for book in page:
+            created = book.timestamp
+            if created > watermark:
+                new_ids.add(book.id)
+            page_max = max(page_max, created)
+        watermark = page_max
+    return new_ids
+
+
+def _seed_legacy_install(sync_harness, count=218, stagger=True, record_flat=True):
+    """A pre-#1925 install: flat KoboSyncedBooks, no per-device ledger rows."""
+    from cps import db, ub
+
+    delivered = [sync_harness.book]
+    base = sync_harness.book.last_modified
+    sync_harness.book.timestamp = base
+    for number in range(2, count + 1):
+        clock = base + timedelta(seconds=number - 1) if stagger else base
+        book = db.Books(
+            f"Held Book {number}",
+            f"Held Book {number}",
+            "Author",
+            clock,
+            db.Books.DEFAULT_PUBDATE,
+            "1.0",
+            clock,
+            f"held-book-{number}",
+            0,
+            [],
+            [],
+        )
+        sync_harness.session.add(book)
+        sync_harness.session.flush()
+        book.uuid = f"00000000-0000-0000-0003-{number:012d}"
+        sync_harness.session.add(db.Data(
+            book.id, "EPUB", 3_000_000 + number, f"held-book-{number}",
+        ))
+        delivered.append(book)
+    if record_flat:
+        sync_harness.session.add_all([
+            ub.KoboSyncedBooks(
+                user_id=sync_harness.user.id,
+                book_id=book.id,
+                book_uuid=str(book.uuid),
+            )
+            for book in delivered
+        ])
+    sync_harness.session.commit()
+    return delivered
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "KNOWN GAP, deliberately left failing rather than fitted to. This "
+        "models a PRE-v4.1.43 install, which has no per-device ledger at all "
+        "-- only the user-wide flat KoboSyncedBooks history. v4.1.43 is the "
+        "only release that ever shipped the ledger seed. Making this pass "
+        "requires writing ledger rows for flat-marked books, and MEASURED: "
+        "doing so turns test_a_book_the_device_never_received_survives_one_"
+        "library_deletion red -- a book the device never got is suppressed as "
+        "already delivered, i.e. permanently starved. That is the same failure "
+        "class as live issue #2201, and a permanent starvation is worse than a "
+        "one-time re-download. The two cases are not distinguishable: the only "
+        "thing separating this install from that one is historical "
+        "timestamp-vs-last_modified ordering, and v4.1.43's table carries no "
+        "such provenance -- its columns are exactly (id, device_id, book_id, "
+        "fingerprint, updated_at); payload_schema_version and change_basis are "
+        "added by THIS migration with DEFAULT 1 / NULL. This population's "
+        "behaviour is bit-for-bit unchanged from main, so nothing regresses "
+        "here. strict=True so that if a future change makes it pass, CI says "
+        "so instead of leaving a stale xfail."
+    ),
+)
+def test_upgrade_with_a_valid_token_does_not_reannounce_a_held_library(
+    sync_harness, caplog, monkeypatch,
+):
+    """An existing, fully-downloaded Kobo must not be told its library is New.
+
+    Models the ordinary upgrade of a pre-#1925 install.  Every book was
+    emitted to the device as a NewEntitlement by the legacy handler (asserted
+    below, not assumed), so the physical Kobo holds all 218 files, and it
+    presents its own valid token whose cursor is already past the library.
+    Nickel treats a NewEntitlement for a book it already holds as "not
+    downloaded" (#1925), so a full re-announce is a full re-download.
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    caplog.set_level(logging.DEBUG, logger="cps.kobo")
+
+    delivered = _seed_legacy_install(sync_harness)
+
+    # Premise: under the legacy classifier every one of these 218 books was a
+    # NewEntitlement, so an empty Kobo could accept every one of them. This is
+    # the shape #1735 does NOT describe; nothing here was silently dropped.
+    legacy_new = _legacy_classification_replay(delivered, kobo.SYNC_ITEM_LIMIT)
+    assert len(legacy_new) == 218, (
+        "test premise broken: the legacy handler would not have delivered "
+        f"all 218 books as New (only {len(legacy_new)})"
+    )
+    assert sync_harness.session.query(ub.KoboSyncedBooks).count() == 218
+    assert sync_harness.session.query(ub.KoboDeviceBookEntitlement).count() == 0
+
+    # The device's own token, exactly where a fully drained legacy sync left
+    # it: past every book by (last_modified, id) and by created clock.
+    settled_token = kobo.SyncToken.SyncToken(
+        books_last_modified=max(book.last_modified for book in delivered),
+        books_last_created=max(book.timestamp for book in delivered),
+        books_last_id=max(book.id for book in delivered),
+    ).build_sync_token()
+
+    token = settled_token
+    page_sizes = []
+    kinds = set()
+    for _page in range(4):
+        response = sync_harness.sync(token)
+        assert response.status_code == 200
+        items = _entitlements(response)
+        page_sizes.append(len(items))
+        kinds.update(
+            "New" if "NewEntitlement" in item else "Changed" for item in items
+        )
+        token = response.headers[sync_harness.token_header]
+
+    assert page_sizes == [0, 0, 0, 0], (
+        "a Kobo that holds every book and presents a valid token must be "
+        f"sent nothing; it was sent {sum(page_sizes)} entitlements "
+        f"({sorted(kinds)}) across pages {page_sizes}"
+    )
+
+
+def test_upgrade_still_removes_a_book_hard_deleted_before_the_upgrade(
+    sync_harness, monkeypatch,
+):
+    """A pre-upgrade hard delete must still reach the Kobo that holds it.
+
+    The admin deleted a book on the old server, which recorded a
+    ``KoboDeletedBook`` tombstone.  The device was offline and never received
+    the removal, so its token's archive cursor still predates the deletion.
+    After the upgrade the removal must still be delivered, or the file stays
+    on the Kobo forever with no server-side way to dislodge it.
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+
+    delivered = _seed_legacy_install(sync_harness, count=3)
+    modified = max(book.last_modified for book in delivered)
+    orphan_uuid = "00000000-0000-0000-0009-000000000001"
+    deleted_at = modified + timedelta(hours=1)
+    sync_harness.session.add(ub.KoboDeletedBook(
+        user_id=sync_harness.user.id,
+        book_uuid=orphan_uuid,
+        deleted_at=deleted_at,
+    ))
+    sync_harness.session.commit()
+    assert sync_harness.session.query(
+        ub.KoboDeviceDeletedEntitlement,
+    ).count() == 0
+
+    # The offline device's token: past every book, but its archive cursor is
+    # still before the deletion it never heard about.
+    stale_token = kobo.SyncToken.SyncToken(
+        books_last_modified=modified,
+        books_last_created=max(book.timestamp for book in delivered),
+        books_last_id=max(book.id for book in delivered),
+        archive_last_modified=modified,
+    ).build_sync_token()
+
+    response = sync_harness.sync(stale_token)
+    assert response.status_code == 200
+    removed = [
+        item[kind]["BookEntitlement"]["Id"]
+        for item in response.get_json()
+        for kind in ("NewEntitlement", "ChangedEntitlement")
+        if kind in item
+        and item[kind].get("BookEntitlement", {}).get("IsRemoved") is True
+    ]
+    assert removed == [orphan_uuid], (
+        "the upgrade sync swallowed a hard delete the device never received; "
+        f"removals emitted: {removed}"
+    )
+
+
+def test_a_book_the_device_never_received_survives_one_library_deletion(
+    sync_harness, monkeypatch,
+):
+    """#1735's undelivered book must still arrive after an unrelated delete.
+
+    Legacy shape: last_modified ascending, date-added descending.  The old
+    handler sent books 1-100 as New and book 101 as Changed, which an empty
+    Kobo drops (#1735) - so the device does NOT hold book 101.  The admin then
+    deletes one unrelated book.  Any upgrade path that reconstructs "what the
+    legacy handler classified as New" from CURRENT library rows now re-pages
+    the history and can mistake book 101 for a delivered book.
+    """
+    from cps import db, kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+
+    base = sync_harness.book.last_modified
+    total = kobo.SYNC_ITEM_LIMIT + 1
+    books = [sync_harness.book]
+    sync_harness.book.last_modified = base
+    sync_harness.book.timestamp = base + timedelta(seconds=total)
+    for offset in range(1, total):
+        book = db.Books(
+            f"Legacy Paged Book {offset + 1}",
+            f"Legacy Paged Book {offset + 1}",
+            "Author",
+            base + timedelta(seconds=total - offset),   # date added
+            db.Books.DEFAULT_PUBDATE,
+            "1.0",
+            base + timedelta(seconds=offset),           # last modified
+            f"legacy-paged-book-{offset + 1}",
+            0,
+            [],
+            [],
+        )
+        sync_harness.session.add(book)
+        sync_harness.session.flush()
+        book.uuid = f"00000000-0000-0000-0007-{offset + 1:012d}"
+        sync_harness.session.add(db.Data(
+            book.id, "EPUB", 7_000_000 + offset,
+            f"legacy-paged-book-{offset + 1}",
+        ))
+        books.append(book)
+    undelivered = books[-1]
+    sync_harness.session.add_all([
+        ub.KoboSyncedBooks(
+            user_id=sync_harness.user.id,
+            book_id=book.id,
+            book_uuid=str(book.uuid),
+        )
+        for book in books
+    ])
+    sync_harness.session.commit()
+
+    # Premise: under the legacy classifier only page one was New, so the
+    # physical Kobo never received the last book.
+    legacy_new = _legacy_classification_replay(books, kobo.SYNC_ITEM_LIMIT)
+    assert undelivered.id not in legacy_new
+    assert len(legacy_new) == kobo.SYNC_ITEM_LIMIT
+
+    # One unrelated book leaves the library, as books routinely do.
+    dropped = books[10]
+    sync_harness.session.query(db.Data).filter_by(book=dropped.id).delete()
+    sync_harness.session.query(db.Books).filter_by(id=dropped.id).delete()
+    sync_harness.session.commit()
+
+    settled_token = kobo.SyncToken.SyncToken(
+        books_last_modified=max(b.last_modified for b in books),
+        books_last_created=max(b.timestamp for b in books),
+        books_last_id=max(b.id for b in books),
+    ).build_sync_token()
+
+    token = settled_token
+    seen = set()
+    for _page in range(4):
+        response = sync_harness.sync(token)
+        for item in response.get_json():
+            for kind in ("NewEntitlement", "ChangedEntitlement"):
+                if kind in item:
+                    seen.add(item[kind]["BookEntitlement"]["Id"])
+        token = response.headers[sync_harness.token_header]
+
+    assert str(undelivered.uuid) in seen, (
+        "the book the device never received was suppressed as already "
+        "delivered after one unrelated library deletion re-paged the "
+        "reconstructed legacy history"
+    )
+
+
+def test_v4_1_43_install_upgrading_is_not_told_its_whole_library_is_new(
+    sync_harness, monkeypatch, caplog,
+):
+    """The shipped v4.1.43 -> next-release upgrade must be silent.
+
+    v4.1.43 (tag bdead55920) ships ``_seed_existing_device_entitlement_ledgers``
+    in its SEEDING form and has no ``ENTITLEMENT_CLASSIFICATION_VERSION``
+    column, so every existing install has a full per-device ledger whose
+    ``classification_version`` reads 0.  Here that ledger is built by real
+    acknowledged deliveries, so the device provably holds all 218 books and
+    every fingerprint is genuine.  Flipping the stamp to 0 is the whole
+    upgrade.  Nickel re-downloads any book announced New (#1925).
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    delivered = _seed_legacy_install(sync_harness, record_flat=False)
+
+    # Drain the library for real: these are acknowledged deliveries.
+    token = kobo.SyncToken.SyncToken().build_sync_token()
+    drained = []
+    for _page in range(4):
+        response = sync_harness.sync(token)
+        drained.append(len(_entitlements(response)))
+        token = response.headers[sync_harness.token_header]
+    assert drained == [100, 100, 18, 0], drained
+    assert sync_harness.session.query(
+        ub.KoboDeviceBookEntitlement,
+    ).count() == 218
+
+    # This is the entire v4.1.43 -> main upgrade: the classification stamp
+    # that release never wrote now reads 0.
+    seed = sync_harness.session.get(
+        ub.KoboDeviceEntitlementSeed, sync_harness.device.id,
+    )
+    assert seed is not None
+    seed.classification_version = 0
+    sync_harness.session.commit()
+
+    caplog.clear()
+    caplog.set_level(logging.DEBUG, logger="cps.kobo")
+    upgrade_pages = []
+    for _page in range(4):
+        response = sync_harness.sync(token)
+        upgrade_pages.append(len(_entitlements(response)))
+        token = response.headers[sync_harness.token_header]
+
+    assert upgrade_pages == [0, 0, 0, 0], (
+        "upgrading a v4.1.43 install re-announced "
+        f"{sum(upgrade_pages)} of its 218 already-downloaded books "
+        f"across pages {upgrade_pages}"
+    )
+
+
+def test_upgrade_preserves_acknowledged_pages_when_a_second_kobo_is_added(
+    sync_harness, monkeypatch,
+):
+    """Adding a household reader cannot erase another reader's real history.
+
+    These rows are built by actual acknowledged pages after their seed stamp;
+    they are not the ambiguous user-wide guesses the old seed used to copy.
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    _seed_legacy_install(sync_harness, record_flat=False)
+
+    token = kobo.SyncToken.SyncToken().build_sync_token()
+    for _page in range(4):
+        response = sync_harness.sync(token)
+        token = response.headers[sync_harness.token_header]
+    assert sync_harness.session.query(
+        ub.KoboDeviceBookEntitlement,
+    ).count() == 218
+
+    sync_harness.session.add(ub.Device(
+        user_id=sync_harness.user.id,
+        kind="kobo",
+        display_name="Second Household Kobo",
+        model="Kobo Libra Colour",
+        active=True,
+        created_by="auto",
+    ))
+    seed = sync_harness.session.get(
+        ub.KoboDeviceEntitlementSeed, sync_harness.device.id,
+    )
+    seed.classification_version = 0
+    sync_harness.session.commit()
+
+    upgrade_pages = []
+    kinds = set()
+    for _page in range(4):
+        response = sync_harness.sync(token)
+        items = _entitlements(response)
+        upgrade_pages.append(len(items))
+        kinds.update(
+            "New" if "NewEntitlement" in item else "Changed" for item in items
+        )
+        token = response.headers[sync_harness.token_header]
+
+    assert upgrade_pages == [0, 0, 0, 0], (
+        "adding another Kobo must preserve this device's own delivered pages; "
+        f"pages {upgrade_pages}"
+    )
+    assert kinds == set()
+
+
+def test_v4_1_43_upgrade_keeps_a_held_row_over_the_position_sentinel(
+    sync_harness, monkeypatch,
+):
+    """A kept row already proves delivery; the sentinel must not clobber it.
+
+    The reading-position sentinel exists for books the device demonstrably
+    holds but that have no ledger row.  Writing it over a row that survived
+    the audit would force a pointless ChangedEntitlement for exactly the
+    books whose delivery is best evidenced.
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    delivered = _seed_legacy_install(sync_harness, count=3, record_flat=False)
+
+    token = kobo.SyncToken.SyncToken().build_sync_token()
+    for _page in range(2):
+        response = sync_harness.sync(token)
+        token = response.headers[sync_harness.token_header]
+    assert sync_harness.session.query(
+        ub.KoboDeviceBookEntitlement,
+    ).count() == 3
+
+    position = sync_harness.session.query(ub.DeviceReadingPosition).filter_by(
+        device_id=sync_harness.device.id, book_id=delivered[0].id,
+    ).one_or_none()
+    if position is None:
+        position = ub.DeviceReadingPosition(
+            device_id=sync_harness.device.id,
+            book_id=delivered[0].id,
+            server_modified_at=delivered[0].last_modified,
+        )
+        sync_harness.session.add(position)
+    position.client_modified_at = delivered[0].last_modified
+    seed = sync_harness.session.get(
+        ub.KoboDeviceEntitlementSeed, sync_harness.device.id,
+    )
+    seed.classification_version = 0
+    sync_harness.session.commit()
+    before = {
+        row.book_id: row.fingerprint
+        for row in sync_harness.session.query(ub.KoboDeviceBookEntitlement)
+    }
+
+    response = sync_harness.sync(token)
+    assert _entitlements(response) == []
+    after = {
+        row.book_id: row.fingerprint
+        for row in sync_harness.session.query(ub.KoboDeviceBookEntitlement)
+    }
+    assert after == before
+
+
+def test_v4_1_43_upgrade_still_delivers_a_book_the_ledger_never_recorded(
+    sync_harness, monkeypatch,
+):
+    """Keeping the ledger must not suppress a book that is not in it.
+
+    The live under-delivery reports (#1735, #2201) are libraries where only
+    part of the collection ever reached the reader.  Those books have no
+    ledger row, so the cursor-independent recovery arm must still announce
+    them New across the upgrade -- keeping the rows for the delivered books
+    may not cost the undelivered ones their repair.
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    delivered = _seed_legacy_install(sync_harness, count=3, record_flat=False)
+
+    token = kobo.SyncToken.SyncToken().build_sync_token()
+    for _page in range(2):
+        response = sync_harness.sync(token)
+        token = response.headers[sync_harness.token_header]
+    assert sync_harness.session.query(
+        ub.KoboDeviceBookEntitlement,
+    ).count() == 3
+
+    # This book never physically arrived, so the ledger has no row for it.
+    never_arrived = delivered[-1]
+    sync_harness.session.query(ub.KoboDeviceBookEntitlement).filter_by(
+        device_id=sync_harness.device.id, book_id=never_arrived.id,
+    ).delete(synchronize_session=False)
+    seed = sync_harness.session.get(
+        ub.KoboDeviceEntitlementSeed, sync_harness.device.id,
+    )
+    seed.classification_version = 0
+    sync_harness.session.commit()
+
+    response = sync_harness.sync(token)
+    items = _entitlements(response)
+    assert [sorted(item) for item in items] == [["NewEntitlement"]], items
+    assert (
+        items[0]["NewEntitlement"]["BookEntitlement"]["Id"]
+        == str(never_arrived.uuid)
     )

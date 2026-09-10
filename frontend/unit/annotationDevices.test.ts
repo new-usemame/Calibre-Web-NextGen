@@ -34,3 +34,15 @@ test('dismiss clears a success or failure toast without changing the successful 
     assert.deepEqual(assignments, { highlight: 'reader-b' });
   }
 });
+
+
+test('Browser attribution is translated while custom source names remain unchanged', () => {
+  const devices = {
+    browser: { type: 'webreader', label: 'Browser' },
+    renamed: { type: 'webreader', label: 'My reading' },
+    physical: { type: 'kobo', label: 'Browser' },
+  };
+  assert.equal(annotationDeviceLabel('browser', devices, 'Inconnu', 'Supprimé', 'Navigateur'), 'Navigateur');
+  assert.equal(annotationDeviceLabel('renamed', devices, 'Inconnu', 'Supprimé', 'Navigateur'), 'My reading');
+  assert.equal(annotationDeviceLabel('physical', devices, 'Inconnu', 'Supprimé', 'Navigateur'), 'Browser');
+});

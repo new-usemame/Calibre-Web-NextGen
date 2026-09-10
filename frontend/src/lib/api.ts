@@ -1,7 +1,5 @@
 /* Typed fetch helpers — same-origin, credentials included. */
 
-import { webreaderDeviceHeaders } from './deviceIdentity';
-
 declare global {
   interface Window { __CWNG_PREFIX__?: string; }
 }
@@ -253,6 +251,8 @@ export interface BookDetail {
   /** Membership for personal-library detail deep links. Older servers omit it,
    *  which preserves the historical whole-library behavior. */
   in_my_library?: boolean;
+  /** Read/download access through a public shelf without personal membership. */
+  accessible_via_public_shelf?: boolean;
   /** Sync-driven "currently reading" tri-state (fork #634) — true when KOReader/
    *  Kobo reports the book as in progress (read_status IN_PROGRESS) and it isn't
    *  marked read. Distinct from `read`; matches the classic detail page marker. */
@@ -516,9 +516,11 @@ export interface LibraryModePayload {
 /** Server-wide state of the admin "Try My Library" intro card — shared by all
  *  administrators and persisted in app.db, so it survives sessions and browsers. */
 export interface MyLibraryIntroState {
-  status: 'not_enabled' | 'enabled';
+  status: 'not_enabled' | 'incomplete' | 'enabled';
   dismissed: boolean;
   snapshot_accounts: number;
+  pending_accounts: number;
+  failed_accounts: Array<{ user_id: number; name: string; error: string }>;
 }
 
 export interface GlobalLibraryPage extends BooksPage {
@@ -617,8 +619,6 @@ export function navigateToLogout(): void {
 
 export interface ApiRequestOptions {
   auth?: 'protected' | 'public';
-  /** Attribute a reading-data mutation to this browser installation. */
-  webreaderDevice?: boolean;
 }
 
 function isProtected(options?: ApiRequestOptions): boolean {
@@ -801,14 +801,11 @@ export async function apiPost<T>(
   requestOptions?: Pick<RequestInit, 'keepalive'> & ApiRequestOptions,
 ): Promise<T> {
   const doPost = async (csrf: string): Promise<Response> => {
-    const { auth: _auth, webreaderDevice: _device, ...fetchOptions } = requestOptions ?? {};
+    const { auth: _auth, ...fetchOptions } = requestOptions ?? {};
     return classifiedFetch(path, {
       method: 'POST',
       credentials: 'include',
-      headers: requestOptions?.webreaderDevice ? webreaderDeviceHeaders({
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrf,
-      }) : {
+      headers: {
         'Content-Type': 'application/json',
         'X-CSRFToken': csrf,
       },
@@ -881,9 +878,7 @@ export async function apiDelete<T>(path: string, options?: ApiRequestOptions): P
     classifiedFetch(path, {
       method: 'DELETE',
       credentials: 'include',
-      headers: options?.webreaderDevice
-        ? webreaderDeviceHeaders({ 'X-CSRFToken': csrf })
-        : { 'X-CSRFToken': csrf },
+      headers: { 'X-CSRFToken': csrf },
     }, options);
 
   let csrf = await getCsrf(options);
@@ -921,10 +916,7 @@ export async function apiPatch<T>(path: string, body?: unknown, options?: ApiReq
     classifiedFetch(path, {
       method: 'PATCH',
       credentials: 'include',
-      headers: options?.webreaderDevice ? webreaderDeviceHeaders({
-        'Content-Type': 'application/json',
-        'X-CSRFToken': csrf,
-      }) : {
+      headers: {
         'Content-Type': 'application/json',
         'X-CSRFToken': csrf,
       },

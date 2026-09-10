@@ -1,0 +1,19 @@
+{
+  "area": "reader",
+  "body": "Actual mouse selection succeeded in both readers but epub.js selected events did not fire in WebKit script-disabled srcdoc frames (WebKit 218086). A shared parent-side observer reads only the focused reader selection and emits after stable selection, preserving embedded-script isolation and native-event deduplication. Both desktop WebKit cases were seen failing before the fix; the full candidate image passes both readers on desktop and mobile WebKit profiles with annotation payload, browser identity, rendered result and malicious-script canary assertions. Mobile profile uses focused DOM selection, not physical OS handles. Candidate fix for #2208; public release pending. Canceling and immediately reselecting the same passage is covered: the observer compares the original selection Range identity as well as cloned endpoints, so a new gesture is accepted even when the collapsed transition falls between polls.",
+  "created": "2026-09-09",
+  "id": "F-960947",
+  "refs": [
+    "#2208"
+  ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-09",
+    "note": "Implemented and independently verified on the full #2208 candidate image; not yet released.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Safari cannot open highlight creation controls in sandboxed EPUB readers"
+}

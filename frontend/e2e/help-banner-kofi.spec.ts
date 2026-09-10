@@ -266,7 +266,7 @@ test('a superseded Ko-fi dismissal ID does not pre-dismiss the current Ko-fi ban
   );
 });
 
-test('Help menu ends with a secure external Ko-fi support link', async ({ page }) => {
+test('Help menu ends with a secure external Ko-fi support link', async ({ page, browserName }) => {
   const trigger = page.getByRole('button', { name: /^Help(?: — new updates available)?$/ });
   await trigger.focus();
   await page.keyboard.press('Enter');
@@ -279,7 +279,9 @@ test('Help menu ends with a secure external Ko-fi support link', async ({ page }
   await expect(supportLink).toHaveAttribute('rel', 'noopener noreferrer');
   await expect(items.last()).toHaveText('Support on Ko-fi →');
 
-  for (let index = 0; index < 6; index += 1) await page.keyboard.press('Tab');
+  // macOS Safari includes links in keyboard traversal with Option-Tab.
+  const nextLink = browserName === 'webkit' && process.platform === 'darwin' ? 'Alt+Tab' : 'Tab';
+  for (let index = 0; index < 6; index += 1) await page.keyboard.press(nextLink);
   await expect(supportLink).toBeFocused();
   await page.keyboard.press('Escape');
   await expect(trigger).toHaveAttribute('aria-expanded', 'false');

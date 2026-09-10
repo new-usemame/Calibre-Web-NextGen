@@ -1,5 +1,5 @@
 import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
-import { LifeBuoy, ArrowUpRight, X } from 'lucide-react';
+import { LifeBuoy, ArrowUpRight, Sparkles, X } from 'lucide-react';
 import { useT, type TFunction } from '../lib/i18n';
 import { prioritizeAnnouncements } from '../lib/announcementQueue';
 import { useDismissMyLibraryIntro, useMe } from '../lib/queries';
@@ -49,12 +49,14 @@ const ANNOUNCEMENTS: readonly Announcement[] = [
       && me.library_mode === 'personal_library' && me.show_my_library_intro === true,
     content: (t, me) => (
       <>
-        <span className={styles.iconWrap} aria-hidden="true"><LifeBuoy size={17} focusable={false} /></span>
+        <span className={styles.iconWrap} aria-hidden="true"><Sparkles size={18} focusable={false} /></span>
         <span className={styles.text}>
-          <strong>{t('New: My Library')}</strong>{' '}
-          {me?.role?.browse_global
-            ? t('The library is shared and holds every book once — what you keep is My Library. Nothing you had is gone. Every book, new arrivals included, is under Global Library in the menu.')
-            : t('The library is shared and holds every book once — what you keep is My Library. Nothing you had is gone. Your administrator manages what enters it.')}
+          <strong className={styles.headline}>{t('New: My Library')}</strong>
+          <span className={styles.bodyCopy}>
+            {me?.role?.browse_global
+              ? t('The library is shared and holds every book once — what you keep is My Library. Nothing you had is gone. Every book, new arrivals included, is under Global Library in the menu.')
+              : t('The library is shared and holds every book once — what you keep is My Library. Nothing you had is gone. Your administrator manages what enters it.')}
+          </span>
         </span>
       </>
     ),
@@ -180,7 +182,7 @@ export function AnnouncementBanner() {
   };
 
   const content = announcement.content(t, me);
-  const variantClass = announcement.variant === 'support' ? styles.supportBanner : '';
+  const variantClass = announcement.variant === 'support' ? styles.supportBanner : styles.noticeBanner;
 
   return (
     <div

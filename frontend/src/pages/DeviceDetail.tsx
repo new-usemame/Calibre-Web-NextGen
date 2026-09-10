@@ -5,6 +5,7 @@ import { ChevronLeft, Smartphone } from 'lucide-react';
 import { apiGet } from '../lib/api';
 import { clampOffset, clampPage } from '../lib/pagination';
 import { useT } from '../lib/i18n';
+import { annotationDeviceLabel } from '../lib/annotationDevices';
 import { DeviceInventory, type Device } from '../components/DeviceInventory';
 import { DeviceSummary } from '../components/DeviceSummary';
 import { EmptyState } from '../components/EmptyState';
@@ -12,7 +13,7 @@ import { SpinnerCentered } from '../components/Spinner';
 import styles from './DeviceDetail.module.css';
 
 type AnnotationType = 'highlight' | 'note' | 'dogear';
-type Tab = AnnotationType | 'inventory';
+type Tab = AnnotationType | 'all' | 'inventory';
 
 interface DeviceAnnotation {
   annotation_id: string;
@@ -65,6 +66,7 @@ interface PositionRow {
 }
 
 interface PositionsPayload {
+  device?: Device;
   positions: PositionRow[];
   limit: number;
   offset: number;
@@ -85,6 +87,7 @@ const HIGHLIGHT_COLORS: Record<string, string> = {
 };
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: 'all', label: 'All annotations' },
   { id: 'highlight', label: 'Highlights' },
   { id: 'note', label: 'Notes' },
   { id: 'dogear', label: 'Dog-ears' },
@@ -124,8 +127,7 @@ function AnnotationList({ payload, loading, error }: {
             {row.note_text && <p>{row.note_text}</p>}
             <small>
               {[
-                (row.origin_device_id && payload?.devices[row.origin_device_id]?.label)
-                  || row.source,
+                annotationDeviceLabel(row.origin_device_id, payload?.devices ?? {}, row.source ?? '', row.source ?? '', t('Browser')),
                 row.chapter_progress == null
                 ? null
                 : `${Math.round(row.chapter_progress * 100)}%`,
@@ -186,7 +188,7 @@ function PositionList({ data, loading, error }: {
 
 export function DeviceDetail({ publicId }: { publicId: string }) {
   const t = useT();
-  const [tab, setTab] = useState<Tab>('highlight');
+  const [tab, setTab] = useState<Tab>('all');
   const [role, setRole] = useState<'origin' | 'assigned'>('origin');
   const [page, setPage] = useState(1);
   const [positionOffset, setPositionOffset] = useState(0);
@@ -211,7 +213,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
   const annotations = useQuery<AnnotationPayload>({
     queryKey: ['device-annotations', publicId, tab, role, page],
     queryFn: () => apiGet(
-      `/api/annotations/devices/${publicId}/annotations?type=${tab}&role=${role}&page=${page}`,
+      `/api/annotations/devices/${publicId}/annotations?${tab === 'all' ? '' : `type=${tab}&`}role=${role}&page=${page}`,
     ),
     enabled: tab !== 'inventory',
   });
@@ -230,9 +232,12 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
     if (stalePositionPage) setPositionOffset(correctedPositionOffset);
   }, [correctedPositionOffset, stalePositionPage]);
   const resolvedDevice = useMemo(
-    () => registry.data?.devices.find((candidate) => candidate.public_id === publicId)
-      || (annotations.data?.device.public_id === publicId ? annotations.data.device : undefined),
-    [annotations.data, publicId, registry.data],
+    // Detail responses belong to this requested publicId's query keys. A
+    // migrated alias legitimately returns the canonical device's public id.
+    // Positions also resolves the device while the inventory tab disables annotations.
+    () => positions.data?.device || annotations.data?.device
+      || registry.data?.devices.find((candidate) => candidate.public_id === publicId),
+    [annotations.data, positions.data, publicId, registry.data],
   );
   useEffect(() => {
     if (resolvedDevice) setRetainedDevice({ publicId, device: resolvedDevice });
@@ -243,6 +248,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
   const device = resolvedDevice
     || (retainedDevice?.publicId === publicId ? retainedDevice.device : undefined);
 
+  const availableTabs = TABS.filter(item => device?.type !== 'webreader' || item.id !== 'inventory');
   const selectTab = (next: Tab) => {
     setTab(next);
     setPage(1);
@@ -254,17 +260,17 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
     const current = buttons.indexOf(event.target as HTMLButtonElement);
     if (current < 0) return;
     let next = current;
-    if (event.key === 'ArrowRight') next = (current + 1) % TABS.length;
-    else if (event.key === 'ArrowLeft') next = (current - 1 + TABS.length) % TABS.length;
+    if (event.key === 'ArrowRight') next = (current + 1) % availableTabs.length;
+    else if (event.key === 'ArrowLeft') next = (current - 1 + availableTabs.length) % availableTabs.length;
     else if (event.key === 'Home') next = 0;
-    else if (event.key === 'End') next = TABS.length - 1;
+    else if (event.key === 'End') next = availableTabs.length - 1;
     else return;
     event.preventDefault();
-    selectTab(TABS[next].id);
+    selectTab(availableTabs[next].id);
     buttons[next]?.focus();
   };
 
-  if (registry.isLoading || (annotations.isLoading && !device)) return <SpinnerCentered size={40} />;
+  if (!device && (registry.isLoading || positions.isLoading || annotations.isLoading)) return <SpinnerCentered size={40} />;
   if (!device) {
     return (
       <main className={styles.container}>
@@ -281,7 +287,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
       </Link>
       <header className={styles.header}>
         <Smartphone aria-hidden="true" focusable={false} />
-        <div><h1>{device.label}</h1><p>{device.kind_label || device.type}</p></div>
+        <div><h1>{device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label}</h1><p>{device.type === 'webreader' ? t('Browser reading source') : device.kind_label || device.type}</p></div>
       </header>
       <section className={styles.summary} aria-label={t('Device summary')}>
         <DeviceSummary device={{
@@ -305,7 +311,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
         <span>{t('Show annotations assigned to this device')}</span>
       </label>
       <div className={styles.tabs} role="tablist" aria-label={t('Device data')} onKeyDown={onTabKeyDown}>
-        {TABS.map((item) => (
+        {availableTabs.map((item) => (
           <button
             key={item.id}
             id={`device-tab-${item.id}`}

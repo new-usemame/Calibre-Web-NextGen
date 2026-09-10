@@ -26,7 +26,8 @@ These are source-pins (the SPA is TypeScript, so like ``test_750``'s
 1. ``api.ts`` exports ``apiDelete`` (method ``DELETE``) + ``apiPatch``.
 2. ``Reader.tsx`` no longer paints highlights with an undefined click callback,
    and wires a real handler (``openHighlightEditor``) + ``cwng-hl`` className.
-3. ``Reader.tsx`` captures the annotation id at both paint sites (load + create).
+3. ``Reader.tsx`` captures the annotation id at creation. Loaded IDs are covered
+   by the real browser flow in reader-native-annotations.spec.ts.
 4. The remove flow calls ``apiDelete`` on the annotation path and un-paints via
    ``rendition.annotations.remove(…, 'highlight')``.
 5. ``spa_strings.py`` anchors the new SPA-only msgid (``Remove highlight``).
@@ -112,19 +113,9 @@ def test_reader_passes_click_callback_and_classname(reader_src):
 # 3. The annotation id is captured at both paint sites
 # ---------------------------------------------------------------------------
 
-def test_reader_captures_id_on_load(reader_src):
-    # Saved highlights come from /annotations/<id>/data.json; each row's
-    # annotation_id must reach paintHighlight so a tap can target the row.
-    #
-    # Matches the ARGUMENT, not the whole call. These pins guard an invariant —
-    # "the id reaches the paint site" — and pinning the exact literal made them
-    # fail on any signature change instead: #1508 appended a `hasNote` argument
-    # and broke both, with the id still flowing correctly. A pin that reds on
-    # every legitimate refactor teaches people to update it without reading it,
-    # which is how the regression it exists to catch eventually walks through.
-    assert re.search(
-        r"paintHighlight\(\s*a\.cfi_range\s*,[^)]*\ba\.annotation_id\b", reader_src
-    ), "the load loop must pass the saved annotation_id into paintHighlight"
+# Loaded-ID coverage lives in frontend/e2e/reader-native-annotations.spec.ts:
+# it clicks real loaded overlays and checks their annotation-specific requests.
+# Removing the ID at reconciliation is mutation-tested to fail that flow.
 
 
 def test_reader_captures_id_on_create(reader_src):

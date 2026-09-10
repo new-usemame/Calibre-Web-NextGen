@@ -49,7 +49,10 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
-  workers: isCI ? 2 : undefined,
+  // Every test in the dedicated server-state invocation mutates the same
+  // all-account setup state. Separating the invocation from broad tests is
+  // insufficient if its own scenarios can still run on two CI workers.
+  workers: serverStateEnabled ? 1 : isCI ? 2 : undefined,
   timeout: 45_000,
   expect: {
     timeout: 10_000,
@@ -240,7 +243,7 @@ export default defineConfig({
     //    Keep this project narrow: the broad suite remains Chromium-backed.
     {
       name: 'webkit-reader',
-      testMatch: WEBKIT_READER_SPEC,
+      testMatch: [WEBKIT_READER_SPEC, /reader-selection\.spec\.ts/, /reader-native-annotations\.spec\.ts/, /reader-drawer-edit\.spec\.ts/],
       use: {
         ...devices['Desktop Safari'],
         viewport: { width: 1280, height: 800 },
@@ -248,6 +251,23 @@ export default defineConfig({
       },
       dependencies: ['setup'],
     },
+
+    {
+      name: 'webkit-reader-mobile',
+      testMatch: [/reader-selection\.spec\.ts/, /reader-native-annotations\.spec\.ts/, /reader-drawer-edit\.spec\.ts/],
+      use: { ...devices['iPhone 13'], storageState: STORAGE },
+      dependencies: ['setup'],
+    },
+
+    ...[
+      { name: 'topbar-webkit', profile: devices['Desktop Safari'] },
+      { name: 'topbar-webkit-mobile', profile: devices['iPhone 13'] },
+    ].map(({ name, profile }) => ({
+      name,
+      testMatch: /topbar-menu-interaction\.spec\.ts/,
+      use: { ...profile, storageState: STORAGE },
+      dependencies: ['setup'],
+    })),
 
     // 8. Sub-path reverse proxy (opt-in: set E2E_SUBPATH_URL to the nginx rig).
     //    Guards Class 1 subpath breakage (v4.1.1 reader 404, #571 white page).

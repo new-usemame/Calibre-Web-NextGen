@@ -53,6 +53,12 @@ test('user generates settings, copies them, and confirms the first device check-
   await expect(pairing.getByText(syncUrl, { exact: true })).toBeVisible();
   await expect(pairing.getByText(`api_endpoint=${syncUrl}`, { exact: true })).toBeVisible();
   await expect(pairing.getByText(serverUrl, { exact: true })).toBeVisible();
+  // A copy button must not squeeze the settings into a few characters per
+  // line inside the desktop pairing columns. This also protects translations.
+  for (const address of [syncUrl, serverUrl]) {
+    const box = await pairing.getByText(address, { exact: true }).boundingBox();
+    expect(box?.width, `readable address width for ${address}`).toBeGreaterThanOrEqual(160);
+  }
   await expect(pairing).toContainText('.kobo/Kobo/Kobo eReader.conf');
   await expect(pairing).toContainText('the plugin adds /kosync itself');
   await expect(pairing.getByRole('link', { name: 'Install or update the NextGen Sync plugin.' }))
@@ -76,14 +82,38 @@ test('user generates settings, copies them, and confirms the first device check-
   await assertNoHorizontalOverflow(page);
 });
 
+test('account distinguishes loading sources from an empty account', async ({ page }) => {
+  let releaseDevices!: () => void;
+  const devicesReady = new Promise<void>((resolve) => { releaseDevices = resolve; });
+  await page.route('**/api/annotations/devices?*', async (route) => {
+    await devicesReady;
+    await route.fulfill({ json: { devices: [], limit: 100, offset: 0, total: 0 } });
+  });
+  try {
+    await page.goto('/app/account');
+    const sources = page.getByRole('region', { name: 'Devices and browsers' });
+    await expect(sources.getByRole('status')).toBeVisible();
+    await expect(sources.getByText('No devices or browser reading data yet.')).toHaveCount(0);
+    releaseDevices();
+    await expect(sources.getByText('No devices or browser reading data yet.')).toBeVisible();
+  } finally {
+    releaseDevices();
+  }
+});
+
 test('account links directly to the SPA pairing section', async ({ page }) => {
   await enableKoboFeature(page);
   await page.route('**/api/annotations/devices?*', (route) => route.fulfill({ json: {
     devices: [], limit: 100, offset: 0, total: 0,
   } }));
   await page.goto('/app/account');
-  await expect(page.getByRole('link', { name: 'Pair a Kobo or KOReader' }))
-    .toHaveAttribute('href', '/app/account/devices#kobo-pairing');
+  const pair = page.getByRole('link', { name: 'Pair a Kobo or KOReader' });
+  await expect(pair).toHaveAttribute('href', '/app/account/devices#kobo-pairing');
+  await pair.click();
+  const pairing = page.getByRole('region', { name: 'Pair a Kobo or KOReader' });
+  await expect(pairing.getByRole('heading', { name: 'Pair a Kobo or KOReader' })).toBeInViewport();
+  await expect(pairing.getByRole('heading', { name: 'Stock Kobo', exact: true })).toBeVisible();
+  await expect(pairing.getByRole('heading', { name: 'KOReader', exact: true })).toBeVisible();
 });
 
 test('KOReader setup remains discoverable without stock Kobo sync or a token', async ({ page }) => {

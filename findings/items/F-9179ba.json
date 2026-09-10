@@ -1,0 +1,19 @@
+{
+  "area": "kobo",
+  "body": "Independent release review: actual v4.1.43 data plus a retained position, real Full Sync/resend helper, then real sync handler emitted Changed instead of New. Historical classification reconstructed deliberately cleared delivery state from the position journal. Four reset/resend combinations with/without seed markers seen red then green. Fixed c2a740bd96 by maintaining a current classification boundary and classifying before per-book clear; reading positions retained.",
+  "created": "2026-09-08",
+  "id": "F-9179ba",
+  "refs": [
+    "#2025"
+  ],
+  "resolution": {
+    "commit": "c2a740bd96",
+    "date": "2026-09-08",
+    "note": "Four real tagged-database FullSync/resend cases seen red then green. Explicit recovery emits New while retaining positions; normal proven historical deliveries remain silent. Independent source/behavior verification recorded in docs/kobo-explicit-reset-upgrade-verification.md.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Explicit Kobo Full Sync and resend can be undone by historical position classification"
+}

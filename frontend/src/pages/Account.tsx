@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, Globe, KeyRound, Check, CheckCheck, Smartphone, Trash2, Copy, PenLine } from 'lucide-react';
+import { Mail, Globe, KeyRound, Check, CheckCheck, ChevronRight, Smartphone, Trash2, Copy, PenLine } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import {
@@ -8,6 +8,7 @@ import {
   useKoboTwoWayAnnotations, useUpdateKoboTwoWayAnnotations, useSetKoboTwoWayBook,
   useUpdateLibraryMode,
 } from '../lib/queries';
+import type { Device } from '../components/DeviceInventory';
 import { Avatar } from '../components/Avatar';
 import { Button } from '../components/Button';
 import { SpinnerCentered } from '../components/Spinner';
@@ -46,7 +47,7 @@ export function Account() {
   const changePassword = useChangePassword();
   const createAppPw = useCreateAppPassword();
   const revokeAppPw = useRevokeAppPassword();
-  const devices = useQuery<{ devices: { public_id: string; label: string; annotation_count: number }[] }>({
+  const devices = useQuery<{ devices: Device[] }>({
     queryKey: ['annotation-devices'], queryFn: () => apiGet('/api/annotations/devices?active=true'),
   });
   const updateLibraryMode = useUpdateLibraryMode();
@@ -231,15 +232,44 @@ export function Account() {
       <h1 className={styles.title}>{t('Account')}</h1>
 
       <section className={styles.card} aria-labelledby="account-ereaders-title">
-        <h2 id="account-ereaders-title" className={styles.cardTitle}><Smartphone size={16} aria-hidden="true" focusable={false} /> {t('E-readers')}</h2>
-        {devices.data?.devices.length ? (
-          <ul className={styles.deviceSummary}>
-            {devices.data.devices.map((device) => <li key={device.public_id}>{device.label} · {t('{n} highlights and notes', { n: device.annotation_count })}</li>)}
+        <h2 id="account-ereaders-title" className={styles.cardTitle}><Smartphone size={16} aria-hidden="true" focusable={false} /> {t('Devices and browsers')}</h2>
+        {devices.isLoading ? (
+          <p className={styles.muted} role="status">{t('Loading devices and browsers…')}</p>
+        ) : devices.isError ? (
+          <p className={styles.muted} role="alert">{t('Could not load devices and browsers.')}</p>
+        ) : devices.data?.devices.length ? (
+          <ul className={styles.sourceList} role="list">
+            {devices.data!.devices.map((device) => (
+              <li key={device.public_id} className={styles.sourceRow}>
+                {device.type === 'webreader'
+                  ? <Globe size={18} aria-hidden="true" focusable={false} className={styles.sourceIcon} />
+                  : <Smartphone size={18} aria-hidden="true" focusable={false} className={styles.sourceIcon} />}
+                <p className={styles.sourceLine}>
+                  <strong>{device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label}</strong>
+                  {' · '}
+                  {device.origin_annotation_count != null
+                    ? (device.origin_annotation_count === 1
+                      ? t('1 annotation from this source')
+                      : t('{n} annotations from this source', { n: device.origin_annotation_count }))
+                    : (device.annotation_count === 1
+                      ? t('1 annotation assigned to this source')
+                      : t('{n} annotations assigned to this source', { n: device.annotation_count }))}
+                </p>
+              </li>
+            ))}
           </ul>
-        ) : <p className={styles.muted}>{devices.isError ? t('Could not load e-readers.') : t('No e-readers yet.')}</p>}
-        <div className={styles.deviceLinks}>
-          <Link href="/account/devices" className={styles.manageDevices}>{t('Manage e-readers')}</Link>
-          <Link href="/account/devices#kobo-pairing" className={styles.manageDevices}>
+        ) : (
+          <>
+            <p className={styles.muted}>{t('No devices or browser reading data yet.')}</p>
+            <p className={styles.hint}>{t('Devices appear after their first sync. Browser appears after saving reading progress or annotations.')}</p>
+          </>
+        )}
+        <div className={styles.deviceActions}>
+          <Link href="/account/devices" className={styles.manageLink}>
+            {t('Manage devices and browsers')}
+            <ChevronRight size={16} aria-hidden="true" focusable={false} />
+          </Link>
+          <Link href="/account/devices#kobo-pairing" className={styles.pairLink}>
             {t('Pair a Kobo or KOReader')}
           </Link>
         </div>

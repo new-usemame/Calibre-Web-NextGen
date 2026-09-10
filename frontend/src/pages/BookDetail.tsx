@@ -313,6 +313,7 @@ export function BookDetail() {
   const me = useMe().data;
   const selectionMode = me?.library_mode === 'personal_library';
   const inLibrary = !!book && (!selectionMode || book.in_my_library !== false);
+  const canAccessBook = inLibrary || book?.accessible_via_public_shelf === true;
   const toggleRead = useToggleRead(id);
   const toggleFavorite = useToggleFavorite(id);
   const toggleArchived = useToggleArchived(id);
@@ -528,7 +529,7 @@ export function BookDetail() {
             {/* Passive "currently reading" marker (fork #634) — mirrors the classic
                 detail page. Sync-driven display only; the read toggle below stays a
                 2-state read/unread control. Shows the synced percent when known. */}
-            {inLibrary && book.in_progress && (
+            {canAccessBook && book.in_progress && (
               <div className={styles.readProgressWrap}>
                 <p className={styles.currentlyReading}>
                   <BookOpen size={14} aria-hidden="true" focusable={false} />
@@ -577,7 +578,7 @@ export function BookDetail() {
                 {addToLibrary.isPending ? t('Adding…') : t('Add to my library')}
               </button>
             )}
-            {inLibrary && primaryReadTarget ? (
+            {canAccessBook && primaryReadTarget ? (
               <Link href={primaryReadTarget} className={styles.actionPrimary}>
                 {t('Read now')}
               </Link>
@@ -628,7 +629,7 @@ export function BookDetail() {
               {book.archived ? t('Archived') : t('Archive')}
             </button>}
 
-            {inLibrary && canDownloadBooks(me) && book.formats.map((fmt) => (
+            {canAccessBook && canDownloadBooks(me) && book.formats.map((fmt) => (
               <a
                 key={fmt.format}
                 href={resourceUrl(fmt.download_url)}
@@ -711,7 +712,7 @@ export function BookDetail() {
             {/* Highlights/annotations — view + export + import (Kobo). Opens the
                 server annotations page; in-reader highlight creation is the
                 flagship reader phase-2 (tracked separately). */}
-            {inLibrary && <Link href={`/book/${book.id}/annotations`} className={styles.downloadBtn}
+            {canAccessBook && <Link href={`/book/${book.id}/annotations`} className={styles.downloadBtn}
               aria-label={(book.annotation_count ?? 0) > 0
                 ? t('Highlights, {count} saved annotations', { count: book.annotation_count ?? 0 })
                 : undefined}>
@@ -860,13 +861,13 @@ export function BookDetail() {
                 <dd className={styles.metaValue}>{book.original_filename}</dd>
               </>
             )}
-            {inLibrary && book.kosync_progress != null && (
+            {canAccessBook && book.kosync_progress != null && (
               <>
                 <dt className={styles.metaLabel}>{t('KOReader Progress')}</dt>
                 <dd className={styles.metaValue}>{book.kosync_progress.toFixed(1)}%</dd>
               </>
             )}
-            {inLibrary && book.kosync_progress_created_at !== null && (
+            {canAccessBook && book.kosync_progress_created_at !== null && (
               <>
                 <dt className={styles.metaLabel} title={t('When reading progress was first synced')}>
                   {t('Started reading')}
@@ -874,7 +875,7 @@ export function BookDetail() {
                 <dd className={styles.metaValue}>{formatDate(book.kosync_progress_created_at, true)}</dd>
               </>
             )}
-            {inLibrary && book.kosync_progress_timestamp !== null && (
+            {canAccessBook && book.kosync_progress_timestamp !== null && (
               <>
                 <dt className={styles.metaLabel}>{t('Last synced')}</dt>
                 <dd className={styles.metaValue}>{formatDate(book.kosync_progress_timestamp, true)}</dd>

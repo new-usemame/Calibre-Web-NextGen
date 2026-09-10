@@ -42,11 +42,8 @@ test('reader CTA and content route use viewer independently of download', () => 
   assert.equal(canDownloadBooks(probes[1].me), false);
   assert.equal(getReaderContentUrl(197, 'EPUB'), '/show/197/epub');
 
-  const detail = source('../src/pages/BookDetail.tsx');
-  const card = source('../src/components/BookCard.tsx');
-  assert.match(detail, /getPrimaryReadTarget\([\s\S]*?canReadBooks\(me\),\s*\)/);
-  assert.match(detail, /inLibrary && primaryReadTarget \? \(/);
-  assert.match(card, /getPrimaryReadTarget\(book\.id, book\.formats, canRead\)/);
+  // Rendered shared-resource controls and denied roles are covered by the
+  // real browser flow in shared-book-continuation.spec.ts.
 });
 
 test('all destructive book CTAs require delete-books and edit together', () => {

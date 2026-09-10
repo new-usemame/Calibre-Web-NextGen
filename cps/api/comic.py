@@ -32,7 +32,7 @@ def _natural_key(s):
 
 def _comic_file(book_id):
     """(filesystem path, format) of a book's comic archive, or (None, None)."""
-    book = calibre_db.get_filtered_book(book_id)
+    book = calibre_db.get_filtered_book(book_id, allow_public_shelf_books=True)
     if not book:
         return None, None
     for d in (getattr(book, "data", None) or []):

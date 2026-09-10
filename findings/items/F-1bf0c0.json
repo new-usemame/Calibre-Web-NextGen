@@ -1,0 +1,19 @@
+{
+  "area": "my-library",
+  "body": "P1 release concern, P2 recovery defect. cps/user_library.py:347-407 commits per-account mode/role changes before persisting snapshot_json at396. Simulated stop after real set_library_mode commit, close/reopen file-backed SQLite session: account personal=True,browse_global=True, intro not_enabled,snapshot=None. Retry then Undo leaves bothTrue although both were originallyFalse. Two independent probes confirm durable state, not only in-memory rollback. Persist immutable original snapshot before first account commit and resume partial work idempotently. Main1ec1bfe677 audit2026-09-08.",
+  "created": "2026-09-08",
+  "id": "F-1bf0c0",
+  "refs": [
+    "#2093"
+  ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-08",
+    "note": "Fixed by durable pre-write restore point, atomic per-account mode/completion receipt and cross-process enable/undo exclusion. File-backed restart test seen red on 1c4f7c52ab, green after fix. tests/unit/test_my_library_enable_recovery.py.",
+    "release": ""
+  },
+  "severity": "data-integrity",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Interrupted My Library bulk enable loses the original Undo snapshot"
+}

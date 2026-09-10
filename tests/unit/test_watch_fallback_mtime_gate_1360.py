@@ -238,3 +238,41 @@ def test_cwa_1360_anchor_present():
         "scripts/watch_fallback.py must reference CWA #1360 near the gate "
         "logic so future code archaeology can find the rationale."
     )
+
+
+@pytest.mark.parametrize('change', ['nested_arrival', 'replace_existing'])
+def test_main_reconciles_files_when_directory_metadata_is_cached(tmp_path, monkeypatch, watch_fallback, change):
+    """Docker Desktop can expose fresh readdir but stale directory stat.
+    Drive the shipped loop with that metadata cache and a bounded clock;
+    new files and replacements must arrive without refiring static files.
+    """
+    from types import SimpleNamespace
+
+    existing = tmp_path / 'existing.epub'
+    existing.write_bytes(b'old book')
+    os.utime(existing, (0, 0))
+    target = existing if change == 'replace_existing' else tmp_path / 'user' / 'batch' / 'new.epub'
+    now = [100.0]
+    emitted = []
+    changed = [False]
+
+    def sleep(seconds):
+        now[0] += seconds
+        if not changed[0]:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(b'a newly completed book')
+            os.utime(target, (0, 0))
+            changed[0] = True
+        if now[0] >= 175:
+            raise KeyboardInterrupt
+
+    monkeypatch.setattr(watch_fallback, 'time', SimpleNamespace(
+        time=lambda: now[0], monotonic=lambda: now[0], sleep=sleep))
+    monkeypatch.setattr(watch_fallback, '_dir_mtime_signature', lambda *_: (123, 64))
+    monkeypatch.setattr(watch_fallback, 'print_event',
+        lambda event, path: emitted.append((now[0], event, path)))
+
+    assert watch_fallback.main(['--path', str(tmp_path), '--interval', '5']) == 0
+    assert [(event, path) for _, event, path in emitted] == [
+        ('CLOSE_WRITE', str(existing)), ('CLOSE_WRITE', str(target))]
+    assert emitted[1][0] <= 140, 'cached directory metadata starved a completed file'

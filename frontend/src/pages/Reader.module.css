@@ -493,6 +493,12 @@
   font-size: 10px; font-weight: 700; line-height: 16px; text-align: center;
 }
 .annItem { margin-bottom: var(--sp-1); }
+.annEdit {
+  min-width: 44px; min-height: 44px; padding: var(--sp-2) var(--sp-3);
+  margin-inline-start: var(--sp-2); border-radius: var(--r-sm);
+  color: var(--text); background: var(--surface-2); cursor: pointer;
+}
+.annEdit:hover { background: var(--surface-3); }
 .annJump {
   display: flex; gap: var(--sp-2); width: 100%; text-align: left;
   padding: var(--sp-2); border-radius: var(--r-sm); cursor: pointer;

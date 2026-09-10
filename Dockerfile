@@ -111,6 +111,8 @@ RUN --mount=type=cache,target=/root/.npm npm ci
 
 # Then build. vite.config.ts outDir is ../cps/static/app => /build/cps/static/app.
 COPY frontend/ ./
+# The classic and SPA readers share the sandbox-safe selection bridge.
+COPY cps/static/js/reading/selection-observer.* /build/cps/static/js/reading/
 RUN npm run build
 
 # ==========================================================================

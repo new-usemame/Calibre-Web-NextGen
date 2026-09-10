@@ -480,15 +480,43 @@ def _seed_existing_device_entitlement_ledgers(user_id):
 
 
 def _migrate_device_entitlement_classification(user_id):
-    """Reclassify every pre-ack device row as unconfirmed exactly once.
+    """Stamp the one-time v0 audit, keeping a device-scoped ledger intact.
 
-    Historical per-device entitlement rows record a committed server emission,
-    not device receipt. No timestamp reconstruction can restore that missing
-    fact, so those rows are removed and conservatively reannounced as New.
+    A pre-#2025 install already carries per-device rows written by the shipped
+    v4.1.43 seed and by its own emitted deliveries.  Deleting them costs
+    the entire library: the cursor-independent recovery arm below reselects
+    every book, and against an empty ledger every one of them classifies as
+    ``NewEntitlement``, which Nickel treats as "not downloaded" (#1925).  That
+    is a whole-library re-download with reading position lost, once, on every
+    existing Kobo -- far larger than the ambiguity the delete was clearing.
+
+    The v4.1.43 seed copied the user-wide history onto every known Kobo,
+    but it stamped ``seeded_at`` only AFTER staging those guessed rows.
+    A row updated strictly after that marker came from this device's own
+    emitted page (or a later acknowledged page), not that shared seed. Keep
+    such rows even in a multi-reader household, including retired devices.
+    Book timestamps and token watermarks cannot establish this provenance.
+    Equal timestamps are ambiguous and are never treated as post-seed proof.
+    A non-null change_basis is independent modern acknowledgment provenance:
+    the v4.1.43 schema did not have it and migration adds it as NULL.
+
+    A single Kobo also retains its shipped book seed for compatibility. Seeded
+    deletion hashes are different: the old seed copied outstanding tombstones
+    without sending them. Clear those guesses for every household size so a
+    pending hard deletion cannot be suppressed forever.
+
+    Deliberately accepted, and unchanged from v4.1.43: a legacy
+    ``ChangedEntitlement`` that an empty Kobo dropped (#1735) still wrote a
+    flat marker, so a kept row can name a book the device never stored.  That
+    gap already ships in v4.1.43, is not created here, and stays recoverable
+    through Full Sync and per-book resend.  Deleting every row instead turns a
+    bounded, recoverable gap into a certain, unrecoverable one for everybody.
+
     A device-authored reading-position observation is the narrow durable proof
-    that the physical Kobo possessed that book; those books retain only a
-    non-matching classification sentinel so they fail open as Changed rather
-    than being byte-suppressed from reconstructed present-day metadata.
+    that the physical Kobo possessed a book.  Proven books that have no ledger
+    row keep a non-matching classification sentinel so they fail open as
+    Changed rather than being announced New to a device that demonstrably
+    holds them.
     """
     device_ids = kobo_sync_status.get_kobo_device_ids_requiring_classification(
         user_id, ENTITLEMENT_CLASSIFICATION_VERSION,
@@ -498,19 +526,39 @@ def _migrate_device_entitlement_classification(user_id):
 
     started = monotonic()
     try:
+        ledger_is_device_scoped = (
+            kobo_sync_status.count_user_kobo_devices(user_id) == 1
+        )
         removed = 0
+        preserved = 0
         device_proven = 0
         for device_id in device_ids:
-            removed += ub.session.query(
-                ub.KoboDeviceBookEntitlement,
-            ).filter(
-                ub.KoboDeviceBookEntitlement.device_id == int(device_id),
-            ).delete(synchronize_session=False)
+            seed = ub.session.get(ub.KoboDeviceEntitlementSeed, int(device_id))
+            if not ledger_is_device_scoped:
+                removed += ub.session.query(
+                    ub.KoboDeviceBookEntitlement,
+                ).filter(
+                    ub.KoboDeviceBookEntitlement.device_id == int(device_id),
+                    ub.KoboDeviceBookEntitlement.updated_at <= seed.seeded_at,
+                    ub.KoboDeviceBookEntitlement.change_basis.is_(None),
+                ).delete(synchronize_session=False)
+            # The shipped seed copied even *undelivered* hard-delete events.
+            # Post-seed emissions or modern acknowledgments are valid guards.
             removed += ub.session.query(
                 ub.KoboDeviceDeletedEntitlement,
             ).filter(
                 ub.KoboDeviceDeletedEntitlement.device_id == int(device_id),
+                ub.KoboDeviceDeletedEntitlement.updated_at <= seed.seeded_at,
+                ub.KoboDeviceDeletedEntitlement.change_basis.is_(None),
             ).delete(synchronize_session=False)
+            ledger_book_ids = {
+                row.book_id for row in ub.session.query(
+                    ub.KoboDeviceBookEntitlement.book_id,
+                ).filter(
+                    ub.KoboDeviceBookEntitlement.device_id == int(device_id),
+                ).all()
+            }
+            preserved += len(ledger_book_ids)
             proven_book_ids = {
                 row.book_id for row in ub.session.query(
                     ub.DeviceReadingPosition.book_id,
@@ -518,7 +566,7 @@ def _migrate_device_entitlement_classification(user_id):
                     ub.DeviceReadingPosition.device_id == int(device_id),
                     ub.DeviceReadingPosition.client_modified_at.isnot(None),
                 ).all()
-            }
+            } - ledger_book_ids
             if proven_book_ids:
                 kobo_sync_status.stage_device_entitlement_fingerprints(
                     device_id,
@@ -543,11 +591,12 @@ def _migrate_device_entitlement_classification(user_id):
 
     log.debug(
         "Kobo Sync classification migration: user=%s devices=%d "
-        "device_proven=%d rearmed=%d elapsed_ms=%.1f",
+        "device_proven=%d rearmed=%d preserved=%d elapsed_ms=%.1f",
         user_id,
         len(device_ids),
         device_proven,
         removed,
+        preserved,
         round((monotonic() - started) * 1000, 1),
     )
     return True
@@ -1597,8 +1646,8 @@ def HandleSyncRequest():
             response_mode="ledger_seed_failed",
             capture_session=capture_session,
         )
-    # Pre-ack rows prove only a committed server emission. Clear them once
-    # before they can hide an uncertain book from the recovery arm below.
+    # Audit legacy seed guesses once, retaining device-specific emissions and
+    # acknowledgments before the missing-ledger recovery query runs.
     if (requesting_device_id
             and not _migrate_device_entitlement_classification(current_user.id)):
         return _abort_sync_with_observability(

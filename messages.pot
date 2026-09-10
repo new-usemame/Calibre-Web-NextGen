@@ -13919,3 +13919,138 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+#, python-brace-format
+msgid ""
+"My Library setup is incomplete for {accounts} account(s). You can retry or "
+"undo."
+msgstr ""
+
+msgid ""
+"Retry finishes the remaining accounts without changing completed selections."
+" Undo restores the settings from before setup began."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Browser reading sources"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Browsers appear after saving reading progress or annotations. Different "
+"browsers or profiles can appear separately."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Unidentified browser source"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} annotations from this source"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} annotations assigned to this source"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Inventory not reported"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This device has not reported its inventory yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Reading data is kept. Future browser saves can appear under an "
+"unidentified browser source."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} annotations were made on this source. They are not deleted. Their "
+"origin history is kept."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} annotations assigned to this source will become Unknown device."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "All annotations"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Location unavailable"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Warning: the saved highlight could not be located in the current book. "
+"Its text is preserved."
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Browser"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Devices and browsers"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load devices and browsers."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No devices or browser reading data yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Devices appear after their first sync. Browser appears after saving reading progress or annotations."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Browser reading source"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "All browsers and computers signed in to your account share one Browser reading source."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reading data is kept. Browser reappears when you next save reading progress or annotations."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Manage devices and browsers"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Loading devices and browsers…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "1 annotation from this source"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "1 annotation assigned to this source"
+msgstr ""
+
+msgid "Could not rename this source. Try again."
+msgstr ""
+
+msgid "Could not load removal details. Try again."
+msgstr ""
+
+msgid "Could not remove this source. Try again."
+msgstr ""
+
+msgid "Could not restore this source. Try again."
+msgstr ""

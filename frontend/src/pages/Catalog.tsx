@@ -16,6 +16,7 @@ import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
 import { apiPost, apiGet, ApiError, type Book, type AdvancedSearchParams } from '../lib/api';
 import { formatAuthors } from '../lib/authors';
 import { saveCatalog, loadCatalog } from '../lib/scrollCache';
+import { useLibraryRevision } from '../lib/libraryRevision';
 import { useNamedPreference } from '../lib/useNamedPreference';
 import { usePersistentChoice } from '../lib/usePersistentChoice';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
@@ -211,6 +212,9 @@ function useLibraryRefresh() {
 }
 
 export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogProps) {
+  const me = useMe().data;
+  const revision = useLibraryRevision();
+  const libraryScope = `${me?.id ?? 'guest'}:${me?.library_mode ?? 'monolibrary'}:${revision}`;
   const t = useT();
   const announce = useAnnouncer();
   const libraryRefresh = useLibraryRefresh();
@@ -243,7 +247,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
   // Scroll/state restoration (#578): identity of THIS catalog instance (library
   // vs a specific entity vs a discovery view) — stable across a book → Back trip.
-  const restoreKey = `catalog:${entityKind ?? ''}:${entityId ?? ''}:${view ?? ''}`;
+  const restoreKey = `catalog:${libraryScope}:${entityKind ?? ''}:${entityId ?? ''}:${view ?? ''}`;
   // Only restore a snapshot when it's consistent with the current URL query. A
   // fresh top-bar search navigates to /?q=… on the SAME library route; a stale
   // snapshot must not be rehydrated there or it would ignore the new search
@@ -295,7 +299,6 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
   // Quick-edit pencil on cards (fork #572) — only for users who can edit, and
   // never while multi-selecting (the whole card toggles selection then).
-  const me = useMe().data;
   const canEdit = !!me?.role?.edit;
   const canRenameTag = entityKind === 'tag' && canEdit;
   // #1288: the role is only half the gate — classic also requires the admin's
@@ -469,7 +472,20 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // saving a different one) changes which books belong here, so the accumulator
   // must reset rather than append the new set onto the old (#928).
   const resetKey = [search, sort, readFilter, entityKind ?? '', entityId ?? '', view ?? '', perPage, showHidden,
-    filterActive ? JSON.stringify(defaultFilter) : ''].join('|');
+    filterActive ? JSON.stringify(defaultFilter) : '', libraryScope].join('|');
+
+  const previousLibraryScope = useRef(libraryScope);
+  const changedLibrary = previousLibraryScope.current !== libraryScope;
+  // Use page 1 in this render, before the effect updates pagination. Otherwise
+  // changing selection on a loaded page can issue the new query at the old offset.
+  const requestPage = changedLibrary ? 1 : page;
+  useEffect(() => {
+    if (!changedLibrary) return;
+    previousLibraryScope.current = libraryScope;
+    setPage(1);
+    setAllBooks([]);
+    accKeyRef.current = '';
+  }, [changedLibrary, libraryScope]);
 
   // Any filter change resets paging to the first page — except on the first
   // restored mount, where the rehydrated page must survive (#578).
@@ -548,7 +564,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
   // Both hooks are always called (hook order is fixed); exactly one is enabled.
   const booksQuery = useBooks({
-    page,
+    page: requestPage,
     perPage,
     search,
     sort,
@@ -564,7 +580,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const advParams: AdvancedSearchParams | null = filterActive && gridReady
     ? { ...defaultFilter, sort, ...(readFilter !== 'all' ? { read_status: readFilter } : {}) }
     : null;
-  const advQuery = useAdvancedSearch(advParams, page, perPage);
+  const advQuery = useAdvancedSearch(advParams, requestPage, perPage);
   const { data, isLoading, isFetching, isPlaceholderData, error } =
     filterActive ? advQuery : booksQuery;
 

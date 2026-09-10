@@ -33,6 +33,7 @@ from .cover_version import COVER_VERSION_ARG, cover_version_token
 from sqlalchemy.sql.expression import true, false, and_, or_, text, func
 from sqlalchemy.exc import InvalidRequestError, OperationalError
 from werkzeug.datastructures import Headers
+from werkzeug.http import parse_options_header
 from werkzeug.security import generate_password_hash
 from markupsafe import escape
 from urllib.parse import quote
@@ -1875,6 +1876,7 @@ def get_book_cover(book_id, resolution=None):
         allow_show_archived=True,
         allow_show_hidden=True,
         allow_show_global=allow_show_global,
+        allow_public_shelf_books=True,
     )
     return get_book_cover_internal(book, resolution=resolution)
 
@@ -2829,23 +2831,10 @@ def do_download_file(book, book_format, client, data, headers, cover_user_id=Non
                 download_name = book_name
                 metadata_was_embedded = False
 
-            # Rename the exported file to match the expected download name (from Content-Disposition)
-            # This ensures KOReader calculates the checksum on the same file we calculated it on
-            if filename and download_name:
-                uuid_file = os.path.join(filename, download_name + "." + book_format)
-                expected_file = os.path.join(filename, book_name + "." + book_format)
-
-                if os.path.exists(uuid_file) and uuid_file != expected_file:
-                    try:
-                        # Remove the target file if it already exists
-                        if os.path.exists(expected_file):
-                            os.remove(expected_file)
-                        # Rename UUID file to expected name
-                        os.rename(uuid_file, expected_file)
-                        download_name = book_name
-                        log.info(f'Renamed exported file to match expected name: {book_name}.{book_format}')
-                    except Exception as e:
-                        log.error(f'Failed to rename exported file: {e}')
+            # Keep Calibre's unique staging name. Renaming every export to
+            # the shared library basename lets concurrent downloads overwrite
+            # and unlink one another. Checksum registration receives the client
+            # filename separately below.
         else:
             download_name = book_name
 
@@ -2896,7 +2885,10 @@ def do_download_file(book, book_format, client, data, headers, cover_user_id=Non
                     calculate_and_store_checksum(
                         book_id=book.id,
                         book_format=book_format,
-                        file_path=exported_file
+                        file_path=exported_file,
+                        filename_for_matching=parse_options_header(
+                            headers.get("Content-Disposition", "")
+                        )[1].get("filename", book_name + "." + book_format),
                     )
         except Exception as e:
             checksum_source = "embedded" if metadata_was_embedded else "original"
@@ -3057,13 +3049,16 @@ def check_valid_domain(domain_text):
     return not len(ub.session.query(ub.Registration).from_statement(text(sql)).params(domain=domain_text).all())
 
 
-def get_download_link(book_id, book_format, client):
+def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=False):
     book_format = book_format.split(".")[0]
     # Try filtered view first to respect user restrictions.
     # allow_show_hidden=True: a user's own hidden book is still downloadable
     # through Send-to-eReader and OPDS — hidden hides from listings, not from
     # the user's own access (#319 pushback).
-    book = calibre_db.get_filtered_book(book_id, allow_show_archived=True, allow_show_hidden=True)
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_hidden=True,
+        allow_public_shelf_books=allow_public_shelf_books,
+    )
 
     # If not found but user is admin, fall back to unfiltered direct lookup
     if not book and getattr(current_user, 'role_admin', lambda: False)():

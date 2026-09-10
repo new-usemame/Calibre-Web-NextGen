@@ -1546,7 +1546,7 @@ class CalibreDB:
 
     def get_filtered_book(self, book_id, allow_show_archived=False,
                           allow_show_hidden=False, allow_show_global=False,
-                          user=None):
+                          user=None, allow_public_shelf_books=False):
         self.ensure_session()
         # Eagerly load all relationships to prevent detached instance errors during editing
         # allow_show_hidden=True: covers/read/edit/download flows for a user's
@@ -1569,6 +1569,7 @@ class CalibreDB:
                     allow_show_hidden=allow_show_hidden,
                     allow_show_global=allow_show_global,
                     user=user,
+                    allow_public_shelf_books=allow_public_shelf_books,
                 ))
                 .first())
 
@@ -1704,6 +1705,7 @@ class CalibreDB:
         allow_show_archived=False,
         allow_show_hidden=False,
         allow_show_global=False,
+        allow_public_shelf_books=False,
     ):
         self.ensure_session()
         if not read_column:
@@ -1729,6 +1731,7 @@ class CalibreDB:
                     allow_show_archived,
                     allow_show_hidden=allow_show_hidden,
                     allow_show_global=allow_show_global,
+                    allow_public_shelf_books=allow_public_shelf_books,
                 )).first())
 
     def get_book_by_uuid(self, book_uuid):

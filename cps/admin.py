@@ -689,7 +689,8 @@ def cover_generator_choices():
     from .services import cover_generator
     return {
         "presets": cover_generator.catalogue()["presets"],
-        "availability": cover_generator.renderer_availability(config.config_binariesdir or ""),
+        "availability": cover_generator.renderer_availability(
+            getattr(config, "config_binariesdir", "") or ""),
     }
 
 

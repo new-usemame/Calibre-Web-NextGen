@@ -203,7 +203,8 @@ def designer_state() -> dict:
     with neither Calibre nor Pillow, and the panel stays hidden rather than
     offering a button that can only fail.
     """
-    availability = cover_generator.renderer_availability(config.config_binariesdir or "")
+    availability = cover_generator.renderer_availability(
+        getattr(config, "config_binariesdir", "") or "")
     catalogue = cover_generator.catalogue()
     catalogue["default_preset"] = (
         getattr(config, "config_cover_generator_default_preset", None)
@@ -337,7 +338,7 @@ def cover_picker_apply(book_id):
             spec = _spec_from_body(body, cover_generator.APPLY_WIDTH, cover_generator.APPLY_HEIGHT)
             rendered = cover_preview._run_in_pool(
                 cover_generator.render, _book_cover_meta(book), spec,
-                config.config_binariesdir or "",
+                getattr(config, "config_binariesdir", "") or "",
             )
         except cover_generator.CoverGenerationError as error:
             return _json_error(*_designer_error(error))
@@ -367,7 +368,7 @@ def cover_picker_design_preview(book_id):
         spec = _spec_from_body(body, cover_generator.PREVIEW_WIDTH, cover_generator.PREVIEW_HEIGHT)
         data_url, renderer = cover_preview._run_in_pool(
             cover_generator.render_data_url, _book_cover_meta(book), spec,
-            config.config_binariesdir or "",
+            getattr(config, "config_binariesdir", "") or "",
         )
     except cover_generator.CoverGenerationError as error:
         return _json_error(*_designer_error(error))

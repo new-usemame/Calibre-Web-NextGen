@@ -389,6 +389,15 @@ function DesignerPanel({ id, catalogue, locked, personal, onApplied, onError }: 
                 : <div className={styles.currentFallback}>
                     {rendering ? <span className={styles.spin}><Loader2 size={22} /></span> : <Palette size={26} />}
                   </div>}
+              {/* Re-render feedback where the eye already is: the outgoing cover
+                  dims (via aria-busy in the CSS, so the two never drift) and a
+                  spinner rides over it. First render keeps the fallback above.
+                  Decorative — the role=status caption carries the announcement. */}
+              {rendering && preview && (
+                <div className={styles.designerBusy} aria-hidden="true">
+                  <span className={styles.spin}><Loader2 size={18} /></span>
+                </div>
+              )}
             </div>
             <p className={styles.panelNote} role="status">
               {rendering ? t('Drawing the cover…')

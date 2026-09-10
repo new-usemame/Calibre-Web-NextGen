@@ -59,8 +59,8 @@ test.describe('cover designer', () => {
 
     await page.goto(`/app/book/${id}/cover`);
 
-    const panel = page.getByRole('group', { name: /Design a cover/i });
-    const summary = page.getByText('Design a cover', { exact: true });
+    const panel = page.locator('details').filter({ hasText: 'Design a cover' });
+    const summary = panel.locator('summary');
     await expect(summary).toBeVisible();
 
     // Rendering costs a server subprocess: nothing is requested until the
@@ -75,17 +75,24 @@ test.describe('cover designer', () => {
 
     // Changing the arrangement re-renders, and the picture on screen changes to
     // the one the server returned for the NEW design.
+    await panel.getByLabel('Arrangement').scrollIntoViewIfNeeded();
     await panel.getByLabel('Arrangement').selectOption('banner');
     const latest = () => previewBodies[previewBodies.length - 1];
     await expect.poll(() => latest()?.layout).toBe('banner');
     await expect(preview).not.toHaveAttribute('src', firstSrc!);
     await expect(preview).toHaveAttribute('src', dataUrlFor(latest().scheme, 'banner'));
 
-    // Picking a preset moves all three controls together.
-    await panel.getByRole('radio', { name: 'Ember' }).check();
+    // Picking a preset moves all three controls together. The chip is the
+    // target, not the visually-collapsed radio behind it (SC 2.5.8).
+    const ember = panel.getByText('Ember', { exact: true });
+    await ember.scrollIntoViewIfNeeded();
+    await ember.click();
+    await expect(panel.getByRole('radio', { name: 'Ember' })).toBeChecked();
     await expect.poll(() => latest()?.scheme).toBe('ember');
 
-    await panel.getByRole('button', { name: 'Use this cover' }).click();
+    const useIt = panel.getByRole('button', { name: 'Use this cover' });
+    await useIt.scrollIntoViewIfNeeded();
+    await useIt.click();
     await expect.poll(() => applyBodies.length).toBe(1);
 
     // The apply body carries design ids and nothing that could be pixels.
@@ -117,9 +124,8 @@ test.describe('cover designer', () => {
     }));
 
     await page.goto(`/app/book/${id}/cover`);
-    await page.getByText('Design a cover', { exact: true }).click();
-
-    const panel = page.getByRole('group', { name: /Design a cover/i });
+    const panel = page.locator('details').filter({ hasText: 'Design a cover' });
+    await panel.locator('summary').click();
     await expect(panel.getByRole('alert')
       .filter({ hasText: 'Could not design a cover for this book.' })).toBeVisible();
     // A failed render must not leave an apply button armed over nothing.

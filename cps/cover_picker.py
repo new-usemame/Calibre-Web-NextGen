@@ -88,13 +88,14 @@ def _load_book(book_id: int):
 
 
 def _book_query_for_search(book) -> str:
-    """Build the metadata-search query the picker fires off behind the
-    scenes. Title + first author hits the right edition for most books;
-    if an ISBN is present in the book identifiers we use that for
-    higher-precision results."""
-    isbn_ids = [i.val for i in (book.identifiers or []) if (i.type or "").lower() in ("isbn", "isbn_10", "isbn_13")]
-    if isbn_ids:
-        return isbn_ids[0]
+    """Build the metadata-search query the picker fires off behind the scenes.
+
+    Title + first author, never a bare ISBN. Most sources are text catalogues
+    or scrapers that cannot resolve an ISBN they do not stock: measured on the
+    household instance (2026-09-10, same book, 15 sources) the stored ISBN made
+    3 sources answer with 17 candidates, the title and author made 6 answer
+    with 61. The ISBNs and ASINs still reach the lookups built for them
+    (``book_isbns`` / ``book_asins`` feed the Amazon CDN probe)."""
     title = book.title or ""
     authors = [a.name for a in (book.authors or [])]
     return (title + " " + (authors[0] if authors else "")).strip()

@@ -19,7 +19,8 @@ from sqlalchemy.exc import InvalidRequestError, OperationalError
 from sqlalchemy.orm.attributes import flag_modified
 
 from cps.services import parallel
-from cps.services.Metadata import Metadata
+from cps.services.Metadata import Metadata, ProviderRefused
+from cps.services.cover_picker import format_provider_summary
 from cps.services.cover_booster import boost_covers
 from . import config, constants, logger, ub, web_server
 from .usermanagement import user_login_required
@@ -384,6 +385,9 @@ def _classify_provider_failure(exc: Exception, provider=None) -> tuple:
     a "go set an API key" hint sends the user after one that does not exist.
     PROVIDER_KEY_REGISTRY is the single source of truth for which take one.
     """
+    if isinstance(exc, ProviderRefused):
+        # The provider already knows what happened and what to do about it.
+        return (exc.status, str(exc))
     text = str(exc) or exc.__class__.__name__
     lowered = text.lower()
     pid = getattr(provider, "__id__", None)
@@ -527,6 +531,7 @@ def metadata_search():
             "message": message,
             "duration_ms": elapsed_ms,
         })
+    log.info("metadata search query=%r: %s", query, format_provider_summary(provider_status, len(results)))
     # Order provider rows by the configured hierarchy (fork #405) so the modal
     # presents providers in the order the user set — the same order the ingest
     # auto-fetch obeys — with alphabetical fallback for providers not listed.

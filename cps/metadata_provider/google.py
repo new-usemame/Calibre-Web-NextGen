@@ -15,7 +15,7 @@ import requests
 
 from cps import config, logger
 from cps.isoLanguages import get_lang3, get_language_name
-from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata
+from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata, ProviderRefused
 
 log = logger.create()
 
@@ -51,12 +51,14 @@ class Google(Metadata):
                 results.raise_for_status()
             except requests.HTTPError as e:
                 if getattr(e.response, "status_code", None) == 429:
-                    log.warning(
-                        "Google Books quota exceeded (HTTP 429). "
-                        "Set config_google_books_api_key to lift the limit."
+                    remedy = (
+                        "Google Books quota exceeded (HTTP 429). Without a key this install "
+                        "shares the anonymous per-IP quota; set a Google Books API key in "
+                        "Configuration to lift the limit."
                     )
-                else:
-                    log.warning(e)
+                    log.warning(remedy)
+                    raise ProviderRefused("rate_limited", remedy)
+                log.warning(e)
                 return []
             except Exception as e:
                 log.warning(e)

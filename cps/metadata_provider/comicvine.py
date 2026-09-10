@@ -12,7 +12,7 @@ from urllib.parse import quote
 
 import requests
 from cps import config, logger
-from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata
+from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata, ProviderRefused
 
 log = logger.create()
 
@@ -69,7 +69,7 @@ class ComicVine(Metadata):
         return config.resolved_comicvine_api_key() or ComicVine.SHARED_API_KEY
 
     @staticmethod
-    def _log_refusal(detail: str, api_key: str) -> None:
+    def _log_refusal(detail: str, api_key: str, key_rejected: bool = False) -> None:
         """Explain a refused search, and name the remedy that fits the install.
 
         ComicVine refuses on two different channels — an HTTP 401/420 for a
@@ -78,17 +78,23 @@ class ComicVine(Metadata):
         message per situation.
         """
         if api_key == ComicVine.SHARED_API_KEY:
-            log.warning(
+            message = (
                 "ComicVine search refused (%s). This install is using the "
                 "shared ComicVine key, which every install sends and which "
                 "can hit the rate limit. Add your own free key in the "
-                "metadata-search Keys panel to get a separate quota.", detail
+                "metadata-search Keys panel to get a separate quota." % detail
             )
+            status = "rate_limited"
         else:
-            log.warning(
+            message = (
                 "ComicVine search refused (%s). Check the ComicVine API key "
-                "configured for this install.", detail
+                "configured for this install." % detail
             )
+            status = "missing_key" if key_rejected else "rate_limited"
+        log.warning(message)
+        # Raised, not swallowed: the search surfaces classify it, so the user
+        # sees "rate-limited" / "key rejected" instead of "No results".
+        raise ProviderRefused(status, message)
 
     def search(
         self, query: str, generic_cover: str = "", locale: str = "en"
@@ -117,8 +123,9 @@ class ComicVine(Metadata):
                 # in-body status_code the API documents. 420 "Enhance Your
                 # Calm" and 429 are the throttling variants. Anything else is
                 # an ordinary transport failure and stays a bare warning.
-                if getattr(e.response, "status_code", None) in (401, 403, 420, 429):
-                    self._log_refusal(_scrub(e, api_key), api_key)
+                code = getattr(e.response, "status_code", None)
+                if code in (401, 403, 420, 429):
+                    self._log_refusal(_scrub(e, api_key), api_key, key_rejected=code in (401, 403))
                 else:
                     log.warning(_scrub(e, api_key))
                 return []
@@ -135,6 +142,7 @@ class ComicVine(Metadata):
                 self._log_refusal(
                     _scrub(payload.get("error") or f"status_code {status_code}", api_key),
                     api_key,
+                    key_rejected=status_code == 100,
                 )
                 return []
             for result in payload.get("results", []):

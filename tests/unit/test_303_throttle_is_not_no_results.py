@@ -60,7 +60,10 @@ def _classifier():
             and any(getattr(t, "id", None) == "PROVIDER_KEY_REGISTRY" for t in node.targets))
     ]
     assert len(wanted) == 2, "expected PROVIDER_KEY_REGISTRY and _classify_provider_failure"
-    ns: dict = {}
+    # The classifier's first check is for a provider's own refusal; the class is
+    # importable here even though the module that uses it is not.
+    from cps.services.Metadata import ProviderRefused
+    ns: dict = {"ProviderRefused": ProviderRefused}
     exec(compile(ast.Module(body=wanted, type_ignores=[]), SEARCH_META, "exec"), ns)
     return ns["_classify_provider_failure"], ns["PROVIDER_KEY_REGISTRY"]
 

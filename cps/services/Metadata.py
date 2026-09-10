@@ -43,6 +43,23 @@ class MetaRecord:
     match_reason: Optional[str] = ""
 
 
+class ProviderRefused(Exception):
+    """The source refused to answer: a rejected key, an exhausted quota or an
+    outright block, as opposed to "no such book".
+
+    ``status`` is one of the provider-status values the UI already renders
+    (``missing_key`` / ``rate_limited`` / ``blocked`` / ``error``); the message
+    is the remedy shown to the user. A provider raises this instead of logging
+    and returning ``[]`` so the search surfaces can tell a misconfigured source
+    from an empty one (household instance, 2026-09-10: four sources refused
+    every search and all four showed "No results for this query").
+    """
+
+    def __init__(self, status: str, message: str):
+        super().__init__(message)
+        self.status = status
+
+
 class Metadata:
     __name__ = "Generic"
     __id__ = "generic"

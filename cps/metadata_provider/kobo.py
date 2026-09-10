@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import os
 import time
 from http.cookies import SimpleCookie
+from urllib.parse import quote_plus
 
 try:
     from curl_cffi import requests as creq  # type: ignore
@@ -152,8 +153,7 @@ class Kobo(Metadata):
 
         # Build primary and fallback search URLs
         primary_url = self._build_search_url(query=query, lang=locale or "en")
-        simple_q = "+".join(list(self.get_title_tokens(query, strip_joiners=False)) or [query])
-        fallback_url = f"https://www.kobo.com/search?query={simple_q}&fcmedia=Book"
+        fallback_url = self._build_fallback_url(query)
 
         r = None
         for url in (primary_url, fallback_url):
@@ -220,9 +220,17 @@ class Kobo(Metadata):
         lang = str(lang or "en").lower()
         country = "jp" if lang == "ja" else "us"
         path_lang = "ja" if lang == "ja" else "en"
+        return f"https://www.kobo.com/{country}/{path_lang}/search?query={self._query_param(query)}&fcmedia=Book"
+
+    def _build_fallback_url(self, query: str) -> str:
+        return f"https://www.kobo.com/search?query={self._query_param(query)}&fcmedia=Book"
+
+    def _query_param(self, query: str) -> str:
+        # Percent-encoded per token: a raw "Brontë" in the URL made Kobo answer
+        # HTTP 400 on both the primary and the fallback URL (household log,
+        # 2026-09-10), so every non-ASCII title or author drew a blank.
         tokens = list(self.get_title_tokens(query, strip_joiners=False)) or [query]
-        q = "+".join(tokens)
-        return f"https://www.kobo.com/{country}/{path_lang}/search?query={q}&fcmedia=Book"
+        return "+".join(quote_plus(t) for t in tokens)
 
     def _headers_for_locale(self, locale: str) -> Dict[str, str]:
         h = dict(self.headers)

@@ -43,6 +43,8 @@ from pathlib import Path
 
 import pytest
 
+from cps.services.Metadata import ProviderRefused
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 SHARED_KEY = "57558043c53943d5d1e96a9ad425b0eb85532ee6"
@@ -508,7 +510,8 @@ class TestErrorState:
         )
         seen = self._warnings(monkeypatch)
 
-        assert _provider().search("Batman") == []
+        with pytest.raises(ProviderRefused):
+            _provider().search("Batman")
         assert len(seen) == 1
         assert "Rate Limit Exceeded" in seen[0]
         assert "Keys panel" in seen[0], (
@@ -525,7 +528,8 @@ class TestErrorState:
         )
         seen = self._warnings(monkeypatch)
 
-        assert _provider().search("Batman") == []
+        with pytest.raises(ProviderRefused):
+            _provider().search("Batman")
         assert len(seen) == 1
         assert "Invalid API Key" in seen[0]
         assert "Keys panel" not in seen[0], (
@@ -600,7 +604,8 @@ class TestHttpRefusalChannel:
         self._http_error(monkeypatch, status)
         seen = self._warnings(monkeypatch)
 
-        assert _provider().search("Batman") == []
+        with pytest.raises(ProviderRefused):
+            _provider().search("Batman")
         assert len(seen) == 1
         assert "Keys panel" in seen[0], (
             f"HTTP {status} is how ComicVine actually refuses; without this "
@@ -612,7 +617,8 @@ class TestHttpRefusalChannel:
         self._http_error(monkeypatch, 401)
         seen = self._warnings(monkeypatch)
 
-        assert _provider().search("Batman") == []
+        with pytest.raises(ProviderRefused):
+            _provider().search("Batman")
         assert "Check the ComicVine API key" in seen[0]
         assert "Keys panel" not in seen[0]
 
@@ -649,7 +655,8 @@ class TestHttpRefusalChannel:
         monkeypatch.setattr(comicvine.requests, "get", fake_get)
         seen = self._warnings(monkeypatch)
 
-        assert _provider().search("Batman") == []
+        with pytest.raises(ProviderRefused):
+            _provider().search("Batman")
         assert len(seen) == 1
         assert secret not in seen[0], "the install's API key leaked into the log"
         assert "api_key=***" in seen[0]
@@ -669,7 +676,8 @@ class TestHttpRefusalChannel:
         )
         seen = self._warnings(monkeypatch)
 
-        assert _provider().search("Batman") == []
+        with pytest.raises(ProviderRefused):
+            _provider().search("Batman")
         assert secret not in seen[0], "the key leaked via the upstream error text"
         assert "***" in seen[0]
 

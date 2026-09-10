@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Link } from 'wouter';
 import {
   ChevronLeft, Lock, Unlock, Upload as UploadIcon, Link2, RefreshCw, Check, X,
-  Image as ImageIcon, AlertTriangle, KeyRound, Smartphone, Loader2, Sparkles,
+  Image as ImageIcon, AlertTriangle, KeyRound, Smartphone, Loader2, Sparkles, Search as SearchIcon,
 } from 'lucide-react';
 import { useBook } from '../lib/queries';
 import {
@@ -30,7 +30,13 @@ export function CoverPicker({ id }: { id: string }) {
   const personal = new URLSearchParams(window.location.search).get('personal') === '1';
   const { data: book } = useBook(id);
   const { data: state } = useCoverState(id, personal);
-  const candidatesQ = useCandidates(id, personal);
+  // The sources are searched with the book's title and author by default;
+  // the toolbar lets the user re-run them with their own words (a different
+  // title, the original-language title, an ISBN they trust) without leaving
+  // the picker. `query` is what was submitted, `draft` what is being typed.
+  const [query, setQuery] = useState('');
+  const [draft, setDraft] = useState('');
+  const candidatesQ = useCandidates(id, personal, query);
 
   const [locked, setLocked] = useState(false);
   const [coverBust, setCoverBust] = useState<string | null>(null);
@@ -138,6 +144,15 @@ export function CoverPicker({ id }: { id: string }) {
 
           <div className={styles.gridToolbar}>
             <h2 className={styles.gridTitle}>{t('Choose a cover')}</h2>
+            <form className={styles.queryForm} role="search" onSubmit={(e) => { e.preventDefault(); setQuery(draft.trim()); }}>
+              <input type="search" className={`${styles.input} ${styles.queryInput}`} value={draft}
+                     onChange={(e) => setDraft(e.target.value)}
+                     placeholder={candidatesQ.data?.query || t('Search sources with different words')}
+                     aria-label={t('Search sources with different words')} />
+              <Button type="submit" variant="ghost" size="sm" disabled={candidatesQ.isFetching}>
+                <SearchIcon size={14} /> {t('Search')}
+              </Button>
+            </form>
             <ProviderSummary providers={candidatesQ.data?.providers} loading={candidatesQ.isFetching} />
             <Button variant="ghost" size="sm" onClick={() => candidatesQ.refetch()} disabled={candidatesQ.isFetching}>
               <span className={candidatesQ.isFetching ? styles.spin : ''}><RefreshCw size={14} /></span> {t('Refresh')}

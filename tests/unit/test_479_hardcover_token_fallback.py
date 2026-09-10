@@ -93,9 +93,10 @@ def test_search_aborts_only_when_every_token_rejected(monkeypatch):
 
     provider = hc.Hardcover()
     provider.active = True
-    result = provider.search("dune")
-
-    assert result == []
+    from cps.services.Metadata import ProviderRefused
+    with pytest.raises(ProviderRefused) as refused:
+        provider.search("dune")
+    assert refused.value.status == "missing_key"
     # both distinct tokens were attempted before giving up
     assert sum(1 for c in calls if "BAD1" in c) == 1
     assert sum(1 for c in calls if "BAD2" in c) == 1

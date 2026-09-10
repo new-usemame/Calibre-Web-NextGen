@@ -15299,3 +15299,6 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+msgid "Search sources with different words"
+msgstr "Bronnen doorzoeken met andere woorden"

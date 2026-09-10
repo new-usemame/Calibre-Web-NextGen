@@ -147,7 +147,9 @@
 .field select:focus-visible, .field input:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
 /* ---- grid toolbar ---- */
-.gridToolbar { display: flex; align-items: center; gap: var(--sp-3); margin: var(--sp-4) 0 var(--sp-3); }
+.gridToolbar { display: flex; align-items: center; flex-wrap: wrap; gap: var(--sp-3); margin: var(--sp-4) 0 var(--sp-3); }
+.queryForm { display: flex; align-items: center; gap: var(--sp-2); flex: 1 1 260px; min-width: 0; }
+.queryInput { flex: 1 1 auto; width: auto; min-width: 0; }
 .gridTitle { font-family: var(--font-display); font-size: var(--fs-lg); font-weight: var(--fw-semi); color: var(--text); margin: 0; }
 .provSummary { color: var(--text-faint); font-size: var(--fs-xs); margin-right: auto; }
 .gridLoading { display: flex; align-items: center; gap: var(--sp-2); color: var(--text-muted); font-size: var(--fs-sm); padding: var(--sp-8) 0; justify-content: center; }

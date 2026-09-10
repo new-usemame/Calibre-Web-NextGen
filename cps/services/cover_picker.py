@@ -238,7 +238,42 @@ def gather_cover_candidates(
         existing_urls.add(cover_url)
 
     statuses.sort(key=lambda s: s.name.lower())
+    log.info("cover-picker search query=%r: %s", query, format_provider_summary(statuses, len(candidates)))
     return candidates, statuses
+
+
+_SUMMARY_ORDER = ("ok", "empty", "missing_key", "rate_limited", "blocked", "error", "disabled")
+
+
+def _status_field(status, name):
+    return getattr(status, name) if hasattr(status, name) else status[name]
+
+
+def format_provider_summary(statuses, candidate_count: int) -> str:
+    """One line per search naming every source and its outcome.
+
+    A source that answers nothing logs nothing of its own, so before this the
+    server log could not say which of the enabled sources answered a given
+    search, and "1 of 15 sources answered" could only be diagnosed by
+    reproducing the search (household instance, 2026-09-10). Accepts the
+    service's ``ProviderStatus`` rows and the metadata modal's dicts.
+    """
+    by_status = {}
+    for row in statuses:
+        by_status.setdefault(_status_field(row, "status"), []).append(row)
+    answered = len(by_status.get("ok", []))
+    parts = ["%d of %d sources answered, %d candidate%s" % (
+        answered, len(statuses), candidate_count, "" if candidate_count == 1 else "s")]
+    for status in _SUMMARY_ORDER + tuple(sorted(set(by_status) - set(_SUMMARY_ORDER))):
+        rows = by_status.get(status)
+        if not rows:
+            continue
+        if status == "ok":
+            parts.append("ok: " + ", ".join(
+                "%s=%d" % (_status_field(r, "id"), _status_field(r, "count")) for r in rows))
+        else:
+            parts.append("%s: %s" % (status, ", ".join(_status_field(r, "id") for r in rows)))
+    return "; ".join(parts)
 
 
 def _image_origin_label(origin_id: Optional[str], source_id: str) -> Optional[str]:

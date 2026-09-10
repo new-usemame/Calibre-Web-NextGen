@@ -194,10 +194,12 @@ export function useCoverState(id: string, personal = false) {
   return useQuery({ queryKey: ['cover-state', id, personal], queryFn: () => coverApi.state(id, personal) });
 }
 
-export function useCandidates(id: string, personal = false) {
+/** `query` empty = the server's default (title + author); anything else is the
+ *  user's own words, sent verbatim to every source. */
+export function useCandidates(id: string, personal = false, query = '') {
   return useQuery({
-    queryKey: ['cover-candidates', id, personal],
-    queryFn: () => coverApi.candidates(id, undefined, personal),
+    queryKey: ['cover-candidates', id, personal, query],
+    queryFn: () => coverApi.candidates(id, query || undefined, personal),
     staleTime: 60_000, // provider fan-out is slow; don't refetch on remount
     refetchOnWindowFocus: false,
   });

@@ -38,6 +38,7 @@ except ImportError:
 try:  # pragma: no cover - normal app path
     from cps import logger, config, constants  # type: ignore
     from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata  # type: ignore
+    from cps.services.Metadata import ProviderRefused  # type: ignore
     from cps.isoLanguages import get_language_name  # type: ignore
     from ..cw_login import current_user  # type: ignore
 except Exception:  # pragma: no cover - CLI/testing path
@@ -66,6 +67,11 @@ except Exception:  # pragma: no cover - CLI/testing path
         USER_AGENT = "Calibre-Web-NextGen/HardcoverTest"
 
     constants = _FallbackConstants()  # type: ignore
+
+    class ProviderRefused(Exception):  # type: ignore
+        def __init__(self, status, message):
+            super().__init__(message)
+            self.status = status
 
     # Minimal stand-ins for CLI runs
     @dataclass
@@ -199,12 +205,13 @@ class Hardcover(Metadata):
                     if idx + 1 < len(candidate_tokens):
                         log.info("Hardcover token #%d rejected (401); trying the next configured token.", idx + 1)
                         continue
-                    log.warning(
+                    remedy = (
                         "Hardcover rejected every configured token (HTTP 401 'Unable to verify token'). "
                         "Generate a fresh one at https://hardcover.app/account/api and paste it into "
                         "Admin > Basic Configuration > Hardcover API Key (or the per-user field)."
                     )
-                    return []
+                    log.warning(remedy)
+                    raise ProviderRefused("missing_key", remedy)
                 log.warning(f"HTTP request failed: {e}")
                 return []
             except requests.exceptions.RequestException as e:

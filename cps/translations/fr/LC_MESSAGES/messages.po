@@ -15804,3 +15804,6 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+msgid "Search sources with different words"
+msgstr "Rechercher dans les sources avec d’autres mots"

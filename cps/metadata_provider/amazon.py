@@ -16,7 +16,7 @@ try:
 except ImportError:
     pass
 
-from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata
+from cps.services.Metadata import MetaRecord, MetaSourceInfo, Metadata, ProviderRefused
 import cps.logger as logger
 
 #from time import time
@@ -209,7 +209,12 @@ class Amazon(Metadata):
                 results.raise_for_status()
             except requests.exceptions.HTTPError as e:
                 log.error_or_exception(e)
-                return []
+                code = getattr(getattr(e, "response", None), "status_code", None)
+                status = {429: "rate_limited", 403: "blocked", 503: "blocked"}.get(code, "error")
+                raise ProviderRefused(status, (
+                    "%s refused the search (HTTP %s). It throttles automated lookups "
+                    "from time to time; try again later." % ("Amazon", code)
+                ))
             except Exception as e:
                 log.warning(e)
                 return []

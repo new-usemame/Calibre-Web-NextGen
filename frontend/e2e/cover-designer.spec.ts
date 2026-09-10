@@ -73,13 +73,14 @@ test.describe('cover designer', () => {
     const firstSrc = await preview.getAttribute('src');
     expect(firstSrc).toBe(dataUrlFor(previewBodies[0].scheme, previewBodies[0].layout));
 
+    // The panel opens on the library's default design, so exactly one chip is lit.
+    await expect(panel.getByRole('radio', { checked: true })).toHaveCount(1);
+
     // Changing the arrangement re-renders, and the picture on screen changes to
     // the one the server returned for the NEW design.
     await panel.getByLabel('Arrangement').scrollIntoViewIfNeeded();
     await panel.getByLabel('Arrangement').selectOption('banner');
     const latest = () => previewBodies[previewBodies.length - 1];
-    // The panel opens on the library's default design, so exactly one chip is lit.
-    await expect(panel.getByRole('radio', { checked: true })).toHaveCount(1);
     await expect.poll(() => latest()?.layout).toBe('banner');
     await expect(preview).not.toHaveAttribute('src', firstSrc!);
     await expect(preview).toHaveAttribute('src', dataUrlFor(latest().scheme, 'banner'));

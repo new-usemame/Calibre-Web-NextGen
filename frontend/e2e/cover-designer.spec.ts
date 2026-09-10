@@ -78,9 +78,16 @@ test.describe('cover designer', () => {
     await panel.getByLabel('Arrangement').scrollIntoViewIfNeeded();
     await panel.getByLabel('Arrangement').selectOption('banner');
     const latest = () => previewBodies[previewBodies.length - 1];
+    // The panel opens on the library's default design, so exactly one chip is lit.
+    await expect(panel.getByRole('radio', { checked: true })).toHaveCount(1);
     await expect.poll(() => latest()?.layout).toBe('banner');
     await expect(preview).not.toHaveAttribute('src', firstSrc!);
     await expect(preview).toHaveAttribute('src', dataUrlFor(latest().scheme, 'banner'));
+
+    // Diverging from a preset must un-light its chip: the preset names a
+    // combination, and after this change the combination is nobody's preset.
+    // A chip that stayed lit would be the control lying about what is rendered.
+    await expect(panel.getByRole('radio', { checked: true })).toHaveCount(0);
 
     // Picking a preset moves all three controls together. The chip is the
     // target, not the visually-collapsed radio behind it (SC 2.5.8).
@@ -90,7 +97,7 @@ test.describe('cover designer', () => {
     await expect(panel.getByRole('radio', { name: 'Ember' })).toBeChecked();
     await expect.poll(() => latest()?.scheme).toBe('ember');
 
-    const useIt = panel.getByRole('button', { name: 'Use this cover' });
+    const useIt = panel.getByRole('button', { name: 'Use this design' });
     await useIt.scrollIntoViewIfNeeded();
     await useIt.click();
     await expect.poll(() => applyBodies.length).toBe(1);
@@ -129,6 +136,6 @@ test.describe('cover designer', () => {
     await expect(panel.getByRole('alert')
       .filter({ hasText: 'Could not design a cover for this book.' })).toBeVisible();
     // A failed render must not leave an apply button armed over nothing.
-    await expect(panel.getByRole('button', { name: 'Use this cover' })).toBeDisabled();
+    await expect(panel.getByRole('button', { name: 'Use this design' })).toBeDisabled();
   });
 });

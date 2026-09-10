@@ -411,3 +411,49 @@ def test_the_designer_panel_is_hidden_when_nothing_can_render(monkeypatch):
     with patch.object(cover_picker, "config", MagicMock(config_binariesdir="",
                                                         config_cover_generator_default_preset="classic")):
         assert cover_picker.designer_state()["available"] is False
+
+
+def test_a_render_failure_never_hands_the_reader_the_server_s_stderr():
+    """The personal-cover route must not echo calibre-debug's output.
+
+    ``CoverGenerationError.message`` quotes up to 400 characters of the helper's
+    stderr, which carries absolute server paths and Calibre internals. Both apply
+    routes go through the same mapping, so the reader gets one of three
+    sentences and the detail stays in the log.
+    """
+    from cps import cover_picker
+    from cps.api import actions
+
+    leaky = cg.CoverGenerationError(
+        "render_failed",
+        "calibre: RuntimeError: /srv/calibre-library/Some Author/Book (7)/cover.jpg "
+        "qt.qpa.plugin: could not load /usr/lib/x86_64-linux-gnu/qt6/plugins/platforms",
+    )
+
+    book = MagicMock()
+    book.id = 42
+    book.title = META.title
+    book.authors = []
+    book.series = []
+    book.series_index = None
+
+    app = flask.Flask(__name__)
+    with app.test_request_context(json={"kind": "generated", "preset": "classic"}, method="PUT"):
+        with patch.object(cover_picker, "_", side_effect=lambda text, **kw: text), \
+             patch.object(actions, "_require_real_user", return_value=None), \
+             patch.object(actions, "_personal_cover_book", return_value=book), \
+             patch.object(actions.user_library, "mark_response_user_specific"), \
+             patch.object(actions.user_cover, "row_for_user", return_value=None), \
+             patch.object(actions.user_cover, "next_updated_at", return_value=1), \
+             patch.object(cg, "render", side_effect=leaky), \
+             patch.object(actions, "current_user", MagicMock(id=3)):
+            view = actions.set_my_book_cover
+            while hasattr(view, "__wrapped__"):
+                view = view.__wrapped__
+            response, status = view(42)
+
+    body = json.dumps(response.get_json())
+    assert status == 502
+    assert "Could not design a cover for this book." in body
+    for secret in ("/srv/calibre-library", "/usr/lib/x86_64-linux-gnu", "qt.qpa.plugin", "RuntimeError"):
+        assert secret not in body, f"the response leaked {secret!r}: {body}"

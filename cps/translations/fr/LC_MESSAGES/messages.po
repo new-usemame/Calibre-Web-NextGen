@@ -15002,6 +15002,15 @@ msgstr "Ce modèle de couverture n’est pas proposé."
 msgid "This server can't design covers — no renderer is installed."
 msgstr "Ce serveur ne peut pas créer de couvertures — aucun moteur de rendu n’est installé."
 
+msgid "Presets"
+msgstr "Préréglages"
+
+msgid "Use this design"
+msgstr "Utiliser ce modèle"
+
+msgid "Make one from the book's title and author"
+msgstr "En créer une à partir du titre et de l’auteur du livre"
+
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"

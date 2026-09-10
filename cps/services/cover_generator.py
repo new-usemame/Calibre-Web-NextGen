@@ -132,10 +132,14 @@ PRESETS: dict[str, dict] = {
 
 DEFAULT_PRESET = "classic"
 
-# Applied covers render at Calibre's own default size; previews render smaller so
-# the round trip stays interactive. Both stay inside the clamp below.
-APPLY_WIDTH, APPLY_HEIGHT = 1200, 1600
-PREVIEW_WIDTH, PREVIEW_HEIGHT = 600, 800
+# 2:3, because that is what every cover frame in the app is: the picker's current
+# cover card, the candidate grid and the compare modal all use aspect-ratio 2/3
+# with object-fit: contain. Calibre's own default is 3:4, and rendering at it made
+# a freshly applied cover letterbox with dark bars the moment it landed in the
+# card the user checks it in. Previews render at half the applied size so the
+# round trip stays interactive; both stay inside the clamp below.
+APPLY_WIDTH, APPLY_HEIGHT = 1200, 1800
+PREVIEW_WIDTH, PREVIEW_HEIGHT = 600, 900
 MIN_DIMENSION, MAX_DIMENSION = 200, 2400
 
 # A generated cover is a few hundred KB of flat colour and text. Anything past
@@ -306,6 +310,38 @@ def renderer_availability(binaries_dir: str = "") -> dict:
         "available": bool(calibre_ok or pil_ok),
         "renderer": "calibre" if calibre_ok else ("pil" if pil_ok else None),
     }
+
+
+_COMPLEX_SCRIPT_WARNED = [False]
+
+
+def _warn_once_if_no_complex_shaping(text: str) -> None:
+    """Say so when Pillow cannot shape the script this title is written in.
+
+    Arabic, Hebrew, Devanagari and the Indic scripts need HarfBuzz (Pillow's
+    optional ``raqm`` layout engine) to join and reorder their glyphs; without it
+    Pillow draws them unjoined and left-to-right, which is unreadable rather than
+    merely plain. Calibre's renderer shapes them correctly, so this only bites a
+    Calibre-less installation — and it is a log line, not a refusal: a wrong-
+    looking cover the admin has been told about beats no cover with no reason.
+    """
+    if _COMPLEX_SCRIPT_WARNED[0] or not text:
+        return
+    if not any("\u0590" <= character <= "\u1cff" or "\ufb00" <= character <= "\ufdff"
+               for character in text):
+        return
+    try:
+        from PIL import features
+        if features.check("raqm"):
+            return
+    except ImportError:  # pragma: no cover - defensive
+        return
+    _COMPLEX_SCRIPT_WARNED[0] = True
+    log.warning(
+        "cover_generator: this Pillow build has no raqm/HarfBuzz support, so generated "
+        "covers for titles in Arabic, Hebrew or an Indic script will render unshaped. "
+        "Install Calibre (its renderer shapes them correctly) or a Pillow built with raqm."
+    )
 
 
 def _pil_available() -> bool:
@@ -532,6 +568,8 @@ def _render_with_pil(meta: BookCoverMeta, spec: CoverSpec) -> bytes:
     subtitle_font = _load_font(family["pil"], max(12, int(width * 0.05)))
     footer_font = _load_font(family["pil_bold"] + family["pil"], max(12, int(width * 0.055)))
 
+    _warn_once_if_no_complex_shaping(meta.title)
+
     image = Image.new("RGB", (width, height), background)
     draw = ImageDraw.Draw(image)
     margin = int(width * 0.08)
@@ -546,7 +584,7 @@ def _render_with_pil(meta: BookCoverMeta, spec: CoverSpec) -> bytes:
     authors = ", ".join([a for a in (meta.authors or ()) if a][:2])
 
     if spec.layout == "blocks":
-        band_top = int(height * 0.68)
+        band_top = int(height * 0.72)
         draw.rectangle([0, band_top, width, height], fill=accent)
         title_lines = _wrap(draw, meta.title, title_font, text_width, 4)
         y = _draw_centered(draw, title_lines, title_font, on_background,

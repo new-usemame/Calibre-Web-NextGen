@@ -142,7 +142,7 @@ def set_my_book_cover(book_id):
         elif kind == "generated":
             # Design ids only; the bytes are rendered here from the book's own
             # metadata, never taken from the client.
-            from ..cover_picker import _book_cover_meta, _spec_from_body
+            from ..cover_picker import _book_cover_meta, _designer_error, _spec_from_body
             from ..services import cover_generator, cover_preview
             try:
                 spec = _spec_from_body(
@@ -151,8 +151,11 @@ def set_my_book_cover(book_id):
                     cover_generator.render, _book_cover_meta(book), spec,
                     getattr(config, "config_binariesdir", "") or "")
             except cover_generator.CoverGenerationError as error:
-                status = 503 if error.code == "unavailable" else 400
-                return _err("cover_design_failed", str(error.message), status)
+                # The renderer's own message quotes up to 400 characters of
+                # calibre-debug stderr, which carries server paths. It belongs in
+                # the log (_designer_error writes it there), never in a response.
+                code, message, status = _designer_error(error)
+                return _err(code, str(message), status)
             staged, message = user_cover.stage_bytes(
                 current_user.id, book_id, updated_at, rendered.data)
         else:

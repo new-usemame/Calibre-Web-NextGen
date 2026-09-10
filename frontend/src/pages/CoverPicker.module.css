@@ -254,10 +254,18 @@
 .designerLayout {
   display: grid; grid-template-columns: 190px 1fr; gap: var(--sp-4); align-items: start;
 }
-@media (max-width: 700px) { .designerLayout { grid-template-columns: 1fr; } }
+@media (max-width: 700px) {
+  .designerLayout { grid-template-columns: 1fr; }
+  /* Stacked, a 2:3 frame at full phone width is 560px of scroll before the
+     first control. Cap it and centre it. */
+  .designerPreview { max-width: 260px; margin: 0 auto; }
+}
 .designerPreview { display: flex; flex-direction: column; gap: var(--sp-2); }
 .designerFrame {
-  aspect-ratio: 3 / 4; border-radius: var(--r-md); overflow: hidden;
+  /* 2:3, matching .currentFrame / .cardImgWrap / .compareFrame. A preview in a
+     different ratio from the frame the applied cover lands in is a promise the
+     apply cannot keep — the cover letterboxed the moment it was applied. */
+  aspect-ratio: 2 / 3; border-radius: var(--r-md); overflow: hidden;
   background: var(--surface-3); box-shadow: var(--cover-shadow);
   display: grid; place-items: center; color: var(--text-faint);
 }
@@ -270,9 +278,15 @@
   padding: var(--sp-2) var(--sp-3); border-radius: var(--r-full);
   background: var(--surface-3); border: 1px solid var(--border-strong);
   color: var(--text); font-size: var(--fs-sm); cursor: pointer;
-  /* SC 2.5.8: the chip itself is the target, never the 16px radio dot. */
+  /* SC 2.5.8: the chip itself is the target, never the collapsed radio dot. */
   min-height: 32px;
   transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+/* Two-tone dot from the preset's own colour scheme, so the five presets are
+   scannable without reading the labels. Decorative: the label carries the name. */
+.presetSwatch {
+  width: 12px; height: 12px; border-radius: 50%; flex: 0 0 auto;
+  border: 1px solid var(--border-strong);
 }
 .presetChip:hover { background: var(--surface-2); }
 .presetChipOn { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-hover); }
@@ -284,4 +298,30 @@
 }
 .presetChip:focus-within, .presetChipOn:focus-within {
   outline: 2px solid var(--accent-ring); outline-offset: 2px;
+}
+
+/* Desktop: the third select owns the full row instead of leaving a dead gap
+   beside it, and the CTA is a button rather than a 540px banner. Scoped to the
+   designer so the "Add your own" panel keeps its full-width button. */
+@media (min-width: 701px) {
+  .designerControls .ereaderGrid .field:last-child { grid-column: 1 / -1; }
+  .designerControls .fullBtn { width: auto; align-self: flex-start; min-width: 240px; }
+}
+
+/* Phone: chips get the 44px-ish target the platform expects and share the row
+   width, so five presets balance 3+2 instead of orphaning one onto its own row. */
+@media (max-width: 600px) {
+  .presetChip, .presetChipOn {
+    min-height: 40px; padding: var(--sp-2) var(--sp-4);
+    flex: 1 1 auto; justify-content: center;
+  }
+}
+
+/* Every panel summary is a single flex row, so the hint's `margin-left: auto`
+   takes half the width and wraps the panel's own title mid-phrase on a phone
+   ("Design a / cover", "E-reader / preview", "API / keys"). One rule heals all
+   three: the hint drops to its own line instead of competing for the row. */
+@media (max-width: 600px) {
+  .panelSummary { flex-wrap: wrap; }
+  .panelHint { flex-basis: 100%; margin-left: 0; }
 }

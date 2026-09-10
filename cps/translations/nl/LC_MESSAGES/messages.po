@@ -14657,6 +14657,15 @@ msgstr "Dat omslagontwerp bieden we niet aan."
 msgid "This server can't design covers — no renderer is installed."
 msgstr "Deze server kan geen omslagen ontwerpen — er is geen renderer geïnstalleerd."
 
+msgid "Presets"
+msgstr "Voorinstellingen"
+
+msgid "Use this design"
+msgstr "Dit ontwerp gebruiken"
+
+msgid "Make one from the book's title and author"
+msgstr "Maak er een van de titel en auteur van het boek"
+
 #: cps/templates/user_table.html
 #, fuzzy
 msgid "Show Read/Unread Section"

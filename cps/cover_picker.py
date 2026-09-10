@@ -388,12 +388,18 @@ def _spec_from_body(body: dict, width: int, height: int):
 
 
 def _designer_error(error):
-    """Map a renderer failure onto (code, user-facing message, HTTP status)."""
+    """Map a renderer failure onto (code, user-facing message, HTTP status).
+
+    The renderer's own message quotes the helper's stderr, which carries server
+    paths and Calibre internals. It is logged here and never returned: every
+    caller — this blueprint and the personal-cover route in cps/api/actions.py —
+    sends the user one of these three sentences instead.
+    """
+    log.warning("cover designer render failed: %s: %s", error.code, error.message)
     if error.code in ("unknown_scheme", "unknown_font", "unknown_layout"):
         return error.code, _(u"That cover design is not one we offer."), 400
     if error.code == "unavailable":
         return error.code, _(u"This server can't design covers — no renderer is installed."), 503
-    log.warning("cover designer render failed: %s: %s", error.code, error.message)
     return error.code, _(u"Could not design a cover for this book."), 502
 
 

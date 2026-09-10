@@ -314,7 +314,6 @@ function DesignerPanel({ id, catalogue, locked, personal, onApplied, onError }: 
   const t = useT();
   const [open, setOpen] = useState(false);
   const first = catalogue.presets.find((p) => p.id === catalogue.default_preset) ?? catalogue.presets[0];
-  const [preset, setPreset] = useState(first?.id ?? '');
   const [scheme, setScheme] = useState(first?.scheme ?? '');
   const [font, setFont] = useState(first?.font ?? '');
   const [layout, setLayout] = useState(first?.layout ?? '');
@@ -324,11 +323,23 @@ function DesignerPanel({ id, catalogue, locked, personal, onApplied, onError }: 
   const [applying, setApplying] = useState(false);
   const seq = useRef(0); // a slow render must not overwrite a newer one
 
+  // A preset is a name for a combination, not a mode you are in. Deriving it
+  // from the three values means the chip tells the truth in both directions:
+  // diverging from Classic un-lights Classic, and rebuilding Ember's exact
+  // triple by hand lights Ember. No lit chip means "custom", which is honest.
+  const activePreset = catalogue.presets.find(
+    (p) => p.scheme === scheme && p.font === font && p.layout === layout,
+  )?.id ?? '';
+
   const choosePreset = (next: string) => {
     const entry = catalogue.presets.find((p) => p.id === next);
     if (!entry) return;
-    setPreset(next);
     setScheme(entry.scheme); setFont(entry.font); setLayout(entry.layout);
+  };
+
+  const swatchFor = (schemeId: string) => {
+    const found = catalogue.schemes.find((o) => o.id === schemeId)?.swatch ?? [];
+    return `linear-gradient(135deg, ${found[0] ?? 'transparent'} 50%, ${found[1] ?? 'transparent'} 50%)`;
   };
 
   // Rendering costs a subprocess on the server, so nothing is rendered until the
@@ -366,7 +377,7 @@ function DesignerPanel({ id, catalogue, locked, personal, onApplied, onError }: 
     <details className={styles.panel} onToggle={(e) => setOpen((e.currentTarget as HTMLDetailsElement).open)}>
       <summary className={styles.panelSummary}>
         <Palette size={15} aria-hidden="true" focusable={false} /> {t('Design a cover')}
-        <span className={styles.panelHint}>{t('Make one from the title and author when no cover exists')}</span>
+        <span className={styles.panelHint}>{t("Make one from the book's title and author")}</span>
       </summary>
       <div className={styles.panelBody}>
         <div className={styles.designerLayout}>
@@ -388,12 +399,14 @@ function DesignerPanel({ id, catalogue, locked, personal, onApplied, onError }: 
 
           <div className={styles.designerControls}>
             <fieldset className={styles.presetSet}>
-              <legend className={styles.cardLabel}>{t('Design')}</legend>
+              <legend className={styles.cardLabel}>{t('Presets')}</legend>
               <div className={styles.presetChips}>
                 {catalogue.presets.map((p) => (
-                  <label key={p.id} className={preset === p.id ? styles.presetChipOn : styles.presetChip}>
-                    <input type="radio" name="cp-design-preset" value={p.id} checked={preset === p.id}
+                  <label key={p.id} className={activePreset === p.id ? styles.presetChipOn : styles.presetChip}>
+                    <input type="radio" name="cp-design-preset" value={p.id} checked={activePreset === p.id}
                            className={styles.presetRadio} onChange={() => choosePreset(p.id)} />
+                    <span className={styles.presetSwatch} aria-hidden="true"
+                          style={{ background: swatchFor(p.scheme) }} />
                     <span>{t(p.label)}</span>
                   </label>
                 ))}
@@ -421,8 +434,10 @@ function DesignerPanel({ id, catalogue, locked, personal, onApplied, onError }: 
               </label>
             </div>
 
+            {/* Its own verb and icon: "Use this cover" already appears twice on
+                this page, and a leading check mark reads as "already applied". */}
             <Button onClick={apply} disabled={locked || applying || !preview || rendering} className={styles.fullBtn}>
-              {applying ? <span className={styles.spin}><Loader2 size={14} /></span> : <Check size={14} />} {t('Use this cover')}
+              {applying ? <span className={styles.spin}><Loader2 size={14} /></span> : <Sparkles size={14} />} {t('Use this design')}
             </Button>
             {locked && <p className={styles.lockedHint}>{t('Unlock the cover above to apply a new one.')}</p>}
           </div>

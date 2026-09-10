@@ -5,6 +5,7 @@
   named presets and a live preview. Covers are rendered on the server — by Calibre's own cover
   generator where Calibre is installed, and by a built-in renderer otherwise — so the preview and
   the cover that gets saved are the same picture. Personal covers offer the same designs.
-- Admin → Basic Configuration gains a default cover design, and an opt-in
-  "Design a cover for books that arrive without one" that gives newly imported coverless books a
-  real cover during ingest and enforcement. Books that already have a cover are never touched.
+- **Automatic covers for coverless imports.** Admin → Basic Configuration gains a default cover
+  design, and an opt-in "Design a cover for books that arrive without one" that gives newly imported
+  coverless books a real cover during ingest and enforcement. Books that already have a cover are
+  never touched.

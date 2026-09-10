@@ -249,3 +249,39 @@
   .spin, .overlay, .modal { animation: none; }
   .card:hover:not(:disabled) { transform: none; }
 }
+
+/* ---- "Design a cover" panel ---- */
+.designerLayout {
+  display: grid; grid-template-columns: 190px 1fr; gap: var(--sp-4); align-items: start;
+}
+@media (max-width: 700px) { .designerLayout { grid-template-columns: 1fr; } }
+.designerPreview { display: flex; flex-direction: column; gap: var(--sp-2); }
+.designerFrame {
+  aspect-ratio: 3 / 4; border-radius: var(--r-md); overflow: hidden;
+  background: var(--surface-3); box-shadow: var(--cover-shadow);
+  display: grid; place-items: center; color: var(--text-faint);
+}
+.designerImg { width: 100%; height: 100%; object-fit: contain; }
+.designerControls { display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; }
+.presetSet { border: 0; margin: 0; padding: 0; }
+.presetChips { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.presetChip, .presetChipOn {
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3); border-radius: var(--r-full);
+  background: var(--surface-3); border: 1px solid var(--border-strong);
+  color: var(--text); font-size: var(--fs-sm); cursor: pointer;
+  /* SC 2.5.8: the chip itself is the target, never the 16px radio dot. */
+  min-height: 32px;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.presetChip:hover { background: var(--surface-2); }
+.presetChipOn { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-hover); }
+/* The radio stays focusable and in the tab order; only its box is collapsed, so
+   arrow-key navigation of the group keeps working (it is a real radio group). */
+.presetRadio {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+.presetChip:focus-within, .presetChipOn:focus-within {
+  outline: 2px solid var(--accent-ring); outline-offset: 2px;
+}

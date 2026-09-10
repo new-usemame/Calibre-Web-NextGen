@@ -1132,6 +1132,18 @@ msgid "Unknown cover source."
 msgstr "Fonte della copertina non riconosciuta."
 
 #: cps/cover_picker.py
+msgid "That cover design is not one we offer."
+msgstr ""
+
+#: cps/cover_picker.py
+msgid "This server can't design covers — no renderer is installed."
+msgstr ""
+
+#: cps/cover_picker.py cps/spa_strings.py
+msgid "Could not design a cover for this book."
+msgstr ""
+
+#: cps/cover_picker.py
 msgid "Could not save lock state."
 msgstr "Impossibile salvare lo stato di blocco."
 
@@ -4617,6 +4629,66 @@ msgid "≥"
 msgstr "≥"
 
 #: cps/spa_strings.py
+msgid "Classic"
+msgstr "Classico"
+
+#: cps/spa_strings.py
+msgid "Meadow"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Ember"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Slate"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Plum"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Ink on cream"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Meadow green"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Ember red"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Slate grey"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Plum violet"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Serif"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Sans-serif"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Blocks — title above, authors on a colour band"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Banner — title on a ribbon near the top"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Ornamental — title inside a decorative frame"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(Nessun testo rilevato)"
 
@@ -4785,6 +4857,10 @@ msgstr "Archivia"
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Archived"
 msgstr "Archiviati"
+
+#: cps/spa_strings.py
+msgid "Arrangement"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Ask in Discord"
@@ -5013,10 +5089,6 @@ msgid "Choose your theme"
 msgstr "Seleziona il tema"
 
 #: cps/spa_strings.py
-msgid "Classic"
-msgstr "Classico"
-
-#: cps/spa_strings.py
 msgid "Clear default"
 msgstr "Cancella predefinito"
 
@@ -5047,6 +5119,10 @@ msgstr "Chiudi il lettore"
 #: cps/spa_strings.py
 msgid "Code"
 msgstr "Codice"
+
+#: cps/spa_strings.py
+msgid "Colour scheme"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Columns"
@@ -5513,6 +5589,10 @@ msgid "Description formatting"
 msgstr "Formattazione descrizione"
 
 #: cps/spa_strings.py
+msgid "Design a cover"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Device administration"
 msgstr "Amministrazione dispositivo"
 
@@ -5609,6 +5689,10 @@ msgstr "Ordinamento completato"
 #: cps/templates/shelf.html cps/templates/user_table.html
 msgid "Download"
 msgstr "Download"
+
+#: cps/spa_strings.py
+msgid "Drawing the cover…"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Drop files here, or click to choose"
@@ -6184,6 +6268,10 @@ msgid "Last synced"
 msgstr "Ultima sincronizzazione"
 
 #: cps/spa_strings.py
+msgid "Lettering"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Library settings"
 msgstr "Impostazioni della biblioteca"
 
@@ -6254,10 +6342,6 @@ msgid "Looks good"
 msgstr "Sembra corretto"
 
 #: cps/spa_strings.py
-msgid "Using the image behind that Google link"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Low-res"
 msgstr "Bassa risulozuone"
 
@@ -6268,6 +6352,10 @@ msgstr "Magic link"
 #: cps/spa_strings.py
 msgid "Magic link QR code"
 msgstr "QR code del Magic link"
+
+#: cps/spa_strings.py
+msgid "Make one from the book's title and author"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Make private"
@@ -6862,10 +6950,18 @@ msgstr "Riparazione posizione in coda"
 msgid "Preparing your magic link…"
 msgstr "Sto preparando il magic-link…"
 
+#: cps/spa_strings.py
+msgid "Presets"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/duplicates.html
 #: cps/templates/kobo_reconcile.html
 msgid "Preview"
 msgstr "Anteprima"
+
+#: cps/spa_strings.py
+msgid "Preview of the designed cover"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
@@ -7184,6 +7280,10 @@ msgstr "Ambiti"
 #: cps/spa_strings.py
 msgid "Search inside book"
 msgstr "Cerca nel libro"
+
+#: cps/spa_strings.py
+msgid "Search sources with different words"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Search term"
@@ -7507,10 +7607,6 @@ msgid "Source details"
 msgstr "Dettagli delle fonti"
 
 #: cps/spa_strings.py
-msgid "Search sources with different words"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid ""
 "Start My Library? It begins as everything you can see now, so nothing "
 "changes until you remove books yourself. Your e-reader keeps the same books "
@@ -7674,6 +7770,10 @@ msgstr ""
 "La biblioteca è condivisa e contiene una sola copia di ogni libro: ciò che "
 "conservi costituisce la Biblioteca Personale. Nulla è andato perso. Il tuo "
 "amministratore gestisce ciò che contiene."
+
+#: cps/spa_strings.py
+msgid "The server draws this cover; nothing is saved until you apply it."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -7883,6 +7983,10 @@ msgstr ""
 msgid "Use this cover"
 msgstr "Usa questa copertina"
 
+#: cps/spa_strings.py
+msgid "Use this design"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/tasks.html
 msgid "User"
 msgstr "Utente"
@@ -7916,6 +8020,10 @@ msgstr "Attributo nome utente"
 #: cps/spa_strings.py
 msgid "Users"
 msgstr "Utenti"
+
+#: cps/spa_strings.py
+msgid "Using the image behind that Google link"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Versions"
@@ -10292,6 +10400,33 @@ msgstr ""
 #: cps/templates/config_edit.html
 msgid "Allowed Upload Fileformats"
 msgstr "Formati di file autorizzati ad essere caricati"
+
+#: cps/templates/config_edit.html
+msgid "Default cover design"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"The design the cover designer opens on, and the one used for covers "
+"generated automatically."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Design a cover for books that arrive without one"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"New books imported without a cover get a generated cover in the default "
+"design instead of the grey placeholder. Books that already have a cover are "
+"never touched."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"No cover renderer is available on this installation, so no cover can be "
+"generated."
+msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Enable Anonymous Browsing"

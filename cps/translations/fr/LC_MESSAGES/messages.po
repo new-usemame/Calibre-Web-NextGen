@@ -1157,6 +1157,20 @@ msgid "Unknown cover source."
 msgstr "Erreur de connexion"
 
 #: cps/cover_picker.py
+msgid "That cover design is not one we offer."
+msgstr "Ce modèle de couverture n’est pas proposé."
+
+#: cps/cover_picker.py
+msgid "This server can't design covers — no renderer is installed."
+msgstr ""
+"Ce serveur ne peut pas créer de couvertures — aucun moteur de rendu n’est "
+"installé."
+
+#: cps/cover_picker.py cps/spa_strings.py
+msgid "Could not design a cover for this book."
+msgstr "Impossible de créer une couverture pour ce livre."
+
+#: cps/cover_picker.py
 msgid "Could not save lock state."
 msgstr ""
 
@@ -4642,6 +4656,66 @@ msgid "≥"
 msgstr "≥"
 
 #: cps/spa_strings.py
+msgid "Classic"
+msgstr "Classique"
+
+#: cps/spa_strings.py
+msgid "Meadow"
+msgstr "Prairie"
+
+#: cps/spa_strings.py
+msgid "Ember"
+msgstr "Braise"
+
+#: cps/spa_strings.py
+msgid "Slate"
+msgstr "Ardoise"
+
+#: cps/spa_strings.py
+msgid "Plum"
+msgstr "Prune"
+
+#: cps/spa_strings.py
+msgid "Ink on cream"
+msgstr "Encre sur crème"
+
+#: cps/spa_strings.py
+msgid "Meadow green"
+msgstr "Vert prairie"
+
+#: cps/spa_strings.py
+msgid "Ember red"
+msgstr "Rouge braise"
+
+#: cps/spa_strings.py
+msgid "Slate grey"
+msgstr "Gris ardoise"
+
+#: cps/spa_strings.py
+msgid "Plum violet"
+msgstr "Violet prune"
+
+#: cps/spa_strings.py
+msgid "Serif"
+msgstr "Avec empattements"
+
+#: cps/spa_strings.py
+msgid "Sans-serif"
+msgstr "Sans empattements"
+
+#: cps/spa_strings.py
+msgid "Blocks — title above, authors on a colour band"
+msgstr "Blocs — titre en haut, auteurs sur un bandeau coloré"
+
+#: cps/spa_strings.py
+msgid "Banner — title on a ribbon near the top"
+msgstr "Bannière — titre sur un ruban près du haut"
+
+#: cps/spa_strings.py
+msgid "Ornamental — title inside a decorative frame"
+msgstr "Ornemental — titre dans un cadre décoratif"
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(aucun texte enregistré)"
 
@@ -4811,6 +4885,10 @@ msgstr "Archiver"
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Archived"
 msgstr "Archivé"
+
+#: cps/spa_strings.py
+msgid "Arrangement"
+msgstr "Disposition"
 
 #: cps/spa_strings.py
 msgid "Ask in Discord"
@@ -5039,10 +5117,6 @@ msgid "Choose your theme"
 msgstr "Choisir votre thème"
 
 #: cps/spa_strings.py
-msgid "Classic"
-msgstr "Classique"
-
-#: cps/spa_strings.py
 msgid "Clear default"
 msgstr "Effacer la valeur par défaut"
 
@@ -5073,6 +5147,10 @@ msgstr "Fermer le lecteur"
 #: cps/spa_strings.py
 msgid "Code"
 msgstr "Code"
+
+#: cps/spa_strings.py
+msgid "Colour scheme"
+msgstr "Palette de couleurs"
 
 #: cps/spa_strings.py
 msgid "Columns"
@@ -5542,6 +5620,10 @@ msgid "Description formatting"
 msgstr "Mise en forme de la description"
 
 #: cps/spa_strings.py
+msgid "Design a cover"
+msgstr "Créer une couverture"
+
+#: cps/spa_strings.py
 msgid "Device administration"
 msgstr "Administration des appareils"
 
@@ -5638,6 +5720,10 @@ msgstr "Réorganisation terminée"
 #: cps/templates/shelf.html cps/templates/user_table.html
 msgid "Download"
 msgstr "Télécharger"
+
+#: cps/spa_strings.py
+msgid "Drawing the cover…"
+msgstr "Création de la couverture…"
 
 #: cps/spa_strings.py
 msgid "Drop files here, or click to choose"
@@ -6220,6 +6306,10 @@ msgid "Last synced"
 msgstr "Dernière synchronisation"
 
 #: cps/spa_strings.py
+msgid "Lettering"
+msgstr "Typographie"
+
+#: cps/spa_strings.py
 msgid "Library settings"
 msgstr "Paramètres de la bibliothèque"
 
@@ -6290,10 +6380,6 @@ msgid "Looks good"
 msgstr "Tout est bon"
 
 #: cps/spa_strings.py
-msgid "Using the image behind that Google link"
-msgstr "Utilisation de l’image derrière ce lien Google"
-
-#: cps/spa_strings.py
 msgid "Low-res"
 msgstr "Basse résolution"
 
@@ -6304,6 +6390,10 @@ msgstr "Lien magique"
 #: cps/spa_strings.py
 msgid "Magic link QR code"
 msgstr "QR code du lien magique"
+
+#: cps/spa_strings.py
+msgid "Make one from the book's title and author"
+msgstr "En créer une à partir du titre et de l’auteur du livre"
 
 #: cps/spa_strings.py
 msgid "Make private"
@@ -6895,10 +6985,18 @@ msgstr "Restauration de la position en attente"
 msgid "Preparing your magic link…"
 msgstr "Préparation de votre lien magique…"
 
+#: cps/spa_strings.py
+msgid "Presets"
+msgstr "Préréglages"
+
 #: cps/spa_strings.py cps/templates/duplicates.html
 #: cps/templates/kobo_reconcile.html
 msgid "Preview"
 msgstr "Aperçu"
+
+#: cps/spa_strings.py
+msgid "Preview of the designed cover"
+msgstr "Aperçu de la couverture créée"
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
@@ -7224,6 +7322,10 @@ msgid "Search inside book"
 msgstr "Rechercher dans le livre"
 
 #: cps/spa_strings.py
+msgid "Search sources with different words"
+msgstr "Rechercher dans les sources avec d’autres mots"
+
+#: cps/spa_strings.py
 msgid "Search term"
 msgstr "Terme de recherche"
 
@@ -7544,10 +7646,6 @@ msgid "Source details"
 msgstr "Détails de la source"
 
 #: cps/spa_strings.py
-msgid "Search sources with different words"
-msgstr "Rechercher dans les sources avec d’autres mots"
-
-#: cps/spa_strings.py
 msgid ""
 "Start My Library? It begins as everything you can see now, so nothing "
 "changes until you remove books yourself. Your e-reader keeps the same books "
@@ -7710,6 +7808,12 @@ msgstr ""
 "La bibliothèque est partagée et ne contient chaque livre qu'une seule fois — "
 "ce que vous gardez, c'est Ma bibliothèque. Rien de ce que vous aviez n'a "
 "disparu. Votre administrateur gère ce qui y entre."
+
+#: cps/spa_strings.py
+msgid "The server draws this cover; nothing is saved until you apply it."
+msgstr ""
+"Le serveur dessine cette couverture ; rien n’est enregistré tant que vous ne "
+"l’appliquez pas."
 
 #: cps/spa_strings.py
 msgid ""
@@ -7916,6 +8020,10 @@ msgstr ""
 msgid "Use this cover"
 msgstr "Utiliser cette couverture"
 
+#: cps/spa_strings.py
+msgid "Use this design"
+msgstr "Utiliser ce modèle"
+
 #: cps/spa_strings.py cps/templates/tasks.html
 msgid "User"
 msgstr "Utilisateur"
@@ -7949,6 +8057,10 @@ msgstr "Revendication de nom d’utilisateur"
 #: cps/spa_strings.py
 msgid "Users"
 msgstr "Utilisateurs"
+
+#: cps/spa_strings.py
+msgid "Using the image behind that Google link"
+msgstr "Utilisation de l’image derrière ce lien Google"
 
 #: cps/spa_strings.py
 msgid "Versions"
@@ -10292,6 +10404,40 @@ msgstr ""
 #: cps/templates/config_edit.html
 msgid "Allowed Upload Fileformats"
 msgstr "Formats de fichiers à télécharger autorisés"
+
+#: cps/templates/config_edit.html
+msgid "Default cover design"
+msgstr "Modèle de couverture par défaut"
+
+#: cps/templates/config_edit.html
+msgid ""
+"The design the cover designer opens on, and the one used for covers "
+"generated automatically."
+msgstr ""
+"Le modèle proposé d’emblée par le créateur de couvertures, et celui utilisé "
+"pour les couvertures générées automatiquement."
+
+#: cps/templates/config_edit.html
+msgid "Design a cover for books that arrive without one"
+msgstr "Créer une couverture pour les livres qui arrivent sans"
+
+#: cps/templates/config_edit.html
+msgid ""
+"New books imported without a cover get a generated cover in the default "
+"design instead of the grey placeholder. Books that already have a cover are "
+"never touched."
+msgstr ""
+"Les nouveaux livres importés sans couverture reçoivent une couverture créée "
+"selon le modèle par défaut au lieu de l’image grise générique. Les livres "
+"qui ont déjà une couverture ne sont jamais modifiés."
+
+#: cps/templates/config_edit.html
+msgid ""
+"No cover renderer is available on this installation, so no cover can be "
+"generated."
+msgstr ""
+"Aucun moteur de rendu de couverture n’est disponible sur cette "
+"installation : aucune couverture ne peut être créée."
 
 #: cps/templates/config_edit.html
 msgid "Enable Anonymous Browsing"
@@ -14909,111 +15055,16 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Expose selected Shelves to OPDS"
 msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 
-msgid "Meadow"
-msgstr "Prairie"
-
-msgid "Ember"
-msgstr "Braise"
-
-msgid "Slate"
-msgstr "Ardoise"
-
-msgid "Plum"
-msgstr "Prune"
-
-msgid "Ink on cream"
-msgstr "Encre sur crème"
-
-msgid "Meadow green"
-msgstr "Vert prairie"
-
-msgid "Ember red"
-msgstr "Rouge braise"
-
-msgid "Slate grey"
-msgstr "Gris ardoise"
-
-msgid "Plum violet"
-msgstr "Violet prune"
-
-msgid "Serif"
-msgstr "Avec empattements"
-
-msgid "Sans-serif"
-msgstr "Sans empattements"
-
-msgid "Blocks — title above, authors on a colour band"
-msgstr "Blocs — titre en haut, auteurs sur un bandeau coloré"
-
-msgid "Banner — title on a ribbon near the top"
-msgstr "Bannière — titre sur un ruban près du haut"
-
-msgid "Ornamental — title inside a decorative frame"
-msgstr "Ornemental — titre dans un cadre décoratif"
-
-msgid "Arrangement"
-msgstr "Disposition"
-
-msgid "Colour scheme"
-msgstr "Palette de couleurs"
-
-msgid "Could not design a cover for this book."
-msgstr "Impossible de créer une couverture pour ce livre."
-
-msgid "Design"
-msgstr "Modèle"
-
-msgid "Design a cover"
-msgstr "Créer une couverture"
-
-msgid "Drawing the cover…"
-msgstr "Création de la couverture…"
-
-msgid "Lettering"
-msgstr "Typographie"
-
-msgid "Make one from the title and author when no cover exists"
-msgstr "En créer une à partir du titre et de l’auteur lorsqu’il n’y en a pas"
-
-msgid "Preview of the designed cover"
-msgstr "Aperçu de la couverture créée"
-
-msgid "The server draws this cover; nothing is saved until you apply it."
-msgstr "Le serveur dessine cette couverture ; rien n’est enregistré tant que vous ne l’appliquez pas."
-
-msgid "Default cover design"
-msgstr "Modèle de couverture par défaut"
-
-msgid "The design the cover designer opens on, and the one used for covers generated automatically."
-msgstr "Le modèle proposé d’emblée par le créateur de couvertures, et celui utilisé pour les couvertures générées automatiquement."
-
-msgid "Design a cover for books that arrive without one"
-msgstr "Créer une couverture pour les livres qui arrivent sans"
-
-msgid "New books imported without a cover get a generated cover in the default design instead of the grey placeholder. Books that already have a cover are never touched."
-msgstr "Les nouveaux livres importés sans couverture reçoivent une couverture créée selon le modèle par défaut au lieu de l’image grise générique. Les livres qui ont déjà une couverture ne sont jamais modifiés."
-
-msgid "No cover renderer is available on this installation, so no cover can be generated."
-msgstr "Aucun moteur de rendu de couverture n’est disponible sur cette installation : aucune couverture ne peut être créée."
-
-msgid "That cover design is not one we offer."
-msgstr "Ce modèle de couverture n’est pas proposé."
-
-msgid "This server can't design covers — no renderer is installed."
-msgstr "Ce serveur ne peut pas créer de couvertures — aucun moteur de rendu n’est installé."
-
-msgid "Presets"
-msgstr "Préréglages"
-
-msgid "Use this design"
-msgstr "Utiliser ce modèle"
-
-msgid "Make one from the book's title and author"
-msgstr "En créer une à partir du titre et de l’auteur du livre"
-
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#~ msgid "Design"
+#~ msgstr "Modèle"
+
+#~ msgid "Make one from the title and author when no cover exists"
+#~ msgstr ""
+#~ "En créer une à partir du titre et de l’auteur lorsqu’il n’y en a pas"
 
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr ""

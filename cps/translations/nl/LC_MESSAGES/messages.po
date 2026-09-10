@@ -1101,6 +1101,19 @@ msgid "Unknown cover source."
 msgstr "Verbindingsfout"
 
 #: cps/cover_picker.py
+msgid "That cover design is not one we offer."
+msgstr "Dat omslagontwerp bieden we niet aan."
+
+#: cps/cover_picker.py
+msgid "This server can't design covers — no renderer is installed."
+msgstr ""
+"Deze server kan geen omslagen ontwerpen — er is geen renderer geïnstalleerd."
+
+#: cps/cover_picker.py cps/spa_strings.py
+msgid "Could not design a cover for this book."
+msgstr "Kon geen omslag ontwerpen voor dit boek."
+
+#: cps/cover_picker.py
 msgid "Could not save lock state."
 msgstr ""
 
@@ -4520,6 +4533,66 @@ msgid "≥"
 msgstr "≥"
 
 #: cps/spa_strings.py
+msgid "Classic"
+msgstr "Klassiek"
+
+#: cps/spa_strings.py
+msgid "Meadow"
+msgstr "Weide"
+
+#: cps/spa_strings.py
+msgid "Ember"
+msgstr "Sintel"
+
+#: cps/spa_strings.py
+msgid "Slate"
+msgstr "Leisteen"
+
+#: cps/spa_strings.py
+msgid "Plum"
+msgstr "Pruim"
+
+#: cps/spa_strings.py
+msgid "Ink on cream"
+msgstr "Inkt op crème"
+
+#: cps/spa_strings.py
+msgid "Meadow green"
+msgstr "Weidegroen"
+
+#: cps/spa_strings.py
+msgid "Ember red"
+msgstr "Sintelrood"
+
+#: cps/spa_strings.py
+msgid "Slate grey"
+msgstr "Leigrijs"
+
+#: cps/spa_strings.py
+msgid "Plum violet"
+msgstr "Pruimpaars"
+
+#: cps/spa_strings.py
+msgid "Serif"
+msgstr "Met schreef"
+
+#: cps/spa_strings.py
+msgid "Sans-serif"
+msgstr "Schreefloos"
+
+#: cps/spa_strings.py
+msgid "Blocks — title above, authors on a colour band"
+msgstr "Blokken — titel bovenaan, auteurs op een gekleurde band"
+
+#: cps/spa_strings.py
+msgid "Banner — title on a ribbon near the top"
+msgstr "Banier — titel op een lint bovenin"
+
+#: cps/spa_strings.py
+msgid "Ornamental — title inside a decorative frame"
+msgstr "Sierlijk — titel in een decoratief kader"
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(geen tekst vastgelegd)"
 
@@ -4690,6 +4763,10 @@ msgstr "Archiveren"
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Archived"
 msgstr "Gearchiveerd"
+
+#: cps/spa_strings.py
+msgid "Arrangement"
+msgstr "Indeling"
 
 #: cps/spa_strings.py
 msgid "Ask in Discord"
@@ -4918,10 +4995,6 @@ msgid "Choose your theme"
 msgstr "Kies je thema"
 
 #: cps/spa_strings.py
-msgid "Classic"
-msgstr "Klassiek"
-
-#: cps/spa_strings.py
 msgid "Clear default"
 msgstr "Standaard wissen"
 
@@ -4952,6 +5025,10 @@ msgstr "Lezer sluiten"
 #: cps/spa_strings.py
 msgid "Code"
 msgstr "Code"
+
+#: cps/spa_strings.py
+msgid "Colour scheme"
+msgstr "Kleurenschema"
 
 #: cps/spa_strings.py
 msgid "Columns"
@@ -5416,6 +5493,10 @@ msgid "Description formatting"
 msgstr "Opmaak van beschrijving"
 
 #: cps/spa_strings.py
+msgid "Design a cover"
+msgstr "Een omslag ontwerpen"
+
+#: cps/spa_strings.py
 msgid "Device administration"
 msgstr "Apparaatbeheer"
 
@@ -5512,6 +5593,10 @@ msgstr "Klaar met herschikken"
 #: cps/templates/shelf.html cps/templates/user_table.html
 msgid "Download"
 msgstr "Downloaden"
+
+#: cps/spa_strings.py
+msgid "Drawing the cover…"
+msgstr "De omslag wordt getekend…"
 
 #: cps/spa_strings.py
 msgid "Drop files here, or click to choose"
@@ -6088,6 +6173,10 @@ msgid "Last synced"
 msgstr "Laatst gesynchroniseerd"
 
 #: cps/spa_strings.py
+msgid "Lettering"
+msgstr "Letters"
+
+#: cps/spa_strings.py
 msgid "Library settings"
 msgstr "Bibliotheekinstellingen"
 
@@ -6158,10 +6247,6 @@ msgid "Looks good"
 msgstr "Ziet er goed uit"
 
 #: cps/spa_strings.py
-msgid "Using the image behind that Google link"
-msgstr "De afbeelding achter die Google-link wordt gebruikt"
-
-#: cps/spa_strings.py
 msgid "Low-res"
 msgstr "Lage resolutie"
 
@@ -6172,6 +6257,10 @@ msgstr "Magische link"
 #: cps/spa_strings.py
 msgid "Magic link QR code"
 msgstr "Magische link QR-code"
+
+#: cps/spa_strings.py
+msgid "Make one from the book's title and author"
+msgstr "Maak er een van de titel en auteur van het boek"
 
 #: cps/spa_strings.py
 msgid "Make private"
@@ -6753,10 +6842,18 @@ msgstr "Herstel van leespositie in wachtrij"
 msgid "Preparing your magic link…"
 msgstr "Je magische link voorbereiden…"
 
+#: cps/spa_strings.py
+msgid "Presets"
+msgstr "Voorinstellingen"
+
 #: cps/spa_strings.py cps/templates/duplicates.html
 #: cps/templates/kobo_reconcile.html
 msgid "Preview"
 msgstr "Voorbeeld"
+
+#: cps/spa_strings.py
+msgid "Preview of the designed cover"
+msgstr "Voorbeeld van de ontworpen omslag"
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
@@ -7079,6 +7176,10 @@ msgid "Search inside book"
 msgstr "Zoeken in het boek"
 
 #: cps/spa_strings.py
+msgid "Search sources with different words"
+msgstr "Bronnen doorzoeken met andere woorden"
+
+#: cps/spa_strings.py
 msgid "Search term"
 msgstr "Zoekterm"
 
@@ -7397,10 +7498,6 @@ msgid "Source details"
 msgstr "Brondetails"
 
 #: cps/spa_strings.py
-msgid "Search sources with different words"
-msgstr "Bronnen doorzoeken met andere woorden"
-
-#: cps/spa_strings.py
 msgid ""
 "Start My Library? It begins as everything you can see now, so nothing "
 "changes until you remove books yourself. Your e-reader keeps the same books "
@@ -7564,6 +7661,11 @@ msgstr ""
 "De bibliotheek is gedeeld en bevat elk boek maar één keer — wat je bewaart "
 "is Mijn bibliotheek. Niets dat je had is weg. Je beheerder beheert wat erin "
 "komt."
+
+#: cps/spa_strings.py
+msgid "The server draws this cover; nothing is saved until you apply it."
+msgstr ""
+"De server tekent deze omslag; er wordt niets opgeslagen tot u ze toepast."
 
 #: cps/spa_strings.py
 msgid ""
@@ -7770,6 +7872,10 @@ msgstr ""
 msgid "Use this cover"
 msgstr "Deze omslag gebruiken"
 
+#: cps/spa_strings.py
+msgid "Use this design"
+msgstr "Dit ontwerp gebruiken"
+
 #: cps/spa_strings.py cps/templates/tasks.html
 msgid "User"
 msgstr "Gebruiker"
@@ -7803,6 +7909,10 @@ msgstr "Gebruikersnaam claim"
 #: cps/spa_strings.py
 msgid "Users"
 msgstr "Gebruikers"
+
+#: cps/spa_strings.py
+msgid "Using the image behind that Google link"
+msgstr "De afbeelding achter die Google-link wordt gebruikt"
 
 #: cps/spa_strings.py
 msgid "Versions"
@@ -10123,6 +10233,40 @@ msgstr "(Zorg dat gebruikers uploadrechten hebben)"
 #: cps/templates/config_edit.html
 msgid "Allowed Upload Fileformats"
 msgstr "Toegelaten upload bestandsformaten"
+
+#: cps/templates/config_edit.html
+msgid "Default cover design"
+msgstr "Standaard omslagontwerp"
+
+#: cps/templates/config_edit.html
+msgid ""
+"The design the cover designer opens on, and the one used for covers "
+"generated automatically."
+msgstr ""
+"Het ontwerp waarmee de omslagontwerper opent, en het ontwerp dat wordt "
+"gebruikt voor automatisch gegenereerde omslagen."
+
+#: cps/templates/config_edit.html
+msgid "Design a cover for books that arrive without one"
+msgstr "Een omslag ontwerpen voor boeken die zonder omslag binnenkomen"
+
+#: cps/templates/config_edit.html
+msgid ""
+"New books imported without a cover get a generated cover in the default "
+"design instead of the grey placeholder. Books that already have a cover are "
+"never touched."
+msgstr ""
+"Nieuwe boeken die zonder omslag worden geïmporteerd, krijgen een "
+"gegenereerde omslag in het standaardontwerp in plaats van de grijze "
+"tijdelijke afbeelding. Boeken die al een omslag hebben, blijven ongemoeid."
+
+#: cps/templates/config_edit.html
+msgid ""
+"No cover renderer is available on this installation, so no cover can be "
+"generated."
+msgstr ""
+"Op deze installatie is geen omslagrenderer beschikbaar, dus er kan geen "
+"omslag worden gegenereerd."
 
 #: cps/templates/config_edit.html
 msgid "Enable Anonymous Browsing"
@@ -14564,112 +14708,16 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Expose selected Shelves to OPDS"
 msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 
-msgid "Meadow"
-msgstr "Weide"
-
-msgid "Ember"
-msgstr "Sintel"
-
-msgid "Slate"
-msgstr "Leisteen"
-
-msgid "Plum"
-msgstr "Pruim"
-
-msgid "Ink on cream"
-msgstr "Inkt op crème"
-
-msgid "Meadow green"
-msgstr "Weidegroen"
-
-msgid "Ember red"
-msgstr "Sintelrood"
-
-msgid "Slate grey"
-msgstr "Leigrijs"
-
-msgid "Plum violet"
-msgstr "Pruimpaars"
-
-msgid "Serif"
-msgstr "Met schreef"
-
-msgid "Sans-serif"
-msgstr "Schreefloos"
-
-msgid "Blocks — title above, authors on a colour band"
-msgstr "Blokken — titel bovenaan, auteurs op een gekleurde band"
-
-msgid "Banner — title on a ribbon near the top"
-msgstr "Banier — titel op een lint bovenin"
-
-msgid "Ornamental — title inside a decorative frame"
-msgstr "Sierlijk — titel in een decoratief kader"
-
-msgid "Arrangement"
-msgstr "Indeling"
-
-msgid "Colour scheme"
-msgstr "Kleurenschema"
-
-msgid "Could not design a cover for this book."
-msgstr "Kon geen omslag ontwerpen voor dit boek."
-
-msgid "Design"
-msgstr "Ontwerp"
-
-msgid "Design a cover"
-msgstr "Een omslag ontwerpen"
-
-msgid "Drawing the cover…"
-msgstr "De omslag wordt getekend…"
-
-msgid "Lettering"
-msgstr "Letters"
-
-msgid "Make one from the title and author when no cover exists"
-msgstr "Maak er een van de titel en auteur als er geen omslag is"
-
-msgid "Preview of the designed cover"
-msgstr "Voorbeeld van de ontworpen omslag"
-
-msgid "The server draws this cover; nothing is saved until you apply it."
-msgstr "De server tekent deze omslag; er wordt niets opgeslagen tot u ze toepast."
-
-msgid "Default cover design"
-msgstr "Standaard omslagontwerp"
-
-msgid "The design the cover designer opens on, and the one used for covers generated automatically."
-msgstr "Het ontwerp waarmee de omslagontwerper opent, en het ontwerp dat wordt gebruikt voor automatisch gegenereerde omslagen."
-
-msgid "Design a cover for books that arrive without one"
-msgstr "Een omslag ontwerpen voor boeken die zonder omslag binnenkomen"
-
-msgid "New books imported without a cover get a generated cover in the default design instead of the grey placeholder. Books that already have a cover are never touched."
-msgstr "Nieuwe boeken die zonder omslag worden geïmporteerd, krijgen een gegenereerde omslag in het standaardontwerp in plaats van de grijze tijdelijke afbeelding. Boeken die al een omslag hebben, blijven ongemoeid."
-
-msgid "No cover renderer is available on this installation, so no cover can be generated."
-msgstr "Op deze installatie is geen omslagrenderer beschikbaar, dus er kan geen omslag worden gegenereerd."
-
-msgid "That cover design is not one we offer."
-msgstr "Dat omslagontwerp bieden we niet aan."
-
-msgid "This server can't design covers — no renderer is installed."
-msgstr "Deze server kan geen omslagen ontwerpen — er is geen renderer geïnstalleerd."
-
-msgid "Presets"
-msgstr "Voorinstellingen"
-
-msgid "Use this design"
-msgstr "Dit ontwerp gebruiken"
-
-msgid "Make one from the book's title and author"
-msgstr "Maak er een van de titel en auteur van het boek"
-
 #: cps/templates/user_table.html
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#~ msgid "Design"
+#~ msgstr "Ontwerp"
+
+#~ msgid "Make one from the title and author when no cover exists"
+#~ msgstr "Maak er een van de titel en auteur als er geen omslag is"
 
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr ""

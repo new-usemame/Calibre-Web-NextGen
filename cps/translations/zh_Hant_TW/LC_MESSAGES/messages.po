@@ -1046,6 +1046,18 @@ msgid "Unknown cover source."
 msgstr "未知封面來源"
 
 #: cps/cover_picker.py
+msgid "That cover design is not one we offer."
+msgstr ""
+
+#: cps/cover_picker.py
+msgid "This server can't design covers — no renderer is installed."
+msgstr ""
+
+#: cps/cover_picker.py cps/spa_strings.py
+msgid "Could not design a cover for this book."
+msgstr ""
+
+#: cps/cover_picker.py
 msgid "Could not save lock state."
 msgstr "無法儲存鎖定狀態"
 
@@ -4319,6 +4331,66 @@ msgid "≥"
 msgstr "≥"
 
 #: cps/spa_strings.py
+msgid "Classic"
+msgstr "經典"
+
+#: cps/spa_strings.py
+msgid "Meadow"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Ember"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Slate"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Plum"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Ink on cream"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Meadow green"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Ember red"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Slate grey"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Plum violet"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Serif"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Sans-serif"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Blocks — title above, authors on a colour band"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Banner — title on a ribbon near the top"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Ornamental — title inside a decorative frame"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "（未擷取文字）"
 
@@ -4483,6 +4555,10 @@ msgstr "歸檔"
 #: cps/spa_strings.py cps/templates/detail.html cps/templates/listenmp3.html
 msgid "Archived"
 msgstr "歸檔"
+
+#: cps/spa_strings.py
+msgid "Arrangement"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Ask in Discord"
@@ -4706,10 +4782,6 @@ msgid "Choose your theme"
 msgstr "選擇您的佈景主題"
 
 #: cps/spa_strings.py
-msgid "Classic"
-msgstr "經典"
-
-#: cps/spa_strings.py
 msgid "Clear default"
 msgstr "清除預設"
 
@@ -4740,6 +4812,10 @@ msgstr "關閉閱讀器"
 #: cps/spa_strings.py
 msgid "Code"
 msgstr "程式碼"
+
+#: cps/spa_strings.py
+msgid "Colour scheme"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Columns"
@@ -5191,6 +5267,10 @@ msgid "Description formatting"
 msgstr "描述格式"
 
 #: cps/spa_strings.py
+msgid "Design a cover"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Device administration"
 msgstr "裝置管理"
 
@@ -5285,6 +5365,10 @@ msgstr "排序完成"
 #: cps/templates/shelf.html cps/templates/user_table.html
 msgid "Download"
 msgstr "下載書籍"
+
+#: cps/spa_strings.py
+msgid "Drawing the cover…"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Drop files here, or click to choose"
@@ -5841,6 +5925,10 @@ msgid "Last synced"
 msgstr "上次同步"
 
 #: cps/spa_strings.py
+msgid "Lettering"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Library settings"
 msgstr "書庫設定"
 
@@ -5911,10 +5999,6 @@ msgid "Looks good"
 msgstr "看起來不錯"
 
 #: cps/spa_strings.py
-msgid "Using the image behind that Google link"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Low-res"
 msgstr "低解析度"
 
@@ -5925,6 +6009,10 @@ msgstr "魔術連結"
 #: cps/spa_strings.py
 msgid "Magic link QR code"
 msgstr "魔術連結 QR 碼"
+
+#: cps/spa_strings.py
+msgid "Make one from the book's title and author"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Make private"
@@ -6477,10 +6565,18 @@ msgstr "進度修復已加入佇列"
 msgid "Preparing your magic link…"
 msgstr "正在準備您的魔術連結…"
 
+#: cps/spa_strings.py
+msgid "Presets"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/duplicates.html
 #: cps/templates/kobo_reconcile.html
 msgid "Preview"
 msgstr "預覽"
+
+#: cps/spa_strings.py
+msgid "Preview of the designed cover"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
@@ -6791,6 +6887,10 @@ msgid "Search inside book"
 msgstr "搜尋書中內容"
 
 #: cps/spa_strings.py
+msgid "Search sources with different words"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Search term"
 msgstr "搜尋關鍵詞"
 
@@ -7098,10 +7198,6 @@ msgid "Source details"
 msgstr "來源詳情"
 
 #: cps/spa_strings.py
-msgid "Search sources with different words"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid ""
 "Start My Library? It begins as everything you can see now, so nothing "
 "changes until you remove books yourself. Your e-reader keeps the same books "
@@ -7241,6 +7337,10 @@ msgstr ""
 msgid ""
 "The library is shared and holds every book once — what you keep is My "
 "Library. Nothing you had is gone. Your administrator manages what enters it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The server draws this cover; nothing is saved until you apply it."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7436,6 +7536,10 @@ msgstr ""
 msgid "Use this cover"
 msgstr "使用此封面"
 
+#: cps/spa_strings.py
+msgid "Use this design"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/tasks.html
 msgid "User"
 msgstr "用戶名稱"
@@ -7469,6 +7573,10 @@ msgstr "使用者名稱聲明"
 #: cps/spa_strings.py
 msgid "Users"
 msgstr "用戶列表"
+
+#: cps/spa_strings.py
+msgid "Using the image behind that Google link"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Versions"
@@ -9726,6 +9834,33 @@ msgstr "（請確保使用者也有上傳權限）"
 #: cps/templates/config_edit.html
 msgid "Allowed Upload Fileformats"
 msgstr "允許上傳的文件格式"
+
+#: cps/templates/config_edit.html
+msgid "Default cover design"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"The design the cover designer opens on, and the one used for covers "
+"generated automatically."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid "Design a cover for books that arrive without one"
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"New books imported without a cover get a generated cover in the default "
+"design instead of the grey placeholder. Books that already have a cover are "
+"never touched."
+msgstr ""
+
+#: cps/templates/config_edit.html
+msgid ""
+"No cover renderer is available on this installation, so no cover can be "
+"generated."
+msgstr ""
 
 #: cps/templates/config_edit.html
 msgid "Enable Anonymous Browsing"

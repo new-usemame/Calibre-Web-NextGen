@@ -56,6 +56,7 @@ from .constants import (STATIC_DIR as _STATIC_DIR, CACHE_TYPE_THUMBNAILS, THUMBN
 from .subproc_wrapper import process_wait
 from .services.file_move import copy_with_metadata_fallback
 from .services import parallel
+from .services.cover_url_validator import cover_fetch_headers
 
 # Track books with pending thumbnail generation to prevent duplicate tasks
 _pending_thumbnail_books = set()
@@ -2228,10 +2229,15 @@ def save_cover_from_url(url, book_path):
         # advocate path stays SSRF-safe under redirects because validation
         # happens per-connection in ValidatingPoolManager — every hop's
         # target is re-validated, not just the first URL (fork #404).
+        # Identify the software on the download too: hosts like Wikimedia
+        # answer 403 to the bare python-requests agent, and the validator
+        # probe already sends these — the two must agree or a link that
+        # previewed fine fails on apply.
+        headers = cover_fetch_headers()
         if cli_param.allow_localhost:
-            img = requests.get(url, timeout=(10, 30), allow_redirects=True, stream=True)
+            img = requests.get(url, timeout=(10, 30), allow_redirects=True, stream=True, headers=headers)
         elif use_advocate:
-            img = cw_advocate.get(url, timeout=(10, 30), allow_redirects=True, stream=True)
+            img = cw_advocate.get(url, timeout=(10, 30), allow_redirects=True, stream=True, headers=headers)
         else:
             log.error("python module advocate is not installed but is needed")
             return False, _("Python module 'advocate' is not installed but is needed for cover uploads")

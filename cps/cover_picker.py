@@ -288,6 +288,10 @@ def cover_picker_apply(book_id):
         url = (body.get("url") or "").strip()
         if not url:
             return _json_error("empty_url", _(u"Provide a cover URL."), 400)
+        # A Google Images results link is applied as the image behind it,
+        # the same way the preview validated it — API clients that skip
+        # the preview get the same unwrapping.
+        url = cover_url_validator.resolve_pasted_cover_url(url)
         staged_cover, message = helper.save_cover_from_url(url, book.path)
         return _apply_response(staged_cover, message, book)
 
@@ -502,7 +506,8 @@ def _fetch_url_bytes(url: str) -> Optional[bytes]:
         # (5 s connect, 8 s read) — picker context is interactive, so prefer
         # to drop a slow URL fast and let the user move on. The full 10/30
         # timeout still applies on the save path (helper.save_cover_from_url).
-        resp = cw_advocate.get(url, timeout=(5, 8), allow_redirects=True, stream=True)
+        resp = cw_advocate.get(url, timeout=(5, 8), allow_redirects=True, stream=True,
+                               headers=cover_url_validator.cover_fetch_headers())
         if resp.status_code != 200:
             return None
         max_bytes = 10 * 1024 * 1024

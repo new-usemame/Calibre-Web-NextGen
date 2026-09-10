@@ -210,3 +210,192 @@ class TestSerialization:
         assert d["height"] == 1500
         assert d["content_type"] == "image/jpeg"
         assert d["size_bytes"] == 250000
+
+
+# ---------------------------------------------------------------------------
+# Pasted-link fixes: an identifying User-Agent, a GET fallback when HEAD is
+# refused, and Google Images results links unwrapped to the image behind them.
+# Measured before the fix: upload.wikimedia.org answered 403 to the bare
+# python-requests agent (HEAD and GET) and 200 to an identifying one, so a
+# good link showed "Server returned HTTP 403." with the apply button disabled.
+# ---------------------------------------------------------------------------
+
+_IDENT_UA_TAIL = "(+https://github.com/new-usemame/calibre-web-nextgen)"
+
+
+def _mock_get(status, content_type, body=b"", content_length=None):
+    length = len(body) if content_length is None else content_length
+    return types.SimpleNamespace(
+        status_code=status,
+        headers={"content-type": content_type, "content-length": str(length)},
+        iter_content=lambda chunk_size=2048: iter([body]) if body else iter([]),
+        close=lambda: None,
+        raise_for_status=lambda: None,
+    )
+
+
+@pytest.mark.unit
+class TestIdentifyingHeaders:
+    def test_head_probe_identifies_the_software(self):
+        seen = {}
+
+        def fake_request(method, url, **kwargs):
+            seen["headers"] = kwargs.get("headers") or {}
+            return _mock_head(200, "image/jpeg", 250000)
+
+        with patch.object(validator.cw_advocate, "request", side_effect=fake_request), \
+             patch.object(validator, "_probe_dimensions", return_value=(900, 1200)):
+            assert validator.validate_cover_url("https://example.com/cover.jpg").valid
+        ua = seen["headers"].get("User-Agent", "")
+        assert ua.startswith(validator.constants.USER_AGENT), ua
+        assert ua.endswith(_IDENT_UA_TAIL), ua
+        assert seen["headers"].get("Accept") == "image/*,*/*;q=0.8"
+
+    def test_dimension_probe_get_identifies_the_software(self):
+        seen = {}
+
+        def fake_get(url, **kwargs):
+            seen["headers"] = kwargs.get("headers") or {}
+            return _mock_get(200, "image/jpeg", b"")
+
+        with patch.object(validator.cw_advocate, "get", side_effect=fake_get):
+            validator._probe_dimensions("https://example.com/cover.jpg")
+        assert seen["headers"].get("User-Agent", "").endswith(_IDENT_UA_TAIL), seen
+
+
+@pytest.mark.unit
+class TestHeadFallback:
+    def test_head_405_then_get_200_image_is_valid(self):
+        calls = []
+
+        def fake_request(method, url, **kwargs):
+            calls.append(method)
+            return _mock_head(405, "text/plain", 0)
+
+        def fake_get(url, **kwargs):
+            calls.append("GET")
+            assert kwargs.get("stream") is True
+            return _mock_get(200, "image/jpeg", b"\xff\xd8\xff", content_length=250000)
+
+        with patch.object(validator.cw_advocate, "request", side_effect=fake_request), \
+             patch.object(validator.cw_advocate, "get", side_effect=fake_get):
+            result = validator.validate_cover_url("https://example.com/cover.jpg")
+        assert result.valid, result
+        assert result.content_type == "image/jpeg"
+        assert result.size_bytes == 250000
+        assert calls == ["HEAD", "GET"]
+
+    def test_head_403_then_get_403_stays_bad_status(self):
+        with patch.object(validator.cw_advocate, "request",
+                          return_value=_mock_head(403, "text/html", 0)), \
+             patch.object(validator.cw_advocate, "get",
+                          return_value=_mock_get(403, "text/html", b"<html>")):
+            result = validator.validate_cover_url("https://example.com/cover.jpg")
+        assert not result.valid
+        assert result.error_code == "bad_status"
+        assert "403" in result.error_message
+
+    def test_head_404_does_not_fall_back(self):
+        get = patch.object(validator.cw_advocate, "get",
+                           side_effect=AssertionError("GET must not run for a 404 HEAD"))
+        with patch.object(validator.cw_advocate, "request",
+                          return_value=_mock_head(404, "text/html", 0)), get:
+            result = validator.validate_cover_url("https://example.com/missing.jpg")
+        assert result.error_code == "bad_status"
+
+    def test_fallback_get_reads_at_most_the_probe_prefix(self):
+        served = []
+
+        def body_chunks(chunk_size=2048):
+            for _ in range(100):
+                served.append(chunk_size)
+                yield b"\x00" * chunk_size
+
+        resp = types.SimpleNamespace(
+            status_code=200,
+            headers={"content-type": "image/png", "content-length": "500000"},
+            iter_content=body_chunks, close=lambda: None, raise_for_status=lambda: None,
+        )
+        with patch.object(validator.cw_advocate, "request",
+                          return_value=_mock_head(501, "", 0)), \
+             patch.object(validator.cw_advocate, "get", return_value=resp):
+            result = validator.validate_cover_url("https://example.com/cover.png")
+        assert result.valid
+        assert sum(served) <= validator._DIM_PROBE_BYTES + 2048
+
+
+@pytest.mark.unit
+class TestGoogleImgresLinks:
+    IMGRES = ("https://www.google.com/imgres?imgurl=https%3A%2F%2Fcdn.example.test%2Fcovers%2F"
+              "book%20one.jpg&imgrefurl=https%3A%2F%2Fexample.test%2Fbook&tbnid=abc")
+    INNER = "https://cdn.example.test/covers/book one.jpg"
+
+    def test_resolve_unwraps_imgurl(self):
+        assert validator.resolve_pasted_cover_url(self.IMGRES) == self.INNER
+
+    def test_resolve_accepts_country_and_images_hosts(self):
+        for host in ("google.co.uk", "images.google.de", "www.google.com.au"):
+            url = f"https://{host}/imgres?imgurl=https%3A%2F%2Fcdn.example.test%2Fa.jpg"
+            assert validator.resolve_pasted_cover_url(url) == "https://cdn.example.test/a.jpg", host
+
+    def test_resolve_ignores_non_google_hosts(self):
+        for url in ("https://example.com/imgres?imgurl=https%3A%2F%2Fcdn.example.test%2Fa.jpg",
+                    "https://google.com.evil.example/imgres?imgurl=https%3A%2F%2Fcdn.example.test%2Fa.jpg",
+                    "https://www.google.com/search?imgurl=https%3A%2F%2Fcdn.example.test%2Fa.jpg"):
+            assert validator.resolve_pasted_cover_url(url) == url, url
+
+    def test_resolve_refuses_non_http_inner_values(self):
+        for inner in ("javascript%3Aalert(1)", "file%3A%2F%2F%2Fetc%2Fpasswd", "cdn.example.test%2Fa.jpg", ""):
+            url = f"https://www.google.com/imgres?imgurl={inner}&imgrefurl=x"
+            assert validator.resolve_pasted_cover_url(url) == url, inner
+
+    def test_validate_probes_the_inner_url_and_reports_resolved_url(self):
+        probed = []
+
+        def fake_request(method, url, **kwargs):
+            probed.append(url)
+            return _mock_head(200, "image/jpeg", 250000)
+
+        with patch.object(validator.cw_advocate, "request", side_effect=fake_request), \
+             patch.object(validator, "_probe_dimensions", return_value=(900, 1200)):
+            result = validator.validate_cover_url(self.IMGRES)
+        assert result.valid
+        assert probed == [self.INNER]
+        assert result.url == self.IMGRES          # the stale-response guard compares this
+        assert result.resolved_url == self.INNER  # the client applies this one
+        assert result.to_dict()["resolved_url"] == self.INNER
+
+    def test_plain_url_has_no_resolved_url(self):
+        with patch.object(validator.cw_advocate, "request",
+                          return_value=_mock_head(200, "image/jpeg", 250000)), \
+             patch.object(validator, "_probe_dimensions", return_value=(900, 1200)):
+            result = validator.validate_cover_url("https://example.com/cover.jpg")
+        assert result.resolved_url is None
+
+
+@pytest.mark.unit
+class TestOutcomeLogging:
+    def _run(self, head, url="https://example.com/cover.jpg"):
+        lines = []
+        fake_log = types.SimpleNamespace(
+            info=lambda msg, *args, **kw: lines.append(msg % args),
+            debug=lambda *a, **k: None, warning=lambda *a, **k: None, error=lambda *a, **k: None,
+        )
+        with patch.object(validator, "log", fake_log), \
+             patch.object(validator.cw_advocate, "request", return_value=head), \
+             patch.object(validator.cw_advocate, "get", return_value=_mock_get(403, "text/html")), \
+             patch.object(validator, "_probe_dimensions", return_value=(1, 1)):
+            validator.validate_cover_url(url)
+        return lines
+
+    def test_refusals_are_logged_at_info_with_the_outcome_code(self):
+        lines = self._run(_mock_head(403, "text/html", 0))
+        assert len(lines) == 1 and "bad_status 403" in lines[0] and "https://example.com/cover.jpg" in lines[0]
+        lines = self._run(_mock_head(200, "text/html", 5000))
+        assert len(lines) == 1 and "not_image text/html" in lines[0]
+
+    def test_success_and_imgres_resolution_are_logged(self):
+        lines = self._run(_mock_head(200, "image/jpeg", 250000))
+        assert len(lines) == 1 and "outcome=valid" in lines[0]
+        lines = self._run(_mock_head(200, "image/jpeg", 250000), url=TestGoogleImgresLinks.IMGRES)
+        assert len(lines) == 1 and "resolved imgres" in lines[0]

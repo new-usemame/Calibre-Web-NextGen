@@ -7145,6 +7145,10 @@ msgid "Source details"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Search sources with different words"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Start My Library? It begins as everything you can see now, so nothing "
 "changes until you remove books yourself. Your e-reader keeps the same books "

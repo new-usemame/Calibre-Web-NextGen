@@ -7393,6 +7393,10 @@ msgid "Source details"
 msgstr "Brondetails"
 
 #: cps/spa_strings.py
+msgid "Search sources with different words"
+msgstr "Bronnen doorzoeken met andere woorden"
+
+#: cps/spa_strings.py
 msgid ""
 "Start My Library? It begins as everything you can see now, so nothing "
 "changes until you remove books yourself. Your e-reader keeps the same books "
@@ -15299,6 +15303,3 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
-
-msgid "Search sources with different words"
-msgstr "Bronnen doorzoeken met andere woorden"

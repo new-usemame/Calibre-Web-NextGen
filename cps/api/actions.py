@@ -16,6 +16,7 @@ from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
 from ..helper import send_mail, valid_email
 from ..kobo_sync_status import change_archived_books, remove_synced_book
+from ..cover_picker import designer_state
 from ..services import cover_extract, cover_url_validator, device_delivery, user_cover
 
 BATCH_MEMBERSHIP_LIMIT = 200
@@ -68,6 +69,10 @@ def _my_cover_payload(book, row):
             "fill_mode": getattr(config, "config_kobo_cover_padding_fill_mode", None) or "edge_mirror",
             "color": getattr(config, "config_kobo_cover_padding_color", None) or "",
         },
+        # Same designs as the library picker: a personal cover a reader designs
+        # for themselves is the same render, stored per user instead of in the
+        # book folder.
+        "designer": designer_state(),
     }
 
 
@@ -134,6 +139,22 @@ def set_my_book_cover(book_id):
                 return _err("invalid_request", "This book has no embedded cover", 400)
             staged, message = user_cover.stage_bytes(
                 current_user.id, book_id, updated_at, extracted.data)
+        elif kind == "generated":
+            # Design ids only; the bytes are rendered here from the book's own
+            # metadata, never taken from the client.
+            from ..cover_picker import _book_cover_meta, _spec_from_body
+            from ..services import cover_generator, cover_preview
+            try:
+                spec = _spec_from_body(
+                    body, cover_generator.APPLY_WIDTH, cover_generator.APPLY_HEIGHT)
+                rendered = cover_preview._run_in_pool(
+                    cover_generator.render, _book_cover_meta(book), spec,
+                    getattr(config, "config_binariesdir", "") or "")
+            except cover_generator.CoverGenerationError as error:
+                status = 503 if error.code == "unavailable" else 400
+                return _err("cover_design_failed", str(error.message), status)
+            staged, message = user_cover.stage_bytes(
+                current_user.id, book_id, updated_at, rendered.data)
         else:
             return _err("invalid_request", "Unknown cover source", 400)
     if staged is None:

@@ -180,6 +180,23 @@
       </div>
     </div>
     <div class="form-group">
+      <label for="config_cover_generator_default_preset">{{_('Default cover design')}}</label>
+      <select name="config_cover_generator_default_preset" id="config_cover_generator_default_preset" class="form-control">
+        {% for preset in (cover_generator.presets if cover_generator else []) %}
+        <option value="{{ preset.id }}" {% if config.config_cover_generator_default_preset == preset.id %}selected{% endif %}>{{_(preset.label)}}</option>
+        {% endfor %}
+      </select>
+      <p class="help-block">{{_('The design the cover designer opens on, and the one used for covers generated automatically.')}}</p>
+    </div>
+    <div class="form-group">
+      <input type="checkbox" id="config_cover_generator_auto_enabled" name="config_cover_generator_auto_enabled" {% if config.config_cover_generator_auto_enabled %}checked{% endif %}>
+      <label for="config_cover_generator_auto_enabled">{{_('Design a cover for books that arrive without one')}}</label>
+      <p class="help-block">{{_('New books imported without a cover get a generated cover in the default design instead of the grey placeholder. Books that already have a cover are never touched.')}}</p>
+      {% if cover_generator and not cover_generator.availability.available %}
+      <p class="help-block text-danger">{{_('No cover renderer is available on this installation, so no cover can be generated.')}}</p>
+      {% endif %}
+    </div>
+    <div class="form-group">
         <input type="checkbox" id="config_anonbrowse" name="config_anonbrowse" {% if config.config_anonbrowse %}checked{% endif %}>
         <label for="config_anonbrowse">{{_('Enable Anonymous Browsing')}}</label>
     </div>

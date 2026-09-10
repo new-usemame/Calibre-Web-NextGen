@@ -2347,6 +2347,52 @@ class StagedCoverWrite:
             return False, str(ex)
 
 
+class InPlaceStagedCoverWrite(StagedCoverWrite):
+    """A validated stage elsewhere, published by rewriting the live cover in place.
+
+    Used only when the book folder refuses new entries (a folder owned by
+    another uid on a network share is the measured case) but the existing
+    ``cover.jpg`` itself is writable. Overwriting an existing file needs no
+    directory permission, which is exactly what the pre-#2127 store relied on.
+    The rewrite is not an atomic rename: a crash between truncate and fsync
+    leaves a torn cover, which the next successful save repairs. That is the
+    trade for not refusing the user's cover outright; the honest alternative
+    (a permission error) is still what they get when no writable cover exists.
+    """
+
+    def publish(self):
+        if self._published:
+            return True, None
+        try:
+            with open(self.staged_path, "rb") as staged_file:
+                content = staged_file.read()
+            # No O_CREAT: creating the file would need the directory permission
+            # this path exists to do without, and it must fail loudly instead.
+            fd = os.open(
+                self.target_path,
+                os.O_WRONLY | os.O_TRUNC | getattr(os, "O_NOFOLLOW", 0),
+            )
+            try:
+                _write_all(fd, content)
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            self._published = True
+        except (IOError, OSError) as ex:
+            log.error(
+                "Publishing cover in place failed target=%s: %s: %s",
+                self.target_path,
+                type(ex).__name__,
+                ex,
+            )
+            return False, str(ex)
+        try:
+            os.remove(self.staged_path)
+        except OSError as ex:
+            log.warning("Could not remove published cover stage %s: %s", self.staged_path, ex)
+        return True, None
+
+
 class GDriveStagedCoverWrite(StagedCoverWrite):
     """Locally validated cover bytes awaiting a post-commit Drive upload."""
 
@@ -2435,12 +2481,63 @@ def _validate_and_normalize_staged_cover(staged_path):
         verified.load()
 
 
+class _CoverNotDecodable(Exception):
+    """The staged bytes are not an image we accept (wraps the decoder error)."""
+
+
+def _describe_owner(path):
+    try:
+        return os.stat(path).st_uid
+    except OSError:
+        return "?"
+
+
+def _server_uid():
+    return os.geteuid() if hasattr(os, "geteuid") else "?"
+
+
+def _open_cover_stage(filepath, saved_filename):
+    """Create the stage file, beside the target when the folder allows it.
+
+    Returns ``(fd, staged_path, in_place)``. ``in_place`` is True when the book
+    folder refused a new entry and the existing target is writable, in which
+    case the stage lives in the temp directory (where the startup scavenger
+    already looks) and publication rewrites the target in place. A folder that
+    refuses new entries with no writable target is a real permission failure
+    and the PermissionError is re-raised for the caller to report as such.
+    """
+    prefix = ".{}.cwng-".format(saved_filename)
+    target = os.path.join(filepath, saved_filename)
+    try:
+        fd, staged_path = tempfile.mkstemp(prefix=prefix, suffix=".stage", dir=filepath)
+        return fd, staged_path, False
+    except PermissionError as ex:
+        # A symlinked target is never rewritten in place: the rename path
+        # replaced the link itself, and following it here would write through
+        # to wherever the link points.
+        if os.path.islink(target) or not (os.path.isfile(target) and os.access(target, os.W_OK)):
+            raise
+        log.warning(
+            "Book folder %s refuses new entries (owner uid %s, server uid %s): %s. "
+            "Replacing the existing cover in place instead of by atomic rename. "
+            "Give the folder the server's uid to restore the atomic path.",
+            filepath, _describe_owner(filepath), _server_uid(), ex,
+        )
+    fd, staged_path = tempfile.mkstemp(prefix=prefix, suffix=".stage", dir=get_temp_dir())
+    return fd, staged_path, True
+
+
 def save_cover_from_filestorage(filepath, saved_filename, img, handle_factory=None):
     """Write and validate a temporary sibling, returning a publish handle.
 
     Despite the historical name, this function deliberately does not replace
     ``saved_filename``.  It is the single storage primitive used by every cover
     surface; callers own the surrounding metadata transaction.
+
+    The failure message distinguishes bytes that are not an image from bytes
+    that could not be stored: a permission problem on the book folder is
+    reported as one, with the folder and the uids involved, never as a bad
+    image (measured on a household library, 2026-09-10).
     """
     if not os.path.exists(filepath):
         try:
@@ -2451,12 +2548,9 @@ def save_cover_from_filestorage(filepath, saved_filename, img, handle_factory=No
     target = os.path.join(filepath, saved_filename)
     staged_path = None
     fd = None
+    in_place = False
     try:
-        fd, staged_path = tempfile.mkstemp(
-            prefix=".{}.cwng-".format(saved_filename),
-            suffix=".stage",
-            dir=filepath,
-        )
+        fd, staged_path, in_place = _open_cover_stage(filepath, saved_filename)
         try:
             staged_mode = os.stat(target).st_mode & 0o777
         except OSError:
@@ -2469,7 +2563,7 @@ def save_cover_from_filestorage(filepath, saved_filename, img, handle_factory=No
                 log.error("Cover save aborted: empty response body (url=%s, content-type=%s, http=%s)",
                           getattr(getattr(img, "request", None), "url", "?"), ct,
                           getattr(img, "status_code", "?"))
-                raise ValueError("empty response body")
+                raise _CoverNotDecodable("empty response body")
             _write_all(fd, img.content)
             os.fsync(fd)
         else:
@@ -2495,14 +2589,38 @@ def save_cover_from_filestorage(filepath, saved_filename, img, handle_factory=No
                 os.fsync(sync_fd)
             finally:
                 os.close(sync_fd)
-        _validate_and_normalize_staged_cover(staged_path)
+        try:
+            _validate_and_normalize_staged_cover(staged_path)
+        except (ValueError, OSError) as decode_error:
+            # PIL raises OSError subclasses (UnidentifiedImageError, truncated
+            # data) for bad bytes; that is an image problem, not a storage one.
+            raise _CoverNotDecodable(decode_error)
         if handle_factory is not None:
             return handle_factory(staged_path), None
+        if in_place:
+            return InPlaceStagedCoverWrite(staged_path, target), None
         return StagedCoverWrite(staged_path, target), None
-    except (IOError, OSError, ValueError) as e:
+    except _CoverNotDecodable as e:
+        log.error("Cover rejected target=%s: not a decodable image: %s", target, e)
+        message = _("Cover-file is not a valid image file, or could not be stored")
+    except PermissionError as e:
+        log.error(
+            "Cover storage refused target=%s: %s (folder %s owner uid %s, server uid %s). "
+            "The server cannot create files in this book folder; give the folder the "
+            "server's uid or make it group-writable.",
+            target, e, filepath, _describe_owner(filepath), _server_uid(),
+        )
+        message = _(
+            "Cover could not be stored: the server has no permission to write into "
+            "the book folder %(folder)s (folder owner uid %(owner)s, server uid %(uid)s).",
+            folder=filepath, owner=_describe_owner(filepath), uid=_server_uid(),
+        )
+    except (IOError, OSError) as e:
         log.error("Cover staging failed target=%s: %s: %s", target, type(e).__name__, e)
+        message = _("Cover could not be stored: %(reason)s", reason=str(e))
     except Exception as e:
         log.error("Cover staging failed (unexpected) target=%s: %s: %s", target, type(e).__name__, e)
+        message = _("Cover-file is not a valid image file, or could not be stored")
     finally:
         if fd is not None:
             try:
@@ -2514,7 +2632,7 @@ def save_cover_from_filestorage(filepath, saved_filename, img, handle_factory=No
             os.remove(staged_path)
         except OSError:
             pass
-    return None, _("Cover-file is not a valid image file, or could not be stored")
+    return None, message
 
 
 # saves book cover to gdrive or locally

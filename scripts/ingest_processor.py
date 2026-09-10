@@ -1259,6 +1259,70 @@ class NewBookProcessor:
             print(f"[ingest-processor] WARN: Could not register title_sort function: {e}", flush=True)
             return False
 
+    def generate_missing_cover_if_enabled(self, book_id) -> bool:
+        """Design a cover for an imported book that arrived without one.
+
+        Opt-in (Admin -> Basic Configuration -> "Design a cover for books that
+        arrive without one"). Best-effort throughout: an import must not fail
+        because a cover could not be drawn, and a book that already has a cover
+        is never touched — ``generate_cover_file`` refuses to overwrite, so a
+        re-run over the same library is a no-op rather than a rewrite.
+        """
+        if book_id is None:
+            return False
+        try:
+            if _CPS_ROOT not in sys.path:
+                sys.path.insert(0, _CPS_ROOT)
+            from cps.services import cover_generator
+        except ImportError as error:
+            print(f"[ingest-processor] WARN: cover generator unavailable: {error}", flush=True)
+            return False
+
+        try:
+            settings = cover_generator.settings_from_app_db(str(app_paths.app_db_path()))
+            if not settings.auto_enabled:
+                return False
+
+            with sqlite3.connect(self.metadata_db, timeout=30) as connection:
+                row = connection.execute(
+                    "SELECT path, title, has_cover, series_index FROM books WHERE id = ?",
+                    (int(book_id),),
+                ).fetchone()
+                if not row:
+                    return False
+                book_path, title, has_cover, series_index = row
+                if has_cover:
+                    return False
+                authors = [name for (name,) in connection.execute(
+                    "SELECT a.name FROM authors a JOIN books_authors_link l ON l.author = a.id "
+                    "WHERE l.book = ? ORDER BY l.id", (int(book_id),))]
+                series_row = connection.execute(
+                    "SELECT s.name FROM series s JOIN books_series_link l ON l.series = s.id "
+                    "WHERE l.book = ? LIMIT 1", (int(book_id),)).fetchone()
+
+            destination = os.path.join(self.library_dir, book_path, "cover.jpg")
+            written = cover_generator.generate_cover_file(
+                destination,
+                cover_generator.BookCoverMeta(
+                    title=title or "",
+                    authors=authors,
+                    series=series_row[0] if series_row else None,
+                    series_index=series_index,
+                ),
+                preset=settings.default_preset,
+            )
+            if not written:
+                return False
+            with sqlite3.connect(self.metadata_db, timeout=30) as connection:
+                connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
+            print(f"[ingest-processor] INFO: Designed a cover for book {book_id} "
+                  f"({settings.default_preset}) — it was imported without one.", flush=True)
+            return True
+        except Exception as error:
+            print(f"[ingest-processor] WARN: Could not design a cover for book "
+                  f"{book_id}: {error}", flush=True)
+            return False
+
     def _fix_unicode_path(self, book_id: int) -> None:
         """Rename the path calibredb add generated with ascii_filename() to the
         CWA-canonical form produced by get_valid_filename_shared().
@@ -2354,6 +2418,14 @@ class NewBookProcessor:
             # Runs after fetch_metadata so any author-name update is already in the DB.
             if self.last_added_book_id is not None:
                 self._fix_unicode_path(self.last_added_book_id)
+
+            # A book that still has no cover here has none to be had: metadata
+            # fetch has already run and any embedded cover was taken during the
+            # import. Design one from its own title and author instead of
+            # leaving it as another grey placeholder in the grid.
+            for imported_id in (self.last_added_book_ids or
+                                ([self.last_added_book_id] if self.last_added_book_id is not None else [])):
+                self.generate_missing_cover_if_enabled(imported_id)
 
             # Trigger auto-send for users who have it enabled
             if self.last_added_book_id is not None:

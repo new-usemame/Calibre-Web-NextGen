@@ -789,8 +789,70 @@ class Enforcer:
 
         return supported_files
 
+    def generate_missing_cover_if_enabled(self, book_dir: str) -> bool:
+        """Design a cover for a book that has none, before its file is enforced.
+
+        Enforcement embeds ``cover.jpg`` into the book file, so a book with no
+        cover.jpg has nothing to embed and stays a grey placeholder everywhere.
+        When the admin has opted in, one is designed from the book's own title
+        and author first, and enforcement then embeds it like any other cover.
+
+        Best-effort: a failure here leaves the book exactly as it was and
+        enforcement carries on. An existing cover.jpg is never overwritten.
+        """
+        cover_path = os.path.join(book_dir, "cover.jpg")
+        if os.path.exists(cover_path):
+            return False
+        try:
+            app_paths.ensure_app_root_on_sys_path()
+            from cps.services import cover_generator
+        except ImportError as error:
+            print(f"[cover-metadata-enforcer] INFO: cover generator unavailable: {error}", flush=True)
+            return False
+        try:
+            settings = cover_generator.settings_from_app_db(str(app_paths.app_db_path()))
+            if not settings.auto_enabled:
+                return False
+            book_id = (list(re.findall(r"\(\d*\)", book_dir))[-1])[1:-1]
+            metadata_db = os.path.join(
+                (self.split_library or {}).get("db_path", self.calibre_library), "metadata.db")
+            with sqlite3.connect(metadata_db, timeout=60) as connection:
+                row = connection.execute(
+                    "SELECT title, has_cover, series_index FROM books WHERE id = ?",
+                    (int(book_id),)).fetchone()
+                if not row or row[1]:
+                    return False
+                title, _has_cover, series_index = row
+                authors = [name for (name,) in connection.execute(
+                    "SELECT a.name FROM authors a JOIN books_authors_link l ON l.author = a.id "
+                    "WHERE l.book = ? ORDER BY l.id", (int(book_id),))]
+                series_row = connection.execute(
+                    "SELECT s.name FROM series s JOIN books_series_link l ON l.series = s.id "
+                    "WHERE l.book = ? LIMIT 1", (int(book_id),)).fetchone()
+            written = cover_generator.generate_cover_file(
+                cover_path,
+                cover_generator.BookCoverMeta(
+                    title=title or "", authors=authors,
+                    series=series_row[0] if series_row else None,
+                    series_index=series_index,
+                ),
+                preset=settings.default_preset,
+            )
+            if not written:
+                return False
+            with sqlite3.connect(metadata_db, timeout=60) as connection:
+                connection.execute("UPDATE books SET has_cover = 1 WHERE id = ?", (int(book_id),))
+            print(f"[cover-metadata-enforcer] INFO: Designed a cover for book {book_id} "
+                  f"({settings.default_preset}) — it had none.", flush=True)
+            return True
+        except Exception as error:
+            print(f"[cover-metadata-enforcer] WARN: Could not design a cover for "
+                  f"'{book_dir}': {error}", flush=True)
+            return False
+
     def enforce_cover(self, book_dir: str) -> list:
         """Will force the Cover & Metadata to update for the supported book files in the given directory"""
+        self.generate_missing_cover_if_enabled(book_dir)
         supported_files = self.get_supported_files_from_dir(book_dir)
         if supported_files:
             if len(supported_files) > 1:

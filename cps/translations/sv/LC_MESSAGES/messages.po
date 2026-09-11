@@ -9,7 +9,7 @@ msgstr ""
 "Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
-"PO-Revision-Date: 2026-09-06 00:00+0000\n"
+"PO-Revision-Date: 2026-09-11 00:00+0000\n"
 "Last-Translator: Daniel Nylander <github@danielnylander.se>\n"
 "Language-Team: Swedish\n"
 "Language: sv\n"
@@ -1114,15 +1114,15 @@ msgstr "Okänd omslagskälla."
 
 #: cps/cover_picker.py
 msgid "That cover design is not one we offer."
-msgstr ""
+msgstr "Den omslagsdesignen erbjuder vi inte."
 
 #: cps/cover_picker.py
 msgid "This server can't design covers — no renderer is installed."
-msgstr ""
+msgstr "Servern kan inte skapa omslag — ingen renderare är installerad."
 
 #: cps/cover_picker.py cps/spa_strings.py
 msgid "Could not design a cover for this book."
-msgstr ""
+msgstr "Det gick inte att skapa ett omslag för den här boken."
 
 #: cps/cover_picker.py
 msgid "Could not save lock state."
@@ -1819,11 +1819,13 @@ msgid ""
 "Cover could not be stored: the server has no permission to write into the "
 "book folder %(folder)s (folder owner uid %(owner)s, server uid %(uid)s)."
 msgstr ""
+"Omslaget kunde inte sparas: servern saknar behörighet att skriva i bokmappen "
+"%(folder)s (mappens ägar-UID %(owner)s, serverns UID %(uid)s)."
 
 #: cps/helper.py
 #, python-format
 msgid "Cover could not be stored: %(reason)s"
-msgstr ""
+msgstr "Omslaget kunde inte sparas: %(reason)s"
 
 #: cps/helper.py cps/spa_strings.py
 msgid "Cover"
@@ -4571,59 +4573,59 @@ msgstr "Klassisk"
 
 #: cps/spa_strings.py
 msgid "Meadow"
-msgstr ""
+msgstr "Äng"
 
 #: cps/spa_strings.py
 msgid "Ember"
-msgstr ""
+msgstr "Glöd"
 
 #: cps/spa_strings.py
 msgid "Slate"
-msgstr ""
+msgstr "Skiffer"
 
 #: cps/spa_strings.py
 msgid "Plum"
-msgstr ""
+msgstr "Plommon"
 
 #: cps/spa_strings.py
 msgid "Ink on cream"
-msgstr ""
+msgstr "Bläck på krämfärgat"
 
 #: cps/spa_strings.py
 msgid "Meadow green"
-msgstr ""
+msgstr "Ängsgrön"
 
 #: cps/spa_strings.py
 msgid "Ember red"
-msgstr ""
+msgstr "Glödröd"
 
 #: cps/spa_strings.py
 msgid "Slate grey"
-msgstr ""
+msgstr "Skiffergrå"
 
 #: cps/spa_strings.py
 msgid "Plum violet"
-msgstr ""
+msgstr "Plommonviolett"
 
 #: cps/spa_strings.py
 msgid "Serif"
-msgstr ""
+msgstr "Serif"
 
 #: cps/spa_strings.py
 msgid "Sans-serif"
-msgstr ""
+msgstr "Sans serif"
 
 #: cps/spa_strings.py
 msgid "Blocks — title above, authors on a colour band"
-msgstr ""
+msgstr "Block — titel ovanför, författare på ett färgat band"
 
 #: cps/spa_strings.py
 msgid "Banner — title on a ribbon near the top"
-msgstr ""
+msgstr "Banderoll — titel på ett band nära överkanten"
 
 #: cps/spa_strings.py
 msgid "Ornamental — title inside a decorative frame"
-msgstr ""
+msgstr "Ornamental — titel i en dekorativ ram"
 
 #: cps/spa_strings.py
 msgid "(no text captured)"
@@ -4795,7 +4797,7 @@ msgstr "Arkiverad"
 
 #: cps/spa_strings.py
 msgid "Arrangement"
-msgstr ""
+msgstr "Layout"
 
 #: cps/spa_strings.py
 msgid "Ask in Discord"
@@ -5056,7 +5058,7 @@ msgstr "Kod"
 
 #: cps/spa_strings.py
 msgid "Colour scheme"
-msgstr ""
+msgstr "Färgschema"
 
 #: cps/spa_strings.py
 msgid "Columns"
@@ -5518,7 +5520,7 @@ msgstr "Formatering av beskrivning"
 
 #: cps/spa_strings.py
 msgid "Design a cover"
-msgstr ""
+msgstr "Skapa omslag"
 
 #: cps/spa_strings.py
 msgid "Device administration"
@@ -5619,7 +5621,7 @@ msgstr "Hämta"
 
 #: cps/spa_strings.py
 msgid "Drawing the cover…"
-msgstr ""
+msgstr "Skapar omslaget …"
 
 #: cps/spa_strings.py
 msgid "Drop files here, or click to choose"
@@ -6194,7 +6196,7 @@ msgstr "Senast synkroniserad"
 
 #: cps/spa_strings.py
 msgid "Lettering"
-msgstr ""
+msgstr "Textstil"
 
 #: cps/spa_strings.py
 msgid "Library settings"
@@ -6280,7 +6282,7 @@ msgstr "QR-kod för magisk länk"
 
 #: cps/spa_strings.py
 msgid "Make one from the book's title and author"
-msgstr ""
+msgstr "Skapa ett utifrån bokens titel och författare"
 
 #: cps/spa_strings.py
 msgid "Make private"
@@ -6863,7 +6865,7 @@ msgstr "Förbereder din magiska länk…"
 
 #: cps/spa_strings.py
 msgid "Presets"
-msgstr ""
+msgstr "Förval"
 
 #: cps/spa_strings.py cps/templates/duplicates.html
 #: cps/templates/kobo_reconcile.html
@@ -6872,7 +6874,7 @@ msgstr "Förhandsvisa"
 
 #: cps/spa_strings.py
 msgid "Preview of the designed cover"
-msgstr ""
+msgstr "Förhandsvisning av det skapade omslaget"
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
@@ -7194,7 +7196,7 @@ msgstr "Sök i boken"
 
 #: cps/spa_strings.py
 msgid "Search sources with different words"
-msgstr ""
+msgstr "Sök i källorna med andra ord"
 
 #: cps/spa_strings.py
 msgid "Search term"
@@ -7674,7 +7676,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "The server draws this cover; nothing is saved until you apply it."
-msgstr ""
+msgstr "Servern skapar omslaget; inget sparas förrän du använder det."
 
 #: cps/spa_strings.py
 msgid ""
@@ -7882,7 +7884,7 @@ msgstr "Använd detta omslag"
 
 #: cps/spa_strings.py
 msgid "Use this design"
-msgstr ""
+msgstr "Använd den här designen"
 
 #: cps/spa_strings.py cps/templates/tasks.html
 msgid "User"
@@ -7920,7 +7922,7 @@ msgstr "Användarlista"
 
 #: cps/spa_strings.py
 msgid "Using the image behind that Google link"
-msgstr ""
+msgstr "Använder bilden bakom Google-länken"
 
 #: cps/spa_strings.py
 msgid "Versions"
@@ -10267,17 +10269,19 @@ msgstr "Tillåtna filformat för uppladdning"
 
 #: cps/templates/config_edit.html
 msgid "Default cover design"
-msgstr ""
+msgstr "Standarddesign för omslag"
 
 #: cps/templates/config_edit.html
 msgid ""
 "The design the cover designer opens on, and the one used for covers "
 "generated automatically."
 msgstr ""
+"Den design som omslagsdesignern öppnas med och som används för omslag som "
+"skapas automatiskt."
 
 #: cps/templates/config_edit.html
 msgid "Design a cover for books that arrive without one"
-msgstr ""
+msgstr "Skapa ett omslag för böcker som saknar ett"
 
 #: cps/templates/config_edit.html
 msgid ""
@@ -10285,12 +10289,17 @@ msgid ""
 "design instead of the grey placeholder. Books that already have a cover are "
 "never touched."
 msgstr ""
+"Nya böcker som importeras utan omslag får ett automatiskt skapat omslag med "
+"standarddesignen i stället för den grå platshållaren. Böcker som redan har "
+"ett omslag påverkas aldrig."
 
 #: cps/templates/config_edit.html
 msgid ""
 "No cover renderer is available on this installation, so no cover can be "
 "generated."
 msgstr ""
+"Ingen omslagsrenderare är tillgänglig i den här installationen, så inga "
+"omslag kan skapas."
 
 #: cps/templates/config_edit.html
 msgid "Enable Anonymous Browsing"

@@ -23,7 +23,7 @@ except ImportError:  # pragma: no cover - unit/minimal environments
 
 from .file_helper import get_temp_dir
 from .subproc_wrapper import process_open
-from . import logger, config
+from . import logger, config, content_server
 from .constants import SUPPORTED_CALIBRE_BINARIES
 
 log = logger.create()
@@ -86,10 +86,10 @@ def _do_calibre_export_blocking(book_id, book_format):
         if config.config_calibre_split:
             my_env['CALIBRE_OVERRIDE_DATABASE_PATH'] = os.path.join(config.config_calibre_dir, "metadata.db")
         library_path = config.get_book_path()
-        opf_command = [calibredb_binarypath, 'export', '--dont-write-opf', '--dont-save-cover',
-                       '--with-library', library_path,
-                       '--to-dir', tmp_dir, '--formats', book_format, "--template", "{}".format(temp_file_name),
-                       str(book_id)]
+        opf_command = ([calibredb_binarypath, 'export', '--dont-write-opf', '--dont-save-cover']
+                       + (content_server.library_arguments() or ['--with-library', library_path])
+                       + ['--to-dir', tmp_dir, '--formats', book_format, "--template", "{}".format(temp_file_name),
+                          str(book_id)])
         p = process_open(opf_command, quotes, my_env)
         embed_timeout = _embed_timeout()
         try:

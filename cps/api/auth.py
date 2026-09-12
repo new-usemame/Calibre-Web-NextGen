@@ -235,8 +235,17 @@ def _me_payload(user):
     payload["avatar"] = _user_avatar(user.name)
     catalog_settings = (getattr(user, "view_settings", None) or {}).get("catalog", {})
     default_filter = catalog_settings.get("default_filter") if isinstance(catalog_settings, dict) else None
+    custom_field_ids = catalog_settings.get("custom_field_ids") if isinstance(catalog_settings, dict) else None
+    custom_field_labels = catalog_settings.get("custom_field_labels") if isinstance(catalog_settings, dict) else None
     payload["catalog"] = {
         "default_filter": default_filter if isinstance(default_filter, dict) else None,
+        "custom_field_ids": (custom_field_ids if isinstance(custom_field_ids, list)
+                             and all(type(column_id) is int for column_id in custom_field_ids)
+                             else None),
+        "custom_field_labels": (custom_field_labels if isinstance(custom_field_labels, dict)
+                                and all(type(key) is str and type(value) is str
+                                        for key, value in custom_field_labels.items())
+                                else None),
     }
     payload["display"] = {
         # Some auth tests and bootstrap paths intentionally provide a minimal

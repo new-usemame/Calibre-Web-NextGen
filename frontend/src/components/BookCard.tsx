@@ -1,7 +1,7 @@
 import { memo, useEffect, useId, useRef, useState } from 'react';
 import { BookOpen, BookCheck, BookPlus, Check, EyeOff, X, Pencil, MoreHorizontal } from 'lucide-react';
 import { Link } from 'wouter';
-import type { Book } from '../lib/api';
+import type { Book, ListCustomColumnDefinition } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { BookCover } from './BookCover';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
@@ -49,6 +49,8 @@ interface BookCardProps {
   /** The authenticated account's viewer role. Kept explicit so a catalog card
    *  can never infer file access from the formats it happens to receive. */
   canRead?: boolean;
+  /** User-selected scalar Calibre fields, defined once by the list response. */
+  customColumnDefinitions?: ListCustomColumnDefinition[];
 }
 
 /** Format a Calibre series_index (a float, e.g. 1.0, 2.5) for display: whole
@@ -70,6 +72,7 @@ function BookCardInner({
   addPending = false,
   detailsEnabled = true,
   canRead = false,
+  customColumnDefinitions = [],
 }: BookCardProps) {
   const t = useT();
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -126,6 +129,18 @@ function BookCardInner({
         ? t('{series} #{n}', { series: book.series, n: cardIndexLabel })
         : book.series
       : null;
+  const customFieldLines = customColumnDefinitions.flatMap((column) => {
+    const value = book.custom_columns?.[String(column.id)]?.[0]?.value;
+    if (value === null || value === undefined || value === '') return [];
+    let display = String(value);
+    if (column.datatype === 'datetime' && typeof value === 'string') {
+      const date = new Date(value);
+      display = Number.isNaN(date.getTime()) ? value : date.toLocaleDateString();
+    } else if ((column.datatype === 'int' || column.datatype === 'float') && typeof value === 'number') {
+      display = new Intl.NumberFormat(undefined, { maximumFractionDigits: column.datatype === 'float' ? 2 : 0 }).format(value);
+    }
+    return [{ id: column.id, text: `${column.name}: ${display}` }];
+  });
 
   // Cover + overlay badges. All non-interactive (pointer-events: none via CSS) so
   // the single wrapping control (link or toggle button) is the only tab stop.
@@ -200,6 +215,9 @@ function BookCardInner({
       {seriesLine && (
         <p className={styles.series} dir="auto" data-testid="book-card-series">{seriesLine}</p>
       )}
+      {customFieldLines.map((field) => (
+        <p key={field.id} className={styles.customField} dir="auto" title={field.text}>{field.text}</p>
+      ))}
     </div>
   );
 

@@ -1,7 +1,8 @@
 import { BookCard } from './BookCard';
-import { useBooks } from '../lib/queries';
+import { useBooks, useMe } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import styles from './MoreByAuthor.module.css';
+import { selectedCustomColumns } from '../lib/customColumnDisplay';
 
 const MAX = 12;
 
@@ -14,6 +15,7 @@ export function MoreByAuthor({ authorId, authorName, excludeBookId, hideActions 
   { authorId: number | string; authorName: string; excludeBookId: number; hideActions?: boolean; canRead?: boolean }) {
   const t = useT();
   const { data } = useBooks({ page: 1, entityKind: 'author', entityId: authorId, sort: 'new' });
+  const customColumns = selectedCustomColumns(data?.custom_column_definitions, useMe().data);
   const books = (data?.items ?? []).filter((b) => b.id !== excludeBookId).slice(0, MAX);
 
   if (books.length === 0) return null;
@@ -25,7 +27,7 @@ export function MoreByAuthor({ authorId, authorName, excludeBookId, hideActions 
       <div className={styles.strip}>
         {books.map((b) => (
           <div className={styles.item} key={b.id}>
-            <BookCard book={b} hideActions={hideActions} canRead={canRead} />
+            <BookCard book={b} hideActions={hideActions} canRead={canRead} customColumnDefinitions={customColumns} />
           </div>
         ))}
       </div>

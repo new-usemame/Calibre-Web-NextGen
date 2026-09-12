@@ -10,6 +10,7 @@ import { useAddToMyLibrary, useGlobalLibrary, useMe } from '../lib/queries';
 import { usePersistentBool } from '../lib/usePersistentBool';
 import { usePersistentChoice } from '../lib/usePersistentChoice';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
+import { selectedCustomColumns } from '../lib/customColumnDisplay';
 import { useT } from '../lib/i18n';
 import catalogStyles from './Catalog.module.css';
 import styles from './GlobalLibrary.module.css';
@@ -60,11 +61,24 @@ export function GlobalLibrary() {
     setBooks((current) => page === 1 ? listing.data!.items : appendUnique(current, listing.data!.items));
   }, [listing.data, listing.isPlaceholderData, page]);
 
+  useEffect(() => {
+    if (!listing.data || listing.isPlaceholderData || !listing.data.sort || listing.data.sort === sort) return;
+    setSort(listing.data.sort);
+  }, [listing.data, listing.isPlaceholderData, sort]);
+
   if (me?.library_mode === 'monolibrary') return <SpinnerCentered size={40} />;
 
   const denied = listing.error instanceof ApiError && listing.error.status === 403;
   const total = listing.data?.total ?? 0;
   const hasMore = books.length < total;
+  const customColumns = selectedCustomColumns(listing.data?.custom_column_definitions, me);
+  const sortOptions = [
+    { value: 'new', label: t('Recently added') },
+    { value: 'old', label: t('Oldest') },
+    { value: 'abc', label: t('Title A–Z') },
+    { value: 'authaz', label: t('Author A–Z') },
+    ...(listing.data?.custom_sort_options ?? []),
+  ];
 
   const addBook = (book: Book) => add.mutate(book.id, {
     onSuccess: () => announce(t('Added to your library')),
@@ -93,10 +107,7 @@ export function GlobalLibrary() {
         </form>
         <select className={catalogStyles.sortSelect} value={sort} onChange={(event) => setSort(event.target.value)}
           aria-label={t('Sort order')}>
-          <option value="new">{t('Recently added')}</option>
-          <option value="old">{t('Oldest')}</option>
-          <option value="abc">{t('Title A–Z')}</option>
-          <option value="authaz">{t('Author A–Z')}</option>
+          {sortOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </div>
 
@@ -119,6 +130,7 @@ export function GlobalLibrary() {
                 detailsEnabled
                 canRead={owned && !!me?.role?.viewer}
                 hideActions={cardActionsHidden}
+                customColumnDefinitions={customColumns}
                 onAddToLibrary={owned ? undefined : addBook}
                 addPending={add.isPending && add.variables === book.id} />;
             })}

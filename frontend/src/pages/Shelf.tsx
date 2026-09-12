@@ -19,6 +19,7 @@ import { useT } from '../lib/i18n';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { getShelfVisibilityAction } from '../lib/shelfVisibility';
+import { selectedCustomColumns } from '../lib/customColumnDisplay';
 import { SORT_OPTIONS } from '../lib/bookSortOptions';
 
 const SHELF_SORT_OPTIONS = [
@@ -81,6 +82,7 @@ export function Shelf({ id }: { id: string }) {
   const { remove } = useShelfMembership();
   const me = useMe().data;
   const updateProfile = useUpdateProfile();
+  const customColumns = selectedCustomColumns(data?.custom_column_definitions, me);
 
   const [editing, setEditing] = useState(false);
   const [draftName, setDraftName] = useState('');
@@ -419,6 +421,7 @@ export function Shelf({ id }: { id: string }) {
                 removeLabel={t('Remove from shelf')}
                 canRead={!!me?.role?.viewer}
                 hideActions={cardActionsHidden}
+                customColumnDefinitions={customColumns}
               />
             ))}
           </div>

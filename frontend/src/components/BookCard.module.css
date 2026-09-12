@@ -132,6 +132,18 @@
   -webkit-box-orient: vertical;
 }
 
+/* User-selected scalar Calibre fields. They deliberately share the card's
+ * one-line overflow rule: metadata is scannable in the grid, while the detail
+ * page remains the place for unabridged values. */
+.customField {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Cover badges live in ONE bottom-left row. Previously .readBadge sat at
    top-right while .hiddenBadge and .seriesBadge both claimed bottom-left —
    which meant a hidden book in a series view stacked two badges on the same

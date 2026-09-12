@@ -10,7 +10,7 @@ import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { DiscoverSection } from '../components/DiscoverSection';
 import { VirtualizedGridRows } from '../components/VirtualizedGridRows';
-import { useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag, useDeleteTag, tagConflictOf, useMyLibraryRemovalImpact, useRemoveFromMyLibrary } from '../lib/queries';
+import { useBooks, useAdvancedSearch, useEntityList, ENTITY_PLURAL, useMe, useRenameTag, useDeleteTag, tagConflictOf, useMyLibraryRemovalImpact, useRemoveFromMyLibrary, useUpdateCatalogCustomFields } from '../lib/queries';
 import type { TagConflict } from '../lib/queries';
 import type { EntityKind, ReadFilter, DiscoveryView } from '../lib/queries';
 import { apiPost, apiGet, ApiError, type Book, type AdvancedSearchParams } from '../lib/api';
@@ -304,6 +304,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const personalLibrary = me?.library_mode === 'personal_library';
   const removalImpact = useMyLibraryRemovalImpact();
   const removeFromLibrary = useRemoveFromMyLibrary();
+  const updateCatalogCustomFields = useUpdateCatalogCustomFields();
 
   // Catalog-wide choices follow a signed-in account. Guests stay local-only;
   // an existing local value is adopted once when the account has no value yet.
@@ -321,6 +322,30 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const [cardActionsHidden, setCardActionsHidden, cardActionsPreferenceSaving]
     = useCardActionsHidden({ onError: catalogPreferenceError });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // `null` means a newly installed UI: show every administrator-enabled custom
+  // field until the reader chooses a smaller subset in View settings.
+  const [visibleCustomColumnIds, setVisibleCustomColumnIds] = useState<number[] | null>(() => {
+    try {
+      const stored = localStorage.getItem('cwng:catalog-custom-fields-v1');
+      const parsed: unknown = stored ? JSON.parse(stored) : null;
+      return Array.isArray(parsed) && parsed.every((id) => Number.isInteger(id)) ? parsed : null;
+    } catch { return null; }
+  });
+  const [customFieldLabels, setCustomFieldLabels] = useState<Record<string, string>>({});
+  useEffect(() => {
+    // Scoped preference writes update /me after every serialized request. Do
+    // not let an intermediate, older server snapshot repaint the controls
+    // while a newer full-selection write is still queued.
+    if (!updateCatalogCustomFields.isPending) {
+      if (Array.isArray(me?.catalog?.custom_field_ids)) {
+        setVisibleCustomColumnIds(me.catalog.custom_field_ids);
+      }
+      if (me?.catalog?.custom_field_labels) {
+        setCustomFieldLabels(me.catalog.custom_field_labels);
+      }
+    }
+  }, [me?.catalog?.custom_field_ids, me?.catalog?.custom_field_labels,
+      updateCatalogCustomFields.isPending]);
   const [density, setDensity] = usePersistentChoice(
     'cwng:catalog-density-v1', ['comfortable', 'compact', 'dense'] as const, 'compact');
   const [rowsChoice, setRowsChoice] = usePersistentChoice(
@@ -567,6 +592,46 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const advQuery = useAdvancedSearch(advParams, page, perPage);
   const { data, isLoading, isFetching, isPlaceholderData, error } =
     filterActive ? advQuery : booksQuery;
+  const customSortOptions = view === 'hot' || view === 'discover'
+    ? [] : (data?.custom_sort_options ?? []);
+  const activeSortOptions = [...sortOptions, ...customSortOptions];
+  const customColumnDefinitions = (data?.custom_column_definitions ?? []).map((column) => ({
+    ...column,
+    name: customFieldLabels[String(column.id)]?.trim() || column.name,
+  }));
+  const visibleCustomColumns = visibleCustomColumnIds === null
+    ? customColumnDefinitions
+    : customColumnDefinitions.filter((column) => visibleCustomColumnIds.includes(column.id));
+  const saveCustomFields = (ids: number[], labels = customFieldLabels) => {
+    if (me && !me.role?.anonymous) updateCatalogCustomFields.mutate({
+      custom_column_ids: ids,
+      custom_column_labels: labels,
+    }, { onError: () => announce(t('Could not save.'), { assertive: true }) });
+  };
+  const toggleCustomColumn = (id: number) => {
+    setVisibleCustomColumnIds((current) => {
+      const selected = new Set(current ?? customColumnDefinitions.map((column) => column.id));
+      if (selected.has(id)) selected.delete(id); else selected.add(id);
+      const next = [...selected];
+      try { localStorage.setItem('cwng:catalog-custom-fields-v1', JSON.stringify(next)); } catch { /* unavailable */ }
+      saveCustomFields(next);
+      return next;
+    });
+  };
+  const saveCustomFieldLabel = (id: number, value: string) => {
+    const next = { ...customFieldLabels, [String(id)]: value };
+    if (!value.trim()) delete next[String(id)];
+    setCustomFieldLabels(next);
+    const ids = visibleCustomColumnIds ?? customColumnDefinitions.map((column) => column.id);
+    saveCustomFields(ids, next);
+  };
+
+  // A saved custom sort can be removed by an administrator. Trust the server's
+  // effective value so the controlled select never retains an absent option.
+  useEffect(() => {
+    if (!data || isPlaceholderData || !data.sort || data.sort === sort) return;
+    setSort(data.sort);
+  }, [data, isPlaceholderData, sort]);
 
   // Accumulate pages; replace the accumulator whenever the filter set changes.
   // Skip placeholder data: on a filter change react-query briefly returns the
@@ -870,7 +935,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           onChange={(e) => setSort(e.target.value)}
           aria-label={t('Sort order')}
         >
-          {sortOptions.map((opt) => (
+          {activeSortOptions.map((opt) => (
             <option key={opt.value} value={opt.value}>
               {t(opt.label)}
             </option>
@@ -961,6 +1026,30 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   />
                   <span>{t('Show Read now and edit buttons')}</span>
                 </label>
+                {customColumnDefinitions.length > 0 && (
+                  <fieldset className={styles.densityField}>
+                    <legend>{t('Custom fields on book cards')}</legend>
+                    {customColumnDefinitions.map((column) => (
+                      <div key={column.id} className={styles.customFieldSetting}>
+                        <label className={styles.settingsItem}>
+                          <input type="checkbox" checked={visibleCustomColumns.some((item) => item.id === column.id)}
+                            onChange={() => toggleCustomColumn(column.id)} />
+                          <span>{column.name}</span>
+                        </label>
+                        <input
+                          type="text"
+                          className={styles.customFieldLabel}
+                          defaultValue={customFieldLabels[String(column.id)] ?? ''}
+                          key={`${column.id}:${customFieldLabels[String(column.id)] ?? ''}`}
+                          maxLength={80}
+                          placeholder={t('Custom display name')}
+                          aria-label={t('Display name for {name}', { name: column.name })}
+                          onBlur={(event) => saveCustomFieldLabel(column.id, event.target.value)}
+                        />
+                      </div>
+                    ))}
+                  </fieldset>
+                )}
                 <fieldset className={styles.densityField}>
                   <legend>{t('Book density')}</legend>
                   {DENSITY_OPTIONS.map((option) => (
@@ -1054,6 +1143,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   quickEdit={canEdit && !selecting}
                   canRead={!!me?.role?.viewer}
                   hideActions={cardActionsHidden}
+                  customColumnDefinitions={visibleCustomColumns}
                   selectable={selecting}
                   selected={selected.has(book.id)}
                   onToggleSelect={(b) =>

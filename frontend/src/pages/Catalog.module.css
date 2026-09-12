@@ -444,6 +444,20 @@
   transition: background var(--dur-fast) var(--ease);
 }
 .settingsItem:hover { background: var(--surface-3); }
+.customFieldSetting { padding: 0 var(--sp-2) var(--sp-2); }
+.customFieldSetting .settingsItem { padding-inline: 0; }
+.customFieldLabel {
+  width: 100%;
+  min-height: 32px;
+  padding: var(--sp-1) var(--sp-2);
+  color: var(--text);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: var(--fs-sm);
+}
+.customFieldLabel:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
 .settingsCheck {
   width: 16px;
   height: 16px;

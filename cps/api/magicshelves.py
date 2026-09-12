@@ -14,7 +14,7 @@ from flask_babel import gettext as _
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import api_v1
-from .books import _rows_to_items
+from .books import _rows_to_items, _list_custom_column_data
 from .. import ub, config, db, calibre_db, logger, magic_shelf
 from ..cw_login import current_user
 from ..custom_column_sort import (
@@ -124,11 +124,13 @@ def magic_shelf_books(shelf_id):
     entries, _random, pagination = calibre_db.fill_indexpage(
         page, per_page, db.Books, query_filter, list(resolved_sort.order_by),
         True, config.config_read_column, *series_join, *resolved_sort.join)
+    custom_column_definitions, _custom_values = _list_custom_column_data([])
     return jsonify({
         **shelf_item,
         # rules included so the builder can load this shelf for editing
         "rules": shelf.rules or {"condition": "AND", "rules": []},
         "items": _rows_to_items(entries),
+        "custom_column_definitions": custom_column_definitions,
         "sort": resolved_sort.key,
         "sort_persistable": resolved_sort.persistable,
         "custom_sort_options": sort_options,

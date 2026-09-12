@@ -357,6 +357,14 @@ def test_spa_response_exposes_that_an_outage_fallback_must_not_be_persisted():
     assert body["custom_sort_options"] == []
 
 
+def test_classic_sort_options_are_empty_without_a_calibre_session(monkeypatch):
+    from cps import web
+
+    monkeypatch.setattr(web.calibre_db, "session", None)
+
+    assert web._sortable_custom_columns() == []
+
+
 def test_classic_route_persists_real_fallback_but_not_outage_fallback():
     from cps import web
     from flask_babel import Babel

@@ -678,8 +678,11 @@ def test_forensic_payload_schema_transition_restamps_without_wire_entitlement(
         "ChangedEntitlement": 0,
         "IsRemoved": 0,
     }
-    assert {row["schema"] for row in after["books"].values()} == {1}
-    assert {row["schema"] for row in after["deleted"].values()} == {1}
+    from cps import kobo
+
+    current = kobo.ENTITLEMENT_PAYLOAD_SCHEMA_VERSION
+    assert {row["schema"] for row in after["books"].values()} == {current}
+    assert {row["schema"] for row in after["deleted"].values()} == {current}
 
 
 def test_forensic_older_valid_sync_token_version_suppresses_without_restamp(

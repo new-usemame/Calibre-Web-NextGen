@@ -149,6 +149,39 @@ def mark_book_modified(book, *, set_dirty=True, unsync=False):
         kobo_sync_status.remove_synced_book(book.id, all=True)
 
 
+KOBO_DELIVERABLE_FORMATS = frozenset({"KEPUB", "EPUB", "EPUB3"})
+
+
+def mark_book_format_materialised(book, new_format, *, set_dirty=False):
+    """Single source of truth for "a converted/derived format row was added".
+
+    Advances ``last_modified`` (through :func:`mark_book_modified`) ONLY when
+    the new format makes the book Kobo-deliverable for the first time, e.g. a
+    PDF-only book gaining its first EPUB: the sync selects books by
+    ``Books.last_modified > sync_token``, so without a bump that book would
+    never be offered.
+
+    A KEPUB derived from an existing EPUB (or vice versa) leaves the clock
+    alone. The entitlement Nickel holds still describes the same source
+    bytes, and advancing the clock re-sent it on the next sync; Nickel answers
+    a ChangedEntitlement by marking the book not-downloaded. OBSERVED
+    2026-09-11 on a Libra Colour: the on-demand KEPUB minted by the reader's
+    own re-download bumped the clock, and the second de-download came 25 s
+    after she had re-found her place.
+
+    Returns ``True`` when the clock was advanced.
+    """
+    new_format = (new_format or "").upper()
+    if new_format not in KOBO_DELIVERABLE_FORMATS:
+        return False
+    for row in getattr(book, "data", None) or ():
+        existing = (getattr(row, "format", None) or "").upper()
+        if existing in KOBO_DELIVERABLE_FORMATS and existing != new_format:
+            return False
+    mark_book_modified(book, set_dirty=set_dirty)
+    return True
+
+
 def log_metadata_change(book, changed=None):
     """Queue a CWA metadata/cover *file-level* enforcement for ``book`` (#707).
 
@@ -3106,6 +3139,20 @@ def get_download_link(book_id, book_format, client):
     if not data1:
         log.error("Requested format %s for book id %s not found in database", book_format.upper(), book_id)
         abort(404)
+
+    if client == "kobo":
+        # The device is about to replace its local copy; remember that so the
+        # annotation GET that follows is answered from CWNG's own rows.
+        try:
+            from flask import g
+            from .services.kobo_post_download_restore import record_download
+            record_download(
+                device_id=getattr(g, "annotation_origin_device_id", None),
+                book_id=book.id, book_format=book_format, log=log,
+            )
+        except Exception:
+            log.warning("Kobo download ledger update failed for book %s",
+                        book.id, exc_info=True)
 
     # collect downloaded books only for registered user and not for anonymous user
     if current_user.is_authenticated:

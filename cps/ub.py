@@ -948,6 +948,43 @@ class KoboDeviceBookEntitlement(Base):
     )
 
 
+class KoboDeviceBookDownload(Base):
+    """Latest file download of one book by one physical Kobo (#1925 follow-up).
+
+    Nickel discards a book's local annotations and reading position when it
+    re-downloads the file, then asks ``/annotations`` for the replacement set.
+    This row is the server-side memory that such a request is the first one
+    after a download, so CWNG can answer it from its own rows instead of
+    proxying to a Kobo cloud that never held them (OBSERVED 2026-09-11: the
+    proxied answer was an empty set and the reader's 22 highlights vanished).
+    ``restore_state`` is ``pending`` until that first request is answered.
+    """
+    __tablename__ = 'kobo_device_book_download'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    device_id = Column(
+        Integer, ForeignKey('device.id', ondelete='CASCADE'), nullable=False,
+    )
+    # calibre's Books row lives in metadata.db: no cross-database foreign key.
+    book_id = Column(Integer, nullable=False)
+    book_format = Column(String(16), nullable=True)
+    downloaded_at = Column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
+    )
+    restore_state = Column(
+        String(16), nullable=False, default='pending', server_default='pending',
+    )
+    restored_at = Column(DateTime, nullable=True)
+    restored_count = Column(Integer, nullable=True)
+
+    __table_args__ = (
+        UniqueConstraint(
+            'device_id', 'book_id', name='uq_kobo_device_book_download_device_book',
+        ),
+        Index('ix_kobo_device_book_download_book', 'book_id'),
+    )
+
+
 class KoboDeviceDeletedEntitlement(Base):
     """Last hard-delete entitlement delivered to one physical Kobo.
 
@@ -2326,6 +2363,7 @@ def add_missing_tables(engine, _session):
         ("kobo_device_deleted_entitlement", KoboDeviceDeletedEntitlement.__table__),
         ("kobo_device_entitlement_seed", KoboDeviceEntitlementSeed.__table__),
         ("kobo_device_pending_sync_page", KoboDevicePendingSyncPage.__table__),
+        ("kobo_device_book_download", KoboDeviceBookDownload.__table__),
     )
     for table_name, table in tables + kobo_entitlement_tables:
         # Explicit transaction control means even schema inspection begins a

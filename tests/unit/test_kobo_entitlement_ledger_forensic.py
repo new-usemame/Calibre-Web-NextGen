@@ -606,10 +606,19 @@ def test_forensic_empty_flat_markers_reset_suppresses_without_restamp(
     }
 
 
-def test_forensic_classification_migration_restamps_all_and_emits_new(
+def test_forensic_classification_migration_keeps_a_single_kobo_ledger_silent(
     sync_harness, monkeypatch,
 ):
-    """The v0-to-v1 audit deletes uncertain rows, then reannounces them New."""
+    """The v0-to-v1 audit is no longer a restamp candidate for one Kobo.
+
+    This candidate previously reproduced the incident signature exactly: it
+    deleted the whole device ledger, so the recovery arm reselected the
+    library and reannounced all 18 held books New with the tombstone replayed
+    -- the same wire shape the reporters saw as books flipping to "Download".
+    With one paired Kobo the user-wide flat history is that device's history,
+    so the audit now only stamps the version.  Nothing is restamped and
+    nothing crosses the wire.
+    """
     from cps import ub
 
     _establish_acknowledged_ledgers(sync_harness, monkeypatch)
@@ -623,10 +632,10 @@ def test_forensic_classification_migration_restamps_all_and_emits_new(
     page = sync_harness.sync(_stale_valid_token(), acknowledge=False)
     assert sync_harness.session.query(
         ub.KoboDeviceBookEntitlement,
-    ).filter_by(device_id=sync_harness.device.id).count() == 0
+    ).filter_by(device_id=sync_harness.device.id).count() == _HELD_BOOK_COUNT
     assert sync_harness.session.query(
         ub.KoboDeviceDeletedEntitlement,
-    ).filter_by(device_id=sync_harness.device.id).count() == 0
+    ).filter_by(device_id=sync_harness.device.id).count() == 1
     assert sync_harness.session.get(
         ub.KoboDeviceEntitlementSeed, sync_harness.device.id,
     ).classification_version == 1
@@ -638,11 +647,17 @@ def test_forensic_classification_migration_restamps_all_and_emits_new(
     signature = _signature(before, after)
     _print_result("classification_v0_to_v1", page, ack, signature)
 
-    assert _matches_incident_signature(signature)
+    assert not _matches_incident_signature(signature)
+    assert after == before
     assert _wire_counts(page) == {
-        "NewEntitlement": _HELD_BOOK_COUNT,
-        "ChangedEntitlement": 1,
-        "IsRemoved": 1,
+        "NewEntitlement": 0,
+        "ChangedEntitlement": 0,
+        "IsRemoved": 0,
+    }
+    assert _wire_counts(ack) == {
+        "NewEntitlement": 0,
+        "ChangedEntitlement": 0,
+        "IsRemoved": 0,
     }
 
 

@@ -1,0 +1,3 @@
+### Fixed
+
+- **Re-downloading a book on a Kobo no longer wipes its highlights, and a book is no longer re-sent just because the reader downloaded it.** When the KEPUB was built on demand from the stored EPUB, the book's clock advanced and the next sync told the device the book had changed, so it removed and re-fetched the book seconds after the reader had found her place. That materialisation now leaves the clock alone. After any download, the first annotation request from that device is answered from the highlights the server already holds instead of being forwarded to Kobo's empty cloud set, and highlights whose chapter no longer exists in the new file are re-anchored by their text so they still render.

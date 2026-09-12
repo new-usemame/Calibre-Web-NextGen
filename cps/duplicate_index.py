@@ -22,6 +22,7 @@ from .duplicates import (
     get_common_filters,
     normalize_title_for_duplicates,
     normalize_text_for_duplicates,
+    canonical_author_key,
 )
 
 from cps.cwa_db_loader import load_cwa_db
@@ -30,7 +31,7 @@ CWA_DB = load_cwa_db().CWA_DB
 
 log = logger.create()
 
-NORMALIZATION_VERSION = "duplicate-index-v3"  # v3: + accent-fold (NFKD) + punctuation-to-space, precision-preserving (D6)
+NORMALIZATION_VERSION = "duplicate-index-v4"  # v4: + title-stem (series/edition annotation) + order-independent author key
 MAX_INCREMENTAL_BOOK_IDS = 1000
 DUPLICATE_INDEX_REBUILD_BATCH_SIZE = 250
 
@@ -135,7 +136,10 @@ def build_book_key_parts(book, settings):
     # leading primary-author prefix, unlike the old Python fallback's no-author mode.
     return BookKeyParts(
         normalized_title=normalize_title_for_duplicates(title, primary_author),
-        normalized_author=normalize_text_for_duplicates(primary_author, default="unknown"),
+        # Order-independent: "Liu, Cixin" and "Cixin Liu" are one person, and
+        # the index key must agree with the Python grouping path that now uses
+        # the same helper.
+        normalized_author=canonical_author_key(primary_author),
         normalized_language=normalize_text_for_duplicates(language, default="unknown"),
         normalized_series=normalize_text_for_duplicates(series, default="no_series"),
         normalized_publisher=normalize_text_for_duplicates(publisher, default="unknown_publisher"),

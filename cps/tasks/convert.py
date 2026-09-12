@@ -180,7 +180,8 @@ class TaskConvert(CalibreTask):
                         # Recovery adopted a Kobo-visible file that existed on
                         # disk without a Data row; mirror the ordinary
                         # conversion path's cursor provenance update below.
-                        helper.mark_book_modified(cur_book, set_dirty=False)
+                        helper.mark_book_format_materialised(
+                            cur_book, self.settings['new_book_format'])
                     local_db.session.commit()
                 except SQLAlchemyError as e:
                     local_db.session.rollback()
@@ -222,7 +223,11 @@ class TaskConvert(CalibreTask):
                     try:
                         local_db.session.merge(new_format)
                         if self.settings['new_book_format'].upper() in ['KEPUB', 'EPUB', 'EPUB3']:
-                            helper.mark_book_modified(cur_book, set_dirty=False)
+                            # A derived sibling format (EPUB -> KEPUB) must not
+                            # advance the Kobo entitlement clock: the device
+                            # already holds these bytes (see helper docstring).
+                            helper.mark_book_format_materialised(
+                                cur_book, self.settings['new_book_format'])
                         local_db.session.commit()
                     except SQLAlchemyError as e:
                         local_db.session.rollback()

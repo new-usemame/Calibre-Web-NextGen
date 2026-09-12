@@ -875,6 +875,19 @@ def _owned_annotation_get_response(capture_session, ownership, entitlement_id):
         sticky = history == AUTHORITY_EVER
         has_cursor = request.args.get("pageOffsetToken") is not None
         if sticky:
+            from cps.services.kobo_annotation_authority import (
+                reanchor_after_download,
+            )
+            from cps.services.kobo_annotation_reanchor import reanchor_for_book
+            reanchor_after_download(
+                user_id=current_user.id,
+                book_id=ownership.id,
+                device_id=getattr(g, "annotation_origin_device_id", None),
+                log=log,
+                reanchor=lambda rows: reanchor_for_book(
+                    ownership, entitlement_id, rows, log=log,
+                ),
+            )
             pre_serve = prepare_authoritative_device_get(
                 user_id=current_user.id,
                 book_id=ownership.id,
@@ -909,6 +922,36 @@ def _owned_annotation_get_response(capture_session, ownership, entitlement_id):
             page_limit = sticky_render_page_limit(
                 current_user.id, ownership.id, page_limit,
             )
+        if not sticky and not has_cursor:
+            # First GET after this device downloaded the file: Nickel has just
+            # emptied the book's local set, so CWNG's own rows are the best
+            # answer regardless of the seeding gates (see
+            # services/kobo_post_download_restore.py).
+            from cps.services.kobo_annotation_authority import (
+                render_post_download_restore,
+            )
+            from cps.services.kobo_annotation_reanchor import reanchor_for_book
+            restored = render_post_download_restore(
+                user_id=current_user.id,
+                book_id=ownership.id,
+                entitlement_id=entitlement_id,
+                device_id=getattr(g, "annotation_origin_device_id", None),
+                log=log,
+                reanchor=lambda rows: reanchor_for_book(
+                    ownership, entitlement_id, rows, log=log,
+                ),
+            )
+            if restored is not None:
+                body, etag = restored
+                _record_annotation_decision(
+                    capture_session, ownership, "restored_after_download",
+                    entitlement_id,
+                )
+                response = make_response(body, 200)
+                response.headers["Content-Type"] = "application/json"
+                response.headers["Content-Length"] = str(len(body))
+                response.headers["ETag"] = etag
+                return response
         if not sticky and (has_cursor or not local_get_is_eligible(
             settings=config,
             user=current_user,

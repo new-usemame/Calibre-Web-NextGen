@@ -68,6 +68,8 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ### Bug fixes
 
+- **Kobo re-downloads are harmless.** An on-demand EPUB→KEPUB materialisation no longer advances `books.last_modified` (helper SSOT) and `DownloadUrls[].Size` leaves the entitlement fingerprint (payload schema v2), so the device is not told the book changed; each Kobo download is ledgered per device and the next annotations GET from that device is served from the server's own rows, re-anchored by text against the current KEPUB when the chapter names changed. New table `kobo_device_book_download`, auto-created. | SHA `TBD` | release `TBD`.
+
 - **Clearing a note now agrees in the classic and new readers.** Explicit web-reader clears store an empty string; omitted notes and existing NULLs stay unknown. Kobo column rendering treats either empty representation as no note. No migration. | SHA `TBD` | release `TBD`.
 
 - **Hardcover's automatic ID crawler can now be turned off without disabling reading-progress or annotation sync** (fork issue [#2103](https://github.com/new-usemame/Calibre-Web-NextGen/issues/2103)). The CWA settings schedule has an explicit `Never (auto-fetch off)` value; refreshing the schedule removes only the recurring Hardcover crawler job and leaves the canonical `config_hardcover_sync` setting untouched. Unknown persisted schedule values are diagnosed and fall back to the backward-compatible weekly default, while invalid form submissions retain the prior stored value. Fork-original. | SHA `TBD` | release `TBD`.

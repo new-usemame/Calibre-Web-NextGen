@@ -1736,16 +1736,18 @@ def test_entitlement_payload_shape_matches_declared_schema_version(
         }
 
     pinned_schema_and_hashes = {
+        # v2: DownloadUrls[].Size is excluded from the fingerprint so that an
+        # on-demand KEPUB materialised from the stored EPUB does not re-send.
         "live": (
-            1,
-            "28ba9f171cd833b2779b549c9bff86347447d40c011439a06408babe656da0c2",
+            2,
+            "2af6cd084a1ef108e0ac55a0749d1283f15a0c87bbd8cbe533d50cbc425b7bfe",
         ),
         "archived_live": (
-            1,
-            "ad2030d15995f1083b42c90f751af6e24b6a74c02cddfe0e6e5af38674cb7e02",
+            2,
+            "3cd2f24b0cd16744100508bd58afe1c2d9f1f8e447d837e257854c452bd7d521",
         ),
         "hard_delete": (
-            1,
+            2,
             "8d72ce590309549d65cf110a0d44b61d2145bb2401ca4d6bf204ad41f5244011",
         ),
     }

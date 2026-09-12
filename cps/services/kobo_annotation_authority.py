@@ -1147,7 +1147,6 @@ def _emergency_render(*, user_id, book_id, entitlement_id, page_limit,
 
 def _render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit,
                               device_id, log):
-    objects = []
     reasons = []
     rows = _annotation_rows(user_id, book_id, page_limit)
     if len(rows) > page_limit:
@@ -1158,21 +1157,9 @@ def _render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit,
         row_ids={annotation.annotation_id for annotation, _ in rows},
     ):
         return None
-    for annotation, materialization in rows:
-        try:
-            raw = _exact_raw(annotation, materialization)
-            if raw is not None:
-                objects.append(raw)
-                continue
-            mapped, faithful, reason = _fallback_object(annotation, entitlement_id)
-            if not faithful:
-                reasons.append(f"column_fallback:{reason}")
-            objects.append(_encode_object(mapped))
-        except Exception as error:
-            # A single malformed row or serializer bug cannot abort a
-            # replacement-set GET.  Preserve at least its id and user text.
-            objects.append(_encode_object(_emergency_object(annotation, entitlement_id)))
-            reasons.append(_failure_reason("row_render", error))
+    # A single malformed row or serializer bug cannot abort a
+    # replacement-set GET.  Preserve at least its id and user text.
+    objects = _render_rows(rows, entitlement_id, reasons)
 
     body = b'{"annotations":[' + b",".join(objects) \
         + b'],"nextPageOffsetToken":null}'
@@ -1205,6 +1192,170 @@ def _render_owned_annotations(*, user_id, book_id, entitlement_id, page_limit,
     _log_degraded(
         log, user_id=user_id, book_id=book_id,
         visible_count=len(rows), reasons=reasons,
+    )
+    return body, etag
+
+
+def _render_rows(rows, entitlement_id, reasons):
+    """Encode rows to wire objects without ever dropping one."""
+    objects = []
+    for annotation, materialization in rows:
+        try:
+            raw = _exact_raw(annotation, materialization)
+            if raw is not None:
+                objects.append(raw)
+                continue
+            mapped, faithful, reason = _fallback_object(annotation, entitlement_id)
+            if not faithful:
+                reasons.append(f"column_fallback:{reason}")
+            objects.append(_encode_object(mapped))
+        except Exception as error:
+            objects.append(_encode_object(_emergency_object(annotation, entitlement_id)))
+            reasons.append(_failure_reason("row_render", error))
+    return objects
+
+
+def reanchor_after_download(*, user_id, book_id, device_id, log, reanchor):
+    """Sticky (already authoritative) books: re-anchor rows after a download.
+
+    The authoritative path already serves CWNG's rows, so nothing needs to be
+    restored; but a re-converted file may have renamed its chapters, and rows
+    that point at vanished chapters render nowhere. Consume the device's
+    pending download and re-anchor before the render. Returns the number of
+    rows considered, or ``None`` when nothing was pending.
+    """
+    from cps.services import kobo_post_download_restore as ledger
+
+    try:
+        pending = ledger.pending_download(device_id=device_id, book_id=book_id)
+    except Exception:
+        _safe_rollback()
+        log.warning(
+            "Kobo post-download reanchor lookup failed user_id=%s book_id=%s",
+            user_id, book_id, exc_info=True,
+        )
+        return None
+    if pending is None:
+        return None
+    try:
+        rows = _simple_annotation_rows(user_id, book_id, 2 ** 31 - 2)
+        annotations = [row[0] if isinstance(row, tuple) else row for row in rows]
+        if annotations:
+            reanchor(annotations)
+        ledger.settle_pending_download(
+            pending,
+            state=ledger.RESTORE_SERVED if annotations else ledger.RESTORE_EMPTY,
+            count=len(annotations),
+        )
+        ub.session.commit()
+    except Exception:
+        _safe_rollback()
+        log.warning(
+            "Kobo post-download reanchor failed user_id=%s book_id=%s device_id=%s",
+            user_id, book_id, device_id, exc_info=True,
+        )
+        return None
+    log.info(
+        "Kobo post-download reanchor considered %d annotation(s) "
+        "user_id=%s book_id=%s device_id=%s",
+        len(annotations), user_id, book_id, device_id,
+    )
+    return len(annotations)
+
+
+def render_post_download_restore(*, user_id, book_id, entitlement_id, device_id,
+                                 log, reanchor=None):
+    """Answer the first annotation GET after a device download from CWNG rows.
+
+    Returns ``(body, etag)`` or ``None`` (nothing pending, or nothing to
+    restore: the caller then proxies exactly as before).
+
+    The seeding gates exist so that a partial local set never replaces a
+    fuller one on the device. Right after a download the device set is
+    empty by construction, so any non-empty local set is strictly better
+    than the proxied answer, which on the measured household instance was
+    Kobo's empty cloud set. Serving it makes CWNG this book's authority from
+    now on (``ever_authoritative``), exactly as a completed seed would.
+    """
+    from cps.services import kobo_post_download_restore as ledger
+
+    try:
+        pending = ledger.pending_download(device_id=device_id, book_id=book_id)
+    except Exception:
+        _safe_rollback()
+        log.warning(
+            "Kobo post-download restore lookup failed user_id=%s book_id=%s",
+            user_id, book_id, exc_info=True,
+        )
+        return None
+    if pending is None:
+        return None
+
+    reasons = []
+    try:
+        rows = _annotation_rows(user_id, book_id, 2 ** 31 - 2)
+    except Exception:
+        _safe_rollback()
+        rows = _simple_annotation_rows(user_id, book_id, 2 ** 31 - 2)
+    if not rows:
+        ledger.settle_pending_download(pending, state=ledger.RESTORE_EMPTY, count=0)
+        ub.session.commit()
+        log.info(
+            "Kobo post-download restore: no local annotations for "
+            "user_id=%s book_id=%s device_id=%s; proxying",
+            user_id, book_id, device_id,
+        )
+        return None
+
+    if reanchor is not None:
+        try:
+            reanchor([annotation for annotation, _ in rows])
+        except Exception as error:
+            _safe_rollback()
+            reasons.append(_failure_reason("reanchor", error))
+
+    objects = _render_rows(rows, entitlement_id, reasons)
+    body = b'{"annotations":[' + b",".join(objects) \
+        + b'],"nextPageOffsetToken":null}'
+    digest = hashlib.sha256(body).hexdigest()
+    state, normalized_content_id, state_reason = _book_state(
+        user_id, book_id, entitlement_id,
+    )
+    if state_reason is not None:
+        reasons.append(state_reason)
+
+    if state is None:
+        etag = _transient_etag(user_id, book_id, normalized_content_id, digest)
+    else:
+        now = datetime.now(timezone.utc)
+        state.authority_status = "authoritative"
+        state.ever_authoritative = True
+        state.quarantine_reason = None
+        if state.seeded_at is None:
+            state.seeded_at = now
+        try:
+            etag = _commit_complete_render(
+                state=state, body=body, digest=digest, annotation_count=len(rows),
+            )
+        except Exception as error:
+            _safe_rollback()
+            reasons.append(_failure_reason("book_state_commit", error))
+            etag = _transient_etag(user_id, book_id, normalized_content_id, digest)
+
+    try:
+        ledger.settle_pending_download(
+            pending, state=ledger.RESTORE_SERVED, count=len(rows),
+        )
+        ub.session.commit()
+    except Exception as error:
+        _safe_rollback()
+        reasons.append(_failure_reason("download_ledger_commit", error))
+
+    log.info(
+        "Kobo post-download restore served %d annotation(s) user_id=%s "
+        "book_id=%s device_id=%s%s",
+        len(rows), user_id, book_id, device_id,
+        (" reasons=" + ",".join(reasons)) if reasons else "",
     )
     return body, etag
 

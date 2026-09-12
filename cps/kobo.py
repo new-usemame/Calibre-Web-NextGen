@@ -70,7 +70,13 @@ KOB0_COVER_RESET_PROGRESS_EPSILON = 1.0
 # the server intentionally changes the entitlement renderer's declared shape;
 # unchanged book/tombstone bases will then be lazily re-fingerprinted instead
 # of being re-delivered to Nickel.
-ENTITLEMENT_PAYLOAD_SCHEMA_VERSION = 1
+# v2: the entitlement fingerprint no longer covers ``DownloadUrls[].Size``.
+# Materialising a KEPUB from a stored EPUB swaps the served Data row, which
+# changed Size and therefore the fingerprint while the canonical book basis
+# (``last_modified``) stayed put; that was delivered as a ChangedEntitlement
+# and de-downloaded the book on the device that had just fetched it. Content
+# provenance is the basis; Size is a description of a derived artifact.
+ENTITLEMENT_PAYLOAD_SCHEMA_VERSION = 2
 
 # Stored in KoboDeviceEntitlementSeed, never sent to the device. Version 1
 # replaces Books.timestamp watermark classification with the physical-device
@@ -84,10 +90,35 @@ kobo_auth.register_url_value_preprocessor(kobo)
 log = logger.create()
 
 
+def _fingerprint_projection(value):
+    """Copy ``value`` without the download ``Size`` members (schema v2)."""
+    if isinstance(value, dict):
+        projected = {}
+        for key, member in value.items():
+            if key == "DownloadUrls" and isinstance(member, list):
+                projected[key] = [
+                    {k: v for k, v in entry.items() if k != "Size"}
+                    if isinstance(entry, dict) else entry
+                    for entry in member
+                ]
+            else:
+                projected[key] = _fingerprint_projection(member)
+        return projected
+    if isinstance(value, list):
+        return [_fingerprint_projection(item) for item in value]
+    return value
+
+
 def _entitlement_fingerprint(entitlement):
-    """Stable hash of fields that can change Nickel's local book record."""
+    """Stable hash of fields that can change Nickel's local book record.
+
+    ``DownloadUrls[].Size`` is excluded: it changes when a derived artifact
+    (on-demand KEPUB) replaces the served row without any change to the
+    source bytes the device already holds. Real content changes advance
+    ``Books.last_modified`` and are caught by the change basis.
+    """
     payload = json.dumps(
-        entitlement,
+        _fingerprint_projection(entitlement),
         sort_keys=True,
         separators=(",", ":"),
         ensure_ascii=False,

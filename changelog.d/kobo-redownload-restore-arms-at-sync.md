@@ -1,0 +1,2 @@
+### Fixed
+- Kobo: the post-download annotation restore now actually engages on hardware. Nickel fetches the book file with no device headers, so the download alone could not identify the device; the restore is now armed by the sync that re-sends a held book (`ChangedEntitlement`) and the headerless download is attributed to the user's Kobo that just synced. A GET while the restore is armed is answered from local rows and the row stays armed until the download has been seen.

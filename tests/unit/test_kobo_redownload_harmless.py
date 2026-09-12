@@ -595,3 +595,101 @@ def test_sticky_get_after_download_serves_the_new_anchor(app, session, monkeypat
     [served] = json.loads(response.get_data())["annotations"]
     assert served["location"]["span"]["chapterFilename"] == "OEBPS/chap0021.xhtml"
     assert served["location"]["span"]["startPath"] == "span#kobo\\.156\\.1"
+
+
+# ------------------------------------------- B1b: the restore must actually arm
+
+
+def test_headerless_kobo_download_is_attributed_to_the_users_kobo(session, monkeypatch):
+    """OBSERVED on hardware: Nickel fetches the file with the token in the URL
+    and no ``x-kobo-*`` headers, so the route sees no device. The user's
+    (only / most recently seen) active Kobo is the one that just synced."""
+    from cps import helper
+
+    book = SimpleNamespace(
+        id=BOOK_ID, title="Hellenistic Astrology", authors=[], path="x",
+        data=[SimpleNamespace(name="b", format="KEPUB", uncompressed_size=1)],
+    )
+    monkeypatch.setattr(helper, "calibre_db", SimpleNamespace(
+        get_filtered_book=lambda *_a, **_k: book,
+        get_book_format=lambda *_a: book.data[0],
+    ))
+    monkeypatch.setattr(helper, "current_user", SimpleNamespace(
+        id=USER_ID, name="reader", is_authenticated=True, is_anonymous=False,
+        role_admin=lambda: False,
+    ))
+    monkeypatch.setattr(helper.ub, "update_download", lambda *_a: None)
+    monkeypatch.setattr(helper, "get_valid_filename", lambda name, **_k: name)
+    monkeypatch.setattr(helper, "CWA_DB", lambda: SimpleNamespace(log_activity=lambda **_k: None))
+    monkeypatch.setattr(helper, "do_download_file", lambda *a, **k: make_response(b"bytes"))
+    session.add(ub.Device(
+        id=2, user_id=USER_ID, kind="kobo", display_name="Older Kobo",
+        model="Kobo Aura", active=True, created_by="auto",
+        last_seen_at=datetime(2025, 1, 1, tzinfo=timezone.utc),
+    ))
+    session.add(ub.Device(
+        id=3, user_id=99, kind="kobo", display_name="Someone else's",
+        model="Kobo Clara BW", active=True, created_by="auto",
+    ))
+    session.commit()
+
+    app = Flask(__name__)
+    with app.test_request_context(f"/kobo/token/download/{BOOK_ID}/kepub"):
+        g.annotation_origin_device_id = None
+        helper.get_download_link(BOOK_ID, "kepub", "kobo")
+
+    row = session.query(ub.KoboDeviceBookDownload).one()
+    assert (row.device_id, row.book_id, row.restore_state) == (DEVICE_ID, BOOK_ID, "pending")
+
+
+def test_changed_entitlement_arms_the_restore_at_sync_time(sync_harness, monkeypatch):
+    """The sync that tells the device a held book Changed is the moment CWNG
+    knows a de-download is coming; on the Clara Nickel's annotation GET
+    arrived before the file download, so waiting for the download is too late."""
+    from cps import kobo
+
+    monkeypatch.setattr(kobo.config, "config_kobo_suppress_replayed_entitlements", True)
+    first = sync_harness.sync()
+    assert len(_entitlements(first)) == 1
+    token = first.headers[sync_harness.token_header]
+    assert sync_harness.session.query(ub.KoboDeviceBookDownload).count() == 0, (
+        "a NewEntitlement is not a re-download; nothing to restore"
+    )
+
+    sync_harness.book.last_modified = datetime.now() + timedelta(seconds=5)
+    sync_harness.session.commit()
+    second = sync_harness.sync(token)
+    assert [list(e.keys())[0] for e in _entitlements(second)] == ["ChangedEntitlement"]
+
+    row = sync_harness.session.query(ub.KoboDeviceBookDownload).one()
+    assert (row.device_id, row.book_id, row.restore_state) == (
+        sync_harness.device.id, sync_harness.book.id, "armed",
+    )
+
+
+def test_armed_row_serves_the_get_before_and_after_the_download(app, session, monkeypatch):
+    _unseeded_owned(monkeypatch, session)
+    session.add(_highlight("a-1", "these are techniques that can do things"))
+    session.commit()
+    log = logging.getLogger("test")
+    ledger.arm_pending_restore(device_id=DEVICE_ID, book_ids=[BOOK_ID], log=log)
+    session.commit()
+    monkeypatch.setattr(
+        rs, "proxy_to_kobo_reading_services",
+        lambda **_k: pytest.fail("a GET while the restore is armed went to Kobo's cloud"),
+    )
+
+    before = _get(app)
+    assert before.status_code == 200
+    assert len(json.loads(before.get_data())["annotations"]) == 1
+    row = session.query(ub.KoboDeviceBookDownload).one()
+    assert row.restore_state == "armed", "the download has not happened yet"
+
+    ledger.record_download(device_id=DEVICE_ID, book_id=BOOK_ID, book_format="kepub", log=log)
+    assert session.query(ub.KoboDeviceBookDownload).one().restore_state == "pending"
+
+    after = _get(app)
+    assert after.status_code == 200
+    assert len(json.loads(after.get_data())["annotations"]) == 1
+    row = session.query(ub.KoboDeviceBookDownload).one()
+    assert (row.restore_state, row.restored_count) == ("served", 1)

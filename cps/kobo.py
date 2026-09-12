@@ -2075,6 +2075,7 @@ def HandleSyncRequest():
     reseeded_shape_change_deleted_uuids = set()
     delivered_book_identities = []
     rehydrate_book_ids = set()
+    redownload_book_ids = set()
     book_candidates_scanned = 0
     book_delivery_slots = 0
     book_selection_exhausted = book_count == 0
@@ -2197,6 +2198,10 @@ def HandleSyncRequest():
                     sync_results.append({"NewEntitlement": entitlement})
                 else:
                     sync_results.append({"ChangedEntitlement": entitlement})
+                    # Nickel answers a Changed entitlement for a book it
+                    # holds by de-downloading it; the annotation GET after
+                    # its re-download must be served from CWNG's rows.
+                    redownload_book_ids.add(book.Books.id)
                 candidate_emitted_work = True
                 # Only a real delivery arms repair. A byte-identical replay
                 # that #1925 suppresses (including a declared #1953 shape
@@ -2826,6 +2831,24 @@ def HandleSyncRequest():
         )
         for position in rehydrate_positions_emitted:
             position.rehydrate_needed = False
+
+    if requesting_device_id and redownload_book_ids:
+        try:
+            from .services.kobo_post_download_restore import arm_pending_restore
+            arm_pending_restore(
+                device_id=requesting_device_id,
+                book_ids=sorted(redownload_book_ids),
+                log=log,
+            )
+        except Exception:
+            return _abort_sync_with_observability(
+                503,
+                requesting_device_id,
+                sync_cursor_in,
+                response_mode="post_download_restore_arm_failed",
+                capture_session=capture_session,
+                outgoing_cursor=sync_cursor_out,
+            )
 
     # This commit makes only the replayable response durable. Confirmed
     # delivery state was promoted at the beginning of this request (when its

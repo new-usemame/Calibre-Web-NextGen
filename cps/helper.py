@@ -3149,6 +3149,7 @@ def get_download_link(book_id, book_format, client):
             record_download(
                 device_id=getattr(g, "annotation_origin_device_id", None),
                 book_id=book.id, book_format=book_format, log=log,
+                user_id=getattr(current_user, "id", None),
             )
         except Exception:
             log.warning("Kobo download ledger update failed for book %s",

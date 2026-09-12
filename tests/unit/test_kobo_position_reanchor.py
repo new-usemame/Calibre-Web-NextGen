@@ -157,6 +157,33 @@ def test_replacing_a_book_re_anchors_every_reader_and_re_arms_their_devices(
     assert latch.rehydrate_needed is True
 
 
+def test_a_moved_position_carries_a_fresh_clock_so_the_device_takes_it(
+    session, monkeypatch, tmp_path,
+):
+    """The replayed reading state must be newer than the device's own copy,
+    and a later echo of the old locator must read as older than the repair."""
+    _kepub(tmp_path / "old.kepub.epub", OLD)
+    book = _library_book(tmp_path, monkeypatch)
+    _kepub(tmp_path / "lib" / "Brennan" / "new.kepub", NEW)
+    device_clock = datetime(2026, 9, 12, 2, 51, 48)
+    state = session.query(ub.KoboReadingState).one()
+    state.current_bookmark.last_modified = device_clock
+    state.last_modified = state.priority_timestamp = device_clock
+    session.commit()
+
+    positions.reanchor_book_positions(
+        book, old_kepub_path=str(tmp_path / "old.kepub.epub"), log=LOG,
+    )
+
+    session.expire_all()
+    state = session.query(ub.KoboReadingState).one()
+    assert state.current_bookmark.last_modified > device_clock
+    assert state.last_modified > device_clock
+    assert state.priority_timestamp > device_clock
+    latch = session.query(ub.DeviceReadingPosition).one()
+    assert latch.server_modified_at > device_clock
+
+
 def test_serving_a_reading_state_whose_chapter_vanished_re_places_it_by_fraction(
     session, monkeypatch, tmp_path,
 ):

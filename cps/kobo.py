@@ -3741,7 +3741,12 @@ def HandleStateRequest(book_uuid):
                     location_supplied=bool(location),
                     incoming_clock=request_lm,
                     clock_accepts=True,
-                    equal_accepts=True,
+                    # An armed latch means the server holds a position it
+                    # deliberately re-placed (a re-converted book) and will
+                    # replay on the next sync. The device echoing its old
+                    # locator at the same progress with an older clock must
+                    # not overwrite that repair (OBSERVED on hardware).
+                    equal_accepts=not rehydrate_pending,
                     preserve_clock_when_missing=True,
                     block_lower_at_or_below=(
                         KOB0_COVER_RESET_PROGRESS_EPSILON

@@ -90,7 +90,8 @@ def test_titleless_books_never_share_a_key():
 
 def test_index_normalization_version_bumped():
     # changing the normalizer must change the fingerprint so the index rebuilds
-    assert duplicate_index.NORMALIZATION_VERSION == "duplicate-index-v3"
+    # v4: title stem (series/edition annotation) + order-independent author key
+    assert duplicate_index.NORMALIZATION_VERSION == "duplicate-index-v4"
 
 
 # --- selection strategy: which copy is kept --------------------------------

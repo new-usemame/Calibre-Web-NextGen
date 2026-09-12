@@ -183,12 +183,18 @@ def normalize_text_for_duplicates(value, default=""):
     return text.strip()
 
 
-def generate_group_hash(title, author):
+def generate_group_hash(title, author, discriminator=None):
     """Generate MD5 hash for a duplicate group based on title and author
 
     Args:
         title: Book title (will be normalized)
         author: Primary author name (will be normalized)
+        discriminator: optional extra token that keeps two groups sharing one
+            display title apart. Sibling volumes ("Wayward Pines" #1 and #2 are
+            both stored under that exact title) split into separate groups
+            below, and without this they would hash identically — dismissing
+            one would silently dismiss the other. Omitted for every
+            single-group title, so existing dismissals keep their hashes.
 
     Returns:
         32-character MD5 hash string
@@ -198,6 +204,8 @@ def generate_group_hash(title, author):
 
     # Create composite key
     composite = f"{normalized_title}|{normalized_author}"
+    if discriminator is not None:
+        composite = f"{composite}|{discriminator}"
 
     # Generate MD5 hash
     return hashlib.md5(composite.encode('utf-8')).hexdigest()
@@ -224,7 +232,194 @@ def normalize_title_for_duplicates(title, primary_author=None):
         author_prefix = f"{author_norm}, "
         if cmp.startswith(author_prefix):
             text = cmp[len(author_prefix):]
-    return normalize_text_for_duplicates(text, default="untitled")
+    return canonical_title_stem(text)
+
+
+# --- Variant-title duplicates ------------------------------------------------
+#
+# normalize_text_for_duplicates keeps every word and number, which is what
+# stops two distinct books from colliding. The cost is that ONE book catalogued
+# twice under two different titles is invisible: sources disagree about whether
+# to append the series, the volume or the imprint, so a library ends up holding
+#
+#     "Golden Son"       and   "Golden Son (Red Rising Series Book 2)"
+#     "The Road"         and   "The Road (Vintage International)"
+#     "Pines"            and   "Pines (Wayward Pines)"
+#
+# as unrelated books. Those are real rows from the library this was developed
+# against; none of them grouped.
+#
+# Stripping the annotation alone would be unsafe in the other direction. Books
+# in a series share a stem ("Wayward Pines (Book 1)" / "(Book 2)"), and
+# execute-resolution DELETES books — so the volume is handled explicitly, as a
+# filter applied AFTER grouping rather than as part of the key. Keying it
+# directly was measured and rejected: it split genuine duplicates whenever one
+# copy had been imported without series metadata and the other had it.
+
+# Words that mark a parenthetical as annotation rather than title content.
+_ANNOTATION_MARKERS = ('book', 'books', 'series', 'edition', 'volume', 'vol',
+                       'trilogy', 'saga', 'omnibus', 'collection', 'chronicles')
+# Scaffolding that sits directly in front of a volume number.
+_VOLUME_LABEL = r'(?:book|bk|vol|volume|part|no|num|#)'
+_ROMAN_VALUES = {'i': 1, 'ii': 2, 'iii': 3, 'iv': 4, 'v': 5, 'vi': 6,
+                 'vii': 7, 'viii': 8, 'ix': 9, 'x': 10, 'xi': 11, 'xii': 12}
+
+
+def _strip_trailing_bracket_groups(text):
+    """Repeatedly drop a trailing "(...)" or "[...]" group.
+
+    End-anchored deliberately: a parenthetical in the MIDDLE of a title is far
+    more likely to be title-distinguishing than noise. This is what collapses
+    "The Road (Vintage International)" — an imprint carries no marker word, so
+    the marker rule below cannot catch it.
+    """
+    previous = None
+    while previous != text:
+        previous = text
+        text = re.sub(r'\s*[\(\[][^()\[\]]*[\)\]]\s*$', ' ', text).strip()
+    return text
+
+
+def _strip_annotation_brackets(text):
+    """Drop a bracket group ANYWHERE that names a series, volume or edition."""
+    def replace(match):
+        inner = match.group(0).lower()
+        return ' ' if any(word in inner for word in _ANNOTATION_MARKERS) else match.group(0)
+    return re.sub(r'[\(\[][^()\[\]]*[\)\]]', replace, text)
+
+
+def canonical_title_stem(title):
+    """The title with series/edition/imprint annotation removed.
+
+    The volume LABEL is dropped but its NUMBER is kept ("Book 12" -> "12"), so
+    "Wool Book 12" and "Wool Book 13" still differ in the stem itself and never
+    reach the volume filter at all.
+    """
+    raw = title if title is not None and str(title) else "untitled"
+    # Square brackets are a tagging convention, not title punctuation:
+    # "[Wayward Pines 01] Pines", "[2013]", "[Kindle Edition]". They are
+    # stripped wherever they sit, including a LEADING tag that no marker word
+    # would catch. Parentheses get the narrower treatment below, because they
+    # genuinely appear inside real titles far more often than brackets do.
+    stem = re.sub(r'\s*\[[^\[\]]*\]\s*', ' ', str(raw))
+    stem = _strip_annotation_brackets(stem)
+    stem = _strip_trailing_bracket_groups(stem)
+    stem = re.sub(_VOLUME_LABEL + r'\.?\s+(\d+)', r'\1', stem, flags=re.IGNORECASE)
+    stem = normalize_text_for_duplicates(stem, default="untitled")
+    # A title that is nothing BUT an annotation ("(Boxed Set)") must not
+    # normalize to the empty string, or every such book would collide.
+    return stem or normalize_text_for_duplicates(raw, default="untitled")
+
+
+def canonical_author_key(author):
+    """Order-independent author key.
+
+    Calibre stores "Liu, Cixin" where another source says "Cixin Liu", and the
+    two hash apart today — which kept "The Dark Forest" and "The Dark Forest
+    (The Three-Body Problem)" in separate groups even once the title rule
+    collapsed their stems. Sorting the name tokens reconciles the two spellings
+    without being able to merge two different people: it only reorders tokens
+    they were already spelled with.
+
+    Bracketed repeats and domain tokens are dropped first — "Liu, Cixin [Liu,
+    Cixin] || chenjin5.com" is a real author record, where the domain is a
+    scraper's watermark rather than a contributor.
+    """
+    raw = str(author) if author is not None else ''
+    raw = re.sub(r'\[[^\]]*\]', ' ', raw)
+    raw = re.sub(r'[\w-]+\.[a-z]{2,}\b', ' ', raw, flags=re.IGNORECASE)
+    cleaned = ' '.join(sorted(normalize_text_for_duplicates(raw, default='').split()))
+    if cleaned:
+        return cleaned
+    # Everything was stripped (an author recorded ONLY as a domain): fall back
+    # to the original text rather than collapsing every such book together.
+    return ' '.join(sorted(normalize_text_for_duplicates(author, default='unknown').split()))
+
+
+def _volume_number_in(text):
+    """The volume a fragment names, or None.
+
+    Digits are read up to 999 only: a four-digit number is a year or part of a
+    title ("1984", "2001"), never a volume. A roman numeral counts when it is
+    two or more letters, or when a volume label precedes it — a lone "I" is
+    also an English word and an initial.
+    """
+    if not text:
+        return None
+    low = str(text).lower()
+    match = re.search(_VOLUME_LABEL + r'\.?\s*(\d{1,3})\b', low)
+    if match:
+        return int(match.group(1))
+    match = re.search(_VOLUME_LABEL + r'\.?\s*([ivx]{1,5})\b', low)
+    if match and match.group(1) in _ROMAN_VALUES:
+        return _ROMAN_VALUES[match.group(1)]
+    match = re.search(r'\b([ivx]{2,5})\b', low)
+    if match and match.group(1) in _ROMAN_VALUES:
+        return _ROMAN_VALUES[match.group(1)]
+    match = re.search(r'\b(\d{1,3})\s*$', low.strip())
+    if match:
+        return int(match.group(1))
+    return None
+
+
+def declared_volume(title, series_index=None, has_series=False):
+    """The volume this book DECLARES, or None when it declares none.
+
+    None means "does not say", NOT "volume 1" — the difference is what lets a
+    copy imported without series metadata still group with the same book that
+    has it.
+    """
+    raw = str(title) if title is not None else ''
+    annotations = ' '.join(re.findall(r'[\(\[][^()\[\]]*[\)\]]', raw))
+    volume = _volume_number_in(annotations)
+    if volume is None:
+        volume = _volume_number_in(raw)
+    if volume is None and has_series and series_index is not None:
+        try:
+            index = float(series_index)
+            if index.is_integer() and 1 <= index <= 999:
+                volume = int(index)
+        except (TypeError, ValueError):
+            pass
+    return volume
+
+
+def split_on_volume_conflict(members):
+    """Partition one stem group so sibling volumes are never grouped together.
+
+    Applied AFTER grouping, never as part of the key, with the asymmetry a
+    volume check needs: it never creates a group, it only refuses one.
+
+      - nobody declares a volume        -> one group, unchanged
+      - exactly one volume declared     -> one group; copies declaring nothing
+                                           are the same book with thinner
+                                           metadata, not a different volume
+      - two or more volumes declared    -> split per volume, and any copy that
+                                           declares NOTHING is dropped from
+                                           every group: the stem spans more
+                                           than one volume, nothing says which
+                                           this copy is, and an ambiguous book
+                                           must never be offered for automatic
+                                           deletion
+
+    This also tightens an existing false positive: sibling volumes stored under
+    one identical title (Calibre keeps the volume only in series_index) group
+    together today, and auto-resolution would delete one of them.
+
+    Args:
+        members: list of (item, volume_or_None) pairs.
+
+    Returns:
+        list of lists of item, each list one group.
+    """
+    volumes = {volume for _, volume in members if volume is not None}
+    if len(volumes) <= 1:
+        return [[item for item, _ in members]]
+    by_volume = {}
+    for item, volume in members:
+        if volume is not None:
+            by_volume.setdefault(volume, []).append(item)
+    return [by_volume[volume] for volume in sorted(by_volume)]
 
 
 def validate_resolution_strategy(strategy):
@@ -982,7 +1177,11 @@ def find_duplicate_books_python(use_title, use_author, use_language, use_series,
             key_parts.append(normalize_title_for_duplicates(title, primary_author))
 
         if use_author:
-            key_parts.append(primary_author.lower().strip() if primary_author else "unknown")
+            # canonical_author_key, not .lower().strip(): "Liu, Cixin" and
+            # "Cixin Liu" are one person and must land in one group. This also
+            # brings this path in line with duplicate_index, which already
+            # routed the author through the shared normalizer.
+            key_parts.append(canonical_author_key(primary_author) if primary_author else "unknown")
         
         if use_language:
             # Get primary language code
@@ -1025,10 +1224,46 @@ def find_duplicate_books_python(use_title, use_author, use_language, use_series,
         grouped_books[key].append(book)
     
     print(f"[cwa-duplicates] Grouped books into {len(grouped_books)} unique combinations based on selected criteria", flush=True)
-    
+
+    # Volume filter (see split_on_volume_conflict): the title stem intentionally
+    # ignores a "(Book 2)"-style annotation so one book catalogued two ways
+    # converges, which means sibling volumes can now share a stem. Split them
+    # back apart before anything is offered for resolution. Only a stem that
+    # actually spans several declared volumes is touched, so the vast majority
+    # of groups pass through unchanged and keep their existing group_hash.
+    split_groups = []
+    for key, books in grouped_books.items():
+        if len(books) < 2:
+            continue
+        members = [
+            (book, declared_volume(
+                book.title,
+                getattr(book, 'series_index', None),
+                bool(getattr(book, 'series', None)),
+            ))
+            for book in books
+        ]
+        partitions = split_on_volume_conflict(members)
+        # A discriminator is only needed when one stem produced several groups;
+        # leaving it None otherwise keeps every existing dismissal hash valid.
+        needs_discriminator = len(partitions) > 1
+        for partition in partitions:
+            if len(partition) > 1:
+                discriminator = None
+                if needs_discriminator:
+                    # Compare by id: SQLAlchemy instances are matched by
+                    # identity, and a group is small enough that this is cheap.
+                    partition_ids = {book.id for book in partition}
+                    volumes = {volume for book, volume in members
+                               if book.id in partition_ids and volume is not None}
+                    discriminator = next(iter(volumes)) if len(volumes) == 1 else None
+                split_groups.append((key, partition, discriminator))
+    if len(split_groups) != sum(1 for books in grouped_books.values() if len(books) > 1):
+        print("[cwa-duplicates] Volume filter adjusted grouping for series siblings", flush=True)
+
     # Filter to only groups with duplicates and prepare display data
     duplicate_groups = []
-    for key, books in grouped_books.items():
+    for key, books, volume_discriminator in split_groups:
         if len(books) > 1:
             # Sort books by timestamp (newest first)
             books.sort(key=lambda x: _timestamp_or_default(x.timestamp, _AWARE_MIN), reverse=True)
@@ -1058,7 +1293,7 @@ def find_duplicate_books_python(use_title, use_author, use_language, use_series,
                 display_author = books[0].author_names.split(',')[0].strip()
             
             # Generate group hash for dismiss tracking
-            group_hash = generate_group_hash(display_title, display_author)
+            group_hash = generate_group_hash(display_title, display_author, volume_discriminator)
             
             duplicate_groups.append({
                 'title': display_title,

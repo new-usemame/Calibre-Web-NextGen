@@ -67,6 +67,7 @@ class Chapter:
             self.spans.append((match.group(1), cursor, cursor + len(text)))
             cursor += len(text)
         self.text = "".join(parts)
+        self.note_spans = _note_span_ids(markup)
         # map of normalized text -> original index, built lazily
         self._norm = None
         self._index = None
@@ -109,6 +110,22 @@ class Chapter:
             if (s0 <= pos < s1) or (end and pos == s1):
                 return span_id, pos - s0
         return None
+
+
+_NOTE_BLOCK = re.compile(
+    r"<(aside|section)\b[^>]*(?:epub:type=\"(?:foot|end|rear)notes?\"|class=\"[^\"]*footnotes[^\"]*\")"
+    r"[^>]*>.*?</\1>",
+    re.S | re.I,
+)
+_SPAN_ID = re.compile(r"\bid=\"(kobo\.\d+\.\d+)\"")
+
+
+def _note_span_ids(markup):
+    """Span ids that sit inside a footnote/endnote block of ``markup``."""
+    ids = set()
+    for block in _NOTE_BLOCK.finditer(markup):
+        ids.update(_SPAN_ID.findall(block.group(0)))
+    return ids
 
 
 def _escape_span_id(span_id):

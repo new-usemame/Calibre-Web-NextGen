@@ -21,6 +21,7 @@ from .kobo_annotation_reanchor import KepubIndex, _kepub_path, normalize
 
 ANCHOR_CHARS = 200
 _SHRINK = (200, 120, 60, 30)
+LOOKAHEAD_SPANS = 40  # a v3 page-foot note block ran 14 spans before body prose resumed
 
 
 def _chapter(index, name):
@@ -45,6 +46,28 @@ def anchor_text(index, chapter_name, span_id, length=ANCHOR_CHARS):
     return ""
 
 
+def _anchor_candidates(index, chapter_name, span_id, limit=LOOKAHEAD_SPANS):
+    """Anchor snippets for ``span_id`` and the spans that follow it in reading order.
+
+    A position saved on a paragraph the new conversion moved out of the body
+    flow (a page-foot note that became an endnote) must follow the reading
+    page, so the spans after it are candidates too."""
+    chapter = _chapter(index, chapter_name)
+    if chapter is None:
+        return []
+    ids = [sid for sid, _s, _e in chapter.spans]
+    if span_id not in ids:
+        return []
+    out = []
+    for sid in ids[ids.index(span_id):ids.index(span_id) + limit]:
+        if sid in chapter.note_spans:
+            continue
+        snippet = anchor_text(index, chapter_name, sid)
+        if snippet:
+            out.append(snippet)
+    return out
+
+
 def locate_text(index, snippet):
     """``(chapter, span id)`` of the unique place ``snippet`` (or its head) occurs."""
     for length in _SHRINK:
@@ -62,6 +85,8 @@ def locate_text(index, snippet):
         if len(hits) == 1:
             name, start = hits[0]
             found = index.chapters[name].locate(start)
+            if found is not None and found[0] in index.chapters[name].note_spans:
+                return None  # the text lives in an endnote now; not a reading position
             if found is not None:
                 return name, found[0]
         if not hits:
@@ -113,15 +138,19 @@ def reanchor_position_rows(old_index, new_index, rows, *, log):
             continue
         if not getattr(row, "location_value", None):
             continue
-        if _has_position(new_index, row):
+        if old_index is None and _has_position(new_index, row):
             continue
+        # With the old file at hand every row is re-placed: a re-conversion can
+        # reuse a chapter name and a span id for different text, so presence in
+        # the new file proves nothing.
         target = None
         how = "fraction"
         if old_index is not None:
-            snippet = anchor_text(old_index, row.location_source, row.location_value)
-            if snippet:
+            for snippet in _anchor_candidates(old_index, row.location_source, row.location_value):
                 target = locate_text(new_index, snippet)
-                how = "text"
+                if target is not None:
+                    how = "text"
+                    break
         if target is None:
             target = locate_fraction(new_index, getattr(row, "progress_percent", None))
             how = "fraction"

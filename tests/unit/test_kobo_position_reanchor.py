@@ -13,6 +13,7 @@ is re-placed at the same fraction of the book.
 from __future__ import annotations
 
 import logging
+import zipfile
 from datetime import datetime
 from types import SimpleNamespace
 
@@ -187,3 +188,41 @@ def test_a_highlight_whose_chapter_name_was_reused_is_re_anchored_when_forced(tm
     assert reanchor.reanchor_rows(new, [row], OWNED, log=LOG, force=True) == [row]
     assert row.content_id.endswith("!!OEBPS/chap0009.xhtml")
     assert row.start_container_path == "span#kobo\\.4\\.1"
+
+
+def test_a_position_on_a_footnote_paragraph_lands_in_the_body_prose_that_follows(tmp_path):
+    """v3 output set page-foot notes as body paragraphs; v4 moves them into
+    endnote asides at the end of the chapter document. A position saved on such
+    a paragraph must follow the reading page, not the note."""
+    _kepub(tmp_path / "old.kepub.epub", [
+        ("OEBPS/chap0021.xhtml", [
+            ("kobo.155.1", "Antiochus wrote in the first century CE. "),
+            ("kobo.156.1", "1 His arguments were originally outlined in Pingree, Antiochus and Rhetorius. "),
+            ("kobo.157.1", "The next page continues the discussion of Antiochus and his summary. "),
+        ]),
+    ])
+    with zipfile.ZipFile(tmp_path / "new.kepub.epub", "w") as z:
+        z.writestr("mimetype", "application/epub+zip")
+        z.writestr("META-INF/container.xml",
+                   '<?xml version="1.0"?><container version="1.0" '
+                   'xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles>'
+                   '<rootfile full-path="OEBPS/content.opf" '
+                   'media-type="application/oebps-package+xml"/></rootfiles></container>')
+        z.writestr("OEBPS/content.opf",
+                   '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0">'
+                   '<manifest><item id="c0" href="chap0021.xhtml" media-type="application/xhtml+xml"/>'
+                   '</manifest><spine><itemref idref="c0"/></spine></package>')
+        z.writestr("OEBPS/chap0021.xhtml",
+                   '<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml" '
+                   'xmlns:epub="http://www.idpf.org/2007/ops"><body>'
+                   '<p><span class="koboSpan" id="kobo.1.1">Antiochus wrote in the first century CE. </span></p>'
+                   '<p><span class="koboSpan" id="kobo.2.1">The next page continues the discussion of Antiochus and his summary. </span></p>'
+                   '<section class="footnotes" epub:type="footnotes"><aside epub:type="footnote" id="fn-1">'
+                   '<p><span class="koboSpan" id="kobo.156.1">1 His arguments were originally outlined in Pingree, Antiochus and Rhetorius. </span></p>'
+                   '</aside></section></body></html>')
+    old = reanchor.KepubIndex(str(tmp_path / "old.kepub.epub"))
+    new = reanchor.KepubIndex(str(tmp_path / "new.kepub.epub"))
+    row = _row()  # OEBPS/chap0021.xhtml kobo.156.1 - the name AND the span id survive
+
+    assert positions.reanchor_position_rows(old, new, [row], log=LOG) == [row]
+    assert (row.location_source, row.location_value) == ("OEBPS/chap0021.xhtml", "kobo.2.1")

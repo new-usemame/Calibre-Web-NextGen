@@ -4165,6 +4165,14 @@ def get_or_create_reading_state(book_id):
 
 
 def get_kobo_reading_state_response(book, kobo_reading_state):
+    try:
+        from .services.kobo_position_reanchor import reanchor_missing_position
+        reanchor_missing_position(
+            book, kobo_reading_state.current_bookmark, log=log,
+        )
+    except Exception:  # noqa: BLE001 - a broken file must not break the sync
+        log.exception("Kobo position reanchor failed for book %s",
+                      getattr(book, "id", None))
     return {
         "EntitlementId": book.uuid,
         "Created": convert_to_kobo_timestamp_string(book.timestamp),

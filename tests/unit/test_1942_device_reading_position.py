@@ -417,6 +417,39 @@ def test_rehydrate_latch_survives_cover_reset_until_sync_clears_it(
     ).scalar() is False
 
 
+def test_armed_latch_keeps_the_servers_location_against_an_older_equal_progress_echo(
+        state_harness):
+    """OBSERVED on a Kobo Clara (2026-09-12): after the server re-placed a
+    position into a re-converted book, Nickel echoed its own pre-conversion
+    locator with the same progress and an older clock, and that echo replaced
+    the repair before the sync could replay it. While the latch is armed the
+    equal-progress locator refresh must not accept a clock older than the
+    stored bookmark's."""
+    from cps.services import device_reading_position as positions
+
+    harness = state_harness
+    bookmark = harness.state.current_bookmark
+    bookmark.location_value = "reanchored.80"
+    bookmark.last_modified = _clock(12)
+    positions.mark_rehydrate_needed(harness.device.id, [BOOK_ID])
+    harness.session.commit()
+
+    response = harness.put(80.0, clock="2026-08-29T11:00:00Z")
+    assert response.get_json()["RequestResult"] == "Success"
+    harness.session.expire_all()
+
+    assert harness.state.current_bookmark.location_value == "reanchored.80"
+    assert harness.state.current_bookmark.last_modified == _clock(12).replace(tzinfo=None)
+    position = harness.session.query(ub.DeviceReadingPosition).one()
+    assert position.location_value == "device.80.0", "the device journal is truthful"
+    assert position.rehydrate_needed is True
+
+    # A genuine newer reading on the device still wins while armed.
+    harness.put(81.0, clock="2026-08-29T13:00:00Z")
+    harness.session.expire_all()
+    assert harness.state.current_bookmark.location_value == "device.81.0"
+
+
 def test_armed_non_cover_backward_jump_is_not_misclassified_as_reset(
         state_harness):
     from cps.services import device_reading_position as positions

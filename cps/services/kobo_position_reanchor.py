@@ -14,6 +14,7 @@ from __future__ import annotations
 import os
 import posixpath
 import zipfile
+from datetime import datetime, timezone
 
 from cps import ub
 
@@ -196,9 +197,20 @@ def reanchor_book_positions(book, *, old_kepub_path=None, log):
     if old_kepub_path and os.path.isfile(old_kepub_path):
         old_index = KepubIndex(old_kepub_path)
     moved = reanchor_position_rows(old_index, new_index, bookmarks + latches, log=log)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     for row in moved:
         if isinstance(row, ub.DeviceReadingPosition):
             row.rehydrate_needed = True
+            row.server_modified_at = now
+        else:
+            # The repair is a new observation: newer than the device's own copy
+            # so Nickel takes the replay, and newer than the device's echo of
+            # the old locator so that echo cannot overwrite it.
+            row.last_modified = now
+            state = getattr(row, "kobo_reading_state", None)
+            if state is not None:
+                state.last_modified = now
+                state.priority_timestamp = now
     if moved:
         ub.session.commit()
         log.info("Kobo position reanchor: moved %d of %d position row(s) for book %s",

@@ -22,6 +22,7 @@ from __future__ import annotations
 
 # ruff: noqa: F811  (the imported `sync_harness` fixture is used by parameter name)
 
+import hashlib
 import json
 import logging
 import os
@@ -595,6 +596,59 @@ def test_sticky_get_after_download_serves_the_new_anchor(app, session, monkeypat
     [served] = json.loads(response.get_data())["annotations"]
     assert served["location"]["span"]["chapterFilename"] == "OEBPS/chap0021.xhtml"
     assert served["location"]["span"]["startPath"] == "span#kobo\\.156\\.1"
+
+
+def test_reanchored_row_with_a_raw_kobo_sidecar_serves_the_new_location(app, session, monkeypatch, tmp_path):
+    """OBSERVED on the Clara (rehearsal book, 2026-09-12): a highlight made on the
+    device is stored with its raw PATCH sidecar; the re-anchor moved the columns
+    to the new chapter, but the byte-exact sidecar still won the render and the
+    device kept the old span. The served object must carry the new anchor."""
+    book = _unseeded_owned(monkeypatch, session)
+    state = session.query(ub.KoboAnnotationBookState).one()
+    state.authority_status = "authoritative"
+    state.ever_authoritative = True
+    state.seeded_at = datetime.now(timezone.utc)
+    path = tmp_path / "lib" / "Brennan" / "Hellenistic"
+    path.mkdir(parents=True)
+    _kepub(path / "hellenistic.kepub", [("OEBPS/chap0007.xhtml", [
+        ("kobo.4.1", "the putative founder of the tradition"),
+    ])])
+    book.path = os.path.join("Brennan", "Hellenistic")
+    book.data = [SimpleNamespace(name="hellenistic", format="KEPUB")]
+    monkeypatch.setattr(reanchor.config, "get_book_path", lambda: str(tmp_path / "lib"))
+    row = _highlight("moved", "putative",
+                     content_id=f"{OWNED}!!OEBPS/chap0021.xhtml",
+                     start_container_path="span#kobo\\.5\\.1", end_container_path="span#kobo\\.5\\.1",
+                     start_offset=68, end_offset=76)
+    session.add(row)
+    session.commit()
+    location = (b'{"span": {"chapterFilename": "OEBPS/chap0021.xhtml","chapterProgress": 0.0149,'
+                b'"chapterTitle": "CHAPTER 4","endChar": 76,"endPath": "span#kobo\\\\.5\\\\.1",'
+                b'"startChar": 68,"startPath": "span#kobo\\\\.5\\\\.1"}}')
+    raw = (b'{"clientLastModifiedUtc": "2026-09-12T11:57:43Z","highlightColor": "#A0A0A0",'
+           b'"highlightedText": "putative","id": "moved","location": ' + location + b',"type": "highlight"}')
+    session.add(ub.KoboAnnotationMaterialization(
+        annotation_id=row.id, raw_annotation_json=raw, raw_location_json=location,
+        raw_client_modified_utc="2026-09-12T11:57:43Z",
+        payload_sha256=hashlib.sha256(raw).hexdigest(),
+        materialization_revision=row.content_revision, provenance="kobo_patch",
+        attachments_state="empty", serveable=False,
+    ))
+    session.commit()
+    ledger.record_download(device_id=DEVICE_ID, book_id=BOOK_ID, book_format="kepub",
+                           log=logging.getLogger("test"))
+    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services",
+                        lambda **_k: pytest.fail("proxied"))
+
+    response = _get(app)
+
+    assert response.status_code == 200, response.get_data()
+    [served] = json.loads(response.get_data())["annotations"]
+    assert served["id"] == "moved"
+    assert served["location"]["span"]["chapterFilename"] == "OEBPS/chap0007.xhtml"
+    assert served["location"]["span"]["startPath"] == "span#kobo\\.4\\.1"
+    assert served["location"]["span"]["startChar"] == 4
+    assert served["highlightedText"] == "putative"
 
 
 # ------------------------------------------- B1b: the restore must actually arm

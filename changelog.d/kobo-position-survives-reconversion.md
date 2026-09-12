@@ -1,0 +1,3 @@
+### Fixed
+
+- **A Kobo reading position survives the book being re-converted.** A re-converted book renames its chapter files and renumbers the kobo spans, so the reader's saved place pointed at bytes that no longer existed and the device opened the book at the start. The position's prose is now read from the previous book file and found again in the new one (a chapter that merely kept its old file name is not trusted); a position whose previous file is already gone is re-placed at the same fraction of the book. Device latches that moved are re-armed so the Kobo receives the new place after its download.

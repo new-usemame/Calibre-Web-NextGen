@@ -180,14 +180,18 @@ def _kepub_path(book):
     return None
 
 
-def reanchor_rows(index, rows, entitlement_id, *, log):
-    """Rewrite the location of rows whose chapter is gone; return the changed rows."""
+def reanchor_rows(index, rows, entitlement_id, *, log, force=False):
+    """Rewrite the location of rows whose chapter is gone; return the changed rows.
+
+    ``force`` re-anchors every row by its text: after a re-conversion a chapter
+    file name is routinely reused for different prose, so presence proves nothing.
+    """
     entitlement = (entitlement_id or "").strip().strip("{}")
     changed = []
     for row in rows:
         content_id = row.content_id or ""
         chapter = content_id.split("!!", 1)[1] if "!!" in content_id else ""
-        if index.has_chapter(chapter):
+        if not force and index.has_chapter(chapter):
             continue
         needle = normalize(row.highlighted_text)
         if len(needle) < 4:

@@ -242,6 +242,12 @@ def reanchor_rows(index, rows, entitlement_id, *, log, force=False):
         row.end_offset = last[1]
         row.chapter_progress = (start / len(chapter_obj.text)) if chapter_obj.text else 0.0
         row.context_string = chapter_obj.text[max(0, start - 60):end + 60]
+        # A row that arrived through a Kobo PATCH also keeps its byte-exact
+        # sidecar, and the render prefers that sidecar while its revision still
+        # matches.  Advancing the revision retires the sidecar, so the device is
+        # served the columns just rewritten rather than the span it moved from
+        # (OBSERVED on hardware: the highlight stayed in the old chapter).
+        row.content_revision = (row.content_revision or 0) + 1
         changed.append(row)
     return changed
 

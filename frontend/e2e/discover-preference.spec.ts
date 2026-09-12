@@ -30,16 +30,12 @@ async function installReadNowObserver(page: import('@playwright/test').Page) {
 
 async function expectCardActionsAvailable(page: import('@playwright/test').Page) {
   if (test.info().project.use.hasTouch === true) {
-    const card = page.locator('[class*="wrap"]').filter({
-      has: page.locator('a[aria-label^="Read "]'),
-    }).first();
-    const more = card.getByRole('button', { name: /^More actions for / });
-    await expect(more).toBeVisible();
-    await more.click();
-    await expect(card
-      .getByRole('group', { name: /^Actions for / })
-      .getByRole('link', { name: /^Read / })).toBeVisible();
-    await page.keyboard.press('Escape');
+    // Coarse pointers show no card actions at all (operator ruling 2026-09-12):
+    // the row is still RENDERED — which is what the preference controls — but
+    // the coarse media rule keeps it out of the layout. The off-state assertion
+    // at each call site is what proves the preference removes it from the DOM,
+    // so "available" here is exactly "still rendered".
+    await expect(page.locator('a[aria-label^="Read "]').first()).toBeAttached();
     return;
   }
 

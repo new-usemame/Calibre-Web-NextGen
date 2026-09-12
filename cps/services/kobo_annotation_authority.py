@@ -1215,6 +1215,54 @@ def _render_rows(rows, entitlement_id, reasons):
     return objects
 
 
+def reanchor_after_download(*, user_id, book_id, device_id, log, reanchor):
+    """Sticky (already authoritative) books: re-anchor rows after a download.
+
+    The authoritative path already serves CWNG's rows, so nothing needs to be
+    restored; but a re-converted file may have renamed its chapters, and rows
+    that point at vanished chapters render nowhere. Consume the device's
+    pending download and re-anchor before the render. Returns the number of
+    rows considered, or ``None`` when nothing was pending.
+    """
+    from cps.services import kobo_post_download_restore as ledger
+
+    try:
+        pending = ledger.pending_download(device_id=device_id, book_id=book_id)
+    except Exception:
+        _safe_rollback()
+        log.warning(
+            "Kobo post-download reanchor lookup failed user_id=%s book_id=%s",
+            user_id, book_id, exc_info=True,
+        )
+        return None
+    if pending is None:
+        return None
+    try:
+        rows = _simple_annotation_rows(user_id, book_id, 2 ** 31 - 2)
+        annotations = [row[0] if isinstance(row, tuple) else row for row in rows]
+        if annotations:
+            reanchor(annotations)
+        ledger.settle_pending_download(
+            pending,
+            state=ledger.RESTORE_SERVED if annotations else ledger.RESTORE_EMPTY,
+            count=len(annotations),
+        )
+        ub.session.commit()
+    except Exception:
+        _safe_rollback()
+        log.warning(
+            "Kobo post-download reanchor failed user_id=%s book_id=%s device_id=%s",
+            user_id, book_id, device_id, exc_info=True,
+        )
+        return None
+    log.info(
+        "Kobo post-download reanchor considered %d annotation(s) "
+        "user_id=%s book_id=%s device_id=%s",
+        len(annotations), user_id, book_id, device_id,
+    )
+    return len(annotations)
+
+
 def render_post_download_restore(*, user_id, book_id, entitlement_id, device_id,
                                  log, reanchor=None):
     """Answer the first annotation GET after a device download from CWNG rows.

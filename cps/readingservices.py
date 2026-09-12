@@ -875,6 +875,19 @@ def _owned_annotation_get_response(capture_session, ownership, entitlement_id):
         sticky = history == AUTHORITY_EVER
         has_cursor = request.args.get("pageOffsetToken") is not None
         if sticky:
+            from cps.services.kobo_annotation_authority import (
+                reanchor_after_download,
+            )
+            from cps.services.kobo_annotation_reanchor import reanchor_for_book
+            reanchor_after_download(
+                user_id=current_user.id,
+                book_id=ownership.id,
+                device_id=getattr(g, "annotation_origin_device_id", None),
+                log=log,
+                reanchor=lambda rows: reanchor_for_book(
+                    ownership, entitlement_id, rows, log=log,
+                ),
+            )
             pre_serve = prepare_authoritative_device_get(
                 user_id=current_user.id,
                 book_id=ownership.id,

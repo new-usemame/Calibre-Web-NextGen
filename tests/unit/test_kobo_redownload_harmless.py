@@ -20,7 +20,8 @@ Three layers, each with its own seen-red test here:
 
 from __future__ import annotations
 
-import io
+# ruff: noqa: F811  (the imported `sync_harness` fixture is used by parameter name)
+
 import json
 import logging
 import os
@@ -527,3 +528,70 @@ def test_restore_get_reanchors_before_serving(app, session, monkeypatch, tmp_pat
     assert served["location"]["span"]["startChar"] == 0
     stored = session.query(ub.Annotation).one()
     assert stored.content_id == f"{OWNED}!!OEBPS/chap0021.xhtml"
+
+
+def test_already_authoritative_book_is_reanchored_after_a_download(app, session, monkeypatch, tmp_path):
+    """Sticky books skip the restore path, but their rows still need new anchors."""
+    book = _unseeded_owned(monkeypatch, session)
+    state = session.query(ub.KoboAnnotationBookState).one()
+    state.authority_status = "authoritative"
+    state.ever_authoritative = True
+    state.seeded_at = datetime.now(timezone.utc)
+    path = tmp_path / "lib" / "Brennan" / "Hellenistic"
+    path.mkdir(parents=True)
+    _kepub(path / "hellenistic.kepub", [("OEBPS/chap0021.xhtml", [
+        ("kobo.156.1", "these are techniques that can do things that we didn't even think were possible"),
+    ])])
+    book.path = os.path.join("Brennan", "Hellenistic")
+    book.data = [SimpleNamespace(name="hellenistic", format="KEPUB")]
+    monkeypatch.setattr(reanchor.config, "get_book_path", lambda: str(tmp_path / "lib"))
+    session.add(_highlight("moved", "these are techniques that can do things that we didn't even think were possible"))
+    session.commit()
+    ledger.record_download(device_id=DEVICE_ID, book_id=BOOK_ID, book_format="kepub",
+                           log=logging.getLogger("test"))
+
+    considered = authority.reanchor_after_download(
+        user_id=USER_ID, book_id=BOOK_ID, device_id=DEVICE_ID, log=logging.getLogger("test"),
+        reanchor=lambda rows: reanchor.reanchor_for_book(book, OWNED, rows, log=logging.getLogger("test")),
+    )
+
+    assert considered == 1
+    stored = session.query(ub.Annotation).one()
+    assert stored.content_id == f"{OWNED}!!OEBPS/chap0021.xhtml"
+    assert stored.start_container_path == "span#kobo\\.156\\.1"
+    download = session.query(ub.KoboDeviceBookDownload).one()
+    assert (download.restore_state, download.restored_count) == ("served", 1)
+    # consumed: a second call is a no-op
+    assert authority.reanchor_after_download(
+        user_id=USER_ID, book_id=BOOK_ID, device_id=DEVICE_ID,
+        log=logging.getLogger("test"), reanchor=lambda rows: pytest.fail("re-ran"),
+    ) is None
+
+
+def test_sticky_get_after_download_serves_the_new_anchor(app, session, monkeypatch, tmp_path):
+    book = _unseeded_owned(monkeypatch, session)
+    state = session.query(ub.KoboAnnotationBookState).one()
+    state.authority_status = "authoritative"
+    state.ever_authoritative = True
+    state.seeded_at = datetime.now(timezone.utc)
+    path = tmp_path / "lib" / "Brennan" / "Hellenistic"
+    path.mkdir(parents=True)
+    _kepub(path / "hellenistic.kepub", [("OEBPS/chap0021.xhtml", [
+        ("kobo.156.1", "these are techniques that can do things that we didn't even think were possible"),
+    ])])
+    book.path = os.path.join("Brennan", "Hellenistic")
+    book.data = [SimpleNamespace(name="hellenistic", format="KEPUB")]
+    monkeypatch.setattr(reanchor.config, "get_book_path", lambda: str(tmp_path / "lib"))
+    session.add(_highlight("moved", "these are techniques that can do things that we didn't even think were possible"))
+    session.commit()
+    ledger.record_download(device_id=DEVICE_ID, book_id=BOOK_ID, book_format="kepub",
+                           log=logging.getLogger("test"))
+    monkeypatch.setattr(rs, "proxy_to_kobo_reading_services",
+                        lambda **_k: pytest.fail("proxied"))
+
+    response = _get(app)
+
+    assert response.status_code == 200, response.get_data()
+    [served] = json.loads(response.get_data())["annotations"]
+    assert served["location"]["span"]["chapterFilename"] == "OEBPS/chap0021.xhtml"
+    assert served["location"]["span"]["startPath"] == "span#kobo\\.156\\.1"

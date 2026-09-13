@@ -14,7 +14,7 @@ test('Library sort order persists across a full page reload', async ({ page }) =
 
   await sort.selectOption({ label: 'Author A–Z' });
   await expect(sort).toHaveValue('authaz');
-  expect(await page.evaluate(() => localStorage.getItem('cwng:library-sort-v1'))).toBe('authaz');
+  expect(await page.evaluate(() => localStorage.getItem('cwng:library-sort-v2'))).toBe('authaz');
 
   await page.reload();
   await expect(page.getByRole('combobox', { name: 'Sort order' })).toHaveValue('authaz');

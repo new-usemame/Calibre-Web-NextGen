@@ -7068,6 +7068,10 @@ msgid "Reading positions"
 msgstr "Positions de lecture"
 
 #: cps/spa_strings.py
+msgid "Recent"
+msgstr "Lecture récente"
+
+#: cps/spa_strings.py
 msgid "Recipient(s)"
 msgstr "Destinataire(s)"
 

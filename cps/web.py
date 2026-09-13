@@ -44,7 +44,7 @@ from .helper import check_valid_domain, check_email, check_username, \
     send_registration_mail, check_send_to_ereader, check_read_formats, tags_filters, reset_password, valid_email, \
     edit_book_read_status, valid_password, get_kosync_progress_display
 from .pagination import Pagination
-from .sort_orders import BOOK_SORT_ORDERS, book_sort_order
+from .sort_orders import BOOK_SORT_ORDERS, book_sort_order, viewer_id
 from .custom_column_sort import (
     load_configured_columns,
     resolve_magic_shelf_sort,
@@ -647,8 +647,10 @@ def get_sort_function(sort_param, data):
             return BOOK_SORT_ORDERS["seriesasc"], "seriesasc"
         sort_param = "new"
     # The ORDER BY itself is shared with the new UI's /api/v1 lists so the two
-    # cannot disagree, and so every sort keeps its unique tiebreaker (#1331).
-    return book_sort_order(sort_param), sort_param
+    # cannot disagree, and so every sort keeps its unique tiebreaker (#1331) —
+    # including the per-user "recent", so a stored choice made in the new UI
+    # does not silently mean something else on a classic page.
+    return book_sort_order(sort_param, user_id=viewer_id(current_user)), sort_param
 
 
 def cwa_get_library_location() -> str:

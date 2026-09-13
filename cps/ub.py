@@ -749,6 +749,14 @@ class Bookmark(Base):
     bookmark_key = Column(String)
     updated_at = Column(DateTime)
 
+    # Every read of this table is "this user, this book" — the reader opening a
+    # book, the reader saving a position, and the "Recent" order asking when the
+    # user last read each book on the page. Without it that last one is a full
+    # scan per book listed. Not unique: one row per format.
+    __table_args__ = (
+        Index('ix_bookmark_user_book', 'user_id', 'book_id'),
+    )
+
 
 class BookCoverLock(Base):
     """Per-book flag that prevents the cover from being overwritten by the
@@ -1268,6 +1276,13 @@ class KoboBookmark(Base):
     location_value = Column(String)
     progress_percent = Column(Float)
     content_source_progress_percent = Column(Float)
+
+    # The parent FK is how every reader of this table reaches it. Unindexed,
+    # SQLite reports "AUTOMATIC PARTIAL COVERING INDEX" — it rebuilds a
+    # throwaway index on each statement (measured on the "Recent" order).
+    __table_args__ = (
+        Index('ix_kobo_bookmark_state', 'kobo_reading_state_id'),
+    )
 
 
 class KoboStatistics(Base):
@@ -4942,11 +4957,43 @@ def migrate_thumbnail_lookup_index(engine, _session):
         )
 
 
+def migrate_reading_activity_indexes(engine, _session):
+    """Index the two reading-position tables by how they are actually read.
+
+    ``book_read_link`` and ``kobo_reading_state`` already carry UNIQUE(user_id,
+    book_id); these two never carried anything. Every lookup of a position is
+    "this user, this book" (the reader) or "this reading state" (the Kobo sync
+    and the "Recent" order), so unindexed they cost a scan of the whole table
+    per book — and the "Recent" order evaluates them once per book on the page.
+
+    Not gated on a CONFIG_DIR marker, for the same reason
+    :func:`migrate_thumbnail_lookup_index` is not: a different app.db can be
+    selected or restored under the same config directory. ``IF NOT EXISTS`` is
+    the idempotency guard.
+    """
+    try:
+        _run_ddl_with_retry(
+            engine,
+            [
+                "CREATE INDEX IF NOT EXISTS ix_bookmark_user_book "
+                "ON bookmark(user_id, book_id)",
+                "CREATE INDEX IF NOT EXISTS ix_kobo_bookmark_state "
+                "ON kobo_bookmark(kobo_reading_state_id)",
+            ],
+        )
+    except Exception as error:
+        log.warning(
+            "[reading-activity-index-migration] index creation failed: %s",
+            error,
+        )
+
+
 def migrate_Database(_session):
     engine = _session.bind
     add_missing_tables(engine, _session)
     migrate_kobo_entitlement_ledger_columns(engine, _session)
     migrate_thumbnail_lookup_index(engine, _session)
+    migrate_reading_activity_indexes(engine, _session)
     migrate_hardcover_match_queue_dedup(engine, _session)
     migrate_registration_table(engine, _session)
     migrate_user_session_table(engine, _session)

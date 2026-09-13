@@ -93,6 +93,9 @@ export function GlobalLibrary() {
         </form>
         <select className={catalogStyles.sortSelect} value={sort} onChange={(event) => setSort(event.target.value)}
           aria-label={t('Sort order')}>
+          {/* Offered here too, but the global library keeps opening on what is
+              newly available rather than on what this reader has been reading. */}
+          <option value="recent">{t('Recent')}</option>
           <option value="new">{t('Recently added')}</option>
           <option value="old">{t('Oldest')}</option>
           <option value="abc">{t('Title A–Z')}</option>

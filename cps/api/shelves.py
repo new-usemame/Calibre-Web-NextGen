@@ -19,7 +19,7 @@ from .serializers import serialize_shelf
 from .books import _rows_to_items
 from .. import calibre_db, config, db, ub, user_library
 from ..cw_login import current_user
-from ..sort_orders import BOOK_SORT_ORDERS
+from ..sort_orders import BOOK_SORT_ORDERS, RECENT_SORT, recent_sort_order, viewer_id
 from ..usermanagement import login_required_if_no_ano
 from ..shelf import (
     check_shelf_view_permissions,
@@ -102,8 +102,15 @@ def shelf_detail(shelf_id):
     # Shelf sorting is view-only: "stored", an unknown value, and the two
     # app-DB download-count sorts all retain the manual BookShelf order. Every
     # metadata sort comes from the shared ORDER BY map used by the catalog.
+    # "Recent" is per-user and so is not in that map; a shelf browsed by the
+    # anonymous guest has no history to sort by and falls back the way every
+    # other unsupported sort does here — to the order the owner arranged.
     sort = request.args.get("sort", "stored")
-    order = BOOK_SORT_ORDERS.get(sort)
+    if sort == RECENT_SORT:
+        reader = viewer_id(current_user)
+        order = None if reader is None else recent_sort_order(reader)
+    else:
+        order = BOOK_SORT_ORDERS.get(sort)
     if order is None or sort in ("hotdesc", "hotasc"):
         order = [ub.BookShelf.order.asc()]
 

@@ -24,7 +24,10 @@ import { useAnnouncer } from '../lib/a11y/announcer';
 import { measureCatalogColumnCount } from '../lib/catalogGridMeasurement';
 import styles from './Catalog.module.css';
 import { canUploadBooks } from '../lib/permissions';
-import { SORT_OPTIONS } from '../lib/bookSortOptions';
+import {
+  DEFAULT_LIBRARY_SORT, LIBRARY_SORT_KEY, LIBRARY_SORT_KEY_LEGACY, SORT_OPTIONS,
+  resolveLibrarySort,
+} from '../lib/bookSortOptions';
 
 const VIEW_OPTIONS: Record<DiscoveryView, { label: string }> = {
   hot: { label: 'Hot — Most Downloaded' },
@@ -55,7 +58,6 @@ const READ_FILTERS: { label: string; value: ReadFilter }[] = [
 // and the read filter → "All". Entity/series/discovery views keep their contextual
 // defaults (#573 series-order, #498 saved view) and are intentionally excluded — a
 // remembered whole-library sort must not leak into a series or author listing.
-const LIBRARY_SORT_KEY = 'cwng:library-sort-v1';
 const LIBRARY_READ_FILTER_KEY = 'cwng:library-readfilter-v1';
 const LIBRARY_SORT_VALUES = SORT_OPTIONS.map((o) => o.value);
 const LIBRARY_READ_FILTER_VALUES: ReadFilter[] = READ_FILTERS.map((f) => f.value);
@@ -67,6 +69,16 @@ function readStoredChoice<T extends string>(key: string, allowed: readonly T[]):
   try {
     const stored = localStorage.getItem(key) as T | null;
     return stored && allowed.includes(stored) ? stored : undefined;
+  } catch { return undefined; }
+}
+
+// The sort has two keys: this build's, and the one v1 left behind. v1 was
+// written on every mount rather than only when the reader used the menu, so it
+// cannot vouch for the value it seeded itself with — see resolveLibrarySort.
+function readStoredSort(): string | undefined {
+  try {
+    return resolveLibrarySort(localStorage.getItem(LIBRARY_SORT_KEY),
+      localStorage.getItem(LIBRARY_SORT_KEY_LEGACY), LIBRARY_SORT_VALUES);
   } catch { return undefined; }
 }
 
@@ -234,7 +246,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // Series views expose two extra series-order options and default to ascending
   // series order so the list reads 1, 2, 3… instead of newest-first (#573).
   const sortOptions = isSeries ? [...SERIES_SORT_OPTIONS, ...SORT_OPTIONS] : SORT_OPTIONS;
-  const defaultSort = isSeries ? 'seriesasc' : 'new';
+  const defaultSort = isSeries ? 'seriesasc' : DEFAULT_LIBRARY_SORT;
   // Library-only controls (search box, advanced link, read-status filter) are
   // hidden for both entity-scoped and discovery views.
   const hideLibraryControls = filtered || isView;
@@ -264,7 +276,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const [search, setSearch] = useState(() => snap?.search ?? '');
   const [sort, setSort] = useState(() =>
     snap?.sort
-    ?? (isPlainLibrary ? readStoredChoice(LIBRARY_SORT_KEY, LIBRARY_SORT_VALUES) : undefined)
+    ?? (isPlainLibrary ? readStoredSort() : undefined)
     ?? defaultSort);
   const [readFilter, setReadFilter] = useState<ReadFilter>(() =>
     (snap?.readFilter as ReadFilter)
@@ -273,10 +285,15 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
   // Persist the Library view's sort + read filter so a full reload restores them (#640).
   // Scoped to the plain library — entity/discovery views must not overwrite the key.
-  useEffect(() => {
+  // The sort is written where the reader picks it, not from an effect on mount:
+  // a key seeded by merely rendering the page records no preference, but is
+  // indistinguishable from one, which is why v1 had to be superseded rather than
+  // reused (LIBRARY_SORT_KEY_LEGACY).
+  const chooseSort = useCallback((next: string) => {
+    setSort(next);
     if (!isPlainLibrary) return;
-    try { localStorage.setItem(LIBRARY_SORT_KEY, sort); } catch { /* storage can be disabled */ }
-  }, [isPlainLibrary, sort]);
+    try { localStorage.setItem(LIBRARY_SORT_KEY, next); } catch { /* storage can be disabled */ }
+  }, [isPlainLibrary]);
   useEffect(() => {
     if (!isPlainLibrary) return;
     try { localStorage.setItem(LIBRARY_READ_FILTER_KEY, readFilter); } catch { /* storage can be disabled */ }
@@ -867,7 +884,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         <select
           className={styles.sortSelect}
           value={sort}
-          onChange={(e) => setSort(e.target.value)}
+          onChange={(e) => chooseSort(e.target.value)}
           aria-label={t('Sort order')}
         >
           {sortOptions.map((opt) => (

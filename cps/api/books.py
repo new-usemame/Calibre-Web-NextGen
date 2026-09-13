@@ -20,7 +20,7 @@ from ..services import user_cover
 from ..helper import edit_book_read_status, book_in_progress_ids, book_is_in_progress, \
     get_convert_options, get_kosync_progress_display, \
     SQLITE_IN_CHUNK_SIZE as _SQLITE_IN_CHUNK
-from ..sort_orders import BOOK_SORT_ORDERS
+from ..sort_orders import BOOK_SORT_ORDERS, book_sort_order, viewer_id
 from ..usermanagement import login_required_if_no_ano
 
 log = logger.create()
@@ -78,14 +78,24 @@ def _original_filename(book_id):
 SORT_MAP = BOOK_SORT_ORDERS
 
 
+def _requested_order(sort_param):
+    """Resolve the ORDER BY for this request, including the per-user ones.
+
+    ``recent`` needs the viewer, and an anonymous browse has no reading history
+    to sort by, so it degrades to the default there rather than 400ing on a
+    sort the SPA legitimately offers to signed-in users.
+    """
+    return book_sort_order(sort_param, user_id=_real_user_id())
+
+
 def _real_user_id():
-    """Return a concrete user id, tolerating stripped-decorator unit contexts."""
-    try:
-        if (not current_user.is_authenticated) or current_user.is_anonymous:
-            return None
-        return int(current_user.id)
-    except (AttributeError, RuntimeError):
-        return None
+    """Return a concrete user id, tolerating stripped-decorator unit contexts.
+
+    The anonymous-browse guest is signed in as a real row, so this is not the
+    same question as ``is_authenticated`` — see ``sort_orders.viewer_id``, which
+    is where that rule lives now that the per-user sorts need it too.
+    """
+    return viewer_id(current_user)
 
 
 def _can_browse_global():
@@ -242,7 +252,7 @@ def list_books():
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", config.config_books_per_page, type=int)
     sort = request.args.get("sort", "new")
-    order = SORT_MAP.get(sort, SORT_MAP["new"])
+    order = _requested_order(sort)
     search = request.args.get("search")
     show_hidden = (request.args.get("show_hidden", "").strip().lower()
                    in ("1", "true", "yes", "on"))
@@ -420,7 +430,7 @@ def list_global_library():
         "per_page", config.config_books_per_page, type=int
     )))
     sort = request.args.get("sort", "new")
-    order = SORT_MAP.get(sort, SORT_MAP["new"])
+    order = _requested_order(sort)
     term = (request.args.get("search") or "").strip()
     filter_name = request.args.get("filter", "all")
     if filter_name not in ("all", "not_in_my_library"):

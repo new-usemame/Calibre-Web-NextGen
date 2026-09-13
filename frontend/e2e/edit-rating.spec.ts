@@ -18,22 +18,22 @@ import { collectPageErrors, assertNoPageErrors } from './utils';
 
 const RATING = '[role="slider"][aria-label="Rating"]';
 
-/** First book id in the library whose edit page has ONE rating widget. A book
- *  with a rating-type custom column renders a second identical slider, and the
- *  single-target selectors below were written for exactly one. */
+/** The edit page's BUILT-IN rating slider, scoped to its "Rating" field group.
+ *  A library with a rating-type custom column ("My Rating"…) renders a second,
+ *  identical widget in Custom columns; the #1061 selectors were written for
+ *  exactly one. (The DOM-order evaluate below keeps the bare selector — the
+ *  built-in field precedes the custom-columns section.) */
+function ratingSlider(page: Page) {
+  return page.getByRole('group', { name: 'Rating', exact: true }).locator(RATING);
+}
+
+/** First book id in the library, or null on an empty seed. */
 async function firstBookId(page: Page): Promise<number | null> {
   return await page.evaluate(async () => {
-    const r = await fetch('/api/v1/books?per_page=25', { credentials: 'same-origin' });
+    const r = await fetch('/api/v1/books?per_page=1', { credentials: 'same-origin' });
     if (!r.ok) return null;
     const d = await r.json();
-    for (const item of d.items ?? []) {
-      const detail = await fetch(`/api/v1/books/${item.id}`, { credentials: 'same-origin' })
-        .then((x) => (x.ok ? x.json() : null)).catch(() => null);
-      if (detail && !(detail.custom_columns ?? []).some((c: { datatype: string }) => c.datatype === 'rating')) {
-        return item.id as number;
-      }
-    }
-    return null;
+    return d.items?.[0]?.id ?? null;
   });
 }
 
@@ -43,8 +43,8 @@ async function firstBookId(page: Page): Promise<number | null> {
 async function clickStars(page: Page, frac: number) {
   // boundingBox() is viewport-relative; measuring while the widget is below the
   // fold sends the click to the page background instead.
-  await page.locator(RATING).scrollIntoViewIfNeeded();
-  const box = await page.locator(RATING).boundingBox();
+  await ratingSlider(page).scrollIntoViewIfNeeded();
+  const box = await ratingSlider(page).boundingBox();
   expect(box, 'rating widget has no box').not.toBeNull();
   await page.mouse.click(box!.x + box!.width * frac, box!.y + box!.height / 2);
 }
@@ -52,9 +52,10 @@ async function clickStars(page: Page, frac: number) {
 /** Put the widget back to "Not rated", whatever the seed left behind. The clear
  *  button is disabled at 0, so clicking it unconditionally would just hang. */
 async function clearRating(page: Page) {
-  const clear = page.getByRole('button', { name: /clear rating/i });
+  const clear = page.getByRole('group', { name: 'Rating', exact: true })
+    .getByRole('button', { name: /clear rating/i });
   if (await clear.isEnabled()) await clear.click();
-  await expect(page.locator(RATING)).toHaveAttribute('aria-valuenow', '0');
+  await expect(ratingSlider(page)).toHaveAttribute('aria-valuenow', '0');
 }
 
 // Serial: these tests share one book and mutate its rating.
@@ -68,7 +69,7 @@ test.describe('#1061 star rating on the edit page', () => {
     test.skip(!id, 'seed has no books');
 
     await page.goto(`/app/book/${id}/edit`);
-    const rating = page.locator(RATING);
+    const rating = ratingSlider(page);
     await expect(rating).toBeVisible();
 
     // Start from unrated — the reporter's first case, where nothing happened at
@@ -96,15 +97,15 @@ test.describe('#1061 star rating on the edit page', () => {
     test.skip(!id, 'seed has no books');
 
     await page.goto(`/app/book/${id}/edit`);
-    await expect(page.locator(RATING)).toBeVisible();
+    await expect(ratingSlider(page)).toBeVisible();
     await clickStars(page, 0.75);
-    await expect(page.locator(RATING)).toHaveAttribute('aria-valuenow', '4');
+    await expect(ratingSlider(page)).toHaveAttribute('aria-valuenow', '4');
 
     await page.getByRole('button', { name: /save changes/i }).click();
     await page.waitForURL(`**/app/book/${id}`, { timeout: 15_000 });
 
     await page.goto(`/app/book/${id}/edit`);
-    await expect(page.locator(RATING)).toHaveAttribute('aria-valuenow', '4');
+    await expect(ratingSlider(page)).toHaveAttribute('aria-valuenow', '4');
   });
 
   test('the rating widget is not wrapped in a label that owns a control', async ({ page }) => {
@@ -113,7 +114,7 @@ test.describe('#1061 star rating on the edit page', () => {
     test.skip(!id, 'seed has no books');
 
     await page.goto(`/app/book/${id}/edit`);
-    await expect(page.locator(RATING)).toBeVisible();
+    await expect(ratingSlider(page)).toBeVisible();
 
     // Structural pin: re-wrapping the selector in a <label> that contains a
     // button reintroduces the implicit-activation bug, and the click assertions
@@ -129,8 +130,9 @@ test.describe('#1061 star rating on the edit page', () => {
     expect(enclosing.inLabel && enclosing.controls > 0,
       'rating selector sits in a <label> that owns a control — clicks will be forwarded to it').toBe(false);
 
-    // The label text must still name the group for assistive tech.
-    await expect(page.getByRole('group', { name: /rating/i })).toBeVisible();
+    // The label text must still name the group for assistive tech. (Exact:
+    // a rating-type custom column adds a "My Rating" group of its own.)
+    await expect(page.getByRole('group', { name: 'Rating', exact: true })).toBeVisible();
   });
 
   /*
@@ -150,19 +152,19 @@ test.describe('#1061 star rating on the edit page', () => {
     test.skip(!id, 'seed has no books');
 
     await page.goto(`/app/book/${id}/edit`);
-    await expect(page.locator(RATING)).toBeVisible();
+    await expect(ratingSlider(page)).toBeVisible();
 
     const languages = page.getByLabel(/languages/i).first();
     const widths = async () => ({
       languages: (await languages.boundingBox())!.width,
-      stars: (await page.locator(RATING).boundingBox())!.width,
+      stars: (await ratingSlider(page).boundingBox())!.width,
     });
 
     await clearRating(page);
     const unrated = await widths();
 
     await clickStars(page, 0.75);
-    await expect(page.locator(RATING)).toHaveAttribute('aria-valuenow', '4');
+    await expect(ratingSlider(page)).toHaveAttribute('aria-valuenow', '4');
     const rated = await widths();
 
     // Sub-pixel drift from fractional flex distribution is fine; a whole glyph
@@ -175,7 +177,7 @@ test.describe('#1061 star rating on the edit page', () => {
     // Half stars go through the fractional-fill path — pin that it keeps the
     // same track width rather than only the integer case.
     await clickStars(page, 0.45);
-    await expect(page.locator(RATING)).toHaveAttribute('aria-valuenow', '2.5');
+    await expect(ratingSlider(page)).toHaveAttribute('aria-valuenow', '2.5');
     const half = await widths();
     expect(Math.abs(half.stars - unrated.stars)).toBeLessThan(1);
     expect(Math.abs(half.languages - unrated.languages)).toBeLessThan(1);

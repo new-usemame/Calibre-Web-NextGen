@@ -143,8 +143,10 @@ test('touch cards expose no action targets; the book page carries them (2026-09-
     'the legacy card pencil must occupy no touch target',
   ).toBeNull();
 
-  // Where those actions live now. Each is a full-width page control, so this is
-  // the measurement that protects a touch user's reach.
+  // Where those actions live now. Read now and Add to shelf are full-width row
+  // controls; the Edit affordance is the gear menu's "Edit metadata" item (the
+  // menu stays open while measured). These are the measurements that protect a
+  // touch user's reach.
   const href = await details.first().getAttribute('href');
   const bookId = href!.match(/\/book\/(\d+)$/)![1];
   await page.goto(`/app/book/${bookId}`);
@@ -152,10 +154,12 @@ test('touch cards expose no action targets; the book page carries them (2026-09-
     'Book page Read now',
     page.getByRole('link', { name: 'Read now' }),
   );
+  await page.getByTestId('book-actions-menu').click();
   await expectSc258Target(
-    'Book page Edit',
-    page.locator(`a[href$="/book/${bookId}/edit"]`).first(),
+    'Book page Edit metadata menuitem',
+    page.getByRole('menuitem', { name: 'Edit metadata' }),
   );
+  await page.keyboard.press('Escape');
   await expectSc258Target(
     'Book page Add to shelf',
     page.getByRole('button', { name: 'Add to shelf' }),
@@ -239,9 +243,12 @@ test('compact controls expose at least a 24x24 effective clickable target', asyn
       { message: `temporary ${TEMP_FORMAT} format was not attached by ingest`, timeout: 30_000 },
     ).toBe(true);
 
-    await page.goto(`/app/book/${formatBookId}/edit`);
-    const deleteButton = page.getByRole('button', { name: `Delete ${TEMP_FORMAT}` });
-    await expectSc258Target('EditBook format delete button', deleteButton);
+    await page.goto(`/app/book/${formatBookId}`);
+    // The per-format delete button moved from Edit metadata to the book page's
+    // Files section with the book-page actions cleanup.
+    const deleteButton = page.getByTestId('book-files')
+      .getByRole('button', { name: `Delete ${TEMP_FORMAT}` });
+    await expectSc258Target('Book page Files format delete button', deleteButton);
   } finally {
     if (formatQueued && formatBookId !== undefined) {
       const deleted = await page.request.post(

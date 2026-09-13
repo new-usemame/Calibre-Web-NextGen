@@ -107,8 +107,9 @@ async function firstBookId(page: Page): Promise<number | null> {
 }
 
 // #803 — the new UI had no way to delete a book (users had to switch to classic).
-// The book-detail page now carries a whole-book delete action, gated on the
-// delete role and confirmed before it fires. These fail pre-fix (no button).
+// Whole-book deletion now lives in the book page's "More actions" gear menu, in
+// an admin-only section, gated on the delete role and confirmed before it fires.
+// These fail pre-fix (no such control).
 
 test('a permitted user gets a delete action that confirms, calls the delete endpoint, and returns to the library (#803)', async ({ page }) => {
   await page.goto('/app');
@@ -132,10 +133,13 @@ test('a permitted user gets a delete action that confirms, calls the delete endp
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
 
   // #1939 renamed the accessible name to disambiguate irreversible global
-  // deletion from "remove from my library". The flow this test guards (#803) -
-  // confirm dialog, whole-book delete endpoint, return to the library - is
-  // unchanged.
-  const del = page.getByRole('button', { name: 'Delete from the global library' });
+  // deletion from "remove from my library"; it now sits on the gear menu's
+  // admin-only menuitem. The flow this test guards (#803) — confirm dialog,
+  // whole-book delete endpoint, return to the library — is unchanged.
+  const trigger = page.getByTestId('book-actions-menu');
+  await expect(trigger).toBeVisible({ timeout: 10_000 });
+  await trigger.click();
+  const del = page.getByRole('menuitem', { name: 'Delete from the global library' });
   await expect(del).toBeVisible({ timeout: 10_000 });
 
   // Clicking fires the confirm dialog, then a POST to the whole-book delete
@@ -171,12 +175,19 @@ test('the delete action is hidden for a user without the delete role (#803)', as
   });
 
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
-  // The page has rendered (an existing action is present) but delete is absent.
-  await expect(page.getByRole('button', { name: /Mark as (read|unread)/ })).toBeVisible({ timeout: 10_000 });
+  // The page has rendered (the gear menu opens and an existing action is
+  // present) but the admin-only delete section is absent.
+  const trigger = page.getByTestId('book-actions-menu');
+  await expect(trigger).toBeVisible({ timeout: 10_000 });
+  await trigger.click();
+  const menu = page.getByTestId('book-actions-menu-list');
+  await expect(menu.getByRole('menuitem', { name: /Mark as (read|unread)/ }))
+    .toBeVisible({ timeout: 10_000 });
   // #1939 renamed the book-detail destructive control's accessible name. This
   // absence assertion MUST track the rename: against the old name it would now
   // pass whether or not the control is hidden, i.e. prove nothing.
-  await expect(page.getByRole('button', { name: 'Delete from the global library' })).toHaveCount(0);
+  await expect(menu.getByRole('menuitem', { name: 'Delete from the global library' })).toHaveCount(0);
+  await expect(menu.getByText('Admin only')).toHaveCount(0);
 });
 
 test('book detail with a "More by" strip has no horizontal overflow on mobile', async ({ page }) => {

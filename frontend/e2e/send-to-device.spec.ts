@@ -43,9 +43,11 @@ test('a book can be queued to one selected pull reader', async ({ page }) => {
   await stubDeliveryDevice(page, bookId!);
 
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
-  const disclosure = page.getByRole('button', { name: 'Send to device' });
-  await expect(disclosure).toBeVisible();
-  await disclosure.click();
+  // "Send to device" is a gear-menu item now; selecting it opens the panel.
+  const trigger = page.getByTestId('book-actions-menu');
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+  await page.getByRole('menuitem', { name: 'Send to device' }).click();
 
   const panel = page.getByTestId('device-send-panel');
   await expect(panel.getByRole('combobox', { name: 'Device' })).toHaveValue('reader-a');
@@ -63,7 +65,8 @@ test('send-to-device panel is accessible and does not overflow on touch mobile',
   await stubDeliveryDevice(page, bookId!);
 
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: 'Send to device' }).click();
+  await page.getByTestId('book-actions-menu').click();
+  await page.getByRole('menuitem', { name: 'Send to device' }).click();
   await expect(page.getByTestId('device-send-panel')).toBeVisible();
 
   const results = await new AxeBuilder({ page })

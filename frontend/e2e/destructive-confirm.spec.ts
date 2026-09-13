@@ -4,11 +4,13 @@ import { collectPageErrors, assertNoPageErrors } from './utils';
 /*
  * #1496 — destructive SPA actions must confirm before they fire.
  *
- * Reported by @JamesHACS: "Reload metadata from disk" sits in the same action
+ * Reported by @JamesHACS: "Reload metadata from disk" sat in the same action
  * row as the per-format download buttons on the book page and fired straight
  * out of onClick. Reaching for a download and landing one button over rewrote
  * the book's details from the file, replacing any title/author/series the user
- * had curated. There is no undo in the UI.
+ * had curated. There is no undo in the UI. The control lives in the book
+ * page's "More actions" gear menu now; the confirm gate behind it is what
+ * these specs pin.
  *
  * The SPA already had a settled convention — bulk merge, bulk delete, format
  * delete, whole-book delete, shelf delete, smart-shelf delete, admin user
@@ -74,7 +76,10 @@ test('dismissing the confirm does NOT reload metadata from disk (#1496)', async 
 
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
 
-  const reload = page.getByRole('button', { name: 'Reload metadata from disk' });
+  const trigger = page.getByTestId('book-actions-menu');
+  await expect(trigger).toBeVisible({ timeout: 10_000 });
+  await trigger.click();
+  const reload = page.getByRole('menuitem', { name: 'Reload metadata from disk' });
   await expect(reload).toBeVisible({ timeout: 10_000 });
   await reload.click();
 
@@ -100,7 +105,10 @@ test('accepting the confirm still reloads metadata from disk (#1496)', async ({ 
 
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
 
-  const reload = page.getByRole('button', { name: 'Reload metadata from disk' });
+  const trigger = page.getByTestId('book-actions-menu');
+  await expect(trigger).toBeVisible({ timeout: 10_000 });
+  await trigger.click();
+  const reload = page.getByRole('menuitem', { name: 'Reload metadata from disk' });
   await expect(reload).toBeVisible({ timeout: 10_000 });
 
   const [req] = await Promise.all([

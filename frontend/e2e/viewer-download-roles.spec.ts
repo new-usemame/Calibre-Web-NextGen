@@ -110,8 +110,9 @@ test('viewer and download roles independently govern every book affordance (F-ed
           name,
           email: `${name}@example.test`,
           password: PASSWORD,
-          // Edit access makes the edit-book file list reachable so the same
-          // download-role contract is exercised on every SPA book surface.
+          // Edit access makes the book page's Files section render even for a
+          // user without the download role, so the same download-role contract
+          // is exercised on every SPA book surface.
           roles: { viewer: roleCase.viewer, download: roleCase.download, edit: true },
         },
       });
@@ -171,17 +172,25 @@ test('viewer and download roles independently govern every book affordance (F-ed
           page.locator(`a[href$="/read/${readableBookId}"], a[href*="/view/${readableBookId}/"]`),
           `${user.label}: New UI detail Read affordance must match API role.viewer`,
         ).toHaveCount(me.role.viewer ? 1 : 0);
+        // Per-format downloads live in the book page's Files section (they
+        // moved out of the action row and off the edit page).
         await expect(
-          page.locator(`a[href*="/download/${readableBookId}/"]`),
+          page.getByTestId('book-files').locator(`a[href*="/download/${readableBookId}/"]`),
           `${user.label}: New UI detail download affordances must match API role.download`,
         ).toHaveCount(me.role.download ? book.formats.length : 0);
-
-        await page.goto(`/app/book/${readableBookId}/edit`);
-        await expect(page.getByRole('heading', { name: 'Files' })).toBeVisible();
         await expect(
           page.locator(`a[href*="/download/${readableBookId}/"]`),
-          `${user.label}: New UI edit-page download affordances must match API role.download`,
+          `${user.label}: New UI detail must expose no download links outside the Files section`,
         ).toHaveCount(me.role.download ? book.formats.length : 0);
+
+        // The edit page keeps metadata only: no download affordances at all,
+        // whatever the role.
+        await page.goto(`/app/book/${readableBookId}/edit`);
+        await expect(page.getByRole('heading', { name: 'Edit metadata' })).toBeVisible();
+        await expect(
+          page.locator(`a[href*="/download/${readableBookId}/"]`),
+          `${user.label}: New UI edit page no longer carries download affordances`,
+        ).toHaveCount(0);
 
         // New UI catalog cards use the same viewer answer as detail.
         await page.goto(`/app/?q=${encodeURIComponent(book.title)}`);

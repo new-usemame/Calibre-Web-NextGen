@@ -78,21 +78,27 @@ test('Hide persists across reload; Show hidden reveals a marked book and provide
   const errors = collectPageErrors(page);
 
   await page.goto(`/app/book/${book!.id}`);
-  const hide = page.getByTestId('hide-book-toggle');
-  await expect(hide).toBeVisible();
-  await expect(hide).toHaveRole('button');
-  const hideName = await hide.getAttribute('aria-label');
-  expect(hideName).toBeTruthy();
   const actionControls = page.getByTestId('book-actions').locator('a, button');
   expect(await actionControls.count()).toBeGreaterThan(0);
   for (const control of await actionControls.all()) {
     await expect(control).toHaveAccessibleName(/\S/);
   }
 
+  // The hide toggle is a gear-menu item now (state-aware label: Hide/Unhide).
+  // The menu closes when an item is selected, so each look at the label is a
+  // fresh open.
+  await page.getByTestId('book-actions-menu').click();
+  const hide = page.getByTestId('hide-book-toggle');
+  await expect(hide).toBeVisible();
+  await expect(hide).toHaveRole('menuitem');
+  const hideName = ((await hide.textContent()) ?? '').trim();
+  expect(hideName).toBeTruthy();
+
   try {
     const before = await page.request.get('/api/v1/books?per_page=60').then((r) => r.json());
     await hide.click();
-    await expect(hide).not.toHaveAttribute('aria-label', hideName!);
+    await page.getByTestId('book-actions-menu').click();
+    await expect(page.getByTestId('hide-book-toggle')).not.toHaveAccessibleName(hideName);
 
     await page.goto('/app');
     const afterHide = await page.request.get('/api/v1/books?per_page=60').then((r) => r.json());
@@ -119,9 +125,11 @@ test('Hide persists across reload; Show hidden reveals a marked book and provide
     await page.reload();
     await expect(page.getByRole('link', { name: `Open details for ${book!.title}` })).toBeVisible();
     await page.getByRole('link', { name: `Open details for ${book!.title}` }).click();
-    const unhide = page.getByTestId('hide-book-toggle');
-    await unhide.click();
-    await expect(unhide).toHaveAttribute('aria-label', hideName!);
+    await page.getByTestId('book-actions-menu').click();
+    await page.getByTestId('hide-book-toggle').click();
+    // Menu closed on select; reopen to see the label flip back.
+    await page.getByTestId('book-actions-menu').click();
+    await expect(page.getByTestId('hide-book-toggle')).toHaveAccessibleName(hideName);
   } finally {
     // Idempotent cleanup: only toggle when the detail payload still says hidden.
     const detail = await page.request.get(`/api/v1/books/${book!.id}`).then((r) => r.json()).catch(() => null);
@@ -145,10 +153,14 @@ test('hidden+archived remains recoverable through Show hidden, while Archived ke
 
   await page.goto(`/app/book/${book!.id}`);
   try {
+    // Both toggles are gear-menu items; the menu closes on each select.
+    await page.getByTestId('book-actions-menu').click();
     const archive = page.getByTestId('archive-book-toggle');
-    const archiveName = await archive.getAttribute('aria-label');
+    const archiveName = ((await archive.textContent()) ?? '').trim();
+    expect(archiveName).toBeTruthy();
     await archive.click();
-    await expect(archive).not.toHaveAttribute('aria-label', archiveName!);
+    await page.getByTestId('book-actions-menu').click();
+    await expect(page.getByTestId('archive-book-toggle')).not.toHaveAccessibleName(archiveName);
     await page.getByTestId('hide-book-toggle').click();
 
     await page.goto('/app/archived');
@@ -182,6 +194,7 @@ test('hiding is per-user and a non-delete user still receives Hide', async ({ pa
 
   try {
     await page.goto(`/app/book/${book!.id}`);
+    await page.getByTestId('book-actions-menu').click();
     await page.getByTestId('hide-book-toggle').click();
 
     const me = await secondaryUser.page.request.get('/api/v1/auth/me').then((r) => r.json());
@@ -201,9 +214,12 @@ test('hiding is per-user and a non-delete user still receives Hide', async ({ pa
       await route.fulfill({ response, json: payload });
     });
     await page.reload();
+    await page.getByTestId('book-actions-menu').click();
     const personalAction = page.getByTestId('hide-book-toggle');
     await expect(personalAction).toBeVisible();
-    expect(await personalAction.evaluate((node) => node.nextElementSibling === null)).toBe(true);
+    // The toggle is a gear-menu item now — deliberately outside the delete-role
+    // gate, but no longer an action-row control of its own.
+    await expect(personalAction).toHaveRole('menuitem');
   } finally {
     const cleanup = await page.request.post(`/api/v1/books/${book!.id}/hidden`, {
       headers, data: { hidden: false },
@@ -251,7 +267,11 @@ test('Guest never receives a Hide action even when the instance feature is enabl
     await route.fulfill({ status: 200, contentType: 'application/json', json: me });
   });
   await page.goto(`/app/book/${book!.id}`);
-  await expect(page.getByTestId('hide-book-toggle')).toHaveCount(0);
+  // Guests still get the gear menu (read/archive live there); Hide must not.
+  await page.getByTestId('book-actions-menu').click();
+  const menu = page.getByTestId('book-actions-menu-list');
+  await expect(menu).toBeVisible();
+  await expect(menu.getByTestId('hide-book-toggle')).toHaveCount(0);
 });
 
 test('mobile detail actions and View settings stay within 390px', async ({ page }) => {
@@ -263,6 +283,10 @@ test('mobile detail actions and View settings stay within 390px', async ({ page 
   await expect(page.getByTestId('show-hidden-books')).toBeVisible();
   await assertNoHorizontalOverflow(page);
   await page.goto(`/app/book/${book!.id}`);
+  // The hide toggle lives in the gear menu; verify it there, then measure the
+  // settled page with the menu closed again.
+  await page.getByTestId('book-actions-menu').click();
   await expect(page.getByTestId('hide-book-toggle')).toBeVisible();
+  await page.keyboard.press('Escape');
   await assertNoHorizontalOverflow(page);
 });

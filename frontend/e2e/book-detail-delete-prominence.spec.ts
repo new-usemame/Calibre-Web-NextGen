@@ -1,5 +1,19 @@
 import { expect, Page, test } from '@playwright/test';
 
+/*
+ * #1862/#1828 — where whole-book deletion lives on the book page.
+ *
+ * The action row carries only its four visible controls; every other action is
+ * in the "More actions" gear menu, with deletion at the foot in a separated,
+ * danger-styled section labelled "Admin only". The menu is the same DOM at
+ * every viewport width — the old desktop-only bordered region and the narrow
+ * layout's icon-level control are both gone — so every test here runs against
+ * both the desktop and the mobile project with no layout branching.
+ *
+ * Seed-resilient: each test probes the API for a book and skips when absent.
+ * Role gating is made deterministic by a fetch-then-modify stub of /auth/me.
+ */
+
 interface SeedBook {
   id: number;
   title: string;
@@ -29,10 +43,16 @@ async function setDeletePermission(page: Page, allowed: boolean) {
   });
 }
 
-test('book-detail deletion remains visible and accessible with delete permission (#1862)', async ({ page, isMobile }) => {
-  // #1828 demotes mobile deletion to an icon-level control in the action row;
-  // the bordered region is desktop-only now. The mobile half is asserted below.
-  test.skip(isMobile === true, 'desktop region — mobile uses the icon-level control (#1828)');
+async function openActionsMenu(page: Page) {
+  const trigger = page.getByTestId('book-actions-menu');
+  await expect(trigger).toBeVisible({ timeout: 10_000 });
+  await trigger.click();
+  const menu = page.getByTestId('book-actions-menu-list');
+  await expect(menu).toBeVisible();
+  return menu;
+}
+
+test('book-detail deletion is a menuitem in an admin-only menu section, at every width (#1862)', async ({ page }) => {
   await page.goto('/app');
   const book = await firstBook(page);
   if (book == null) {
@@ -43,17 +63,26 @@ test('book-detail deletion remains visible and accessible with delete permission
   await setDeletePermission(page, true);
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
 
-  // #1939's disambiguating wording remains load-bearing, but the redundant
-  // heading row does not: the region and the control now carry the wording.
-  const region = page.getByTestId('book-destructive-actions');
-  await expect(region).toBeVisible();
-  await expect(region).toHaveAccessibleName('Delete from the global library');
-  await expect(region).toHaveAttribute('aria-label', 'Delete from the global library');
-  await expect(region.getByRole('heading')).toHaveCount(0);
-  const deleteButton = region.getByRole('button', { name: 'Delete from the global library' });
-  await expect(deleteButton).toHaveCount(1);
-  await expect(deleteButton).toBeVisible();
-  await expect(deleteButton).toHaveText('Delete from the global library');
+  // Deletion is never one of the visible row controls — only the gear menu
+  // carries it, on desktop and mobile alike.
+  await expect(
+    page.getByTestId('book-actions').getByRole('button', { name: 'Delete from the global library' }),
+  ).toHaveCount(0);
+
+  const menu = await openActionsMenu(page);
+  // #1939's disambiguating wording remains load-bearing. The section label
+  // names who the control is for, and the item is the section's only member.
+  const adminSection = menu.getByRole('group', { name: 'Admin only' });
+  await expect(adminSection).toBeVisible();
+  const deleteItem = adminSection.getByRole('menuitem', { name: 'Delete from the global library' });
+  await expect(deleteItem).toHaveCount(1);
+  await expect(deleteItem).toBeVisible();
+  await expect(deleteItem).toHaveText('Delete from the global library');
+
+  // No control in the open menu may render with an empty accessible name.
+  for (const item of await menu.getByRole('menuitem').all()) {
+    await expect(item).toHaveAccessibleName(/\S/);
+  }
 });
 
 test('book-detail deletion remains absent without delete permission (#1862)', async ({ page }) => {
@@ -67,15 +96,16 @@ test('book-detail deletion remains absent without delete permission (#1862)', as
   await setDeletePermission(page, false);
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
 
-  await expect(page.getByTestId('book-destructive-actions')).toHaveCount(0);
+  const menu = await openActionsMenu(page);
+  await expect(menu.getByRole('menuitem', { name: /Mark as (read|unread)/ })).toBeVisible();
   // #1939 renamed the book-detail destructive control's accessible name. This
   // absence assertion MUST track the rename: against the old name it would now
   // pass whether or not the control is hidden, i.e. prove nothing.
-  await expect(page.getByRole('button', { name: 'Delete from the global library' })).toHaveCount(0);
+  await expect(menu.getByRole('menuitem', { name: 'Delete from the global library' })).toHaveCount(0);
+  await expect(menu.getByText('Admin only')).toHaveCount(0);
 });
 
-test('dismissing book-detail deletion confirmation never calls the endpoint (#1862)', async ({ page, isMobile }) => {
-  test.skip(isMobile === true, 'desktop region — the mobile confirm path is covered by the icon-control test below');
+test('dismissing book-detail deletion confirmation never calls the endpoint (#1862)', async ({ page }) => {
   await page.goto('/app');
   const book = await firstBook(page);
   if (book == null) {
@@ -91,16 +121,16 @@ test('dismissing book-detail deletion confirmation never calls the endpoint (#18
   });
 
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
-  const deleteButton = page.getByTestId('book-destructive-actions')
-    .getByRole('button', { name: 'Delete from the global library' });
-  await expect(deleteButton).toBeVisible();
+  const menu = await openActionsMenu(page);
+  const deleteItem = menu.getByRole('menuitem', { name: 'Delete from the global library' });
+  await expect(deleteItem).toBeVisible();
 
   let declinedPrompt = '';
   page.once('dialog', (dialog) => {
     declinedPrompt = dialog.message();
     void dialog.dismiss();
   });
-  await deleteButton.click();
+  await deleteItem.click();
   await page.waitForTimeout(500);
 
   expect(declinedPrompt).toContain(`"${book.title}"`);
@@ -109,8 +139,7 @@ test('dismissing book-detail deletion confirmation never calls the endpoint (#18
   await expect(page).toHaveURL(new RegExp(`/book/${book.id}\\b`));
 });
 
-test('book-detail deletion is a quiet region in light and dark themes (#1862)', async ({ page, isMobile }) => {
-  test.skip(isMobile === true, 'desktop region — hidden on mobile by #1828, so there is nothing to theme');
+test('the admin-only section stays a quiet divider with a danger menuitem in light and dark themes (#1862)', async ({ page }) => {
   await page.goto('/app');
   const book = await firstBook(page);
   if (book == null) {
@@ -120,15 +149,16 @@ test('book-detail deletion is a quiet region in light and dark themes (#1862)', 
 
   await setDeletePermission(page, true);
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
+  const menu = await openActionsMenu(page);
+  const adminSection = menu.getByRole('group', { name: 'Admin only' });
 
-  const region = page.getByTestId('book-destructive-actions');
   for (const theme of ['light', 'dark']) {
     await page.locator('html').evaluate((html, value) => html.setAttribute('data-theme', value), theme);
-    const appearance = await region.evaluate((element) => {
+    const appearance = await adminSection.evaluate((element) => {
       const style = getComputedStyle(element);
-      const button = element.querySelector('button');
-      if (!(button instanceof HTMLElement)) {
-        throw new Error('destructive region must retain its delete control');
+      const item = element.querySelector('[role="menuitem"]');
+      if (!(item instanceof HTMLElement)) {
+        throw new Error('admin-only section must retain its delete menuitem');
       }
 
       const dangerProbe = document.createElement('span');
@@ -137,20 +167,16 @@ test('book-detail deletion is a quiet region in light and dark themes (#1862)', 
       const dangerColor = getComputedStyle(dangerProbe).color;
       dangerProbe.remove();
 
-      const buttonStyle = getComputedStyle(button);
+      const itemStyle = getComputedStyle(item);
       return {
         backgroundColor: style.backgroundColor,
-        borderLeftStyle: style.borderLeftStyle,
-        borderRightStyle: style.borderRightStyle,
-        borderBottomStyle: style.borderBottomStyle,
         borderTopStyle: style.borderTopStyle,
         borderTopWidth: style.borderTopWidth,
         borderTopColor: style.borderTopColor,
         outlineStyle: style.outlineStyle,
         boxShadow: style.boxShadow,
         dangerColor,
-        buttonColor: buttonStyle.color,
-        buttonBorderColor: buttonStyle.borderColor,
+        itemColor: itemStyle.color,
       };
     });
 
@@ -162,79 +188,14 @@ test('book-detail deletion is a quiet region in light and dark themes (#1862)', 
       hasTopDivider: true,
       usesDangerColor: false,
     });
-    expect.soft({
-      foreground: appearance.buttonColor,
-      border: appearance.buttonBorderColor,
-    }, `${theme} theme must retain danger emphasis on the delete button`).toEqual({
-      foreground: appearance.dangerColor,
-      border: appearance.dangerColor,
-    });
+    expect.soft(
+      appearance.itemColor,
+      `${theme} theme must retain danger emphasis on the delete menuitem`,
+    ).toBe(appearance.dangerColor);
     expect.soft(appearance, `${theme} theme must not render a filled, boxed danger banner`).toMatchObject({
       backgroundColor: 'rgba(0, 0, 0, 0)',
-      borderLeftStyle: 'none',
-      borderRightStyle: 'none',
-      borderBottomStyle: 'none',
       outlineStyle: 'none',
       boxShadow: 'none',
     });
   }
-});
-
-/*
- * #1828 — mobile counterpart to the region assertions above. On narrow
- * viewports whole-book deletion is an icon-level control at the end of the
- * ordinary action row: a red trash icon, the same accessible name, the same
- * confirm dialog doing the guarding. The bordered desktop region is not
- * rendered at all at this width (conditional render, never a hidden control),
- * so nothing red dominates the scroll path to the description.
- */
-test('mobile demotes deletion to a hit-testable icon control in the action row (#1828)', async ({ page, isMobile }) => {
-  test.skip(isMobile !== true, 'mobile-only layout');
-  await page.goto('/app');
-  const book = await firstBook(page);
-  if (book == null) {
-    test.skip(true, 'seed has no books');
-    return;
-  }
-
-  await setDeletePermission(page, true);
-  let deleteCalls = 0;
-  await page.route(`**/api/v1/books/${book.id}/delete`, async (route) => {
-    deleteCalls += 1;
-    await route.fulfill({ status: 204, contentType: 'application/json', body: '' });
-  });
-  await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
-
-  // The heavy region is not in the narrow DOM at all…
-  await expect(page.getByTestId('book-destructive-actions')).toHaveCount(0);
-
-  // …and the icon control replaces it inside the ordinary action row, keeping
-  // the #1939 disambiguating name and gaining the tooltip the reporter asked
-  // for. Exactly one control carries the name — with the region unrendered,
-  // strict mode enforces that nothing doubles it.
-  const icon = page.getByTestId('book-actions')
-    .getByRole('button', { name: 'Delete from the global library' });
-  await expect(icon).toBeVisible();
-  await expect(icon).toHaveAttribute('title', 'Delete from the global library');
-
-  // The icon owns its own hit target — nothing overlays it.
-  const ownsCenter = await icon.evaluate((el) => {
-    const box = el.getBoundingClientRect();
-    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
-    return hit !== null && (hit === el || el.contains(hit));
-  });
-  expect(ownsCenter, 'the delete icon is covered by another element').toBe(true);
-
-  // A declined confirm from the icon never reaches the endpoint.
-  let declinedPrompt = '';
-  page.once('dialog', (dialog) => {
-    declinedPrompt = dialog.message();
-    void dialog.dismiss();
-  });
-  await icon.click();
-  await page.waitForTimeout(500);
-  expect(declinedPrompt).toContain(`"${book.title}"`);
-  expect(declinedPrompt).toContain('cannot be undone');
-  expect(deleteCalls, 'declining confirmation must not call the delete endpoint').toBe(0);
-  await expect(page).toHaveURL(new RegExp(`/book/${book.id}\\b`));
 });

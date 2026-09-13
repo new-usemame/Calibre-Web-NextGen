@@ -7,6 +7,10 @@ import { collectPageErrors, assertNoPageErrors } from './utils';
  *   - Target options exclude the currently selected source format.
  *   - Submitting the form POSTs the chosen {from, to} pair.
  *
+ * The form lives in the book page's Files section (it moved out of Edit
+ * metadata with the book-page actions cleanup); labels and aria-labels are
+ * unchanged.
+ *
  * Seed-resilient: queries the API for a book with at least one source format
  * and one different target format, skipping otherwise.
  */
@@ -61,14 +65,17 @@ test('convert form offers a target dropdown that excludes the source format and 
     }
   });
 
-  await page.goto(`/app/book/${book!.id}/edit`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`/app/book/${book!.id}`, { waitUntil: 'domcontentloaded' });
 
-  // The convert section has two selects and a visible "to" separator.
-  const fromSelect = page.locator('select', { hasText: book!.source.toUpperCase() }).first();
-  const toSelect = page.locator('select', { has: page.locator('option[value=""]', { hasText: /select format/i }) }).first();
+  // The convert form is part of the Files section at the foot of the book
+  // page: two selects and a visible "to" separator.
+  const files = page.getByTestId('book-files');
+  const fromSelect = files.locator('select', { hasText: book!.source.toUpperCase() }).first();
+  const toSelect = files.getByLabel('Convert to format');
   await expect(fromSelect).toBeVisible({ timeout: 10_000 });
   await expect(toSelect).toBeVisible({ timeout: 10_000 });
-  await expect(page.locator('text=to').first()).toBeVisible();
+  await expect(files.getByText('to', { exact: true })).toBeVisible();
+  await expect(toSelect.locator('option[value=""]')).toHaveText('Select format');
 
   // The "to" dropdown does not contain the selected source format.
   const toOptions = await toSelect.locator('option').allTextContents();
@@ -76,9 +83,9 @@ test('convert form offers a target dropdown that excludes the source format and 
 
   // Choose a target and submit.
   await toSelect.selectOption(book!.target.toUpperCase());
-  await page.getByRole('button', { name: /convert/i }).click();
+  await files.getByRole('button', { name: 'Convert', exact: true }).click();
 
-  await expect(page.locator('text=Queued for conversion').first()).toBeVisible({ timeout: 10_000 });
+  await expect(files.getByText(/Queued for conversion/)).toBeVisible({ timeout: 10_000 });
   expect(postedBody).toEqual({
     from: book!.source.toUpperCase(),
     to: book!.target.toUpperCase(),

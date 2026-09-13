@@ -15473,3 +15473,136 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+# Cover designer v2 (SPA)
+msgid "Alignment"
+msgstr "Uitlijning"
+
+msgid "Author text"
+msgstr "Auteurstekst"
+
+msgid "Background"
+msgstr "Achtergrond"
+
+msgid "Band"
+msgstr "Band"
+
+msgid "Between {min} and {max} px. Locked to 2:3, the ratio every cover frame in the app uses."
+msgstr "Tussen {min} en {max} px. Vergrendeld op 2:3, de verhouding die elk omslagkader in de app gebruikt."
+
+msgid "Built-in"
+msgstr "Ingebouwd"
+
+msgid "Center"
+msgstr "Gecentreerd"
+
+msgid "Could not save the preset. Try again."
+msgstr "Kan de voorinstelling niet opslaan. Probeer het opnieuw."
+
+msgid "Cover size"
+msgstr "Omslaggrootte"
+
+msgid "Custom"
+msgstr "Aangepast"
+
+msgid "Custom (based on {name})"
+msgstr "Aangepast (op basis van {name})"
+
+msgid "Custom colours"
+msgstr "Aangepaste kleuren"
+
+msgid "Delete {name}?"
+msgstr "{name} verwijderen?"
+
+msgid "Edit custom colours"
+msgstr "Aangepaste kleuren bewerken"
+
+msgid "Fonts per line, wording, cover size"
+msgstr "Lettertypen per regel, tekst, omslaggrootte"
+
+msgid "Height (px)"
+msgstr "Hoogte (px)"
+
+msgid "Hidden built-ins"
+msgstr "Verborgen ingebouwde"
+
+msgid "Hide {name}?"
+msgstr "{name} verbergen?"
+
+msgid "Left"
+msgstr "Links"
+
+msgid "Lock the 2:3 proportions"
+msgstr "Vergrendel de 2:3-verhouding"
+
+msgid "Manage presets"
+msgstr "Voorinstellingen beheren"
+
+msgid "Manage presets…"
+msgstr "Voorinstellingen beheren…"
+
+msgid "Mine"
+msgstr "Van mij"
+
+msgid "Mixed lettering — set per line in Advanced."
+msgstr "Gemengde lettertypen — per regel in te stellen onder Geavanceerd."
+
+msgid "My presets"
+msgstr "Mijn voorinstellingen"
+
+msgid "No presets yet. Save one from the designer."
+msgstr "Nog geen voorinstellingen. Sla er een op vanuit de ontwerper."
+
+msgid "Placeholders: {title}, {authors}, {series}, {series_index}. Leave a field empty to use its default."
+msgstr "Plaatsaanduidingen: {title}, {authors}, {series}, {series_index}. Laat een veld leeg om de standaardwaarde te gebruiken."
+
+msgid "Preset"
+msgstr "Voorinstelling"
+
+msgid "Preset name"
+msgstr "Naam van de voorinstelling"
+
+msgid "Preset saved."
+msgstr "Voorinstelling opgeslagen."
+
+msgid "Reset to defaults"
+msgstr "Standaardwaarden herstellen"
+
+msgid "Restore"
+msgstr "Herstellen"
+
+msgid "Right"
+msgstr "Rechts"
+
+msgid "Save as preset"
+msgstr "Opslaan als voorinstelling"
+
+msgid "Save for the whole library"
+msgstr "Opslaan voor de hele bibliotheek"
+
+msgid "Save preset"
+msgstr "Voorinstelling opslaan"
+
+msgid "Size (pt)"
+msgstr "Grootte (pt)"
+
+msgid "Subtitle"
+msgstr "Ondertitel"
+
+msgid "Text templates"
+msgstr "Tekstsjablonen"
+
+msgid "The preset change failed. Try again."
+msgstr "De wijziging van de voorinstelling is mislukt. Probeer het opnieuw."
+
+msgid "Title text"
+msgstr "Titeltekst"
+
+msgid "Unlock the 2:3 proportions"
+msgstr "Ontgrendel de 2:3-verhouding"
+
+msgid "Width (px)"
+msgstr "Breedte (px)"
+
+msgid "{name} hex value"
+msgstr "Hexwaarde van {name}"

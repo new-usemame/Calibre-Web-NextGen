@@ -15981,3 +15981,136 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+# Cover designer v2 (SPA)
+msgid "Alignment"
+msgstr "Alignement"
+
+msgid "Author text"
+msgstr "Texte de l’auteur"
+
+msgid "Background"
+msgstr "Arrière-plan"
+
+msgid "Band"
+msgstr "Bandeau"
+
+msgid "Between {min} and {max} px. Locked to 2:3, the ratio every cover frame in the app uses."
+msgstr "Entre {min} et {max} px. Verrouillé sur 2:3, le ratio utilisé par tous les cadres de couverture de l’app."
+
+msgid "Built-in"
+msgstr "Intégré"
+
+msgid "Center"
+msgstr "Centré"
+
+msgid "Could not save the preset. Try again."
+msgstr "Impossible d’enregistrer le préréglage. Réessayez."
+
+msgid "Cover size"
+msgstr "Taille de la couverture"
+
+msgid "Custom"
+msgstr "Personnalisé"
+
+msgid "Custom (based on {name})"
+msgstr "Personnalisé (d’après {name})"
+
+msgid "Custom colours"
+msgstr "Couleurs personnalisées"
+
+msgid "Delete {name}?"
+msgstr "Supprimer {name} ?"
+
+msgid "Edit custom colours"
+msgstr "Modifier les couleurs personnalisées"
+
+msgid "Fonts per line, wording, cover size"
+msgstr "Polices par ligne, texte, taille de la couverture"
+
+msgid "Height (px)"
+msgstr "Hauteur (px)"
+
+msgid "Hidden built-ins"
+msgstr "Éléments intégrés masqués"
+
+msgid "Hide {name}?"
+msgstr "Masquer {name} ?"
+
+msgid "Left"
+msgstr "Gauche"
+
+msgid "Lock the 2:3 proportions"
+msgstr "Verrouiller les proportions 2:3"
+
+msgid "Manage presets"
+msgstr "Gérer les préréglages"
+
+msgid "Manage presets…"
+msgstr "Gérer les préréglages…"
+
+msgid "Mine"
+msgstr "À moi"
+
+msgid "Mixed lettering — set per line in Advanced."
+msgstr "Lettrage mixte — à régler ligne par ligne dans Avancé."
+
+msgid "My presets"
+msgstr "Mes préréglages"
+
+msgid "No presets yet. Save one from the designer."
+msgstr "Aucun préréglage pour l’instant. Enregistrez-en un depuis le concepteur."
+
+msgid "Placeholders: {title}, {authors}, {series}, {series_index}. Leave a field empty to use its default."
+msgstr "Variables : {title}, {authors}, {series}, {series_index}. Laissez un champ vide pour utiliser sa valeur par défaut."
+
+msgid "Preset"
+msgstr "Préréglage"
+
+msgid "Preset name"
+msgstr "Nom du préréglage"
+
+msgid "Preset saved."
+msgstr "Préréglage enregistré."
+
+msgid "Reset to defaults"
+msgstr "Réinitialiser les valeurs par défaut"
+
+msgid "Restore"
+msgstr "Restaurer"
+
+msgid "Right"
+msgstr "Droite"
+
+msgid "Save as preset"
+msgstr "Enregistrer comme préréglage"
+
+msgid "Save for the whole library"
+msgstr "Enregistrer pour toute la bibliothèque"
+
+msgid "Save preset"
+msgstr "Enregistrer le préréglage"
+
+msgid "Size (pt)"
+msgstr "Taille (pt)"
+
+msgid "Subtitle"
+msgstr "Sous-titre"
+
+msgid "Text templates"
+msgstr "Modèles de texte"
+
+msgid "The preset change failed. Try again."
+msgstr "La modification du préréglage a échoué. Réessayez."
+
+msgid "Title text"
+msgstr "Texte du titre"
+
+msgid "Unlock the 2:3 proportions"
+msgstr "Déverrouiller les proportions 2:3"
+
+msgid "Width (px)"
+msgstr "Largeur (px)"
+
+msgid "{name} hex value"
+msgstr "Valeur hexadécimale de {name}"

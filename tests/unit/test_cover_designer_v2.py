@@ -34,6 +34,8 @@ import os
 import pathlib
 import shutil
 import stat
+import subprocess
+import sys
 import textwrap
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -791,6 +793,107 @@ def test_a_catalogue_picture_is_drawn_once_and_then_read_from_disk():
     assert first == second
     assert (cached_first, cached_second) == (False, True)
     assert len(calls) == 1
+
+
+# The designer asks for every thumbnail the moment the panel opens, so the
+# interesting case is not one request — it is several requests for the same
+# uncached picture arriving together. That has to be measured the way the server
+# actually runs it: gevent, one OS thread carrying every request as a greenlet,
+# and a render dispatched to a threadpool that yields while it waits. A test that
+# used ordinary threads would pass whatever this module does, because blocking
+# one thread out of several costs nothing. So the scenario runs in a child
+# process with a hard wall-clock bound around it, and the bound is the
+# assertion: a server that stops answering does not fail this test slowly.
+_CONCURRENT_MISS_PROBE = textwrap.dedent('''
+    import sys
+    import time
+    from pathlib import Path
+
+    sys.path.insert(0, sys.argv[1])
+
+    import gevent
+
+    from cps.services import cover_designer_cache, cover_preview, cover_preview_cache
+
+    cover_preview_cache.CACHE_ROOT = Path(sys.argv[2])
+
+    renders = []
+    beats = []
+    answers = {}
+
+
+    def draw():
+        """A catalogue render: real work on the pool, which yields to the hub."""
+        renders.append(1)
+        cover_preview._run_in_pool(time.sleep, 0.4)
+        return b"\\xff\\xd8" + b"catalogue-image" * 4
+
+
+    def ask(name):
+        answers[name] = cover_designer_cache.cached(
+            "style", "banner", 120, 180, "pil", draw)
+
+
+    def heartbeat():
+        """Everything else the server would be doing while that render runs."""
+        while True:
+            gevent.sleep(0.02)
+            beats.append(1)
+
+
+    pulse = gevent.spawn(heartbeat)
+    started = time.time()
+    asking = [gevent.spawn(ask, "first"), gevent.spawn(ask, "second")]
+    gevent.joinall(asking, timeout=15)
+    pulse.kill()
+    for greenlet in asking:
+        if greenlet.exception is not None:
+            print("greenlet failed: %r" % (greenlet.exception,), file=sys.stderr)
+    print("PROBE answers=%d renders=%d beats=%d seconds=%.2f"
+          % (len(answers), len(renders), len(beats), time.time() - started))
+''')
+
+
+def test_two_readers_opening_the_designer_at_once_both_get_their_picture(tmp_path):
+    """Both requests answer, one render happens, and the server stays awake.
+
+    Miss the same key twice at once and the second request must not be able to
+    stop the first one from finishing. Holding an ordinary lock across the render
+    does exactly that here: the waiting request blocks the one thread the hub
+    runs on, the finished render can never be handed back, and the whole server
+    stops — not just the designer.
+    """
+    pytest.importorskip("gevent")
+    probe = tmp_path / "concurrent_miss_probe.py"
+    probe.write_text(_CONCURRENT_MISS_PROBE)
+    cache_root = tmp_path / "designer-cache"
+    cache_root.mkdir()
+    tree = pathlib.Path(__file__).resolve().parents[2]
+
+    try:
+        finished = subprocess.run(
+            [sys.executable, str(probe), str(tree), str(cache_root)],
+            capture_output=True, text=True, timeout=30)
+    except subprocess.TimeoutExpired:
+        pytest.fail(
+            "two readers opened the designer at once and neither got a picture: "
+            "the second request for an uncached image wedged the process the "
+            "first one's render had to come back through")
+
+    report = [line for line in finished.stdout.splitlines() if line.startswith("PROBE ")]
+    assert report, "probe produced no result\nstdout: %s\nstderr: %s" % (
+        finished.stdout, finished.stderr)
+    measured = dict(field.split("=", 1) for field in report[0].split()[1:])
+    detail = "%s\nstderr: %s" % (report[0], finished.stderr)
+
+    # Both readers got their picture ...
+    assert int(measured["answers"]) == 2, detail
+    # ... from a single render, which is the point of the cache ...
+    assert int(measured["renders"]) == 1, detail
+    # ... without the waiting request stopping everything else the server does ...
+    assert int(measured["beats"]) >= 3, detail
+    # ... and in about the length of one render, not in a timeout.
+    assert float(measured["seconds"]) < 10, detail
 
 
 def test_a_picture_cached_without_calibre_is_not_served_once_calibre_is_installed():

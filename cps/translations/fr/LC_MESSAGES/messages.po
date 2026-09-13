@@ -16061,9 +16061,6 @@ msgstr "Mes préréglages"
 msgid "No presets yet. Save one from the designer."
 msgstr "Aucun préréglage pour l’instant. Enregistrez-en un depuis le concepteur."
 
-msgid "Placeholders: {title}, {authors}, {series}, {series_index}. Leave a field empty to use its default."
-msgstr "Variables : {title}, {authors}, {series}, {series_index}. Laissez un champ vide pour utiliser sa valeur par défaut."
-
 msgid "Preset"
 msgstr "Préréglage"
 
@@ -16114,3 +16111,160 @@ msgstr "Largeur (px)"
 
 msgid "{name} hex value"
 msgstr "Valeur hexadécimale de {name}"
+
+# Cover designer v2 catalogue vocabulary + new controls (SPA)
+msgid "A band down the left edge meeting a rounded title panel."
+msgstr "Un bandeau le long du bord gauche rejoignant un panneau de titre arrondi."
+
+msgid "All authors, separated by commas"
+msgstr "Tous les auteurs, séparés par des virgules"
+
+msgid "All three text blocks"
+msgstr "Les trois blocs de texte"
+
+msgid "Authors, and the ornaments"
+msgstr "Les auteurs, et les ornements"
+
+msgid "Authors, on the band"
+msgstr "Les auteurs, sur le bandeau"
+
+msgid "Authors, on the page"
+msgstr "Les auteurs, sur la page"
+
+msgid "Banner"
+msgstr "Bannière"
+
+msgid "Blocks"
+msgstr "Blocs"
+
+msgid "Book title"
+msgstr "Titre du livre"
+
+msgid "Bottom third"
+msgstr "Tiers inférieur"
+
+msgid "Calibre blue"
+msgstr "Bleu Calibre"
+
+msgid "Calibre earth"
+msgstr "Terre Calibre"
+
+msgid "Centre of the wash"
+msgstr "Centre du lavis"
+
+msgid "Earth"
+msgstr "Terre"
+
+msgid "Edge of the wash"
+msgstr "Bord du lavis"
+
+msgid "First author only"
+msgstr "Premier auteur uniquement"
+
+msgid "First language"
+msgstr "Première langue"
+
+msgid "Forest"
+msgstr "Forêt"
+
+msgid "Grass"
+msgstr "Prairie"
+
+msgid "Half and half"
+msgstr "Moitié-moitié"
+
+msgid "Leave a field empty to use its default."
+msgstr "Laissez un champ vide pour utiliser sa valeur par défaut."
+
+msgid "Left edge and the title panel"
+msgstr "Bord gauche et panneau de titre"
+
+msgid "Middle of the wash"
+msgstr "Milieu du lavis"
+
+msgid "Midnight"
+msgstr "Minuit"
+
+msgid "Move {name} down"
+msgstr "Descendre {name}"
+
+msgid "Move {name} up"
+msgstr "Monter {name}"
+
+msgid "Noir"
+msgstr "Noir"
+
+msgid "Number within the series"
+msgstr "Numéro dans la série"
+
+msgid "Ocean"
+msgstr "Océan"
+
+msgid "One colour washing into another from top to bottom."
+msgstr "Une couleur fondant dans une autre de haut en bas."
+
+msgid "Ornamental"
+msgstr "Ornemental"
+
+msgid "Page"
+msgstr "Page"
+
+msgid "Placeholders:"
+msgstr "Variables :"
+
+msgid "Rating out of five, as a number"
+msgstr "Note sur cinq, en chiffre"
+
+msgid "Rating out of five, as stars"
+msgstr "Note sur cinq, en étoiles"
+
+msgid "Rose"
+msgstr "Rose"
+
+msgid "Series name"
+msgstr "Nom de la série"
+
+msgid "Silver"
+msgstr "Argent"
+
+msgid "Tags, separated by commas"
+msgstr "Étiquettes, séparées par des virgules"
+
+msgid "The Cross"
+msgstr "La Croix"
+
+msgid "The ribbon"
+msgstr "Le ruban"
+
+msgid "Title and subtitle"
+msgstr "Titre et sous-titre"
+
+msgid "Title and subtitle, on the panel"
+msgstr "Titre et sous-titre, sur le panneau"
+
+msgid "Title and subtitle, on the ribbon"
+msgstr "Titre et sous-titre, sur le ruban"
+
+msgid "Title at the top, authors on a colour band across the bottom third."
+msgstr "Titre en haut, auteurs sur un bandeau de couleur sur le tiers inférieur."
+
+msgid "Title inside a decorated frame over a soft radial wash."
+msgstr "Titre dans un cadre décoré sur un lavis radial doux."
+
+msgid "Title on a folded ribbon near the top, authors below on the page."
+msgstr "Titre sur un ruban plié près du haut, auteurs en dessous sur la page."
+
+msgid "Top and bottom of the wash"
+msgstr "Haut et bas du lavis"
+
+msgid "Unused by this arrangement"
+msgstr "Inutilisé par cette disposition"
+
+msgid "Upper two thirds"
+msgstr "Deux tiers supérieurs"
+
+msgid "Water"
+msgstr "Eau"
+
+msgid "Year of publication"
+msgstr "Année de publication"

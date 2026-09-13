@@ -63,6 +63,9 @@ export const coverDesignerApi = {
     cdJson<void>('DELETE', `/cover-designer/presets/${encodeURIComponent(id)}`),
   restorePreset: (id: string) =>
     cdJson<PresetResponse>('POST', `/cover-designer/presets/${encodeURIComponent(id)}/restore`, {}),
+  /** The reader's own ordering of saved presets; returns the refreshed list. */
+  reorderPresets: (order: string[]) =>
+    cdJson<PresetListResponse>('POST', `/cover-designer/presets/order`, { order }),
 
   designPreview: (id: string | number, design: CoverDesign, personal = false) =>
     cdJson<PreviewResponse & { ok?: boolean }>(

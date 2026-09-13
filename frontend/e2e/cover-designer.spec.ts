@@ -79,8 +79,19 @@ test.describe('cover designer v2 (contract fixtures)', () => {
     await manage.getByLabel('Preset name').fill('Renamed Look');
     await manage.getByRole('button', { name: 'Save' }).click();
     await expect.poll(() => c.presetPuts.length).toBe(1);
-    expect(c.presetPuts[0]).toEqual({ id: 'user-1', body: { name: 'Renamed Look' } });
+    expect(c.presetPuts[0]).toEqual({ id: 'user-2', body: { name: 'Renamed Look' } });
     await expect(manage.locator('li').filter({ hasText: 'Renamed Look' })).toBeVisible();
+
+    // Reorder: move the renamed preset above "My Draft" inside My presets; the
+    // posted order covers every saved preset (library first, then mine), and
+    // the modal reflects the new order immediately.
+    const renamedRow = () => manage.locator('li').filter({ hasText: 'Renamed Look' });
+    await renamedRow().getByRole('button', { name: 'Move Renamed Look up' }).click();
+    await expect.poll(() => c.presetOrders.length).toBe(1);
+    expect(c.presetOrders[0]).toEqual(['library-1', 'user-2', 'user-1']);
+    const rowTexts = await manage.locator('li').allTextContents();
+    expect(rowTexts.findIndex((s) => s.includes('Renamed Look')))
+      .toBeLessThan(rowTexts.findIndex((s) => s.includes('My Draft')));
 
     const meadowRow = () => manage.locator('li').filter({ hasText: 'Meadow' });
     await meadowRow().getByRole('button', { name: 'Hide' }).click();
@@ -93,10 +104,9 @@ test.describe('cover designer v2 (contract fixtures)', () => {
     await expect(meadowRow().getByRole('button', { name: 'Hide' })).toBeVisible();
 
     // Delete the user preset; the dropdown falls back to the plain custom state.
-    const renamedRow = () => manage.locator('li').filter({ hasText: 'Renamed Look' });
     await renamedRow().getByRole('button', { name: 'Delete' }).click();
     await renamedRow().getByRole('button', { name: 'Delete' }).click(); // inline confirm
-    await expect.poll(() => c.presetDeletes).toContain('user-1');
+    await expect.poll(() => c.presetDeletes).toContain('user-2');
     await page.keyboard.press('Escape');
     await expect(presetSelect).toHaveText('Custom');
 

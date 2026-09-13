@@ -12,8 +12,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, BookmarkPlus, Check, ChevronDown, Loader2, Lock, Palette,
-  Plus, RotateCcw, Settings2, Sparkles, Unlock, X,
+  AlignCenter, AlignLeft, AlignRight, Bold, BookmarkPlus, Check, ChevronDown, ChevronUp, Italic,
+  Loader2, Lock, Palette, Plus, RotateCcw, Settings2, Sparkles, Unlock, X,
 } from 'lucide-react';
 import { ApiError } from '../../lib/api';
 import { useT, type TFunction } from '../../lib/i18n';
@@ -21,51 +21,40 @@ import { useMe } from '../../lib/queries';
 import { Button } from '../../components/Button';
 import { coverDesignerApi } from './api';
 import {
-  ALIGNMENTS, ASPECT_RATIO, SLOTS, clampDimension, designsEqual, effectiveColors, mergeDesign,
-  normalizeHex, resolvePreset,
+  ALIGNMENTS, ASPECT_RATIO, SLOTS, TEXT_PLACEHOLDERS, catalogueOf, clampDimension, designsEqual,
+  effectiveColors, mergeDesign, normalizeHex, resolvePreset,
   type Alignment, type CataloguePreset, type CoverDesign,
-  type DesignColors, type DesignerCatalogue, type DesignerState, type SlotName,
+  type DesignColors, type DesignerCatalogue, type DesignerState, type SlotFont, type SlotName,
 } from './contract';
 import styles from './DesignerPanel.module.css';
 
 const CUSTOM = '__custom';
-const HIDDEN_KEY = 'cwng.coverDesigner.hiddenBuiltins';
-
-/** Built-ins this browser has hidden, id → name, so the manager can offer
- *  Restore even on a server whose preset list does not carry the additive
- *  `hidden` flag the contract allows. */
-function readHiddenBuiltins(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(HIDDEN_KEY);
-    const parsed = raw ? JSON.parse(raw) : {};
-    return parsed && typeof parsed === 'object' ? parsed as Record<string, string> : {};
-  } catch { return {}; }
-}
-function writeHiddenBuiltins(map: Record<string, string>) {
-  try { localStorage.setItem(HIDDEN_KEY, JSON.stringify(map)); } catch { /* private mode */ }
-}
 
 export function CoverDesignerPanel({ id, designer, locked, personal, onApplied, onError }: {
   id: string; designer: DesignerState | undefined; locked: boolean; personal: boolean;
   onApplied: (url?: string) => void; onError: (e: unknown) => void;
 }) {
   // A v1 server (or a box with neither Calibre nor Pillow) has no catalogue —
-  // hide the panel rather than offering controls that can only fail.
-  if (!designer?.available || !designer.catalogue) return null;
+  // hide the panel rather than offering controls that can only fail. The v2
+  // server sends the catalogue flat inside `designer`; the nested form is
+  // accepted too.
+  const catalogue = catalogueOf(designer);
+  if (!catalogue) return null;
   return (
     <DesignerPanelInner
-      id={id} catalogue={designer.catalogue} locked={locked} personal={personal}
+      id={id} catalogue={catalogue} canShare={designer?.can_share_presets}
+      locked={locked} personal={personal}
       onApplied={onApplied} onError={onError} />
   );
 }
 
-function DesignerPanelInner({ id, catalogue, locked, personal, onApplied, onError }: {
-  id: string; catalogue: DesignerCatalogue; locked: boolean; personal: boolean;
+function DesignerPanelInner({ id, catalogue, canShare, locked, personal, onApplied, onError }: {
+  id: string; catalogue: DesignerCatalogue; canShare?: boolean; locked: boolean; personal: boolean;
   onApplied: (url?: string) => void; onError: (e: unknown) => void;
 }) {
   const t = useT();
   const { data: me } = useMe();
-  const isAdmin = !!me?.role?.admin;
+  const isAdmin = canShare ?? !!me?.role?.admin;
 
   const [open, setOpen] = useState(false);
   const [design, setDesign] = useState<CoverDesign>(() => mergeDesign({}, catalogue.defaults));
@@ -73,8 +62,8 @@ function DesignerPanelInner({ id, catalogue, locked, personal, onApplied, onErro
    *  (based on X)" state after the user diverges. */
   const [basedOn, setBasedOn] = useState<string | null>(null);
   const [presets, setPresets] = useState<CataloguePreset[]>(catalogue.presets);
-  const [hiddenServer, setHiddenServer] = useState<CataloguePreset[]>([]);
-  const [hiddenLocal, setHiddenLocal] = useState<Record<string, string>>(readHiddenBuiltins);
+  /** Hidden presets (flagged entries from the presets endpoint's manage list). */
+  const [hiddenPresets, setHiddenPresets] = useState<CataloguePreset[]>([]);
 
   const [preview, setPreview] = useState<string | null>(null);
   const [rendering, setRendering] = useState(false);
@@ -92,21 +81,12 @@ function DesignerPanelInner({ id, catalogue, locked, personal, onApplied, onErro
   // hand and its entry lights up again.
   const matchedPreset = presets.find((p) => designsEqual(resolvePreset(p, catalogue.defaults), design));
   const basedOnName = basedOn ? presets.find((p) => p.id === basedOn)?.name
-    ?? hiddenLocal[basedOn] ?? null : null;
-
-  const visibleHidden = useMemo(() => {
-    const byId = new Map<string, string>();
-    for (const p of hiddenServer) byId.set(p.id, p.name);
-    for (const [hid, name] of Object.entries(hiddenLocal)) {
-      if (!presets.some((p) => p.id === hid)) byId.set(hid, name);
-    }
-    return [...byId.entries()].map(([hid, name]) => ({ id: hid, name }));
-  }, [hiddenServer, hiddenLocal, presets]);
+    ?? hiddenPresets.find((p) => p.id === basedOn)?.name ?? null : null;
 
   const refreshPresets = useCallback(async () => {
     const r = await coverDesignerApi.presets();
     setPresets(r.presets.filter((p) => !p.hidden));
-    setHiddenServer(r.presets.filter((p) => p.hidden));
+    setHiddenPresets(r.presets.filter((p) => p.hidden));
   }, []);
 
   // The catalogue payload carries the preset list already; the standalone GET
@@ -172,18 +152,6 @@ function DesignerPanelInner({ id, catalogue, locked, personal, onApplied, onErro
     refreshPresets().catch(() => {});
   };
 
-  const onHiddenBuiltin = (presetId: string, name: string) => {
-    const next = { ...hiddenLocal, [presetId]: name };
-    setHiddenLocal(next);
-    writeHiddenBuiltins(next);
-  };
-  const onRestoredBuiltin = (presetId: string) => {
-    const next = { ...hiddenLocal };
-    delete next[presetId];
-    setHiddenLocal(next);
-    writeHiddenBuiltins(next);
-  };
-
   const groups = useMemo(() => ({
     builtin: presets.filter((p) => p.builtin),
     library: presets.filter((p) => !p.builtin && p.scope === 'library'),
@@ -244,7 +212,14 @@ function DesignerPanelInner({ id, catalogue, locked, personal, onApplied, onErro
               <ArrangementPicker
                 catalogue={catalogue}
                 value={design.style ?? catalogue.defaults.style ?? catalogue.styles[0].id}
-                onChange={(style) => patchDesign({ style })}
+                onChange={(style) => {
+                  if (style === design.style) return;
+                  // Adopting the arrangement's own align defaults matches what
+                  // the server resolves for an omitted align, and gives each
+                  // arrangement its designed look; Advanced can still override.
+                  const styleAlign = catalogue.styles.find((s) => s.id === style)?.align;
+                  patchDesign(styleAlign ? { style, align: styleAlign } : { style });
+                }}
               />
             )}
 
@@ -292,6 +267,7 @@ function DesignerPanelInner({ id, catalogue, locked, personal, onApplied, onErro
         <SavePresetModal
           isAdmin={isAdmin}
           design={design}
+          maxNameLength={catalogue.limits.max_name_length ?? 60}
           onClose={() => setSaveOpen(false)}
           onSaved={onSavedPreset}
         />
@@ -299,12 +275,10 @@ function DesignerPanelInner({ id, catalogue, locked, personal, onApplied, onErro
       {manageOpen && (
         <ManagePresetsModal
           presets={presets}
-          hidden={visibleHidden}
+          hidden={hiddenPresets}
           catalogue={catalogue}
           onClose={() => setManageOpen(false)}
           onChanged={() => refreshPresets().catch(() => {})}
-          onHiddenBuiltin={onHiddenBuiltin}
-          onRestoredBuiltin={onRestoredBuiltin}
         />
       )}
     </details>
@@ -660,6 +634,7 @@ function SchemePicker({ catalogue, design, popoverOpen, onTogglePopover, onPickS
         {popoverOpen && (
           <ColorPopover
             colors={currentColors}
+            roles={catalogue.styles.find((s) => s.id === design.style)?.color_roles}
             onChange={onCustomColors}
             onClose={() => onTogglePopover(false)}
           />
@@ -693,8 +668,10 @@ const COLOR_SLOTS: { key: keyof DesignColors; label: string }[] = [
   { key: 'author', label: 'Author text' },
 ];
 
-function ColorPopover({ colors, onChange, onClose }: {
+function ColorPopover({ colors, roles, onChange, onClose }: {
   colors: Required<DesignColors>;
+  /** What each colour paints in the current arrangement (English, via t()). */
+  roles?: Partial<Record<keyof Required<DesignColors>, string>>;
   onChange: (colors: DesignColors) => void;
   onClose: () => void;
 }) {
@@ -728,7 +705,10 @@ function ColorPopover({ colors, onChange, onClose }: {
     <div className={styles.popover} role="dialog" aria-label={t('Custom colours')} ref={ref}>
       {COLOR_SLOTS.map(({ key, label }) => (
         <div className={styles.popRow} key={key}>
-          <span className={styles.popLabel}>{t(label)}</span>
+          <span className={styles.popLabel}>
+            {t(label)}
+            {roles?.[key] && <span className={styles.popRole}>{t(roles[key]!)}</span>}
+          </span>
           <input
             type="color"
             className={styles.colorInput}
@@ -853,6 +833,7 @@ function AdvancedControls({ catalogue, design, onPatch, onReset, onSet }: {
                 type="text"
                 className={styles.textInput}
                 value={design.text?.[slot] ?? ''}
+                maxLength={catalogue.limits.max_template_length ?? 200}
                 placeholder={catalogue.defaults.text?.[slot] ?? ''}
                 onChange={(e) => {
                   // An emptied field removes the key so the server default
@@ -867,8 +848,16 @@ function AdvancedControls({ catalogue, design, onPatch, onReset, onSet }: {
               />
             </label>
           ))}
+          <div className={styles.placeholderRow}>
+            <span className={styles.helpText}>{t('Placeholders:')}</span>
+            {(catalogue.placeholders ?? TEXT_PLACEHOLDERS.map((id) => ({ id, label: id }))).map((p) => (
+              <code key={p.id} className={styles.placeholderChip} title={t(p.label)}>
+                {`{${p.id}}`}
+              </code>
+            ))}
+          </div>
           <p className={styles.helpText}>
-            {t('Placeholders: {title}, {authors}, {series}, {series_index}. Leave a field empty to use its default.')}
+            {t('Leave a field empty to use its default.')}
           </p>
         </fieldset>
 
@@ -897,7 +886,7 @@ function SlotControls({ slot, catalogue, design, onPatch, t }: {
   const slotFont = design.fonts?.[slot] ?? {};
   const align = design.align?.[slot] ?? catalogue.defaults.align?.[slot] ?? 'center';
   const limits = catalogue.limits;
-  const setFont = (patch: { family?: string; size?: number }) =>
+  const setFont = (patch: Partial<SlotFont>) =>
     onPatch({ fonts: { ...design.fonts, [slot]: { ...slotFont, ...patch } } });
 
   return (
@@ -932,13 +921,35 @@ function SlotControls({ slot, catalogue, design, onPatch, t }: {
         </label>
         <div className={styles.field}>
           <span className={styles.fieldLabel} id={`cd-align-label-${slot}`}>{t('Alignment')}</span>
-          <div className={styles.alignGroup} role="radiogroup" aria-labelledby={`cd-align-label-${slot}`}>
-            {ALIGNMENTS.map((a) => (
-              <AlignButton
-                key={a} value={a} checked={align === a}
-                onPick={() => onPatch({ align: { ...design.align, [slot]: a } })}
-              />
-            ))}
+          <div className={styles.alignRow}>
+            <div className={styles.alignGroup} role="radiogroup" aria-labelledby={`cd-align-label-${slot}`}>
+              {ALIGNMENTS.map((a) => (
+                <AlignButton
+                  key={a} value={a} checked={align === a}
+                  onPick={() => onPatch({ align: { ...design.align, [slot]: a } })}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              className={slotFont.bold ? styles.emphBtnOn : styles.emphBtn}
+              aria-pressed={!!slotFont.bold}
+              aria-label={t('Bold')}
+              title={t('Bold')}
+              onClick={() => setFont({ bold: !slotFont.bold })}
+            >
+              <Bold size={14} aria-hidden="true" focusable={false} />
+            </button>
+            <button
+              type="button"
+              className={slotFont.italic ? styles.emphBtnOn : styles.emphBtn}
+              aria-pressed={!!slotFont.italic}
+              aria-label={t('Italic')}
+              title={t('Italic')}
+              onClick={() => setFont({ italic: !slotFont.italic })}
+            >
+              <Italic size={14} aria-hidden="true" focusable={false} />
+            </button>
           </div>
         </div>
       </div>
@@ -1076,8 +1087,8 @@ function useModalBehavior(onClose: () => void) {
   return ref;
 }
 
-function SavePresetModal({ isAdmin, design, onClose, onSaved }: {
-  isAdmin: boolean; design: CoverDesign;
+function SavePresetModal({ isAdmin, design, maxNameLength, onClose, onSaved }: {
+  isAdmin: boolean; design: CoverDesign; maxNameLength: number;
   onClose: () => void; onSaved: (preset: CataloguePreset) => void;
 }) {
   const t = useT();
@@ -1119,7 +1130,7 @@ function SavePresetModal({ isAdmin, design, onClose, onSaved }: {
               type="text"
               className={styles.textInput}
               value={name}
-              maxLength={80}
+              maxLength={maxNameLength}
               onChange={(e) => setName(e.target.value)}
             />
           </label>
@@ -1143,14 +1154,14 @@ function SavePresetModal({ isAdmin, design, onClose, onSaved }: {
   );
 }
 
-function ManagePresetsModal({ presets, hidden, catalogue, onClose, onChanged, onHiddenBuiltin, onRestoredBuiltin }: {
+function ManagePresetsModal({ presets, hidden, catalogue, onClose, onChanged }: {
   presets: CataloguePreset[];
-  hidden: { id: string; name: string }[];
+  /** Hidden presets, flagged by the presets endpoint (authoritative — a reader
+   *  cannot restore what the response left out). */
+  hidden: CataloguePreset[];
   catalogue: DesignerCatalogue;
   onClose: () => void;
   onChanged: () => void;
-  onHiddenBuiltin: (id: string, name: string) => void;
-  onRestoredBuiltin: (id: string) => void;
 }) {
   const t = useT();
   const ref = useModalBehavior(onClose);
@@ -1159,6 +1170,10 @@ function ManagePresetsModal({ presets, hidden, catalogue, onClose, onChanged, on
   const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Optimistic display order while reorder POSTs land; resyncs from props.
+  const [localOrder, setLocalOrder] = useState<CataloguePreset[]>(presets);
+  useEffect(() => { setLocalOrder(presets); }, [presets]);
+  const maxNameLength = catalogue.limits.max_name_length ?? 60;
 
   const fail = (e: unknown) =>
     setError((e instanceof ApiError && e.message) || t('The preset change failed. Try again.'));
@@ -1180,7 +1195,6 @@ function ManagePresetsModal({ presets, hidden, catalogue, onClose, onChanged, on
     setBusy(true);
     try {
       await coverDesignerApi.deletePreset(preset.id);
-      if (preset.builtin) onHiddenBuiltin(preset.id, preset.name);
       setConfirmingDelete(null);
       onChanged();
     } catch (e) { fail(e); }
@@ -1192,14 +1206,117 @@ function ManagePresetsModal({ presets, hidden, catalogue, onClose, onChanged, on
     setBusy(true);
     try {
       await coverDesignerApi.restorePreset(presetId);
-      onRestoredBuiltin(presetId);
       onChanged();
     } catch (e) { fail(e); }
     finally { setBusy(false); }
   };
 
+  /** Move a saved preset within its group (library or mine) and persist the
+   *  reader's ordering of all saved presets. Built-ins keep their shipped
+   *  order — the endpoint only orders saved rows. */
+  const doMove = async (preset: CataloguePreset, dir: -1 | 1) => {
+    if (busy) return;
+    const sameGroup = (p: CataloguePreset) =>
+      !p.builtin && (p.scope === 'library') === (preset.scope === 'library');
+    const group = localOrder.filter(sameGroup);
+    const idx = group.findIndex((p) => p.id === preset.id);
+    const swapWith = group[idx + dir];
+    if (idx < 0 || !swapWith) return;
+    const next = [...localOrder];
+    next[next.findIndex((p) => p.id === preset.id)] = swapWith;
+    next[next.findIndex((p) => p.id === swapWith.id)] = preset;
+    setLocalOrder(next);
+    setBusy(true);
+    try {
+      await coverDesignerApi.reorderPresets(next.filter((p) => !p.builtin).map((p) => p.id));
+      onChanged();
+    } catch (e) {
+      setLocalOrder(localOrder);
+      fail(e);
+    } finally { setBusy(false); }
+  };
+
   const scopeBadge = (p: CataloguePreset) =>
     p.builtin ? t('Built-in') : p.scope === 'library' ? t('Library') : t('Mine');
+
+  const renderRow = (p: CataloguePreset, groupFirst: boolean, groupLast: boolean) => (
+    <li key={p.id} className={styles.manageRow}>
+      <span
+        className={styles.manageDot}
+        aria-hidden="true"
+        style={{ background: presetDot(p, catalogue) }}
+      />
+      {renaming === p.id ? (
+        <input
+          type="text"
+          className={styles.textInput}
+          value={renameDraft}
+          maxLength={maxNameLength}
+          aria-label={t('Preset name')}
+          onChange={(e) => setRenameDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { e.preventDefault(); void doRename(p.id); }
+            if (e.key === 'Escape') setRenaming(null);
+          }}
+        />
+      ) : (
+        <span className={styles.manageName}>{p.builtin ? t(p.name) : p.name}</span>
+      )}
+      <span className={styles.manageBadge}>{scopeBadge(p)}</span>
+      <span className={styles.rowActions}>
+        {renaming === p.id ? (
+          <>
+            <Button size="sm" variant="ghost" disabled={busy || !renameDraft.trim()}
+                    onClick={() => void doRename(p.id)}>{t('Save')}</Button>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => setRenaming(null)}>{t('Cancel')}</Button>
+          </>
+        ) : confirmingDelete === p.id ? (
+          <>
+            <span className={styles.confirmText}>
+              {p.builtin ? t('Hide {name}?', { name: p.name }) : t('Delete {name}?', { name: p.name })}
+            </span>
+            <Button size="sm" variant="danger" disabled={busy} onClick={() => void doDelete(p)}>
+              {p.builtin ? t('Hide') : t('Delete')}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirmingDelete(null)}>{t('Cancel')}</Button>
+          </>
+        ) : (
+          <>
+            {!p.builtin && (
+              <>
+                <button
+                  type="button" className={styles.orderBtn} disabled={busy || groupFirst}
+                  aria-label={t('Move {name} up', { name: p.name })}
+                  title={t('Move {name} up', { name: p.name })}
+                  onClick={() => void doMove(p, -1)}>
+                  <ChevronUp size={14} aria-hidden="true" focusable={false} />
+                </button>
+                <button
+                  type="button" className={styles.orderBtn} disabled={busy || groupLast}
+                  aria-label={t('Move {name} down', { name: p.name })}
+                  title={t('Move {name} down', { name: p.name })}
+                  onClick={() => void doMove(p, 1)}>
+                  <ChevronDown size={14} aria-hidden="true" focusable={false} />
+                </button>
+                <Button size="sm" variant="ghost" disabled={busy}
+                        onClick={() => { setRenaming(p.id); setRenameDraft(p.name); setConfirmingDelete(null); }}>
+                  {t('Rename')}
+                </Button>
+              </>
+            )}
+            <Button size="sm" variant="ghost" disabled={busy}
+                    onClick={() => { setConfirmingDelete(p.id); setRenaming(null); }}>
+              {p.builtin ? t('Hide') : t('Delete')}
+            </Button>
+          </>
+        )}
+      </span>
+    </li>
+  );
+
+  const builtins = localOrder.filter((p) => p.builtin);
+  const library = localOrder.filter((p) => !p.builtin && p.scope === 'library');
+  const own = localOrder.filter((p) => !p.builtin && p.scope !== 'library');
 
   return (
     <div className={styles.overlay} onClick={onClose} role="presentation">
@@ -1213,64 +1330,9 @@ function ManagePresetsModal({ presets, hidden, catalogue, onClose, onChanged, on
         <div className={styles.modalBody}>
           {presets.length === 0 && <p className={styles.helpText}>{t('No presets yet. Save one from the designer.')}</p>}
           <ul className={styles.manageList}>
-            {presets.map((p) => (
-              <li key={p.id} className={styles.manageRow}>
-                <span
-                  className={styles.manageDot}
-                  aria-hidden="true"
-                  style={{ background: presetDot(p, catalogue) }}
-                />
-                {renaming === p.id ? (
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={renameDraft}
-                    maxLength={80}
-                    aria-label={t('Preset name')}
-                    onChange={(e) => setRenameDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') { e.preventDefault(); void doRename(p.id); }
-                      if (e.key === 'Escape') setRenaming(null);
-                    }}
-                  />
-                ) : (
-                  <span className={styles.manageName}>{p.name}</span>
-                )}
-                <span className={styles.manageBadge}>{scopeBadge(p)}</span>
-                <span className={styles.rowActions}>
-                  {renaming === p.id ? (
-                    <>
-                      <Button size="sm" variant="ghost" disabled={busy || !renameDraft.trim()}
-                              onClick={() => void doRename(p.id)}>{t('Save')}</Button>
-                      <Button size="sm" variant="ghost" disabled={busy} onClick={() => setRenaming(null)}>{t('Cancel')}</Button>
-                    </>
-                  ) : confirmingDelete === p.id ? (
-                    <>
-                      <span className={styles.confirmText}>
-                        {p.builtin ? t('Hide {name}?', { name: p.name }) : t('Delete {name}?', { name: p.name })}
-                      </span>
-                      <Button size="sm" variant="danger" disabled={busy} onClick={() => void doDelete(p)}>
-                        {p.builtin ? t('Hide') : t('Delete')}
-                      </Button>
-                      <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirmingDelete(null)}>{t('Cancel')}</Button>
-                    </>
-                  ) : (
-                    <>
-                      {!p.builtin && (
-                        <Button size="sm" variant="ghost" disabled={busy}
-                                onClick={() => { setRenaming(p.id); setRenameDraft(p.name); setConfirmingDelete(null); }}>
-                          {t('Rename')}
-                        </Button>
-                      )}
-                      <Button size="sm" variant="ghost" disabled={busy}
-                              onClick={() => { setConfirmingDelete(p.id); setRenaming(null); }}>
-                        {p.builtin ? t('Hide') : t('Delete')}
-                      </Button>
-                    </>
-                  )}
-                </span>
-              </li>
-            ))}
+            {builtins.map((p) => renderRow(p, true, true))}
+            {library.map((p, i) => renderRow(p, i === 0, i === library.length - 1))}
+            {own.map((p, i) => renderRow(p, i === 0, i === own.length - 1))}
           </ul>
           {hidden.length > 0 && (
             <>
@@ -1278,7 +1340,12 @@ function ManagePresetsModal({ presets, hidden, catalogue, onClose, onChanged, on
               <ul className={styles.manageList}>
                 {hidden.map((h) => (
                   <li key={h.id} className={styles.manageRow}>
-                    <span className={styles.manageName}>{h.name}</span>
+                    <span
+                      className={styles.manageDot}
+                      aria-hidden="true"
+                      style={{ background: presetDot(h, catalogue) }}
+                    />
+                    <span className={styles.manageName}>{h.builtin ? t(h.name) : h.name}</span>
                     <span className={styles.rowActions}>
                       <Button size="sm" variant="ghost" disabled={busy} onClick={() => void doRestore(h.id)}>
                         {t('Restore')}

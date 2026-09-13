@@ -28,6 +28,8 @@ export interface DesignColors {
 export interface SlotFont {
   family?: string;
   size?: number;
+  bold?: boolean;
+  italic?: boolean;
 }
 
 export type DesignFonts = Partial<Record<SlotName, SlotFont>>;
@@ -59,6 +61,12 @@ export interface CatalogueStyle {
   label: string;
   description: string;
   thumbnail_url: string;
+  /** What each of the four colours paints in THIS arrangement (English source
+   *  strings, rendered through t()). Extension added by the v2 API leg. */
+  color_roles?: Partial<Record<keyof Required<DesignColors>, string>>;
+  /** The arrangement's own default alignment per slot — what the server
+   *  resolves when the design omits align. */
+  align?: Partial<Record<SlotName, Alignment>>;
 }
 
 export interface CatalogueScheme {
@@ -66,6 +74,8 @@ export interface CatalogueScheme {
   label: string;
   colors: Required<DesignColors>;
   builtin: boolean;
+  /** v1 field, retained by the v2 catalogue: [background, band]. */
+  swatch?: string[];
 }
 
 export interface CatalogueFont {
@@ -73,6 +83,8 @@ export interface CatalogueFont {
   label: string;
   css_stack: string;
   sample_url: string;
+  /** "serif" | "sans" | "mono" for the three ids that always exist. */
+  generic?: string;
 }
 
 export interface CataloguePreset {
@@ -80,10 +92,16 @@ export interface CataloguePreset {
   name: string;
   design: CoverDesign;
   builtin: boolean;
-  scope: 'user' | 'library';
-  /** Additive, not in the base contract: the presets endpoint MAY flag built-ins
-   *  the user has hidden. The UI also keeps its own record when it is absent. */
+  /** The backend marks shipped presets "builtin"; the base contract only knew
+   *  user|library. */
+  scope: 'user' | 'library' | 'builtin';
+  /** Additive: flagged on every entry by the presets endpoint (the catalogue's
+   *  own list omits hidden entries entirely). */
   hidden?: boolean;
+  /** v1 alias of `name`, retained server-side. */
+  label?: string;
+  /** Saved presets only: the reader's own ordering. */
+  position?: number;
 }
 
 export interface CatalogueLimits {
@@ -93,6 +111,14 @@ export interface CatalogueLimits {
   max_height: number;
   font_size_min: number;
   font_size_max: number;
+  max_template_length?: number;
+  max_name_length?: number;
+  max_presets?: number;
+}
+
+export interface CataloguePlaceholder {
+  id: string;
+  label: string;
 }
 
 export interface DesignerCatalogue {
@@ -102,13 +128,37 @@ export interface DesignerCatalogue {
   presets: CataloguePreset[];
   defaults: CoverDesign;
   limits: CatalogueLimits;
+  placeholders?: CataloguePlaceholder[];
+  alignments?: Alignment[];
+  text_slots?: SlotName[];
+  color_slots?: (keyof Required<DesignColors>)[];
+  /** v1 keys the server retains (the admin settings page reads `layouts`). */
+  default_preset?: string;
+  layouts?: { id: string; label: string }[];
 }
 
-/** `designer` inside GET /book/<id>/cover/state (and the my-cover payload). */
-export interface DesignerState {
+/** `designer` inside GET /book/<id>/cover/state (and the my-cover payload).
+ *  The server sends the catalogue FLAT (the designer_state() payload IS the
+ *  catalogue plus these keys); the contract doc's nested `catalogue` form is
+ *  accepted too, for forward compatibility. */
+export interface DesignerState extends Partial<DesignerCatalogue> {
   available: boolean;
   renderer?: string | null;
   catalogue?: DesignerCatalogue;
+  /** Ids of presets this reader has hidden (flat form). */
+  hidden_presets?: string[];
+  /** Server-computed "may save scope:library" — the admin role. */
+  can_share_presets?: boolean;
+}
+
+/** The catalogue out of a designer state payload, whichever form it takes. */
+export function catalogueOf(designer: DesignerState | undefined): DesignerCatalogue | null {
+  if (!designer?.available) return null;
+  if (designer.catalogue) return designer.catalogue;
+  if (Array.isArray(designer.styles) && designer.defaults && designer.limits) {
+    return designer as DesignerCatalogue;
+  }
+  return null;
 }
 
 // ---- preview / apply / presets endpoints ---------------------------------------
@@ -121,6 +171,8 @@ export interface PreviewResponse {
 
 export interface PresetListResponse {
   presets: CataloguePreset[];
+  /** Ids of presets this reader has hidden (the list already flags them). */
+  hidden?: string[];
 }
 
 export interface PresetResponse {
@@ -129,8 +181,9 @@ export interface PresetResponse {
 
 // ---- helpers -------------------------------------------------------------------
 
-/** Calibre template placeholders a text template may reference. */
-export const TEXT_PLACEHOLDERS = ['{title}', '{authors}', '{series}', '{series_index}'];
+/** Calibre template placeholder ids a text template may reference (fallback
+ *  list; the catalogue's `placeholders[]` carries labels and is preferred). */
+export const TEXT_PLACEHOLDERS = ['title', 'authors', 'series', 'series_index'];
 
 /** The locked cover aspect: 2:3, like every cover frame in the app. */
 export const ASPECT_RATIO = 2 / 3;

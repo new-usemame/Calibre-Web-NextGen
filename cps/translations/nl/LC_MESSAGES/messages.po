@@ -15553,9 +15553,6 @@ msgstr "Mijn voorinstellingen"
 msgid "No presets yet. Save one from the designer."
 msgstr "Nog geen voorinstellingen. Sla er een op vanuit de ontwerper."
 
-msgid "Placeholders: {title}, {authors}, {series}, {series_index}. Leave a field empty to use its default."
-msgstr "Plaatsaanduidingen: {title}, {authors}, {series}, {series_index}. Laat een veld leeg om de standaardwaarde te gebruiken."
-
 msgid "Preset"
 msgstr "Voorinstelling"
 
@@ -15606,3 +15603,160 @@ msgstr "Breedte (px)"
 
 msgid "{name} hex value"
 msgstr "Hexwaarde van {name}"
+
+# Cover designer v2 catalogue vocabulary + new controls (SPA)
+msgid "A band down the left edge meeting a rounded title panel."
+msgstr "Een band langs de linkerrand die overgaat in een afgerond titelpaneel."
+
+msgid "All authors, separated by commas"
+msgstr "Alle auteurs, gescheiden door komma's"
+
+msgid "All three text blocks"
+msgstr "Alle drie de tekstblokken"
+
+msgid "Authors, and the ornaments"
+msgstr "De auteurs, en de ornamenten"
+
+msgid "Authors, on the band"
+msgstr "De auteurs, op de band"
+
+msgid "Authors, on the page"
+msgstr "De auteurs, op de pagina"
+
+msgid "Banner"
+msgstr "Banner"
+
+msgid "Blocks"
+msgstr "Blokken"
+
+msgid "Book title"
+msgstr "Boektitel"
+
+msgid "Bottom third"
+msgstr "Onderste derde"
+
+msgid "Calibre blue"
+msgstr "Calibre-blauw"
+
+msgid "Calibre earth"
+msgstr "Calibre-aarde"
+
+msgid "Centre of the wash"
+msgstr "Midden van de waas"
+
+msgid "Earth"
+msgstr "Aarde"
+
+msgid "Edge of the wash"
+msgstr "Rand van de waas"
+
+msgid "First author only"
+msgstr "Alleen de eerste auteur"
+
+msgid "First language"
+msgstr "Eerste taal"
+
+msgid "Forest"
+msgstr "Bos"
+
+msgid "Grass"
+msgstr "Gras"
+
+msgid "Half and half"
+msgstr "Half om half"
+
+msgid "Leave a field empty to use its default."
+msgstr "Laat een veld leeg om de standaardwaarde te gebruiken."
+
+msgid "Left edge and the title panel"
+msgstr "Linkerrand en het titelpaneel"
+
+msgid "Middle of the wash"
+msgstr "Midden van de waas"
+
+msgid "Midnight"
+msgstr "Middernacht"
+
+msgid "Move {name} down"
+msgstr "{name} omlaag verplaatsen"
+
+msgid "Move {name} up"
+msgstr "{name} omhoog verplaatsen"
+
+msgid "Noir"
+msgstr "Noir"
+
+msgid "Number within the series"
+msgstr "Nummer binnen de serie"
+
+msgid "Ocean"
+msgstr "Oceaan"
+
+msgid "One colour washing into another from top to bottom."
+msgstr "De ene kleur loopt van boven naar beneden in de andere over."
+
+msgid "Ornamental"
+msgstr "Ornamenteel"
+
+msgid "Page"
+msgstr "Pagina"
+
+msgid "Placeholders:"
+msgstr "Plaatsaanduidingen:"
+
+msgid "Rating out of five, as a number"
+msgstr "Beoordeling op vijf, als getal"
+
+msgid "Rating out of five, as stars"
+msgstr "Beoordeling op vijf, als sterren"
+
+msgid "Rose"
+msgstr "Roze"
+
+msgid "Series name"
+msgstr "Naam van de serie"
+
+msgid "Silver"
+msgstr "Zilver"
+
+msgid "Tags, separated by commas"
+msgstr "Tags, gescheiden door komma's"
+
+msgid "The Cross"
+msgstr "Het Kruis"
+
+msgid "The ribbon"
+msgstr "Het lint"
+
+msgid "Title and subtitle"
+msgstr "Titel en ondertitel"
+
+msgid "Title and subtitle, on the panel"
+msgstr "Titel en ondertitel, op het paneel"
+
+msgid "Title and subtitle, on the ribbon"
+msgstr "Titel en ondertitel, op het lint"
+
+msgid "Title at the top, authors on a colour band across the bottom third."
+msgstr "Titel bovenaan, auteurs op een kleurband over het onderste derde."
+
+msgid "Title inside a decorated frame over a soft radial wash."
+msgstr "Titel in een versierd kader over een zachte radiale waas."
+
+msgid "Title on a folded ribbon near the top, authors below on the page."
+msgstr "Titel op een gevouwen lint bovenaan, auteurs daaronder op de pagina."
+
+msgid "Top and bottom of the wash"
+msgstr "Boven- en onderkant van de waas"
+
+msgid "Unused by this arrangement"
+msgstr "Niet gebruikt door deze opmaak"
+
+msgid "Upper two thirds"
+msgstr "Bovenste twee derde"
+
+msgid "Water"
+msgstr "Water"
+
+msgid "Year of publication"
+msgstr "Jaar van publicatie"

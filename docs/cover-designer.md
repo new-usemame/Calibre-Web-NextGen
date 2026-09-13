@@ -122,3 +122,30 @@ Arrangement thumbnails and lettering samples are real renders, cached on disk un
 cover preview cache (so they share its size budget and its sweeper) with the renderer that drew
 them as part of the cache identity — a picture drawn by the Pillow fallback is not served once
 Calibre is installed.
+
+## Waiting for a render without stopping the server
+
+The panel asks for every thumbnail at once, so the same uncached image is missed several times in
+the same millisecond and only one of those misses should reach a renderer. The obvious way to
+arrange that — a per-key lock held across the render — is wrong here, and wrong in a way that stops
+the whole server rather than just the designer.
+
+CWNG serves every request from a gevent greenlet on a single OS thread and deliberately does not
+call `monkey.patch_all()`, while a catalogue render is dispatched to the gevent threadpool and
+yields its greenlet while a worker thread runs it. A second request that then blocks on a native
+`threading.Lock` stops the one thread the hub runs on: the first request's render finishes, no hub
+is left to deliver the result, the first greenlet never resumes to release the lock, and the
+process never answers anything again. Measured twice — a cold container wedged on the second
+concurrent thumbnail, with `py-spy` showing its single thread parked in `Lock.acquire` inside
+`cover_designer_cache.cached` and every pool worker idle with its render already done, and the same
+stack out of `faulthandler` on a two-greenlet host reproduction.
+
+`cover_designer_cache.single_flight_lock` is therefore a `gevent.lock.Semaphore` wherever gevent is
+importable, so waiting parks the greenlet and leaves the hub free to deliver the very render the
+waiter is waiting for, and a `threading.Semaphore` where it is not. The wait is also bounded: a
+request that has waited `SINGLE_FLIGHT_WAIT_SECONDS` renders its own copy, so a renderer that never
+returns costs one slow request instead of every later request for that image.
+
+The cover-tile cache next door keeps its native lock, and is right to: it pads its image inline on
+the request greenlet and never yields while holding it. The distinction that matters is not which
+cache it is, but whether the work inside the lock can yield.

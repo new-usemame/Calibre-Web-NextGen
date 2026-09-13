@@ -148,13 +148,15 @@ function targetCard(page: Page) {
 /** Enter the edit flow through the control exposed by the active pointer
  * contract. Fine pointers retain the hover pencil; coarse pointers carry no
  * card actions at all (operator ruling 2026-09-12), so the touch route is the
- * one a phone user has: tap into the book and use its own Edit link. */
+ * one a phone user has: tap into the book and use the gear menu's "Edit
+ * metadata" item (the book page no longer carries a bare Edit link). */
 async function openQuickEdit(page: Page) {
   const card = targetCard(page).first().locator('..');
   if (test.info().project.use.hasTouch === true) {
     await targetCard(page).first().click();
     await page.waitForURL(`**/book/${TARGET_ID}`);
-    await page.locator(`a[href$="/book/${TARGET_ID}/edit"]`).first().click();
+    await page.getByTestId('book-actions-menu').click();
+    await page.getByRole('menuitem', { name: 'Edit metadata' }).click();
     return;
   }
 

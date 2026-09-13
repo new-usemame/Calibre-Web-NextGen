@@ -151,8 +151,10 @@ async function coldLoad(page: Page, seed: Record<string, string> = {}) {
     if (!response.url().includes('/api/v1/books?') || response.status() !== 200) return;
     const params = new URL(response.url()).searchParams;
     // The same endpoint serves the Discover rail and the entity/read-filtered
-    // views; those own `?filter=` and the entity keys and carry no sort of
-    // their own. Only the plain library grid is the default under test.
+    // views. Those DO carry a sort — queries.ts sets one on every books request
+    // — but it is a different default with a different answer (see the author
+    // test below), so counting them here would make `sorts[0]` a race between
+    // two listings. `?filter=` and the entity keys are what tell them apart.
     const sort = params.get('sort');
     if (sort === null || params.has('filter') || params.has('search')) return;
     if (['series', 'author', 'tag', 'publisher', 'language'].some((key) => params.has(key))) return;
@@ -173,6 +175,29 @@ async function coldLoad(page: Page, seed: Record<string, string> = {}) {
   await page.goto('/app');
   await expect(page.getByRole('combobox', { name: 'Sort order' })).toBeVisible();
   await expect.poll(() => sorts.length, { message: 'no listing request observed' })
+    .toBeGreaterThan(0);
+  return sorts;
+}
+
+/**
+ * The sort the SPA asks for when it opens a listing scoped to ONE author.
+ *
+ * Same blank-page discipline as `coldLoad` and for the same reason: the fixture
+ * has already loaded /app in this tab.
+ */
+async function authorListingSort(page: Page, authorId: number) {
+  const sorts: string[] = [];
+  await page.goto('about:blank');
+  page.on('response', (response) => {
+    if (!response.url().includes('/api/v1/books?') || response.status() !== 200) return;
+    const params = new URL(response.url()).searchParams;
+    const sort = params.get('sort');
+    if (sort === null || !params.has('author')) return;
+    sorts.push(sort);
+  });
+  await page.goto(`/app/authors/${authorId}`);
+  await expect(page.getByRole('combobox', { name: 'Sort order' })).toBeVisible();
+  await expect.poll(() => sorts.length, { message: 'no author listing request observed' })
     .toBeGreaterThan(0);
   return sorts;
 }
@@ -294,6 +319,41 @@ test.describe('Recent library sort', () => {
     expect(sorts[0]).toBe('recent');
     await expect(secondaryUser.page.getByRole('combobox', { name: 'Sort order' }))
       .toHaveValue('recent');
+  });
+
+  test('a listing scoped to one author still opens on newest added', async ({ secondaryUser }) => {
+    // The sort menu is one component, so making Recent the library's default
+    // made it the default of every listing that menu is on — an author, a tag,
+    // a discovery view. Those never read the stored choice (Catalog persists it
+    // for the plain library only), so a default imposed there is one the reader
+    // cannot change for next time. This is the assertion that keeps the new
+    // default inside the page it was asked for.
+    const { page, readBookId, readBookTitle } = await aReaderWithAHistory(secondaryUser);
+    const api = secondaryUser.context.request;
+    const detail = await api.get(`/api/v1/books/${readBookId}`);
+    expect(detail.ok(), `book ${readBookId} failed: ${detail.status()}`).toBeTruthy();
+    const author = ((await detail.json()) as { authors: { id: number }[] }).authors?.[0];
+    expect(author?.id, 'the book this reader has read needs an author to scope by')
+      .toBeTruthy();
+
+    const sorts = await authorListingSort(page, author.id);
+    expect(sorts[0], 'an author page is not asked what this reader has been reading')
+      .toBe('new');
+    expect(sorts.filter((sort) => sort !== 'new'),
+      'and nothing corrects it to the library default afterwards').toEqual([]);
+    await expect(page.getByRole('combobox', { name: 'Sort order' })).toHaveValue('new');
+
+    // The instrument check: this listing does contain the book the reader has
+    // been reading, so opening on Recent here would have been visible — the
+    // assertion above is not passing because the case cannot arise.
+    await expect.poll(async () => (await renderedIds(page)).includes(readBookId),
+      { message: `${readBookTitle} must be in this author's listing for the check to bite` })
+      .toBe(true);
+
+    // Worth a picture: this is the surface the Library's new default would have
+    // changed without being asked to, so the evidence that it did not should be
+    // something a reviewer can look at rather than only an expectation.
+    await shoot(page, 'author-newest');
   });
 
   test('the Global Library offers Recent without opening on it', async ({ page }) => {

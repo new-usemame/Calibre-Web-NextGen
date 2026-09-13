@@ -6,6 +6,7 @@ import {
   LIBRARY_SORT_KEY,
   LIBRARY_SORT_KEY_LEGACY,
   SORT_OPTIONS,
+  defaultCatalogSort,
   resolveLibrarySort,
 } from '../src/lib/bookSortOptions.ts';
 
@@ -49,4 +50,18 @@ test('a value this build no longer offers falls through to the default', () => {
 
 test('the two keys are distinct, so the migration can tell them apart', () => {
   assert.notEqual(LIBRARY_SORT_KEY, LIBRARY_SORT_KEY_LEGACY);
+});
+
+// Which listing opens on which order. The whole library is the only view that
+// remembers a choice, so it is the only one a per-reader default belongs in.
+test('the whole library opens on Recent', () => {
+  assert.equal(defaultCatalogSort({ isSeries: false, isPlainLibrary: true }), 'recent');
+});
+
+test('a series listing still opens in series order', () => {
+  assert.equal(defaultCatalogSort({ isSeries: true, isPlainLibrary: false }), 'seriesasc');
+});
+
+test('an author, tag or discovery listing still opens on newest added', () => {
+  assert.equal(defaultCatalogSort({ isSeries: false, isPlainLibrary: false }), 'new');
 });

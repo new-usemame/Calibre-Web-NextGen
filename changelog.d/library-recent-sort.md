@@ -1,6 +1,6 @@
 ### Added
 
-- **Your Library now opens on Recent: the books you have been reading, newest first, then everything you have not read in the order it was added.** Recency comes from every reader that reports progress — the web reader, a Kobo's sync, KOReader — so picking a book up on one device moves it to the top on the others. It is the first entry in the sort menu, and it is offered on shelves and in the Global Library too, which keep their own defaults. A sort you have chosen yourself still wins.
+- **Your Library now opens on Recent: the books you have been reading, newest first, then everything you have not read in the order it was added.** Recency comes from every reader that reports progress — the web reader, a Kobo's sync, KOReader — so picking a book up on one device moves it to the top on the others. It is the first entry in the sort menu, and it is offered on shelves, on author and tag pages and in the Global Library too — all of which keep opening on the order they already did. A sort you have chosen yourself still wins.
 
 ### Changed
 

@@ -20,6 +20,27 @@ export type BookSortValue = (typeof SORT_OPTIONS)[number]['value'];
 /** What the plain Library view opens on when the reader has expressed no choice. */
 export const DEFAULT_LIBRARY_SORT = 'recent';
 
+/** What every other book listing opens on — unchanged by this build. */
+export const DEFAULT_SCOPED_SORT = 'new';
+
+/**
+ * What a listing opens on when this reader has expressed no choice for it.
+ *
+ * Only the plain Library gets Recent. A series opens in series order (#573),
+ * and every other scoped listing — one author, one tag, a discovery view —
+ * keeps opening on what was added most recently. That is not timidity: those
+ * views never consult the stored preference (Catalog only persists and reads it
+ * for the plain library), so a default imposed there is a default the reader
+ * cannot change for next time, and "the books by this author I have been
+ * reading" is not the question an author page is asked.
+ */
+export function defaultCatalogSort(
+  { isSeries, isPlainLibrary }: { isSeries: boolean; isPlainLibrary: boolean },
+): string {
+  if (isSeries) return 'seriesasc';
+  return isPlainLibrary ? DEFAULT_LIBRARY_SORT : DEFAULT_SCOPED_SORT;
+}
+
 /** Where the Library's remembered sort lives (#640), per browser. */
 export const LIBRARY_SORT_KEY = 'cwng:library-sort-v2';
 

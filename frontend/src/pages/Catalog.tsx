@@ -25,8 +25,8 @@ import { measureCatalogColumnCount } from '../lib/catalogGridMeasurement';
 import styles from './Catalog.module.css';
 import { canUploadBooks } from '../lib/permissions';
 import {
-  DEFAULT_LIBRARY_SORT, LIBRARY_SORT_KEY, LIBRARY_SORT_KEY_LEGACY, SORT_OPTIONS,
-  resolveLibrarySort,
+  LIBRARY_SORT_KEY, LIBRARY_SORT_KEY_LEGACY, SORT_OPTIONS,
+  defaultCatalogSort, resolveLibrarySort,
 } from '../lib/bookSortOptions';
 
 const VIEW_OPTIONS: Record<DiscoveryView, { label: string }> = {
@@ -246,12 +246,13 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // Series views expose two extra series-order options and default to ascending
   // series order so the list reads 1, 2, 3… instead of newest-first (#573).
   const sortOptions = isSeries ? [...SERIES_SORT_OPTIONS, ...SORT_OPTIONS] : SORT_OPTIONS;
-  const defaultSort = isSeries ? 'seriesasc' : DEFAULT_LIBRARY_SORT;
   // Library-only controls (search box, advanced link, read-status filter) are
   // hidden for both entity-scoped and discovery views.
   const hideLibraryControls = filtered || isView;
-  // The plain Library tab — the only view whose sort/read-filter is persisted (#640).
+  // The plain Library tab — the only view whose sort/read-filter is persisted (#640),
+  // and therefore the only one that opens on Recent (bookSortOptions).
   const isPlainLibrary = !filtered && !isView;
+  const defaultSort = defaultCatalogSort({ isSeries, isPlainLibrary });
 
   // Scroll/state restoration (#578): identity of THIS catalog instance (library
   // vs a specific entity vs a discovery view) — stable across a book → Back trip.

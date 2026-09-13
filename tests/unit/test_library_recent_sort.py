@@ -613,10 +613,45 @@ def test_the_books_endpoint_asks_for_the_per_user_order(library, monkeypatch):
         [str(e.compile()) for e in expected]
 
 
+def test_the_global_library_offers_the_order_without_opening_on_it(library, monkeypatch):
+    """The global archive gets the option; what it opens on is unchanged.
+
+    Both halves are asserted because they fail in opposite directions: an
+    endpoint that ignored ``sort=recent`` would leave the option inert, and one
+    that adopted it as its own default would reorder a *discovery* view — which
+    is for what is newly available, not for what this reader has been reading —
+    by a history most of its books have none of.
+    """
+    from cps.api import books as books_mod
+    from cps.pagination import Pagination
+    from cps.sort_orders import BOOK_SORT_ORDERS
+
+    library.reader.role = library.reader.role | constants.ROLE_BROWSE_GLOBAL
+    library.session.commit()
+    captured = {}
+
+    def fill(_page, _per_page, _model, _filter, order, *_a, **_kw):
+        captured["order"] = order
+        return [], None, Pagination(1, 60, 0)
+
+    monkeypatch.setattr(books_mod.calibre_db, "fill_indexpage", fill)
+    monkeypatch.setattr(books_mod.config, "config_books_per_page", 60,
+                        raising=False)
+    monkeypatch.setattr(books_mod.config, "config_read_column", 0,
+                        raising=False)
+    monkeypatch.setattr(books_mod, "current_user", library.reader,
+                        raising=False)
+
+    app = flask.Flask(__name__)
+    for query, wanted in (("?sort=recent", library.order(user=library.reader)),
+                          ("", BOOK_SORT_ORDERS["new"])):
+        with app.test_request_context("/api/v1/library/global" + query):
+            inspect.unwrap(books_mod.list_global_library)()
+        assert _same_order(captured["order"], wanted), query or "(no sort asked for)"
+
+
 def test_an_anonymous_books_request_for_recent_gets_newest(library, monkeypatch):
     """The endpoint's own degradation, at the boundary the user reaches."""
-    from types import SimpleNamespace
-
     from cps.api import books as books_mod
     from cps.pagination import Pagination
     from cps.sort_orders import BOOK_SORT_ORDERS

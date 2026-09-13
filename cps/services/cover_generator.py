@@ -1441,7 +1441,10 @@ def builtin_presets(binaries_dir: str = "") -> list:
         design = resolve_design(value["design"], strict=False,
                                 binaries_dir=binaries_dir).to_dict()
         entries.append({"id": key, "name": value["label"], "label": value["label"],
-                        "design": design, "builtin": True, "scope": "builtin"})
+                        "design": design, "builtin": True, "scope": "builtin",
+                        # Every preset entry carries the flag, so a client can
+                        # read it without knowing which list it came from.
+                        "hidden": False})
     return entries
 
 

@@ -47,10 +47,28 @@
   outline-offset: 2px;
 }
 
-/* Lift on hover or when anything in the card (card control or an action button)
-   is focused. Keyed off .wrap so focusing a sibling action button lifts too. */
-.wrap:hover .coverWrap,
-.wrap:focus-within .coverWrap {
+/* Lift when a pointer that can hover rests on the card, or when keyboard focus
+   lands on anything in it (card control or an action button; keyed off .wrap so
+   focusing a sibling action button lifts too).
+
+   Hover is gated on `(hover: hover)` because iOS Safari applies a synthetic
+   :hover to the last thing tapped and keeps it until the next tap lands
+   elsewhere — so on a phone the ring stayed lit under a cover the reader had
+   touched while scrolling and never opened. A device whose primary pointer
+   cannot hover gets no hover lift at all; there is no "stable" version of a
+   hover affordance on a finger.
+
+   Focus uses :focus-visible rather than :focus-within for the same reason: a
+   tap focuses the link in some engines, and that focus is not a cue the user
+   asked for. Keyboard focus still lifts. */
+@media (hover: hover) {
+  .wrap:hover .coverWrap {
+    transform: translateY(-4px);
+    box-shadow: var(--elev-3);
+    outline-color: var(--accent);
+  }
+}
+.wrap:has(:focus-visible) .coverWrap {
   transform: translateY(-4px);
   box-shadow: var(--elev-3);
   outline-color: var(--accent);

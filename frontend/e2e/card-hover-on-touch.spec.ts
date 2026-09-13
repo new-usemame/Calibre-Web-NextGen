@@ -50,8 +50,13 @@ test('the cover lift never follows the pointer on a touch device', async ({ page
 
     // Keyboard users keep the lift as their focus cue.
     await page.mouse.move(0, 0);
+    // Land on the card by keyboard: step back off it and Tab forward onto it,
+    // so the final focus move is a keystroke and :focus-visible applies.
+    await first.focus();
+    await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
-    await expect.poll(() => first.evaluate((n) => n === document.activeElement)).toBe(true);
+    await expect.poll(() => first.evaluate((n) => n === document.activeElement),
+      { message: 'keyboard focus lands on the first card' }).toBe(true);
     const focused = await liftState(page);
     expect(focused.transform, 'keyboard focus lifts the cover').not.toBe('none');
   }

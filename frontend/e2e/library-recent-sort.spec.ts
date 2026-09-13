@@ -42,10 +42,6 @@ const READ_CFI = 'epubcfi(/6/14!/4/2/2[pgepubid00001]/1:0)';
 const LEGACY_KEY = 'cwng:library-sort-v1';
 const SORT_KEY = 'cwng:library-sort-v2';
 
-// Evidence screenshots are opt-in and land outside the repo. Unset (CI, a
-// normal local run) the spec still asserts everything; it just takes no images.
-const SHOT_DIR = process.env.CWNG_SHOT_DIR;
-
 interface BookItem { id: number; title: string }
 
 /** The two books whose positions tell the two orders apart, for one reader. */
@@ -170,11 +166,16 @@ async function coldLoad(page: Page, seed: Record<string, string> = {}) {
  * rail, which is further down than one 800px viewport reaches. The rail is
  * dismissible, but dismissing it writes a preference on the account.
  *
+ * Written to the run's own output directory and attached to the report, the way
+ * the other specs that carry visual evidence do it (admin-device-cards,
+ * admin-context-sidebar). Not behind a flag: evidence that only exists when
+ * someone remembers to set a variable is absent exactly when it is wanted, and
+ * an absent image and a correct one look identical in a passing run.
+ *
  * The file is named after the project, so the desktop and phone-sized runs of
  * the same test keep their own images instead of overwriting each other.
  */
 async function shoot(page: Page, name: string) {
-  if (!SHOT_DIR) return;
   // Park the pointer over the header first. The desktop nav rail expands on
   // hover and Playwright leaves the pointer at (0, 0), which is inside it, so
   // an unmoved mouse puts the expanded panel on top of the first column of the
@@ -183,13 +184,17 @@ async function shoot(page: Page, name: string) {
   // end, so the shot is the collapsed rail rather than a frame of it closing.
   const view = page.viewportSize();
   if (view) await page.mouse.move(view.width / 2, 8);
+  const info = test.info();
+  const file = `${info.project.name}-${name}.jpg`;
+  const path = info.outputPath(file);
   await page.screenshot({
-    path: `${SHOT_DIR}/${test.info().project.name}-${name}.jpg`,
+    path,
     type: 'jpeg',
     quality: 70,
     fullPage: true,
     animations: 'disabled',
   });
+  await info.attach(file, { path, contentType: 'image/jpeg' });
 }
 
 test.describe('Recent library sort', () => {

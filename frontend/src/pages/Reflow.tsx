@@ -44,7 +44,9 @@ const STATUS_LABEL = (status: string, t: TFunction): string => ({
   done: t('Finished'),
   capped: t('Stopped at the cap'),
   failed: t('Failed'),
-  cancelled: t('Cancelled'),
+  // Not the classic task list's "Cancelled": a conversion has two ways of
+  // stopping early and the bill is different, so each says which one it was.
+  cancelled: t('Stopped before it finished'),
 }[status] ?? status);
 
 export function Reflow({ id }: { id: string }) {

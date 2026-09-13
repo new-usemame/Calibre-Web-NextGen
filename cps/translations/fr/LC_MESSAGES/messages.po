@@ -15506,6 +15506,235 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+#: cps/spa_strings.py
+msgid "A sample"
+msgstr "Un échantillon"
+
+#: cps/spa_strings.py
+msgid "A scanned PDF converts badly. Reflow rebuilds its chapters, paragraphs and footnotes with a model, at a cost you agree to first."
+msgstr "Un PDF numérisé se convertit mal. Reflow en reconstruit les chapitres, les paragraphes et les notes de bas de page à l’aide d’un modèle, pour un coût que vous acceptez au préalable."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "About {pages} of them will need a model."
+msgstr "Environ {pages} d’entre elles auront besoin d’un modèle."
+
+#: cps/spa_strings.py
+msgid "Back to edit"
+msgstr "Retour à la modification"
+
+#: cps/spa_strings.py
+msgid "Convert the book"
+msgstr "Convertir le livre"
+
+#: cps/spa_strings.py
+msgid "Convert the sample"
+msgstr "Convertir l’échantillon"
+
+#: cps/spa_strings.py
+msgid "Convert the whole book"
+msgstr "Convertir tout le livre"
+
+#: cps/spa_strings.py
+msgid "Converting"
+msgstr "Conversion en cours"
+
+#: cps/spa_strings.py
+msgid "Download the sample"
+msgstr "Télécharger l’échantillon"
+
+#: cps/spa_strings.py
+msgid "Every other page is converted by reading the PDF itself, which costs nothing. A page only goes to a model when the layout cannot be settled without one."
+msgstr "Toutes les autres pages sont converties en lisant le PDF lui-même, ce qui ne coûte rien. Une page n’est envoyée à un modèle que lorsque sa mise en page ne peut pas être établie autrement."
+
+#: cps/spa_strings.py
+msgid "Every page is a picture of the page with OCR text behind it. The words are readable, but the structure has to be rebuilt."
+msgstr "Chaque page est une image de la page, avec du texte OCR derrière. Les mots sont lisibles, mais la structure doit être reconstruite."
+
+#: cps/spa_strings.py
+msgid "How much to convert"
+msgstr "Quelle partie convertir"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "I agree to spend up to {amount} of my own OpenRouter credit on this conversion."
+msgstr "J’accepte de dépenser jusqu’à {amount} de mon propre crédit OpenRouter pour cette conversion."
+
+#: cps/spa_strings.py
+msgid "No OpenRouter key is configured, so nothing can be converted yet."
+msgstr "Aucune clé OpenRouter n’est configurée : rien ne peut donc encore être converti."
+
+#: cps/spa_strings.py
+msgid "Nothing to convert"
+msgstr "Rien à convertir"
+
+#: cps/spa_strings.py
+msgid "Open admin settings"
+msgstr "Ouvrir les paramètres d’administration"
+
+#: cps/spa_strings.py
+msgid "Open the book"
+msgstr "Ouvrir le livre"
+
+#: cps/spa_strings.py
+msgid "Pages"
+msgstr "Pages"
+
+#: cps/spa_strings.py
+msgid "Pages a model will read"
+msgstr "Pages qu’un modèle lira"
+
+#: cps/spa_strings.py
+msgid "Pages in the sample"
+msgstr "Pages dans l’échantillon"
+
+#: cps/spa_strings.py
+msgid "Pages reused from an earlier run"
+msgstr "Pages réutilisées d’une conversion précédente"
+
+#: cps/spa_strings.py
+msgid "Pages sent to a model"
+msgstr "Pages envoyées à un modèle"
+
+#: cps/spa_strings.py
+msgid "Pages the check accepted"
+msgstr "Pages acceptées par la vérification"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Prices measured on {date}. What you are charged is capped below — a conversion stops when it reaches the cap, and keeps the pages already paid for."
+msgstr "Tarifs mesurés le {date}. Le montant qui vous est facturé est plafonné ci-dessous : une conversion s’arrête lorsqu’elle atteint le plafond et conserve les pages déjà payées."
+
+#: cps/spa_strings.py
+msgid "Queued"
+msgstr "En file d’attente"
+
+#: cps/spa_strings.py
+msgid "Reflow PDF to EPUB"
+msgstr "Reflow : du PDF vers l’EPUB"
+
+#: cps/spa_strings.py
+msgid "Reflow this PDF with AI…"
+msgstr "Retraiter ce PDF avec l’IA (Reflow)…"
+
+#: cps/spa_strings.py
+msgid "Replace the EPUB this book already has"
+msgstr "Remplacer l’EPUB que ce livre possède déjà"
+
+#: cps/spa_strings.py
+msgid "Spent"
+msgstr "Dépensé"
+
+#: cps/spa_strings.py
+msgid "Stop"
+msgstr "Arrêter"
+
+#: cps/spa_strings.py
+msgid "Stop after spending"
+msgstr "Arrêter après avoir dépensé"
+
+#: cps/spa_strings.py
+msgid "Stopped at the cap"
+msgstr "Arrêté au plafond"
+
+#: cps/spa_strings.py
+msgid "Stopped before it finished"
+msgstr "Arrêté avant la fin"
+
+#: cps/spa_strings.py
+msgid "Text layer"
+msgstr "Couche de texte"
+
+#: cps/spa_strings.py
+msgid "That is below the estimate, so the conversion would stop before it finished."
+msgstr "C’est en dessous de l’estimation : la conversion s’arrêterait donc avant la fin."
+
+#: cps/spa_strings.py
+msgid "The book was converted"
+msgstr "Le livre a été converti"
+
+#: cps/spa_strings.py
+msgid "The conversion could not be started."
+msgstr "La conversion n’a pas pu être lancée."
+
+#: cps/spa_strings.py
+msgid "The whole book"
+msgstr "Tout le livre"
+
+#: cps/spa_strings.py
+msgid "The whole book, at the model you picked:"
+msgstr "Tout le livre, avec le modèle que vous avez choisi :"
+
+#: cps/spa_strings.py
+msgid "There is no text in this PDF at all, only images. Every page has to be read by the model, which costs the most."
+msgstr "Ce PDF ne contient aucun texte, seulement des images. Chaque page doit être lue par le modèle, ce qui coûte le plus cher."
+
+#: cps/spa_strings.py
+msgid "There is very little text on each page. This is usually a sparse scan, or two printed pages photographed as one."
+msgstr "Il y a très peu de texte sur chaque page. C’est généralement une numérisation clairsemée, ou deux pages imprimées photographiées comme une seule."
+
+#: cps/spa_strings.py
+msgid "This PDF has a real text layer. Most pages will convert without asking a model anything."
+msgstr "Ce PDF possède une véritable couche de texte. La plupart des pages seront converties sans rien demander à un modèle."
+
+#: cps/spa_strings.py
+msgid "This PDF has a text layer, but it is not readable words. It has to be treated as if there were no text at all."
+msgstr "Ce PDF possède une couche de texte, mais ce ne sont pas des mots lisibles. Il doit être traité comme s’il n’y avait aucun texte."
+
+#: cps/spa_strings.py
+msgid "This PDF has not been assessed."
+msgstr "Ce PDF n’a pas été évalué."
+
+#: cps/spa_strings.py
+msgid "This book costs more than the target. Convert a sample first and see whether the result is worth the rest."
+msgstr "Ce livre coûte plus que l’objectif fixé. Convertissez d’abord un échantillon et voyez si le résultat vaut le reste."
+
+#: cps/spa_strings.py
+msgid "This book has no PDF to convert."
+msgstr "Ce livre n’a aucun PDF à convertir."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "This stopped at the {amount} cap. The pages converted before it was reached are in the file; the rest were left as they were."
+msgstr "La conversion s’est arrêtée au plafond de {amount}. Les pages converties avant qu’il ne soit atteint sont dans le fichier ; les autres sont restées telles quelles."
+
+#: cps/spa_strings.py
+msgid "What is in this PDF"
+msgstr "Ce que contient ce PDF"
+
+#: cps/spa_strings.py
+msgid "What it will cost"
+msgstr "Ce que cela coûtera"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Your administrator allows at most {amount} for one conversion."
+msgstr "Votre administrateur autorise au maximum {amount} pour une conversion."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Your administrator set a target of {amount} a book."
+msgstr "Votre administrateur a fixé un objectif de {amount} par livre."
+
+#: cps/spa_strings.py
+msgid "Your sample is ready"
+msgstr "Votre échantillon est prêt"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} pages did not pass the word check and kept the text read straight out of the PDF. Nothing was rewritten."
+msgstr "{count} pages n’ont pas passé la vérification des mots et ont conservé le texte lu directement dans le PDF. Rien n’a été réécrit."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{pages} pages, added to this book as an EPUB format."
+msgstr "{pages} pages, ajoutées à ce livre au format EPUB."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{pages} pages, downloaded as an EPUB to look at. Nothing is added to your library."
+msgstr "{pages} pages, téléchargées en EPUB pour examen. Rien n’est ajouté à votre bibliothèque."
+
 #~ msgid "Change my cover"
 #~ msgstr "Modifier ma couverture"
 

@@ -15158,6 +15158,235 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+#: cps/spa_strings.py
+msgid "A sample"
+msgstr "Een voorproefje"
+
+#: cps/spa_strings.py
+msgid "A scanned PDF converts badly. Reflow rebuilds its chapters, paragraphs and footnotes with a model, at a cost you agree to first."
+msgstr "Een gescande PDF laat zich slecht omzetten. Reflow bouwt de hoofdstukken, alinea's en voetnoten opnieuw op met een model, tegen een prijs waarmee je vooraf akkoord gaat."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "About {pages} of them will need a model."
+msgstr "Ongeveer {pages} daarvan hebben een model nodig."
+
+#: cps/spa_strings.py
+msgid "Back to edit"
+msgstr "Terug naar bewerken"
+
+#: cps/spa_strings.py
+msgid "Convert the book"
+msgstr "Het boek omzetten"
+
+#: cps/spa_strings.py
+msgid "Convert the sample"
+msgstr "Het voorproefje omzetten"
+
+#: cps/spa_strings.py
+msgid "Convert the whole book"
+msgstr "Het hele boek omzetten"
+
+#: cps/spa_strings.py
+msgid "Converting"
+msgstr "Bezig met omzetten"
+
+#: cps/spa_strings.py
+msgid "Download the sample"
+msgstr "Het voorproefje downloaden"
+
+#: cps/spa_strings.py
+msgid "Every other page is converted by reading the PDF itself, which costs nothing. A page only goes to a model when the layout cannot be settled without one."
+msgstr "Alle andere pagina's worden omgezet door de PDF zelf te lezen, wat niets kost. Een pagina gaat alleen naar een model als de opmaak er niet zonder is vast te stellen."
+
+#: cps/spa_strings.py
+msgid "Every page is a picture of the page with OCR text behind it. The words are readable, but the structure has to be rebuilt."
+msgstr "Elke pagina is een afbeelding van de pagina met OCR-tekst erachter. De woorden zijn leesbaar, maar de structuur moet opnieuw worden opgebouwd."
+
+#: cps/spa_strings.py
+msgid "How much to convert"
+msgstr "Hoeveel er omgezet wordt"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "I agree to spend up to {amount} of my own OpenRouter credit on this conversion."
+msgstr "Ik ga ermee akkoord tot {amount} van mijn eigen OpenRouter-tegoed aan deze omzetting te besteden."
+
+#: cps/spa_strings.py
+msgid "No OpenRouter key is configured, so nothing can be converted yet."
+msgstr "Er is geen OpenRouter-sleutel ingesteld, dus er kan nog niets omgezet worden."
+
+#: cps/spa_strings.py
+msgid "Nothing to convert"
+msgstr "Niets om om te zetten"
+
+#: cps/spa_strings.py
+msgid "Open admin settings"
+msgstr "Beheerinstellingen openen"
+
+#: cps/spa_strings.py
+msgid "Open the book"
+msgstr "Het boek openen"
+
+#: cps/spa_strings.py
+msgid "Pages"
+msgstr "Pagina's"
+
+#: cps/spa_strings.py
+msgid "Pages a model will read"
+msgstr "Pagina's die een model leest"
+
+#: cps/spa_strings.py
+msgid "Pages in the sample"
+msgstr "Pagina's in het voorproefje"
+
+#: cps/spa_strings.py
+msgid "Pages reused from an earlier run"
+msgstr "Pagina's hergebruikt uit een eerdere omzetting"
+
+#: cps/spa_strings.py
+msgid "Pages sent to a model"
+msgstr "Pagina's naar een model gestuurd"
+
+#: cps/spa_strings.py
+msgid "Pages the check accepted"
+msgstr "Pagina's die de controle heeft geaccepteerd"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Prices measured on {date}. What you are charged is capped below — a conversion stops when it reaches the cap, and keeps the pages already paid for."
+msgstr "Prijzen gemeten op {date}. Wat je betaalt is hieronder begrensd: een omzetting stopt zodra ze de grens bereikt en behoudt de pagina's die al betaald zijn."
+
+#: cps/spa_strings.py
+msgid "Queued"
+msgstr "In de wachtrij"
+
+#: cps/spa_strings.py
+msgid "Reflow PDF to EPUB"
+msgstr "Reflow: van PDF naar EPUB"
+
+#: cps/spa_strings.py
+msgid "Reflow this PDF with AI…"
+msgstr "Deze PDF met AI omzetten (Reflow)…"
+
+#: cps/spa_strings.py
+msgid "Replace the EPUB this book already has"
+msgstr "De EPUB vervangen die dit boek al heeft"
+
+#: cps/spa_strings.py
+msgid "Spent"
+msgstr "Uitgegeven"
+
+#: cps/spa_strings.py
+msgid "Stop"
+msgstr "Stoppen"
+
+#: cps/spa_strings.py
+msgid "Stop after spending"
+msgstr "Stoppen na het uitgeven van"
+
+#: cps/spa_strings.py
+msgid "Stopped at the cap"
+msgstr "Gestopt bij de grens"
+
+#: cps/spa_strings.py
+msgid "Stopped before it finished"
+msgstr "Gestopt voordat het klaar was"
+
+#: cps/spa_strings.py
+msgid "Text layer"
+msgstr "Tekstlaag"
+
+#: cps/spa_strings.py
+msgid "That is below the estimate, so the conversion would stop before it finished."
+msgstr "Dat is lager dan de schatting, dus de omzetting zou stoppen voordat ze klaar is."
+
+#: cps/spa_strings.py
+msgid "The book was converted"
+msgstr "Het boek is omgezet"
+
+#: cps/spa_strings.py
+msgid "The conversion could not be started."
+msgstr "De omzetting kon niet worden gestart."
+
+#: cps/spa_strings.py
+msgid "The whole book"
+msgstr "Het hele boek"
+
+#: cps/spa_strings.py
+msgid "The whole book, at the model you picked:"
+msgstr "Het hele boek, met het model dat je koos:"
+
+#: cps/spa_strings.py
+msgid "There is no text in this PDF at all, only images. Every page has to be read by the model, which costs the most."
+msgstr "Er staat helemaal geen tekst in deze PDF, alleen afbeeldingen. Elke pagina moet door het model gelezen worden, wat het duurst is."
+
+#: cps/spa_strings.py
+msgid "There is very little text on each page. This is usually a sparse scan, or two printed pages photographed as one."
+msgstr "Er staat heel weinig tekst op elke pagina. Meestal is dat een schaarse scan, of twee gedrukte pagina's die als één zijn gefotografeerd."
+
+#: cps/spa_strings.py
+msgid "This PDF has a real text layer. Most pages will convert without asking a model anything."
+msgstr "Deze PDF heeft een echte tekstlaag. De meeste pagina's worden omgezet zonder een model iets te vragen."
+
+#: cps/spa_strings.py
+msgid "This PDF has a text layer, but it is not readable words. It has to be treated as if there were no text at all."
+msgstr "Deze PDF heeft een tekstlaag, maar het zijn geen leesbare woorden. Hij moet behandeld worden alsof er helemaal geen tekst is."
+
+#: cps/spa_strings.py
+msgid "This PDF has not been assessed."
+msgstr "Deze PDF is niet beoordeeld."
+
+#: cps/spa_strings.py
+msgid "This book costs more than the target. Convert a sample first and see whether the result is worth the rest."
+msgstr "Dit boek kost meer dan het streefbedrag. Zet eerst een voorproefje om en kijk of het resultaat de rest waard is."
+
+#: cps/spa_strings.py
+msgid "This book has no PDF to convert."
+msgstr "Dit boek heeft geen PDF om om te zetten."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "This stopped at the {amount} cap. The pages converted before it was reached are in the file; the rest were left as they were."
+msgstr "Dit is gestopt bij de grens van {amount}. De pagina's die daarvoor omgezet zijn, staan in het bestand; de rest is gebleven zoals ze was."
+
+#: cps/spa_strings.py
+msgid "What is in this PDF"
+msgstr "Wat er in deze PDF zit"
+
+#: cps/spa_strings.py
+msgid "What it will cost"
+msgstr "Wat het gaat kosten"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Your administrator allows at most {amount} for one conversion."
+msgstr "Je beheerder staat hoogstens {amount} toe voor één omzetting."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Your administrator set a target of {amount} a book."
+msgstr "Je beheerder heeft een streefbedrag van {amount} per boek ingesteld."
+
+#: cps/spa_strings.py
+msgid "Your sample is ready"
+msgstr "Je voorproefje is klaar"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} pages did not pass the word check and kept the text read straight out of the PDF. Nothing was rewritten."
+msgstr "{count} pagina's kwamen niet door de woordcontrole en behielden de tekst die rechtstreeks uit de PDF is gelezen. Er is niets herschreven."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{pages} pages, added to this book as an EPUB format."
+msgstr "{pages} pagina's, aan dit boek toegevoegd als EPUB-formaat."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{pages} pages, downloaded as an EPUB to look at. Nothing is added to your library."
+msgstr "{pages} pagina's, als EPUB gedownload om te bekijken. Er wordt niets aan je bibliotheek toegevoegd."
+
 #~ msgid "Change my cover"
 #~ msgstr "Mijn omslag wijzigen"
 

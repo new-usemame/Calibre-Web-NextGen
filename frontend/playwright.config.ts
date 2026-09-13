@@ -25,7 +25,7 @@ const SUBPATH_URL = process.env.E2E_SUBPATH_URL;
 const STORAGE = 'e2e/.auth/state.json';
 const isCI = !!process.env.CI;
 const WEBKIT_READER_SPEC = /native-reader-keyboard-scroll\.spec\.ts/;
-const IPAD_TOUCH_SPECS = /(?:book-card-actions|mobile|sidebar|sidebar-drawer-a11y|sidebar-pin)\.spec\.ts/;
+const IPAD_TOUCH_SPECS = /(?:book-card-actions|card-hover-on-touch|mobile|sidebar|sidebar-drawer-a11y|sidebar-pin)\.spec\.ts/;
 const CATALOG_LAYOUT_SPEC = /catalog-layout-watchdog\.spec\.ts/;
 // In-book link routing is a TOUCH-first surface: the reported failure (#reader
 // links) was a tap on a footnote marker in iPhone Safari. Chromium touch
@@ -232,7 +232,7 @@ export default defineConfig({
     },
     {
       name: 'webkit-mobile-touch',
-      testMatch: /book-card-actions\.spec\.ts/,
+      testMatch: /(?:book-card-actions|card-hover-on-touch)\.spec\.ts/,
       use: {
         browserName: 'webkit',
         viewport: { width: 390, height: 844 },

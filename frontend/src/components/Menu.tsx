@@ -55,6 +55,10 @@ interface MenuProps {
 export function Menu({ label, title, icon, sections, menuLabel, triggerTestId, menuTestId, triggerClassName }: MenuProps) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
+  // The menu is right-anchored to the trigger. When the trigger wraps to the
+  // left edge of a narrow row, that anchor pushes the panel off-screen — flip
+  // to left-anchored after measuring once per open.
+  const [flipLeft, setFlipLeft] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -82,6 +86,12 @@ export function Menu({ label, title, icon, sections, menuLabel, triggerTestId, m
     document.addEventListener('pointerdown', onPointer);
     return () => document.removeEventListener('pointerdown', onPointer);
   }, [open, close]);
+
+  useEffect(() => {
+    if (!open) return;
+    const menu = menuRef.current;
+    if (menu) setFlipLeft(menu.getBoundingClientRect().left < 8);
+  }, [open]);
 
   // Roving tabindex: move DOM focus to the active item whenever it changes.
   useEffect(() => {
@@ -185,7 +195,7 @@ export function Menu({ label, title, icon, sections, menuLabel, triggerTestId, m
       </button>
       {open && itemCount > 0 && (
         <div ref={menuRef} role="menu" aria-label={menuLabel ?? label}
-          className={styles.menu} data-testid={menuTestId}>
+          className={`${styles.menu} ${flipLeft ? styles.menuLeft : ''}`} data-testid={menuTestId}>
           {sections.map((section) => {
             if (section.items.length === 0) return null;
             const labelId = section.label ? `${menuId}-${section.id}` : undefined;

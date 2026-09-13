@@ -78,21 +78,25 @@ test('Hide persists across reload; Show hidden reveals a marked book and provide
   const errors = collectPageErrors(page);
 
   await page.goto(`/app/book/${book!.id}`);
-  const actionControls = page.getByTestId('book-actions').locator('a, button');
-  expect(await actionControls.count()).toBeGreaterThan(0);
-  for (const control of await actionControls.all()) {
-    await expect(control).toHaveAccessibleName(/\S/);
-  }
-
   // The hide toggle is a gear-menu item now (state-aware label: Hide/Unhide).
-  // The menu closes when an item is selected, so each look at the label is a
-  // fresh open.
+  // Opening the menu doubles as the render wait the old visible-button sweep
+  // relied on. The menu closes when an item is selected, so each look at the
+  // label is a fresh open.
   await page.getByTestId('book-actions-menu').click();
   const hide = page.getByTestId('hide-book-toggle');
   await expect(hide).toBeVisible();
   await expect(hide).toHaveRole('menuitem');
   const hideName = ((await hide.textContent()) ?? '').trim();
   expect(hideName).toBeTruthy();
+
+  // Every visible control in the row keeps a non-empty accessible name (the
+  // menu's own items live outside book-actions, so the open menu doesn't
+  // pollute the sweep).
+  const actionControls = page.getByTestId('book-actions').locator('a, button');
+  expect(await actionControls.count()).toBeGreaterThan(0);
+  for (const control of await actionControls.all()) {
+    await expect(control).toHaveAccessibleName(/\S/);
+  }
 
   try {
     const before = await page.request.get('/api/v1/books?per_page=60').then((r) => r.json());

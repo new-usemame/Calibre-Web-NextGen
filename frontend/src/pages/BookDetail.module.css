@@ -598,6 +598,12 @@
 }
 
 /* Send-to-e-reader panel */
+.sendPanelWrap {
+  /* Clears the sticky TopBar when scrollIntoView pulls an opened panel to the
+     top of the viewport (56px bar + breathing room). */
+  scroll-margin-top: calc(56px + var(--sp-3));
+}
+
 .sendPanel {
   margin-top: var(--sp-3);
   background: var(--surface-1);

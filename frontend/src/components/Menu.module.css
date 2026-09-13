@@ -60,6 +60,11 @@
   .menu { animation: none; }
 }
 
+.menuLeft {
+  right: auto;
+  left: 0;
+}
+
 .section + .section,
 .sectionDanger {
   border-top: 1px solid var(--border);

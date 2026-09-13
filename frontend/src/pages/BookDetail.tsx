@@ -330,7 +330,8 @@ export function BookDetail() {
   const deliveryDevices = useActiveDeliveryDevices(
     inLibrary && !!me && !me.role?.anonymous && !!me.role?.download,
   );
-  /* Stage 0 two-way sync state chip (read-only; manage it on Account). */
+  /* Stage 0 two-way sync state (read-only; manage it on Account). Renders as a
+     row in the metadata list below. */
   const twoWay = useKoboTwoWayAnnotations({
     enabled: inLibrary && !!me && !me.role?.anonymous && !!me.features?.kobo_two_way_annotations,
   });
@@ -344,6 +345,14 @@ export function BookDetail() {
   const [sendBanner, setSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
   const [deviceSendOpen, setDeviceSendOpen] = useState(false);
   const [deviceSendBanner, setDeviceSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
+  /* Panels opened from the gear menu need a scroll nudge: the menu item's click
+     doesn't pull the page to the row the way the old in-row button's click did,
+     so a panel could open under the sticky TopBar or below the fold. */
+  const sendPanelWrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!sendOpen && !deviceSendOpen) return;
+    sendPanelWrapRef.current?.scrollIntoView({ block: 'start' });
+  }, [sendOpen, deviceSendOpen]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reloadMessage, setReloadMessage] = useState('');
   // Shelf membership for the metadata list (#1254). Both queries are already
@@ -467,7 +476,7 @@ export function BookDetail() {
       id: 'send-ereader',
       label: t('Send to e-reader'),
       icon: <Send size={15} />,
-      onSelect: () => { setSendOpen(true); setSendBanner(null); },
+      onSelect: () => { setSendOpen((v) => !v); setSendBanner(null); },
     });
   }
   if (inLibrary && me?.role?.download && book.formats.length > 0 && (deliveryDevices.data?.devices.length ?? 0) > 0) {
@@ -475,7 +484,7 @@ export function BookDetail() {
       id: 'send-device',
       label: t('Send to device'),
       icon: <TabletSmartphone size={15} />,
-      onSelect: () => { setDeviceSendOpen(true); setDeviceSendBanner(null); },
+      onSelect: () => { setDeviceSendOpen((v) => !v); setDeviceSendBanner(null); },
     });
   }
   if (me?.role?.edit) {
@@ -733,12 +742,13 @@ export function BookDetail() {
           </div>
           <p className={reloadMessage ? styles.actionStatus : undefined} role="status">{reloadMessage}</p>
 
-          {/* Rendered outside the region so the error still surfaces on mobile,
-              where the region itself is hidden (#1828). */}
+          {/* The delete error surfaces beside the row regardless of viewport —
+              the destructive control itself lives in the gear menu. */}
           {deleteError && <p className={styles.deleteErr} role="alert">{deleteError}</p>}
 
-          {/* Send-to-e-reader panel */}
-          {sendOpen && (
+          {/* Send-to-e-reader / send-to-device panels (opened from the menu) */}
+          <div ref={sendPanelWrapRef} className={styles.sendPanelWrap}>
+            {sendOpen && (
             <SendPanel
               formats={book.formats.map((f) => f.format)}
               pending={sendToEreader.isPending}
@@ -777,6 +787,7 @@ export function BookDetail() {
               }}
             />
           )}
+          </div>
 
           {/* Tags — inline add/remove for editors (fork #572), read-only links
               otherwise. */}

@@ -634,3 +634,81 @@
   outline: 2px solid currentColor;
   outline-offset: -3px;
 }
+
+/* ---- in-book links -------------------------------------------------------
+ *
+ * The reader's own hit targets for the links on the visible page, painted in
+ * THIS document over the book frame. Required, not decorative: a sandboxed
+ * frame without allow-scripts delivers no DOM events at all in WebKit, so a
+ * link tap can only be caught out here (see Reader.tsx for the measurements).
+ *
+ * Invisible on purpose — the book keeps styling its own links. What the layer
+ * adds is a reliably tappable area and a keyboard-reachable control.
+ */
+.linkLayer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 39; /* over the book frame and epub.js's marks pane, under the chrome */
+}
+.linkHit {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.linkHit:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Footnote sheet. Anchored to the bottom edge so it is reachable one-handed on
+ * a phone, and capped so a long endnote scrolls rather than covering the book. */
+.noteSheet {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: calc(var(--z-overlay) + 1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(560px, 100vw);
+  max-height: min(60vh, 520px);
+  box-sizing: border-box;
+  padding: 10px 14px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--reader-chrome);
+  color: var(--reader-chrome-text);
+  border: 1px solid var(--reader-chrome-border);
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
+  box-shadow: var(--elev-3);
+}
+.noteSheetHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 44px;
+}
+.noteSheetTitle { font-weight: 600; font-size: 15px; }
+.noteSheetBody {
+  overflow-y: auto;
+  font-size: 15px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.noteSheetBody :first-child { margin-top: 0; }
+.noteSheetBody :last-child { margin-bottom: 0; }
+.noteSheetActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.noteSheetActions button { min-height: 44px; }

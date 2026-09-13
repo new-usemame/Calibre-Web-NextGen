@@ -415,6 +415,106 @@ def create_epub_with_metadata(output_path: Path) -> None:
     print(f"  ✓ Created ({size:,} bytes)")
 
 
+def create_noteref_epub(output_path: Path) -> None:
+    """
+    Build an EPUB 3 whose links exercise every in-book link class a reader has
+    to route (footnote markers, cross-document links, external links).
+
+    The markup is the shape real converted books ship and the shape the EPUB 3
+    structural-semantics vocabulary prescribes: `epub:type="noteref"` on the
+    marker, `epub:type="footnote"` on an `<aside>` in a
+    `<section epub:type="footnotes">` at the end of the SAME document, and a
+    backlink from the note to its marker. A second marker carries only the
+    DPUB-ARIA equivalents (`role="doc-noteref"` / `role="doc-footnote"`), which
+    is what an HTML-first toolchain emits, so a reader that only understands one
+    of the two vocabularies cannot pass.
+
+    Every assertable string is a distinct ASCII marker so a test can say WHICH
+    note it is looking at rather than that some popup appeared.
+    """
+    print(f"Creating noteref/link EPUB: {output_path.name}")
+
+    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as epub:
+        epub.writestr('mimetype', 'application/epub+zip',
+                      compress_type=zipfile.ZIP_STORED)
+
+        epub.writestr('META-INF/container.xml', '''<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="content.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>''')
+
+        epub.writestr('content.opf', '''<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="bookid">test-noteref-links-001</dc:identifier>
+    <dc:title>Noteref Link Sample</dc:title>
+    <dc:creator>CWA Test Suite</dc:creator>
+    <dc:language>en</dc:language>
+    <dc:date>2025-01-01</dc:date>
+    <meta property="dcterms:modified">2025-01-01T00:00:00Z</meta>
+  </metadata>
+  <manifest>
+    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+    <item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ch2" href="ch2.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  <spine>
+    <itemref idref="ch1"/>
+    <itemref idref="ch2"/>
+  </spine>
+</package>''')
+
+        epub.writestr('nav.xhtml', '''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>Contents</title></head>
+<body>
+  <nav epub:type="toc" id="toc">
+    <ol>
+      <li><a href="ch1.xhtml">Noteref Chapter</a></li>
+      <li><a href="ch2.xhtml">Target Chapter</a></li>
+    </ol>
+  </nav>
+</body>
+</html>''')
+
+        epub.writestr('ch1.xhtml', '''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en" xml:lang="en">
+<head><title>Noteref Chapter</title></head>
+<body>
+  <h1>NOTEREF-SECTION-1</h1>
+  <p id="para-epub">An EPUB 3 footnote marker<sup class="noteref" id="fnref-80-2"><a epub:type="noteref" href="#fn-80-2">2</a></sup> sits in this sentence.</p>
+  <p id="para-aria">A DPUB-ARIA footnote marker<sup class="noteref" id="fnref-aria"><a role="doc-noteref" href="#fn-aria">3</a></sup> sits in this one.</p>
+  <p id="para-cross">A note that lives in the next document<sup class="noteref" id="fnref-cross"><a epub:type="noteref" href="ch2.xhtml#fn-cross">4</a></sup> sits here.</p>
+  <p id="para-plain"><a id="plain-link" href="ch2.xhtml">PLAIN-CROSS-DOCUMENT-LINK</a></p>
+  <p id="para-external"><a id="external-link" href="https://example.org/cwng-external">EXTERNAL-LINK</a></p>
+  <section class="footnotes" epub:type="footnotes">
+    <aside epub:type="footnote" id="fn-80-2"><p><a href="#fnref-80-2">2</a> NOTE-EPUB-TEXT-ALPHA</p></aside>
+    <aside role="doc-footnote" id="fn-aria"><p><a href="#fnref-aria">3</a> NOTE-ARIA-TEXT-BETA <em>emphasised</em></p><script>window.parent.NOTE_SCRIPT_RAN = true;</script><img src="data:," onerror="window.parent.NOTE_IMG_ONERROR_RAN = true" alt="NOTE-IMG-SHOULD-BE-DROPPED"/><p onclick="window.parent.NOTE_HANDLER_RAN = true">NOTE-HANDLER-PARAGRAPH</p></aside>
+  </section>
+</body>
+</html>''')
+
+        epub.writestr('ch2.xhtml', '''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en" xml:lang="en">
+<head><title>Target Chapter</title></head>
+<body>
+  <h1>NOTEREF-SECTION-2</h1>
+  <p>The second document of the fixture.</p>
+  <section class="footnotes" epub:type="footnotes">
+    <aside epub:type="footnote" id="fn-cross"><p><a href="ch1.xhtml#fnref-cross">4</a> NOTE-CROSS-TEXT-GAMMA</p></aside>
+  </section>
+</body>
+</html>''')
+
+    size = output_path.stat().st_size
+    print(f"  \u2713 Created ({size:,} bytes)")
+
+
 def main():
     """Main entry point."""
     print("=" * 70)
@@ -478,6 +578,11 @@ def main():
         # 10. Left-to-right control for the same test (#1303)
         path = output_dir / "test_ltr_horizontal.epub"
         create_ltr_epub(path)
+        files_created.append(path)
+
+        # 11. In-book links: noteref markers, cross-document and external links
+        path = output_dir / "test_noteref_links.epub"
+        create_noteref_epub(path)
         files_created.append(path)
 
     except Exception as e:

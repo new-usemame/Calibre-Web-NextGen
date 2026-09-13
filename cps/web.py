@@ -3890,10 +3890,16 @@ def read_book(book_id, book_format):
                 log.debug("Start comic reader for %d", book_id)
                 return render_title_template('readcbr.html', comicfile=all_name, title=title,
                                              extension=fileExt, bookmark=bookmark)
-        log.debug("Selected book is unavailable. File does not exist or is not accessible")
-        flash(_("Oops! Selected book is unavailable. File does not exist or is not accessible"),
-              category="error")
-        return redirect(url_for("web.index"))
+        log.debug("Reader requested for an unsupported format: %s", book_format)
+        # 404, not a redirect to the library.
+        #
+        # This route is reachable from inside the web reader's own content frame:
+        # a link in an EPUB resolves against the section's path, so a stray
+        # request can arrive here with a format this reader cannot open. Answering
+        # with the library home page rendered THE APP inside the book frame — the
+        # user's book replaced by the catalogue. A reader frame must never be
+        # handed a page of the app, and a caller can recognise a status code.
+        abort(404)
 
 
 @web.route("/book/<int:book_id>")

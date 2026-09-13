@@ -27,6 +27,11 @@ const isCI = !!process.env.CI;
 const WEBKIT_READER_SPEC = /native-reader-keyboard-scroll\.spec\.ts/;
 const IPAD_TOUCH_SPECS = /(?:book-card-actions|mobile|sidebar|sidebar-drawer-a11y|sidebar-pin)\.spec\.ts/;
 const CATALOG_LAYOUT_SPEC = /catalog-layout-watchdog\.spec\.ts/;
+// In-book link routing is a TOUCH-first surface: the reported failure (#reader
+// links) was a tap on a footnote marker in iPhone Safari. Chromium touch
+// emulation is not that engine, so the spec runs on both a real WebKit touch
+// device and the desktop project.
+const READER_LINKS_SPEC = /reader-links\.spec\.ts/;
 const CATALOG_WATCHDOG_CLASSIFIER_SPEC = /catalog-layout-watchdog-classifier\.spec\.ts/;
 const CATALOG_LAYOUT_SPECS = [CATALOG_LAYOUT_SPEC, CATALOG_WATCHDOG_CLASSIFIER_SPEC];
 // Specs that mutate SERVER-WIDE state across every account at once (the My
@@ -207,10 +212,24 @@ export default defineConfig({
       dependencies: ['setup'],
     },
 
-    // 5. Safari-engine touch coverage for the card-action regression. Chromium
-    // touch emulation and WebKit disagree about synthetic hover on first tap;
-    // both engines must reach the same visible disclosure instead of an
-    // opacity-hidden link. Keep these projects focused on the one touch spec.
+    // 5. Safari-engine touch coverage. Chromium touch emulation is not WebKit:
+    // for card actions the two engines disagree about synthetic hover on first
+    // tap, and for in-book links a sandboxed frame delivers no DOM events at
+    // all in WebKit while Chromium delivers them normally — which is why the
+    // reported iPhone reader-link defect was invisible on the Chromium lanes.
+    // Keep these projects focused on their one spec each.
+    {
+      name: 'webkit-phone-reader-links',
+      testMatch: READER_LINKS_SPEC,
+      use: {
+        browserName: 'webkit',
+        viewport: { width: 390, height: 844 },
+        isMobile: true,
+        hasTouch: true,
+        storageState: STORAGE,
+      },
+      dependencies: ['setup'],
+    },
     {
       name: 'webkit-mobile-touch',
       testMatch: /book-card-actions\.spec\.ts/,

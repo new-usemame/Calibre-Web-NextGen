@@ -178,6 +178,74 @@ var reader;
         reader.rendition.on('rendered', function () { window.suppressReaderNativeMenu(); });
     }
 
+    /*
+     * In-book links: keep them inside the reader.
+     *
+     * epub.js renders each section into an iframe sandboxed `allow-same-origin`
+     * with no `allow-scripts`, and its own interception is `link.onclick = …`.
+     * MEASURED 2026-09-12: WebKit (desktop Safari and iOS-class touch alike)
+     * dispatches NO DOM events into a scripting-disabled document while still
+     * performing the link's native activation, so that onclick never runs and
+     * the content frame navigates to `origin + <section path>#id` — a URL this
+     * server does not serve, which filled the reader with a page of the app.
+     *
+     * Two layers, in this order:
+     *   1. `target="_blank"`. This sandbox has no `allow-popups`, so the browser
+     *      refuses the activation outright. MEASURED: WebKit then stays put.
+     *   2. A capture-phase click listener (addEventListener, never onclick) for
+     *      the engines that do deliver a click — it routes the link through the
+     *      rendition instead, which is what a reader expects a footnote to do.
+     */
+    function readerAnchorFrom(node) {
+        while (node && node.nodeType === 1) {
+            if ((node.localName || node.tagName || '').toLowerCase() === 'a' &&
+                node.hasAttribute('href')) {
+                return node;
+            }
+            node = node.parentNode;
+        }
+        return null;
+    }
+    function interceptReaderLinks(contents) {
+        var doc = contents && contents.document;
+        if (!doc || doc.__cwaLinksIntercepted) { return; }
+        doc.__cwaLinksIntercepted = true;
+        var links = doc.querySelectorAll('a[href]');
+        for (var i = 0; i < links.length; i++) {
+            links[i].setAttribute('target', '_blank');
+        }
+        doc.addEventListener('click', function (ev) {
+            var anchor = readerAnchorFrom(ev.target);
+            if (!anchor) { return; }
+            ev.preventDefault();
+            ev.stopPropagation();
+            var raw = (anchor.getAttribute('href') || '').trim();
+            var scheme = /^([a-z][a-z0-9+.-]*):/i.exec(raw);
+            if (scheme) {
+                // Only web and contact schemes leave; javascript:/data: never do.
+                if (/^(https?|mailto|tel|sms)$/i.test(scheme[1])) {
+                    window.open(raw, '_blank', 'noopener,noreferrer');
+                }
+                return;
+            }
+            try {
+                var resolved = new URL(anchor.href);
+                var target = reader.book.path.relative(resolved.pathname) +
+                    (resolved.hash || '');
+                reader.rendition.display(target)["catch"](function () {
+                    reader.rendition.display(reader.book.path.relative(resolved.pathname));
+                });
+            } catch (e) { /* an unresolvable link simply does nothing */ }
+        }, true);
+    }
+    if (reader && reader.rendition && typeof reader.rendition.on === 'function') {
+        reader.rendition.on('rendered', function () {
+            var list = [];
+            try { list = reader.rendition.getContents() || []; } catch (e) { list = []; }
+            list.forEach(interceptReaderLinks);
+        });
+    }
+
     if (reader && reader.rendition) {
         reader.rendition.on('touchstart', function(event) {
             var t = event.changedTouches[0];
@@ -195,6 +263,13 @@ var reader;
 
             // Never turn the page while text is selected (highlight gesture).
             if (readerHasSelection()) {
+                return;
+            }
+
+            // A tap on a link is a link activation, not a page turn. Without
+            // this, tapping a footnote marker in the right half of the screen
+            // also advanced the page underneath the note.
+            if (readerAnchorFrom(event.target)) {
                 return;
             }
 

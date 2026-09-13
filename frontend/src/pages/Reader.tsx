@@ -24,7 +24,51 @@ import {
 import { chapterLabelForHref, splitSearchExcerpt } from '../lib/reader/searchUi';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/safeStorage';
 import { getReaderContentUrl } from '../lib/readerTarget';
+import {
+  classifyHref, inBookTarget, isNoteElement, isNoterefAnchor, isOpenableHref,
+  sanitizeNoteElement,
+} from '../lib/readerLinks';
 import styles from './Reader.module.css';
+
+/*
+ * Parent-side hit target for one visible run of one link in the book.
+ *
+ * Geometry only: the anchor itself is held in a ref, keyed by `key`, because a
+ * DOM node from the book frame has no business in React state.
+ */
+interface LinkHit {
+  key: string;
+  /** The book's own href, verbatim — the hit target's stable identity. */
+  href: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  label: string;
+}
+
+/** An open footnote, already sanitised. `target` is what "Go to note" displays. */
+interface ReaderNote {
+  html: string;
+  label: string;
+  target: string;
+}
+
+/*
+ * Smallest hit target we will paint, in CSS pixels (WCAG 2.2 SC 2.5.8 asks for
+ * 24). A footnote marker is often a 7px superscript digit, which is why tapping
+ * one is a coin flip on a phone even when the routing is right. The box only
+ * ever GROWS around the link's own rectangle and is then clipped to the page,
+ * so it cannot push a neighbouring link's target off its own text.
+ */
+const MIN_LINK_HIT_PX = 24;
+
+/** `epub:type` survives HTML parsing as a literal attribute name, but a book
+ *  served as XHTML puts it in the OPS namespace. Ask for both. */
+function epubTypeOf(element: Element): string | null {
+  return element.getAttribute('epub:type')
+    ?? element.getAttributeNS('http://www.idpf.org/2007/ops', 'type');
+}
 
 // Highlight colors as ARIA/label keys (SC 1.4.1: a color must never be conveyed
 // by hue alone — every swatch + saved highlight carries the color's name).
@@ -994,6 +1038,229 @@ export function Reader({ id }: { id: string }) {
   const leftLabel = rtl ? t('Next page') : t('Previous page');
   const rightLabel = rtl ? t('Previous page') : t('Next page');
 
+  /* ================= in-book links and footnote popups =================
+   *
+   * epub.js's own link handling cannot be used, and neither can any listener
+   * placed inside the book frame. MEASURED 2026-09-12 against this container
+   * with a fixture EPUB, WebKit and Chromium:
+   *
+   *   engine                 events delivered into the sandboxed frame   result
+   *   Chromium (touch/mouse) pointerdown mousedown … click               handled
+   *   WebKit desktop         NONE                                        frame
+   *   WebKit touch (iPhone)  NONE                                        navigated
+   *
+   * A `sandbox="allow-same-origin"` frame has scripting disabled, and WebKit
+   * dispatches no DOM events at all into such a document while still performing
+   * the link's native activation. The frame then loaded `origin + /ch1.xhtml#…`,
+   * a path this server does not serve, and the reader filled with the app's own
+   * page — the reported "tapping a footnote shows the library" defect.
+   *
+   * So activation is taken in the PARENT document, over transparent hit targets
+   * laid on top of the links of the visible page — the same place epub.js
+   * already paints its highlight marks pane. Two further layers back that up:
+   * every book anchor gets `target="_blank"`, which a sandbox without
+   * allow-popups refuses outright (MEASURED: WebKit then stays put even with no
+   * overlay), and a capture-phase listener still routes the click on engines
+   * that deliver one.
+   */
+  const [note, setNote] = useState<ReaderNote | null>(null);
+  const [linkHits, setLinkHits] = useState<LinkHit[]>([]);
+  const linkAnchorsRef = useRef(new Map<string, { anchor: HTMLAnchorElement; contents: any }>());
+  const noteSheetRef = useRef<HTMLDivElement>(null);
+  const closeNote = useCallback(() => setNote(null), []);
+  useFocusTrap(noteSheetRef, { onClose: closeNote, active: !!note });
+
+  /*
+   * Re-measure every link on the visible page(s) and republish the overlay.
+   *
+   * Idempotent by construction, because it is run repeatedly: a section is
+   * rendered before its layout settles (and again when a late web font or image
+   * reflows it), and a hit target measured too early is either missing or — far
+   * worse — sitting over the wrong words.
+   */
+  const linkSyncTimers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const linkSyncRetries = useRef(0);
+  const syncLinkHitsRef = useRef<() => void>(() => {});
+  const syncLinkHits = useCallback(() => {
+    const rendition = renditionRef.current;
+    if (!rendition) { setLinkHits([]); return; }
+    const anchors = new Map<string, { anchor: HTMLAnchorElement; contents: any }>();
+    const hits: LinkHit[] = [];
+    let sawAnchors = false;
+    let sawRects = false;
+    let views: any[] = [];
+    try { views = rendition.getContents?.() || []; } catch { views = []; }
+    views.forEach((contents: any, viewIndex: number) => {
+      const doc: Document | undefined = contents?.document;
+      const frame = contents?.window?.frameElement as HTMLIFrameElement | undefined;
+      if (!doc || !frame) return;
+      const frameRect = frame.getBoundingClientRect();
+      const pageWidth = doc.documentElement?.clientWidth || frameRect.width;
+      const pageHeight = doc.documentElement?.clientHeight || frameRect.height;
+      Array.from(doc.querySelectorAll('a[href]')).forEach((node, anchorIndex) => {
+        const anchor = node as HTMLAnchorElement;
+        sawAnchors = true;
+        // Layer 2: make the frame structurally unable to navigate itself.
+        if (anchor.getAttribute('target') !== '_blank') anchor.setAttribute('target', '_blank');
+        Array.from(anchor.getClientRects()).forEach((rect, rectIndex) => {
+          if (rect.width > 0 && rect.height > 0) sawRects = true;
+          // Paginated flow lays the whole section out in columns, so most links
+          // are off-screen in some other column. Only what the reader can
+          // actually see gets a hit target.
+          if (rect.width <= 0 || rect.height <= 0) return;
+          if (rect.right <= 0 || rect.bottom <= 0) return;
+          if (rect.left >= pageWidth || rect.top >= pageHeight) return;
+          const padX = Math.max(0, (MIN_LINK_HIT_PX - rect.width) / 2);
+          const padY = Math.max(0, (MIN_LINK_HIT_PX - rect.height) / 2);
+          const left = Math.max(0, rect.left - padX);
+          const top = Math.max(0, rect.top - padY);
+          const width = Math.min(pageWidth, rect.right + padX) - left;
+          const height = Math.min(pageHeight, rect.bottom + padY) - top;
+          if (width <= 0 || height <= 0) return;
+          const key = `${viewIndex}:${anchorIndex}:${rectIndex}`;
+          anchors.set(key, { anchor, contents });
+          hits.push({
+            key,
+            href: anchor.getAttribute('href') || '',
+            left: frameRect.left + left,
+            top: frameRect.top + top,
+            width,
+            height,
+            label: (anchor.textContent || '').replace(/\s+/g, ' ').trim() || t('Link'),
+          });
+        });
+      });
+    });
+    linkAnchorsRef.current = anchors;
+    setLinkHits(hits);
+
+    /*
+     * A section whose anchors exist but have NO geometry yet has not finished
+     * laying out — on a loaded container that can take much longer than the
+     * measurement chain below. Keep asking, bounded, rather than leaving the
+     * reader with links it cannot activate. (Anchors that are laid out but all
+     * off-screen in another column are a legitimate empty result, not a retry.)
+     */
+    if (sawAnchors && !sawRects && linkSyncRetries.current < 12) {
+      linkSyncRetries.current += 1;
+      linkSyncTimers.current.push(setTimeout(
+        () => requestAnimationFrame(() => syncLinkHitsRef.current()),
+        250 * linkSyncRetries.current,
+      ));
+    }
+  }, [t]);
+  syncLinkHitsRef.current = syncLinkHits;
+
+  /*
+   * Layout settles a frame or two after a render, a relocation or a typography
+   * change, so measuring once, synchronously, would place every target at its
+   * old spot. Measure across the settling window instead: the passes are cheap
+   * and each one replaces the previous answer.
+   */
+  const scheduleLinkSync = useCallback(() => {
+    linkSyncTimers.current.forEach(clearTimeout);
+    linkSyncTimers.current = [];
+    linkSyncRetries.current = 0;
+    [0, 60, 200, 500, 1200].forEach((delay) => {
+      linkSyncTimers.current.push(setTimeout(
+        () => requestAnimationFrame(() => syncLinkHitsRef.current()),
+        delay,
+      ));
+    });
+  }, []);
+
+  /** Send the rendition to an in-book target, falling back to the document when
+   *  its fragment cannot be placed. */
+  const displayInBook = useCallback((target: string, documentOnly: string) => {
+    const rendition = renditionRef.current;
+    if (!rendition) return;
+    // Following a link is the reader moving themselves, exactly like a page
+    // turn, so it ends any preview and the position saves again.
+    setRemoteResume(null);
+    previewingRef.current = false;
+    Promise.resolve(rendition.display(target)).catch(() => {
+      Promise.resolve(rendition.display(documentOnly)).catch(() => {/* give up quietly */});
+    });
+  }, []);
+
+  const openNoteFrom = useCallback((
+    element: Element,
+    markerId: string | null,
+    label: string,
+    target: string,
+  ) => {
+    const html = sanitizeNoteElement(element, markerId);
+    if (!html.trim()) return false;
+    setNote({ html, label, target });
+    return true;
+  }, []);
+
+  /**
+   * Route one activated book link.
+   *
+   * Shared by the overlay targets and by the capture-phase listener, so the two
+   * entry points can never disagree about what a link does.
+   */
+  const activateLink = useCallback(async (
+    anchor: HTMLAnchorElement,
+    contents: any,
+  ): Promise<void> => {
+    const raw = anchor.getAttribute('href');
+    const kind = classifyHref(raw);
+    if (kind !== 'in-book') {
+      // The book frame cannot open anything (no allow-popups), and it should not
+      // be able to: the parent decides, and refuses javascript:/data: outright.
+      if (raw && isOpenableHref(raw)) window.open(raw, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    const book = bookRef.current;
+    const rendition = renditionRef.current;
+    const doc: Document | undefined = contents?.document;
+    if (!book || !rendition || !doc) return;
+    const base = doc.querySelector('base')?.getAttribute('href') || doc.baseURI;
+    const target = inBookTarget(anchor.href, base);
+    if (!target) return;
+    let relative = target.path;
+    try { relative = book.path.relative(target.path); } catch { /* keep the path */ }
+    const display = target.hash ? `${relative}#${target.hash}` : relative;
+    const label = (anchor.textContent || '').replace(/\s+/g, ' ').trim();
+    const noteref = isNoterefAnchor({
+      epubType: epubTypeOf(anchor), role: anchor.getAttribute('role'),
+    });
+    // The marker's id is what the note's backlink points at; it usually sits on
+    // the wrapping <sup class="noteref">, not on the anchor.
+    const markerId = anchor.id || anchor.parentElement?.id || null;
+
+    if (target.hash && target.sameDocument) {
+      const element = doc.getElementById(target.hash);
+      const isNote = !!element && (noteref || isNoteElement({
+        epubType: epubTypeOf(element), role: element.getAttribute('role'), tagName: element.tagName,
+      }));
+      // A note in the same document needs no load and no navigation at all: the
+      // reader keeps their page and the note comes to them.
+      if (element && isNote && openNoteFrom(element, markerId, label, display)) return;
+    } else if (target.hash && noteref) {
+      // A note kept in a separate endnotes document is the same promise; it just
+      // costs one section load. Navigation remains the fallback.
+      try {
+        const section = book.spine.get(relative) || book.spine.get(target.path);
+        if (section) {
+          await section.load(book.load.bind(book));
+          const element = section.document?.getElementById(target.hash);
+          const shown = !!element && openNoteFrom(element, markerId, label, display);
+          try { section.unload(); } catch { /* best effort */ }
+          if (shown) return;
+        }
+      } catch { /* fall through to navigation */ }
+    }
+    displayInBook(display, relative);
+  }, [displayInBook, openNoteFrom]);
+
+  const activateLinkByKey = useCallback((key: string) => {
+    const entry = linkAnchorsRef.current.get(key);
+    if (entry) void activateLink(entry.anchor, entry.contents);
+  }, [activateLink]);
+
   // Build the rendition once the epub format + its download URL are known.
   useEffect(() => {
     if (!epubFormat || !epubContentUrl || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !settingsHydrated) return;
@@ -1023,6 +1290,39 @@ export function Reader({ id }: { id: string }) {
         });
         renditionRef.current = rendition;
 
+        /*
+         * Layer 3: capture-phase click routing inside the book frame.
+         *
+         * addEventListener, never `link.onclick` — epub.js's own interception is
+         * an onclick and that is half of why this broke. Registered on the
+         * document in the capture phase so a click on anything inside an anchor
+         * (a <sup>, a <span> a publisher wrapped the digit in) still routes, and
+         * so book markup cannot stop it first.
+         */
+        rendition.hooks.content.register((contents: any) => {
+          const contentDocument: Document | undefined = contents?.document;
+          if (!contentDocument) return;
+          contentDocument.addEventListener('click', (event: Event) => {
+            const origin = event.target as Element | null;
+            const anchor = (origin?.closest?.('a[href]') ?? null) as HTMLAnchorElement | null;
+            if (!anchor) return;
+            event.preventDefault();
+            event.stopPropagation();
+            void activateLink(anchor, contents);
+          }, true);
+          scheduleLinkSync();
+
+          /*
+           * A section reflows after its images and web fonts arrive, which moves
+           * every link on the page. Re-measure when they do, so a hit target
+           * never lingers over the wrong words.
+           */
+          const contentWindow: Window | undefined = contents?.window;
+          contentWindow?.addEventListener?.('load', scheduleLinkSync);
+          const fonts = (contentDocument as Document & { fonts?: { ready?: Promise<unknown> } }).fonts;
+          void fonts?.ready?.then(() => scheduleLinkSync()).catch(() => {});
+        });
+
         Object.entries(THEMES).forEach(([name, t]) => rendition.themes.register(name, t));
         rendition.themes.select(theme);
         rendition.themes.fontSize(`${fontPct}%`);
@@ -1036,6 +1336,8 @@ export function Reader({ id }: { id: string }) {
           });
           applyTheme(theme);
           applyTypography();
+          // Typography reflows the page, so the link targets are measured after it.
+          scheduleLinkSync();
         });
 
         setRemoteResume(null);
@@ -1113,8 +1415,22 @@ export function Reader({ id }: { id: string }) {
           })
           .catch(() => {/* locations are best-effort */});
 
+        let lastRelocatedCfi: string | undefined;
         rendition.on('relocated', (location: any) => {
           const cfi = location?.start?.cfi;
+          /*
+           * The page under the popup has changed, so an open note no longer
+           * belongs to it — but ONLY when the page really changed. epub.js also
+           * re-emits `relocated` for the position it is already on (a resize, a
+           * late settle after the first display), and closing the note on those
+           * dismissed the popup a heartbeat after the reader opened it.
+           */
+          if (cfi !== lastRelocatedCfi) {
+            lastRelocatedCfi = cfi;
+            setNote(null);
+          }
+          // The overlay is re-measured for whatever is now on screen.
+          scheduleLinkSync();
           if (!cfi) return;
           // Locations must exist for percentageFromCfi to mean anything; without
           // them the position still saves, just without the shareable percentage.
@@ -1184,6 +1500,10 @@ export function Reader({ id }: { id: string }) {
 
     return () => {
       cancelled = true;
+      linkSyncTimers.current.forEach(clearTimeout); linkSyncTimers.current = [];
+      linkAnchorsRef.current = new Map();
+      setLinkHits([]);
+      setNote(null);
       if (saveTimer.current) {
         clearTimeout(saveTimer.current);
         saveTimer.current = null;
@@ -1217,6 +1537,27 @@ export function Reader({ id }: { id: string }) {
     safeLocalStorageSet(LS_FONT, String(fontPct));
     applyTypography();
   }, [fontPct, fontFamily, margin, lineHeight, applyTypography]);
+
+  /*
+   * Keep the link overlay on top of the links it belongs to.
+   *
+   * The targets are absolute geometry in the app's own document, so anything
+   * that moves the text under them — a rotation, a window resize, entering
+   * fullscreen, a font or margin change — has to re-measure or the reader ends
+   * up tapping where a footnote marker used to be. Dependencies are the visible
+   * typography rather than the applied callbacks, so a re-render cannot cost a
+   * measurement.
+   */
+  useEffect(() => {
+    if (!rendered) return;
+    scheduleLinkSync();
+    window.addEventListener('resize', scheduleLinkSync);
+    window.addEventListener('orientationchange', scheduleLinkSync);
+    return () => {
+      window.removeEventListener('resize', scheduleLinkSync);
+      window.removeEventListener('orientationchange', scheduleLinkSync);
+    };
+  }, [rendered, theme, fontPct, fontFamily, margin, lineHeight, spread, scheduleLinkSync]);
 
   // Arrow-key navigation (the iframe also forwards keys via rendition).
   useEffect(() => {
@@ -1632,6 +1973,55 @@ export function Reader({ id }: { id: string }) {
           </div>
         )}
       </div>
+
+      {/*
+        * Hit targets for the links on the visible page, in the APP's document.
+        * They exist because nothing inside the book frame can intercept a link
+        * activation in WebKit (see the measurement table above). Sitting on top
+        * of the frame, they also mean the activation never reaches it at all.
+        */}
+      {linkHits.length > 0 && (
+        <div className={styles.linkLayer}>
+          {linkHits.map((hit) => (
+            <button
+              key={hit.key}
+              type="button"
+              className={styles.linkHit}
+              style={{ left: hit.left, top: hit.top, width: hit.width, height: hit.height }}
+              data-testid="reader-link-hit"
+              data-href={hit.href}
+              aria-label={t('Follow link: {label}', { label: hit.label })}
+              onClick={() => activateLinkByKey(hit.key)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Footnote / endnote sheet. Bottom-anchored so a thumb can reach it. */}
+      {note && (
+        <>
+          <div className={styles.tocScrim} onClick={closeNote} aria-hidden="true" />
+          <div ref={noteSheetRef} className={styles.noteSheet} role="dialog" aria-modal="true"
+            aria-label={t('Note')} tabIndex={-1} data-testid="reader-note-sheet">
+            <div className={styles.noteSheetHead}>
+              <span className={styles.noteSheetTitle}>
+                {note.label ? t('Note {label}', { label: note.label }) : t('Note')}
+              </span>
+              <button className={styles.iconBtn} onClick={closeNote} aria-label={t('Close')}>
+                <X size={20} aria-hidden="true" focusable={false} />
+              </button>
+            </div>
+            <div className={styles.noteSheetBody} dangerouslySetInnerHTML={{ __html: note.html }} />
+            <div className={styles.noteSheetActions}>
+              <Button variant="primary" onClick={() => {
+                const target = note.target;
+                closeNote();
+                displayInBook(target, target.split('#')[0]);
+              }}>{t('Go to note')}</Button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Highlight color popover for the current selection */}
       {pendingSel && (

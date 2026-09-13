@@ -33,7 +33,7 @@ export interface SlotFont {
 export type DesignFonts = Partial<Record<SlotName, SlotFont>>;
 export type DesignAlign = Partial<Record<SlotName, Alignment>>;
 /** Calibre templates per slot, e.g. "{title}" / "{series} {series_index}" /
- *  "{authors}". An empty string means the slot is not drawn. */
+ *  "{authors}". An absent key means the server default applies. */
 export type DesignText = Partial<Record<SlotName, string>>;
 
 export interface DesignSize {

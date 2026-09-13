@@ -135,6 +135,57 @@ def test_a_page_the_model_marked_up_faithfully_is_adopted(tmp_path):
     assert result.outcomes[1].gate == "PASS"
 
 
+def test_an_answer_that_invents_a_heading_level_is_refused(tmp_path):
+    """G3. Every word is there, so the word gate is happy; the page has been given a
+    heading level this book does not use, which is a guess that would land in the
+    reader's table of contents."""
+    doc = _doc(F.prose_page, F.ambiguous_residue_page, F.prose_page)
+    client = FakeClient(answer=lambda text: "<h4>%s</h4>" % text)
+    try:
+        result, book = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.outcomes[1].source == "deterministic"
+    assert result.outcomes[1].gate == "FAIL"
+    assert any("h4" in reason for reason in result.outcomes[1].gate_reasons), \
+        result.outcomes[1].gate_reasons
+    assert "<h4>" not in result.page_html[1]
+
+
+def test_an_answer_that_drops_the_pages_figure_is_refused(tmp_path):
+    """G2. An illustration leaves no words in the text layer, so an answer that
+    simply does not mention it keeps every word it was given and takes the picture
+    out of the reader's book."""
+    doc = _doc(lambda d: F.illustrated_page(d, F.solid_png()))
+    client = FakeClient()
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert client.calls, "a page with an uncaptioned figure was not routed"
+    assert result.outcomes[0].gate == "FAIL"
+    assert any("figure" in reason for reason in result.outcomes[0].gate_reasons), \
+        result.outcomes[0].gate_reasons
+    assert "<figure>" in result.page_html[0]
+
+
+def test_an_answer_that_keeps_the_pages_figure_is_adopted(tmp_path):
+    """The control: a gate that refused every answer would pass the test above."""
+    doc = _doc(lambda d: F.illustrated_page(d, F.solid_png()))
+    figure = ('<figure><img src="images/fig_p0000_0.jpg" alt=""/>'
+              '<figcaption class="reflow-no-caption"></figcaption></figure>')
+    client = FakeClient(answer=lambda text: "<p>%s</p>%s" % (text, figure))
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.outcomes[0].gate == "PASS", result.outcomes[0].gate_reasons
+    assert result.outcomes[0].source == "model"
+
+
 # ------------------------------------------------------------------- what resumes
 
 def test_a_second_run_spends_nothing_on_the_pages_already_paid_for(tmp_path):
@@ -174,6 +225,25 @@ def test_a_changed_prompt_invalidates_what_was_cached(tmp_path, monkeypatch):
         doc.close()
 
     assert len(client.calls) == 2
+
+
+def test_an_answer_the_gate_refused_is_not_remembered_as_this_pages_answer(tmp_path):
+    """A refusal is not a result. The answer may have come back truncated by a
+    provider hiccup; remembering it under the page's key would make one bad minute
+    permanent for that book, and the page would never be looked at again."""
+    doc = _doc(F.prose_page, F.ambiguous_residue_page, F.prose_page)
+    mangler = FakeClient(answer=_drop_a_word)
+    honest = FakeClient()
+    try:
+        first, _ = _run(doc, mangler, tmp_path)
+        second, _ = _run(doc, honest, tmp_path)
+    finally:
+        doc.close()
+
+    assert first.outcomes[1].gate == "FAIL"
+    assert len(honest.calls) == 1, "the refused page was never tried again"
+    assert second.outcomes[1].source == "model"
+    assert second.reused == 0
 
 
 # -------------------------------------------------------------------- what stops

@@ -240,10 +240,13 @@ def test_a_sentence_that_runs_over_a_page_turn_is_one_paragraph_in_the_file(tmp_
 def test_no_link_in_the_book_points_at_an_id_that_is_not_there(tmp_path):
     """A footnote whose marker and text are split into different documents by a
     chapter break still has to work: the link names the file, not just the id."""
-    book = _book(F.mid_page_heading_page, F.defect_c_page)
+    book = _book(lambda d: F.chapter_opening_page(d, "Chapter Four"),
+                 lambda d: F.section_heading_page(d, "Antiochus of Athens"),
+                 F.mid_page_heading_page, F.defect_c_page)
 
     result = _build(book, tmp_path)
 
+    crossing = 0
     with zipfile.ZipFile(result.path) as zf:
         documents = _xhtml_names(zf)
         ids = {name: set(re.findall(r'id="([^"]+)"', zf.read(name).decode("utf-8")))
@@ -260,9 +263,14 @@ def test_no_link_in_the_book_points_at_an_id_that_is_not_there(tmp_path):
                 assert where in ids, "%s -> %s" % (name, href)
                 if anchor:
                     assert anchor in ids[where], "%s -> %s" % (name, href)
+                if where != name:
+                    crossing += 1
                 links += 1
 
     assert links >= 2, "no internal link was checked"
+    # Without this the test passes on a book whose links never leave their own
+    # document, which is the case it exists to cover.
+    assert crossing >= 1, "no footnote link crossed a document boundary"
 
 
 def test_a_footnote_is_an_epub_footnote_and_not_a_paragraph_at_the_end(tmp_path):
@@ -424,3 +432,92 @@ def test_the_about_page_is_written_once_the_pages_have_somewhere_to_live(tmp_pat
     with zipfile.ZipFile(result.path) as zf:
         about = zf.read("OEBPS/reflow-about.xhtml").decode("utf-8")
     assert 'href="%s#pg_0001"' % seen[1] in about, about
+
+
+def test_a_note_number_that_repeats_on_another_page_does_not_collide(tmp_path):
+    """Note numbering restarts per chapter in most books, so the same number is set
+    on more than one page. Two elements with one id is a document no reader can
+    resolve: the note button opens whichever the parser saw first."""
+    book = _book(F.defect_c_page, F.defect_c_page)
+
+    result = _build(book, tmp_path)
+
+    with zipfile.ZipFile(result.path) as zf:
+        for name in _xhtml_names(zf):
+            found = re.findall(r'id="([^"]+)"', zf.read(name).decode("utf-8"))
+            duplicates = [i for i, n in collections.Counter(found).items() if n > 1]
+            assert not duplicates, "%s repeats %s" % (name, duplicates)
+        notes = sum(len(re.findall(r'epub:type="footnote"', zf.read(n).decode("utf-8")))
+                    for n in _content_names(zf))
+
+    assert notes >= 6, "the two pages' notes were not both written"
+
+
+def test_two_sentences_either_side_of_a_page_turn_stay_two_paragraphs(tmp_path):
+    """The control for the page-turn join. A rule that joins every page turn reads
+    as confidently as one that joins none, and silently welds the last sentence of
+    every page onto the first of the next."""
+    book = _book(F.prose_page, F.prose_page)
+
+    result = _build(book, tmp_path, page_html={
+        0: "<p>The argument of the chapter is complete on this page.</p>",
+        1: "<p>Another argument begins on the page after it.</p>"})
+
+    with zipfile.ZipFile(result.path) as zf:
+        body = "".join(_body(zf, name) for name in _content_names(zf))
+
+    paragraphs = re.findall(r"<p[^>]*>(.*?)</p>", body, re.S)
+
+    assert len(paragraphs) == 2, paragraphs
+    assert paragraphs[0].strip().endswith("complete on this page."), paragraphs
+
+
+def test_a_sentence_left_outside_a_paragraph_still_reaches_the_reader(tmp_path):
+    """A model that answers with a bare sentence between two paragraphs has made a
+    mistake the gate judges. Losing the sentence while writing the file is a
+    different thing: the gate has already passed the page by then."""
+    book = _book(F.prose_page)
+
+    result = _build(book, tmp_path, page_html={
+        0: "<p>Before the interruption.</p>\n"
+           "Ptolemy is named here and nowhere else.\n"
+           "<p>After the interruption.</p>\n"
+           "Valens is named after the last paragraph closes."})
+
+    with zipfile.ZipFile(result.path) as zf:
+        body = "".join(_body(zf, name) for name in _content_names(zf))
+
+    written = build_epub.block_text(body)
+
+    assert "Ptolemy is named here and nowhere else." in written
+    # The tail is its own case: text after the last closing tag is where a splitter
+    # that only notices what is between elements stops looking.
+    assert "Valens is named after the last paragraph closes." in written
+
+
+def test_a_figure_the_page_printed_no_caption_for_says_so(tmp_path):
+    """SPEC §6: every figure carries a caption or an explicit "caption not found".
+    An illustration contributes no words, so nothing that counts words can tell
+    whether it was placed, mis-placed or dropped."""
+    book = _book(lambda d: F.illustrated_page(d, F.solid_png()))
+
+    fragment = build_epub.page_fragment(book, 0)
+    verdict = gate.check_structure(fragment, ladder=(1,), require_figure_caption=True)
+
+    assert verdict.ok, verdict.reasons
+    assert verdict.counts["figures"] == 1, verdict.counts
+    assert "figure_without_caption" in book.page_reasons(0)
+
+
+def test_a_marker_whose_note_is_elsewhere_is_not_glued_to_the_word_before_it():
+    """A marker that resolves to nothing is still a marker. Left as text it closes
+    up against the word in front of it and the page reads "set overleaf204."."""
+    book = _book(F.orphan_marker_page)
+
+    printed = assemble.page_source_text(book, 0)
+    fragment = build_epub.page_fragment(book, 0)
+
+    assert "overleaf204" not in printed, printed[-120:]
+    assert "overleaf204" not in build_epub.block_text(fragment), fragment[-160:]
+    assert "204" in build_epub.block_text(fragment)
+    assert "unresolved_marker" in book.page_reasons(0)

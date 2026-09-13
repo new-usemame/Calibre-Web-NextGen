@@ -219,13 +219,18 @@ _FIGURE = re.compile(r"<figure\b.*?</figure>", re.I | re.S)
 _HEADING = re.compile(r"<h([1-6])\b", re.I)
 
 
-def check_structure(model_html, ladder=(1, 2, 3, 4), require_figure_caption=True):
+def check_structure(model_html, ladder=(1, 2, 3, 4), require_figure_caption=True,
+                    figures_expected=None):
     """G3. The markup contract the EPUB builder is allowed to trust.
 
     ``ladder`` is the set of heading levels the deterministic skeleton found on
     this page's book. A model that invents an ``<h4>`` where the book has three
     levels is guessing, and its guess would land in the reader's table of
     contents.
+
+    ``figures_expected`` is how many figures the page prints. The word gate cannot
+    see a figure — an illustration has no words — so an answer that drops one would
+    pass every other check and take the picture out of the reader's book.
     """
     reasons = []
     html = model_html or ""
@@ -250,6 +255,9 @@ def check_structure(model_html, ladder=(1, 2, 3, 4), require_figure_caption=True
         for fig in figures:
             if "<figcaption" not in fig.lower():
                 reasons.append("figure without a caption")
+    if figures_expected is not None and len(figures) < int(figures_expected):
+        reasons.append("the page prints %d figures and the answer has %d"
+                       % (int(figures_expected), len(figures)))
 
     counts = {
         "headings": len(_HEADING.findall(html)),

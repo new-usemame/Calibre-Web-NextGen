@@ -136,7 +136,12 @@ class Book(object):
 # ------------------------------------------------------------------- run primitives
 
 def plain_text(runs):
-    """The readable text of a run list. A marker is ``[9]``, never a glued digit."""
+    """The readable text of a run list. A marker is ``[9]``, never a glued digit.
+
+    That holds for a marker whose note was found and for one whose note was not: the
+    model is shown the same shape either way, and the gate measures the same shape
+    back.
+    """
     text = "".join(r[1] if r[0] == "t" else "[%s]" % r[1] for r in runs)
     return re.sub(r"[^\S\n]{2,}", " ", text).strip()
 
@@ -246,7 +251,14 @@ def _line_runs(line, pno, page_notes, claimed, repairs, reasons):
                 index += 1
                 continue
             if raised and number is None:
+                # The note is set on another page, or was never found. The digits are
+                # still a marker: left as text they glue onto the word before them and
+                # the page reads "set overleaf204." A marker with nothing to point at
+                # is a superscript, not a link, and the reader is told which ones.
                 reasons.append("unresolved_marker")
+                runs.append(["mark", text.strip()])
+                index += 1
+                continue
         runs.append(["t", text])
         index += 1
     return runs
@@ -464,6 +476,14 @@ def _page_elements(skel, repairs, reasons):
                                 pages=[skel.pno]))
 
     _recover_residue_markers(elements, skel, claimed, repairs, reasons)
+    # A plate with no caption under it has nothing to place it by, which is a page
+    # worth a second look rather than a silent <figcaption></figcaption>.
+    for index, element in enumerate(elements):
+        if element.kind != "fig":
+            continue
+        following = elements[index + 1] if index + 1 < len(elements) else None
+        if following is None or following.kind != "caption":
+            reasons.append("figure_without_caption")
     return elements, claimed
 
 
@@ -529,7 +549,10 @@ def assemble(skeletons, style, raw_pages=None):
         "figures": len(book.figures),
         "notes": len([n for n in book.notes if n.num is not None]),
         "notes_unmarked": len(unmarked),
-        "markers": sum(1 for el in book.elements for run in el.runs if run[0] == "sup"),
+        "markers": sum(1 for el in book.elements for run in el.runs
+                       if run[0] in ("sup", "mark")),
+        "markers_unresolved": sum(1 for el in book.elements for run in el.runs
+                                  if run[0] == "mark"),
         "page_joins": stitched,
         "page_joins_refused": refused,
         "repairs": len(book.repairs),

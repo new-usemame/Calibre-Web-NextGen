@@ -92,6 +92,7 @@ def numbers(result, ledger=None, client=None):
             "headings": stats.get("headings", 0),
             "footnotes": stats.get("notes", 0),
             "footnotes_unmarked": stats.get("notes_unmarked", 0),
+            "markers_unresolved": stats.get("markers_unresolved", 0),
             "figures": stats.get("figures", 0),
             "tables": len(_TABLE.findall(markup)),
             "blockquotes": len(_BLOCKQUOTE.findall(markup)),
@@ -145,6 +146,11 @@ def _unplaced(payload, result):
         out.append("%d footnotes are printed in the book but no marker for them was "
                    "found in the text; they are kept with the page they were printed "
                    "on." % structure["footnotes_unmarked"])
+    if structure.get("markers_unresolved"):
+        out.append("%d footnote markers in the text point at a note that was not "
+                   "printed on their page; they are kept as printed superscripts "
+                   "rather than made into links that open nothing."
+                   % structure["markers_unresolved"])
     if structure["page_joins_refused"]:
         out.append("%d paragraphs that may run over a page turn were left as two "
                    "paragraphs rather than joined on a guess."

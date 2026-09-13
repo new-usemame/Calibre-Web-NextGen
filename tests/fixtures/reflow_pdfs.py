@@ -480,6 +480,22 @@ def image_only_page(doc, png_bytes):
     return page
 
 
+def illustrated_page(doc, png_bytes):
+    """Prose with a plate set into it, and no caption under the plate.
+
+    An illustration leaves no words in the text layer, so nothing that counts words
+    can tell whether it survived the conversion. This is the page that proves a
+    picture is not quietly dropped.
+    """
+    page = add_page(doc)
+    add_running_head(page, "117", "ANUBIO (FIRST CENTURY CE?)")
+    y = add_body_lines(page, PROSE_LINES[:8])
+    page.insert_image(pymupdf.Rect(LEFT, y + 20.0, LEFT + 180.0, y + 140.0),
+                      stream=png_bytes)
+    add_body_lines(page, PROSE_LINES[8:12], top=y + 160.0)
+    return page
+
+
 def solid_png(width=60, height=80, colour=(20, 20, 20)):
     """A small opaque PNG, for pages that must carry real ink."""
     pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, width, height), False)
@@ -624,7 +640,14 @@ def mid_page_heading_page(doc, title="Serapio of Alexandria", folio="103"):
     y = add_body_lines(page, PROSE_LINES[:6])
     y = add_line_with_marker(page, y, "as Pingree observed in his own edition",
                              "212", " of the text.")
-    _put(page, LEFT, y + 8.0, title, size=HEAD_SIZE, font=_BOLD)
-    add_body_lines(page, PROSE_LINES[6:16], top=y + 8.0 + BODY_LEADING)
+    # A section heading is set with air above and below it, and the paragraph under
+    # it opens a new sentence. Both are what tell a converter it is a heading and
+    # not a bold lead-in to the sentence that follows.
+    head_y = y + BODY_LEADING * 1.8
+    _put(page, LEFT, head_y, title, size=HEAD_SIZE, font=_BOLD)
+    add_body_lines(page,
+                   ["Serapio is named in three of the surviving handbooks as an"]
+                   + PROSE_LINES[6:14],
+                   top=head_y + BODY_LEADING * 1.8)
     add_notes(page, [(212, "Pingree, Yavanajataka, vol. 2, p. 441.")])
     return page

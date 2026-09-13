@@ -161,7 +161,7 @@ def sample_pages(book, style, count):
 
 
 def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
-        progress=None, should_stop=None, require_figure_caption=False):
+        progress=None, should_stop=None, require_figure_caption=True):
     """Convert one document. Returns what happened as well as what was produced."""
     report = _reporter(progress)
     result = ReflowResult()
@@ -260,11 +260,18 @@ def _edit_one_page(doc, book, pno, client, ledger, cache, result, ladder,
 def _adopt(result, book, pno, outcome, html, uncertain, ladder,
            require_figure_caption, ledger=None, cost=0.0, answer=None,
            cached=False):
-    """Take the model's page only if it still says what the page said."""
+    """Take the model's page only if it still says what the page said.
+
+    The figure count is part of that: the model is sent the page's text layer, in
+    which an illustration leaves no words at all, so an answer that simply omits it
+    would pass the word gate and lose the picture.
+    """
     source_text = assemble.page_source_text(book, pno)
+    figures = sum(1 for el in (book.pages.get(pno) or []) if el.kind == "fig")
     words = gate.check_word_preservation(source_text, html)
     structure = gate.check_structure(html, ladder=ladder,
-                                     require_figure_caption=require_figure_caption)
+                                     require_figure_caption=require_figure_caption,
+                                     figures_expected=figures)
 
     outcome.uncertain = list(uncertain or [])
     if words.ok and structure.ok:

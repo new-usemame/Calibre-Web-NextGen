@@ -78,8 +78,12 @@ function DesignerPanelInner({ id, catalogue, canShare, locked, personal, onAppli
   // Selecting a preset loads its design; every edit after that diverges and the
   // dropdown says so. Deriving the match (instead of tracking a selection) keeps
   // the control honest in both directions: rebuild a preset's exact design by
-  // hand and its entry lights up again.
-  const matchedPreset = presets.find((p) => designsEqual(resolvePreset(p, catalogue.defaults), design));
+  // hand and its entry lights up again. When several presets share one design
+  // (e.g. a freshly saved duplicate of the current look), the one we were just
+  // loaded from wins the name — the dropdown must not appear to rename itself.
+  const designMatches = (p: CataloguePreset) => designsEqual(resolvePreset(p, catalogue.defaults), design);
+  const matchedPreset = (basedOn && presets.find((p) => p.id === basedOn && designMatches(p)))
+    || presets.find(designMatches);
   const basedOnName = basedOn ? presets.find((p) => p.id === basedOn)?.name
     ?? hiddenPresets.find((p) => p.id === basedOn)?.name ?? null : null;
 

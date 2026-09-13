@@ -113,20 +113,30 @@ def _pixels(data: bytes):
     return Image.open(io.BytesIO(data)).convert("RGB")
 
 
-def _pixels_near(data: bytes, target: str, tolerance: int = 40) -> int:
-    """How many pixels are within *tolerance* of ``#rrggbb``.
+def _colour_band(data: bytes, target: str, tolerance: int = 40):
+    """``(count, first row, last row)`` for pixels close to ``#rrggbb``.
 
     JPEG moves colours around, so an exact match would measure the encoder
-    rather than the design; a wide-tolerance count measures whether that colour
-    is on the cover at all, which is the question.
+    rather than the design; a wide tolerance answers the two questions that
+    matter — is that colour on the cover, and *where* — which is how "the title
+    colour paints the title" becomes checkable instead of "some text somewhere
+    is red".
     """
     image = _pixels(data)
     want = tuple(int(target.lstrip("#")[index:index + 2], 16) for index in (0, 2, 4))
-    total = 0
-    for count, colour in image.getcolors(maxcolors=image.width * image.height) or ():
-        if all(abs(colour[index] - want[index]) <= tolerance for index in range(3)):
-            total += count
-    return total
+    pixels = image.load()
+    count = 0
+    rows = []
+    for row in range(image.height):
+        hit = False
+        for column in range(image.width):
+            colour = pixels[column, row]
+            if all(abs(colour[index] - want[index]) <= tolerance for index in range(3)):
+                count += 1
+                hit = True
+        if hit:
+            rows.append(row)
+    return count, (rows[0] if rows else None), (rows[-1] if rows else None)
 
 
 def _plain(markup: str) -> str:
@@ -190,16 +200,23 @@ def test_each_colour_slot_paints_the_part_of_the_cover_it_names():
             "colors": {"background": "#ffffff", "band": "#ffffff",
                        "title": "#ff0000", "author": "#0000ff"},
         })
-        assert _pixels_near(data, "#ff0000") > 50, \
-            "%s: the title colour never reached the cover" % style
+        titles, title_top, title_bottom = _colour_band(data, "#ff0000")
+        authors, author_top, _author_bottom = _colour_band(data, "#0000ff")
+        assert titles > 50, "%s: the title colour never reached the cover" % style
 
-        author_used = "Unused" not in entry["color_roles"]["author"]
-        found = _pixels_near(data, "#0000ff")
-        if author_used:
-            assert found > 50, "%s: the author colour never reached the cover" % style
-        else:
-            assert found == 0, \
+        if "Unused" in entry["color_roles"]["author"]:
+            assert authors == 0, \
                 "%s says the author colour is unused but painted with it" % style
+            continue
+
+        assert authors > 50, "%s: the author colour never reached the cover" % style
+        # Every arrangement puts the authors below the title, so this is what
+        # says the two colours went to the right blocks rather than merely both
+        # appearing somewhere: swap them and the rows cross over.
+        assert title_bottom < author_top, (
+            "%s: the title colour is drawn at rows %s-%s and the author colour "
+            "from row %s — they are on each other's text"
+            % (style, title_top, title_bottom, author_top))
 
 
 def test_a_named_scheme_hands_calibre_its_own_four_colours():

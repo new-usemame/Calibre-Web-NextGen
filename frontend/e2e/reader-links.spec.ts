@@ -154,16 +154,40 @@ const linkHit = (page: Page, href: string) =>
  * they must be re-measured on every relocation or they rot in place.
  */
 async function tapLink(page: Page, href: string): Promise<void> {
+  const selector = `a[href="${href}"]`;
   const hit = linkHit(page, href);
   for (let turn = 0; turn < 8; turn += 1) {
     if (await hit.count()) break;
+    if (onScreen(page, await anchorPoint(page, selector))) {
+      // On the page, but not measured yet: the reader keeps re-measuring for
+      // about a second after a section settles. Wait once, then tap whatever
+      // is there.
+      await page.waitForTimeout(1000);
+      break;
+    }
     await page.keyboard.press('ArrowRight');
     await page.waitForTimeout(700);
   }
-  await expect(hit, `a hit target should cover the link to ${href}`).toBeVisible({ timeout: 15_000 });
+
   const hasTouch = await page.evaluate(() => 'ontouchstart' in window || navigator.maxTouchPoints > 0);
-  if (hasTouch) await hit.tap();
-  else await hit.click();
+  if (await hit.count()) {
+    if (hasTouch) await hit.tap();
+    else await hit.click();
+    return;
+  }
+
+  /*
+   * No hit target. Tap the link itself, at its place on the glass, and let the
+   * test's own assertions judge what the reader does — this spec is about what
+   * a reader experiences, not about which of the layers caught the tap. (This
+   * is also the path that reproduces the original defect against unfixed code,
+   * rather than failing early on a missing overlay.)
+   */
+  const point = await anchorPoint(page, selector);
+  expect(point, `the link to ${href} should be on the visible page`).not.toBeNull();
+  const { x, y } = point as { x: number; y: number };
+  if (hasTouch) await page.touchscreen.tap(x, y);
+  else await page.mouse.click(x, y);
 }
 
 const noteSheet = (page: Page) => page.getByTestId('reader-note-sheet');

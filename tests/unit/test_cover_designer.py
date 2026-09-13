@@ -136,7 +136,7 @@ def test_a_preset_that_no_longer_exists_still_renders():
     """The library default is a stored preset id; a release that drops a preset
     must not take every automatic cover down with it."""
     spec = cg.resolve_spec(preset="a-preset-from-an-older-release", width=300, height=400)
-    assert spec.scheme == cg.PRESETS[cg.DEFAULT_PRESET]["scheme"]
+    assert spec.scheme == cg.PRESETS[cg.DEFAULT_PRESET]["design"]["scheme"]
     assert cg.render(META, spec).data
 
 
@@ -203,9 +203,11 @@ def test_the_book_reaches_calibre_as_its_own_metadata(tmp_path, monkeypatch):
     with patch.object(cg.subprocess, "run", side_effect=capture):
         cg.render(META, cg.resolve_spec(preset="meadow", width=300, height=400))
 
-    assert seen["title"] == META.title
-    assert seen["authors"] == ["Becky Chambers"]
-    assert seen["series"] == "Wayfarers"
+    # The three strings are expanded from the book's own row before they are
+    # handed over; no template, and nothing the client sent, reaches the helper.
+    assert META.title in seen["title"]
+    assert "Becky Chambers" in seen["footer"]
+    assert "Wayfarers" in seen["subtitle"]
     # Colours travel without '#': calibre's theme_to_colors prepends one, and a
     # '#'-prefixed value silently renders greyscale instead of the chosen scheme.
     assert all(not value.startswith("#") for value in seen["spec"]["colors"].values())

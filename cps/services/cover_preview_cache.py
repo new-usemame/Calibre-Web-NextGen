@@ -272,6 +272,17 @@ def stampede_lock(key: str) -> threading.Lock:
 
     Same key always returns the same Lock instance. Different keys
     return different Lock instances so unrelated misses don't serialize.
+
+    **Never hold this across anything that yields to the gevent hub.** This is
+    a native lock, and CWNG serves every request from a greenlet on one OS
+    thread without ``monkey.patch_all()``: a second greenlet's ``acquire()``
+    stops that thread outright, so a render that was handed to
+    ``cover_preview._run_in_pool`` finishes with no hub left running to deliver
+    it, the first greenlet never resumes to release the lock, and the whole
+    server stops answering. The tile path above is safe because it pads its
+    image inline, on the request greenlet, and so never yields while holding
+    this. A caller whose render yields wants a cooperative lock instead — see
+    ``cps.services.cover_designer_cache.single_flight_lock``.
     """
     # The master lock makes the get-or-create atomic across threads.
     # Without it, two threads can both observe `key not in dict` and

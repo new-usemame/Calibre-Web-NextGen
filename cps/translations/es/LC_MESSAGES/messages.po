@@ -1153,7 +1153,15 @@ msgid "That cover design is not one we offer."
 msgstr ""
 
 #: cps/cover_picker.py
+msgid "That preset no longer exists."
+msgstr ""
+
+#: cps/cover_picker.py
 msgid "This server can't design covers — no renderer is installed."
+msgstr ""
+
+#: cps/cover_picker.py
+msgid "Could not save that design."
 msgstr ""
 
 #: cps/cover_picker.py cps/spa_strings.py
@@ -4676,6 +4684,198 @@ msgid "Ornamental — title inside a decorative frame"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Blocks"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Banner"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Ornamental"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The Cross"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Half and half"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Title at the top, authors on a colour band across the bottom third."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Title on a folded ribbon near the top, authors below on the page."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Title inside a decorated frame over a soft radial wash."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "A band down the left edge meeting a rounded title panel."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "One colour washing into another from top to bottom."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Earth"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Grass"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Water"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Silver"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Midnight"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Rose"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Ocean"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Forest"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Noir"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Calibre blue"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Calibre earth"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Book title"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "All authors, separated by commas"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "First author only"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Series name"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Number within the series"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Year of publication"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Tags, separated by commas"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "First language"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Rating out of five, as a number"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Rating out of five, as stars"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Upper two thirds"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Bottom third"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Title and subtitle"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Authors, on the band"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Page"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The ribbon"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Title and subtitle, on the ribbon"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Authors, on the page"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Centre of the wash"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Edge of the wash"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Authors, and the ornaments"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Left edge and the title panel"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Title and subtitle, on the panel"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Top and bottom of the wash"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Middle of the wash"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "All three text blocks"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Unused by this arrangement"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(no se capturó texto)"
 
@@ -4781,6 +4981,10 @@ msgid "Advanced search"
 msgstr "Búsqueda avanzada"
 
 #: cps/spa_strings.py
+msgid "Alignment"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "All books"
 msgstr "Todos los libros"
 
@@ -4883,6 +5087,10 @@ msgid "Author Z–A"
 msgstr "Autor Z-A"
 
 #: cps/spa_strings.py
+msgid "Author text"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Authorised — signing you in…"
 msgstr "Autorizado; iniciando sesión…"
 
@@ -4911,6 +5119,14 @@ msgid "Back to library"
 msgstr "Volver a la biblioteca"
 
 #: cps/spa_strings.py
+msgid "Background"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Band"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Base DN"
 msgstr "DN base"
 
@@ -4921,6 +5137,13 @@ msgstr "Configuración básica"
 #: cps/spa_strings.py
 msgid "Beta"
 msgstr "Beta"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"Between {min} and {max} px. Locked to 2:3, the ratio every cover frame in "
+"the app uses."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Black"
@@ -4978,6 +5201,10 @@ msgstr ""
 "biblioteca aquí."
 
 #: cps/spa_strings.py
+msgid "Built-in"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Built-in providers (leave blank to disable):"
 msgstr "Proveedores integrados (déjalo en blanco para desactivar):"
 
@@ -5022,6 +5249,10 @@ msgstr "Cancelar edición del título"
 #, python-brace-format
 msgid "Cancel {task}"
 msgstr "Cancelar {task}"
+
+#: cps/spa_strings.py
+msgid "Center"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Certificate file path"
@@ -5325,6 +5556,10 @@ msgid "Could not save the default library filter."
 msgstr "No se pudo guardar el filtro de biblioteca predeterminado."
 
 #: cps/spa_strings.py
+msgid "Could not save the preset. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not save the shelf."
 msgstr "No se pudo guardar la estantería."
 
@@ -5367,6 +5602,10 @@ msgstr "Portada bloqueada"
 #: cps/spa_strings.py
 msgid "Cover not reachable"
 msgstr "Portada no accesible"
+
+#: cps/spa_strings.py
+msgid "Cover size"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Cover updated from the selected result."
@@ -5428,8 +5667,21 @@ msgid "Currently reading"
 msgstr "Leyendo actualmente"
 
 #: cps/spa_strings.py
+msgid "Custom"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Custom (based on {name})"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Custom border colour"
 msgstr "Color de borde personalizado"
+
+#: cps/spa_strings.py
+msgid "Custom colours"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Custom columns"
@@ -5535,6 +5787,11 @@ msgstr ""
 #, python-brace-format
 msgid "Delete {name}"
 msgstr "Borrar {name}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Delete {name}?"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -5741,6 +5998,10 @@ msgid "Edit HTML"
 msgstr "Editar HTML"
 
 #: cps/spa_strings.py
+msgid "Edit custom colours"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Edit note"
 msgstr "Editar nota"
 
@@ -5892,6 +6153,10 @@ msgstr "Filtrar {items}…"
 msgid "Follow link: {label}"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/read.html
+msgid "Font"
+msgstr "Fuente"
+
 #: cps/spa_strings.py
 msgid "Font family"
 msgstr "Familia tipográfica"
@@ -5899,6 +6164,10 @@ msgstr "Familia tipográfica"
 #: cps/spa_strings.py
 msgid "Font size"
 msgstr "Tamaño de fuente"
+
+#: cps/spa_strings.py
+msgid "Fonts per line, wording, cover size"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Forgot password?"
@@ -6018,6 +6287,10 @@ msgid "Heading"
 msgstr "Encabezado"
 
 #: cps/spa_strings.py
+msgid "Height (px)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Help & support"
 msgstr "Ayuda y soporte"
 
@@ -6028,6 +6301,10 @@ msgstr "Menú de ayuda"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Hidden"
 msgstr "Oculto"
+
+#: cps/spa_strings.py
+msgid "Hidden built-ins"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/readcbr.html
 msgid "Hide"
@@ -6052,6 +6329,11 @@ msgstr "Ocultar campos"
 #: cps/spa_strings.py
 msgid "Hide password"
 msgstr "Ocultar contraseña"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Hide {name}?"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Highlight"
@@ -6256,6 +6538,14 @@ msgid "Last synced"
 msgstr "Última sincronización"
 
 #: cps/spa_strings.py
+msgid "Leave a field empty to use its default."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Left"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Lettering"
 msgstr ""
 
@@ -6308,6 +6598,10 @@ msgstr "Cargando…"
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Lock cover"
 msgstr "Bloquear portada"
+
+#: cps/spa_strings.py
+msgid "Lock the 2:3 proportions"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Login button text"
@@ -6366,6 +6660,14 @@ msgid "Manage e-readers"
 msgstr "Gestionar eReaders"
 
 #: cps/spa_strings.py
+msgid "Manage presets"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Manage presets…"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Manage shelves"
 msgstr "Gestionar estanterías"
 
@@ -6422,8 +6724,16 @@ msgid "Min"
 msgstr "Mín"
 
 #: cps/spa_strings.py
+msgid "Mine"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Minimum rating"
 msgstr "Valoración mínima"
+
+#: cps/spa_strings.py
+msgid "Mixed lettering — set per line in Advanced."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Model"
@@ -6449,6 +6759,16 @@ msgstr "Subir"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "Move {name} down"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Move {name} up"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "My Library is now on for {accounts} accounts."
 msgstr "Mi biblioteca ya está activada para {accounts} cuentas."
 
@@ -6462,6 +6782,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "My account"
 msgstr "Mi cuenta"
+
+#: cps/spa_strings.py
+msgid "My presets"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Name"
@@ -6593,6 +6917,10 @@ msgstr "Aún no hay ningún dispositivo nuevo registrado."
 #: cps/spa_strings.py
 msgid "No pages found in this comic."
 msgstr "No se han encontrado páginas en este cómic."
+
+#: cps/spa_strings.py
+msgid "No presets yet. Save one from the designer."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No reading positions from this device yet."
@@ -6914,6 +7242,10 @@ msgid "Pink"
 msgstr "Rosa"
 
 #: cps/spa_strings.py
+msgid "Placeholders:"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Please give this a try, you can easily undo later."
 msgstr "Pruébalo; puedes deshacerlo fácilmente más tarde."
 
@@ -6934,7 +7266,15 @@ msgid "Preparing your magic link…"
 msgstr "Preparando tu enlace mágico…"
 
 #: cps/spa_strings.py
-msgid "Presets"
+msgid "Preset"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Preset name"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Preset saved."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/duplicates.html
@@ -7156,6 +7496,14 @@ msgstr ""
 "funcionar y se le enviará una nueva por correo."
 
 #: cps/spa_strings.py
+msgid "Reset to defaults"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Restore"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Restored the previous library mode for {accounts} accounts."
 msgstr "Se restauró el modo de biblioteca anterior para {accounts} cuentas."
@@ -7186,6 +7534,10 @@ msgstr ""
 "¿Revocar la contraseña de aplicación «{label}»? Cualquier dispositivo que "
 "aún la use perderá el acceso de inmediato, y la contraseña no se puede "
 "recuperar."
+
+#: cps/spa_strings.py
+msgid "Right"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Rows per load"
@@ -7221,8 +7573,16 @@ msgid "Save"
 msgstr "Guardar"
 
 #: cps/spa_strings.py
+msgid "Save as preset"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Save email settings"
 msgstr "Guardar configuración de correo"
+
+#: cps/spa_strings.py
+msgid "Save for the whole library"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Save name"
@@ -7231,6 +7591,10 @@ msgstr "Guardar nombre"
 #: cps/spa_strings.py
 msgid "Save note"
 msgstr "Guardar nota"
+
+#: cps/spa_strings.py
+msgid "Save preset"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Save security settings"
@@ -7549,6 +7913,10 @@ msgid "Site title"
 msgstr "Título del sitio"
 
 #: cps/spa_strings.py
+msgid "Size (pt)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Smart shelf not found."
 msgstr "Estantería inteligente no encontrada."
 
@@ -7630,6 +7998,10 @@ msgstr "Estirar para rellenar: sin borde, ligera distorsión"
 #: cps/spa_strings.py
 msgid "Subheading"
 msgstr "Subencabezado"
+
+#: cps/spa_strings.py
+msgid "Subtitle"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Support on Ko-fi →"
@@ -7715,6 +8087,10 @@ msgid "Technical details"
 msgstr "Detalles técnicos"
 
 #: cps/spa_strings.py
+msgid "Text templates"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "That URL is not a usable image."
 msgstr "Esa URL no es una imagen utilizable."
 
@@ -7750,6 +8126,10 @@ msgstr ""
 "La biblioteca es compartida y contiene cada libro una sola vez; lo que "
 "mantienes es Mi biblioteca. No has perdido nada de lo que tenías. Tu "
 "administrador gestiona qué entra en ella."
+
+#: cps/spa_strings.py
+msgid "The preset change failed. Try again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "The server draws this cover; nothing is saved until you apply it."
@@ -7819,6 +8199,10 @@ msgstr "Título A-Z"
 #: cps/spa_strings.py
 msgid "Title Z–A"
 msgstr "Título Z-A"
+
+#: cps/spa_strings.py
+msgid "Title text"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Title, author, or ISBN"
@@ -7891,6 +8275,10 @@ msgstr "Dispositivo desconocido"
 #: cps/spa_strings.py
 msgid "Unknown source"
 msgstr "Origen desconocido"
+
+#: cps/spa_strings.py
+msgid "Unlock the 2:3 proportions"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unlock the cover above to apply a new one."
@@ -8092,6 +8480,10 @@ msgid "Which books sync?"
 msgstr "¿Qué libros se sincronizan?"
 
 #: cps/spa_strings.py
+msgid "Width (px)"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "With automatic start on, the login page goes straight to the provider. Add ?"
 "local=1 to the login URL to reach the password form, which keeps working as "
@@ -8282,6 +8674,11 @@ msgstr "{field} (separado por comas)"
 #, python-brace-format
 msgid "{free} free of {total}"
 msgstr "{free} libres de {total}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{name} hex value"
+msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -14123,10 +14520,6 @@ msgstr "Tamaños de letra"
 #: cps/templates/read.html
 msgid "Text margin"
 msgstr "Margen de texto"
-
-#: cps/templates/read.html
-msgid "Font"
-msgstr "Fuente"
 
 #: cps/templates/read.html
 msgid "Default"

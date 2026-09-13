@@ -28,10 +28,12 @@ pytestmark = pytest.mark.unit
 class FakeClient(object):
     """A model that answers the way the test tells it to, and counts its calls."""
 
-    def __init__(self, answer=None, price=0.002):
+    def __init__(self, answer=None, price=0.002, uncertain=None):
         self.calls = []
         self.hints = []
         self.images = []
+        self._uncertain = uncertain if callable(uncertain) else (
+            lambda _text, records=list(uncertain or ()): records)
         self._answer = answer or (lambda text: "<p>%s</p>" % text)
         self.spec = types.SimpleNamespace(price_per_page=price, model_id="test/model")
         self.model_id = "test/model"
@@ -50,6 +52,7 @@ class FakeClient(object):
         self.hints.append(list(hints or []))
         self.images.append(image_jpeg)
         return model.ModelResult(html=self._answer(page_text), model=self.model_id,
+                                 uncertain=[dict(r) for r in self._uncertain(page_text)],
                                  cost_usd=self.spec.price_per_page,
                                  cost_source="price_table", prompt_tokens=900,
                                  completion_tokens=600)
@@ -182,6 +185,80 @@ def test_a_marker_the_scanner_destroyed_can_come_back_off_the_page_image(tmp_pat
     assert result.outcomes[1].gate == "PASS", result.outcomes[1].gate_reasons
     assert result.outcomes[1].source == "model"
     assert 'href="#fn_88"' in result.page_html[1]
+
+
+# ------------------------------------------------- R3: damage marked, not replaced
+
+def test_a_reading_the_model_flagged_is_marked_in_the_page_the_reader_gets(tmp_path):
+    """R3 is only kept if the mark reaches the book. The record on its own is a
+    line in a log; the reader has to be able to see which word of their book the
+    conversion is not sure about, and read the printed one anyway."""
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    client = FakeClient(
+        uncertain=lambda text: [{"token": text.split()[0], "candidates": ["mangled"]}])
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    outcome = result.outcomes[1]
+    flagged = client.calls[0].split()[0]
+    assert outcome.gate == "PASS", outcome.gate_reasons
+    assert outcome.marked == 1
+    assert ('<span class="reflow-uncertain" title="likely: mangled">%s</span>' % flagged
+            in result.page_html[1])
+
+
+def test_a_page_the_gate_refused_carries_no_marks(tmp_path):
+    """The marks belong to the model's answer. A page whose answer was thrown away
+    ships the deterministic text, and a highlight on it would be pointing at a
+    reading nothing in this book ever adopted."""
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    client = FakeClient(answer=_drop_a_word,
+                        uncertain=[{"token": "the", "candidates": ["teh"]}])
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.outcomes[1].gate == "FAIL"
+    assert "reflow-uncertain" not in result.page_html[1]
+    assert result.outcomes[1].marked == 0
+
+
+def test_a_marker_the_gate_says_came_back_is_not_also_called_unresolved(tmp_path):
+    """MEASURED on the acceptance book: 19 of 28 flagged readings were superscripts
+    the same answer had already put back as noterefs. Listing those on the about
+    page sends a reader to look at damage that is not there, and inflates the one
+    number the page uses to describe how uncertain the conversion was."""
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    client = FakeClient(answer=_restore_marker(88, ".'\""),
+                        uncertain=[{"token": ".'\"", "candidates": ["88"]}])
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    outcome = result.outcomes[1]
+    assert outcome.gate == "PASS", outcome.gate_reasons
+    assert outcome.recovered_markers == [88]
+    assert outcome.uncertain == []
+
+
+def test_a_reading_nothing_explains_is_kept_even_when_it_cannot_be_marked(tmp_path):
+    """The fallback that keeps the filter honest: a reading the conversion cannot
+    point at is still a reading, and the about page still has to say so."""
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    client = FakeClient(uncertain=[{"token": "its\u00b0", "candidates": ["it."]}])
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    outcome = result.outcomes[1]
+    assert outcome.gate == "PASS", outcome.gate_reasons
+    assert outcome.marked == 0
+    assert [span["token"] for span in outcome.uncertain] == ["its\u00b0"]
 
 
 def test_the_model_is_told_what_the_deterministic_pass_could_not_settle(tmp_path):

@@ -248,8 +248,8 @@ def test_only_the_first_uncertain_readings_are_listed_and_the_rest_are_counted(t
     """A scan can produce hundreds. A page that prints all of them is one nobody
     reads, and the count is the part that tells the reader how much to trust."""
     def many(call):
-        return [{"page": call, "text": "reading %d" % n, "reading": "auto",
-                 "alternatives": ["a", "b"]} for n in range(30)]
+        return [{"token": "reading %d" % n, "candidates": ["a", "b"]}
+                for n in range(30)]
 
     result, ledger, _ = _run(tmp_path, F.prose_page, F.ambiguous_residue_page,
                              client=FakeClient(uncertain=many))
@@ -266,8 +266,7 @@ def test_only_the_first_uncertain_readings_are_listed_and_the_rest_are_counted(t
 
 def test_an_uncertain_reading_links_to_the_page_it_is_on(tmp_path):
     def one(call):
-        return [{"page": call, "text": "luminaries", "reading": "luminaries",
-                 "alternatives": ["luminanes"]}]
+        return [{"token": "luminanes", "candidates": ["luminaries"]}]
 
     result, ledger, _ = _run(tmp_path, F.prose_page, F.ambiguous_residue_page,
                              client=FakeClient(uncertain=one))
@@ -278,6 +277,72 @@ def test_an_uncertain_reading_links_to_the_page_it_is_on(tmp_path):
     assert 'href="ch001.xhtml#pg_0001"' in html, html
 
 
+def test_the_reading_the_model_flagged_is_the_one_the_list_prints(tmp_path):
+    """A list that names no word sends the reader to a page to look for nothing.
+
+    The spans are built here by the real contract parser rather than by hand, so
+    the page and the prompt cannot drift apart: the shape the model is asked for
+    is the shape the reader's list has to be able to read.
+    """
+    line = ('{"uncertain": [{"token": "Hephaestio.s\u00b0", '
+            '"candidates": ["Hephaestio.50"]}], "notes": ""}')
+    spans, _notes, _html = model._split_contract("<p>x</p>\n" + line)
+
+    result, ledger, _ = _run(tmp_path, F.prose_page, F.ambiguous_residue_page,
+                             client=FakeClient(uncertain=lambda call: spans))
+    payload = report.numbers(result, ledger)
+
+    text = _text(_page(payload))
+
+    assert "Hephaestio.s\u00b0" in text
+    assert "Hephaestio.50" in text
+
+
+def test_the_page_says_how_many_of_the_readings_a_reader_can_actually_find(tmp_path):
+    """A reading is marked in the text where the conversion can point at the word,
+    and only described where it cannot. Saying "12 marked uncertain" when the book
+    highlights three sends nine readers looking for a highlight that is not there.
+
+    ``Rhetorius`` is printed on the fixture page; ``Poeme`` is not.
+    """
+    def two(call):
+        return [{"token": "Rhetorius", "candidates": ["Rhetorios"]},
+                {"token": "Poeme", "candidates": ["Po\u00e8me"]}]
+
+    result, ledger, _ = _run(tmp_path, F.prose_page, F.ambiguous_residue_page,
+                             client=FakeClient(uncertain=two))
+    payload = report.numbers(result, ledger)
+
+    assert payload["fidelity"]["uncertain_total"] == 2
+    assert payload["fidelity"]["uncertain_marked"] == 1
+    assert 'class="reflow-uncertain"' in result.page_html[1]
+    assert "1 of them is highlighted in the text" in _page(payload)
+
+
+def test_a_book_where_every_reading_is_marked_does_not_count_them_twice(tmp_path):
+    def one(call):
+        return [{"token": "Rhetorius", "candidates": ["Rhetorios"]}]
+
+    result, ledger, _ = _run(tmp_path, F.prose_page, F.ambiguous_residue_page,
+                             client=FakeClient(uncertain=one))
+    payload = report.numbers(result, ledger)
+
+    assert payload["fidelity"]["uncertain_marked"] == 1
+    assert "it is highlighted in the text" in _page(payload)
+
+
+def test_a_reading_the_conversion_cannot_point_at_promises_no_highlight(tmp_path):
+    def one(call):
+        return [{"token": "Poeme", "candidates": ["Po\u00e8me"]}]
+
+    result, ledger, _ = _run(tmp_path, F.prose_page, F.ambiguous_residue_page,
+                             client=FakeClient(uncertain=one))
+    payload = report.numbers(result, ledger)
+
+    assert payload["fidelity"]["uncertain_marked"] == 0
+    assert "highlighted" not in _page(payload)
+
+
 # ---------------------------------------------------------------- well-formedness
 
 def test_the_report_is_well_formed_even_when_the_book_is_awkward(tmp_path):
@@ -286,9 +351,8 @@ def test_the_report_is_well_formed_even_when_the_book_is_awkward(tmp_path):
     result, ledger, _ = _run(tmp_path, F.typographers_page,
                              F.ambiguous_residue_page,
                              client=FakeClient(uncertain=lambda call: [
-                                 {"page": call, "text": "Hall & Fisher <sic>",
-                                  "reading": "Hall & Fisher",
-                                  "alternatives": ["Hall and Fisher"]}]))
+                                 {"token": "Hall & Fisher <sic>",
+                                  "candidates": ["Hall and Fisher"]}]))
     payload = report.numbers(result, ledger)
     payload["source"]["fonts"] = {"Times & Co <Roman>": 4000}
 

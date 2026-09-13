@@ -29,6 +29,7 @@ from typing import Optional
 
 import requests
 
+from .annotate import uncertain_record
 from .gate import number_the_notes
 from .prompts import PROMPT_VERSION, structure_prompt, user_prompt
 
@@ -355,9 +356,11 @@ def _split_contract(content):
         return [], "", (content[:match.start()] + content[match.end():]).strip()
     html = (content[:match.start()] + content[match.end():]).strip()
     uncertain = parsed.get("uncertain") or []
-    if isinstance(uncertain, dict):
+    if isinstance(uncertain, (dict, str)):
         uncertain = [uncertain]
-    return list(uncertain), str(parsed.get("notes") or ""), html
+    records = [record for record in (uncertain_record(item) for item in uncertain)
+               if record is not None]
+    return records, str(parsed.get("notes") or ""), html
 
 
 def _error_detail(response):

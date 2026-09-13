@@ -28,7 +28,8 @@ import os
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
-from . import assemble, assess, build_epub, extract, gate, prompts, route, skeleton
+from . import (annotate, assemble, assess, build_epub, extract, gate, prompts, route,
+               skeleton)
 from .ledger import CapExceeded
 from .model import ModelError
 
@@ -67,6 +68,7 @@ class PageOutcome(object):
     reasons: List[str] = field(default_factory=list)
     gate_reasons: List[str] = field(default_factory=list)
     uncertain: List[object] = field(default_factory=list)
+    marked: int = 0                    # uncertain readings highlighted in the text
     cost_usd: float = 0.0
     cached: bool = False
     model: str = ""
@@ -75,7 +77,8 @@ class PageOutcome(object):
     def to_dict(self):
         return {"pno": self.pno, "source": self.source, "gate": self.gate,
                 "reasons": self.reasons, "gate_reasons": self.gate_reasons,
-                "uncertain": self.uncertain, "cost_usd": round(self.cost_usd, 6),
+                "uncertain": self.uncertain, "marked": self.marked,
+                "cost_usd": round(self.cost_usd, 6),
                 "cached": self.cached, "model": self.model,
                 "recovered_markers": list(self.recovered_markers)}
 
@@ -425,6 +428,12 @@ def _adopt(result, book, pno, outcome, html, uncertain, ladder,
     if words.ok and structure.ok:
         outcome.gate = "PASS"
         outcome.source = "model"
+        # R3, after the gate and not before it: the gate judges what the model
+        # said, and the mark is ours. It is placed only where it cannot change a
+        # word (see annotate.mark_uncertain), so a gate re-run on this page would
+        # reach the same verdict.
+        html, outcome.uncertain, outcome.marked = annotate.annotate_page(
+            html, outcome.uncertain, recovered=outcome.recovered_markers)
         result.page_html[pno] = html
     else:
         outcome.gate = "FAIL" if words.verdict != "NOT_APPLICABLE" or not structure.ok \
@@ -438,7 +447,7 @@ def _adopt(result, book, pno, outcome, html, uncertain, ladder,
                  "gate": outcome.gate, "model": outcome.model,
                  "reasons": outcome.reasons, "gate_reasons": outcome.gate_reasons,
                  "similarity": round(words.similarity, 4),
-                 "uncertain": len(outcome.uncertain)}
+                 "uncertain": len(outcome.uncertain), "marked": outcome.marked}
         if outcome.recovered_markers:
             entry["recovered_markers"] = list(outcome.recovered_markers)
         if answer is not None:

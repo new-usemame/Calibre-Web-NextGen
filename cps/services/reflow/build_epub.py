@@ -80,6 +80,10 @@ blockquote { margin: 1em 2em; font-size: 0.95em; }
 aside.footnote { font-size: 0.85em; margin: 0.4em 0; }
 a.noteref { text-decoration: none; }
 sup.noteref-unresolved { color: inherit; }
+/* A word the scan damaged. The page's own reading is what is printed here; the
+   likelier one is in the title, and every one of them is listed on the about
+   page, because an e-reader has no hover. */
+span.reflow-uncertain { border-bottom: 1px dotted currentColor; }
 figure { margin: 1em 0; text-align: center; page-break-inside: avoid; }
 figcaption { font-size: 0.85em; text-align: center; }
 img { max-width: 100%; }

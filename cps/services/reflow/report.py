@@ -22,6 +22,7 @@ import re
 from datetime import datetime, timezone
 from xml.sax.saxutils import escape
 
+from .annotate import uncertain_readings
 from .build_epub import CONVERTER, CONVERTER_VERSION
 
 #: Hundreds of uncertain readings on a bad scan is normal. A page that prints all of
@@ -81,6 +82,10 @@ def numbers(result, ledger=None, client=None):
             "pages_reviewed": len(answered),
             "pages_routed_not_reviewed": max(0, len(result.routed) - len(answered)),
             "uncertain_total": len(uncertain),
+            # How many of those a reader will actually find highlighted. A reading
+            # can only be marked where the conversion can point at the word it
+            # names, so this is the honest half of the count above.
+            "uncertain_marked": sum(o.marked for o in outcomes),
             "uncertain": uncertain[:MAX_UNCERTAIN_LISTED],
             "conservation": (book.conservation.to_dict()
                              if book is not None and book.conservation else None),
@@ -290,25 +295,36 @@ def _structure_section(payload):
 
 def _uncertain_section(payload, links):
     fidelity = payload["fidelity"]
-    if not fidelity["uncertain_total"]:
+    total = fidelity["uncertain_total"]
+    if not total:
         return []
+    listed = fidelity["uncertain"]
+    marked = fidelity.get("uncertain_marked") or 0
+    clauses = []
+    if marked:
+        clauses.append("it is highlighted in the text" if total == 1
+                       else "all of them are highlighted in the text" if marked == total
+                       else "%d of them %s highlighted in the text"
+                       % (marked, "is" if marked == 1 else "are"))
+    if total > len(listed):
+        clauses.append("the first %d are listed here" % len(listed))
     out = ["<h2>Readings worth checking</h2>",
-           "<p>%d places were marked uncertain%s.</p>"
-           % (fidelity["uncertain_total"],
-              "; the first %d are listed here" % len(fidelity["uncertain"])
-              if fidelity["uncertain_total"] > len(fidelity["uncertain"]) else "")]
+           "<p>%s marked uncertain%s.</p>"
+           % ("One place was" if total == 1 else "%d places were" % total,
+              "".join("; " + clause for clause in clauses))]
     items = []
-    for span in fidelity["uncertain"]:
-        text = escape(str(span.get("text") or span.get("reading") or ""))
+    for span in listed:
+        token, readings = uncertain_readings(span)
         page = span.get("page")
         href = links.get(page)
         label = "page %s" % ((page or 0) + 1)
         where = ('<a href="%s#pg_%04d">%s</a>' % (escape(href), int(page), label)
                  if href is not None and page is not None else label)
-        alternatives = span.get("alternatives") or []
-        also = (" (also read as %s)" % escape(", ".join(str(a) for a in alternatives))
-                if alternatives else "")
-        items.append("<li>%s: %s%s</li>" % (where, text, also))
+        said = escape(token) if token else "<em>an unnamed reading</em>"
+        likely = (" &#8212; likely %s" % escape(readings[0])) if readings else ""
+        also = (" (also read as %s)" % escape(", ".join(readings[1:]))
+                if len(readings) > 1 else "")
+        items.append("<li>%s: %s%s%s</li>" % (where, said, likely, also))
     out.append("<ul>%s</ul>" % "".join(items))
     return out
 

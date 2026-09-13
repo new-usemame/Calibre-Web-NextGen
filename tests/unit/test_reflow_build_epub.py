@@ -23,7 +23,7 @@ from xml.etree import ElementTree as ET
 
 import pytest
 
-from cps.services.reflow import assemble, build_epub, gate
+from cps.services.reflow import annotate, assemble, build_epub, gate
 from tests.fixtures import reflow_pdfs as F
 
 pytestmark = pytest.mark.unit
@@ -53,6 +53,28 @@ def _build(book, tmp_path, **kwargs):
     kwargs.setdefault("metadata", {"title": "Hellenistic Astrology",
                                    "authors": ["Chris Brennan"], "language": "en"})
     return build_epub.build(book, str(tmp_path / "out.epub"), **kwargs)
+
+
+def test_a_marked_uncertain_reading_reaches_the_reader_looking_marked(tmp_path):
+    """R3 ends here. A mark that the builder's block splitting mangles, or that the
+    book's stylesheet says nothing about, is an annotation nobody can see -- and an
+    invisible annotation is indistinguishable from having replaced the word."""
+    book = _book(F.prose_page)
+    fragments = _fragments(book)
+    marked, placed = annotate.mark_uncertain(
+        fragments[0], [{"token": fragments[0].split(">")[1].split()[0],
+                        "candidates": ["luminaries"]}])
+    assert placed, "the fixture page did not take a mark"
+
+    result = _build(book, tmp_path, page_html={0: marked})
+
+    with zipfile.ZipFile(result.path) as zf:
+        chapters = "".join(zf.read(n).decode("utf-8") for n in _content_names(zf))
+        style = zf.read("OEBPS/style.css").decode("utf-8")
+
+    assert 'class="%s"' % annotate.CLASS in chapters
+    assert 'title="likely: luminaries"' in chapters
+    assert annotate.CLASS in style, "the mark is in the book and styled by nothing"
 
 
 def _xhtml_names(zf):

@@ -229,8 +229,30 @@ def test_the_contract_line_is_parsed_off_the_html():
             content=PAGE_HTML + '\n{"uncertain": ["marker after \'caution.\'"]}'))
         result = _edit(_client())
 
-    assert result.uncertain == ["marker after 'caution.'"]
+    assert result.uncertain == [{"token": "marker after 'caution.'",
+                                 "candidates": []}]
     assert "uncertain" not in result.html
+
+
+def test_a_flagged_reading_arrives_in_one_shape_whatever_the_model_called_it():
+    """Everything downstream -- the report list, the inline annotation -- has to
+    find the damaged token and its candidate readings without knowing which model
+    answered. The prompt asks for {"token", "candidates"} and DeepSeek obliges
+    (28 of 28 records measured on book 567), but the key names are the model's
+    choice, not ours, and a record nobody can read is a reading nobody checks.
+    """
+    line = ('{"uncertain": [{"token": "4s", "candidates": ["45", "4s"]}, '
+            '{"text": "Po\u00e8me", "alternatives": ["Po\u00e8me", "Poeme"]}, '
+            '{"word": "mathematike"}], "notes": ""}')
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, json=_reply(content=PAGE_HTML + "\n" + line))
+        result = _edit(_client())
+
+    assert result.uncertain == [
+        {"token": "4s", "candidates": ["45", "4s"]},
+        {"token": "Po\u00e8me", "candidates": ["Po\u00e8me", "Poeme"]},
+        {"token": "mathematike", "candidates": []},
+    ]
 
 
 # ------------------------------------------------------------------- the ledger

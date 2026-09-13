@@ -27,6 +27,7 @@ import { Tasks } from './pages/Tasks';
 import { Table } from './pages/Table';
 import { Duplicates } from './pages/Duplicates';
 import { Annotations } from './pages/Annotations';
+import { Reflow } from './pages/Reflow';
 import { WhatsNew } from './pages/WhatsNew';
 import { MagicShelf } from './pages/MagicShelf';
 import { MagicShelfView } from './pages/MagicShelfView';
@@ -208,6 +209,7 @@ export function App() {
           <Route path={SPA_ROUTES.editBook}>{(p) => <EditBook id={p.id} />}</Route>
           <Route path={SPA_ROUTES.coverPicker}>{(p) => <CoverPicker id={p.id} />}</Route>
           <Route path={SPA_ROUTES.annotations}>{(p) => <Annotations id={p.id} />}</Route>
+          <Route path={SPA_ROUTES.reflow}>{(p) => <Reflow id={p.id} />}</Route>
           <Route path={SPA_ROUTES.book} component={BookDetail} />
 
           {/* Browse: entity lists + per-entity filtered catalog */}

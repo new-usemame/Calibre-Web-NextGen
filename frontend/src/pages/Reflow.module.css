@@ -1,0 +1,173 @@
+/* Reflow — the AI-assisted PDF→EPUB conversion page. Consumes design tokens
+   (tokens.css); no hardcoded colour. The page is asking a reader to authorise a
+   spend, so the money is the loudest thing on it and every other control is
+   quiet until the figure has been read. */
+
+.container {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: var(--sp-5) var(--sp-5) var(--sp-10);
+}
+
+/* ---- header ---- */
+.header { margin-bottom: var(--sp-5); }
+.back {
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  color: var(--text-muted); font-size: var(--fs-sm); text-decoration: none;
+  margin-bottom: var(--sp-3); transition: color var(--dur-fast) var(--ease);
+}
+.back:hover { color: var(--accent-hover); }
+.title {
+  font-family: var(--font-display); font-size: var(--fs-xl); line-height: var(--lh-tight);
+  font-weight: var(--fw-bold); color: var(--text); margin: 0 0 var(--sp-2);
+}
+.subtitle { color: var(--text-muted); font-size: var(--fs-base); margin: 0; max-width: 62ch; }
+
+/* ---- cards ---- */
+.card {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: var(--r-lg); padding: var(--sp-4);
+  margin-bottom: var(--sp-4);
+}
+.cardTitle {
+  font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-faint); font-weight: var(--fw-semi);
+  margin: 0 0 var(--sp-3);
+}
+.verdict {
+  color: var(--text); font-size: var(--fs-base); line-height: var(--lh-base);
+  margin: 0 0 var(--sp-3);
+}
+.note { color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-base); margin: var(--sp-2) 0 0; }
+
+/* ---- the page's facts, as a definition strip ---- */
+.facts {
+  display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-6);
+  margin: 0;
+}
+.fact { display: flex; flex-direction: column; gap: 2px; min-width: 7rem; }
+.factLabel {
+  font-size: var(--fs-xs); color: var(--text-faint);
+  text-transform: uppercase; letter-spacing: .05em;
+}
+.factValue { font-size: var(--fs-md); color: var(--text); font-weight: var(--fw-semi); }
+
+/* ---- tiers ---- */
+.tiers { display: flex; flex-direction: column; gap: var(--sp-2); }
+.tier, .tierOn {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: baseline;
+  gap: var(--sp-3);
+  padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--surface-2); cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
+}
+.tier:hover, .tierOn:hover { border-color: var(--border-strong); }
+.tier:focus-within, .tierOn:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+/* The chosen tier is the one the money belongs to, so it is drawn, not just ticked. */
+.tierOn { border-color: var(--accent); background: var(--accent-soft); }
+.tierLabel { color: var(--text); font-size: var(--fs-base); font-weight: var(--fw-medium); }
+.tierModel {
+  color: var(--text-faint); font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+.tierPrice { color: var(--accent-text); font-size: var(--fs-md); font-weight: var(--fw-semi); font-variant-numeric: tabular-nums; }
+.radio { accent-color: var(--accent); width: 1rem; height: 1rem; }
+
+.targetLine { color: var(--text-muted); font-size: var(--fs-sm); margin: var(--sp-3) 0 0; }
+.overTarget {
+  margin: var(--sp-3) 0 0; padding: var(--sp-3);
+  background: var(--danger-soft); border: 1px solid var(--danger-border);
+  border-radius: var(--r-md); color: var(--danger); font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+}
+
+/* ---- mode ---- */
+.modes { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-3); }
+.mode, .modeOn {
+  display: inline-flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border);
+  border-radius: var(--r-full); background: var(--surface-2); cursor: pointer;
+}
+.mode:focus-within, .modeOn:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.modeOn { border-color: var(--accent); background: var(--accent-soft); }
+.modeLabel { color: var(--text); font-size: var(--fs-sm); }
+.modeOn .modeLabel { color: var(--accent-text); font-weight: var(--fw-medium); }
+.modeHint { color: var(--text-muted); font-size: var(--fs-sm); margin: 0 0 var(--sp-3); line-height: var(--lh-base); }
+
+.field { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-3); }
+.label { color: var(--text); font-size: var(--fs-sm); }
+.fieldHint { color: var(--text-faint); font-size: var(--fs-xs); flex-basis: 100%; }
+.inputNarrow {
+  width: 7rem; padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-3); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--r-sm);
+  font-size: var(--fs-base); font-variant-numeric: tabular-nums;
+}
+.inputNarrow:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+/* The two things the cap has to say: before, that the number typed is below the
+   estimate and would be refused; after, that a conversion stopped when it reached
+   it. Neither is an error the page did something wrong, so neither is a red box. */
+.capWarn {
+  margin: 0 0 var(--sp-3); color: var(--danger);
+  font-size: var(--fs-sm); line-height: var(--lh-base);
+}
+
+/* ---- consent ---- */
+.consent {
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  padding: var(--sp-3); border: 1px solid var(--border-strong);
+  border-radius: var(--r-md); background: var(--surface-2);
+  color: var(--text); font-size: var(--fs-base); line-height: var(--lh-base);
+  cursor: pointer;
+}
+.check { accent-color: var(--accent); width: 1.1rem; height: 1.1rem; margin-top: 2px; flex: none; }
+.checkRow {
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  color: var(--text); font-size: var(--fs-sm); line-height: var(--lh-base);
+  margin-bottom: var(--sp-3); cursor: pointer;
+}
+
+.actions { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; margin-top: var(--sp-4); }
+
+/* ---- progress ---- */
+.bar {
+  height: 8px; border-radius: var(--r-full); background: var(--surface-3);
+  overflow: hidden; margin: var(--sp-3) 0;
+}
+.barFill {
+  height: 100%; background: var(--accent);
+  transition: width var(--dur-base) var(--ease-out);
+}
+.progressMessage { color: var(--text-muted); font-size: var(--fs-sm); margin: 0; line-height: var(--lh-base); }
+.spin {
+  display: inline-flex; margin-right: var(--sp-2); color: var(--text-muted);
+  vertical-align: -2px; animation: reflow-spin 1.1s linear infinite;
+}
+@keyframes reflow-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+  .barFill { transition: none; }
+}
+
+.download { margin-top: var(--sp-3); display: inline-flex; gap: var(--sp-2); align-items: center; }
+
+.error {
+  padding: var(--sp-3); border-radius: var(--r-md);
+  background: var(--danger-soft); border: 1px solid var(--danger-border);
+  color: var(--danger); font-size: var(--fs-sm); line-height: var(--lh-base);
+}
+.notConfigured {
+  display: flex; align-items: flex-start; gap: var(--sp-3);
+  margin-bottom: var(--sp-4); padding: var(--sp-4); border-radius: var(--r-md);
+  background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text-muted); font-size: var(--fs-base); line-height: var(--lh-base);
+}
+.adminLink { color: var(--accent-text); text-decoration: none; }
+.adminLink:hover { text-decoration: underline; }
+
+@media (max-width: 560px) {
+  .container { padding: var(--sp-4) var(--sp-4) var(--sp-8); }
+  .tier, .tierOn { grid-template-columns: auto 1fr; }
+  .tierPrice { grid-column: 2; }
+  .facts { gap: var(--sp-3) var(--sp-4); }
+}

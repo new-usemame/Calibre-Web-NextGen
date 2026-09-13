@@ -140,6 +140,26 @@ class PageCache(object):
         return path
 
 
+#: A page with this much prose on it is the book rather than its front matter.
+BODY_WORDS = 120
+#: How many pages a cost estimate reads. The deterministic pass over a 700-page
+#: book is a minute of work; the page that asks a user to authorise a spend has to
+#: answer in the time it takes to render.
+SURVEY_PAGES = 40
+
+
+def first_body_page(book):
+    """Where the book starts, as opposed to where the file starts."""
+    pages = sorted(book.pages)
+    if not pages:
+        return 0
+    for pno in pages:
+        elements = book.pages.get(pno) or []
+        if sum(len(el.text.split()) for el in elements if el.kind == "p") >= BODY_WORDS:
+            return pno
+    return pages[0]
+
+
 def sample_pages(book, style, count):
     """The first *count* body pages, starting where the front matter stops.
 
@@ -149,15 +169,54 @@ def sample_pages(book, style, count):
     pages = sorted(book.pages)
     if not pages:
         return []
-    first_body = pages[0]
-    for pno in pages:
-        elements = book.pages.get(pno) or []
-        words = sum(len(el.text.split()) for el in elements if el.kind == "p")
-        if words >= 120:
-            first_body = pno
-            break
-    start = pages.index(first_body)
+    start = pages.index(first_body_page(book))
     return pages[start:start + int(count)]
+
+
+def deterministic_window(doc, pages):
+    """The deterministic pass over the first *pages* pages, and nothing else."""
+    count = max(1, min(int(pages), doc.page_count))
+    return assemble.deterministic_book(doc, page_numbers=list(range(count)))
+
+
+def survey_pages(page_count, sample=SURVEY_PAGES):
+    """Pages spread evenly through the book, ends included.
+
+    Evenly rather than the first N: front matter, plates and the index route for
+    different reasons than the body does, and an estimate taken from the first forty
+    pages of a scholarly book is an estimate of its front matter.
+    """
+    count = max(1, int(page_count))
+    take = max(1, min(int(sample), count))
+    if take == 1:
+        return [0]
+    step = (count - 1) / float(take - 1)
+    return sorted({int(round(index * step)) for index in range(take)})
+
+
+def survey(doc, sample=SURVEY_PAGES):
+    """What a conversion would cost, measured rather than assumed.
+
+    The deterministic pass runs on a sample of pages and the routed share is scaled
+    to the book. The number the user consents to is therefore this book's own
+    routing rate, not a fixed percentage — but it is an estimate from a sample, and
+    ``sampled`` says how big the sample was so the page can say so.
+    """
+    pages = survey_pages(doc.page_count, sample)
+    result = run(doc, page_numbers=pages)
+    routed = len(result.routed)
+    share = routed / float(len(pages)) if pages else 0.0
+    projected = int(round(share * doc.page_count))
+    quote = route.estimate(projected, doc.page_count)
+    quote.update({
+        "sampled": len(pages),
+        "sampled_routed": routed,
+        "verdict": result.assessment.verdict if result.assessment else "",
+        "text_layer": bool(result.assessment and result.assessment.verdict
+                           not in ("NO_TEXT_LAYER", "GARBAGE_TEXT")),
+        "reasons": dict((result.routing or {}).get("reasons") or {}),
+    })
+    return quote
 
 
 def run(doc, client=None, ledger=None, cache=None, page_numbers=None,

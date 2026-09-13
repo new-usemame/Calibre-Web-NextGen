@@ -694,3 +694,19 @@ def run_epubcheck(path, timeout=120):
     output = (completed.stdout or b"") + (completed.stderr or b"")
     return {"ran": True, "returncode": completed.returncode,
             "output": output.decode("utf-8", "replace")[:4000]}
+
+
+def read_sidecar(path):
+    """The conversion's own numbers, read back out of a finished EPUB.
+
+    Returns ``None`` rather than raising for a book Reflow did not make, a file that
+    is not a zip, or a sidecar that has been corrupted: the caller is a book page
+    asking "is there a fidelity report for this?", and every one of those answers is
+    "no", not "the request failed".
+    """
+    try:
+        with zipfile.ZipFile(path) as zf:
+            with zf.open(SIDECAR_PATH) as handle:
+                return json.loads(handle.read().decode("utf-8"))
+    except (KeyError, ValueError, zipfile.BadZipFile, IOError, OSError):
+        return None

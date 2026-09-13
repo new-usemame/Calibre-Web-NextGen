@@ -85,6 +85,36 @@ class Ledger(object):
         """Pages already paid for — the resume point after a crash or a cap stop."""
         return {int(e["page"]) for e in self._entries if e.get("page") is not None}
 
+    def job(self):
+        """What the job records say it is: mode, owner, how it ended.
+
+        The last ``start`` wins and the last ``finish`` wins, so a resumed job reads
+        as one row rather than two — the ledger is append-only and a resume appends.
+        """
+        facts = {"job_id": self.job_id, "status": "running"}
+        for entry in self._entries:
+            if entry.get("kind") != "job":
+                continue
+            if entry.get("event") == "start":
+                for key in ("mode", "user_id", "tier", "pages", "title", "cap_usd"):
+                    if entry.get(key) is not None:
+                        facts[key] = entry[key]
+                facts["started"] = entry.get("ts")
+            elif entry.get("event") == "finish":
+                facts["status"] = entry.get("status") or "done"
+                facts["finished"] = entry.get("ts")
+                if entry.get("error"):
+                    facts["error"] = entry["error"]
+        return facts
+
+    def summary(self):
+        """One row for the job list: what it was, how it ended, what it cost."""
+        row = dict(self.totals())
+        # The job's own record wins: a ledger reopened to read a finished job does
+        # not know the cap that job ran under until the start record says so.
+        row.update(self.job())
+        return row
+
     def totals(self):
         gate = Counter(e.get("gate") for e in self._entries if e.get("gate"))
         models = Counter(e.get("model") for e in self._entries if e.get("model"))
@@ -124,3 +154,31 @@ def _read(path):
                 # entry is right; refusing to open the file at all is not.
                 continue
     return entries
+
+
+def read_summaries(directory, limit=20):
+    """The recent jobs for one book, newest first.
+
+    Reading the files rather than keeping a table is deliberate: the ledger already
+    has to survive a crash, so it is the record, and a second store could disagree
+    with it. ``limit`` is applied after sorting by modification time so a book with
+    hundreds of attempts does not read hundreds of files.
+    """
+    if not os.path.isdir(directory):
+        return []
+    files = []
+    for name in os.listdir(directory):
+        if not name.endswith(".jsonl"):
+            continue
+        path = os.path.join(directory, name)
+        try:
+            files.append((os.path.getmtime(path), path, name[:-len(".jsonl")]))
+        except OSError:                                           # pragma: no cover
+            continue
+    files.sort(reverse=True)
+    rows = []
+    for _mtime, path, job_id in files[:int(limit)]:
+        led = Ledger(path, cap_usd=0.0, job_id=job_id)
+        led.cap_usd = float(led.job().get("cap_usd") or 0.0)
+        rows.append(led.summary())
+    return rows

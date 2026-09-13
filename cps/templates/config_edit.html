@@ -351,6 +351,37 @@
       <div class="help-block">{{_('Optional. Without a key, Google Books is rate-limited to ~1,000 requests / IP / day, which is easily exhausted on shared servers (HTTP 429). Free key at https://console.cloud.google.com — enable the "Books API" and create an API key.')}}</div>
     </div>
     <div class="form-group">
+      <label for="config_openrouter_key_e">{{_('OpenRouter API Key (Reflow PDF to EPUB)')}}</label>
+      <input type="password" class="form-control" id="config_openrouter_key_e" name="config_openrouter_key_e" value="" autocomplete="new-password" placeholder="{% if config.resolved_openrouter_key() %}{{_('A key is saved. Leave blank to keep it.')}}{% else %}{{_('No key saved')}}{% endif %}">
+      <div class="help-block">{{_('Optional. Reflow converts a PDF into a reflowable EPUB with the help of a language model, which only ever re-marks-up the page — no wording is changed. Without a key the conversion still runs, but every page is laid out by the deterministic reader alone. Key at https://openrouter.ai/keys. The key is stored encrypted and is never shown again.')}}</div>
+      {% if config.openrouter_key_source() and config.openrouter_key_source() != 'database' %}
+      <div class="help-block">{{_('A key is currently coming from the environment (%(source)s); it takes effect only while no key is saved here.', source=config.openrouter_key_source()) }}</div>
+      {% endif %}
+      {% if config.resolved_openrouter_key() %}
+      <input type="checkbox" id="config_openrouter_key_clear" name="config_openrouter_key_clear">
+      <label for="config_openrouter_key_clear">{{_('Delete the saved key')}}</label>
+      {% endif %}
+    </div>
+    <div class="form-group">
+      <label for="config_reflow_default_tier">{{_('Reflow model')}}</label>
+      <select name="config_reflow_default_tier" id="config_reflow_default_tier" class="form-control">
+        <option value="cheap" {% if config.config_reflow_default_tier == 'cheap' %}selected{% endif %}>{{_('Cheapest')}}</option>
+        <option value="standard" {% if config.config_reflow_default_tier == 'standard' or not config.config_reflow_default_tier %}selected{% endif %}>{{_('Standard')}}</option>
+        <option value="quality" {% if config.config_reflow_default_tier == 'quality' %}selected{% endif %}>{{_('Best quality')}}</option>
+      </select>
+      <div class="help-block">{{_('Which model a conversion uses unless the person starting it chooses another.')}}</div>
+    </div>
+    <div class="form-group">
+      <label for="config_reflow_target_usd">{{_('Reflow target cost per book (USD)')}}</label>
+      <input type="number" min="0" step="0.05" class="form-control" id="config_reflow_target_usd" name="config_reflow_target_usd" value="{{ config.config_reflow_target_usd if config.config_reflow_target_usd != None else 0.5 }}" autocomplete="off">
+      <div class="help-block">{{_('Not a limit. A book estimated above this is flagged before anyone starts it, and a sample is suggested first.')}}</div>
+    </div>
+    <div class="form-group">
+      <label for="config_reflow_hard_cap_usd">{{_('Reflow maximum spend per conversion (USD)')}}</label>
+      <input type="number" min="0" step="0.5" class="form-control" id="config_reflow_hard_cap_usd" name="config_reflow_hard_cap_usd" value="{{ config.config_reflow_hard_cap_usd if config.config_reflow_hard_cap_usd != None else 5.0 }}" autocomplete="off">
+      <div class="help-block">{{_('A hard limit. No conversion may be started with a cost cap above this figure, and a running conversion stops when it reaches its cap.')}}</div>
+    </div>
+    <div class="form-group">
       <input type="checkbox" id="config_allow_reverse_proxy_header_login" name="config_allow_reverse_proxy_header_login" data-control="reverse-proxy-login-settings" {% if config.config_allow_reverse_proxy_header_login %}checked{% endif %}>
       <label for="config_allow_reverse_proxy_header_login">{{_('Allow Reverse Proxy Authentication')}}</label>
       <div class="help-block">{{_('Trusts the "Remote-User" header from a reverse proxy for authentication. This is an authentication method, distinct from the HTTPS security setting below.')}}</div>

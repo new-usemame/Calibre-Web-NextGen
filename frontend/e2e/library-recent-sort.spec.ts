@@ -127,9 +127,26 @@ async function renderedIds(page: Page): Promise<number[]> {
  * The listening starts before the navigation, so the value returned is the
  * FIRST listing request of a cold load — the default itself, not whatever the
  * page settled on afterwards.
+ *
+ * It leaves the app before it starts listening, and that line is load-bearing
+ * rather than tidy: the page a test receives is NOT blank. The secondaryUser
+ * fixture proves the session by visiting /app itself (`await
+ * secondaryPage.goto('/app')` in fixtures.ts), so the app has already cold
+ * loaded in this tab once — with empty storage, which means it asked for the
+ * default, `recent`. That load's listing request is still in flight when this
+ * function is called, and its response arrives about a millisecond BEFORE the
+ * navigation below even begins. Without the blank page, `sorts[0]` is then the
+ * FIXTURE's cold load rather than this test's: the test expecting a stored
+ * choice fails (MEASURED: 5 of 25 repeats), and — worse, because it is silent —
+ * the test expecting `recent` passes on a request the feature did not produce.
+ *
+ * Scoping by request start time instead was measurably not enough (1 of 25):
+ * the old document is still live and can issue a listing of its own after the
+ * mark. Navigating away ends it, so nothing it does is observable at all.
  */
 async function coldLoad(page: Page, seed: Record<string, string> = {}) {
   const sorts: string[] = [];
+  await page.goto('about:blank');
   page.on('response', (response) => {
     if (!response.url().includes('/api/v1/books?') || response.status() !== 200) return;
     const params = new URL(response.url()).searchParams;

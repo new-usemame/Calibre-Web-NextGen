@@ -379,7 +379,6 @@ export function BookDetail() {
     book.formats.map((f) => f.format),
     canReadBooks(me),
   );
-  const canDelete = canDeleteBooks(me);
 
   // The membership endpoint returns ids only, and both it and the shelf list
   // apply the same server-side visibility filter (own shelves + public ones),
@@ -558,7 +557,10 @@ export function BookDetail() {
     });
   }
   const menuSections: MenuSectionDef[] = [{ id: 'actions', items: menuItems }];
-  if (canDelete) {
+  // Whole-book deletion is admin-only in the SPA (operator instruction): the
+  // server keeps its own delete+edit check, so this gate is the
+  // discoverability layer, not the enforcement.
+  if (me?.role?.admin) {
     menuSections.push({
       id: 'destructive',
       label: t('Admin only'),

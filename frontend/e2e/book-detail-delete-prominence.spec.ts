@@ -30,13 +30,15 @@ async function firstBook(page: Page): Promise<SeedBook | null> {
   });
 }
 
-async function setDeletePermission(page: Page, allowed: boolean) {
+// The book-page delete section is gated on the ADMIN role (operator
+// instruction); the server keeps its own delete+edit check.
+async function setAdminPermission(page: Page, allowed: boolean) {
   const response = await page.context().request.get(new URL('/api/v1/auth/me', page.url()).href);
   const status = response.status();
   const headers = response.headers();
   const me = await response.json();
   await response.dispose();
-  me.role = { ...(me.role ?? {}), delete_books: allowed };
+  me.role = { ...(me.role ?? {}), admin: allowed };
 
   await page.route('**/api/v1/auth/me', async (route) => {
     await route.fulfill({ status, headers, json: me });
@@ -60,7 +62,7 @@ test('book-detail deletion is a menuitem in an admin-only menu section, at every
     return;
   }
 
-  await setDeletePermission(page, true);
+  await setAdminPermission(page, true);
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
 
   // Deletion is never one of the visible row controls — only the gear menu
@@ -85,7 +87,7 @@ test('book-detail deletion is a menuitem in an admin-only menu section, at every
   }
 });
 
-test('book-detail deletion remains absent without delete permission (#1862)', async ({ page }) => {
+test('book-detail deletion remains absent for a non-admin (#1862)', async ({ page }) => {
   await page.goto('/app');
   const book = await firstBook(page);
   if (book == null) {
@@ -93,7 +95,7 @@ test('book-detail deletion remains absent without delete permission (#1862)', as
     return;
   }
 
-  await setDeletePermission(page, false);
+  await setAdminPermission(page, false);
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
 
   const menu = await openActionsMenu(page);
@@ -113,7 +115,7 @@ test('dismissing book-detail deletion confirmation never calls the endpoint (#18
     return;
   }
 
-  await setDeletePermission(page, true);
+  await setAdminPermission(page, true);
   let deleteCalls = 0;
   await page.route(`**/api/v1/books/${book.id}/delete`, async (route) => {
     deleteCalls += 1;
@@ -147,7 +149,7 @@ test('the admin-only section stays a quiet divider with a danger menuitem in lig
     return;
   }
 
-  await setDeletePermission(page, true);
+  await setAdminPermission(page, true);
   await page.goto(`/app/book/${book.id}`, { waitUntil: 'domcontentloaded' });
   const menu = await openActionsMenu(page);
   const adminSection = menu.getByRole('group', { name: 'Admin only' });

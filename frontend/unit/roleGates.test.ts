@@ -58,11 +58,12 @@ test('all destructive book CTAs require delete-books and edit together', () => {
   const edit = source('../src/pages/EditBook.tsx');
   const bulk = source('../src/components/BulkBar.tsx');
   assert.match(detail, /const canDelete = canDeleteBooks\(me\)/);
-  // The whole-book delete is the gear menu's destructive section (#1046's
-  // separation kept: it never sits among the ordinary actions).
-  assert.match(detail, /if \(canDelete\) \{[\s\S]*label: t\('Admin only'\),[\s\S]*danger: true/);
+  // The whole-book delete in the gear menu is admin-only (operator instruction;
+  // the server keeps its own delete+edit check). It never sits among the
+  // ordinary actions.
+  assert.match(detail, /if \(me\?\.role\?\.admin\) \{[\s\S]*label: t\('Admin only'\),[\s\S]*danger: true/);
   assert.match(detail, /testId: 'menu-delete-book'/);
-  // Per-format delete in the Files section uses the same conjunction.
+  // Per-format delete in the Files section keeps the delete+edit conjunction.
   assert.match(detail, /const canDelete = canDeleteBooks\(me\);[\s\S]*\{canDelete && \(/);
   assert.match(edit, /\{canDeleteBooks\(me\) && \(/);
   assert.match(bulk, /const canDelete = canDeleteBooks\(me\)/);

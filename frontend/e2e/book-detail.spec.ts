@@ -159,19 +159,19 @@ test('a permitted user gets a delete action that confirms, calls the delete endp
   assertNoPageErrors(errors);
 });
 
-test('the delete action is hidden for a user without the delete role (#803)', async ({ page }) => {
+test('the delete action is hidden for a non-admin user (#803)', async ({ page }) => {
   await page.goto('/app');
   const bookId = await firstBookId(page);
   test.skip(bookId == null, 'seed has no books');
 
-  // Force the current-user payload to lack the delete role; the control must
+  // Force the current-user payload to lack the admin role; the control must
   // not render at all (hidden, never merely disabled — a forged request is
   // separately rejected server-side with 403).
   await page.route('**/api/v1/auth/me', async (route) => {
     const got = await fetchJsonSafe(route);
     if (!got) return;
     const { response: res, body: me } = got;
-    if (me?.role) me.role.delete_books = false;
+    if (me?.role) me.role.admin = false;
     await route.fulfill({ response: res, json: me });
   });
 

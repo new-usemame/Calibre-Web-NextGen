@@ -121,17 +121,19 @@ test('the gear menu lists every action, with an admin-only delete section', asyn
   assertNoPageErrors(errors);
 });
 
-test('the delete section vanishes without the delete role; the rest of the menu stays', async ({ page }) => {
+test('the delete section is admin-only: a delete-role non-admin never sees it', async ({ page }) => {
   await page.goto('/app');
   const bookId = await firstBookWithFormats(page);
   test.skip(bookId == null, 'seed has no book with files');
   await stubFullAccess(page);
-  // One role short of destructive: admin section must not render at all.
+  // Every destructive role EXCEPT admin: the section must not render at all.
+  // (The server-side delete endpoint keeps its own delete+edit check; this is
+  // the discoverability layer the operator asked to be admin-only.)
   await page.route('**/api/v1/auth/me', async (route) => {
     const got = await fetchJsonSafe(route);
     if (!got) return;
     const { response: res, body: me } = got;
-    me.role.delete_books = false;
+    me.role.admin = false;
     await route.fulfill({ response: res, json: me });
   });
 

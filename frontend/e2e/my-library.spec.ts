@@ -282,7 +282,9 @@ test.describe('My Library', () => {
       const menu = page.getByTestId('book-actions-menu-list');
       await expect(menu.getByRole('menuitem', { name: 'Add to library' })).toBeVisible();
       await expect(menu.getByRole('menuitem', { name: 'Edit metadata' })).toBeVisible();
-      await expect(menu.getByRole('menuitem', { name: 'Delete from the global library' })).toBeVisible();
+      // This account has delete_books but is NOT an admin: whole-book deletion
+      // in the SPA menu is admin-only, so the section stays absent for it.
+      await expect(menu.getByRole('menuitem', { name: 'Delete from the global library' })).toHaveCount(0);
 
       // Member-only controls are absent from the menu, not just the row.
       await expect(menu.getByRole('menuitem', { name: 'Remove from library' })).toHaveCount(0);

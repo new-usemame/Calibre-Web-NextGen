@@ -12,6 +12,7 @@ import { apiPost, type Book, type AdvancedSearchParams, type Me } from '../lib/a
 import { useT } from '../lib/i18n';
 import styles from './AdvancedSearch.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
+import { selectedCustomColumns } from '../lib/customColumnDisplay';
 
 type ReadStatus = 'all' | 'read' | 'unread';
 
@@ -67,6 +68,7 @@ export function AdvancedSearch({ defaultFilter }: { defaultFilter?: AdvancedSear
   const accKeyRef = useRef<string>('');
 
   const { data, isFetching, isPlaceholderData, error } = useAdvancedSearch(submitted, page);
+  const customColumns = selectedCustomColumns(data?.custom_column_definitions, me);
 
   // Skip placeholder data: on a new search react-query briefly returns the
   // PREVIOUS result (placeholderData) under the new key — acting on it would
@@ -253,7 +255,7 @@ export function AdvancedSearch({ defaultFilter }: { defaultFilter?: AdvancedSear
               <div className={styles.resultsGrid}>
                 {results.map((book, i) => (
                   <BookCard key={book.id} book={book} quickEdit={canEdit} canRead={!!me?.role?.viewer}
-                    hideActions={cardActionsHidden}
+                    hideActions={cardActionsHidden} customColumnDefinitions={customColumns}
                     style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }} />
                 ))}
               </div>

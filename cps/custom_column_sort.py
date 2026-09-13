@@ -212,3 +212,24 @@ def resolve_magic_shelf_sort(
         order_by,
         (model, db.Books.id == book_column),
     )
+
+
+def sortable_columns(columns: Iterable[Any], config) -> list[Any]:
+    """Compatibility view for catalog callers: live, admin-selected columns."""
+    return configured_columns(columns, config)
+
+
+def resolve(sort_param, config, columns=_COLUMNS_NOT_PROVIDED):
+    """Return the trusted direct model and ordering for a valid custom key.
+
+    Catalog and table consumers only need a custom result; built-in and invalid
+    keys deliberately return ``None`` so their existing sort maps remain in
+    control. The implementation delegates to the canonical Magic Shelf
+    resolver, keeping validation and SQL construction in one place.
+    """
+    if not isinstance(sort_param, str) or _CUSTOM_SORT_KEY.fullmatch(sort_param) is None:
+        return None
+    resolved = resolve_magic_shelf_sort(sort_param, config, columns)
+    if resolved.key != sort_param or not resolved.join:
+        return None
+    return resolved.join[0], list(resolved.order_by)

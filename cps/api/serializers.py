@@ -178,7 +178,7 @@ def cover_url_for(book, resolution, cover_override=None):
 
 
 def serialize_book_list_item(book, read=False, archived=False, hidden=False,
-                             in_progress=False, cover_override=None):
+                             in_progress=False, cover_override=None, custom_columns=None):
     series = book.series[0].name if getattr(book, "series", None) else None
     return {
         "id": book.id,
@@ -202,6 +202,10 @@ def serialize_book_list_item(book, read=False, archived=False, hidden=False,
         "in_progress": bool(in_progress),
         "archived": bool(archived),
         "hidden": bool(hidden),
+        # List endpoints send definitions once at the page level; this compact
+        # id -> values map lets cards and table rows show selected Calibre fields
+        # without paying for a detail request per book.
+        "custom_columns": custom_columns or {},
     }
 
 

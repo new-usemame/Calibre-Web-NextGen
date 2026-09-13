@@ -154,6 +154,12 @@ def test_a_second_run_spends_nothing_on_the_pages_already_paid_for(tmp_path):
     assert second.outcomes[1].cost_usd == 0.0
     assert second.reused == 1
 
+    totals = book.totals()
+
+    assert totals["reused"] == 1, totals
+    assert totals["calls"] == 1, "the cached page was counted as a second call"
+    assert totals["pages"] == 1, totals
+
 
 def test_a_changed_prompt_invalidates_what_was_cached(tmp_path, monkeypatch):
     """A cached answer belongs to the question that produced it. Answering a new

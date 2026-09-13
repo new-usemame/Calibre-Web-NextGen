@@ -293,11 +293,23 @@ def _scope_ids(html, pno):
     return html
 
 
+def page_anchor(pno):
+    """The EPUB 3 page-break marker for one PDF page.
+
+    It earns its place twice: a reader can show "page 97 of 698" against the print,
+    and the about page has somewhere to send a reader who wants to look at an
+    uncertain reading in context. The label is the PDF's own page number, which is
+    not always the folio printed on the paper.
+    """
+    return ('<span epub:type="pagebreak" role="doc-pagebreak" id="pg_%04d" '
+            'class="reflow-page" aria-label="%d"></span>' % (pno, pno + 1))
+
+
 def _page_blocks(page_html):
     pages = []
     for pno in sorted(page_html):
         blocks = split_blocks(_scope_ids(page_html[pno] or "", pno))
-        pages.append({"pno": pno,
+        pages.append({"pno": pno, "anchor": page_anchor(pno),
                       "body": [b for b in blocks if not _is_aside(b)],
                       "asides": [b for b in blocks if _is_aside(b)]})
     return pages
@@ -330,15 +342,21 @@ def _chapters(pages):
         return chapter
 
     for page in pages:
+        # The page marker waits for the block it belongs to, so a page that opens a
+        # chapter puts its marker in the new document and not the previous one.
+        pending = page["anchor"]
         for block in page["body"] + page["asides"]:
             heading = _SPLIT_HEADING.match(block)
             if heading or current is None or len(current.blocks) >= MAX_BLOCKS_PER_DOC:
-                title = block_text(block) if heading else ""
-                if current is not None and not heading and not _is_paragraph(block):
-                    # Never start a document on a stray aside or figure.
-                    pass
-                current = start(title)
+                current = start(block_text(block) if heading else "")
+            if pending:
+                current.blocks.append(pending)
+                pending = None
             current.blocks.append(block)
+            if page["pno"] not in current.pages:
+                current.pages.append(page["pno"])
+        if pending and current is not None:
+            current.blocks.append(pending)
             if page["pno"] not in current.pages:
                 current.pages.append(page["pno"])
     for chapter in chapters:
@@ -542,6 +560,9 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     spine = []
     documents = {}
 
+    if callable(report_html):
+        where = {pno: chapter.href for chapter in chapters for pno in chapter.pages}
+        report_html = report_html(where)
     if report_html:
         documents[ABOUT_HREF] = _document("About this conversion", report_html, language)
         manifest.append({"id": "reflow-about", "href": ABOUT_HREF,

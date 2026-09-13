@@ -372,3 +372,55 @@ def test_every_kind_of_page_is_written_as_the_page_printed_it(builder):
                                                build_epub.page_fragment(book, pno))
         assert verdict.verdict in ("PASS", "NOT_APPLICABLE"), \
             (pno, verdict.as_dict())
+
+
+# ---------------------------------------------------------------- page markers
+
+def test_every_page_of_the_pdf_is_marked_once_in_the_book(tmp_path):
+    """EPUB 3 page markers let a reader show "page 97 of 698" against the print, and
+    give the about page somewhere to send a reader who wants to see an uncertain
+    reading in its context. A duplicate marker makes both ambiguous."""
+    book = _book(lambda d: F.chapter_opening_page(d, "Chapter One"),
+                 F.defect_c_page, F.prose_page)
+
+    result = _build(book, tmp_path)
+
+    with zipfile.ZipFile(result.path) as zf:
+        body = "".join(_body(zf, n) for n in _content_names(zf))
+    markers = re.findall(r'id="(pg_\d+)"', body)
+
+    assert sorted(markers) == ["pg_0000", "pg_0001", "pg_0002"], markers
+
+
+def test_the_marker_for_a_page_that_opens_a_chapter_is_in_that_chapter(tmp_path):
+    """Left in the previous document, every link for that page lands at the end of
+    the chapter before it."""
+    book = _book(F.prose_page,
+                 lambda d: F.chapter_opening_page(d, "Chapter Two", folio="45"))
+
+    result = _build(book, tmp_path)
+
+    with zipfile.ZipFile(result.path) as zf:
+        holder = [n for n in _content_names(zf) if 'id="pg_0001"' in _body(zf, n)]
+        assert len(holder) == 1, holder
+        assert "Chapter Two" in _body(zf, holder[0])
+
+
+def test_the_about_page_is_written_once_the_pages_have_somewhere_to_live(tmp_path):
+    """The report wants to link to a page, and which document a page ends up in is
+    only known after the split. So the report is asked for last, with the answer."""
+    book = _book(F.prose_page,
+                 lambda d: F.chapter_opening_page(d, "Chapter Two", folio="45"))
+    seen = {}
+
+    def write_about(where):
+        seen.update(where)
+        return ('<h1>About this conversion</h1>'
+                '<p><a href="%s#pg_0001">the second page</a></p>' % where[1])
+
+    result = _build(book, tmp_path, report_html=write_about)
+
+    assert set(seen) == {0, 1}, seen
+    with zipfile.ZipFile(result.path) as zf:
+        about = zf.read("OEBPS/reflow-about.xhtml").decode("utf-8")
+    assert 'href="%s#pg_0001"' % seen[1] in about, about

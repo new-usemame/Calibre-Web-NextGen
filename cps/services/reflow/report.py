@@ -1,0 +1,303 @@
+# -*- coding: utf-8 -*-
+# Calibre-Web Automated – fork of Calibre-Web
+# Copyright (C) 2024-2026 Calibre-Web-NextGen contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# See CONTRIBUTORS for full list of authors.
+
+"""Stage 6: what the book says about how it was made.
+
+A conversion nobody can audit is one the reader has to take on trust, and this one
+used a language model. So the page is written to be true in the directions that do
+not flatter it: it names the pages the gate refused, it says when no model ran
+rather than reporting a clean sweep, and it says how much of the book a stopped run
+never reached.
+
+``numbers()`` is the single source of both the page and the JSON twin, and
+``check_completion()`` (SPEC §6 G4) refuses to let either ship while they disagree
+with the ledger. A report that can drift from its own evidence reads exactly like
+one that cannot, which is what makes the drift worth a gate.
+"""
+
+import re
+from datetime import datetime, timezone
+from xml.sax.saxutils import escape
+
+from .build_epub import CONVERTER, CONVERTER_VERSION
+
+#: Hundreds of uncertain readings on a bad scan is normal. A page that prints all of
+#: them is a page nobody reads; the total is the number that means something.
+MAX_UNCERTAIN_LISTED = 10
+MAX_FONTS_LISTED = 6
+MAX_REPAIRS_LISTED = 8
+
+STATEMENT = "No wording was changed by this conversion."
+
+_TABLE = re.compile(r"<table\b", re.I)
+_BLOCKQUOTE = re.compile(r"<blockquote\b", re.I)
+
+STOP_REASONS = {
+    "cost_cap": "The conversion stopped when it reached its cost cap.",
+    "cancelled": "The conversion was cancelled before every page was reviewed.",
+    "not_configured": "No model was configured, so no page was reviewed.",
+}
+
+
+def numbers(result, ledger=None, client=None):
+    """Everything the about page says, as data. The JSON twin is this, verbatim."""
+    book = result.book
+    outcomes = list(result.outcomes.values())
+    adopted = [o for o in outcomes if o.source == "model"]
+    refused = [o for o in outcomes if o.gate in ("FAIL", "NOT_APPLICABLE")]
+    answered = [o for o in outcomes if o.gate]
+    uncertain = [dict(span, page=span.get("page", o.pno))
+                 for o in outcomes for span in (o.uncertain or [])]
+
+    described = client.describe() if client is not None and hasattr(client, "describe") \
+        else {}
+    model_id = described.get("model") or next((o.model for o in answered if o.model), "")
+
+    markup = "\n".join(result.page_html.values())
+    stats = dict(book.stats or {}) if book is not None else {}
+    totals = ledger.totals() if ledger is not None else {}
+
+    payload = {
+        "converter": CONVERTER,
+        "converter_version": CONVERTER_VERSION,
+        "generated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+        "source": _source(result),
+        "fidelity": {
+            "pages": len(result.page_html),
+            "pages_deterministic": len(result.page_html) - len(adopted),
+            "pages_model": len(adopted),
+            "pages_routed": len(result.routed),
+            "pages_reviewed": len(answered),
+            "pages_routed_not_reviewed": max(0, len(result.routed) - len(answered)),
+            "uncertain_total": len(uncertain),
+            "uncertain": uncertain[:MAX_UNCERTAIN_LISTED],
+            "conservation": (book.conservation.to_dict()
+                             if book is not None and book.conservation else None),
+        },
+        "model": {
+            "used": bool(answered),
+            "model": model_id,
+            "tier": described.get("tier", ""),
+            "prompt_version": described.get("prompt_version", ""),
+            "structure_only": True,
+            "pages_sent": len(answered),
+            "pages_adopted": len(adopted),
+            "pages_refused": len(refused),
+            "pages_reused": sum(1 for o in answered if o.cached),
+        },
+        "structure": {
+            "headings": stats.get("headings", 0),
+            "footnotes": stats.get("notes", 0),
+            "footnotes_unmarked": stats.get("notes_unmarked", 0),
+            "figures": stats.get("figures", 0),
+            "tables": len(_TABLE.findall(markup)),
+            "blockquotes": len(_BLOCKQUOTE.findall(markup)),
+            "page_joins": stats.get("page_joins", 0),
+            "page_joins_refused": stats.get("page_joins_refused", 0),
+            "repairs": stats.get("repairs", 0),
+            "repairs_listed": [r.to_dict() for r in (book.repairs or [])[:MAX_REPAIRS_LISTED]]
+            if book is not None else [],
+        },
+        "routing": dict(result.routing or {}),
+        "spend": {
+            "usd": round(result.spend_usd, 6),
+            "cap_usd": totals.get("cap_usd"),
+            "calls": totals.get("calls", 0),
+            "reused": totals.get("reused", 0),
+            "prompt_tokens": totals.get("prompt_tokens", 0),
+            "completion_tokens": totals.get("completion_tokens", 0),
+            "models": totals.get("models", {}),
+        },
+        "stopped": result.stopped,
+        "statement": STATEMENT,
+    }
+    payload["unplaced"] = _unplaced(payload, result)
+    return payload
+
+
+def _source(result):
+    assessment = result.assessment
+    if assessment is None:
+        return {"pages": len(result.page_html), "verdict": "", "verdict_plain": "",
+                "fonts": {}}
+    fonts = sorted((assessment.fonts or {}).items(), key=lambda kv: -kv[1])
+    return {
+        "pages": assessment.pages,
+        "verdict": assessment.verdict,
+        "verdict_plain": assessment.describe(),
+        "layer_is_trusted": assessment.layer_is_trusted,
+        "median_chars": round(assessment.median_chars, 1),
+        "prose_share": round(assessment.prose_share, 4),
+        "scan_share": round(assessment.scan_share, 4),
+        "drawings": assessment.drawings_total,
+        "fonts": dict(fonts[:MAX_FONTS_LISTED]),
+    }
+
+
+def _unplaced(payload, result):
+    """What the conversion could not do, in the reader's terms rather than ours."""
+    out = []
+    structure = payload["structure"]
+    if structure["footnotes_unmarked"]:
+        out.append("%d footnotes are printed in the book but no marker for them was "
+                   "found in the text; they are kept with the page they were printed "
+                   "on." % structure["footnotes_unmarked"])
+    if structure["page_joins_refused"]:
+        out.append("%d paragraphs that may run over a page turn were left as two "
+                   "paragraphs rather than joined on a guess."
+                   % structure["page_joins_refused"])
+    columns = (payload["routing"].get("reasons") or {}).get("multi_column")
+    if columns:
+        out.append("%d pages look set in columns. The text is kept in the order the "
+                   "page stored it and is not re-ordered into column order." % columns)
+    conservation = payload["fidelity"]["conservation"]
+    if conservation and not conservation.get("ok"):
+        out.append("%d words of the source did not reach the finished book."
+                   % len(conservation.get("missing") or []))
+    return out
+
+
+# ------------------------------------------------------------------------- G4
+
+def check_completion(payload, ledger):
+    """G4: the report's numbers are the ledger's numbers, or nothing ships."""
+    problems = []
+    if ledger is None:
+        return problems
+    totals = ledger.totals()
+    gate = totals.get("gate") or {}
+    model = payload.get("model") or {}
+    spend = payload.get("spend") or {}
+
+    checks = [
+        ("pages sent", model.get("pages_sent"), totals.get("pages")),
+        ("pages adopted", model.get("pages_adopted"), gate.get("PASS", 0)),
+        ("pages refused", model.get("pages_refused"),
+         gate.get("FAIL", 0) + gate.get("NOT_APPLICABLE", 0)),
+    ]
+    for label, reported, recorded in checks:
+        if reported != recorded:
+            problems.append("%s: the report says %s and the ledger says %s"
+                            % (label, reported, recorded))
+    if round(float(spend.get("usd") or 0.0), 6) != round(totals.get("spend_usd", 0.0), 6):
+        problems.append("spend: the report says %s and the ledger says %s"
+                        % (spend.get("usd"), totals.get("spend_usd")))
+    return problems
+
+
+# -------------------------------------------------------------------- the page
+
+def about_page(payload, show_cost=False, links=None):
+    """The XHTML body of ``reflow-about.xhtml``, in plain language."""
+    links = links or {}
+    out = ["<h1>About this conversion</h1>",
+           "<p>This book was made from a PDF by %s %s on %s. %s</p>"
+           % (escape(CONVERTER), escape(CONVERTER_VERSION),
+              escape(payload.get("generated", "")), escape(STATEMENT))]
+
+    out.append("<h2>The PDF this came from</h2>")
+    source = payload["source"]
+    out.append("<p>%s pages. %s</p>" % (source.get("pages", 0),
+                                        escape(source.get("verdict_plain", ""))))
+    if source.get("fonts"):
+        out.append("<p>Type seen on the page: %s.</p>"
+                   % escape(", ".join(sorted(source["fonts"]))))
+
+    out.extend(_fidelity_section(payload))
+    out.extend(_structure_section(payload))
+    if payload.get("unplaced"):
+        out.append("<h2>What could not be placed</h2><ul>%s</ul>"
+                   % "".join("<li>%s</li>" % escape(item)
+                             for item in payload["unplaced"]))
+    out.extend(_uncertain_section(payload, links))
+    if show_cost:
+        out.extend(_spend_section(payload))
+    return "\n".join(out)
+
+
+def _fidelity_section(payload):
+    fidelity = payload["fidelity"]
+    model = payload["model"]
+    out = ["<h2>How faithful this is</h2>"]
+
+    if not model["used"]:
+        out.append("<p>No model was used: every page here is the converter's own "
+                   "reading of the PDF, and no page was reviewed by a model.</p>")
+    else:
+        out.append(
+            "<p>%d of %d pages were sent to a model to have their structure read. "
+            "%d came back word-for-word identical to the page and were used; %d were "
+            "refused by the word-preservation check and the converter's own reading "
+            "was kept instead.</p>"
+            % (model["pages_sent"], fidelity["pages"], model["pages_adopted"],
+               model["pages_refused"]))
+        out.append("<p>The model was asked only to mark up structure. Every answer "
+                   "is compared with the page word by word, and any answer that adds, "
+                   "drops or re-capitalises a word is thrown away.</p>")
+
+    if fidelity["pages_routed_not_reviewed"]:
+        out.append("<p>%d pages the converter wanted a second opinion on were never "
+                   "reviewed. %s</p>"
+                   % (fidelity["pages_routed_not_reviewed"],
+                      escape(STOP_REASONS.get(payload.get("stopped") or "",
+                                              "The run ended first."))))
+    conservation = fidelity.get("conservation")
+    if conservation:
+        out.append("<p>Word check: %s of %s words of the PDF's text are in this book.</p>"
+                   % (conservation.get("output_total"), conservation.get("source_total")))
+    return out
+
+
+def _structure_section(payload):
+    structure = payload["structure"]
+    rows = [("Headings", structure["headings"]),
+            ("Footnotes", structure["footnotes"]),
+            ("Figures", structure["figures"]),
+            ("Tables", structure["tables"]),
+            ("Block quotations", structure["blockquotes"]),
+            ("Paragraphs rejoined across a page turn", structure["page_joins"]),
+            ("Damaged footnote numbers read from the page", structure["repairs"])]
+    body = "".join("<tr><td>%s</td><td>%s</td></tr>" % (escape(label), value)
+                   for label, value in rows)
+    return ["<h2>What was recovered</h2>",
+            "<table><tbody>%s</tbody></table>" % body]
+
+
+def _uncertain_section(payload, links):
+    fidelity = payload["fidelity"]
+    if not fidelity["uncertain_total"]:
+        return []
+    out = ["<h2>Readings worth checking</h2>",
+           "<p>%d places were marked uncertain%s.</p>"
+           % (fidelity["uncertain_total"],
+              "; the first %d are listed here" % len(fidelity["uncertain"])
+              if fidelity["uncertain_total"] > len(fidelity["uncertain"]) else "")]
+    items = []
+    for span in fidelity["uncertain"]:
+        text = escape(str(span.get("text") or span.get("reading") or ""))
+        page = span.get("page")
+        href = links.get(page)
+        label = "page %s" % ((page or 0) + 1)
+        where = ('<a href="%s#pg_%04d">%s</a>' % (escape(href), int(page), label)
+                 if href is not None and page is not None else label)
+        alternatives = span.get("alternatives") or []
+        also = (" (also read as %s)" % escape(", ".join(str(a) for a in alternatives))
+                if alternatives else "")
+        items.append("<li>%s: %s%s</li>" % (where, text, also))
+    out.append("<ul>%s</ul>" % "".join(items))
+    return out
+
+
+def _spend_section(payload):
+    spend = payload["spend"]
+    out = ["<h2>What this cost</h2>",
+           "<p>$%.4f in model calls over %d pages.</p>"
+           % (spend["usd"], spend["calls"])]
+    if payload["model"]["model"]:
+        out.append("<p>Model: %s. Prompt version: %s.</p>"
+                   % (escape(payload["model"]["model"]),
+                      escape(payload["model"]["prompt_version"] or "n/a")))
+    return out

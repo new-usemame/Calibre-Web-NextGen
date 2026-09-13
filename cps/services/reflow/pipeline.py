@@ -237,7 +237,7 @@ def _edit_one_page(doc, book, pno, client, ledger, cache, result, ladder,
         result.reused += 1
         _adopt(result, book, pno, outcome, cached.get("html") or "",
                cached.get("uncertain") or [], ladder, require_figure_caption,
-               ledger=None, cost=0.0)
+               ledger=ledger, cost=0.0, cached=True)
         return outcome
 
     image = _raster(doc, pno)
@@ -258,7 +258,8 @@ def _edit_one_page(doc, book, pno, client, ledger, cache, result, ladder,
 
 
 def _adopt(result, book, pno, outcome, html, uncertain, ladder,
-           require_figure_caption, ledger=None, cost=0.0, answer=None):
+           require_figure_caption, ledger=None, cost=0.0, answer=None,
+           cached=False):
     """Take the model's page only if it still says what the page said."""
     source_text = assemble.page_source_text(book, pno)
     words = gate.check_word_preservation(source_text, html)
@@ -278,6 +279,7 @@ def _adopt(result, book, pno, outcome, html, uncertain, ladder,
 
     if ledger is not None:
         entry = {"kind": "page", "page": pno, "cost_usd": cost,
+                 "cached": bool(cached),
                  "gate": outcome.gate, "model": outcome.model,
                  "reasons": outcome.reasons, "gate_reasons": outcome.gate_reasons,
                  "similarity": round(words.similarity, 4),

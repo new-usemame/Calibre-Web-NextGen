@@ -88,9 +88,15 @@ class Ledger(object):
     def totals(self):
         gate = Counter(e.get("gate") for e in self._entries if e.get("gate"))
         models = Counter(e.get("model") for e in self._entries if e.get("model"))
-        calls = sum(1 for e in self._entries if e.get("cost_usd") is not None)
+        # A page served from the cache is evidence and belongs in the file, but it
+        # is not a call: counting it would make a resumed job look like it spent
+        # again at $0.00 a page.
+        calls = sum(1 for e in self._entries
+                    if e.get("cost_usd") is not None and not e.get("cached"))
+        reused = sum(1 for e in self._entries if e.get("cached"))
         return {
             "calls": calls,
+            "reused": reused,
             "spend_usd": self.spent(),
             "cap_usd": self.cap_usd,
             "remaining_usd": self.remaining(),

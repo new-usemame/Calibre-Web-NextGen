@@ -16,6 +16,7 @@ geometry stage 2 needs.
 """
 
 import io
+import os
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -315,12 +316,31 @@ def crop_jpeg(doc, pno, rect, scale=2.0, quality=85):
 
 
 def document_fingerprint(source):
-    """SHA-256 of the PDF bytes: the stable half of the per-page cache key."""
+    """SHA-256 of the PDF: the stable half of the per-page cache key.
+
+    A path or bytes is hashed as it stands. An already-open document is hashed
+    through the file it was opened from when it has one, and otherwise through what
+    it contains -- MEASURED: ``Document.tobytes()`` embeds a fresh document id on
+    every call, so hashing that would produce a different key each run and a cache
+    that never once hit.
+    """
     import hashlib
 
     digest = hashlib.sha256()
     if isinstance(source, (bytes, bytearray)):
         digest.update(source)
+        return digest.hexdigest()
+    if hasattr(source, "page_count"):
+        name = getattr(source, "name", None)
+        if name and os.path.exists(name):
+            return document_fingerprint(name)
+        digest.update(b"reflow-memory-document\x00")
+        for pno in range(source.page_count):
+            page = source[pno]
+            digest.update(("%.2f,%.2f\x00" % (page.rect.width,
+                                              page.rect.height)).encode("ascii"))
+            digest.update(page.get_text().encode("utf-8", "replace"))
+            digest.update(b"\x00")
         return digest.hexdigest()
     with open(source, "rb") as handle:
         for chunk in iter(lambda: handle.read(1 << 20), b""):

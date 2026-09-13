@@ -110,3 +110,51 @@ def test_the_conservation_check_can_actually_fail():
 
     assert not report.ok
     assert report.missing
+
+
+class TestOcrDamagedNoteNumbers(object):
+    """The note's own number can be damaged exactly like the marker that points at it.
+
+    MEASURED on the acceptance book: 39 pages carry note numbers that do not ascend —
+    ``[8, 9, 1, 11, 12, 13]``, ``[96, 97, 98, 99, 1, 101]``, ``[277, 278, 279, 288,
+    281]``. Each is a printed number the OCR truncated or substituted a digit in.
+    Repairing one is only allowed when the page itself proves the answer: exactly one
+    number fits between its neighbours, and the damaged text is one edit away from it.
+    """
+
+    def test_a_note_number_the_ocr_broke_is_repaired_from_its_neighbours(self):
+        book = _book(F.broken_note_number_page)
+
+        assert sorted(n.num for n in book.notes) == [9, 10, 11]
+        assert [n.num for n in book.notes if n.marked] == [10]
+        assert any(r.kind == "note_number" for r in book.repairs), book.repairs
+
+    def test_the_repair_says_what_it_changed_and_why(self):
+        book = _book(F.broken_note_number_page)
+        repair = [r for r in book.repairs if r.kind == "note_number"][0]
+
+        assert "1" in repair.detail and "10" in repair.detail, repair.detail
+
+    def test_a_note_number_is_left_alone_when_more_than_one_number_would_fit(self):
+        """The control. Between 9 and 13 the broken ``1`` could be 10, 11 or 12, and
+        nothing on the page decides between them. A converter that picks one is
+        inventing a citation."""
+        book = _book(F.ambiguous_note_number_page)
+
+        assert sorted(n.num for n in book.notes) == [1, 9, 13]
+        assert not any(r.kind == "note_number" for r in book.repairs)
+        assert "note_marker_mismatch" in book.page_reasons(0)
+
+
+def test_a_word_broken_across_two_lines_of_a_footnote_is_put_back_together():
+    """MEASURED on the acceptance book: five words survive the body text and are lost
+    inside footnotes -- ``non-standard``, ``hour-priests``, ``astrologer-bashing`` --
+    because a note's text was assembled by joining its lines and the body's was not.
+    The conservation check is what found them, which is the whole reason it counts
+    the side channels rather than forgiving them."""
+    book = _book(F.hyphenated_note_page)
+    note = [n for n in book.notes if n.num == 31][0]
+
+    assert "non-standard" in note.text or "nonstandard" in note.text, note.text
+    assert "non- standard" not in note.text
+    assert book.conservation.ok, (book.conservation.missing, book.conservation.added)

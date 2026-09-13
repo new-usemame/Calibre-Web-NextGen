@@ -41,6 +41,42 @@ _ROMAN = "tiro"
 _BOLD = "tibo"
 
 
+#: A real typeset page of this book runs to about 40 lines and 2,700 characters
+#: (MEASURED: median 2701 over every seventh page of the acceptance book, p10 1127).
+#: A seven-line stand-in is a thin page and would be classified as one, correctly —
+#: so a fixture that stands in for an ordinary page has to be an ordinary page.
+PROSE_LINES = [
+    "The astrologers of this period were not in agreement about the",
+    "question, and it is for that reason that we have to be careful when",
+    "we read the later compilations, because they often preserve more",
+    "than one view of what the doctrine was and how it should be used.",
+    "This is the point that has been made by a number of scholars who",
+    "have looked at the transmission of the texts in some detail, and it",
+    "is one of the things that will be taken up again in a later chapter.",
+    "What we can say with some confidence is that the material which",
+    "came into Greek from the older traditions of Mesopotamia was not",
+    "taken over without change, and that the writers who worked with",
+    "it were willing to set aside what did not fit the system they were",
+    "building. The result is a body of doctrine that looks unified on",
+    "the surface and turns out, when it is read closely, to be a record",
+    "of several centuries of argument about how the art should work.",
+    "There are places where the disagreement is stated openly, and the",
+    "reader is told that some of the older authorities held one view",
+    "while others held another; there are many more places where it has",
+    "been smoothed over by a compiler who had no interest in the",
+    "history of the question and only wanted a rule that could be",
+    "applied. It is the second kind of passage that causes the most",
+    "trouble, because nothing in the text itself tells us that a choice",
+    "was made at all, and we are left to infer it from what the other",
+    "sources say about the same doctrine. That is why the later Arabic",
+    "and Latin translations matter so much to this discussion, even",
+    "though they are far removed in time from the Greek originals: they",
+    "often preserve a version of the material that had gone out of use",
+    "in the tradition we can read directly, and they allow us to see",
+    "which of the two views a given compiler had decided to follow.",
+]
+
+
 def _put(page, x, y, text, size=BODY_SIZE, font=_ROMAN, rise=0.0):
     page.insert_text((x, y - rise), text, fontname=font, fontsize=size)
     return pymupdf.get_text_length(text, fontname=font, fontsize=size)
@@ -111,6 +147,100 @@ def add_notes(page, notes, top=NOTE_TOP):
         _put(page, x + 2, y, text, size=NOTE_TEXT_SIZE)
         y += 12.0
     return y
+
+
+def add_merged_notes(page, notes, top=NOTE_TOP):
+    """Footnotes whose raised number the OCR could not keep apart from the text.
+
+    MEASURED on the acceptance book: 138 footnotes on 70 pages open with a single
+    full-size ``24 Diodorus Siculus, ...`` span, because a 5.7pt raised digit beside
+    9.5pt text is below what the scanner's segmentation can separate. A reader that
+    only recognises the small standalone span leaves every one of them inline in the
+    body, which is the footnote defect this whole side channel exists to prevent.
+    """
+    y = top
+    for num, text in notes:
+        _put(page, LEFT + 4, y, "%d %s" % (num, text), size=NOTE_TEXT_SIZE)
+        y += 12.0
+    return y
+
+
+def add_display_line(page, text, y=120.0, size=22.0):
+    """One line of display type, as a title page carries it."""
+    _put(page, LEFT, y, text, size=size, font=_BOLD)
+    return page
+
+
+def chapter_opening_page(doc, title, folio="31", size=16.0):
+    """A chapter opening: the title in chapter type over its first paragraph."""
+    page = add_page(doc)
+    add_running_head(page, folio, "CHAPTER 2: ORIGINS OF HELLENISTIC ASTROLOGY")
+    _put(page, LEFT, BODY_TOP, title, size=size, font=_BOLD)
+    add_body_lines(page, PROSE_LINES[:12], top=BODY_TOP + 24.0)
+    return page
+
+
+def section_heading_page(doc, title, folio="32", size=13.0):
+    """A section heading: the next step down the ladder, used far more often."""
+    page = add_page(doc)
+    add_running_head(page, folio, "CHAPTER 2: ORIGINS OF HELLENISTIC ASTROLOGY")
+    _put(page, LEFT, BODY_TOP, title, size=size, font=_BOLD)
+    add_body_lines(page, PROSE_LINES[:12], top=BODY_TOP + 20.0)
+    return page
+
+
+def title_page(doc):
+    """The one page in a book set in display type, and the one that must not be
+    allowed to define the heading ladder: nothing on it is a heading level."""
+    page = add_page(doc)
+    add_display_line(page, "HELLENISTIC ASTROLOGY", y=200.0, size=22.7)
+    add_display_line(page, "The Study of Fate and Fortune", y=240.0, size=21.0)
+    add_display_line(page, "CHRIS BRENNAN", y=320.0, size=13.8)
+    return page
+
+
+def merged_note_number_page(doc):
+    """Page 46 of book 567: three footnotes, one of whose numbers merged into text."""
+    page = add_page(doc)
+    add_running_head(page, "20", "CHAPTER 2: ORIGINS OF HELLENISTIC ASTROLOGY")
+    y = add_body_lines(page, PROSE_LINES[:8])
+    y = add_line_with_marker(page, y, "the account is given by Diodorus", "24",
+                             " and repeated later", superscript=True)
+    add_merged_notes(page, [
+        (24, "Diodorus Siculus, Library of History, 17: 112, trans. Oldfather."),
+        (25, "Cramer, Astrology in Roman Law, p. 58."),
+    ])
+    return page
+
+
+def broken_note_number_page(doc):
+    """Page 29 of book 567: the note numbered 10 came back from the OCR as ``1``.
+
+    Its neighbours are 9 and 11, the body carries a marker for 10, and no other
+    number fits the gap. Everything needed to repair it is on the page; guessing is
+    not required and is not allowed.
+    """
+    page = add_page(doc)
+    add_running_head(page, "3", "CHAPTER 1: ASTROLOGY IN MESOPOTAMIA AND EGYPT")
+    y = add_body_lines(page, PROSE_LINES[:6])
+    y = add_line_with_marker(page, y, "the Diaries were continued", "10",
+                             " for several centuries", superscript=True)
+    add_notes(page, [(9, "Rochberg, The Heavenly Writing, p. 44."),
+                     (1, "Parker, A Vienna Demotic Papyrus, p. 12."),
+                     (11, "Pingree, From Astral Omens to Astrology, p. 26.")])
+    return page
+
+
+def ambiguous_note_number_page(doc):
+    """The same damage with a wider gap: 9, then ``1``, then 13. The broken number
+    could be 10, 11 or 12 and nothing on the page decides between them."""
+    page = add_page(doc)
+    add_running_head(page, "4", "CHAPTER 1: ASTROLOGY IN MESOPOTAMIA AND EGYPT")
+    add_body_lines(page, PROSE_LINES[:6])
+    add_notes(page, [(9, "Rochberg, The Heavenly Writing, p. 44."),
+                     (1, "Parker, A Vienna Demotic Papyrus, p. 12."),
+                     (13, "Pingree, From Astral Omens to Astrology, p. 26.")])
+    return page
 
 
 def defect_a_page(doc):
@@ -321,6 +451,28 @@ def hyphenated_page(doc):
     return page
 
 
+def hyphenated_note_page(doc):
+    """A footnote whose own text breaks a word across its two lines.
+
+    Page 504 of book 567: ``...since it is a non-`` / ``standard view. There is...``,
+    printed inside the note and not in the body above it.
+    """
+    page = add_page(doc)
+    add_running_head(page, "478", "CHAPTER 12: THE ANTHOLOGY OF VETTIUS VALENS")
+    y = add_body_lines(page, PROSE_LINES[:8])
+    add_line_with_marker(page, y, "the remark is made in passing", "31",
+                         " and not developed", superscript=True)
+    y = NOTE_TOP
+    x = LEFT + 4
+    x += _put(page, x, y, "31", size=NOTE_NUM_SIZE)
+    _put(page, x + 2, y, "It is not clear why Valens makes this remark, since it is a non-",
+         size=NOTE_TEXT_SIZE)
+    _put(page, LEFT + 4, y + 12.0,
+         "standard view. There is also still a considerable debate about it.",
+         size=NOTE_TEXT_SIZE)
+    return page
+
+
 def image_only_page(doc, png_bytes):
     """A page that is nothing but a raster: no text layer at all."""
     page = add_page(doc)
@@ -333,3 +485,146 @@ def solid_png(width=60, height=80, colour=(20, 20, 20)):
     pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, width, height), False)
     pix.set_rect(pix.irect, colour)
     return pix.tobytes("png")
+
+
+#: Lowercase, word-shaped, and not English: what a bad OCR pass leaves on a page of
+#: foxed type. A character counter sees a full page of text. A word counter sees a
+#: full page of words. Only the *common* words are missing, which is the one signal
+#: that separates a text layer worth having from one that has to be thrown away.
+GARBAGE_LINES = [
+    "aenlm rtoiu cdhes ngiol rtaem uqsli pnoew mtchi rvael",
+    "sdlku ngtae rmoib phlcs evtam nrsiq dolge twhca pmrei",
+    "ltnoa csdue rmigh pwtal ensvo bdrik mcuqa sltep rnaiv",
+    "gtoem rslnc adpui hwtem ovlsa rnbit qcdes muplo rtiaw",
+    "elsnr tohca pmiqd ugvel rnsat bcloi wtpme adsru nlogh",
+    "crtem plwua sgdoi nvtea rlbam qcish potwe unldr gmsea",
+    "trnol asvic pduem bghwa rlseo tqnim cdpav wtuel rngba",
+    "moish rctpa elgnv wdsua rtlem bcoqi nphes atvug rmodl",
+    "swcta prnei ulmgo hdbar vtlse qcnip amteo rwugd lhnsc",
+    "bitre mplao cvnud gwsha rtoel mqbin adlur pctev snigo",
+]
+
+
+def garbage_text_page(doc):
+    """A text layer that is pure noise — the shape a bad OCR pass leaves behind.
+
+    Every character counter reports a full page of content here, and so does every
+    word counter. Only the common English words are absent, which is why the census
+    counts *those* rather than characters.
+    """
+    page = add_page(doc)
+    y = BODY_TOP
+    for line in GARBAGE_LINES * 3:
+        _put(page, LEFT, y, line, size=BODY_SIZE)
+        y += BODY_LEADING
+    return page
+
+
+def ocr_scan_page(doc, png_bytes, head="ANUBIO (FIRST CENTURY CE?)"):
+    """A photograph of a page with a readable OCR text layer over it.
+
+    This is the shape of the acceptance book, and the reason OCR_LAYER is its own
+    verdict: the words are there and usable, but every structural signal a born-
+    digital PDF would carry — font names, sizes, vector rules — is gone with the ink.
+    """
+    page = add_page(doc)
+    page.insert_image(pymupdf.Rect(0, 0, PAGE_W, PAGE_H), stream=png_bytes)
+    add_running_head(page, "97", head)
+    add_body_lines(page, PROSE_LINES)
+    return page
+
+
+def prose_page(doc, marker=None):
+    """An ordinary page of prose: enough common words to read as real text."""
+    page = add_page(doc)
+    add_running_head(page, "97", "ANUBIO (FIRST CENTURY CE?)")
+    add_body_lines(page, PROSE_LINES)
+    if marker is not None:
+        add_notes(page, [(marker, "Pingree, From Astral Omens to Astrology, p. 26.")])
+    return page
+
+
+def thin_page(doc):
+    """Seven lines on a page: a sparse scan, or two printed pages photographed as one.
+
+    Not a defect — but the user has to be told, because a book of these converts to
+    an EPUB with a paragraph per page and the fault is in the PDF, not in Reflow.
+    """
+    page = add_page(doc)
+    add_running_head(page, "97", "ANUBIO (FIRST CENTURY CE?)")
+    add_body_lines(page, PROSE_LINES[:7])
+    return page
+
+
+def uncertain_join_pages(doc):
+    """A page turn where the punctuation and the capital disagree.
+
+    The tail page's last line carries no terminal punctuation, and the head page
+    opens on a capital. Either the printer dropped a full stop, or a sentence runs
+    on into a proper noun. The page image settles it and the text layer does not,
+    which is precisely the page turn worth paying a model to look at — and the
+    opposite of the defect-B turn, where the lowercase opening settles it for free.
+    """
+    tail = add_page(doc)
+    add_running_head(tail, "101", "ANUBIO (FIRST CENTURY CE?)")
+    add_body_lines(tail, PROSE_LINES[:12] + [
+        "one manuscript breaks off at this point and the leaf after it is blank",
+    ])
+
+    head = add_page(doc)
+    add_running_head(head, "102", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    add_body_lines(head, [
+        "Firmicus gives the same doctrine in a fuller form, and the",
+        "version he gives is the one that reached the Latin West.",
+    ] + PROSE_LINES[:10])
+    return tail, head
+
+
+def orphan_marker_page(doc):
+    """A marker printed on a page whose note is set somewhere else.
+
+    Real books do this whenever a long note overflows its page. The marker is
+    genuine; the note is simply not here. A converter that emits an EPUB footnote
+    link anyway ships a button that goes nowhere.
+    """
+    page = add_page(doc)
+    add_running_head(page, "98", "ANUBIO (FIRST CENTURY CE?)")
+    y = add_body_lines(page, PROSE_LINES[:10])
+    add_line_with_marker(page, y, "and the note for this passage is set overleaf",
+                         "204", ".", superscript=True)
+    return page
+
+
+def typographers_page(doc):
+    """Characters that are text on the page and markup in a file.
+
+    ``&``, ``<`` and ``>`` are set as type in plenty of books — an ampersand in a
+    publisher's name, angle brackets in an editorial insertion. Written into XHTML
+    unescaped they make a file no EPUB reader will open.
+    """
+    page = add_page(doc)
+    add_running_head(page, "99", "ANUBIO (FIRST CENTURY CE?)")
+    add_body_lines(page, [
+        "printed at the press of Hall & Fisher in the spring of that year,",
+        "with the editor's insertion <the text breaks off here> set in brackets",
+        "and the note \"cf. Ptolemy & Valens\" carried in the apparatus below.",
+    ] + PROSE_LINES[:10])
+    return page
+
+
+def mid_page_heading_page(doc, title="Serapio of Alexandria", folio="103"):
+    """A section heading that starts part way down a page which also sets notes.
+
+    The chapter split happens at the heading, so this one page's text lands in two
+    files while its footnotes stay in one of them. That is the case where a footnote
+    link has to name the file it points into and not only the fragment.
+    """
+    page = add_page(doc)
+    add_running_head(page, folio, "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    y = add_body_lines(page, PROSE_LINES[:6])
+    y = add_line_with_marker(page, y, "as Pingree observed in his own edition",
+                             "212", " of the text.")
+    _put(page, LEFT, y + 8.0, title, size=HEAD_SIZE, font=_BOLD)
+    add_body_lines(page, PROSE_LINES[6:16], top=y + 8.0 + BODY_LEADING)
+    add_notes(page, [(212, "Pingree, Yavanajataka, vol. 2, p. 441.")])
+    return page

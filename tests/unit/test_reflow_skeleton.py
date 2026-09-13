@@ -234,3 +234,93 @@ def test_a_body_size_digit_run_is_not_a_note_marker():
 
     assert not skeleton.is_marker_span(body, line_size=11.3)
     assert skeleton.is_marker_span(marker, line_size=11.3)
+
+
+class TestOcrDamagedFootnoteNumbers(object):
+    """The footnote's number is printed as a raised 5.7pt digit beside 9.5pt text.
+
+    Whether the scanner keeps that digit as its own span is a coin toss: MEASURED on
+    the acceptance book, 138 footnotes on 70 of 698 pages open with the number merged
+    into the first text span instead. Missing them does not lose the words — it
+    leaves the note inline in the body, which is the defect the side channel exists
+    to prevent, and it leaves the marker in the text pointing at nothing.
+    """
+
+    def test_a_footnote_whose_number_merged_into_its_text_is_still_a_footnote(self):
+        doc = F.new_doc()
+        F.merged_note_number_page(doc)
+        try:
+            raw = extract.read_pages(doc)
+            style = skeleton.book_style(raw)
+            skel = skeleton.page_skeleton(raw[0], style)
+        finally:
+            doc.close()
+
+        assert skel.note_numbers == [24, 25]
+        body = " ".join(region.text for region in skel.body_regions)
+        assert "Diodorus Siculus" not in body, "the note was left in the body text"
+
+    def test_a_note_zone_line_that_merely_starts_with_a_number_is_not_a_footnote(self):
+        """The control. Endnote-style entries, table rows and page-bottom debris all
+        begin with digits; only a digit run followed by the start of a sentence is
+        a footnote opening."""
+        doc = F.new_doc()
+        F.numbered_bibliography_page(doc)
+        try:
+            raw = extract.read_pages(doc)
+            style = skeleton.book_style(raw)
+            skel = skeleton.page_skeleton(raw[0], style)
+        finally:
+            doc.close()
+
+        assert skel.note_numbers == []
+
+
+class TestTheHeadingLadder(object):
+    """A heading level is a level because the book uses it more than once.
+
+    MEASURED on the acceptance book: the four largest type sizes are 47.8, 43.8, 40.9
+    and 35.1pt, each on exactly one page, all of them scanner debris on the cover. A
+    ladder built from the largest sizes puts every real heading below the bottom rung,
+    and the EPUB's table of contents comes out flat.
+    """
+
+    def test_one_off_display_type_does_not_define_a_heading_level(self):
+        doc = F.new_doc()
+        F.title_page(doc)
+        for index in range(4):
+            F.chapter_opening_page(doc, "CHAPTER %d" % (index + 1), folio=str(30 + index))
+        for index in range(6):
+            F.section_heading_page(doc, "The Hellenistic Period", folio=str(40 + index))
+        try:
+            raw = extract.read_pages(doc)
+            style = skeleton.book_style(raw)
+        finally:
+            doc.close()
+
+        assert style.ladder, "no ladder at all means every heading is level 1"
+        assert max(style.ladder) < 20.0, style.ladder
+        assert style.level_for(16.0) == 1, style.ladder
+        assert style.level_for(13.0) == 2, style.ladder
+
+    def test_type_larger_than_the_ladder_is_never_demoted_below_it(self):
+        """A size above every rung has to be level 1. Falling through to the bottom
+        would set a book's largest heading deeper than its smallest."""
+        style = skeleton.BookStyle(body_size=11.3, ladder=[15.7, 13.0], page_count=40)
+
+        assert style.level_for(30.0) == 1
+        assert style.level_for(15.8) == 1
+        assert style.level_for(13.1) == 2
+        assert style.level_for(11.9) == 3
+
+
+def test_a_scanner_page_label_outline_is_not_a_table_of_contents():
+    """MEASURED: book 567's PDF outline has 698 entries, titled ``Page 1`` through
+    ``Page 698``. Building the EPUB's navigation from it would produce a table of
+    contents with one meaningless entry per page and no chapters at all."""
+    labels = [{"level": 1, "title": "Page %d" % (n + 1), "pno": n} for n in range(40)]
+    real = [{"level": 1, "title": "Chapter 1: Astrology in Mesopotamia", "pno": 3},
+            {"level": 2, "title": "The Hellenistic Period", "pno": 11}]
+
+    assert not skeleton.outline_is_useful(labels)
+    assert skeleton.outline_is_useful(real)

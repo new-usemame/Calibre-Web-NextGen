@@ -1,0 +1,675 @@
+# -*- coding: utf-8 -*-
+# Calibre-Web Automated – fork of Calibre-Web
+# Copyright (C) 2024-2026 Calibre-Web-NextGen contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# See CONTRIBUTORS for full list of authors.
+
+"""Stage 5: the file a reader opens.
+
+The unit of work everywhere upstream is one page, because that is the unit a model
+can be shown and a gate can check. The unit a reader wants is a book, and the two
+differ in three places, which is most of what this module is.
+
+*A page is markup, not runs.* ``page_fragment`` renders one page the way the page was
+printed, and it is what the model is asked to improve and what its answer replaces.
+So the join across a page turn has to be made again here, on the markup, over
+whatever came back — deterministic text or a model's edit of it.
+
+*A footnote has to stay with its marker.* EPUB 3 shows a note as a popup only when
+the ``noteref`` resolves; a note number that repeats on another page would collide,
+so ids are scoped to their page as the book is assembled, and any link that ends up
+in a different document from its target is rewritten to name that document.
+
+*Nothing may be lost in the split.* Chapters exist so a 700-page book is not one
+XHTML file. Splitting is also the easiest place to drop a block, so the split moves
+blocks and never rewrites them.
+"""
+
+import json
+import logging
+import os
+import posixpath
+import re
+import shutil
+import subprocess
+import time
+import uuid
+import zipfile
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import List, Optional
+from xml.sax.saxutils import escape, quoteattr
+
+from . import assemble, extract
+
+log = logging.getLogger(__name__)
+
+CONVERTER = "Reflow"
+CONVERTER_VERSION = "1.0"
+REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
+SIDECAR_PATH = "META-INF/reflow.json"
+OEBPS = "OEBPS"
+ABOUT_HREF = "reflow-about.xhtml"
+
+#: Chapters split on the ladder's top two levels, per SPEC §3.
+SPLIT_LEVELS = (1, 2)
+#: A book with no headings at all still has to be split, or a reader repaginates the
+#: whole of it on every page turn.
+MAX_BLOCKS_PER_DOC = 300
+
+_VOID = frozenset({"img", "br", "hr", "meta", "link", "source", "col", "area"})
+_TOKEN = re.compile(r"<\s*(/?)\s*([A-Za-z][A-Za-z0-9]*)([^>]*?)(/?)\s*>", re.S)
+_SPLIT_HEADING = re.compile(r"^<h([%s])\b" % "".join(str(x) for x in SPLIT_LEVELS), re.I)
+_PARAGRAPH = re.compile(r"^<p[\s>]", re.I)
+_ASIDE = re.compile(r"^<aside[\s>]", re.I)
+_TAG = re.compile(r"<[^>]+>")
+_HEADING_TEXT = re.compile(r"<h[1-6][^>]*>(.*?)</h[1-6]>", re.I | re.S)
+_TRAILING_HYPHEN = re.compile(
+    r"(\w)[" + assemble.HYPHENS + r"](\s*(?:</[A-Za-z0-9]+>\s*)*)$")
+_ID = re.compile(r'\sid="([^"]+)"')
+_HREF = re.compile(r'href="#([^"]+)"')
+_IMG_SRC = re.compile(r'<img\b[^>]*\bsrc="([^"]+)"[^>]*/?>', re.I)
+_IMG_TAG = re.compile(r"<img\b[^>]*/?>", re.I)
+
+STYLESHEET = """\
+body { margin: 0 5%; line-height: 1.45; text-align: justify; }
+h1, h2, h3, h4, h5, h6 { text-align: left; page-break-after: avoid; }
+p { margin: 0; text-indent: 1.2em; }
+p.first, h1 + p, h2 + p, h3 + p, blockquote + p { text-indent: 0; }
+blockquote { margin: 1em 2em; font-size: 0.95em; }
+aside.footnote { font-size: 0.85em; margin: 0.4em 0; }
+a.noteref { text-decoration: none; }
+sup.noteref-unresolved { color: inherit; }
+figure { margin: 1em 0; text-align: center; page-break-inside: avoid; }
+figcaption { font-size: 0.85em; text-align: center; }
+img { max-width: 100%; }
+"""
+
+
+@dataclass
+class Chapter(object):
+    index: int
+    title: str
+    blocks: List[str] = field(default_factory=list)
+    pages: List[int] = field(default_factory=list)
+
+    @property
+    def href(self):
+        return "ch%03d.xhtml" % self.index
+
+    @property
+    def item_id(self):
+        return "ch%03d" % self.index
+
+
+@dataclass
+class BuildResult(object):
+    path: str = ""
+    chapters: List[dict] = field(default_factory=list)
+    notes: int = 0
+    figures: int = 0
+    images: int = 0
+    page_joins: int = 0
+    warnings: List[str] = field(default_factory=list)
+    sidecar: dict = field(default_factory=dict)
+    epubcheck: Optional[dict] = None
+
+
+# ------------------------------------------------------------------ one page
+
+def page_fragment(book, pno, style=None):
+    """One page as it was printed: the unit the model edits and the gate measures."""
+    elements = list(book.pages.get(pno) or [])
+    notes = [n for n in book.notes if n.pno == pno]
+    available = {str(n.num) for n in notes if n.num is not None}
+    ref_ids = {}
+    blocks = []
+    figure_index = 0
+
+    index = 0
+    while index < len(elements):
+        element = elements[index]
+        index += 1
+        if element.kind == "fig":
+            caption = ""
+            if index < len(elements) and elements[index].kind == "caption":
+                caption = _runs_html(elements[index].runs, available, ref_ids)
+                index += 1
+            blocks.append(_figure_html(pno, figure_index, caption))
+            figure_index += 1
+            continue
+        inner = _runs_html(element.runs, available, ref_ids)
+        if not inner.strip():
+            continue
+        if element.kind == "h":
+            level = min(6, max(1, int(element.level or 1)))
+            blocks.append("<h%d>%s</h%d>" % (level, inner, level))
+        elif element.kind == "caption":
+            blocks.append('<p class="caption">%s</p>' % inner)
+        else:
+            blocks.append("<p>%s</p>" % inner)
+
+    for note in notes:
+        blocks.append(_aside_html(note, ref_ids, available))
+    return "\n".join(blocks)
+
+
+def _runs_html(runs, available, ref_ids):
+    parts = []
+    for run in runs:
+        if run[0] == "t":
+            parts.append(escape(run[1]))
+            continue
+        number = str(run[1])
+        if number in available:
+            ref = "fnref_%s" % number
+            if number in ref_ids:
+                ref = "%s_%d" % (ref, len(ref_ids) + 1)
+            ref_ids.setdefault(number, ref)
+            parts.append('<a class="noteref" epub:type="noteref" id="%s" '
+                         'href="#fn_%s"><sup>%s</sup></a>'
+                         % (ref, number, escape(number)))
+        else:
+            # The note is set on another page, or was never found. A link here is a
+            # footnote button that opens nothing, so the marker stays a marker.
+            parts.append('<sup class="noteref-unresolved">%s</sup>' % escape(number))
+    return "".join(parts)
+
+
+def _aside_html(note, ref_ids, available):
+    body = escape(note.text)
+    if note.num is None:
+        return '<aside class="footnote" epub:type="footnote"><p>%s</p></aside>' % body
+    number = str(note.num)
+    label = escape(number)
+    if number in ref_ids:
+        label = '<a href="#%s">%s</a>' % (ref_ids[number], label)
+    return ('<aside class="footnote" epub:type="footnote" id="fn_%s">'
+            '<p>%s %s</p></aside>' % (number, label, body))
+
+
+def _figure_html(pno, index, caption):
+    src = "images/fig_p%04d_%d.jpg" % (pno, index)
+    # SPEC §3: a figure always carries a figcaption, empty when the page printed no
+    # caption, so "no caption found" is stated rather than left to be inferred.
+    return ('<figure><img src="%s" alt=""/><figcaption%s>%s</figcaption></figure>'
+            % (src, "" if caption else ' class="reflow-no-caption"', caption))
+
+
+# ------------------------------------------------------------- markup primitives
+
+def split_blocks(html):
+    """The top-level elements of a fragment, in order, as raw strings.
+
+    Text that is not inside an element is kept as its own block rather than dropped:
+    a model that answers with a bare sentence between two paragraphs has made a
+    mistake the gate should judge, not one this splitter should hide.
+    """
+    blocks = []
+    depth = 0
+    start = None
+    cursor = 0
+
+    def flush_text(upto):
+        text = html[cursor:upto]
+        if text.strip():
+            blocks.append(text.strip())
+
+    for match in _TOKEN.finditer(html):
+        closing, name, _attrs, selfclose = match.groups()
+        name = name.lower()
+        void = name in _VOID or bool(selfclose)
+        if depth == 0 and start is None and void:
+            flush_text(match.start())
+            cursor = match.end()
+            blocks.append(match.group(0))
+            continue
+        if void:
+            continue
+        if not closing:
+            if depth == 0:
+                flush_text(match.start())
+                cursor = match.start()
+                start = match.start()
+            depth += 1
+            continue
+        depth -= 1
+        if depth <= 0:
+            if start is not None:
+                blocks.append(html[start:match.end()].strip())
+            start = None
+            depth = 0
+            cursor = match.end()
+    flush_text(len(html))
+    return [b for b in blocks if b]
+
+
+def block_text(block):
+    return re.sub(r"\s+", " ", _TAG.sub(" ", block or "")).strip()
+
+
+def _is_paragraph(block):
+    return bool(_PARAGRAPH.match(block.strip()))
+
+
+def _is_aside(block):
+    return bool(_ASIDE.match(block.strip()))
+
+
+def _inner(block):
+    opening = block.find(">")
+    closing = block.rfind("</")
+    if opening < 0 or closing < opening:
+        return block
+    return block[opening + 1:closing]
+
+
+def _open_tag(block):
+    return block[:block.find(">") + 1]
+
+
+def merge_paragraphs(left, right):
+    """Join two paragraphs the way the typesetter's page turn joined them."""
+    head = _inner(right).lstrip()
+    tail = _inner(left).rstrip()
+    plain = block_text(tail)
+    if _TRAILING_HYPHEN.search(tail) and block_text(head)[:1].islower():
+        tail = _TRAILING_HYPHEN.sub(r"\1\2", tail)
+        glue = ""
+    elif _TRAILING_HYPHEN.search(tail) or assemble.ENDDASH.search(plain):
+        glue = ""
+    else:
+        glue = " "
+    return "%s%s%s%s</p>" % (_open_tag(left), tail, glue, head)
+
+
+# --------------------------------------------------------------- the whole book
+
+def _scope_ids(html, pno):
+    """Note numbers repeat from page to page; ids in one book may not."""
+    prefix = "p%04d_" % pno
+    html = re.sub(r'(\sid=")(fn_|fnref_)', r"\1\2%s" % prefix, html)
+    html = re.sub(r'(href="#)(fn_|fnref_)', r"\1\2%s" % prefix, html)
+    return html
+
+
+def _page_blocks(page_html):
+    pages = []
+    for pno in sorted(page_html):
+        blocks = split_blocks(_scope_ids(page_html[pno] or "", pno))
+        pages.append({"pno": pno,
+                      "body": [b for b in blocks if not _is_aside(b)],
+                      "asides": [b for b in blocks if _is_aside(b)]})
+    return pages
+
+
+def _join_page_turns(pages):
+    """DIAGNOSIS B on the markup: the sentence, not the page, is the unit."""
+    joined = 0
+    for index in range(1, len(pages)):
+        previous, current = pages[index - 1], pages[index]
+        if not previous["body"] or not current["body"]:
+            continue
+        tail, head = previous["body"][-1], current["body"][0]
+        if not (_is_paragraph(tail) and _is_paragraph(head)):
+            continue
+        if not assemble.continues(block_text(tail), block_text(head)):
+            continue
+        previous["body"][-1] = merge_paragraphs(tail, current["body"].pop(0))
+        joined += 1
+    return joined
+
+
+def _chapters(pages):
+    chapters = []
+    current = None
+
+    def start(title):
+        chapter = Chapter(index=len(chapters) + 1, title=title)
+        chapters.append(chapter)
+        return chapter
+
+    for page in pages:
+        for block in page["body"] + page["asides"]:
+            heading = _SPLIT_HEADING.match(block)
+            if heading or current is None or len(current.blocks) >= MAX_BLOCKS_PER_DOC:
+                title = block_text(block) if heading else ""
+                if current is not None and not heading and not _is_paragraph(block):
+                    # Never start a document on a stray aside or figure.
+                    pass
+                current = start(title)
+            current.blocks.append(block)
+            if page["pno"] not in current.pages:
+                current.pages.append(page["pno"])
+    for chapter in chapters:
+        if not chapter.title:
+            match = _HEADING_TEXT.search("\n".join(chapter.blocks))
+            chapter.title = (block_text(match.group(0)) if match
+                             else _first_words(chapter.blocks))
+    return chapters
+
+
+def _first_words(blocks):
+    for block in blocks:
+        text = block_text(block)
+        if text:
+            words = text.split()
+            return " ".join(words[:6]) + ("…" if len(words) > 6 else "")
+    return "Text"
+
+
+def _bind_links(chapters):
+    """A link that crosses a document boundary has to name the document."""
+    home = {}
+    for chapter in chapters:
+        for block in chapter.blocks:
+            for ident in _ID.findall(block):
+                home.setdefault(ident, chapter.href)
+
+    dropped = []
+    for chapter in chapters:
+        blocks = []
+        for block in chapter.blocks:
+            def rewrite(match, here=chapter.href):
+                target = match.group(1)
+                where = home.get(target)
+                if where is None:
+                    dropped.append(target)
+                    return 'href="#"'
+                if where == here:
+                    return match.group(0)
+                return 'href="%s#%s"' % (where, target)
+            blocks.append(_HREF.sub(rewrite, block))
+        chapter.blocks = blocks
+    return dropped
+
+
+# ------------------------------------------------------------------- packaging
+
+def _document(title, body, language="en"):
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<html xmlns="http://www.w3.org/1999/xhtml" '
+        'xmlns:epub="http://www.idpf.org/2007/ops" xml:lang=%s lang=%s>\n'
+        "<head><title>%s</title>"
+        '<meta charset="utf-8"/>'
+        '<link rel="stylesheet" type="text/css" href="style.css"/></head>\n'
+        "<body>\n%s\n</body>\n</html>\n"
+        % (quoteattr(language), quoteattr(language), escape(title or ""), body))
+
+
+def _nav(entries, language="en"):
+    items = "\n".join('    <li><a href="%s">%s</a></li>' % (href, escape(title))
+                      for href, title in entries)
+    body = ('<nav epub:type="toc" id="toc">\n  <h1>Contents</h1>\n  <ol>\n%s\n  </ol>\n'
+            "</nav>" % items)
+    return _document("Contents", body, language)
+
+
+def _ncx(entries, identifier, title):
+    points = []
+    for index, (href, label) in enumerate(entries, start=1):
+        points.append(
+            '  <navPoint id="nav%d" playOrder="%d">\n'
+            "    <navLabel><text>%s</text></navLabel>\n"
+            '    <content src="%s"/>\n'
+            "  </navPoint>" % (index, index, escape(label), href))
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">\n'
+        "<head>\n"
+        '  <meta name="dtb:uid" content=%s/>\n'
+        '  <meta name="dtb:depth" content="1"/>\n'
+        '  <meta name="dtb:totalPageCount" content="0"/>\n'
+        '  <meta name="dtb:maxPageNumber" content="0"/>\n'
+        "</head>\n"
+        "<docTitle><text>%s</text></docTitle>\n"
+        "<navMap>\n%s\n</navMap>\n</ncx>\n"
+        % (quoteattr(identifier), escape(title or ""), "\n".join(points)))
+
+
+def _opf(metadata, manifest, spine, identifier, modified):
+    meta_lines = [
+        '    <dc:identifier id="bookid">%s</dc:identifier>' % escape(identifier),
+        "    <dc:title>%s</dc:title>" % escape(metadata.get("title") or "Untitled"),
+        "    <dc:language>%s</dc:language>" % escape(metadata.get("language") or "en"),
+        '    <meta property="dcterms:modified">%s</meta>' % modified,
+        '    <meta property="cwng:reflow">%s</meta>' % SIDECAR_PATH,
+        '    <meta property="cwng:converter">%s %s</meta>' % (CONVERTER,
+                                                              CONVERTER_VERSION),
+    ]
+    for index, author in enumerate(metadata.get("authors") or []):
+        meta_lines.append('    <dc:creator id="au%d">%s</dc:creator>' % (index, escape(author)))
+    if metadata.get("publisher"):
+        meta_lines.append("    <dc:publisher>%s</dc:publisher>"
+                          % escape(metadata["publisher"]))
+    if metadata.get("description"):
+        meta_lines.append("    <dc:description>%s</dc:description>"
+                          % escape(metadata["description"]))
+    for tag in metadata.get("tags") or []:
+        meta_lines.append("    <dc:subject>%s</dc:subject>" % escape(tag))
+
+    items = "\n".join(
+        '    <item id="%s" href="%s" media-type="%s"%s/>'
+        % (item["id"], item["href"], item["type"],
+           ' properties="%s"' % item["properties"] if item.get("properties") else "")
+        for item in manifest)
+    refs = "\n".join('    <itemref idref="%s"/>' % ref for ref in spine)
+    return (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" '
+        'unique-identifier="bookid" prefix="cwng: %s">\n'
+        '  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">\n%s\n  </metadata>\n'
+        '  <manifest>\n%s\n  </manifest>\n'
+        '  <spine toc="ncx">\n%s\n  </spine>\n'
+        "</package>\n" % (REFLOW_NS, "\n".join(meta_lines), items, refs))
+
+
+def _figure_images(chapters, doc, book):
+    """Crop each figure the fragments referred to; drop the ones we cannot make."""
+    wanted = []
+    for chapter in chapters:
+        wanted.extend(_IMG_SRC.findall("\n".join(chapter.blocks)))
+    wanted = [src for src in dict.fromkeys(wanted) if src.startswith("images/")]
+    if not wanted:
+        return {}, []
+
+    boxes = {}
+    for index, figure in enumerate(book.figures):
+        seen = boxes.setdefault(figure["pno"], [])
+        seen.append(figure["bbox"])
+
+    images, missing = {}, []
+    for src in wanted:
+        match = re.match(r"images/fig_p(\d+)_(\d+)\.jpg$", src)
+        if not match or doc is None:
+            missing.append(src)
+            continue
+        pno, index = int(match.group(1)), int(match.group(2))
+        page_boxes = boxes.get(pno) or []
+        if index >= len(page_boxes):
+            missing.append(src)
+            continue
+        try:
+            images[src] = extract.crop_jpeg(doc, pno, page_boxes[index])
+        except Exception as exc:                                  # pragma: no cover
+            log.warning("reflow: figure %s could not be cropped: %s", src, exc)
+            missing.append(src)
+    return images, missing
+
+
+def _drop_images(chapters, missing):
+    if not missing:
+        return
+    gone = set(missing)
+
+    def strip(match):
+        src = _IMG_SRC.match(match.group(0))
+        inner = re.search(r'src="([^"]+)"', match.group(0))
+        if inner and inner.group(1) in gone:
+            return ""
+        return match.group(0)
+
+    for chapter in chapters:
+        chapter.blocks = [_IMG_TAG.sub(strip, block) for block in chapter.blocks]
+
+
+def build(book, out_path, page_html=None, metadata=None, doc=None,
+          report_html=None, sidecar=None, identifier=None):
+    """Write one EPUB 3 and say what went into it."""
+    metadata = dict(metadata or {})
+    language = metadata.get("language") or "en"
+    if page_html is None:
+        page_html = {pno: page_fragment(book, pno) for pno in sorted(book.pages)}
+
+    pages = _page_blocks(page_html)
+    joins = _join_page_turns(pages)
+    chapters = _chapters(pages)
+    dropped = _bind_links(chapters)
+    images, missing = _figure_images(chapters, doc, book)
+    _drop_images(chapters, missing)
+
+    identifier = identifier or "urn:uuid:%s" % uuid.uuid4()
+    modified = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    entries = []
+    manifest = [
+        {"id": "nav", "href": "nav.xhtml", "type": "application/xhtml+xml",
+         "properties": "nav"},
+        {"id": "ncx", "href": "toc.ncx", "type": "application/x-dtbncx+xml"},
+        {"id": "css", "href": "style.css", "type": "text/css"},
+    ]
+    spine = []
+    documents = {}
+
+    if report_html:
+        documents[ABOUT_HREF] = _document("About this conversion", report_html, language)
+        manifest.append({"id": "reflow-about", "href": ABOUT_HREF,
+                         "type": "application/xhtml+xml"})
+        spine.append("reflow-about")
+        entries.append((ABOUT_HREF, "About this conversion"))
+
+    for chapter in chapters:
+        documents[chapter.href] = _document(chapter.title,
+                                            "\n".join(chapter.blocks), language)
+        manifest.append({"id": chapter.item_id, "href": chapter.href,
+                         "type": "application/xhtml+xml"})
+        spine.append(chapter.item_id)
+        entries.append((chapter.href, chapter.title))
+
+    for index, src in enumerate(sorted(images)):
+        manifest.append({"id": "img%03d" % index, "href": src, "type": "image/jpeg"})
+
+    payload = _sidecar(book, pages, chapters, images, joins, sidecar)
+    warnings = []
+    if dropped:
+        warnings.append("%d note links had no target and were disarmed" % len(dropped))
+    if missing:
+        warnings.append("%d figure images could not be extracted" % len(missing))
+
+    _write_epub(out_path, {
+        "opf": _opf(metadata, manifest, spine, identifier, modified),
+        "nav": _nav(entries, language),
+        "ncx": _ncx(entries, identifier, metadata.get("title") or ""),
+        "documents": documents,
+        "images": images,
+        "sidecar": payload,
+    })
+
+    return BuildResult(path=str(out_path), notes=payload["notes"],
+                       figures=payload["figures"], images=len(images),
+                       page_joins=joins, warnings=warnings, sidecar=payload,
+                       chapters=[{"href": c.href, "title": c.title,
+                                  "pages": list(c.pages)} for c in chapters])
+
+
+def _sidecar(book, pages, chapters, images, joins, extra):
+    payload = {
+        "converter": CONVERTER,
+        "converter_version": CONVERTER_VERSION,
+        "generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "pages": len(pages),
+        "chapters": len(chapters),
+        "notes": len(book.notes),
+        "notes_unmarked": sum(1 for n in book.notes
+                              if n.num is not None and not n.marked),
+        "figures": len(book.figures),
+        "images_embedded": len(images),
+        "page_joins": joins,
+        "repairs": [r.to_dict() for r in book.repairs[:200]],
+        "repair_count": len(book.repairs),
+        "headings": sum(1 for el in book.elements if el.kind == "h"),
+        "conservation": book.conservation.to_dict() if book.conservation else None,
+        "wording_changed": False,
+    }
+    payload.update(extra or {})
+    return payload
+
+
+def _write_epub(out_path, parts):
+    directory = os.path.dirname(str(out_path))
+    if directory and not os.path.isdir(directory):
+        os.makedirs(directory, exist_ok=True)
+    tmp = "%s.tmp" % out_path
+    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
+        # The mimetype entry must be first and uncompressed: that is what makes the
+        # zip recognisable as an EPUB before anything inside it is read.
+        info = zipfile.ZipInfo("mimetype", date_time=time.localtime(time.time())[:6])
+        info.compress_type = zipfile.ZIP_STORED
+        zf.writestr(info, b"application/epub+zip")
+        zf.writestr("META-INF/container.xml",
+                    '<?xml version="1.0" encoding="utf-8"?>\n'
+                    '<container version="1.0" '
+                    'xmlns="urn:oasis:names:tc:opendocument:xmlns:container">\n'
+                    "  <rootfiles>\n"
+                    '    <rootfile full-path="%s/content.opf" '
+                    'media-type="application/oebps-package+xml"/>\n'
+                    "  </rootfiles>\n</container>\n" % OEBPS)
+        zf.writestr(SIDECAR_PATH,
+                    json.dumps(parts["sidecar"], ensure_ascii=False, indent=1))
+        zf.writestr("%s/content.opf" % OEBPS, parts["opf"])
+        zf.writestr("%s/nav.xhtml" % OEBPS, parts["nav"])
+        zf.writestr("%s/toc.ncx" % OEBPS, parts["ncx"])
+        zf.writestr("%s/style.css" % OEBPS, STYLESHEET)
+        for href, text in parts["documents"].items():
+            zf.writestr(posixpath.join(OEBPS, href), text)
+        for href, data in parts["images"].items():
+            zf.writestr(posixpath.join(OEBPS, href), data)
+    os.replace(tmp, str(out_path))
+    return str(out_path)
+
+
+# -------------------------------------------------------------------- validation
+
+def validate(path):
+    """A readable zip with the parts a reader needs, and epubcheck if it is here."""
+    problems = []
+    try:
+        with zipfile.ZipFile(path) as zf:
+            broken = zf.testzip()
+            if broken:
+                problems.append("corrupt entry %s" % broken)
+            names = zf.namelist()
+            if not names or names[0] != "mimetype":
+                problems.append("mimetype is not the first entry")
+            for required in ("META-INF/container.xml", "%s/content.opf" % OEBPS):
+                if required not in names:
+                    problems.append("missing %s" % required)
+    except (zipfile.BadZipFile, IOError, OSError) as exc:
+        problems.append("not a readable zip: %s" % exc)
+    return problems
+
+
+def run_epubcheck(path, timeout=120):
+    """Soft: report what epubcheck says when it is installed, never require it."""
+    binary = shutil.which("epubcheck")
+    if not binary:
+        return None
+    try:
+        completed = subprocess.run([binary, "--quiet", str(path)],
+                                   capture_output=True, timeout=timeout)
+    except (OSError, subprocess.SubprocessError) as exc:          # pragma: no cover
+        return {"ran": False, "error": str(exc)}
+    output = (completed.stdout or b"") + (completed.stderr or b"")
+    return {"ran": True, "returncode": completed.returncode,
+            "output": output.decode("utf-8", "replace")[:4000]}

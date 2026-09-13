@@ -121,6 +121,7 @@ class Book(object):
     notes: List[Note] = field(default_factory=list)
     repairs: List[Repair] = field(default_factory=list)
     furniture: List[str] = field(default_factory=list)
+    pages: dict = field(default_factory=dict)         # pno -> [Element] as printed
     figures: List[dict] = field(default_factory=list)
     reasons: dict = field(default_factory=dict)       # pno -> [reason, ...]
     style: Optional[skeleton.BookStyle] = None
@@ -321,6 +322,123 @@ def _recover_residue_markers(elements, skel, claimed, repairs, reasons):
 
 # ------------------------------------------------------------------------ assembly
 
+#: How far a printed note number can be from what the OCR returned before the repair
+#: stops being a reading and starts being a guess. MEASURED on the acceptance book:
+#: every one of the 39 damaged numbers is a dropped trailing digit (10 -> "1",
+#: 50 -> "5", 100 -> "1") or a single substitution (130 -> "138", 165 -> "163",
+#: 235 -> "233", 280 -> "288"). Nothing needs more licence than that.
+MAX_DROPPED_DIGITS = 2
+
+
+def _ocr_could_read(printed, seen):
+    """Could a scanner have returned *seen* from a page that printed *printed*?"""
+    if printed == seen:
+        return True
+    if printed.startswith(seen) and 0 < len(printed) - len(seen) <= MAX_DROPPED_DIGITS:
+        return True
+    if len(printed) == len(seen):
+        return sum(1 for a, b in zip(printed, seen) if a != b) == 1
+    return False
+
+
+def _page_marker_digits(skel):
+    """Digit runs printed in the body as inline markers, damaged or not."""
+    found = set()
+    for region in skel.body_regions:
+        for line in region.lines:
+            for span in line.spans:
+                if skeleton.is_marker_span(span, line.size):
+                    found.add(span.text.strip())
+    return found
+
+
+def _is_marked(printed, markers):
+    """Does the body mark this note? The marker can be damaged the same way the
+    note's own number was — MEASURED: on page 49 the note printed 40 came back as
+    "4" and so did the marker pointing at it. Demanding an undamaged marker as proof
+    would refuse the repair on exactly the pages that need one."""
+    return any(_ocr_could_read(printed, marker) for marker in markers)
+
+
+#: A note's own printed number, at the head of its own text.
+_OPENING_NUMBER = re.compile(r"^\d{1,3}[ \t.)\]]*")
+
+
+def note_text(region):
+    """A footnote's text, assembled the way a paragraph is.
+
+    Notes go down a side channel, and for a while that meant they skipped the line
+    joining the body text gets. MEASURED: five words of the acceptance book were lost
+    that way -- ``non-standard`` printed across two lines of a note came out as
+    ``non- standard`` -- so this folds the note's lines through the same stitcher
+    rather than keeping a second, quietly different one.
+    """
+    runs = []
+    for index, line in enumerate(region.lines):
+        text = line.stripped
+        if index == 0 and region.number is not None:
+            text = _OPENING_NUMBER.sub("", text, count=1)
+        if not text:
+            continue
+        piece = [["t", text]]
+        runs = stitch_runs(runs, piece) if runs else piece
+    return plain_text(tidy(runs))
+
+
+def _repair_note_numbers(skel, repairs):
+    """Read a damaged note number off the page it was printed on.
+
+    A page's footnote numbers ascend. One that does not is damage, and the page
+    carries its own answer: the gap its neighbours leave, and the marker in the body
+    that points at it. Where exactly one number fits the gap, a scanner could have
+    returned what we got from it, and the body marks that number, the repair is a
+    reading of the page. Where any of the three is missing it stays broken, the page
+    says so, and a model gets to look at it.
+    """
+    regions = [r for r in skel.note_regions if r.number is not None]
+    markers = _page_marker_digits(skel)
+    for index, region in enumerate(regions):
+        previous = regions[index - 1].number if index else None
+        if previous is None or region.number > previous:
+            continue
+        following = regions[index + 1].number if index + 1 < len(regions) else None
+        top = following - 1 if following is not None else previous + 1
+        window = range(previous + 1, top + 1)
+        seen = str(region.number)
+        fits = [n for n in window
+                if _ocr_could_read(str(n), seen) and _is_marked(str(n), markers)]
+        if len(fits) != 1:
+            continue
+        repairs.append(Repair(kind="note_number", pno=skel.pno,
+                              detail="note %s reads as %d between notes %d and %s"
+                                     % (seen, fits[0], previous,
+                                        following if following is not None else "-"),
+                              confidence="high"))
+        region.number = fits[0]
+
+
+def _copy_element(element):
+    return Element(kind=element.kind, runs=[list(run) for run in element.runs],
+                   pno=element.pno, level=element.level, bbox=element.bbox,
+                   pages=list(element.pages))
+
+
+def page_source_text(book, pno):
+    """The page as it was printed: what the model is shown, and what its answer is
+    measured against. Furniture is already gone; the notes come after the body, the
+    way the page sets them."""
+    parts = [element.text for element in book.pages.get(pno, [])]
+    for note in book.notes:
+        if note.pno != pno:
+            continue
+        # A note whose number was never read keeps whatever the page printed in its
+        # text; inventing a "?" for it would put a word in the model's mouth and
+        # then fail the gate for saying it back.
+        parts.append("[%d] %s" % (note.num, note.text) if note.num is not None
+                     else note.text)
+    return "\n\n".join(part for part in parts if part.strip())
+
+
 def _page_elements(skel, repairs, reasons):
     page_notes = skel.note_numbers
     claimed = set()
@@ -357,13 +475,21 @@ def assemble(skeletons, style, raw_pages=None):
 
     for skel in skeletons:
         page_reasons = list(skel.reasons)
+        _repair_note_numbers(skel, book.repairs)
         elements, claimed = _page_elements(skel, book.repairs, page_reasons)
+        # Two views of the same page, and the difference matters. ``pages`` is the
+        # page as it was printed, which is what a model is shown and what its answer
+        # is gated against; the stream below is the book as it reads, with sentences
+        # carried over the page turns. Joining mutates runs, so the stream gets its
+        # own copies.
+        book.pages[skel.pno] = elements
+        elements = [_copy_element(el) for el in elements]
 
         for region in skel.regions:
             if region.kind == "furniture":
                 book.furniture.append(region.text)
             elif region.kind == "note":
-                book.notes.append(Note(num=region.number, text=region.text,
+                book.notes.append(Note(num=region.number, text=note_text(region),
                                        pno=skel.pno,
                                        marked=region.number in claimed))
             elif region.kind == "figure":
@@ -415,7 +541,9 @@ def assemble(skeletons, style, raw_pages=None):
 def deterministic_book(doc, page_numbers=None):
     """The whole no-model pass: open pages, measure the book, read every page."""
     raw_pages = extract.read_pages(doc, page_numbers)
-    style = skeleton.book_style(raw_pages, outline=extract.outline(doc))
+    outline = extract.outline(doc)
+    style = skeleton.book_style(
+        raw_pages, outline=outline if skeleton.outline_is_useful(outline) else None)
     skeletons = [skeleton.page_skeleton(raw, style) for raw in raw_pages]
     return assemble(skeletons, style, raw_pages)
 

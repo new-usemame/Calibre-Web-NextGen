@@ -48,6 +48,16 @@ MARKER_SIZE_MAX = 0.85
 HEAD_RATIO = 1.05
 #: A distinct size this far above the body earns a level in the heading ladder.
 LADDER_RATIO = 1.12
+#: Two sizes this close are the same printed size. MEASURED on the acceptance book:
+#: one 16pt chapter title reads between 15.5 and 16.4pt from page to page, a spread
+#: of 5.8%, because the scan is photographed type and not a font instruction.
+LADDER_TOL = 0.06
+#: A heading level recurs through the book; display type on a title page does not,
+#: and neither does the type on a chart. MEASURED on the acceptance book, the rungs
+#: come out at 1, 1, 3, 37, 9 and 108 pages: the two heavy ones are its chapter and
+#: section headings, and the four light ones are the cover and chart legends. Type
+#: above the top rung is level 1 anyway, so a rare *real* heading loses nothing.
+LADDER_MIN_PAGES = 0.02
 #: Levels below this are more taxonomy than navigation.
 LADDER_MAX_LEVELS = 4
 
@@ -91,7 +101,13 @@ class PageSkeleton(object):
 
     @property
     def note_numbers(self):
-        return {r.number for r in self.regions if r.kind == "note" and r.number is not None}
+        """In printed order: the sequence is the evidence a damaged number is read by."""
+        return [r.number for r in self.regions
+                if r.kind == "note" and r.number is not None]
+
+    @property
+    def note_regions(self):
+        return [r for r in self.regions if r.kind == "note"]
 
     @property
     def body_regions(self):
@@ -124,10 +140,61 @@ class BookStyle(object):
         return list(range(1, len(self.ladder) + 1)) or [1]
 
     def level_for(self, size):
-        for index, ladder_size in enumerate(self.ladder):
-            if abs(size - ladder_size) < 0.35:
+        """The ladder runs largest first, so the first rung the size reaches is its
+        level. Type above every rung is level 1: a heading larger than the book's
+        largest cannot be set deeper than its smallest."""
+        for index, centre in enumerate(self.ladder):
+            if size >= centre * (1.0 - LADDER_TOL):
                 return index + 1
         return min(LADDER_MAX_LEVELS, len(self.ladder) + 1)
+
+
+def heading_ladder(body_size, census, pages, page_count):
+    """The heading sizes this book actually uses, largest first.
+
+    Two things have to be true of a rung. It has to be *bigger than the body*, which
+    is what makes it a heading at all; and it has to *recur*, which is what makes it
+    a level rather than a one-off piece of display type. On a scan neither is a clean
+    equality: the same printed heading measures differently on every page it appears
+    on, so sizes within LADDER_TOL of a rung's running centre belong to that rung.
+    """
+    if not body_size:
+        return []
+    floor = max(2, int(round(LADDER_MIN_PAGES * page_count)))
+    candidates = sorted(((size, chars) for size, chars in census.items()
+                         if size >= body_size * LADDER_RATIO and chars >= 8),
+                        key=lambda kv: -kv[0])
+
+    clusters = []                      # [[weighted size total, chars, {pages}], ...]
+    for size, chars in candidates:
+        seen = pages.get(size, set())
+        if clusters:
+            centre = clusters[-1][0] / clusters[-1][1]
+            if size >= centre * (1.0 - LADDER_TOL):
+                clusters[-1][0] += size * chars
+                clusters[-1][1] += chars
+                clusters[-1][2] |= seen
+                continue
+        clusters.append([size * chars, chars, set(seen)])
+
+    ladder = [total / chars for total, chars, seen in clusters if len(seen) >= floor]
+    return [round(size, 2) for size in ladder[:LADDER_MAX_LEVELS]]
+
+
+#: A scanner writes one outline entry per page and titles it after the page. That is
+#: a page index, not a table of contents. MEASURED: book 567's outline is 698 entries
+#: reading "Page 1" to "Page 698"; a navigation built from it has no chapters in it.
+_PAGE_LABEL = re.compile(r"^(page|p\.?|folio|sheet|image|scan)\s*[ivxlcdm\d]+$", re.I)
+
+
+def outline_is_useful(outline):
+    """True when the PDF's own outline is a table of contents worth keeping."""
+    titles = [str(entry.get("title") or "").strip() for entry in outline or []]
+    titles = [t for t in titles if t]
+    if len(titles) < 2:
+        return False
+    labels = sum(1 for t in titles if _PAGE_LABEL.match(t))
+    return labels <= len(titles) * 0.2
 
 
 def band_key(text):
@@ -146,6 +213,7 @@ def book_style(raw_pages, outline=None):
     central = Counter()
     everything = Counter()
     bands = Counter()
+    pages = {}
 
     for raw in raw_pages:
         top, bottom = raw.height * HEADER_BAND, raw.height * FN_ZONE_NUMBERED
@@ -158,6 +226,7 @@ def book_style(raw_pages, outline=None):
                 everything[size] += chars
                 if ln.bbox[3] > top and ln.bbox[1] < bottom:
                     central[size] += chars
+                    pages.setdefault(size, set()).add(raw.pno)
                 if ln.bbox[3] <= top or ln.bbox[1] >= raw.height * FOOTER_BAND:
                     if len(ln.stripped) <= BAND_TEXT_MAX:
                         bands[band_key(ln.stripped)] += 1
@@ -165,12 +234,7 @@ def book_style(raw_pages, outline=None):
     census = central or everything
     body_size = census.most_common(1)[0][0] if census else 0.0
 
-    ladder = []
-    if body_size:
-        candidates = [(size, chars) for size, chars in census.items()
-                      if size >= body_size * LADDER_RATIO and chars >= 8]
-        ladder = [size for size, _ in sorted(candidates, key=lambda kv: -kv[0])]
-        ladder = ladder[:LADDER_MAX_LEVELS]
+    ladder = heading_ladder(body_size, census, pages, len(raw_pages))
 
     return BookStyle(body_size=body_size, ladder=ladder, band_hits=dict(bands),
                      page_count=len(raw_pages), outline=list(outline or []))
@@ -294,7 +358,9 @@ def _split_off_notes(raw, style, skel):
         if blk.size > style.body_size * FN_SIZE_RATIO:
             body.append(blk)
             continue
-        opened = _note_number(blk.lines[0], blk.size)
+        known = [r.number for r in notes if r.number is not None]
+        opened = _note_number(blk.lines[0], blk.size, opening=True,
+                              after=known[-1] if known else None)
         if opened is None and not seen_note:
             body.append(blk)
             continue
@@ -316,9 +382,12 @@ def _notes_in_block(blk, existing):
     """
     out = []
     current = None
-    for ln in blk.lines:
-        number = _note_number(ln, blk.size)
+    seen = [r.number for r in existing if r.number is not None]
+    for position, ln in enumerate(blk.lines):
+        number = _note_number(ln, blk.size, opening=(position == 0),
+                              after=seen[-1] if seen else None)
         if number is not None:
+            seen.append(number)
             current = Region(kind="note", lines=[ln], number=number, bbox=ln.bbox)
             out.append(current)
             continue
@@ -339,18 +408,43 @@ def _append_line(region, line):
                    max(region.bbox[2], line.bbox[2]), line.bbox[3])
 
 
-def _note_number(line, block_size):
-    """The note's own number when the line opens one."""
+#: A footnote opening the OCR could not keep apart from its own number: the digits,
+#: a space, and then the start of a sentence. The trailing context is what separates
+#: it from an endnote entry ("15. Brennan..."), a table row and page-bottom debris.
+_MERGED_NOTE_NUMBER = re.compile(r"^(\d{1,3})[ \t]+(?=[A-Z\u201c\u2018\"\'])")
+
+
+def _note_number(line, block_size, opening=False, after=None):
+    """The note's own number when the line opens one.
+
+    Two printed shapes reach us. The raised number survives as its own small span —
+    the strong signal, and the only one accepted mid-block. Or the scanner merged it
+    into the first text span at full size, which MEASURED costs 138 footnotes on 70
+    of the acceptance book's 698 pages; that shape is only read at the first line of
+    a block already inside the footnote zone, where a number can only be a number.
+    """
     spans = [sp for sp in line.spans if sp.text.strip()]
     if not spans:
         return None
     first = spans[0]
     text = first.text.strip()
-    if not re.fullmatch(r"\d{1,3}", text):
-        return None
-    if block_size and first.size > MARGIN_SIZE * block_size:
-        return None
-    return int(text)
+    if re.fullmatch(r"\d{1,3}", text):
+        if block_size and first.size > MARGIN_SIZE * block_size:
+            return None
+        return int(text)
+    merged = _MERGED_NOTE_NUMBER.match(line.stripped)
+    if merged:
+        value = int(merged.group(1))
+        # Footnotes ascend down the page. Where that is checkable it is the guard
+        # that keeps a citation's own numbers ("112, trans. Oldfather") from opening
+        # a note; at the first note in the zone there is nothing yet to check it
+        # against, and the block's position in the zone carries the claim instead.
+        if after is None:
+            if opening:
+                return value
+        elif value > after:
+            return value
+    return None
 
 
 def _furniture_reason(line, raw, style):

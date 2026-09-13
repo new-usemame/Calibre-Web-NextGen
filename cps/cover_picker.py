@@ -20,6 +20,18 @@ Routes (all gated by edit permission):
     POST /book/<book_id>/cover/apply            -> applies chosen cover
     POST /book/<book_id>/cover/lock             -> toggle BookCoverLock
 
+The cover designer's own surface is book-independent and lives beside them:
+
+    GET    /cover-designer/catalogue            -> JSON: every design choice
+    GET    /cover-designer/style-thumb/<id>     -> JPEG: sample of one arrangement
+    GET    /cover-designer/font-sample/<id>     -> JPEG: sample of one lettering
+    GET    /cover-designer/presets              -> JSON: builtin + library + own
+    POST   /cover-designer/presets              -> saves a design under a name
+    PUT    /cover-designer/presets/<id>         -> renames/replaces a saved design
+    DELETE /cover-designer/presets/<id>         -> deletes it, or hides one that
+                                                   is not this reader's to delete
+    POST   /cover-designer/presets/<id>/restore -> un-hides one they hid
+
 The blueprint is thin — orchestration lives in cps.services.cover_picker
 and cps.services.cover_url_validator. Adding a new candidate source
 means adding a metadata provider in cps/metadata_provider/, not editing
@@ -30,11 +42,12 @@ from __future__ import annotations
 import base64
 import os
 from datetime import datetime, timezone
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 from functools import wraps
 from typing import Optional
 
 from flask import Blueprint, abort, flash, jsonify, make_response, redirect, request, url_for
+from werkzeug.routing import BuildError
 from flask_babel import gettext as _
 from flask_babel import get_locale
 
@@ -42,7 +55,7 @@ from . import calibre_db, config, helper, kobo_sync_status, logger, ub
 from .cw_login import current_user
 from .render_template import render_title_template
 from .services import (
-    cover_extract, cover_generator, cover_preview,
+    cover_design_presets, cover_designer_cache, cover_extract, cover_generator, cover_preview,
     cover_picker as cover_picker_svc, cover_url_validator,
 )
 from .usermanagement import user_login_required
@@ -195,6 +208,36 @@ def cover_picker_state(book_id):
     })
 
 
+def _binaries_dir() -> str:
+    return getattr(config, "config_binariesdir", "") or ""
+
+
+def _catalogue_url(endpoint: str, key: str, value: str, path: str) -> str:
+    """Where one catalogue image lives.
+
+    ``url_for`` when there is an application that knows this blueprint, because
+    an installation mounted under a sub-path needs its script root prepended.
+    When there is not — ``designer_state()`` is also read by the personal-cover
+    payload and by callers that only want to know whether this box can render at
+    all — the literal path the blueprint registers is the honest answer. A
+    catalogue is worth more than a perfectly prefixed URL nobody will fetch.
+    """
+    try:
+        return url_for(endpoint, **{key: value})
+    except (RuntimeError, BuildError):
+        return path + quote(str(value), safe="")
+
+
+def _style_thumb_url(style_id: str) -> str:
+    return _catalogue_url("cover_picker.cover_designer_style_thumb", "style_id", style_id,
+                          "/cover-designer/style-thumb/")
+
+
+def _font_sample_url(font_id: str) -> str:
+    return _catalogue_url("cover_picker.cover_designer_font_sample", "font_id", font_id,
+                          "/cover-designer/font-sample/")
+
+
 def designer_state() -> dict:
     """The "Design a cover" vocabulary plus whether this box can render at all.
 
@@ -202,19 +245,48 @@ def designer_state() -> dict:
     offer exactly the same designs. ``available`` is false on an installation
     with neither Calibre nor Pillow, and the panel stays hidden rather than
     offering a button that can only fail.
+
+    The preset list is per-user: the shipped designs this reader has not hidden,
+    then the library's, then their own.
     """
-    availability = cover_generator.renderer_availability(
-        getattr(config, "config_binariesdir", "") or "")
-    catalogue = cover_generator.catalogue()
+    binaries = _binaries_dir()
+    availability = cover_generator.renderer_availability(binaries)
+    saved = _presets_for_current_user(binaries)
+    catalogue = cover_generator.catalogue(
+        binaries,
+        extra_presets=[entry for entry in saved["presets"] if not entry.get("builtin")],
+        hidden_builtins=saved["hidden"],
+        thumb_url=_style_thumb_url,
+        sample_url=_font_sample_url,
+    )
     catalogue["default_preset"] = (
         getattr(config, "config_cover_generator_default_preset", None)
         or cover_generator.DEFAULT_PRESET
     )
     if catalogue["default_preset"] not in cover_generator.PRESETS:
         catalogue["default_preset"] = cover_generator.DEFAULT_PRESET
+    catalogue["hidden_presets"] = saved["hidden"]
+    catalogue["can_share_presets"] = bool(getattr(current_user, "role_admin", lambda: False)())
     catalogue["available"] = availability["available"]
     catalogue["renderer"] = availability["renderer"]
     return catalogue
+
+
+def _presets_for_current_user(binaries: str) -> dict:
+    """Saved presets for whoever is asking, or just the builtins if nobody is.
+
+    A database that has not been migrated yet (or a read that fails) must not
+    take the designer down with it: the shipped designs are enough to open the
+    panel with, so a failure here degrades to them.
+    """
+    user_id = getattr(current_user, "id", None)
+    if user_id is None:
+        return {"presets": cover_generator.builtin_presets(binaries), "hidden": []}
+    try:
+        return cover_design_presets.list_presets(int(user_id), binaries)
+    except Exception as error:  # noqa: BLE001 - a preset table is not worth a 500
+        log.warning("cover designer: could not read saved presets: %s", error)
+        return {"presets": cover_generator.builtin_presets(binaries), "hidden": []}
 
 
 @cover_picker.route("/book/<int:book_id>/cover/candidates", methods=["POST"])
@@ -337,11 +409,10 @@ def cover_picker_apply(book_id):
         try:
             spec = _spec_from_body(body, cover_generator.APPLY_WIDTH, cover_generator.APPLY_HEIGHT)
             rendered = cover_preview._run_in_pool(
-                cover_generator.render, _book_cover_meta(book), spec,
-                getattr(config, "config_binariesdir", "") or "",
+                cover_generator.render, _book_cover_meta(book), spec, _binaries_dir(),
             )
         except cover_generator.CoverGenerationError as error:
-            return _json_error(*_designer_error(error))
+            return _designer_json_error(error)
         staged_cover, message = _apply_bytes(book, rendered.data, ".jpg")
         return _apply_response(staged_cover, message, book)
 
@@ -358,33 +429,48 @@ def cover_picker_design_preview(book_id):
     half the applied size so the round trip stays interactive; the design is
     identical, only the pixel count differs.
 
-    Body: ``{"preset": "classic", "scheme": "ink", "font": "serif",
-    "layout": "blocks"}`` — every field optional, the preset supplying whatever
-    is not overridden.
+    Body: ``{"design": {...}}`` — the whole design object (style, scheme or four
+    explicit colours, per-slot font/size/alignment/template, size), every field
+    optional and the defaults supplying the rest. The v1 body
+    ``{"preset", "scheme", "font", "layout"}`` still works and is mapped onto a
+    design, so an older client keeps its covers.
     """
     book = _load_book(book_id)
     body = request.get_json(silent=True) or {}
     try:
-        spec = _spec_from_body(body, cover_generator.PREVIEW_WIDTH, cover_generator.PREVIEW_HEIGHT)
+        spec = _spec_from_body(body)
+        # The design keeps the size the reader chose; only the picture shrinks,
+        # and font sizes scale with it, so the preview is the same cover with
+        # fewer pixels rather than a different one.
         data_url, renderer = cover_preview._run_in_pool(
-            cover_generator.render_data_url, _book_cover_meta(book), spec,
-            getattr(config, "config_binariesdir", "") or "",
+            cover_generator.render_data_url, _book_cover_meta(book),
+            spec.scaled(cover_generator.PREVIEW_WIDTH, cover_generator.PREVIEW_HEIGHT),
+            _binaries_dir(),
         )
     except cover_generator.CoverGenerationError as error:
-        return _json_error(*_designer_error(error))
+        return _designer_json_error(error)
+    resolved = spec.to_dict()
     return jsonify({"ok": True, "data_url": data_url, "renderer": renderer,
-                    "resolved": spec.to_dict()})
+                    "design": resolved, "resolved": resolved})
 
 
-def _spec_from_body(body: dict, width: int, height: int):
-    """Resolve the design ids in a request body. Raises CoverGenerationError."""
+def _spec_from_body(body: dict, width: Optional[int] = None, height: Optional[int] = None):
+    """Resolve a request body into a design. Raises CoverGenerationError.
+
+    Both vocabularies are accepted: the designer sends a whole ``design`` object,
+    while an older client (and the admin default) sends preset/scheme/font/layout
+    ids. The design wins where they overlap, so a client can send both while it
+    migrates.
+    """
     return cover_generator.resolve_spec(
+        design=(body.get("design") if isinstance(body.get("design"), dict) else None),
         preset=(body.get("preset") or None),
         scheme=(body.get("scheme") or None),
         font=(body.get("font") or None),
         layout=(body.get("layout") or None),
         width=width,
         height=height,
+        binaries_dir=_binaries_dir(),
     )
 
 
@@ -396,30 +482,251 @@ def _designer_error(error):
     caller — this blueprint and the personal-cover route in cps/api/actions.py —
     sends the user one of these three sentences instead.
     """
-    log.warning("cover designer render failed: %s: %s", error.code, error.message)
-    if error.code in ("unknown_scheme", "unknown_font", "unknown_layout"):
+    log.warning("cover designer request failed: %s: %s", error.code, error.message)
+    if error.code in ("unknown_scheme", "unknown_font", "unknown_layout", "unknown_style"):
         return error.code, _(u"That cover design is not one we offer."), 400
+    # These carry a sentence this module wrote about what the reader asked for —
+    # a placeholder that does not exist, a colour that is not a colour — and it
+    # is far more use than a generic refusal, so it goes back verbatim. It is
+    # written here, never by the renderer: no subprocess output reaches a client.
+    # (Source English; these are not in the SPA's msgid catalogue yet.)
+    if error.code in ("invalid_design", "invalid_color", "invalid_align", "invalid_text",
+                      "invalid_name", "duplicate_name", "too_many_presets", "builtin_preset"):
+        return error.code, error.message, 400
+    if error.code == "forbidden":
+        return error.code, error.message, 403
+    if error.code == "unknown_preset":
+        return error.code, _(u"That preset no longer exists."), 404
     if error.code == "unavailable":
         return error.code, _(u"This server can't design covers — no renderer is installed."), 503
+    if error.code == "storage_failed":
+        return error.code, _(u"Could not save that design."), 500
     return error.code, _(u"Could not design a cover for this book."), 502
 
 
+def _designer_json_error(error):
+    """The designer's error body: the contract's shape and the picker's, at once.
+
+    The contract the SPA panel is written against says ``{"error", "message"}``;
+    every other route in this blueprint says ``{"error_code", "error_message"}``
+    and the existing client reads that. Sending both keys costs a few bytes and
+    means neither client has to guess which route it is talking to.
+    """
+    code, message, status = _designer_error(error)
+    return make_response(jsonify({
+        "ok": False, "error": code, "message": message,
+        "error_code": code, "error_message": message,
+    }), status)
+
+
+def _first_name(book, attribute: str, field: str = "name"):
+    """The first related row's *field*, or None. Never raises."""
+    try:
+        related = getattr(book, attribute, None) or []
+        value = getattr(related[0], field, None) if related else None
+    except Exception:  # noqa: BLE001 - a malformed row must not fail an apply
+        return None
+    return str(value) if value else None
+
+
+def _book_year(book):
+    """The publication year, or None for a book that does not claim one."""
+    pubdate = getattr(book, "pubdate", None)
+    year = getattr(pubdate, "year", None)
+    if not isinstance(year, int):
+        return None
+    # Calibre writes 0101-01-01 for "no publication date"; a cover that
+    # announces the year 101 is worse than one that says nothing.
+    return year if year > 1400 else None
+
+
+def _book_rating(book):
+    """The rating out of five, or None. Calibre stores 0-10 (half stars)."""
+    try:
+        ratings = getattr(book, "ratings", None) or []
+        raw = getattr(ratings[0], "rating", None) if ratings else None
+        return float(raw) / 2.0 if raw is not None else None
+    except (TypeError, ValueError, IndexError):
+        return None
+
+
 def _book_cover_meta(book):
-    """The book's own text, as the renderer's input."""
-    series = None
+    """The book's own text, as the renderer's input.
+
+    Everything here is best-effort: a book with a malformed series index or a
+    rating row that is not a number still gets a cover, just without that line.
+    A designed cover is never important enough to fail an apply over.
+    """
+    series = _first_name(book, "series")
     series_index = None
-    if getattr(book, "series", None):
-        series = book.series[0].name
+    if series is not None:
         try:
-            series_index = float(book.series_index) if book.series_index is not None else None
+            raw_index = getattr(book, "series_index", None)
+            series_index = float(raw_index) if raw_index is not None else None
         except (TypeError, ValueError):
             series_index = None
+    try:
+        authors = [str(a.name) for a in (getattr(book, "authors", None) or []) if getattr(a, "name", None)]
+    except Exception:  # noqa: BLE001
+        authors = []
+    try:
+        tags = [str(t.name) for t in (getattr(book, "tags", None) or []) if getattr(t, "name", None)]
+    except Exception:  # noqa: BLE001
+        tags = []
+    title = getattr(book, "title", None)
     return cover_generator.BookCoverMeta(
-        title=book.title or "",
-        authors=[a.name for a in (book.authors or [])],
+        title=str(title) if title else "",
+        authors=authors,
         series=series,
         series_index=series_index,
+        publisher=_first_name(book, "publishers"),
+        year=_book_year(book),
+        tags=tags,
+        language=_first_name(book, "languages", "lang_code"),
+        rating=_book_rating(book),
     )
+
+
+# ---------------------------------------------------------------------------
+# The cover designer's own surface: catalogue, imagery and saved presets.
+# These are book-independent, so they live off /cover-designer/ rather than
+# under a book, and the panel can open them once instead of per book.
+# ---------------------------------------------------------------------------
+
+@cover_picker.route("/cover-designer/catalogue", methods=["GET"])
+@user_login_required
+def cover_designer_catalogue():
+    """Every design choice this installation offers, for this user."""
+    return jsonify(designer_state())
+
+
+def _catalogue_image(kind: str, identifier: str, render):
+    """Serve one small catalogue image, cached on disk.
+
+    Every user gets the same picture of the same arrangement, so it is rendered
+    once and kept: on a Calibre installation each of these is a subprocess, and a
+    panel with a hundred lettering samples in it cannot pay that per open.
+    """
+    binaries = _binaries_dir()
+    availability = cover_generator.renderer_availability(binaries)
+    if not availability["available"]:
+        return _designer_json_error(
+            cover_generator.CoverGenerationError("unavailable", "no renderer installed"))
+    try:
+        data, was_cached = cover_designer_cache.cached(
+            kind, identifier, cover_generator.THUMBNAIL_WIDTH, cover_generator.THUMBNAIL_HEIGHT,
+            availability["renderer"] or "none",
+            lambda: cover_preview._run_in_pool(render, identifier, binaries).data,
+        )
+    except cover_generator.CoverGenerationError as error:
+        return _designer_json_error(error)
+    response = make_response(data)
+    response.headers["Content-Type"] = "image/jpeg"
+    # Private: the catalogue depends on what this installation has installed,
+    # not on who is asking, but it is still behind a login.
+    response.headers["Cache-Control"] = "private, max-age=86400"
+    response.headers["X-Cwng-Designer-Cache"] = "hit" if was_cached else "miss"
+    return response
+
+
+@cover_picker.route("/cover-designer/style-thumb/<style_id>", methods=["GET"])
+@user_login_required
+def cover_designer_style_thumb(style_id):
+    """A small neutral sample of one arrangement, for the picker's style row."""
+    return _catalogue_image("style", style_id, cover_generator.style_thumbnail)
+
+
+@cover_picker.route("/cover-designer/font-sample/<font_id>", methods=["GET"])
+@user_login_required
+def cover_designer_font_sample(font_id):
+    """A small sample of one lettering, set in that lettering."""
+    return _catalogue_image("font", font_id, cover_generator.font_sample)
+
+
+def _current_user_id() -> int:
+    return int(current_user.id)
+
+
+def _is_admin() -> bool:
+    return bool(getattr(current_user, "role_admin", lambda: False)())
+
+
+@cover_picker.route("/cover-designer/presets", methods=["GET"])
+@user_login_required
+def cover_designer_presets():
+    """Builtin, then library, then this reader's own."""
+    return jsonify(cover_design_presets.list_presets(_current_user_id(), _binaries_dir()))
+
+
+@cover_picker.route("/cover-designer/presets", methods=["POST"])
+@user_login_required
+def cover_designer_preset_create():
+    """Save the design in the body under a name. ``scope`` "library" needs admin."""
+    body = request.get_json(silent=True) or {}
+    try:
+        preset = cover_design_presets.create_preset(
+            _current_user_id(), _is_admin(), body.get("name"), body.get("design"),
+            body.get("scope") or "user", _binaries_dir())
+    except cover_generator.CoverGenerationError as error:
+        return _designer_json_error(error)
+    return make_response(jsonify({"ok": True, "preset": preset}), 201)
+
+
+@cover_picker.route("/cover-designer/presets/<preset_id>", methods=["PUT"])
+@user_login_required
+def cover_designer_preset_update(preset_id):
+    """Rename a saved preset, replace its design, or both."""
+    body = request.get_json(silent=True) or {}
+    try:
+        preset = cover_design_presets.update_preset(
+            _current_user_id(), _is_admin(), preset_id,
+            name=body.get("name"), design=body.get("design"),
+            binaries_dir=_binaries_dir())
+    except cover_generator.CoverGenerationError as error:
+        return _designer_json_error(error)
+    return jsonify({"ok": True, "preset": preset})
+
+
+@cover_picker.route("/cover-designer/presets/<preset_id>", methods=["DELETE"])
+@user_login_required
+def cover_designer_preset_delete(preset_id):
+    """Delete a preset, or hide one that is not this reader's to delete."""
+    try:
+        outcome = cover_design_presets.delete_preset(_current_user_id(), _is_admin(), preset_id)
+    except cover_generator.CoverGenerationError as error:
+        return _designer_json_error(error)
+    response = make_response("", 204)
+    # The panel needs to know whether to offer "restore" afterwards.
+    response.headers["X-Cwng-Preset-Outcome"] = outcome
+    return response
+
+
+@cover_picker.route("/cover-designer/presets/<preset_id>/restore", methods=["POST"])
+@user_login_required
+def cover_designer_preset_restore(preset_id):
+    """Bring back a preset this reader hid."""
+    try:
+        preset = cover_design_presets.restore_preset(
+            _current_user_id(), preset_id, _binaries_dir())
+    except cover_generator.CoverGenerationError as error:
+        return _designer_json_error(error)
+    return jsonify({"ok": True, "preset": preset})
+
+
+@cover_picker.route("/cover-designer/presets/order", methods=["POST"])
+@user_login_required
+def cover_designer_preset_order():
+    """Persist the reader's own ordering of their saved presets."""
+    body = request.get_json(silent=True) or {}
+    order = body.get("order")
+    if not isinstance(order, list):
+        return _designer_json_error(
+            cover_generator.CoverGenerationError("invalid_design", "Send an \"order\" list of preset ids."))
+    try:
+        cover_design_presets.reorder_presets(_current_user_id(), order[:200])
+    except cover_generator.CoverGenerationError as error:
+        return _designer_json_error(error)
+    return jsonify(cover_design_presets.list_presets(_current_user_id(), _binaries_dir()))
 
 
 @cover_picker.route("/book/<int:book_id>/cover/lock", methods=["POST"])

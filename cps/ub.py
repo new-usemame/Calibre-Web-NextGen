@@ -895,6 +895,61 @@ class UserBookCover(Base):
                         default=lambda: datetime.now(timezone.utc))
 
 
+class CoverDesignPreset(Base):
+    """A named cover design somebody saved.
+
+    Presets are only useful if a reader can add and remove their own, so the
+    shipped ones are a starting point rather than the whole vocabulary. A row is
+    owned by the user who saved it; an admin can additionally save one with
+    ``scope='library'``, which offers it to everybody on the instance without
+    taking away their ability to hide it again (see
+    :class:`HiddenCoverDesignPreset`).
+
+    The design is stored as JSON rather than as columns because it *is* a
+    document — five styles' worth of colours, per-slot fonts and templates — and
+    nothing here ever queries inside it. It is re-validated on the way out, so a
+    design saved before a font was uninstalled still opens.
+    """
+    __tablename__ = 'cover_design_preset'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    scope = Column(String, nullable=False, default='user')
+    name = Column(String, nullable=False)
+    design = Column(String, nullable=False)
+    position = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, nullable=False,
+                        default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, nullable=False,
+                        default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'scope', 'name', name='uq_cover_design_preset_name'),
+    )
+
+
+class HiddenCoverDesignPreset(Base):
+    """One user's decision not to see one preset they cannot delete.
+
+    Deleting a builtin preset, or a library preset somebody else saved, must not
+    remove it for everyone — but a dropdown full of designs a reader will never
+    use is exactly the complaint that made presets worth fixing. So a delete of
+    something they do not own hides it for them alone, and the restore route
+    brings it back.
+    """
+    __tablename__ = 'hidden_cover_design_preset'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    preset_key = Column(String, nullable=False)
+    hidden_at = Column(DateTime, nullable=False,
+                       default=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        UniqueConstraint('user_id', 'preset_key', name='uq_hidden_cover_design_preset'),
+    )
+
+
 class KoboSyncedBooks(Base):
     __tablename__ = 'kobo_synced_books'
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -3620,6 +3675,15 @@ def migrate_user_book_cover_table(engine, _session):
     )
 
 
+def migrate_cover_design_preset_tables(engine, _session):
+    """Create the saved-cover-design tables on upgraded app.db files."""
+    Base.metadata.create_all(
+        engine,
+        tables=[CoverDesignPreset.__table__, HiddenCoverDesignPreset.__table__],
+        checkfirst=True,
+    )
+
+
 def migrate_notice_tables(engine, _session):
     """Create the generic notice inbox and resumable repair journal idempotently."""
     Base.metadata.create_all(
@@ -4981,6 +5045,7 @@ def migrate_Database(_session):
     migrate_kobo_two_way_annotation_sync(engine, _session)
     migrate_book_cover_preview_table(engine, _session)
     migrate_user_book_cover_table(engine, _session)
+    migrate_cover_design_preset_tables(engine, _session)
     migrate_notice_tables(engine, _session)
     migrate_kepub_package_repair_disposition(engine, _session)
     migrate_dismissed_duplicate_groups_table(engine, _session)

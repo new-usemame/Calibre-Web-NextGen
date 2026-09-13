@@ -218,8 +218,14 @@ test.describe('Recent library sort', () => {
 
     await expect(page.getByTestId('catalog-grid')).toBeVisible();
     await expect.poll(async () => (await renderedIds(page))[0],
-      { message: 'the recently read book must lead the grid' })
+      { message: `the recently read book (${readBookTitle}) must lead the grid` })
       .toBe(readBookId);
+    // The id above comes from the card's href; this is the text the reader
+    // actually sees. The catalog renders its cards through a measured row
+    // window, so a card that carried the right link over another book's title
+    // would satisfy the first assertion and fail this one.
+    await expect(page.getByTestId('catalog-grid').locator('a[href*="/book/"]').first())
+      .toContainText(readBookTitle);
     // The instrument check, in the browser: this book leads because it was
     // read, and it is the very last book the other order would show.
     expect(readBookId).not.toBe(newestBookId);

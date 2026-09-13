@@ -373,6 +373,11 @@ _PLACEHOLDER = re.compile(r"\{([a-z_]+)\}")
 _TOKEN_SPLIT = re.compile(r"(\{[a-z_]+\}|</?(?:b|i|em|strong)>|<br\s*/?>)", re.IGNORECASE)
 _EMPTY_TAG_PAIR = re.compile(r"<(b|i|em|strong)>\s*</\1>", re.IGNORECASE)
 _SEPARATOR_ONLY = re.compile(r"^[\s\-\u2013\u2014:;,./|\u00b7]*$")
+# Brackets are punctuation too, but paired: "{publisher} ({year})" on a book
+# with no year should read "Hodder", and "Hodder (2015)" must keep both of them.
+# They are therefore tracked as a run rather than dropped side by side.
+_BRACKET_SPLIT = re.compile(r"([()\[\]])")
+_BRACKET_PAIRS = {"(": ")", "[": "]"}
 
 
 # ---------------------------------------------------------------------------
@@ -1106,6 +1111,59 @@ def _field_value(name: str, meta: BookCoverMeta) -> str:
     return ""  # pragma: no cover - validate_template refuses unknown names
 
 
+def _drop_empty_brackets(resolved: list) -> list:
+    """Remove bracketed runs that ended up with nothing in them.
+
+    ``{title} ({year})`` is a natural thing to type, and on a book with no
+    publication year the brackets have to go with it. They cannot be handled by
+    the one-sided separator rule — an opening bracket has text before it and a
+    closing one has text after it — so a run is tracked from its opener to its
+    matching closer and dropped whole when nothing inside it survived.
+
+    Only the template's own brackets are considered: a run is split out of the
+    literal text around the placeholders, never out of a field's value, so a
+    book whose title really does contain "()" keeps it.
+    """
+    expanded = []
+    for kind, text in resolved:
+        if kind != "literal":
+            expanded.append((kind, text))
+            continue
+        for piece in _BRACKET_SPLIT.split(text):
+            if not piece:
+                continue
+            if piece in _BRACKET_PAIRS:
+                expanded.append(("open", piece))
+            elif piece in _BRACKET_PAIRS.values():
+                expanded.append(("close", piece))
+            elif _SEPARATOR_ONLY.match(piece):
+                expanded.append(("separator", piece))
+            else:
+                expanded.append(("literal", piece))
+
+    dropped = set()
+    open_runs = []  # (index of the opener, the closer it wants, saw real text)
+    for index, (kind, text) in enumerate(expanded):
+        if kind == "open":
+            open_runs.append([index, _BRACKET_PAIRS[text], False])
+        elif kind == "close":
+            if open_runs and open_runs[-1][1] == text:
+                start, _wanted, saw_text = open_runs.pop()
+                if saw_text:
+                    if open_runs:
+                        open_runs[-1][2] = True
+                else:
+                    dropped.update(range(start, index + 1))
+            elif open_runs:
+                open_runs[-1][2] = True  # a stray closer is just text
+        elif kind in ("field", "literal") and text and open_runs:
+            open_runs[-1][2] = True
+
+    # An opener with no closer is text like any other; nothing to drop.
+    return [("literal", text) if kind in ("open", "close") else (kind, text)
+            for index, (kind, text) in enumerate(expanded) if index not in dropped]
+
+
 def expand_text(template: str, meta: BookCoverMeta, bold: bool = False,
                 italic: bool = False) -> str:
     """Expand one validated template against one book.
@@ -1138,6 +1196,8 @@ def expand_text(template: str, meta: BookCoverMeta, bold: bool = False,
 
     if has_placeholder and not any(text for kind, text in resolved if kind == "field"):
         return ""
+
+    resolved = _drop_empty_brackets(resolved)
 
     # A separator only earns its place when there is real text on both sides of
     # it; markup does not count as text, or an empty field would keep its comma

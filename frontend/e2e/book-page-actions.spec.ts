@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { collectPageErrors, assertNoPageErrors, assertNoHorizontalOverflow } from './utils';
+import { collectPageErrors, assertNoPageErrors, assertNoHorizontalOverflow, fetchJsonSafe } from './utils';
 
 /*
  * Book-page actions cleanup contract:
@@ -34,8 +34,9 @@ async function firstBookWithFormats(page: Page): Promise<number | null> {
  *  renders its complete item set deterministically. */
 async function stubFullAccess(page: Page) {
   await page.route('**/api/v1/auth/me', async (route) => {
-    const res = await route.fetch();
-    const me = await res.json();
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const { response: res, body: me } = got;
     me.role = { ...me.role, admin: true, edit: true, delete_books: true, download: true, upload: true, viewer: true };
     me.features = { ...me.features, mail_configured: true, hide_books: true, uploading: true };
     me.library_mode = 'personal_library';
@@ -127,8 +128,9 @@ test('the delete section vanishes without the delete role; the rest of the menu 
   await stubFullAccess(page);
   // One role short of destructive: admin section must not render at all.
   await page.route('**/api/v1/auth/me', async (route) => {
-    const res = await route.fetch();
-    const me = await res.json();
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const { response: res, body: me } = got;
     me.role.delete_books = false;
     await route.fulfill({ response: res, json: me });
   });
@@ -208,8 +210,9 @@ test('a reader without the edit role lands in the personal scope, no switch show
   test.skip(bookId == null, 'seed has no book with files');
   await mockCoverSources(page);
   await page.route('**/api/v1/auth/me', async (route) => {
-    const res = await route.fetch();
-    const me = await res.json();
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const { response: res, body: me } = got;
     if (me?.role) { me.role.edit = false; me.role.admin = false; }
     await route.fulfill({ response: res, json: me });
   });

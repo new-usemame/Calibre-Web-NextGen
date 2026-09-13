@@ -347,11 +347,12 @@ export function BookDetail() {
   const [deviceSendBanner, setDeviceSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
   /* Panels opened from the gear menu need a scroll nudge: the menu item's click
      doesn't pull the page to the row the way the old in-row button's click did,
-     so a panel could open under the sticky TopBar or below the fold. */
+     so a panel could open under the sticky TopBar or below the fold. 'nearest'
+     scrolls only when the panel isn't already fully visible. */
   const sendPanelWrapRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!sendOpen && !deviceSendOpen) return;
-    sendPanelWrapRef.current?.scrollIntoView({ block: 'start' });
+    sendPanelWrapRef.current?.scrollIntoView({ block: 'nearest' });
   }, [sendOpen, deviceSendOpen]);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reloadMessage, setReloadMessage] = useState('');

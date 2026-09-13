@@ -1,4 +1,4 @@
-import { Page, expect } from '@playwright/test';
+import { Page, Route, expect } from '@playwright/test';
 
 /** Attach a console/pageerror collector. A clean console is a test result, not
  *  decoration — this is what catches the `[object Object]` error-envelope class. */
@@ -212,4 +212,20 @@ async function describeIndirectOverflow(page: Page, limit: number): Promise<stri
     parts.push('  nothing matched either probe — inspect documentElement/body padding directly');
   }
   return parts.join('\n');
+}
+
+/** Fetch-then-modify route handlers race the page that owns them: a navigation
+ *  (or the test ending) disposes the in-flight response, and the handler then
+ *  throws "Response has been disposed" as an unattributed error that Playwright
+ *  parks on whatever test runs next in the worker. A null return means "the
+ *  response died mid-flight — abort quietly". */
+export async function fetchJsonSafe(route: Route): Promise<{ response: Awaited<ReturnType<Route['fetch']>>; body: any } | null> {
+  try {
+    const response = await route.fetch();
+    const body = await response.json();
+    return { response, body };
+  } catch {
+    await route.abort().catch(() => {});
+    return null;
+  }
 }

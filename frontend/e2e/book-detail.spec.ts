@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { collectPageErrors, assertNoPageErrors, assertNoHorizontalOverflow, pageOverflow } from './utils';
+import { collectPageErrors, assertNoPageErrors, assertNoHorizontalOverflow, pageOverflow, fetchJsonSafe } from './utils';
 
 /*
  * Book-detail completeness pass:
@@ -168,8 +168,9 @@ test('the delete action is hidden for a user without the delete role (#803)', as
   // not render at all (hidden, never merely disabled — a forged request is
   // separately rejected server-side with 403).
   await page.route('**/api/v1/auth/me', async (route) => {
-    const res = await route.fetch();
-    const me = await res.json();
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const { response: res, body: me } = got;
     if (me?.role) me.role.delete_books = false;
     await route.fulfill({ response: res, json: me });
   });
@@ -210,8 +211,9 @@ test('long custom identifier types and values stay within the metadata grid', as
   const longType = `external-catalog-${'x'.repeat(64)}`;
   const longValue = `record-${'y'.repeat(96)}`;
   await page.route(`**/api/v1/books/${bookId}`, async (route) => {
-    const res = await route.fetch();
-    const book = await res.json();
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const { response: res, body: book } = got;
     book.identifiers = [
       ...(book.identifiers ?? []),
       { type: longType, label: longType, val: longValue, url: null },
@@ -248,8 +250,9 @@ test('long tag names add no horizontal overflow to the read-only detail page', a
   // Drop the edit role so the page renders the read-only Pill branch that a
   // guest or viewer account gets.
   await page.route('**/api/v1/auth/me', async (route) => {
-    const res = await route.fetch();
-    const me = await res.json();
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const { response: res, body: me } = got;
     if (me?.role) me.role.edit = false;
     await route.fulfill({ response: res, json: me });
   });
@@ -261,8 +264,9 @@ test('long tag names add no horizontal overflow to the read-only detail page', a
   // A real LoC heading plus a single unbroken token wider than the viewport.
   const longTag = 'France -- History -- Revolution, 1789-1799 -- Fiction';
   await page.route(`**/api/v1/books/${bookId}`, async (route) => {
-    const res = await route.fetch();
-    const book = await res.json();
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const { response: res, body: book } = got;
     book.tags = [
       { id: 990001, name: longTag },
       { id: 990002, name: 'Bildungsroman'.repeat(8) },
@@ -309,8 +313,9 @@ test('long title, author and series tokens add no horizontal overflow', async ({
   // transliterated name, a long series title. None contains a break opportunity.
   const longTitle = 'Kraftfahrzeughaftpflichtversicherungsgesetz';
   await page.route(`**/api/v1/books/${bookId}`, async (route) => {
-    const res = await route.fetch();
-    const book = await res.json();
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const { response: res, body: book } = got;
     book.title = longTitle;
     book.authors = [{ id: 990101, name: 'Nebuchadnezzarssonssonssonsdottir' }];
     book.series = { id: 990102, name: 'Donaudampfschiffahrtsgesellschaftskapitaen' };
@@ -344,8 +349,9 @@ test('long title, author and series tokens add no horizontal overflow', async ({
 
 async function stubDescription(page: Page, bookId: number) {
   await page.route(`**/api/v1/books/${bookId}`, async (route) => {
-    const res = await route.fetch();
-    const book = await res.json();
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const { response: res, body: book } = got;
     book.description_html = '<p>Reading-order sentinel description.</p>';
     book.publishers = [{ id: 990201, name: 'Sentinel Publisher' }];
     await route.fulfill({ response: res, json: book });

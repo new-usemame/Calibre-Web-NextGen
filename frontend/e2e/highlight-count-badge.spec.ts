@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { fetchJsonSafe } from './utils';
 
 /*
  * #1393 — the annotations entry on the book page carries the saved-annotation
@@ -20,9 +21,9 @@ test('View highlights keeps its zero state and exposes a counted accessible name
     }
   });
   await page.route(/\/api\/v1\/books\/\d+(?:\?.*)?$/, async (route) => {
-    const response = await route.fetch();
-    const body = await response.json();
-    await route.fulfill({ response, json: { ...body, annotation_count: annotationCount } });
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    await route.fulfill({ response: got.response, json: { ...got.body, annotation_count: annotationCount } });
   });
 
   await page.goto('/app');

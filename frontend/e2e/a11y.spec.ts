@@ -27,6 +27,12 @@ test.use({ contextOptions: { reducedMotion: 'reduce' } });
 
 async function axeScan(page: Page, label: string) {
   await page.waitForLoadState('networkidle');
+  // Clear any resting-pointer :hover before measuring: the navigation click
+  // leaves the mouse at the old click point, and whatever link happens to sit
+  // under it on the new page renders in its hover colour — axe would then grade
+  // a transient interaction state as the resting contrast (flaky by layout).
+  // (0,0) is page chrome padding, not a control, and never waits or scrolls.
+  await page.mouse.move(0, 0);
   expect(
     await page.evaluate(() => matchMedia('(prefers-reduced-motion: reduce)').matches),
     'the a11y harness must disable transitions before comparing theme endpoints',

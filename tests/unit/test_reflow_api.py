@@ -296,8 +296,10 @@ def test_a_second_conversion_of_the_same_book_is_refused_while_one_is_running(
 @pytest.mark.unit
 def test_a_finished_conversion_does_not_block_the_next_one(
         mod, monkeypatch, pdf_on_disk):
+    from cps.services.worker import STAT_FINISH_SUCCESS
+
     _wire(mod, monkeypatch, pdf_on_disk)
-    done = SimpleNamespace(book_id=5, stat=mod.STAT_FINISH_SUCCESS, id="t1",
+    done = SimpleNamespace(book_id=5, stat=STAT_FINISH_SUCCESS, id="t1",
                            is_reflow=True)
     resp, _added = _start(mod, {"mode": "full", "model_tier": "standard",
                                 "consent": True, "cost_cap_usd": 1.0},
@@ -405,6 +407,36 @@ def test_a_running_job_is_listed_with_its_progress(mod, monkeypatch, pdf_on_disk
     assert body["active"][0]["task_id"] == "t9"
     assert body["active"][0]["progress"] == pytest.approx(0.25)
     assert "page 12 of 40" in body["active"][0]["message"]
+
+
+@pytest.mark.unit
+def test_a_task_the_worker_has_finished_with_is_not_still_active(
+        mod, monkeypatch, pdf_on_disk):
+    """The worker keeps finished tasks in its list until somebody clears them.
+
+    The page reads ``active`` as "something is running right now": it hides the
+    start button and shows a progress bar for every entry. A task that finished
+    an hour ago would leave a full bar on the page and the button disabled, while
+    the start endpoint -- which looks only at waiting and started tasks -- would
+    have accepted the next conversion happily.
+    """
+    from cps.services.worker import STAT_FINISH_SUCCESS
+
+    _wire(mod, monkeypatch, pdf_on_disk)
+    done = SimpleNamespace(book_id=5, stat=STAT_FINISH_SUCCESS, id="t8",
+                           progress=1.0, message="done", job_id="d1b2c3d4e5f60004",
+                           is_cancellable=False, is_reflow=True)
+    running = SimpleNamespace(book_id=5, stat=mod.STAT_WAITING, id="t9", progress=0.0,
+                              message="queued", job_id="d1b2c3d4e5f60005",
+                              is_cancellable=True, is_reflow=True)
+    with _ctx("/api/v1/books/5/reflow/jobs"):
+        with patch.object(mod, "current_user", _user(uid=7)):
+            with patch.object(mod.WorkerThread, "get_instance", staticmethod(
+                    lambda: SimpleNamespace(tasks=[(0, "ed", 0, done, False),
+                                                   (0, "ed", 0, running, False)]))):
+                body = _json(inspect.unwrap(mod.reflow_jobs)(5))
+
+    assert [row["task_id"] for row in body["active"]] == ["t9"]
 
 
 @pytest.mark.unit

@@ -50,15 +50,21 @@ from .. import calibre_db, config
 from ..constants import REFLOW_DIR
 from ..cw_login import current_user
 from ..services.reflow import build_epub, ledger as ledger_mod, model, pipeline
-from ..services.worker import (STAT_CANCELLED, STAT_ENDED, STAT_FAIL,
-                               STAT_FINISH_SUCCESS, STAT_STARTED, STAT_WAITING,
-                               WorkerThread)
+from ..services.worker import STAT_STARTED, STAT_WAITING, WorkerThread
 from ..tasks import reflow as tasks_reflow
 from ..usermanagement import login_required_if_no_ano
 
 #: A job id is a hex token the task made. Anything else is not one, and this is the
 #: only thing a URL is allowed to contribute to a filesystem path here.
 _JOB_ID = re.compile(r"^[0-9a-f]{6,32}$")
+
+#: The two states that mean "this book is being converted right now". The worker
+#: keeps finished tasks in its list until somebody clears them, and a page that
+#: read those as active would sit on a full progress bar with its start button
+#: disabled, while POST /reflow -- which looks at exactly these two states --
+#: would have accepted the next conversion. What a finished job did is in the
+#: ledger, which is what ``items`` is read from.
+_ACTIVE_STATS = {STAT_WAITING: "waiting", STAT_STARTED: "running"}
 
 #: A survey is CPU-bound PyMuPDF work. Two at a time keeps a burst of book pages
 #: from turning the box over to estimating; a third caller waits its turn.
@@ -281,7 +287,7 @@ def _running_task(book_id):
             continue
         if not getattr(task, "is_reflow", False):
             continue
-        if task.stat in (STAT_WAITING, STAT_STARTED):
+        if task.stat in _ACTIVE_STATS:
             return task
     return None
 
@@ -342,11 +348,6 @@ def reflow_start(book_id):
 
 # ── what happened ────────────────────────────────────────────────────────────
 
-_STAT_NAMES = {STAT_WAITING: "waiting", STAT_STARTED: "running",
-               STAT_FAIL: "failed", STAT_FINISH_SUCCESS: "done",
-               STAT_ENDED: "cancelled", STAT_CANCELLED: "cancelled"}
-
-
 def _jobs_dir(book_id):
     return os.path.join(REFLOW_DIR, "jobs", str(int(book_id)))
 
@@ -399,8 +400,11 @@ def reflow_jobs(book_id):
             continue
         if not is_admin and user != current_user.name:
             continue
+        state = _ACTIVE_STATS.get(task.stat)
+        if state is None:
+            continue
         active.append({"task_id": str(task.id), "job_id": getattr(task, "job_id", None),
-                       "status": _STAT_NAMES.get(task.stat, "running"),
+                       "status": state,
                        "progress": round(float(getattr(task, "progress", 0) or 0), 4),
                        "message": str(getattr(task, "message", "") or ""),
                        "cancellable": bool(getattr(task, "is_cancellable", False))})

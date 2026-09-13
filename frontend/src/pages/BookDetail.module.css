@@ -763,7 +763,7 @@
   font-size: var(--fs-base);
   font-family: var(--font-body);
   outline: none;
-  width: 130px;
+  width: 160px;
   min-height: 40px;
   box-sizing: border-box;
 }

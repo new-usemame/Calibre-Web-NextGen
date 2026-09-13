@@ -56,14 +56,30 @@ def _embed_timeout():
 
 def _kill_export_tree(p):
     """Kill a timed-out export and its children (calibre-parallel)."""
-    try:
-        os.killpg(os.getpgid(p.pid), signal.SIGKILL)
-    except (AttributeError, OSError):
-        # Windows (no killpg) or the group is already gone
+    if os.name == "nt":
+        # Windows has no process groups (os.getpgid/os.killpg don't exist), so
+        # kill the whole tree with taskkill /T; fall back to p.kill() when
+        # taskkill is unavailable.
         try:
-            p.kill()
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(p.pid)],
+                capture_output=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.TimeoutExpired, FileNotFoundError):
+            try:
+                p.kill()
+            except OSError:
+                pass
+    else:
+        try:
+            os.killpg(os.getpgid(p.pid), signal.SIGKILL)
         except OSError:
-            pass
+            # The process group is already gone
+            try:
+                p.kill()
+            except OSError:
+                pass
     try:
         p.communicate(timeout=10)
     except Exception:

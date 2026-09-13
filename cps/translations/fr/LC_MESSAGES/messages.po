@@ -2788,16 +2788,6 @@ msgid "Read {title}"
 msgstr "Lire {title}"
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid "More actions for {title}"
-msgstr "Plus d’actions pour {title}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Actions for {title}"
-msgstr "Actions pour {title}"
-
-#: cps/spa_strings.py
 msgid "Standard (username / password)"
 msgstr "Standard (nom d’utilisateur / mot de passe)"
 
@@ -15074,6 +15064,13 @@ msgstr "Note {label}"
 #: cps/spa_strings.py
 msgid "Untitled link"
 msgstr "Lien sans titre"
+#, python-brace-format
+#~ msgid "More actions for {title}"
+#~ msgstr "Plus d’actions pour {title}"
+
+#, python-brace-format
+#~ msgid "Actions for {title}"
+#~ msgstr "Actions pour {title}"
 
 #~ msgid "Design"
 #~ msgstr "Modèle"

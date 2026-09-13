@@ -2576,16 +2576,6 @@ msgid "Read {title}"
 msgstr "閱讀 {title}"
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid "More actions for {title}"
-msgstr "{title} 更多操作"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Actions for {title}"
-msgstr "{title} 的操作"
-
-#: cps/spa_strings.py
 msgid "Standard (username / password)"
 msgstr "標準（用戶名 / 密碼）"
 
@@ -14230,6 +14220,14 @@ msgstr "同步所選書架到 Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "顯示已讀/未讀選擇"
+
+#, python-brace-format
+#~ msgid "More actions for {title}"
+#~ msgstr "{title} 更多操作"
+
+#, python-brace-format
+#~ msgid "Actions for {title}"
+#~ msgstr "{title} 的操作"
 
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr "封面檔案只支援 jpg/jpeg/png/webp/bmp 格式"

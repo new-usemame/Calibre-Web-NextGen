@@ -2727,16 +2727,6 @@ msgid "Read {title}"
 msgstr "Читать «{title}»"
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid "More actions for {title}"
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Actions for {title}"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Standard (username / password)"
 msgstr "Стандартный (имя пользователя / пароль)"
 

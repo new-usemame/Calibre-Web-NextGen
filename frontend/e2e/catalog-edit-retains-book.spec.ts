@@ -146,19 +146,42 @@ function targetCard(page: Page) {
 }
 
 /** Enter the edit flow through the control exposed by the active pointer
- * contract. Fine pointers retain the hover pencil; coarse pointers expose the
- * same edit destination as a labelled item in the card disclosure. */
+ * contract. Fine pointers retain the hover pencil; coarse pointers carry no
+ * card actions at all (operator ruling 2026-09-12), so the touch route is the
+ * one a phone user has: tap into the book and use its own Edit link. */
 async function openQuickEdit(page: Page) {
   const card = targetCard(page).first().locator('..');
   if (test.info().project.use.hasTouch === true) {
-    await card.getByRole('button', { name: /^More actions for / }).click();
-    const actions = card.getByRole('group', { name: /^Actions for / });
-    await actions.getByRole('link', { name: /^Edit / }).click();
+    await targetCard(page).first().click();
+    await page.waitForURL(`**/book/${TARGET_ID}`);
+    await page.locator(`a[href$="/book/${TARGET_ID}/edit"]`).first().click();
     return;
   }
 
   await card.hover();
   await card.locator(`a[href$="/book/${TARGET_ID}/edit"]`).click();
+}
+
+/** Walk client-side back to the library.
+ *
+ * The edit flow's history depth is pointer-dependent now: a fine pointer goes
+ * /app -> /book/N/edit, a coarse one /app -> /book/N -> /book/N/edit. Pinning a
+ * fixed number of goBack() calls would make this spec assert the route shape
+ * rather than the thing it is about — that the listing survives the round trip.
+ */
+async function returnToLibrary(page: Page) {
+  for (let step = 0; step < 4; step += 1) {
+    // wouter updates the URL from popstate, so the library route is what has to
+    // be waited for; goBack() alone resolves before the SPA has re-rendered.
+    await page.goBack();
+    try {
+      await page.waitForURL((u) => !/\/book\//.test(u.pathname), { timeout: 5_000 });
+      return;
+    } catch {
+      // Still on a book route: this pointer's flow has another entry to unwind.
+    }
+  }
+  throw new Error('client-side back navigation never returned to the library');
 }
 
 /** Where the book under test sits among the loaded cards — the thing the
@@ -227,10 +250,7 @@ test.describe('#1169 an edited book stays in the library listing', () => {
 
     // Back to the library the way the reporter does — a client-side return, not
     // a reload. history: /app → /book/N/edit → /book/N.
-    await page.goBack();
-    await page.waitForURL(`**/book/${TARGET_ID}/edit`);
-    await page.goBack();
-    await page.waitForURL((u) => !/\/book\//.test(u.pathname));
+    await returnToLibrary(page);
 
     // The whole listing is still there and the book is still in it…
     await expect(gridBookLinks(page)).toHaveCount(firstPageCount * 2);
@@ -276,10 +296,7 @@ test.describe('#1169 an edited book stays in the library listing', () => {
     await page.getByRole('button', { name: /save changes/i }).click();
     await page.waitForURL(`**/book/${TARGET_ID}`, { timeout: 15_000 });
 
-    await page.goBack();
-    await page.waitForURL(`**/book/${TARGET_ID}/edit`);
-    await page.goBack();
-    await page.waitForURL((u) => !/\/book\//.test(u.pathname));
+    await returnToLibrary(page);
 
     // The snapshot is gone, so the library starts again from page 1 rather
     // than restoring an accumulation the rename has invalidated the order of.

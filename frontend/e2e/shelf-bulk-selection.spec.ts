@@ -213,12 +213,24 @@ test('shelf: bulk read, reorder, route reuse and reversible per-card removal coe
     let dialogs = 0;
     page.on('dialog', dialog => { dialogs++; void dialog.dismiss(); });
     const card = page.getByRole('link', { name: `Open details for ${books[0].title}`, exact: true });
-    await card.hover();
-    const more = page.getByRole('button', { name: `More actions for ${books[0].title}`, exact: true });
-    if (await more.isVisible()) await more.click();
     const removal = page.waitForResponse(res => res.url().endsWith(`/shelves/${shelves[1].id}/books/${books[0].id}/delete`) && res.request().method() === 'POST');
-    await page.getByRole('button', { name: 'Remove from shelf', exact: true }).filter({ visible: true }).first().click();
-    expect((await removal).ok()).toBeTruthy();
+    if (test.info().project.use.hasTouch === true) {
+      // Coarse pointers carry no card actions (operator ruling 2026-09-12), so
+      // the touch route to the same membership change is the book's own page:
+      // the Add-to-shelf popover toggles the shelf off. Same endpoint, and it
+      // must stay just as immediate — no confirmation dialog.
+      await page.goto(`/app/book/${books[0].id}`);
+      await page.getByRole('button', { name: 'Add to shelf' }).click();
+      // The toggle's accessible name is the shelf name plus its visibility badge
+      // ("… Private shelf"), so match on the name as a substring.
+      await page.getByRole('button', { name: shelves[1].name }).click();
+      expect((await removal).ok()).toBeTruthy();
+      await page.goto(`/app/shelf/${shelves[1].id}`);
+    } else {
+      await card.hover();
+      await page.getByRole('button', { name: 'Remove from shelf', exact: true }).filter({ visible: true }).first().click();
+      expect((await removal).ok()).toBeTruthy();
+    }
     await expect(card).toHaveCount(0);
     expect(dialogs).toBe(0);
     const libraryBook = await page.request.get(`/api/v1/books/${books[0].id}`);

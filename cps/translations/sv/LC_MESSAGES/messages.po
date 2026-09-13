@@ -2719,16 +2719,6 @@ msgid "Read {title}"
 msgstr "Läs {title}"
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid "More actions for {title}"
-msgstr "Fler åtgärder för {title}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Actions for {title}"
-msgstr "Åtgärder för {title}"
-
-#: cps/spa_strings.py
 msgid "Standard (username / password)"
 msgstr "Standard (användarnamn/lösenord)"
 
@@ -15012,6 +15002,14 @@ msgstr "Exponera valda hyllor via OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Visa avsnittet Läst/oläst"
+
+#, python-brace-format
+#~ msgid "More actions for {title}"
+#~ msgstr "Fler åtgärder för {title}"
+
+#, python-brace-format
+#~ msgid "Actions for {title}"
+#~ msgstr "Åtgärder för {title}"
 
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr "Endast jpg/jpeg/png/webp/bmp-filer stöds som omslagsfil"

@@ -2691,16 +2691,6 @@ msgid "Read {title}"
 msgstr "{title} olvasása"
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid "More actions for {title}"
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Actions for {title}"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Standard (username / password)"
 msgstr "Normál (felhasználónév / jelszó)"
 

@@ -2779,16 +2779,6 @@ msgid "Read {title}"
 msgstr "Leer {title}"
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid "More actions for {title}"
-msgstr "Más acciones para {title}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Actions for {title}"
-msgstr "Acciones para {title}"
-
-#: cps/spa_strings.py
 msgid "Standard (username / password)"
 msgstr "Estándar (usuario / contraseña)"
 
@@ -15212,3 +15202,11 @@ msgstr "Exponer las estanterías seleccionadas en OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostrar Selección Leidos/No Leidos"
+
+#, python-brace-format
+#~ msgid "More actions for {title}"
+#~ msgstr "Más acciones para {title}"
+
+#, python-brace-format
+#~ msgid "Actions for {title}"
+#~ msgstr "Acciones para {title}"

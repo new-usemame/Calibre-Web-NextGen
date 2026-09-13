@@ -95,247 +95,123 @@ test('book-card actions keep a shared baseline for touch, mouse, and keyboard', 
   }
 });
 
-test('coarse pointers use a visible actions disclosure with real touch input', async ({ page }) => {
-  test.skip(!isTouchProject(), 'coarse-pointer actions disclosure');
+test('coarse pointers carry no card actions; the book page owns them', async ({ page }) => {
+  test.skip(!isTouchProject(), 'coarse-pointer card layout');
 
   await page.goto('/app');
   await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
 
+  // Wait for real cards first: `toHaveCount(0)` is satisfied by an empty page,
+  // so asserting absence before the grid renders proves nothing.
+  const anyCard = page.locator('a[aria-label^="Open details for"]');
+  await expect(anyCard.first()).toBeVisible();
+
+  // Operator ruling 2026-09-12: the "…" disclosure on every cover was too much
+  // chrome on a phone. A touch card is the cover plus its title link, and the
+  // three redundant actions live one tap away on the book's own page.
+  await expect(
+    page.getByRole('button', { name: /^More actions for / }),
+    'no card may carry a More actions disclosure on a coarse pointer',
+  ).toHaveCount(0);
+
   const catalogCard = page.locator('[class*="wrap"]').filter({
     has: page.locator('a[aria-label^="Edit "]'),
   }).first();
+  const catalogDetails = catalogCard.locator('a[aria-label^="Open details for"]');
   const catalogRead = catalogCard.locator('a[aria-label^="Read "]');
   const catalogEdit = catalogCard.locator('a[aria-label^="Edit "]');
   await expect(catalogRead, 'the catalog fixture needs a readable book').toBeAttached();
   await expect(catalogEdit, 'the catalog fixture needs an editable book').toBeAttached();
 
-  // Broken-state discriminator. Before the disclosure fix these links had
-  // opacity:0 but still owned real hit-test boxes. A genuine touch tap at the
-  // blank-looking Read box navigated iPad-class WebKit and Chromium straight
-  // into the reader. The fixed coarse-pointer layout removes those legacy
-  // controls from layout and hit testing, so there is no box to tap.
-  const invisibleReadBox = await catalogRead.boundingBox();
-  if (invisibleReadBox) {
-    const before = page.url();
-    await page.touchscreen.tap(
-      invisibleReadBox.x + invisibleReadBox.width / 2,
-      invisibleReadBox.y + invisibleReadBox.height / 2,
-    );
-    await page.waitForTimeout(300);
-    expect(page.url(), 'blank card space must never activate an invisible Read link').toBe(before);
-  }
+  // PR #2028's invariant still holds and is the reason these keep `display:none`
+  // rather than `opacity:0`: an iPad tap applies synthetic hover, so a
+  // transparent-but-laid-out control reveals AND activates under the same
+  // finger. Removed from layout means there is no box to tap at all.
+  expect(
+    await catalogRead.boundingBox(),
+    'legacy Read must occupy no box in the coarse-pointer layout',
+  ).toBeNull();
+  expect(
+    await catalogEdit.boundingBox(),
+    'legacy Edit must occupy no box in the coarse-pointer layout',
+  ).toBeNull();
 
-  await expect(catalogRead, 'legacy Read is absent from the coarse-pointer layout').toBeHidden();
-  await expect(catalogEdit, 'legacy Edit is absent from the coarse-pointer layout').toBeHidden();
+  // TOUCH: the only thing a tap on the card can do is open the book.
+  const href = await catalogDetails.getAttribute('href');
+  const bookId = href!.match(/\/book\/(\d+)$/)![1];
+  await tap(catalogDetails);
+  await expect(page).toHaveURL(new RegExp(`/book/${bookId}$`));
 
-  const more = catalogCard.getByRole('button', { name: /^More actions for / });
-  await expect(more).toBeVisible();
-  const target = await more.boundingBox();
-  expect(target!.width, 'More actions touch target width').toBeGreaterThanOrEqual(44);
-  expect(target!.height, 'More actions touch target height').toBeGreaterThanOrEqual(44);
-  await expect(more).toHaveAttribute('aria-expanded', 'false');
+  // …and the book page carries the actions the card gave up.
+  const detailRead = page.getByRole('link', { name: 'Read now' });
+  await expect(detailRead, 'the book page offers Read now').toBeVisible();
+  await expect(
+    page.locator(`a[href$="/book/${bookId}/edit"]`).first(),
+    'the book page offers Edit',
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Add to shelf' }),
+    'the book page owns shelf membership, which is how a shelf removal is reached',
+  ).toBeVisible();
 
-  // TOUCH: the first tap reveals labelled actions without navigating.
-  const catalogUrl = page.url();
-  await tap(more);
-  await expect(page).toHaveURL(catalogUrl);
-  await expect(more).toHaveAttribute('aria-expanded', 'true');
-  const actions = catalogCard.getByRole('group', { name: /^Actions for / });
-  const readAction = actions.getByRole('link', { name: /^Read / });
-  const editAction = actions.getByRole('link', { name: /^Edit / });
-  await expect(readAction).toBeVisible();
-  await expect(editAction).toBeVisible();
-
-  // KEYBOARD: disclosure state is announced, Tab reaches its ordinary links,
-  // and Escape closes it while restoring focus to the trigger.
-  await page.keyboard.press('Escape');
-  await expect(more).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(more).toHaveAttribute('aria-expanded', 'true');
-  await page.keyboard.press('Tab');
-  await expect(readAction).toBeFocused();
-  await page.keyboard.press('Escape');
-  await expect(more).toBeFocused();
-
-  // MOUSE on a hybrid coarse-pointer device: the same disclosure is clickable.
-  await more.click();
-  await expect(editAction).toBeVisible();
-  await page.keyboard.press('Escape');
-
-  // TOUCH: activate the real Read action from the visible disclosure.
-  await tap(more);
-  await tap(readAction);
-  await expect(page).toHaveURL(/\/app\/read\/\d+/);
-  const discoverRefetch = page.waitForResponse((response) => {
-    const url = new URL(response.url());
-    return response.request().method() === 'GET'
-      && url.pathname === '/api/v1/books'
-      && url.searchParams.get('filter') === 'discover';
-  });
+  await tap(detailRead);
+  await expect(page).toHaveURL(new RegExp(`/app/read/${bookId}\\b`));
   await page.goBack();
-  const discoverResponse = await discoverRefetch;
-  expect(discoverResponse.ok(), 'Discover refetch after reader navigation').toBeTruthy();
-  const { items: discoverItems } = await discoverResponse.json() as {
-    items: Array<{ id: number }>;
-  };
-  expect(discoverItems.length, 'Discover refetch returns a rail card').toBeGreaterThan(0);
-  await expect(catalogCard).toBeVisible();
 
-  // Horizontal rails are overflow containers, which otherwise clip an
-  // absolutely-positioned panel on the block axis. Exercise a real Discover
-  // BookCard and assert the disclosed Read link is the element hit at its own
-  // centre, not merely present behind the rail's clipping layer.
-  const discover = page.getByTestId('discover-section');
-  await expect(discover).toBeVisible();
-  const railDetails = discover.locator('a[aria-label^="Open details for"]').first();
-  await expect(railDetails).toHaveAttribute('href', new RegExp(`/book/${discoverItems[0].id}$`));
-  const railMore = railDetails.locator('..')
-    .getByRole('button', { name: /^More actions for / });
-  await expect(railMore).toHaveAttribute('aria-expanded', 'false');
-  await railMore.evaluate((node) => node.scrollIntoView({
-    block: 'center',
-    inline: 'center',
-    behavior: 'instant',
-  }));
-  await expect.poll(() => railMore.evaluate((node) => {
-    const box = node.getBoundingClientRect();
-    const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-    return hit === node || node.contains(hit);
-  }), { message: 'Discover trigger owns its centre after rail scroll release' }).toBe(true);
-  await tap(railMore);
-  await expect(railMore).toHaveAttribute('aria-expanded', 'true');
-  const railRead = discover
-    .getByRole('group', { name: /^Actions for / })
-    .getByRole('link', { name: /^Read / });
-  await expect(railRead).toBeVisible();
-  await railRead.scrollIntoViewIfNeeded();
-  expect(await railRead.evaluate((node) => {
-    const box = node.getBoundingClientRect();
-    const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-    return hit === node || node.contains(hit);
-  }), 'Discover disclosure action is not clipped or covered at its centre').toBe(true);
-  await page.keyboard.press('Escape');
-
-  // The default E2E admin uses universal-library mode, where Catalog has no
-  // per-card removal action. Exercise the same real BookCard X on a temporary
-  // shelf instead of weakening the regression into a synthetic DOM fixture.
+  // A shelf card is the same story: its X is gone on touch, and removing the
+  // book from the shelf is a toggle inside the book page's Add-to-shelf popover.
   const csrf = await page.request.get('/api/v1/auth/csrf');
   const { csrf_token } = await csrf.json() as { csrf_token: string };
   const headers = { 'X-CSRFToken': csrf_token };
-  const books = await page.request.get('/api/v1/books?per_page=1');
-  const { items } = await books.json() as { items: Array<{ id: number }> };
-  expect(items.length, 'the fixture must contain a book for the removal-card probe').toBeGreaterThan(0);
-
   const created = await page.request.post('/api/v1/shelves', {
     headers,
     data: { name: `touch-card-actions-${Date.now()}` },
   });
   expect(created.ok(), 'temporary shelf creation').toBeTruthy();
   const shelfId = ((await created.json()) as { id: number }).id;
+  const shelfName = ((await page.request.get(`/api/v1/shelves/${shelfId}`)).ok())
+    ? ((await (await page.request.get(`/api/v1/shelves/${shelfId}`)).json()) as { name: string }).name
+    : '';
   try {
-    const added = await page.request.post(`/api/v1/shelves/${shelfId}/books/${items[0].id}`, { headers });
+    const added = await page.request.post(`/api/v1/shelves/${shelfId}/books/${bookId}`, { headers });
     expect(added.ok(), 'temporary shelf membership').toBeTruthy();
     await page.goto(`/app/shelf/${shelfId}`);
-    // The legacy fine-pointer control remains attached but is deliberately
-    // display:none on touch. Include hidden accessibility nodes to locate the
-    // owning card, then exercise only the visible disclosure action below.
     const remove = page.getByRole('button', { name: 'Remove from shelf', includeHidden: true });
     await expect(remove).toHaveCount(1);
-    const shelfCard = remove.locator('..');
-    await expect(remove, 'legacy Remove is absent from the coarse-pointer layout').toBeHidden();
-    const shelfMore = shelfCard.getByRole('button', { name: /^More actions for / });
-    await tap(shelfMore);
-    const shelfActions = shelfCard.getByRole('group', { name: /^Actions for / });
-    const removeAction = shelfActions.getByRole('button', { name: 'Remove from shelf' });
-    await expect(removeAction).toBeVisible();
-    await tap(removeAction);
-    await expect(page.getByRole('button', { name: 'Remove from shelf' })).toHaveCount(0);
+    expect(
+      await remove.boundingBox(),
+      'legacy Remove must occupy no box in the coarse-pointer layout',
+    ).toBeNull();
+    await expect(
+      page.getByRole('button', { name: /^More actions for / }),
+      'a shelf card carries no disclosure either',
+    ).toHaveCount(0);
+
+    // The reachable path: open the book, toggle the shelf off.
+    await page.goto(`/app/book/${bookId}`);
+    await page.getByRole('button', { name: 'Add to shelf' }).click();
+    await page.getByRole('button', { name: shelfName }).click();
+    await page.goto(`/app/shelf/${shelfId}`);
+    await expect(
+      page.getByRole('button', { name: 'Remove from shelf', includeHidden: true }),
+      'the book left the shelf through the book page',
+    ).toHaveCount(0);
   } finally {
     await page.request.post(`/api/v1/shelves/${shelfId}/delete`, { headers }).catch(() => undefined);
   }
 });
 
-test('keyboard focus leaving a card closes its actions disclosure', async ({ page }) => {
-  test.skip(!isTouchProject(), 'coarse-pointer actions disclosure');
-
-  await page.goto('/app');
-
-  const disclosures = page.getByRole('button', { name: /^More actions for / });
-  await expect(disclosures.first()).toBeVisible();
-  expect(await disclosures.count(), 'the catalog fixture needs at least two action disclosures')
-    .toBeGreaterThan(1);
-  const first = disclosures.nth(0);
-  const second = disclosures.nth(1);
-
-  await first.focus();
-  await page.keyboard.press('Enter');
-  await expect(first).toHaveAttribute('aria-expanded', 'true');
-
-  // Focus moving within one disclosure must leave it open.
-  await page.keyboard.press('Tab');
-  await expect(first.locator('..').getByRole('link').first()).toBeFocused();
-  await expect(first).toHaveAttribute('aria-expanded', 'true');
-
-  // Continue as a keyboard user would until the next card's trigger, then open
-  // it. Leaving the first card must release its panel and paint containment.
-  for (let tab = 0; tab < 8; tab += 1) {
-    if (await second.evaluate((node) => document.activeElement === node)) break;
-    await page.keyboard.press('Tab');
-  }
-  await expect(second).toBeFocused();
-  await page.keyboard.press('Enter');
-  await expect(second).toHaveAttribute('aria-expanded', 'true');
-  await expect(page.locator('button[aria-expanded="true"]')).toHaveCount(1);
-  await expect(first).toHaveAttribute('aria-expanded', 'false');
-});
-
 test('quick-edit action uses the light-theme palette in both presentations', async ({ page }) => {
+  // The pencil is display:none on coarse pointers — the operator's 2026-09-12
+  // ruling leaves a touch card with no actions at all — so there is no visible
+  // control here to measure. Touch reachability is covered by the test above.
+  test.skip(isTouchProject(), 'fine-pointer quick-edit palette');
   await page.goto('/app');
   const quickEdit = page.locator('a[aria-label^="Edit "]').first();
   await expect(quickEdit).toHaveCount(1);
 
   await page.evaluate(() => document.documentElement.setAttribute('data-theme', 'light'));
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  if (isTouchProject()) {
-    // Touch quick-edit disclosure: measure the visible presentation users now
-    // invoke, not the deliberately removed pencil that remains in the DOM for
-    // fine-pointer CSS. This preserves palette coverage at the real control.
-    const card = quickEdit.locator('..').locator('..');
-    await tap(card.getByRole('button', { name: /^More actions for / }));
-    const panel = card.getByRole('group', { name: /^Actions for / });
-    const editAction = panel.getByRole('link', { name: /^Edit / });
-    await expect(editAction).toBeVisible();
-
-    const expected = await editAction.evaluate(() => {
-      const resolveToken = (token: string) => {
-        const probe = document.createElement('span');
-        probe.style.color = `var(${token})`;
-        document.body.appendChild(probe);
-        const resolved = getComputedStyle(probe).color;
-        probe.remove();
-        return resolved;
-      };
-      return {
-        panelBackground: resolveToken('--surface-2'),
-        panelBorder: resolveToken('--border-strong'),
-        actionColor: resolveToken('--text'),
-      };
-    });
-
-    await expect.poll(async () => {
-      const panelStyle = await panel.evaluate((node) => {
-        const style = getComputedStyle(node);
-        return { background: style.backgroundColor, border: style.borderColor };
-      });
-      const actionColor = await editAction.evaluate((node) => getComputedStyle(node).color);
-      return {
-        panelBackground: panelStyle.background,
-        panelBorder: panelStyle.border,
-        actionColor,
-      };
-    }, { message: 'light: touch quick edit resolves to the disclosure palette' }).toEqual(expected);
-    return;
-  }
 
   await quickEdit.locator('..').locator('..').locator('a[aria-label^="Open details for"]').hover();
   await expectRevealed(quickEdit, true, 'light: quick edit is revealed before its visible palette is measured');

@@ -8,8 +8,9 @@ are reading on their ereaders, so Read Now is redundant (I never use it)."
 
 Behavioural coverage is frontend/e2e/card-actions-toggle.spec.ts, which drives
 the real toggle in the browser on desktop and touch. The separate
-book-card-actions.spec.ts pins the 2026-08-29 ruling that redundant actions use
-one visible disclosure on coarse pointers. These pin the wiring
+book-card-actions.spec.ts pins the 2026-09-12 ruling that coarse pointers carry
+no card actions at all, and that the three redundant actions stay reachable one
+tap away on the book's own page. These pin the wiring
 that a refactor could quietly drop: the single storage key, the removal (not
 hiding) of the row, and the fact that EVERY surface rendering a BookCard honours
 it — a missed call site is invisible until a user reports the buttons are still
@@ -48,7 +49,6 @@ _CARD_SURFACES = {
 _STATE_OWNERS = tuple(k for k in _CARD_SURFACES if k[0] == "pages")
 
 _COARSE_MEDIA = "(any-hover: none), (any-pointer: coarse)"
-
 
 
 def _media_block(css: str, opener: str) -> str:
@@ -175,28 +175,34 @@ def test_bookcard_removes_the_row_rather_than_hiding_it():
     assert "const hasActionRow = hasAddAction || (!hideActions && (Boolean(readTarget) || quickEdit));" in src
 
 
-def test_coarse_pointer_card_actions_use_a_visible_disclosure():
-    """Touch must never hit an opacity-hidden live action.
+def test_coarse_pointer_cards_carry_no_actions_at_all():
+    """Operator ruling 2026-09-12: no disclosure, no hover controls on touch.
 
-    The coarse layout removes the legacy controls from layout and exposes one
-    named 44px disclosure; fine pointers keep the established hover controls.
+    A touch card is the cover plus its info link. The three actions it used to
+    carry are reachable by tapping into the book, so nothing on the card may
+    re-introduce a per-card action surface — neither the removed "…" disclosure
+    nor any replacement for it.
     """
     src = (_FE / "components" / "BookCard.tsx").read_text()
     css = (_FE / "components" / "BookCard.module.css").read_text()
-    coarse = _media_block(css, "@media (any-hover: none), (any-pointer: coarse) {")
 
-    assert ".moreActionsTrigger" in css
-    assert "width: 44px;" in css and "height: 44px;" in css
-    assert "aria-expanded={actionsOpen}" in src
-    assert "aria-controls={actionsOpen ? actionsPanelId : undefined}" in src
-    # `aria-haspopup=true` promises a menu, but this is an ordinary disclosure
-    # containing links and a button in a labelled group. Expanded/controls is
-    # the correct screen-reader contract without a false popup role promise.
-    assert 'aria-haspopup="true"' not in src
-    assert "t('More actions for {title}'" in src
-    assert "t('Actions for {title}'" in src
-    assert 'role="group"' in src
+    assert "moreActions" not in css, "the coarse-pointer disclosure CSS must be gone"
+    assert "moreActions" not in src, "the coarse-pointer disclosure JSX must be gone"
+    assert "aria-expanded" not in src, (
+        "a book card must expose no expandable action surface on any pointer"
+    )
+    assert "MoreHorizontal" not in src, "the disclosure icon import must be gone"
 
+    # The rails released their overflow clipping only to let an open panel
+    # escape. With no panel, the release is orphaned and would silently disable
+    # the rails' scroll/snap containment for any future aria-expanded control.
+    for module in ("DiscoverSection.module.css", "MoreByAuthor.module.css"):
+        rail = (_FE / "components" / module).read_text()
+        assert "aria-expanded" not in rail, (
+            f"{module} still releases rail clipping for a disclosure that no longer exists"
+        )
+
+    # Fine pointers are untouched: the established hover/focus reveal stays.
     for selector in (
         ".wrap:hover .removeBtn",
         ".wrap:focus-within .removeBtn",
@@ -239,15 +245,6 @@ def test_coarse_pointer_hides_each_action_in_the_effective_cascade(class_name):
     winner = _effective_class_property(css, class_name, "display", coarse=True)
     assert winner is not None and winner[0] == "none", (
         f".{class_name} must resolve to display:none on coarse pointers; winner={winner}"
-    )
-
-
-def test_coarse_pointer_disclosure_wins_the_effective_cascade():
-    css = (_FE / "components" / "BookCard.module.css").read_text()
-    winner = _effective_class_property(css, "moreActionsWrap", "display", coarse=True)
-    assert winner is not None and winner[0] == "block", (
-        ".moreActionsWrap must resolve to display:block on coarse pointers; "
-        f"winner={winner}"
     )
 
 
@@ -327,6 +324,14 @@ def test_toggle_is_exposed_in_catalog_view_settings():
     assert "t('Show Read now and edit buttons')" in src
 
 
+def test_retired_disclosure_msgids_are_not_left_anchored():
+    """An anchor for a string no source renders keeps a dead msgid alive in every
+    locale catalog, and the next translation pass pays to translate it."""
+    anchors = (_ROOT / "cps" / "spa_strings.py").read_text()
+    assert '_("More actions for {title}")' not in anchors
+    assert '_("Actions for {title}")' not in anchors
+
+
 def test_spa_only_msgid_is_anchored_for_extraction():
     """pybabel does not scan .tsx, so an SPA-only string must be referenced from
     Python or msgmerge marks its translations obsolete and the UI falls back to
@@ -351,30 +356,18 @@ def test_real_touch_helper_scrolls_before_sampling_raw_coordinates():
     )
 
 
-def test_disclosure_stacking_stays_below_global_overlays_until_open():
-    """The active card, not merely its child panel, must clear sibling cards."""
-    src = (_FE / "components" / "BookCard.tsx").read_text()
-    css = (_FE / "components" / "BookCard.module.css").read_text()
-    closed = _effective_class_property(css, "moreActionsWrap", "z-index", coarse=True)
-    opened = _effective_class_property(css, "wrapActionsOpen", "z-index", coarse=True)
+def test_touch_coverage_proves_the_actions_are_reachable_from_the_book_page():
+    """Removing a control is only correct if its job moved somewhere reachable.
 
-    assert closed is not None and closed[0] == "1", (
-        "a closed per-card trigger must remain in the card stacking layer; "
-        f"winner={closed}"
-    )
-    assert opened is not None and opened[0] == "calc(var(--z-bar) - 1)", (
-        "an open card disclosure must clear sibling cards without outranking "
-        f"global overlays; winner={opened}"
-    )
-    assert "actionsOpen ? styles.wrapActionsOpen" in src
-    assert ".wrap.wrapActionsOpen { content-visibility: visible; }" in css
-
-
-def test_touch_palette_coverage_measures_the_visible_disclosure_action():
+    The touch spec must therefore not merely assert the disclosure is absent; it
+    has to drive a real tap into the book and find Read now, Edit and shelf
+    membership there.
+    """
     src = (_E2E / "book-card-actions.spec.ts").read_text()
-    assert "Touch quick-edit disclosure" in src
-    assert "getByRole('group', { name: /^Actions for / })" in src
-    assert "getByRole('link', { name: /^Edit / })" in src
+    assert "await tap(catalogDetails);" in src
+    assert "the book page offers Read now" in src
+    assert "the book page offers Edit" in src
+    assert "the book page owns shelf membership" in src
 
 
 def test_fine_pointer_action_row_geometry_is_not_run_against_removed_touch_row():
@@ -386,32 +379,44 @@ def test_fine_pointer_action_row_geometry_is_not_run_against_removed_touch_row()
     assert marker in overlap
 
 
-def test_mobile_edit_flows_enter_through_the_disclosure():
+def test_mobile_edit_flows_enter_through_the_book_page():
+    """The #1169 listing regression must still be exercised on touch.
+
+    Its entry point moved with the ruling: a coarse pointer has no card pencil,
+    so the spec taps into the book and uses the page's Edit link. The history
+    depth therefore differs by pointer, which is why the return walk must not
+    pin a fixed number of goBack() calls.
+    """
     src = (_E2E / "catalog-edit-retains-book.spec.ts").read_text()
     assert "async function openQuickEdit(" in src
-    assert "getByRole('button', { name: /^More actions for / })" in src
+    assert "More actions for" not in src
     assert src.count("await openQuickEdit(page);") == 2
+    assert "async function returnToLibrary(" in src
+    assert src.count("await returnToLibrary(page);") == 2
 
 
 def test_preference_availability_probe_uses_the_active_pointer_contract():
+    """#1054's preference still controls whether the row is RENDERED.
+
+    On a coarse pointer the row is rendered and then kept out of the layout, so
+    the touch probe asserts attachment; the off-state assertions at the call
+    sites are what prove the preference removes it from the DOM entirely.
+    """
     src = (_E2E / "discover-preference.spec.ts").read_text()
     assert "async function expectCardActionsAvailable(" in src
-    assert "getByRole('button', { name: /^More actions for / })" in src
+    assert "More actions for" not in src
+    assert "toBeAttached()" in src
     assert src.count("await expectCardActionsAvailable(") == 2
 
 
-def test_touch_target_size_coverage_measures_disclosed_actions():
+def test_touch_target_size_coverage_moves_to_the_book_page():
+    """SC 2.5.8 coverage follows the actions rather than being deleted.
+
+    The card now offers no touch target to measure, so the spec asserts that
+    absence and measures the book page controls the actions moved to.
+    """
     src = (_E2E / "target-size-sc258.spec.ts").read_text()
-    assert "Touch card More actions trigger" in src
-    assert "Touch card Read now disclosure action" in src
-    assert "Touch card Edit disclosure action" in src
-    assert "Touch card Remove disclosure action" in src
-
-
-def test_horizontal_card_rails_release_clipping_while_a_disclosure_is_open():
-    discover = (_FE / "components" / "DiscoverSection.module.css").read_text()
-    author = (_FE / "components" / "MoreByAuthor.module.css").read_text()
-    state = ':has([aria-expanded="true"])'
-    assert f".box{state}" in discover
-    assert f".strip{state}" in discover
-    assert f".strip{state}" in author
+    assert "a touch card must expose no More actions target" in src
+    assert "Book page Read now" in src
+    assert "Book page Edit" in src
+    assert "Book page Add to shelf" in src

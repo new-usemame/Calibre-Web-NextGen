@@ -2678,16 +2678,6 @@ msgid "Read {title}"
 msgstr "{title} lezen"
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid "More actions for {title}"
-msgstr "Meer acties voor {title}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Actions for {title}"
-msgstr "Acties voor {title}"
-
-#: cps/spa_strings.py
 msgid "Standard (username / password)"
 msgstr "Standaard (gebruikersnaam / wachtwoord)"
 
@@ -14728,6 +14718,13 @@ msgstr "Noot {label}"
 #: cps/spa_strings.py
 msgid "Untitled link"
 msgstr "Link zonder titel"
+#, python-brace-format
+#~ msgid "More actions for {title}"
+#~ msgstr "Meer acties voor {title}"
+
+#, python-brace-format
+#~ msgid "Actions for {title}"
+#~ msgstr "Acties voor {title}"
 
 #~ msgid "Design"
 #~ msgstr "Ontwerp"

@@ -2767,16 +2767,6 @@ msgid "Read {title}"
 msgstr "Leggi {title}"
 
 #: cps/spa_strings.py
-#, python-brace-format
-msgid "More actions for {title}"
-msgstr "Altre azioni per {title}"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid "Actions for {title}"
-msgstr "Azioni per {title}"
-
-#: cps/spa_strings.py
 msgid "Standard (username / password)"
 msgstr "Predefinita (nome utente / password)"
 
@@ -15260,6 +15250,14 @@ msgstr "Sincronizza gli scaffali selezionati con OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostra sezione Libri letti e Libri da leggere"
+
+#, python-brace-format
+#~ msgid "More actions for {title}"
+#~ msgstr "Altre azioni per {title}"
+
+#, python-brace-format
+#~ msgid "Actions for {title}"
+#~ msgstr "Azioni per {title}"
 
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr ""

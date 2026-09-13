@@ -1,0 +1,296 @@
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: var(--sp-6) var(--sp-5);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-5);
+  flex-wrap: wrap;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  color: var(--text);
+}
+
+/* ── books-placement toolbar (after-tree / after-children) ────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.toolbarLabel {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.viewToggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+}
+.viewToggle button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--sp-3);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  border-radius: var(--r-sm);
+}
+.viewToggle button[aria-pressed='true'] {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+.viewToggle button:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+.count {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  margin-bottom: var(--sp-4);
+}
+.back:hover { color: var(--text); }
+.back:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+
+/* ── column list (no column selected) ─────────────────────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--sp-3);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.columnCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-4);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text);
+}
+.columnCard:hover { background: var(--surface-3); }
+.columnCard:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+
+.columnName {
+  font-size: var(--fs-base);
+  overflow-wrap: anywhere;
+}
+
+.badge {
+  flex-shrink: 0;
+  min-width: 24px;
+  text-align: center;
+  padding: 2px var(--sp-2);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+}
+
+/* ── tree (column selected) ───────────────────────────────────────────── */
+
+.tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.treeNode { margin: 2px 0; }
+
+.treeSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  list-style: none; /* hide the default disclosure marker; the chevron is ours */
+  min-height: 40px;
+}
+.treeNode summary::-webkit-details-marker { display: none; }
+.treeNode summary:hover { background: var(--surface-2); }
+.treeNode summary:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+
+/* Leaf rows use the same flex row as summaries (marker | name | count) but
+   without cursor/hover affordances that imply expandability. */
+div.treeSummary { cursor: default; }
+div.treeSummary:hover { background: transparent; }
+
+.chevronPlaceholder {
+  width: 14px;
+  min-width: 14px;
+}
+
+.leafMarker {
+  width: 15px;
+  min-width: 15px;
+  text-align: center;
+  font-size: 12px;
+}
+
+.chevron {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  transition: transform 0.15s ease;
+}
+.treeNode[open] > summary .chevron { transform: rotate(90deg); }
+
+.nodeIcon {
+  flex-shrink: 0;
+  color: var(--text-muted);
+}
+
+.nodeLink {
+  flex: 1;
+  min-width: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.nodeLink:hover { color: var(--accent-text); }
+.nodeLink:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; border-radius: 2px; }
+
+.nodeLinkActive {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.children {
+  list-style: none;
+  margin: 0;
+  padding-left: var(--sp-5);
+  border-left: 1px solid var(--border);
+  margin-left: calc(var(--sp-3) + 8px);
+}
+
+/* ── books inserted inside the tree (after-children mode) ─────────────── */
+
+.booksInset { margin: var(--sp-2) 0; }
+
+.insetBooks {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-4);
+  margin: var(--sp-2) 0;
+}
+
+/* "───── Books ─────" divider: a hairline with the label interrupting it,
+   so the block reads as content belonging to the selected node rather than
+   as another hierarchy level. */
+.insetDivider {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+  color: var(--text-muted);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.insetDivider::before,
+.insetDivider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.insetDividerLabel { flex-shrink: 0; }
+
+/* ── books under a node ───────────────────────────────────────────────── */
+
+.booksSection {
+  margin-top: var(--sp-6);
+}
+
+.booksHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  margin-bottom: var(--sp-4);
+}
+
+.booksTitle {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.bookGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--sp-4);
+}
+
+/* Inside the tree inset the available width shrinks with depth — tighter
+   columns keep the cards usable on narrow viewports too. */
+.insetBooks .bookGrid {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: var(--sp-3);
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+}
+
+.pageButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--text);
+  background: var(--surface-2);
+  min-height: 40px;
+}
+.pageButton:hover:not(:disabled) { background: var(--surface-3); }
+.pageButton:disabled { opacity: 0.5; cursor: not-allowed; }
+.pageButton:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+
+.pageInfo {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  min-width: 80px;
+  text-align: center;
+}
+
+.hint {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  margin-bottom: var(--sp-4);
+}

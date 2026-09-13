@@ -3,8 +3,9 @@ import { Link, useLocation } from 'wouter';
 import {
   Library, Globe, BookCopy,
   Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X, Pin, PinOff,
+  Tag,
 } from 'lucide-react';
-import { useShelves, useMe, useMagicShelves, useUpdateSidebar } from '../lib/queries';
+import { useShelves, useMe, useMagicShelves, useUpdateSidebar, useColumns } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useIsDrawerMode } from '../lib/a11y/useIsDrawerMode';
 import { useFocusTrap } from '../lib/a11y/useFocusTrap';
@@ -103,6 +104,10 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const { data: shelvesData } = useShelves();
   const shelves = shelvesData?.items ?? [];
   const magicShelves = useMagicShelves().data?.items ?? [];
+  // Custom-column browse (tag-like text/enumeration columns). The entry only
+  // renders when at least one column is browsable, so a library without any
+  // keeps the sidebar unchanged.
+  const ccColumns = useColumns().data?.items ?? [];
   const me = useMe().data;
   const canEdit = !!me?.role?.edit;
   const isAdmin = !!me?.role?.admin;
@@ -344,6 +349,26 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
 
             {/* Customizable region (browse-by + discovery + Shelves), in saved order. */}
             {renderOrderedRegion()}
+
+            {/* Custom columns (tag-like text/enumeration; hierarchical ones
+                render as a tree) — SPA parity with the classic sidebar's
+                per-column entries, kept as one pinned entry so the server's
+                ORDERABLE_SIDEBAR_KEYS contract is untouched. */}
+            {ccColumns.length > 0 && (
+              <ul className={styles.list} role="list">
+                <li>
+                  <Link
+                    href="/cc"
+                    className={isActive(location, '/cc', true) ? styles.itemActive : styles.item}
+                    aria-current={isActive(location, '/cc', true) ? 'page' : undefined}
+                    onClick={onNavigate}
+                  >
+                    <Tag size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+                    <span>{t('Custom Columns')}</span>
+                  </Link>
+                </li>
+              </ul>
+            )}
 
             {/* Smart shelves + power features (pinned). */}
             <ul className={styles.list} role="list">

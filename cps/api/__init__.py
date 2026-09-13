@@ -209,6 +209,7 @@ from . import admin    # noqa: E402,F401
 from . import info     # noqa: E402,F401
 from . import duplicates  # noqa: E402,F401
 from . import magicshelves  # noqa: E402,F401
+from . import columns  # noqa: E402,F401
 from . import comic     # noqa: E402,F401
 from . import admin_security  # noqa: E402,F401
 from . import notices   # noqa: E402,F401

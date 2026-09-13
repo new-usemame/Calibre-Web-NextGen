@@ -26,6 +26,7 @@ import { About } from './pages/About';
 import { Tasks } from './pages/Tasks';
 import { Table } from './pages/Table';
 import { Duplicates } from './pages/Duplicates';
+import { CcBrowse } from './pages/CcBrowse';
 import { Annotations } from './pages/Annotations';
 import { WhatsNew } from './pages/WhatsNew';
 import { MagicShelf } from './pages/MagicShelf';
@@ -281,6 +282,12 @@ export function App() {
           <Route path={SPA_ROUTES.tasks}>{() => <Tasks />}</Route>
           <Route path={SPA_ROUTES.table}>{() => <Table />}</Route>
           <Route path={SPA_ROUTES.duplicates}>{() => <Duplicates />}</Route>
+
+          {/* Custom columns (tag-like text/enumeration; hierarchical ones
+              render as a tree) — SPA parity with the classic /custom_column
+              views. See react_spa_cc_hier_implementation.md. */}
+          <Route path={SPA_ROUTES.ccList}>{() => <CcBrowse />}</Route>
+          <Route path={SPA_ROUTES.cc}>{(p) => <CcBrowse id={p.id} />}</Route>
           <Route path={SPA_ROUTES.magicEdit}>{(p) => <MagicShelf editId={p.id} />}</Route>
           <Route path={SPA_ROUTES.magicView}>{(p) => <MagicShelfView id={p.id} />}</Route>
           <Route path={SPA_ROUTES.magic}>{() => <MagicShelf />}</Route>

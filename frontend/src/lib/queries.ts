@@ -20,6 +20,7 @@ import type {
   GlobalLibraryPage, LibraryModePayload, LibraryRemovalImpact, DeliveryDevice,
   DeviceDeliveryResult, MyLibraryIntroState,
   KoboSyncToken,
+  CcColumnsPage, CcTree, CcBooksPage,
 } from './api';
 
 /** Entity kinds the catalog can be filtered by. Singular here; the browse-list
@@ -414,13 +415,49 @@ export function useDismissMyLibraryIntro() {
   });
 }
 
-/** Fetch an entity-browse list (authors/series/tags/publishers/languages).
- *  `plural` is the endpoint segment (e.g. "authors"). */
 export function useEntityList(plural: string) {
   return useQuery<EntityList>(createEntityListQueryOptions(
     plural,
     () => apiGet<EntityList>(`/api/v1/${plural}`),
   ));
+}
+
+/** Browsable custom columns (tag-like text/enumeration), with their hierarchy
+ *  status. Empty items = the library has no browsable columns (or the caller
+ *  hid every one on their profile page). */
+export function useColumns(enabled = true) {
+  return useQuery<CcColumnsPage>({
+    queryKey: ['cc-columns'],
+    queryFn: () => apiGet<CcColumnsPage>('/api/v1/columns'),
+    enabled,
+    staleTime: 60000,
+  });
+}
+
+/** The full hierarchy tree for one custom column. */
+export function useCcTree(colId: string | number, enabled = true) {
+  return useQuery<CcTree>({
+    queryKey: ['cc-tree', String(colId)],
+    queryFn: () => apiGet<CcTree>(`/api/v1/columns/${colId}/tree`),
+    enabled,
+    staleTime: 60000,
+  });
+}
+
+/** One page of books under a node of a custom column. An empty `path` lists
+ *  every book carrying any value in the column. */
+export function useCcBooks(colId: string | number, path: string, page: number, enabled = true) {
+  return useQuery<CcBooksPage>({
+    queryKey: ['cc-books', String(colId), path, page],
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(page) });
+      if (path) params.set('path', path);
+      return apiGet<CcBooksPage>(`/api/v1/columns/${colId}/books?${params.toString()}`);
+    },
+    enabled,
+    staleTime: 60000,
+    placeholderData: keepPreviousData,
+  });
 }
 
 /** The tag a rename collided with, carried on the 409 so the caller can offer

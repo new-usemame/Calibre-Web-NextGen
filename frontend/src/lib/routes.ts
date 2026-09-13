@@ -44,6 +44,8 @@ export const SPA_ROUTES = {
   tasks: '/tasks',
   table: '/table',
   duplicates: '/duplicates',
+  ccList: '/cc',
+  cc: '/cc/:id',
   magicEdit: '/magic/:id/edit',
   magicView: '/magic/:id',
   magic: '/magic',

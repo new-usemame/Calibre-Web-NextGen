@@ -291,6 +291,43 @@ export interface EntityList {
   items: EntityListItem[];
 }
 
+/** One browsable custom column (tag-like: text/enumeration datatype).
+ *  `hierarchical` marks columns whose stored values form a Calibre-style
+ *  dotted hierarchy (e.g. `Computers.DB.Oracle`) — those render as a tree. */
+export interface CcColumn {
+  id: number;
+  name: string;
+  datatype: string;
+  hierarchical: boolean;
+}
+
+export interface CcColumnsPage {
+  items: CcColumn[];
+}
+
+/** One node of a hierarchical custom column's tree. `path` is the canonical
+ *  dotted path from the root (e.g. `Computers.DB`); `count` is direct hits on
+ *  the exact value, `total_count` includes every descendant. */
+export interface CcNode {
+  name: string;
+  path: string;
+  count: number;
+  total_count: number;
+  children: CcNode[];
+}
+
+export interface CcTree {
+  column: CcColumn;
+  nodes: CcNode[];
+}
+
+/** Books under one node of a custom column (or all books carrying any value
+ *  in the column when no path was requested). */
+export interface CcBooksPage extends BooksPage {
+  path: string;
+  column: { id: number; name: string };
+}
+
 export interface Shelf {
   id: number;
   name: string;

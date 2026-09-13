@@ -12,11 +12,14 @@ book silently rewritten; a run that cannot resume after a cap stop spends the ca
 again from the top. Each of those is a test below.
 """
 
+import io
 import types
 
+import pymupdf
 import pytest
 
-from cps.services.reflow import assemble, gate, ledger as ledger_mod, model, pipeline
+from cps.services.reflow import (assemble, extract, gate, ledger as ledger_mod, model,
+                                 pipeline)
 from tests.fixtures import reflow_pdfs as F
 
 pytestmark = pytest.mark.unit
@@ -28,6 +31,7 @@ class FakeClient(object):
     def __init__(self, answer=None, price=0.002):
         self.calls = []
         self.hints = []
+        self.images = []
         self._answer = answer or (lambda text: "<p>%s</p>" % text)
         self.spec = types.SimpleNamespace(price_per_page=price, model_id="test/model")
         self.model_id = "test/model"
@@ -44,6 +48,7 @@ class FakeClient(object):
             ledger.reserve(self.spec.price_per_page)
         self.calls.append(page_text)
         self.hints.append(list(hints or []))
+        self.images.append(image_jpeg)
         return model.ModelResult(html=self._answer(page_text), model=self.model_id,
                                  cost_usd=self.spec.price_per_page,
                                  cost_source="price_table", prompt_tokens=900,
@@ -501,3 +506,46 @@ def test_a_sample_of_a_book_with_no_front_matter_starts_at_its_first_page(tmp_pa
         doc.close()
 
     assert chosen == [0, 1], chosen
+
+
+# ------------------------------------------------- the picture the model is given
+
+def _ink_rows(jpeg):
+    """Which rows of an image have ink on them, top to bottom."""
+    pix = pymupdf.Pixmap(io.BytesIO(jpeg))
+    rows = []
+    for y in range(pix.height):
+        start = y * pix.stride
+        rows.append(min(pix.samples[start:start + pix.width * pix.n]) < 128)
+    return rows
+
+
+def _lines_of_ink(jpeg):
+    """How many separate lines of type an image contains."""
+    rows = _ink_rows(jpeg)
+    return sum(1 for y, ink in enumerate(rows) if ink and not (y and rows[y - 1]))
+
+
+def test_the_model_is_shown_the_page_its_words_came_from(tmp_path):
+    """The running head is not in the picture, because it is not in the words.
+
+    MEASURED against the acceptance book before this: every page of a 30-page range
+    came back with the chapter title transcribed into the body -- five words the
+    text layer never contained, so every page failed the word gate. The page image
+    is the only place those words could have come from, and a prompt rule telling a
+    vision model not to read what is in front of it did not hold.
+
+    Counted in lines of type rather than in pixels: a crop that silently did not
+    happen, or one measured against the wrong page, shows up as the extra line.
+    """
+    doc = _doc(F.ambiguous_glyph_marker_page)
+    client = FakeClient()
+    try:
+        printed = _lines_of_ink(extract.render_page_jpeg(
+            doc, 0, scale=pipeline.RASTER_SCALE, quality=pipeline.RASTER_QUALITY))
+        _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert len(client.images) == 1 and client.images[0]
+    assert _lines_of_ink(client.images[0]) == printed - 1

@@ -260,3 +260,157 @@ class TestStructuralSchemaGate:
         result = gate.check_structure("<figure><img src='x.png'/></figure>", ladder=[1])
 
         assert not result.ok
+
+
+class TestANoteIsTheNumberItIdentifies(object):
+    """Whether the number is printed in the note or only in its id is not a fact
+    about the book.
+
+    MEASURED on the acceptance book, one run, one model, two pages: page 100 came
+    back as ``<aside id="fn_33">33 Heilen, ...`` and page 103 as
+    ``<aside id="fn_58">Cumont, ...``. The deterministic reader hands the model
+    ``[58] Cumont, ...`` either way, so the second page was refused for losing a word
+    it had not lost -- the number was in the markup, in the one place the word gate
+    does not look. The prompt now asks for it in the text, and an answer that leaves
+    it in the id is read as though it were there, because a rule a provider can
+    quietly decline is not a rule to refuse somebody's book over.
+    """
+
+    SOURCE = "text of the page[58]\n\n[58] Cumont, Astrology and Religion, p. 76."
+    BODY = '<p>text of the page<a class="noteref" href="#fn_58">58</a></p>'
+
+    def test_a_note_that_prints_its_number_passes(self):
+        html = self.BODY + '<aside class="footnote" id="fn_58">58 Cumont, ' \
+                           'Astrology and Religion, p. 76.</aside>'
+        assert gate.check_word_preservation(self.SOURCE, gate.number_the_notes(html)).ok
+
+    def test_a_note_that_leaves_its_number_in_the_id_passes_too(self):
+        html = self.BODY + '<aside class="footnote" id="fn_58">Cumont, ' \
+                           'Astrology and Religion, p. 76.</aside>'
+        assert gate.check_word_preservation(self.SOURCE, gate.number_the_notes(html)).ok
+
+    def test_a_number_already_printed_is_not_printed_twice(self):
+        html = '<aside class="footnote" id="fn_58">58 Cumont.</aside>'
+        assert gate.number_the_notes(gate.number_the_notes(html)) == \
+            gate.number_the_notes(html)
+        assert gate.number_the_notes(html).count("58") == 2      # the id and the text
+
+    def test_the_number_supplied_is_the_note_s_own_and_nothing_else(self):
+        """A crafted violation: the aside says one number and is identified by
+        another. Reading the id in place of the text would launder the wrong number
+        into the page."""
+        html = self.BODY + '<aside class="footnote" id="fn_58">99 Cumont, ' \
+                           'Astrology and Religion, p. 76.</aside>'
+        assert not gate.check_word_preservation(self.SOURCE, gate.number_the_notes(html)).ok
+
+    def test_an_aside_that_is_not_numbered_at_all_is_left_alone(self):
+        html = '<aside class="footnote" id="fn_note-a">Cumont.</aside>'
+        assert gate.number_the_notes(html) == html
+
+
+class TestABlockThePageSetInTheWrongPlace(object):
+    """Defect A, seen from the gate.
+
+    MEASURED on page 121 of the acceptance book: the text layer returns the section
+    head ``Serapio of Alexandria (First Century CE?)`` forty lines below where it is
+    printed, after the last footnote marker of the section it opens. The model does
+    exactly what SPEC 8.2 asks -- makes it an ``<h2>`` and puts it back -- and a gate
+    that compares two sequences reads a relocation as a paragraph lost in one place
+    and invented in another.
+
+    Preservation is about words, not positions: nothing is lost, nothing is gained,
+    and the run stays whole. What must still be refused is a page whose words were
+    rearranged rather than whose blocks were moved.
+    """
+
+    HEAD = "Serapio of Alexandria (First Century CE?)"
+    BODY = ("Serapio of Alexandria was an astrologer who wrote on inceptional "
+            "astrology, although only fragments of his work survive.")
+    TAIL = ("There is a long list of definitions attributed to Serapio that was "
+            "edited by Cumont in the Catalogus.")
+
+    def _source(self):
+        return "%s\n\n%s\n\n%s" % (self.BODY, self.HEAD, self.TAIL)
+
+    def test_a_heading_the_model_put_back_where_it_belongs_is_not_a_lost_paragraph(self):
+        out = ("<h2>%s</h2>\n<p>%s</p>\n<p>%s</p>\n" % (self.HEAD, self.BODY, self.TAIL))
+
+        result = gate.check_word_preservation(self._source(), out)
+
+        assert result.verdict == "PASS", (result.missing, result.invented)
+        assert any(d.kind == "moved" for d in result.allowed_hits), result.allowed_hits
+
+    def test_the_move_is_recorded_rather_than_quietly_forgiven(self):
+        """An allowance nobody can see is an allowance nobody can audit."""
+        out = ("<h2>%s</h2>\n<p>%s</p>\n<p>%s</p>\n" % (self.HEAD, self.BODY, self.TAIL))
+
+        result = gate.check_word_preservation(self._source(), out)
+        moved = [d for d in result.allowed_hits if d.kind == "moved"]
+
+        assert " ".join(moved[0].source) == self.HEAD, moved[0].source
+
+    def test_a_page_whose_words_were_rearranged_is_still_refused(self):
+        """The control that matters. Every word survives and the page is nonsense:
+        a bag-of-words gate calls this clean."""
+        words = self._source().split()
+        out = "<p>%s</p>\n" % " ".join(words[::-1])
+
+        result = gate.check_word_preservation(self._source(), out)
+
+        assert result.verdict == "FAIL"
+
+    def test_a_block_that_moved_and_lost_a_word_on_the_way_is_refused(self):
+        out = ("<h2>%s</h2>\n<p>%s</p>\n<p>%s</p>\n"
+               % (self.HEAD.replace("Alexandria ", ""), self.BODY, self.TAIL))
+
+        result = gate.check_word_preservation(self._source(), out)
+
+        assert result.verdict == "FAIL"
+
+    def test_a_heading_the_model_invented_is_refused(self):
+        out = ("<h2>Teucer of Babylon (First Century BCE)</h2>\n"
+               "<p>%s</p>\n<p>%s</p>\n<p>%s</p>\n"
+               % (self.BODY, self.HEAD, self.TAIL))
+
+        result = gate.check_word_preservation(self._source(), out)
+
+        assert result.verdict == "FAIL"
+
+
+class TestOrphanPunctuationIsNotAWord(object):
+    """What is left of a superscript after the scanner has destroyed it.
+
+    MEASURED on pages 114 and 115 of the acceptance book: the only difference
+    between the model's answer and the page is one orphan quotation mark, the
+    wreckage of a note marker whose note this page has already resolved by another
+    route. Refusing a perfect page over a stray quote is the gate measuring the
+    wrong subject -- the rule is word preservation, and a lone quote is not a word.
+    """
+
+    SRC = ("possibly from the same period as the Anthologies of Vettius Valens. \" "
+           "The list is incomplete, with the last page missing.")
+
+    def test_a_stray_quote_the_scanner_left_behind_may_be_dropped(self):
+        out = _html(self.SRC.replace(' " ', " "))
+
+        result = gate.check_word_preservation(self.SRC, out)
+
+        assert result.verdict == "PASS", (result.missing, result.invented)
+        assert any(d.kind == "punctuation" for d in result.allowed_hits)
+
+    def test_a_stray_quote_turned_into_a_citation_is_refused(self):
+        """MEASURED on page 104: the page marks 59 and prints notes 58, 60, 61, so
+        the model wrote 59 where the quote was. It may well be right, and the page
+        cannot confirm it, so the page is refused rather than printed."""
+        out = _html(self.SRC.replace('"', "59"))
+
+        result = gate.check_word_preservation(self.SRC, out)
+
+        assert result.verdict == "FAIL"
+
+    def test_a_word_next_to_the_quote_still_cannot_be_dropped(self):
+        out = _html(self.SRC.replace(' " The list', " The"))
+
+        result = gate.check_word_preservation(self.SRC, out)
+
+        assert result.verdict == "FAIL"

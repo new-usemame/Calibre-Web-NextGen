@@ -15,7 +15,7 @@ $0.15 conversion into a $1.50 one; one that never fires ships the defects.
 
 import pytest
 
-from cps.services.reflow import assemble, assess, extract, route, skeleton
+from cps.services.reflow import assemble, assess, extract, model, route, skeleton
 from tests.fixtures import reflow_pdfs as F
 
 pytestmark = pytest.mark.unit
@@ -178,7 +178,14 @@ def test_routing_is_the_basis_of_the_quoted_price():
     quote = route.estimate(routed, pages=len(routes))
 
     assert quote["routed_pages"] == routed
-    assert quote["cheap"] < quote["standard"] < quote["quality"]
+    for name, spec in model.TIERS.items():
+        assert quote[name] == pytest.approx(round(spec.price_per_page * routed, 4)), name
+    # The cheapest tier is the cheapest quote, which is what the page orders its
+    # choices by. The other two are NOT asserted to differ: MEASURED 2026-09-13,
+    # Luna's own endpoints are priced a little under deepseek's dearest, so the tier
+    # named for quality is not automatically the tier that costs the most. Pinning an
+    # order here would be pinning OpenRouter's price list, not Reflow's behaviour.
+    assert quote["cheap"] == min(quote[name] for name in model.TIERS)
     assert quote["worst_case"]["standard"] > quote["standard"]
 
 

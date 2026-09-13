@@ -651,3 +651,235 @@ def mid_page_heading_page(doc, title="Serapio of Alexandria", folio="103"):
                    top=head_y + BODY_LEADING * 1.8)
     add_notes(page, [(212, "Pingree, Yavanajataka, vol. 2, p. 441.")])
     return page
+
+
+def glyph_marker_page(doc):
+    """A superscript note number the scanner read as letters, not digits.
+
+    MEASURED on the acceptance book: a marker set two points below the body comes
+    back as ``Hephaestio.s°`` for 50, ``Petosiris.si`` for 51, ``century.loo``
+    for 100. There is no digit left for a marker span to recognise, so the note
+    stays unreferenced and the page reads ``Hephaestio.s°``.
+    """
+    page = add_page(doc)
+    y = BODY_TOP
+    _put(page, LEFT, y, "Antiochus, Manetho, Ptolemy, Valens, and Hephaestio.s° Other")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "authors such as Dorotheus were said to have drawn on them.")
+    add_notes(page, [(50, "Hephaestio, Apotelesmatika, 2, 21: 26.")])
+    return page
+
+
+def glyph_marker_without_its_note_page(doc):
+    """The control: the same damaged shape on a page that prints no note it fits.
+
+    Nothing on this page says the letters are a number, so they stay letters and
+    the page is routed instead.
+    """
+    page = add_page(doc)
+    y = BODY_TOP
+    _put(page, LEFT, y, "Antiochus, Manetho, Ptolemy, Valens, and Hephaestio.s° Other")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "authors such as Dorotheus were said to have drawn on them.")
+    add_notes(page, [(7, "Pingree, From Astral Omens, p. 40.")])
+    return page
+
+
+def split_glyph_marker_page(doc):
+    """Half the marker survived as a digit and half came back as a letter.
+
+    MEASURED: ``45`` prints as a marker span ``4`` followed by a body-size ``s``,
+    so the marker resolves to nothing (there is no note 4) and the page reads
+    ``above.4s``.
+    """
+    page = add_page(doc)
+    y = BODY_TOP
+    x = LEFT
+    x += _put(page, x, y, "the length of life technique mentioned above.")
+    x += add_marker(page, x, y, "4", superscript=False)
+    _put(page, x, y, "s A system of determining the advantageous place")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "was also attributed to them by later authors.")
+    add_notes(page, [(45, "Valens, Anthology, 3, 9: 3.")])
+    return page
+
+
+def glyph_prefix_marker_page(doc):
+    """The marker's leading digits came back as punctuation and its last as itself.
+
+    MEASURED: note 103 prints as ``fourth.'°`` followed by a marker span ``3``.
+    The window repair finds 103 from the ``3``; the ``'°`` is the ``10`` in
+    front of it and has to go with it, or the page reads ``fourth.'°``.
+    """
+    page = add_page(doc)
+    y = BODY_TOP
+    x = LEFT
+    x += _put(page, x, y, "Venus rejoices in the tenth and Saturn in the fourth.'°")
+    x += add_marker(page, x, y, "3", superscript=False)
+    _put(page, x, y, " It is not clear if Manilius is representing an")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "otherwise unattested tradition or an error of his own.")
+    add_notes(page, [(103, "Manilius, Astronomica, 2: 433-452.")])
+    return page
+
+
+def ambiguous_glyph_marker_page(doc):
+    """The control: the damaged run is one edit away from two of the page's notes.
+
+    ``"°`` reads as 110, and both 100 and 111 are printed here and unreferenced.
+    Picking one prints a citation the page does not make.
+    """
+    page = add_page(doc)
+    add_running_head(page, "110", "MARCUS MANILIUS")
+    y = BODY_TOP
+    _put(page, LEFT, y, "every four years until at least the mid-third century.\"° Marcus")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "Manilius wrote an astrological poem in five books.")
+    add_notes(page, [(100, "Ehrhardt, \"The Date of the First Balbillea.\""),
+                     (111, "Volk, Manilius and his Intellectual Background.")])
+    return page
+
+
+def two_damaged_note_numbers_page(doc):
+    """Page 115 of book 567: two note numbers in a row lost a digit.
+
+    The zone reads ``117, 18, 1, 120`` -- 118 lost its leading digit to the note
+    above it and 119 lost two. Neither is readable on its own; together they are,
+    because the gap their undamaged neighbours leave holds exactly two numbers and
+    the body marks both.
+    """
+    page = add_page(doc)
+    add_running_head(page, "115", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    y = add_body_lines(page, PROSE_LINES[:5])
+    y = add_line_with_marker(page, y, "the surviving evidence", "118", " is thin")
+    y = add_line_with_marker(page, y, "as Pingree notes", "119", " elsewhere")
+    add_notes(page, [(117, "Neugebauer, A History of Ancient Mathematical Astronomy."),
+                     (18, "Pingree, The Yavanajataka of Sphujidhvaja, p. 195."),
+                     (1, "Jones, Astronomical Papyri from Oxyrhynchus, p. 12."),
+                     (120, "Barton, Ancient Astrology, p. 31.")])
+    return page
+
+
+def note_number_read_too_high_page(doc):
+    """Page 117 of book 567: the damaged numbers read HIGHER than the true ones.
+
+    The zone reads ``27, 28, 29, 38, 39, 32, 33, 34``. Reading it left to right
+    blames the four numbers after 39; the page is telling the opposite story,
+    because the longest ascending run through it is ``27, 28, 29, 32, 33, 34`` and
+    the two that break it are 30 and 31 read with a damaged first digit.
+    """
+    page = add_page(doc)
+    add_running_head(page, "117", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    y = add_body_lines(page, PROSE_LINES[:4])
+    y = add_line_with_marker(page, y, "his own horoscope", "30", " is preserved")
+    y = add_line_with_marker(page, y, "a later compiler", "31", " repeats it")
+    add_notes(page, [(27, "Valens, Anthologies, 2: 21."),
+                     (28, "Valens, Anthologies, 3: 11."),
+                     (29, "Riley, A Survey of Vettius Valens, p. 4."),
+                     (38, "Neugebauer and Van Hoesen, Greek Horoscopes, p. 110."),
+                     (39, "Pingree, From Astral Omens to Astrology, p. 26."),
+                     (32, "Barton, Ancient Astrology, p. 33."),
+                     (33, "Cramer, Astrology in Roman Law, p. 58."),
+                     (34, "Rochberg, The Heavenly Writing, p. 44.")])
+    return page
+
+
+def damaged_first_note_pages(doc):
+    """Two facing pages: the damage is the FIRST note of the second one.
+
+    ``115`` came back as ``1`` at the top of its own zone, so on that page alone
+    there is no earlier number for it to fail to ascend from. The page before is
+    what makes it damage.
+    """
+    first = add_page(doc)
+    add_running_head(first, "113", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    y = add_body_lines(first, PROSE_LINES[:4])
+    y = add_line_with_marker(first, y, "the Anthologies", "113", " survive")
+    y = add_line_with_marker(first, y, "in several recensions", "114", " of it")
+    add_notes(first, [(113, "Riley, A Survey of Vettius Valens, p. 2."),
+                      (114, "Riley, A Survey of Vettius Valens, p. 3.")])
+
+    second = add_page(doc)
+    add_running_head(second, "114", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    y = add_body_lines(second, PROSE_LINES[:4])
+    y = add_line_with_marker(second, y, "the later tradition", "115", " knows them")
+    y = add_line_with_marker(second, y, "and Rhetorius", "116", " quotes them")
+    y = add_line_with_marker(second, y, "as does Olympiodorus", "117", " after him")
+    add_notes(second, [(1, "Pingree, ed., Rhetorii Aegyptii Capitula, p. 8."),
+                       (116, "Rhetorius, Compendium, 5: 57."),
+                       (117, "Olympiodorus, Commentary, p. 41.")])
+    return second
+
+
+def restarting_note_numbers_pages(doc):
+    """The control for the ascending-run repair: a book whose notes restart.
+
+    Two chapters, each numbering its notes from 1. Nothing here is damaged, and a
+    converter that reads the restart as damage renumbers a whole chapter's
+    citations.
+    """
+    pages = []
+    for chapter, folio in (("2", "40"), ("3", "41")):
+        page = add_page(doc)
+        add_running_head(page, folio, "CHAPTER %s: ORIGINS OF HELLENISTIC ASTROLOGY"
+                         % chapter)
+        y = add_body_lines(page, PROSE_LINES[:4])
+        for digits in ("1", "2", "3"):
+            y = add_line_with_marker(page, y, "the point is made", digits, " again")
+        add_notes(page, [(1, "Rochberg, The Heavenly Writing, p. 44."),
+                         (2, "Cramer, Astrology in Roman Law, p. 58."),
+                         (3, "Barton, Ancient Astrology, p. 31.")])
+        pages.append(page)
+    return pages
+
+
+def marker_for_a_missing_note_page(doc):
+    """Page 104 of book 567: the body marks 59 and the note zone has no 59.
+
+    Its text was swept into note 58 above it. The number in the body is undamaged
+    and means what it says; binding it to 58 because 58 is one digit away prints a
+    citation the book does not make.
+    """
+    page = add_page(doc)
+    add_running_head(page, "104", "CHAPTER 3: THE EARLY HELLENISTIC SOURCES")
+    y = add_body_lines(page, PROSE_LINES[:4])
+    add_body_lines(page, ["the rise of Christianity in the fourth century.59",
+                          "was already an old argument by then"], top=y)
+    add_notes(page, [(58, "Barton, Ancient Astrology, p. 31. Cramer, Astrology in "
+                          "Roman Law, p. 58."),
+                     (60, "Pingree, From Astral Omens to Astrology, p. 26."),
+                     (61, "Jones, Astronomical Papyri from Oxyrhynchus, p. 12.")])
+    return page
+
+
+def glyph_numbered_note_page(doc):
+    """Page 109 of book 567: the footnote's OWN number came back as letters.
+
+    The zone opens ``9° Tarrant, Thrasyllan Platonism, p. 10`` -- note 90, whose
+    number the scanner read as a nine and a degree sign. Nothing recognises that as
+    a number, so the note is not a note: its text is printed as a stray paragraph in
+    the middle of the body, note 90 does not exist, and the marker in the body that
+    points at it has nothing to bind to.
+    """
+    page = add_page(doc)
+    add_running_head(page, "82", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    y = add_body_lines(page, PROSE_LINES[:5])
+    add_body_lines(page, ["choosing to suspend judgment on whether the two are related.9°",
+                          "I tend to side with those who argue that Balbillus was one"],
+                   top=y)
+    add_notes(page, [("9°", "Tarrant, Thrasyllan Platonism, p. 10."),
+                     (91, "Cramer explored the potential lineage of the family."),
+                     (92, "Cramer, Astrology in Roman Law and Politics, p. 108.")])
+    return page
+
+
+def lowercase_word_in_the_note_zone_page(doc):
+    """The control. A note that ran over from the page before opens the zone with an
+    ordinary word, and ``so`` is two glyphs a digit is mistaken for -- 5 and 0. A
+    reader that takes it for note 50 has invented a footnote out of a sentence."""
+    page = add_page(doc)
+    add_running_head(page, "83", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    y = add_body_lines(page, PROSE_LINES[:5])
+    add_notes(page, [("so", "Tarrant argues, was already an old position by then."),
+                     (91, "Cramer explored the potential lineage of the family.")])
+    return page

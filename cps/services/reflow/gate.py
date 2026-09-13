@@ -153,6 +153,30 @@ def strip_markup(text):
     return html_module.unescape(text)
 
 
+#: An aside that identifies itself as note N but does not open with N. The
+#: back-reference inside the lookahead is what makes "already numbered" mean this
+#: note's own number rather than any number.
+_ASIDE_UNNUMBERED = re.compile(r'(<aside[^>]*\bid="fn_(\d+)"[^>]*>\s*)(?!\2\b)', re.I)
+
+
+def number_the_notes(html):
+    """An aside prints the number it is identified by.
+
+    The page prints "58" under the rule, and the deterministic reader hands the model
+    ``[58] Cumont, ...`` -- so the number is one of the page's words. Where a provider
+    writes it back is not: MEASURED on the acceptance book, the same model on one run
+    wrote ``<aside id="fn_33">33 Heilen, ...`` for one page and
+    ``<aside id="fn_58">Cumont, ...`` for another, and the second was refused for
+    losing a word that was sitting in the markup all along. Worse, the reader's EPUB
+    would have carried an unnumbered note.
+
+    So the number goes back into the text of any aside that left it in the id. This
+    can only ever restore a note's own number -- an aside that opens with a different
+    number is left exactly as it is, and fails the gate for saying it.
+    """
+    return _ASIDE_UNNUMBERED.sub(lambda m: "%s%s " % (m.group(1), m.group(2)), html)
+
+
 def drop_contract_line(text):
     """The prompt's required trailing JSON object is scaffolding, not page text."""
     return _CONTRACT_LINE.sub("", text)
@@ -221,6 +245,101 @@ def _is_retokenisation(a, b):
     return "".join(a) == "".join(b)
 
 
+#: A block the model put somewhere else on the page. Nothing is lost, nothing is
+#: gained, and the run stays whole: MEASURED on page 121 of the acceptance book, the
+#: text layer returns the section head ``Serapio of Alexandria (First Century CE?)``
+#: forty lines below where it is printed, and SPEC 8.2 asks the model to put it back.
+#: Four tokens is the floor because three-word runs recur inside a page and a shorter
+#: allowance starts forgiving rearrangement rather than relocation; two moves is the
+#: ceiling because the measured damage is one misplaced block per page, and a page
+#: that needs three has not been repaired, it has been rewritten.
+MIN_MOVED_TOKENS = 4
+MAX_MOVES = 2
+
+
+def _is_punctuation(a, b):
+    """Neither side holds a word.
+
+    MEASURED on pages 114 and 115 of the acceptance book: the only difference
+    between the model's answer and the page is one orphan quotation mark, the
+    wreckage of a superscript this page has already resolved by another route. The
+    rule is word preservation, and a lone quote is not a word -- but a quote that
+    came back as a citation number is, and ``59`` is not punctuation.
+    """
+    return not any(char.isalnum() for char in "".join(a) + "".join(b))
+
+
+class _Comparison(object):
+    """One pass of the sequence comparison, before any relocation is considered."""
+
+    __slots__ = ("missing", "invented", "case_only", "allowed", "unexplained",
+                 "recovered", "similarity")
+
+    def __init__(self, src, out, available):
+        self.missing, self.invented, self.case_only = [], [], []
+        self.allowed, self.unexplained, self.recovered = [], [], []
+        matcher = difflib.SequenceMatcher(None, src, out, autojunk=False)
+        self.similarity = matcher.ratio()
+        for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+            if tag == "equal":
+                continue
+            a, b = src[i1:i2], out[j1:j2]
+            if _is_case_only(a, b):
+                # Never an allowance: this is the failure mode a laxer gate misses.
+                self.case_only.append(Difference("case", a, b))
+                continue
+            if _is_retokenisation(a, b):
+                self.allowed.append(Difference("retokenised", a, b))
+                continue
+            number = _marker_recovery(a, b, available)
+            if number is not None:
+                available.remove(number)
+                self.recovered.append(number)
+                self.allowed.append(Difference("marker_recovered", a, b))
+                continue
+            if _is_punctuation(a, b):
+                self.allowed.append(Difference("punctuation", a, b))
+                continue
+            if a:
+                self.missing.append(Difference("missing", a, b))
+            if b:
+                self.invented.append(Difference("invented", a, b))
+            self.unexplained.append(Difference(tag, a, b))
+
+    @property
+    def clean(self):
+        return not self.unexplained and not self.case_only
+
+
+def _run_at(tokens, run):
+    """Where *run* sits in *tokens*, or ``None``. First occurrence; they are equal."""
+    width = len(run)
+    for start in range(len(tokens) - width + 1):
+        if tokens[start:start + width] == run:
+            return start
+    return None
+
+
+def _find_move(src, out, comparison):
+    """A whole run of page text that is present on both sides in different places.
+
+    The candidates are the blocks the comparison could not explain, taken from
+    whichever side the aligner left them whole on -- a relocated heading usually
+    survives intact as the deleted block, a relocated paragraph opening as the
+    inserted one.
+    """
+    seen = []
+    for difference in comparison.unexplained:
+        for run in (difference.source, difference.output):
+            if len(run) >= MIN_MOVED_TOKENS and run not in seen:
+                seen.append(run)
+    for run in seen:
+        here, there = _run_at(src, run), _run_at(out, run)
+        if here is not None and there is not None:
+            return run, here, there
+    return None
+
+
 def check_word_preservation(source_text, model_html, recoverable_markers=()):
     """G1. Compare the model's page against the deterministic transcription.
 
@@ -242,37 +361,30 @@ def check_word_preservation(source_text, model_html, recoverable_markers=()):
 
 
     available = [int(n) for n in recoverable_markers or ()]
-    recovered = []
-    matcher = difflib.SequenceMatcher(None, src, out, autojunk=False)
-    missing, invented, case_only, allowed_hits, unexplained = [], [], [], [], []
+    comparison = _Comparison(src, out, list(available))
 
-    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
-        if tag == "equal":
-            continue
-        a, b = src[i1:i2], out[j1:j2]
-        if _is_case_only(a, b):
-            # Never an allowance: this is the failure mode a laxer gate misses.
-            case_only.append(Difference("case", a, b))
-            continue
-        if _is_retokenisation(a, b):
-            allowed_hits.append(Difference("retokenised", a, b))
-            continue
-        number = _marker_recovery(a, b, available)
-        if number is not None:
-            available.remove(number)
-            recovered.append(number)
-            allowed_hits.append(Difference("marker_recovered", a, b))
-            continue
-        if a:
-            missing.append(Difference("missing", a, b))
-        if b:
-            invented.append(Difference("invented", a, b))
-        unexplained.append(Difference(tag, a, b))
+    # A relocation is only ever read as one when reading it as one makes the whole
+    # page come out clean. A page that still has a lost word after the move had a
+    # lost word before it, and is reported the way it was first seen.
+    moved, trimmed_src, trimmed_out = [], src, out
+    while not comparison.clean and len(moved) < MAX_MOVES:
+        move = _find_move(trimmed_src, trimmed_out, comparison)
+        if move is None:
+            break
+        run, here, there = move
+        trimmed_src = trimmed_src[:here] + trimmed_src[here + len(run):]
+        trimmed_out = trimmed_out[:there] + trimmed_out[there + len(run):]
+        moved.append(Difference("moved", run, run))
+        comparison = _Comparison(trimmed_src, trimmed_out, list(available))
+    if moved and not comparison.clean:
+        moved = []
+        comparison = _Comparison(src, out, list(available))
 
-    verdict = "PASS" if not unexplained and not case_only else "FAIL"
-    return GateResult(verdict, len(src), len(out), matcher.ratio(),
-                      missing, invented, case_only, allowed_hits, unexplained,
-                      recovered_markers=recovered if verdict == "PASS" else [])
+    verdict = "PASS" if comparison.clean else "FAIL"
+    return GateResult(verdict, len(src), len(out), comparison.similarity,
+                      comparison.missing, comparison.invented, comparison.case_only,
+                      moved + comparison.allowed, comparison.unexplained,
+                      recovered_markers=comparison.recovered if verdict == "PASS" else [])
 
 
 _TAG_NAME = re.compile(r"<\s*(/?)\s*([A-Za-z][A-Za-z0-9]*)")

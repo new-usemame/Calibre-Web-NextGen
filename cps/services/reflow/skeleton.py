@@ -33,6 +33,9 @@ FOOTER_BAND = 0.925
 BOILER_HITS = 0.20
 #: A short in-band string reads as furniture; a long one is body text that strayed.
 BAND_TEXT_MAX = 90
+#: How far past the furniture, in points, the picture sent to the model starts. Small
+#: enough that it can never reach a line of the book, and the clamp below makes sure.
+CROP_GAP = 2.0
 
 #: A footnote number / inline marker is at most this share of its block's type size.
 MARGIN_SIZE = 0.7
@@ -98,6 +101,48 @@ class PageSkeleton(object):
     regions: List[Region] = field(default_factory=list)
     reasons: List[str] = field(default_factory=list)
     is_scan: bool = False
+
+    def body_box(self):
+        """The part of the printed page whose words were kept.
+
+        The model is sent this page's text with the running head, the running foot
+        and the folio already removed, and a picture of the page. If the picture
+        still prints all three, the two disagree and the model reconciles them the
+        way a reader would -- by typing in what it can see. MEASURED on the
+        acceptance book: "Chapter 4: The Hellenistic Astrologers" came back inside
+        the chapter on every page of a 30-page range, five words that were not in
+        the text layer, and every page failed the word gate for it. A written rule
+        not to read what is in front of it did not hold on any provider. So the
+        picture is cropped to the page the words came from.
+
+        The crop only ever removes furniture. Each edge stops short of the
+        outermost line that survived, so a page whose body starts high in the
+        header band, or whose notes run down into the footer band, keeps the height
+        it needs: an image missing a line of the book would be a worse defect than
+        the one this fixes, because the model would then be placing words it cannot
+        see.
+        """
+        top, bottom = 0.0, self.height
+        kept, head, foot = [], [], []
+        for region in self.regions:
+            for line in region.lines:
+                if region.kind != "furniture":
+                    kept.append(line.bbox)
+                elif line.bbox[3] <= self.height * HEADER_BAND:
+                    head.append(line.bbox)
+                elif line.bbox[1] >= self.height * FOOTER_BAND:
+                    foot.append(line.bbox)
+        if head:
+            top = max(box[3] for box in head) + CROP_GAP
+            if kept:
+                top = min(top, min(box[1] for box in kept))
+            top = max(0.0, top)
+        if foot:
+            bottom = min(box[1] for box in foot) - CROP_GAP
+            if kept:
+                bottom = max(bottom, max(box[3] for box in kept))
+            bottom = min(self.height, bottom)
+        return (0.0, top, self.width, bottom)
 
     @property
     def note_numbers(self):
@@ -408,6 +453,43 @@ def _append_line(region, line):
                    max(region.bbox[2], line.bbox[2]), line.bbox[3])
 
 
+#: What a scanner returns instead of a digit when it reads a note marker set two
+#: points under the body. MEASURED on the acceptance book: ``Hephaestio.s°`` for 50,
+#: ``Petosiris.si`` for 51, ``Republic.s6`` for 56, ``related.9°`` for 90,
+#: ``Antiochus."1`` for 111, ``century.loo`` for 100, ``CE.20'`` for 201. The damage
+#: is per glyph and it is the usual one: a 5 is read as an s, a 0 as a degree sign or
+#: an o, a 1 as an l or an apostrophe, a pair of 1s as one double quote.
+MARKER_GLYPHS = {"0": "0Oo°º", "1": "1lI|!i\'’‘", "2": "2Zz", "3": "3",
+                 "4": "4", "5": "5sS", "6": "6b", "7": "7", "8": "8B", "9": "9gq"}
+GLYPH_DIGITS = {char: digit for digit, chars in MARKER_GLYPHS.items() for char in chars}
+GLYPH_DIGITS.update({'"': "11", "”": "11", "“": "11"})
+
+
+
+def glyph_number(text):
+    """The number a scanner could have been reading when it returned *text*.
+
+    ``None`` when any glyph in the run is not one a digit is mistaken for, which
+    is most of them: this is a lookup, not a guess.
+    """
+    digits = []
+    for char in text:
+        digit = GLYPH_DIGITS.get(char)
+        if digit is None:
+            return None
+        digits.append(digit)
+    return "".join(digits)
+
+
+#: A note number the scanner read as letters, at the head of the note's own text:
+#: the run, the space, and then the note's first word. MEASURED, page 109 of the
+#: acceptance book opens its footnote zone with ``9° Tarrant, Thrasyllan Platonism``
+#: and page 113 with ``"1 Edited in CCAG 5, 4``. A run that is nothing but letters
+#: is a word and not a number, however well ``so`` reads as 50 -- a note that ran
+#: over from the page before opens the zone with one.
+_GLYPH_NOTE_NUMBER = re.compile("^(\\S{2,4})[ \\t]+(?=[A-Z\u201c\u2018\"\'])")
+
+
 #: A footnote opening the OCR could not keep apart from its own number: the digits,
 #: a space, and then the start of a sentence. The trailing context is what separates
 #: it from an endnote entry ("15. Brennan..."), a table row and page-bottom debris.
@@ -444,6 +526,17 @@ def _note_number(line, block_size, opening=False, after=None):
                 return value
         elif value > after:
             return value
+
+    glyphed = _GLYPH_NOTE_NUMBER.match(line.stripped)
+    if glyphed and not glyphed.group(1).isalpha() and not glyphed.group(1).isdigit():
+        digits = glyph_number(glyphed.group(1))
+        if digits and 0 < len(digits) <= 3 and int(digits) > 0:
+            value = int(digits)
+            if after is None:
+                if opening:
+                    return value
+            elif value > after:
+                return value
     return None
 
 

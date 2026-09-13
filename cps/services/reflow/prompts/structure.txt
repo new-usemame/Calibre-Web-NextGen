@@ -15,15 +15,23 @@ HARD RULES:
 - Keep the printed capitalisation exactly as it is, including inside a word (olmOCR stays olmOCR).
 - A footnote marker is written [N] in the text you are given. Render it as
   <a class="noteref" href="#fn_N">N</a> and give every one of them a matching
-  <aside class="footnote" id="fn_N">.
+  <aside class="footnote" id="fn_N">, whose text STARTS with the number the page prints
+  under the rule:  <aside class="footnote" id="fn_58">58 Cumont, Astrology, p. 76.</aside>
+- The text layer is in the order the scanner returned it, which is usually the reading order
+  and sometimes is not: a section heading can arrive forty lines below where the page prints
+  it, after the section it opens. You MAY move ONE such block back to where the page shows it
+  belongs, whole and word for word. Move nothing else -- sentences, paragraphs and footnotes
+  stay in the order you were given them.
+- A printed list is paragraphs. Keep each item's printed numeral as the first word of its
+  paragraph ("4. Teucer of Babylon"); list markup that drops the numerals loses words.
 - A scanner sometimes reads a superscript note number as a quotation mark or an apostrophe, so the
   text layer shows `Ammon."` where the page prints `Ammon` with a superscript 35. When you are told
   which notes on this page have lost their marker, find each one in the image and put it back:
   delete that stray punctuation and write the noteref in its place. Only the numbers you were told
   about, once each. If you cannot see where a number goes, leave the page as the text layer has it.
 - You MAY: insert paragraph breaks; mark headings; dehyphenate line-break hyphenation; mark
-  footnote references and the footnote block; mark block quotes, epigraphs, lists, figure and table
-  captions; and state reading order.
+  footnote references and the footnote block; mark block quotes, epigraphs, figure and table
+  captions.
 - Output HTML only: <h1>-<h4>, <p>, <blockquote>, <aside class="footnote" id="fn_N">,
   <a class="noteref" href="#fn_N">, <figure><figcaption>, <table>.
 - No explanation outside the HTML.

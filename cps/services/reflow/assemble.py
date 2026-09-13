@@ -24,6 +24,7 @@ superscripts wrong in three measured ways; each repair is recorded with its page
 its evidence, and each is paired with printed text it must leave alone.
 """
 
+import bisect
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -42,10 +43,18 @@ SENT_END = re.compile(r'[.!?;:"”’\)\]]\s*$')
 #: so matched neither of the 62 measured ``.'"`` sites.
 GLYPH_RESIDUE = re.compile(r"(?<=[.,;:!?])['’](?:[\"”])?(?=\s|$)")
 
-#: OCR reads a leading 1 as an apostrophe (``CE.'`` + ``56`` for note 156) only where
-#: the marker had to be resolved through the note window; a marker that resolves on
-#: its own face is beside a printed apostrophe.
-STRAY_APOSTROPHE = re.compile(r"(?<=[.,;:!?])['’]\s*$")
+#: A damaged marker is a short run of those glyphs standing tight against the word it
+#: marks -- no space between the two -- and nothing but space after it. Both halves of
+#: that shape are load-bearing. A degree token is ``16°`` after a space (the book
+#: prints 207 of them); a marker is ``fourth.’°`` with none. The run must be at least
+#: two glyphs long, so a sentence that ends ``, I`` cannot be read as note 1.
+#: Read where the note zone first needs them, one layer down.
+MARKER_GLYPHS = skeleton.MARKER_GLYPHS
+GLYPH_DIGITS = skeleton.GLYPH_DIGITS
+glyph_number = skeleton.glyph_number
+
+GLYPH_MARKER = re.compile("(?<=[.,;:!?)\\]])([%s]{2,4})(?=\\s|$)"
+                          % re.escape("".join(sorted(GLYPH_DIGITS))))
 
 #: How far above its own face a note number may be printed and still be that note.
 #: OCR loses the leading digit of a 3-digit marker; it does not lose two.
@@ -95,10 +104,14 @@ class Repair(object):
     pno: int
     detail: str
     confidence: str = "high"
+    #: The exact characters the repair took out of the text layer. The conservation
+    #: check subtracts these, itemised, rather than forgiving a whole category of
+    #: loss: a repair that eats a real word is then visible as the word it ate.
+    consumed: str = ""
 
     def to_dict(self):
         return {"kind": self.kind, "pno": self.pno, "detail": self.detail,
-                "confidence": self.confidence}
+                "confidence": self.confidence, "consumed": self.consumed}
 
 
 @dataclass
@@ -122,6 +135,7 @@ class Book(object):
     repairs: List[Repair] = field(default_factory=list)
     furniture: List[str] = field(default_factory=list)
     pages: dict = field(default_factory=dict)         # pno -> [Element] as printed
+    body_boxes: dict = field(default_factory=dict)    # pno -> the page minus its furniture
     figures: List[dict] = field(default_factory=list)
     reasons: dict = field(default_factory=dict)       # pno -> [reason, ...]
     style: Optional[skeleton.BookStyle] = None
@@ -131,6 +145,10 @@ class Book(object):
 
     def page_reasons(self, pno):
         return list(self.reasons.get(pno, []))
+
+    def page_box(self, pno):
+        """What to photograph for this page: the part its words came from."""
+        return self.body_boxes.get(pno)
 
     def unmarked_notes(self, pno):
         """Notes this page prints that nothing on this page points at.
@@ -235,6 +253,36 @@ def resolve_marker(digits, page_notes, claimed, following_text):
     return None, None
 
 
+def fit_note(seen, unclaimed, exact_only=False, printed=None):
+    """Which of the page's unreferenced notes the scanner was reading, if one.
+
+    A run that reads back as a note number exactly is that note. A run one
+    substitution away from exactly one of them is that note only once the better
+    evidence has had its turn -- see the order the three recovery passes run in --
+    because ``\'"`` reads as 111 and is one edit from 161, and a page that prints
+    one unreferenced note and holds one residue has already answered the question
+    by counting. Two candidates is not a near miss, it is a coin flip, and the page
+    is routed instead.
+
+    ``printed`` is the page's own span of note numbers. A run of plain digits whose
+    value falls inside it is not damage at all: MEASURED, page 104 marks 59 and
+    prints notes 58, 60, 61, because 59's text was swept into 58's. ``59`` is one
+    digit from ``58``, and binding it there prints a citation the book does not
+    make. The page is missing a note, and saying so is the answer.
+    """
+    if not seen:
+        return None
+    exact = [n for n in unclaimed if str(n) == seen]
+    if exact:
+        return exact[0] if len(exact) == 1 else None
+    if exact_only:
+        return None
+    if printed and seen.isdigit() and printed[0] - 1 <= int(seen) <= printed[1] + 1:
+        return None
+    near = [n for n in unclaimed if _ocr_could_read(str(n), seen)]
+    return near[0] if len(near) == 1 else None
+
+
 def _line_runs(line, pno, page_notes, claimed, repairs, reasons):
     """One physical line's runs, with inline markers bound to their notes."""
     spans = [sp for sp in line.spans if sp.text]
@@ -253,7 +301,7 @@ def _line_runs(line, pno, page_notes, claimed, repairs, reasons):
             opens_line = not any(r[0] == "t" and r[1].strip() for r in runs)
             if number is not None and (raised or not opens_line):
                 if how == "window":
-                    _repair_stray_apostrophe(runs, repairs, pno, text.strip(), number)
+                    _strip_marker_prefix(runs, repairs, pno, text.strip(), number)
                 if how == "degree":
                     texts[index + 1] = _repair_degree(texts[index + 1], repairs, pno,
                                                       text.strip(), number)
@@ -283,20 +331,34 @@ def _is_raised(span, line):
     return span.bbox[3] < line.bbox[3] - 0.25 * height
 
 
-def _repair_stray_apostrophe(runs, repairs, pno, digits, number):
-    """C1: the OCR read the marker's leading ``1`` as an apostrophe."""
+def _strip_marker_prefix(runs, repairs, pno, digits, number):
+    """C1: the digits the scanner dropped are still on the page, as punctuation.
+
+    A marker that resolved through the note window lost its leading digits -- 103
+    came back as ``3``. Those digits were printed, so something stands where they
+    were: MEASURED, ``fourth.'°`` in front of the ``3`` and ``CE.'`` in front of a
+    ``56``. The run in front of the marker is taken only when it reads back as
+    exactly the digits that are missing, which is what tells it apart from the
+    printed apostrophe in ``the astrologers'`` beside a marker that needed no window.
+    """
+    want = str(number)[:-len(digits)] if str(number).endswith(digits) else ""
+    if not want:
+        return
     index = next((k for k in range(len(runs) - 1, -1, -1)
                   if runs[k][0] == "t" and runs[k][1].strip()), None)
     if index is None:
         return
     text = runs[index][1]
-    match = STRAY_APOSTROPHE.search(text)
-    if not match:
+    tail = text.rstrip()
+    for width in range(1, len(want) + 2):
+        residue = tail[-width:]
+        if len(residue) != width or glyph_number(residue) != want:
+            continue
+        runs[index] = ["t", tail[:-width]]
+        repairs.append(Repair("marker_prefix", pno,
+                              "read %r before marker %s as the %s of note %d"
+                              % (residue, digits, want, number), consumed=residue))
         return
-    runs[index] = ["t", text[:match.start()] + text[match.end():]]
-    repairs.append(Repair("marker_apostrophe", pno,
-                          "read %r before marker %s as the leading digit of note %d"
-                          % (match.group(0).strip(), digits, number)))
 
 
 def _repair_degree(following, repairs, pno, digits, number):
@@ -309,6 +371,74 @@ def _repair_degree(following, repairs, pno, digits, number):
                           "read the degree sign after %s as the trailing digit of note %d"
                           % (digits, number)))
     return following[:offset] + stripped[1:]
+
+
+def _recover_glyph_markers(elements, skel, claimed, repairs, reasons,
+                           exact_only=False):
+    """C4: the scanner read the whole superscript as letters, and the page says so.
+
+    This is the damage that costs the most. MEASURED over pages 100-129 of the
+    acceptance book, 17 of 21 refused model answers differed from the deterministic
+    text in nothing but this: the page prints ``Hephaestio`` and a superscript 50,
+    the text layer returns ``Hephaestio.s°``, and the model -- which is shown the
+    page -- writes the 50. There is no digit left for a marker span to recognise, so
+    every one of those notes was also left unreferenced.
+
+    The evidence for the reading is the page's own footnote zone. A run of glyphs
+    that a digit is mistaken for, set tight against the word it marks, reading back
+    as a number this page prints as a note and leaves unreferenced, is that marker.
+    Where two of the page's notes would fit, nothing is repaired -- pairing them off
+    by position prints a citation the page does not make.
+    """
+    unclaimed = [n for n in sorted(skel.note_numbers) if n not in claimed]
+    if not unclaimed:
+        return
+    numbers = sorted(skel.note_numbers)
+    printed = (numbers[0], numbers[-1]) if numbers else None
+    read_back = False
+
+    for element in elements:
+        if element.kind not in ("p", "caption", "h") or not unclaimed:
+            continue
+        index = 0
+        while index < len(element.runs) and unclaimed:
+            run = element.runs[index]
+            if run[0] != "t":
+                index += 1
+                continue
+            text = run[1]
+            found, position = None, 0
+            while True:
+                match = GLYPH_MARKER.search(text, position)
+                if match is None:
+                    break
+                digits = glyph_number(match.group(1))
+                number = fit_note(digits, unclaimed, exact_only=exact_only,
+                                  printed=None if match.group(1) != digits else printed)
+                if number is not None:
+                    found = (match, number)
+                    break
+                position = match.end()
+            if found is None:
+                index += 1
+                continue
+            match, number = found
+            element.runs[index:index + 1] = [["t", text[:match.start()]],
+                                             ["sup", str(number), skel.pno],
+                                             ["t", text[match.end():]]]
+            claimed.add(number)
+            unclaimed.remove(number)
+            repairs.append(Repair("marker_glyphs", skel.pno,
+                                  "read %r as the marker for note %d"
+                                  % (match.group(1), number),
+                                  confidence="medium", consumed=match.group(1)))
+            read_back = True
+            index += 2
+
+    if read_back:
+        reasons.append("glyph_markers_read")
+        for element in elements:
+            element.runs = tidy(element.runs)
 
 
 def _recover_residue_markers(elements, skel, claimed, repairs, reasons):
@@ -347,17 +477,28 @@ def _recover_residue_markers(elements, skel, claimed, repairs, reasons):
 
 #: How far a printed note number can be from what the OCR returned before the repair
 #: stops being a reading and starts being a guess. MEASURED on the acceptance book:
-#: every one of the 39 damaged numbers is a dropped trailing digit (10 -> "1",
-#: 50 -> "5", 100 -> "1") or a single substitution (130 -> "138", 165 -> "163",
-#: 235 -> "233", 280 -> "288"). Nothing needs more licence than that.
+#: every one of the damaged numbers is a dropped digit off one end (10 -> "1",
+#: 50 -> "5", 100 -> "1", 118 -> "18", 115 -> "1", 112 -> "12") or a single
+#: substitution (130 -> "138", 165 -> "163", 101 -> "161", 235 -> "233",
+#: 280 -> "288"). Nothing needs more licence than that.
 MAX_DROPPED_DIGITS = 2
 
 
 def _ocr_could_read(printed, seen):
-    """Could a scanner have returned *seen* from a page that printed *printed*?"""
+    """Could a scanner have returned *seen* from a page that printed *printed*?
+
+    Digits go missing off either end. A note number set in the outer margin loses
+    its last digit to the trim; one set tight against the previous note's full stop
+    loses its first digit to the stop -- MEASURED, 118 came back as ``18`` and 115
+    as ``1``. Both directions are one kind of damage, and widening the reading only
+    makes the repairs that use it *less* willing to fire, because each of them
+    demands that exactly one candidate survive.
+    """
     if printed == seen:
         return True
-    if printed.startswith(seen) and 0 < len(printed) - len(seen) <= MAX_DROPPED_DIGITS:
+    dropped = len(printed) - len(seen)
+    if 0 < dropped <= MAX_DROPPED_DIGITS and (printed.startswith(seen)
+                                              or printed.endswith(seen)):
         return True
     if len(printed) == len(seen):
         return sum(1 for a, b in zip(printed, seen) if a != b) == 1
@@ -365,13 +506,24 @@ def _ocr_could_read(printed, seen):
 
 
 def _page_marker_digits(skel):
-    """Digit runs printed in the body as inline markers, damaged or not."""
+    """Digit runs printed in the body as inline markers, damaged or not.
+
+    A marker the scanner read as letters is still a marker, and a note whose own
+    number is damaged is often marked by one: MEASURED, note 130 came back as 138
+    and the only thing pointing at it was ``life.'3°``. Reading the glyph runs here
+    too is what lets the note-number repair see its evidence.
+    """
     found = set()
     for region in skel.body_regions:
         for line in region.lines:
             for span in line.spans:
                 if skeleton.is_marker_span(span, line.size):
                     found.add(span.text.strip())
+        for line in region.lines:
+            for glyphs in GLYPH_MARKER.findall("".join(sp.text for sp in line.spans)):
+                digits = glyph_number(glyphs)
+                if digits:
+                    found.add(digits)
     return found
 
 
@@ -408,36 +560,90 @@ def note_text(region):
     return plain_text(tidy(runs))
 
 
-def _repair_note_numbers(skel, repairs):
-    """Read a damaged note number off the page it was printed on.
+def _ascending_backbone(values):
+    """Indices of the longest strictly ascending run through *values*.
 
-    A page's footnote numbers ascend. One that does not is damage, and the page
-    carries its own answer: the gap its neighbours leave, and the marker in the body
-    that points at it. Where exactly one number fits the gap, a scanner could have
-    returned what we got from it, and the body marks that number, the repair is a
-    reading of the page. Where any of the three is missing it stays broken, the page
-    says so, and a model gets to look at it.
+    A book's note numbers ascend, so the ones that break the ascent are the damaged
+    ones -- but which ones those are is not a left-to-right question. MEASURED, page
+    117 of the acceptance book came back as ``27, 28, 29, 38, 39, 32, 33``: two
+    numbers near the middle are damaged, and reading left to right trusts those two
+    and blames the four correct citations after them. The longest ascending
+    subsequence is the book's real numbering and everything outside it is damage.
+
+    Where two runs are equally long the earlier reading wins, which is what lets a
+    page that opens ``9, 1, 11`` keep its 9 instead of keeping its 1.
     """
-    regions = [r for r in skel.note_regions if r.number is not None]
-    markers = _page_marker_digits(skel)
-    for index, region in enumerate(regions):
-        previous = regions[index - 1].number if index else None
-        if previous is None or region.number > previous:
+    total = len(values)
+    # Longest ascending run *starting* at each index, by patience sorting over the
+    # reversed sequence. O(n log n), because a long book has thousands of notes.
+    onward = [1] * total
+    tails = []
+    for index in range(total - 1, -1, -1):
+        position = bisect.bisect_left(tails, -values[index])
+        onward[index] = position + 1
+        if position == len(tails):
+            tails.append(-values[index])
+        else:
+            tails[position] = -values[index]
+    longest = max(onward) if onward else 0
+    kept, need, last = [], longest, None
+    for index, value in enumerate(values):
+        if onward[index] == need and (last is None or value > last):
+            kept.append(index)
+            need -= 1
+            last = value
+    return kept
+
+
+def repair_note_numbers(skeletons, repairs):
+    """Read the damaged note numbers of a book off the undamaged ones around them.
+
+    The evidence a repair needs is the gap the surviving numbers leave, the fact
+    that a scanner could have returned what we got from the numbers that fill it,
+    and a marker in the body pointing at each one. Where the gap holds exactly as
+    many numbers as there are damaged notes in it, the page has answered by
+    counting and each damaged number takes its place in order. Where it does not --
+    a note whose whole region the scanner swept into its neighbour, a book that
+    restarts its numbering every chapter -- nothing is repaired, the page says so,
+    and a model gets to look at it.
+
+    This runs over the whole book rather than a page at a time because the damage
+    does not respect page breaks: MEASURED, note 115 came back as ``1`` at the head
+    of its own zone with no earlier number on that page to fail to ascend from, and
+    note 190 came back as ``198`` whose error is only visible from the 192 on the
+    page after it.
+    """
+    regions = [(skel, region) for skel in skeletons for region in skel.note_regions
+               if region.number is not None]
+    values = [region.number for _, region in regions]
+    kept = _ascending_backbone(values)
+    markers = {}
+    for left, right in zip(kept, kept[1:]):
+        damaged = list(range(left + 1, right))
+        if not damaged:
             continue
-        following = regions[index + 1].number if index + 1 < len(regions) else None
-        top = following - 1 if following is not None else previous + 1
-        window = range(previous + 1, top + 1)
-        seen = str(region.number)
-        fits = [n for n in window
-                if _ocr_could_read(str(n), seen) and _is_marked(str(n), markers)]
-        if len(fits) != 1:
+        window = list(range(values[left] + 1, values[right]))
+        if len(window) != len(damaged):
             continue
-        repairs.append(Repair(kind="note_number", pno=skel.pno,
-                              detail="note %s reads as %d between notes %d and %s"
-                                     % (seen, fits[0], previous,
-                                        following if following is not None else "-"),
-                              confidence="high"))
-        region.number = fits[0]
+        pairs = list(zip(damaged, window))
+        if not all(_ocr_could_read(str(number), str(values[index]))
+                   for index, number in pairs):
+            continue
+        for index, number in pairs:
+            skel = regions[index][0]
+            if skel.pno not in markers:
+                markers[skel.pno] = _page_marker_digits(skel)
+        if not all(_is_marked(str(number), markers[regions[index][0].pno])
+                   for index, number in pairs):
+            continue
+        for index, number in pairs:
+            skel, region = regions[index]
+            repairs.append(Repair(
+                kind="note_number", pno=skel.pno,
+                detail="note %s reads as %d between notes %d and %d"
+                       % (region.number, number, values[left], values[right]),
+                confidence="high"))
+            region.number = number
 
 
 def _copy_element(element):
@@ -486,7 +692,12 @@ def _page_elements(skel, repairs, reasons):
                                 level=region.level, bbox=region.bbox,
                                 pages=[skel.pno]))
 
+    # Strongest evidence first. A run that reads back as a note number exactly is
+    # that note; then a page whose residue count matches its unreferenced notes has
+    # answered by counting; only then is a single near miss allowed to decide.
+    _recover_glyph_markers(elements, skel, claimed, repairs, reasons, exact_only=True)
     _recover_residue_markers(elements, skel, claimed, repairs, reasons)
+    _recover_glyph_markers(elements, skel, claimed, repairs, reasons)
     # A plate with no caption under it has nothing to place it by, which is a page
     # worth a second look rather than a silent <figcaption></figcaption>.
     for index, element in enumerate(elements):
@@ -504,9 +715,12 @@ def assemble(skeletons, style, raw_pages=None):
     stitched = 0
     refused = 0
 
+    # Before anything else, because a damaged note number is what a damaged marker
+    # would otherwise be fitted to, and the evidence for it is spread over pages.
+    repair_note_numbers(skeletons, book.repairs)
+
     for skel in skeletons:
         page_reasons = list(skel.reasons)
-        _repair_note_numbers(skel, book.repairs)
         elements, claimed = _page_elements(skel, book.repairs, page_reasons)
         # Two views of the same page, and the difference matters. ``pages`` is the
         # page as it was printed, which is what a model is shown and what its answer
@@ -514,6 +728,7 @@ def assemble(skeletons, style, raw_pages=None):
         # carried over the page turns. Joining mutates runs, so the stream gets its
         # own copies.
         book.pages[skel.pno] = elements
+        book.body_boxes[skel.pno] = skel.body_box()
         elements = [_copy_element(el) for el in elements]
 
         for region in skel.regions:
@@ -549,7 +764,8 @@ def assemble(skeletons, style, raw_pages=None):
     if raw_pages is not None:
         book.source_words = source_word_counter(raw_pages)
         book.conservation = check_conservation(book.source_words, book.elements,
-                                               book.notes, book.furniture)
+                                               book.notes, book.furniture,
+                                               book.repairs)
 
     unmarked = [n for n in book.notes if n.num is not None and not n.marked]
     book.stats = {
@@ -598,12 +814,18 @@ def source_word_counter(raw_pages):
     return counter
 
 
-def check_conservation(source_words, elements, notes, furniture):
+def check_conservation(source_words, elements, notes, furniture, repairs=()):
     """SPEC §3: the assembled output's words are the source's words.
 
     Furniture is removed on purpose, so it is counted here rather than forgiven — a
     running head that stops being recognised as furniture shows up as *added*, and a
     paragraph that falls out of the stream shows up as *missing*.
+
+    ``repairs`` are the only subtractions. A marker repair reads ``s°`` as the number
+    50 and the ``s`` stops being a word, so the characters each repair declares it
+    consumed come off the source side — itemised, one repair at a time, never as a
+    category. A repair that eats a real word therefore still shows up here, as the
+    word it ate.
     """
     output = Counter()
     for element in elements:
@@ -613,6 +835,10 @@ def check_conservation(source_words, elements, notes, furniture):
     for line in furniture:
         output.update(_WORD.findall(line))
 
+    for repair in repairs:
+        for word in _WORD.findall(repair.consumed):
+            if source_words[word]:
+                source_words = source_words - Counter([word])
     missing = sorted((source_words - output).elements())
     added = sorted((output - source_words).elements())
     return ConservationReport(ok=not missing and not added,

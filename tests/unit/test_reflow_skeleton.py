@@ -203,7 +203,7 @@ class TestOcrDamagedMarkers:
 
         kinds = {r.kind for r in book.repairs}
 
-        assert {"marker_apostrophe", "marker_degree", "marker_residue"} <= kinds
+        assert {"marker_prefix", "marker_degree", "marker_residue"} <= kinds
         assert all(r.pno == 0 for r in book.repairs)
         assert all(r.detail for r in book.repairs)
 
@@ -324,3 +324,112 @@ def test_a_scanner_page_label_outline_is_not_a_table_of_contents():
 
     assert not skeleton.outline_is_useful(labels)
     assert skeleton.outline_is_useful(real)
+
+
+class TestThePageTheWordsCameFrom(object):
+    """The picture sent to the model and the words sent to the model are one page.
+
+    The deterministic pass strips the running head, the running foot and the folio
+    before the text ever leaves the process, and then the old code handed the model
+    a photograph of the page with all three still printed on it. That is not a
+    prompt problem: it asks a vision model to look at a chapter title and not read
+    it, and MEASURED on the acceptance book it lost, putting "Chapter 4: The
+    Hellenistic Astrologers" inside the chapter on every page of a 30-page range.
+    """
+
+    def _skeleton(self, build):
+        doc = F.new_doc()
+        build(doc)
+        try:
+            raw = extract.read_pages(doc, [0])
+            style = skeleton.book_style(raw)
+            return skeleton.page_skeleton(raw[0], style)
+        finally:
+            doc.close()
+
+    def test_the_band_the_running_head_sits_in_is_not_in_the_picture(self):
+        skel = self._skeleton(F.prose_page)
+        head = [line for region in skel.regions if region.kind == "furniture"
+                for line in region.lines]
+        assert head, "this fixture is supposed to have furniture"
+
+        box = skel.body_box()
+
+        assert box[1] > max(line.bbox[3] for line in head)
+
+    def test_every_line_that_survived_is_still_in_the_picture(self):
+        """The crop can only ever remove furniture. A page whose body starts high, or
+        whose notes run to the foot, keeps the height it needs -- cutting a line of
+        the book out of the image would be a far worse defect than the one this
+        fixes, because the model would be asked to place words it cannot see."""
+        skel = self._skeleton(F.prose_page)
+        kept = [line for region in skel.regions if region.kind != "furniture"
+                for line in region.lines]
+
+        box = skel.body_box()
+
+        assert box[1] <= min(line.bbox[1] for line in kept)
+        assert box[3] >= max(line.bbox[3] for line in kept)
+
+    def test_a_page_with_no_furniture_is_photographed_whole(self):
+        skel = self._skeleton(F.title_page)
+        assert not [r for r in skel.regions if r.kind == "furniture"]
+
+        assert skel.body_box() == (0.0, 0.0, skel.width, skel.height)
+
+    def test_furniture_low_enough_to_touch_the_text_does_not_crop_the_text(self):
+        """A crafted violation: a folio printed inside the footer band on a page whose
+        notes run down into it. Trusting the band alone would cut the last note off
+        the picture."""
+        doc = F.new_doc()
+        page = F.add_page(doc)
+        F.add_body_lines(page, F.PROSE_LINES[:6])
+        F._put(page, F.LEFT, F.PAGE_H * 0.94, "a note that runs into the foot band")
+        F._put(page, F.PAGE_W - 60, F.PAGE_H * 0.96, "121", size=10.2)
+        try:
+            raw = extract.read_pages(doc, [0])
+            skel = skeleton.page_skeleton(raw[0], skeleton.book_style(raw))
+        finally:
+            doc.close()
+        kept = [line for region in skel.regions if region.kind != "furniture"
+                for line in region.lines]
+
+        assert skel.body_box()[3] >= max(line.bbox[3] for line in kept)
+
+
+class TestANoteWhoseOwnNumberTheScannerAte(object):
+    """MEASURED on the acceptance book: the footnote zone of page 109 opens
+    ``9° Tarrant, Thrasyllan Platonism, p. 10`` and page 113's opens ``"1 Edited in
+    CCAG 5, 4``. Neither line opens a note today, because neither starts with
+    something that parses as a number -- so the note's text is emitted as a stray
+    paragraph in the middle of the body, the note itself never exists, and the
+    marker in the body pointing at it has nothing to bind to. Three defects, one
+    unread number.
+    """
+
+    def _regions(self, builder):
+        doc = F.new_doc()
+        builder(doc)
+        try:
+            raw = extract.read_pages(doc, [0])
+            style = skeleton.book_style(raw, None)
+            return skeleton.page_skeleton(raw[0], style)
+        finally:
+            doc.close()
+
+    def test_a_number_read_as_letters_still_opens_its_note(self):
+        skel = self._regions(F.glyph_numbered_note_page)
+
+        assert [r.number for r in skel.note_regions] == [90, 91, 92]
+
+    def test_the_notes_text_is_not_left_standing_in_the_body(self):
+        skel = self._regions(F.glyph_numbered_note_page)
+        body = " ".join(r.text for r in skel.body_regions)
+
+        assert "Tarrant" not in body, body
+
+    def test_a_word_in_the_note_zone_is_not_read_as_a_number(self):
+        """The control. ``so`` is an s and an o, which are a 5 and a 0."""
+        skel = self._regions(F.lowercase_word_in_the_note_zone_page)
+
+        assert 50 not in [r.number for r in skel.note_regions]

@@ -29,6 +29,7 @@ from typing import Optional
 
 import requests
 
+from .gate import number_the_notes
 from .prompts import PROMPT_VERSION, structure_prompt, user_prompt
 
 log = logging.getLogger(__name__)
@@ -62,33 +63,58 @@ def completion_budget(page_text):
     return max(COMPLETION_TOKENS_FLOOR, min(COMPLETION_TOKENS_CEILING, needed))
 
 
+#: What one page of a real book costs in tokens. MEASURED 2026-09-13 on the
+#: acceptance book: prompt 1,878-2,029 (the page's text plus its raster) and
+#: completion 892-1,293. These carry about 10% over the worst page measured, and they
+#: are what every dollar figure shown to a user is built from.
+PAGE_PROMPT_TOKENS = 2100
+PAGE_COMPLETION_TOKENS = 1400
+
+
 @dataclass
 class ModelSpec(object):
+    """A tier: which model, and the most its upstreams are allowed to charge.
+
+    The two rates are not a guess at what routing will pick. They are sent with every
+    request as a hard ceiling, so the price the user was quoted is the price they can
+    be billed -- see ``_payload``.
+    """
+
     model_id: str
-    price_per_page: float          # measured $/page on a dense page with its raster
     prompt_usd_per_mtok: float
     completion_usd_per_mtok: float
     label: str = ""
     supports_images: bool = True
 
+    @property
+    def price_per_page(self):
+        """The most one page of a book can cost at this tier's ceiling."""
+        return round((PAGE_PROMPT_TOKENS * self.prompt_usd_per_mtok
+                      + PAGE_COMPLETION_TOKENS * self.completion_usd_per_mtok) / 1e6, 6)
 
-#: Measured on the acceptance book's densest pages, image + text, one page per call.
+    @property
+    def max_price(self):
+        """The ceiling, in the shape OpenRouter's provider router wants."""
+        return {"prompt": self.prompt_usd_per_mtok,
+                "completion": self.completion_usd_per_mtok}
+
+
+#: The rates below are ceilings chosen from OpenRouter's per-endpoint price list,
+#: MEASURED 2026-09-13 (``/api/v1/models/<slug>/endpoints``), not from the catalogue
+#: headline. A model on OpenRouter is not one price: deepseek-v4.1-flash is served by
+#: fourteen upstreams between $0.15/$0.60 and $0.375/$1.50 per million tokens, and
+#: routing picks one per request. Each ceiling here admits most of that model's
+#: upstreams and excludes the dearest -- $0.30/$1.20 leaves thirteen of the fourteen
+#: and rules out only Venice, the one that charged 2.9x what the cheapest did for the
+#: same page on the same day.
 #:
-#: The per-token figures are what OpenRouter BILLED, not what its catalogue
-#: advertises. MEASURED 2026-09-13 on deepseek-v4.1-flash: the catalogue quotes
-#: $0.15/$0.60 per million and two different providers charged $0.30/$1.20 and
-#: $0.375/$1.50 for the same model on the same day. Quoting the catalogue floor to a
-#: user who is about to consent to a figure understates their bill by 2x and stops
-#: their job half way through the book, so these are the upper end of what was
-#: actually charged. ``price_per_page`` is the whole call — a page's text, its raster
-#: and the answer — at that upper end.
+#: The two tiers costing the same is not a slip: Luna's own endpoints sit at
+#: $0.22/$1.32, slightly under deepseek's dearest. Which of the two is better at this
+#: particular job is a question for a measured comparison, not for a price list.
 TIERS = {
-    "cheap": ModelSpec("qwen/qwen3-vl-32b-instruct", 0.0016, 0.26, 1.04,
-                       label="Cheapest"),
-    "standard": ModelSpec("deepseek/deepseek-v4.1-flash", 0.0032, 0.375, 1.50,
-                          label="Standard"),
-    "quality": ModelSpec("openai/gpt-5.6-luna", 0.0050, 0.50, 3.00,
-                         label="Best quality"),
+    "cheap": ModelSpec("qwen/qwen3-vl-32b-instruct", 0.11, 0.45, label="Cheapest"),
+    "standard": ModelSpec("deepseek/deepseek-v4.1-flash", 0.30, 1.20, label="Standard"),
+    "quality": ModelSpec("openai/gpt-5.6-luna", 0.22, 1.32, label="Best quality"),
 }
 DEFAULT_TIER = "standard"
 
@@ -210,6 +236,10 @@ class OpenRouterClient(object):
             # completion tokens and consume the same ceiling, so leaving them on
             # pays for thinking nobody reads and crowds out the answer.
             "reasoning": {"enabled": False},
+            # The user consented to a dollar figure computed from these rates. Sent
+            # as a ceiling, they stop the request reaching an upstream that would
+            # bill more than the figure they agreed to.
+            "provider": {"max_price": self.spec.max_price},
         }
 
     def _post(self, payload):
@@ -283,7 +313,10 @@ class OpenRouterClient(object):
         completion_tokens = int(usage.get("completion_tokens") or 0)
         cost, source = self._cost(usage, prompt_tokens, completion_tokens)
 
-        return ModelResult(html=html, uncertain=uncertain, notes=notes,
+        # One shape from here on: the gate, the page cache and the EPUB all read the
+        # same markup, so which of the two ways a provider chose to write a note down
+        # stops being something any of them has to know about.
+        return ModelResult(html=number_the_notes(html), uncertain=uncertain, notes=notes,
                            model=data.get("model") or self.model_id,
                            prompt_tokens=prompt_tokens,
                            completion_tokens=completion_tokens,

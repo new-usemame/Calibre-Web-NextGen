@@ -270,3 +270,55 @@ def test_the_ledger_writes_one_json_object_per_line(tmp_path):
     lines = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
 
     assert [entry["page"] for entry in lines] == [1, 2]
+
+
+# ------------------------------------------------ the price the user was quoted
+
+def test_no_upstream_that_charges_more_than_the_quote_can_serve_the_request():
+    """The estimate is a ceiling the request enforces, not a guess about routing.
+
+    MEASURED 2026-09-13: deepseek-v4.1-flash is served by fourteen upstreams on
+    OpenRouter charging between $0.15 and $0.375 per million prompt tokens, and
+    default routing picks a different one per request -- three consecutive pages of
+    the acceptance book were billed by DeepInfra, GMICloud and Venice at $0.00093,
+    $0.00148 and $0.00270 for the same work. A figure computed from one of those and
+    billed at another is not a figure anybody can consent to, and the difference is
+    the job stopping half way through the book on a cap the user thought was
+    generous. So every request carries the quoted rate as a hard price ceiling.
+    """
+    for tier, spec in model.TIERS.items():
+        with requests_mock.Mocker() as m:
+            m.post(ENDPOINT, json=_reply())
+            _edit(_client(tier=tier))
+            sent = m.last_request.json()
+
+        ceiling = (sent.get("provider") or {}).get("max_price") or {}
+        assert ceiling.get("prompt") == pytest.approx(spec.prompt_usd_per_mtok), tier
+        assert ceiling.get("completion") == pytest.approx(spec.completion_usd_per_mtok), tier
+
+
+def test_the_page_price_the_estimate_multiplies_is_the_ceiling_rate():
+    """What a page costs and what a page is allowed to cost are one number.
+
+    A tier whose per-page figure was written by hand can drift below its own price
+    ceiling, and then the estimate understates the bill by our arithmetic rather than
+    the provider's -- which is the same failure with nobody to blame it on.
+    """
+    for tier, spec in model.TIERS.items():
+        worst = (model.PAGE_PROMPT_TOKENS * spec.prompt_usd_per_mtok
+                 + model.PAGE_COMPLETION_TOKENS * spec.completion_usd_per_mtok) / 1e6
+        assert spec.price_per_page == pytest.approx(worst, rel=1e-6), tier
+
+
+def test_a_note_that_came_back_without_its_number_comes_out_with_it():
+    """The answer is put into one shape here, so the gate, the cache and the EPUB all
+    see the same note. MEASURED on the acceptance book: providers differ on whether
+    the number goes in the aside's text or only in its id, and a reader's EPUB with
+    unnumbered notes is a worse outcome than a refused page."""
+    bare = ('<p>text of the page<a class="noteref" href="#fn_160">160</a></p>'
+            '<aside class="footnote" id="fn_160">Beck, p. 12.</aside>')
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, json=_reply(content=bare))
+        result = _edit(_client())
+
+    assert '<aside class="footnote" id="fn_160">160 Beck, p. 12.</aside>' in result.html

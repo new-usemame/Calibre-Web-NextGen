@@ -382,7 +382,7 @@ def _edit_one_page(doc, book, pno, client, ledger, cache, result, ladder,
                ledger=ledger, cost=0.0, cached=True)
         return outcome
 
-    image = _raster(doc, pno)
+    image = _raster(doc, pno, book.page_box(pno))
     answer = client.edit_page(source_text, image_jpeg=image, ladder=ladder,
                               hints=hints, page_label=str(pno + 1), ledger=ledger)
     outcome.cost_usd = float(getattr(answer, "cost_usd", 0.0) or 0.0)
@@ -469,11 +469,11 @@ def _gate_reasons(words, structure):
     return reasons
 
 
-def _raster(doc, pno):
+def _raster(doc, pno, clip=None):
     try:
         return extract.render_page_jpeg(doc, pno, scale=RASTER_SCALE,
                                         quality=RASTER_QUALITY,
-                                        max_bytes=RASTER_MAX_BYTES)
+                                        max_bytes=RASTER_MAX_BYTES, clip=clip)
     except Exception as exc:                                  # pragma: no cover
         log.warning("reflow: could not render page %d: %s", pno, exc)
         return None

@@ -20,7 +20,7 @@ exactly is what makes the gate pass on a faithful edit.
 import os
 
 #: Bump on ANY change to the system prompt or the response contract.
-PROMPT_VERSION = "reflow-structure-2"
+PROMPT_VERSION = "reflow-structure-4"
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 

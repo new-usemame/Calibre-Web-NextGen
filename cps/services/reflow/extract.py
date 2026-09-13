@@ -285,15 +285,20 @@ def read_pages(doc, page_numbers=None):
     return [read_page(doc, pno) for pno in page_numbers]
 
 
-def render_page_jpeg(doc, pno, scale=1.5, quality=80, max_bytes=None):
+def render_page_jpeg(doc, pno, scale=1.5, quality=80, max_bytes=None, clip=None):
     """A JPEG of the page for the vision model.
 
     ``max_bytes`` steps the scale down rather than the quality: a model reading small
     superscripts needs resolution more than it needs smooth gradients.
+
+    ``clip`` narrows the picture to part of the page -- the pipeline uses it to leave
+    the running head and the folio out, because they were taken out of the words.
+    Cropping also buys resolution: the same byte budget over fewer pixels.
     """
+    rect = pymupdf.Rect(*clip) if clip else None
     for attempt_scale in _scale_ladder(scale):
         matrix = pymupdf.Matrix(attempt_scale, attempt_scale)
-        pix = doc[pno].get_pixmap(matrix=matrix, alpha=False)
+        pix = doc[pno].get_pixmap(matrix=matrix, alpha=False, clip=rect)
         buf = io.BytesIO(pix.tobytes("jpg", jpg_quality=quality))
         data = buf.getvalue()
         if max_bytes is None or len(data) <= max_bytes:

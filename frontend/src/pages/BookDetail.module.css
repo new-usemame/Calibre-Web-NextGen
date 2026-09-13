@@ -350,6 +350,14 @@
   flex-wrap: wrap;
 }
 
+/* The TopBar is sticky: focus/anchor scrolling must never park a row control
+   half under it (scroll-margin is honoured by scrollIntoView, which browsers
+   run for keyboard focus and hit-test probes alike). Controls nest (AddToShelf
+   wraps its trigger), so this targets every actionable descendant. */
+.actions :is(a, button) {
+  scroll-margin-top: calc(56px + var(--sp-2));
+}
+
 .actionStatus {
   margin: var(--sp-2) 0 0;
   color: var(--text-muted);

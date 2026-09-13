@@ -68,11 +68,16 @@ test('browse-card covers carry a themed hairline, not a swallowed edge (#987)', 
 
 test('detail-page cover carries a themed hairline (#987)', async ({ page }) => {
   await page.goto('/app');
-  const link = page.locator('a[href*="/book/"]').first();
-  await expect(link).toBeVisible();
-  const href = await link.getAttribute('href');
-  test.skip(!href, 'seed has no books to open');
-  await page.goto(href!);
+  // Pick a book that actually HAS cover art: the catalog's first card can be a
+  // coverless fixture, whose typographic fallback renders no <img> to measure.
+  const id = await page.evaluate(async () => {
+    const r = await fetch('/api/v1/books?per_page=25', { headers: { Accept: 'application/json' } })
+      .catch(() => null);
+    const d = r && r.ok ? await r.json() : null;
+    return d?.items?.find((b: { cover_url?: string | null }) => b.cover_url)?.id ?? null;
+  });
+  test.skip(!id, 'seed has no book with cover art');
+  await page.goto(`/app/book/${id}`);
 
   // CSS-module hashed class — `_cover_ab12` — identifies the detail cover
   // itself, not the "More by this author" strip further down the page.

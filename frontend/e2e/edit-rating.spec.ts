@@ -18,13 +18,22 @@ import { collectPageErrors, assertNoPageErrors } from './utils';
 
 const RATING = '[role="slider"][aria-label="Rating"]';
 
-/** First book id in the library, or null on an empty seed. */
+/** First book id in the library whose edit page has ONE rating widget. A book
+ *  with a rating-type custom column renders a second identical slider, and the
+ *  single-target selectors below were written for exactly one. */
 async function firstBookId(page: Page): Promise<number | null> {
   return await page.evaluate(async () => {
-    const r = await fetch('/api/v1/books?per_page=1', { credentials: 'same-origin' });
+    const r = await fetch('/api/v1/books?per_page=25', { credentials: 'same-origin' });
     if (!r.ok) return null;
     const d = await r.json();
-    return d.items?.[0]?.id ?? null;
+    for (const item of d.items ?? []) {
+      const detail = await fetch(`/api/v1/books/${item.id}`, { credentials: 'same-origin' })
+        .then((x) => (x.ok ? x.json() : null)).catch(() => null);
+      if (detail && !(detail.custom_columns ?? []).some((c: { datatype: string }) => c.datatype === 'rating')) {
+        return item.id as number;
+      }
+    }
+    return null;
   });
 }
 

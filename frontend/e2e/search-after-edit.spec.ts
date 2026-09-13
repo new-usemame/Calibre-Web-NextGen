@@ -73,7 +73,9 @@ test('editing removes a restored book from old-title search results', async ({ p
   // production metadata mutation, then the detail redirect mirrors real use.
   await page.locator(`a[href$="/book/${id}"]`).click();
   await expect(page).toHaveURL(new RegExp(`/book/${id}$`));
-  await page.getByRole('link', { name: /^Edit$/ }).click();
+  // The book page's editor entry is the gear menu's "Edit metadata" item.
+  await page.getByTestId('book-actions-menu').click();
+  await page.getByRole('menuitem', { name: 'Edit metadata' }).click();
   await expect(page).toHaveURL(new RegExp(`/book/${id}/edit$`));
   const titleInput = page.getByLabel('Title');
   await expect(titleInput).toHaveValue(oldTitle);

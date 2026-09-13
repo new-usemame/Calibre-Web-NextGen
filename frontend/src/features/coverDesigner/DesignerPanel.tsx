@@ -558,12 +558,12 @@ function StyleThumb({ styleId, url, label }: { styleId: string; url: string; lab
 }
 
 /** Neutral per-style glyph drawn from the arrangement idea itself. Unknown
- *  styles get the generic stacked-lines drawing. Decorative: the button's
- *  accessible name comes from its label, so these carry no alt text. */
-function StyleGlyph({ styleId, label }: { styleId: string; label: string }) {
+ *  styles get the generic stacked-lines drawing. Decorative (aria-hidden): the
+ *  button's accessible name comes from the visible label under it. */
+function StyleGlyph({ styleId }: { styleId: string; label?: string }) {
   const common = { fill: 'currentColor' } as const;
   return (
-    <svg viewBox="0 0 64 96" className={styles.arrangeGlyph} role="img" aria-label={label}>
+    <svg viewBox="0 0 64 96" className={styles.arrangeGlyph} aria-hidden="true" focusable={false}>
       {styleId === 'banner' && (
         <>
           <rect x="6" y="14" width="52" height="18" rx="2" opacity="0.9" {...common} />
@@ -792,7 +792,7 @@ function LetteringPicker({ catalogue, design, onChange }: {
               className={checked ? styles.fontCardOn : styles.fontCard}
               onClick={() => onChange(f.id)}
             >
-              <FontSample sampleUrl={f.sample_url} cssStack={f.css_stack} label={f.label} />
+              <FontSample sampleUrl={f.sample_url} cssStack={f.css_stack} />
               <span className={styles.fontLabel}>{t(f.label)}</span>
             </button>
           );
@@ -803,7 +803,7 @@ function LetteringPicker({ catalogue, design, onChange }: {
   );
 }
 
-function FontSample({ sampleUrl, cssStack, label }: { sampleUrl: string; cssStack: string; label: string }) {
+function FontSample({ sampleUrl, cssStack }: { sampleUrl: string; cssStack: string }) {
   const [failed, setFailed] = useState(!sampleUrl);
   useEffect(() => { setFailed(!sampleUrl); }, [sampleUrl]);
   if (failed) {
@@ -813,9 +813,10 @@ function FontSample({ sampleUrl, cssStack, label }: { sampleUrl: string; cssStac
       </span>
     );
   }
+  // alt="": the card's visible label under the sample already names it.
   return (
     <img
-      src={sampleUrl} alt={label} loading="lazy" className={styles.fontSample}
+      src={sampleUrl} alt="" loading="lazy" className={styles.fontSample}
       onError={() => setFailed(true)} />
   );
 }

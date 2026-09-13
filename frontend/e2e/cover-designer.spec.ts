@@ -1,6 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
-import { CATALOGUE_V2 } from './fixtures/cover-designer-v2';
-import type { CataloguePreset, CoverDesign } from '../src/features/coverDesigner/contract';
+import {
+  CATALOGUE_V2, advancedDetails, dataUrlFor, designerPanel, firstBookId, installContractFixtures,
+  lastPreview,
+} from './fixtures/cover-designer-v2';
+import type { CoverDesign } from '../src/features/coverDesigner/contract';
 
 /*
  * "Design a cover" v2 — preset management, arrangement thumbnails, colour
@@ -12,150 +15,27 @@ import type { CataloguePreset, CoverDesign } from '../src/features/coverDesigner
  * the v2 backend is built in a parallel branch, so this spec must pass against
  * any server. What is asserted is the client's half of the contract: which
  * requests fire, what bodies they carry, and what the UI shows as a result.
- *
- * Each mocked render is a distinct data URL keyed by the design that produced
- * it, so "the preview changed" is a real observation rather than a spinner.
  */
 
-interface Captured {
-  previewBodies: { design: CoverDesign }[];
-  applyBodies: Record<string, unknown>[];
-  presetPosts: { name: string; design: CoverDesign; scope?: string }[];
-  presetPuts: { id: string; body: { name?: string } }[];
-  presetDeletes: string[];
-  presetRestores: string[];
-}
+/** A slot's Advanced fieldset, scoped by its own legend. Exact regex: a plain
+ *  'Title' hasText would also match the 'Subtitle' legend. */
+const slotFieldset = (page: Page, slot: 'Title' | 'Subtitle' | 'Author') =>
+  advancedDetails(page).locator('fieldset')
+    .filter({ has: page.locator(':scope > legend', { hasText: new RegExp(`^${slot}$`) }) });
 
-const dataUrlFor = (design: CoverDesign) => {
-  const marker = [
-    design.style ?? '-',
-    design.scheme === null ? 'custom' : design.scheme ?? '-',
-    design.colors?.background ?? '-',
-    design.fonts?.title?.family ?? '-',
-    design.fonts?.title?.size ?? '-',
-    design.align?.title ?? '-',
-    design.text?.title ?? '-',
-    design.size?.width ?? '-',
-  ].join('|');
-  return `data:image/jpeg;base64,${Buffer.from(`rendered:${marker}`).toString('base64')}`;
-};
-
-/** A tiny stand-in for the server-rendered style thumbnails: an SVG that names
- *  the style, so a loaded thumbnail is distinguishable from the inline fallback
- *  glyph (which has no <img>). */
-const thumbSvg = (id: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="#999"/><text x="100" y="150" font-size="20" text-anchor="middle" fill="#fff">${id}</text></svg>`;
-const fontSvg = (id: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="80"><rect width="240" height="80" fill="#eee"/><text x="120" y="52" font-size="36" text-anchor="middle" fill="#333">Aa ${id}</text></svg>`;
-
-async function installContractFixtures(page: Page, bookId: number): Promise<Captured> {
-  const captured: Captured = {
-    previewBodies: [], applyBodies: [], presetPosts: [], presetPuts: [], presetDeletes: [], presetRestores: [],
-  };
-  // Preset storage lives in the fixture closure: POST/PUT/DELETE mutate it and
-  // GET re-reads it, exactly like the contract server will.
-  let presets: CataloguePreset[] = structuredClone(CATALOGUE_V2.presets);
-  let userCounter = 0;
-
-  await page.route(`**/book/${bookId}/cover/state*`, (route) => route.fulfill({
-    json: {
-      locked: false,
-      ereader_enabled: false,
-      ereader_defaults: { aspect: 'kobo_libra_color', fill_mode: 'edge_mirror', color: '' },
-      designer: { available: true, renderer: 'pil', catalogue: CATALOGUE_V2 },
-    },
-  }));
-
-  await page.route('**/cover-designer/presets**', async (route) => {
-    const req = route.request();
-    const url = new URL(req.url());
-    const tail = url.pathname.split('/cover-designer/presets')[1] ?? '';
-    const idMatch = tail.match(/^\/([^/]+)$/);
-    const restoreMatch = tail.match(/^\/([^/]+)\/restore$/);
-
-    if (restoreMatch && req.method() === 'POST') {
-      const preset = CATALOGUE_V2.presets.find((p) => p.id === restoreMatch[1]);
-      captured.presetRestores.push(restoreMatch[1]);
-      if (preset && !presets.some((p) => p.id === preset.id)) presets = [...presets, preset];
-      await route.fulfill({ json: { preset } });
-      return;
-    }
-    if (idMatch && req.method() === 'PUT') {
-      const body = (req.postDataJSON() ?? {}) as { name?: string };
-      captured.presetPuts.push({ id: idMatch[1], body });
-      const preset = presets.find((p) => p.id === idMatch[1]);
-      if (preset && body.name) preset.name = body.name;
-      await route.fulfill({ json: { preset } });
-      return;
-    }
-    if (idMatch && req.method() === 'DELETE') {
-      captured.presetDeletes.push(idMatch[1]);
-      presets = presets.filter((p) => p.id !== idMatch[1]);
-      await route.fulfill({ status: 204, body: '' });
-      return;
-    }
-    if (req.method() === 'POST') {
-      const body = (req.postDataJSON() ?? {}) as { name: string; design: CoverDesign; scope?: string };
-      captured.presetPosts.push(body);
-      const preset: CataloguePreset = {
-        id: `user-${++userCounter}`, name: body.name, design: body.design,
-        builtin: false, scope: body.scope === 'library' ? 'library' : 'user',
-      };
-      presets = [...presets, preset];
-      await route.fulfill({ status: 201, json: { preset } });
-      return;
-    }
-    await route.fulfill({ json: { presets } });
-  });
-
-  await page.route('**/cover-designer/style-thumb/*', (route) =>
-    route.fulfill({ contentType: 'image/svg+xml', body: thumbSvg(route.request().url().split('/').pop() ?? '') }));
-  await page.route('**/cover-designer/font-sample/*', (route) =>
-    route.fulfill({ contentType: 'image/svg+xml', body: fontSvg(route.request().url().split('/').pop() ?? '') }));
-
-  await page.route('**/cover/design-preview*', async (route) => {
-    const body = (route.request().postDataJSON() ?? {}) as { design: CoverDesign };
-    captured.previewBodies.push(body);
-    await route.fulfill({
-      json: { data_url: dataUrlFor(body.design ?? {}), renderer: 'pil', design: body.design ?? {} },
-    });
-  });
-
-  await page.route('**/cover/apply', async (route) => {
-    const body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
-    if (body.kind !== 'generated') { await route.fallback(); return; }
-    captured.applyBodies.push(body);
-    await route.fulfill({ json: { ok: true, cover_url: `/cover/${bookId}/og?ts=designed` } });
-  });
-
-  // Candidate fan-out is irrelevant here and slow; keep the page quiet.
-  await page.route('**/cover/candidates*', (route) =>
-    route.fulfill({ json: { candidates: [], providers: [], query: 'seed' } }));
-
-  return captured;
-}
-
-async function firstBookId(page: Page): Promise<number | null> {
-  await page.goto('/app/');
-  return page.evaluate(async () => {
-    const r = await fetch('/api/v1/books?per_page=1', { headers: { Accept: 'application/json' } })
-      .then((x) => (x.ok ? x.json() : null)).catch(() => null);
-    return r?.items?.[0]?.id ?? null;
-  });
-}
-
-const designerPanel = (page: Page) => page.locator('details').filter({ hasText: 'Design a cover' }).first();
-const lastPreview = (c: Captured) => c.previewBodies[c.previewBodies.length - 1]?.design;
+const sectionFieldset = (page: Page, legend: string) =>
+  advancedDetails(page).locator('fieldset')
+    .filter({ has: page.locator(':scope > legend', { hasText: new RegExp(`^${legend}$`) }) });
 
 test.describe('cover designer v2 (contract fixtures)', () => {
-  test('presets: dropdown select, save-as-preset, delete, hide and restore a built-in', async ({ page }) => {
+  test('presets: dropdown select, save-as-preset, rename, delete, hide and restore a built-in', async ({ page }) => {
     const id = await firstBookId(page);
     test.skip(!id, 'seed has no books');
     const c = await installContractFixtures(page, id!);
     await page.goto(`/app/book/${id}/cover`);
 
     const panel = designerPanel(page);
-    await panel.locator('summary').first().click();
+    await panel.locator(':scope > summary').first().click();
 
     // The catalogue's default design resolves onto the Classic preset, and the
     // preview only renders once the panel is actually opened.
@@ -193,31 +73,29 @@ test.describe('cover designer v2 (contract fixtures)', () => {
     // Manage presets: rename the user preset, hide a built-in, restore it.
     await panel.getByRole('button', { name: 'Manage presets…' }).click();
     const manage = page.getByRole('dialog', { name: 'Manage presets' });
-    const myRow = manage.locator('li').filter({ hasText: 'My Cover Look' });
-    await myRow.getByRole('button', { name: 'Rename' }).click();
-    await myRow.getByLabel('Preset name').fill('Renamed Look');
-    await myRow.getByRole('button', { name: 'Save' }).click();
+    await manage.locator('li').filter({ hasText: 'My Cover Look' })
+      .getByRole('button', { name: 'Rename' }).click();
+    // Rename replaces the row's name text with the input, so re-scope by label.
+    await manage.getByLabel('Preset name').fill('Renamed Look');
+    await manage.getByRole('button', { name: 'Save' }).click();
     await expect.poll(() => c.presetPuts.length).toBe(1);
     expect(c.presetPuts[0]).toEqual({ id: 'user-1', body: { name: 'Renamed Look' } });
     await expect(manage.locator('li').filter({ hasText: 'Renamed Look' })).toBeVisible();
 
-    const meadowRow = manage.locator('li').filter({ hasText: 'Meadow' });
-    await meadowRow.getByRole('button', { name: 'Hide' }).first().click();
-    await meadowRow.getByRole('button', { name: 'Hide' }).last().click(); // inline confirm
+    const meadowRow = () => manage.locator('li').filter({ hasText: 'Meadow' });
+    await meadowRow().getByRole('button', { name: 'Hide' }).click();
+    await meadowRow().getByRole('button', { name: 'Hide' }).click(); // inline confirm
     await expect.poll(() => c.presetDeletes).toContain('meadow');
-    await expect(manage.locator('li').filter({ hasText: 'Meadow' })).toHaveCount(0);
-    const hiddenRow = manage.locator('li').filter({ hasText: 'Meadow' });
-    // The hidden built-ins section lists it again, restorable.
     await expect(manage.getByText('Hidden built-ins')).toBeVisible();
-    await expect(hiddenRow).toHaveCount(1);
-    await hiddenRow.getByRole('button', { name: 'Restore' }).click();
+    await expect(meadowRow().getByRole('button', { name: 'Restore' })).toBeVisible();
+    await meadowRow().getByRole('button', { name: 'Restore' }).click();
     await expect.poll(() => c.presetRestores).toContain('meadow');
-    await expect(manage.locator('li').filter({ hasText: 'Meadow' }).getByRole('button', { name: 'Hide' })).toBeVisible();
+    await expect(meadowRow().getByRole('button', { name: 'Hide' })).toBeVisible();
 
     // Delete the user preset; the dropdown falls back to the plain custom state.
-    const renamedRow = manage.locator('li').filter({ hasText: 'Renamed Look' });
-    await renamedRow.getByRole('button', { name: 'Delete' }).first().click();
-    await renamedRow.getByRole('button', { name: 'Delete' }).last().click();
+    const renamedRow = () => manage.locator('li').filter({ hasText: 'Renamed Look' });
+    await renamedRow().getByRole('button', { name: 'Delete' }).click();
+    await renamedRow().getByRole('button', { name: 'Delete' }).click(); // inline confirm
     await expect.poll(() => c.presetDeletes).toContain('user-1');
     await page.keyboard.press('Escape');
     await expect(presetSelect).toHaveText('Custom');
@@ -243,7 +121,7 @@ test.describe('cover designer v2 (contract fixtures)', () => {
     await page.goto(`/app/book/${id}/cover`);
 
     const panel = designerPanel(page);
-    await panel.locator('summary').first().click();
+    await panel.locator(':scope > summary').first().click();
     await expect.poll(() => c.previewBodies.length).toBe(1);
 
     // Arrangement thumbnails: pick by thumbnail button, then drive the
@@ -279,20 +157,17 @@ test.describe('cover designer v2 (contract fixtures)', () => {
     expect(lastPreview(c)?.fonts?.author?.family).toBe('sans');
 
     // Advanced: per-slot size, alignment, text template and the 2:3-locked size.
-    const advanced = panel.locator('details').filter({ hasText: 'Advanced' });
-    await advanced.locator('summary').first().click();
-    const titleSlot = advanced.locator('fieldset').filter({ has: page.locator(':scope > legend', { hasText: 'Title' }) });
-    await titleSlot.getByLabel('Size (pt)').fill('90');
+    await advancedDetails(page).locator(':scope > summary').first().click();
+    await slotFieldset(page, 'Title').getByLabel('Size (pt)').fill('90');
     await expect.poll(() => lastPreview(c)?.fonts?.title?.size).toBe(90);
-    await titleSlot.getByRole('radio', { name: 'Left' }).click();
+    await slotFieldset(page, 'Title').getByRole('radio', { name: 'Left' }).click();
     await expect.poll(() => lastPreview(c)?.align?.title).toBe('left');
 
-    const templates = advanced.locator('fieldset').filter({ has: page.locator(':scope > legend', { hasText: 'Text templates' }) });
-    await templates.getByLabel('Title', { exact: true }).fill('{title} — director’s cut');
+    await sectionFieldset(page, 'Text templates')
+      .getByLabel('Title', { exact: true }).fill('{title} — director’s cut');
     await expect.poll(() => lastPreview(c)?.text?.title).toBe('{title} — director’s cut');
 
-    const sizeBox = advanced.locator('fieldset').filter({ has: page.locator(':scope > legend', { hasText: 'Cover size' }) });
-    await sizeBox.getByLabel('Width (px)').fill('1000');
+    await sectionFieldset(page, 'Cover size').getByLabel('Width (px)').fill('1000');
     await expect.poll(() => lastPreview(c)?.size?.width).toBe(1000);
     expect(lastPreview(c)?.size?.height).toBe(1500); // 2:3 lock derived it
 
@@ -334,7 +209,7 @@ test.describe('cover designer v2 (contract fixtures)', () => {
 
     await page.goto(`/app/book/${id}/cover`);
     const panel = designerPanel(page);
-    await panel.locator('summary').first().click();
+    await panel.locator(':scope > summary').first().click();
     await expect(panel.getByRole('alert')
       .filter({ hasText: 'Could not design a cover for this book.' })).toBeVisible();
     // A failed render must not leave an apply button armed over nothing.

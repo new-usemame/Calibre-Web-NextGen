@@ -63,8 +63,8 @@ title, blue — is **The Cross** with the **Water** theme.
 Calibre's own defaults are a 1200x1600 cover (3:4) with title 120, subtitle 80 and footer 80, and
 no font family set for any of the three. This project defaults to **1200x1800** (2:3) instead,
 because every other cover in the application is 2:3 and a generated cover that did not match would
-be obvious in a grid. Font sizes are design units — pixels on a 1200px-wide cover — and scale with
-the output, so a preview is the same cover with fewer pixels rather than a different one.
+be obvious in a grid. Font sizes are design units — pixels on a 1200px-wide cover — and scale
+with the output, so a preview is the same cover with fewer pixels rather than a different one.
 
 The font catalogue is built by walking the machine's font directories plus Calibre's own bundled
 `resources/fonts`, reading the family name out of each file's name table (the same string Qt
@@ -82,6 +82,14 @@ never towards hiding one. On the container image three of the eighteen installed
 families are held back — `D050000L` and `Standard Symbols PS`, which both declare class 12, and
 `calibre Symbols`, which maps five characters — leaving fifteen typefaces beside the three
 aliases.
+
+Each entry also carries a serif/sans/mono hint, used for the CSS stack the panel falls back to if
+a sample image does not load and for the face Pillow substitutes when it cannot open the family
+itself; the Calibre renderer always asks for the family by name and never consults it. The hint is
+read from the family name, because the files mostly do not say: of the fifteen typefaces on the
+container image three declare an OpenType family class and six a PANOSE family type, and the URW
+clones of the standard PostScript faces — `C059`, `P052`, `Z003` — declare neither, so a serif
+face whose name does not contain a serif word is described as sans.
 
 ## Text, and why no Calibre template ever runs
 

@@ -16,4 +16,6 @@
 - **The designer shows you what each choice looks like before you pick it.** The
   catalogue now carries a small rendered sample of every arrangement and of
   every lettering the server can actually draw with, cached on disk so a panel
-  with a hundred fonts in it opens at once.
+  with a hundred fonts in it opens at once. Icon and dingbat fonts installed on
+  the machine are left out of the lettering list: every typeface offered can
+  actually set a title, rather than turning one into a row of little pictures.

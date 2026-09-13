@@ -178,7 +178,7 @@
 /* ---- custom-colour popover ---- */
 .popover {
   position: absolute; z-index: var(--z-overlay); top: calc(100% + var(--sp-1)); left: 0;
-  width: min(320px, 100%);
+  width: min(320px, 100%); max-height: min(70vh, 420px); overflow: auto;
   background: var(--surface-1); border: 1px solid var(--border-strong); border-radius: var(--r-md);
   box-shadow: var(--elev-3); padding: var(--sp-3);
   display: flex; flex-direction: column; gap: var(--sp-2);
@@ -352,5 +352,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .spin, .overlay, .modal, .popover { animation: none; }
+  .spin, .overlay, .modal, .popover, .presetList { animation: none; }
 }

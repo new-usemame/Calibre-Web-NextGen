@@ -1126,7 +1126,7 @@ export function Reader({ id }: { id: string }) {
             top: frameRect.top + top,
             width,
             height,
-            label: (anchor.textContent || '').replace(/\s+/g, ' ').trim() || t('Link'),
+            label: (anchor.textContent || '').replace(/\s+/g, ' ').trim() || t('Untitled link'),
           });
         });
       });

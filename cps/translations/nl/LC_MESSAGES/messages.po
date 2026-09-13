@@ -14713,6 +14713,22 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+#: cps/spa_strings.py
+msgid "Follow link: {label}"
+msgstr "Link volgen: {label}"
+
+#: cps/spa_strings.py
+msgid "Go to note"
+msgstr "Ga naar noot"
+
+#: cps/spa_strings.py
+msgid "Note {label}"
+msgstr "Noot {label}"
+
+#: cps/spa_strings.py
+msgid "Untitled link"
+msgstr "Link zonder titel"
+
 #~ msgid "Design"
 #~ msgstr "Ontwerp"
 

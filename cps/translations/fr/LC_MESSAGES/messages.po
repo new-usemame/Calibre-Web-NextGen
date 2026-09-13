@@ -15059,6 +15059,22 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+#: cps/spa_strings.py
+msgid "Follow link: {label}"
+msgstr "Suivre le lien : {label}"
+
+#: cps/spa_strings.py
+msgid "Go to note"
+msgstr "Aller à la note"
+
+#: cps/spa_strings.py
+msgid "Note {label}"
+msgstr "Note {label}"
+
+#: cps/spa_strings.py
+msgid "Untitled link"
+msgstr "Lien sans titre"
+
 #~ msgid "Design"
 #~ msgstr "Modèle"
 

@@ -372,6 +372,16 @@ test('mobile reading order: description precedes the action row and the attribut
   await expect(actions).toBeVisible();
   const metaList = page.locator('main dl');
   await expect(metaList).toContainText('Sentinel Publisher');
+  // The three boxes are read SEQUENTIALLY; late layout shifts between reads
+  // invert the comparison by tens of px. Two movers: a webfont swap re-wrapping
+  // the header (the seed's first book has an Arabic display-face title), and
+  // the cover image arriving — `aspect-ratio: auto 2 / 3` reserves 2:3 only
+  // until the natural ratio lands. Pin the settled layout first.
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() =>
+    Promise.all(Array.from(document.images).map((img) =>
+      img.complete ? null : img.decode().catch(() => null))));
+  await expect(description).toBeVisible();
 
   const descBox = (await description.boundingBox())!;
   const actionsBox = (await actions.boundingBox())!;
@@ -399,6 +409,13 @@ test('desktop layout is unchanged: the action row still precedes the description
   await expect(description).toBeVisible({ timeout: 10_000 });
   const actions = page.getByTestId('book-actions');
   await expect(actions).toBeVisible();
+  // Same sequential-measurement race as the mobile half — settle fonts and
+  // cover art first (see the mobile test above for the movers).
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() =>
+    Promise.all(Array.from(document.images).map((img) =>
+      img.complete ? null : img.decode().catch(() => null))));
+  await expect(description).toBeVisible();
 
   const descBox = (await description.boundingBox())!;
   const actionsBox = (await actions.boundingBox())!;

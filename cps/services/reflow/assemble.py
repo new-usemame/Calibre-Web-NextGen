@@ -132,6 +132,17 @@ class Book(object):
     def page_reasons(self, pno):
         return list(self.reasons.get(pno, []))
 
+    def unmarked_notes(self, pno):
+        """Notes this page prints that nothing on this page points at.
+
+        Almost always a marker the scanner destroyed rather than a note the author
+        forgot to call: the number is printed under the rule, its superscript is
+        printed in the body, and only the text layer disagrees. The model is shown
+        the scan, so this is the short list it is allowed to put back (G1).
+        """
+        return sorted(note.num for note in self.notes
+                      if note.pno == pno and note.num is not None and not note.marked)
+
 
 # ------------------------------------------------------------------- run primitives
 

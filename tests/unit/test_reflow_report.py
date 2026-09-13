@@ -117,6 +117,36 @@ def test_a_page_the_gate_refused_is_stated_and_not_quietly_dropped(tmp_path):
     assert "1" in text and "refused" in text.lower(), text
 
 
+def _restore_marker(number, where):
+    def answer(text):
+        out = []
+        for part in text.split("\n\n"):
+            if part.startswith("["):
+                num, _, rest = part.partition("] ")
+                out.append('<aside class="footnote" id="fn_%s">%s %s</aside>'
+                           % (num[1:], num[1:], rest))
+            else:
+                out.append("<p>%s</p>"
+                           % part.replace(where, '.<a class="noteref" href="#fn_%d">%d</a>'
+                                          % (number, number), 1))
+        return "\n".join(out)
+    return answer
+
+
+def test_a_footnote_the_model_reconnected_is_no_longer_counted_as_unmarked(tmp_path):
+    """The count the reader acts on. ``notes_unmarked`` is measured before the model
+    runs; reporting it afterwards tells a reader their book still has an orphaned
+    footnote when the link is right there in it — and the repair, which changed a
+    printed character, would go unstated."""
+    result, ledger, _ = _run(tmp_path, F.prose_page, F.ambiguous_residue_page,
+                             client=FakeClient(answer=_restore_marker(88, ".\'\"")))
+    payload = report.numbers(result, ledger)
+
+    assert payload["structure"]["markers_recovered"] == 1, payload["structure"]
+    assert payload["structure"]["footnotes_unmarked"] == 0, payload["structure"]
+    assert "88" in _text(_page(payload))
+
+
 def test_a_conversion_with_no_model_says_so_rather_than_reporting_a_clean_sweep(tmp_path):
     """With no key configured every page is deterministic. Reporting that as 'no
     pages failed the gate' would be true and deeply misleading."""
@@ -187,6 +217,20 @@ def test_a_report_that_has_drifted_from_the_ledger_is_caught(tmp_path, field, de
     payload["model"][field] += delta
 
     assert report.check_completion(payload, ledger), payload["model"]
+
+
+def test_arithmetic_alone_never_fails_the_completion_gate(tmp_path):
+    """MEASURED on the acceptance fixture: a two-page run reported $0.002634 against
+    a ledger that held $0.002633 and G4 refused the job over it. The two numbers are
+    sums of the same per-page costs, so any difference between them is the run's own
+    arithmetic — and a gate that fails a good conversion is worse than no gate,
+    because the user is told their book is wrong and it is not."""
+    result, ledger, _ = _run(tmp_path, F.ambiguous_residue_page, F.ambiguous_residue_page,
+                             F.ambiguous_residue_page,
+                             client=FakeClient(price=0.0000005))
+    payload = report.numbers(result, ledger)
+
+    assert report.check_completion(payload, ledger) == []
 
 
 def test_a_spend_that_has_drifted_from_the_ledger_is_caught(tmp_path):

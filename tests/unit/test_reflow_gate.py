@@ -140,6 +140,84 @@ def test_the_models_trailing_json_contract_line_is_not_page_content():
     assert result.verdict == "PASS", result.unexplained
 
 
+class TestMarkerTheScannerAte:
+    """A superstitial class-less group would read as unrelated tests; these four are
+    one rule seen from four sides.
+
+    MEASURED on the acceptance book, page index 100: the scan prints
+    ``King Ammon.[35]`` and the text layer returns ``King Ammon."`` — the whole
+    superscript arrives as one quotation mark. 424 of the book's notes lose their
+    marker that way. The deterministic pass cannot tell that quotation mark from a
+    real one (same font, same glyph id, same advance width: MEASURED), so it leaves
+    it alone and routes the page. The model can see the scan. This is the allowance
+    that lets it say so — and it is an allowance, so it is bounded and it is
+    reported.
+    """
+
+    SRC = ('the texts takes the form of a letter from Asclepius addressed to King '
+           'Ammon." Modern scholars have long wondered about the name.')
+
+    def _out(self, marker='<a class="noteref" href="#fn_35">35</a>'):
+        return _html(self.SRC.replace('Ammon."', "Ammon." + marker))
+
+    def test_a_marker_read_as_a_quotation_mark_may_be_restored(self):
+        result = gate.check_word_preservation(self.SRC, self._out(),
+                                              recoverable_markers=[35])
+
+        assert result.verdict == "PASS", result.unexplained
+        assert any(d.kind == "marker_recovered" for d in result.allowed_hits), \
+            "a repair nobody can audit is not a repair"
+
+    def test_the_quotation_mark_stays_punctuation_when_no_note_is_missing(self):
+        """The default. Every page of dialogue in every book depends on it: 555 of
+        this book's ``."`` closings sit on pages with no unmarked note at all."""
+        assert gate.check_word_preservation(self.SRC, self._out()).verdict == "FAIL"
+
+    def test_only_a_number_the_page_actually_prints_may_be_restored(self):
+        """The model reading ``36`` off a page whose missing note is 35 is a guess,
+        and a guess that lands in the reader's book as a link to the wrong source."""
+        out = self._out('<a class="noteref" href="#fn_36">36</a>')
+
+        assert gate.check_word_preservation(self.SRC, out,
+                                            recoverable_markers=[35]).verdict == "FAIL"
+
+    def test_the_restoration_cannot_carry_a_second_change_with_it(self):
+        """The allowance is a single character becoming a single number. Anything
+        else riding along with it is what an allow-list is for catching."""
+        out = self._out().replace("Modern scholars have long ", "Modern scholars ")
+
+        assert gate.check_word_preservation(self.SRC, out,
+                                            recoverable_markers=[35]).verdict == "FAIL"
+
+    def test_an_apostrophe_and_quote_together_are_still_one_marker(self):
+        """MEASURED shape C3: the superscript comes back as ``.'"`` — two characters
+        for one number. Refusing that would leave the commonest damage unrepairable."""
+        src = "the domicile lords of the luminaries.'\" Rhetorius cited him later."
+        out = _html(src.replace(".'\"", '.<a class="noteref" href="#fn_161">161</a>'))
+
+        result = gate.check_word_preservation(src, out, recoverable_markers=[161])
+
+        assert result.verdict == "PASS", result.unexplained
+        assert any(d.kind == "marker_recovered" for d in result.allowed_hits)
+
+    def test_a_whole_word_of_punctuation_is_not_a_marker(self):
+        """One or two characters is the measured damage. Three would start letting
+        the model delete printed punctuation and call it a repair."""
+        src = "the luminaries.'\"' Rhetorius cited him later on in the same chapter."
+        out = _html(src.replace(".'\"'", '.<a class="noteref" href="#fn_161">161</a>'))
+
+        assert gate.check_word_preservation(src, out,
+                                            recoverable_markers=[161]).verdict == "FAIL"
+
+    def test_one_missing_note_cannot_be_spent_twice(self):
+        src = 'to King Ammon." Later, and again to King Thoth." The scribe agrees.'
+        out = _html(src.replace('Ammon."', 'Ammon.<a class="noteref" href="#fn_35">35</a>')
+                       .replace('Thoth."', 'Thoth.<a class="noteref" href="#fn_35">35</a>'))
+
+        assert gate.check_word_preservation(src, out,
+                                            recoverable_markers=[35]).verdict == "FAIL"
+
+
 def test_curly_and_straight_quotes_are_the_same_word():
     """Typographic normalisation is not a content change."""
     src = "he said “no” and left"

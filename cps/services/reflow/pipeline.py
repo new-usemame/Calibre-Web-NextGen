@@ -30,6 +30,7 @@ from typing import Dict, List, Optional
 
 from . import assemble, assess, build_epub, extract, gate, prompts, route, skeleton
 from .ledger import CapExceeded
+from .model import ModelError
 
 log = logging.getLogger(__name__)
 
@@ -69,12 +70,14 @@ class PageOutcome(object):
     cost_usd: float = 0.0
     cached: bool = False
     model: str = ""
+    recovered_markers: List[int] = field(default_factory=list)
 
     def to_dict(self):
         return {"pno": self.pno, "source": self.source, "gate": self.gate,
                 "reasons": self.reasons, "gate_reasons": self.gate_reasons,
                 "uncertain": self.uncertain, "cost_usd": round(self.cost_usd, 6),
-                "cached": self.cached, "model": self.model}
+                "cached": self.cached, "model": self.model,
+                "recovered_markers": list(self.recovered_markers)}
 
 
 @dataclass
@@ -142,6 +145,11 @@ class PageCache(object):
 
 #: A page with this much prose on it is the book rather than its front matter.
 BODY_WORDS = 120
+#: How many refusals in a row mean the provider, not the page: a revoked key, a
+#: model withdrawn, a region block. Walking a 700-page book into all of them wastes
+#: the user's time and tells them nothing they could not have been told on page 3.
+MAX_CONSECUTIVE_REFUSALS = 3
+
 #: How many pages a cost estimate reads. The deterministic pass over a 700-page
 #: book is a minute of work; the page that asks a user to authorise a spend has to
 #: answer in the time it takes to render.
@@ -247,6 +255,7 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
     routes = route.route_pages(book, skeletons, result.assessment)
     result.routing = route.summarise(routes)
     result.routed = route.routed_pages(routes)
+    why = {page.pno: list(page.reasons) for page in routes}
 
     for pno in sorted(book.pages):
         result.page_html[pno] = build_epub.page_fragment(book, pno, style)
@@ -261,31 +270,105 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
     levels = sorted({el.level for el in book.elements if el.kind == "h" and el.level})
     ladder = levels or [1]
 
+    refusals = 0
     for index, pno in enumerate(result.routed, start=1):
         if should_stop is not None and should_stop():
             result.stopped = "cancelled"
             break
         try:
             outcome = _edit_one_page(doc, book, pno, client, ledger, cache, result,
-                                     ladder, require_figure_caption)
+                                     ladder, require_figure_caption,
+                                     hints=page_hints(book, pno, why.get(pno)))
         except CapExceeded as exc:
             log.info("reflow: %s", exc)
             result.stopped = "cost_cap"
             break
+        except ModelError as exc:
+            # One page the provider would not answer is one page that keeps its
+            # deterministic text. A book is hundreds of chances for that to happen
+            # and letting the first one out of this loop would throw away every page
+            # already paid for.
+            refusals += 1
+            log.info("reflow: page %d was not converted: %s", pno, exc)
+            result.outcomes[pno] = _refused(book, pno, exc, ledger, client)
+            result.gate_failures += 1
+            if refusals >= MAX_CONSECUTIVE_REFUSALS:
+                result.stopped = "model_errors"
+                break
+            continue
+        refusals = 0
         result.outcomes[pno] = outcome
         result.pages_done += 1
-        result.spend_usd = round(result.spend_usd + outcome.cost_usd, 6)
+        result.spend_usd = _spent(result, ledger)
         report(Progress(stage="model", page=index, pages=len(result.routed),
                         spend_usd=result.spend_usd,
                         message="page %d of %d reviewed" % (index, len(result.routed))))
 
+    result.spend_usd = _spent(result, ledger)
     report(Progress(stage="build", page=pages_total, pages=pages_total,
                     spend_usd=result.spend_usd))
     return result
 
 
+def _spent(result, ledger):
+    """What the job has spent, counted once.
+
+    Money is added up in exactly one place. The ledger is the copy that survives
+    the process — it is what the cap reserves against and what a resumed job reads
+    back — so when there is one, it is the answer and this is a view of it.
+
+    The alternative, keeping a second running total here, is not merely redundant:
+    rounding a running total at every page is lossy. Three pages at half a
+    micro-dollar each round individually to nothing and sum to nothing, while the
+    same three entries in the ledger sum to $0.000002 — and the completion check
+    (G4) compares the two and fails the job. A conversion where every page passed
+    every gate is then reported to the user as a failure over arithmetic.
+    """
+    if ledger is not None:
+        return ledger.spent()
+    return round(sum(outcome.cost_usd for outcome in result.outcomes.values()), 6)
+
+
+def _refused(book, pno, exc, ledger, client):
+    """A page the provider would not answer, recorded rather than swallowed."""
+    outcome = PageOutcome(pno=pno, reasons=list(book.page_reasons(pno)),
+                          model=getattr(client, "model_id", ""),
+                          gate="FAIL",
+                          gate_reasons=["the model could not answer: %s" % exc])
+    if ledger is not None:
+        ledger.record({"kind": "page", "page": pno, "cost_usd": 0.0, "cached": False,
+                       "gate": "FAIL", "model": outcome.model,
+                       "reasons": outcome.reasons,
+                       "gate_reasons": outcome.gate_reasons,
+                       "error": str(exc)})
+    return outcome
+
+
+def page_hints(book, pno, reasons=None):
+    """Why this page is being paid for, in words the model can act on.
+
+    A page arrives at the model because something about it could not be settled
+    deterministically. Sending it without saying what asks the model to re-mark a
+    page that already looks finished, and the thing we are paying to have looked at
+    is the thing it has no reason to look at. The unmarked notes are named because
+    those numbers are the only ones the gate will accept back (G1).
+    """
+    hints = [route.PAGE_REASONS[reason] for reason in (reasons or [])
+             if reason in route.PAGE_REASONS]
+    unmarked = book.unmarked_notes(pno) if book is not None else []
+    if unmarked:
+        hints.append(
+            "notes %s are printed on this page and nothing in the text points at "
+            "them: their superscripts are legible in the image but the text layer "
+            "lost them, in some places leaving a stray quotation mark or apostrophe "
+            "where the number belongs. Put each one back as a noteref where the "
+            "image shows it, replacing that punctuation, and use no other number."
+            % ", ".join(str(number) for number in unmarked))
+    return hints
+
+
 def _edit_one_page(doc, book, pno, client, ledger, cache, result, ladder,
-                   require_figure_caption):
+                   require_figure_caption, hints=None):
     outcome = PageOutcome(pno=pno, reasons=list(book.page_reasons(pno)),
                           model=getattr(client, "model_id", ""))
     source_text = assemble.page_source_text(book, pno)
@@ -301,7 +384,7 @@ def _edit_one_page(doc, book, pno, client, ledger, cache, result, ladder,
 
     image = _raster(doc, pno)
     answer = client.edit_page(source_text, image_jpeg=image, ladder=ladder,
-                              page_label=str(pno + 1), ledger=ledger)
+                              hints=hints, page_label=str(pno + 1), ledger=ledger)
     outcome.cost_usd = float(getattr(answer, "cost_usd", 0.0) or 0.0)
     outcome.model = getattr(answer, "model", outcome.model)
 
@@ -327,12 +410,18 @@ def _adopt(result, book, pno, outcome, html, uncertain, ladder,
     """
     source_text = assemble.page_source_text(book, pno)
     figures = sum(1 for el in (book.pages.get(pno) or []) if el.kind == "fig")
-    words = gate.check_word_preservation(source_text, html)
+    # The notes this page prints and never points at. They are the only numbers the
+    # model is allowed to conjure out of the scan, and only in place of the
+    # punctuation the scanner left behind — see gate._marker_recovery.
+    unmarked = book.unmarked_notes(pno)
+    words = gate.check_word_preservation(source_text, html,
+                                         recoverable_markers=unmarked)
     structure = gate.check_structure(html, ladder=ladder,
                                      require_figure_caption=require_figure_caption,
                                      figures_expected=figures)
 
     outcome.uncertain = list(uncertain or [])
+    outcome.recovered_markers = list(words.recovered_markers)
     if words.ok and structure.ok:
         outcome.gate = "PASS"
         outcome.source = "model"
@@ -350,7 +439,10 @@ def _adopt(result, book, pno, outcome, html, uncertain, ladder,
                  "reasons": outcome.reasons, "gate_reasons": outcome.gate_reasons,
                  "similarity": round(words.similarity, 4),
                  "uncertain": len(outcome.uncertain)}
+        if outcome.recovered_markers:
+            entry["recovered_markers"] = list(outcome.recovered_markers)
         if answer is not None:
+            entry["provider"] = getattr(answer, "provider", "")
             entry["prompt_tokens"] = answer.prompt_tokens
             entry["completion_tokens"] = answer.completion_tokens
             entry["attempts"] = answer.attempts

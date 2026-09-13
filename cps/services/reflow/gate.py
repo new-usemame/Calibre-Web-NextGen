@@ -15,10 +15,18 @@ probe caught a frontier model normalising the printed brand ``olmOCR`` to
 A punctuation-insensitive comparison missed it.
 
 The allow-list is deliberately tiny and every hit is reported, because an
-allow-list is where a safety gate goes to die. It permits exactly one class of
-difference: a *re-tokenisation*, where the same characters are split or joined
-differently (``caution.160`` -> ``caution. 160``). Nothing may be added and
-nothing may be lost.
+allow-list is where a safety gate goes to die. It permits two classes of
+difference, both of which move characters around and neither of which can add a
+word or lose one:
+
+* a *re-tokenisation*, where the same characters are split or joined differently
+  (``caution.160`` -> ``caution. 160``);
+* a *marker recovery*, where one punctuation character that the scanner left in
+  place of a superscript note number becomes that number again — and only a
+  number this page prints, leaves unreferenced, and has not already used.
+
+The second is off unless the caller passes ``recoverable_markers``, so on a page
+that has lost nothing a quotation mark is still a quotation mark.
 
 **G3, structural schema.** Allowed tags only; heading levels drawn from the
 deterministic ladder rather than the model's opinion (probes showed models
@@ -66,10 +74,12 @@ class GateResult(object):
     """The verdict plus everything a reviewer needs to second-guess it."""
 
     __slots__ = ("verdict", "src_tokens", "out_tokens", "similarity",
-                 "missing", "invented", "case_only", "allowed_hits", "unexplained")
+                 "missing", "invented", "case_only", "allowed_hits", "unexplained",
+                 "recovered_markers")
 
     def __init__(self, verdict, src_tokens, out_tokens, similarity,
-                 missing, invented, case_only, allowed_hits, unexplained):
+                 missing, invented, case_only, allowed_hits, unexplained,
+                 recovered_markers=()):
         self.verdict = verdict
         self.src_tokens = src_tokens
         self.out_tokens = out_tokens
@@ -79,6 +89,8 @@ class GateResult(object):
         self.case_only = case_only
         self.allowed_hits = allowed_hits
         self.unexplained = unexplained
+        #: Notes whose marker the model read back off the page image (G1 allowance).
+        self.recovered_markers = sorted(recovered_markers)
 
     @property
     def ok(self):
@@ -115,6 +127,7 @@ class GateResult(object):
             "missing_count": self.missing_count,
             "invented_count": self.invented_count,
             "case_only_count": self.case_only_count,
+            "recovered_markers": list(self.recovered_markers),
         }
 
 
@@ -161,6 +174,40 @@ def _is_case_only(a, b):
     return bool(a) and bool(b) and [x.lower() for x in a] == [x.lower() for x in b]
 
 
+#: What is left of a superscript note number after a scanner has read it. The
+#: acceptance book returns a quotation mark for 424 of its markers and an
+#: apostrophe for others; both arrive here already folded to their straight form
+#: by ``_QUOTE_MAP``.
+_MARKER_RESIDUE = "\"'"
+
+
+def _marker_recovery(a, b, available):
+    """A note marker the scanner turned into punctuation, read back off the scan.
+
+    Returns the note number the model restored, or ``None``. The rule is at most
+    two characters wide — the measured damage is ``"`` or ``\'"``, never more —
+    and what replaces them must be the digits of exactly one note that this page
+    prints and this page leaves unreferenced. Every other character on both sides
+    still has to match, so the substitution can neither add a word nor lose one,
+    and ``available`` is consumed: a page cannot hand the same missing note to two
+    different quotation marks.
+    """
+    if not available or not a or not b:
+        return None
+    left, right = "".join(a), "".join(b)
+    for index, char in enumerate(left):
+        if char not in _MARKER_RESIDUE:
+            continue
+        for width in (1, 2):
+            residue = left[index:index + width]
+            if len(residue) != width or any(c not in _MARKER_RESIDUE for c in residue):
+                continue
+            for number in available:
+                if left[:index] + str(number) + left[index + width:] == right:
+                    return number
+    return None
+
+
 def _is_retokenisation(a, b):
     """Same characters, different word boundaries.
 
@@ -174,12 +221,18 @@ def _is_retokenisation(a, b):
     return "".join(a) == "".join(b)
 
 
-def check_word_preservation(source_text, model_html):
+def check_word_preservation(source_text, model_html, recoverable_markers=()):
     """G1. Compare the model's page against the deterministic transcription.
 
     ``source_text`` is our own assembled page text (markers as ``[160]``), not
     the raw PDF layer: the model is given that same text, so a faithful model
     scores zero differences and every difference is a real decision it made.
+
+    ``recoverable_markers`` are the notes this page prints and this page never
+    refers to, because the scanner read their superscripts as punctuation. Those
+    numbers, and only those, may come back out of the page image — see
+    ``_marker_recovery``. Pass nothing and a quotation mark stays a quotation
+    mark, which is the right answer on every page that has not lost a marker.
     """
     src = normalise(source_text or "")
     out = normalise(drop_contract_line(model_html or ""), markup=True)
@@ -187,6 +240,9 @@ def check_word_preservation(source_text, model_html):
     if len(src) < MIN_SOURCE_TOKENS:
         return GateResult("NOT_APPLICABLE", len(src), len(out), 0.0, [], [], [], [], [])
 
+
+    available = [int(n) for n in recoverable_markers or ()]
+    recovered = []
     matcher = difflib.SequenceMatcher(None, src, out, autojunk=False)
     missing, invented, case_only, allowed_hits, unexplained = [], [], [], [], []
 
@@ -201,6 +257,12 @@ def check_word_preservation(source_text, model_html):
         if _is_retokenisation(a, b):
             allowed_hits.append(Difference("retokenised", a, b))
             continue
+        number = _marker_recovery(a, b, available)
+        if number is not None:
+            available.remove(number)
+            recovered.append(number)
+            allowed_hits.append(Difference("marker_recovered", a, b))
+            continue
         if a:
             missing.append(Difference("missing", a, b))
         if b:
@@ -209,7 +271,8 @@ def check_word_preservation(source_text, model_html):
 
     verdict = "PASS" if not unexplained and not case_only else "FAIL"
     return GateResult(verdict, len(src), len(out), matcher.ratio(),
-                      missing, invented, case_only, allowed_hits, unexplained)
+                      missing, invented, case_only, allowed_hits, unexplained,
+                      recovered_markers=recovered if verdict == "PASS" else [])
 
 
 _TAG_NAME = re.compile(r"<\s*(/?)\s*([A-Za-z][A-Za-z0-9]*)")

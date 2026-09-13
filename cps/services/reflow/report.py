@@ -39,6 +39,9 @@ STOP_REASONS = {
     "cost_cap": "The conversion stopped when it reached its cost cap.",
     "cancelled": "The conversion was cancelled before every page was reviewed.",
     "not_configured": "No model was configured, so no page was reviewed.",
+    "model_errors": "The conversion stopped because the model service refused "
+                    "several pages in a row. The pages already reviewed are in "
+                    "this book; the rest keep the text read from the PDF.",
 }
 
 
@@ -59,6 +62,11 @@ def numbers(result, ledger=None, client=None):
     markup = "\n".join(result.page_html.values())
     stats = dict(book.stats or {}) if book is not None else {}
     totals = ledger.totals() if ledger is not None else {}
+    # ``notes_unmarked`` is counted while the book is assembled, before any page has
+    # been shown to a model. Every marker the model then read back off the scan is
+    # one fewer orphaned footnote in the finished book, and saying otherwise sends
+    # the reader looking for a problem that is not there any more.
+    recovered = sorted({number for o in outcomes for number in (o.recovered_markers or [])})
 
     payload = {
         "converter": CONVERTER,
@@ -91,7 +99,10 @@ def numbers(result, ledger=None, client=None):
         "structure": {
             "headings": stats.get("headings", 0),
             "footnotes": stats.get("notes", 0),
-            "footnotes_unmarked": stats.get("notes_unmarked", 0),
+            "footnotes_unmarked": max(0, stats.get("notes_unmarked", 0) - len(recovered)),
+            "footnotes_unmarked_before_review": stats.get("notes_unmarked", 0),
+            "markers_recovered": len(recovered),
+            "markers_recovered_notes": recovered[:MAX_REPAIRS_LISTED],
             "markers_unresolved": stats.get("markers_unresolved", 0),
             "figures": stats.get("figures", 0),
             "tables": len(_TABLE.findall(markup)),
@@ -265,7 +276,12 @@ def _structure_section(payload):
             ("Tables", structure["tables"]),
             ("Block quotations", structure["blockquotes"]),
             ("Paragraphs rejoined across a page turn", structure["page_joins"]),
-            ("Damaged footnote numbers read from the page", structure["repairs"])]
+            ("Damaged footnote numbers read from the page",
+             structure["repairs"] + structure.get("markers_recovered", 0))]
+    if structure.get("markers_recovered"):
+        rows.append(("Footnote markers the scan restored (notes %s)"
+                     % ", ".join(str(n) for n in structure["markers_recovered_notes"]),
+                     structure["markers_recovered"]))
     body = "".join("<tr><td>%s</td><td>%s</td></tr>" % (escape(label), value)
                    for label, value in rows)
     return ["<h2>What was recovered</h2>",

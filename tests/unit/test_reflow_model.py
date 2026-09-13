@@ -162,6 +162,65 @@ def test_an_answer_with_no_usable_html_is_an_error_not_an_empty_page():
             _edit(_client(backoff=0.0))
 
 
+def test_an_answer_the_provider_cut_short_is_an_error_and_not_half_a_page():
+    """MEASURED on the acceptance book: page 100 came back at exactly the completion
+    ceiling, missing 182 words and five closing asides. Parsed as an answer it looks
+    like a model that deleted a third of the page, the gate refuses it for the wrong
+    reason, and the money is spent either way. The provider already said what
+    happened; this makes the pipeline say it too."""
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, json={"id": "gen-1", "model": "deepseek/deepseek-v4.1-flash",
+                               "choices": [{"message": {"content": PAGE_HTML[:60]},
+                                            "finish_reason": "length"}],
+                               "usage": {"prompt_tokens": 1200, "completion_tokens": 4096}})
+        with pytest.raises(model.ModelError) as raised:
+            _edit(_client())
+
+    assert "cut" in str(raised.value).lower() or "truncat" in str(raised.value).lower()
+
+
+def test_a_dense_page_is_given_room_to_come_back_whole():
+    """The answer is the page again with markup around it, so the ceiling has to be
+    a function of the page rather than a constant somebody picked once."""
+    sent = []
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, json=_reply())
+        client = _client()
+        client.edit_page(page_text="word " * 40, image_jpeg=None, ladder=(1,))
+        sent.append(m.last_request.json()["max_tokens"])
+        client.edit_page(page_text="word " * 4000, image_jpeg=None, ladder=(1,))
+        sent.append(m.last_request.json()["max_tokens"])
+
+    assert sent[1] > sent[0], sent
+    assert sent[0] >= 2048, "even a thin page needs room for its markup"
+
+
+def test_the_request_does_not_pay_for_thinking_nobody_reads():
+    """MEASURED: with reasoning left on, the same page cost 0.0054 and came back
+    truncated; with it off, 0.0021 and complete. Re-marking text that is already in
+    front of the model is not a reasoning problem, and the reasoning tokens are
+    billed as completion tokens whether or not anyone can see them."""
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, json=_reply())
+        _edit(_client())
+        body = m.last_request.json()
+
+    assert body.get("reasoning", {}).get("enabled") is False, body.get("reasoning")
+
+
+def test_the_answer_records_which_provider_served_it():
+    """MEASURED: the same model on the same day billed $0.30/$1.20 per million from
+    one provider and $0.375/$1.50 from another, and answered differently. A ledger
+    that cannot say which one served a page cannot answer either question."""
+    with requests_mock.Mocker() as m:
+        payload = _reply()
+        payload["provider"] = "Venice"
+        m.post(ENDPOINT, json=payload)
+        result = _edit(_client())
+
+    assert result.provider == "Venice"
+
+
 def test_the_contract_line_is_parsed_off_the_html():
     """The prompt requires a trailing JSON object naming what the model was unsure
     of. That is metadata, and it must not end up in the reader's book."""

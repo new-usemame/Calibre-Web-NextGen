@@ -27,6 +27,7 @@ class FakeClient(object):
 
     def __init__(self, answer=None, price=0.002):
         self.calls = []
+        self.hints = []
         self._answer = answer or (lambda text: "<p>%s</p>" % text)
         self.spec = types.SimpleNamespace(price_per_page=price, model_id="test/model")
         self.model_id = "test/model"
@@ -42,6 +43,7 @@ class FakeClient(object):
         if ledger is not None:
             ledger.reserve(self.spec.price_per_page)
         self.calls.append(page_text)
+        self.hints.append(list(hints or []))
         return model.ModelResult(html=self._answer(page_text), model=self.model_id,
                                  cost_usd=self.spec.price_per_page,
                                  cost_source="price_table", prompt_tokens=900,
@@ -133,6 +135,83 @@ def test_a_page_the_model_marked_up_faithfully_is_adopted(tmp_path):
     assert result.gate_failures == 0
     assert result.outcomes[1].source == "model"
     assert result.outcomes[1].gate == "PASS"
+
+
+def _restore_marker(number, where):
+    """A model that reads the scan and puts back a marker the text layer lost.
+
+    Faithful in every other respect: the page's own paragraphs and its own note
+    text, marked up and not rewritten, so the only thing the gate has to judge is
+    the marker."""
+    def answer(text):
+        out = []
+        for part in text.split("\n\n"):
+            if part.startswith("["):
+                num, _, rest = part.partition("] ")
+                out.append('<aside class="footnote" id="fn_%s">%s %s</aside>'
+                           % (num[1:], num[1:], rest))
+            else:
+                out.append("<p>%s</p>"
+                           % part.replace(where, '.<a class="noteref" href="#fn_%d">%d</a>'
+                                          % (number, number), 1))
+        return "\n".join(out)
+    return answer
+
+
+def test_a_marker_the_scanner_destroyed_can_come_back_off_the_page_image(tmp_path):
+    """The page the deterministic pass deliberately refused to guess at.
+
+    ``ambiguous_residue_page`` prints two quotation residues and one unreferenced
+    note, so the counts disagree and the deterministic repair steps back — which is
+    correct, and which is also why the page is routed. The model is looking at the
+    scan, where the superscript is legible. If the gate refuses its answer anyway,
+    routing the page bought nothing and the reader keeps a footnote with no link.
+    """
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    client = FakeClient(answer=_restore_marker(88, ".'\""))
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.outcomes[1].gate == "PASS", result.outcomes[1].gate_reasons
+    assert result.outcomes[1].source == "model"
+    assert 'href="#fn_88"' in result.page_html[1]
+
+
+def test_the_model_is_told_what_the_deterministic_pass_could_not_settle(tmp_path):
+    """Paying for a page and not saying why it was sent wastes the call.
+
+    The page below prints note 88 and never refers to it. Told that, the model knows
+    to look for one superscript in the scan; told nothing, it is being asked to
+    re-mark a page that already looks finished, and the commonest damage in the book
+    goes unrepaired.
+    """
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    client = FakeClient()
+    try:
+        _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert client.hints, "the page was not routed"
+    said = " ".join(client.hints[-1])
+    assert "88" in said, said
+
+
+def test_a_marker_for_a_note_the_page_does_not_print_is_still_refused(tmp_path):
+    """The control. The allowance is the page's own unreferenced notes and nothing
+    else; a model that reads ``89`` off a page whose note is 88 is guessing, and the
+    guess would be a link to the wrong source."""
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    client = FakeClient(answer=_restore_marker(89, ".'\""))
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.outcomes[1].gate == "FAIL"
+    assert result.outcomes[1].source == "deterministic"
 
 
 def test_an_answer_that_invents_a_heading_level_is_refused(tmp_path):
@@ -247,6 +326,57 @@ def test_an_answer_the_gate_refused_is_not_remembered_as_this_pages_answer(tmp_p
 
 
 # -------------------------------------------------------------------- what stops
+
+class _FailingClient(FakeClient):
+    """A provider that refuses some pages. Content filters, truncation and 400s all
+    arrive here as the same exception."""
+
+    def __init__(self, fail_pages=(), **kwargs):
+        FakeClient.__init__(self, **kwargs)
+        self.fail_pages = set(fail_pages)
+
+    def edit_page(self, page_text, **kwargs):
+        if len(self.calls) in self.fail_pages:
+            self.calls.append(page_text)
+            self.hints.append([])
+            raise model.ModelError("the provider refused this page")
+        return FakeClient.edit_page(self, page_text, **kwargs)
+
+
+def test_one_page_the_provider_refuses_does_not_end_the_conversion(tmp_path):
+    """A 700-page book is 700 chances for a provider to return a 400. Letting the
+    first one out of the loop throws away every page already paid for and leaves the
+    user with a failed job and a bill."""
+    doc = _doc(F.ambiguous_residue_page, F.ambiguous_residue_page,
+               F.ambiguous_residue_page)
+    client = _FailingClient(fail_pages=[0])
+    try:
+        result, book = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.stopped is None
+    assert len(client.calls) == 3
+    assert result.outcomes[0].gate == "FAIL"
+    assert "refused" in " ".join(result.outcomes[0].gate_reasons)
+    assert result.outcomes[1].source == "model" and result.outcomes[2].source == "model"
+    assert result.page_html[0], "the page still has its deterministic text"
+    assert book.totals()["gate"]["FAIL"] == 1
+
+
+def test_a_provider_that_refuses_everything_is_stopped_rather_than_walked_through(tmp_path):
+    """The other side of the same rule. Something systemic — a revoked key, a model
+    withdrawn, a region block — should stop after a few pages, not after 700."""
+    doc = _doc(*([F.ambiguous_residue_page] * 6))
+    client = _FailingClient(fail_pages=range(6))
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.stopped == "model_errors"
+    assert len(client.calls) < 6, client.calls
+
 
 def test_the_cost_cap_stops_the_run_and_keeps_what_it_paid_for(tmp_path):
     """G5. Stopping at the cap is a normal outcome, not a crash: the finished pages

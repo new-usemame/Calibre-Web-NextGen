@@ -35,15 +35,31 @@ log = logging.getLogger(__name__)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-#: Date the per-page and per-token prices below were measured (RESEARCH §3.4-3.6).
-#: Prices move; a table with no date is a table nobody will ever revisit.
-PRICE_TABLE_MEASURED = "2026-09-12"
+#: Date the per-page and per-token prices below were measured (RESEARCH §3.4-3.6,
+#: re-measured 2026-09-13 against real billing). Prices move; a table with no date is
+#: a table nobody will ever revisit.
+PRICE_TABLE_MEASURED = "2026-09-13"
 
 #: Reflow identifies itself to OpenRouter so the spend is attributable.
 REFERER = "https://github.com/new-usemame/Calibre-Web-NextGen"
 TITLE = "Calibre-Web-NextGen Reflow"
 
 RETRY_STATUS = (408, 409, 425, 429, 500, 502, 503, 504)
+
+#: The answer is the page's own text again with markup around it, so the room it
+#: needs is a function of the page. MEASURED on the acceptance book: a dense page of
+#: 2,604 characters came back in 947 completion tokens once the model was told not to
+#: think out loud. Half a token per character plus a floor for the markup leaves room
+#: for the worst page in the book without ever being the reason a page is refused.
+COMPLETION_TOKENS_FLOOR = 2048
+COMPLETION_TOKENS_CEILING = 16384
+COMPLETION_TOKENS_PER_CHAR = 0.5
+
+
+def completion_budget(page_text):
+    """How much room to leave for one page's answer."""
+    needed = COMPLETION_TOKENS_FLOOR + int(len(page_text or "") * COMPLETION_TOKENS_PER_CHAR)
+    return max(COMPLETION_TOKENS_FLOOR, min(COMPLETION_TOKENS_CEILING, needed))
 
 
 @dataclass
@@ -57,12 +73,21 @@ class ModelSpec(object):
 
 
 #: Measured on the acceptance book's densest pages, image + text, one page per call.
+#:
+#: The per-token figures are what OpenRouter BILLED, not what its catalogue
+#: advertises. MEASURED 2026-09-13 on deepseek-v4.1-flash: the catalogue quotes
+#: $0.15/$0.60 per million and two different providers charged $0.30/$1.20 and
+#: $0.375/$1.50 for the same model on the same day. Quoting the catalogue floor to a
+#: user who is about to consent to a figure understates their bill by 2x and stops
+#: their job half way through the book, so these are the upper end of what was
+#: actually charged. ``price_per_page`` is the whole call — a page's text, its raster
+#: and the answer — at that upper end.
 TIERS = {
-    "cheap": ModelSpec("qwen/qwen3-vl-32b-instruct", 0.0009, 0.20, 0.60,
+    "cheap": ModelSpec("qwen/qwen3-vl-32b-instruct", 0.0016, 0.26, 1.04,
                        label="Cheapest"),
-    "standard": ModelSpec("deepseek/deepseek-v4.1-flash", 0.0022, 0.28, 0.88,
+    "standard": ModelSpec("deepseek/deepseek-v4.1-flash", 0.0032, 0.375, 1.50,
                           label="Standard"),
-    "quality": ModelSpec("openai/gpt-5.6-luna", 0.0031, 0.45, 1.60,
+    "quality": ModelSpec("openai/gpt-5.6-luna", 0.0050, 0.50, 3.00,
                          label="Best quality"),
 }
 DEFAULT_TIER = "standard"
@@ -97,6 +122,10 @@ class ModelResult(object):
     completion_tokens: int = 0
     cost_usd: float = 0.0
     cost_source: str = "price_table"
+    #: Which upstream served the call. OpenRouter picks one per request and they do
+    #: not all charge the same or answer the same, so a page's cost and its verdict
+    #: are only explainable next to this.
+    provider: str = ""
     attempts: int = 1
     prompt_version: str = PROMPT_VERSION
     dry_run: bool = False
@@ -149,7 +178,7 @@ class OpenRouterClient(object):
     # ------------------------------------------------------------------- calling
 
     def edit_page(self, page_text, image_jpeg=None, ladder=(1, 2, 3, 4), hints=None,
-                  page_label=None, ledger=None, max_tokens=4096):
+                  page_label=None, ledger=None, max_tokens=None):
         """Ask the model to mark up one page. Words in, the same words out."""
         if ledger is not None:
             ledger.reserve(self.spec.price_per_page)
@@ -158,7 +187,7 @@ class OpenRouterClient(object):
             return self._dry_run_result(page_text)
 
         payload = self._payload(page_text, image_jpeg, ladder, hints, page_label,
-                                max_tokens)
+                                max_tokens or completion_budget(page_text))
         data, attempts = self._post(payload)
         return self._parse(data, attempts)
 
@@ -176,6 +205,11 @@ class OpenRouterClient(object):
             "temperature": 0,
             "max_tokens": int(max_tokens),
             "usage": {"include": True},
+            # This is a re-marking job: the words are already in front of the model
+            # and there is nothing to work out. Reasoning tokens are billed as
+            # completion tokens and consume the same ceiling, so leaving them on
+            # pays for thinking nobody reads and crowds out the answer.
+            "reasoning": {"enabled": False},
         }
 
     def _post(self, payload):
@@ -225,9 +259,18 @@ class OpenRouterClient(object):
 
     def _parse(self, data, attempts):
         try:
-            content = data["choices"][0]["message"]["content"] or ""
+            choice = data["choices"][0]
+            content = choice["message"]["content"] or ""
         except (KeyError, IndexError, TypeError):
             raise ModelError("the provider's reply had no message content")
+
+        if (choice.get("finish_reason") or choice.get("native_finish_reason")) == "length":
+            # Adopting the fragment is not an option and neither is pretending it is
+            # a model that deleted the end of the page: say what happened, so the
+            # page keeps its deterministic text for a reason somebody can act on.
+            raise ModelError("the provider cut the answer short at the token ceiling "
+                             "(%s completion tokens); the page was not converted"
+                             % (data.get("usage") or {}).get("completion_tokens", "?"))
 
         content = _FENCE.sub("", content).strip()
         uncertain, notes, html = _split_contract(content)
@@ -244,7 +287,8 @@ class OpenRouterClient(object):
                            model=data.get("model") or self.model_id,
                            prompt_tokens=prompt_tokens,
                            completion_tokens=completion_tokens,
-                           cost_usd=cost, cost_source=source, attempts=attempts)
+                           cost_usd=cost, cost_source=source,
+                           provider=str(data.get("provider") or ""), attempts=attempts)
 
     def _cost(self, usage, prompt_tokens, completion_tokens):
         reported = usage.get("cost")

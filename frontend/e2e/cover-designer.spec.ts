@@ -159,23 +159,24 @@ test.describe('cover designer v2 (contract fixtures)', () => {
 
     // The catalogue's default design resolves onto the Classic preset, and the
     // preview only renders once the panel is actually opened.
-    const presetSelect = panel.getByLabel('Preset');
-    await expect(presetSelect).toHaveValue('classic');
+    const presetSelect = panel.getByRole('combobox', { name: 'Preset' });
+    await expect(presetSelect).toContainText('Classic');
     await expect.poll(() => c.previewBodies.length).toBe(1);
     expect(lastPreview(c)).toMatchObject({ style: 'blocks', scheme: 'ink' });
     const preview = page.getByRole('img', { name: 'Preview of the designed cover' });
     await expect(preview).toBeVisible();
 
-    // Selecting a preset loads its design; the next render carries it.
-    await presetSelect.selectOption('ember');
+    // Selecting a preset loads its design; the next render carries it. The
+    // dropdown is an APG listbox: trigger opens it, options are role=option.
+    await presetSelect.click();
+    await page.getByRole('option', { name: 'Ember' }).click();
     await expect.poll(() => lastPreview(c)?.scheme).toBe('ember');
     await expect(preview).toHaveAttribute('src', dataUrlFor(lastPreview(c)));
 
     // Diverging from Ember turns the dropdown into the honest custom state.
     await panel.getByRole('radio', { name: 'Ornamental' }).click();
     await expect.poll(() => lastPreview(c)?.style).toBe('ornamental');
-    await expect(presetSelect).toHaveValue('__custom');
-    await expect(presetSelect.locator('option:checked')).toHaveText('Custom (based on Ember)');
+    await expect(presetSelect).toHaveText('Custom (based on Ember)');
 
     // "Save as preset" beside "Use this design" posts the current design and
     // the new preset becomes the selected one.
@@ -187,7 +188,7 @@ test.describe('cover designer v2 (contract fixtures)', () => {
     expect(c.presetPosts[0].name).toBe('My Cover Look');
     expect(c.presetPosts[0].design).toMatchObject({ style: 'ornamental', scheme: 'ember' });
     await expect(panel.getByText('Preset saved.')).toBeVisible();
-    await expect(presetSelect).toHaveValue('user-1');
+    await expect(presetSelect).toHaveText('My Cover Look');
 
     // Manage presets: rename the user preset, hide a built-in, restore it.
     await panel.getByRole('button', { name: 'Manage presets…' }).click();
@@ -219,8 +220,20 @@ test.describe('cover designer v2 (contract fixtures)', () => {
     await renamedRow.getByRole('button', { name: 'Delete' }).last().click();
     await expect.poll(() => c.presetDeletes).toContain('user-1');
     await page.keyboard.press('Escape');
-    await expect(presetSelect).toHaveValue('__custom');
-    await expect(presetSelect.locator('option:checked')).toHaveText('Custom');
+    await expect(presetSelect).toHaveText('Custom');
+
+    // Keyboard contract: the trigger opens the listbox and arrows move the
+    // active option; Enter picks. Focus stays on the trigger throughout
+    // (aria-activedescendant), which is what screen readers announce.
+    await presetSelect.focus();
+    await page.keyboard.press('ArrowDown');
+    const listbox = page.getByRole('listbox', { name: 'Preset' });
+    await expect(listbox).toBeVisible();
+    await page.keyboard.press('ArrowDown');
+    await expect(presetSelect).toHaveAttribute('aria-activedescendant', 'cd-preset-opt-1');
+    await page.keyboard.press('Enter');
+    await expect(presetSelect).toContainText('Classic');
+    await expect.poll(() => lastPreview(c)?.style).toBe('blocks');
   });
 
   test('arrangement, custom colours, lettering and advanced fields all reach the preview body', async ({ page }) => {

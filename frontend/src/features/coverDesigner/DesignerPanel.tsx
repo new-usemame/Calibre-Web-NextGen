@@ -12,8 +12,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  AlignCenter, AlignLeft, AlignRight, BookmarkPlus, Check, Loader2, Lock, Palette, Plus,
-  RotateCcw, Settings2, Sparkles, Unlock, X,
+  AlignCenter, AlignLeft, AlignRight, BookmarkPlus, Check, ChevronDown, Loader2, Lock, Palette,
+  Plus, RotateCcw, Settings2, Sparkles, Unlock, X,
 } from 'lucide-react';
 import { ApiError } from '../../lib/api';
 import { useT, type TFunction } from '../../lib/i18n';
@@ -198,35 +198,18 @@ function DesignerPanelInner({ id, catalogue, locked, personal, onApplied, onErro
       </summary>
       <div className={styles.panelBody}>
         <div className={styles.presetBar}>
-          <label className={styles.presetField}>
-            <span className={styles.fieldLabel}>{t('Preset')}</span>
-            <select
-              className={styles.select}
-              value={matchedPreset?.id ?? CUSTOM}
-              onChange={(e) => choosePreset(e.target.value)}
-            >
-              {!matchedPreset && (
-                <option value={CUSTOM}>
-                  {basedOnName ? t('Custom (based on {name})', { name: basedOnName }) : t('Custom')}
-                </option>
-              )}
-              {groups.builtin.length > 0 && (
-                <optgroup label={t('Built-in')}>
-                  {groups.builtin.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </optgroup>
-              )}
-              {groups.library.length > 0 && (
-                <optgroup label={t('Library')}>
-                  {groups.library.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </optgroup>
-              )}
-              {groups.user.length > 0 && (
-                <optgroup label={t('My presets')}>
-                  {groups.user.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </optgroup>
-              )}
-            </select>
-          </label>
+          <div className={styles.presetField}>
+            <span className={styles.fieldLabel} id="cd-preset-label">{t('Preset')}</span>
+            <PresetSelect
+              groups={groups}
+              selectedId={matchedPreset?.id ?? null}
+              customLabel={matchedPreset ? null
+                : basedOnName ? t('Custom (based on {name})', { name: basedOnName }) : t('Custom')}
+              customColors={effectiveColors(design, catalogue)}
+              catalogue={catalogue}
+              onChoose={choosePreset}
+            />
+          </div>
           <Button variant="ghost" size="sm" onClick={() => setManageOpen(true)}>
             <Settings2 size={14} aria-hidden="true" focusable={false} /> {t('Manage presets…')}
           </Button>
@@ -325,6 +308,184 @@ function DesignerPanelInner({ id, catalogue, locked, personal, onApplied, onErro
         />
       )}
     </details>
+  );
+}
+
+// ============================================================================
+// Preset dropdown — an APG combobox + listbox (a native <select> can't show
+// the per-preset colour dots or group headers, and its open popup renders
+// outside the page, unstyled and uncapturable)
+// ============================================================================
+
+function PresetSelect({ groups, selectedId, customLabel, customColors, catalogue, onChoose }: {
+  groups: { builtin: CataloguePreset[]; library: CataloguePreset[]; user: CataloguePreset[] };
+  selectedId: string | null;
+  /** Non-null when the working design matches no preset: the listbox then opens
+   *  with a selected "Custom (based on X)" entry on top. */
+  customLabel: string | null;
+  customColors: Required<DesignColors>;
+  catalogue: DesignerCatalogue;
+  onChoose: (id: string) => void;
+}) {
+  const t = useT();
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+
+  const sections = [
+    { label: t('Built-in'), items: groups.builtin },
+    { label: t('Library'), items: groups.library },
+    { label: t('My presets'), items: groups.user },
+  ].filter((s) => s.items.length > 0);
+
+  const options: { id: string; label: string }[] = [
+    ...(customLabel ? [{ id: CUSTOM, label: customLabel }] : []),
+    ...sections.flatMap((s) => s.items.map((p) => ({ id: p.id, label: p.name }))),
+  ];
+  const optionIndex = new Map(options.map((o, i) => [o.id, i]));
+  const selectedIndex = customLabel ? 0 : (selectedId ? optionIndex.get(selectedId) ?? -1 : -1);
+  const [activeIndex, setActiveIndex] = useState(selectedIndex >= 0 ? selectedIndex : 0);
+
+  // Opening re-centres the active descendant on the selected option.
+  useEffect(() => {
+    if (open) setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Outside pointer closes; the listbox is non-modal.
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: PointerEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointer);
+    return () => document.removeEventListener('pointerdown', onPointer);
+  }, [open]);
+
+  // Keep the active option visible while arrowing through a long list.
+  useEffect(() => {
+    if (!open) return;
+    listRef.current
+      ?.querySelector(`[data-opt-index="${activeIndex}"]`)
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [open, activeIndex]);
+
+  const currentLabel = customLabel
+    ?? (selectedId ? options.find((o) => o.id === selectedId)?.label : null)
+    ?? t('Custom');
+
+  const pick = (idx: number) => {
+    const opt = options[idx];
+    setOpen(false);
+    if (opt && opt.id !== CUSTOM) onChoose(opt.id);
+  };
+
+  const onTriggerKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (!open) {
+      if (['ArrowDown', 'ArrowUp', 'Enter', ' '].includes(e.key)) {
+        e.preventDefault();
+        setOpen(true);
+      }
+      return;
+    }
+    switch (e.key) {
+      case 'Escape': e.preventDefault(); setOpen(false); break;
+      case 'ArrowDown': e.preventDefault(); setActiveIndex((i) => Math.min(options.length - 1, i + 1)); break;
+      case 'ArrowUp': e.preventDefault(); setActiveIndex((i) => Math.max(0, i - 1)); break;
+      case 'Home': e.preventDefault(); setActiveIndex(0); break;
+      case 'End': e.preventDefault(); setActiveIndex(options.length - 1); break;
+      case 'Enter': case ' ': e.preventDefault(); pick(activeIndex); break;
+      case 'Tab': setOpen(false); break;
+      default:
+        // Typeahead: jump to the next option starting with the typed character.
+        if (e.key.length === 1 && /\S/.test(e.key)) {
+          const lower = e.key.toLowerCase();
+          const rotated = [...options.slice(activeIndex + 1), ...options.slice(0, activeIndex + 1)];
+          const hit = rotated.findIndex((o) => o.label.toLowerCase().startsWith(lower));
+          if (hit >= 0) setActiveIndex((activeIndex + 1 + hit) % options.length);
+        }
+    }
+  };
+
+  const optClass = (idx: number, selected: boolean) => [
+    styles.presetOption,
+    idx === activeIndex ? styles.presetOptionActive : '',
+    selected ? styles.presetOptionSelected : '',
+  ].filter(Boolean).join(' ');
+
+  return (
+    <div className={styles.presetSelectWrap} ref={wrapRef}>
+      <button
+        type="button"
+        className={styles.presetTrigger}
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls="cd-preset-listbox"
+        aria-labelledby="cd-preset-label"
+        aria-activedescendant={open ? `cd-preset-opt-${activeIndex}` : undefined}
+        onClick={() => setOpen((o) => !o)}
+        onKeyDown={onTriggerKey}
+      >
+        <span className={styles.presetTriggerText}>{currentLabel}</span>
+        <ChevronDown size={14} aria-hidden="true" focusable={false}
+                     className={open ? styles.chevOpen : styles.chev} />
+      </button>
+      {open && (
+        <ul
+          className={styles.presetList}
+          role="listbox"
+          id="cd-preset-listbox"
+          aria-labelledby="cd-preset-label"
+          ref={listRef}
+        >
+          {customLabel && (
+            <li
+              role="option"
+              id="cd-preset-opt-0"
+              data-opt-index={0}
+              aria-selected="true"
+              className={optClass(0, true)}
+              onClick={() => pick(0)}
+            >
+              <span
+                className={styles.manageDot} aria-hidden="true"
+                style={{ background: `linear-gradient(135deg, ${customColors.background} 50%, ${customColors.band} 50%)` }}
+              />
+              <span className={styles.presetOptionName}>{customLabel}</span>
+              <Check size={14} className={styles.presetCheck} aria-hidden="true" focusable={false} />
+            </li>
+          )}
+          {sections.map((section) => (
+            <li key={section.label} role="presentation">
+              <div className={styles.presetGroupHead} role="presentation">{section.label}</div>
+              <ul role="group" aria-label={section.label} className={styles.presetGroup}>
+                {section.items.map((p) => {
+                  const idx = optionIndex.get(p.id)!;
+                  const selected = !customLabel && p.id === selectedId;
+                  return (
+                    <li
+                      key={p.id}
+                      role="option"
+                      id={`cd-preset-opt-${idx}`}
+                      data-opt-index={idx}
+                      aria-selected={selected}
+                      className={optClass(idx, selected)}
+                      onClick={() => pick(idx)}
+                    >
+                      <span className={styles.manageDot} aria-hidden="true"
+                            style={{ background: presetDot(p, catalogue) }} />
+                      <span className={styles.presetOptionName}>{p.name}</span>
+                      {selected && <Check size={14} className={styles.presetCheck} aria-hidden="true" focusable={false} />}
+                    </li>
+                  );
+                })}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }
 

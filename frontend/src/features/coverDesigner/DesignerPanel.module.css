@@ -20,7 +20,7 @@
 .presetBar {
   display: flex; align-items: flex-end; gap: var(--sp-2); flex-wrap: wrap;
 }
-.presetField { display: flex; flex-direction: column; gap: var(--sp-1); flex: 1 1 240px; min-width: 0; }
+.presetField { display: flex; flex-direction: column; gap: var(--sp-1); flex: 1 1 240px; min-width: 0; max-width: 420px; position: relative; }
 .fieldLabel {
   font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em;
   color: var(--text-faint); font-weight: var(--fw-semi);
@@ -34,6 +34,41 @@
 .select:focus-visible, .textInput:focus-visible, .numInput:focus-visible {
   outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
 }
+
+/* ---- preset listbox ---- */
+.presetSelectWrap { position: relative; }
+.presetTrigger {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2);
+  width: 100%; padding: var(--sp-2) var(--sp-3); border-radius: var(--r-sm);
+  background: var(--surface-3); border: 1px solid var(--border-strong); color: var(--text);
+  font-size: var(--fs-sm); font-family: var(--font-body); cursor: pointer; text-align: left;
+  min-height: 34px;
+}
+.presetTrigger:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.presetTriggerText { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chev { flex: 0 0 auto; color: var(--text-faint); transition: transform var(--dur-fast) var(--ease); }
+.chevOpen { composes: chev; transform: rotate(180deg); }
+.presetList {
+  position: absolute; z-index: var(--z-overlay); top: calc(100% + 4px); left: 0; right: 0;
+  max-height: 320px; overflow: auto; margin: 0; padding: var(--sp-1);
+  list-style: none; background: var(--surface-1); border: 1px solid var(--border-strong);
+  border-radius: var(--r-md); box-shadow: var(--elev-3);
+  animation: cdpop var(--dur-base) var(--ease-out);
+}
+.presetGroupHead {
+  padding: var(--sp-2) var(--sp-2) var(--sp-1); font-size: 10px; font-weight: var(--fw-semi);
+  text-transform: uppercase; letter-spacing: .06em; color: var(--text-faint);
+}
+.presetGroup { list-style: none; margin: 0; padding: 0; }
+.presetOption {
+  display: flex; align-items: center; gap: var(--sp-2);
+  padding: var(--sp-2); border-radius: var(--r-sm); cursor: pointer;
+  color: var(--text); font-size: var(--fs-sm); min-height: 32px;
+}
+.presetOptionActive { background: var(--surface-3); }
+.presetOptionSelected { color: var(--accent-hover); }
+.presetOptionName { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.presetCheck { flex: 0 0 auto; color: var(--accent-hover); }
 
 /* ---- main grid: preview + controls ---- */
 .designerGrid {

@@ -31,6 +31,8 @@ from __future__ import annotations
 import io
 import json
 import os
+import pathlib
+import shutil
 import stat
 import textwrap
 from types import SimpleNamespace
@@ -210,9 +212,16 @@ def test_each_colour_slot_paints_the_part_of_the_cover_it_names():
             continue
 
         assert authors > 50, "%s: the author colour never reached the cover" % style
-        # Every arrangement puts the authors below the title, so this is what
-        # says the two colours went to the right blocks rather than merely both
-        # appearing somewhere: swap them and the rows cross over.
+        if "ornament" in entry["color_roles"]["author"].lower():
+            # This arrangement paints its decoration in the author colour as
+            # well, by Calibre's own design, so that colour is all over the
+            # cover and the rows cannot tell the two blocks apart. The
+            # declaration says so, and the panel shows the reader the same
+            # sentence next to the swatch.
+            continue
+        # The rest put the authors below the title, so this is what says the two
+        # colours went to the right blocks rather than merely both appearing
+        # somewhere: swap them and the bands cross over.
         assert title_bottom < author_top, (
             "%s: the title colour is drawn at rows %s-%s and the author colour "
             "from row %s — they are on each other's text"
@@ -693,7 +702,9 @@ def test_a_design_is_validated_before_it_is_stored(app_db):
         presets_mod.create_preset(7, False, "Bad", {"text": {"title": "{python: 1}"}})
     with pytest.raises(cg.CoverGenerationError):
         presets_mod.create_preset(7, False, "Bad", {"fonts": {"title": {"family": "/etc/passwd"}}})
-    assert presets_mod.list_presets(7)["presets"] == cg.builtin_presets()
+    stored = presets_mod.list_presets(7)["presets"]
+    assert [entry["id"] for entry in stored] == [entry["id"] for entry in cg.builtin_presets()], (
+        "a rejected design was stored anyway")
 
 
 def test_a_saved_design_still_opens_after_the_font_it_names_is_gone(app_db):
@@ -840,3 +851,169 @@ def test_the_library_default_preset_survives_being_removed_in_a_later_release():
     spec = cg.resolve_spec(preset="a-preset-that-was-retired", width=160, height=240)
     assert spec.style in cg.STYLES
     assert cg.render(META, spec).data[:2] == b"\xff\xd8"
+
+
+# ---------------------------------------------------------------------------
+# The lettering list is a list of typefaces
+# ---------------------------------------------------------------------------
+
+def _font_directory(tmp_path, *names) -> str:
+    """A font directory holding copies of fonts this repository already ships."""
+    repository = pathlib.Path(cg.__file__).resolve().parents[2]
+    directory = tmp_path / ("fonts-%d" % len(os.listdir(tmp_path)))
+    directory.mkdir()
+    for name in names:
+        source = repository / name
+        shutil.copy(source, directory / source.name)
+    return str(directory)
+
+
+def _offered_lettering(binaries_dir="") -> set:
+    cg.reset_font_cache()
+    try:
+        return {entry["label"] for entry in cg.catalogue(binaries_dir)["fonts"]}
+    finally:
+        cg.reset_font_cache()
+
+
+def test_an_icon_font_is_not_offered_as_lettering(tmp_path, monkeypatch):
+    """Font directories hold icon sheets as well as typefaces, and a title set
+    in one comes out as a row of little pictures or of empty boxes. Offering it
+    is offering the reader a broken cover."""
+    monkeypatch.setattr(cg, "_calibre_font_dirs", lambda *args, **kwargs: ())
+    monkeypatch.setattr(cg, "_FONT_SEARCH_DIRS", (_font_directory(
+        tmp_path,
+        "cps/static/standard_fonts/LiberationSans-Regular.ttf",
+        "cps/static/css/fonts/fontello.ttf",
+        "cps/static/css/fonts/glyphicons-halflings-regular.ttf"),))
+
+    offered = _offered_lettering()
+    assert "Liberation Sans" in offered
+    assert not [label for label in offered
+                if "fontello" in label.lower() or "glyphicon" in label.lower()]
+
+
+def test_a_font_that_declares_itself_a_symbol_set_is_not_offered(tmp_path, monkeypatch):
+    """Dingbats and symbol faces map the alphabet to pictures, so nothing about
+    their outlines gives them away — but they say what they are in their own
+    OS/2 table. The same file, that one declaration changed, must drop out."""
+    monkeypatch.setattr(cg, "_calibre_font_dirs", lambda *args, **kwargs: ())
+    plain = _font_directory(tmp_path, "cps/static/standard_fonts/LiberationSans-Regular.ttf")
+
+    monkeypatch.setattr(cg, "_FONT_SEARCH_DIRS", (plain,))
+    assert "Liberation Sans" in _offered_lettering()
+
+    face = next(pathlib.Path(plain).iterdir())
+    with face.open("rb") as handle:
+        tables = cg._sfnt_tables(handle)
+    raw = bytearray(face.read_bytes())
+    at = tables["OS/2"][0] + 30
+    raw[at:at + 2] = (cg._SYMBOLIC_FAMILY_CLASS << 8).to_bytes(2, "big")
+    face.write_bytes(bytes(raw))
+
+    assert "Liberation Sans" not in _offered_lettering()
+
+
+def test_a_font_this_server_cannot_read_is_still_offered(tmp_path, monkeypatch):
+    """The rule errs towards offering a font: a face whose tables we cannot
+    parse is a face somebody installed on purpose, not a reason to hide it."""
+    monkeypatch.setattr(cg, "_calibre_font_dirs", lambda *args, **kwargs: ())
+    directory = _font_directory(tmp_path, "cps/static/standard_fonts/LiberationSans-Regular.ttf")
+    face = next(pathlib.Path(directory).iterdir())
+    raw = bytearray(face.read_bytes())
+    with face.open("rb") as handle:
+        tables = cg._sfnt_tables(handle)
+    # Truncate the character map so nothing can be counted from it.
+    raw[tables["cmap"][0]:tables["cmap"][0] + 4] = b"\x00\x00\x00\x00"
+    face.write_bytes(bytes(raw))
+
+    monkeypatch.setattr(cg, "_FONT_SEARCH_DIRS", (directory,))
+    assert "Liberation Sans" in _offered_lettering()
+
+
+# ---------------------------------------------------------------------------
+# What the panel opens on, and what it can put back
+# ---------------------------------------------------------------------------
+
+def test_the_panel_opens_on_the_design_the_library_chose(monkeypatch):
+    """The panel decides which preset is selected by matching the design it
+    opens on against each one, so a ``defaults`` that matched nothing would
+    open every reader on "Custom"."""
+    for preset in ("classic", "calibre-blue", "midnight"):
+        offered = cg.catalogue(default_preset=preset)
+        assert offered["default_preset"] == preset
+        chosen = next(entry for entry in offered["presets"] if entry["id"] == preset)
+        assert offered["defaults"] == chosen["design"], preset
+
+    retired = cg.catalogue(default_preset="a-preset-that-was-retired")
+    assert retired["default_preset"] == cg.DEFAULT_PRESET
+
+
+def test_the_library_default_reaches_the_panel(monkeypatch):
+    """Settings hold an id; the panel is handed the design it stands for."""
+    from cps import cover_picker
+
+    app = flask.Flask(__name__)
+    with app.test_request_context():
+        with patch.object(cover_picker, "current_user", MagicMock(id=7)), \
+             patch.object(cover_picker, "config",
+                          MagicMock(config_binariesdir="",
+                                    config_cover_generator_default_preset="calibre-blue")), \
+             patch.object(cover_picker, "_presets_for_current_user",
+                          MagicMock(return_value={"presets": cg.builtin_presets(),
+                                                  "hidden": []})):
+            state = cover_picker.designer_state()
+    assert state["default_preset"] == "calibre-blue"
+    chosen = next(entry for entry in state["presets"] if entry["id"] == "calibre-blue")
+    assert state["defaults"] == chosen["design"]
+
+
+def test_a_hidden_shipped_design_is_still_listed_for_the_reader_who_hid_it(app_db):
+    """Hiding one is not deleting it, and the only way back is the list that
+    manages them: a reader cannot restore something they can no longer see."""
+    from cps.services import cover_design_presets as presets_mod
+
+    builtin = cg.DEFAULT_PRESET
+    presets_mod.delete_preset(7, False, builtin)
+
+    offered = presets_mod.list_presets(7)["presets"]
+    assert builtin not in [entry["id"] for entry in offered]
+    assert all(entry["hidden"] is False for entry in offered)
+
+    manage = presets_mod.list_presets(7, include_hidden=True)["presets"]
+    assert [entry["id"] for entry in manage if entry["hidden"]] == [builtin]
+    assert builtin in [entry["id"] for entry in manage]
+
+
+def test_a_reader_without_edit_rights_can_still_design_their_own_cover():
+    """The personal-cover picker sends ``?scope=personal``: that reader may set
+    a cover only they see, and has no edit role for the library's own. The
+    designer has to let them draw one, and refuse them without it."""
+    from werkzeug.exceptions import Forbidden
+
+    from cps import cover_picker
+
+    # Only the login check is skipped; the scope guard and the view are the
+    # subject of the test.
+    view = cover_picker.cover_picker_design_preview.__wrapped__
+    reader = MagicMock(id=7)
+    reader.role_edit.return_value = False
+    reader.role_admin.return_value = False
+    reader.role_browse_global.return_value = False
+    app = flask.Flask(__name__)
+
+    with app.test_request_context("/book/1/cover/design-preview?scope=personal",
+                                  json={"design": {"style": "banner", **SMALL}}):
+        with patch.object(cover_picker, "current_user", reader), \
+             patch.object(cover_picker, "_load_book", MagicMock(return_value=object())), \
+             patch.object(cover_picker, "_book_cover_meta",
+                          MagicMock(return_value=_rich_book())), \
+             patch.object(cover_picker, "config", MagicMock(config_binariesdir="")):
+            body = view(1).get_json()
+    assert body["data_url"].startswith("data:image/")
+
+    with app.test_request_context("/book/1/cover/design-preview",
+                                  json={"design": {"style": "banner"}}):
+        with patch.object(cover_picker, "current_user", reader):
+            with pytest.raises(Forbidden):
+                view(1)

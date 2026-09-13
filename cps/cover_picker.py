@@ -258,13 +258,9 @@ def designer_state() -> dict:
         hidden_builtins=saved["hidden"],
         thumb_url=_style_thumb_url,
         sample_url=_font_sample_url,
+        default_preset=(getattr(config, "config_cover_generator_default_preset", None)
+                        or cover_generator.DEFAULT_PRESET),
     )
-    catalogue["default_preset"] = (
-        getattr(config, "config_cover_generator_default_preset", None)
-        or cover_generator.DEFAULT_PRESET
-    )
-    if catalogue["default_preset"] not in cover_generator.PRESETS:
-        catalogue["default_preset"] = cover_generator.DEFAULT_PRESET
     catalogue["hidden_presets"] = saved["hidden"]
     catalogue["can_share_presets"] = bool(getattr(current_user, "role_admin", lambda: False)())
     catalogue["available"] = availability["available"]
@@ -654,8 +650,14 @@ def _is_admin() -> bool:
 @cover_picker.route("/cover-designer/presets", methods=["GET"])
 @user_login_required
 def cover_designer_presets():
-    """Builtin, then library, then this reader's own."""
-    return jsonify(cover_design_presets.list_presets(_current_user_id(), _binaries_dir()))
+    """Builtin, then library, then this reader's own.
+
+    This one is the manage list, so it carries the hidden shipped designs too,
+    each flagged ``hidden``: restoring one is the only way back, and a reader
+    cannot restore something the response left out.
+    """
+    return jsonify(cover_design_presets.list_presets(
+        _current_user_id(), _binaries_dir(), include_hidden=True))
 
 
 @cover_picker.route("/cover-designer/presets", methods=["POST"])

@@ -131,15 +131,26 @@ def _visible_rows(user_id: int) -> list:
     ).order_by(ub.CoverDesignPreset.position, ub.CoverDesignPreset.id).all()
 
 
-def list_presets(user_id: int, binaries_dir: str = "") -> dict:
+def list_presets(user_id: int, binaries_dir: str = "",
+                 include_hidden: bool = False) -> dict:
     """``{"presets": [...], "hidden": [...]}`` — builtin, then library, then own.
 
     That order is the one the panel shows: the designs everybody has, then the
     ones this library added, then the reader's own at the bottom where they
     accumulate.
+
+    Every entry carries ``hidden``. The panel that *offers* designs leaves the
+    hidden ones out (``include_hidden`` false), while the one that *manages*
+    them asks for the lot, because a reader cannot restore a shipped design they
+    can no longer see.
     """
     hidden = hidden_keys(user_id)
-    presets = [entry for entry in builtin_presets(binaries_dir) if entry["id"] not in hidden]
+    presets = []
+    for entry in builtin_presets(binaries_dir):
+        was_hidden = entry["id"] in hidden
+        if was_hidden and not include_hidden:
+            continue
+        presets.append(dict(entry, hidden=was_hidden))
     try:
         rows = _visible_rows(user_id)
     except SQLAlchemyError as error:  # pragma: no cover - defensive
@@ -149,9 +160,10 @@ def list_presets(user_id: int, binaries_dir: str = "") -> dict:
     library = [row for row in rows if row.scope == "library"]
     own = [row for row in rows if row.scope != "library"]
     for row in library + own:
-        if preset_id(row) in hidden:
+        was_hidden = preset_id(row) in hidden
+        if was_hidden and not include_hidden:
             continue
-        presets.append(_row_to_dict(row, binaries_dir))
+        presets.append(dict(_row_to_dict(row, binaries_dir), hidden=was_hidden))
     return {"presets": presets, "hidden": sorted(hidden)}
 
 

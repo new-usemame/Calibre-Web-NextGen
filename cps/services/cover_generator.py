@@ -70,6 +70,7 @@ import re
 import shutil
 import subprocess
 import sqlite3
+import struct
 import threading
 from dataclasses import dataclass, field
 from typing import Optional, Sequence
@@ -503,6 +504,18 @@ _FONT_EXTENSIONS = (".ttf", ".otf", ".ttc")
 # first request that asks for the catalogue.
 _MAX_FONT_FILES = 2000
 
+# Not every font file on a machine is a typeface. Icon sheets and dingbat fonts
+# sit in the same directories, and a title set in one comes out as a row of
+# scissors or of empty boxes, so they are not offered as lettering. Two facts
+# out of the file itself decide it, both of them the font's own declaration:
+# OpenType family class 12 is "Symbolic", and a font that maps a handful of
+# code points is an icon sheet rather than an alphabet.
+_SYMBOLIC_FAMILY_CLASS = 12
+# Below any real alphabet with its digits and stops. For scale: the narrowest
+# text face on the container image maps 190 code points, and Calibre's own icon
+# font maps five.
+_MIN_TEXT_CODEPOINTS = 32
+
 _font_cache: dict = {}
 _font_cache_lock = threading.Lock()
 
@@ -577,6 +590,167 @@ def _calibre_font_dirs(binaries_dir: str = "") -> tuple:
     return tuple(found)
 
 
+def _sfnt_tables(handle) -> dict:
+    """``{table tag: (offset, length)}`` for the first face in a font file.
+
+    Enough of the OpenType container to read two declarations out of it. Any
+    file that does not parse as one returns nothing, and every caller here
+    treats nothing as "no opinion".
+    """
+    handle.seek(0)
+    header = handle.read(12)
+    if len(header) < 12:
+        return {}
+    tag, count = struct.unpack(">IH", header[:6])
+    base = 12
+    if tag == 0x74746366:  # 'ttcf' - a collection; its first face will do
+        handle.seek(12)
+        offset = struct.unpack(">I", handle.read(4))[0]
+        handle.seek(offset + 4)
+        count = struct.unpack(">H", handle.read(2))[0]
+        base = offset + 12
+    if not 0 < count <= 512:
+        return {}
+    handle.seek(base)
+    blob = handle.read(count * 16)
+    tables = {}
+    for index in range(count):
+        record = blob[index * 16:(index + 1) * 16]
+        if len(record) < 16:
+            break
+        name, _checksum, offset, length = struct.unpack(">4sIII", record)
+        tables[name.decode("latin-1", "replace").strip()] = (offset, length)
+    return tables
+
+
+def _os2_family_class(handle, tables: dict) -> int:
+    """The OS/2 table's ``sFamilyClass`` high byte, or 0 for "unclassified"."""
+    entry = tables.get("OS/2")
+    if not entry:
+        return 0
+    handle.seek(entry[0] + 30)
+    raw = handle.read(2)
+    if len(raw) < 2:
+        return 0
+    return struct.unpack(">H", raw)[0] >> 8
+
+
+# Private-use code points carry no character: an icon set mapped into them is a
+# sheet of pictures whatever its glyphs look like.
+_PRIVATE_USE_RANGES = ((0xE000, 0xF8FF), (0xF0000, 0x10FFFF))
+# Only the Unicode character maps are read. A legacy Mac or symbol map says
+# nothing about what the font can spell.
+_UNICODE_CMAPS = ((0, None), (3, 1), (3, 10))
+
+
+def _characters_in(start: int, end: int) -> int:
+    """Code points between *start* and *end* that are real characters."""
+    total = max(0, end - start + 1)
+    for low, high in _PRIVATE_USE_RANGES:
+        total -= max(0, min(end, high) - max(start, low) + 1)
+    return max(0, total)
+
+
+def _cmap_codepoints(handle, tables: dict) -> Optional[int]:
+    """How many characters the font maps, or None when that cannot be read.
+
+    Counted from the character map's ranges rather than by walking every code
+    point, because this runs over every font file on the machine. Ranges can
+    only over-count, which is the safe direction: the only thing the number
+    decides is whether a font is too small to be an alphabet.
+    """
+    entry = tables.get("cmap")
+    if not entry:
+        return None
+    base = entry[0]
+    handle.seek(base)
+    header = handle.read(4)
+    if len(header) < 4:
+        return None
+    count = struct.unpack(">H", header[2:4])[0]
+    if not 0 < count <= 64:
+        return None
+    offsets = []
+    for _ in range(count):
+        record = handle.read(8)
+        if len(record) < 8:
+            break
+        platform, encoding, offset = struct.unpack(">HHI", record)
+        if any(platform == want and (enc is None or encoding == enc)
+               for want, enc in _UNICODE_CMAPS):
+            offsets.append(base + offset)
+    best = None
+    for offset in offsets:
+        covered = _cmap_subtable_size(handle, offset)
+        if covered is not None and (best is None or covered > best):
+            best = covered
+    return best
+
+
+def _cmap_subtable_size(handle, offset: int) -> Optional[int]:
+    """Characters covered by one Unicode character-map subtable."""
+    handle.seek(offset)
+    raw = handle.read(2)
+    if len(raw) < 2:
+        return None
+    subtable_format = struct.unpack(">H", raw)[0]
+    if subtable_format == 4:
+        head = handle.read(6)
+        if len(head) < 6:
+            return None
+        segments = struct.unpack(">H", head[4:6])[0] // 2
+        if not 0 < segments <= 20000:
+            return None
+        handle.read(6)
+        ends = struct.unpack(">%dH" % segments, handle.read(segments * 2))
+        handle.read(2)
+        starts = struct.unpack(">%dH" % segments, handle.read(segments * 2))
+        return sum(_characters_in(start, end)
+                   for start, end in zip(starts, ends) if start != 0xFFFF)
+    if subtable_format == 6:
+        head = handle.read(8)
+        if len(head) < 8:
+            return None
+        first, entries = struct.unpack(">HH", head[4:8])
+        return _characters_in(first, first + max(0, entries - 1))
+    if subtable_format == 12:
+        head = handle.read(14)
+        if len(head) < 14:
+            return None
+        groups = struct.unpack(">I", head[10:14])[0]
+        if not 0 < groups <= 20000:
+            return None
+        total = 0
+        for _ in range(groups):
+            record = handle.read(12)
+            if len(record) < 12:
+                break
+            start, end, _glyph = struct.unpack(">III", record)
+            total += _characters_in(start, end)
+        return total
+    return None
+
+
+def _font_sets_text(path: str) -> bool:
+    """Is this font file a typeface, or a box of pictures?
+
+    Anything unreadable, unparseable or merely unusual is a typeface as far as
+    this is concerned: the catalogue errs towards offering a font, never
+    towards hiding one it did not understand.
+    """
+    try:
+        with open(path, "rb") as handle:
+            tables = _sfnt_tables(handle)
+            if not tables:
+                return True
+            if _os2_family_class(handle, tables) == _SYMBOLIC_FAMILY_CLASS:
+                return False
+            covered = _cmap_codepoints(handle, tables)
+            return covered is None or covered >= _MIN_TEXT_CODEPOINTS
+    except (OSError, ValueError, struct.error):  # pragma: no cover - defensive
+        return True
+
+
 def _scan_font_files(extra_dirs: Sequence[str] = ()) -> dict:
     """``{family: {style key: path}}`` for every font file this host can read.
 
@@ -616,7 +790,7 @@ def _scan_font_files(extra_dirs: Sequence[str] = ()) -> dict:
                     family, style_name = ImageFont.truetype(path, 12).getname()
                 except (OSError, ValueError, TypeError):
                     continue
-                if not family:
+                if not family or not _font_sets_text(path):
                     continue
                 families.setdefault(str(family), {}).setdefault(_style_key(style_name or ""), path)
             if examined >= _MAX_FONT_FILES:
@@ -1272,11 +1446,17 @@ def builtin_presets(binaries_dir: str = "") -> list:
 
 
 def catalogue(binaries_dir: str = "", extra_presets: Sequence[dict] = (),
-              hidden_builtins: Sequence[str] = (), thumb_url=None, sample_url=None) -> dict:
+              hidden_builtins: Sequence[str] = (), thumb_url=None, sample_url=None,
+              default_preset: str = "") -> dict:
     """The design vocabulary, shaped for the SPA's designer panel.
 
     Labels are English source strings: the SPA translates them through the same
     msgid catalogue as the rest of its chrome (see ``cps/spa_strings.py``).
+
+    ``defaults`` is the design the panel opens on, and it is the chosen default
+    preset's own design rather than a fourth set of values: the panel decides
+    which preset is selected by matching it, so a design that matched nothing
+    would open the panel on "Custom" every time.
     """
     thumb_url = thumb_url or _style_thumbnail_url
     sample_url = sample_url or _font_sample_url
@@ -1284,8 +1464,10 @@ def catalogue(binaries_dir: str = "", extra_presets: Sequence[dict] = (),
     presets = [entry for entry in builtin_presets(binaries_dir) if entry["id"] not in hidden]
     presets.extend(extra_presets or ())
 
+    chosen = default_preset if default_preset in PRESETS else DEFAULT_PRESET
     fonts = font_catalogue(binaries_dir)
-    defaults = resolve_design(strict=False, binaries_dir=binaries_dir).to_dict()
+    defaults = resolve_design(PRESETS[chosen]["design"], strict=False,
+                              binaries_dir=binaries_dir).to_dict()
 
     return {
         "styles": [
@@ -1322,7 +1504,7 @@ def catalogue(binaries_dir: str = "", extra_presets: Sequence[dict] = (),
         "text_slots": list(TEXT_SLOTS),
         "color_slots": list(COLOR_SLOTS),
         # v1 keys, still read by the admin settings page and older clients.
-        "default_preset": DEFAULT_PRESET,
+        "default_preset": chosen,
         "layouts": [{"id": key, "label": value["label"]} for key, value in STYLES.items()],
     }
 

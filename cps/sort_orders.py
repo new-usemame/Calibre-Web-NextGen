@@ -48,7 +48,7 @@ it per request instead; the callers that iterate the map (the #1331 invariants,
 ``custom_column_sort``'s magic-shelf allowlist) therefore never see a sort whose
 meaning depends on who is asking. See ``recent_sort_order``.
 """
-from sqlalchemy import select
+from sqlalchemy import String, select, type_coerce
 from sqlalchemy.orm import aliased
 from sqlalchemy.sql.expression import func
 from sqlalchemy.sql.functions import coalesce
@@ -174,10 +174,22 @@ def _reading_activity(user_id):
         .correlate(db.Books)
         .scalar_subquery()
     )
-    return func.max(
-        coalesce(read_activity, _NO_ACTIVITY),
-        coalesce(kobo_activity, _NO_ACTIVITY),
-        coalesce(web_activity, _NO_ACTIVITY),
+    # Typed as the text SQLite stores, because that is what the comparison is
+    # and because neither stand-in above is a moment in time. It matters beyond
+    # bookkeeping: every list view pages through ``fill_indexpage``, which eager
+    # loads five relationships under a LIMIT, so SQLAlchemy wraps the book query
+    # in a subquery and lifts each ORDER BY expression into it as a *selected*
+    # column (the #1411 shape). Whatever this claims to be is then what each
+    # row is decoded as on the way back, and a datetime claim turns the first
+    # never-read book on the page into ``Invalid isoformat string: ''`` --
+    # which that caller catches and logs, serving an empty library.
+    return type_coerce(
+        func.max(
+            coalesce(read_activity, _NO_ACTIVITY),
+            coalesce(kobo_activity, _NO_ACTIVITY),
+            coalesce(web_activity, _NO_ACTIVITY),
+        ),
+        String,
     )
 
 

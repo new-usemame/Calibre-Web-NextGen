@@ -44,11 +44,12 @@ mock of the session cannot show that.
 """
 import inspect
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 import flask
 import pytest
 from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import scoped_session, sessionmaker
 
 from cps import constants, db, ub
 
@@ -91,10 +92,12 @@ def _user(session, name):
 class _Library:
     """One attached SQLite connection carrying app.db and metadata.db models."""
 
-    def __init__(self, session, reader, stranger):
+    def __init__(self, session, reader, stranger, engine, monkeypatch):
         self.session = session
         self.reader = reader
         self.stranger = stranger
+        self.engine = engine
+        self.monkeypatch = monkeypatch
 
     def order(self, sort_param="recent", user=None):
         from cps.sort_orders import book_sort_order
@@ -108,6 +111,34 @@ class _Library:
         if limit is not None:
             query = query.limit(limit)
         return [row[0] for row in query.all()]
+
+    def page(self, user, sort_param="recent", page=1, pagesize=60):
+        """The ids on one page of the list views, through the real funnel.
+
+        ``fill_indexpage`` is what /api/v1/books, the classic library and the
+        shelf lists all page through, and it is not a plain SELECT: it eagerly
+        loads ``Books.authors``/``tags``/``data``/``series``/``ratings`` under a
+        LIMIT, so SQLAlchemy wraps the book query in a subquery and lifts every
+        ORDER BY expression into it as a *selected* column — the #1411 shape.
+        It also catches whatever the query raises and logs it, so a page that
+        cannot be built arrives as an empty list rather than as an error.
+        """
+        self.monkeypatch.setattr(db, "current_user", user)
+        self.monkeypatch.setattr(db.CalibreDB, "engine", self.engine)
+        self.monkeypatch.setattr(
+            db.CalibreDB, "session_factory",
+            scoped_session(sessionmaker(bind=self.engine)))
+        self.monkeypatch.setattr(db.CalibreDB, "config", SimpleNamespace(
+            config_books_per_page=60, config_random_books=4,
+            config_restricted_column=0, config_read_column=0))
+        series_join = (db.books_series_link,
+                       db.Books.id == db.books_series_link.c.book, db.Series)
+        app = flask.Flask(__name__)
+        with app.test_request_context("/api/v1/books"):
+            entries, _random, _pagination = db.CalibreDB().fill_indexpage(
+                page, pagesize, db.Books, True, self.order(sort_param, user),
+                True, 0, *series_join)
+        return [entry.Books.id for entry in entries]
 
 
 @pytest.fixture
@@ -130,7 +161,7 @@ def library(monkeypatch):
                           BASE_TS + timedelta(days=days)))
     session.commit()
 
-    yield _Library(session, reader, stranger)
+    yield _Library(session, reader, stranger, engine, monkeypatch)
 
     session.close()
     engine.dispose()
@@ -519,6 +550,34 @@ def test_the_order_survives_a_change_of_query_plan(library):
     library.session.commit()
 
     assert library.ids(user=library.reader) == before
+
+
+# --------------------------------------------------------------------------
+# The query the list views actually run
+# --------------------------------------------------------------------------
+
+def test_a_page_of_the_library_spans_the_read_and_the_unread_books(library):
+    """The order has to survive ``fill_indexpage``, not just a SELECT.
+
+    The library the user sees is a page built by a query that eager-loads five
+    relationships under a LIMIT, so SQLAlchemy wraps it in a subquery and every
+    ORDER BY expression becomes a *selected* column of that subquery — which
+    means the expression's value is decoded on the way back, for every book on
+    the page. "Never read" is not a moment in time, so an order that advertises
+    one for it cannot survive the first unread book on the page, and
+    ``fill_indexpage`` turns the failure into an empty library rather than an
+    error. Measured on a 51-book rig before the fix: ``sort=recent&per_page=5``
+    returned five books and ``per_page=250`` returned none.
+
+    The "new" leg is the instrument check: it fails if this harness cannot page
+    the library at all, so a failure below can only be about *this* order.
+    """
+    _web_reader_save(library, 3, percentage=45.0)
+
+    assert library.page(library.reader, "new") == NEWEST_FIRST
+    assert library.page(library.reader) == expected(3)
+    assert (library.page(library.reader, page=1, pagesize=2)
+            + library.page(library.reader, page=2, pagesize=2)) == expected(3)
 
 
 # --------------------------------------------------------------------------

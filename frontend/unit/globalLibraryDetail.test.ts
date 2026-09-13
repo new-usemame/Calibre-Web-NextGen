@@ -18,11 +18,16 @@ test('non-member detail keeps global editing and hides member-only controls', ()
   const queries = source('../src/lib/queries.ts');
 
   assert.match(detail, /const inLibrary = !!book && \(!selectionMode \|\| book\.in_my_library !== false\)/);
-  assert.match(detail, /!inLibrary && selectionMode && me\?\.role\?\.browse_global[\s\S]*Add to my library/);
+  // The membership action lives in the gear menu, labelled by the action it
+  // performs; only global-browsers can add a book they do not own.
+  assert.match(detail, /if \(selectionMode\)/);
+  assert.match(detail, /label: t\('Remove from library'\)/);
+  assert.match(detail, /else if \(me\?\.role\?\.browse_global\)[\s\S]*label: t\('Add to library'\)/);
+  assert.match(detail, /label: t\('Not in your library'\)/);
   assert.match(detail, /\{inLibrary && book\.in_progress && \(/);
   assert.match(detail, /\{inLibrary && \([\s\S]*<AddToShelf/);
-  assert.match(detail, /\{inLibrary && <Link href=\{`\/book\/\$\{book\.id\}\/annotations`\}/);
-  assert.match(detail, /\{me\?\.role\?\.edit && \([\s\S]*href=\{`\/book\/\$\{book\.id\}\/edit`\}/);
+  assert.match(detail, /if \(inLibrary\) \{[\s\S]*to: `\/book\/\$\{book\.id\}\/annotations`/);
+  assert.match(detail, /if \(me\?\.role\?\.edit\) \{[\s\S]*to: `\/book\/\$\{book\.id\}\/edit`/);
   assert.match(detail, /const canDelete = canDeleteBooks\(me\)/);
 
   assert.match(detail, /useBookShelves\(id, \{ enabled: inLibrary \}\)/);

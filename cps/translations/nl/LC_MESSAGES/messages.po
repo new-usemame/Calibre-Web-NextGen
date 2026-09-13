@@ -23,6 +23,50 @@ msgstr ""
 "Generated-By: Babel 2.13.1\n"
 "X-Generator: Poedit 3.9\n"
 
+#: cps/spa_strings.py
+msgid "Remove from library"
+msgstr "Verwijderen uit bibliotheek"
+
+#: cps/spa_strings.py
+msgid "Open cover editor"
+msgstr "Omslageditor openen"
+
+#: cps/spa_strings.py
+msgid "My own cover"
+msgstr "Mijn eigen omslag"
+
+#: cps/spa_strings.py
+msgid "More actions"
+msgstr "Meer acties"
+
+#: cps/spa_strings.py
+msgid "Library cover"
+msgstr "Bibliotheekomslag"
+
+#: cps/spa_strings.py
+msgid "Kobo two-way sync"
+msgstr "Kobo-synchronisatie in twee richtingen"
+
+#: cps/spa_strings.py
+msgid "Edit cover…"
+msgstr "Omslag bewerken…"
+
+#: cps/spa_strings.py
+msgid "Edit cover"
+msgstr "Omslag bewerken"
+
+#: cps/spa_strings.py
+msgid "Cover scope"
+msgstr "Te wijzigen omslag"
+
+#: cps/spa_strings.py
+msgid "Admin only"
+msgstr "Alleen voor beheerders"
+
+#: cps/spa_strings.py
+msgid "Add to library"
+msgstr "Toevoegen aan bibliotheek"
+
 #: cps/about.py cps/spa_strings.py
 msgid "Statistics"
 msgstr "Statistieken"
@@ -44,6 +88,10 @@ msgstr "Bezig met het afsluiten van de server, sluit het venster"
 #: cps/admin.py
 msgid "Success! Database Reconnected"
 msgstr "Gelukt! Database opnieuw verbonden"
+
+#: cps/spa_strings.py
+msgid "The library cover is back for you."
+msgstr "De bibliotheekomslag is voor je hersteld."
 
 #: cps/admin.py
 msgid "Unknown command"
@@ -161,6 +209,15 @@ msgstr "Alles"
 #: cps/admin.py
 msgid "User not found"
 msgstr "Gebruiker niet gevonden"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "View highlights, {count} saved annotations"
+msgstr "Markeringen bekijken, {count} opgeslagen annotaties"
+
+#: cps/spa_strings.py
+msgid "View highlights"
+msgstr "Markeringen bekijken"
 
 #: cps/admin.py
 #, python-brace-format

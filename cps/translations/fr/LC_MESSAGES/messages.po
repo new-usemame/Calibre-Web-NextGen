@@ -37,6 +37,50 @@ msgstr ""
 "Generated-By: Babel 2.13.1\n"
 "X-Generator: Poedit 3.8\n"
 
+#: cps/spa_strings.py
+msgid "Remove from library"
+msgstr "Retirer de la bibliothèque"
+
+#: cps/spa_strings.py
+msgid "Open cover editor"
+msgstr "Ouvrir l'éditeur de couverture"
+
+#: cps/spa_strings.py
+msgid "My own cover"
+msgstr "Ma propre couverture"
+
+#: cps/spa_strings.py
+msgid "More actions"
+msgstr "Plus d'actions"
+
+#: cps/spa_strings.py
+msgid "Library cover"
+msgstr "Couverture de la bibliothèque"
+
+#: cps/spa_strings.py
+msgid "Kobo two-way sync"
+msgstr "Synchronisation bidirectionnelle Kobo"
+
+#: cps/spa_strings.py
+msgid "Edit cover…"
+msgstr "Modifier la couverture…"
+
+#: cps/spa_strings.py
+msgid "Edit cover"
+msgstr "Modifier la couverture"
+
+#: cps/spa_strings.py
+msgid "Cover scope"
+msgstr "Couverture à modifier"
+
+#: cps/spa_strings.py
+msgid "Admin only"
+msgstr "Réservé aux administrateurs"
+
+#: cps/spa_strings.py
+msgid "Add to library"
+msgstr "Ajouter à la bibliothèque"
+
 #: cps/about.py cps/spa_strings.py
 msgid "Statistics"
 msgstr "Statistiques"
@@ -58,6 +102,10 @@ msgstr "Arrêt du serveur en cours, merci de fermer la fenêtre."
 #: cps/admin.py
 msgid "Success! Database Reconnected"
 msgstr "Bravo ! Base de données reconnectée"
+
+#: cps/spa_strings.py
+msgid "The library cover is back for you."
+msgstr "La couverture de la bibliothèque est rétablie pour vous."
 
 #: cps/admin.py
 msgid "Unknown command"
@@ -179,6 +227,15 @@ msgstr "Tout"
 #: cps/admin.py
 msgid "User not found"
 msgstr "L'utilisateur n'a pas été trouvé"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "View highlights, {count} saved annotations"
+msgstr "Voir les surlignages, {count} annotations enregistrées"
+
+#: cps/spa_strings.py
+msgid "View highlights"
+msgstr "Voir les surlignages"
 
 #: cps/admin.py
 #, python-brace-format

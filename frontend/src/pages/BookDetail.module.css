@@ -57,10 +57,13 @@
   display: block;
 }
 
-/* "Change cover" affordance overlaid on the cover — discoverable for editors
-   without a trip through the edit page. Always present but quiet; lifts on
-   hover/focus. Visible on touch (no hover needed) and reachable by keyboard
-   (it's a focusable link, with a focus-visible ring). */
+/* "Edit cover" affordance overlaid on the cover — opens the cover editor,
+   where both the library cover and the reader's own private cover live. On
+   touch/coarse pointers it is always visible (there is no hover to reveal it);
+   on fine pointers it fades in when the cover is hovered or when focus lands
+   inside the wrapper, so keyboard users get the same reveal before reaching
+   it. pointer-events track visibility so the hidden pill is never a mystery
+   click target over the artwork. */
 .changeCover {
   position: absolute;
   left: 50%;
@@ -87,59 +90,32 @@
   opacity: .92;
   transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
 }
-.coverWrap:hover .changeCover,
-.changeCover:hover,
-.changeCover:focus-visible {
-  background: var(--accent);
-  color: var(--on-accent);
-  border-color: var(--accent);
-  opacity: 1;
-  transform: translateX(-50%) translateY(-2px);
+.changeCover:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); opacity: 1; }
+/* Hover rules live under (hover: hover): iOS keeps a synthetic :hover stuck on
+   the last tapped element, which would leave the accent state "on" after the
+   tap (#2230's class of bug). */
+@media (hover: hover) and (pointer: fine) {
+  .changeCover { opacity: 0; pointer-events: none; }
+  .coverWrap:hover .changeCover,
+  .coverWrap:focus-within .changeCover { opacity: .92; pointer-events: auto; }
+  .coverWrap:hover .changeCover:hover,
+  .changeCover:hover,
+  .changeCover:focus-visible {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+    opacity: 1;
+    transform: translateX(-50%) translateY(-2px);
+  }
 }
-.changeCover:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); }
+@media (hover: none) {
+  .changeCover:active {
+    background: var(--accent);
+    color: var(--on-accent);
+    border-color: var(--accent);
+  }
+}
 @media (prefers-reduced-motion: reduce) { .changeCover { transition: none; } }
-
-.coverPreferences {
-  margin-top: var(--sp-3);
-  display: grid;
-  gap: var(--sp-2);
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
-  line-height: var(--lh-normal);
-}
-
-.coverPreferences p { margin: 0; }
-
-.coverPreferenceActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-}
-
-.coverPreferenceActions a,
-.coverPreferenceActions button {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  min-height: 44px;
-  padding: var(--sp-2) var(--sp-3);
-  border: 1px solid var(--border-strong);
-  border-radius: var(--r-md);
-  background: var(--surface-1);
-  color: var(--text);
-  font: inherit;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.coverPreferenceActions a:hover,
-.coverPreferenceActions button:hover { border-color: var(--accent); }
-.coverPreferenceActions button:disabled { opacity: .6; cursor: wait; }
-.coverPreferenceActions a:focus-visible,
-.coverPreferenceActions button:focus-visible {
-  outline: 3px solid var(--accent-ring);
-  outline-offset: 2px;
-}
 
 /* Coverless detail cover — a themed typographic cover (mirrors BookCover's
    card fallback, larger). Tokens only, so it adapts to every theme; never a
@@ -455,8 +431,8 @@
   background: var(--surface-2);
 }
 
-/* Download button — ghost link styled as button */
-.downloadBtn {
+/* Download/button ghost style for file rows and small section actions */
+.fileAction {
   display: inline-flex;
   align-items: center;
   gap: var(--sp-2);
@@ -464,18 +440,24 @@
   font-weight: var(--fw-semi);
   font-family: var(--font-body);
   padding: var(--sp-2) var(--sp-3);
-  height: 38px;
+  min-height: 38px;
   border-radius: var(--r-md);
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
 }
 
-.downloadBtn:hover {
+.fileAction:hover {
   background: var(--surface-2);
+}
+
+.fileAction:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .highlightCount {
@@ -493,74 +475,12 @@
   line-height: 1;
 }
 
-/* Whole-book deletion stays separate from the ordinary-actions row (#1046),
-   but the region itself is intentionally quiet; danger emphasis belongs to
-   the control that performs the destructive action (#1862). */
-.dangerZone {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--sp-3);
-  flex-wrap: wrap;
-  padding: var(--sp-4) 0 0;
-  border-top: 1px solid var(--border);
-  background: transparent;
-}
-
-.actionDanger {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-2);
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-semi);
-  font-family: var(--font-body);
-  padding: var(--sp-2) var(--sp-3);
-  height: 38px;
-  border-radius: var(--r-md);
-  background: var(--surface-1);
-  border: 1px solid var(--danger);
-  color: var(--danger);
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background var(--dur-fast) var(--ease);
-}
-
-.actionDanger:hover:not(:disabled) {
-  background: var(--danger-soft);
-}
-
-.actionDanger:disabled {
-  opacity: 0.6;
-  cursor: default;
-}
-
 .deleteErr {
   flex-basis: 100%;
   color: var(--danger);
   font-size: var(--fs-sm);
   margin: 0;
 }
-
-/* Narrow-layout icon-level delete (#1828). The component renders this button
-   only at ≤700px (useMediaQuery — the bordered dangerZone region renders at
-   wider widths instead), so this rule styles an element that only exists in
-   the narrow layout; no display toggling lives here on purpose: a hidden
-   interactive element in the DOM is an a11y/sweep hazard, not a solution. */
-.deleteIconButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 34px;
-  height: 34px;
-  border-radius: var(--r-md);
-  border: 1px solid var(--danger);
-  background: transparent;
-  color: var(--danger);
-  cursor: pointer;
-  transition: background var(--dur-fast) var(--ease);
-}
-.deleteIconButton:hover:not(:disabled) { background: var(--danger-soft); }
-.deleteIconButton:disabled { opacity: 0.6; cursor: default; }
 
 /* Tags row */
 .tags {
@@ -649,15 +569,9 @@
      the DOM — header beside the cover, then description, then everything else. */
   .description { order: 0; }
 
-  /* #1828: whole-book deletion trades its bordered region for an icon-level
-     button at the end of the action row (both are conditionally rendered in
-     the component — the region never exists in the narrow DOM). The confirm
-     dialog is the guard; the region's box was the loudest element between the
-     reader and the book. */
-
-  /* #1828 chip compression: the action row was a wall of 38px chips with wide
-     gaps, pushing the description off the first two screens. 34px keeps the
-     SC 2.5.8 24px floor with margin; labels shrink one step. */
+  /* #1828 chip compression: the action row keeps 34px chips with tighter gaps
+     so the description stays near the first screen. 34px keeps the SC 2.5.8
+     24px floor with margin; labels shrink one step. */
   .actions { gap: var(--sp-2); }
   .actionPrimary,
   .readToggleActive,
@@ -666,12 +580,6 @@
     padding: var(--sp-2) var(--sp-3);
     font-size: var(--fs-sm);
   }
-  .downloadBtn {
-    height: 34px;
-    padding: var(--sp-2) var(--sp-3);
-    font-size: var(--fs-xs);
-  }
-  .twoWayChip { min-height: 34px; padding: var(--sp-1) var(--sp-3); }
   .tags { gap: var(--sp-1); }
 
   .coverCol {
@@ -758,15 +666,130 @@
 .sendErr { color: var(--danger); font-size: var(--fs-sm); }
 .sendHint { color: var(--text-muted); font-size: var(--fs-xs); }
 
-/* Stage 0 Kobo two-way sync state chip (read-only; managed on Account) */
-.twoWayChip {
-  display: inline-flex; align-items: center; flex-wrap: wrap; gap: var(--sp-2);
-  font-size: var(--fs-sm); color: var(--text-muted);
-  padding: var(--sp-2) var(--sp-3); min-height: 38px;
-  text-decoration: none; white-space: nowrap;
-}
+/* Stage 0 Kobo two-way sync state badge (in the metadata list; managed on
+   Account) */
 .twoWayBlocked {
   font-size: var(--fs-xs); color: var(--text);
   background: var(--danger-soft); border: 1px solid var(--danger-border);
   border-radius: var(--r-full); padding: 2px var(--sp-2);
+  margin-left: var(--sp-2);
 }
+
+/* Files section — per-format download/delete, convert, add-a-format. Sits at
+   the very bottom of the page, full width. */
+.filesSection {
+  margin-top: var(--sp-6);
+  padding-top: var(--sp-5);
+  border-top: 1px solid var(--border);
+}
+
+.filesTitle {
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  color: var(--text);
+  margin: 0 0 var(--sp-3);
+}
+
+.fileList {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin: 0 0 var(--sp-4);
+  padding: 0;
+  max-width: 560px;
+}
+
+.fileItem {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.fileName { font-weight: 600; color: var(--text); font-size: var(--fs-sm); }
+.fileSize { flex: 1; color: var(--text-muted); font-size: var(--fs-sm); }
+
+.fileDelete { color: var(--danger); border-color: var(--danger); }
+.fileDelete:hover:not(:disabled) { background: var(--danger-soft); }
+
+.fileNote {
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  margin: calc(-1 * var(--sp-2)) 0 var(--sp-4);
+  max-width: 70ch;
+}
+
+.convertForm {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--sp-3);
+}
+
+.fileField { display: flex; flex-direction: column; gap: var(--sp-2); }
+
+.fileFieldLabel {
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
+}
+
+.fileSelect {
+  background: var(--surface-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--text);
+  font-size: var(--fs-base);
+  font-family: var(--font-body);
+  outline: none;
+  width: 130px;
+  min-height: 40px;
+  box-sizing: border-box;
+}
+
+.fileSelect:focus { border-color: var(--accent); }
+
+.convertToLabel {
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  padding-bottom: calc(var(--sp-2) + 1px);
+}
+
+.fileAddBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+  /* --accent-text (not --accent): accent-as-text must clear 4.5:1 on the light
+     surface; the raw --accent fill is only ~3:1 on Light. */
+  font-size: var(--fs-sm);
+  color: var(--accent-text);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: var(--sp-2) var(--sp-3);
+  min-height: 38px;
+  width: fit-content;
+}
+
+/* C3: the file input is visually hidden but stays focusable + in the tab order
+   (unlike hidden/display:none). The label mirrors the input's focus with a ring. */
+.fileInput {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.fileAddBtn:focus-within {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+  border-color: var(--accent);
+}
+
+.fileMsgOk { color: var(--success); font-size: var(--fs-sm); }
+.fileMsgErr { color: var(--danger); font-size: var(--fs-sm); }

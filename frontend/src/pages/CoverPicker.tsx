@@ -5,7 +5,7 @@ import {
   Image as ImageIcon, AlertTriangle, KeyRound, Smartphone, Loader2, Sparkles, Search as SearchIcon,
   Palette,
 } from 'lucide-react';
-import { useBook } from '../lib/queries';
+import { useBook, useClearMyCover, useMe } from '../lib/queries';
 import {
   useCoverState, useCandidates, useProviderKeys, coverApi,
   EREADER_ASPECTS, EREADER_FILL_MODES,
@@ -28,7 +28,17 @@ const isEmbedded = (c: CoverCandidate) => c.source_id === 'embedded' || c.candid
 export function CoverPicker({ id }: { id: string }) {
   const t = useT();
   const qc = useQueryClient();
-  const personal = new URLSearchParams(window.location.search).get('personal') === '1';
+  const me = useMe().data;
+  const clearMyCover = useClearMyCover(id);
+  // Library cover (shared, edit role required server-side) vs. the reader's own
+  // cover (private to them + their e-reader deliveries). The scope is switchable
+  // here — it used to be two separate entry points on the book page.
+  const [scope, setScope] = useState<'library' | 'personal'>(() =>
+    new URLSearchParams(window.location.search).get('personal') === '1' ? 'personal' : 'library');
+  const canEditLibrary = !!(me?.role?.edit || me?.role?.admin);
+  // Without the edit role every library-scope endpoint 403s
+  // (cps/cover_picker.py edit_required), so the only usable scope is personal.
+  const personal = scope === 'personal' || !canEditLibrary;
   const { data: book } = useBook(id);
   const { data: state } = useCoverState(id, personal);
   // The sources are searched with the book's title and author by default;
@@ -76,6 +86,33 @@ export function CoverPicker({ id }: { id: string }) {
     setBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Something went wrong. Try again.') });
   }, [t]);
 
+  const switchScope = (next: 'library' | 'personal') => {
+    if (next === scope) return;
+    setScope(next);
+    setBanner(null);
+    setConfirm(null);
+    // An apply in the other scope must not bleed its cache-busted URL into
+    // this scope's "current cover" frame.
+    setCoverBust(null);
+    // Keep the URL honest, so a refresh or a copied link lands in this scope.
+    const params = new URLSearchParams(window.location.search);
+    if (next === 'personal') params.set('personal', '1');
+    else params.delete('personal');
+    const qs = params.toString();
+    window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+  };
+
+  const restoreLibraryCover = () => {
+    if (clearMyCover.isPending) return;
+    clearMyCover.mutate(undefined, {
+      onSuccess: () => {
+        setCoverBust(null); // the refetched book carries the library cover again
+        setBanner({ ok: true, text: t('The library cover is back for you.') });
+      },
+      onError,
+    });
+  };
+
   const toggleLock = async () => {
     const next = !locked;
     setLocked(next); // optimistic
@@ -99,6 +136,21 @@ export function CoverPicker({ id }: { id: string }) {
             ? t('Your cover appears only to you and on books delivered to your e-readers. The library cover stays unchanged for everyone else, and administrators manage it.')
             : t('Pick a cover from any source we support, paste a URL, upload a file, or use the cover embedded in the book itself.')}
         </p>
+        {canEditLibrary && (
+          <div className={styles.scopeSwitch} role="group" aria-label={t('Cover scope')}
+            data-testid="cover-scope-switch">
+            <button type="button" aria-pressed={!personal}
+              className={!personal ? styles.scopeOn : styles.scope}
+              onClick={() => switchScope('library')}>
+              {t('Library cover')}
+            </button>
+            <button type="button" aria-pressed={personal}
+              className={personal ? styles.scopeOn : styles.scope}
+              onClick={() => switchScope('personal')}>
+              {t('My own cover')}
+            </button>
+          </div>
+        )}
       </header>
 
       {banner && (
@@ -131,6 +183,15 @@ export function CoverPicker({ id }: { id: string }) {
             </button>}
             {!personal && <p className={styles.lockHelp}>
               {t('When locked, fetching metadata will not overwrite this cover.')}
+            </p>}
+            {personal && book.using_my_cover && (
+              <button type="button" className={styles.restoreLibrary} onClick={restoreLibraryCover}
+                disabled={clearMyCover.isPending}>
+                {clearMyCover.isPending ? t('Restoring…') : t('Use the library cover')}
+              </button>
+            )}
+            {personal && <p className={styles.lockHelp}>
+              {t('Your own cover is private to you and your e-reader deliveries. The library cover stays unchanged for everyone else.')}
             </p>}
           </div>
 

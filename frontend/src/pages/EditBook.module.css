@@ -142,30 +142,7 @@
 .msgOk { color: var(--success); font-size: var(--fs-sm); }
 .msgErr { color: var(--danger); font-size: var(--fs-sm); }
 
-.formatsSection {
-  margin-top: var(--sp-6);
-  padding-top: var(--sp-5);
-  border-top: 1px solid var(--border);
-}
-.subTitle { font-family: var(--font-display); font-size: var(--fs-lg); color: var(--text); margin-bottom: var(--sp-3); }
-.formatList { list-style: none; display: flex; flex-direction: column; gap: var(--sp-2); margin-bottom: var(--sp-4); max-width: 480px; }
-.formatItem {
-  display: flex; align-items: center; gap: var(--sp-3);
-  padding: var(--sp-2) var(--sp-3);
-  background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-md);
-}
-.formatName { flex: 1; font-weight: 600; color: var(--text); font-size: var(--fs-sm); }
-.formatDownload { color: var(--accent); font-size: var(--fs-sm); }
-.formatDelete {
-  position: relative; color: var(--text-muted); padding: var(--sp-1);
-}
-.formatDelete::before { content: ''; position: absolute; inset: -1px; }
-.formatDelete:hover:not(:disabled) { color: var(--danger); }
-.formatDeleteReason { color: var(--text-muted); font-size: var(--fs-sm); margin: calc(-1 * var(--sp-2)) 0 var(--sp-4); }
-.convertForm { display: flex; align-items: flex-end; gap: var(--sp-3); flex-wrap: wrap; }
-.convertToLabel { font-size: var(--fs-sm); color: var(--text-muted); padding-bottom: calc(var(--sp-2) + 1px); }
-
-.coverSection { display: flex; gap: var(--sp-4); margin-bottom: var(--sp-5); align-items: flex-start; }
+.coverSection { display: flex; gap: var(--sp-4); margin-bottom: var(--sp-5); align-items: center; }
 .coverPreview { flex-shrink: 0; }
 .coverImg { width: 120px; height: auto; border-radius: var(--r-md); border: 1px solid var(--border); }
 .coverPlaceholder {
@@ -173,28 +150,18 @@
   background: var(--surface-1); border: 1px dashed var(--border); border-radius: var(--r-md); color: var(--text-muted);
 }
 .coverControls { display: flex; flex-direction: column; gap: var(--sp-2); flex: 1; }
-.coverUploadBtn {
-  display: inline-flex; align-items: center; gap: var(--sp-2); cursor: pointer;
+.coverEditorLink {
+  display: inline-flex; align-items: center; gap: var(--sp-2); width: fit-content;
+  min-height: 38px; padding: var(--sp-2) var(--sp-4);
+  font-size: var(--fs-sm); font-weight: var(--fw-semi);
   /* --accent-text (not --accent): accent-as-text must clear 4.5:1 on the light
      surface; the raw --accent fill is only ~3:1 on Light. */
-  font-size: var(--fs-sm); color: var(--accent-text);
-  border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-2) var(--sp-3);
-  width: fit-content;
+  color: var(--accent-text); text-decoration: none;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  transition: border-color var(--dur-fast) var(--ease), background var(--dur-fast) var(--ease);
 }
-/* C3: the file input is visually hidden but stays focusable + in the tab order
-   (unlike hidden/display:none). The label mirrors the input's focus with a ring. */
-.fileInput {
-  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
-}
-.coverUploadBtn:focus-within {
-  outline: 2px solid var(--accent-ring);
-  outline-offset: 2px;
-  border-color: var(--accent);
-}
-.coverUrlRow { display: flex; gap: var(--sp-2); }
-.coverAdvanced { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--text-muted); font-size: var(--fs-sm); }
-.coverAdvanced:hover { color: var(--accent); }
+.coverEditorLink:hover { border-color: var(--accent); background: var(--accent-soft); }
+.coverEditorLink:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
 
 .metaFetch { margin-bottom: var(--sp-5); }
 .metaPanel {

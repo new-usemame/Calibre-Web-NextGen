@@ -22,6 +22,58 @@
 }
 .subtitle { color: var(--text-muted); font-size: var(--fs-base); margin: 0; max-width: 60ch; }
 
+/* ---- scope switch (Library cover | My own cover) ---- */
+.scopeSwitch {
+  display: inline-flex;
+  gap: 2px;
+  margin-top: var(--sp-3);
+  padding: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+}
+.scope, .scopeOn {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: var(--sp-1) var(--sp-4);
+  border: none;
+  border-radius: var(--r-full);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.scope { background: transparent; color: var(--text-muted); }
+.scope:hover { color: var(--text); }
+.scopeOn { background: var(--accent); color: var(--on-accent); cursor: default; }
+.scope:focus-visible, .scopeOn:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
+/* Personal scope: drop the private cover and fall back to the library one. */
+.restoreLibrary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 34px;
+  margin-top: var(--sp-2);
+  padding: var(--sp-1) var(--sp-3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
+}
+.restoreLibrary:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-strong); }
+.restoreLibrary:disabled { opacity: .6; cursor: wait; }
+
 /* ---- banner ---- */
 .bannerOk, .bannerErr {
   display: flex; align-items: center; gap: var(--sp-2);

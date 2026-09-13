@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef, useId, cloneElement, isValidElement, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
 import { Link, useLocation } from 'wouter';
-import { ChevronLeft, Save, Trash2, RefreshCw, Image as ImageIcon, Upload as UploadIcon, ExternalLink, Sparkles, Search, Plus, X, MoreHorizontal } from 'lucide-react';
+import { ChevronLeft, Save, Trash2, Image as ImageIcon, Sparkles, Search, Plus, X, MoreHorizontal } from 'lucide-react';
 import {
-  useBookMetadata, useUpdateMetadata, useBook, useMe, useDeleteFormat, useConvertFormat,
-  useSetCover, useMetadataSearch, useMetadataProviders, useSetMetadataProviderActive, useAddFormat,
+  useBookMetadata, useUpdateMetadata, useBook, useMe,
+  useSetCover, useMetadataSearch, useMetadataProviders, useSetMetadataProviderActive,
   useDeleteBook,
 } from '../lib/queries';
 import { Button } from '../components/Button';
@@ -18,7 +18,7 @@ import { formatAuthors } from '../lib/authors';
 import { ApiError, resourceUrl } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './EditBook.module.css';
-import { canDeleteBooks, canDownloadBooks, canUploadBooks } from '../lib/permissions';
+import { canDeleteBooks } from '../lib/permissions';
 
 interface Ident { type: string; val: string }
 
@@ -371,8 +371,6 @@ export function EditBook({ id }: { id: string }) {
           <span className={banner ? (banner.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{banner?.text}</span>
         </div>
       </form>
-
-      <FormatsManager id={id} />
     </main>
   );
 }
@@ -705,208 +703,28 @@ function ResultDetails({ r, onClose }: { r: MetaResult; onClose: () => void }) {
   );
 }
 
-/** Replace the book cover: upload a file or paste a URL. The full provider
- *  candidate grid + e-reader padding preview lives at the legacy /book/:id/cover. */
+/** The book's cover. All cover changes happen in the cover editor (provider
+ *  search, URL/upload, embedded art, e-reader preview, personal cover) — this
+ *  section is just the current cover plus the way in. */
 function CoverManager({ id }: { id: string }) {
   const t = useT();
   const { data: book } = useBook(id);
-  const setCover = useSetCover(id);
-  const [url, setUrl] = useState('');
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setMsg(null);
-    setCover.mutate({ file }, {
-      onSuccess: () => setMsg({ ok: true, text: t('Cover updated.') }),
-      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Upload failed.') }),
-    });
-  };
-
-  // setCover.data is the response to the most recent successful replacement. It
-  // carries the book's NEW ?c=<cover version>, because the endpoint now bumps
-  // last_modified — so it differs from the URL this page was rendered with.
-  // Falls back to the book's own URL before any upload, which is versioned too
-  // and therefore cacheable on a normal page load.
-  const previewUrl = setCover.data?.cover_url ?? book?.cover_url;
-
-  const onUrl = () => {
-    if (!url.trim()) return;
-    setMsg(null);
-    setCover.mutate({ url: url.trim() }, {
-      onSuccess: () => { setMsg({ ok: true, text: t('Cover updated.') }); setUrl(''); },
-      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Could not fetch cover.') }),
-    });
-  };
 
   return (
     <section className={styles.coverSection}>
       <div className={styles.coverPreview}>
-        {/* Prefer the URL the upload returned. The cover used to live at a
-            stable path, so after a replacement the refetched book handed back a
-            byte-identical src — React re-renders, the browser serves its cached
-            copy, and the upload looks like it did nothing (#989, reported by
-            @chloeroform). The API already answered with a cache-busted URL for
-            exactly this; it was simply being discarded. Cover URLs now carry
-            ?c=<version> and the endpoint bumps it, so the refetched book changes
-            too — this still prefers the response so the preview updates without
-            waiting for the refetch. */}
-        {previewUrl
-          ? <img src={resourceUrl(previewUrl)} alt={t('Current cover')} className={styles.coverImg} />
+        {/* Cover URLs carry ?c=<version> and a replacement bumps it, so a plain
+            refetch always hands back the fresh image (#989). */}
+        {book?.cover_url
+          ? <img src={resourceUrl(book.cover_url)} alt={t('Current cover')} className={styles.coverImg} />
           : <div className={styles.coverPlaceholder}><ImageIcon size={28} /></div>}
       </div>
       <div className={styles.coverControls}>
-        <label className={styles.coverUploadBtn}>
-          <UploadIcon size={15} aria-hidden="true" focusable={false} /> {t('Upload image')}
-          {/* C3: sr-only (NOT hidden) keeps the input focusable + in tab order;
-              the label shows a focus ring via :focus-within. */}
-          <input type="file" accept="image/*" className={styles.fileInput}
-            onChange={onFile} disabled={setCover.isPending} />
-        </label>
-        <div className={styles.coverUrlRow}>
-          <input className={styles.input} value={url} onChange={(e) => setUrl(e.target.value)}
-            aria-label={t('Cover image URL')}
-            placeholder={t('…or paste an image URL')} />
-          <Button type="button" variant="ghost" onClick={onUrl} disabled={setCover.isPending || !url.trim()}>
-            {t('Fetch')}
-          </Button>
-        </div>
-        <Link className={styles.coverAdvanced} href={`/book/${id}/cover?origin=edit`}>
-          <ExternalLink size={13} /> {t('More cover options (search providers, e-reader preview)')}
+        <Link className={styles.coverEditorLink} href={`/book/${id}/cover?origin=edit`}
+          data-testid="open-cover-editor">
+          <ImageIcon size={15} aria-hidden="true" focusable={false} /> {t('Open cover editor')}
         </Link>
-        <span className={msg ? (msg.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{msg?.text}</span>
       </div>
-    </section>
-  );
-}
-
-/** Manage a book's files: delete a format, or queue a conversion. */
-function FormatsManager({ id }: { id: string }) {
-  const t = useT();
-  const { data: book } = useBook(id);
-  const me = useMe().data;
-  const deleteFormat = useDeleteFormat(id);
-  const convertFormat = useConvertFormat(id);
-  const addFormat = useAddFormat(id);
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  const formats = book?.formats.map((f) => f.format) ?? [];
-  const convertOptions = book?.convert_options;
-  // Sources/targets come from the server as lowercase; display them uppercased
-  // to match the legacy edit page and the format list.
-  const sources = (convertOptions?.sources.length ? convertOptions.sources : formats.map((f) => f.toLowerCase()));
-  const targets = convertOptions?.targets ?? [];
-  if (!book) return null;
-  const canDelete = canDeleteBooks(me);
-  // #1288: "Add a format" POSTs to /api/v1/books/<id>/formats, which requires
-  // role_upload and now honours the admin's "Enable Uploads" switch. Gate the
-  // control on the same pair, or the switch turns a hidden button into a 403.
-  const canUpload = canUploadBooks(me);
-
-  // Keep the selected source/target normalized to lowercase option values.
-  const selectedFrom = (from || sources[0] || '').toLowerCase();
-  const availableTargets = targets.filter((t) => t.toLowerCase() !== selectedFrom);
-  const selectedTo = (to || '').toLowerCase();
-
-  const onAddFormat = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setMsg(null);
-    addFormat.mutate(file, {
-      onSuccess: () => setMsg({ ok: true, text: t('Format queued — it will appear once processed.') }),
-      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Upload failed.') }),
-    });
-    e.target.value = '';
-  };
-
-  const onConvert = (e: React.FormEvent) => {
-    e.preventDefault();
-    setMsg(null);
-    const src = selectedFrom;
-    const dst = selectedTo;
-    if (!src || !dst || src === dst) return;
-    convertFormat.mutate(
-      { from: src.toUpperCase(), to: dst.toUpperCase() },
-      {
-        onSuccess: (r) => { setMsg({ ok: true, text: r.message }); setTo(''); },
-        onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Convert failed.') }),
-      },
-    );
-  };
-
-  return (
-    <section className={styles.formatsSection}>
-      <h2 className={styles.subTitle}>{t('Files')}</h2>
-      <ul className={styles.formatList}>
-        {book!.formats.map((f) => (
-          <li key={f.format} className={styles.formatItem}>
-            <span className={styles.formatName}>{f.format}</span>
-            {canDownloadBooks(me) && (
-              <a className={styles.formatDownload} href={resourceUrl(f.download_url)} download target="_blank" rel="noopener">{t('Download')}</a>
-            )}
-            {canDelete && (
-              <button className={styles.formatDelete}
-                onClick={() => {
-                  if (window.confirm(t('Delete the {fmt} file? The book record, metadata, shelves, and reading state stay available.', { fmt: f.format }))) {
-                    setMsg(null);
-                    deleteFormat.mutate(f.format, {
-                      onSuccess: (result) => setMsg(result?.warning
-                        ? { ok: false, text: result.warning.message }
-                        : { ok: true, text: t('Format deleted.') }),
-                      onError: (err) => setMsg({
-                        ok: false,
-                        text: err instanceof ApiError ? err.message : t('Could not delete this format.'),
-                      }),
-                    });
-                  }
-                }}
-                disabled={deleteFormat.isPending}
-                aria-label={t('Delete {fmt}', { fmt: f.format })}>
-                <Trash2 size={14} aria-hidden="true" focusable={false} />
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-      {canDelete && book.formats.length > 0 && (
-        <p className={styles.formatDeleteReason}>
-          {t('The book record, metadata, shelves, and reading state stay available. If this is the last format, you can add a replacement later.')}
-        </p>
-      )}
-
-      {sources.length > 0 && availableTargets.length > 0 && (
-        <form className={styles.convertForm} onSubmit={onConvert}>
-          <label className={styles.fieldNarrow}>
-            <span className={styles.label}>{t('Convert from')}</span>
-            <select className={styles.inputNarrow} value={selectedFrom} onChange={(e) => setFrom(e.target.value)}>
-              {sources.map((f) => <option key={f} value={f.toLowerCase()}>{f.toUpperCase()}</option>)}
-            </select>
-          </label>
-          <span className={styles.convertToLabel} aria-hidden="true">{t('to')}</span>
-          <label className={styles.fieldNarrow}>
-            <span className={styles.label}>{t('Convert to')}</span>
-            <select className={styles.inputNarrow} value={selectedTo} onChange={(e) => setTo(e.target.value)}
-              aria-label={t('Convert to format')}>
-              <option value="" disabled>{t('Select format')}</option>
-              {availableTargets.map((f) => <option key={f} value={f.toLowerCase()}>{f.toUpperCase()}</option>)}
-            </select>
-          </label>
-          <Button type="submit" variant="ghost" disabled={convertFormat.isPending || !selectedTo}>
-            <RefreshCw size={15} /> {t('Convert')}
-          </Button>
-        </form>
-      )}
-
-      {canUpload && (
-        <label className={styles.coverUploadBtn} style={{ marginTop: 'var(--sp-3)' }}>
-          <UploadIcon size={15} aria-hidden="true" focusable={false} /> {addFormat.isPending ? t('Uploading…') : t('Add a format')}
-          <input type="file" className={styles.fileInput} onChange={onAddFormat} disabled={addFormat.isPending} />
-        </label>
-      )}
-      <span className={msg ? (msg.ok ? styles.msgOk : styles.msgErr) : undefined} role="status">{msg?.text}</span>
     </section>
   );
 }

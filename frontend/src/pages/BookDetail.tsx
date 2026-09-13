@@ -1,17 +1,19 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
-import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, Trash2, RefreshCw, TabletSmartphone } from 'lucide-react';
+import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
 import {
   useBook, useToggleRead, useToggleFavorite, useToggleArchived, useToggleHidden,
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
   useBookShelves, useShelves, useKoboTwoWayAnnotations, selectKoboTwoWayBook,
   useAddToMyLibrary, useMyLibraryRemovalImpact, useRemoveFromMyLibrary,
-  useActiveDeliveryDevices, useQueueDeviceDelivery, useClearMyCover,
+  useActiveDeliveryDevices, useQueueDeviceDelivery,
+  useDeleteFormat, useConvertFormat, useAddFormat,
 } from '../lib/queries';
 import { authorityLabel, opaqueLabel } from '../lib/koboTwoWay';
 import { MetadataTypeahead } from '../components/MetadataTypeahead';
 import { Pill } from '../components/Pill';
 import { AddToShelf } from '../components/AddToShelf';
+import { Menu, type MenuSectionDef } from '../components/Menu';
 import { StarRating } from '../components/StarRating';
 import { MoreByAuthor } from '../components/MoreByAuthor';
 import { AUTHOR_SEPARATOR } from '../lib/authors';
@@ -21,7 +23,7 @@ import type { CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice } from 
 import { ApiError, resourceUrl, resourceSrcSet } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
-import { canDeleteBooks, canDownloadBooks, canReadBooks } from '../lib/permissions';
+import { canDeleteBooks, canDownloadBooks, canReadBooks, canUploadBooks } from '../lib/permissions';
 import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { BookUserNotices } from '../components/UserNotices';
@@ -324,7 +326,6 @@ export function BookDetail() {
   const addToLibrary = useAddToMyLibrary();
   const removalImpact = useMyLibraryRemovalImpact();
   const removeFromLibrary = useRemoveFromMyLibrary();
-  const clearMyCover = useClearMyCover(id);
   const [location, navigate] = useLocation();
   const deliveryDevices = useActiveDeliveryDevices(
     inLibrary && !!me && !me.role?.anonymous && !!me.role?.download,
@@ -345,13 +346,6 @@ export function BookDetail() {
   const [deviceSendBanner, setDeviceSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reloadMessage, setReloadMessage] = useState('');
-  /* #1828's destructive-control swap is a CONDITIONAL RENDER, not a hidden
-     element: the icon button and the bordered region never exist in the DOM
-     together, because a display:none control still shows up in DOM sweeps with
-     an empty accessible name (it has none — it is not rendered) and failed
-     hidden-books.spec's every-control-is-named sweep on desktop. Keep this
-     query in sync with the 700px mobile cutover in BookDetail.module.css. */
-  const narrowLayout = useMediaQuery(BOOK_DETAIL_NARROW_QUERY);
   // Shelf membership for the metadata list (#1254). Both queries are already
   // in flight for the always-rendered AddToShelf popover below and share its
   // cache keys, so reading them here costs no extra request.
@@ -418,28 +412,158 @@ export function BookDetail() {
     });
   };
 
-  const coverPreferences = !me?.role?.anonymous ? (
-    <div className={styles.coverPreferences} data-testid="book-cover-preferences">
-      <p>{t('Your own cover is private to you and your e-reader deliveries. The library cover stays unchanged for everyone else.')}</p>
-      <div className={styles.coverPreferenceActions}>
-        <Link href={`/book/${book.id}/cover?personal=1`}>
-          <ImageIcon size={15} aria-hidden="true" focusable={false} />
-          {book.using_my_cover ? t('Change my cover') : t('Use my own cover')}
-        </Link>
-        {book.using_my_cover && (
-          <button type="button" disabled={clearMyCover.isPending}
-            onClick={() => clearMyCover.mutate()}>
-            {clearMyCover.isPending ? t('Restoring…') : t('Use the library cover')}
-          </button>
-        )}
-        {me?.role?.edit && (
-          <Link href={`/book/${book.id}/cover`}>
-            {t('Change library cover')}
-          </Link>
-        )}
-      </div>
-    </div>
-  ) : null;
+  const requestReloadMetadata = () => {
+    if (reloadMetadata.isPending) return;
+    // Destructive: reload overwrites whatever the user curated here with what
+    // the file on disk says, and there is no undo. Every other destructive
+    // action in the SPA confirms first (#1496, @JamesHACS).
+    if (!window.confirm(
+      t('Reload metadata for "{title}" from the file on disk? Any title, author or series you edited here is replaced by what the file contains. This cannot be undone.', { title: book.title })
+    )) return;
+    setReloadMessage('');
+    reloadMetadata.mutate(undefined, {
+      onSuccess: (result) => setReloadMessage(result.message),
+      onError: (err) => setReloadMessage(err instanceof ApiError ? err.message : t('Could not reload metadata')),
+    });
+  };
+
+  /* The "More actions" gear menu — every book action that is not one of the
+     four visible controls (Read now, Favorite, Add to shelf, the gear itself).
+     Labels name the ACTION performed (state-aware), per the cleanup brief:
+     today's "In your library" state chip becomes "Remove from library". */
+  const menuItems: MenuSectionDef['items'] = [];
+  if (inLibrary) {
+    menuItems.push({
+      id: 'read-toggle',
+      label: book.read ? t('Mark as unread') : t('Mark as read'),
+      icon: book.read ? <BookOpen size={15} /> : <BookCheck size={15} />,
+      disabled: toggleRead.isPending,
+      onSelect: () => toggleRead.mutate(!book.read),
+      testId: 'menu-read-toggle',
+    });
+    menuItems.push({
+      id: 'archive-toggle',
+      label: book.archived ? t('Unarchive') : t('Archive'),
+      icon: <Archive size={15} />,
+      disabled: toggleArchived.isPending,
+      onSelect: () => toggleArchived.mutate(),
+      testId: 'archive-book-toggle',
+    });
+    /* Personal action, deliberately outside the delete-role gate. Guest sessions
+       cannot own hidden state, so never offer them a control that returns 401. */
+    if (!me?.role?.anonymous && (me?.features?.hide_books || book.hidden)) {
+      menuItems.push({
+        id: 'hide-toggle',
+        label: book.hidden ? t('Unhide') : t('Hide'),
+        icon: book.hidden ? <Eye size={15} /> : <EyeOff size={15} />,
+        disabled: toggleHidden.isPending,
+        onSelect: () => toggleHidden.mutate(!book.hidden),
+        testId: 'hide-book-toggle',
+      });
+    }
+  }
+  if (canSend && book.formats.length > 0) {
+    menuItems.push({
+      id: 'send-ereader',
+      label: t('Send to e-reader'),
+      icon: <Send size={15} />,
+      onSelect: () => { setSendOpen(true); setSendBanner(null); },
+    });
+  }
+  if (inLibrary && me?.role?.download && book.formats.length > 0 && (deliveryDevices.data?.devices.length ?? 0) > 0) {
+    menuItems.push({
+      id: 'send-device',
+      label: t('Send to device'),
+      icon: <TabletSmartphone size={15} />,
+      onSelect: () => { setDeviceSendOpen(true); setDeviceSendBanner(null); },
+    });
+  }
+  if (me?.role?.edit) {
+    menuItems.push({
+      id: 'reload-metadata',
+      label: reloadMetadata.isPending ? t('Reloading…') : t('Reload metadata from disk'),
+      icon: <RefreshCw size={15} />,
+      disabled: reloadMetadata.isPending,
+      onSelect: requestReloadMetadata,
+    });
+  }
+  if (selectionMode) {
+    if (inLibrary) {
+      menuItems.push({
+        id: 'remove-from-library',
+        label: t('Remove from library'),
+        icon: <BookCheck size={15} />,
+        disabled: removalImpact.isPending || removeFromLibrary.isPending,
+        onSelect: removeMembership,
+        testId: 'menu-remove-from-library',
+      });
+    } else if (me?.role?.browse_global) {
+      menuItems.push({
+        id: 'add-to-library',
+        label: t('Add to library'),
+        icon: <BookPlus size={15} />,
+        disabled: addToLibrary.isPending,
+        onSelect: () => addToLibrary.mutate(book.id, {
+          onSuccess: () => announce(t('Added to your library')),
+          onError: () => announce(t('Could not add the book. Please try again.'), { assertive: true }),
+        }),
+        testId: 'menu-add-to-library',
+      });
+    } else {
+      // Not toggleable for this user: show the current state, disabled.
+      menuItems.push({ id: 'not-in-library', label: t('Not in your library'), icon: <BookPlus size={15} />, disabled: true });
+    }
+  }
+  if (inLibrary) {
+    const annotationCount = book.annotation_count ?? 0;
+    menuItems.push({
+      id: 'highlights',
+      label: t('View highlights'),
+      icon: <Highlighter size={15} />,
+      to: `/book/${book.id}/annotations`,
+      ariaLabel: annotationCount > 0
+        ? t('View highlights, {count} saved annotations', { count: annotationCount })
+        : undefined,
+      trailing: annotationCount > 0 ? (
+        <span className={styles.highlightCount} data-testid="highlight-count" aria-hidden="true">
+          {annotationCount}
+        </span>
+      ) : undefined,
+    });
+  }
+  if (me?.role?.edit) {
+    menuItems.push({
+      id: 'edit-metadata',
+      label: t('Edit metadata'),
+      icon: <Pencil size={15} />,
+      to: `/book/${book.id}/edit`,
+    });
+  }
+  if (!me?.role?.anonymous) {
+    menuItems.push({
+      id: 'edit-cover',
+      label: t('Edit cover…'),
+      icon: <ImageIcon size={15} />,
+      to: `/book/${book.id}/cover`,
+    });
+  }
+  const menuSections: MenuSectionDef[] = [{ id: 'actions', items: menuItems }];
+  if (canDelete) {
+    menuSections.push({
+      id: 'destructive',
+      label: t('Admin only'),
+      danger: true,
+      items: [{
+        id: 'delete-book',
+        label: deleteBook.isPending ? t('Deleting…') : t('Delete from the global library'),
+        icon: <Trash2 size={15} />,
+        danger: true,
+        disabled: deleteBook.isPending,
+        onSelect: requestDeleteBook,
+        testId: 'menu-delete-book',
+      }],
+    });
+  }
 
   return (
     <main className={styles.container}>
@@ -482,13 +606,20 @@ export function BookDetail() {
                 <span className={styles.coverFallbackMark} aria-hidden="true">NextGen</span>
               </div>
             )}
+            {/* "Edit cover" pill overlaid on the artwork — opens the cover
+                editor, where both the library cover and the reader's own
+                (private) cover are managed. Always visible on touch/coarse
+                pointers; hover/focus-revealed on fine pointers (see the CSS).
+                Guests get no control: the editor's sources answer 403/401 for
+                them, so the affordance would be a dead end. */}
+            {!me?.role?.anonymous && (
+              <Link href={`/book/${book.id}/cover`} className={styles.changeCover}
+                data-testid="edit-cover-pill">
+                <ImageIcon size={14} aria-hidden="true" focusable={false} />
+                {t('Edit cover')}
+              </Link>
+            )}
           </div>
-          {/* Keep cover choices under the artwork on wide layouts. On narrow
-              layouts this block follows the ordinary action row instead: when
-              it lived in the cover grid cell, its prose and two 44px controls
-              made that first row tall enough to push #1828's delete target
-              below the viewport even though the button remained rendered. */}
-          {!narrowLayout && coverPreferences}
         </div>
 
         {/* RIGHT: info */}
@@ -565,45 +696,14 @@ export function BookDetail() {
             />
           )}
 
-          {/* Actions */}
+          {/* Actions — the four visible controls. Everything else lives in the
+              gear menu (built above) or in the Files section at the page foot. */}
           <div className={styles.actions} data-testid="book-actions">
-            {!inLibrary && selectionMode && me?.role?.browse_global && (
-              <button type="button" className={styles.actionPrimary} disabled={addToLibrary.isPending}
-                onClick={() => addToLibrary.mutate(book.id, {
-                  onSuccess: () => announce(t('Added to your library')),
-                  onError: () => announce(t('Could not add the book. Please try again.'), { assertive: true }),
-                })}>
-                <BookPlus size={15} aria-hidden="true" focusable={false} />
-                {addToLibrary.isPending ? t('Adding…') : t('Add to my library')}
-              </button>
-            )}
             {inLibrary && primaryReadTarget ? (
               <Link href={primaryReadTarget} className={styles.actionPrimary}>
                 {t('Read now')}
               </Link>
             ) : null}
-
-            {inLibrary && <button
-              className={book.read ? styles.readToggleActive : styles.readToggleGhost}
-              onClick={() => toggleRead.mutate(!book.read)}
-              disabled={toggleRead.isPending}
-              aria-label={book.read ? t('Mark as unread') : t('Mark as read')}
-            >
-              {book.read ? `${t('Read')} ✓` : t('Mark as read')}
-            </button>}
-
-            {selectionMode && inLibrary && (
-              <button type="button" className={styles.readToggleGhost}
-                disabled={removalImpact.isPending || removeFromLibrary.isPending}
-                aria-label={t('Remove from my library')} onClick={removeMembership}>
-                <BookCheck size={14} aria-hidden="true" focusable={false} />
-                {removeFromLibrary.isPending ? t('Removing…') : t('In your library')}
-              </button>
-            )}
-
-            {inLibrary && (
-              <AddToShelf bookId={book.id} inLibrary={inLibrary} />
-            )}
 
             {/* Star / favorite */}
             {inLibrary && <button
@@ -616,193 +716,23 @@ export function BookDetail() {
               {book.favorited ? t('Favorited') : t('Favorite')}
             </button>}
 
-            {/* Archive (sync-pause) */}
-            {inLibrary && <button
-              data-testid="archive-book-toggle"
-              className={book.archived ? styles.readToggleActive : styles.readToggleGhost}
-              onClick={() => toggleArchived.mutate()}
-              disabled={toggleArchived.isPending}
-              aria-label={book.archived ? t('Unarchive') : t('Archive')}
-            >
-              <Archive size={14} />
-              {book.archived ? t('Archived') : t('Archive')}
-            </button>}
-
-            {inLibrary && canDownloadBooks(me) && book.formats.map((fmt) => (
-              <a
-                key={fmt.format}
-                href={resourceUrl(fmt.download_url)}
-                className={styles.downloadBtn}
-                download
-                // NOTE: the comment that used to sit here said this route serves
-                // `Content-Disposition: inline`. That is wrong, and it sent #717 after
-                // the wrong fix. `download_url` hits cps/helper.py get_download_link,
-                // which sets `attachment`; `inline` is on the reader route `/show/`
-                // (cps/web.py). The download itself works — #716 is that an iOS
-                // standalone Home Screen app has no browser chrome, so a top-level
-                // navigation to an attachment leaves the user with no way back.
-                //
-                // `target` below is therefore inert on this element: per the HTML
-                // "following hyperlinks" algorithm, a present `download` attribute
-                // means the UA downloads and never consults `target`. It is left in
-                // place only because removing it is a behaviour change that needs a
-                // real standalone iOS run to verify, which #716 is still blocked on.
-                // Full diagnosis and the reproduction plan are on issue #716.
-                target="_blank"
-                rel="noopener"
-              >
-                <Download size={15} />
-                {fmt.format} · {formatBytes(fmt.size_bytes)}
-              </a>
-            ))}
-
-            {/* Send to e-reader — gated on mail being configured + download role */}
-            {inLibrary && me?.features?.mail_configured && me?.role?.download && book.formats.length > 0 && (
-              <button
-                className={styles.downloadBtn}
-                onClick={() => { setSendOpen((v) => !v); setSendBanner(null); }}
-                aria-label={t('Send to e-reader')}
-              >
-                <Send size={14} />
-                {t('Send to e-reader')}
-              </button>
+            {inLibrary && (
+              <AddToShelf bookId={book.id} inLibrary={inLibrary} />
             )}
 
-            {inLibrary && me?.role?.download && book.formats.length > 0 && (deliveryDevices.data?.devices.length ?? 0) > 0 && (
-              <button type="button" className={styles.downloadBtn}
-                aria-expanded={deviceSendOpen} aria-controls="device-send-panel"
-                onClick={() => { setDeviceSendOpen((value) => !value); setDeviceSendBanner(null); }}>
-                <TabletSmartphone size={14} aria-hidden="true" focusable={false} />
-                {t('Send to device')}
-              </button>
+            {menuItems.length > 0 && (
+              <Menu
+                label={t('More actions')}
+                title={t('More actions')}
+                icon={<Settings size={17} aria-hidden="true" focusable={false} />}
+                sections={menuSections}
+                triggerTestId="book-actions-menu"
+                menuTestId="book-actions-menu-list"
+              />
             )}
-
-            {me?.role?.edit && (
-              <>
-                <Link href={`/book/${book.id}/edit`} className={styles.downloadBtn}>
-                  <Pencil size={14} aria-hidden="true" focusable={false} />
-                  {t('Edit')}
-                </Link>
-                {/* Destructive: reload overwrites whatever the user curated here with
-                    what the file on disk says, and there is no undo. It sits in the
-                    same row as the per-format download buttons, so it was being hit
-                    by accident while reaching for a download (#1496, @JamesHACS).
-                    Every other destructive action in the SPA confirms first; this was
-                    the one that didn't. */}
-                <button type="button" className={styles.downloadBtn}
-                  disabled={reloadMetadata.isPending}
-                  onClick={() => {
-                    if (reloadMetadata.isPending) return;
-                    if (!window.confirm(
-                      t('Reload metadata for "{title}" from the file on disk? Any title, author or series you edited here is replaced by what the file contains. This cannot be undone.', { title: book.title })
-                    )) return;
-                    setReloadMessage('');
-                    reloadMetadata.mutate(undefined, {
-                      onSuccess: (result) => setReloadMessage(result.message),
-                      onError: (err) => setReloadMessage(err instanceof ApiError ? err.message : t('Could not reload metadata')),
-                    });
-                  }}>
-                  <RefreshCw size={14} aria-hidden="true" focusable={false} />
-                  {reloadMetadata.isPending ? t('Reloading…') : t('Reload metadata from disk')}
-                </button>
-              </>
-            )}
-
-            {/* Highlights/annotations — view + export + import (Kobo). Opens the
-                server annotations page; in-reader highlight creation is the
-                flagship reader phase-2 (tracked separately). */}
-            {inLibrary && <Link href={`/book/${book.id}/annotations`} className={styles.downloadBtn}
-              aria-label={(book.annotation_count ?? 0) > 0
-                ? t('Highlights, {count} saved annotations', { count: book.annotation_count ?? 0 })
-                : undefined}>
-              <Highlighter size={14} aria-hidden="true" focusable={false} />
-              {t('Highlights')}
-              {(book.annotation_count ?? 0) > 0 && (
-                <span className={styles.highlightCount} data-testid="highlight-count" aria-hidden="true">
-                  {book.annotation_count}
-                </span>
-              )}
-            </Link>}
-
-            {/* Stage 0 per-book two-way state, when the user opted in and the
-                book has pipeline state. Read-only; manage it on Account. */}
-            {(() => {
-              const twoWayBook = selectKoboTwoWayBook(twoWay.data, book.id);
-              if (!inLibrary || !twoWay.data?.enabled || !twoWayBook) return null;
-              return (
-                <Link href="/account" className={styles.twoWayChip}>
-                  {t('Kobo two-way sync: {state}', { state: authorityLabel(t, twoWayBook, twoWay.data.scope) })}
-                  {opaqueLabel(t, twoWayBook) && <span className={styles.twoWayBlocked}>{opaqueLabel(t, twoWayBook)}</span>}
-                </Link>
-              );
-            })()}
-
-            {/* Personal action, deliberately outside the delete-role gate. It
-                sits immediately beside Delete when Delete is available and is
-                still the final action for ordinary users. Guest sessions cannot
-                own hidden state, so never offer them a control that returns 401. */}
-            {inLibrary && !me?.role?.anonymous && (me?.features?.hide_books || book.hidden) && (
-              <button
-                type="button"
-                data-testid="hide-book-toggle"
-                className={book.hidden ? styles.readToggleActive : styles.readToggleGhost}
-                onClick={() => toggleHidden.mutate(!book.hidden)}
-                disabled={toggleHidden.isPending}
-                aria-label={book.hidden ? t('Unhide') : t('Hide')}
-              >
-                {book.hidden
-                  ? <Eye size={14} aria-hidden="true" focusable={false} />
-                  : <EyeOff size={14} aria-hidden="true" focusable={false} />}
-                {book.hidden ? t('Unhide') : t('Hide')}
-              </button>
-            )}
-
-            {/* Narrow-viewport destructive control (#1828): the whole-book
-                delete is an icon-level button at the END of this row — a red
-                trash can, the confirm dialog doing the actual guarding. It is
-                rendered only in the narrow layout; at desktop widths the
-                separated region below renders instead (both share
-                requestDeleteBook, so behaviour is identical). Placed last so
-                the primary actions keep their positions. */}
-            {narrowLayout && canDelete && (
-              <button
-                type="button"
-                data-testid="book-delete-icon"
-                className={styles.deleteIconButton}
-                disabled={deleteBook.isPending}
-                aria-label={t('Delete from the global library')}
-                title={t('Delete from the global library')}
-                onClick={requestDeleteBook}
-              >
-                <Trash2 size={16} aria-hidden="true" focusable={false} />
-              </button>
-            )}
-
           </div>
-          {narrowLayout && coverPreferences}
           <p className={reloadMessage ? styles.actionStatus : undefined} role="status">{reloadMessage}</p>
 
-          {/* Whole-book deletion is intentionally separated from the wrapping row
-              of ordinary action chips (#1046) in the wide layout; in the narrow
-              layout the icon-level control inside the action row above renders
-              INSTEAD of this region (#1828) — neither is ever hidden in the DOM.
-              This uses the same delete-and-edit policy as the server;
-              this gate and grouping are the discoverability/UX layer. */}
-          {!narrowLayout && canDelete && (
-            <section className={styles.dangerZone} data-testid="book-destructive-actions"
-              aria-label={t('Delete from the global library')}>
-              <button
-                type="button"
-                className={styles.actionDanger}
-                disabled={deleteBook.isPending}
-                aria-label={t('Delete from the global library')}
-                onClick={requestDeleteBook}
-              >
-                <Trash2 size={14} aria-hidden="true" focusable={false} />
-                {deleteBook.isPending ? t('Deleting…') : t('Delete from the global library')}
-              </button>
-            </section>
-          )}
           {/* Rendered outside the region so the error still surfaces on mobile,
               where the region itself is hidden (#1828). */}
           {deleteError && <p className={styles.deleteErr} role="alert">{deleteError}</p>}
@@ -940,6 +870,26 @@ export function BookDetail() {
                 </dd>
               </>
             )}
+            {/* Stage 0 per-book two-way state, when the user opted in and the
+                book has pipeline state. Read-only status line (was an action-row
+                chip); manage it on Account. */}
+            {(() => {
+              const twoWayBook = selectKoboTwoWayBook(twoWay.data, book.id);
+              if (!inLibrary || !twoWay.data?.enabled || !twoWayBook) return null;
+              return (
+                <>
+                  <dt className={styles.metaLabel}>{t('Kobo two-way sync')}</dt>
+                  <dd className={styles.metaValue}>
+                    <Link href="/account" className={styles.metaLink}>
+                      {authorityLabel(t, twoWayBook, twoWay.data.scope)}
+                    </Link>
+                    {opaqueLabel(t, twoWayBook) && (
+                      <span className={styles.twoWayBlocked}>{opaqueLabel(t, twoWayBook)}</span>
+                    )}
+                  </dd>
+                </>
+              );
+            })()}
             {book.identifiers.map((id, i) => (
               <Fragment key={`id-${i}`}>
                 <dt className={styles.metaLabel}>{id.label || id.type.toUpperCase()}</dt>
@@ -985,6 +935,161 @@ export function BookDetail() {
           excludeBookId={book.id}
         />
       )}
+
+      {/* Files — the per-format downloads (out of the action row) plus the
+          delete/convert/add-format controls that used to sit at the foot of
+          the edit-metadata page. Last on the page by design. */}
+      <FilesSection id={id} />
     </main>
+  );
+}
+
+/** The book's files: one row per format with Download (download role) and
+ *  Delete (delete+edit roles), the Convert from/to control (edit role — the
+ *  endpoint is _require_edit), and "Add a format" (upload role + the
+ *  instance's upload switch). Moved here from Edit metadata. */
+function FilesSection({ id }: { id: string }) {
+  const t = useT();
+  const { data: book } = useBook(id);
+  const me = useMe().data;
+  const deleteFormat = useDeleteFormat(id);
+  const convertFormat = useConvertFormat(id);
+  const addFormat = useAddFormat(id);
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const formats = book?.formats.map((f) => f.format) ?? [];
+  const convertOptions = book?.convert_options;
+  // Sources/targets come from the server as lowercase; display them uppercased
+  // to match the format list.
+  const sources = (convertOptions?.sources.length ? convertOptions.sources : formats.map((f) => f.toLowerCase()));
+  const targets = convertOptions?.targets ?? [];
+  if (!book || book.formats.length === 0) return null;
+  const canDownload = canDownloadBooks(me);
+  const canDelete = canDeleteBooks(me);
+  // #1288: "Add a format" POSTs to /api/v1/books/<id>/formats, which requires
+  // role_upload and honours the admin's "Enable Uploads" switch.
+  const canUpload = canUploadBooks(me);
+  const canEdit = !!me?.role?.edit;
+  if (!canDownload && !canDelete && !canUpload && !canEdit) return null;
+
+  // Keep the selected source/target normalized to lowercase option values.
+  const selectedFrom = (from || sources[0] || '').toLowerCase();
+  const availableTargets = targets.filter((target) => target.toLowerCase() !== selectedFrom);
+  const selectedTo = (to || '').toLowerCase();
+
+  const onAddFormat = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setMsg(null);
+    addFormat.mutate(file, {
+      onSuccess: () => setMsg({ ok: true, text: t('Format queued — it will appear once processed.') }),
+      onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Upload failed.') }),
+    });
+    e.target.value = '';
+  };
+
+  const onConvert = (e: React.FormEvent) => {
+    e.preventDefault();
+    setMsg(null);
+    const src = selectedFrom;
+    const dst = selectedTo;
+    if (!src || !dst || src === dst) return;
+    convertFormat.mutate(
+      { from: src.toUpperCase(), to: dst.toUpperCase() },
+      {
+        onSuccess: (r) => { setMsg({ ok: true, text: r.message }); setTo(''); },
+        onError: (err) => setMsg({ ok: false, text: err instanceof ApiError ? err.message : t('Convert failed.') }),
+      },
+    );
+  };
+
+  return (
+    <section className={styles.filesSection} data-testid="book-files" aria-labelledby="book-files-heading">
+      <h2 className={styles.filesTitle} id="book-files-heading">{t('Files')}</h2>
+      <ul className={styles.fileList}>
+        {book.formats.map((f) => (
+          <li key={f.format} className={styles.fileItem}>
+            <span className={styles.fileName}>{f.format.toUpperCase()}</span>
+            <span className={styles.fileSize}>{formatBytes(f.size_bytes)}</span>
+            {canDownload && (
+              // download_url hits cps/helper.py get_download_link, which sets
+              // `attachment`. `target` is inert with a present `download`
+              // attribute (the UA downloads without consulting it); it stays
+              // only because removing it needs a real standalone-iOS run to
+              // verify (#716).
+              <a className={styles.fileAction} href={resourceUrl(f.download_url)}
+                download target="_blank" rel="noopener">
+                <Download size={14} aria-hidden="true" focusable={false} />
+                {t('Download')}
+              </a>
+            )}
+            {canDelete && (
+              <button type="button" className={`${styles.fileAction} ${styles.fileDelete}`}
+                onClick={() => {
+                  if (window.confirm(t('Delete the {fmt} file? The book record, metadata, shelves, and reading state stay available.', { fmt: f.format }))) {
+                    setMsg(null);
+                    deleteFormat.mutate(f.format, {
+                      onSuccess: (result) => setMsg(result?.warning
+                        ? { ok: false, text: result.warning.message }
+                        : { ok: true, text: t('Format deleted.') }),
+                      onError: (err) => setMsg({
+                        ok: false,
+                        text: err instanceof ApiError ? err.message : t('Could not delete this format.'),
+                      }),
+                    });
+                  }
+                }}
+                disabled={deleteFormat.isPending}
+                aria-label={t('Delete {fmt}', { fmt: f.format })}>
+                <Trash2 size={14} aria-hidden="true" focusable={false} />
+                {t('Delete')}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {canDelete && (
+        <p className={styles.fileNote}>
+          {t('The book record, metadata, shelves, and reading state stay available. If this is the last format, you can add a replacement later.')}
+        </p>
+      )}
+
+      {canEdit && sources.length > 0 && availableTargets.length > 0 && (
+        <form className={styles.convertForm} onSubmit={onConvert}>
+          <label className={styles.fileField}>
+            <span className={styles.fileFieldLabel}>{t('Convert from')}</span>
+            <select className={styles.fileSelect} value={selectedFrom} onChange={(e) => setFrom(e.target.value)}>
+              {sources.map((f) => <option key={f} value={f.toLowerCase()}>{f.toUpperCase()}</option>)}
+            </select>
+          </label>
+          <span className={styles.convertToLabel} aria-hidden="true">{t('to')}</span>
+          <label className={styles.fileField}>
+            <span className={styles.fileFieldLabel}>{t('Convert to')}</span>
+            <select className={styles.fileSelect} value={selectedTo} onChange={(e) => setTo(e.target.value)}
+              aria-label={t('Convert to format')}>
+              <option value="" disabled>{t('Select format')}</option>
+              {availableTargets.map((f) => <option key={f} value={f.toLowerCase()}>{f.toUpperCase()}</option>)}
+            </select>
+          </label>
+          <button type="submit" className={styles.fileAction}
+            disabled={convertFormat.isPending || !selectedTo}>
+            <RefreshCw size={14} aria-hidden="true" focusable={false} /> {t('Convert')}
+          </button>
+        </form>
+      )}
+
+      {canUpload && (
+        <label className={styles.fileAddBtn}>
+          <UploadIcon size={15} aria-hidden="true" focusable={false} />
+          {addFormat.isPending ? t('Uploading…') : t('Add a format')}
+          {/* C3: sr-only (NOT hidden) keeps the input focusable + in tab order;
+              the label shows a focus ring via :focus-within. */}
+          <input type="file" className={styles.fileInput} onChange={onAddFormat} disabled={addFormat.isPending} />
+        </label>
+      )}
+      <span className={msg ? (msg.ok ? styles.fileMsgOk : styles.fileMsgErr) : undefined} role="status">{msg?.text}</span>
+    </section>
   );
 }

@@ -186,17 +186,15 @@ export default defineConfig({
       // layout — the sort control, the position badge and the inline editor are
       // the same DOM at 375px — so desktop owning them costs no coverage.
       //
-      // library-recent-sort is the sharpest case of the same trade: its fixture
-      // is the seed account's READING HISTORY, which is exactly what the sort
-      // under test reads, so a second project clearing that book's position
-      // mid-run would reorder the library the first project is asserting on. It
-      // keeps its own 375×667 coverage by resizing inside the desktop project.
+      // library-recent-sort is the counter-example, and shows what the trade
+      // costs: its fixture is READING HISTORY, so it cannot share an account
+      // with anything — including a second project running it. It creates a
+      // reader of its own per test instead, and therefore runs here too.
       testIgnore: [
         /subpath\.spec\.ts/,
         /default-library-view\.spec\.ts/,
         /series-sort-order\.spec\.ts/,
         /table-inline-title\.spec\.ts/,
-        /library-recent-sort\.spec\.ts/,
         WEBKIT_READER_SPEC,
         VISUAL_REGRESSION_SPEC,
         ...CATALOG_LAYOUT_SPECS,

@@ -1,11 +1,5 @@
-import {
-  test,
-  expect,
-  request as playwrightRequest,
-  type APIRequestContext,
-  type Page,
-} from '@playwright/test';
-import { adminCredentialsFromEnvironment } from './direct-admin-api';
+import { test, expect, type SecondaryUserSession } from './fixtures';
+import type { APIRequestContext, Page } from '@playwright/test';
 
 /*
  * "Recent" — the Library opens on what this reader has been reading, then the
@@ -25,16 +19,25 @@ import { adminCredentialsFromEnvironment } from './direct-admin-api';
  * the wrong sort would be visible here as the sort it asked for, and a
  * post-mount correction would be visible as a second listing request.
  *
- * FIXTURE. The book given reading activity is taken from the FAR END of the
- * newest-first listing — the oldest-added book in the library — so "it is
- * first because it was read" cannot be confused with "it is first because it
- * is newest". `beforeAll` asserts that the two differ before anything runs.
- * Reading is recorded through the route the web reader itself posts to, and
- * cleared afterwards through the route the Read checkmark posts to, which is
- * the documented reset (#683) and clears every position carrier.
+ * FIXTURE — a reader of its own. Recency is per-reader state, so every test
+ * here runs as a freshly created account (the `secondaryUser` fixture), which
+ * is deleted again when the test ends. The shared seed login is wrong for this
+ * spec in both directions: other specs WRITE that account while this one reads
+ * it — default-library-view.spec.ts saves a default library filter on it, and
+ * while one is saved the library grid is a filtered view, so this spec's cold
+ * load sees no unfiltered listing at all (MEASURED: running those two files in
+ * one desktop invocation fails this spec every time) — and this spec's own
+ * writes are reading history, which is exactly the input the sort under test
+ * consumes. A private account also hands the fixture a known starting point: no
+ * activity anywhere, so "this book leads because it was read" cannot be left
+ * over from an earlier run, and the no-activity case is itself asserted below.
+ *
+ * The book given reading activity is taken from the FAR END of the newest-first
+ * listing — the oldest-added book in the library — so "it is first because it
+ * was read" cannot be confused with "it is first because it is newest".
+ * Reading is recorded through the route the web reader itself posts to.
  */
 
-const STORAGE = 'e2e/.auth/state.json';
 const READ_CFI = 'epubcfi(/6/14!/4/2/2[pgepubid00001]/1:0)';
 const LEGACY_KEY = 'cwng:library-sort-v1';
 const SORT_KEY = 'cwng:library-sort-v2';
@@ -44,6 +47,14 @@ const SORT_KEY = 'cwng:library-sort-v2';
 const SHOT_DIR = process.env.CWNG_SHOT_DIR;
 
 interface BookItem { id: number; title: string }
+
+/** The two books whose positions tell the two orders apart, for one reader. */
+interface Fixture {
+  page: Page;
+  readBookId: number;
+  readBookTitle: string;
+  newestBookId: number;
+}
 
 async function csrfToken(api: APIRequestContext): Promise<string> {
   const res = await api.get('/api/v1/auth/csrf');
@@ -67,12 +78,35 @@ async function recordReading(api: APIRequestContext, id: number, percentage: num
     .toBeTruthy();
 }
 
-/** "Mark unread" — the documented reset, which clears every position store. */
-async function clearReading(api: APIRequestContext, id: number) {
-  await api.post(`/api/v1/books/${id}/read`, {
-    headers: { 'X-CSRFToken': await csrfToken(api) },
-    data: { read: false },
-  }).catch(() => undefined);
+/**
+ * Give this brand-new account one book it has been reading.
+ *
+ * `context.request` shares the account's cookie jar, so every call here is that
+ * reader's own view of the library — not the admin's.
+ */
+async function aReaderWithAHistory(session: SecondaryUserSession): Promise<Fixture> {
+  const api = session.context.request;
+  const byDateAdded = await listing(api, '/api/v1/books?sort=new&per_page=250');
+  expect(byDateAdded.length, 'the library needs at least two books to order')
+    .toBeGreaterThanOrEqual(2);
+  const oldest = byDateAdded[byDateAdded.length - 1];
+
+  // Before this account has read anything, Recent IS Newest — the definition at
+  // its boundary, and the control the promotion below is measured against. It
+  // is also the whole library in a single page, which is where this order first
+  // shipped broken: every page that reached a never-read book came back empty.
+  const noHistoryYet = await listing(api, '/api/v1/books?sort=recent&per_page=250');
+  expect(noHistoryYet.map((book) => book.id),
+    'with no reading anywhere, Recent must be the order the books were added in')
+    .toEqual(byDateAdded.map((book) => book.id));
+
+  await recordReading(api, oldest.id, 42);
+  return {
+    page: session.page,
+    readBookId: oldest.id,
+    readBookTitle: oldest.title,
+    newestBookId: byDateAdded[0].id,
+  };
 }
 
 /** The ids of the cards the SPA has rendered, in DOM order. */
@@ -134,7 +168,10 @@ async function coldLoad(page: Page, seed: Record<string, string> = {}) {
  * Full page, because the claim needs both halves in one frame: the sort control
  * says "Recent" near the top and the grid it produced starts below the Discover
  * rail, which is further down than one 800px viewport reaches. The rail is
- * dismissible, but dismissing it writes a preference on the shared seed account.
+ * dismissible, but dismissing it writes a preference on the account.
+ *
+ * The file is named after the project, so the desktop and phone-sized runs of
+ * the same test keep their own images instead of overwriting each other.
  */
 async function shoot(page: Page, name: string) {
   if (!SHOT_DIR) return;
@@ -147,7 +184,7 @@ async function shoot(page: Page, name: string) {
   const view = page.viewportSize();
   if (view) await page.mouse.move(view.width / 2, 8);
   await page.screenshot({
-    path: `${SHOT_DIR}/${name}.jpg`,
+    path: `${SHOT_DIR}/${test.info().project.name}-${name}.jpg`,
     type: 'jpeg',
     quality: 70,
     fullPage: true,
@@ -155,53 +192,10 @@ async function shoot(page: Page, name: string) {
   });
 }
 
-let api: APIRequestContext;
-/** The oldest-added book in the library — last in the newest-first listing. */
-let readBookId: number;
-let readBookTitle: string;
-/** The book the newest-first listing leads with, which must NOT lead here. */
-let newestBookId: number;
-
-test.beforeAll(async ({ baseURL }) => {
-  if (!baseURL) throw new Error('library-recent-sort requires Playwright use.baseURL');
-  const { username, password } = adminCredentialsFromEnvironment();
-  api = await playwrightRequest.newContext({ baseURL, storageState: STORAGE });
-  const login = await api.post('/api/v1/auth/login', {
-    headers: { 'X-CSRFToken': await csrfToken(api) },
-    data: { username, password, remember: false },
-  });
-  expect(login.ok(), `fixture login failed: ${await login.text()}`).toBeTruthy();
-
-  const byDateAdded = await listing(api, '/api/v1/books?sort=new&per_page=250');
-  expect(byDateAdded.length, 'the library needs at least two books to order')
-    .toBeGreaterThanOrEqual(2);
-  newestBookId = byDateAdded[0].id;
-  const oldest = byDateAdded[byDateAdded.length - 1];
-  readBookId = oldest.id;
-  readBookTitle = oldest.title;
-
-  // Start from a clean slate: a previous run killed mid-flight would otherwise
-  // leave this book read and make "reading promotes it" pass before it is read.
-  await clearReading(api, readBookId);
-  expect(
-    (await listing(api, '/api/v1/books?sort=recent&per_page=250'))[0].id,
-    'fixture is not discriminating: the book about to be read already leads',
-  ).not.toBe(readBookId);
-
-  await recordReading(api, readBookId, 42);
-});
-
-test.afterAll(async () => {
-  if (!api) return;
-  await clearReading(api, readBookId);
-  await api.dispose().catch(() => undefined);
-});
-
-// Serial: every test drives the one shared library and the one seeded account.
-test.describe.configure({ mode: 'serial' });
-
 test.describe('Recent library sort', () => {
-  test('a cold load asks for Recent and shows the recently read book first', async ({ page }) => {
+  test('a cold load asks for Recent and shows the recently read book first', async ({ secondaryUser }) => {
+    const { page, readBookId, readBookTitle, newestBookId } =
+      await aReaderWithAHistory(secondaryUser);
     const sorts = await coldLoad(page);
 
     expect(sorts[0], 'the Library must open on Recent').toBe('recent');
@@ -215,6 +209,15 @@ test.describe('Recent library sort', () => {
     expect(await menu.locator('option').first().getAttribute('value'),
       'Recent must be the first entry in the menu').toBe('recent');
     await expect(menu.locator('option[value="recent"]')).toHaveText('Recent');
+
+    // The control has to be reachable and legible at this project's viewport,
+    // not merely present: #288 shipped a sort dropdown that overflowed the
+    // viewport at 375px, which is where the mobile project runs this.
+    const box = await menu.boundingBox();
+    expect(box, 'the sort control must be laid out').toBeTruthy();
+    const width = page.viewportSize()?.width ?? 0;
+    expect(box!.x).toBeGreaterThanOrEqual(0);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(width);
 
     await expect(page.getByTestId('catalog-grid')).toBeVisible();
     await expect.poll(async () => (await renderedIds(page))[0],
@@ -230,10 +233,11 @@ test.describe('Recent library sort', () => {
     // read, and it is the very last book the other order would show.
     expect(readBookId).not.toBe(newestBookId);
 
-    await shoot(page, 'desktop-recent-default');
+    await shoot(page, 'recent-default');
   });
 
-  test('switching to Newest puts the newest book back on top', async ({ page }) => {
+  test('switching to Newest puts the newest book back on top', async ({ secondaryUser }) => {
+    const { page, newestBookId } = await aReaderWithAHistory(secondaryUser);
     await coldLoad(page);
     const menu = page.getByRole('combobox', { name: 'Sort order' });
 
@@ -244,38 +248,45 @@ test.describe('Recent library sort', () => {
 
     // The choice is a choice now, so it is written where the reader made it.
     expect(await page.evaluate((key) => localStorage.getItem(key), SORT_KEY)).toBe('new');
-    await shoot(page, 'desktop-newest-comparison');
+    await shoot(page, 'newest-comparison');
 
     await page.reload();
     await expect(page.getByRole('combobox', { name: 'Sort order' })).toHaveValue('new');
   });
 
-  test('a sort the reader picked before this change still wins', async ({ page }) => {
+  test('a sort the reader picked before this change still wins', async ({ secondaryUser }) => {
     // The old key recorded what the page was showing, not what anyone chose —
     // but a value it could not have seeded itself with can only be a choice.
-    const sorts = await coldLoad(page, { [LEGACY_KEY]: 'authaz' });
+    const sorts = await coldLoad(secondaryUser.page, { [LEGACY_KEY]: 'authaz' });
 
     expect(sorts[0]).toBe('authaz');
-    await expect(page.getByRole('combobox', { name: 'Sort order' })).toHaveValue('authaz');
+    await expect(secondaryUser.page.getByRole('combobox', { name: 'Sort order' }))
+      .toHaveValue('authaz');
   });
 
-  test('the value the old key seeded itself with does not suppress Recent', async ({ page }) => {
+  test('the value the old key seeded itself with does not suppress Recent', async ({ secondaryUser }) => {
     // Every install that ever opened the Library holds this, whether or not
     // anyone chose it. Reading it as a choice would mean Recent reached nobody.
-    const sorts = await coldLoad(page, { [LEGACY_KEY]: 'new' });
+    const sorts = await coldLoad(secondaryUser.page, { [LEGACY_KEY]: 'new' });
 
     expect(sorts[0]).toBe('recent');
-    await expect(page.getByRole('combobox', { name: 'Sort order' })).toHaveValue('recent');
+    await expect(secondaryUser.page.getByRole('combobox', { name: 'Sort order' }))
+      .toHaveValue('recent');
   });
 
   test('the Global Library offers Recent without opening on it', async ({ page }) => {
+    // The one test here that stays on the seed admin: browsing the global
+    // library is a role the per-test account is not given. It reads a MENU
+    // rather than a grid, so nothing another spec writes to that shared account
+    // can change the answer.
+    //
     // Skip on what the ACCOUNT is, never on whether the control turned up: "the
     // menu is missing" is a failure this test exists to catch, so it must not
     // also be its reason to stop looking. The page redirects to the library for
     // a monolibrary account (GlobalLibrary.tsx) — on such an instance there is
     // no global library to assert about, and the server half is covered in
     // tests/unit/test_library_recent_sort.py.
-    const me = await (await api.get('/api/v1/auth/me')).json();
+    const me = await (await page.request.get('/api/v1/auth/me')).json();
     test.skip(!me?.role?.browse_global, 'this account cannot browse the global library');
     test.skip(me?.library_mode === 'monolibrary',
       'this instance has no separate global library');
@@ -286,38 +297,6 @@ test.describe('Recent library sort', () => {
     await expect(menu, 'the global library keeps opening on what is newly available')
       .toHaveValue('new');
     expect(await menu.locator('option').first().getAttribute('value')).toBe('recent');
-    await shoot(page, 'desktop-global-library-menu');
-  });
-});
-
-/*
- * Phone width, inside this project rather than the mobile one. The fixture here
- * is the seed account's reading history — the very thing the sort reads — and
- * every project shares one seed login, so a second project clearing this book's
- * position mid-run would reorder the library the first is asserting on
- * (playwright.config.ts carries the same note for series-sort-order). Resizing
- * keeps the 375px claim in the one invocation that owns the fixture.
- */
-test.describe('Recent library sort at phone width', () => {
-  test.use({ viewport: { width: 375, height: 667 } });
-
-  test('a 375px viewport opens on Recent with the same menu', async ({ page }) => {
-    const sorts = await coldLoad(page);
-
-    expect(sorts[0]).toBe('recent');
-    const menu = page.getByRole('combobox', { name: 'Sort order' });
-    await expect(menu).toHaveValue('recent');
-    expect(await menu.locator('option').first().getAttribute('value')).toBe('recent');
-
-    // The control has to be reachable and legible at 375px, not merely present:
-    // #288 shipped a sort dropdown that overflowed the viewport there.
-    const box = await menu.boundingBox();
-    expect(box, 'the sort control must be laid out').toBeTruthy();
-    const width = page.viewportSize()?.width ?? 0;
-    expect(box!.x).toBeGreaterThanOrEqual(0);
-    expect(box!.x + box!.width).toBeLessThanOrEqual(width);
-
-    await expect.poll(async () => (await renderedIds(page))[0]).toBe(readBookId);
-    await shoot(page, 'mobile-recent-default');
+    await shoot(page, 'global-library-menu');
   });
 });

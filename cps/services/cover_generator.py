@@ -517,6 +517,11 @@ _SYMBOLIC_FAMILY_CLASS = 12
 _MIN_TEXT_CODEPOINTS = 32
 
 _font_cache: dict = {}
+# A native lock, deliberately: everything it is held across is file reading, and
+# none of it can yield to the gevent hub. That is the whole test for a lock in
+# this app — the hub runs on one OS thread that never calls monkey.patch_all(),
+# so a native acquire while another greenlet holds it stops the server outright.
+# See cover_designer_cache for the cooperative lock the yielding path needs.
 _font_cache_lock = threading.Lock()
 
 

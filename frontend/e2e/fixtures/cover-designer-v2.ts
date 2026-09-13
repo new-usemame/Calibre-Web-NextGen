@@ -101,11 +101,22 @@ export const dataUrlFor = (design: CoverDesign) => {
   return `data:image/jpeg;base64,${Buffer.from(`rendered:${marker}`).toString('base64')}`;
 };
 
-/** A tiny stand-in for the server-rendered style thumbnails: an SVG that names
- *  the style, so a loaded thumbnail is distinguishable from the inline fallback
- *  glyph (which has no <img>). */
-const thumbSvg = (id: string) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="#999"/><text x="100" y="150" font-size="20" text-anchor="middle" fill="#fff">${id}</text></svg>`;
+/** A tiny stand-in for the server-rendered style thumbnails: an SVG sketch of
+ *  the arrangement, so a loaded thumbnail is distinguishable from the inline
+ *  fallback glyph (which has no <img>). */
+const thumbSvg = (id: string) => {
+  const bg = '#44403c', ink = '#f5f5f4', accent = '#a8a29e';
+  const band = (y: number, h: number) => `<rect x="0" y="${y}" width="200" height="${h}" fill="${accent}"/>`;
+  const title = (y: number) => `<rect x="40" y="${y}" width="120" height="12" rx="6" fill="${ink}"/><rect x="60" y="${y + 20}" width="80" height="8" rx="4" fill="${ink}" opacity="0.7"/>`;
+  const sketch: Record<string, string> = {
+    blocks: `${title(60)}${band(210, 60)}`,
+    banner: `${band(30, 70)}${title(150)}`,
+    ornamental: `<rect x="20" y="20" width="160" height="260" fill="none" stroke="${accent}" stroke-width="6"/>${title(120)}`,
+    emblem: `<circle cx="100" cy="80" r="34" fill="${accent}"/>${title(160)}`,
+    stripes: `${band(40, 26)}${band(90, 26)}${band(140, 26)}${title(210)}`,
+  };
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="300"><rect width="200" height="300" fill="${bg}"/>${sketch[id] ?? sketch.blocks}</svg>`;
+};
 const fontSvg = (id: string) =>
   `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="80"><rect width="240" height="80" fill="#eee"/><text x="120" y="52" font-size="36" text-anchor="middle" fill="#333">Aa ${id}</text></svg>`;
 

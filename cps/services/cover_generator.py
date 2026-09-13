@@ -1448,6 +1448,22 @@ def builtin_presets(binaries_dir: str = "") -> list:
     return entries
 
 
+def _v1_preset_fields(design: dict) -> dict:
+    """The (scheme, font, layout) triple a design corresponds to.
+
+    The pre-v2 panel drives itself from those three ids and draws nothing at all
+    until it holds all three, so a catalogue that described its presets only as
+    v2 designs would leave an older client open, populated and blank. They are a
+    projection of the design rather than a second source of truth: a design with
+    colours of its own has no scheme id, which is exactly the "no chip lit"
+    state that panel already shows for a combination nobody saved.
+    """
+    title = (design.get("fonts") or {}).get("title") or {}
+    return {"scheme": design.get("scheme") or "",
+            "font": title.get("family") or "",
+            "layout": design.get("style") or ""}
+
+
 def catalogue(binaries_dir: str = "", extra_presets: Sequence[dict] = (),
               hidden_builtins: Sequence[str] = (), thumb_url=None, sample_url=None,
               default_preset: str = "") -> dict:
@@ -1466,6 +1482,8 @@ def catalogue(binaries_dir: str = "", extra_presets: Sequence[dict] = (),
     hidden = set(hidden_builtins or ())
     presets = [entry for entry in builtin_presets(binaries_dir) if entry["id"] not in hidden]
     presets.extend(extra_presets or ())
+    presets = [dict(entry, **_v1_preset_fields(entry.get("design") or {}))
+               for entry in presets]
 
     chosen = default_preset if default_preset in PRESETS else DEFAULT_PRESET
     fonts = font_catalogue(binaries_dir)

@@ -838,6 +838,38 @@ def test_an_older_client_still_gets_the_cover_it_asked_for():
     assert cg.render(META, old).data[:2] == b"\xff\xd8"
 
 
+def test_a_preset_still_names_the_three_ids_the_old_panel_draws_from():
+    """The pre-v2 panel holds a scheme, a font and a layout, and renders nothing
+    at all until it has all three of them — it reads them off the preset it
+    opens on. A catalogue that described its presets only as v2 designs would
+    leave that panel open, populated and permanently blank."""
+    catalogue = cg.catalogue("")
+    schemes = {entry["id"] for entry in catalogue["schemes"]}
+    fonts = {entry["id"] for entry in catalogue["fonts"]}
+    layouts = {entry["id"] for entry in catalogue["layouts"]}
+    for entry in catalogue["presets"]:
+        assert entry["scheme"] in schemes, entry["id"]
+        assert entry["font"] in fonts, entry["id"]
+        assert entry["layout"] in layouts, entry["id"]
+        # The three are a view of the design, not a second opinion about it.
+        assert entry["layout"] == entry["design"]["style"], entry["id"]
+        assert entry["scheme"] == entry["design"]["scheme"], entry["id"]
+        assert entry["font"] == entry["design"]["fonts"]["title"]["family"], entry["id"]
+
+
+def test_the_old_panel_opens_on_a_preset_rather_than_on_nothing():
+    """It lights the chip whose three ids equal the ones it is holding, and it
+    starts out holding the default preset's. Matching nothing is the state it
+    shows for a custom design, so opening in it would be a lie."""
+    catalogue = cg.catalogue("")
+    opening = next(entry for entry in catalogue["presets"]
+                   if entry["id"] == catalogue["default_preset"])
+    lit = [entry["id"] for entry in catalogue["presets"]
+           if (entry["scheme"], entry["font"], entry["layout"])
+           == (opening["scheme"], opening["font"], opening["layout"])]
+    assert lit[0] == catalogue["default_preset"]
+
+
 def test_every_shipped_preset_still_names_a_design_we_can_draw():
     for key, entry in cg.PRESETS.items():
         spec = cg.resolve_design(entry["design"], strict=True)

@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { collectPageErrors, assertNoPageErrors } from './utils';
+import { collectPageErrors, assertNoPageErrors, fetchJsonSafe } from './utils';
 
 /*
  * #1496 — destructive SPA actions must confirm before they fire.
@@ -132,10 +132,11 @@ const STUB_LABEL = 'KOReader on phone';
  *  depend on the seed having generated one. */
 async function withStubbedAppPassword(page: Page) {
   await page.route('**/api/v1/account', async (route) => {
-    const res = await route.fetch();
-    const account = await res.json();
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const account = got.body;
     account.app_passwords = [{ id: 990501, label: STUB_LABEL }];
-    await route.fulfill({ response: res, json: account });
+    await route.fulfill({ response: got.response, json: account });
   });
 }
 

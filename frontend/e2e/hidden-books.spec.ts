@@ -1,6 +1,6 @@
 import { test, expect } from './fixtures';
 import type { Page } from '@playwright/test';
-import { assertNoHorizontalOverflow, collectPageErrors, assertNoPageErrors } from './utils';
+import { assertNoHorizontalOverflow, collectPageErrors, assertNoPageErrors, fetchJsonSafe } from './utils';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -212,10 +212,11 @@ test('hiding is per-user and a non-delete user still receives Hide', async ({ pa
     // delete-books permission. Isolation above used two real server sessions;
     // this interception changes only the current page's role presentation.
     await page.route('**/api/v1/auth/me', async (route) => {
-      const response = await route.fetch();
-      const payload = await response.json();
+      const got = await fetchJsonSafe(route);
+      if (!got) return;
+      const payload = got.body;
       payload.role = { ...(payload.role ?? {}), delete_books: false };
-      await route.fulfill({ response, json: payload });
+      await route.fulfill({ response: got.response, json: payload });
     });
     await page.reload();
     await page.getByTestId('book-actions-menu').click();

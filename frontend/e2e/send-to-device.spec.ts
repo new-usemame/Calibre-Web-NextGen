@@ -1,6 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
-import { assertNoHorizontalOverflow } from './utils';
+import { assertNoHorizontalOverflow, fetchJsonSafe } from './utils';
 
 
 async function firstBookId(page: Page): Promise<number | null> {
@@ -15,10 +15,11 @@ async function firstBookId(page: Page): Promise<number | null> {
 
 async function stubDeliveryDevice(page: Page, bookId: number) {
   await page.route('**/api/v1/auth/me', async (route) => {
-    const response = await route.fetch();
-    const me = await response.json();
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const me = got.body;
     me.role = { ...(me.role ?? {}), download: true, anonymous: false };
-    await route.fulfill({ response, json: me });
+    await route.fulfill({ response: got.response, json: me });
   });
   await page.route('**/api/annotations/devices?active=true', (route) =>
     route.fulfill({ json: { devices: [{

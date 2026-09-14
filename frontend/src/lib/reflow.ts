@@ -11,10 +11,10 @@ import type { ReflowEstimate, ReflowMode } from './reflowMoney.ts';
 // The shapes and the sums are one subject with the endpoints, and every caller
 // reaches them through this module; only the file they are written in moved.
 export type {
-  ReflowEstimate, ReflowMode, ReflowTier, ReflowTierChoice,
+  ReflowEstimate, ReflowJobCounts, ReflowMode, ReflowTier, ReflowTierChoice,
 } from './reflowMoney.ts';
 export {
-  consentUsd, requiredUsd, routedPagesAreProjected, sampleRoutedPages,
+  consentUsd, jobCounts, requiredUsd, routedPagesAreProjected, sampleRoutedPages,
   suggestedCap, usd,
 } from './reflowMoney.ts';
 

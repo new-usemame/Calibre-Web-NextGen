@@ -6,7 +6,7 @@ import {
 import { useBook } from '../lib/queries';
 import {
   useReflowEstimate, useReflowJobs, useStartReflow, useCancelReflow,
-  consentUsd, requiredUsd, routedPagesAreProjected, sampleRoutedPages,
+  consentUsd, jobCounts, requiredUsd, routedPagesAreProjected, sampleRoutedPages,
   suggestedCap, usd,
   type ReflowJob, type ReflowMode,
 } from '../lib/reflow';
@@ -366,10 +366,9 @@ function JobResult({ job, bookId, t, onConvertAll }: {
   const produced = job.status === 'done' || job.status === 'capped'
     || job.status === 'incomplete';
   const whole = job.status === 'done';
-  const adopted = job.gate?.PASS ?? 0;
-  const refused = (job.gate?.FAIL ?? 0) + (job.gate?.NOT_APPLICABLE ?? 0);
-  const sent = adopted + refused;
-  const share = sent ? Math.round((adopted / sent) * 100) : 0;
+  // `sent` is the pages this run bought, not the pages it judged: a resumed job
+  // replays everything an earlier one got right, and those were sent to nobody.
+  const { sent, adopted, refused, sharePct } = jobCounts(job);
 
   return (
     <section className={styles.card} aria-labelledby="reflow-result">
@@ -395,10 +394,11 @@ function JobResult({ job, bookId, t, onConvertAll }: {
       <dl className={styles.facts}>
         <Fact label={t('Spent')} value={usd(job.spend_usd)} />
         <Fact label={t('Pages sent to a model')} value={String(sent)} />
-        <Fact label={t('Pages the check accepted')} value={`${adopted} (${share}%)`} />
         {job.reused > 0 && (
           <Fact label={t('Pages reused from an earlier run')} value={String(job.reused)} />
         )}
+        <Fact label={t('Pages the check accepted')}
+          value={`${adopted} (${sharePct}%)`} />
       </dl>
       {refused > 0 && (
         <p className={styles.note}>

@@ -44,6 +44,62 @@ export interface ReflowEstimate {
   cached: boolean;
 }
 
+/** The counts a finished job's card shows, kept apart from one another.
+ *
+ *  Shaped structurally rather than against `ReflowJob` so the sums stay in this
+ *  module and `reflow.ts` keeps re-exporting them (it imports this file, not the
+ *  other way round). */
+export interface ReflowJobLike {
+  gate?: Record<string, number> | null;
+  calls?: number | null;
+  reused?: number | null;
+}
+
+export interface ReflowJobCounts {
+  /** Pages this run sent to a model and paid for. */
+  sent: number;
+  /** Pages whose answer was replayed from an earlier run, at no cost. */
+  reused: number;
+  /** Pages the gate judged: the two above, together. */
+  checked: number;
+  adopted: number;
+  refused: number;
+  /** `adopted` as a percentage of `checked`; 0 when nothing was checked. */
+  sharePct: number;
+}
+
+/** What a job did, with the pages it bought kept apart from the pages it replayed.
+ *
+ *  `ledger.totals` is explicit that a page served from the cache "is not a call:
+ *  counting it would make a resumed job look like it spent again at $0.00 a page",
+ *  and it keeps the two in separate fields for that reason. The gate counts do not:
+ *  `_adopt` judges a replayed page exactly as it judges a bought one, so
+ *  `PASS + FAIL + NOT_APPLICABLE` is every page the conversion reviewed and not
+ *  every page it sent anywhere. A card that reads the gate total as "pages sent to
+ *  a model" reports 422 on a run that sent 210 — and then says 212 were reused two
+ *  lines below it. `calls` is the number that was paid for; the share stays over
+ *  everything judged, because that is the share of the *book* the model's version
+ *  was used for. A summary from a build that did not report `calls` still knows
+ *  what it replayed, and what it bought is the rest. */
+export function jobCounts(job: ReflowJobLike): ReflowJobCounts {
+  const gate = job.gate || {};
+  const adopted = gate.PASS || 0;
+  const refused = (gate.FAIL || 0) + (gate.NOT_APPLICABLE || 0);
+  const checked = adopted + refused;
+  const reused = Math.max(0, job.reused || 0);
+  const calls = job.calls;
+  const sent = typeof calls === 'number' && Number.isFinite(calls) && calls >= 0
+    ? calls : Math.max(0, checked - reused);
+  return {
+    sent,
+    reused,
+    checked,
+    adopted,
+    refused,
+    sharePct: checked ? Math.round((adopted / checked) * 100) : 0,
+  };
+}
+
 /** USD, always two decimals and always with the sign the consent line quotes. */
 export function usd(amount: number): string {
   return `$${(Math.round((amount + Number.EPSILON) * 100) / 100).toFixed(2)}`;

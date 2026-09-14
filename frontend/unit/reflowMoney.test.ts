@@ -9,8 +9,8 @@ import test from 'node:test';
 
 import type { ReflowEstimate } from '../src/lib/reflowMoney.ts';
 import {
-  consentUsd, requiredUsd, routedPagesAreProjected, sampleRoutedPages, suggestedCap,
-  usd,
+  consentUsd, jobCounts, requiredUsd, routedPagesAreProjected, sampleRoutedPages,
+  suggestedCap, usd,
 } from '../src/lib/reflowMoney.ts';
 
 /** Per page, at the ceilings `cps/services/reflow/model.py` prices a tier by. */
@@ -226,3 +226,53 @@ test('with no cap typed yet, the estimate is the only figure there is', () => {
     assert.equal(consentUsd(needed, typed), needed, String(typed));
   }
 });
+
+/** The three whole-book runs of §4, as their own ledgers summarise them. */
+const JOBS = {
+  coldCache: { calls: 402, reused: 0, gate: { PASS: 204, FAIL: 198 } },
+  warmCache: { calls: 210, reused: 212, gate: { PASS: 223, FAIL: 198, NOT_APPLICABLE: 1 } },
+  olderLedger: { reused: 212, gate: { PASS: 223, FAIL: 198, NOT_APPLICABLE: 1 } },
+};
+
+test('a page replayed from the cache was not sent to a model', () => {
+  // `ledger.totals` is explicit about this: a cached page "is not a call: counting
+  // it would make a resumed job look like it spent again at $0.00 a page". The card
+  // that reports the job has to keep the same two populations apart, or it says a
+  // model was handed 422 pages on a run that handed it 210 and says so two lines
+  // further down under "Pages reused from an earlier run".
+  const counts = jobCounts(JOBS.warmCache);
+  assert.equal(counts.sent, 210);
+  assert.equal(counts.reused, 212);
+  assert.equal(counts.sent + counts.reused, counts.checked,
+               'the pages bought and the pages replayed should be the pages judged');
+});
+
+test('the accepted share is out of the pages judged, not the pages bought', () => {
+  // 223 of the 422 pages the gate judged were the model's. Divided by the 210 this
+  // run actually bought it would read 106%, which is what pricing a replay as a
+  // purchase does to a percentage.
+  for (const job of Object.values(JOBS)) {
+    const counts = jobCounts(job);
+    assert.equal(counts.sharePct, Math.round((counts.adopted / counts.checked) * 100));
+    assert.ok(counts.sharePct <= 100, `${counts.sharePct}% of the pages were accepted`);
+  }
+});
+
+test('a run that bought every page it judged says the same number twice', () => {
+  // The cold-cache run, where there is nothing to tell apart: 402 sent, 402 judged.
+  const counts = jobCounts(JOBS.coldCache);
+  assert.equal(counts.sent, 402);
+  assert.equal(counts.checked, 402);
+  assert.equal(counts.reused, 0);
+  assert.equal(counts.sharePct, 51);
+});
+
+test('a job summary written before calls were recorded is not read as a purchase',
+     () => {
+       // The ledger is the record and it is re-read, not migrated. A row from a
+       // build that did not report `calls` still knows what it replayed, and the
+       // pages it bought are the rest.
+       const counts = jobCounts(JOBS.olderLedger);
+       assert.equal(counts.sent, 210);
+       assert.equal(counts.checked, 422);
+     });

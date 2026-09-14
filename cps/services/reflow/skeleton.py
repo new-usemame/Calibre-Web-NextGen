@@ -388,12 +388,22 @@ def heading_ish(line, style):
     contents. So roman type has to reach a rung the book actually uses; only bold
     type may be a heading on weight alone, which is what defect A needs (a run-in
     head is set on the body's own leading and may be barely larger than it).
+
+    Bold still needs a floor, because the same book sets its example-chart labels and
+    its notes in bold at a genuinely smaller rung. The floor is the body size less
+    the tolerance the ladder already uses for scanner wobble, and it is
+    ``LADDER_TOL`` rather than a tighter number for the reason the ladder has a
+    tolerance at all: the wobble runs both ways. MEASURED on book 567, the bold
+    section heads come back between 10.8 and 11.5pt against an 11.3pt body -- one
+    printed rung -- and a floor at the body size itself takes the ones the scanner
+    rounded up and refuses the 38 it rounded down, among them 'Mystery Traditions',
+    'The Moon - Selene' and 'Saturn / Kronos, the "Shining One" (Phainon)'.
     """
     if not style.body_size:
         return False
     size = line.size
     if line.bold:
-        return size >= style.body_size * 0.98
+        return size >= style.body_size * (1.0 - LADDER_TOL)
     return size >= style.body_size * HEAD_RATIO and style.on_the_ladder(size)
 
 

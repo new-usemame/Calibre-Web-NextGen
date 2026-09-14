@@ -1270,6 +1270,48 @@ def flat_run_in_heading_page(doc):
     return page
 
 
+def run_in_heading_the_scanner_measured_small_page(doc):
+    """The same head as :func:`flat_run_in_heading_page`, measured a little *under*
+    the body rather than at it.
+
+    A scan's measurements wobble in both directions and the wobble is the whole
+    reason ``LADDER_TOL`` exists. MEASURED on book 567: the book's bold section heads
+    come back anywhere between 10.8 and 11.5pt against an 11.3pt body -- one printed
+    rung, read as two -- so a rule that takes the ones the scanner rounded up and
+    refuses the ones it rounded down splits that rung down its middle. 92 bold
+    heading lines in that book are refused this way; 38 of them sit in the band this
+    page is set in.
+    """
+    page = add_page(doc)
+    add_running_head(page, "94", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    _put(page, LEFT, BODY_TOP, "Serapio of Alexandria (First Century CE?)",
+         size=round(BODY_SIZE * 0.97, 2), font=_BOLD)
+    add_body_lines(page, [
+        "Serapio of Alexandria was an astrologer who wrote on inceptional",
+        "astrology and possibly other topics, although only fragments of",
+        "his work survive in the later compilations.",
+    ], top=BODY_TOP + BODY_LEADING)
+    return page
+
+
+def bold_line_far_below_the_body_page(doc):
+    """The floor. Bold type set far smaller than the body is a different rung, not a
+    section head measured badly: in book 567 that band holds the example-chart labels
+    and the note face, and promoting it would put 50 chart labels in the heading
+    ladder. Set here at 0.78 of the body, where those labels measure.
+    """
+    page = add_page(doc)
+    add_running_head(page, "94", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    _put(page, LEFT, BODY_TOP, "Serapio of Alexandria (First Century CE?)",
+         size=round(BODY_SIZE * 0.78, 2), font=_BOLD)
+    add_body_lines(page, [
+        "Serapio of Alexandria was an astrologer who wrote on inceptional",
+        "astrology and possibly other topics, although only fragments of",
+        "his work survive in the later compilations.",
+    ], top=BODY_TOP + BODY_LEADING)
+    return page
+
+
 def _drifted_line_page(doc, drifted, following, folio):
     """A page whose first line of a block the scan measured up to heading size.
 

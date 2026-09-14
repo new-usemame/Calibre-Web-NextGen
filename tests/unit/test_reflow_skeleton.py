@@ -519,6 +519,36 @@ class TestTypeThatIsOnlyBiggerBecauseTheScannerSaidSo(object):
         assert [el for el in _kinds(book, "h") if "Serapio of Alexandria" in el.text], \
             [el.text for el in _kinds(book, "h")]
 
+    def test_a_bold_head_the_scanner_measured_under_the_body_still_reads(self):
+        """The wobble the ladder exists for runs both ways. MEASURED on book 567: the
+        book's bold section heads come back between 10.8 and 11.5pt against an 11.3pt
+        body, one printed rung; taking the ones the scanner rounded up and refusing
+        the ones it rounded down loses 38 of them, among them 'Mystery Traditions',
+        'The Moon - Selene' and 'Saturn / Kronos, the "Shining One" (Phainon)'."""
+        book = self._with_a_ladder(F.run_in_heading_the_scanner_measured_small_page)
+
+        assert [el for el in _kinds(book, "h") if "Serapio of Alexandria" in el.text], \
+            [el.text for el in _kinds(book, "h")]
+
+    def test_the_paragraph_under_an_under_measured_head_does_not_still_contain_it(self):
+        """A promoted line has to leave the paragraph it was the first line of, or the
+        reader reads the heading twice."""
+        book = self._with_a_ladder(F.run_in_heading_the_scanner_measured_small_page)
+
+        holding = [el for el in _kinds(book, "p") if "was an astrologer" in el.text]
+
+        assert holding, [el.text for el in book.elements]
+        assert not holding[0].text.startswith("Serapio of Alexandria (First Century")
+
+    def test_bold_type_far_below_the_body_is_a_different_rung_and_not_a_head(self):
+        """The floor on the same rule. Book 567 sets its example-chart labels bold at
+        about 0.78 of the body -- 'STEVEN SPIELBERG', 'TIGER WOODS', 50 of them -- and
+        a weight rule with no floor puts every one of them in the heading ladder."""
+        book = self._with_a_ladder(F.bold_line_far_below_the_body_page)
+
+        assert not [el for el in _kinds(book, "h") if "Serapio of Alexandria" in el.text], \
+            [el.text for el in _kinds(book, "h")]
+
 
 class TestASentenceTheScannerSetLargeIsStillASentence(object):
     """Two more measured false headings from book 567, both reaching the book's own

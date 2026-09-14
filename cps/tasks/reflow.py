@@ -38,6 +38,14 @@ log = logger.create()
 SAMPLE_PAGES_DEFAULT = 20
 SAMPLE_PAGES_MAX = 60
 
+#: What a pipeline stop is called in the record the jobs list reads. ``cancelled``
+#: never reaches this table -- it has its own branch, because a conversion nobody
+#: waited for is not filed at all -- so what is left is the two ways a conversion
+#: ends holding a file that is less than the book it was asked for. Neither of them
+#: is ``done``: a run that stopped is a run the user has a reason to start again,
+#: and a jobs list that reports both endings with one word takes that reason away.
+STOP_STATUS = {"cost_cap": "capped", "model_errors": "incomplete"}
+
 
 def reflow_dir(*parts):
     path = os.path.join(REFLOW_DIR, *parts)
@@ -193,7 +201,7 @@ class TaskReflowPdf(CalibreTask):
             self.results["spend_usd"] = round(result.spend_usd, 6)
             self.message = self._summary(result)
             ledger.record({"kind": "job", "event": "finish",
-                           "status": "capped" if result.stopped == "cost_cap" else "done"})
+                           "status": STOP_STATUS.get(result.stopped, "done")})
             self._handleSuccess()
         except Exception as exc:                                  # noqa: BLE001
             log.error_or_exception(exc)
@@ -315,6 +323,9 @@ class TaskReflowPdf(CalibreTask):
         if result.stopped == "cost_cap":
             return ("stopped at the cost cap after %d pages · $%.2f"
                     % (result.pages_done, result.spend_usd))
+        if result.stopped == "model_errors":
+            return ("the model service stopped answering after %d of %d pages · $%.2f"
+                    % (result.pages_done, len(result.routed), result.spend_usd))
         if result.routed:
             return ("%d pages reviewed of %d · $%.2f"
                     % (result.pages_done, len(result.routed), result.spend_usd))

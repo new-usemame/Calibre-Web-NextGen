@@ -43,6 +43,7 @@ const STATUS_LABEL = (status: string, t: TFunction): string => ({
   running: t('Converting'),
   done: t('Finished'),
   capped: t('Stopped at the cap'),
+  incomplete: t('The model service stopped answering'),
   failed: t('Failed'),
   // Not the classic task list's "Cancelled": a conversion has two ways of
   // stopping early and the bill is different, so each says which one it was.
@@ -335,7 +336,14 @@ function Fact({ label, value }: { label: string; value: string }) {
 function JobResult({ job, bookId, t, onConvertAll }: {
   job: ReflowJob; bookId: string; t: TFunction; onConvertAll: () => void;
 }) {
-  const finished = job.status === 'done' || job.status === 'capped';
+  // Three endings leave a file in the library: the book was converted, the money
+  // ran out, or the model service went away mid-book. All three are worth opening
+  // and all three are worth starting again — but only the first did what it was
+  // asked, and a heading that calls the other two a conversion is how a truncated
+  // book gets closed as done.
+  const produced = job.status === 'done' || job.status === 'capped'
+    || job.status === 'incomplete';
+  const whole = job.status === 'done';
   const adopted = job.gate?.PASS ?? 0;
   const refused = (job.gate?.FAIL ?? 0) + (job.gate?.NOT_APPLICABLE ?? 0);
   const sent = adopted + refused;
@@ -344,7 +352,7 @@ function JobResult({ job, bookId, t, onConvertAll }: {
   return (
     <section className={styles.card} aria-labelledby="reflow-result">
       <h2 className={styles.cardTitle} id="reflow-result">
-        {finished
+        {whole
           ? (job.mode === 'sample' ? t('Your sample is ready') : t('The book was converted'))
           : STATUS_LABEL(job.status, t)}
       </h2>
@@ -354,6 +362,11 @@ function JobResult({ job, bookId, t, onConvertAll }: {
         <p className={styles.capWarn} role="status">
           {t('This stopped at the {amount} cap. The pages converted before it was reached are in the file; the rest were left as they were.')
             .replace('{amount}', usd(job.cap_usd))}
+        </p>
+      )}
+      {job.status === 'incomplete' && (
+        <p className={styles.capWarn} role="status">
+          {t('The model service stopped answering partway through, so this ended early. The pages converted before it stopped are in the file and the rest kept the text read straight out of the PDF. Starting it again re-uses every page that was accepted, so none of those is paid for twice.')}
         </p>
       )}
 
@@ -380,12 +393,12 @@ function JobResult({ job, bookId, t, onConvertAll }: {
             <Download size={15} aria-hidden="true" focusable={false} /> {t('Download the sample')}
           </a>
         )}
-        {job.mode === 'sample' && finished && (
+        {job.mode === 'sample' && produced && (
           <Button variant="ghost" onClick={onConvertAll}>
             <Check size={15} aria-hidden="true" focusable={false} /> {t('Convert the whole book')}
           </Button>
         )}
-        {job.mode === 'full' && finished && (
+        {job.mode === 'full' && produced && (
           <Link href={`/book/${bookId}`} className={styles.download}>
             {t('Open the book')}
           </Link>

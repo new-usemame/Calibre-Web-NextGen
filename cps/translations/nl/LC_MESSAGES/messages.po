@@ -15310,6 +15310,14 @@ msgid "The conversion could not be started."
 msgstr "De omzetting kon niet worden gestart."
 
 #: cps/spa_strings.py
+msgid "The model service stopped answering"
+msgstr "De modeldienst gaf geen antwoord meer"
+
+#: cps/spa_strings.py
+msgid "The model service stopped answering partway through, so this ended early. The pages converted before it stopped are in the file and the rest kept the text read straight out of the PDF. Starting it again re-uses every page that was accepted, so none of those is paid for twice."
+msgstr "De modeldienst gaf halverwege geen antwoord meer, dus is dit voortijdig gestopt. De pagina's die daarvoor omgezet zijn, staan in het bestand en de rest behield de tekst die rechtstreeks uit de PDF is gelezen. Als je het opnieuw start, wordt elke pagina die is geaccepteerd hergebruikt, dus daarvoor betaal je niet twee keer."
+
+#: cps/spa_strings.py
 msgid "The whole book"
 msgstr "Het hele boek"
 

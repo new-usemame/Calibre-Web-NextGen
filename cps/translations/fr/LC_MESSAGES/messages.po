@@ -15658,6 +15658,14 @@ msgid "The conversion could not be started."
 msgstr "La conversion n’a pas pu être lancée."
 
 #: cps/spa_strings.py
+msgid "The model service stopped answering"
+msgstr "Le service de modèle a cessé de répondre"
+
+#: cps/spa_strings.py
+msgid "The model service stopped answering partway through, so this ended early. The pages converted before it stopped are in the file and the rest kept the text read straight out of the PDF. Starting it again re-uses every page that was accepted, so none of those is paid for twice."
+msgstr "Le service de modèle a cessé de répondre en cours de route, la conversion s’est donc arrêtée avant la fin. Les pages converties avant l’arrêt sont dans le fichier et les autres ont conservé le texte lu directement dans le PDF. En la relançant, chaque page déjà acceptée est réutilisée : aucune d’elles n’est payée deux fois."
+
+#: cps/spa_strings.py
 msgid "The whole book"
 msgstr "Tout le livre"
 

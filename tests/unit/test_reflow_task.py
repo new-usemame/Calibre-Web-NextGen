@@ -19,7 +19,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from cps.services.reflow import ledger as ledger_mod
+from cps.services.reflow import ledger as ledger_mod, model as model_mod
 from cps.services.worker import STAT_ENDED, STAT_FAIL, STAT_FINISH_SUCCESS
 from tests.fixtures import reflow_pdfs as F
 
@@ -189,6 +189,50 @@ def test_the_job_says_what_it_was_and_how_it_ended(rig):
     assert row["status"] == "done"
     assert row["cap_usd"] == pytest.approx(0.75)
     assert row["started"] and row["finished"]
+
+
+class _DeadProvider(object):
+    """A provider that has gone away: it takes every page and answers none of them."""
+
+    def __init__(self):
+        self.calls = 0
+        self.model_id = "test/model"
+        self.tier = "standard"
+        self.dry_run = False
+        self.spec = SimpleNamespace(price_per_page=0.002, model_id="test/model")
+
+    def describe(self):
+        return {"model": self.model_id, "tier": self.tier, "configured": True,
+                "dry_run": False, "prompt_version": "test-1"}
+
+    def edit_page(self, *_args, **_kwargs):
+        self.calls += 1
+        raise model_mod.ModelError("OpenRouter 503: upstream is unavailable")
+
+
+def test_a_conversion_the_model_service_ended_early_does_not_say_it_finished(rig,
+                                                                            monkeypatch):
+    """A book that stopped is not a book that finished.
+
+    The conversion walks away from the model after a run of refusals, which is the
+    right thing to do with a service that has died -- but every page after the walk
+    away keeps the text read straight out of the PDF, and the user is never told.
+    MEASURED on the acceptance book: a 698-page run ended twenty routed pages early
+    and the jobs list called it done, so the only place the truth appeared was a
+    sentence inside the EPUB nobody had a reason to open.
+    """
+    provider = _DeadProvider()
+    monkeypatch.setattr(rig.mod, "make_client", lambda _tier: provider)
+
+    task = _run(rig, mode="full", cost_cap_usd=1.0)
+
+    # Every page still has its deterministic text, so the book is worth filing.
+    assert task.stat == STAT_FINISH_SUCCESS, task.error
+    assert provider.calls == rig.mod.pipeline.MAX_CONSECUTIVE_REFUSALS
+    assert os.path.isfile(str(rig.folder / "Book - Author.epub"))
+    # What it may not do is call itself a finished conversion.
+    row = _ledger_rows(rig)[0]
+    assert row["status"] == "incomplete", row
 
 
 def test_a_job_that_failed_says_so_rather_than_disappearing(rig):

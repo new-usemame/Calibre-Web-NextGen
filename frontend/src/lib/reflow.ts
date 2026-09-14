@@ -20,9 +20,13 @@ export {
 export interface ReflowJob {
   job_id: string;
   mode: ReflowMode;
-  /** ``capped`` is a success that stopped early: the pages bought before the
-   *  cap was reached were written, the rest were not. See cps/tasks/reflow.py. */
-  status: 'waiting' | 'running' | 'done' | 'capped' | 'failed' | 'cancelled';
+  /** ``capped`` and ``incomplete`` both stopped early with a file in hand: the
+   *  pages bought before the stop were written, the rest were not. The first is
+   *  the cap the user set, the second is the model service going away mid-book.
+   *  Only ``done`` is a conversion that did what it was asked for.
+   *  See STOP_STATUS in cps/tasks/reflow.py. */
+  status: 'waiting' | 'running' | 'done' | 'capped' | 'incomplete' | 'failed'
+    | 'cancelled';
   started: number | null;
   finished: number | null;
   spend_usd: number;

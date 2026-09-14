@@ -14,7 +14,7 @@ export type {
   ReflowEstimate, ReflowMode, ReflowTier, ReflowTierChoice,
 } from './reflowMoney.ts';
 export {
-  requiredUsd, sampleRoutedPages, suggestedCap, usd,
+  requiredUsd, routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
 } from './reflowMoney.ts';
 
 export interface ReflowJob {

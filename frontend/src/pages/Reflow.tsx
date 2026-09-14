@@ -6,7 +6,7 @@ import {
 import { useBook } from '../lib/queries';
 import {
   useReflowEstimate, useReflowJobs, useStartReflow, useCancelReflow,
-  requiredUsd, sampleRoutedPages, suggestedCap, usd,
+  requiredUsd, routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
   type ReflowJob, type ReflowMode,
 } from '../lib/reflow';
 import { Button } from '../components/Button';
@@ -131,6 +131,10 @@ export function Reflow({ id }: { id: string }) {
     );
   }
 
+  // Past the guard above `est` is the server's payload: say whether its page count
+  // was measured over the book or scaled up from the survey's sample.
+  const projectedPages = routedPagesAreProjected(est);
+
   return (
     <div className={styles.container}>
       <Header id={id} title={est.title || book?.title || ''} t={t} />
@@ -151,12 +155,23 @@ export function Reflow({ id }: { id: string }) {
         <dl className={styles.facts}>
           <Fact label={t('Pages')} value={String(est.pages)} />
           <Fact label={t('Pages a model will read')}
-            value={`${est.routed_pages_estimate} (${Math.round(est.routed_share * 100)}%)`} />
+            value={projectedPages
+              ? t('about {pages} ({percent}%)',
+                  { pages: est.routed_pages_estimate,
+                    percent: Math.round(est.routed_share * 100) })
+              : `${est.routed_pages_estimate} (${Math.round(est.routed_share * 100)}%)`} />
           <Fact label={t('Text layer')}
             value={est.text_layer ? t('Yes') : t('No')} />
         </dl>
         <p className={styles.note}>
           {t('Every other page is converted by reading the PDF itself, which costs nothing. A page only goes to a model when the layout cannot be settled without one.')}
+          {projectedPages && (
+            <>
+              {' '}
+              {t('That count is worked out from {sampled} pages spread through the book, so the rest of it may need a few more or a few fewer.',
+                 { sampled: est.sampled })}
+            </>
+          )}
         </p>
       </section>
 

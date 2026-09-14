@@ -15403,6 +15403,16 @@ msgstr "Eén pagina, als EPUB gedownload om te bekijken. Er wordt niets aan je b
 msgid "{pages} pages, downloaded as an EPUB to look at. Nothing is added to your library."
 msgstr "{pages} pagina's, als EPUB gedownload om te bekijken. Er wordt niets aan je bibliotheek toegevoegd."
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "That count is worked out from {sampled} pages spread through the book, so the rest of it may need a few more or a few fewer."
+msgstr "Dat aantal is berekend op basis van {sampled} pagina's verspreid over het boek, dus de rest heeft er misschien iets meer of iets minder nodig."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "about {pages} ({percent}%)"
+msgstr "ongeveer {pages} ({percent}%)"
+
 #~ msgid "Change my cover"
 #~ msgstr "Mijn omslag wijzigen"
 

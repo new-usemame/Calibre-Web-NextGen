@@ -49,6 +49,20 @@ export function usd(amount: number): string {
   return `$${(Math.round((amount + Number.EPSILON) * 100) / 100).toFixed(2)}`;
 }
 
+/** Whether "pages a model will read" is a measurement or a projection.
+ *
+ *  `pipeline.survey` runs the deterministic pass over at most SURVEY_PAGES pages
+ *  spread through the book and scales their routed share to the whole of it, so on
+ *  anything longer than that sample the count is an estimate: on the acceptance
+ *  book it projects 384 where the whole-book pass routes 425. The money is padded
+ *  for that already (`suggestedCap`), the sentence is not, and `survey` returns
+ *  `sampled` for no other reason than to let the page say which it is showing.
+ *  A book short enough to be read entirely is not an estimate and is not hedged. */
+export function routedPagesAreProjected(est: ReflowEstimate): boolean {
+  const sampled = est.sampled || 0;
+  return sampled > 0 && sampled < (est.pages || 0);
+}
+
 /** How many pages of a *pages*-page sample would reach the model, mirroring
  *  cps/api/reflow.py::_sample_share. */
 export function sampleRoutedPages(est: ReflowEstimate, pages: number): number {

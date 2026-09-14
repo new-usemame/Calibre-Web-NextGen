@@ -9,7 +9,7 @@ import test from 'node:test';
 
 import type { ReflowEstimate } from '../src/lib/reflowMoney.ts';
 import {
-  requiredUsd, sampleRoutedPages, suggestedCap, usd,
+  requiredUsd, routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
 } from '../src/lib/reflowMoney.ts';
 
 /** Per page, at the ceilings `cps/services/reflow/model.py` prices a tier by. */
@@ -24,7 +24,8 @@ const TIERS = Object.keys(PRICE);
  *  `route.estimate()` derives it: the tier's price per page times the routed count.
  *  A fixture carrying made-up totals would let the page and the server disagree
  *  about a book without any of this noticing. */
-function estimateFor(pages: number, routed: number, hardCap = 5): ReflowEstimate {
+function estimateFor(pages: number, routed: number, hardCap = 5,
+                     sampled = Math.min(40, pages)): ReflowEstimate {
   const money = (tier: string, count: number) =>
     Math.round(PRICE[tier] * count * 10000) / 10000;
   return {
@@ -50,7 +51,7 @@ function estimateFor(pages: number, routed: number, hardCap = 5): ReflowEstimate
       tier, model: `provider/${tier}`, label: tier, price_per_page: PRICE[tier],
     })),
     priced_on: '2026-09-13',
-    sampled: 12,
+    sampled,
     reasons: { footnotes: routed },
     cached: false,
   };
@@ -147,6 +148,32 @@ test('a sample of a long book is never quoted at nothing, nor above the whole bo
          }
        }
      });
+
+test('a page count worked out from a sample is not presented as a count', () => {
+  // `pipeline.survey` reads at most SURVEY_PAGES = 40 pages spread through the book
+  // and scales their routed share to the whole of it. MEASURED on the acceptance
+  // book: 22 of the 40 sampled pages route, which projects 384, where the
+  // whole-book deterministic pass routes 425 -- 9.6% more. The figure is worth
+  // showing and wrong to show as a fact, and `survey` returns `sampled` for no
+  // other reason than to let the page say which it is.
+  const long = estimateFor(698, 384, 5, 40);
+  assert.equal(routedPagesAreProjected(long), true,
+               'a 698-page book priced off 40 pages was quoted as measured');
+});
+
+test('a book the survey read from end to end is quoted no estimate', () => {
+  // `survey_pages` takes min(SURVEY_PAGES, page_count), so a book shorter than the
+  // sample is read entirely and its routed count is the count. Hedging that one
+  // would be its own small lie.
+  for (const pages of [1, 12, 40]) {
+    const est = estimateFor(pages, Math.max(1, Math.round(pages / 2)), 5, pages);
+    assert.equal(routedPagesAreProjected(est), false, `${pages} pages`);
+  }
+  // A payload from a build that did not report a sample size says nothing about
+  // how the number was reached, and a page may not invent the hedge either.
+  assert.equal(routedPagesAreProjected(estimateFor(698, 384, 5, 0)), false,
+               'a payload with no sample size was described as an estimate anyway');
+});
 
 test('the quoted figure is never rounded down below what will be charged', () => {
   // 1.005 is not 1.005 in binary; it is a shade under, and Math.round alone answers

@@ -148,6 +148,48 @@ def test_a_footnote_the_model_reconnected_is_no_longer_counted_as_unmarked(tmp_p
     assert "88" in _text(_page(payload))
 
 
+def test_the_same_note_number_repaired_on_two_pages_is_two_repaired_footnotes(tmp_path):
+    """A note number is only unique on the page that prints it.
+
+    A book numbers its notes from 1 again every chapter, so counting the *set* of
+    numbers the model read back counts one repair for every page that happened to
+    lose note 3 -- and leaves the reader told that the rest are still orphaned.
+    MEASURED on the acceptance book: 123 markers came back on 83 pages, the page
+    said 73, and it put 50 footnotes in the "no marker anywhere" column that have
+    a marker in them.
+    """
+    result, ledger, _ = _run(tmp_path, F.prose_page, F.ambiguous_residue_page,
+                             F.ambiguous_residue_page,
+                             client=FakeClient(answer=_restore_marker(88, ".\'\"")))
+    payload = report.numbers(result, ledger)
+
+    assert payload["structure"]["footnotes_unmarked_before_review"] == 2, \
+        payload["structure"]
+    assert payload["structure"]["markers_recovered"] == 2, payload["structure"]
+    assert payload["structure"]["footnotes_unmarked"] == 0, payload["structure"]
+
+
+def test_a_list_of_repaired_notes_too_long_to_print_does_not_read_as_the_whole_list(
+        tmp_path):
+    """The readings list trims at ten and says so in the same breath. This row
+    trimmed at eight and said nothing, so "notes 3, 5, 6, 7, 8, 10, 11, 12" stood
+    beside a count of 73 and read as a contradiction the reader has to resolve."""
+    result, ledger, _ = _run(tmp_path, F.prose_page, F.ambiguous_residue_page,
+                             client=FakeClient(answer=_restore_marker(88, ".\'\"")))
+    payload = report.numbers(result, ledger)
+    listed = [3, 5, 6, 7, 8, 10, 11, 12]
+    payload["structure"]["markers_recovered"] = 123
+    payload["structure"]["markers_recovered_notes"] = list(listed)
+    payload["structure"]["markers_recovered_notes_total"] = 73
+
+    text = _text(_page(payload))
+
+    assert "123" in text, text
+    assert all(str(n) in text for n in listed), text
+    assert str(73 - len(listed)) in text, \
+        "eight numbers stand for seventy-three and nothing says so"
+
+
 def _split_swept_note(number, where):
     """The model answer that puts back a note the scan folded into its neighbour."""
     def answer(text):

@@ -67,13 +67,18 @@ def numbers(result, ledger=None, client=None):
     # been shown to a model. Every marker the model then read back off the scan is
     # one fewer orphaned footnote in the finished book, and saying otherwise sends
     # the reader looking for a problem that is not there any more.
-    recovered = sorted({number for o in outcomes for number in (o.recovered_markers or [])})
-    # The same correction for the other footnote loss. A swept note is counted per
-    # page, never book-wide: this book numbers its notes from 1 again every chapter,
-    # so "note 59 came back" is only a statement about the page it came back on.
+    # Counted per page, never book-wide: a book numbers its notes from 1 again
+    # every chapter, so "note 3 came back" is only ever a statement about the page
+    # it came back on, and a set of numbers counts one repair for every page that
+    # happened to lose the same one.
+    repaired = sorted({(o.pno, number)
+                       for o in outcomes for number in (o.recovered_markers or [])})
+    recovered = sorted({number for _, number in repaired})
+    # The same correction for the other footnote loss, and the reason the two
+    # cannot share a total: a swept note was never in the book to be unmarked.
     swept = {o.pno: set(book.swept_notes(o.pno)) for o in outcomes} if book is not None else {}
-    swept_back = sum(1 for o in outcomes for number in (o.recovered_markers or [])
-                     if number in swept.get(o.pno, ()))
+    swept_back = sum(1 for pno, number in repaired if number in swept.get(pno, ()))
+    unmarked_back = len(repaired) - swept_back
 
     payload = {
         "converter": CONVERTER,
@@ -110,13 +115,14 @@ def numbers(result, ledger=None, client=None):
         "structure": {
             "headings": stats.get("headings", 0),
             "footnotes": stats.get("notes", 0),
-            "footnotes_unmarked": max(0, stats.get("notes_unmarked", 0) - len(recovered)),
+            "footnotes_unmarked": max(0, stats.get("notes_unmarked", 0) - unmarked_back),
             "footnotes_unmarked_before_review": stats.get("notes_unmarked", 0),
             "footnotes_swept": max(0, stats.get("notes_swept", 0) - swept_back),
             "footnotes_swept_before_review": stats.get("notes_swept", 0),
             "footnotes_swept_restored": swept_back,
-            "markers_recovered": len(recovered),
+            "markers_recovered": len(repaired),
             "markers_recovered_notes": recovered[:MAX_REPAIRS_LISTED],
+            "markers_recovered_notes_total": len(recovered),
             "markers_unresolved": stats.get("markers_unresolved", 0),
             "figures": stats.get("figures", 0),
             "tables": len(_TABLE.findall(markup)),
@@ -351,13 +357,27 @@ def _structure_section(payload):
             ("Damaged footnote numbers read from the page",
              structure["repairs"] + structure.get("markers_recovered", 0))]
     if structure.get("markers_recovered"):
-        rows.append(("Footnote markers the scan restored (notes %s)"
-                     % ", ".join(str(n) for n in structure["markers_recovered_notes"]),
-                     structure["markers_recovered"]))
+        rows.append((_repaired_markers_label(structure), structure["markers_recovered"]))
     body = "".join("<tr><td>%s</td><td>%s</td></tr>" % (escape(label), value)
                    for label, value in rows)
     return ["<h2>What was recovered</h2>",
             "<table><tbody>%s</tbody></table>" % body]
+
+
+def _repaired_markers_label(structure):
+    """Name the notes whose marker came back, and never imply a trimmed list is all
+    of them: a row reading "notes 3, 5, 6, 7, 8, 10, 11, 12" beside a count of 73 is
+    a contradiction the reader is left to resolve."""
+    label = "Footnote markers the scan destroyed and the model read back"
+    listed = list(structure.get("markers_recovered_notes") or [])
+    if not listed:
+        return label
+    distinct = int(structure.get("markers_recovered_notes_total") or len(listed))
+    named = ", ".join(str(n) for n in listed)
+    rest = distinct - len(listed)
+    if rest > 0:
+        return "%s (notes %s and %d more)" % (label, named, rest)
+    return "%s (notes %s)" % (label, named)
 
 
 def _uncertain_section(payload, links):

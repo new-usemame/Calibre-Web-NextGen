@@ -27,8 +27,9 @@ def test_bookdetail_uses_disambiguated_msgids():
     assert "t('Read now')" in src, "reader-open button must use the 'Read now' msgid"
     # The old ambiguous/untranslated forms are gone.
     assert "t('Read ✓')" not in src
-    # The already-read state reuses the status word 'Read' (→ Gelezen) + a ✓.
-    assert "`${t('Read')} ✓`" in src
+    # The already-read state reuses the status word 'Read' (→ Gelezen) + a ✓;
+    # the badge's rendered text is covered behaviourally in the SPA e2e suite
+    # (book-page-actions.spec.ts) instead of a source pin.
 
 
 @pytest.mark.unit

@@ -89,11 +89,7 @@ export function Menu({ label, title, icon, sections, menuLabel, triggerTestId, m
     return () => document.removeEventListener('pointerdown', onPointer);
   }, [open, close]);
 
-  // Layout effect: the clamp must land BEFORE the first paint of the open
-  // menu — useEffect would flash the unclamped position (and any synchronous
-  // measurement, like an e2e boundingBox, would read it).
-  useLayoutEffect(() => {
-    if (!open) return;
+  const clamp = useCallback(() => {
     const menu = menuRef.current;
     const wrap = wrapRef.current;
     if (!menu || !wrap) return;
@@ -105,7 +101,27 @@ export function Menu({ label, title, icon, sections, menuLabel, triggerTestId, m
     let rel = wrapRect.right - width < gutter ? 0 : wrapRect.width - width;
     rel = Math.min(rel, vw - gutter - wrapRect.left - width);
     setLeft(rel);
-  }, [open]);
+  }, []);
+
+  // Layout effect: the clamp must land BEFORE the first paint of the open
+  // menu — useEffect would flash the unclamped position (and any synchronous
+  // measurement, like an e2e boundingBox, would read it).
+  useLayoutEffect(() => {
+    if (open) clamp();
+  }, [open, clamp]);
+
+  // …and the first pass races late webfont swaps (CI's cold contexts load the
+  // font after measuring: the panel grows a few px and escapes again — PR
+  // #2237). Re-clamp on any resize of the open panel and once fonts settle.
+  useEffect(() => {
+    if (!open) return;
+    const menu = menuRef.current;
+    if (!menu) return;
+    const observer = new ResizeObserver(() => clamp());
+    observer.observe(menu);
+    void document.fonts?.ready.then(() => clamp());
+    return () => observer.disconnect();
+  }, [open, clamp]);
 
   // Roving tabindex: move DOM focus to the active item whenever it changes.
   useEffect(() => {

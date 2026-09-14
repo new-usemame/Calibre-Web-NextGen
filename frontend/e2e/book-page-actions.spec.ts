@@ -379,15 +379,70 @@ test('the open gear menu stays inside the viewport even when the row overflows (
 
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('book-actions-menu')).toBeVisible({ timeout: 10_000 });
-  // CI's fonts leave the page a few px wider than the 375px viewport, putting
-  // the gear's anchor past the right edge; the menu must clamp inside anyway.
-  // Emulate that exact geometry: park the trigger's wrapper 24px past the
-  // viewport's right edge (what CI's metrics did to it) and open the menu.
+  // CI's cold contexts put the gear's anchor past the right edge AND changed
+  // the panel's content size after the one-shot clamp (PR #2237 run: right
+  // edge 383.8–386.2px at a 375px viewport). Reproduce both halves: park the
+  // trigger's wrapper 24px past the viewport's right edge…
   await page.addStyleTag({
     content: 'div:has(> [data-testid="book-actions-menu"]) { position: fixed; right: -24px; bottom: 140px; z-index: 999; }',
   });
   const menu = await openGearMenu(page);
+  // …then grow the open panel — the clamp must re-run, not hold the stale
+  // measurement. (The bundle ships no webfonts to delay; a late item-style
+  // change is the same resize signal the ResizeObserver must catch.)
+  await page.addStyleTag({
+    content: '[role="menu"] [role="menuitem"] { font-size: 18px; }',
+  });
+  await expect
+    .poll(async () => {
+      const box = await menu.boundingBox();
+      return box ? box.x + box.width : -1;
+    }, { message: 'the menu must re-clamp inside the viewport after it resizes' })
+    .toBeLessThanOrEqual(376);
   const box = (await menu.boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(0);
-  expect(box.x + box.width).toBeLessThanOrEqual(376);
+});
+
+test('Files download links carry the app mount prefix', async ({ page }) => {
+  await page.goto('/app');
+  const bookId = await firstBookWithFormats(page);
+  test.skip(bookId == null, 'seed has no book with files');
+  await stubFullAccess(page);
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  const link = page.getByTestId('book-files').locator('a[href*="/download/"]').first();
+  await expect(link).toBeVisible({ timeout: 10_000 });
+  // The prefix is whatever the shell injected; the rendered href must carry it
+  // (resourceUrl at consumption), or the link 404s behind a reverse-proxy
+  // subpath (#571). Compares against the app's own runtime value, not a
+  // hardcoded root.
+  const prefix = await page.evaluate(
+    () => (window as unknown as { __CWNG_PREFIX__?: string }).__CWNG_PREFIX__ ?? '',
+  );
+  const href = await link.getAttribute('href');
+  expect(href!.startsWith(`${prefix}/download/${bookId}/`)).toBe(true);
+});
+
+test('a read book shows a visible Read ✓ state badge; unread shows none', async ({ page }) => {
+  await page.goto('/app');
+  const bookId = await firstBookWithFormats(page);
+  test.skip(bookId == null, 'seed has no book with files');
+  let read = true;
+  await page.route(new RegExp(`/api/v1/books/${bookId}(?:\\?.*)?$`), async (route) => {
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const { response: res, body: book } = got;
+    book.read = read;
+    await route.fulfill({ response: res, json: book });
+  });
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  // The badge text is the plain 'Read' msgid + ✓ (Dutch renders "Gelezen ✓" —
+  // the status word must never be an untranslated composite).
+  await expect(page.getByTestId('book-read-badge')).toHaveText('Read ✓', { timeout: 10_000 });
+
+  read = false;
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('book-actions-menu')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('book-read-badge')).toHaveCount(0);
 });

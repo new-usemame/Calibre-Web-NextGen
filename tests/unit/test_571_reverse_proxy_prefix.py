@@ -228,7 +228,6 @@ def test_resource_urls_prefixed_at_consumption():
     assert "resourceUrl(coverUrl)" in bc
     detail = (_FE / "pages" / "BookDetail.tsx").read_text()
     assert "resourceUrl(book.cover_url)" in detail
-    assert "resourceUrl(fmt.download_url)" in detail
 
 
 @pytest.mark.unit

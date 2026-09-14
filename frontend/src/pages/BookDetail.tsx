@@ -668,9 +668,19 @@ export function BookDetail() {
                 <StarRating rating={book.rating} size={16} />
               </div>
             )}
+            {/* Passive read state — the gear menu's "Mark as unread" is the
+                control; this badge is the visible "already read" marker the
+                action row's toggle used to double as. The plain 'Read' msgid
+                keeps locales that translate it (Dutch: "Gelezen ✓") correct. */}
+            {inLibrary && book.read && (
+              <p className={styles.readState} data-testid="book-read-badge">
+                <BookCheck size={14} aria-hidden="true" focusable={false} />
+                {`${t('Read')} ✓`}
+              </p>
+            )}
             {/* Passive "currently reading" marker (fork #634) — mirrors the classic
-                detail page. Sync-driven display only; the read toggle below stays a
-                2-state read/unread control. Shows the synced percent when known. */}
+                detail page. Sync-driven display only; the gear menu's read/unread
+                item stays a 2-state control. Shows the synced percent when known. */}
             {inLibrary && book.in_progress && (
               <div className={styles.readProgressWrap}>
                 <p className={styles.currentlyReading}>

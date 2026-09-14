@@ -146,9 +146,12 @@ test('coarse pointers carry no card actions; the book page owns them', async ({ 
   const detailRead = page.getByRole('link', { name: 'Read now' });
   await expect(detailRead, 'the book page offers Read now').toBeVisible();
   // Edit lives in the "More actions" gear menu now; a tap opens it and the
-  // menuitem navigates to the editor.
+  // menuitem navigates to the editor. Wait for the menu itself before
+  // asserting its items — WebKit's synthetic tap resolves a beat later.
   await tap(page.getByTestId('book-actions-menu'));
-  const editItem = page.getByRole('menuitem', { name: 'Edit metadata' });
+  const menuList = page.getByTestId('book-actions-menu-list');
+  await expect(menuList).toBeVisible({ timeout: 10_000 });
+  const editItem = menuList.getByRole('menuitem', { name: 'Edit metadata' });
   await expect(editItem, 'the book page offers Edit metadata in the gear menu').toBeVisible();
   await tap(editItem);
   await expect(page).toHaveURL(new RegExp(`/book/${bookId}/edit$`));

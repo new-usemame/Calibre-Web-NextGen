@@ -139,14 +139,22 @@ def _survey_uncached(path):
 
 
 def _cache_key(path):
-    """The file as it is now. A rebuilt PDF is a different book to price.
+    """The file as it is now, priced by the converter as it is now.
+
+    A rebuilt PDF is a different book to price -- and an upgraded converter, or a
+    re-measured price table, is a different price for the same book. The PDF does not
+    change when either of those does, so both go in the key: the quote is the figure a
+    person authorises a payment against, and serving one this build would not have
+    made is quoting them last release's money.
 
     Hashed with sha1 rather than ``hash()`` because the estimate cache outlives the
     process and PYTHONHASHSEED does not: a str hash is randomised per run, so every
     restart would miss its own cache.
     """
     stat = os.stat(path)
-    digest = hashlib.sha1(os.path.abspath(path).encode("utf-8")).hexdigest()[:16]
+    priced_by = "\0".join((os.path.abspath(path), build_epub.CONVERTER_VERSION,
+                           model.PRICE_TABLE_MEASURED))
+    digest = hashlib.sha1(priced_by.encode("utf-8")).hexdigest()[:16]
     return "%s-%d-%d" % (digest, stat.st_size, int(stat.st_mtime))
 
 

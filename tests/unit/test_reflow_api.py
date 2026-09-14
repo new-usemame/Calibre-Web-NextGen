@@ -195,6 +195,33 @@ def test_the_second_view_of_the_same_pdf_does_not_read_it_again(
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("what_changed", ["the price table", "the converter"])
+def test_a_quote_this_build_would_not_have_made_is_not_served_from_the_cache(
+        mod, monkeypatch, pdf_on_disk, what_changed):
+    """The estimate is the figure a person authorises a payment against.
+
+    It is cached against the PDF, and the PDF does not change when the app is
+    upgraded or the prices are re-measured. A quote kept across either of those is
+    last release's money against this release's work.
+    """
+    wired = _wire(mod, monkeypatch, pdf_on_disk)
+
+    def priced():
+        with _ctx("/api/v1/books/5/reflow/estimate"):
+            with patch.object(mod, "current_user", _user()):
+                return _json(inspect.unwrap(mod.reflow_estimate)(5))
+
+    priced()
+    if what_changed == "the price table":
+        monkeypatch.setattr(mod.model, "PRICE_TABLE_MEASURED", "2099-01-01")
+    else:
+        monkeypatch.setattr(mod.build_epub, "CONVERTER_VERSION", "99.0")
+    priced()
+
+    assert len(wired.surveys) == 2
+
+
+@pytest.mark.unit
 def test_an_edited_pdf_is_surveyed_again(mod, monkeypatch, pdf_on_disk):
     wired = _wire(mod, monkeypatch, pdf_on_disk)
 

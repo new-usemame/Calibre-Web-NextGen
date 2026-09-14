@@ -408,6 +408,89 @@ def ambiguous_residue_page(doc):
     return page
 
 
+def swept_note_page(doc):
+    """A note whose own printed number the scanner read as punctuation.
+
+    MEASURED on the acceptance book, page index 103: the page prints notes 58, 59
+    and 60 under the rule, and the text layer returns 58's text running straight on
+    into 59's after a stray quotation mark, with no 59 anywhere. 29 of the book's
+    notes are lost this way. The reader cannot see the note, so it cannot be one of
+    the numbers a model is allowed to put back -- and the page is routed to a model
+    for exactly this reason, which makes refusing its answer the worst of both.
+    """
+    page = add_page(doc)
+    y = BODY_TOP
+    _put(page, LEFT, y, "Valens cites the older authorities.\" Rhetorius repeats it.")
+    y += BODY_LEADING
+    # As the real page returns it: 59's body marker survived, fused onto the word in
+    # front of it, and only the note's own number under the rule was lost.
+    _put(page, LEFT, y, "Antiochus gives the same list in a later chapter.59")
+    add_notes(page, [
+        (58, 'Cumont, Astrology, p. 76. " Pliny, Natural History, 2, 6: 38.'),
+        (60, "Hubner, Eigenschaften, p. 12."),
+    ])
+    return page
+
+
+def two_swept_notes_page(doc):
+    """The control for the gap rule: two numbers missing between two printed ones.
+
+    One missing number has one place to go. Two do not: the page prints 58 and 61,
+    and nothing on it says where 59 stops and 60 starts. A converter that splits a
+    note there is guessing at a citation boundary, so the gap is left alone.
+    """
+    page = add_page(doc)
+    y = BODY_TOP
+    _put(page, LEFT, y, "Valens cites the older authorities.\" Rhetorius repeats it.")
+    add_notes(page, [
+        (58, 'Cumont, Astrology, p. 76. " Pliny, Natural History, 2, 6: 38. '
+             '" Antiochus, Summary, p. 116: 3-12.'),
+        (61, "Hubner, Eigenschaften, p. 12."),
+    ])
+    return page
+
+
+def shortened_note_number_page(doc):
+    """The other control: the missing number is printed, one digit short.
+
+    MEASURED on the acceptance book, page 157: the note zone returns ``26, 27, 28,
+    29, 3, 31`` -- the 3 is the 30, whose second digit the scan dropped, and the
+    same damage hit the marker pointing at it, so the deterministic repair has no
+    undamaged number to read it back from. The gap between 29 and 31 is real and
+    there is nothing swept about it: the note is right there.
+    """
+    page = add_page(doc)
+    y = add_line_with_marker(page, BODY_TOP, "Valens cites the older authorities.", "29")
+    _put(page, LEFT, y, "Rhetorius repeats the same list in a later chapter.")
+    add_notes(page, [
+        (29, "Pingree, From Astral Omens, p. 41."),
+        (3, "Pingree, \"Masha'allah's (?) Arabic Translation of Dorotheus.\""),
+        (31, "King, \"A Hellenistic Astrological Table,\" p. 667."),
+    ])
+    return page
+
+
+def quietly_swept_note_page(doc):
+    """The same damage on a page where nothing else is wrong.
+
+    MEASURED on the acceptance book, page 115: notes 124 and 126 are printed and both
+    are marked in the body, so every count on the page agrees and the deterministic
+    pass reports nothing. Note 125 is gone -- its text hangs off the end of 124 after
+    the letters the scanner made of its number -- and the reader loses a citation on a
+    page no one ever looks at. 6 of the book's 29 swept notes are on pages like this.
+    """
+    page = add_page(doc)
+    y = add_line_with_marker(
+        page, BODY_TOP, "Antiochus is an important source for the tradition.", "124")
+    add_line_with_marker(
+        page, y, "Critodemus was a semi-significant early expositor.", "126")
+    add_notes(page, [
+        (124, 'Pingree, "Antiochus and Rhetorius," p. 207. Its CCAG 8, 3, p. 116: 3-12.'),
+        (126, "Pliny, Natural History, 2, 6: 38."),
+    ])
+    return page
+
+
 def chart_label_page(doc):
     """A chart key set in large type: the thing that outranks real headings on size.
 

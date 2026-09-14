@@ -141,6 +141,20 @@ def test_a_page_with_an_unexplained_marker_mismatch_is_routed():
     assert "note_marker_mismatch" in routes[1].reasons
 
 
+def test_a_page_that_lost_a_notes_number_is_routed_although_nothing_else_is_wrong():
+    """MEASURED, page 115 of the acceptance book: two notes printed, both marked,
+    every count on the page agreeing -- and a third note's text hanging off the end of
+    the first because the scan ate its number. 6 of the book's 29 swept notes sit on
+    pages like this, and until the page is routed nobody ever looks at them: the model
+    is the only reader in the pipeline that can see the number printed on the scan."""
+    routes = _routes(F.prose_page, F.quietly_swept_note_page, F.prose_page)
+
+    assert routes[1].routed, routes[1].reasons
+    assert routes[1].reasons == ["note_number_swept"]
+    assert routes[1].to_dict()["why"] != ["note_number_swept"], \
+        "a reason with no sentence behind it reaches the user as a raw key"
+
+
 def test_a_page_with_no_text_layer_is_routed():
     routes = _routes(F.prose_page, lambda d: F.image_only_page(d, F.solid_png()))
 

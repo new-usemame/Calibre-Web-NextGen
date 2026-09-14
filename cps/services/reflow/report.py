@@ -68,6 +68,12 @@ def numbers(result, ledger=None, client=None):
     # one fewer orphaned footnote in the finished book, and saying otherwise sends
     # the reader looking for a problem that is not there any more.
     recovered = sorted({number for o in outcomes for number in (o.recovered_markers or [])})
+    # The same correction for the other footnote loss. A swept note is counted per
+    # page, never book-wide: this book numbers its notes from 1 again every chapter,
+    # so "note 59 came back" is only a statement about the page it came back on.
+    swept = {o.pno: set(book.swept_notes(o.pno)) for o in outcomes} if book is not None else {}
+    swept_back = sum(1 for o in outcomes for number in (o.recovered_markers or [])
+                     if number in swept.get(o.pno, ()))
 
     payload = {
         "converter": CONVERTER,
@@ -106,6 +112,9 @@ def numbers(result, ledger=None, client=None):
             "footnotes": stats.get("notes", 0),
             "footnotes_unmarked": max(0, stats.get("notes_unmarked", 0) - len(recovered)),
             "footnotes_unmarked_before_review": stats.get("notes_unmarked", 0),
+            "footnotes_swept": max(0, stats.get("notes_swept", 0) - swept_back),
+            "footnotes_swept_before_review": stats.get("notes_swept", 0),
+            "footnotes_swept_restored": swept_back,
             "markers_recovered": len(recovered),
             "markers_recovered_notes": recovered[:MAX_REPAIRS_LISTED],
             "markers_unresolved": stats.get("markers_unresolved", 0),
@@ -162,6 +171,11 @@ def _unplaced(payload, result):
         out.append("%d footnotes are printed in the book but no marker for them was "
                    "found in the text; they are kept with the page they were printed "
                    "on." % structure["footnotes_unmarked"])
+    if structure.get("footnotes_swept"):
+        out.append("%d footnotes lost their own printed number to the scan and are "
+                   "still joined to the note printed above them; every word of both "
+                   "is in the book, set as one note rather than two."
+                   % structure["footnotes_swept"])
     if structure.get("markers_unresolved"):
         out.append("%d footnote markers in the text point at a note that was not "
                    "printed on their page; they are kept as printed superscripts "

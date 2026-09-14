@@ -281,6 +281,82 @@ def test_the_model_is_told_what_the_deterministic_pass_could_not_settle(tmp_path
     assert "88" in said, said
 
 
+def _split_swept_note(number, where):
+    """A model that finds the note the scan folded into the note before it.
+
+    It rewrites nothing: the note whose text holds *where* is cut there, and the
+    number the scan ate goes back at the head of the second half, where the page
+    prints it. The body marker survived fused to the word in front of it, so the
+    only other thing the answer does is detach it."""
+    def answer(text):
+        out = []
+        for part in text.split("\n\n"):
+            if not part.startswith("["):
+                out.append("<p>%s</p>" % part.replace(
+                    ".%d" % number,
+                    '.<a class="noteref" href="#fn_%d">%d</a>' % (number, number), 1))
+                continue
+            num, _, rest = part.partition("] ")
+            num = num[1:]
+            head, found, tail = rest.partition(where)
+            out.append('<aside class="footnote" id="fn_%s">%s %s</aside>'
+                       % (num, num, head.strip() if found else rest))
+            if found:
+                out.append('<aside class="footnote" id="fn_%d">%d %s</aside>'
+                           % (number, number, tail.strip()))
+        return "\n".join(out)
+    return answer
+
+
+def test_the_number_of_a_note_the_scan_swept_away_can_come_back(tmp_path):
+    """MEASURED, page 103 of the acceptance book: the page prints notes 58, 59 and 60,
+    and the text layer returns 59's text run on into 58's behind a stray quotation
+    mark. The page is routed for exactly this. Refusing the answer that fixes it is
+    the worst of both -- the call is paid for and the note stays buried."""
+    doc = _doc(F.prose_page, F.swept_note_page)
+    client = FakeClient(answer=_split_swept_note(59, ' " '))
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    outcome = result.outcomes[1]
+    assert outcome.gate == "PASS", outcome.gate_reasons
+    assert outcome.recovered_markers == [59]
+    assert 'id="fn_59">59 Pliny' in result.page_html[1], result.page_html[1]
+
+
+def test_the_model_is_told_which_number_the_page_stopped_printing(tmp_path):
+    """The hint is the difference between a model that looks for a missing note and
+    one that reformats a page which already looks finished. It has to say the number:
+    the gate will take that number back and no other."""
+    doc = _doc(F.prose_page, F.swept_note_page)
+    client = FakeClient()
+    try:
+        _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert client.hints, "the page was not routed"
+    said = " ".join(client.hints[-1])
+    assert "59" in said, said
+    assert "58" in said, said
+
+
+def test_a_number_the_page_never_lost_is_still_refused(tmp_path):
+    """The control for the widened allowance. The gap says 59 and nothing else, so a
+    model that reads 57 off the same residue is guessing at a citation."""
+    doc = _doc(F.prose_page, F.swept_note_page)
+    client = FakeClient(answer=_split_swept_note(57, ' " '))
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.outcomes[1].gate == "FAIL"
+    assert result.outcomes[1].source == "deterministic"
+
+
 def test_a_marker_for_a_note_the_page_does_not_print_is_still_refused(tmp_path):
     """The control. The allowance is the page's own unreferenced notes and nothing
     else; a model that reads ``89`` off a page whose note is 88 is guessing, and the

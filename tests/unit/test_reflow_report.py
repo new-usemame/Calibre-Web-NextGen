@@ -147,6 +147,61 @@ def test_a_footnote_the_model_reconnected_is_no_longer_counted_as_unmarked(tmp_p
     assert "88" in _text(_page(payload))
 
 
+def _split_swept_note(number, where):
+    """The model answer that puts back a note the scan folded into its neighbour."""
+    def answer(text):
+        out = []
+        for part in text.split("\n\n"):
+            if not part.startswith("["):
+                out.append("<p>%s</p>" % part.replace(
+                    ".%d" % number,
+                    '.<a class="noteref" href="#fn_%d">%d</a>' % (number, number), 1))
+                continue
+            num, _, rest = part.partition("] ")
+            num = num[1:]
+            head, found, tail = rest.partition(where)
+            out.append('<aside class="footnote" id="fn_%s">%s %s</aside>'
+                       % (num, num, head.strip() if found else rest))
+            if found:
+                out.append('<aside class="footnote" id="fn_%d">%d %s</aside>'
+                           % (number, number, tail.strip()))
+        return "\n".join(out)
+    return answer
+
+
+def test_a_note_the_scan_swept_away_is_admitted_although_nothing_else_flagged_it(tmp_path):
+    """The damage no other count can see. The page printed three notes and the book
+    ships two, with the third's citation sitting inside the second. Nothing is
+    unmarked, nothing is unresolved, the conservation check is happy because no word
+    was lost -- so unless this page says it, the reader is told the conversion went
+    perfectly and the note they cannot find is their own fault."""
+    control = tmp_path / "control"
+    control.mkdir()
+    quiet, quiet_ledger, _ = _run(control, F.prose_page, F.prose_page)
+    result, ledger, _ = _run(tmp_path, F.prose_page, F.quietly_swept_note_page)
+
+    payload = report.numbers(result, ledger)
+
+    assert payload["structure"]["footnotes_swept"] == 1, payload["structure"]
+    assert len(payload["unplaced"]) == \
+        len(report.numbers(quiet, quiet_ledger)["unplaced"]) + 1, payload["unplaced"]
+    assert "125" not in _text(_page(payload)), \
+        "the number is a guess at what the page printed, not something to quote"
+
+
+def test_a_swept_note_the_model_put_back_is_not_still_called_missing(tmp_path):
+    """The other direction, and the one a reader acts on: a report that keeps saying
+    a note is buried after the conversion dug it out sends them looking for damage
+    that is not in their book."""
+    result, ledger, _ = _run(tmp_path, F.prose_page, F.swept_note_page,
+                             client=FakeClient(answer=_split_swept_note(59, ' " ')))
+    payload = report.numbers(result, ledger)
+
+    assert payload["structure"]["footnotes_swept_before_review"] == 1
+    assert payload["structure"]["footnotes_swept_restored"] == 1, payload["structure"]
+    assert payload["structure"]["footnotes_swept"] == 0
+
+
 def test_a_conversion_with_no_model_says_so_rather_than_reporting_a_clean_sweep(tmp_path):
     """With no key configured every page is deterministic. Reporting that as 'no
     pages failed the gate' would be true and deeply misleading."""

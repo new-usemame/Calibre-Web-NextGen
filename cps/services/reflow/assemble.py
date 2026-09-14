@@ -161,6 +161,37 @@ class Book(object):
         return sorted(note.num for note in self.notes
                       if note.pno == pno and note.num is not None and not note.marked)
 
+    def swept_notes(self, pno):
+        """Numbers this page printed under the rule that the text layer never returned.
+
+        A different loss from ``unmarked_notes`` and invisible to it: there is no note
+        to be unmarked. MEASURED on the acceptance book, 29 notes on 29 pages -- the
+        page prints 58, 59 and 60, and 59's text comes back glued to the end of 58's
+        with a stray quotation mark where its number belongs. The reader gets one note
+        where the page printed two, and the second citation is buried in the first.
+
+        The page's own numbering is the evidence. A number missing between two the
+        page prints in ascending order was printed on this page, unless something else
+        printed on the page could be that number misread -- which is the whole of the
+        second condition, and what keeps page 157 out: it returns ``26, 27, 28, 29, 3,
+        31`` and that 3 is the 30, damaged, not a note that went missing.
+
+        Only a gap of exactly one is reported. Two numbers missing between the same
+        two neighbours leaves nothing on the page to say where one note ends and the
+        next begins, and a converter that splits them there is inventing a citation.
+        """
+        order = [note.num for note in self.notes
+                 if note.pno == pno and note.num is not None]
+        if len(order) < 2:
+            return []
+        backbone = set(_ascending_backbone(order))
+        spine = [order[i] for i in sorted(backbone)]
+        damaged = [order[i] for i in range(len(order)) if i not in backbone]
+        return [left + 1 for left, right in zip(spine, spine[1:])
+                if right - left == 2
+                and not any(_ocr_could_read(str(left + 1), str(seen))
+                            for seen in damaged)]
+
 
 # ------------------------------------------------------------------- run primitives
 
@@ -758,6 +789,13 @@ def assemble(skeletons, style, raw_pages=None):
                 refused += 1
             book.elements.append(element)
 
+        # Asked here because it is a question about the page's finished note list,
+        # and because a page that prints nothing else wrong is exactly where a
+        # swept note hides: 6 of the acceptance book's 29 are on pages with no
+        # other reason to be looked at.
+        if book.swept_notes(skel.pno):
+            page_reasons.append("note_number_swept")
+
         if page_reasons:
             book.reasons[skel.pno] = sorted(set(page_reasons))
 
@@ -776,6 +814,10 @@ def assemble(skeletons, style, raw_pages=None):
         "figures": len(book.figures),
         "notes": len([n for n in book.notes if n.num is not None]),
         "notes_unmarked": len(unmarked),
+        # Notes the page printed and the text layer never returned. Counted here
+        # because it is the one footnote defect no other number in this dict can
+        # show: the note is not unmarked, it is not unresolved, and no word was lost.
+        "notes_swept": sum(len(book.swept_notes(pno)) for pno in book.pages),
         "markers": sum(1 for el in book.elements for run in el.runs
                        if run[0] in ("sup", "mark")),
         "markers_unresolved": sum(1 for el in book.elements for run in el.runs

@@ -30,6 +30,7 @@ PAGE_REASONS = {
     "unresolved_marker": "a footnote marker on the page matches no note on it",
     "note_marker_mismatch": "the page's notes and markers do not add up",
     "duplicate_note_numbers": "the page prints the same note number twice",
+    "note_number_swept": "a note's own printed number is missing from the page",
     "residue_markers_paired": "a marker was recovered from punctuation and should be confirmed",
     "run_in_candidate_rejected": "a bold line might be a heading and might be a lead-in",
     "large_type_not_a_heading": "large type on the page did not read as a heading",

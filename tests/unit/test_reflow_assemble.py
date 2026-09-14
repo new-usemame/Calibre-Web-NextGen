@@ -182,6 +182,75 @@ class TestOcrDamagedNoteNumbers(object):
         assert not any(r.kind == "note_number" for r in book.repairs), book.repairs
 
 
+class TestNotesTheScannerSweptAway(object):
+    """A note whose own printed number the scan lost, text and all.
+
+    MEASURED on the acceptance book: 29 notes on 29 pages. The page prints 58, 59 and
+    60 under the rule; the text layer returns 58's text running straight on into 59's
+    after a stray quotation mark, and there is no 59 anywhere on the page. Nothing
+    upstream can see it -- there is no note to be unmarked and no damaged number to
+    repair -- so the reader gets one note where the page printed two, with the second
+    citation buried inside the first. On 6 of those 29 pages nothing else was wrong
+    either, and the page was never even looked at.
+
+    The evidence is the gap the page's own numbering leaves, and the test for a false
+    gap is whether anything else printed on the page could be that number misread.
+    """
+
+    def test_the_number_the_page_stops_printing_is_named(self):
+        book = _book(F.swept_note_page)
+
+        assert book.swept_notes(0) == [59]
+
+    def test_it_is_not_the_question_unmarked_notes_answers(self):
+        """The two lists are different damage. 58 and 60 are printed and unreferenced;
+        59 is not printed at all, which is why it needs saying separately."""
+        book = _book(F.swept_note_page)
+
+        assert book.unmarked_notes(0) == [58, 60]
+
+    def test_the_page_says_so_where_a_model_will_be_told(self):
+        book = _book(F.swept_note_page)
+
+        assert "note_number_swept" in book.page_reasons(0)
+
+    def test_a_page_whose_numbering_runs_straight_through_reports_nothing(self):
+        """The control. Four notes, no gap, nothing swept."""
+        book = _book(F.two_damaged_note_numbers_page)
+
+        assert sorted(n.num for n in book.notes) == [117, 118, 119, 120]
+        assert book.swept_notes(0) == []
+
+    def test_two_numbers_missing_at_once_are_not_read_as_one_swept_note(self):
+        """One missing number has one place to go; two do not. The page prints 58 and
+        61 and nothing on it says where 59 stops and 60 starts, so a converter that
+        splits the note there is inventing a citation boundary."""
+        book = _book(F.two_swept_notes_page)
+
+        assert book.swept_notes(0) == []
+
+    def test_a_number_the_scan_shortened_is_not_a_number_the_scan_swept(self):
+        """The control that does the work. MEASURED on page 157: the zone returns
+        ``26, 27, 28, 29, 3, 31`` -- the 3 is the 30 with a digit gone, and the marker
+        pointing at it lost the same digit, so there is nothing undamaged to repair it
+        from. The gap between 29 and 31 is real and the note is not missing: it is
+        sitting in the middle of the page with the wrong name."""
+        book = _book(F.shortened_note_number_page)
+
+        assert sorted(n.num for n in book.notes) == [3, 29, 31], \
+            "the fixture stopped reproducing the damage"
+        assert book.swept_notes(0) == []
+
+    def test_a_page_where_nothing_else_is_wrong_still_says_it(self):
+        """MEASURED, page 115: both printed notes are marked and every count on the
+        page agrees. Without this the page is never routed, and note 125 stays inside
+        note 124 for the life of the book."""
+        book = _book(F.quietly_swept_note_page)
+
+        assert book.swept_notes(0) == [125]
+        assert book.page_reasons(0) == ["note_number_swept"]
+
+
 def test_a_word_broken_across_two_lines_of_a_footnote_is_put_back_together():
     """MEASURED on the acceptance book: five words survive the body text and are lost
     inside footnotes -- ``non-standard``, ``hour-priests``, ``astrologer-bashing`` --

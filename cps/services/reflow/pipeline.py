@@ -367,6 +367,14 @@ def page_hints(book, pno, reasons=None):
             "where the number belongs. Put each one back as a noteref where the "
             "image shows it, replacing that punctuation, and use no other number."
             % ", ".join(str(number) for number in unmarked))
+    swept = book.swept_notes(pno) if book is not None else []
+    for number in swept:
+        hints.append(
+            "the page also prints note %d under the rule and the text layer lost it "
+            "whole: its number is gone and its text reads on from the end of note "
+            "%d. Cut note %d where the image shows it starting, open it with %d in "
+            "place of whatever the scan left there, and move no words between the "
+            "two." % (number, number - 1, number, number))
     return hints
 
 
@@ -416,9 +424,12 @@ def _adopt(result, book, pno, outcome, html, uncertain, ladder,
     # The notes this page prints and never points at. They are the only numbers the
     # model is allowed to conjure out of the scan, and only in place of the
     # punctuation the scanner left behind — see gate._marker_recovery.
-    unmarked = book.unmarked_notes(pno)
+    # ... plus the numbers the page printed and the text layer never returned at
+    # all, which are missing from that list for the same reason they are missing
+    # from the page: there is no note left to be unmarked (see Book.swept_notes).
+    recoverable = book.unmarked_notes(pno) + book.swept_notes(pno)
     words = gate.check_word_preservation(source_text, html,
-                                         recoverable_markers=unmarked)
+                                         recoverable_markers=recoverable)
     structure = gate.check_structure(html, ladder=ladder,
                                      require_figure_caption=require_figure_caption,
                                      figures_expected=figures)

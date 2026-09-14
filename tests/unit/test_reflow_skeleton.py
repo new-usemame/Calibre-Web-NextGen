@@ -69,6 +69,28 @@ def test_the_paragraph_under_a_run_in_heading_does_not_still_contain_it():
     assert not paragraphs[0].text.startswith("Serapio of Alexandria (First Century CE?)")
 
 
+def test_a_run_in_heading_comes_before_the_paragraph_it_opens():
+    """A heading in the wrong place is worse than no heading: the EPUB splits on h1
+    and h2, so a section head that sorts *after* its own first paragraph leaves that
+    paragraph at the end of the previous chapter and opens the new one mid-thought.
+
+    MEASURED on book 567 page 121 (index 120): heading and paragraph share the text
+    block's top, and the block's left edge (53.65) is further left than the heading
+    line that opens it (53.94), so ordering the page by position alone puts the body
+    first."""
+    book = _book(F.run_in_heading_with_scan_jitter_page)
+
+    kinds = [el.kind for el in book.elements]
+    heads = [i for i, el in enumerate(book.elements)
+             if el.kind == "h" and el.text.startswith("Serapio of Alexandria (First")]
+    paras = [i for i, el in enumerate(book.elements)
+             if el.kind == "p" and el.text.startswith("Serapio of Alexandria was")]
+
+    assert heads and paras, kinds
+    assert heads[0] < paras[0], (
+        "the heading must open its section, not trail it: %s" % kinds)
+
+
 def test_numbered_bibliography_entries_are_not_headings():
     """103 bold-numbered entries in one book are heading candidates by weight and
     every one is a correct rejection."""

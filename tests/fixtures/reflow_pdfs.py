@@ -1252,3 +1252,25 @@ def long_heading_with_function_words_page(doc, folio="440"):
          size=HEAD_SIZE)
     add_body_lines(page, PROSE_LINES[:6], top=BODY_TOP + BODY_LEADING)
     return page
+
+
+def run_in_heading_with_scan_jitter_page(doc):
+    """The same run-in head as :func:`defect_a_page`, set the way a scan sets it.
+
+    MEASURED on book 567 page 121 (index 120): the heading line starts at x=53.94
+    and the body lines under it start anywhere between 53.65 and 54.25, so the text
+    block's own left edge is *further left* than the heading that opens it. Both
+    share the block's top, because the heading is the block's first line.
+    """
+    page = add_page(doc)
+    add_running_head(page, "94", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    _put(page, LEFT + 0.29, BODY_TOP, "Serapio of Alexandria (First Century CE?)",
+         size=HEAD_SIZE, font=_BOLD)
+    y = BODY_TOP + BODY_LEADING
+    for drift, line in zip((0.0, -0.35, 0.24),
+                           ["Serapio of Alexandria was an astrologer who wrote on",
+                            "inceptional astrology and possibly other topics, although",
+                            "only fragments of his work survive."]):
+        _put(page, LEFT + drift, y, line, size=BODY_SIZE)
+        y += BODY_LEADING
+    return page

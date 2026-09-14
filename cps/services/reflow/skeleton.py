@@ -438,6 +438,24 @@ def _region_order(region):
             round(region.bbox[0], 1))
 
 
+def _lines_bbox(lines, fallback):
+    """The box the given lines actually occupy.
+
+    A region's box has to describe the region, not the text block it was cut out
+    of. When a run-in head is split off the front of a block, the paragraph left
+    behind still starts where the block does if it keeps the block's box -- it then
+    ties with its own heading on the page's reading order and the tie is broken by
+    left edge, which on a scan is jitter. MEASURED on book 567 page 121 (index 120):
+    the paragraph won the tie and the section head came out *after* the section's
+    first paragraph.
+    """
+    boxes = [ln.bbox for ln in lines if ln.bbox]
+    if not boxes:
+        return fallback
+    return (min(b[0] for b in boxes), min(b[1] for b in boxes),
+            max(b[2] for b in boxes), max(b[3] for b in boxes))
+
+
 def _split_off_notes(raw, style, skel):
     """Separate the footnote zone from the body, keeping multi-block notes together."""
     body, notes = [], []
@@ -632,14 +650,15 @@ def _classify_body(lines, blk, style, skel):
         if acceptable_heading(joined):
             skel.regions.append(Region(kind="heading", lines=list(lines),
                                        level=style.level_for(lines[0].size),
-                                       bbox=blk.bbox))
+                                       bbox=_lines_bbox(lines, blk.bbox)))
             return
         skel.reasons.append("large_type_not_a_heading")
 
     if not lines:
         return
     kind = "caption" if CAPTION_LINE.match(lines[0].stripped) else "body"
-    skel.regions.append(Region(kind=kind, lines=list(lines), bbox=blk.bbox))
+    skel.regions.append(Region(kind=kind, lines=list(lines),
+                               bbox=_lines_bbox(lines, blk.bbox)))
 
 
 def _looks_multi_column(blocks, raw):

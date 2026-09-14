@@ -1244,6 +1244,18 @@ def heading_that_stops_on_a_function_word_page(doc):
         folio="438")
 
 
+def line_that_ends_in_sentence_punctuation_page(doc):
+    """MEASURED, book 567 PDF page 486 (index 485): ``The native was the son of U.S.``
+    came back at heading size in the body's roman face. It begins like a title, ends
+    on a content word, and is short -- every shape rule but one says heading. The one
+    that does not is that it ends where a sentence ends."""
+    return _drifted_line_page(
+        doc, "The native was the son of U.S.",
+        ["Senator William Fulbright, and the chart was cast for a",
+         "birth in Arkansas in the spring of 1944."],
+        folio="401")
+
+
 def long_heading_with_function_words_page(doc, folio="440"):
     """The control: a real section head that uses those same words inside it."""
     page = add_page(doc)

@@ -548,6 +548,16 @@ class TestASentenceTheScannerSetLargeIsStillASentence(object):
         assert not [el for el in _kinds(book, "h") if "Capricorn" in el.text], \
             [el.text for el in _kinds(book, "h")]
 
+    def test_a_line_that_ends_where_a_sentence_ends_is_not_a_heading(self):
+        """MEASURED on book 567: two body lines the scan set large end in sentence
+        punctuation and nothing else about them says prose. This is ``The native was
+        the son of U.S.`` (index 485); the other, a house-list line ending in a comma
+        (index 367), is caught first by the lowercase line under it."""
+        book = self._with_a_ladder(F.line_that_ends_in_sentence_punctuation_page)
+
+        assert not [el for el in _kinds(book, "h") if "native was the son" in el.text], \
+            [el.text for el in _kinds(book, "h")]
+
     def test_a_real_heading_may_use_those_words_inside_it(self):
         """The control: the rule is about where the words fall, not that they appear."""
         book = self._with_a_ladder(F.long_heading_with_function_words_page)

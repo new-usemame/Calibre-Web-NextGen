@@ -759,9 +759,46 @@ def _drop_images(chapters, missing):
         chapter.blocks = [_IMG_TAG.sub(strip, block) for block in chapter.blocks]
 
 
+def _losses(dropped, missing):
+    """What the builder had to drop, in the reader's terms rather than the log's.
+
+    Only the builder knows these: a marker whose note is not in the finished book,
+    and a plate it could not cut out of the PDF. A reader meets both of them in
+    their book -- the number opens nothing, the picture is not there -- so they
+    belong with everything else the conversion could not do. Returned to the report
+    page and written into the sidecar, not left in a warnings list nobody reads.
+    """
+    out = []
+    if dropped:
+        out.append(_count(
+            len(dropped),
+            "One footnote marker pointed at a note that is not in this book. It is "
+            "kept as a printed number rather than made into a link that opens "
+            "nothing.",
+            "%d footnote markers pointed at notes that are not in this book. They "
+            "are kept as printed numbers rather than made into links that open "
+            "nothing."))
+    if missing:
+        out.append(_count(
+            len(missing),
+            "One picture could not be taken out of the PDF and is not in this book.",
+            "%d pictures could not be taken out of the PDF and are not in this "
+            "book."))
+    return out
+
+
+def _count(n, one, many):
+    return one if n == 1 else many % n
+
+
 def build(book, out_path, page_html=None, metadata=None, doc=None,
           report_html=None, sidecar=None, identifier=None):
-    """Write one EPUB 3 and say what went into it."""
+    """Write one EPUB 3 and say what went into it.
+
+    ``report_html`` is called last, with the document each page marker landed in and
+    the list of things the build itself could not place -- neither is known until
+    the split and the crops are done.
+    """
     metadata = dict(metadata or {})
     language = metadata.get("language") or "en"
     if page_html is None:
@@ -787,8 +824,9 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     spine = []
     documents = {}
 
+    losses = _losses(dropped, missing)
     if callable(report_html):
-        report_html = report_html(_page_homes(chapters))
+        report_html = report_html(_page_homes(chapters), losses)
     if report_html:
         documents[ABOUT_HREF] = _document("About this conversion", report_html, language)
         manifest.append({"id": "reflow-about", "href": ABOUT_HREF,
@@ -808,6 +846,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         manifest.append({"id": "img%03d" % index, "href": src, "type": "image/jpeg"})
 
     payload = _sidecar(book, pages, chapters, images, joins, sidecar)
+    if losses:
+        payload["unplaced"] = list(payload.get("unplaced") or []) + losses
     warnings = []
     if dropped:
         warnings.append("%d note links had no target and were disarmed" % len(dropped))

@@ -245,6 +245,22 @@ def test_a_swept_note_the_model_put_back_is_not_still_called_missing(tmp_path):
     assert payload["structure"]["footnotes_swept"] == 0
 
 
+def test_what_the_builder_could_not_place_is_on_the_page_with_everything_else(tmp_path):
+    """Two losses only the EPUB builder can see -- a note link with no note to open,
+    a plate it could not cut out of the PDF -- and the reader meets both of them in
+    their book. They belong in the same list as every other thing the conversion
+    could not do, not in a return value nobody reads."""
+    result, ledger, _ = _run(tmp_path, F.prose_page, F.prose_page)
+    payload = report.numbers(result, ledger)
+    losses = ["One footnote link had no note to open and was disarmed.",
+              "One picture could not be taken out of the PDF."]
+
+    text = _text(report.about_page(payload, losses=losses))
+
+    for loss in losses:
+        assert loss in text, text
+
+
 def test_a_conversion_with_no_model_says_so_rather_than_reporting_a_clean_sweep(tmp_path):
     """With no key configured every page is deterministic. Reporting that as 'no
     pages failed the gate' would be true and deeply misleading."""

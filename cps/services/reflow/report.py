@@ -263,8 +263,13 @@ def check_completion(payload, ledger):
 
 # -------------------------------------------------------------------- the page
 
-def about_page(payload, show_cost=False, links=None):
-    """The XHTML body of ``reflow-about.xhtml``, in plain language."""
+def about_page(payload, show_cost=False, links=None, losses=()):
+    """The XHTML body of ``reflow-about.xhtml``, in plain language.
+
+    ``losses`` are the things only the EPUB builder knows it could not place; they
+    join the rest of what the conversion could not do rather than forming a second
+    list of bad news somewhere else on the page.
+    """
     links = links or {}
     out = ["<h1>About this conversion</h1>",
            "<p>This book was made from a PDF by %s %s on %s. %s</p>"
@@ -282,10 +287,10 @@ def about_page(payload, show_cost=False, links=None):
 
     out.extend(_fidelity_section(payload))
     out.extend(_structure_section(payload))
-    if payload.get("unplaced"):
+    unplaced = list(payload.get("unplaced") or []) + list(losses or ())
+    if unplaced:
         out.append("<h2>What could not be placed</h2><ul>%s</ul>"
-                   % "".join("<li>%s</li>" % escape(item)
-                             for item in payload["unplaced"]))
+                   % "".join("<li>%s</li>" % escape(item) for item in unplaced))
     out.extend(_uncertain_section(payload, links))
     if show_cost:
         out.extend(_spend_section(payload))

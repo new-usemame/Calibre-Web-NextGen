@@ -458,7 +458,7 @@ def test_the_about_page_is_written_once_the_pages_have_somewhere_to_live(tmp_pat
                  lambda d: F.chapter_opening_page(d, "Chapter Two", folio="45"))
     seen = {}
 
-    def write_about(where):
+    def write_about(where, losses=()):
         seen.update(where)
         return ('<h1>About this conversion</h1>'
                 '<p><a href="%s#pg_0001">the second page</a></p>' % where[1])
@@ -530,6 +530,38 @@ def test_a_sentence_left_outside_a_paragraph_still_reaches_the_reader(tmp_path):
     # The tail is its own case: text after the last closing tag is where a splitter
     # that only notices what is between elements stops looking.
     assert "Valens is named after the last paragraph closes." in written
+
+
+def test_a_picture_that_could_not_be_taken_out_of_the_pdf_is_told_to_the_reader(tmp_path):
+    """The builder is the only thing that knows what it had to drop.
+
+    A figure whose crop fails and a note link whose note is not in the book are both
+    losses a reader can see in their book and cannot explain: the plate is simply
+    not there, the number simply does not open. Both were counted into a warnings
+    list on the return value that the task never read and the report page never
+    printed, so the one page whose whole job is to say what the conversion could not
+    do said nothing about either.
+    """
+    doc = F.new_doc()
+    F.illustrated_page(doc, F.solid_png())
+    told = {}
+
+    def write_about(where, losses):
+        told.setdefault("losses", []).append(list(losses))
+        return "<h1>About this conversion</h1><p>ok</p>"
+
+    try:
+        book = assemble.deterministic_book(doc)
+        kept = _build(book, tmp_path / "kept", report_html=write_about, doc=doc)
+        # The same book built by a builder with no PDF to crop from: every figure
+        # the fragments refer to is one it cannot produce.
+        lost = _build(book, tmp_path / "lost", report_html=write_about, doc=None)
+    finally:
+        doc.close()
+
+    assert kept.images == 1 and lost.images == 0, (kept.images, lost.images)
+    assert told["losses"][0] == [], "nothing was dropped and something was reported"
+    assert told["losses"][1], "the picture went missing and the report page was not told"
 
 
 def test_a_figure_the_page_printed_no_caption_for_says_so(tmp_path):
@@ -886,7 +918,7 @@ def test_every_link_in_the_finished_book_lands_on_something_that_is_in_it(tmp_pa
     where the about page sent a reader to ch008 for a marker that is in ch007."""
     book = _book(F.prose_page, F.mid_page_heading_page, F.prose_page)
 
-    def write_about(where):
+    def write_about(where, losses=()):
         return ('<h1>About this conversion</h1><p>%s</p>'
                 % "".join('<a href="%s#pg_%04d">page %d</a> ' % (href, pno, pno)
                           for pno, href in sorted(where.items())))

@@ -254,13 +254,17 @@ class TaskReflowPdf(CalibreTask):
         target = self._target_path(book, local_db)
         page = None
         if self.options.include_report_page:
-            def page(links=None, _payload=payload):
+            def page(links=None, losses=(), _payload=payload):
                 return report.about_page(_payload,
                                          show_cost=self.options.show_cost_in_report,
-                                         links=links)
+                                         links=links, losses=losses)
         built = build_epub.build(result.book, target, page_html=result.page_html,
                                  metadata=_metadata(book), doc=document,
                                  report_html=page, sidecar=payload)
+        for warning in built.warnings:
+            # The reader is told the same thing in their own book, on the report
+            # page; this is the terser half, for whoever has to find out why.
+            log.warning("reflow: %s", warning)
         problems = build_epub.validate(built.path)
         if problems:
             # A document a reader's parser stops on is not a chapter with a mistake

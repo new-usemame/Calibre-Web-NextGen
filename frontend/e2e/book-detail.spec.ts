@@ -416,17 +416,24 @@ test('desktop: the action row leads above the cover/title block; the description
   await expect(actions).toBeVisible();
   const cover = page.locator('main [class*="coverWrap"]').first();
   await expect(cover).toBeVisible();
+  const metaList = page.locator('main dl');
+  await expect(metaList).toContainText('Sentinel Publisher');
   await settleBookLayout(page);
 
   const actionsBox = (await actions.boundingBox())!;
   const coverBox = (await cover.boundingBox())!;
   const descBox = (await description.boundingBox())!;
+  const metaBox = (await metaList.boundingBox())!;
   expect(
     actionsBox.y + actionsBox.height,
     'the action row must end above the cover/title block on desktop',
   ).toBeLessThanOrEqual(coverBox.y + 1);
+  // On desktop the description lives in the info column beside the cover, so
+  // its height relative to the cover depends on how many attribute rows the
+  // book has (CI's first seed book has fewer than the dev rig's). What #1828
+  // pins is the column order: the description comes after the attribute list.
   expect(
-    coverBox.y + coverBox.height,
-    'desktop keeps the description after the header block',
+    metaBox.y + metaBox.height,
+    'desktop keeps the description last in the info column, after the attribute list',
   ).toBeLessThanOrEqual(descBox.y + 1);
 });

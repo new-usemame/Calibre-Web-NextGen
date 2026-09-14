@@ -145,10 +145,15 @@ test('coarse pointers carry no card actions; the book page owns them', async ({ 
   // …and the book page carries the actions the card gave up.
   const detailRead = page.getByRole('link', { name: 'Read now' });
   await expect(detailRead, 'the book page offers Read now').toBeVisible();
-  await expect(
-    page.locator(`a[href$="/book/${bookId}/edit"]`).first(),
-    'the book page offers Edit',
-  ).toBeVisible();
+  // Edit lives in the "More actions" gear menu now; a tap opens it and the
+  // menuitem navigates to the editor.
+  await tap(page.getByTestId('book-actions-menu'));
+  const editItem = page.getByRole('menuitem', { name: 'Edit metadata' });
+  await expect(editItem, 'the book page offers Edit metadata in the gear menu').toBeVisible();
+  await tap(editItem);
+  await expect(page).toHaveURL(new RegExp(`/book/${bookId}/edit$`));
+  await page.goBack();
+  await expect(page.getByRole('link', { name: 'Read now' })).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Add to shelf' }),
     'the book page owns shelf membership, which is how a shelf removal is reached',

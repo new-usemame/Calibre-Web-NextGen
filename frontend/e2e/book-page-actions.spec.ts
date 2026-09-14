@@ -285,3 +285,109 @@ test('Edit metadata keeps no inline cover controls; its button opens the cover e
 
   assertNoPageErrors(errors);
 });
+
+// ── Behavioural replacements for the deleted Python source pins
+// (tests/unit/test_api_v1_edit.py asserted TSX text; these pin the promises
+// the pins were named after: the message reaches the user, the note still
+// renders, and a metadata-only book has no file controls).
+
+test('a format-delete failure surfaces the message in the Files section', async ({ page }) => {
+  await page.goto('/app');
+  const bookId = await firstBookWithFormats(page);
+  test.skip(bookId == null, 'seed has no book with files');
+  await stubFullAccess(page);
+  await page.route(`**/api/v1/books/${bookId}/formats/*/delete`, async (route) => {
+    await route.fulfill({
+      status: 400,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'delete_failed', message: 'Stubbed format failure.' } }),
+    });
+  });
+  page.on('dialog', (d) => void d.accept());
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  const files = page.getByTestId('book-files');
+  await files.getByRole('button', { name: /^Delete [A-Z0-9]+/i }).first().click();
+  await expect(files.getByRole('status')).toContainText('Stubbed format failure.');
+});
+
+test('the Files section explains that deleting the last format keeps the book', async ({ page }) => {
+  await page.goto('/app');
+  const bookId = await firstBookWithFormats(page);
+  test.skip(bookId == null, 'seed has no book with files');
+  await stubFullAccess(page);
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('book-files')).toContainText(
+    'The book record, metadata, shelves, and reading state stay available.',
+    { timeout: 10_000 },
+  );
+});
+
+test('a metadata-only book shows no file delivery controls', async ({ page }) => {
+  await page.goto('/app');
+  const bookId = await firstBookWithFormats(page);
+  test.skip(bookId == null, 'seed has no book with files');
+  await stubFullAccess(page);
+  await page.route(new RegExp(`/api/v1/books/${bookId}(?:\\?.*)?$`), async (route) => {
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const { response: res, body: book } = got;
+    book.formats = [];
+    book.convert_options = { sources: [], targets: [] };
+    await route.fulfill({ response: res, json: book });
+  });
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10_000 });
+  // No Files section, no download links, no per-format delete buttons.
+  await expect(page.getByTestId('book-files')).toHaveCount(0);
+  await expect(page.locator('a[href*="/download/"]')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Delete [A-Z0-9]+/i })).toHaveCount(0);
+  // The send routes gate on having files, so neither appears in the menu.
+  const menu = await openGearMenu(page);
+  await expect(menu.getByRole('menuitem', { name: 'Send to e-reader' })).toHaveCount(0);
+  await expect(menu.getByRole('menuitem', { name: 'Send to device' })).toHaveCount(0);
+});
+
+test('a whole-book delete shows the API warning after it succeeds', async ({ page }) => {
+  await page.goto('/app');
+  const bookId = await firstBookWithFormats(page);
+  test.skip(bookId == null, 'seed has no book with files');
+  await page.route(`**/api/v1/books/${bookId}/delete`, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ warning: { message: 'Stubbed delete warning.' } }),
+    });
+  });
+  const dialogs: string[] = [];
+  page.on('dialog', (d) => { dialogs.push(`${d.type()}:${d.message()}`); void d.accept(); });
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  const menu = await openGearMenu(page);
+  await menu.getByRole('menuitem', { name: 'Delete from the global library' }).click();
+  await expect.poll(() => dialogs.some((d) => d === 'alert:Stubbed delete warning.')).toBe(true);
+});
+
+test('the open gear menu stays inside the viewport even when the row overflows (CI font metrics)', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 667 });
+  await page.goto('/app');
+  const bookId = await firstBookWithFormats(page);
+  test.skip(bookId == null, 'seed has no book with files');
+  await stubFullAccess(page);
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('book-actions-menu')).toBeVisible({ timeout: 10_000 });
+  // CI's fonts leave the page a few px wider than the 375px viewport, putting
+  // the gear's anchor past the right edge; the menu must clamp inside anyway.
+  // Emulate that exact geometry: park the trigger's wrapper 24px past the
+  // viewport's right edge (what CI's metrics did to it) and open the menu.
+  await page.addStyleTag({
+    content: 'div:has(> [data-testid="book-actions-menu"]) { position: fixed; right: -24px; bottom: 140px; z-index: 999; }',
+  });
+  const menu = await openGearMenu(page);
+  const box = (await menu.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(376);
+});

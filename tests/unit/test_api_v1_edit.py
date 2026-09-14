@@ -267,18 +267,6 @@ def test_delete_api_never_treats_a_missing_core_success_as_204(core_result):
 
 
 @pytest.mark.unit
-def test_spa_surfaces_delete_warnings_and_format_failures():
-    from pathlib import Path
-    root = Path(__file__).parents[2]
-    queries = (root / "frontend" / "src" / "lib" / "queries.ts").read_text()
-    detail = (root / "frontend" / "src" / "pages" / "BookDetail.tsx").read_text()
-    edit = (root / "frontend" / "src" / "pages" / "EditBook.tsx").read_text()
-    assert "export interface DeleteResult" in queries
-    assert "result?.warning" in detail and "window.alert(result.warning.message)" in detail
-    assert "onError: (err) => setMsg" in edit
-
-
-@pytest.mark.unit
 def test_update_metadata_collects_field_errors():
     from cps.api import edit as mod
     fake_book = SimpleNamespace(
@@ -387,13 +375,6 @@ def test_delete_format_allows_removing_the_last_format():
 
 
 @pytest.mark.unit
-def test_edit_book_explains_that_deleting_the_last_format_keeps_the_book():
-    component = (Path(__file__).parents[2] / "frontend" / "src" / "pages" / "EditBook.tsx").read_text()
-    assert "disabled={deleteFormat.isPending}" in component
-    assert "The book record, metadata, shelves, and reading state stay available." in component
-
-
-@pytest.mark.unit
 def test_classic_route_allows_removing_a_single_format():
     """Drive POST /delete/<id>/<format> directly for the reporter's case."""
     from cps import editbooks as mod
@@ -426,13 +407,6 @@ def test_classic_edit_explains_metadata_only_result_and_renders_single_format_co
     template = (Path(__file__).parents[2] / "cps" / "templates" / "book_edit.html").read_text()
     assert "book.data|length > 1" not in template
     assert "The book record, metadata, shelves, and reading state stay available." in template
-
-
-@pytest.mark.unit
-def test_metadata_only_detail_hides_all_file_delivery_controls():
-    component = (Path(__file__).parents[2] / "frontend" / "src" / "pages" / "BookDetail.tsx").read_text()
-    assert "book.formats.map((fmt) =>" in component
-    assert "book.formats.length > 0 && (deliveryDevices.data?.devices.length ?? 0) > 0" in component
 
 
 @pytest.mark.unit

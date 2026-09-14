@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useId, type ReactNode } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useId, type ReactNode } from 'react';
 import { Link } from 'wouter';
 import styles from './Menu.module.css';
 
@@ -55,10 +55,12 @@ interface MenuProps {
 export function Menu({ label, title, icon, sections, menuLabel, triggerTestId, menuTestId, triggerClassName }: MenuProps) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
-  // The menu is right-anchored to the trigger. When the trigger wraps to the
-  // left edge of a narrow row, that anchor pushes the panel off-screen — flip
-  // to left-anchored after measuring once per open.
-  const [flipLeft, setFlipLeft] = useState(false);
+  // Horizontal position as an explicit px offset from the wrap's left edge,
+  // computed once per open: right-anchored by default, left-anchored when that
+  // would cross the left edge (wrapped row on a narrow phone), and clamped so
+  // the right edge never crosses the viewport — a page a few px wider than the
+  // viewport (CI #2237) must not take the menu off-screen with it.
+  const [left, setLeft] = useState<number | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -87,10 +89,22 @@ export function Menu({ label, title, icon, sections, menuLabel, triggerTestId, m
     return () => document.removeEventListener('pointerdown', onPointer);
   }, [open, close]);
 
-  useEffect(() => {
+  // Layout effect: the clamp must land BEFORE the first paint of the open
+  // menu — useEffect would flash the unclamped position (and any synchronous
+  // measurement, like an e2e boundingBox, would read it).
+  useLayoutEffect(() => {
     if (!open) return;
     const menu = menuRef.current;
-    if (menu) setFlipLeft(menu.getBoundingClientRect().left < 8);
+    const wrap = wrapRef.current;
+    if (!menu || !wrap) return;
+    const vw = document.documentElement.clientWidth;
+    const gutter = 8;
+    const wrapRect = wrap.getBoundingClientRect();
+    const width = menu.offsetWidth;
+    // wrapRect.width - width is the stylesheet's right:0 anchor.
+    let rel = wrapRect.right - width < gutter ? 0 : wrapRect.width - width;
+    rel = Math.min(rel, vw - gutter - wrapRect.left - width);
+    setLeft(rel);
   }, [open]);
 
   // Roving tabindex: move DOM focus to the active item whenever it changes.
@@ -195,7 +209,9 @@ export function Menu({ label, title, icon, sections, menuLabel, triggerTestId, m
       </button>
       {open && itemCount > 0 && (
         <div ref={menuRef} role="menu" aria-label={menuLabel ?? label}
-          className={`${styles.menu} ${flipLeft ? styles.menuLeft : ''}`} data-testid={menuTestId}>
+          className={styles.menu}
+          style={left !== null ? { left, right: 'auto' } : undefined}
+          data-testid={menuTestId}>
           {sections.map((section) => {
             if (section.items.length === 0) return null;
             const labelId = section.label ? `${menuId}-${section.id}` : undefined;

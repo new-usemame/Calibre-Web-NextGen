@@ -298,6 +298,12 @@
   font-size: var(--fs-sm, 0.85rem);
 }
 .tagChipLink {
+  /* SC 2.5.8: the smallest hit targets in a chip row must clear 24px — the
+     chips are packed too close to use the spacing exception instead. */
+  display: inline-flex;
+  align-items: center;
+  min-width: 24px;
+  min-height: 24px;
   color: var(--text);
   text-decoration: none;
 }
@@ -308,8 +314,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--r-full);
   border: none;
   background: transparent;
@@ -364,12 +370,25 @@
   display: flex;
   align-items: center;
   gap: var(--sp-3);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   margin-bottom: var(--sp-5);
 }
 
-/* The gear menu is the row's last control, pinned to its right edge. */
+/* The three buttons wrap beneath themselves at narrow widths… */
+.actionsGroup {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+/* …while the gear stays pinned to the top-right of the FIRST row — never a
+   row of its own with an empty band under the buttons. */
 .gearWrap {
+  flex: 0 0 auto;
+  align-self: flex-start;
   margin-left: auto;
   display: inline-flex;
 }
@@ -658,7 +677,8 @@
   /* #1828 chip compression: the action row keeps 34px chips with tighter gaps
      so the description stays near the first screen. 34px keeps the SC 2.5.8
      24px floor with margin; labels shrink one step. */
-  .actions { gap: var(--sp-2); }
+  .actions,
+  .actionsGroup { gap: var(--sp-2); }
   .actionPrimary,
   .readToggleActive,
   .readToggleGhost {

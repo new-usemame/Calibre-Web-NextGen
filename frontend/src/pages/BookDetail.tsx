@@ -655,29 +655,33 @@ export function BookDetail() {
       {/* The four visible controls lead the page: directly under the back
           link, above the cover/title block, on both viewports (operator ruling
           2026-09-14). Everything else lives in the gear menu (built above) or
-          in the Files section at the page foot. The gear is pushed to the
-          row's right edge. */}
+          in the Files section at the page foot. Two flex children: a wrapping
+          group for the three buttons, and the gear pinned to the TOP-RIGHT of
+          the first row — it must never drop onto a row of its own when the
+          buttons wrap beneath it (review on top-actions-mobile.jpg). */}
       <div className={styles.actions} data-testid="book-actions">
-        {inLibrary && primaryReadTarget ? (
-          <Link href={primaryReadTarget} className={styles.actionPrimary}>
-            {t('Read now')}
-          </Link>
-        ) : null}
+        <div className={styles.actionsGroup}>
+          {inLibrary && primaryReadTarget ? (
+            <Link href={primaryReadTarget} className={styles.actionPrimary}>
+              {t('Read now')}
+            </Link>
+          ) : null}
 
-        {/* Star / favorite */}
-        {inLibrary && <button
-          className={book.favorited ? styles.readToggleActive : styles.readToggleGhost}
-          onClick={() => toggleFavorite.mutate()}
-          disabled={toggleFavorite.isPending}
-          aria-label={book.favorited ? t('Remove from favorites') : t('Add to favorites')}
-        >
-          <Star size={14} fill={book.favorited ? 'currentColor' : 'none'} />
-          {book.favorited ? t('Favorited') : t('Favorite')}
-        </button>}
+          {/* Star / favorite */}
+          {inLibrary && <button
+            className={book.favorited ? styles.readToggleActive : styles.readToggleGhost}
+            onClick={() => toggleFavorite.mutate()}
+            disabled={toggleFavorite.isPending}
+            aria-label={book.favorited ? t('Remove from favorites') : t('Add to favorites')}
+          >
+            <Star size={14} fill={book.favorited ? 'currentColor' : 'none'} />
+            {book.favorited ? t('Favorited') : t('Favorite')}
+          </button>}
 
-        {inLibrary && (
-          <AddToShelf bookId={book.id} inLibrary={inLibrary} />
-        )}
+          {inLibrary && (
+            <AddToShelf bookId={book.id} inLibrary={inLibrary} />
+          )}
+        </div>
 
         {menuItems.length > 0 && (
           <div className={styles.gearWrap}>

@@ -253,8 +253,23 @@ test('the book page layout holds on a 375px phone: controls wrap, no horizontal 
   await stubFullAccess(page);
 
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByTestId('book-actions-menu')).toBeVisible({ timeout: 10_000 });
-  await assertNoHorizontalOverflow(page);
+  const trigger = page.getByTestId('book-actions-menu');
+  await expect(trigger).toBeVisible({ timeout: 10_000 });
+  // The gear must stay pinned to the TOP-RIGHT of the first row at every
+  // narrow width — never wrapping onto a row of its own (which left an empty
+  // band under the buttons, item 5 review).
+  for (const width of [375, 320]) {
+    await page.setViewportSize({ width, height: 667 });
+    const [gearBox, readBox] = await Promise.all([
+      trigger.boundingBox(),
+      page.getByRole('link', { name: 'Read now' }).boundingBox(),
+    ]);
+    expect(
+      Math.abs(gearBox!.y - readBox!.y),
+      `gear must share the first row with Read now at ${width}px, not drop to its own row`,
+    ).toBeLessThanOrEqual(2);
+    await assertNoHorizontalOverflow(page);
+  }
   // The gear menu stays inside the viewport when open.
   const menu = await openGearMenu(page);
   const box = (await menu.boundingBox())!;

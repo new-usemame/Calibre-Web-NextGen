@@ -1085,3 +1085,69 @@ def lowercase_word_in_the_note_zone_page(doc):
     add_notes(page, [("so", "Tarrant argues, was already an old position by then."),
                      (91, "Cramer explored the potential lineage of the family.")])
     return page
+
+
+def glyph_note_number_page(doc):
+    """Page 119 of book 567: a note whose own printed number the scan read as letters.
+
+    The number is set two points under the note's text, and the scanner returned it
+    inside the text span rather than as a raised number of its own: the line arrives
+    as ``Is' Pingree, Yavanajataka, vol. 2, p. 445.`` -- the two 1s of 151 read as an
+    I and an apostrophe, the 5 as an s. The number is still recoverable, because that
+    is what those glyphs spell; what is left over is the note's own number printed a
+    second time at the head of its text, where it is neither a citation nor a word.
+    """
+    page = add_page(doc)
+    add_running_head(page, "102", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    y = add_body_lines(page, PROSE_LINES[:5])
+    y = add_line_with_marker(page, y, "Bidez and Cumont originally argued", "150",
+                             " that the Maguseans", superscript=True)
+    add_body_lines(page, ["were responsible for transmitting some forms of the"], top=y)
+    y = add_notes(page, [(150, "Les Mages Hellenises, ed. Bidez and Cumont, pp. 56-84.")])
+    _put(page, LEFT + 4, y, "Is' Pingree, Yavanajataka, vol. 2, p. 445.",
+         size=NOTE_TEXT_SIZE)
+    return page
+
+
+def split_glyph_note_number_page(doc):
+    """Page 110 of book 567: the scan split the note's number and mangled the rest.
+
+    ``105`` came back as a raised ``1`` and a full-size ``"``. Two digits are gone
+    and what is left does not spell the number: the number is repaired from the notes
+    around it, and the residue is not proof of anything. It stays in the note's text
+    where a model can see what the page printed.
+    """
+    page = add_page(doc)
+    add_running_head(page, "93", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    y = add_body_lines(page, PROSE_LINES[:5])
+    y = add_line_with_marker(page, y, "his intellectual background is", "105",
+                             " set out by Volk", superscript=True)
+    add_body_lines(page, ["in a study of the poem that remains the standard one."], top=y)
+    y = add_notes(page, [(104, "Manilius, Astronomica, 4: 294-407.")])
+    x = LEFT + 4
+    x += _put(page, x, y, "1", size=NOTE_NUM_SIZE)
+    _put(page, x + 2, y, '" Volk, Manilius and His Background, p. 48f.',
+         size=NOTE_TEXT_SIZE)
+    add_notes(page, [(106, "Pingree, Review of Manilius, p. 263.")], top=y + 12.0)
+    return page
+
+
+def note_opening_with_a_letter_word_page(doc):
+    """Page 63 of book 567: a note that opens with the word ``I``.
+
+    One letter, and it reads as a 1 -- the control for every repair here that reads
+    letters as digits. The note's own number is printed and undamaged, so the word
+    behind it is the note's first word and nothing may take it for part of a number.
+    """
+    page = add_page(doc)
+    add_running_head(page, "46", "CHAPTER 3: THE EARLY HELLENISTIC TRADITION")
+    y = add_body_lines(page, PROSE_LINES[:5])
+    y = add_line_with_marker(page, y, "the evidence for this lineage", "78",
+                             " is set out below", superscript=True)
+    add_body_lines(page, ["and rests on a passage that has not been read this way."],
+                   top=y)
+    add_merged_notes(page, [
+        (78, "I believe that we can find further evidence for this in the Anthology."),
+        (79, "Cramer, Astrology in Roman Law and Politics, p. 108."),
+    ])
+    return page

@@ -482,3 +482,73 @@ class TestMarkersTheScannerReadAsLetters(object):
 
         assert "places.[111]" in assemble.page_source_text(book, 0)
         assert [n.marked for n in book.notes if n.num == 111] == [True]
+
+
+class TestANotesOwnNumberPrintedTwice(object):
+    """The number at the head of a note's text is the note's number, not its text.
+
+    A note's number is printed twice in what reaches us: once as the number the
+    reader takes, and once in the characters the scanner returned for it. Where the
+    scanner returned digits the reader has always dropped them. Where it returned
+    letters and quotation marks it did not, and the note ships with the wreckage of
+    its own number in front of its first word. MEASURED on the acceptance book: 38
+    of its 1,483 numbered notes open on a run that spells the number they already
+    carry, and the model, which can see the page, drops it -- which is a word the
+    gate then reports as lost, on a page whose answer was right.
+    """
+
+    def test_the_scan_of_the_number_does_not_open_the_note_it_numbers(self):
+        book = _book(F.glyph_note_number_page)
+        note = [n for n in book.notes if n.num == 151]
+
+        assert note, [n.num for n in book.notes]
+        assert note[0].text.startswith("Pingree"), note[0].text
+
+    def test_the_note_keeps_its_number_and_every_word_of_its_citation(self):
+        book = _book(F.glyph_note_number_page)
+        note = [n for n in book.notes if n.num == 151][0]
+
+        assert "Yavanajataka" in note.text and "p. 445" in note.text
+
+    def test_the_page_shown_to_the_model_prints_the_number_once(self):
+        book = _book(F.glyph_note_number_page)
+        source = assemble.page_source_text(book, 0)
+
+        assert "[151] Pingree" in source
+        assert "Is'" not in source
+
+    def test_the_repair_says_which_characters_it_read_as_the_number(self):
+        book = _book(F.glyph_note_number_page)
+        repair = [r for r in book.repairs if r.kind == "note_number_glyphs"]
+
+        assert repair, book.repairs
+        assert "151" in repair[0].detail and "Is'" in repair[0].detail
+
+    def test_the_page_still_accounts_for_every_printed_word(self):
+        """The strip takes letters out of the text layer, so it has to declare them
+        the way every other repair here does."""
+        book = _book(F.glyph_note_number_page)
+
+        assert book.conservation.ok, (book.conservation.missing,
+                                      book.conservation.added)
+
+    def test_wreckage_that_does_not_spell_this_note_s_number_is_left_standing(self):
+        """The control. ``1"`` in front of note 105 is two digits short of the number
+        and spells 111, which is not this note's number and not a number this page
+        prints. There is no evidence of what it was, so it stays where the scanner
+        put it and a model gets to look at the page."""
+        book = _book(F.split_glyph_note_number_page)
+        note = [n for n in book.notes if n.num == 105]
+
+        assert note, [n.num for n in book.notes]
+        assert note[0].text.startswith('"'), note[0].text
+        assert not [r for r in book.repairs if r.kind == "note_number_glyphs"]
+
+    def test_a_note_that_opens_on_a_word_keeps_the_word(self):
+        """The control that bounds the rule. ``I`` reads as a 1 and stands exactly
+        where a number would, and it is this note's first word."""
+        book = _book(F.note_opening_with_a_letter_word_page)
+        note = [n for n in book.notes if n.num == 78]
+
+        assert note, [n.num for n in book.notes]
+        assert note[0].text.startswith("I believe"), note[0].text

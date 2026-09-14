@@ -638,11 +638,44 @@ def _is_marked(printed, markers):
     return any(_ocr_could_read(printed, marker) for marker in markers)
 
 
-#: A note's own printed number, at the head of its own text.
+#: A note's own printed number, at the head of its own text, where the scanner
+#: returned it as digits.
 _OPENING_NUMBER = re.compile(r"^\d{1,3}[ \t.)\]]*")
 
 
-def note_text(region):
+def _opening_number(text, number, repairs, pno):
+    """Take the note's own printed number off the head of the note's text.
+
+    The number reaches us twice: once as the number this note carries, and once in
+    whatever the scanner returned for the raised digits in front of its first word.
+    Where that was digits it has always come off here. Where the scan of a raised
+    number is letters and quotation marks it did not, and the note shipped with the
+    wreckage of its own number in front of its first word -- ``Is' Pingree,
+    Yavanajataka`` for note 151, ``"1 Edited in CCAG`` for note 111.
+
+    A run comes off only when it spells the number this note already has, which is
+    evidence and not a guess: the glyphs are the number's own digits, so nothing is
+    being decided here that the number did not already decide. A run that spells
+    some other number (MEASURED: ``1"`` in front of note 105, two digits short and
+    reading as 111) is wreckage of something this page cannot prove, and stays where
+    the scanner put it for a model to read. A run that is nothing but letters is a
+    word, however well it reads as a number.
+    """
+    run = text.split(" ", 1)[0]
+    core = run.rstrip(".)]")
+    if (core and not core.isdigit() and not core.isalpha()
+            and skeleton.glyph_number(core) == str(number)):
+        if repairs is not None:
+            repairs.append(Repair(
+                kind="note_number_glyphs", pno=pno,
+                detail="read %r at the head of note %d as the scan of that number"
+                       % (core, number),
+                consumed=core))
+        return text[len(run):].lstrip(" \t")
+    return _OPENING_NUMBER.sub("", text, count=1)
+
+
+def note_text(region, repairs=None, pno=None):
     """A footnote's text, assembled the way a paragraph is.
 
     Notes go down a side channel, and for a while that meant they skipped the line
@@ -655,7 +688,7 @@ def note_text(region):
     for index, line in enumerate(region.lines):
         text = line.stripped
         if index == 0 and region.number is not None:
-            text = _OPENING_NUMBER.sub("", text, count=1)
+            text = _opening_number(text, region.number, repairs, pno)
         if not text:
             continue
         piece = [["t", text]]
@@ -890,7 +923,8 @@ def assemble(skeletons, style, raw_pages=None):
             if region.kind == "furniture":
                 book.furniture.append(region.text)
             elif region.kind == "note":
-                book.notes.append(Note(num=region.number, text=note_text(region),
+                book.notes.append(Note(num=region.number,
+                                       text=note_text(region, book.repairs, skel.pno),
                                        pno=skel.pno,
                                        marked=region.number in claimed))
             elif region.kind == "figure":

@@ -343,6 +343,28 @@ def test_the_model_is_told_which_number_the_page_stopped_printing(tmp_path):
     assert "58" in said, said
 
 
+def test_the_model_is_told_which_numbers_the_scan_read_wrong(tmp_path):
+    """MEASURED, page 125 of the acceptance book: the page prints 190 under the rule,
+    the text layer returned 198, and the deterministic pass repaired it off the
+    numbering either side. The model was then sent the repaired text and a raster of
+    the same small print, read 198 off the image exactly as the scanner had, and had
+    its whole page refused over two digits we already knew the answer to.
+
+    A page is not paid for twice, so the repair has to travel with the page.
+    """
+    doc = _doc(F.prose_page, F.note_number_read_too_high_page)
+    client = FakeClient()
+    try:
+        _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert client.hints, "the page was not routed"
+    told = client.hints[-1]
+    assert any("38" in hint and "30" in hint for hint in told), told
+    assert any("39" in hint and "31" in hint for hint in told), told
+
+
 def test_a_number_the_page_never_lost_is_still_refused(tmp_path):
     """The control for the widened allowance. The gap says 59 and nothing else, so a
     model that reads 57 off the same residue is guessing at a citation."""

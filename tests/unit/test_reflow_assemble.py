@@ -163,6 +163,26 @@ class TestOcrDamagedNoteNumbers(object):
         assert sorted(n.num for n in book.notes) == [27, 28, 29, 30, 31, 32, 33, 34]
         assert sorted(n.num for n in book.notes if n.marked) == [30, 31]
 
+    def test_a_repaired_number_is_remembered_beside_what_the_scan_returned(self):
+        """Both readings are needed later, and only the page knows both.
+
+        The repaired number is what the book prints and what the text now carries.
+        The scan's reading is what a second reader of the same small print comes back
+        with -- MEASURED, page 125 of the acceptance book prints 190 under the rule,
+        the text layer returned 198, and the model sent the page read 198 off the
+        image too and had its whole page refused for it.
+        """
+        book = _book(F.note_number_read_too_high_page)
+
+        assert book.renumbered_notes(0) == [(38, 30), (39, 31)]
+
+    def test_a_page_whose_numbers_were_never_repaired_remembers_nothing(self):
+        """The control. Between 9 and 13 nothing was repaired, so there is no second
+        reading to warn anybody about."""
+        book = _book(F.ambiguous_note_number_page)
+
+        assert book.renumbered_notes(0) == []
+
     def test_a_note_damaged_at_the_top_of_a_page_is_read_from_the_page_before(self):
         """MEASURED: note 115 came back as ``1`` at the head of its own zone. On that
         page alone it has no predecessor to fail to ascend from, so the damage is

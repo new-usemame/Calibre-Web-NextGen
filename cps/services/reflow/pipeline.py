@@ -354,7 +354,9 @@ def page_hints(book, pno, reasons=None):
     deterministically. Sending it without saying what asks the model to re-mark a
     page that already looks finished, and the thing we are paying to have looked at
     is the thing it has no reason to look at. The unmarked notes are named because
-    those numbers are the only ones the gate will accept back (G1).
+    those numbers are the only ones the gate will accept back (G1), and the repaired
+    note numbers are named because the model is reading the same small print the
+    scanner misread and will otherwise contradict the text it was sent.
     """
     hints = [route.PAGE_REASONS[reason] for reason in (reasons or [])
              if reason in route.PAGE_REASONS]
@@ -375,6 +377,13 @@ def page_hints(book, pno, reasons=None):
             "%d. Cut note %d where the image shows it starting, open it with %d in "
             "place of whatever the scan left there, and move no words between the "
             "two." % (number, number - 1, number, number))
+    for returned, kept in (book.renumbered_notes(pno) if book is not None else []):
+        hints.append(
+            "the scan read note %d's own number as %s, and the numbering either side "
+            "of it settles it at %d -- which is what the text you have been given "
+            "carries. A superscript that small reads either way in the image: keep "
+            "%d, in the note and in the marker that points at it."
+            % (kept, returned, kept, kept))
     return hints
 
 

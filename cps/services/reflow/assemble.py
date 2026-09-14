@@ -140,6 +140,8 @@ class Book(object):
     reasons: dict = field(default_factory=dict)       # pno -> [reason, ...]
     style: Optional[skeleton.BookStyle] = None
     source_words: Counter = field(default_factory=Counter)
+    #: pno -> [(what the text layer returned, what the book's numbering says), ...]
+    renumbered: dict = field(default_factory=dict)
     conservation: Optional[ConservationReport] = None
     stats: dict = field(default_factory=dict)
 
@@ -191,6 +193,19 @@ class Book(object):
                 if right - left == 2
                 and not any(_ocr_could_read(str(left + 1), str(seen))
                             for seen in damaged)]
+
+    def renumbered_notes(self, pno):
+        """The note numbers this page had repaired, as ``(returned, kept)`` pairs.
+
+        The text now carries the kept number and says nothing about the other one,
+        and that is a problem for the second reader of the same small print. MEASURED
+        on the acceptance book, page 125 prints 190 under the rule; the scanner
+        returned 198; the model sent the repaired text alongside a raster of that
+        superscript read 198 off the image exactly as the scanner had, and its whole
+        page -- markers, asides and all -- was refused over the two digits we had
+        already settled with better evidence than either reading.
+        """
+        return list(self.renumbered.get(pno, []))
 
 
 # ------------------------------------------------------------------- run primitives
@@ -644,6 +659,7 @@ def repair_note_numbers(skeletons, repairs):
     note 190 came back as ``198`` whose error is only visible from the 192 on the
     page after it.
     """
+    renumbered = {}
     regions = [(skel, region) for skel in skeletons for region in skel.note_regions
                if region.number is not None]
     values = [region.number for _, region in regions]
@@ -674,7 +690,9 @@ def repair_note_numbers(skeletons, repairs):
                 detail="note %s reads as %d between notes %d and %d"
                        % (region.number, number, values[left], values[right]),
                 confidence="high"))
+            renumbered.setdefault(skel.pno, []).append((region.number, number))
             region.number = number
+    return renumbered
 
 
 def _copy_element(element):
@@ -748,7 +766,7 @@ def assemble(skeletons, style, raw_pages=None):
 
     # Before anything else, because a damaged note number is what a damaged marker
     # would otherwise be fitted to, and the evidence for it is spread over pages.
-    repair_note_numbers(skeletons, book.repairs)
+    book.renumbered = repair_note_numbers(skeletons, book.repairs)
 
     for skel in skeletons:
         page_reasons = list(skel.reasons)

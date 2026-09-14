@@ -15721,6 +15721,10 @@ msgid "Your sample is ready"
 msgstr "Votre échantillon est prêt"
 
 #: cps/spa_strings.py
+msgid "One page did not pass the word check and kept the text read straight out of the PDF. Nothing was rewritten."
+msgstr "Une page n’a pas passé la vérification des mots et a conservé le texte lu directement dans le PDF. Rien n’a été réécrit."
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} pages did not pass the word check and kept the text read straight out of the PDF. Nothing was rewritten."
 msgstr "{count} pages n’ont pas passé la vérification des mots et ont conservé le texte lu directement dans le PDF. Rien n’a été réécrit."
@@ -15729,6 +15733,10 @@ msgstr "{count} pages n’ont pas passé la vérification des mots et ont conser
 #, python-brace-format
 msgid "{pages} pages, added to this book as an EPUB format."
 msgstr "{pages} pages, ajoutées à ce livre au format EPUB."
+
+#: cps/spa_strings.py
+msgid "One page, downloaded as an EPUB to look at. Nothing is added to your library."
+msgstr "Une page, téléchargée en EPUB pour examen. Rien n’est ajouté à votre bibliothèque."
 
 #: cps/spa_strings.py
 #, python-brace-format

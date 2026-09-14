@@ -204,8 +204,10 @@ export function Reflow({ id }: { id: string }) {
               className={styles.radio} onChange={() => setMode('sample')} />
             <span className={styles.modeLabel}>{t('A sample')}</span>
             <span className={styles.modeHint}>
-              {t('{pages} pages, downloaded as an EPUB to look at. Nothing is added to your library.')
-                .replace('{pages}', String(samplePages))}
+              {samplePages === 1
+                ? t('One page, downloaded as an EPUB to look at. Nothing is added to your library.')
+                : t('{pages} pages, downloaded as an EPUB to look at. Nothing is added to your library.')
+                  .replace('{pages}', String(samplePages))}
             </span>
           </label>
           <label className={mode === 'full' ? styles.modeOn : styles.mode}>
@@ -360,8 +362,10 @@ function JobResult({ job, bookId, t, onConvertAll }: {
       </dl>
       {refused > 0 && (
         <p className={styles.note}>
-          {t('{count} pages did not pass the word check and kept the text read straight out of the PDF. Nothing was rewritten.')
-            .replace('{count}', String(refused))}
+          {refused === 1
+            ? t('One page did not pass the word check and kept the text read straight out of the PDF. Nothing was rewritten.')
+            : t('{count} pages did not pass the word check and kept the text read straight out of the PDF. Nothing was rewritten.')
+              .replace('{count}', String(refused))}
         </p>
       )}
 

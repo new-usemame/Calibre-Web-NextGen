@@ -15373,6 +15373,10 @@ msgid "Your sample is ready"
 msgstr "Je voorproefje is klaar"
 
 #: cps/spa_strings.py
+msgid "One page did not pass the word check and kept the text read straight out of the PDF. Nothing was rewritten."
+msgstr "Eén pagina kwam niet door de woordcontrole en behield de tekst die rechtstreeks uit de PDF is gelezen. Er is niets herschreven."
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "{count} pages did not pass the word check and kept the text read straight out of the PDF. Nothing was rewritten."
 msgstr "{count} pagina's kwamen niet door de woordcontrole en behielden de tekst die rechtstreeks uit de PDF is gelezen. Er is niets herschreven."
@@ -15381,6 +15385,10 @@ msgstr "{count} pagina's kwamen niet door de woordcontrole en behielden de tekst
 #, python-brace-format
 msgid "{pages} pages, added to this book as an EPUB format."
 msgstr "{pages} pagina's, aan dit boek toegevoegd als EPUB-formaat."
+
+#: cps/spa_strings.py
+msgid "One page, downloaded as an EPUB to look at. Nothing is added to your library."
+msgstr "Eén pagina, als EPUB gedownload om te bekijken. Er wordt niets aan je bibliotheek toegevoegd."
 
 #: cps/spa_strings.py
 #, python-brace-format

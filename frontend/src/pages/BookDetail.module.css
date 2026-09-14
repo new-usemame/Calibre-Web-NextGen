@@ -905,3 +905,8 @@
 
 .fileMsgOk { color: var(--success); font-size: var(--fs-sm); }
 .fileMsgErr { color: var(--danger); font-size: var(--fs-sm); }
+
+/* A PDF has one more route out of the Files section than the converter offers. */
+.reflowLine { margin: var(--sp-3) 0 0; color: var(--text-muted); font-size: var(--fs-sm); line-height: var(--lh-base); }
+.reflowLink { color: var(--accent-text); text-decoration: none; font-weight: var(--fw-medium); }
+.reflowLink:hover { text-decoration: underline; }

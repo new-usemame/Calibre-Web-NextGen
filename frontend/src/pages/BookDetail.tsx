@@ -1174,6 +1174,13 @@ function FilesSection({ id }: { id: string }) {
         </form>
       )}
 
+      {canEdit && formats.some((f) => f.toLowerCase() === 'pdf') && (
+        <p className={styles.reflowLine}>
+          <Link href={`/book/${id}/reflow`} className={styles.reflowLink}>{t('Reflow this PDF with AI…')}</Link>
+          {' '}{t('A scanned PDF converts badly. Reflow rebuilds its chapters, paragraphs and footnotes with a model, at a cost you agree to first.')}
+        </p>
+      )}
+
       {canUpload && (
         <label className={styles.fileAddBtn}>
           <UploadIcon size={15} aria-hidden="true" focusable={false} />

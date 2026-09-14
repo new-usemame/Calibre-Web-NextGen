@@ -253,6 +253,21 @@ class TaskReflowPdf(CalibreTask):
         built = build_epub.build(result.book, target, page_html=result.page_html,
                                  metadata=_metadata(book), doc=document,
                                  report_html=page, sidecar=payload)
+        problems = build_epub.validate(built.path)
+        if problems:
+            # A document a reader's parser stops on is not a chapter with a mistake
+            # in it; it is a chapter the reader never sees. Filing that as the book
+            # is worse than failing, and it costs the user nothing to fail: every
+            # page a model was paid for is in the cache, so a second run after a fix
+            # buys nothing. Same stance as G4 above -- what cannot be trusted does
+            # not ship.
+            log.error("reflow: the EPUB just built does not open: %s", problems)
+            try:
+                os.remove(built.path)
+            except OSError:                                       # pragma: no cover
+                pass
+            raise ValueError("the EPUB Reflow built is not a book a reader can "
+                             "open: %s" % "; ".join(problems[:3]))
         if self.options.mode == "sample":
             return {"sample": os.path.basename(built.path), "path": built.path,
                     "report": payload}

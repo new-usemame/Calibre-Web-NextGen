@@ -134,6 +134,29 @@ def test_a_replacement_the_user_asked_for_is_written(rig):
     assert rig.local_db.session.commits == 1
 
 
+def test_a_book_whose_pages_do_not_open_is_not_filed_in_the_library(rig, monkeypatch):
+    """A document that is not well-formed XML is a chapter the reader cannot open,
+    and it is a well-formed zip entry -- so the file looks finished from outside.
+    OBSERVED on the acceptance book: one model page carried a raw "&", the whole
+    document stopped parsing, and nothing in the job noticed. The builder's own
+    check is the thing that can notice, so the job has to ask it before it tells
+    the library there is an EPUB. Injected here as a markup fault in the writer,
+    because the point is the faults nobody has met yet."""
+    document = rig.mod.build_epub._document
+    monkeypatch.setattr(rig.mod.build_epub, "_document",
+                        lambda title, body, language="en":
+                        document(title, body + "<p>Hephaestio 9 & 29</p>", language))
+
+    task = _run(rig, mode="full", cost_cap_usd=1.0)
+
+    assert task.stat == STAT_FAIL
+    assert "parse" in (task.error or ""), task.error
+    # Nothing was filed, and nothing was left behind for an importer to find.
+    assert rig.local_db.session.commits == 0
+    assert not os.path.exists(str(rig.folder / "Book - Author.epub"))
+    assert [row["status"] for row in _ledger_rows(rig)] == ["failed"]
+
+
 def test_a_sample_is_a_look_and_not_a_filing(rig):
     task = _run(rig, mode="sample", sample_pages=2, cost_cap_usd=1.0)
 

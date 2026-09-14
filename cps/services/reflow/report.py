@@ -163,36 +163,67 @@ def _source(result):
     }
 
 
+def _count(count, one, many):
+    """One of a thing, said as one of a thing.
+
+    This page is asking a reader to believe a set of numbers about their own book.
+    "1 footnotes are printed in the book" is how they work out that nobody read the
+    page before it shipped, and a reader who stops believing this page has no other
+    way to audit the conversion. So each sentence carries both of its forms.
+    """
+    return one if count == 1 else many % count
+
+
 def _unplaced(payload, result):
     """What the conversion could not do, in the reader's terms rather than ours."""
     out = []
     structure = payload["structure"]
     if structure["footnotes_unmarked"]:
-        out.append("%d footnotes are printed in the book but no marker for them was "
-                   "found in the text; they are kept with the page they were printed "
-                   "on." % structure["footnotes_unmarked"])
+        out.append(_count(
+            structure["footnotes_unmarked"],
+            "One footnote is printed in the book but no marker for it was found in "
+            "the text; it is kept with the page it was printed on.",
+            "%d footnotes are printed in the book but no marker for them was found "
+            "in the text; they are kept with the page they were printed on."))
     if structure.get("footnotes_swept"):
-        out.append("%d footnotes lost their own printed number to the scan and are "
-                   "still joined to the note printed above them; every word of both "
-                   "is in the book, set as one note rather than two."
-                   % structure["footnotes_swept"])
+        out.append(_count(
+            structure["footnotes_swept"],
+            "One footnote lost its own printed number to the scan and is still "
+            "joined to the note printed above it; every word of both is in the "
+            "book, set as one note rather than two.",
+            "%d footnotes lost their own printed number to the scan and are still "
+            "joined to the note printed above them; every word of both is in the "
+            "book, set as one note rather than two."))
     if structure.get("markers_unresolved"):
-        out.append("%d footnote markers in the text point at a note that was not "
-                   "printed on their page; they are kept as printed superscripts "
-                   "rather than made into links that open nothing."
-                   % structure["markers_unresolved"])
+        out.append(_count(
+            structure["markers_unresolved"],
+            "One footnote marker in the text points at a note that was not printed "
+            "on its page; it is kept as a printed superscript rather than made into "
+            "a link that opens nothing.",
+            "%d footnote markers in the text point at a note that was not printed "
+            "on their page; they are kept as printed superscripts rather than made "
+            "into links that open nothing."))
     if structure["page_joins_refused"]:
-        out.append("%d paragraphs that may run over a page turn were left as two "
-                   "paragraphs rather than joined on a guess."
-                   % structure["page_joins_refused"])
+        out.append(_count(
+            structure["page_joins_refused"],
+            "One paragraph that may run over a page turn was left as two paragraphs "
+            "rather than joined on a guess.",
+            "%d paragraphs that may run over a page turn were left as two "
+            "paragraphs rather than joined on a guess."))
     columns = (payload["routing"].get("reasons") or {}).get("multi_column")
     if columns:
-        out.append("%d pages look set in columns. The text is kept in the order the "
-                   "page stored it and is not re-ordered into column order." % columns)
+        out.append(_count(
+            columns,
+            "One page looks set in columns. The text is kept in the order the page "
+            "stored it and is not re-ordered into column order.",
+            "%d pages look set in columns. The text is kept in the order the page "
+            "stored it and is not re-ordered into column order."))
     conservation = payload["fidelity"]["conservation"]
     if conservation and not conservation.get("ok"):
-        out.append("%d words of the source did not reach the finished book."
-                   % len(conservation.get("missing") or []))
+        out.append(_count(
+            len(conservation.get("missing") or []),
+            "One word of the source did not reach the finished book.",
+            "%d words of the source did not reach the finished book."))
     return out
 
 
@@ -236,8 +267,9 @@ def about_page(payload, show_cost=False, links=None):
 
     out.append("<h2>The PDF this came from</h2>")
     source = payload["source"]
-    out.append("<p>%s pages. %s</p>" % (source.get("pages", 0),
-                                        escape(source.get("verdict_plain", ""))))
+    out.append("<p>%s. %s</p>"
+               % (_count(source.get("pages", 0), "One page", "%d pages"),
+                  escape(source.get("verdict_plain", ""))))
     if source.get("fonts"):
         out.append("<p>Type seen on the page: %s.</p>"
                    % escape(", ".join(sorted(source["fonts"]))))
@@ -263,21 +295,42 @@ def _fidelity_section(payload):
         out.append("<p>No model was used: every page here is the converter's own "
                    "reading of the PDF, and no page was reviewed by a model.</p>")
     else:
-        out.append(
-            "<p>%d of %d pages were sent to a model to have their structure read. "
-            "%d came back word-for-word identical to the page and were used; %d were "
-            "refused by the word-preservation check and the converter's own reading "
-            "was kept instead.</p>"
-            % (model["pages_sent"], fidelity["pages"], model["pages_adopted"],
-               model["pages_refused"]))
+        sent, kept, refused = (model["pages_sent"], model["pages_adopted"],
+                               model["pages_refused"])
+        if sent == 1:
+            asked = ("One of the %d pages was sent to a model to have its structure "
+                     "read." % fidelity["pages"])
+        else:
+            asked = ("%d of the %d pages were sent to a model to have their "
+                     "structure read." % (sent, fidelity["pages"]))
+        if not kept:
+            used = "None came back word-for-word identical to the page"
+        else:
+            used = _count(kept,
+                          "One came back word-for-word identical to the page and "
+                          "was used",
+                          "%d came back word-for-word identical to the page and "
+                          "were used")
+        if not refused:
+            thrown = "none were refused by the word-preservation check"
+        else:
+            thrown = _count(refused,
+                            "one was refused by the word-preservation check and "
+                            "the converter's own reading was kept instead",
+                            "%d were refused by the word-preservation check and "
+                            "the converter's own reading was kept instead")
+        out.append("<p>%s %s; %s.</p>" % (asked, used, thrown))
         out.append("<p>The model was asked only to mark up structure. Every answer "
                    "is compared with the page word by word, and any answer that adds, "
                    "drops or re-capitalises a word is thrown away.</p>")
 
     if fidelity["pages_routed_not_reviewed"]:
-        out.append("<p>%d pages the converter wanted a second opinion on were never "
-                   "reviewed. %s</p>"
-                   % (fidelity["pages_routed_not_reviewed"],
+        out.append("<p>%s %s</p>"
+                   % (_count(fidelity["pages_routed_not_reviewed"],
+                             "One page the converter wanted a second opinion on was "
+                             "never reviewed.",
+                             "%d pages the converter wanted a second opinion on were "
+                             "never reviewed."),
                       escape(STOP_REASONS.get(payload.get("stopped") or "",
                                               "The run ended first."))))
     conservation = fidelity.get("conservation")
@@ -346,8 +399,8 @@ def _uncertain_section(payload, links):
 def _spend_section(payload):
     spend = payload["spend"]
     out = ["<h2>What this cost</h2>",
-           "<p>$%.4f in model calls over %d pages.</p>"
-           % (spend["usd"], spend["calls"])]
+           "<p>$%.4f in model calls over %s.</p>"
+           % (spend["usd"], _count(spend["calls"], "one page", "%d pages"))]
     if payload["model"]["model"]:
         out.append("<p>Model: %s. Prompt version: %s.</p>"
                    % (escape(payload["model"]["model"]),

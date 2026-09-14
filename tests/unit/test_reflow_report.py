@@ -14,6 +14,7 @@ report that can drift from the evidence it summarises is worse than no report,
 because it reads exactly like one that cannot.
 """
 
+import re
 import types
 from xml.etree import ElementTree as ET
 
@@ -396,6 +397,98 @@ def test_a_reading_the_conversion_cannot_point_at_promises_no_highlight(tmp_path
 
     assert payload["fidelity"]["uncertain_marked"] == 0
     assert "highlighted" not in _page(payload)
+
+
+# ------------------------------------------------------------- one of a thing
+
+_SINGLE = re.compile(r"(?<![\w.$])(?:1|One|one)(?![\w.,])\s+(\w+)")
+_PLURAL_VERB = re.compile(r"\b(?:were|are)\b")
+#: Words that end in "s" and are still singular, so that "one was refused" reads as
+#: the correct English it is rather than as a miscount.
+_NOT_A_PLURAL = frozenset(("was", "is", "has", "its", "this", "as", "thus"))
+
+
+def _prose(html):
+    """The report's sentences: every <p> and every <li>, which is where the page
+    talks to a reader rather than tabulating for one."""
+    root = ET.fromstring("<body>%s</body>" % html)
+    out = []
+    for node in root.iter():
+        if node.tag in ("p", "li"):
+            said = ET.tostring(node, method="text", encoding="unicode")
+            out.extend(part.strip() for part in re.split(r"(?<=[.;])\s+", said)
+                       if part.strip())
+    return out
+
+
+def _counts_one_but_says_several(html):
+    """Sentences that count one of something and then carry on in the plural.
+    Read off the rendered page rather than matched against sentences copied out
+    of the report, so that rewording the report cannot quietly switch this off."""
+    slips = []
+    for sentence in _prose(html):
+        found = _SINGLE.search(sentence)
+        if not found:
+            continue
+        noun = found.group(1)
+        reads_plural = (noun.endswith("s") and not noun.endswith("ss")
+                        and noun not in _NOT_A_PLURAL)
+        if reads_plural or _PLURAL_VERB.search(sentence):
+            slips.append(sentence)
+    return slips
+
+
+def test_a_book_with_one_of_each_problem_is_not_told_about_it_in_the_plural(tmp_path):
+    """"1 footnotes are printed in the book" is how a reader works out that nobody
+    read this page before it shipped, and being worth believing is the page's only
+    job. The counts here are real ones: a note with no marker, a note the scan
+    swept into its neighbour, a marker whose note is on another page, and a
+    paragraph left unjoined over a page turn."""
+    result, ledger, _ = _run(tmp_path, F.glyph_marker_without_its_note_page,
+                             F.quietly_swept_note_page, F.orphan_marker_page,
+                             F.uncertain_join_pages)
+    payload = report.numbers(result, ledger)
+    structure = payload["structure"]
+
+    assert (structure["footnotes_unmarked"], structure["footnotes_swept"],
+            structure["markers_unresolved"], structure["page_joins_refused"]) \
+        == (1, 1, 1, 1), structure
+    assert len(payload["unplaced"]) == 4, payload["unplaced"]
+    assert _counts_one_but_says_several(_page(payload)) == []
+
+
+def test_a_conversion_that_sent_one_page_to_a_model_says_one_page(tmp_path):
+    """The fidelity paragraph is where a sceptical reader goes first, and a short
+    PDF sends exactly one page often enough to be worth writing for."""
+    result, ledger, client = _run(tmp_path, F.prose_page, F.ambiguous_residue_page,
+                                  client=FakeClient())
+    payload = report.numbers(result, ledger, client=client)
+
+    assert (payload["model"]["pages_sent"], payload["model"]["pages_adopted"]) == (1, 1)
+    assert payload["spend"]["calls"] == 1
+    assert _counts_one_but_says_several(_page(payload, show_cost=True)) == []
+
+
+def test_the_one_page_a_model_was_refused_on_is_reported_in_the_singular(tmp_path):
+    """The other half of the same paragraph, and the half worth more: the refusal
+    count is the number this page exists to publish."""
+    result, ledger, client = _run(tmp_path, F.prose_page, F.ambiguous_residue_page,
+                                  client=FakeClient(answer=_drop_a_word))
+    payload = report.numbers(result, ledger, client=client)
+
+    assert (payload["model"]["pages_adopted"], payload["model"]["pages_refused"]) \
+        == (0, 1), payload["model"]
+    assert _counts_one_but_says_several(_page(payload, show_cost=True)) == []
+
+
+def test_a_pdf_of_a_single_page_is_not_described_as_pages(tmp_path):
+    """The first line of the report, and the first thing a reader is told about
+    their own file."""
+    result, ledger, _ = _run(tmp_path, F.prose_page)
+    payload = report.numbers(result, ledger)
+
+    assert payload["source"]["pages"] == 1, payload["source"]
+    assert _counts_one_but_says_several(_page(payload)) == []
 
 
 # ---------------------------------------------------------------- well-formedness

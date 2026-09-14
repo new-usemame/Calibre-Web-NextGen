@@ -558,3 +558,215 @@ def test_a_marker_whose_note_is_elsewhere_is_not_glued_to_the_word_before_it():
     assert "overleaf204" not in build_epub.block_text(fragment), fragment[-160:]
     assert "204" in build_epub.block_text(fragment)
     assert "unresolved_marker" in book.page_reasons(0)
+
+
+# ------------------------------------------ the notes on a page the model rewrote
+
+#: The shape ``prompts/structure.txt`` asks the model for, and therefore the shape a
+#: page reaches the builder in once the gate has accepted it: the class, the href,
+#: the id on the note, and nothing else. The prompt asks small on purpose -- every
+#: attribute in the ask is one more thing an answer can get wrong and lose the page
+#: for -- so what the reader needs on top of it has to be added here.
+MODEL_ANSWER = (
+    '<p>Pingree notes that he wrote sometime prior to the second century '
+    'CE<a class="noteref" href="#fn_56">56</a> and that the text should be used '
+    'with caution<a class="noteref" href="#fn_16">16</a>.</p>\n'
+    '<aside class="footnote" id="fn_56">56 Cumont first made this argument in '
+    'CCAG 8, 4, p. 225.</aside>\n'
+    '<aside class="footnote" id="fn_16">16 Hephaestio, Apotelesmatika, 2, 2: 11-18.'
+    '</aside>'
+)
+
+MODEL_ANSWER_NOTE_CARRIED_OVER = (
+    '<p>The argument runs on from the page before and finishes here.</p>\n'
+    '<aside class="footnote" id="fn_9">9 Continued from the foot of the last page.'
+    '</aside>'
+)
+
+MODEL_ANSWER_MARKED_TWICE = (
+    '<p>He says so once<a class="noteref" href="#fn_56">56</a> and again lower down '
+    'the page<a class="noteref" href="#fn_56">56</a>.</p>\n'
+    '<aside class="footnote" id="fn_56">56 Cumont, CCAG 8, 4, p. 225.</aside>'
+)
+
+
+def _model_page(tmp_path, html=MODEL_ANSWER):
+    """One page whose markup came back from the model rather than from the PDF."""
+    return _build(_book(F.defect_c_page), tmp_path, page_html={0: html})
+
+
+def _noterefs(root):
+    return [a for a in root.iter(XHTML + "a")
+            if "noteref" in (a.get("class") or "").split()]
+
+
+def test_a_note_the_model_marked_up_itself_still_opens_as_a_popup(tmp_path):
+    """A device shows a note in a popup because ``epub:type`` says it is a note, and
+    lays it out as running text when it does not. The prompt never asks the model for
+    ``epub:type``, so the pages Reflow *succeeded* on are the ones whose notes would
+    read as stray paragraphs at the end of every page -- the pages it refused keep
+    the deterministic markup and come out right."""
+    result = _model_page(tmp_path)
+
+    with zipfile.ZipFile(result.path) as zf:
+        body = "".join(_body(zf, n) for n in _content_names(zf))
+
+    assert body.count('epub:type="noteref"') == 2, body
+    assert body.count('epub:type="footnote"') == 2, body
+
+
+def test_a_reader_who_followed_a_model_pages_note_can_get_back(tmp_path):
+    """The number printed at the head of a note is the way back to the sentence that
+    called it. The model is not asked to write that link, and there is nothing for it
+    to point at either: the marker it writes carries no id."""
+    result = _model_page(tmp_path)
+
+    with zipfile.ZipFile(result.path) as zf:
+        root = ET.fromstring(zf.read(_content_names(zf)[0]))
+
+    ids = {el.get("id"): el for el in root.iter() if el.get("id")}
+    checked = 0
+    for aside in root.iter(XHTML + "aside"):
+        back = [a for a in aside.iter(XHTML + "a")
+                if (a.get("href") or "").startswith("#")]
+        assert back, "note %s gives the reader no way back" % aside.get("id")
+        for link in back:
+            target = link.get("href")[1:]
+            assert target in ids, "the way back points at %s, which is not here" % target
+            assert ids[target].get("href") == "#" + aside.get("id"), \
+                "the way back from %s lands on something else" % aside.get("id")
+        checked += 1
+
+    assert checked == 2, "the two notes on the page were not both checked"
+
+
+def test_a_note_whose_marker_was_printed_on_the_last_page_invents_no_way_back(tmp_path):
+    """A note that runs over from the previous page is set here and called there. A
+    link back written anyway points at an id that is nowhere in the book, and the
+    builder has to disarm it -- so the reader gets a note with a dead link in it
+    instead of a note."""
+    result = _model_page(tmp_path, html=MODEL_ANSWER_NOTE_CARRIED_OVER)
+
+    assert result.warnings == [], result.warnings
+    with zipfile.ZipFile(result.path) as zf:
+        name = _content_names(zf)[0]
+        body = _body(zf, name)
+        root = ET.fromstring(zf.read(name))
+
+    assert 'epub:type="footnote"' in body, "it stopped being a note"
+    assert 'href="#"' not in body, "a link was written and then disarmed"
+    asides = list(root.iter(XHTML + "aside"))
+    assert len(asides) == 1
+    assert not list(asides[0].iter(XHTML + "a")), ET.tostring(asides[0])
+
+
+def test_a_marker_the_model_wrote_at_body_size_is_raised_like_every_other(tmp_path):
+    """Half the markers in a book set as superscripts and half set inline is the same
+    book telling the reader two different things about what a bare number means."""
+    result = _model_page(tmp_path)
+
+    with zipfile.ZipFile(result.path) as zf:
+        root = ET.fromstring(zf.read(_content_names(zf)[0]))
+
+    markers = _noterefs(root)
+    assert len(markers) == 2
+    for marker in markers:
+        raised = list(marker.iter(XHTML + "sup"))
+        assert len(raised) == 1, ET.tostring(marker)
+
+
+def test_two_markers_pointing_at_one_note_do_not_take_the_same_id(tmp_path):
+    """Two elements with one id is a document a reader resolves by whichever the
+    parser saw first: the same failure the per-page scoping exists to prevent, one
+    page further in."""
+    result = _model_page(tmp_path, html=MODEL_ANSWER_MARKED_TWICE)
+
+    with zipfile.ZipFile(result.path) as zf:
+        name = _content_names(zf)[0]
+        raw = zf.read(name).decode("utf-8")
+        root = ET.fromstring(raw)
+
+    found = re.findall(r'id="([^"]+)"', raw)
+    duplicates = [i for i, n in collections.Counter(found).items() if n > 1]
+    assert not duplicates, "%s repeats %s" % (name, duplicates)
+
+    aside = list(root.iter(XHTML + "aside"))[0]
+    markers = _noterefs(root)
+    assert len(markers) == 2
+    assert {m.get("href") for m in markers} == {"#" + aside.get("id")}
+    back = [a.get("href")[1:] for a in aside.iter(XHTML + "a")]
+    # The way back goes to the first of the two, the way a printed book sends you to
+    # where the note was first called.
+    assert back == [markers[0].get("id")], (back, [m.get("id") for m in markers])
+
+
+def test_a_page_the_gate_refused_is_not_marked_up_a_second_time(tmp_path):
+    """The builder finishes the model's short form into the form a reader needs. The
+    pages the gate refused are already in that form, and finishing them again gives a
+    note whose number is a link inside a link and an attribute the parser sees
+    twice."""
+    result = _build(_book(F.defect_c_page), tmp_path)
+
+    with zipfile.ZipFile(result.path) as zf:
+        name = _content_names(zf)[0]
+        raw = zf.read(name).decode("utf-8")
+        root = ET.fromstring(raw)
+
+    for tag in re.findall(r"<(?:a|aside)\b[^>]*>", raw):
+        assert tag.count("epub:type") <= 1, tag
+        assert tag.count(' id="') <= 1, tag
+    for anchor in root.iter(XHTML + "a"):
+        assert not list(anchor.iter(XHTML + "a"))[1:], ET.tostring(anchor)
+    for aside in root.iter(XHTML + "aside"):
+        assert len([a for a in aside.iter(XHTML + "a")
+                    if (a.get("href") or "").startswith("#")]) <= 1, ET.tostring(aside)
+
+
+MODEL_ANSWER_NUMBER_RAISED = (
+    '<p>Pingree notes that he wrote sometime prior to the second century '
+    'CE<a class="noteref" href="#fn_56"><sup>56</sup></a>.</p>\n'
+    '<aside class="footnote" id="fn_56"><sup>56</sup> Cumont first made this '
+    'argument in CCAG 8, 4, p. 225.</aside>'
+)
+
+
+def test_a_note_whose_number_the_model_raised_itself_still_goes_back(tmp_path):
+    """The prompt shows the number at the head of a note as plain text and the model
+    is free to set it as a superscript instead, the way the page prints it. That is
+    the same note and the reader still has to be able to get out of it."""
+    result = _model_page(tmp_path, html=MODEL_ANSWER_NUMBER_RAISED)
+
+    assert result.warnings == [], result.warnings
+    with zipfile.ZipFile(result.path) as zf:
+        root = ET.fromstring(zf.read(_content_names(zf)[0]))
+
+    aside = list(root.iter(XHTML + "aside"))[0]
+    back = [a for a in aside.iter(XHTML + "a") if (a.get("href") or "").startswith("#")]
+    assert len(back) == 1, ET.tostring(aside)
+    assert back[0].get("href")[1:] == _noterefs(root)[0].get("id")
+    assert len(list(_noterefs(root)[0].iter(XHTML + "sup"))) == 1
+
+
+MODEL_ANSWER_NUMBER_NOT_PRINTED = (
+    '<p>Cumont said as much in his last paper'
+    '<a class="noteref" href="#fn_9">9</a>.</p>\n'
+    '<aside class="footnote" id="fn_9">1929 was the year he wrote it.</aside>'
+)
+
+
+def test_a_note_that_does_not_print_its_number_is_not_linked_through_whatever_does(tmp_path):
+    """The way back out of a note is the number the note prints at its head. When the
+    scanner lost that number the note starts with an ordinary word -- here a year --
+    and turning that into the link back tells the reader the date is a control."""
+    result = _model_page(tmp_path, html=MODEL_ANSWER_NUMBER_NOT_PRINTED)
+
+    assert result.warnings == [], result.warnings
+    with zipfile.ZipFile(result.path) as zf:
+        name = _content_names(zf)[0]
+        root = ET.fromstring(zf.read(name))
+        body = _body(zf, name)
+
+    aside = list(root.iter(XHTML + "aside"))[0]
+    assert not list(aside.iter(XHTML + "a")), ET.tostring(aside)
+    assert "1929 was the year" in body
+    assert 'epub:type="footnote"' in body

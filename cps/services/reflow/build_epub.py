@@ -289,6 +289,89 @@ def merge_paragraphs(left, right):
 
 # --------------------------------------------------------------- the whole book
 
+_NOTEREF_ANCHOR = re.compile(
+    r'<a\b(?P<attrs>[^>]*class="[^"]*noteref[^"]*"[^>]*)>(?P<inner>.*?)</a>', re.I | re.S)
+_NOTE_ASIDE = re.compile(
+    r'<aside\b(?P<attrs>[^>]*class="[^"]*footnote[^"]*"[^>]*)>(?P<inner>.*?)</aside>',
+    re.I | re.S)
+_NOTE_TARGET = re.compile(r'href="#fn_([^"]+)"')
+_HAS_EPUB_TYPE = re.compile(r'\sepub:type="')
+_BARE_NUMBER = re.compile(r"^\s*\d+\s*$")
+#: The number a note prints under the rule, through whatever the page wraps it in.
+#: ``a`` is deliberately not on that list: a number already inside a link is a note
+#: that already goes back somewhere, and a link inside a link resolves to neither.
+_NOTE_OPENS_WITH_ITS_NUMBER = re.compile(
+    r"^(\s*(?:<(?:p|sup|em|strong|b|i)\b[^>]*>\s*)*)(\d+)", re.I)
+
+
+def _reader_ready_notes(html):
+    """Every note in the book the same shape, whoever wrote the page.
+
+    ``prompts/structure.txt`` asks the model for the short form -- ``<a
+    class="noteref" href="#fn_N">N</a>`` and ``<aside class="footnote" id="fn_N">N
+    ...`` -- and asks small on purpose: every attribute in the ask is another thing
+    an answer can get wrong and lose the whole page for. The reader needs more than
+    that. ``epub:type`` is what makes a device open a note in a popup instead of
+    laying it out as running text at the end of the page, and the number printed at
+    the head of the note is how a reader who followed the link gets back to the
+    sentence. Without this the pages Reflow *succeeded* on are the ones whose notes
+    come out worse than the pages it refused.
+
+    So the short form is finished into the long one here: deterministically, after
+    the gate, and on the markup only. Nothing this does changes a word -- the number
+    at the head of a note is wrapped where the note already prints it and is never
+    written in where the page does not have one, because a number this function
+    invented would be a word the source does not have.
+
+    Idempotent by construction: an attribute already present is left alone and a note
+    that already links back is not linked again, so the pages the gate refused --
+    which arrive in the long form already -- come back unchanged.
+    """
+    back = {}
+    seen = {}
+
+    def marker(match):
+        attrs, inner = match.group("attrs"), match.group("inner")
+        target = _NOTE_TARGET.search(attrs)
+        if not target:
+            return match.group(0)
+        number = target.group(1)
+        if not _HAS_EPUB_TYPE.search(attrs):
+            attrs = ' epub:type="noteref"' + attrs
+        found = _ID.search(attrs)
+        if found:
+            ident = found.group(1)
+        else:
+            seen[number] = seen.get(number, 0) + 1
+            ident = "fnref_%s" % number
+            if seen[number] > 1:
+                ident = "%s_%d" % (ident, seen[number])
+            attrs = ' id="%s"%s' % (ident, attrs)
+        back.setdefault(number, ident)
+        if _BARE_NUMBER.match(inner):
+            inner = "<sup>%s</sup>" % inner.strip()
+        return "<a%s>%s</a>" % (attrs, inner)
+
+    def note(match):
+        attrs, inner = match.group("attrs"), match.group("inner")
+        if not _HAS_EPUB_TYPE.search(attrs):
+            attrs = ' epub:type="footnote"' + attrs
+        found = _ID.search(attrs)
+        number = found.group(1)[3:] if found and found.group(1).startswith("fn_") else None
+        target = back.get(number)
+        if target:
+            def link(head):
+                if head.group(2) != number:
+                    return head.group(0)
+                return '%s<a href="#%s">%s</a>' % (head.group(1), target, head.group(2))
+            inner = _NOTE_OPENS_WITH_ITS_NUMBER.sub(link, inner, count=1)
+        return "<aside%s>%s</aside>" % (attrs, inner)
+
+    # The markers first: a note can only be given a way back to a marker that has an
+    # id, and the marker gets its id in this pass.
+    return _NOTE_ASIDE.sub(note, _NOTEREF_ANCHOR.sub(marker, html))
+
+
 def _scope_ids(html, pno):
     """Note numbers repeat from page to page; ids in one book may not."""
     prefix = "p%04d_" % pno
@@ -312,7 +395,8 @@ def page_anchor(pno):
 def _page_blocks(page_html):
     pages = []
     for pno in sorted(page_html):
-        blocks = split_blocks(_scope_ids(page_html[pno] or "", pno))
+        blocks = split_blocks(
+            _scope_ids(_reader_ready_notes(page_html[pno] or ""), pno))
         pages.append({"pno": pno, "anchor": page_anchor(pno),
                       "body": [b for b in blocks if not _is_aside(b)],
                       "asides": [b for b in blocks if _is_aside(b)]})

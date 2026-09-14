@@ -193,6 +193,15 @@ class BookStyle(object):
                 return index + 1
         return min(LADDER_MAX_LEVELS, len(self.ladder) + 1)
 
+    def on_the_ladder(self, size):
+        """True when this size reaches a rung the book's own heading type defines.
+
+        Below the bottom rung a size says nothing: on a scan the same paragraph
+        measures differently line to line, so "a few percent above the body" is as
+        likely to be the scanner as the typesetter.
+        """
+        return any(size >= centre * (1.0 - LADDER_TOL) for centre in self.ladder)
+
 
 def heading_ladder(body_size, census, pages, page_count):
     """The heading sizes this book actually uses, largest first.
@@ -320,14 +329,43 @@ def looks_like_chart_junk(text):
     return False
 
 
+#: Words that stand inside a title but cannot end one. A line that stops on one of
+#: these stopped because the page ran out of width, not because the phrase finished.
+#: MEASURED on book 567: 'Capricorn, Mars and Saturn in' (p527), read as a heading
+#: because the scan set it at 12.50pt against a 12.99pt heading rung.
+_NOT_A_LAST_WORD = frozenset("""
+a an the and or nor but if so then than that which who whom whose whether
+of in on at to for from by with within without into onto over under above below
+between among against about across after before during since until while because
+although though unless upon toward towards through is are was were be been being am
+it its his her their our your my no not
+""".split())
+
+_TRAILING_NON_WORD = re.compile(r"[^A-Za-z0-9']+$")
+
+
 def acceptable_heading(text):
-    """The shape of a heading, independent of how it is set."""
+    """The shape of a heading, independent of how it is set.
+
+    Two of the three rules here exist because a scan's measurements wobble: a line of
+    a paragraph that comes back a little large reaches a heading rung and nothing
+    about its type says otherwise, so the only evidence left is what the line says.
+    A false heading costs more than a missed one -- the EPUB splits its chapters on
+    the top of the ladder, so it breaks a chapter in the middle of a paragraph.
+    """
     text = (text or "").strip()
     if not 4 <= len(text) <= 120:
         return False
     if text.endswith((".", ",", ":", ";")):
         # A line that ends in sentence punctuation is a sentence. One real heading per
         # book is lost this way; it comes back through the model route.
+        return False
+    if text[:1].islower():
+        # A heading begins where a sentence begins. MEASURED on book 567:
+        # 'bonify Mercury. Conversely, if' (p493).
+        return False
+    last = _TRAILING_NON_WORD.sub("", text).rsplit(" ", 1)[-1].lower()
+    if last in _NOT_A_LAST_WORD:
         return False
     return not looks_like_chart_junk(text)
 
@@ -338,12 +376,22 @@ def continues_lowercase(line):
 
 
 def heading_ish(line, style):
+    """Could this line be a heading, judged on how it is set rather than what it says.
+
+    Weight is the reliable signal and size is not. MEASURED on book 567: the body of
+    PDF page 112 comes back between 11.0 and 11.7pt and one line of a running
+    paragraph at 12.00pt, in the same roman face -- read as "bigger than the body"
+    that line becomes a heading, and half a sentence lands in the reader's table of
+    contents. So roman type has to reach a rung the book actually uses; only bold
+    type may be a heading on weight alone, which is what defect A needs (a run-in
+    head is set on the body's own leading and may be barely larger than it).
+    """
     if not style.body_size:
         return False
     size = line.size
-    if size >= style.body_size * HEAD_RATIO:
-        return True
-    return line.bold and size >= style.body_size * 0.98
+    if line.bold:
+        return size >= style.body_size * 0.98
+    return size >= style.body_size * HEAD_RATIO and style.on_the_ladder(size)
 
 
 # ----------------------------------------------------------------------- the skeleton

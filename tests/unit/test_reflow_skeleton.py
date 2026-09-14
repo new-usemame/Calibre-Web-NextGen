@@ -433,3 +433,110 @@ class TestANoteWhoseOwnNumberTheScannerAte(object):
         skel = self._regions(F.lowercase_word_in_the_note_zone_page)
 
         assert 50 not in [r.number for r in skel.note_regions]
+
+
+class TestTypeThatIsOnlyBiggerBecauseTheScannerSaidSo(object):
+    """DIAGNOSIS A has a mirror image. A converter that reads a drifted measurement as
+    a heading puts half a sentence in the reader's table of contents, and -- because
+    the EPUB splits its chapters on the top of the ladder -- can split a chapter in
+    the middle of a paragraph.
+
+    MEASURED on book 567: over PDF pages 100-145 the deterministic pass emitted two
+    such headings, 'Schmidt published an attempt to reconstruct the original
+    definitions o' (p112, 12.00pt roman) and "Ptolemy's astrological work was
+    apparently originally known as the" (p128, 11.90pt roman), against 20 real ones.
+    Both sit below the book's own heading rung; both are set in the body face.
+    """
+
+    @staticmethod
+    def _with_a_ladder(page_builder):
+        """The page under test, in a book whose section heads define a rung.
+
+        A rung is a rung because the book uses it on more than one page, so the
+        drifted line can only be judged against a ladder that exists.
+        """
+        return _book(
+            lambda doc: F.chapter_opening_page(doc, "The Hellenistic Astrologers"),
+            lambda doc: F.section_heading_page(doc, "Critodemus", folio="70"),
+            lambda doc: F.section_heading_page(doc, "Abraham", folio="74"),
+            lambda doc: F.section_heading_page(doc, "Zoroaster", folio="78"),
+            page_builder,
+        )
+
+    def test_a_line_the_scanner_measured_high_is_not_a_heading(self):
+        book = self._with_a_ladder(F.ocr_size_drift_page)
+
+        assert not [el for el in _kinds(book, "h") if "Schmidt" in el.text], \
+            [el.text for el in _kinds(book, "h")]
+
+    def test_the_line_stays_in_the_paragraph_it_belongs_to(self):
+        """Not losing the words is not enough -- a heading is its own element, so a
+        promoted line also breaks the paragraph it was a line of."""
+        book = self._with_a_ladder(F.ocr_size_drift_page)
+
+        holding = [el for el in _kinds(book, "p") if "Schmidt published" in el.text]
+
+        assert holding, [el.text for el in book.elements]
+        assert "reconstruct the original Antiochus definitions" in holding[0].text
+
+    def test_a_heading_in_the_body_face_at_the_books_own_heading_size_still_reads(self):
+        """The control. Nothing here is bold: the only thing that makes it a heading
+        is that the book sets its section heads at this size."""
+        book = self._with_a_ladder(
+            lambda doc: F.roman_heading_on_the_ladder_page(doc, "Serapio of Alexandria"))
+
+        assert [el for el in _kinds(book, "h") if "Serapio of Alexandria" in el.text], \
+            [el.text for el in _kinds(book, "h")]
+
+    def test_a_bold_run_in_head_below_every_rung_still_reads(self):
+        """The other control. A run-in head is set on the body's own leading and can
+        be barely larger than the body -- it is the weight that marks it, and defect A
+        is exactly the case where the size signal is not there to be had."""
+        book = self._with_a_ladder(F.flat_run_in_heading_page)
+
+        assert [el for el in _kinds(book, "h") if "Serapio of Alexandria" in el.text], \
+            [el.text for el in _kinds(book, "h")]
+
+
+class TestASentenceTheScannerSetLargeIsStillASentence(object):
+    """Two more measured false headings from book 567, both reaching the book's own
+    section-head rung, so the ladder cannot tell them from a heading -- and both
+    ``<h2>``, which is a level the EPUB splits its chapters on. A false heading is not
+    cosmetic: it breaks a chapter in the middle of a paragraph.
+    """
+
+    @staticmethod
+    def _with_a_ladder(page_builder):
+        return _book(
+            lambda doc: F.chapter_opening_page(doc, "The Planets"),
+            lambda doc: F.section_heading_page(doc, "Sect", folio="400"),
+            lambda doc: F.section_heading_page(doc, "Exaltations", folio="402"),
+            page_builder,
+        )
+
+    def test_a_line_that_starts_in_the_middle_of_a_sentence_is_not_a_heading(self):
+        book = self._with_a_ladder(F.heading_that_starts_mid_sentence_page)
+
+        assert not [el for el in _kinds(book, "h") if "bonify" in el.text], \
+            [el.text for el in _kinds(book, "h")]
+
+    def test_a_line_that_stops_on_a_word_no_title_stops_on_is_not_a_heading(self):
+        book = self._with_a_ladder(F.heading_that_stops_on_a_function_word_page)
+
+        assert not [el for el in _kinds(book, "h") if "Capricorn" in el.text], \
+            [el.text for el in _kinds(book, "h")]
+
+    def test_a_real_heading_may_use_those_words_inside_it(self):
+        """The control: the rule is about where the words fall, not that they appear."""
+        book = self._with_a_ladder(F.long_heading_with_function_words_page)
+
+        assert [el for el in _kinds(book, "h") if "Three Forms of House" in el.text], \
+            [el.text for el in _kinds(book, "h")]
+
+    def test_a_heading_that_ends_on_an_abbreviation_still_reads(self):
+        """The other control: ``(First Century CE?)`` ends on punctuation and a
+        two-letter word, and is the shape of every section head in this book."""
+        book = self._with_a_ladder(F.defect_a_page)
+
+        assert [el for el in _kinds(book, "h") if "Serapio of Alexandria" in el.text], \
+            [el.text for el in _kinds(book, "h")]

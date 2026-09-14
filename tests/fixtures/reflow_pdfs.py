@@ -1151,3 +1151,104 @@ def note_opening_with_a_letter_word_page(doc):
         (79, "Cramer, Astrology in Roman Law and Politics, p. 108."),
     ])
     return page
+
+
+def ocr_size_drift_page(doc):
+    """A paragraph of ordinary prose whose scanner set one line a hair larger.
+
+    MEASURED on book 567, PDF page 112: the body of that page comes back between
+    11.0 and 11.7pt, and one line of a running paragraph --
+
+        size=12.00 font=Times-Roman flags=4
+        'Schmidt published an attempt to reconstruct the original definitions o'
+
+    -- comes back at 12.00pt in the same roman face, opening its own block over a
+    line that starts a new sentence. Nothing on the printed page says heading; only
+    the measurement drifted. The book's own heading rung sits at 12.96pt.
+    """
+    page = add_page(doc)
+    add_running_head(page, "86", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    y = add_body_lines(page, PROSE_LINES[:4])
+    _put(page, LEFT, y + BODY_LEADING,
+         "Schmidt published an attempt to reconstruct the original",
+         size=BODY_SIZE * 1.062)
+    add_body_lines(page, [
+        "Antiochus definitions from the fragments that survive in the later",
+        "compilations, and that reconstruction is what is quoted here.",
+    ], top=y + 2 * BODY_LEADING)
+    return page
+
+
+def roman_heading_on_the_ladder_page(doc, title="The Hellenistic Period", folio="88"):
+    """The control for :func:`ocr_size_drift_page`: a heading in the body's own roman
+    face, set at the size the book uses for its section heads, over a new sentence."""
+    page = add_page(doc)
+    add_running_head(page, folio, "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    _put(page, LEFT, BODY_TOP, title, size=HEAD_SIZE)
+    add_body_lines(page, PROSE_LINES[:6], top=BODY_TOP + BODY_LEADING)
+    return page
+
+
+def flat_run_in_heading_page(doc):
+    """A run-in heading with no size signal at all: bold, at the body's own size.
+
+    MEASURED on book 567 the Serapio head is 12.92pt over an 11.3pt body -- a signal,
+    but a small one, and the same scanner that drifts a body line up to 12.00pt can
+    just as easily set a real head at the body's size. What is never in doubt is the
+    weight.
+    """
+    page = add_page(doc)
+    add_running_head(page, "94", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    _put(page, LEFT, BODY_TOP, "Serapio of Alexandria (First Century CE?)",
+         size=BODY_SIZE, font=_BOLD)
+    add_body_lines(page, [
+        "Serapio of Alexandria was an astrologer who wrote on inceptional",
+        "astrology and possibly other topics, although only fragments of",
+        "his work survive in the later compilations.",
+    ], top=BODY_TOP + BODY_LEADING)
+    return page
+
+
+def _drifted_line_page(doc, drifted, following, folio):
+    """A page whose first line of a block the scan measured up to heading size.
+
+    The size reaches the book's own section-head rung, so nothing about how the line
+    is set says it is prose. Only what it says does.
+    """
+    page = add_page(doc)
+    add_running_head(page, folio, "CHAPTER 12: THE PLANETS")
+    y = add_body_lines(page, PROSE_LINES[:4])
+    _put(page, LEFT, y + BODY_LEADING, drifted, size=HEAD_SIZE)
+    add_body_lines(page, following, top=y + 2 * BODY_LEADING)
+    return page
+
+
+def heading_that_starts_mid_sentence_page(doc):
+    """MEASURED, book 567 PDF page 493: ``bonify Mercury. Conversely, if`` came back
+    at 12.30pt in the body's roman face and became an ``<h2>`` -- which splits the
+    chapter there and puts the fragment in the reader's table of contents."""
+    return _drifted_line_page(
+        doc, "bonify Mercury. Conversely, if",
+        ["Saturn is in aversion to the sign it rules then the same",
+         "configuration is read the other way about."],
+        folio="404")
+
+
+def heading_that_stops_on_a_function_word_page(doc):
+    """MEASURED, book 567 PDF page 527: ``Capricorn, Mars and Saturn in`` came back at
+    12.50pt in the body's roman face. It ends on a word no title ends on."""
+    return _drifted_line_page(
+        doc, "Capricorn, Mars and Saturn in",
+        ["Aquarius are both said to be in signs of their own sect,",
+         "which is the condition the older authorities ask for."],
+        folio="438")
+
+
+def long_heading_with_function_words_page(doc, folio="440"):
+    """The control: a real section head that uses those same words inside it."""
+    page = add_page(doc)
+    add_running_head(page, folio, "CHAPTER 12: THE PLANETS")
+    _put(page, LEFT, BODY_TOP, "The Midheaven and the Three Forms of House Division",
+         size=HEAD_SIZE)
+    add_body_lines(page, PROSE_LINES[:6], top=BODY_TOP + BODY_LEADING)
+    return page

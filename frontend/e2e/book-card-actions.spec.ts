@@ -162,12 +162,15 @@ test('coarse pointers carry no card actions; the book page owns them', async ({ 
     'the book page owns shelf membership, which is how a shelf removal is reached',
   ).toBeVisible();
 
+  // The reader route depends on the book's formats — the SPA reader for
+  // EPUB/kepub, the native reader for PDF & co (readerTarget.ts) — so assert
+  // against the href the control actually advertises, not one hard-coded route.
+  const readHref = await detailRead.getAttribute('href');
+  expect(readHref, 'Read now advertises a target').toBeTruthy();
   await tap(detailRead);
-  // EPUB/KEPUB open the epub.js reader (/read/<id>); the other readable
-  // formats go to the native reader (/view/<id>/<format>). The Recent default
-  // sort (#2238) decides which book leads the catalog, so pin the behaviour —
-  // "Read now opens this book's reader" — not one route shape.
-  await expect(page).toHaveURL(new RegExp(`/app/(read|view)/${bookId}\\b`));
+  await expect(page).toHaveURL(
+    new RegExp(`${readHref!.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`),
+  );
   await page.goBack();
 
   // A shelf card is the same story: its X is gone on touch, and removing the

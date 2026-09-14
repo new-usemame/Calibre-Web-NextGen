@@ -39,6 +39,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from html.entities import html5 as HTML5_ENTITIES
 from typing import List, Optional
+from urllib.parse import unquote
 from xml.etree import ElementTree
 from xml.sax.saxutils import escape, quoteattr
 
@@ -862,13 +863,56 @@ def _write_epub(out_path, parts):
 
 # -------------------------------------------------------------------- validation
 
+#: How many of one kind of fault to name before saying how many more there are. A
+#: systematic mistake in a 200-document book produces the same line a thousand times,
+#: and a thousand identical lines is not more evidence than twenty.
+_REPORT_LIMIT = 20
+_XHTML_NS = "{http://www.w3.org/1999/xhtml}"
+_NOT_A_LINK = ("http:", "https:", "mailto:", "tel:", "data:", "ftp:")
+
+
+def _ids_and_links(root):
+    """Every id this document declares, and every internal href it follows."""
+    ids, links = [], []
+    for element in root.iter():
+        ident = element.get("id")
+        if ident:
+            ids.append(ident)
+        tag = element.tag
+        if tag in ("a", _XHTML_NS + "a"):
+            href = (element.get("href") or "").strip()
+            if href and href != "#" and not href.lower().startswith(_NOT_A_LINK):
+                links.append(href)
+    return ids, links
+
+
+def _too_many(problems, found, kind):
+    for item in found[:_REPORT_LIMIT]:
+        problems.append(item)
+    if len(found) > _REPORT_LIMIT:
+        problems.append("and %d more %s" % (len(found) - _REPORT_LIMIT, kind))
+
+
 def validate(path):
-    """A readable zip with the parts a reader needs, and every part of it parses.
+    """A readable zip with the parts a reader needs, and every part of it usable.
 
     Reading only the zip is what let a document no reader can open ship with a clean
     bill: a page whose markup is not well-formed XML is a well-formed zip entry, and
     the reader loses the chapter. So each document is parsed here as a reader's
-    parser would, and a book that says nothing is a book whose every page opens.
+    parser would.
+
+    Parsing is not enough either. Two elements under one id, and a footnote link into
+    a document that does not hold the note, are both well-formed XML and both a
+    footnote that does not open -- OBSERVED with epubcheck on the acceptance book as
+    twenty-five RSC-005 and four RSC-012 errors, in a conversion that reported itself
+    a success and filed the book. The builder no longer writes either shape, and the
+    check that stands between a built book and a reader's library says so anyway:
+    a gate that only holds while the generator is right is not a gate.
+
+    ``href="#"`` is deliberately not a fault. It is what ``_bind_links`` writes for a
+    marker whose note is nowhere in the book, ``build`` counts them and warns, and
+    refusing a whole conversion over one note the scanner lost would be worse for the
+    reader than the dead marker is.
     """
     problems = []
     try:
@@ -882,13 +926,38 @@ def validate(path):
             for required in ("META-INF/container.xml", "%s/content.opf" % OEBPS):
                 if required not in names:
                     problems.append("missing %s" % required)
+            declared, followed = {}, {}
             for name in names:
                 if not name.endswith((".xhtml", ".opf", ".ncx", ".xml")):
                     continue
                 try:
-                    ElementTree.fromstring(zf.read(name))
+                    root = ElementTree.fromstring(zf.read(name))
                 except ElementTree.ParseError as exc:
                     problems.append("%s does not parse: %s" % (name, exc))
+                    continue
+                if not name.endswith(".xhtml"):
+                    continue
+                ids, links = _ids_and_links(root)
+                declared[name] = set(ids)
+                followed[name] = links
+                twice = sorted(set(x for x in ids if ids.count(x) > 1))
+                _too_many(problems,
+                          ['%s gives two elements the id "%s"' % (name, x)
+                           for x in twice], "ids used twice")
+            nowhere = []
+            for name, links in sorted(followed.items()):
+                here = posixpath.dirname(name)
+                for href in links:
+                    target, _, anchor = href.partition("#")
+                    where = (posixpath.normpath(posixpath.join(here, unquote(target)))
+                             if target else name)
+                    if target and where not in names:
+                        nowhere.append('%s links to "%s", which is not in the book'
+                                       % (name, href))
+                    elif anchor and where in declared and anchor not in declared[where]:
+                        nowhere.append('%s links to "%s", and nothing there has '
+                                       "that id" % (name, href))
+            _too_many(problems, nowhere, "links that land on nothing")
     except (zipfile.BadZipFile, IOError, OSError) as exc:
         problems.append("not a readable zip: %s" % exc)
     return problems

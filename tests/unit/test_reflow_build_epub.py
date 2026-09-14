@@ -974,3 +974,79 @@ def test_a_document_that_does_not_parse_is_not_called_a_valid_book(tmp_path):
 
     assert problems, "a document that does not parse is a book that does not open"
     assert any("ch001.xhtml" in p for p in problems), problems
+
+
+def _rewritten(source, target, name_ends, old, new):
+    """The same book with one document altered -- a violation no builder writes."""
+    with zipfile.ZipFile(source) as good, zipfile.ZipFile(target, "w") as bad:
+        for item in good.infolist():
+            data = good.read(item.filename)
+            if item.filename.endswith(name_ends):
+                assert old in data, "the fixture never contained %r" % old
+                data = data.replace(old, new, 1)
+            bad.writestr(item, data)
+    return target
+
+
+def test_a_book_that_uses_one_id_twice_is_not_called_a_valid_book(tmp_path):
+    """Two elements under one id is a document that parses and a footnote that does
+    not open: a reader following the second marker lands on the first note, and the
+    second note is unreachable from anywhere in the book.
+
+    OBSERVED with epubcheck on the acceptance book before the builder learned to tell
+    two notes of one number apart -- twelve pages, twenty-five RSC-005 errors, and the
+    conversion reported itself a success. The builder no longer writes them, and the
+    check that stands between a built book and the library has to be able to say so
+    anyway: the whole point of the check is that it holds when the generator is
+    wrong."""
+    result = _build(_book(F.defect_c_page), tmp_path)
+    assert build_epub.validate(result.path) == []
+
+    with zipfile.ZipFile(result.path) as zf:
+        name = _content_names(zf)[0]
+        ident = re.search(rb'\sid="(fn_[^"]+)"', zf.read(name)).group(1)
+    # The page marker is made to answer to the note's id as well: two elements, one
+    # id, and a document that still parses -- which is exactly why parsing missed it.
+    broken = _rewritten(result.path, str(tmp_path / "twice.epub"), "ch001.xhtml",
+                        b'id="pg_', b'id="%s" data-page="pg_' % ident)
+
+    problems = build_epub.validate(broken)
+
+    assert problems, "a book with one id on two elements is not a book that opens"
+    assert any(ident.decode("ascii") in p for p in problems), problems
+    assert any("ch001.xhtml" in p for p in problems), problems
+
+
+def test_a_link_that_lands_on_nothing_is_not_called_a_valid_book(tmp_path):
+    """A noteref whose aside is not in the same document is the shape a chapter break
+    makes of a page: the marker goes in one file and the note in the next, and an
+    ``href="#fn_x"`` means "in this file". OBSERVED as epubcheck RSC-012 on the
+    acceptance book. ``href="#"`` is not this: the builder writes that on purpose for
+    a marker whose note the book does not have, and reports it as a warning."""
+    result = _build(_book(F.defect_c_page), tmp_path)
+    assert build_epub.validate(result.path) == []
+
+    broken = _rewritten(result.path, str(tmp_path / "nowhere.epub"), "ch001.xhtml",
+                        b'href="#fn_', b'href="#fn_gone_')
+
+    problems = build_epub.validate(broken)
+
+    assert problems, "a link into nothing is a footnote the reader cannot open"
+    assert any("fn_gone_" in p for p in problems), problems
+
+    away = _rewritten(result.path, str(tmp_path / "away.epub"), "ch001.xhtml",
+                      b'href="#fn_', b'href="ch404.xhtml#fn_')
+    assert any("ch404.xhtml" in p for p in build_epub.validate(away)), \
+        build_epub.validate(away)
+
+
+def test_the_link_a_note_never_had_is_still_a_book_that_opens(tmp_path):
+    """The control for the test above. ``href="#"`` is the builder's declared answer
+    for a marker whose note is nowhere in the book -- ``build`` counts those and
+    warns -- and turning that warning into a refusal would throw a whole conversion
+    away over one note the scanner lost."""
+    result = _build(_book(F.defect_c_page), tmp_path)
+    disarmed = _rewritten(result.path, str(tmp_path / "disarmed.epub"), "ch001.xhtml",
+                          b'href="#fn_', b'href="#" data-was="fn_')
+
+    assert build_epub.validate(disarmed) == []

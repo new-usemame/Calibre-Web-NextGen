@@ -823,6 +823,61 @@ def ambiguous_glyph_marker_page(doc):
     return page
 
 
+def _runover_pages(doc, note_finishes):
+    """Pages 138-140 of book 567: a footnote runs over onto the next page.
+
+    Note 258's text does not fit under the page that prints its number, so its last
+    line is set at the top of the next page's footnote zone with no number in front
+    of it. The footnote zone is found by where the small type starts, and that line
+    is above it, so it is read as the last paragraph of the body -- which puts a
+    bibliographic citation in the middle of the chapter and stands between the two
+    halves of the sentence the page turn split.
+
+    ``note_finishes`` writes the control: a note that ends its own sentence on its
+    own page has not run over, and the small paragraph after it is a paragraph.
+    """
+    first = add_page(doc)
+    add_running_head(first, "112", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    y = add_body_lines(first, PROSE_LINES[:8])
+    add_line_with_marker(first, y, "Sometime during the next decade Firmicus converted.",
+                         "258", after=" He")
+    # Short enough to be set on one line: this page's note zone is the evidence the
+    # next page's unnumbered line is weighed against, so it has to read back whole.
+    tail = "On Firmicus' conversion see The Error, trans. Forbes, pp. 7-8."
+    if not note_finishes:
+        tail = "On Firmicus' conversion see The Error, p. 7. The statement read as"
+    add_notes(first, [(257, "Mommsen, \"Firmicus Maternus,\" p. 468."), (258, tail)])
+
+    second = add_page(doc)
+    add_running_head(second, "113", "FIRMICUS MATERNUS")
+    y = add_body_lines(second, PROSE_LINES[8:14])
+    y = add_body_lines(second, [
+        "One example of this is Firmicus' different treatment of Porphyry between",
+        "the two works, and it provides some interesting insight into the",
+        "social climate of astrology during"], top=y + BODY_LEADING)
+    _put(second, LEFT, NOTE_TOP - 40, "occurs in The Error, 8: 4, although it is not "
+         "terribly overt.", size=NOTE_TEXT_SIZE)
+    add_notes(second, [(259, "See Porphyry, Porphyry Against the Christians, trans. "
+                             "Berchman.")])
+
+    third = add_page(doc)
+    add_running_head(third, "114", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    add_body_lines(third, [
+        "the rise of Christianity in the fourth century, and how quickly views",
+        "began to change, sometimes even within a single lifetime."] + PROSE_LINES[:6])
+    return [first, second, third]
+
+
+def runover_footnote_pages(doc):
+    """The note stops mid-sentence on its own page and finishes on the next."""
+    return _runover_pages(doc, note_finishes=False)
+
+
+def finished_footnote_pages(doc):
+    """The control: the note finishes its sentence, so nothing ran over."""
+    return _runover_pages(doc, note_finishes=True)
+
+
 def out_of_order_glyph_marker_page(doc):
     """Page 117 of book 567: one glyph reading fits the page's order and one does not.
 

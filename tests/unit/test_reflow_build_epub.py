@@ -355,6 +355,21 @@ def test_the_sidecar_is_where_the_api_looks_for_it(tmp_path):
     assert "cwng:reflow" in opf
 
 
+def test_a_note_that_ran_over_a_page_is_not_counted_as_a_second_footnote(tmp_path):
+    """The sidecar's count is what the report page tells a reader the book holds.
+    A note printed across a page turn is one footnote set in two pieces, and the
+    unnumbered piece is not a footnote of its own."""
+    book = _book(F.runover_footnote_pages)
+
+    result = _build(book, tmp_path)
+
+    with zipfile.ZipFile(result.path) as zf:
+        data = json.loads(zf.read("META-INF/reflow.json").decode("utf-8"))
+
+    assert [n.num for n in book.notes] == [257, 258, None, 259]
+    assert data["notes"] == 3
+
+
 def test_the_about_page_leads_the_book_when_it_is_asked_for(tmp_path):
     book = _book(F.prose_page, F.defect_c_page)
     about = "<h1>About this conversion</h1><p>No wording was changed.</p>"

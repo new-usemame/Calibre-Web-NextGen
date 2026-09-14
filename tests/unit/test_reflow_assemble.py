@@ -73,6 +73,72 @@ def test_a_finished_sentence_is_not_joined_across_the_page_turn():
     assert any(p.startswith("sometime prior to the second century") for p in _paras(book))
 
 
+class TestFootnotesThatRunOntoTheNextPage(object):
+    """A note too long for its page finishes at the top of the next one, unnumbered.
+
+    MEASURED on the acceptance book: 16 pages of 698 print the tail of the previous
+    page's last note above their own footnotes. The footnote zone is found by where
+    the page's small type starts, and that line is above it, so it is read as the
+    last paragraph of the body. Two things follow, and the second is the worse one.
+    The citation ships inside the chapter; and because the paragraph it interrupts
+    ends mid-sentence, it is spliced onto the end of that sentence and the real
+    continuation on the next page is orphaned. On 11 of the 16 pages the sentence
+    the page turn split is a real one, and page 139 is the measured example: "the
+    social climate of astrology during" is finished by "occurs in The Error, 8: 4,
+    although it is not terribly overt" instead of by "the rise of Christianity in
+    the fourth century".
+    """
+
+    def test_the_tail_of_a_note_is_not_spliced_onto_a_sentence(self):
+        book = _book(F.runover_footnote_pages)
+
+        assert not any("astrology during occurs in" in p for p in _paras(book)), _paras(book)
+
+    def test_the_sentence_the_page_turn_split_is_finished_by_its_own_page(self):
+        book = _book(F.runover_footnote_pages)
+
+        assert any("social climate of astrology during the rise of Christianity"
+                   in p for p in _paras(book)), _paras(book)
+
+    def test_no_orphan_paragraph_is_left_where_the_page_turned(self):
+        book = _book(F.runover_footnote_pages)
+
+        assert not any(p.startswith("the rise of Christianity") for p in _paras(book))
+
+    def test_the_tail_is_set_as_a_note_of_the_page_that_prints_it(self):
+        """It is not moved back to the page its number is on: the model is shown a
+        picture of the page the words are printed on, and its answer is measured
+        against that page's text."""
+        book = _book(F.runover_footnote_pages)
+
+        assert [n.text for n in book.notes if n.pno == 1 and n.num is None] == \
+            ["occurs in The Error, 8: 4, although it is not terribly overt."]
+
+    def test_the_page_the_model_is_shown_still_reads_the_way_it_is_printed(self):
+        """The tail stands between the body and the numbered notes, where the page
+        sets it, so the words the model is asked for are the words on the page."""
+        book = _book(F.runover_footnote_pages)
+        text = assemble.page_source_text(book, 1)
+
+        assert "occurs in The Error, 8: 4" in text
+        assert text.index("astrology during") < text.index("occurs in The Error") \
+            < text.index("[259]")
+
+    def test_nothing_is_lost_when_the_tail_changes_hands(self):
+        book = _book(F.runover_footnote_pages)
+
+        assert book.conservation.ok, (book.conservation.missing, book.conservation.added)
+
+    def test_a_note_that_finished_its_sentence_did_not_run_over(self):
+        """The control, and the whole of the evidence: a page's last note either
+        stops mid-sentence or it does not. Small type under the body is only a
+        note's tail when there is a note for it to be the tail of."""
+        book = _book(F.finished_footnote_pages)
+
+        assert not [n for n in book.notes if n.pno == 1 and n.num is None]
+        assert any("terribly overt" in p for p in _paras(book)), _paras(book)
+
+
 # ---------------------------------------------------------------------- line joining
 
 def test_a_line_break_hyphen_is_repaired_but_a_printed_compound_is_kept():

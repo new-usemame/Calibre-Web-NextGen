@@ -758,6 +758,47 @@ def _copy_element(element):
                    pages=list(element.pages))
 
 
+def _runover_note(elements, book, skel):
+    """The tail of the previous page's last note, printed above this page's notes.
+
+    A note too long for the page that prints its number finishes at the top of the
+    next page's footnote zone, with no number in front of it. The zone is found by
+    where the page's small type starts, and this line is above it, so it is read as
+    the last paragraph of the body. MEASURED on the acceptance book, 16 pages of 698
+    print one.
+
+    Shipping a bibliographic citation inside the chapter is the smaller half of the
+    damage. The paragraph it lands under is the one the page turn cut in half, so it
+    reads as that sentence's continuation and is joined onto it -- and the real
+    continuation, on the next page, is orphaned. MEASURED, 11 of the 16: page 139's
+    "insight into the social climate of astrology during" is finished by "occurs in
+    The Error, 8: 4, although it is not terribly overt" and page 140 opens a new
+    paragraph at "the rise of Christianity in the fourth century". That is the defect
+    the previous converter shipped, arrived at from the other direction.
+
+    The evidence is the evidence the page-turn join itself runs on, asked of the note
+    instead of the paragraph: the previous page's last note stops mid-sentence and
+    this reads on from it. Small type under the body that finishes nothing is left
+    where it is -- a page can set a paragraph small.
+
+    The tail stays on the page that prints it, as a note with no number. It is not
+    moved back to the page its number is on: the model is shown a picture of the page
+    the words are printed on, and its answer is measured against that page's text.
+    """
+    if len(elements) < 2 or not book.notes or not skel.note_regions:
+        return None
+    tail = elements[-1]
+    if tail.kind != "p" or not tail.bbox:
+        return None
+    if tail.bbox[1] >= min(region.bbox[1] for region in skel.note_regions):
+        return None
+    previous = book.notes[-1]
+    if previous.pno != skel.pno - 1 or not continues(previous.text, tail.text):
+        return None
+    elements.pop()
+    return Note(num=None, text=tail.text, pno=skel.pno)
+
+
 def page_source_text(book, pno):
     """The page as it was printed: what the model is shown, and what its answer is
     measured against. Furniture is already gone; the notes come after the body, the
@@ -828,6 +869,14 @@ def assemble(skeletons, style, raw_pages=None):
     for skel in skeletons:
         page_reasons = list(skel.reasons)
         elements, claimed = _page_elements(skel, book.repairs, page_reasons)
+        runover = _runover_note(elements, book, skel)
+        if runover is not None:
+            book.notes.append(runover)
+            book.repairs.append(Repair("note_runover", skel.pno,
+                                       "read %r as the tail of note %s, printed on "
+                                       "page %d" % (runover.text[:60],
+                                                    book.notes[-2].num, skel.pno - 1),
+                                       confidence="medium"))
         # Two views of the same page, and the difference matters. ``pages`` is the
         # page as it was printed, which is what a model is shown and what its answer
         # is gated against; the stream below is the book as it reads, with sentences

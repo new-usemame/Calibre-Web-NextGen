@@ -615,7 +615,10 @@ def _sidecar(book, pages, chapters, images, joins, extra):
         "generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "pages": len(pages),
         "chapters": len(chapters),
-        "notes": len(book.notes),
+        # A note printed across a page turn is one footnote set in two pieces: the
+        # piece with the number is the note, and the unnumbered tail beneath the
+        # next page's body is the rest of it, not a footnote of its own.
+        "notes": sum(1 for n in book.notes if n.num is not None),
         "notes_unmarked": sum(1 for n in book.notes
                               if n.num is not None and not n.marked),
         "figures": len(book.figures),

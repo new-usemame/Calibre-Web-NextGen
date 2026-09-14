@@ -6,7 +6,8 @@ import {
 import { useBook } from '../lib/queries';
 import {
   useReflowEstimate, useReflowJobs, useStartReflow, useCancelReflow,
-  requiredUsd, routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
+  consentUsd, requiredUsd, routedPagesAreProjected, sampleRoutedPages,
+  suggestedCap, usd,
   type ReflowJob, type ReflowMode,
 } from '../lib/reflow';
 import { Button } from '../components/Button';
@@ -78,6 +79,10 @@ export function Reflow({ id }: { id: string }) {
   }, [est]);
 
   const needed = est && tier ? requiredUsd(est, tier, mode, samplePages) : 0;
+  const capNumber = Number.parseFloat(cap);
+  // What the checkbox beside it actually authorises: the cap, which is what stops
+  // a conversion, and not the estimate the cap was filled in from.
+  const authorised = consentUsd(needed, capNumber);
 
   // The cap follows the estimate until the user types one of their own, and then
   // it is theirs: silently rewriting a number somebody set is how a job spends
@@ -87,8 +92,11 @@ export function Reflow({ id }: { id: string }) {
     setCap(suggestedCap(needed, est.hard_cap_usd).toFixed(2));
   }, [est, needed, capTouched]);
 
-  // Consent is to one figure. Change the figure and it has to be given again.
-  useEffect(() => { setConsent(false); }, [needed, mode, tier, samplePages]);
+  // Consent is to one figure. Change the figure and it has to be given again —
+  // including when it changed because the reader raised the cap, which is the only
+  // one of these the server does not re-derive for itself.
+  useEffect(() => { setConsent(false); },
+            [authorised, needed, mode, tier, samplePages]);
 
   const jobsQ = useReflowJobs(id);
   const active = jobsQ.data?.active ?? [];
@@ -96,7 +104,6 @@ export function Reflow({ id }: { id: string }) {
   // The server lists jobs newest first (ledger.read_summaries).
   const latest = jobsQ.data?.items?.[0] ?? null;
 
-  const capNumber = Number.parseFloat(cap);
   const capValid = Number.isFinite(capNumber) && capNumber > 0
     && (!est || capNumber <= est.hard_cap_usd + 1e-9);
   const capTooLow = capValid && capNumber + 1e-9 < needed;
@@ -280,7 +287,7 @@ export function Reflow({ id }: { id: string }) {
             disabled={!est.configured} onChange={(e) => setConsent(e.target.checked)} />
           <span>
             {t('I agree to spend up to {amount} of my own OpenRouter credit on this conversion.')
-              .replace('{amount}', usd(needed))}
+              .replace('{amount}', usd(authorised))}
           </span>
         </label>
 

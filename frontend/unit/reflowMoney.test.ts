@@ -9,7 +9,8 @@ import test from 'node:test';
 
 import type { ReflowEstimate } from '../src/lib/reflowMoney.ts';
 import {
-  requiredUsd, routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
+  consentUsd, requiredUsd, routedPagesAreProjected, sampleRoutedPages, suggestedCap,
+  usd,
 } from '../src/lib/reflowMoney.ts';
 
 /** Per page, at the ceilings `cps/services/reflow/model.py` prices a tier by. */
@@ -185,5 +186,43 @@ test('the quoted figure is never rounded down below what will be charged', () =>
     assert.match(shown, /^\$\d+\.\d{2}$/, `${amount} was shown as ${shown}`);
     assert.ok(Number(shown.slice(1)) + 0.005 + 1e-9 >= amount,
               `${amount} was shown as ${shown}`);
+  }
+});
+
+test('the consent line names the ceiling that binds, not the estimate below it', () => {
+  // "Stop after spending" is the only number that can stop a conversion:
+  // cps/tasks/reflow.py clamps the job to it and the ledger refuses the call that
+  // would cross it (SPEC §6 G5). The estimate is a projection off forty pages, and
+  // the page starts the cap a quarter above it on purpose -- a book that runs
+  // dearer than its sample should finish rather than stop at 98%. So a sentence
+  // reading "I agree to spend up to $X" that names the estimate understates the
+  // authorisation by that quarter, and by the whole of it if the reader raises the
+  // cap towards the administrator's ceiling.
+  const est = estimateFor(698, 384, 5, 40);
+  const needed = requiredUsd(est, 'standard', 'full', est.sample_pages_default);
+  for (const cap of [suggestedCap(needed, est.hard_cap_usd), 1.5, est.hard_cap_usd]) {
+    assert.ok(cap > needed, `fixture: ${cap} should be above the estimate ${needed}`);
+    assert.equal(consentUsd(needed, cap), cap,
+                 `a reader shown ${consentUsd(needed, cap)} authorised ${cap}`);
+  }
+});
+
+test('lowering the cap lowers what is being agreed to', () => {
+  // The figure is the ceiling, not a floor wearing the word "up to": a reader who
+  // types a cap under the estimate is agreeing to that smaller sum. The start is
+  // refused for its own reason; being told they agreed to more is a separate lie.
+  const est = estimateFor(698, 384, 5, 40);
+  const needed = requiredUsd(est, 'standard', 'full', est.sample_pages_default);
+  assert.ok(needed > 0.5, 'fixture: the estimate should be above the cap tried here');
+  assert.equal(consentUsd(needed, 0.5), 0.5);
+});
+
+test('with no cap typed yet, the estimate is the only figure there is', () => {
+  // The field can be empty mid-edit. Nothing can be started from that state, and
+  // the sentence has nothing better to name than the price it was quoted at.
+  const est = estimateFor(698, 384, 5, 40);
+  const needed = requiredUsd(est, 'standard', 'full', est.sample_pages_default);
+  for (const typed of [Number.NaN, 0, -1]) {
+    assert.equal(consentUsd(needed, typed), needed, String(typed));
   }
 });

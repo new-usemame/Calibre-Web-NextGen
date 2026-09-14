@@ -86,6 +86,22 @@ export function requiredUsd(est: ReflowEstimate, tier: string, mode: ReflowMode,
   return Math.round((est.estimate_usd[tier] ?? 0) * 10000) / 10000;
 }
 
+/** The figure the consent sentence names: the most this conversion can spend.
+ *
+ *  Not the estimate. The estimate is a projection off the forty pages `survey`
+ *  reads; the number that can actually stop a conversion is the cap in "Stop after
+ *  spending", which `cps/tasks/reflow.py` clamps the job to and which G5 refuses to
+ *  let a call cross. The page starts that cap a quarter above the estimate on
+ *  purpose (`suggestedCap`), and the reader may raise it as far as the
+ *  administrator's ceiling — so a sentence that says "up to" and then names the
+ *  estimate understates what is being authorised by at least that quarter. On the
+ *  acceptance book: "up to $0.89" over a cap of $1.11, or of $5.00 if the reader
+ *  raises it. A cap that is not a usable number yet leaves the estimate as the only
+ *  figure there is; nothing can be started from that state anyway. */
+export function consentUsd(needed: number, capUsd: number): number {
+  return Number.isFinite(capUsd) && capUsd > 0 ? capUsd : needed;
+}
+
 /** The cap a job starts with: the estimate plus a quarter, so a book that runs
  *  a little dearer than its sample finishes instead of stopping at 98%. */
 export function suggestedCap(estimate: number, hardCap: number): number {

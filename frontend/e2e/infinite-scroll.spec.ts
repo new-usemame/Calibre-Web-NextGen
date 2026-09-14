@@ -88,7 +88,9 @@ test.describe('library infinite scroll', () => {
 
       const perPage = Number(url.searchParams.get('per_page'));
       expect(perPage, 'the grid asks for a whole number of rows').toBeGreaterThan(0);
-      expect(url.searchParams.get('sort')).toBe('new');
+      // Your Library opens on Recent; a stored choice would change this, and
+      // this spec runs in a fresh context with none.
+      expect(url.searchParams.get('sort')).toBe('recent');
       requestedPages.push(pageNumber);
       requestedSizes.push(perPage);
       await route.fulfill({

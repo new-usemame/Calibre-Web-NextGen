@@ -6,6 +6,15 @@
   display: flex;
   flex-direction: column;
   height: 100%;
+  /* iOS Safari paints its default tap highlight — a grey box BEHIND the link —
+     on every touch that starts on a cover, including touches that turn into a
+     scroll and never open the book (operator, 2026-09-14: "the little highlight
+     that goes behind the tapped on but not necessarily opened book keeps being
+     kinda glitchy"). The property inherits, so opting out here silences the
+     flash for the link and every control inside the tile, and nowhere else —
+     deliberately scoped to the card, not global. Fine pointers never paint a
+     tap highlight, so desktop is unchanged. */
+  -webkit-tap-highlight-color: transparent;
   /* Named query container so the action row can respond to the CARD's width
      rather than the viewport's (#1166) — the same card renders at 82px in a
      dense phone grid and at 260px in search results on the same screen.

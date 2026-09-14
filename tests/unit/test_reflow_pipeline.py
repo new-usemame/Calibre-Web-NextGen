@@ -994,3 +994,42 @@ def test_a_level_below_the_ladders_last_rung_is_still_refused(tmp_path):
     assert any("h4" in reason for reason in result.outcomes[3].gate_reasons), \
         result.outcomes[3].gate_reasons
     assert "<h4>" not in result.page_html[3]
+
+
+class _UnusableAnswerClient(FakeClient):
+    """A provider that is answering, and answering something this page cannot use."""
+
+    def __init__(self, bad_pages=(), **kwargs):
+        FakeClient.__init__(self, **kwargs)
+        self.bad_pages = set(bad_pages)
+
+    def edit_page(self, page_text, **kwargs):
+        if len(self.calls) in self.bad_pages:
+            self.calls.append(page_text)
+            self.hints.append([])
+            raise model.UnusableAnswer(
+                "the model answered prose instead of an HTML fragment: the page "
+                "image is blank and the text layer you supplied is empty")
+        return FakeClient.edit_page(self, page_text, **kwargs)
+
+
+def test_a_run_of_pages_the_model_will_not_transcribe_does_not_end_the_conversion(tmp_path):
+    """A scanned book has blank leaves, and a blank leaf carries a raster with no ink
+    on it, so it is routed to the model as a page with no text layer. The model reads
+    it, says in prose that there is nothing there, and is right.
+
+    MEASURED on the acceptance book: three of those in a row tripped the guard meant
+    for a revoked key and ended a 698-page conversion twenty pages early, while the
+    job still reported itself done. A provider that is answering has not gone away."""
+    doc = _doc(*([F.ambiguous_residue_page] * 6))
+    client = _UnusableAnswerClient(bad_pages=range(4))
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.stopped is None, result.stopped
+    assert len(client.calls) == 6, client.calls
+    assert [result.outcomes[p].gate for p in range(4)] == ["FAIL"] * 4
+    assert result.outcomes[4].source == "model"
+    assert result.outcomes[5].source == "model"

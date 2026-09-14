@@ -31,7 +31,7 @@ from typing import Dict, List, Optional
 from . import (annotate, assemble, assess, build_epub, extract, gate, prompts, route,
                skeleton)
 from .ledger import CapExceeded
-from .model import ModelError
+from .model import ModelError, UnusableAnswer
 
 log = logging.getLogger(__name__)
 
@@ -311,13 +311,18 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
             # deterministic text. A book is hundreds of chances for that to happen
             # and letting the first one out of this loop would throw away every page
             # already paid for.
-            refusals += 1
             log.info("reflow: page %d was not converted: %s", pno, exc)
             result.outcomes[pno] = _refused(book, pno, exc, ledger, client)
             result.gate_failures += 1
-            if refusals >= MAX_CONSECUTIVE_REFUSALS:
-                result.stopped = "model_errors"
-                break
+            if not isinstance(exc, UnusableAnswer):
+                # Only a provider that will not talk to us counts towards the guard.
+                # An answer we cannot use is evidence the service is up, so it does
+                # not advance the count -- and it does not clear it either, because a
+                # dying provider interleaved with unusable pages is still dying.
+                refusals += 1
+                if refusals >= MAX_CONSECUTIVE_REFUSALS:
+                    result.stopped = "model_errors"
+                    break
             continue
         refusals = 0
         result.outcomes[pno] = outcome

@@ -128,6 +128,22 @@ class ModelError(Exception):
     """The provider refused, or answered something we cannot use."""
 
 
+class UnusableAnswer(ModelError):
+    """The provider answered, and the answer is not one this page can use.
+
+    Prose where an HTML fragment was asked for, a reply with no message content, an
+    answer the provider cut off at the token ceiling. The page keeps its
+    deterministic text either way -- that is what the base class means -- but the
+    difference matters one level up: a provider that is answering is not a provider
+    that has gone away, and ``pipeline`` walks a book away from the model after three
+    refusals *in a row* on the theory that something systemic has happened to the
+    service. MEASURED on the acceptance book, whose blank leaves carry a raster with
+    no ink: the model reads them, says in prose that there is nothing to transcribe,
+    and three of those in a row ended a 698-page conversion twenty pages early, with
+    the job still reporting itself done.
+    """
+
+
 class CapExceeded(Exception):
     """Re-exported so callers need not import the ledger to catch the cap."""
 
@@ -300,21 +316,23 @@ class OpenRouterClient(object):
             choice = data["choices"][0]
             content = choice["message"]["content"] or ""
         except (KeyError, IndexError, TypeError):
-            raise ModelError("the provider's reply had no message content")
+            raise UnusableAnswer("the provider's reply had no message content")
 
         if (choice.get("finish_reason") or choice.get("native_finish_reason")) == "length":
             # Adopting the fragment is not an option and neither is pretending it is
             # a model that deleted the end of the page: say what happened, so the
             # page keeps its deterministic text for a reason somebody can act on.
-            raise ModelError("the provider cut the answer short at the token ceiling "
-                             "(%s completion tokens); the page was not converted"
-                             % (data.get("usage") or {}).get("completion_tokens", "?"))
+            raise UnusableAnswer(
+                "the provider cut the answer short at the token ceiling "
+                "(%s completion tokens); the page was not converted"
+                % (data.get("usage") or {}).get("completion_tokens", "?"))
 
         content = _FENCE.sub("", content).strip()
         uncertain, notes, html = _split_contract(content)
         if not _HTML_TAG.search(html):
-            raise ModelError("the model answered prose instead of an HTML fragment: %s"
-                             % html[:160].replace("\n", " "))
+            raise UnusableAnswer(
+                "the model answered prose instead of an HTML fragment: %s"
+                % html[:160].replace("\n", " "))
 
         usage = data.get("usage") or {}
         prompt_tokens = int(usage.get("prompt_tokens") or 0)

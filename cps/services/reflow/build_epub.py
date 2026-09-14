@@ -38,6 +38,7 @@ import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import List, Optional
+from xml.etree import ElementTree
 from xml.sax.saxutils import escape, quoteattr
 
 from . import assemble, extract
@@ -407,6 +408,30 @@ def _reader_ready_notes(html):
     return _NOTE_ASIDE.sub(note, _NOTEREF_ANCHOR.sub(marker, html))
 
 
+#: An ``&`` that does not open an entity reference, and a ``<`` that does not open a
+#: tag. Both are ordinary characters in a book -- "9 & 29", "p < 0.05" -- and both are
+#: fatal in XML: the reader loses the whole document, not the character.
+_LOOSE_AMPERSAND = re.compile(r"&(?!#?\w+;)")
+_LOOSE_ANGLE = re.compile(r"<(?![a-zA-Z/!?])")
+
+
+def _well_formed_text(html):
+    """The markup a model wrote, made into XML without changing a word.
+
+    The deterministic reader escapes what it reads. A model's answer is markup the
+    model wrote, and it reaches the builder exactly as sent: OBSERVED on the
+    acceptance book, one note came back carrying a bare ``&`` and epubcheck called
+    the document FATAL RSC-016 -- so a reader loses a chapter over an ampersand,
+    on one of the pages the gate *accepted*.
+
+    Escaping is not a word change: ``&amp;`` renders as ``&``, which is what the page
+    printed and what the word-preservation check already compared. An ``&`` that
+    already opens an entity, and a ``<`` that already opens a tag, are left alone, so
+    this is safe to run over markup that is well-formed already.
+    """
+    return _LOOSE_ANGLE.sub("&lt;", _LOOSE_AMPERSAND.sub("&amp;", html))
+
+
 def _scope_ids(html, pno):
     """Note numbers repeat from page to page; ids in one book may not."""
     prefix = "p%04d_" % pno
@@ -431,7 +456,8 @@ def _page_blocks(page_html):
     pages = []
     for pno in sorted(page_html):
         blocks = split_blocks(
-            _scope_ids(_reader_ready_notes(page_html[pno] or ""), pno))
+            _scope_ids(_reader_ready_notes(_well_formed_text(page_html[pno] or "")),
+                       pno))
         pages.append({"pno": pno, "anchor": page_anchor(pno),
                       "body": [b for b in blocks if not _is_aside(b)],
                       "asides": [b for b in blocks if _is_aside(b)]})
@@ -497,6 +523,27 @@ def _first_words(blocks):
             words = text.split()
             return " ".join(words[:6]) + ("…" if len(words) > 6 else "")
     return "Text"
+
+
+def _page_homes(chapters):
+    """Which document each page marker actually landed in.
+
+    A page whose blocks straddle a chapter break belongs to two documents, so the
+    page cannot be asked which one it is in -- only its marker can. Asking the page
+    sends a reader to the second document for an anchor written into the first,
+    which is a link that goes nowhere: OBSERVED with epubcheck as RSC-012 on the
+    acceptance book, where the about page offered ch008 for a marker in ch007.
+    """
+    homes = {}
+    for chapter in chapters:
+        for block in chapter.blocks:
+            for ident in _ID.findall(block):
+                if ident.startswith("pg_"):
+                    try:
+                        homes.setdefault(int(ident[3:]), chapter.href)
+                    except ValueError:                            # pragma: no cover
+                        pass
+    return homes
 
 
 def _bind_links(chapters):
@@ -684,8 +731,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     documents = {}
 
     if callable(report_html):
-        where = {pno: chapter.href for chapter in chapters for pno in chapter.pages}
-        report_html = report_html(where)
+        report_html = report_html(_page_homes(chapters))
     if report_html:
         documents[ABOUT_HREF] = _document("About this conversion", report_html, language)
         manifest.append({"id": "reflow-about", "href": ABOUT_HREF,
@@ -789,7 +835,13 @@ def _write_epub(out_path, parts):
 # -------------------------------------------------------------------- validation
 
 def validate(path):
-    """A readable zip with the parts a reader needs, and epubcheck if it is here."""
+    """A readable zip with the parts a reader needs, and every part of it parses.
+
+    Reading only the zip is what let a document no reader can open ship with a clean
+    bill: a page whose markup is not well-formed XML is a well-formed zip entry, and
+    the reader loses the chapter. So each document is parsed here as a reader's
+    parser would, and a book that says nothing is a book whose every page opens.
+    """
     problems = []
     try:
         with zipfile.ZipFile(path) as zf:
@@ -802,6 +854,13 @@ def validate(path):
             for required in ("META-INF/container.xml", "%s/content.opf" % OEBPS):
                 if required not in names:
                     problems.append("missing %s" % required)
+            for name in names:
+                if not name.endswith((".xhtml", ".opf", ".ncx", ".xml")):
+                    continue
+                try:
+                    ElementTree.fromstring(zf.read(name))
+                except ElementTree.ParseError as exc:
+                    problems.append("%s does not parse: %s" % (name, exc))
     except (zipfile.BadZipFile, IOError, OSError) as exc:
         problems.append("not a readable zip: %s" % exc)
     return problems

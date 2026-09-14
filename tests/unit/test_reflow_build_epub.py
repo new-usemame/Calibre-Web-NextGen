@@ -860,3 +860,86 @@ def test_a_page_whose_notes_were_already_separated_is_not_separated_again(tmp_pa
     once = build_epub._reader_ready_notes(MODEL_ANSWER_NUMBER_PRINTED_TWICE)
 
     assert build_epub._reader_ready_notes(once) == once
+
+
+# ------------------------------------------------- a book a reader can actually open
+
+def _links_and_ids(zf):
+    """Every internal link in the book, and every id there is to land on."""
+    ids, links = set(), []
+    names = [n for n in zf.namelist() if n.endswith(".xhtml")]
+    for name in names:
+        text = zf.read(name).decode("utf-8")
+        for ident in re.findall(r'\sid="([^"]+)"', text):
+            ids.add("%s#%s" % (name.split("/")[-1], ident))
+        for href in re.findall(r'href="([^"]*#[^"]+)"', text):
+            doc, frag = href.split("#", 1)
+            links.append("%s#%s" % (doc or name.split("/")[-1], frag))
+    return links, ids
+
+
+def test_every_link_in_the_finished_book_lands_on_something_that_is_in_it(tmp_path):
+    """A page whose blocks straddle a chapter break belongs to two documents, and its
+    page marker is written into the first of them. The report is told which document
+    to send a reader to for a given page, and being told the second one is a link
+    that goes nowhere -- OBSERVED with epubcheck as RSC-012 on the acceptance book,
+    where the about page sent a reader to ch008 for a marker that is in ch007."""
+    book = _book(F.prose_page, F.mid_page_heading_page, F.prose_page)
+
+    def write_about(where):
+        return ('<h1>About this conversion</h1><p>%s</p>'
+                % "".join('<a href="%s#pg_%04d">page %d</a> ' % (href, pno, pno)
+                          for pno, href in sorted(where.items())))
+
+    result = _build(book, tmp_path, report_html=write_about)
+
+    with zipfile.ZipFile(result.path) as zf:
+        links, ids = _links_and_ids(zf)
+    assert links, "a book with no links proves nothing"
+    assert [link for link in links if link not in ids] == [], sorted(ids)
+
+
+MODEL_ANSWER_WITH_AN_AMPERSAND = (
+    '<p>He cites both places at once'
+    '<a class="noteref" href="#fn_120">120</a>.</p>\n'
+    '<aside class="footnote" id="fn_120">120 Hephaestio, Apotelesmatika, 2, 10: '
+    '9 & 29. Pingree, "From Alexandria," p. 7, fn. 35.</aside>'
+)
+
+
+def test_an_ampersand_the_model_left_raw_does_not_stop_the_page_opening(tmp_path):
+    """OBSERVED on the acceptance book: one note on one model page carried a bare
+    "&", epubcheck called it FATAL RSC-016, and the whole document stops parsing --
+    so a reader loses the chapter, not the ampersand. The deterministic reader
+    escapes it; the model's answer is markup the model wrote, and it reaches the
+    builder exactly as sent."""
+    result = _model_page(tmp_path, html=MODEL_ANSWER_WITH_AN_AMPERSAND)
+
+    with zipfile.ZipFile(result.path) as zf:
+        name = _content_names(zf)[0]
+        root = ET.fromstring(zf.read(name))          # the whole point: it parses
+
+    text = ET.tostring(root, method="text", encoding="unicode")
+    assert "9 & 29" in text, text
+
+
+def test_a_document_that_does_not_parse_is_not_called_a_valid_book(tmp_path):
+    """The builder's own check read the zip and not the documents inside it, so a
+    page no reader can open shipped with a clean bill. Crafted here the way the
+    model produced it: markup that is a well-formed zip entry and not well-formed
+    XML."""
+    result = _build(_book(F.prose_page), tmp_path)
+    assert build_epub.validate(result.path) == []
+
+    broken = str(tmp_path / "broken.epub")
+    with zipfile.ZipFile(result.path) as good, zipfile.ZipFile(broken, "w") as bad:
+        for item in good.infolist():
+            data = good.read(item.filename)
+            if item.filename.endswith("ch001.xhtml"):
+                data = data.replace(b"<p>", b"<p>Hephaestio 9 & 29 ", 1)
+            bad.writestr(item, data)
+
+    problems = build_epub.validate(broken)
+
+    assert problems, "a document that does not parse is a book that does not open"
+    assert any("ch001.xhtml" in p for p in problems), problems

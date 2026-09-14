@@ -923,6 +923,37 @@ def test_an_ampersand_the_model_left_raw_does_not_stop_the_page_opening(tmp_path
     assert "9 & 29" in text, text
 
 
+#: HTML a model writes looks like HTML a person writes, and a person writing HTML
+#: types "&mdash;". None of these are XML entities; ``&fnord;`` is not an entity at
+#: all, and the model that typed it meant those seven characters.
+MODEL_ANSWER_WITH_NAMED_ENTITIES = (
+    '<p>Ptolemy&nbsp;II is cited at &sect;12 &mdash; and again at &fnord;7'
+    '<a class="noteref" href="#fn_44">44</a>.</p>\n'
+    '<aside class="footnote" id="fn_44">44 Neugebauer &amp; Van Hoesen, p. 12.</aside>'
+)
+
+
+def test_an_entity_the_model_named_is_a_character_and_not_a_lost_chapter(tmp_path):
+    """``&nbsp;`` is a well-formed zip entry, a well-formed ampersand, and an
+    undefined entity in XML: the reader loses the document, the same way the raw
+    ampersand lost one. Only the five XML entities are defined in a book, so an HTML
+    name has to become the character it names, and a name that is not an entity at
+    all has to stay the text the model typed."""
+    result = _model_page(tmp_path, html=MODEL_ANSWER_WITH_NAMED_ENTITIES)
+
+    assert build_epub.validate(result.path) == []
+
+    with zipfile.ZipFile(result.path) as zf:
+        root = ET.fromstring(zf.read(_content_names(zf)[0]))
+    text = ET.tostring(root, method="text", encoding="unicode")
+
+    assert "\u00a7" + "12" in text, text            # &sect; is a section sign
+    assert "\u2014" in text, text                   # &mdash; is an em dash
+    assert "Ptolemy\u00a0II" in text, text          # &nbsp; is a space that holds
+    assert "&fnord;7" in text, text                 # and this one is just words
+    assert "Neugebauer & Van Hoesen" in text, text  # the XML five still mean it
+
+
 def test_a_document_that_does_not_parse_is_not_called_a_valid_book(tmp_path):
     """The builder's own check read the zip and not the documents inside it, so a
     page no reader can open shipped with a clean bill. Crafted here the way the

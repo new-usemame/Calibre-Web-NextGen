@@ -37,6 +37,7 @@ import uuid
 import zipfile
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from html.entities import html5 as HTML5_ENTITIES
 from typing import List, Optional
 from xml.etree import ElementTree
 from xml.sax.saxutils import escape, quoteattr
@@ -413,6 +414,29 @@ def _reader_ready_notes(html):
 #: fatal in XML: the reader loses the whole document, not the character.
 _LOOSE_AMPERSAND = re.compile(r"&(?!#?\w+;)")
 _LOOSE_ANGLE = re.compile(r"<(?![a-zA-Z/!?])")
+#: ``&name;``. XML defines five of these and HTML defines two thousand, and a model
+#: asked for HTML writes the HTML ones.
+_NAMED_ENTITY = re.compile(r"&([a-zA-Z][a-zA-Z0-9]{0,31});")
+_XML_ENTITIES = frozenset(("amp", "lt", "gt", "quot", "apos"))
+
+
+def _named_entities(html):
+    """``&mdash;`` as the em dash it names, ``&fnord;`` as the seven characters it is.
+
+    A book is XML, and XML declares five entities. Everything else a model types --
+    ``&nbsp;``, ``&mdash;``, ``&sect;``, the whole HTML list -- is undefined there,
+    and an undefined entity is not a stray character in the text: the parser stops
+    and the reader loses the document. Resolving the name to its character keeps the
+    mark the model meant; escaping a name that is not an entity at all keeps the
+    literal text it typed. Either way nothing the model wrote is dropped.
+    """
+    def one(found):
+        name = found.group(1)
+        if name in _XML_ENTITIES:
+            return found.group(0)
+        character = HTML5_ENTITIES.get(name + ";")
+        return character if character is not None else "&amp;%s;" % name
+    return _NAMED_ENTITY.sub(one, html)
 
 
 def _well_formed_text(html):
@@ -428,8 +452,12 @@ def _well_formed_text(html):
     printed and what the word-preservation check already compared. An ``&`` that
     already opens an entity, and a ``<`` that already opens a tag, are left alone, so
     this is safe to run over markup that is well-formed already.
+
+    Named entities are resolved first, so that by the time the loose-ampersand pass
+    runs, every remaining ``&x;`` is one XML understands.
     """
-    return _LOOSE_ANGLE.sub("&lt;", _LOOSE_AMPERSAND.sub("&amp;", html))
+    return _LOOSE_ANGLE.sub("&lt;",
+                            _LOOSE_AMPERSAND.sub("&amp;", _named_entities(html)))
 
 
 def _scope_ids(html, pno):

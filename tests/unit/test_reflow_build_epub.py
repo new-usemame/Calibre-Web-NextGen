@@ -1050,3 +1050,97 @@ def test_the_link_a_note_never_had_is_still_a_book_that_opens(tmp_path):
                           b'href="#fn_', b'href="#" data-was="fn_')
 
     assert build_epub.validate(disarmed) == []
+
+
+def _nav_labels(path):
+    """The table of contents as a reader reads it, in order."""
+    with zipfile.ZipFile(path) as zf:
+        nav = zf.read("OEBPS/nav.xhtml").decode("utf-8")
+    import html as _html
+    return [_html.unescape(re.sub(r"<[^>]+>", "", label)).strip()
+            for label in re.findall(r"<a [^>]*>(.*?)</a>", nav, re.S)]
+
+
+class TestADocumentWithNoHeadingOfItsOwn(object):
+    """What to call a document the book never gave a title to.
+
+    MEASURED on the acceptance book: 4 of its 221 documents carry no heading of any
+    level, and naming a document after the first words that happen to stand on it
+    made ``, ill .ts ?`` -- the specks a scanner read off the frontispiece plate --
+    the first entry in the book's own table of contents. The other three are the
+    middle of the bibliography and the middle of the index, split for length and
+    named after whichever list line the split landed on, e.g.
+    ``507, 510 and whole sign houses,…``.
+
+    A first line is a title only when the page happens to open with one. A document
+    is a place in the book whether or not it announces itself, so it is named for
+    where it is.
+    """
+
+    def test_a_document_of_scan_noise_is_not_named_after_the_noise(self, tmp_path):
+        book = _book(F.garbage_text_page,
+                     lambda doc: F.chapter_opening_page(doc, "The Hellenistic Astrologers"))
+
+        labels = _nav_labels(_build(book, tmp_path).path)
+
+        assert labels, "a book with no table of contents has no way in"
+        assert "aenlm" not in " ".join(labels), labels
+
+    def test_it_is_named_for_the_page_it_stands_on(self, tmp_path):
+        """Not naming it after the noise is half the job: a nav entry still has to
+        tell the reader where it goes."""
+        book = _book(F.garbage_text_page,
+                     lambda doc: F.chapter_opening_page(doc, "The Hellenistic Astrologers"))
+
+        labels = _nav_labels(_build(book, tmp_path).path)
+
+        assert labels[0] == "Page 1", labels
+
+    def test_a_document_split_for_length_says_which_chapter_it_continues(
+            self, tmp_path, monkeypatch):
+        """The three of the four that are not scan noise. A chapter too long for one
+        document is cut into several, and only the first carries the heading; the
+        rest are the same chapter and should say so."""
+        monkeypatch.setattr(build_epub, "MAX_BLOCKS_PER_DOC", 4)
+        book = _book(lambda doc: F.chapter_opening_page(doc, "The Hellenistic Astrologers"),
+                     F.prose_page, F.prose_page, F.prose_page)
+
+        labels = _nav_labels(_build(book, tmp_path).path)
+
+        assert len(labels) > 1, labels
+        assert all(label.startswith("The Hellenistic Astrologers") for label in labels[1:]), \
+            labels
+        assert labels[1] != labels[0], labels
+
+    def test_every_document_is_still_reachable_from_the_table_of_contents(
+            self, tmp_path, monkeypatch):
+        """The property the old fallback existed to keep: a document with no entry is
+        a part of the book a reader can only reach by turning pages to it."""
+        monkeypatch.setattr(build_epub, "MAX_BLOCKS_PER_DOC", 4)
+        book = _book(F.garbage_text_page,
+                     lambda doc: F.chapter_opening_page(doc, "The Hellenistic Astrologers"),
+                     F.prose_page, F.prose_page)
+        result = _build(book, tmp_path)
+
+        with zipfile.ZipFile(result.path) as zf:
+            documents = set(posixpath.basename(n) for n in _content_names(zf))
+        targets = set()
+        with zipfile.ZipFile(result.path) as zf:
+            nav = zf.read("OEBPS/nav.xhtml").decode("utf-8")
+        for href in re.findall(r'<a [^>]*href="([^"#]+)', nav):
+            targets.add(posixpath.basename(href))
+
+        assert documents <= targets, documents - targets
+
+    def test_a_heading_anywhere_in_the_document_is_still_its_title(
+            self, tmp_path, monkeypatch):
+        """The control. A document that was split for length but happens to carry a
+        lower-level heading is titled by that heading, as it always was."""
+        monkeypatch.setattr(build_epub, "MAX_BLOCKS_PER_DOC", 4)
+        book = _book(lambda doc: F.chapter_opening_page(doc, "The Hellenistic Astrologers"),
+                     F.prose_page,
+                     lambda doc: F.section_heading_page(doc, "Serapio of Alexandria"))
+
+        labels = _nav_labels(_build(book, tmp_path).path)
+
+        assert any("Serapio of Alexandria" in label for label in labels), labels

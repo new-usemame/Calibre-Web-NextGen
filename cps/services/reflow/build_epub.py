@@ -99,6 +99,8 @@ class Chapter(object):
     title: str
     blocks: List[str] = field(default_factory=list)
     pages: List[int] = field(default_factory=list)
+    continued: bool = False
+    """Cut out of the document before it, because that one grew too long."""
 
     @property
     def href(self):
@@ -514,8 +516,8 @@ def _chapters(pages):
     chapters = []
     current = None
 
-    def start(title):
-        chapter = Chapter(index=len(chapters) + 1, title=title)
+    def start(title, continued=False):
+        chapter = Chapter(index=len(chapters) + 1, title=title, continued=continued)
         chapters.append(chapter)
         return chapter
 
@@ -525,8 +527,12 @@ def _chapters(pages):
         pending = page["anchor"]
         for block in page["body"] + page["asides"]:
             heading = _SPLIT_HEADING.match(block)
-            if heading or current is None or len(current.blocks) >= MAX_BLOCKS_PER_DOC:
-                current = start(block_text(block) if heading else "")
+            if heading:
+                current = start(block_text(block))
+            elif current is None:
+                current = start("")
+            elif len(current.blocks) >= MAX_BLOCKS_PER_DOC:
+                current = start("", continued=True)
             if pending:
                 current.blocks.append(pending)
                 pending = None
@@ -537,21 +543,43 @@ def _chapters(pages):
             current.blocks.append(pending)
             if page["pno"] not in current.pages:
                 current.pages.append(page["pno"])
-    for chapter in chapters:
-        if not chapter.title:
-            match = _HEADING_TEXT.search("\n".join(chapter.blocks))
-            chapter.title = (block_text(match.group(0)) if match
-                             else _first_words(chapter.blocks))
+    _name_the_untitled(chapters)
     return chapters
 
 
-def _first_words(blocks):
-    for block in blocks:
-        text = block_text(block)
-        if text:
-            words = text.split()
-            return " ".join(words[:6]) + ("…" if len(words) > 6 else "")
-    return "Text"
+def _name_the_untitled(chapters):
+    """Name a document that carries no heading of its own.
+
+    Nearly every document is named by the heading that opened it. Two kinds are
+    not: whatever stands in front of a book's first heading, and the tail of a
+    chapter long enough to be cut into several documents. Naming those after
+    their own first few words puts whatever the scanner made of a frontispiece at
+    the head of the table of contents, and repeats six words of one index entry
+    once per part. A document with nothing to say for itself is named for where
+    it is instead: the chapter it continues, or the pages it stands on.
+    """
+    base = ""
+    for chapter in chapters:
+        if not chapter.title:
+            match = _HEADING_TEXT.search("\n".join(chapter.blocks))
+            if match:
+                chapter.title = block_text(match.group(0))
+        if chapter.title:
+            base = chapter.title
+            continue
+        where = _where_it_stands(chapter.pages)
+        chapter.title = ("%s (%s)" % (base, where[0].lower() + where[1:])
+                         if chapter.continued and base else where)
+
+
+def _where_it_stands(pnos):
+    """The pages a document covers, numbered as its own page markers are."""
+    if not pnos:
+        return "Text"
+    first, last = min(pnos) + 1, max(pnos) + 1
+    if first == last:
+        return "Page %d" % first
+    return "Pages %d–%d" % (first, last)
 
 
 def _page_homes(chapters):

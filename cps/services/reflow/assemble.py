@@ -419,6 +419,52 @@ def _repair_degree(following, repairs, pno, digits, number):
     return following[:offset] + stripped[1:]
 
 
+def _marker_order_allows(elements, skel, at_element, at_run, number):
+    """Would reading this run as *number* cite the notes out of the page's order?
+
+    A book numbers its notes in the order it cites them, so a recovered marker has
+    to fall between the markers already resolved either side of it. MEASURED, page
+    117 of the acceptance book returns ``a teacher he found in Egypt."\'`` -- no
+    digit at all -- ahead of the markers for 138 and 140. The residue reads back as
+    111, one substitution from the 141 this page prints and leaves unreferenced, so
+    it was bound there; the note the sentence cites is 136, whose text is about the
+    teacher in Egypt, and no reading of two quotation marks could ever have reached
+    it. Refusing the reading leaves the residue standing and 141 unreferenced, which
+    is what the page can support, and the page is routed carrying both.
+
+    The order is taken from the ascending backbone of the markers already bound, not
+    from the neighbours themselves, because one marker whose own digits the scan
+    truncated must not be allowed to veto a good reading -- page 157 marks
+    ``26, 27, 28, 29, 3, 31`` and the 3 is a damaged 30.
+
+    None of it applies to a page whose printed notes do not ascend. This book
+    restarts its numbering at every chapter, so a page carrying the end of one
+    chapter and the start of the next prints 111 and then 1, and a marker for 111
+    correctly stands in front of a marker for 1 (MEASURED, page 380). The note zone
+    says so, and it says the same thing about a page whose numbers came back too
+    damaged to order.
+    """
+    printed = skel.note_numbers
+    if any(later <= earlier for earlier, later in zip(printed, printed[1:])):
+        return True
+    rows = [((position, index), int(run[1]))
+            for position, element in enumerate(elements)
+            for index, run in enumerate(element.runs)
+            if run[0] == "sup" and run[1].isdigit()]
+    if not rows:
+        return True
+    values = [value for _, value in rows]
+    backbone = _ascending_backbone(values)
+    here = (at_element, at_run)
+    below = [values[i] for i in backbone if rows[i][0] < here]
+    above = [values[i] for i in backbone if rows[i][0] > here]
+    if below and number <= max(below):
+        return False
+    if above and number >= min(above):
+        return False
+    return True
+
+
 def _recover_glyph_markers(elements, skel, claimed, repairs, reasons,
                            exact_only=False):
     """C4: the scanner read the whole superscript as letters, and the page says so.
@@ -435,6 +481,16 @@ def _recover_glyph_markers(elements, skel, claimed, repairs, reasons,
     as a number this page prints as a note and leaves unreferenced, is that marker.
     Where two of the page's notes would fit, nothing is repaired -- pairing them off
     by position prints a citation the page does not make.
+
+    The page's own order of citation is the second half of that evidence, and
+    ``_marker_order_allows`` holds every reading to it. A reading it refuses is not
+    the end of the search: the run after it is tried for the same note, which is how
+    page 119's 151 leaves the sentence about a rising sign -- where the page's other
+    markers say 146 belongs -- and lands on the sentence about Hermes, Nechepso and
+    Petosiris, after 150. MEASURED over the whole acceptance book it changes five
+    pages: 53, 117 and 372 drop a reading their page's order contradicts, and 119
+    and 207 move one onto the run that fits. Recovered markers go from 202 to 199,
+    and pages citing their notes out of order from 28 to 24.
     """
     unclaimed = [n for n in sorted(skel.note_numbers) if n not in claimed]
     if not unclaimed:
@@ -443,7 +499,7 @@ def _recover_glyph_markers(elements, skel, claimed, repairs, reasons,
     printed = (numbers[0], numbers[-1]) if numbers else None
     read_back = False
 
-    for element in elements:
+    for position_element, element in enumerate(elements):
         if element.kind not in ("p", "caption", "h") or not unclaimed:
             continue
         index = 0
@@ -461,7 +517,8 @@ def _recover_glyph_markers(elements, skel, claimed, repairs, reasons,
                 digits = glyph_number(match.group(1))
                 number = fit_note(digits, unclaimed, exact_only=exact_only,
                                   printed=None if match.group(1) != digits else printed)
-                if number is not None:
+                if number is not None and _marker_order_allows(
+                        elements, skel, position_element, index, number):
                     found = (match, number)
                     break
                 position = match.end()

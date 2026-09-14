@@ -377,3 +377,42 @@ class TestMarkersTheScannerReadAsLetters(object):
         assert "fourth century.59" in text, text
         assert not any(r.kind == "marker_glyphs" for r in book.repairs), book.repairs
         assert 58 not in [n.num for n in book.notes if n.marked]
+
+    def test_a_reading_that_breaks_the_page_s_order_of_citation_is_refused(self):
+        """MEASURED on page 117: ``a teacher he found in Egypt."'`` reads as 111,
+        one substitution from the 141 the page prints and leaves unreferenced, and
+        the converter bound it there. The markers either side of it are 135 and 138,
+        and the note about the teacher in Egypt is 136. A citation cannot be the
+        141st and stand between the 135th and the 138th."""
+        book = _book(F.out_of_order_glyph_marker_page)
+        text = assemble.page_source_text(book, 0)
+
+        assert "[141]" not in text.split("\n")[0], text
+        assert 141 in book.unmarked_notes(0), book.unmarked_notes(0)
+
+    def test_the_residue_is_left_standing_for_the_model_to_read(self):
+        """Refusing the reading has to leave the evidence on the page. The model is
+        shown the raster, so ``Egypt."'`` is a question it can answer; ``Egypt.[141]``
+        is a wrong answer it would have to be believed over."""
+        book = _book(F.out_of_order_glyph_marker_page)
+
+        assert "Egypt.\"'" in assemble.page_source_text(book, 0)
+
+    def test_the_reading_that_does_fit_the_page_s_order_is_still_made(self):
+        """The control on the same page. ``Anthology.''s`` reads as 115 and 135 is
+        the only note it could be; nothing stands in front of it to contradict the
+        order, and refusing every recovery would cost the page its one good one."""
+        book = _book(F.out_of_order_glyph_marker_page)
+
+        assert "Anthology.[135]" in assemble.page_source_text(book, 0)
+
+    def test_a_page_whose_notes_restart_is_not_held_to_an_ascending_order(self):
+        """The control that decides how far the order rule reaches. MEASURED on page
+        380: this book numbers each chapter's notes from 1, so the last citation of
+        one chapter stands in front of the first of the next and the page's markers
+        descend by design. Holding a recovery to the order of a page like that loses
+        a citation the page does prove."""
+        book = _book(F.chapter_restart_glyph_marker_page)
+
+        assert "places.[111]" in assemble.page_source_text(book, 0)
+        assert [n.marked for n in book.notes if n.num == 111] == [True]

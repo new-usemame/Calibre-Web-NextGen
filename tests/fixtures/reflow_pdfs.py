@@ -823,6 +823,44 @@ def ambiguous_glyph_marker_page(doc):
     return page
 
 
+def out_of_order_glyph_marker_page(doc):
+    """Page 117 of book 567: one glyph reading fits the page's order and one does not.
+
+    Two of this page's markers came back as punctuation. ``Anthology.\'\'s`` reads
+    as 115, one substitution from the 135 this page prints and leaves unreferenced,
+    and 135 is the note the sentence cites. ``a teacher he found in Egypt."\'`` reads
+    as 111, one substitution from 141 -- but the markers either side of it are 135
+    and 138, and the note about the teacher in Egypt is 136. Binding it to 141
+    prints a citation the book does not make, and hides the fact that the page is
+    missing a marker.
+    """
+    page = add_page(doc)
+    y = BODY_TOP
+    _put(page, LEFT, y, "of the same topic in book 4 of the Anthology.\'\'s While Valens does")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "mention Critodemus as having dealt with profections, he does not")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "otherwise say that he acquired the profections material from him,")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "but instead that it was taught by a teacher he found in Egypt.\"\' Riley")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "suspects that Valens took more from Critodemus than he says.")
+    y += BODY_LEADING
+    y = add_line_with_marker(page, y, "Abraham is another early author named by Firmicus.", "138",
+                             after=" There he")
+    _put(page, LEFT, y, "is listed as if he were a contemporary of Critodemus, which reads")
+    y += BODY_LEADING
+    y = add_line_with_marker(page, y, "as another instance of pseudepigrapha in the same lineage.", "140")
+    add_notes(page, [(135, "Valens, Anthology, 4, 11: 8."),
+                     (136, "On Valens being taught profections by a teacher in Egypt."),
+                     (137, "Riley, A Survey of Vettius Valens, p. 12."),
+                     (138, "Firmicus, Mathesis, 4, proem: 5."),
+                     (139, "Pingree, From Astral Omens, p. 26."),
+                     (140, "Valens, Anthology, 4, 12: 1."),
+                     (141, "Neugebauer and van Hoesen, Greek Horoscopes, p. 176.")])
+    return page
+
+
 def two_damaged_note_numbers_page(doc):
     """Page 115 of book 567: two note numbers in a row lost a digit.
 
@@ -914,6 +952,32 @@ def restarting_note_numbers_pages(doc):
                          (3, "Barton, Ancient Astrology, p. 31.")])
         pages.append(page)
     return pages
+
+
+def chapter_restart_glyph_marker_page(doc):
+    """Page 380 of book 567: the notes restart, and one marker came back damaged.
+
+    The last citation of one chapter stands in front of the first of the next, so
+    the marker for 111 is printed ahead of the marker for 1 and the page's numbers
+    descend. That descent is the book's numbering, not damage, and it says nothing
+    about where 111 belongs: ``derived places."\'`` is still the marker for 111.
+    """
+    page = add_page(doc)
+    y = BODY_TOP
+    _put(page, LEFT, y, "Valens gives this list at one point in the section on places.\"\' At")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "one point he adds a further pair of places to the same scheme,")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "and the chapter ends with the list of what each one governs.")
+    y += BODY_LEADING
+    y = add_line_with_marker(page, y, "The word refers to the actualizations of the soul.", "1",
+                             after=" By")
+    _put(page, LEFT, y, "extension it can also mean sharing, generosity, or charity.")
+    add_notes(page, [(110, "Valens, Anthology, 4, 12: 1."),
+                     (111, "Valens, Anthology, 4, 25: 9."),
+                     (1, "Schmidt, Definitions and Foundations, p. 180."),
+                     (2, "Riley, A Survey of Vettius Valens, p. 12.")])
+    return page
 
 
 def marker_for_a_missing_note_page(doc):

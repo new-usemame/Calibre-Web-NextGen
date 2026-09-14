@@ -32,9 +32,11 @@ class FakeClient(object):
         self.calls = []
         self.hints = []
         self.images = []
+        self.headings = []
+        self.ladders = []
         self._uncertain = uncertain if callable(uncertain) else (
             lambda _text, records=list(uncertain or ()): records)
-        self._answer = answer or (lambda text: "<p>%s</p>" % text)
+        self._answer = answer
         self.spec = types.SimpleNamespace(price_per_page=price, model_id="test/model")
         self.model_id = "test/model"
         self.tier = "standard"
@@ -44,14 +46,30 @@ class FakeClient(object):
         return {"model": self.model_id, "tier": self.tier, "configured": True,
                 "dry_run": False, "prompt_version": "test-1"}
 
+    def _faithful(self, page_text, headings):
+        """What a model that does as it is told returns: the blocks it was given, in
+        the order it was given them, with the declared headings marked and nothing
+        else made into one."""
+        levels = {text.strip(): int(level) for level, text in headings}
+        blocks = []
+        for block in page_text.split("\n\n"):
+            level = levels.get(block.strip())
+            blocks.append("<h%d>%s</h%d>" % (level, block, level) if level
+                          else "<p>%s</p>" % block)
+        return "\n".join(blocks)
+
     def edit_page(self, page_text, image_jpeg=None, ladder=(), hints=None,
-                  page_label=None, ledger=None, **kwargs):
+                  page_label=None, ledger=None, headings=(), **kwargs):
         if ledger is not None:
             ledger.reserve(self.spec.price_per_page)
         self.calls.append(page_text)
         self.hints.append(list(hints or []))
         self.images.append(image_jpeg)
-        return model.ModelResult(html=self._answer(page_text), model=self.model_id,
+        self.headings.append([(int(level), text) for level, text in (headings or ())])
+        self.ladders.append(list(ladder or ()))
+        html = (self._answer(page_text) if self._answer is not None
+                else self._faithful(page_text, headings or ()))
+        return model.ModelResult(html=html, model=self.model_id,
                                  uncertain=[dict(r) for r in self._uncertain(page_text)],
                                  cost_usd=self.spec.price_per_page,
                                  cost_source="price_table", prompt_tokens=900,
@@ -129,6 +147,63 @@ def test_a_page_the_model_mangles_keeps_the_deterministic_text(tmp_path):
     assert "FAIL" in book.totals()["gate"]
     lost = assemble.page_source_text(result.book, 1).split()[-1]
     assert lost in gate.strip_markup(result.page_html[1]), result.page_html[1][-200:]
+
+
+class TestWhatIsAHeadingIsNotTheModelsToDecide(object):
+    """The reader measures the headings; the model is told them and held to them.
+
+    MEASURED on page index 102 of the acceptance book, in the run of record: asked
+    to mark headings itself, the model made ``<h2>`` of items 6, 7 and 8 of a
+    numbered list that runs on from the previous page. ``build_epub.SPLIT_LEVELS``
+    starts a chapter at every h1 and h2, so that one page would have added three
+    chapters to the reader's table of contents, titled with three sentences.
+    """
+
+    PAGES = (F.prose_page, F.heading_page_the_model_has_to_see, F.prose_page)
+    HEAD = "Serapio of Alexandria (First Century CE?)"
+
+    def _answer_that_promotes_the_body(self, page_text):
+        head, body, notes = page_text.split("\n\n")
+        return ('<h1>%s</h1>\n<h2>%s</h2>\n'
+                '<aside class="footnote" id="fn_88">%s</aside>'
+                % (head, body, notes.replace("[88] ", "88 ")))
+
+    def test_the_model_is_told_which_lines_the_page_sets_as_headings(self, tmp_path):
+        doc = _doc(*self.PAGES)
+        client = FakeClient()
+        try:
+            _run(doc, client, tmp_path)
+        finally:
+            doc.close()
+
+        assert client.headings, "nothing was routed"
+        assert client.headings[-1] == [(1, self.HEAD)], client.headings
+
+    def test_a_sentence_the_model_promoted_keeps_the_deterministic_text(self, tmp_path):
+        doc = _doc(*self.PAGES)
+        client = FakeClient(answer=self._answer_that_promotes_the_body)
+        try:
+            result, _ = _run(doc, client, tmp_path)
+        finally:
+            doc.close()
+
+        assert result.outcomes[1].source == "deterministic"
+        assert any("body text" in reason
+                   for reason in result.outcomes[1].gate_reasons), \
+            result.outcomes[1].gate_reasons
+
+    def test_the_same_answer_with_the_sentence_left_alone_is_adopted(self, tmp_path):
+        """The control. A gate that refused every page would pass the test above."""
+        doc = _doc(*self.PAGES)
+        client = FakeClient(answer=lambda text: self._answer_that_promotes_the_body(
+            text).replace("<h2>", "<p>").replace("</h2>", "</p>"))
+        try:
+            result, _ = _run(doc, client, tmp_path)
+        finally:
+            doc.close()
+
+        assert result.outcomes[1].source == "model", result.outcomes[1].gate_reasons
+        assert "<h1>%s</h1>" % self.HEAD in result.page_html[1]
 
 
 def test_a_page_the_model_marked_up_faithfully_is_adopted(tmp_path):
@@ -765,8 +840,9 @@ def _sectioned(page_builder):
                 page_builder)
 
 
-def test_a_level_the_books_type_defines_is_open_to_the_model(tmp_path):
-    """The ladder is the book's, not the sample's.
+def test_the_ladder_is_the_books_and_the_level_of_a_heading_is_the_readers(tmp_path):
+    """The ladder is the book's, not the sample's -- and it is no longer what decides
+    a heading's level.
 
     MEASURED on book 567: over PDF pages 100-129 the deterministic pass emits only
     level 1, because the two levels this book sets are its chapter heads (15.7pt,
@@ -775,16 +851,25 @@ def test_a_level_the_books_type_defines_is_open_to_the_model(tmp_path):
     that page, including the footnote markers the page was routed for. What the book
     sets is the ladder; below the bottom rung there is one more level, because that
     is where a run-in head set on the body's own leading lands.
+
+    Since the reader declares each heading's level with the heading itself, the rung
+    below the last is now defence in depth rather than a route: a level that reaches
+    the answer legitimately is a level the reader emitted, and one that does not is
+    refused twice over. The ladder still bounds what the prompt offers, which is what
+    this asserts, and ``test_a_level_below_the_ladders_last_rung_is_still_refused``
+    asserts that the bound is enforced.
     """
-    doc = _sectioned(F.ambiguous_residue_page)
-    client = FakeClient(answer=lambda text: "<h2>%s</h2>" % text)
+    doc = _sectioned(F.heading_page_the_model_has_to_see)
+    client = FakeClient()
     try:
         result, _ = _run(doc, client, tmp_path)
     finally:
         doc.close()
 
+    assert client.ladders[-1] == [1, 2], client.ladders
+    assert client.headings[-1] == [(1, "Serapio of Alexandria (First Century CE?)")]
     assert result.outcomes[3].gate == "PASS", result.outcomes[3].gate_reasons
-    assert "<h2>" in result.page_html[3]
+    assert "<h1>Serapio of Alexandria (First Century CE?)</h1>" in result.page_html[3]
 
 
 def test_a_level_below_the_ladders_last_rung_is_still_refused(tmp_path):

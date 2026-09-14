@@ -848,6 +848,20 @@ def page_source_text(book, pno):
     return "\n\n".join(part for part in parts if part.strip())
 
 
+def page_headings(book, pno):
+    """What this page sets as a heading, as the model is told it and judged on it.
+
+    Which lines of a page are headings is a fact the deterministic reader measures
+    -- off the book's type ladder, the geometry of a run-in head and
+    ``skeleton.acceptable_heading`` -- and the model is not asked to have an opinion
+    about it: it is told the answer in ``prompts.user_prompt`` and refused by
+    ``gate.check_structure`` if it marks anything else. The page membership is
+    ``page_source_text``'s, so the list describes exactly the text the model is sent.
+    """
+    return [(int(element.level or 1), element.text)
+            for element in book.pages.get(pno, []) if element.kind == "h"]
+
+
 def _page_elements(skel, repairs, reasons):
     page_notes = skel.note_numbers
     claimed = set()

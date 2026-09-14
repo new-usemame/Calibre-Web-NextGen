@@ -363,6 +363,70 @@ class TestStructuralSchemaGate:
         assert not result.ok
 
 
+class TestTheModelDoesNotDecideWhatAHeadingIs(object):
+    """G3, heading agreement. What is a heading is a fact about the page.
+
+    The deterministic reader settles it with the book's type ladder, the geometry of
+    a run-in head and ``skeleton.acceptable_heading``, all of them measured on the
+    book in hand; the model is told the answer in its prompt and is judged on having
+    used it. Left to decide for itself, MEASURED on page index 102 of the acceptance
+    book in the run of record, it made ``<h2>`` headings of items 6, 7 and 8 of a
+    numbered list running on from the previous page -- and because
+    ``build_epub.SPLIT_LEVELS`` starts a chapter at every h1 and h2, that one page
+    would have put three sentences of a list into the reader's table of contents as
+    three chapters.
+
+    ``headings=None`` means the caller is not declaring them and only the ladder is
+    checked; ``headings=[]`` means this page prints none, which is a fact, and any
+    heading in the answer is invented.
+    """
+
+    HEAD = "Serapio of Alexandria (First Century CE?)"
+    ITEM = ("6. Valens associates some timing methods with Nechepso that involve "
+            "planetary periods and ascensional times.")
+
+    def test_the_headings_the_page_prints_are_clean(self):
+        html = "<h2>%s</h2><p>%s</p>" % (self.HEAD, self.ITEM)
+
+        assert gate.check_structure(html, ladder=[1, 2, 3],
+                                    headings=[(2, self.HEAD)]).ok
+
+    def test_a_line_the_page_sets_as_body_may_not_come_back_as_a_heading(self):
+        result = gate.check_structure("<h2>%s</h2>" % self.ITEM, ladder=[1, 2, 3],
+                                      headings=[])
+
+        assert not result.ok
+        assert any("body" in reason for reason in result.reasons), result.reasons
+
+    def test_a_heading_the_page_prints_may_not_come_back_as_body(self):
+        """The other direction: a head demoted is a chapter and a TOC entry gone."""
+        result = gate.check_structure("<p>%s</p>" % self.HEAD, ladder=[1, 2, 3],
+                                      headings=[(2, self.HEAD)])
+
+        assert not result.ok
+
+    def test_a_heading_may_not_change_level(self):
+        """h3 is on this book's ladder, so the ladder rule cannot be what refuses
+        this: h2 and h3 split the book differently and read differently."""
+        result = gate.check_structure("<h3>%s</h3>" % self.HEAD, ladder=[1, 2, 3],
+                                      headings=[(2, self.HEAD)])
+
+        assert not result.ok
+        assert any("h3" in reason for reason in result.reasons), result.reasons
+
+    def test_a_noteref_inside_a_heading_is_still_that_heading(self):
+        """The reader writes the marker ``[47]``; the model writes the anchor."""
+        html = ('<h2>%s<a class="noteref" href="#fn_47">47</a></h2>'
+                '<aside class="footnote" id="fn_47">47 Valens, Anthology.</aside>'
+                % self.HEAD)
+
+        assert gate.check_structure(html, ladder=[1, 2],
+                                    headings=[(2, self.HEAD + "[47]")]).ok
+
+    def test_a_page_that_declares_no_headings_is_judged_on_the_ladder_alone(self):
+        assert gate.check_structure("<h2>%s</h2>" % self.ITEM, ladder=[1, 2]).ok
+
+
 class TestANoteIsTheNumberItIdentifies(object):
     """Whether the number is printed in the note or only in its id is not a fact
     about the book.
@@ -409,69 +473,60 @@ class TestANoteIsTheNumberItIdentifies(object):
         assert gate.number_the_notes(html) == html
 
 
-class TestABlockThePageSetInTheWrongPlace(object):
-    """Defect A, seen from the gate.
+class TestTheOrderOfTheBlocksIsNotTheModelsToChange(object):
+    """Defect A, seen from the gate -- and the allowance that had to go with it.
 
-    MEASURED on page 121 of the acceptance book: the text layer returns the section
-    head ``Serapio of Alexandria (First Century CE?)`` forty lines below where it is
-    printed, after the last footnote marker of the section it opens. The model does
-    exactly what SPEC 8.2 asks -- makes it an ``<h2>`` and puts it back -- and a gate
-    that compares two sequences reads a relocation as a paragraph lost in one place
-    and invented in another.
-
-    Preservation is about words, not positions: nothing is lost, nothing is gained,
-    and the run stays whole. What must still be refused is a page whose words were
-    rearranged rather than whose blocks were moved.
+    This gate used to forgive one relocated block. The premise was a bug in our own
+    reader: a run-in section head came back below the section it opens, and the
+    model was asked, and licensed, to put it back. ``skeleton._lines_bbox`` removed
+    the premise -- MEASURED on the acceptance book, 133 of its 221 run-in heads came
+    out after their own first paragraph before that fix and none do after it -- and
+    what the allowance forgave next was measured on page index 120 of the run of
+    record: the model hoisted ``Serapio of Alexandria (First Century CE?)`` out of
+    the middle of the page to the top of it, above a paragraph that continues the
+    previous page, and the page passed. A gate comparing two token sequences cannot
+    know where a block belongs. The reader does know, so the answer keeps the order
+    it was given, and a page that comes back re-ordered is a page that ships the
+    reader's own text instead.
     """
 
     HEAD = "Serapio of Alexandria (First Century CE?)"
+    OPENING = ("the name Zoroaster in order to confer authority on the texts, as "
+               "Porphyry complained in his own time.")
     BODY = ("Serapio of Alexandria was an astrologer who wrote on inceptional "
             "astrology, although only fragments of his work survive.")
-    TAIL = ("There is a long list of definitions attributed to Serapio that was "
-            "edited by Cumont in the Catalogus.")
 
     def _source(self):
-        return "%s\n\n%s\n\n%s" % (self.BODY, self.HEAD, self.TAIL)
+        return "%s\n\n%s\n\n%s" % (self.OPENING, self.HEAD, self.BODY)
 
-    def test_a_heading_the_model_put_back_where_it_belongs_is_not_a_lost_paragraph(self):
-        out = ("<h2>%s</h2>\n<p>%s</p>\n<p>%s</p>\n" % (self.HEAD, self.BODY, self.TAIL))
+    def test_a_heading_marked_where_the_page_prints_it_is_clean(self):
+        """The control: refusing relocation must not refuse the ordinary answer."""
+        out = ("<p>%s</p>\n<h2>%s</h2>\n<p>%s</p>\n"
+               % (self.OPENING, self.HEAD, self.BODY))
+
+        assert gate.check_word_preservation(self._source(), out).verdict == "PASS"
+
+    def test_a_heading_hoisted_to_the_top_of_the_page_is_refused(self):
+        """MEASURED: the shape of the answer page index 120 actually returned, which
+        put the section head above a sentence belonging to the page before."""
+        out = ("<h2>%s</h2>\n<p>%s</p>\n<p>%s</p>\n"
+               % (self.HEAD, self.OPENING, self.BODY))
 
         result = gate.check_word_preservation(self._source(), out)
 
-        assert result.verdict == "PASS", (result.missing, result.invented)
-        assert any(d.kind == "moved" for d in result.allowed_hits), result.allowed_hits
+        assert result.verdict == "FAIL", result.allowed_hits
 
-    def test_the_move_is_recorded_rather_than_quietly_forgiven(self):
-        """An allowance nobody can see is an allowance nobody can audit."""
-        out = ("<h2>%s</h2>\n<p>%s</p>\n<p>%s</p>\n" % (self.HEAD, self.BODY, self.TAIL))
-
-        result = gate.check_word_preservation(self._source(), out)
-        moved = [d for d in result.allowed_hits if d.kind == "moved"]
-
-        assert " ".join(moved[0].source) == self.HEAD, moved[0].source
-
-    def test_a_page_whose_words_were_rearranged_is_still_refused(self):
+    def test_a_page_whose_words_were_rearranged_is_refused(self):
         """The control that matters. Every word survives and the page is nonsense:
         a bag-of-words gate calls this clean."""
-        words = self._source().split()
-        out = "<p>%s</p>\n" % " ".join(words[::-1])
+        out = "<p>%s</p>\n" % " ".join(self._source().split()[::-1])
 
-        result = gate.check_word_preservation(self._source(), out)
-
-        assert result.verdict == "FAIL"
-
-    def test_a_block_that_moved_and_lost_a_word_on_the_way_is_refused(self):
-        out = ("<h2>%s</h2>\n<p>%s</p>\n<p>%s</p>\n"
-               % (self.HEAD.replace("Alexandria ", ""), self.BODY, self.TAIL))
-
-        result = gate.check_word_preservation(self._source(), out)
-
-        assert result.verdict == "FAIL"
+        assert gate.check_word_preservation(self._source(), out).verdict == "FAIL"
 
     def test_a_heading_the_model_invented_is_refused(self):
         out = ("<h2>Teucer of Babylon (First Century BCE)</h2>\n"
-               "<p>%s</p>\n<p>%s</p>\n<p>%s</p>\n"
-               % (self.BODY, self.HEAD, self.TAIL))
+               "<p>%s</p>\n<h2>%s</h2>\n<p>%s</p>\n"
+               % (self.OPENING, self.HEAD, self.BODY))
 
         result = gate.check_word_preservation(self._source(), out)
 

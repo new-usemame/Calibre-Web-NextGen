@@ -425,7 +425,8 @@ def _edit_one_page(doc, book, pno, client, ledger, cache, result, ladder,
 
     image = _raster(doc, pno, book.page_box(pno))
     answer = client.edit_page(source_text, image_jpeg=image, ladder=ladder,
-                              hints=hints, page_label=str(pno + 1), ledger=ledger)
+                              hints=hints, page_label=str(pno + 1), ledger=ledger,
+                              headings=assemble.page_headings(book, pno))
     outcome.cost_usd = float(getattr(answer, "cost_usd", 0.0) or 0.0)
     outcome.model = getattr(answer, "model", outcome.model)
 
@@ -462,7 +463,8 @@ def _adopt(result, book, pno, outcome, html, uncertain, ladder,
                                          recoverable_markers=recoverable)
     structure = gate.check_structure(html, ladder=ladder,
                                      require_figure_caption=require_figure_caption,
-                                     figures_expected=figures)
+                                     figures_expected=figures,
+                                     headings=assemble.page_headings(book, pno))
 
     outcome.uncertain = list(uncertain or [])
     outcome.recovered_markers = list(words.recovered_markers)

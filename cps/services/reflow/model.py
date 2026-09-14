@@ -205,8 +205,13 @@ class OpenRouterClient(object):
     # ------------------------------------------------------------------- calling
 
     def edit_page(self, page_text, image_jpeg=None, ladder=(1, 2, 3, 4), hints=None,
-                  page_label=None, ledger=None, max_tokens=None):
-        """Ask the model to mark up one page. Words in, the same words out."""
+                  page_label=None, ledger=None, max_tokens=None, headings=()):
+        """Ask the model to mark up one page. Words in, the same words out.
+
+        ``headings`` is what the deterministic reader read as a heading on this page
+        (``assemble.page_headings``); the model is told rather than asked, and
+        ``gate.check_structure`` refuses an answer that marks anything else.
+        """
         if ledger is not None:
             ledger.reserve(self.spec.price_per_page)
 
@@ -214,14 +219,16 @@ class OpenRouterClient(object):
             return self._dry_run_result(page_text)
 
         payload = self._payload(page_text, image_jpeg, ladder, hints, page_label,
-                                max_tokens or completion_budget(page_text))
+                                max_tokens or completion_budget(page_text),
+                                headings=headings)
         data, attempts = self._post(payload)
         return self._parse(data, attempts)
 
-    def _payload(self, page_text, image_jpeg, ladder, hints, page_label, max_tokens):
+    def _payload(self, page_text, image_jpeg, ladder, hints, page_label, max_tokens,
+                 headings=()):
         content = [{"type": "text",
                     "text": user_prompt(page_text, ladder=ladder, hints=hints,
-                                        page_label=page_label)}]
+                                        page_label=page_label, headings=headings)}]
         if image_jpeg:
             content.insert(0, {"type": "image_url", "image_url": {
                 "url": "data:image/jpeg;base64," + _b64(image_jpeg)}})

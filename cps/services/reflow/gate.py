@@ -14,24 +14,29 @@ probe caught a frontier model normalising the printed brand ``olmOCR`` to
 ``OLMOCR`` — output that reads more correct and is wrong about what is printed.
 A punctuation-insensitive comparison missed it.
 
-The allow-list is deliberately tiny and every hit is reported, because an
-allow-list is where a safety gate goes to die. It permits two classes of
-difference, both of which move characters around and neither of which can add a
-word or lose one:
+The comparison is an alignment, not a bag of words, so the order of the page is
+part of what is preserved: a model that moves a block has changed the page even
+though every word survived. The allow-list is deliberately tiny and every hit is
+reported, because an allow-list is where a safety gate goes to die. It permits
+three classes of difference, all of which move characters around and none of
+which can add a word or lose one:
 
 * a *re-tokenisation*, where the same characters are split or joined differently
   (``caution.160`` -> ``caution. 160``);
 * a *marker recovery*, where one punctuation character that the scanner left in
   place of a superscript note number becomes that number again — and only a
-  number this page prints, leaves unreferenced, and has not already used.
+  number this page prints, leaves unreferenced, and has not already used;
+* an *orphan punctuation* difference, where neither side holds a word at all.
 
 The second is off unless the caller passes ``recoverable_markers``, so on a page
 that has lost nothing a quotation mark is still a quotation mark.
 
 **G3, structural schema.** Allowed tags only; heading levels drawn from the
 deterministic ladder rather than the model's opinion (probes showed models
-disagree about absolute heading level on identical pages); every noteref has an
-aside; every figure carries a caption.
+disagree about absolute heading level on identical pages); the headings
+themselves drawn from the deterministic reader, which has the type ladder and the
+page geometry to know one (see ``check_structure``); every noteref has an aside;
+every figure carries a caption.
 """
 
 import difflib
@@ -304,18 +309,6 @@ def _is_retokenisation(a, b):
     return "".join(a) == "".join(b)
 
 
-#: A block the model put somewhere else on the page. Nothing is lost, nothing is
-#: gained, and the run stays whole: MEASURED on page 121 of the acceptance book, the
-#: text layer returns the section head ``Serapio of Alexandria (First Century CE?)``
-#: forty lines below where it is printed, and SPEC 8.2 asks the model to put it back.
-#: Four tokens is the floor because three-word runs recur inside a page and a shorter
-#: allowance starts forgiving rearrangement rather than relocation; two moves is the
-#: ceiling because the measured damage is one misplaced block per page, and a page
-#: that needs three has not been repaired, it has been rewritten.
-MIN_MOVED_TOKENS = 4
-MAX_MOVES = 2
-
-
 def _is_punctuation(a, b):
     """Neither side holds a word.
 
@@ -370,35 +363,6 @@ class _Comparison(object):
         return not self.unexplained and not self.case_only
 
 
-def _run_at(tokens, run):
-    """Where *run* sits in *tokens*, or ``None``. First occurrence; they are equal."""
-    width = len(run)
-    for start in range(len(tokens) - width + 1):
-        if tokens[start:start + width] == run:
-            return start
-    return None
-
-
-def _find_move(src, out, comparison):
-    """A whole run of page text that is present on both sides in different places.
-
-    The candidates are the blocks the comparison could not explain, taken from
-    whichever side the aligner left them whole on -- a relocated heading usually
-    survives intact as the deleted block, a relocated paragraph opening as the
-    inserted one.
-    """
-    seen = []
-    for difference in comparison.unexplained:
-        for run in (difference.source, difference.output):
-            if len(run) >= MIN_MOVED_TOKENS and run not in seen:
-                seen.append(run)
-    for run in seen:
-        here, there = _run_at(src, run), _run_at(out, run)
-        if here is not None and there is not None:
-            return run, here, there
-    return None
-
-
 def check_word_preservation(source_text, model_html, recoverable_markers=()):
     """G1. Compare the model's page against the deterministic transcription.
 
@@ -411,6 +375,12 @@ def check_word_preservation(source_text, model_html, recoverable_markers=()):
     numbers, and only those, may come back out of the page image — see
     ``_marker_recovery``. Pass nothing and a quotation mark stays a quotation
     mark, which is the right answer on every page that has not lost a marker.
+
+    Order counts. A block that comes back somewhere else on the page aligns as a
+    deletion here and an insertion there, and is refused: where a block belongs is
+    something the reader measured off the page and the gate cannot check, so the
+    answer keeps the order it was given (see
+    ``TestTheOrderOfTheBlocksIsNotTheModelsToChange``).
     """
     src = normalise(source_text or "")
     out = normalise(drop_contract_line(model_html or ""), markup=True)
@@ -422,27 +392,10 @@ def check_word_preservation(source_text, model_html, recoverable_markers=()):
     available = [int(n) for n in recoverable_markers or ()]
     comparison = _Comparison(src, out, list(available))
 
-    # A relocation is only ever read as one when reading it as one makes the whole
-    # page come out clean. A page that still has a lost word after the move had a
-    # lost word before it, and is reported the way it was first seen.
-    moved, trimmed_src, trimmed_out = [], src, out
-    while not comparison.clean and len(moved) < MAX_MOVES:
-        move = _find_move(trimmed_src, trimmed_out, comparison)
-        if move is None:
-            break
-        run, here, there = move
-        trimmed_src = trimmed_src[:here] + trimmed_src[here + len(run):]
-        trimmed_out = trimmed_out[:there] + trimmed_out[there + len(run):]
-        moved.append(Difference("moved", run, run))
-        comparison = _Comparison(trimmed_src, trimmed_out, list(available))
-    if moved and not comparison.clean:
-        moved = []
-        comparison = _Comparison(src, out, list(available))
-
     verdict = "PASS" if comparison.clean else "FAIL"
     return GateResult(verdict, len(src), len(out), comparison.similarity,
                       comparison.missing, comparison.invented, comparison.case_only,
-                      moved + comparison.allowed, comparison.unexplained,
+                      comparison.allowed, comparison.unexplained,
                       recovered_markers=comparison.recovered if verdict == "PASS" else [])
 
 
@@ -451,10 +404,58 @@ _NOTEREF = re.compile(r'<a[^>]*class="[^"]*noteref[^"]*"[^>]*href="#(fn_[^"]+)"'
 _ASIDE_ID = re.compile(r'<aside[^>]*id="(fn_[^"]+)"', re.I)
 _FIGURE = re.compile(r"<figure\b.*?</figure>", re.I | re.S)
 _HEADING = re.compile(r"<h([1-6])\b", re.I)
+_HEADING_BLOCK = re.compile(r"<h([1-6])\b[^>]*>(.*?)</h\1\s*>", re.I | re.S)
+
+
+def _heading_key(level, text):
+    """A heading as the gate compares it: its level and the words it prints.
+
+    Both sides go through ``normalise``, so the reader's ``[47]`` and the model's
+    noteref anchor are the same word, and case still counts -- a head the model
+    title-cased is a head it rewrote.
+    """
+    return int(level or 1), tuple(normalise(text or "", markup=True))
+
+
+def _excerpt(words, limit=8):
+    return " ".join(words[:limit]) + (" ..." if len(words) > limit else "")
+
+
+def _heading_disagreements(html, headings):
+    """Where the answer's headings differ from the ones the page prints.
+
+    What is a heading is a fact about the page, and the deterministic reader is
+    what measures it: it has the book's type ladder, the geometry of a run-in head
+    and ``skeleton.acceptable_heading``. The model is told the answer in its prompt
+    (``prompts.user_prompt``) and judged here on having used it, because a model
+    left to decide takes a sentence it finds important and makes it a chapter --
+    MEASURED on page index 102 of the acceptance book, three items of a numbered
+    list came back as ``<h2>`` and ``build_epub.SPLIT_LEVELS`` would have made
+    three chapters of them.
+    """
+    reasons = []
+    remaining = [_heading_key(level, text) for level, text in headings]
+    for level, body in _HEADING_BLOCK.findall(html):
+        key = _heading_key(level, body)
+        if key in remaining:
+            remaining.remove(key)
+            continue
+        same_words = next((h for h in remaining if h[1] == key[1]), None)
+        if same_words is not None:
+            remaining.remove(same_words)
+            reasons.append("the answer sets %r as h%d and the page sets it as h%d"
+                           % (_excerpt(key[1]), key[0], same_words[0]))
+            continue
+        reasons.append("the answer makes a heading of %r, which the page sets as "
+                       "body text" % _excerpt(key[1]))
+    for level, words in remaining:
+        reasons.append("the page's h%d heading %r is body text in the answer"
+                       % (level, _excerpt(words)))
+    return reasons
 
 
 def check_structure(model_html, ladder=(1, 2, 3, 4), require_figure_caption=True,
-                    figures_expected=None):
+                    figures_expected=None, headings=None):
     """G3. The markup contract the EPUB builder is allowed to trust.
 
     ``ladder`` is the set of heading levels the deterministic skeleton found on
@@ -465,6 +466,12 @@ def check_structure(model_html, ladder=(1, 2, 3, 4), require_figure_caption=True
     ``figures_expected`` is how many figures the page prints. The word gate cannot
     see a figure — an illustration has no words — so an answer that drops one would
     pass every other check and take the picture out of the reader's book.
+
+    ``headings`` is ``(level, text)`` for every heading the deterministic reader
+    found on this page, and the answer must mark those and only those — see
+    ``_heading_disagreements``. ``None`` means the caller is not declaring them and
+    only the ladder is checked; ``[]`` is the declaration that this page prints no
+    heading at all, which is the case that catches an invented one.
     """
     reasons = []
     html = model_html or ""
@@ -483,6 +490,9 @@ def check_structure(model_html, ladder=(1, 2, 3, 4), require_figure_caption=True
     asides = set(_ASIDE_ID.findall(html))
     for orphan in sorted(refs - asides):
         reasons.append("noteref %s has no matching aside" % orphan.replace("fn_", ""))
+
+    if headings is not None:
+        reasons.extend(_heading_disagreements(html, headings))
 
     figures = _FIGURE.findall(html)
     if require_figure_caption:

@@ -47,6 +47,35 @@ def _edit(client, **kwargs):
                             image_jpeg=b"\xff\xd8fake", ladder=(1, 2, 3), **kwargs)
 
 
+def _prompt_of(history):
+    """The text half of the user message that actually went out."""
+    return history[0].json()["messages"][1]["content"][-1]["text"]
+
+
+def test_the_headings_the_reader_measured_go_out_with_the_page():
+    """The model is told what the page sets as a heading rather than asked to find
+    them: MEASURED on page index 102 of the acceptance book, a model left to decide
+    made <h2> of three items of a numbered list, which is three chapters of the
+    finished EPUB. A rule that only lives in the gate refuses pages; a rule the model
+    is told lets it answer."""
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, json=_reply())
+        _edit(_client(), headings=[(2, "Serapio of Alexandria (First Century CE?)")])
+        prompt = _prompt_of(m.request_history)
+
+    assert "<h2> Serapio of Alexandria (First Century CE?)" in prompt, prompt
+
+
+def test_a_page_that_sets_no_heading_is_told_that_too():
+    """Silence would read as 'you decide', which is the failure this closes."""
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, json=_reply())
+        _edit(_client(), headings=[])
+        prompt = _prompt_of(m.request_history)
+
+    assert "sets no heading" in prompt, prompt
+
+
 # --------------------------------------------------------------------- the money
 
 def test_token_usage_becomes_dollars_from_the_measured_price_table():

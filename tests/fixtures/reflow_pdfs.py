@@ -258,6 +258,29 @@ def defect_a_page(doc):
     return page
 
 
+def heading_page_the_model_has_to_see(doc):
+    """A run-in heading on a page the router sends anyway.
+
+    Defect A's geometry with defect C's ambiguity on top of it, because the two
+    questions the model can get wrong about a heading -- where it goes and whether
+    something else is one -- can only be asked about a page that is actually sent.
+    """
+    page = add_page(doc)
+    add_running_head(page, "94", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    y = add_run_in_heading(
+        page,
+        "Serapio of Alexandria (First Century CE?)",
+        ["Serapio of Alexandria was an astrologer who wrote on",
+         "inceptional astrology and possibly other topics, although"],
+        top=BODY_TOP,
+    )
+    _put(page, LEFT, y, "only fragments of his work survive.\" Pingree agrees.")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "Schmidt calls him an early systemizer.\" Cumont too.")
+    add_notes(page, [(88, "Pingree, Yavanajataka, vol. 2, pp. 440-441.")])
+    return page
+
+
 def defect_b_pages(doc):
     """A paragraph broken mid-sentence at a page turn, with footnotes between.
 

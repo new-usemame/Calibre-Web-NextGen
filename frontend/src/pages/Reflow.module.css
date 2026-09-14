@@ -33,6 +33,9 @@
   font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .06em;
   color: var(--text-faint); font-weight: var(--fw-semi);
   margin: 0 0 var(--sp-3);
+  /* The running card's title carries a spinner, and the spinner's wrapper may not
+     own any box of its own -- see .spin -- so the row spaces and aligns it. */
+  display: flex; align-items: center; gap: var(--sp-2);
 }
 .verdict {
   color: var(--text); font-size: var(--fs-base); line-height: var(--lh-base);
@@ -139,9 +142,13 @@
   transition: width var(--dur-base) var(--ease-out);
 }
 .progressMessage { color: var(--text-muted); font-size: var(--fs-sm); margin: 0; line-height: var(--lh-base); }
+/* Nothing here but the turning. An animated compositor property on an <svg> gets
+   no layer of its own and falls back to the main thread, so the icon sits inside
+   this wrapper -- and a wrapper that also set a margin or an alignment would be
+   moving the box the icon used to occupy. Spacing belongs to .cardTitle. */
 .spin {
-  display: inline-flex; margin-right: var(--sp-2); color: var(--text-muted);
-  vertical-align: -2px; animation: reflow-spin 1.1s linear infinite;
+  display: inline-flex; color: var(--text-muted);
+  animation: reflow-spin 1.1s linear infinite;
 }
 @keyframes reflow-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {

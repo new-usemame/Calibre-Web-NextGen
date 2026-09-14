@@ -279,7 +279,12 @@ export function Reflow({ id }: { id: string }) {
       {running && active.map((task) => (
         <section key={task.task_id} className={styles.card} aria-live="polite">
           <h2 className={styles.cardTitle}>
-            <Loader2 size={16} className={styles.spin} aria-hidden="true" focusable={false} />
+            {/* The spin belongs on the wrapper: an SVG gets no compositor layer,
+                so animating it there drops the whole thing onto the main thread
+                while a conversion is busy. */}
+            <span className={styles.spin} aria-hidden="true">
+              <Loader2 size={16} aria-hidden="true" focusable={false} />
+            </span>
             {STATUS_LABEL(task.status, t)}
           </h2>
           <div className={styles.bar}>

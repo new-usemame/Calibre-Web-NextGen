@@ -225,6 +225,22 @@ class TestMarkerTheScannerAte:
         assert result.verdict == "PASS", result.unexplained
         assert any(d.kind == "marker_recovered" for d in result.allowed_hits)
 
+    def test_the_letters_may_stand_for_the_stop_as_well_as_the_number(self):
+        """MEASURED on page index 106: the page prints ``of it.`` with a superscript
+        80, and the text layer returns ``its\u00b0`` -- two characters carrying a full
+        stop and a two-digit number between them. Nothing in that token is a
+        quotation mark, so the letters are the only reading of the superscript there
+        is, and the stop the model supplies is punctuation it could not have taken
+        from anywhere else."""
+        src = "does not survive, although we do possess a later summary of its\u00b0 In the summary"
+        out = _html(src.replace("its\u00b0",
+                                'it.<a class="noteref" href="#fn_80">80</a>'))
+
+        result = gate.check_word_preservation(src, out, recoverable_markers=[80])
+
+        assert result.verdict == "PASS", result.unexplained
+        assert result.recovered_markers == [80]
+
     def test_a_short_word_is_not_a_superscript_however_orphaned_the_note_is(self):
         """The hole the letters open, closed. A quotation mark is never a word, so
         replacing a whole one is safe; ``ms`` and ``as`` and ``is`` are words, and a
@@ -246,6 +262,53 @@ class TestMarkerTheScannerAte:
 
         assert gate.check_word_preservation(src, out,
                                             recoverable_markers=[11]).verdict == "FAIL"
+
+    def test_the_full_stop_the_scanner_ate_with_the_marker_comes_back_with_it(self):
+        """MEASURED on page index 104: the page prints ``brief.`` with a superscript
+        68 after it, and the text layer returns ``brief"`` -- one straight quote
+        standing for the stop and the number together. The model answered ``brief.``
+        plus note 68, which is exactly what the page prints, and the gate refused the
+        whole page for supplying the stop.
+
+        Both halves of that answer are already allowed on their own: a quotation mark
+        that comes back as a full stop is punctuation, and a quotation mark that comes
+        back as a note this page never referred to is a recovered marker. Refusing
+        them together is an accident of where the tokeniser drew the boundary, and on
+        that page it cost the reader a correctly lifted section heading as well.
+        """
+        src = 'delineations of the decans, although they are somewhat brief" Thrasyllus'
+        out = _html(src.replace('brief"',
+                                'brief.<a class="noteref" href="#fn_68">68</a>'))
+
+        result = gate.check_word_preservation(src, out, recoverable_markers=[68])
+
+        assert result.verdict == "PASS", result.unexplained
+        assert any(d.kind == "marker_recovered" for d in result.allowed_hits)
+
+    def test_a_letter_may_not_go_missing_beside_a_recovered_marker(self):
+        """The control, and a hole this book walked straight into: ``brief"`` used to
+        be allowed to become ``brie68``, because a rule that lets the scanner render a
+        superscript as letters will read the ``f`` as one of them. A token holding a
+        quotation mark has already explained its superscript. Punctuation may differ
+        around the number because punctuation is not a word; the letters may not."""
+        src = 'delineations of the decans, although they are somewhat brief" Thrasyllus'
+
+        for answer in ('brie.<a class="noteref" href="#fn_68">68</a>',
+                       'brie<a class="noteref" href="#fn_68">68</a>'):
+            out = _html(src.replace('brief"', answer))
+
+            assert gate.check_word_preservation(
+                src, out, recoverable_markers=[68]).verdict == "FAIL", answer
+
+    def test_a_printed_number_may_not_change_beside_a_recovered_marker(self):
+        """The other control, and the one that matters in a book of citations: the
+        page numbers, dates and section numbers around the marker are words."""
+        src = 'Henceforth Porphyry, Introduction, p. 124." Rhetorius cites it twice.'
+        out = _html(src.replace('124."',
+                                '125.<a class="noteref" href="#fn_68">68</a>'))
+
+        assert gate.check_word_preservation(src, out,
+                                            recoverable_markers=[68]).verdict == "FAIL"
 
     def test_one_missing_note_cannot_be_spent_twice(self):
         src = 'to King Ammon." Later, and again to King Thoth." The scribe agrees.'

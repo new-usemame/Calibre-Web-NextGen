@@ -217,22 +217,51 @@ def _is_letter_residue(residue):
             and any(c.isalpha() for c in residue))
 
 
+def _restores_eaten_punctuation(before, head):
+    """Did the model put back punctuation the scanner ate along with the marker?
+
+    MEASURED on page index 104: the page prints ``brief.`` and a superscript 68, and
+    the text layer returns ``brief"`` -- one straight quote standing for the stop and
+    the number together. A model that answers ``brief.`` and note 68 has said exactly
+    what the page says, and has supplied a full stop that is not in the text it was
+    given. A full stop is not a word, and on its own that difference is already
+    allowed as punctuation; refusing it here only because it arrives in the same
+    token as the number is an accident of where the tokeniser drew the boundary.
+
+    Only additions count. Punctuation the scan *did* return still has to survive, so
+    ``luminaries.'"'`` may not quietly lose a quotation mark to a note number -- the
+    two-character rule above is what bounds the damage a repair may claim, and a
+    model deleting printed punctuation is not repairing anything.
+    """
+    return (before == head
+            or (before.startswith(head)
+                and not any(c.isalnum() for c in before[len(head):])))
+
+
 def _marker_recovery(a, b, available):
     """A note marker the scanner destroyed, read back off the scan.
 
     Returns the note number the model restored, or ``None``. The rule is at most
     two characters wide — the measured damage is never more — and what replaces
     them must be the digits of exactly one note that this page prints and this page
-    leaves unreferenced. Every other character on both sides still has to match, so
+    leaves unreferenced. The letters and digits on both sides still have to match, so
     the substitution can neither add a word nor lose one, and ``available`` is
     consumed: a page cannot hand the same missing note to two different residues.
 
-    Wreckage that contains a letter is held to two further conditions, because a
+    Every other character has to match, except that the model may supply punctuation
+    the scanner ate along with the marker -- its one quote often stands for a full
+    stop and a number together (see ``_restores_eaten_punctuation``).
+
+    Wreckage that contains a letter is held to three further conditions, because a
     letter can be a word and a quotation mark cannot. It must sit at the very end
     of a single token and leave something in front of it — which is where a
-    superscript is printed, after the word it annotates. So ``reasons.ms`` may
-    become ``reasons.105``, while the standalone word ``ms`` may not become ``105``
-    and the chart label ``Tl la`` may not become ``T11a``.
+    superscript is printed, after the word it annotates — and nothing else in the
+    token may be a candidate marker in its own right: a token holding a quotation
+    mark has already explained its superscript, so the letters in front of that mark
+    are the word. So ``reasons.ms`` may become ``reasons.105`` and ``its°`` may
+    become ``it.80``, while the standalone word ``ms`` may not become ``105``, the
+    chart label ``Tl la`` may not become ``T11a``, and ``brief"`` may not become
+    ``brie.68``.
     """
     if not available or not a or not b:
         return None
@@ -247,10 +276,17 @@ def _marker_recovery(a, b, available):
             elif _is_letter_residue(residue):
                 if len(a) != 1 or index == 0 or index + width != len(left):
                     continue
+                if any(c in _MARKER_RESIDUE for c in left):
+                    continue
             else:
                 continue
+            head, tail = left[:index], left[index + width:]
             for number in available:
-                if left[:index] + str(number) + left[index + width:] == right:
+                digits = str(number)
+                if not right.endswith(digits + tail):
+                    continue
+                before = right[:len(right) - len(digits) - len(tail)]
+                if _restores_eaten_punctuation(before, head):
                     return number
     return None
 

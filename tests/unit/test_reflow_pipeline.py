@@ -486,6 +486,33 @@ def test_a_changed_prompt_invalidates_what_was_cached(tmp_path, monkeypatch):
     assert len(client.calls) == 2
 
 
+def test_a_page_the_reader_now_reads_differently_is_not_answered_from_the_cache(
+        tmp_path, monkeypatch):
+    """The other half of the same rule, and the half that actually fires.
+
+    The prompt version changes when we rewrite the instructions; the page changes
+    every time the deterministic reader gets better at reading it -- a note number
+    repaired, a marker recovered, a sentence stitched -- which is most releases. The
+    answer bought for the old reading was never an answer to the new question, and
+    serving it means the improvement is paid for and then thrown away.
+    """
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    client = FakeClient()
+    real = assemble.page_source_text
+    try:
+        _run(doc, client, tmp_path)
+        # A reader that now finds one more line on the page than it used to.
+        monkeypatch.setattr(assemble, "page_source_text",
+                            lambda book, pno: real(book, pno) + "\n\nand a later hand adds a gloss")
+        second, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert len(client.calls) == 2, "the page was answered from a reading it no longer has"
+    assert "a later hand adds a gloss" in client.calls[-1]
+    assert second.outcomes[1].gate == "PASS", second.outcomes[1].gate_reasons
+
+
 def test_an_answer_the_gate_refused_is_not_remembered_as_this_pages_answer(tmp_path):
     """A refusal is not a result. The answer may have come back truncated by a
     provider hiccup; remembering it under the page's key would make one bad minute

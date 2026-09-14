@@ -163,7 +163,11 @@ test('coarse pointers carry no card actions; the book page owns them', async ({ 
   ).toBeVisible();
 
   await tap(detailRead);
-  await expect(page).toHaveURL(new RegExp(`/app/read/${bookId}\\b`));
+  // EPUB/KEPUB open the epub.js reader (/read/<id>); the other readable
+  // formats go to the native reader (/view/<id>/<format>). The Recent default
+  // sort (#2238) decides which book leads the catalog, so pin the behaviour —
+  // "Read now opens this book's reader" — not one route shape.
+  await expect(page).toHaveURL(new RegExp(`/app/(read|view)/${bookId}\\b`));
   await page.goBack();
 
   // A shelf card is the same story: its X is gone on touch, and removing the

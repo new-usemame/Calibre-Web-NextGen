@@ -37,6 +37,14 @@ msgstr ""
 "Generated-By: Babel 2.13.1\n"
 "X-Generator: Poedit 3.8\n"
 
+#: cps/spa_strings.py
+msgid "Show more"
+msgstr "Afficher plus"
+
+#: cps/spa_strings.py
+msgid "Show less"
+msgstr "Afficher moins"
+
 #: cps/about.py cps/spa_strings.py
 msgid "Statistics"
 msgstr "Statistiques"

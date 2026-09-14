@@ -364,17 +364,30 @@ test.describe('My Library', () => {
       expect(secondaryIds).toContain(secondaryBook.id);
       expect(secondaryIds).not.toContain(adminBook.id);
 
-      await adminPage.goto('/app');
+      // Sort-immune UI proof: the Recent default sort (#2238) can push the pair
+      // off page 1 of the grid, so search inside each library — the server-side
+      // membership filter decides what the grid can show. Absence is asserted
+      // on the id-scoped link, not the "No results" copy: the seed carries two
+      // different "Alice's Adventures in Wonderland" books, and owning one must
+      // not mask the other's absence.
+      await adminPage.goto(`/app/?q=${encodeURIComponent(adminBook.title)}`);
       const adminGrid = adminPage.getByTestId('catalog-grid');
-      await expect(adminGrid.getByRole('link', { name: `Open details for ${adminBook.title}` })).toBeVisible();
-      await expect(adminGrid.getByRole('link', { name: `Open details for ${secondaryBook.title}` })).toHaveCount(0);
+      await expect(adminGrid.locator(`a[href$="/book/${adminBook.id}"]`)).toBeVisible();
+      await adminPage.goto(`/app/?q=${encodeURIComponent(secondaryBook.title)}`);
+      await expect(adminGrid.locator(`a[href$="/book/${secondaryBook.id}"]`)).toHaveCount(0);
 
-      await secondaryPage.goto('/app');
+      await secondaryPage.goto(`/app/?q=${encodeURIComponent(secondaryBook.title)}`);
       const secondaryGrid = secondaryPage.getByTestId('catalog-grid');
-      await expect(secondaryGrid.getByRole('link', { name: `Open details for ${secondaryBook.title}` })).toBeVisible();
-      await expect(secondaryGrid.getByRole('link', { name: `Open details for ${adminBook.title}` })).toHaveCount(0);
+      await expect(secondaryGrid.locator(`a[href$="/book/${secondaryBook.id}"]`)).toBeVisible();
+      await secondaryPage.goto(`/app/?q=${encodeURIComponent(adminBook.title)}`);
+      await expect(secondaryGrid.locator(`a[href$="/book/${adminBook.id}"]`)).toHaveCount(0);
 
-      await expect(adminPage.getByRole('link', { name: 'Global Library', includeHidden: true }))
+      // The searched page carries a "Search the global library for …" link
+      // whose name also matches /Global Library/ — leave it before the sidebar
+      // link assertion. Exact name: the empty-library recovery link ("Browse
+      // the global library") must not match either.
+      await adminPage.goto('/app');
+      await expect(adminPage.getByRole('link', { name: 'Global Library', exact: true, includeHidden: true }))
         .toHaveAttribute('href', '/app/global');
       await adminPage.goto('/app/global');
       await expect(adminPage).toHaveURL(/\/app\/global/);
@@ -386,10 +399,11 @@ test.describe('My Library', () => {
 
       await adminPage.getByRole('button', { name: `Add ${secondaryBook.title} to my library` }).click();
       await expect(adminPage.getByText('Added to your library', { exact: true })).toBeAttached();
-      await adminPage.goto('/app');
-      await expect(adminPage.getByTestId('catalog-grid').getByRole('link', {
-        name: `Open details for ${secondaryBook.title}`,
-      })).toBeVisible();
+      // Search rather than page-1 position: the Recent default sort (#2238)
+      // decides where the freshly added book lands in the grid. The link is
+      // id-scoped: the seed carries two books with this exact title.
+      await adminPage.goto(`/app/?q=${encodeURIComponent(secondaryBook.title)}`);
+      await expect(adminPage.getByTestId('catalog-grid').locator(`a[href$="/book/${secondaryBook.id}"]`)).toBeVisible();
 
       await secondaryPage.goto('/app/account');
       await expect(secondaryPage.getByRole('radio', { name: /My Library/ })).toBeChecked();

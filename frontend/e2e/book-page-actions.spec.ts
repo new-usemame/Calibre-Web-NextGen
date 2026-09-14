@@ -446,3 +446,60 @@ test('a read book shows a visible Read ✓ state badge; unread shows none', asyn
   await expect(page.getByTestId('book-actions-menu')).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId('book-read-badge')).toHaveCount(0);
 });
+
+/* Description clamp: long descriptions show ~5 lines with a fade and a
+ * Show more/Show less button; short ones never show the control. The
+ * description HTML is stubbed so the seed's own copy doesn't matter. */
+
+const LONG_DESCRIPTION = Array.from({ length: 12 }, (_, i) =>
+  `<p>Paragraph ${i + 1} of the sentinel long description, padded with enough plain words to overflow a five-line clamp on any viewport width.</p>`,
+).join('');
+
+async function stubDescriptionHtml(page: Page, html: string) {
+  await page.goto('/app');
+  const bookId = await firstBookWithFormats(page);
+  if (bookId == null) return null;
+  await page.route(new RegExp(`/api/v1/books/${bookId}(?:\\?.*)?$`), async (route) => {
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const { response: res, body: book } = got;
+    book.description_html = html;
+    await route.fulfill({ response: res, json: book });
+  });
+  return bookId;
+}
+
+test('a long description clamps to five lines with Show more / Show less', async ({ page }) => {
+  const bookId = await stubDescriptionHtml(page, LONG_DESCRIPTION);
+  test.skip(bookId == null, 'seed has no book with files');
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  const desc = page.getByTestId('book-description');
+  await expect(desc).toBeVisible({ timeout: 10_000 });
+  // Bind by testid, not by name: the accessible name flips with the state.
+  const toggle = page.getByTestId('description-toggle');
+  await expect(toggle).toBeVisible();
+  await expect(toggle).toHaveText('Show more');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  // line-clamp truncates the box itself, so overflow can't be probed via
+  // scrollHeight — the clamp's presence is the observable contract.
+  await expect(desc).toHaveCSS('-webkit-line-clamp', '5');
+
+  await toggle.click();
+  await expect(toggle).toHaveText('Show less');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await expect(desc).toHaveCSS('-webkit-line-clamp', 'none');
+
+  await toggle.click();
+  await expect(toggle).toHaveText('Show more');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('a short description never shows the clamp control', async ({ page }) => {
+  const bookId = await stubDescriptionHtml(page, '<p>One short sentinel line.</p>');
+  test.skip(bookId == null, 'seed has no book with files');
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('book-description')).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('button', { name: /Show (more|less)/ })).toHaveCount(0);
+});

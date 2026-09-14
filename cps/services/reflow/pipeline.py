@@ -358,17 +358,33 @@ def _spent(result, ledger):
 
 
 def _refused(book, pno, exc, ledger, client):
-    """A page the provider would not answer, recorded rather than swallowed."""
+    """A page the provider would not answer, recorded rather than swallowed.
+
+    An answer this page cannot use was still an answer, and a provider that answers
+    bills for the tokens it wrote: ``UnusableAnswer`` carries what the call cost, and
+    a provider that refused outright carries nothing. Writing that down is not
+    bookkeeping -- ``Ledger.spent()`` is the number the cap reserves against and the
+    number the reader is shown, so a real charge recorded here as $0.00 is money the
+    reader's ceiling cannot stop and money the finished job does not admit to.
+    """
+    cost = float(getattr(exc, "cost_usd", 0.0) or 0.0)
     outcome = PageOutcome(pno=pno, reasons=list(book.page_reasons(pno)),
                           model=getattr(client, "model_id", ""),
-                          gate="FAIL",
+                          gate="FAIL", cost_usd=cost,
                           gate_reasons=["the model could not answer: %s" % exc])
     if ledger is not None:
-        ledger.record({"kind": "page", "page": pno, "cost_usd": 0.0, "cached": False,
-                       "gate": "FAIL", "model": outcome.model,
-                       "reasons": outcome.reasons,
-                       "gate_reasons": outcome.gate_reasons,
-                       "error": str(exc)})
+        entry = {"kind": "page", "page": pno, "cost_usd": round(cost, 6),
+                 "cached": False, "gate": "FAIL", "model": outcome.model,
+                 "reasons": outcome.reasons,
+                 "gate_reasons": outcome.gate_reasons,
+                 "error": str(exc)}
+        if getattr(exc, "cost_source", ""):
+            entry["cost_source"] = exc.cost_source
+        for key in ("prompt_tokens", "completion_tokens"):
+            tokens = int(getattr(exc, key, 0) or 0)
+            if tokens:
+                entry[key] = tokens
+        ledger.record(entry)
     return outcome
 
 

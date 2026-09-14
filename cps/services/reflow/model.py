@@ -141,7 +141,23 @@ class UnusableAnswer(ModelError):
     no ink: the model reads them, says in prose that there is nothing to transcribe,
     and three of those in a row ended a 698-page conversion twenty pages early, with
     the job still reporting itself done.
+
+    It carries what the call cost. The provider answered, so the provider billed --
+    an answer cut off at the token ceiling burned the whole completion allowance
+    before it was thrown away -- and ``Ledger.spent()`` is the only number the cap
+    reserves against. A charge that never reaches the ledger is a charge the reader's
+    ceiling cannot stop. MEASURED on the acceptance book: 42 pages over four
+    conversions answered in prose or ran into the ceiling and every one was written
+    down as free.
     """
+
+    def __init__(self, message, cost_usd=0.0, cost_source="", prompt_tokens=0,
+                 completion_tokens=0):
+        ModelError.__init__(self, message)
+        self.cost_usd = float(cost_usd or 0.0)
+        self.cost_source = str(cost_source or "")
+        self.prompt_tokens = int(prompt_tokens or 0)
+        self.completion_tokens = int(completion_tokens or 0)
 
 
 class CapExceeded(Exception):
@@ -312,32 +328,41 @@ class OpenRouterClient(object):
     # ------------------------------------------------------------------ answering
 
     def _parse(self, data, attempts):
+        # The bill first, because every way out of this method is a call that has
+        # already been answered and therefore already been charged. Working the cost
+        # out only on the path that produces a page is how an answer nobody can use
+        # becomes an answer nobody paid for.
+        usage = data.get("usage") or {}
+        prompt_tokens = int(usage.get("prompt_tokens") or 0)
+        completion_tokens = int(usage.get("completion_tokens") or 0)
+        cost, source = self._cost(usage, prompt_tokens, completion_tokens)
+
+        def unusable(message):
+            return UnusableAnswer(message, cost_usd=cost, cost_source=source,
+                                  prompt_tokens=prompt_tokens,
+                                  completion_tokens=completion_tokens)
+
         try:
             choice = data["choices"][0]
             content = choice["message"]["content"] or ""
         except (KeyError, IndexError, TypeError):
-            raise UnusableAnswer("the provider's reply had no message content")
+            raise unusable("the provider's reply had no message content")
 
         if (choice.get("finish_reason") or choice.get("native_finish_reason")) == "length":
             # Adopting the fragment is not an option and neither is pretending it is
             # a model that deleted the end of the page: say what happened, so the
             # page keeps its deterministic text for a reason somebody can act on.
-            raise UnusableAnswer(
+            raise unusable(
                 "the provider cut the answer short at the token ceiling "
                 "(%s completion tokens); the page was not converted"
-                % (data.get("usage") or {}).get("completion_tokens", "?"))
+                % (completion_tokens or "?"))
 
         content = _FENCE.sub("", content).strip()
         uncertain, notes, html = _split_contract(content)
         if not _HTML_TAG.search(html):
-            raise UnusableAnswer(
+            raise unusable(
                 "the model answered prose instead of an HTML fragment: %s"
                 % html[:160].replace("\n", " "))
-
-        usage = data.get("usage") or {}
-        prompt_tokens = int(usage.get("prompt_tokens") or 0)
-        completion_tokens = int(usage.get("completion_tokens") or 0)
-        cost, source = self._cost(usage, prompt_tokens, completion_tokens)
 
         # One shape from here on: the gate, the page cache and the EPUB all read the
         # same markup, so which of the two ways a provider chose to write a note down

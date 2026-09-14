@@ -103,6 +103,50 @@ def test_the_providers_own_cost_wins_when_it_reports_one():
     assert result.cost_source == "provider"
 
 
+def test_an_answer_we_cannot_use_still_carries_what_it_cost():
+    """The provider answered, so the provider billed: the tokens are on the usage
+    block of a 200 whatever the content turned out to be. The page keeps its
+    deterministic text, and the charge is still real, so it travels with the
+    exception to whoever is counting money."""
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, json=_reply(content="I can't transcribe this page: it is blank.",
+                                     usage={"prompt_tokens": 1500, "completion_tokens": 12,
+                                            "cost": 0.0031}))
+        with pytest.raises(model.UnusableAnswer) as caught:
+            _edit(_client())
+
+    assert caught.value.cost_usd == pytest.approx(0.0031)
+    assert caught.value.cost_source == "provider"
+    assert caught.value.prompt_tokens == 1500
+    assert caught.value.completion_tokens == 12
+
+
+def test_an_answer_cut_off_at_the_token_ceiling_carries_what_it_cost():
+    """The expensive half of the same case: a truncated answer burned the whole
+    completion ceiling before it was thrown away."""
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, json={"id": "gen-1", "model": "deepseek/deepseek-v4.1-flash",
+                               "choices": [{"message": {"content": "<p>half a pa"},
+                                            "finish_reason": "length"}],
+                               "usage": {"prompt_tokens": 1500, "completion_tokens": 3840,
+                                         "cost": 0.0042}})
+        with pytest.raises(model.UnusableAnswer) as caught:
+            _edit(_client())
+
+    assert caught.value.cost_usd == pytest.approx(0.0042)
+
+
+def test_a_provider_that_would_not_answer_at_all_carries_no_cost():
+    """The control. A 400 produced no tokens and no bill, and a cost invented for it
+    would charge the reader's cap for a call that never happened."""
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, status_code=400, json={"error": {"message": "bad model"}})
+        with pytest.raises(model.ModelError) as caught:
+            _edit(_client(backoff=0.0))
+
+    assert getattr(caught.value, "cost_usd", 0.0) == 0.0
+
+
 def test_a_call_that_would_break_the_cap_never_reaches_the_network(tmp_path):
     """G5. The check has to happen before the request, not after the bill."""
     book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=0.01)

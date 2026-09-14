@@ -1034,20 +1034,29 @@ def test_a_level_below_the_ladders_last_rung_is_still_refused(tmp_path):
 
 
 class _UnusableAnswerClient(FakeClient):
-    """A provider that is answering, and answering something this page cannot use."""
+    """A provider that is answering, and answering something this page cannot use.
+
+    It reserves against the cap and it bills, because that is what actually arrives:
+    prose where an HTML fragment was asked for, or an answer cut off at the token
+    ceiling, is an HTTP 200 with a usage block on it. The provider read the page and
+    wrote something; the tokens were charged whether or not we could use them."""
 
     def __init__(self, bad_pages=(), **kwargs):
         FakeClient.__init__(self, **kwargs)
         self.bad_pages = set(bad_pages)
 
-    def edit_page(self, page_text, **kwargs):
+    def edit_page(self, page_text, ledger=None, **kwargs):
         if len(self.calls) in self.bad_pages:
+            if ledger is not None:
+                ledger.reserve(self.spec.price_per_page)
             self.calls.append(page_text)
             self.hints.append([])
             raise model.UnusableAnswer(
                 "the model answered prose instead of an HTML fragment: the page "
-                "image is blank and the text layer you supplied is empty")
-        return FakeClient.edit_page(self, page_text, **kwargs)
+                "image is blank and the text layer you supplied is empty",
+                cost_usd=self.spec.price_per_page, cost_source="provider",
+                prompt_tokens=900, completion_tokens=12)
+        return FakeClient.edit_page(self, page_text, ledger=ledger, **kwargs)
 
 
 def test_a_run_of_pages_the_model_will_not_transcribe_does_not_end_the_conversion(tmp_path):
@@ -1070,3 +1079,66 @@ def test_a_run_of_pages_the_model_will_not_transcribe_does_not_end_the_conversio
     assert [result.outcomes[p].gate for p in range(4)] == ["FAIL"] * 4
     assert result.outcomes[4].source == "model"
     assert result.outcomes[5].source == "model"
+
+
+def test_an_answer_the_page_cannot_use_still_costs_what_the_provider_charged(tmp_path):
+    """A 200 with prose in it is a bill. The provider read the page, wrote an answer
+    and charged for the tokens; that we cannot use the answer is our problem and not
+    a refund.
+
+    Recording it at $0.00 is not a bookkeeping nicety. ``Ledger.spent()`` is the only
+    number the cap reserves against, so a page that billed and recorded nothing is
+    money the reader's ceiling cannot see -- and a book whose every page answers this
+    way would bill the whole way through a cap that never moves."""
+    doc = _doc(*([F.ambiguous_residue_page] * 4))
+    client = _UnusableAnswerClient(bad_pages=[0, 1], price=0.002)
+    try:
+        result, book = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert [result.outcomes[p].gate for p in (0, 1)] == ["FAIL", "FAIL"]
+    assert result.outcomes[0].cost_usd == pytest.approx(0.002)
+    # Two pages billed for nothing usable and two pages billed for an answer.
+    assert book.spent() == pytest.approx(0.008)
+    assert result.spend_usd == pytest.approx(0.008)
+    # The tokens of the answers nobody could use are in the job's totals too: two
+    # adopted pages at 600 completion tokens and two thrown away at 12.
+    assert book.totals()["completion_tokens"] == 600 * 2 + 12 * 2
+
+
+def test_a_page_the_provider_would_not_answer_at_all_costs_nothing(tmp_path):
+    """The other half of the rule, and the one that stops the fix from becoming
+    'charge for everything': a provider that refused outright produced no tokens, so
+    charging the reader's cap for it would invent a bill."""
+    doc = _doc(*([F.ambiguous_residue_page] * 3))
+    client = _FailingClient(fail_pages=[0], price=0.002)
+    try:
+        result, book = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.outcomes[0].gate == "FAIL"
+    assert result.outcomes[0].cost_usd == 0.0
+    assert book.spent() == pytest.approx(0.004), "only the two answered pages"
+
+
+def test_a_run_of_answers_the_provider_billed_for_still_stops_at_the_cap(tmp_path):
+    """G5 on the path that produces no page.
+
+    MEASURED on the acceptance book: 42 pages over four conversions answered in prose
+    or ran into the token ceiling, and every one of them was written to the ledger at
+    $0.00. Each was a real charge on the account. The guard that ends a run of
+    outright refusals (``model_errors``) does not fire here by design -- a provider
+    that is answering has not gone away -- so the cap is the only thing left holding
+    the spend down, and it can only hold what it can see."""
+    doc = _doc(*([F.ambiguous_residue_page] * 6))
+    client = _UnusableAnswerClient(bad_pages=range(6), price=0.002)
+    try:
+        result, book = _run(doc, client, tmp_path, cap=0.005)
+    finally:
+        doc.close()
+
+    assert result.stopped == "cost_cap", result.stopped
+    assert len(client.calls) == 2, client.calls
+    assert book.spent() <= 0.005

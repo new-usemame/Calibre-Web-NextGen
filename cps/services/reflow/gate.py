@@ -205,26 +205,49 @@ def _is_case_only(a, b):
 _MARKER_RESIDUE = "\"'"
 
 
+def _is_letter_residue(residue):
+    """Wreckage that includes a letter: ``ms`` for 105, ``si`` for 51, ``s°`` for 50.
+
+    MEASURED across thirty pages of the acceptance book, the scanner renders a
+    superscript as letters at least as often as it renders one as a quotation mark.
+    Digits are excluded because a run of digits is a number the page already has,
+    and turning one number into another is not a repair.
+    """
+    return (not any(c.isdigit() or c.isspace() for c in residue)
+            and any(c.isalpha() for c in residue))
+
+
 def _marker_recovery(a, b, available):
-    """A note marker the scanner turned into punctuation, read back off the scan.
+    """A note marker the scanner destroyed, read back off the scan.
 
     Returns the note number the model restored, or ``None``. The rule is at most
-    two characters wide — the measured damage is ``"`` or ``\'"``, never more —
-    and what replaces them must be the digits of exactly one note that this page
-    prints and this page leaves unreferenced. Every other character on both sides
-    still has to match, so the substitution can neither add a word nor lose one,
-    and ``available`` is consumed: a page cannot hand the same missing note to two
-    different quotation marks.
+    two characters wide — the measured damage is never more — and what replaces
+    them must be the digits of exactly one note that this page prints and this page
+    leaves unreferenced. Every other character on both sides still has to match, so
+    the substitution can neither add a word nor lose one, and ``available`` is
+    consumed: a page cannot hand the same missing note to two different residues.
+
+    Wreckage that contains a letter is held to two further conditions, because a
+    letter can be a word and a quotation mark cannot. It must sit at the very end
+    of a single token and leave something in front of it — which is where a
+    superscript is printed, after the word it annotates. So ``reasons.ms`` may
+    become ``reasons.105``, while the standalone word ``ms`` may not become ``105``
+    and the chart label ``Tl la`` may not become ``T11a``.
     """
     if not available or not a or not b:
         return None
     left, right = "".join(a), "".join(b)
-    for index, char in enumerate(left):
-        if char not in _MARKER_RESIDUE:
-            continue
+    for index in range(len(left)):
         for width in (1, 2):
             residue = left[index:index + width]
-            if len(residue) != width or any(c not in _MARKER_RESIDUE for c in residue):
+            if len(residue) != width:
+                continue
+            if all(c in _MARKER_RESIDUE for c in residue):
+                pass
+            elif _is_letter_residue(residue):
+                if len(a) != 1 or index == 0 or index + width != len(left):
+                    continue
+            else:
                 continue
             for number in available:
                 if left[:index] + str(number) + left[index + width:] == right:

@@ -209,6 +209,44 @@ class TestMarkerTheScannerAte:
         assert gate.check_word_preservation(src, out,
                                             recoverable_markers=[161]).verdict == "FAIL"
 
+    def test_a_superscript_the_scanner_read_as_letters_may_also_be_restored(self):
+        """MEASURED on page index 110: the text layer returns ``reasons.ms`` where
+        the page prints ``reasons.`` with a superscript 105. The scanner does not
+        only leave quotation marks behind -- across the flagged readings of thirty
+        pages it returned ``ms`` for 105, ``si`` for 51, ``s\u00b0`` for 50 and
+        ``.s6`` for 56. A rule that knows only about quotation marks calls the
+        commonest repair on this book a word loss."""
+        src = "he gives no reasons.ms Later writers repeat the omission."
+        out = _html(src.replace("reasons.ms",
+                                'reasons.<a class="noteref" href="#fn_105">105</a>'))
+
+        result = gate.check_word_preservation(src, out, recoverable_markers=[105])
+
+        assert result.verdict == "PASS", result.unexplained
+        assert any(d.kind == "marker_recovered" for d in result.allowed_hits)
+
+    def test_a_short_word_is_not_a_superscript_however_orphaned_the_note_is(self):
+        """The hole the letters open, closed. A quotation mark is never a word, so
+        replacing a whole one is safe; ``ms`` and ``as`` and ``is`` are words, and a
+        model that deletes one and writes an orphaned note number in its place has
+        taken a word out of the book."""
+        src = "the ms of the text was copied later by an unknown scribe."
+        out = _html(src.replace(" ms ", ' <a class="noteref" href="#fn_105">105</a> '))
+
+        assert gate.check_word_preservation(src, out,
+                                            recoverable_markers=[105]).verdict == "FAIL"
+
+    def test_letters_inside_a_word_are_not_a_superscript(self):
+        """MEASURED on page index 106: the model read the chart label ``Tl la`` as
+        ``T11a`` and was refused. A superscript follows the word it annotates; it
+        does not live in the middle of one, and a rule that let it would let a model
+        respell any word whose digits happen to name an orphaned note."""
+        src = "the chart labels Tl la and Ti lb are set in the table."
+        out = _html(src.replace("Tl la", "T11a"))
+
+        assert gate.check_word_preservation(src, out,
+                                            recoverable_markers=[11]).verdict == "FAIL"
+
     def test_one_missing_note_cannot_be_spent_twice(self):
         src = 'to King Ammon." Later, and again to King Thoth." The scribe agrees.'
         out = _html(src.replace('Ammon."', 'Ammon.<a class="noteref" href="#fn_35">35</a>')

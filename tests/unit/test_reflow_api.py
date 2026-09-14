@@ -547,3 +547,55 @@ def test_only_an_administrator_sees_the_reflow_settings(mod, monkeypatch, pdf_on
     with _ctx("/api/v1/admin/reflow"):
         with patch.object(mod, "current_user", _user(admin=False)):
             assert _status(inspect.unwrap(mod.reflow_admin_config)()) == 403
+
+
+# ── a visitor who never signed in ────────────────────────────────────────────
+#
+# `@login_required_if_no_ano` does NOT mean "signed in": with config_anonbrowse
+# on it lets the street through, and the Guest it lets through is a real user row
+# (cps/ub.py Anonymous.loadSettings reads its role bits off the database), so an
+# administrator can give Guest the edit right the way they can give it to anyone.
+# The only thing then standing between an anonymous visitor and the instance's
+# OpenRouter credit is the is_anonymous clause inside _require_edit. Nothing here
+# tested it: `_user(anon=True)` existed in this harness and no test ever passed it.
+
+@pytest.mark.unit
+def test_a_guest_cannot_spend_the_instances_money_even_where_guests_may_edit(
+        mod, monkeypatch, pdf_on_disk):
+    _wire(mod, monkeypatch, pdf_on_disk)
+    resp, added = _start(mod, {"mode": "full", "model_tier": "standard", "consent": True,
+                               "cost_cap_usd": 1.0},
+                         user=_user(anon=True, edit=True, name="Guest"))
+    assert _status(resp) == 401
+    # Not just the status: no conversion was queued, so nothing was going to be spent.
+    added.assert_not_called()
+
+
+@pytest.mark.unit
+def test_no_reflow_endpoint_answers_a_visitor_who_never_signed_in(
+        mod, monkeypatch, pdf_on_disk):
+    """Every endpoint, not just the one that spends money — a report or a sample
+    is somebody's book. Enumerated rather than listed so an endpoint added later
+    is covered by this the day it is written: helpers in that module are
+    underscore-prefixed, so a public ``reflow_*`` name in it is a route."""
+    _wire(mod, monkeypatch, pdf_on_disk)
+    guest = _user(anon=True, edit=True, admin=True, name="Guest")
+    views = {n: getattr(mod, n) for n in dir(mod)
+             if n.startswith("reflow_") and callable(getattr(mod, n))}
+    assert set(views) >= {"reflow_estimate", "reflow_start", "reflow_jobs",
+                          "reflow_sample", "reflow_report", "reflow_admin_config"}, \
+        "an endpoint was renamed or removed; this test is no longer looking at them"
+
+    answered = {}
+    for name, view in sorted(views.items()):
+        view = inspect.unwrap(view)
+        args = [5 if p == "book_id" else "abc123"
+                for p in inspect.signature(view).parameters]
+        with _ctx("/api/v1/books/5/reflow", method="POST", body={}):
+            with patch.object(mod, "current_user", guest):
+                with patch.object(mod.WorkerThread, "get_instance",
+                                  staticmethod(lambda: SimpleNamespace(tasks=[]))):
+                    with patch.object(mod.WorkerThread, "add") as added:
+                        answered[name] = _status(view(*args))
+                        added.assert_not_called()
+    assert answered == dict.fromkeys(views, 401), answered

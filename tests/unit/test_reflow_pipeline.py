@@ -714,6 +714,43 @@ def test_an_answer_the_gate_refused_is_not_remembered_as_this_pages_answer(tmp_p
     assert second.reused == 0
 
 
+def test_an_answer_replayed_from_the_cache_is_judged_again_and_not_grandfathered(
+        tmp_path, monkeypatch):
+    """The cache holds the model's answer, never the verdict on it.
+
+    Every release the gate learns to refuse something it used to let through, and
+    a book is re-run whenever a conversion is resumed, re-tried or extended. If a
+    cached page skipped the gate on the way back in, the very first version of the
+    gate would decide what a book says forever, and the pages already bought --
+    the majority of any resumed run -- would be the ones nobody ever looked at
+    again. OBSERVED on the acceptance book: three pages replayed from the cache
+    came back FAIL under a stricter gate and kept the reader's own text.
+    """
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    client = FakeClient(answer=_drop_a_word)
+    blind = gate.GateResult("PASS", 1, 1, 1.0, [], [], [], [], [])
+    try:
+        # The gate as it was before it learned to count the words: the answer is
+        # adopted, and so it is remembered.
+        monkeypatch.setattr(pipeline.gate, "check_word_preservation",
+                            lambda *a, **k: blind)
+        first, _ = _run(doc, client, tmp_path)
+        assert first.outcomes[1].source == "model", "the bad answer was not cached"
+        monkeypatch.undo()
+
+        second, book = _run(doc, client, tmp_path)
+        lost = assemble.page_source_text(second.book, 1).split()[-1]
+    finally:
+        doc.close()
+
+    assert second.reused == 1, "the page was bought again instead of replayed"
+    assert len(client.calls) == 1, "the cached answer was not the one that came back"
+    assert second.outcomes[1].gate == "FAIL", second.outcomes[1].gate_reasons
+    assert second.outcomes[1].source == "deterministic"
+    assert lost in second.page_html[1], "the reader was left with the refused answer"
+    assert book.totals()["gate"].get("FAIL") == 1, book.totals()
+
+
 # -------------------------------------------------------------------- what stops
 
 class _FailingClient(FakeClient):

@@ -30,9 +30,14 @@ HARD RULES:
   words.
 - A scanner sometimes reads a superscript note number as a quotation mark or an apostrophe, so the
   text layer shows `Ammon."` where the page prints `Ammon` with a superscript 35. When you are told
-  which notes on this page have lost their marker, find each one in the image and put it back:
-  delete that stray punctuation and write the noteref in its place. Only the numbers you were told
-  about, once each. If you cannot see where a number goes, leave the page as the text layer has it.
+  which notes on this page have lost their marker, find each one in the image and write the noteref
+  where the image shows it. Only the numbers you were told about, once each. If you cannot see
+  where a number goes, leave the page as the text layer has it.
+- Restoring a marker may delete ONE OR TWO quotation marks or apostrophes, and nothing else. Where
+  the wreckage holds a letter or a digit -- `.'23`, `.''s`, `r's`, `."4 '` -- those characters are
+  still the text layer's word list: keep every one of them exactly where it is and put the noteref
+  immediately after them. The page is checked character by character against the text layer, and a
+  page that drops a letter or changes a digit is thrown away whole, restored markers and all.
 - You MAY: insert paragraph breaks; wrap the headings you were told about; dehyphenate
   line-break hyphenation; mark footnote references and the footnote block; mark block quotes,
   epigraphs, figure and table captions.

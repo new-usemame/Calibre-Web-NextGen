@@ -570,3 +570,67 @@ class TestOrphanPunctuationIsNotAWord(object):
         result = gate.check_word_preservation(self.SRC, out)
 
         assert result.verdict == "FAIL"
+
+
+class TestAMarkerPutBackBesideWreckageNothingMayDelete(object):
+    """The other half of the same repair: add the number, touch nothing.
+
+    MEASURED on pages 116, 118 and 124 of the acceptance book. The scanner does not
+    always leave a quotation mark where a superscript was -- it leaves ``.'23`` for
+    125, ``.''s`` for 135, ``r's`` for 175. Those hold digits and letters, so no
+    rule here will let the model delete them, and the model deleting them anyway is
+    what threw four of twenty-six paid-for pages away: the page came back with the
+    marker restored and the whole answer was refused over the wreckage beside it.
+
+    The fix is not a wider delete. It is to let the model do the thing that cannot
+    lose a word: leave every character of the text layer where it is and put the
+    noteref next to it. The scan's nonsense stays visible in the reader's book,
+    which is honest -- it is what the page's text layer says -- and the footnote
+    link works.
+    """
+
+    SRC = ("for material from Hermes on the advantageous places.'23 Timaeus is "
+           "cited for some astrological doctrines.")
+
+    def _out(self, marker='<a class="noteref" href="#fn_125">125</a>', src=None):
+        return _html((src or self.SRC).replace(".'23", ".'23" + marker, 1))
+
+    def test_a_noteref_added_beside_the_wreckage_is_allowed(self):
+        result = gate.check_word_preservation(self.SRC, self._out(),
+                                              recoverable_markers=[125])
+
+        assert result.verdict == "PASS", result.unexplained
+        assert any(d.kind == "marker_added" for d in result.allowed_hits), \
+            "a repair nobody can audit is not a repair"
+        assert result.recovered_markers == [125]
+
+    def test_only_a_note_the_page_leaves_unreferenced_may_be_added(self):
+        """Otherwise the allowance is "the model may write any number it likes",
+        and the reader gets a link to a source the page never cited."""
+        assert gate.check_word_preservation(self.SRC, self._out(),
+                                            recoverable_markers=[126]).verdict == "FAIL"
+        assert gate.check_word_preservation(self.SRC, self._out()).verdict == "FAIL"
+
+    def test_the_same_missing_note_cannot_be_added_twice(self):
+        out = _html(self.SRC.replace(".'23", ".'23" + '<a class="noteref" href="#fn_125">125</a>')
+                            .replace("doctrines.",
+                                     'doctrines.<a class="noteref" href="#fn_125">125</a>'))
+
+        assert gate.check_word_preservation(self.SRC, out,
+                                            recoverable_markers=[125]).verdict == "FAIL"
+
+    def test_a_word_may_not_arrive_with_the_number(self):
+        """The allowance is one number and nothing else. Anything travelling with
+        it is prose the page does not print."""
+        out = self._out('<a class="noteref" href="#fn_125">125</a> indeed')
+
+        assert gate.check_word_preservation(self.SRC, out,
+                                            recoverable_markers=[125]).verdict == "FAIL"
+
+    def test_nothing_may_leave_the_page_to_make_room_for_it(self):
+        """The measured failure, stated as a rule: the model may add the marker or
+        it may swap it for one or two quotation marks, and ``'23`` is neither."""
+        out = _html(self.SRC.replace(".'23", '.<a class="noteref" href="#fn_125">125</a>'))
+
+        assert gate.check_word_preservation(self.SRC, out,
+                                            recoverable_markers=[125]).verdict == "FAIL"

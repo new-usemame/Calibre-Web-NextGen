@@ -262,6 +262,60 @@ def test_a_marker_the_scanner_destroyed_can_come_back_off_the_page_image(tmp_pat
     assert 'href="#fn_88"' in result.page_html[1]
 
 
+def _add_marker_beside(number, after):
+    """A model that leaves the text layer alone and puts the noteref next to it."""
+    def answer(text):
+        out = []
+        for part in text.split("\n\n"):
+            if part.startswith("["):
+                num, _, rest = part.partition("] ")
+                out.append('<aside class="footnote" id="fn_%s">%s %s</aside>'
+                           % (num[1:], num[1:], rest))
+            else:
+                out.append("<p>%s</p>"
+                           % part.replace(after, after + '<a class="noteref" '
+                                          'href="#fn_%d">%d</a>' % (number, number), 1))
+        return "\n".join(out)
+    return answer
+
+
+def test_a_marker_may_be_put_back_beside_wreckage_that_cannot_be_deleted(tmp_path):
+    """The measured shape the first version of this repair could not handle.
+
+    ``wrecked_marker_page`` prints a superscript 135 that the scan returned as
+    ``'ts``. Deleting that is a letter leaving the page, which the gate refuses
+    and should. If adding the noteref beside it is refused too then the page has
+    no answer the gate will take, and four of the twenty-six pages of the
+    acceptance sample were thrown away for exactly that.
+    """
+    doc = _doc(F.prose_page, F.wrecked_marker_page)
+    client = FakeClient(answer=_add_marker_beside(135, ".'ts"))
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.outcomes[1].gate == "PASS", result.outcomes[1].gate_reasons
+    assert result.outcomes[1].source == "model"
+    assert 'href="#fn_135"' in result.page_html[1]
+    assert ".'ts" in result.page_html[1], \
+        "the scan's nonsense is what the page says; the repair does not hide it"
+
+
+def test_the_number_beside_the_wreckage_is_still_one_the_page_is_missing(tmp_path):
+    """The allowance is a note this page prints and never refers to. Without that
+    the model may write any number it likes next to any word it likes."""
+    doc = _doc(F.prose_page, F.wrecked_marker_page)
+    client = FakeClient(answer=_add_marker_beside(136, ".'ts"))
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.outcomes[1].gate == "FAIL"
+    assert result.outcomes[1].source == "deterministic"
+
+
 # ------------------------------------------------- R3: damage marked, not replaced
 
 def test_a_reading_the_model_flagged_is_marked_in_the_page_the_reader_gets(tmp_path):

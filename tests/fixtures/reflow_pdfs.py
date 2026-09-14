@@ -431,6 +431,27 @@ def ambiguous_residue_page(doc):
     return page
 
 
+def wrecked_marker_page(doc):
+    """A superscript the scanner read as digits, and the wrong digits at that.
+
+    MEASURED on page index 117 of the acceptance book: the page prints
+    ``Anthology.`` with a superscript 135 and the text layer returns
+    ``Anthology.''s``. The shape varies -- 124 gets ``r's`` for 175 -- and once a
+    letter the glyph table does not know is in it, nothing deterministic reads a
+    number out of it at all. Guessing one anyway is the substitution the whole
+    design forbids, so the note stays unreferenced and the page is routed. What
+    the model can do is leave the wreckage exactly where it is and put the noteref
+    beside it, and that is what this page exists to check end to end.
+    """
+    page = add_page(doc)
+    y = BODY_TOP
+    _put(page, LEFT, y, "He treats the same topic in book 4 of the Anthology.'ts")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "While Valens does mention Critodemus, he says little of him.")
+    add_notes(page, [(135, "Valens, Anthology, 4, 11, ed. Pingree, p. 165.")])
+    return page
+
+
 def swept_note_page(doc):
     """A note whose own printed number the scanner read as punctuation.
 

@@ -385,9 +385,13 @@ def page_hints(book, pno, reasons=None):
         hints.append(
             "notes %s are printed on this page and nothing in the text points at "
             "them: their superscripts are legible in the image but the text layer "
-            "lost them, in some places leaving a stray quotation mark or apostrophe "
-            "where the number belongs. Put each one back as a noteref where the "
-            "image shows it, replacing that punctuation, and use no other number."
+            "lost them, in some places leaving a stray quotation mark, an "
+            "apostrophe or a run of nonsense where the number belongs. Put each "
+            "one back as a noteref where the image shows it, and use no other "
+            "number. You may delete one or two quotation marks or apostrophes "
+            "standing exactly where the number belongs; every other character, "
+            "letters and digits included, stays exactly as you were given it with "
+            "the noteref straight after it."
             % ", ".join(str(number) for number in unmarked))
     swept = book.swept_notes(pno) if book is not None else []
     for number in swept:

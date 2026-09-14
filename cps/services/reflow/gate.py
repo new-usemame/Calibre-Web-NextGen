@@ -26,10 +26,14 @@ which can add a word or lose one:
 * a *marker recovery*, where one punctuation character that the scanner left in
   place of a superscript note number becomes that number again — and only a
   number this page prints, leaves unreferenced, and has not already used;
+* a *marker addition*, the same repair where nothing is given up for it: the
+  wreckage stays exactly as the scanner left it and the number is added beside
+  it, which is the only shape available when that wreckage holds a letter or a
+  digit no rule here will delete;
 * an *orphan punctuation* difference, where neither side holds a word at all.
 
-The second is off unless the caller passes ``recoverable_markers``, so on a page
-that has lost nothing a quotation mark is still a quotation mark.
+The middle two are off unless the caller passes ``recoverable_markers``, so on a
+page that has lost nothing a quotation mark is still a quotation mark.
 
 **G3, structural schema.** Allowed tags only; heading levels drawn from the
 deterministic ladder rather than the model's opinion (probes showed models
@@ -296,6 +300,28 @@ def _marker_recovery(a, b, available):
     return None
 
 
+def _added_marker(b, available):
+    """A note number put back where nothing on the page could be given up for it.
+
+    Returns the number, or ``None``. This is the safe half of the marker repair:
+    the model adds the noteref and the text layer keeps every character it had, so
+    no word can go missing and the only thing that arrives is one number this page
+    prints, this page never refers to, and no other residue has already claimed.
+
+    It exists because the wreckage of a superscript is often not punctuation.
+    MEASURED on pages 116, 118 and 124 of the acceptance book the scanner returned
+    ``places.'23`` for 125, ``Anthology.''s`` for 135 and ``r's`` for 175 --
+    digits and letters, which ``_marker_recovery`` will not let the model delete
+    and should not. Without this the model's only way to restore those markers is
+    a deletion the gate refuses, and the page is thrown away over the scan's
+    nonsense rather than over anything the model did wrong.
+    """
+    if len(b) != 1 or not b[0].isdigit():
+        return None
+    number = int(b[0])
+    return number if number in available else None
+
+
 def _is_retokenisation(a, b):
     """Same characters, different word boundaries.
 
@@ -349,6 +375,13 @@ class _Comparison(object):
                 self.recovered.append(number)
                 self.allowed.append(Difference("marker_recovered", a, b))
                 continue
+            if not a:
+                number = _added_marker(b, available)
+                if number is not None:
+                    available.remove(number)
+                    self.recovered.append(number)
+                    self.allowed.append(Difference("marker_added", a, b))
+                    continue
             if _is_punctuation(a, b):
                 self.allowed.append(Difference("punctuation", a, b))
                 continue

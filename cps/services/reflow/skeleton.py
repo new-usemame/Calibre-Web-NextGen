@@ -361,8 +361,11 @@ def acceptable_heading(text):
         # book is lost this way; it comes back through the model route.
         return False
     if text[:1].islower():
-        # A heading begins where a sentence begins. MEASURED on book 567:
-        # 'bonify Mercury. Conversely, if' (p493).
+        # A heading begins where a sentence begins. No line in the acceptance book
+        # needs this rule -- the one that looked like it did, 'bonify Mercury.
+        # Conversely, if' (p493), is refused by the last-word rule below -- so it is
+        # a guard against a shape that book does not happen to print, not a measured
+        # fix, and no test here can drive it on its own.
         return False
     last = _TRAILING_NON_WORD.sub("", text).rsplit(" ", 1)[-1].lower()
     if last in _NOT_A_LAST_WORD:

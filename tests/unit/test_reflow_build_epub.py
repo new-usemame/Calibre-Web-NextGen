@@ -770,3 +770,93 @@ def test_a_note_that_does_not_print_its_number_is_not_linked_through_whatever_do
     assert not list(aside.iter(XHTML + "a")), ET.tostring(aside)
     assert "1929 was the year" in body
     assert 'epub:type="footnote"' in body
+
+
+#: OBSERVED on page 162 of book 567, and on twelve other pages of it: the page
+#: prints notes 43, 44 and 45, the scanner reads the third number as 43, and the
+#: book ships two notes with one id. epubcheck 5.2.1 calls that 25 errors; a reader
+#: calls it a note they cannot open. The same shape occurs honestly wherever a
+#: chapter's notes restart under the tail of the chapter before.
+MODEL_ANSWER_NUMBER_PRINTED_TWICE = (
+    '<p>Thorndike put it plainly<a class="noteref" href="#fn_43">43</a> and '
+    'returned to it later<a class="noteref" href="#fn_44">44</a>.</p>\n'
+    '<aside class="footnote" id="fn_43">43 Thorndike, "A Roman Astrologer as a '
+    'Historical Source," p. 416.</aside>\n'
+    '<aside class="footnote" id="fn_44">44 The approach is not always clear.'
+    '</aside>\n'
+    '<aside class="footnote" id="fn_43">43 See Cumont, L\'Egypte des astrologues.'
+    '</aside>'
+)
+
+MODEL_ANSWER_TWO_MARKERS_TWO_NOTES = (
+    '<p>The last note of the chapter<a class="noteref" href="#fn_43">43</a> and '
+    'then the first of the next<a class="noteref" href="#fn_43">43</a>.</p>\n'
+    '<aside class="footnote" id="fn_43">43 Thorndike, p. 416.</aside>\n'
+    '<aside class="footnote" id="fn_43">43 See Cumont, L\'Egypte des astrologues.'
+    '</aside>'
+)
+
+
+def _ids(root):
+    return [el.get("id") for el in root.iter() if el.get("id")]
+
+
+def test_two_notes_that_print_the_same_number_do_not_ship_under_one_id(tmp_path):
+    """A duplicate id is an invalid EPUB, which is reason enough, but the reader's
+    version is worse: both notes answer to the same anchor, so whichever the parser
+    reaches first is the one every marker opens and the other note is in the book
+    with no way to reach it."""
+    result = _model_page(tmp_path, html=MODEL_ANSWER_NUMBER_PRINTED_TWICE)
+
+    with zipfile.ZipFile(result.path) as zf:
+        root = ET.fromstring(zf.read(_content_names(zf)[0]))
+
+    ids = _ids(root)
+    assert len(ids) == len(set(ids)), sorted(ids)
+    assert len(list(root.iter(XHTML + "aside"))) == 3
+
+
+def test_the_note_a_page_repeats_is_not_opened_by_the_marker_for_the_first_one(tmp_path):
+    """Only one marker 43 is printed, so only one note 43 has a way in. The second
+    keeps its place on the page and is left unmarked -- which the report already
+    counts and says -- rather than being wired to a marker that does not cite it."""
+    result = _model_page(tmp_path, html=MODEL_ANSWER_NUMBER_PRINTED_TWICE)
+
+    with zipfile.ZipFile(result.path) as zf:
+        root = ET.fromstring(zf.read(_content_names(zf)[0]))
+
+    ids = set(_ids(root))
+    opened = [a.get("href")[1:] for a in _noterefs(root)]
+    assert len(opened) == len(set(opened)), opened
+    for target in opened:
+        assert target in ids, "a marker opens %s, which is not in the book" % target
+    asides = list(root.iter(XHTML + "aside"))
+    assert asides[0].get("id") in opened and asides[2].get("id") not in opened, \
+        [a.get("id") for a in asides]
+
+
+def test_two_markers_of_one_number_open_the_two_notes_in_turn(tmp_path):
+    """The honest version of the same page: a chapter's notes restart under the last
+    of the chapter before, so the page really does print 43 twice and cite it twice.
+    The second marker has to reach the second note, or a reader following it lands on
+    the wrong chapter's citation and has no way to tell."""
+    result = _model_page(tmp_path, html=MODEL_ANSWER_TWO_MARKERS_TWO_NOTES)
+
+    with zipfile.ZipFile(result.path) as zf:
+        root = ET.fromstring(zf.read(_content_names(zf)[0]))
+
+    asides = list(root.iter(XHTML + "aside"))
+    opened = [a.get("href")[1:] for a in _noterefs(root)]
+    assert opened == [asides[0].get("id"), asides[1].get("id")], opened
+    for aside, marker in zip(asides, _noterefs(root)):
+        back = [a.get("href")[1:] for a in aside.iter(XHTML + "a")]
+        assert back == [marker.get("id")], (back, marker.get("id"))
+
+
+def test_a_page_whose_notes_were_already_separated_is_not_separated_again(tmp_path):
+    """The deterministic pages arrive here in the long form already, and every page
+    is written twice in a sample-then-whole-book conversion. A second pass that
+    renumbered what the first pass numbered would move every anchor in the book."""
+    once = build_epub._reader_ready_notes(MODEL_ANSWER_NUMBER_PRINTED_TWICE)
+
+    assert build_epub._reader_ready_notes(once) == once

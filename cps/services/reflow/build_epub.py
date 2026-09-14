@@ -323,12 +323,35 @@ def _reader_ready_notes(html):
     written in where the page does not have one, because a number this function
     invented would be a word the source does not have.
 
-    Idempotent by construction: an attribute already present is left alone and a note
-    that already links back is not linked again, so the pages the gate refused --
-    which arrive in the long form already -- come back unchanged.
+    One page can print one number on two notes. Honestly, when a chapter's notes
+    restart under the tail of the chapter before; or because the scan misread the
+    number, which on book 567 happens on thirteen pages. Either way the short form
+    gives both notes the same id, and the EPUB is then invalid (epubcheck RSC-005)
+    and, worse for a reader, both notes answer to one anchor and only the first can
+    be opened at all. So the notes are counted before anything is rewritten and each
+    repeat after the first takes a suffix; the markers for that number are then
+    paired with them in the order the page prints both. A marker is only ever pointed
+    at a note that is really there -- one marker and two notes leaves the second note
+    unmarked, which is a thing the report already counts and says, rather than a link
+    into nothing.
+
+    Idempotent by construction: an attribute already present is left alone, a note
+    that already links back is not linked again, and a note already carrying its
+    suffix counts as its own first occurrence -- so the pages the gate refused, which
+    arrive in the long form already, come back unchanged.
     """
+    minted = {}
+    for found in _NOTE_ASIDE.finditer(html):
+        ident = _ID.search(found.group("attrs"))
+        if not (ident and ident.group(1).startswith("fn_")):
+            continue
+        made = minted.setdefault(ident.group(1)[3:], [])
+        made.append(ident.group(1) if not made
+                    else "fn_%s_%d" % (ident.group(1)[3:], len(made) + 1))
+
     back = {}
-    seen = {}
+    cited = {}
+    placed = {}
 
     def marker(match):
         attrs, inner = match.group("attrs"), match.group("inner")
@@ -336,18 +359,23 @@ def _reader_ready_notes(html):
         if not target:
             return match.group(0)
         number = target.group(1)
+        nth = cited[number] = cited.get(number, 0) + 1
+        notes = minted.get(number) or []
+        if nth <= len(notes) and notes[nth - 1] != "fn_%s" % number:
+            attrs = attrs.replace('href="#fn_%s"' % number,
+                                  'href="#%s"' % notes[nth - 1])
+        opens = notes[nth - 1] if nth <= len(notes) else "fn_%s" % number
         if not _HAS_EPUB_TYPE.search(attrs):
             attrs = ' epub:type="noteref"' + attrs
         found = _ID.search(attrs)
         if found:
             ident = found.group(1)
         else:
-            seen[number] = seen.get(number, 0) + 1
             ident = "fnref_%s" % number
-            if seen[number] > 1:
-                ident = "%s_%d" % (ident, seen[number])
+            if nth > 1:
+                ident = "%s_%d" % (ident, nth)
             attrs = ' id="%s"%s' % (ident, attrs)
-        back.setdefault(number, ident)
+        back.setdefault(opens, ident)
         if _BARE_NUMBER.match(inner):
             inner = "<sup>%s</sup>" % inner.strip()
         return "<a%s>%s</a>" % (attrs, inner)
@@ -358,7 +386,14 @@ def _reader_ready_notes(html):
             attrs = ' epub:type="footnote"' + attrs
         found = _ID.search(attrs)
         number = found.group(1)[3:] if found and found.group(1).startswith("fn_") else None
-        target = back.get(number)
+        ident = None
+        if number is not None:
+            nth = placed[number] = placed.get(number, 0) + 1
+            ident = minted[number][nth - 1]
+            if ident != found.group(1):
+                attrs = attrs.replace(' id="%s"' % found.group(1),
+                                      ' id="%s"' % ident, 1)
+        target = back.get(ident)
         if target:
             def link(head):
                 if head.group(2) != number:

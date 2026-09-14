@@ -41,6 +41,18 @@ PAGE_REASONS = {
 #: Reasons that pull the neighbouring page in with them.
 BOUNDARY_REASONS = ("page_boundary_join_uncertain",)
 
+#: Reasons worth recording and not worth paying for. Both of these are the reader
+#: declining to call a line a heading, and G3 checks the answer's headings against
+#: the ones the reader measured — so the model cannot overrule that decision and a
+#: page whose only open question is one of these has no answer the gate would take.
+#: MEASURED on the acceptance book: 22 pages raise one of the two and the
+#: deterministic answer is right on all 22 — 20 are chart glyphs and scan wreckage
+#: set large (``'Ts a 9``, ``©``, ``12 ytilks``), two are the ``CHAPTER 7`` line
+#: above a chapter title already marked as the h1, six are bold first lines of
+#: paragraphs. Seven of the 22 raise nothing else; those seven were being bought
+#: to ask a question we would then refuse to hear the answer to.
+SETTLED_REASONS = frozenset({"run_in_candidate_rejected", "large_type_not_a_heading"})
+
 
 @dataclass
 class PageRoute(object):
@@ -71,6 +83,8 @@ def route_pages(book, skeletons, assessment=None, window=BOUNDARY_WINDOW):
             if reason not in PAGE_REASONS:
                 continue
             target.reasons.append(reason)
+            if reason in SETTLED_REASONS:
+                continue
             target.routed = True
             if reason in BOUNDARY_REASONS:
                 _pull_in_neighbours(by_pno, skel.pno, reason, window)

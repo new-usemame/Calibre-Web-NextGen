@@ -262,6 +262,59 @@ def test_a_marker_the_scanner_destroyed_can_come_back_off_the_page_image(tmp_pat
     assert 'href="#fn_88"' in result.page_html[1]
 
 
+class TestAQuestionTheGateWillNotLetTheModelAnswer(object):
+    """A page is paid for to settle something. These two reasons settle nothing.
+
+    ``run_in_candidate_rejected`` and ``large_type_not_a_heading`` are the reader
+    declining to call a line a heading. Since G3 checks the answer's headings
+    against the ones the reader measured, the model cannot overrule that decision
+    -- so a page whose only open question is one of these has no answer the gate
+    would take, and sending it buys a raster, a prompt and a bill.
+
+    MEASURED on the acceptance book: 22 pages raise one of the two and the
+    deterministic answer is right on all 22. Twenty are chart glyphs and scan
+    wreckage set large (``'Ts a 9``, ``©``, ``12 ytilks``); two are the
+    ``CHAPTER 7`` line standing above a chapter title the reader already marks as
+    the h1; six are first lines of paragraphs set bold. Seven of the 22 raise
+    nothing else, and those seven are what this stops paying for.
+    """
+
+    def test_a_bold_lead_in_alone_is_not_worth_a_model_call(self, tmp_path):
+        doc = _doc(F.prose_page, F.lead_in_page)
+        client = FakeClient()
+        try:
+            result, _ = _run(doc, client, tmp_path)
+        finally:
+            doc.close()
+
+        assert result.routed == [], result.routing["reasons"]
+        assert client.calls == []
+
+    def test_the_reader_still_says_it_looked(self, tmp_path):
+        """Silently dropping the reason would leave the report claiming the page
+        had nothing unusual on it, which is not the same statement."""
+        doc = _doc(F.prose_page, F.lead_in_page)
+        try:
+            result, _ = _run(doc, FakeClient(), tmp_path)
+        finally:
+            doc.close()
+
+        assert result.routing["reasons"].get("run_in_candidate_rejected") == 1
+
+    def test_a_page_with_a_real_question_on_it_is_still_sent(self, tmp_path):
+        """The reason is inert, not poisonous: it must not stop a page that has
+        something else the model can settle."""
+        doc = _doc(F.prose_page, F.lead_in_and_lost_marker_page)
+        client = FakeClient()
+        try:
+            result, _ = _run(doc, client, tmp_path)
+        finally:
+            doc.close()
+
+        assert result.routed == [1]
+        assert "run_in_candidate_rejected" in result.routing["reasons"]
+
+
 def _add_marker_beside(number, after):
     """A model that leaves the text layer alone and puts the noteref next to it."""
     def answer(text):

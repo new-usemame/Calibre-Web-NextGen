@@ -379,6 +379,23 @@ def lead_in_page(doc):
     return page
 
 
+def lead_in_and_lost_marker_page(doc):
+    """The same bold lead-in, on a page that also lost a note's marker.
+
+    The heading question on this page settles nothing, and the missing marker
+    settles a great deal, so the page is still worth paying for.
+    """
+    page = add_page(doc)
+    y = BODY_TOP
+    _put(page, LEFT, y, "IT IS AN HONOR AND A PRIVILEGE", size=BODY_SIZE, font=_BOLD)
+    y += BODY_LEADING
+    _put(page, LEFT, y, "to introduce this new translation of the Anthology.'ts")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "It has waited a very long time for a reader like this one.")
+    add_notes(page, [(135, "Valens, Anthology, 4, 11, ed. Pingree, p. 165.")])
+    return page
+
+
 def degree_control_page(doc):
     """Genuine ``N\u00b0`` degree tokens, and a note that is properly marked.
 

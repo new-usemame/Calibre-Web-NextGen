@@ -281,8 +281,17 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
         report(Progress(stage="build", page=pages_total, pages=pages_total))
         return result
 
-    levels = sorted({el.level for el in book.elements if el.kind == "h" and el.level})
-    ladder = levels or [1]
+    # The ladder is the book's, not the sample's. Built from the levels the
+    # deterministic pass happened to emit, it refuses a model answer that uses a
+    # level this book really sets but these pages do not show -- and refusing costs
+    # the whole page, not just the heading. Take what the book's type defines, the
+    # rung below its last (where a run-in head set on the body's own leading lands,
+    # which is the one level the deterministic pass can never emit), and whatever
+    # was in fact emitted.
+    ladder = sorted(set(style.levels)
+                    | {style.level_for(style.body_size)}
+                    | {el.level for el in book.elements
+                       if el.kind == "h" and el.level}) or [1]
 
     refusals = 0
     for index, pno in enumerate(result.routed, start=1):

@@ -751,3 +751,54 @@ def test_the_model_is_shown_the_page_its_words_came_from(tmp_path):
 
     assert len(client.images) == 1 and client.images[0]
     assert _lines_of_ink(client.images[0]) == printed - 1
+
+
+def _sectioned(page_builder):
+    """A book whose section heads define a rung, and one page for the model.
+
+    Three pages are the least that makes a rung a rung, so this is the smallest book
+    in which the ladder means anything at all.
+    """
+    return _doc(lambda d: F.section_heading_page(d, "Sect", folio="400"),
+                lambda d: F.section_heading_page(d, "Exaltations", folio="402"),
+                lambda d: F.section_heading_page(d, "Triplicities", folio="404"),
+                page_builder)
+
+
+def test_a_level_the_books_type_defines_is_open_to_the_model(tmp_path):
+    """The ladder is the book's, not the sample's.
+
+    MEASURED on book 567: over PDF pages 100-129 the deterministic pass emits only
+    level 1, because the two levels this book sets are its chapter heads (15.7pt,
+    none in that range) and its section heads (13.0pt) -- so a ladder built from what
+    was emitted refuses the model's <h2> and throws away everything else it did with
+    that page, including the footnote markers the page was routed for. What the book
+    sets is the ladder; below the bottom rung there is one more level, because that
+    is where a run-in head set on the body's own leading lands.
+    """
+    doc = _sectioned(F.ambiguous_residue_page)
+    client = FakeClient(answer=lambda text: "<h2>%s</h2>" % text)
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.outcomes[3].gate == "PASS", result.outcomes[3].gate_reasons
+    assert "<h2>" in result.page_html[3]
+
+
+def test_a_level_below_the_ladders_last_rung_is_still_refused(tmp_path):
+    """The control, and the reason the rule is 'one more level' and not 'any level'.
+    A book with one heading rung has two levels open to it; a fourth is a guess that
+    would land in the reader's table of contents."""
+    doc = _sectioned(F.ambiguous_residue_page)
+    client = FakeClient(answer=lambda text: "<h4>%s</h4>" % text)
+    try:
+        result, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.outcomes[3].gate == "FAIL"
+    assert any("h4" in reason for reason in result.outcomes[3].gate_reasons), \
+        result.outcomes[3].gate_reasons
+    assert "<h4>" not in result.page_html[3]

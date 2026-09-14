@@ -569,6 +569,27 @@ def chart_label_page(doc):
     return page
 
 
+def table_column_heads_page(doc):
+    """A table's column heads, set as large as a chapter title, over a real section.
+
+    MEASURED on page index 297 of the acceptance book. Table 8.2's header row comes
+    back from the scan as ``Day Night  I' J/ /  0`` -- two column names, then the
+    scanner's attempt at the planetary glyphs beneath them. Two real words clear the
+    junk veto's "at least two words" floor, and the wreckage has letters in it, so
+    nothing on the line counts as a loose glyph either. It became an <h1>: it split
+    the chapter, took the section that follows it out of "Triplicities", and put
+    itself in the table of contents in that section's place.
+    """
+    page = add_page(doc)
+    add_running_head(page, "298", "CHAPTER 8: THE DOCTRINE OF SECT")
+    _put(page, LEFT, BODY_TOP, "Day Night  I' J/ /  0", size=16.0, font=_BOLD)
+    y = add_body_lines(page, PROSE_LINES[:4], top=BODY_TOP + 24.0)
+    _put(page, LEFT, y + 10.0, "Ptolemy's Alternative Triplicity Ruler Scheme",
+         size=13.0, font=_BOLD)
+    add_body_lines(page, PROSE_LINES[4:10], top=y + 32.0)
+    return page
+
+
 def balanced_quotation_page(doc):
     """A closing quotation ``.'\"`` on a page whose notes are all marked already.
 

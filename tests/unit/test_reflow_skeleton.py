@@ -242,6 +242,38 @@ def test_a_large_chart_label_is_not_promoted_to_a_heading():
     assert "DAY CHART a 9 -5 e" in _all_text(book)
 
 
+def test_a_tables_column_heads_do_not_outrank_the_section_they_sit_above():
+    """The junk veto's floor is "two real words", and a table header row clears it.
+
+    ``Day Night  I' J/ /  0`` is two column names and the wreckage of the glyphs
+    under them, set at chapter size. Every existing test of the veto is a line that
+    fails on word count or on loose single characters; this one fails on neither,
+    so it went into the book as an <h1> -- which is a split level, so it took the
+    section printed below it out of its own chapter and stood in the table of
+    contents where that section should be.
+    """
+    book = _book(F.table_column_heads_page)
+
+    heads = [el.text.strip() for el in _kinds(book, "h")]
+
+    assert heads == ["Ptolemy's Alternative Triplicity Ruler Scheme"], heads
+    assert "Day Night" in _all_text(book), "the row itself must still be in the book"
+
+
+def test_a_heading_of_initials_and_a_surname_is_still_a_heading():
+    """The other side of the same rule, and the reason it counts initials as words.
+
+    A line of stops and single letters is exactly what the veto is looking for, and
+    a name set as a heading is made of them.
+    """
+    book = _book(lambda d: F.section_heading_page(
+        d, "R. A. Fisher and J. B. S. Haldane on Inheritance"))
+
+    heads = [el.text.strip() for el in _kinds(book, "h")]
+
+    assert heads == ["R. A. Fisher and J. B. S. Haldane on Inheritance"], heads
+
+
 def test_a_body_size_digit_run_is_not_a_note_marker():
     """OCR splits spans at digit boundaries, so a cross-reference number arrives
     looking exactly like an inline marker except for its type size.

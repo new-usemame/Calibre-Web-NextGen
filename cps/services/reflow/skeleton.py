@@ -310,23 +310,54 @@ def looks_like_chart_junk(text):
     if not tokens:
         return True
 
-    cores = [t.strip(_STRIP_EDGES) for t in tokens]
-    cores = [c for c in cores if c]
     letters = sum(1 for ch in cleaned if ch.isalpha())
-
     if len(tokens) == 1:
         return letters < 3
 
-    words = [c for c in cores if _WORDISH.match(c) and (len(c) >= 2 or c in ("A", "I"))]
-    if len(words) < 2:
+    words = numbers = debris = 0
+    for token in tokens:
+        kind = _token_kind(token)
+        words += kind == "word"
+        numbers += kind == "number"
+        debris += kind == "debris"
+
+    if words < 2:
         return True
-    glyphs = [c for c in cores if len(c) == 1 and not c.isdigit() and c not in ("A", "I")]
-    if len(glyphs) > len(words):
+    if debris > words:
         return True
-    numbers = [c for c in cores if _NUMERIC.match(c)]
-    if len(numbers) >= 2 and len(numbers) >= len(words):
+    if numbers >= 2 and numbers >= words:
         return True
     return False
+
+
+#: Brackets only. Stripping quotation marks and stops as well would turn the
+#: wreckage below back into the words it is not.
+_ENCLOSING = "()[]{}<>«»"
+_AN_INITIAL = re.compile(r"[A-Za-z]\.$")
+
+
+def _token_kind(token):
+    """One token of a would-be heading: a word, a number, or debris.
+
+    Debris is what an OCR pass leaves where a table printed a glyph, and telling it
+    from a word is the whole of the veto. It is not simply "one character": MEASURED
+    on page 297 of the acceptance book, Table 8.2's header row comes back as
+    ``Day Night  I' J/ /  0``, where ``I'`` and ``J/`` are two characters each and a
+    rule that only knew about single characters counted the ``I`` as the pronoun.
+    What separates them from a real one-letter token is that nothing but a bracket
+    was taken off: ``A`` and ``I`` stand alone, an initial keeps its stop.
+    """
+    core = token.strip(_STRIP_EDGES)
+    inner = token.strip(_ENCLOSING)
+    if core and _WORDISH.match(core) and len(core) >= 2:
+        return "word"
+    if core in ("A", "I") and inner == core:
+        return "word"
+    if _AN_INITIAL.match(inner):
+        return "word"
+    if core and _NUMERIC.match(core):
+        return "number"
+    return "debris"
 
 
 #: Words that stand inside a title but cannot end one. A line that stops on one of

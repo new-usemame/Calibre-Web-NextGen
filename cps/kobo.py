@@ -511,15 +511,35 @@ def _seed_existing_device_entitlement_ledgers(user_id):
 
 
 def _migrate_device_entitlement_classification(user_id):
-    """Reclassify every pre-ack device row as unconfirmed exactly once.
+    """Stamp the one-time v0 audit, keeping a device-scoped ledger intact.
 
-    Historical per-device entitlement rows record a committed server emission,
-    not device receipt. No timestamp reconstruction can restore that missing
-    fact, so those rows are removed and conservatively reannounced as New.
+    A pre-#2025 install already carries per-device rows written by the shipped
+    v4.1.43 seed and by its own acknowledged deliveries.  Deleting them costs
+    the entire library: the cursor-independent recovery arm below reselects
+    every book, and against an empty ledger every one of them classifies as
+    ``NewEntitlement``, which Nickel treats as "not downloaded" (#1925).  That
+    is a whole-library re-download with reading position lost, once, on every
+    existing Kobo -- far larger than the ambiguity the delete was clearing.
+
+    The rows are kept only while they can describe one device.  That seed
+    copied the user-wide ``KoboSyncedBooks`` history onto *every* Kobo left
+    unseeded at the upgrade boundary, so with a second paired Kobo the copy
+    provably over-claims for at least one of them and stays untrusted.  With a
+    single paired Kobo the user-wide history is that device's history, and the
+    rows stand.
+
+    Deliberately accepted, and unchanged from v4.1.43: a legacy
+    ``ChangedEntitlement`` that an empty Kobo dropped (#1735) still wrote a
+    flat marker, so a kept row can name a book the device never stored.  That
+    gap already ships in v4.1.43, is not created here, and stays recoverable
+    through Full Sync and per-book resend.  Deleting every row instead turns a
+    bounded, recoverable gap into a certain, unrecoverable one for everybody.
+
     A device-authored reading-position observation is the narrow durable proof
-    that the physical Kobo possessed that book; those books retain only a
-    non-matching classification sentinel so they fail open as Changed rather
-    than being byte-suppressed from reconstructed present-day metadata.
+    that the physical Kobo possessed a book.  Proven books that have no ledger
+    row keep a non-matching classification sentinel so they fail open as
+    Changed rather than being announced New to a device that demonstrably
+    holds them.
     """
     device_ids = kobo_sync_status.get_kobo_device_ids_requiring_classification(
         user_id, ENTITLEMENT_CLASSIFICATION_VERSION,
@@ -529,19 +549,34 @@ def _migrate_device_entitlement_classification(user_id):
 
     started = monotonic()
     try:
+        ledger_is_device_scoped = (
+            kobo_sync_status.count_user_kobo_devices(user_id) == 1
+        )
         removed = 0
+        preserved = 0
         device_proven = 0
         for device_id in device_ids:
-            removed += ub.session.query(
-                ub.KoboDeviceBookEntitlement,
-            ).filter(
-                ub.KoboDeviceBookEntitlement.device_id == int(device_id),
-            ).delete(synchronize_session=False)
-            removed += ub.session.query(
-                ub.KoboDeviceDeletedEntitlement,
-            ).filter(
-                ub.KoboDeviceDeletedEntitlement.device_id == int(device_id),
-            ).delete(synchronize_session=False)
+            ledger_book_ids = set()
+            if ledger_is_device_scoped:
+                ledger_book_ids = {
+                    row.book_id for row in ub.session.query(
+                        ub.KoboDeviceBookEntitlement.book_id,
+                    ).filter(
+                        ub.KoboDeviceBookEntitlement.device_id == int(device_id),
+                    ).all()
+                }
+                preserved += len(ledger_book_ids)
+            else:
+                removed += ub.session.query(
+                    ub.KoboDeviceBookEntitlement,
+                ).filter(
+                    ub.KoboDeviceBookEntitlement.device_id == int(device_id),
+                ).delete(synchronize_session=False)
+                removed += ub.session.query(
+                    ub.KoboDeviceDeletedEntitlement,
+                ).filter(
+                    ub.KoboDeviceDeletedEntitlement.device_id == int(device_id),
+                ).delete(synchronize_session=False)
             proven_book_ids = {
                 row.book_id for row in ub.session.query(
                     ub.DeviceReadingPosition.book_id,
@@ -549,7 +584,7 @@ def _migrate_device_entitlement_classification(user_id):
                     ub.DeviceReadingPosition.device_id == int(device_id),
                     ub.DeviceReadingPosition.client_modified_at.isnot(None),
                 ).all()
-            }
+            } - ledger_book_ids
             if proven_book_ids:
                 kobo_sync_status.stage_device_entitlement_fingerprints(
                     device_id,
@@ -574,11 +609,12 @@ def _migrate_device_entitlement_classification(user_id):
 
     log.debug(
         "Kobo Sync classification migration: user=%s devices=%d "
-        "device_proven=%d rearmed=%d elapsed_ms=%.1f",
+        "device_proven=%d rearmed=%d preserved=%d elapsed_ms=%.1f",
         user_id,
         len(device_ids),
         device_proven,
         removed,
+        preserved,
         round((monotonic() - started) * 1000, 1),
     )
     return True

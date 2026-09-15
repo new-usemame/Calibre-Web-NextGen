@@ -743,8 +743,8 @@ msgid ""
 "https://your-domain.com)"
 msgstr ""
 "В поле «Хост перенаправления OAuth» не следует указывать путь. Используйте "
-"только базовый URL (например, [https://your-domain.com](https://your-domain."
-"com))"
+"только базовый URL (например, [https://your-domain.com](https://your-"
+"domain.com))"
 
 #: cps/admin.py
 msgid "Password length has to be between 1 and 40"
@@ -5147,10 +5147,6 @@ msgid "Certificate path"
 msgstr "Путь к сертификату"
 
 #: cps/spa_strings.py
-msgid "Change library cover"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Check again"
 msgstr ""
 
@@ -5482,14 +5478,14 @@ msgid "Cover scope"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Cover size"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Cover sources and their API keys belong to this server, not to either cover "
 "choice. They help search for images; choosing one here saves it only in the "
 "scope selected above."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Cover size"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5883,19 +5879,15 @@ msgid "Edit cover"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Edit my private cover"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Edit shared library cover"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Edit cover…"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit custom colours"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Edit my private cover"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5905,6 +5897,10 @@ msgstr "Редактировать заметку"
 #: cps/spa_strings.py
 msgid "Edit public shelves"
 msgstr "Редактировать общедоступные полки"
+
+#: cps/spa_strings.py
+msgid "Edit shared library cover"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
@@ -5998,14 +5994,6 @@ msgstr "Не удалось загрузить полки."
 #: cps/spa_strings.py
 msgid "Failed to load."
 msgstr "Не удалось загрузить."
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Favorite"
-msgstr "Избранное"
-
-#: cps/spa_strings.py
-msgid "Favorited"
-msgstr "В избранном"
 
 #: cps/spa_strings.py
 msgid "Fetch metadata from web"
@@ -6437,10 +6425,6 @@ msgid "Lettering"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Library cover"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Library settings"
 msgstr "Настройки библиотеки"
 
@@ -6631,10 +6615,6 @@ msgid "Model"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "More actions"
-msgstr ""
-
-#: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "Дополнительные действия для {name}"
@@ -6672,15 +6652,11 @@ msgid "My account"
 msgstr "Мой аккаунт"
 
 #: cps/spa_strings.py
-msgid "My own cover"
+msgid "My presets"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "My private cover"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "My presets"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7105,14 +7081,6 @@ msgstr "Приостановлено из-за проблемы"
 msgid "People & devices"
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/cover_picker.html
-msgid ""
-"Pick a cover from any source we support, paste a URL, upload a file, or use "
-"the cover embedded in the book itself."
-msgstr ""
-"Выберите обложку из любого поддерживаемого источника, вставьте URL-адрес, "
-"загрузите файл или используйте обложку, встроенную в саму книгу."
-
 #: cps/spa_strings.py
 msgid "Picked"
 msgstr "Выбрано"
@@ -7296,10 +7264,6 @@ msgstr "Удалить устройство"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr "Удалить из избранного"
-
-#: cps/spa_strings.py
-msgid "Remove from library"
-msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from shelf"
@@ -7692,6 +7656,10 @@ msgid "Settings saved."
 msgstr "Настройки сохранены."
 
 #: cps/spa_strings.py
+msgid "Shared cover"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Shelf name"
 msgstr "Название полки"
 
@@ -8001,19 +7969,6 @@ msgstr ""
 msgid "The library cover is back for you."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Every book, new arrivals included, is "
-"under Global Library in the menu."
-msgstr ""
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Your administrator manages what enters it."
-msgstr ""
-
 #: cps/spa_strings.py
 msgid "The preset change failed. Try again."
 msgstr ""
@@ -8030,6 +7985,31 @@ msgstr ""
 "Глобальная настройка сервера также отключена, поэтому синхронизация пока "
 "невозможна. Администратор может включить её в классических настройках "
 "сервера."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: every book, new arrivals included, is under Global Library "
+"in the menu."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: your administrator manages what enters it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This changes only your view of this book and copies delivered to your e-"
+"readers. The shared book cover and everyone else’s view stay unchanged."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This changes the cover stored with the book. Everyone who can access the "
+"book sees it."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This device will no longer sync."
@@ -8076,22 +8056,6 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "This shelf is empty. Add books from any book's page."
 msgstr "Эта полка пуста. Добавьте книги со страницы любой книги."
-
-#: cps/spa_strings.py
-msgid "Shared cover"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This changes only your view of this book and copies delivered to your e-"
-"readers. The shared book cover and everyone else’s view stay unchanged."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This changes the cover stored with the book. Everyone who can access the "
-"book sees it."
-msgstr ""
 
 #: cps/spa_strings.py
 msgid "Title A–Z"
@@ -8222,10 +8186,6 @@ msgstr "Загрузить книги"
 #: cps/spa_strings.py
 msgid "Uploading is not available for your account on this server."
 msgstr "Загрузка недоступна для вашего аккаунта на этом сервере."
-
-#: cps/spa_strings.py
-msgid "Use my own cover"
-msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8430,13 +8390,6 @@ msgstr "Ваша библиотека"
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
 msgstr "Ваш браузер не может воспроизвести этот аудиоформат."
-
-#: cps/spa_strings.py
-msgid ""
-"Your cover appears only to you and on books delivered to your e-readers. The "
-"library cover stays unchanged for everyone else, and administrators manage "
-"it."
-msgstr ""
 
 #: cps/spa_strings.py
 msgid "Your cover was updated."
@@ -10918,9 +10871,9 @@ msgid ""
 msgstr ""
 "Необязательно. Без ключа для Google Books действует ограничение около 1000 "
 "запросов на IP-адрес в день, которое легко исчерпать на общих серверах "
-"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://console.cloud."
-"google.com](https://console.cloud.google.com) — включите «Books API» и "
-"создайте API-ключ."
+"(ошибка HTTP 429). Бесплатный ключ можно получить на [https://"
+"console.cloud.google.com](https://console.cloud.google.com) — включите "
+"«Books API» и создайте API-ключ."
 
 #: cps/templates/config_edit.html
 msgid "Allow Reverse Proxy Authentication"
@@ -11666,6 +11619,14 @@ msgid "Add Allowed/Denied custom column values"
 msgstr "Добавить разрешённые/запрещённые значения пользовательских столбцов"
 
 #: cps/templates/cover_picker.html
+msgid ""
+"Pick a cover from any source we support, paste a URL, upload a file, or use "
+"the cover embedded in the book itself."
+msgstr ""
+"Выберите обложку из любого поддерживаемого источника, вставьте URL-адрес, "
+"загрузите файл или используйте обложку, встроенную в саму книгу."
+
+#: cps/templates/cover_picker.html
 msgid "Use a URL"
 msgstr "Использовать URL"
 
@@ -11924,9 +11885,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Этот инструмент был адаптирован из утилиты <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a>, созданной <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -11949,9 +11910,9 @@ msgid ""
 "container after disabling."
 msgstr ""
 "Примечание: Включение этой опции запускает службу фонового вычисления "
-"контрольных сумм при старте, что может временно заблокировать файл metadata."
-"db. Чтобы остановить запущенный процесс, отключите опцию и перезапустите "
-"контейнер."
+"контрольных сумм при старте, что может временно заблокировать файл "
+"metadata.db. Чтобы остановить запущенный процесс, отключите опцию и "
+"перезапустите контейнер."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable Aggressive EPUB Fixer Mode (riskier)"
@@ -13738,6 +13699,10 @@ msgstr "Вернуться на главную"
 msgid "Logout User"
 msgstr "Завершить сеанс пользователя"
 
+#: cps/templates/image.html
+msgid "Favorite"
+msgstr "Избранное"
+
 #: cps/templates/index.html
 msgid "Dismiss library introduction"
 msgstr ""
@@ -15426,6 +15391,9 @@ msgstr "Показывать выбранные полки в OPDS"
 msgid "Show Read/Unread Section"
 msgstr "Показать раздел прочитанного/непрочитанного"
 
+#~ msgid "Favorited"
+#~ msgstr "В избранном"
+
 #~ msgid "Fetch"
 #~ msgstr "Получить"
 
@@ -15862,9 +15830,9 @@ msgstr "Показать раздел прочитанного/непрочит�
 #~ "metadata.db при запуске. Если найдена только одна библиотека, она "
 #~ "монтируется автоматически; если найдено несколько, по умолчанию будет "
 #~ "смонтирована самая большая, а если ни одной нет, будет автоматически "
-#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://github."
-#~ "com/crocodilestick/Calibre-Web-Automated/wiki/Configuration#database-"
-#~ "configuration\">см. здесь</a>!"
+#~ "создана и смонтирована новая. Для подробностей, <a href=\"https://"
+#~ "github.com/crocodilestick/Calibre-Web-Automated/wiki/"
+#~ "Configuration#database-configuration\">см. здесь</a>!"
 
 #~ msgid ""
 #~ "Therefore, when configuring your docker-compose file for CWA, <b>DO NOT "

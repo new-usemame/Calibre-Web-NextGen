@@ -1,5 +1,5 @@
 import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react';
-import { LifeBuoy, ArrowUpRight, X } from 'lucide-react';
+import { Library, LifeBuoy, ArrowUpRight, X } from 'lucide-react';
 import { useT, type TFunction } from '../lib/i18n';
 import { prioritizeAnnouncements } from '../lib/announcementQueue';
 import { useDismissMyLibraryIntro, useMe } from '../lib/queries';
@@ -26,6 +26,7 @@ interface Announcement {
   url?: string;
   eligible?: (me?: Me | null) => boolean;
   serverDismiss?: boolean;
+  surfaceClass?: string;
 }
 
 /** Add future top-slot announcements here.
@@ -45,16 +46,19 @@ const ANNOUNCEMENTS: readonly Announcement[] = [
     variant: 'help',
     dismissLabel: 'Dismiss library introduction',
     serverDismiss: true,
+    surfaceClass: styles.introSurface,
     eligible: (me) => !!me?.id && !me.role?.anonymous
       && me.library_mode === 'personal_library' && me.show_my_library_intro === true,
     content: (t, me) => (
       <>
-        <span className={styles.iconWrap} aria-hidden="true"><LifeBuoy size={17} focusable={false} /></span>
-        <span className={styles.text}>
-          <strong>{t('New: My Library')}</strong>{' '}
-          {me?.role?.browse_global
-            ? t('The library is shared and holds every book once — what you keep is My Library. Nothing you had is gone. Every book, new arrivals included, is under Global Library in the menu.')
-            : t('The library is shared and holds every book once — what you keep is My Library. Nothing you had is gone. Your administrator manages what enters it.')}
+        <span className={styles.iconChip} aria-hidden="true"><Library size={16} focusable={false} /></span>
+        <span className={styles.introText}>
+          <strong className={styles.introTitle}>{t('New: My Library')}</strong>
+          <span className={styles.introBody}>
+            {me?.role?.browse_global
+              ? t('The shared library holds every book once — My Library is your own selection. Nothing is gone: every book, new arrivals included, is under Global Library in the menu.')
+              : t('The shared library holds every book once — My Library is your own selection. Nothing is gone: your administrator manages what enters it.')}
+          </span>
         </span>
       </>
     ),
@@ -181,6 +185,7 @@ export function AnnouncementBanner() {
 
   const content = announcement.content(t, me);
   const variantClass = announcement.variant === 'support' ? styles.supportBanner : '';
+  const surfaceClass = announcement.surfaceClass ? ` ${announcement.surfaceClass}` : '';
 
   return (
     <div
@@ -190,7 +195,7 @@ export function AnnouncementBanner() {
     >
       {announcement.clickAction === 'open-url-and-dismiss' && announcement.url ? (
         <a
-          className={`${styles.bannerSurface} ${styles.clickableSurface}`}
+          className={`${styles.bannerSurface}${surfaceClass} ${styles.clickableSurface}`}
           href={announcement.url}
           target="_blank"
           rel="noopener noreferrer"
@@ -200,7 +205,7 @@ export function AnnouncementBanner() {
           {content}
         </a>
       ) : (
-        <div className={styles.bannerSurface}>{content}</div>
+        <div className={`${styles.bannerSurface}${surfaceClass}`}>{content}</div>
       )}
       <button
         type="button"

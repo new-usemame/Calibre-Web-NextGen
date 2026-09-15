@@ -12,8 +12,8 @@ msgstr ""
 "Automated\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
 "PO-Revision-Date: 2026-04-26 13:31+0200\n"
-"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at proton."
-"me>\n"
+"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at "
+"proton.me>\n"
 "Language-Team: ed.driesen@telenet.be\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -5184,10 +5184,6 @@ msgid "Certificate path"
 msgstr "Certificaatpad"
 
 #: cps/spa_strings.py
-msgid "Change library cover"
-msgstr "Bibliotheekomslag wijzigen"
-
-#: cps/spa_strings.py
 msgid "Check again"
 msgstr "Opnieuw controleren"
 
@@ -5527,6 +5523,10 @@ msgid "Cover scope"
 msgstr "Te wijzigen omslag"
 
 #: cps/spa_strings.py
+msgid "Cover size"
+msgstr "Omslaggrootte"
+
+#: cps/spa_strings.py
 msgid ""
 "Cover sources and their API keys belong to this server, not to either cover "
 "choice. They help search for images; choosing one here saves it only in the "
@@ -5536,10 +5536,6 @@ msgstr ""
 "beide omslagkeuzes. Ze helpen bij het zoeken naar afbeeldingen; als je hier "
 "een afbeelding kiest, wordt die alleen opgeslagen binnen het hierboven "
 "gekozen bereik."
-
-#: cps/spa_strings.py
-msgid "Cover size"
-msgstr "Omslaggrootte"
 
 #: cps/spa_strings.py
 msgid "Cover updated from the selected result."
@@ -5937,14 +5933,6 @@ msgid "Edit cover"
 msgstr "Omslag bewerken"
 
 #: cps/spa_strings.py
-msgid "Edit my private cover"
-msgstr "Mijn privéomslag bewerken"
-
-#: cps/spa_strings.py
-msgid "Edit shared library cover"
-msgstr "Gedeelde bibliotheekomslag bewerken"
-
-#: cps/spa_strings.py
 msgid "Edit cover…"
 msgstr "Omslag bewerken…"
 
@@ -5953,12 +5941,20 @@ msgid "Edit custom colours"
 msgstr "Aangepaste kleuren bewerken"
 
 #: cps/spa_strings.py
+msgid "Edit my private cover"
+msgstr "Mijn privéomslag bewerken"
+
+#: cps/spa_strings.py
 msgid "Edit note"
 msgstr "Notitie bewerken"
 
 #: cps/spa_strings.py
 msgid "Edit public shelves"
 msgstr "Openbare boekenplanken bewerken"
+
+#: cps/spa_strings.py
+msgid "Edit shared library cover"
+msgstr "Gedeelde bibliotheekomslag bewerken"
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
@@ -6052,14 +6048,6 @@ msgstr "Boekenplanken laden mislukt."
 #: cps/spa_strings.py
 msgid "Failed to load."
 msgstr "Laden mislukt."
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Favorite"
-msgstr "Favoriet"
-
-#: cps/spa_strings.py
-msgid "Favorited"
-msgstr "Aan favorieten toegevoegd"
 
 #: cps/spa_strings.py
 msgid "Fetch metadata from web"
@@ -6500,10 +6488,6 @@ msgid "Lettering"
 msgstr "Letters"
 
 #: cps/spa_strings.py
-msgid "Library cover"
-msgstr "Bibliotheekomslag"
-
-#: cps/spa_strings.py
 msgid "Library settings"
 msgstr "Bibliotheekinstellingen"
 
@@ -6694,10 +6678,6 @@ msgid "Model"
 msgstr "Model"
 
 #: cps/spa_strings.py
-msgid "More actions"
-msgstr "Meer acties"
-
-#: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "Meer acties voor {name}"
@@ -6737,16 +6717,12 @@ msgid "My account"
 msgstr "Mijn account"
 
 #: cps/spa_strings.py
-msgid "My own cover"
-msgstr "Mijn eigen omslag"
+msgid "My presets"
+msgstr "Mijn voorinstellingen"
 
 #: cps/spa_strings.py
 msgid "My private cover"
 msgstr "Mijn privéomslag"
-
-#: cps/spa_strings.py
-msgid "My presets"
-msgstr "Mijn voorinstellingen"
 
 #: cps/spa_strings.py
 msgid "Name"
@@ -7179,14 +7155,6 @@ msgstr "Gepauzeerd na een probleem"
 msgid "People & devices"
 msgstr "Mensen en apparaten"
 
-#: cps/spa_strings.py cps/templates/cover_picker.html
-msgid ""
-"Pick a cover from any source we support, paste a URL, upload a file, or use "
-"the cover embedded in the book itself."
-msgstr ""
-"Kies een omslag uit elke door ons ondersteunde bron, plak een URL, upload "
-"een bestand, of gebruik de omslag die in het boek zelf is ingesloten."
-
 #: cps/spa_strings.py
 msgid "Picked"
 msgstr "Gekozen"
@@ -7368,10 +7336,6 @@ msgstr "Apparaat verwijderen"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr "Verwijderen uit favorieten"
-
-#: cps/spa_strings.py
-msgid "Remove from library"
-msgstr "Verwijderen uit bibliotheek"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from shelf"
@@ -7766,6 +7730,10 @@ msgid "Settings saved."
 msgstr "Instellingen opgeslagen."
 
 #: cps/spa_strings.py
+msgid "Shared cover"
+msgstr "Gedeelde omslag"
+
+#: cps/spa_strings.py
 msgid "Shelf name"
 msgstr "Boekenplanknaam"
 
@@ -8098,25 +8066,6 @@ msgstr "De globale bibliotheek"
 msgid "The library cover is back for you."
 msgstr "De bibliotheekomslag is voor je hersteld."
 
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Every book, new arrivals included, is "
-"under Global Library in the menu."
-msgstr ""
-"De bibliotheek is gedeeld en bevat elk boek maar één keer — wat je bewaart "
-"is Mijn bibliotheek. Niets dat je had is weg. Elk boek, ook nieuwe "
-"aanwinsten, vind je onder Globale bibliotheek in het menu."
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Your administrator manages what enters it."
-msgstr ""
-"De bibliotheek is gedeeld en bevat elk boek maar één keer — wat je bewaart "
-"is Mijn bibliotheek. Niets dat je had is weg. Je beheerder beheert wat erin "
-"komt."
-
 #: cps/spa_strings.py
 msgid "The preset change failed. Try again."
 msgstr "De wijziging van de voorinstelling is mislukt. Probeer het opnieuw."
@@ -8133,6 +8082,41 @@ msgid ""
 msgstr ""
 "De serverbrede optie is ook uit, dus er kan nog niets synchroniseren. Een "
 "beheerder kan dit inschakelen in de klassieke serverinstellingen."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: every book, new arrivals included, is under Global Library "
+"in the menu."
+msgstr ""
+"De gedeelde bibliotheek bevat elk boek maar één keer — Mijn bibliotheek is "
+"jouw eigen selectie. Niets is weg: elk boek, ook nieuwe aanwinsten, vind je "
+"onder Globale bibliotheek in het menu."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: your administrator manages what enters it."
+msgstr ""
+"De gedeelde bibliotheek bevat elk boek maar één keer — Mijn bibliotheek is "
+"jouw eigen selectie. Niets is weg: je beheerder beheert wat erin komt."
+
+#: cps/spa_strings.py
+msgid ""
+"This changes only your view of this book and copies delivered to your e-"
+"readers. The shared book cover and everyone else’s view stay unchanged."
+msgstr ""
+"Dit wijzigt alleen jouw weergave van dit boek en de exemplaren die naar je e-"
+"readers worden gestuurd. De gedeelde boekomslag en de weergave van alle "
+"anderen blijven ongewijzigd."
+
+#: cps/spa_strings.py
+msgid ""
+"This changes the cover stored with the book. Everyone who can access the "
+"book sees it."
+msgstr ""
+"Dit wijzigt de omslag die bij het boek is opgeslagen. Iedereen die toegang "
+"tot het boek heeft, ziet deze."
 
 #: cps/spa_strings.py
 msgid "This device will no longer sync."
@@ -8181,27 +8165,6 @@ msgstr ""
 msgid "This shelf is empty. Add books from any book's page."
 msgstr ""
 "Deze boekenplank is leeg. Voeg boeken toe vanaf de pagina van een boek."
-
-#: cps/spa_strings.py
-msgid "Shared cover"
-msgstr "Gedeelde omslag"
-
-#: cps/spa_strings.py
-msgid ""
-"This changes only your view of this book and copies delivered to your e-"
-"readers. The shared book cover and everyone else’s view stay unchanged."
-msgstr ""
-"Dit wijzigt alleen jouw weergave van dit boek en de exemplaren die naar je e-"
-"readers worden gestuurd. De gedeelde boekomslag en de weergave van alle "
-"anderen blijven ongewijzigd."
-
-#: cps/spa_strings.py
-msgid ""
-"This changes the cover stored with the book. Everyone who can access the "
-"book sees it."
-msgstr ""
-"Dit wijzigt de omslag die bij het boek is opgeslagen. Iedereen die toegang "
-"tot het boek heeft, ziet deze."
 
 #: cps/spa_strings.py
 msgid "Title A–Z"
@@ -8334,10 +8297,6 @@ msgstr "Boeken uploaden"
 #: cps/spa_strings.py
 msgid "Uploading is not available for your account on this server."
 msgstr "Uploaden is niet beschikbaar voor je account op deze server."
-
-#: cps/spa_strings.py
-msgid "Use my own cover"
-msgstr "Mijn eigen omslag gebruiken"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8548,16 +8507,6 @@ msgstr "Jouw bibliotheek"
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
 msgstr "Jouw browser kan dit audioformaat niet afspelen."
-
-#: cps/spa_strings.py
-msgid ""
-"Your cover appears only to you and on books delivered to your e-readers. The "
-"library cover stays unchanged for everyone else, and administrators manage "
-"it."
-msgstr ""
-"Je omslag is alleen zichtbaar voor jou en op boeken die naar je e-readers "
-"worden verzonden. De bibliotheekomslag blijft voor iedereen ongewijzigd en "
-"wordt door beheerders beheerd."
 
 #: cps/spa_strings.py
 msgid "Your cover was updated."
@@ -9105,8 +9054,8 @@ msgstr "Kies e-mailadressen:"
 #, fuzzy
 msgid "Success! Book queued for sending to the selected address(es)!"
 msgstr ""
-"Het boek is in de wachtrij geplaatst om te worden verstuurd aan "
-"%(eReadermail)s"
+"Het boek is in de wachtrij geplaatst om te worden verstuurd aan %"
+"(eReadermail)s"
 
 #: cps/web.py
 msgid "Please wait one minute to register next user"
@@ -11673,6 +11622,14 @@ msgid "Add Allowed/Denied custom column values"
 msgstr "Voeg toegestane/geweigerde aangepaste kolomwaarden toe"
 
 #: cps/templates/cover_picker.html
+msgid ""
+"Pick a cover from any source we support, paste a URL, upload a file, or use "
+"the cover embedded in the book itself."
+msgstr ""
+"Kies een omslag uit elke door ons ondersteunde bron, plak een URL, upload "
+"een bestand, of gebruik de omslag die in het boek zelf is ingesloten."
+
+#: cps/templates/cover_picker.html
 msgid "Use a URL"
 msgstr "Gebruik een URL"
 
@@ -13574,6 +13531,10 @@ msgstr "Terug naar startpagina"
 msgid "Logout User"
 msgstr "Gebruiker uitloggen"
 
+#: cps/templates/image.html
+msgid "Favorite"
+msgstr "Favoriet"
+
 #: cps/templates/index.html
 msgid "Dismiss library introduction"
 msgstr "Introductie van de bibliotheek sluiten"
@@ -15210,6 +15171,54 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+#~ msgid "Change library cover"
+#~ msgstr "Bibliotheekomslag wijzigen"
+
+#~ msgid "Favorited"
+#~ msgstr "Aan favorieten toegevoegd"
+
+#~ msgid "Library cover"
+#~ msgstr "Bibliotheekomslag"
+
+#~ msgid "More actions"
+#~ msgstr "Meer acties"
+
+#~ msgid "My own cover"
+#~ msgstr "Mijn eigen omslag"
+
+#~ msgid "Remove from library"
+#~ msgstr "Verwijderen uit bibliotheek"
+
+#~ msgid ""
+#~ "The library is shared and holds every book once — what you keep is My "
+#~ "Library. Nothing you had is gone. Every book, new arrivals included, is "
+#~ "under Global Library in the menu."
+#~ msgstr ""
+#~ "De bibliotheek is gedeeld en bevat elk boek maar één keer — wat je "
+#~ "bewaart is Mijn bibliotheek. Niets dat je had is weg. Elk boek, ook "
+#~ "nieuwe aanwinsten, vind je onder Globale bibliotheek in het menu."
+
+#~ msgid ""
+#~ "The library is shared and holds every book once — what you keep is My "
+#~ "Library. Nothing you had is gone. Your administrator manages what enters "
+#~ "it."
+#~ msgstr ""
+#~ "De bibliotheek is gedeeld en bevat elk boek maar één keer — wat je "
+#~ "bewaart is Mijn bibliotheek. Niets dat je had is weg. Je beheerder "
+#~ "beheert wat erin komt."
+
+#~ msgid "Use my own cover"
+#~ msgstr "Mijn eigen omslag gebruiken"
+
+#~ msgid ""
+#~ "Your cover appears only to you and on books delivered to your e-readers. "
+#~ "The library cover stays unchanged for everyone else, and administrators "
+#~ "manage it."
+#~ msgstr ""
+#~ "Je omslag is alleen zichtbaar voor jou en op boeken die naar je e-readers "
+#~ "worden verzonden. De bibliotheekomslag blijft voor iedereen ongewijzigd "
+#~ "en wordt door beheerders beheerd."
+
 #~ msgid "Change my cover"
 #~ msgstr "Mijn omslag wijzigen"
 
@@ -15657,10 +15666,11 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Deze paden zijn alleen intern voor CWA, je kunt aan de linkerkant naar "
 #~ "hartenlust wijzigen waar ze aan gekoppeld zijn, maar er is geen reden om "
-#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je <code>metadata."
-#~ "db</code> bestand op een andere locatie wilt dan de rest van je "
-#~ "bibliotheek, gebruik dan de <b>Scheid Boekbestanden van Bibliotheek Optie "
-#~ "hieronder en voer daar het pad naar de rest van de bibliotheek in</b>"
+#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je "
+#~ "<code>metadata.db</code> bestand op een andere locatie wilt dan de rest "
+#~ "van je bibliotheek, gebruik dan de <b>Scheid Boekbestanden van "
+#~ "Bibliotheek Optie hieronder en voer daar het pad naar de rest van de "
+#~ "bibliotheek in</b>"
 
 #~ msgid "Enable CWA Auto-Convert"
 #~ msgstr "Schakel CWA Auto-Conversie in"

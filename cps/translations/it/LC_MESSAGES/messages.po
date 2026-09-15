@@ -5274,10 +5274,6 @@ msgid "Certificate path"
 msgstr "Percorso del certificato"
 
 #: cps/spa_strings.py
-msgid "Change library cover"
-msgstr "Cambia la copertina della biblioteca"
-
-#: cps/spa_strings.py
 msgid "Check again"
 msgstr "Verifica di nuovo"
 
@@ -5615,14 +5611,14 @@ msgid "Cover scope"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Cover size"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Cover sources and their API keys belong to this server, not to either cover "
 "choice. They help search for images; choosing one here saves it only in the "
 "scope selected above."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Cover size"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6025,19 +6021,15 @@ msgid "Edit cover"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Edit my private cover"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Edit shared library cover"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Edit cover…"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit custom colours"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Edit my private cover"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6047,6 +6039,10 @@ msgstr "Modifica la nota"
 #: cps/spa_strings.py
 msgid "Edit public shelves"
 msgstr "Modifica scaffali pubblici"
+
+#: cps/spa_strings.py
+msgid "Edit shared library cover"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
@@ -6140,14 +6136,6 @@ msgstr "Impossibile caricare gli scaffali."
 #: cps/spa_strings.py
 msgid "Failed to load."
 msgstr "Impossibile caricare."
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Favorite"
-msgstr "Preferito"
-
-#: cps/spa_strings.py
-msgid "Favorited"
-msgstr "Aggiunto ai preferiti"
 
 #: cps/spa_strings.py
 msgid "Fetch metadata from web"
@@ -6587,10 +6575,6 @@ msgid "Lettering"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Library cover"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Library settings"
 msgstr "Impostazioni della biblioteca"
 
@@ -6781,10 +6765,6 @@ msgid "Model"
 msgstr "Modello"
 
 #: cps/spa_strings.py
-msgid "More actions"
-msgstr ""
-
-#: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "Altre azioni per {name}"
@@ -6824,15 +6804,11 @@ msgid "My account"
 msgstr "Il mio account"
 
 #: cps/spa_strings.py
-msgid "My own cover"
+msgid "My presets"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "My private cover"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "My presets"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7276,14 +7252,6 @@ msgstr "In pausa in seguito a un problema"
 msgid "People & devices"
 msgstr "Utenti e dispositivi"
 
-#: cps/spa_strings.py cps/templates/cover_picker.html
-msgid ""
-"Pick a cover from any source we support, paste a URL, upload a file, or use "
-"the cover embedded in the book itself."
-msgstr ""
-"Scegli una copertina da qualsiasi fonte supportata, incolla un URL, carica "
-"un file o usa la copertina integrata nel libro."
-
 #: cps/spa_strings.py
 msgid "Picked"
 msgstr "Selezionato"
@@ -7467,10 +7435,6 @@ msgstr "Rimuovi dispositivo"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr "Rimuovi dai preferiti"
-
-#: cps/spa_strings.py
-msgid "Remove from library"
-msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from shelf"
@@ -7863,6 +7827,10 @@ msgid "Settings saved."
 msgstr "Configurazione salvata."
 
 #: cps/spa_strings.py
+msgid "Shared cover"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Shelf name"
 msgstr "Nome dello scaffale"
 
@@ -8197,26 +8165,6 @@ msgstr "Biblioteca globale"
 msgid "The library cover is back for you."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Every book, new arrivals included, is "
-"under Global Library in the menu."
-msgstr ""
-"La biblioteca è condivisa e contiene una sola copia di ogni libro: quello "
-"che decidi di tenere costituisce la Biblioteca Personale. Nulla è andato "
-"perso. Ogni libro, inclusi quelli nuovi, si trova nel menu sotto Biblioteca "
-"globale."
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Your administrator manages what enters it."
-msgstr ""
-"La biblioteca è condivisa e contiene una sola copia di ogni libro: ciò che "
-"conservi costituisce la Biblioteca Personale. Nulla è andato perso. Il tuo "
-"amministratore gestisce ciò che contiene."
-
 #: cps/spa_strings.py
 msgid "The preset change failed. Try again."
 msgstr ""
@@ -8233,6 +8181,37 @@ msgstr ""
 "Anche l'opzione globale del server è disattivata, quindi al momento non è "
 "possibile sincronizzare nulla. Un amministratore può abilitarla nelle "
 "impostazioni del server classico."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: every book, new arrivals included, is under Global Library "
+"in the menu."
+msgstr ""
+"La biblioteca condivisa contiene una sola copia di ogni libro — la Biblioteca "
+"Personale è la tua selezione. Nulla è andato perso: ogni libro, inclusi "
+"quelli nuovi, si trova nel menu sotto Biblioteca globale."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: your administrator manages what enters it."
+msgstr ""
+"La biblioteca condivisa contiene una sola copia di ogni libro — la Biblioteca "
+"Personale è la tua selezione. Nulla è andato perso: il tuo amministratore "
+"gestisce ciò che contiene."
+
+#: cps/spa_strings.py
+msgid ""
+"This changes only your view of this book and copies delivered to your e-"
+"readers. The shared book cover and everyone else’s view stay unchanged."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This changes the cover stored with the book. Everyone who can access the "
+"book sees it."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This device will no longer sync."
@@ -8281,22 +8260,6 @@ msgid "This shelf is empty. Add books from any book's page."
 msgstr ""
 "Lo scaffale è vuoto. Aggiungi libri direttamente dalla scheda di qualsiasi "
 "libro."
-
-#: cps/spa_strings.py
-msgid "Shared cover"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This changes only your view of this book and copies delivered to your e-"
-"readers. The shared book cover and everyone else’s view stay unchanged."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This changes the cover stored with the book. Everyone who can access the "
-"book sees it."
-msgstr ""
 
 #: cps/spa_strings.py
 msgid "Title A–Z"
@@ -8431,10 +8394,6 @@ msgid "Uploading is not available for your account on this server."
 msgstr ""
 "Funzione di caricamento non disponibile per l'account in uso su questo "
 "server."
-
-#: cps/spa_strings.py
-msgid "Use my own cover"
-msgstr "Utilizza copertina personale"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8642,16 +8601,6 @@ msgstr "La tua biblioteca"
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
 msgstr "Il tuo browser non può riprodurre questo formato audio."
-
-#: cps/spa_strings.py
-msgid ""
-"Your cover appears only to you and on books delivered to your e-readers. The "
-"library cover stays unchanged for everyone else, and administrators manage "
-"it."
-msgstr ""
-"La copertina personale è visibile solo a te e sui libri inviati ai tuoi e-"
-"reader. La copertina della biblioteca rimane invariata per tutti gli altri "
-"ed è gestita dagli amministratori."
 
 #: cps/spa_strings.py
 msgid "Your cover was updated."
@@ -10641,9 +10590,9 @@ msgid ""
 "You can also use Last Resort Restore at the bottom of this page to try "
 "rebuilding your Calibre Database from the OPF files in your library."
 msgstr ""
-"Puoi anche utilizzare l'opzione \"Ripristino del database (ultima "
-"speranza)\" in fondo a questa pagina per provare a ricostruire il database "
-"di Calibre dai file OPF presenti nella tua biblioteca."
+"Puoi anche utilizzare l'opzione \"Ripristino del database (ultima speranza)"
+"\" in fondo a questa pagina per provare a ricostruire il database di Calibre "
+"dai file OPF presenti nella tua biblioteca."
 
 #: cps/templates/config_db.html
 msgid "Location of Calibre Database (metadata.db file)"
@@ -10727,9 +10676,9 @@ msgid ""
 "should remain in <code>/calibre-library</code>, however your library files "
 "can be wherever you desire"
 msgstr ""
-"<b>Separa i file degli Ebook dalla Biblioteca</b> - Il file <code>metadata."
-"db</code> dovrebbe rimanere in <code>/calibre-library</code>, tuttavia, i "
-"file della biblioteca possono essere salvati dove preferisci"
+"<b>Separa i file degli Ebook dalla Biblioteca</b> - Il file "
+"<code>metadata.db</code> dovrebbe rimanere in <code>/calibre-library</code>, "
+"tuttavia, i file della biblioteca possono essere salvati dove preferisci"
 
 #: cps/templates/config_db.html
 msgid "Use Google Drive?"
@@ -11170,8 +11119,8 @@ msgid ""
 msgstr ""
 "Opzionale. Senza una chiave, Google Books è soggetto a un limite di circa "
 "1.000 richieste al giorno per IP, soglia facilmente raggiungibile sui server "
-"condivisi (errore HTTP 429). Ottieni una chiave gratuita su https://console."
-"cloud.google.com — abilita la \"Books API\" e crea una chiave API."
+"condivisi (errore HTTP 429). Ottieni una chiave gratuita su https://"
+"console.cloud.google.com — abilita la \"Books API\" e crea una chiave API."
 
 #: cps/templates/config_edit.html
 msgid "Allow Reverse Proxy Authentication"
@@ -11923,6 +11872,14 @@ msgstr "Aggiungi etichette consentite/negate"
 #: cps/templates/config_view_edit.html
 msgid "Add Allowed/Denied custom column values"
 msgstr "Aggiungi valori di colonna personalizzati consentiti/negati"
+
+#: cps/templates/cover_picker.html
+msgid ""
+"Pick a cover from any source we support, paste a URL, upload a file, or use "
+"the cover embedded in the book itself."
+msgstr ""
+"Scegli una copertina da qualsiasi fonte supportata, incolla un URL, carica "
+"un file o usa la copertina integrata nel libro."
 
 #: cps/templates/cover_picker.html
 msgid "Use a URL"
@@ -14056,6 +14013,10 @@ msgstr "Ritorna alla pagina principale"
 msgid "Logout User"
 msgstr "Disconnetti utente"
 
+#: cps/templates/image.html
+msgid "Favorite"
+msgstr "Preferito"
+
 #: cps/templates/index.html
 msgid "Dismiss library introduction"
 msgstr "Nascondi introduzione alla biblioteca"
@@ -15248,8 +15209,8 @@ msgid ""
 "→ Recreate with \"Re-pull image\" enabled."
 msgstr ""
 "Immagini → scarica l'immagine qui sotto, quindi Container → seleziona "
-"Calibre-Web NextGen → Ricrea (recreate) abilitando \"Riscarica "
-"immagine\" (Re-pull image)."
+"Calibre-Web NextGen → Ricrea (recreate) abilitando \"Riscarica immagine\" "
+"(Re-pull image)."
 
 #: cps/templates/update_now_modal.html
 msgid "Synology Container Manager:"
@@ -15744,6 +15705,43 @@ msgstr "Sincronizza gli scaffali selezionati con OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostra sezione Libri letti e Libri da leggere"
+
+#~ msgid "Change library cover"
+#~ msgstr "Cambia la copertina della biblioteca"
+
+#~ msgid "Favorited"
+#~ msgstr "Aggiunto ai preferiti"
+
+#~ msgid ""
+#~ "The library is shared and holds every book once — what you keep is My "
+#~ "Library. Nothing you had is gone. Every book, new arrivals included, is "
+#~ "under Global Library in the menu."
+#~ msgstr ""
+#~ "La biblioteca è condivisa e contiene una sola copia di ogni libro: quello "
+#~ "che decidi di tenere costituisce la Biblioteca Personale. Nulla è andato "
+#~ "perso. Ogni libro, inclusi quelli nuovi, si trova nel menu sotto "
+#~ "Biblioteca globale."
+
+#~ msgid ""
+#~ "The library is shared and holds every book once — what you keep is My "
+#~ "Library. Nothing you had is gone. Your administrator manages what enters "
+#~ "it."
+#~ msgstr ""
+#~ "La biblioteca è condivisa e contiene una sola copia di ogni libro: ciò "
+#~ "che conservi costituisce la Biblioteca Personale. Nulla è andato perso. "
+#~ "Il tuo amministratore gestisce ciò che contiene."
+
+#~ msgid "Use my own cover"
+#~ msgstr "Utilizza copertina personale"
+
+#~ msgid ""
+#~ "Your cover appears only to you and on books delivered to your e-readers. "
+#~ "The library cover stays unchanged for everyone else, and administrators "
+#~ "manage it."
+#~ msgstr ""
+#~ "La copertina personale è visibile solo a te e sui libri inviati ai tuoi e-"
+#~ "reader. La copertina della biblioteca rimane invariata per tutti gli "
+#~ "altri ed è gestita dagli amministratori."
 
 #~ msgid "Change my cover"
 #~ msgstr "Cambia copertina personale"

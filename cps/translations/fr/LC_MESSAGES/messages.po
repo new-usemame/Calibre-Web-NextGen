@@ -5308,10 +5308,6 @@ msgid "Certificate path"
 msgstr "Chemin du certificat"
 
 #: cps/spa_strings.py
-msgid "Change library cover"
-msgstr "Modifier la couverture de la bibliothèque"
-
-#: cps/spa_strings.py
 msgid "Check again"
 msgstr "Vérifier à nouveau"
 
@@ -5652,6 +5648,10 @@ msgid "Cover scope"
 msgstr "Couverture à modifier"
 
 #: cps/spa_strings.py
+msgid "Cover size"
+msgstr "Taille de la couverture"
+
+#: cps/spa_strings.py
 msgid ""
 "Cover sources and their API keys belong to this server, not to either cover "
 "choice. They help search for images; choosing one here saves it only in the "
@@ -5661,10 +5661,6 @@ msgstr ""
 "non à l’un ou l’autre choix de couverture. Elles servent à rechercher des "
 "images ; le choix effectué ici enregistre l’image uniquement dans la portée "
 "sélectionnée ci-dessus."
-
-#: cps/spa_strings.py
-msgid "Cover size"
-msgstr "Taille de la couverture"
 
 #: cps/spa_strings.py
 msgid "Cover updated from the selected result."
@@ -6067,14 +6063,6 @@ msgid "Edit cover"
 msgstr "Modifier la couverture"
 
 #: cps/spa_strings.py
-msgid "Edit my private cover"
-msgstr "Modifier ma couverture privée"
-
-#: cps/spa_strings.py
-msgid "Edit shared library cover"
-msgstr "Modifier la couverture partagée de la bibliothèque"
-
-#: cps/spa_strings.py
 msgid "Edit cover…"
 msgstr "Modifier la couverture…"
 
@@ -6083,12 +6071,20 @@ msgid "Edit custom colours"
 msgstr "Modifier les couleurs personnalisées"
 
 #: cps/spa_strings.py
+msgid "Edit my private cover"
+msgstr "Modifier ma couverture privée"
+
+#: cps/spa_strings.py
 msgid "Edit note"
 msgstr "Modifier la note"
 
 #: cps/spa_strings.py
 msgid "Edit public shelves"
 msgstr "Modifier les étagères publiques"
+
+#: cps/spa_strings.py
+msgid "Edit shared library cover"
+msgstr "Modifier la couverture partagée de la bibliothèque"
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
@@ -6183,14 +6179,6 @@ msgstr "Impossible de charger les étagères."
 #: cps/spa_strings.py
 msgid "Failed to load."
 msgstr "Le chargement a échoué."
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Favorite"
-msgstr "Favori"
-
-#: cps/spa_strings.py
-msgid "Favorited"
-msgstr "Ajouté aux favoris"
 
 #: cps/spa_strings.py
 msgid "Fetch metadata from web"
@@ -6635,10 +6623,6 @@ msgid "Lettering"
 msgstr "Typographie"
 
 #: cps/spa_strings.py
-msgid "Library cover"
-msgstr "Couverture de la bibliothèque"
-
-#: cps/spa_strings.py
 msgid "Library settings"
 msgstr "Paramètres de la bibliothèque"
 
@@ -6829,10 +6813,6 @@ msgid "Model"
 msgstr "Modèle"
 
 #: cps/spa_strings.py
-msgid "More actions"
-msgstr "Plus d'actions"
-
-#: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "Plus d'actions pour {name}"
@@ -6872,16 +6852,12 @@ msgid "My account"
 msgstr "Mon compte"
 
 #: cps/spa_strings.py
-msgid "My own cover"
-msgstr "Ma propre couverture"
+msgid "My presets"
+msgstr "Mes préréglages"
 
 #: cps/spa_strings.py
 msgid "My private cover"
 msgstr "Ma couverture privée"
-
-#: cps/spa_strings.py
-msgid "My presets"
-msgstr "Mes préréglages"
 
 #: cps/spa_strings.py
 msgid "Name"
@@ -7323,15 +7299,6 @@ msgstr "En pause après un problème"
 msgid "People & devices"
 msgstr "Personnes et appareils"
 
-#: cps/spa_strings.py cps/templates/cover_picker.html
-msgid ""
-"Pick a cover from any source we support, paste a URL, upload a file, or use "
-"the cover embedded in the book itself."
-msgstr ""
-"Choisissez une couverture depuis n’importe quelle source prise en charge, "
-"collez une URL, téléversez un fichier, ou utilisez la couverture intégrée au "
-"livre."
-
 #: cps/spa_strings.py
 msgid "Picked"
 msgstr "Sélectionné"
@@ -7513,10 +7480,6 @@ msgstr "Supprimer l'appareil"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr "Retirer des favoris"
-
-#: cps/spa_strings.py
-msgid "Remove from library"
-msgstr "Retirer de la bibliothèque"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from shelf"
@@ -7915,6 +7878,10 @@ msgid "Settings saved."
 msgstr "Paramètres enregistrés."
 
 #: cps/spa_strings.py
+msgid "Shared cover"
+msgstr "Couverture partagée"
+
+#: cps/spa_strings.py
 msgid "Shelf name"
 msgstr "Nom de l’étagère"
 
@@ -8246,26 +8213,6 @@ msgstr "La bibliothèque globale"
 msgid "The library cover is back for you."
 msgstr "La couverture de la bibliothèque est rétablie pour vous."
 
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Every book, new arrivals included, is "
-"under Global Library in the menu."
-msgstr ""
-"La bibliothèque est partagée et ne contient chaque livre qu'une seule fois — "
-"ce que vous gardez, c'est Ma bibliothèque. Rien de ce que vous aviez n'a "
-"disparu. Chaque livre, nouveautés comprises, se trouve sous Bibliothèque "
-"globale dans le menu."
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Your administrator manages what enters it."
-msgstr ""
-"La bibliothèque est partagée et ne contient chaque livre qu'une seule fois — "
-"ce que vous gardez, c'est Ma bibliothèque. Rien de ce que vous aviez n'a "
-"disparu. Votre administrateur gère ce qui y entre."
-
 #: cps/spa_strings.py
 msgid "The preset change failed. Try again."
 msgstr "La modification du préréglage a échoué. Réessayez."
@@ -8284,6 +8231,42 @@ msgstr ""
 "L'option au niveau du serveur est également désactivée, donc rien ne peut "
 "encore se synchroniser. Un administrateur peut l'activer dans les paramètres "
 "classiques du serveur."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: every book, new arrivals included, is under Global Library "
+"in the menu."
+msgstr ""
+"La bibliothèque partagée ne contient chaque livre qu'une seule fois — Ma "
+"bibliothèque est votre propre sélection. Rien n'a disparu : chaque livre, "
+"nouveautés comprises, se trouve sous Bibliothèque globale dans le menu."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: your administrator manages what enters it."
+msgstr ""
+"La bibliothèque partagée ne contient chaque livre qu'une seule fois — Ma "
+"bibliothèque est votre propre sélection. Rien n'a disparu : votre "
+"administrateur gère ce qui y entre."
+
+#: cps/spa_strings.py
+msgid ""
+"This changes only your view of this book and copies delivered to your e-"
+"readers. The shared book cover and everyone else’s view stay unchanged."
+msgstr ""
+"Cela modifie uniquement votre affichage de ce livre et les copies envoyées à "
+"vos liseuses. La couverture partagée du livre et l’affichage des autres "
+"utilisateurs restent inchangés."
+
+#: cps/spa_strings.py
+msgid ""
+"This changes the cover stored with the book. Everyone who can access the "
+"book sees it."
+msgstr ""
+"Cela modifie la couverture enregistrée avec le livre. Toute personne ayant "
+"accès au livre la voit."
 
 #: cps/spa_strings.py
 msgid "This device will no longer sync."
@@ -8330,27 +8313,6 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "This shelf is empty. Add books from any book's page."
 msgstr "Cette étagère est vide. Ajoutez des livres depuis la page d’un livre."
-
-#: cps/spa_strings.py
-msgid "Shared cover"
-msgstr "Couverture partagée"
-
-#: cps/spa_strings.py
-msgid ""
-"This changes only your view of this book and copies delivered to your e-"
-"readers. The shared book cover and everyone else’s view stay unchanged."
-msgstr ""
-"Cela modifie uniquement votre affichage de ce livre et les copies envoyées à "
-"vos liseuses. La couverture partagée du livre et l’affichage des autres "
-"utilisateurs restent inchangés."
-
-#: cps/spa_strings.py
-msgid ""
-"This changes the cover stored with the book. Everyone who can access the "
-"book sees it."
-msgstr ""
-"Cela modifie la couverture enregistrée avec le livre. Toute personne ayant "
-"accès au livre la voit."
 
 #: cps/spa_strings.py
 msgid "Title A–Z"
@@ -8484,10 +8446,6 @@ msgstr "Téléverser des livres"
 msgid "Uploading is not available for your account on this server."
 msgstr ""
 "Le téléversement n'est pas disponible pour votre compte sur ce serveur."
-
-#: cps/spa_strings.py
-msgid "Use my own cover"
-msgstr "Utiliser ma propre couverture"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8702,16 +8660,6 @@ msgstr "Votre bibliothèque"
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
 msgstr "Votre navigateur ne peut pas lire ce format audio."
-
-#: cps/spa_strings.py
-msgid ""
-"Your cover appears only to you and on books delivered to your e-readers. The "
-"library cover stays unchanged for everyone else, and administrators manage "
-"it."
-msgstr ""
-"Votre couverture n’apparaît que pour vous et sur les livres envoyés à vos "
-"liseuses. La couverture de la bibliothèque reste inchangée pour tous les "
-"autres utilisateurs et les administrateurs la gèrent."
 
 #: cps/spa_strings.py
 msgid "Your cover was updated."
@@ -11887,6 +11835,15 @@ msgid "Add Allowed/Denied custom column values"
 msgstr "Ajouter les valeurs de colonnes autorisées/refusées"
 
 #: cps/templates/cover_picker.html
+msgid ""
+"Pick a cover from any source we support, paste a URL, upload a file, or use "
+"the cover embedded in the book itself."
+msgstr ""
+"Choisissez une couverture depuis n’importe quelle source prise en charge, "
+"collez une URL, téléversez un fichier, ou utilisez la couverture intégrée au "
+"livre."
+
+#: cps/templates/cover_picker.html
 msgid "Use a URL"
 msgstr ""
 
@@ -12106,9 +12063,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"
@@ -13894,6 +13851,10 @@ msgstr "Retour à l’accueil"
 msgid "Logout User"
 msgstr "Déconnecter l’utilisateur"
 
+#: cps/templates/image.html
+msgid "Favorite"
+msgstr "Favori"
+
 #: cps/templates/index.html
 msgid "Dismiss library introduction"
 msgstr "Fermer la présentation de la bibliothèque"
@@ -15558,6 +15519,55 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#~ msgid "Change library cover"
+#~ msgstr "Modifier la couverture de la bibliothèque"
+
+#~ msgid "Favorited"
+#~ msgstr "Ajouté aux favoris"
+
+#~ msgid "Library cover"
+#~ msgstr "Couverture de la bibliothèque"
+
+#~ msgid "More actions"
+#~ msgstr "Plus d'actions"
+
+#~ msgid "My own cover"
+#~ msgstr "Ma propre couverture"
+
+#~ msgid "Remove from library"
+#~ msgstr "Retirer de la bibliothèque"
+
+#~ msgid ""
+#~ "The library is shared and holds every book once — what you keep is My "
+#~ "Library. Nothing you had is gone. Every book, new arrivals included, is "
+#~ "under Global Library in the menu."
+#~ msgstr ""
+#~ "La bibliothèque est partagée et ne contient chaque livre qu'une seule "
+#~ "fois — ce que vous gardez, c'est Ma bibliothèque. Rien de ce que vous "
+#~ "aviez n'a disparu. Chaque livre, nouveautés comprises, se trouve sous "
+#~ "Bibliothèque globale dans le menu."
+
+#~ msgid ""
+#~ "The library is shared and holds every book once — what you keep is My "
+#~ "Library. Nothing you had is gone. Your administrator manages what enters "
+#~ "it."
+#~ msgstr ""
+#~ "La bibliothèque est partagée et ne contient chaque livre qu'une seule "
+#~ "fois — ce que vous gardez, c'est Ma bibliothèque. Rien de ce que vous "
+#~ "aviez n'a disparu. Votre administrateur gère ce qui y entre."
+
+#~ msgid "Use my own cover"
+#~ msgstr "Utiliser ma propre couverture"
+
+#~ msgid ""
+#~ "Your cover appears only to you and on books delivered to your e-readers. "
+#~ "The library cover stays unchanged for everyone else, and administrators "
+#~ "manage it."
+#~ msgstr ""
+#~ "Votre couverture n’apparaît que pour vous et sur les livres envoyés à vos "
+#~ "liseuses. La couverture de la bibliothèque reste inchangée pour tous les "
+#~ "autres utilisateurs et les administrateurs la gèrent."
 
 #~ msgid "Change my cover"
 #~ msgstr "Modifier ma couverture"

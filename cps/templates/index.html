@@ -33,9 +33,9 @@
   <button type="button" class="close" id="dismiss-my-library-intro" aria-label="{{ _('Dismiss library introduction') }}"><span aria-hidden="true">&times;</span></button>
   <strong>{{ _('New: My Library') }}</strong>
   {% if current_user.role_browse_global() %}
-    {{ _('The library is shared and holds every book once — what you keep is My Library. Nothing you had is gone. Every book, new arrivals included, is under Global Library in the menu.') }}
+    {{ _('The shared library holds every book once — My Library is your own selection. Nothing is gone: every book, new arrivals included, is under Global Library in the menu.') }}
   {% else %}
-    {{ _('The library is shared and holds every book once — what you keep is My Library. Nothing you had is gone. Your administrator manages what enters it.') }}
+    {{ _('The shared library holds every book once — My Library is your own selection. Nothing is gone: your administrator manages what enters it.') }}
   {% endif %}
 </div>
 {% endif %}

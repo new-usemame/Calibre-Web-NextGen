@@ -787,6 +787,17 @@ def test_the_catalogue_shows_a_picture_of_every_arrangement_and_lettering():
     assert len({samples[font_id] for font_id in ("serif", "sans", "mono")}) == 3
 
 
+def test_changed_catalogue_artwork_invalidates_disk_and_browser_caches(monkeypatch):
+    from cps import cover_picker
+    from cps.services import cover_designer_cache
+
+    old_key = cover_designer_cache.cache_key("font", "serif", 266, 400, "pil")
+    monkeypatch.setattr(cover_designer_cache, "CACHE_VERSION", "next-render")
+
+    assert cover_designer_cache.cache_key("font", "serif", 266, 400, "pil") != old_key
+    assert cover_picker._font_sample_url("serif").endswith("?v=next-render")
+
+
 def test_a_catalogue_picture_is_drawn_once_and_then_read_from_disk():
     from cps.services import cover_designer_cache
 

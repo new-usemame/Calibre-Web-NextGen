@@ -76,7 +76,7 @@ log = logger.create()
 # Bumped whenever the catalogue imagery changes shape (new sample text, a
 # different neutral scheme, a different size). Old entries then miss and are
 # swept rather than being served as a picture of something that no longer exists.
-CACHE_VERSION = "1"
+CACHE_VERSION = "2"
 
 # A 2:3 JPEG a few hundred pixels tall is tens of kilobytes. Anything past this
 # is a renderer having a bad day, and it is served but not stored: the cache is

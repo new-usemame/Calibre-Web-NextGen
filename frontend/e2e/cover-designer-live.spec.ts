@@ -102,6 +102,9 @@ test.describe('cover designer v2 (live backend, no fixtures)', () => {
     // that the cards contain distinct server-rendered glyphs, rather than a
     // visual CSS stack or a repeated placeholder JPEG.
     const loaded = await loadedSamples();
+    for (const { src } of loaded) {
+      expect(new URL(src).searchParams.get('v')).toMatch(/^\d+$/);
+    }
     const signatures = await page.evaluate(async (items: { id: string; src: string }[]) => Promise.all(items.map(async ({ id, src }) => {
       const buffer = await fetch(src, { credentials: 'include' }).then((r) => r.arrayBuffer());
       const bytes = new Uint8Array(buffer as ArrayBuffer);

@@ -234,8 +234,12 @@ def _style_thumb_url(style_id: str) -> str:
 
 
 def _font_sample_url(font_id: str) -> str:
-    return _catalogue_url("cover_picker.cover_designer_font_sample", "font_id", font_id,
-                          "/cover-designer/font-sample/")
+    url = _catalogue_url("cover_picker.cover_designer_font_sample", "font_id", font_id,
+                         "/cover-designer/font-sample/")
+    # The response is browser-cached for a day. Keep its URL tied to the same
+    # version that invalidates the on-disk render, so changed sample artwork is
+    # visible immediately after an update instead of after max-age expires.
+    return "%s?v=%s" % (url, cover_designer_cache.CACHE_VERSION)
 
 
 def designer_state() -> dict:

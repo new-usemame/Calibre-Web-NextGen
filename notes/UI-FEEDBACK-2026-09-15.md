@@ -27,7 +27,9 @@ between shared and private book covers, and the book-detail action order.
   keyboard selection and scrolls the selected card into view.
 - Font cards use real authenticated server JPEGs. The sample uses the fixed
   glyph string `Aa Bb Cc`, so the image shows a font face rather than a font
-  label. The crop is anchored at the top to retain the rendered ink.
+  label. The crop is anchored at the top to retain the rendered ink. The
+  sample URL and disk-cache key now share catalogue cache version 2, so an
+  existing browser or server cannot keep serving the prior sample for 24 hours.
 - The action row is ordered **Read now → Edit cover → Add to shelf → star-only
   favorite → BookX-only Remove from my library → flexible spacer → Settings**.
   `BookX` is unique in the SPA and communicates removing a personal library
@@ -83,6 +85,9 @@ feedback directory outside the repository.
 - `./local-dev/private-e2e-rig.sh test . --project=desktop e2e/cover-designer-live.spec.ts --grep 'real server font samples'` — passed against the real backend, no page routes for designer/font endpoints.
 - `./local-dev/private-e2e-rig.sh test . --project=desktop e2e/book-page-actions.spec.ts` — passed (20 tests plus setup).
 - `./local-dev/private-e2e-rig.sh test . --project=mobile e2e/book-page-actions.spec.ts --grep 'book page layout holds'` — passed.
+- `./local-dev/private-e2e-rig.sh test . --project=desktop --project=mobile e2e/a11y.spec.ts --grep 'book detail'` — passed (desktop and mobile axe scans; no critical or serious findings).
+- Container-level cache probe — changing the catalogue version changed both the server disk-cache key and the font-sample URL; passed.
+- SPA msgid extraction, all shipped `messages.po` `msgfmt --check` compilation, Python compileall, and E2E TypeScript typecheck — passed.
 
 The focused Python test could not be collected under the host interpreter due
 an existing PyOpenSSL/OpenSSL ABI mismatch (`lib.GEN_EMAIL` absent) before the

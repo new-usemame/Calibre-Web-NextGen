@@ -65,7 +65,11 @@ def render_task_status(tasklist):
                 else:
                     ret['status'] = _('Unknown Status')
 
-            ret['taskMessage'] = "{}: {}".format(task.name, task.message) if task.message else task.name
+            # task.message/task.error can carry converter output (e.g. calibre
+            # or kepubify stderr), which sometimes contains stray HTML - escape
+            # them the same way `user` already is so the tasks table shows the
+            # text instead of letting the browser render it as markup.
+            ret['taskMessage'] = "{}: {}".format(task.name, escape(task.message)) if task.message else task.name
             ret['progress'] = "{} %".format(int(task.progress * 100))
             ret['user'] = escape(user)  # prevent xss
 
@@ -73,7 +77,7 @@ def render_task_status(tasklist):
             ret['task_id'] = task.id
             ret['stat'] = task.stat
             ret['is_cancellable'] = task.is_cancellable
-            ret['error'] = task.error
+            ret['error'] = escape(task.error) if task.error else task.error
 
             rendered_tasklist.append(ret)
 

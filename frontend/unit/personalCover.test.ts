@@ -10,9 +10,9 @@ test('book detail routes cover changes through the cover editor only', () => {
 
   assert.match(api, /using_my_cover\?: boolean/);
   assert.match(api, /library_cover_url\?: string \| null/);
-  // One overlay pill on the artwork + one gear-menu item, both to the editor.
-  assert.match(detail, /data-testid="edit-cover-pill"[\s\S]*t\('Edit cover'\)/);
-  assert.match(detail, /label: t\('Edit cover…'\),[\s\S]*to: `\/book\/\$\{book\.id\}\/cover`/);
+  // The direct action and gear-menu item both route to the same editor.
+  assert.match(detail, /href=\{`\/book\/\$\{book\.id\}\/cover`\}[\s\S]*data-testid="edit-cover-action"/);
+  assert.match(detail, /id: 'edit-cover',[\s\S]*to: `\/book\/\$\{book\.id\}\/cover`/);
   // The old per-scope links and the private-cover hint moved into the editor.
   assert.doesNotMatch(detail, /cover\?personal=1/);
   assert.doesNotMatch(detail, /Use my own cover|Change my cover|Use the library cover|Change library cover/);
@@ -25,18 +25,16 @@ test('cover editor owns both scopes and the personal flow', () => {
   // Scope switch near the top; initial scope still honours ?personal=1 links.
   assert.match(picker, /new URLSearchParams\(window\.location\.search\).*personal/);
   assert.match(picker, /data-testid="cover-scope-switch"/);
-  assert.match(picker, /t\('Library cover'\)/);
-  assert.match(picker, /t\('My own cover'\)/);
+  assert.match(picker, /aria-pressed=\{!personal\}[\s\S]*switchScope\('library'\)/);
+  assert.match(picker, /aria-pressed=\{personal\}[\s\S]*switchScope\('personal'\)/);
   // Library scope is edit-role only; everyone else is forced to personal.
   assert.match(picker, /canEditLibrary = !!\(me\?\.role\?\.edit \|\| me\?\.role\?\.admin\)/);
   assert.match(picker, /personal = scope === 'personal' \|\| !canEditLibrary/);
-  // The personal flow that used to live on the book page: the privacy hint and
-  // the "back to the library cover" reset.
-  assert.match(picker, /only to you and on books delivered to your e-readers/);
-  assert.match(picker, /private to you and your e-reader deliveries/);
+  // The personal flow that used to live on the book page retains the
+  // "back to the library cover" reset and private-scope API state.
   assert.match(picker, /book\.using_my_cover[\s\S]*t\('Use the library cover'\)/);
   assert.match(picker, /useClearMyCover/);
-  assert.match(picker, /!personal && <ApiKeysPanel/);
+  assert.match(picker, /canEditLibrary && <ApiKeysPanel/);
 });
 
 test('personal picker writes only through the my-cover API', () => {

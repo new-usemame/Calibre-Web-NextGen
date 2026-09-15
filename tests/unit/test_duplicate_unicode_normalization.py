@@ -117,9 +117,18 @@ class TestD6IndexSurface:
         m = re.search(r"def build_book_key_parts\(book, settings\):(.*?)\ndef ", IDX_SRC, re.S)
         assert m, "build_book_key_parts not found"
         body = m.group(1)
-        assert body.count("normalize_text_for_duplicates(") >= 4, (
+        # The author part now routes through canonical_author_key, which makes
+        # the key order-independent ("Liu, Cixin" == "Cixin Liu") and itself
+        # delegates to normalize_text_for_duplicates -- so the D6 no-drift
+        # intent holds, with one fewer literal call in this body.
+        shared_calls = (body.count("normalize_text_for_duplicates(")
+                        + body.count("canonical_author_key("))
+        assert shared_calls >= 4, (
             "author/language/series/publisher key parts must use the shared "
             "normalizer so all keying surfaces agree (D6)"
+        )
+        assert "canonical_author_key(" in body, (
+            "the author key part must use the order-independent helper"
         )
         assert ".lower().strip()" not in body, (
             "raw .lower().strip() must not survive in build_book_key_parts"

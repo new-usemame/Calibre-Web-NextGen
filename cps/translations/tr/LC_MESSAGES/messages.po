@@ -5018,10 +5018,6 @@ msgid "Certificate path"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Change library cover"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Check again"
 msgstr ""
 
@@ -5353,14 +5349,14 @@ msgid "Cover scope"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Cover size"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Cover sources and their API keys belong to this server, not to either cover "
 "choice. They help search for images; choosing one here saves it only in the "
 "scope selected above."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Cover size"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5746,14 +5742,6 @@ msgid "Edit cover"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Edit my private cover"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Edit shared library cover"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Edit cover…"
 msgstr ""
 
@@ -5762,11 +5750,19 @@ msgid "Edit custom colours"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Edit my private cover"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Edit note"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit public shelves"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Edit shared library cover"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5858,14 +5854,6 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Failed to load."
-msgstr ""
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Favorite"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Favorited"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6293,10 +6281,6 @@ msgid "Lettering"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Library cover"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Library settings"
 msgstr ""
 
@@ -6487,10 +6471,6 @@ msgid "Model"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "More actions"
-msgstr ""
-
-#: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr ""
@@ -6528,15 +6508,11 @@ msgid "My account"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "My own cover"
+msgid "My presets"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "My private cover"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "My presets"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6945,12 +6921,6 @@ msgstr ""
 msgid "People & devices"
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/cover_picker.html
-msgid ""
-"Pick a cover from any source we support, paste a URL, upload a file, or use "
-"the cover embedded in the book itself."
-msgstr ""
-
 #: cps/spa_strings.py
 msgid "Picked"
 msgstr ""
@@ -7128,10 +7098,6 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Remove from library"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
@@ -7515,6 +7481,10 @@ msgid "Settings saved."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Shared cover"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Shelf name"
 msgstr ""
 
@@ -7822,19 +7792,6 @@ msgstr ""
 msgid "The library cover is back for you."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Every book, new arrivals included, is "
-"under Global Library in the menu."
-msgstr ""
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Your administrator manages what enters it."
-msgstr ""
-
 #: cps/spa_strings.py
 msgid "The preset change failed. Try again."
 msgstr ""
@@ -7847,6 +7804,31 @@ msgstr ""
 msgid ""
 "The server-wide option is also off, so nothing can sync yet. An "
 "administrator can enable it in the classic server settings."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: every book, new arrivals included, is under Global Library "
+"in the menu."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: your administrator manages what enters it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This changes only your view of this book and copies delivered to your e-"
+"readers. The shared book cover and everyone else’s view stay unchanged."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This changes the cover stored with the book. Everyone who can access the "
+"book sees it."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7889,22 +7871,6 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "This shelf is empty. Add books from any book's page."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Shared cover"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This changes only your view of this book and copies delivered to your e-"
-"readers. The shared book cover and everyone else’s view stay unchanged."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This changes the cover stored with the book. Everyone who can access the "
-"book sees it."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8035,10 +8001,6 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Uploading is not available for your account on this server."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Use my own cover"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8224,13 +8186,6 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"Your cover appears only to you and on books delivered to your e-readers. The "
-"library cover stays unchanged for everyone else, and administrators manage "
-"it."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -11355,6 +11310,12 @@ msgid "Add Allowed/Denied custom column values"
 msgstr ""
 
 #: cps/templates/cover_picker.html
+msgid ""
+"Pick a cover from any source we support, paste a URL, upload a file, or use "
+"the cover embedded in the book itself."
+msgstr ""
+
+#: cps/templates/cover_picker.html
 msgid "Use a URL"
 msgstr ""
 
@@ -13226,6 +13187,10 @@ msgstr ""
 #, fuzzy
 msgid "Logout User"
 msgstr "Çıkış"
+
+#: cps/templates/image.html
+msgid "Favorite"
+msgstr ""
 
 #: cps/templates/index.html
 msgid "Dismiss library introduction"

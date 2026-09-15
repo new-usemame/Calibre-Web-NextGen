@@ -5208,10 +5208,6 @@ msgid "Certificate path"
 msgstr "Certifikatsökväg"
 
 #: cps/spa_strings.py
-msgid "Change library cover"
-msgstr "Ändra bibliotekets omslag"
-
-#: cps/spa_strings.py
 msgid "Check again"
 msgstr "Kontrollera igen"
 
@@ -5549,14 +5545,14 @@ msgid "Cover scope"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Cover size"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Cover sources and their API keys belong to this server, not to either cover "
 "choice. They help search for images; choosing one here saves it only in the "
 "scope selected above."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Cover size"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5952,19 +5948,15 @@ msgid "Edit cover"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Edit my private cover"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Edit shared library cover"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Edit cover…"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit custom colours"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Edit my private cover"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5974,6 +5966,10 @@ msgstr "Redigera anteckning"
 #: cps/spa_strings.py
 msgid "Edit public shelves"
 msgstr "Redigera offentliga hyllor"
+
+#: cps/spa_strings.py
+msgid "Edit shared library cover"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
@@ -6067,14 +6063,6 @@ msgstr "Det gick inte att läsa in hyllor."
 #: cps/spa_strings.py
 msgid "Failed to load."
 msgstr "Det gick inte att läsa in."
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Favorite"
-msgstr "Favorit"
-
-#: cps/spa_strings.py
-msgid "Favorited"
-msgstr "Favoritmarkerad"
 
 #: cps/spa_strings.py
 msgid "Fetch metadata from web"
@@ -6512,10 +6500,6 @@ msgid "Lettering"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Library cover"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Library settings"
 msgstr "Biblioteksinställningar"
 
@@ -6706,10 +6690,6 @@ msgid "Model"
 msgstr "Modell"
 
 #: cps/spa_strings.py
-msgid "More actions"
-msgstr ""
-
-#: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "Fler åtgärder för {name}"
@@ -6749,15 +6729,11 @@ msgid "My account"
 msgstr "Mitt konto"
 
 #: cps/spa_strings.py
-msgid "My own cover"
+msgid "My presets"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "My private cover"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "My presets"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7189,14 +7165,6 @@ msgstr "Pausad efter ett problem"
 msgid "People & devices"
 msgstr "Personer och enheter"
 
-#: cps/spa_strings.py cps/templates/cover_picker.html
-msgid ""
-"Pick a cover from any source we support, paste a URL, upload a file, or use "
-"the cover embedded in the book itself."
-msgstr ""
-"Välj ett omslag från en källa som stöds, klistra in en webbadress, ladda upp "
-"en fil eller använd omslaget som finns inbäddat i själva boken."
-
 #: cps/spa_strings.py
 msgid "Picked"
 msgstr "Vald"
@@ -7378,10 +7346,6 @@ msgstr "Ta bort enhet"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr "Ta bort från favoriter"
-
-#: cps/spa_strings.py
-msgid "Remove from library"
-msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from shelf"
@@ -7775,6 +7739,10 @@ msgid "Settings saved."
 msgstr "Inställningarna har sparats."
 
 #: cps/spa_strings.py
+msgid "Shared cover"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Shelf name"
 msgstr "Hyllnamn"
 
@@ -8099,25 +8067,6 @@ msgstr "Det globala biblioteket"
 msgid "The library cover is back for you."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Every book, new arrivals included, is "
-"under Global Library in the menu."
-msgstr ""
-"Biblioteket delas och innehåller varje bok en gång — det du behåller är Mitt "
-"bibliotek. Inget du hade har försvunnit. Alla böcker, även nya tillskott, "
-"finns under Globalt bibliotek i menyn."
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Your administrator manages what enters it."
-msgstr ""
-"Biblioteket delas och innehåller varje bok en gång — det du behåller är Mitt "
-"bibliotek. Inget du hade har försvunnit. Administratören hanterar vilka "
-"böcker som läggs till där."
-
 #: cps/spa_strings.py
 msgid "The preset change failed. Try again."
 msgstr ""
@@ -8133,6 +8082,37 @@ msgid ""
 msgstr ""
 "Den serveromfattande inställningen är också av, så inget kan synkroniseras "
 "ännu. En administratör kan aktivera den i de klassiska serverinställningarna."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: every book, new arrivals included, is under Global Library "
+"in the menu."
+msgstr ""
+"Det delade biblioteket innehåller varje bok en gång — Mitt bibliotek är ditt "
+"eget urval. Inget har försvunnit: alla böcker, även nya tillskott, finns "
+"under Globalt bibliotek i menyn."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: your administrator manages what enters it."
+msgstr ""
+"Det delade biblioteket innehåller varje bok en gång — Mitt bibliotek är ditt "
+"eget urval. Inget har försvunnit: administratören hanterar vilka böcker som "
+"läggs till där."
+
+#: cps/spa_strings.py
+msgid ""
+"This changes only your view of this book and copies delivered to your e-"
+"readers. The shared book cover and everyone else’s view stay unchanged."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This changes the cover stored with the book. Everyone who can access the "
+"book sees it."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This device will no longer sync."
@@ -8180,22 +8160,6 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "This shelf is empty. Add books from any book's page."
 msgstr "Den här hyllan är tom. Lägg till böcker från valfri boksida."
-
-#: cps/spa_strings.py
-msgid "Shared cover"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This changes only your view of this book and copies delivered to your e-"
-"readers. The shared book cover and everyone else’s view stay unchanged."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid ""
-"This changes the cover stored with the book. Everyone who can access the "
-"book sees it."
-msgstr ""
 
 #: cps/spa_strings.py
 msgid "Title A–Z"
@@ -8328,10 +8292,6 @@ msgstr "Ladda upp böcker"
 #: cps/spa_strings.py
 msgid "Uploading is not available for your account on this server."
 msgstr "Uppladdning är inte tillgänglig för ditt konto på den här servern."
-
-#: cps/spa_strings.py
-msgid "Use my own cover"
-msgstr "Använd mitt eget omslag"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8538,16 +8498,6 @@ msgstr "Ditt bibliotek"
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
 msgstr "Din webbläsare kan inte spela upp detta ljudformat."
-
-#: cps/spa_strings.py
-msgid ""
-"Your cover appears only to you and on books delivered to your e-readers. The "
-"library cover stays unchanged for everyone else, and administrators manage "
-"it."
-msgstr ""
-"Ditt omslag visas bara för dig och på böcker som levereras till dina e-"
-"boksläsare. Bibliotekets omslag är oförändrat för alla andra, och hanteras "
-"av administratörer."
 
 #: cps/spa_strings.py
 msgid "Your cover was updated."
@@ -11756,6 +11706,14 @@ msgid "Add Allowed/Denied custom column values"
 msgstr "Lägg till tillåtna/avvisade anpassade kolumnvärden"
 
 #: cps/templates/cover_picker.html
+msgid ""
+"Pick a cover from any source we support, paste a URL, upload a file, or use "
+"the cover embedded in the book itself."
+msgstr ""
+"Välj ett omslag från en källa som stöds, klistra in en webbadress, ladda upp "
+"en fil eller använd omslaget som finns inbäddat i själva boken."
+
+#: cps/templates/cover_picker.html
 msgid "Use a URL"
 msgstr "Använd en webbadress"
 
@@ -12006,8 +11964,8 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Detta verktyg har anpassats från verktyget <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a> som skapats av <a "
+"Detta verktyg har anpassats från verktyget <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a> som skapats av <a "
 "href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
@@ -13829,6 +13787,10 @@ msgstr "Tillbaka till hemmet"
 msgid "Logout User"
 msgstr "Logga ut användare"
 
+#: cps/templates/image.html
+msgid "Favorite"
+msgstr "Favorit"
+
 #: cps/templates/index.html
 msgid "Dismiss library introduction"
 msgstr "Stäng bibliotekets introduktion"
@@ -15496,6 +15458,42 @@ msgstr "Exponera valda hyllor via OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Visa avsnittet Läst/oläst"
+
+#~ msgid "Change library cover"
+#~ msgstr "Ändra bibliotekets omslag"
+
+#~ msgid "Favorited"
+#~ msgstr "Favoritmarkerad"
+
+#~ msgid ""
+#~ "The library is shared and holds every book once — what you keep is My "
+#~ "Library. Nothing you had is gone. Every book, new arrivals included, is "
+#~ "under Global Library in the menu."
+#~ msgstr ""
+#~ "Biblioteket delas och innehåller varje bok en gång — det du behåller är "
+#~ "Mitt bibliotek. Inget du hade har försvunnit. Alla böcker, även nya "
+#~ "tillskott, finns under Globalt bibliotek i menyn."
+
+#~ msgid ""
+#~ "The library is shared and holds every book once — what you keep is My "
+#~ "Library. Nothing you had is gone. Your administrator manages what enters "
+#~ "it."
+#~ msgstr ""
+#~ "Biblioteket delas och innehåller varje bok en gång — det du behåller är "
+#~ "Mitt bibliotek. Inget du hade har försvunnit. Administratören hanterar "
+#~ "vilka böcker som läggs till där."
+
+#~ msgid "Use my own cover"
+#~ msgstr "Använd mitt eget omslag"
+
+#~ msgid ""
+#~ "Your cover appears only to you and on books delivered to your e-readers. "
+#~ "The library cover stays unchanged for everyone else, and administrators "
+#~ "manage it."
+#~ msgstr ""
+#~ "Ditt omslag visas bara för dig och på böcker som levereras till dina e-"
+#~ "boksläsare. Bibliotekets omslag är oförändrat för alla andra, och "
+#~ "hanteras av administratörer."
 
 #~ msgid "Change my cover"
 #~ msgstr "Ändra mitt omslag"

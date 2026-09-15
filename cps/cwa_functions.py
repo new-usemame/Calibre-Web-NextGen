@@ -1998,6 +1998,29 @@ def _service_log_path(filename: str) -> str:
     """Resolve a service log beneath the active config directory."""
     return constants.config_path(filename)
 
+
+def _read_service_log(filename: str) -> str:
+    """A service log's contents, or "" when it does not exist yet.
+
+    A service writes its log only on its first run, so on any install where
+    Convert Library or the EPUB Fixer has never been started the file is
+    simply absent. The status endpoints read it on every poll, and an
+    unguarded open() turned that ordinary state into a 500 with a
+    FileNotFoundError traceback in the container log, for as long as the
+    admin page stayed open.
+
+    Empty is the honest answer: extract_progress("") already yields
+    {"current": 0, "total": 0}, which the page renders as "nothing running".
+    OSError rather than FileNotFoundError alone so an unreadable log (bad
+    permissions after a UID change, for instance) degrades the same way
+    instead of failing the request.
+    """
+    try:
+        with open(_service_log_path(filename), 'r') as log:
+            return log.read()
+    except OSError:
+        return ""
+
 ##———————————————————END OF SHARED VARIABLES & FUNCTIONS———————————————————————##
 
 def convert_library_start(queue):
@@ -2018,12 +2041,9 @@ def empty_tmp_con_dir(tmp_conversion_dir) -> None:
         print(f"[cwa-functions]: An error occurred while emptying {tmp_conversion_dir}. See the following error: {e}")
 
 def is_convert_library_finished() -> bool:
-    log_path = _service_log_path("convert-library.log")
-    with open(log_path, 'r') as log:
-        if "NextGen Convert Library Service - Run Ended: " in log.read():
-            return True
-        else:
-            return False
+    # A missing log means the service has not written anything yet, which is
+    # "not finished" -- the same answer the read would have given.
+    return "NextGen Convert Library Service - Run Ended: " in _read_service_log("convert-library.log")
 
 def kill_convert_library(queue):
     trigger_file = Path(tempfile.gettempdir() + "/.kill_convert_library_trigger")
@@ -2152,8 +2172,7 @@ def cancel_convert_library():
 @login_required_if_no_ano
 @admin_required
 def get_status():
-    with open(_service_log_path("convert-library.log"), 'r') as f:
-        status = f.read()
+    status = _read_service_log("convert-library.log")
     progress = extract_progress(status)
     statusList = {'status':status,
                   'progress':progress}
@@ -2174,12 +2193,8 @@ def epub_fixer_start(queue, input_file: str | None = None):
     queue.put(ef_process)
 
 def is_epub_fixer_finished() -> bool:
-    log_path = _service_log_path("epub-fixer.log")
-    with open(log_path, 'r') as log:
-        if "NextGen Kindle EPUB Fixer Service - Run Ended: " in log.read():
-            return True
-        else:
-            return False
+    # See is_convert_library_finished: absent log == not finished.
+    return "NextGen Kindle EPUB Fixer Service - Run Ended: " in _read_service_log("epub-fixer.log")
 
 def kill_epub_fixer(queue):
     trigger_file = Path(tempfile.gettempdir() + "/.kill_epub_fixer_trigger")
@@ -2361,8 +2376,7 @@ def cancel_epub_fixer():
 @login_required_if_no_ano
 @admin_required
 def get_status():
-    with open(_service_log_path("epub-fixer.log"), 'r') as f:
-        status = f.read()
+    status = _read_service_log("epub-fixer.log")
     progress = extract_progress(status)
     statusList = {'status':status,
                   'progress':progress}

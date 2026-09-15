@@ -199,6 +199,42 @@ test.describe('cover designer v2 (contract fixtures)', () => {
     await expect(page.getByRole('status').filter({ hasText: 'Cover updated.' })).toBeVisible();
   });
 
+  test('lettering is a keyboard-operable horizontal carousel on a phone', async ({ page }) => {
+    const id = await firstBookId(page);
+    test.skip(!id, 'seed has no books');
+    await page.setViewportSize({ width: 320, height: 700 });
+    await installContractFixtures(page, id!);
+    await page.goto(`/app/book/${id}/cover`);
+
+    const panel = designerPanel(page);
+    await panel.locator(':scope > summary').first().click();
+    const lettering = panel.getByRole('radiogroup', { name: 'Lettering' });
+    const metrics = await lettering.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return { clientWidth: el.clientWidth, scrollWidth: el.scrollWidth, overflowX: style.overflowX, snap: style.scrollSnapType };
+    });
+    expect(metrics.scrollWidth).toBeGreaterThan(metrics.clientWidth);
+    expect(metrics.overflowX).toBe('auto');
+    expect(metrics.snap).toContain('x');
+
+    // End follows the existing radio-group keyboard contract. Focusing the
+    // final card must also bring it into the horizontally scrollable viewport.
+    const serif = lettering.getByRole('radio', { name: 'Serif', exact: true });
+    await serif.focus();
+    await page.keyboard.press('End');
+    await expect(lettering.getByRole('radio', { name: 'Monospace', exact: true })).toBeFocused();
+    await expect.poll(() => lettering.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+
+    // The fixture stands in only for client rendering here; live backend pixel
+    // proof lives in cover-designer-live.spec.ts. These loaded img elements
+    // specifically guard against regressing to a CSS font-name string.
+    for (const id of ['serif', 'sans']) {
+      const image = lettering.locator(`img[data-font-sample="${id}"]`);
+      await expect(image).toBeVisible();
+      expect(await image.evaluate((img) => (img as HTMLImageElement).naturalWidth)).toBeGreaterThan(0);
+    }
+  });
+
   test('a render failure is reported instead of leaving an empty frame', async ({ page }) => {
     const id = await firstBookId(page);
     test.skip(!id, 'seed has no books');

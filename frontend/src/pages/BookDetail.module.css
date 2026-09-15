@@ -57,66 +57,6 @@
   display: block;
 }
 
-/* "Edit cover" affordance overlaid on the cover — opens the cover editor,
-   where both the library cover and the reader's own private cover live. On
-   touch/coarse pointers it is always visible (there is no hover to reveal it);
-   on fine pointers it fades in when the cover is hovered or when focus lands
-   inside the wrapper, so keyboard users get the same reveal before reaching
-   it. pointer-events track visibility so the hidden pill is never a mystery
-   click target over the artwork. */
-.changeCover {
-  position: absolute;
-  left: 50%;
-  bottom: var(--sp-3);
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-full);
-  background: rgba(20, 28, 36, .82);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  border: 1px solid var(--border-strong);
-  /* The chip is a fixed dark glass scrim (readable over any cover art), so its
-     text must be a fixed light — var(--text) is dark in Light/Sepia and fails
-     contrast on the scrim (1.4:1). The hover state flips to --on-accent/--accent. */
-  color: #f2efe9;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  text-decoration: none;
-  white-space: nowrap;
-  box-shadow: var(--elev-2);
-  opacity: .92;
-  transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
-}
-.changeCover:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); opacity: 1; }
-/* Hover rules live under (hover: hover): iOS keeps a synthetic :hover stuck on
-   the last tapped element, which would leave the accent state "on" after the
-   tap (#2230's class of bug). */
-@media (hover: hover) and (pointer: fine) {
-  .changeCover { opacity: 0; pointer-events: none; }
-  .coverWrap:hover .changeCover,
-  .coverWrap:focus-within .changeCover { opacity: .92; pointer-events: auto; }
-  .coverWrap:hover .changeCover:hover,
-  .changeCover:hover,
-  .changeCover:focus-visible {
-    background: var(--accent);
-    color: var(--on-accent);
-    border-color: var(--accent);
-    opacity: 1;
-    transform: translateX(-50%) translateY(-2px);
-  }
-}
-@media (hover: none) {
-  .changeCover:active {
-    background: var(--accent);
-    color: var(--on-accent);
-    border-color: var(--accent);
-  }
-}
-@media (prefers-reduced-motion: reduce) { .changeCover { transition: none; } }
-
 /* Coverless detail cover — a themed typographic cover (mirrors BookCover's
    card fallback, larger). Tokens only, so it adapts to every theme; never a
    dark logo on a light theme. */
@@ -436,6 +376,49 @@
   background: var(--accent-press);
 }
 
+/* Secondary text action in the ordered book row. */
+.actionSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  height: 38px;
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semi);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.actionSecondary:hover { background: var(--surface-2); }
+
+/* Icon-only personal controls retain a 38px target, a native tooltip, and a
+   full accessible name. `BookX` is deliberately not the trash/delete symbol:
+   it means remove this book from this reader's collection. */
+.actionIcon, .actionIconOn {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.actionIcon:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-strong); }
+.actionIconOn { color: var(--accent-hover); border-color: var(--accent); background: var(--accent-soft); }
+.actionIcon:disabled, .actionIconOn:disabled { opacity: .5; cursor: not-allowed; }
+.actionIcon:focus-visible, .actionIconOn:focus-visible, .actionSecondary:focus-visible {
+  outline: 2px solid var(--accent-ring); outline-offset: 2px;
+}
+
 /* Read-toggle button variants */
 .readToggleActive,
 .readToggleGhost {
@@ -680,6 +663,7 @@
   .actions,
   .actionsGroup { gap: var(--sp-2); }
   .actionPrimary,
+  .actionSecondary,
   .readToggleActive,
   .readToggleGhost {
     height: 34px;

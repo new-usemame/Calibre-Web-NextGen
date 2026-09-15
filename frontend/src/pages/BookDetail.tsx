@@ -1,6 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, Fragment } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
-import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
+import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
 import {
   useBook, useToggleRead, useToggleFavorite, useToggleArchived, useToggleHidden,
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
@@ -506,7 +506,8 @@ export function BookDetail() {
   };
 
   /* The "More actions" gear menu — every book action that is not one of the
-     four visible controls (Read now, Favorite, Add to shelf, the gear itself).
+     visible controls (Read now, Edit cover, Add to shelf, favorite, personal
+     membership removal, and the gear itself).
      Labels name the ACTION performed (state-aware), per the cleanup brief:
      today's "In your library" state chip becomes "Remove from library". */
   const menuItems: MenuSectionDef['items'] = [];
@@ -566,16 +567,7 @@ export function BookDetail() {
     });
   }
   if (selectionMode) {
-    if (inLibrary) {
-      menuItems.push({
-        id: 'remove-from-library',
-        label: t('Remove from library'),
-        icon: <BookCheck size={15} />,
-        disabled: removalImpact.isPending || removeFromLibrary.isPending,
-        onSelect: removeMembership,
-        testId: 'menu-remove-from-library',
-      });
-    } else if (me?.role?.browse_global) {
+    if (!inLibrary && me?.role?.browse_global) {
       menuItems.push({
         id: 'add-to-library',
         label: t('Add to library'),
@@ -652,13 +644,10 @@ export function BookDetail() {
         {bookBackTarget.isOrigin ? t('← Back') : t('← Library')}
       </Link>
 
-      {/* The four visible controls lead the page: directly under the back
-          link, above the cover/title block, on both viewports (operator ruling
-          2026-09-14). Everything else lives in the gear menu (built above) or
-          in the Files section at the page foot. Two flex children: a wrapping
-          group for the three buttons, and the gear pinned to the TOP-RIGHT of
-          the first row — it must never drop onto a row of its own when the
-          buttons wrap beneath it (review on top-actions-mobile.jpg). */}
+      {/* The action row is deliberately ordered by the reader's next likely
+          step: read, edit the artwork, organise, then compact personal state.
+          The flexible group is the spacer before the gear, which pins Settings
+          to the far edge without letting it become an orphaned mobile row. */}
       <div className={styles.actions} data-testid="book-actions">
         <div className={styles.actionsGroup}>
           {inLibrary && primaryReadTarget ? (
@@ -667,27 +656,48 @@ export function BookDetail() {
             </Link>
           ) : null}
 
-          {/* Star / favorite */}
-          {inLibrary && <button
-            className={book.favorited ? styles.readToggleActive : styles.readToggleGhost}
-            onClick={() => toggleFavorite.mutate()}
-            disabled={toggleFavorite.isPending}
-            aria-label={book.favorited ? t('Remove from favorites') : t('Add to favorites')}
-          >
-            <Star size={14} fill={book.favorited ? 'currentColor' : 'none'} />
-            {book.favorited ? t('Favorited') : t('Favorite')}
-          </button>}
+          {!me?.role?.anonymous && (
+            <Link href={`/book/${book.id}/cover`} className={styles.actionSecondary}
+              data-testid="edit-cover-action">
+              <ImageIcon size={15} aria-hidden="true" focusable={false} />
+              {t('Edit cover')}
+            </Link>
+          )}
 
           {inLibrary && (
             <AddToShelf bookId={book.id} inLibrary={inLibrary} />
+          )}
+
+          {/* Favorite is compact because the star carries the familiar state;
+              the accessible name and title always say exactly what it does. */}
+          {inLibrary && <button
+            className={book.favorited ? styles.actionIconOn : styles.actionIcon}
+            onClick={() => toggleFavorite.mutate()}
+            disabled={toggleFavorite.isPending}
+            aria-label={book.favorited ? t('Remove from favorites') : t('Add to favorites')}
+            aria-pressed={book.favorited}
+            title={book.favorited ? t('Remove from favorites') : t('Add to favorites')}
+          >
+            <Star size={17} aria-hidden="true" focusable={false} fill={book.favorited ? 'currentColor' : 'none'} />
+          </button>}
+
+          {selectionMode && inLibrary && (
+            <button type="button" className={styles.actionIcon}
+              onClick={removeMembership}
+              disabled={removalImpact.isPending || removeFromLibrary.isPending}
+              aria-label={t('Remove from my library')}
+              title={t('Remove from my library')}
+              data-testid="remove-from-my-library">
+              <BookX size={17} aria-hidden="true" focusable={false} />
+            </button>
           )}
         </div>
 
         {menuItems.length > 0 && (
           <div className={styles.gearWrap}>
             <Menu
-              label={t('More actions')}
-              title={t('More actions')}
+              label={t('Settings')}
+              title={t('Settings')}
               icon={<Settings size={17} aria-hidden="true" focusable={false} />}
               sections={menuSections}
               triggerTestId="book-actions-menu"
@@ -779,19 +789,6 @@ export function BookDetail() {
                 )}
                 <span className={styles.coverFallbackMark} aria-hidden="true">NextGen</span>
               </div>
-            )}
-            {/* "Edit cover" pill overlaid on the artwork — opens the cover
-                editor, where both the library cover and the reader's own
-                (private) cover are managed. Always visible on touch/coarse
-                pointers; hover/focus-revealed on fine pointers (see the CSS).
-                Guests get no control: the editor's sources answer 403/401 for
-                them, so the affordance would be a dead end. */}
-            {!me?.role?.anonymous && (
-              <Link href={`/book/${book.id}/cover`} className={styles.changeCover}
-                data-testid="edit-cover-pill">
-                <ImageIcon size={14} aria-hidden="true" focusable={false} />
-                {t('Edit cover')}
-              </Link>
             )}
           </div>
         </div>

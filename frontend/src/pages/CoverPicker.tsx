@@ -130,11 +130,11 @@ export function CoverPicker({ id }: { id: string }) {
         <Link href={back.href} className={styles.back}>
           <ChevronLeft size={16} /> {back.label}
         </Link>
-        <h1 className={styles.title}>{personal ? t('Use my own cover') : t('Change library cover')}</h1>
+        <h1 className={styles.title}>{personal ? t('Edit my private cover') : t('Edit shared library cover')}</h1>
         <p className={styles.subtitle}>
           {personal
-            ? t('Your cover appears only to you and on books delivered to your e-readers. The library cover stays unchanged for everyone else, and administrators manage it.')
-            : t('Pick a cover from any source we support, paste a URL, upload a file, or use the cover embedded in the book itself.')}
+            ? t('This changes only your view of this book and copies delivered to your e-readers. The shared book cover and everyone else’s view stay unchanged.')
+            : t('This changes the cover stored with the book. Everyone who can access the book sees it.')}
         </p>
         {canEditLibrary && (
           <div className={styles.scopeSwitch} role="group" aria-label={t('Cover scope')}
@@ -142,15 +142,18 @@ export function CoverPicker({ id }: { id: string }) {
             <button type="button" aria-pressed={!personal}
               className={!personal ? styles.scopeOn : styles.scope}
               onClick={() => switchScope('library')}>
-              {t('Library cover')}
+              {t('Shared cover')}
             </button>
             <button type="button" aria-pressed={personal}
               className={personal ? styles.scopeOn : styles.scope}
               onClick={() => switchScope('personal')}>
-              {t('My own cover')}
+              {t('My private cover')}
             </button>
           </div>
         )}
+        <p className={styles.scopeHelp}>
+          {t('Cover sources and their API keys belong to this server, not to either cover choice. They help search for images; choosing one here saves it only in the scope selected above.')}
+        </p>
       </header>
 
       {banner && (
@@ -206,7 +209,7 @@ export function CoverPicker({ id }: { id: string }) {
             <CoverDesignerPanel id={id} designer={state.designer} locked={locked} personal={personal}
                                 onApplied={onApplied} onError={onError} />
           )}
-          {!personal && <ApiKeysPanel />}
+          {canEditLibrary && <ApiKeysPanel />}
 
           <div className={styles.gridToolbar}>
             <h2 className={styles.gridTitle}>{t('Choose a cover')}</h2>

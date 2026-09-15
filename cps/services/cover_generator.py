@@ -2188,7 +2188,11 @@ def font_sample(font_id: str, binaries_dir: str = "",
         "text": {"title": "{title}", "subtitle": "{series}", "author": "{authors}"},
         "size": {"width": width, "height": height},
     }, strict=False, binaries_dir=binaries_dir)
-    sample = BookCoverMeta(title=entry.label, authors=("0123456789",), series="AaBbCc")
+    # Keep the ink identical across options. The lettering picker crops this
+    # title region into a wide card, so variation in the finished JPEG comes
+    # from the resolved font itself rather than from a different font name or
+    # metadata string masquerading as a preview.
+    sample = BookCoverMeta(title="Aa Bb Cc", authors=(), series="")
     return render(sample, spec, binaries_dir=binaries_dir)
 
 

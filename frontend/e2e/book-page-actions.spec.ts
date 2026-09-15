@@ -3,8 +3,9 @@ import { collectPageErrors, assertNoPageErrors, assertNoHorizontalOverflow, fetc
 
 /*
  * Book-page actions cleanup contract:
- *   - Four visible controls on the book page (Read now, Favorite, Add to shelf,
- *     and the "More actions" gear); every other action lives in the gear's
+ *   - A task-ordered visible row on the book page (Read now, Edit cover, Add to
+ *     shelf, favorite, personal-library removal, then the "More actions" gear);
+ *     every other action lives in the gear's
  *     accessible menu, with whole-book deletion in an admin-only danger section.
  *   - An "Edit cover" pill on the artwork opens the cover editor, which now
  *     carries the "Library cover" / "My own cover" scope switch that absorbed
@@ -94,11 +95,13 @@ test('the gear menu lists every action, with an admin-only delete section', asyn
   const errors = collectPageErrors(page);
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
 
-  // The four visible controls — and nothing else action-like in the row.
+  // The task-ordered visible controls — and nothing else action-like in the row.
   const actions = page.getByTestId('book-actions');
   await expect(actions.getByRole('link', { name: 'Read now' })).toBeVisible({ timeout: 10_000 });
-  await expect(actions.getByRole('button', { name: /^(Add to favorites|Remove from favorites)$/ })).toBeVisible();
+  await expect(actions.getByRole('link', { name: 'Edit cover' })).toBeVisible();
   await expect(actions.getByRole('button', { name: 'Add to shelf' })).toBeVisible();
+  await expect(actions.getByRole('button', { name: /^(Add to favorites|Remove from favorites)$/ })).toBeVisible();
+  await expect(actions.getByRole('button', { name: 'Remove from my library' })).toBeVisible();
   await expect(actions.getByTestId('book-actions-menu')).toBeVisible();
 
   const menu = await openGearMenu(page);
@@ -110,7 +113,7 @@ test('the gear menu lists every action, with an admin-only delete section', asyn
   await expect(items.filter({ hasText: 'Send to e-reader' })).toHaveCount(1);
   await expect(items.filter({ hasText: 'Send to device' })).toHaveCount(1);
   await expect(items.filter({ hasText: 'Reload metadata from disk' })).toHaveCount(1);
-  await expect(items.filter({ hasText: 'Remove from library' })).toHaveCount(1);
+  await expect(items.filter({ hasText: 'Remove from library' })).toHaveCount(0);
   await expect(items.filter({ hasText: /^View highlights/ })).toHaveCount(1);
   await expect(items.filter({ hasText: 'Edit metadata' })).toHaveCount(1);
   await expect(items.filter({ hasText: 'Edit cover…' })).toHaveCount(1);
@@ -119,6 +122,44 @@ test('the gear menu lists every action, with an admin-only delete section', asyn
   await expect(items.filter({ hasText: 'Delete from the global library' })).toHaveCount(1);
 
   assertNoPageErrors(errors);
+});
+
+test('the personal-library action row leads with cover and keeps private removal distinct', async ({ page }) => {
+  await page.goto('/app');
+  const bookId = await firstBookWithFormats(page);
+  test.skip(bookId == null, 'seed has no book with files');
+  await stubFullAccess(page);
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  const actions = page.getByTestId('book-actions');
+  await expect(actions.getByRole('link', { name: 'Read now' })).toBeVisible();
+
+  // This is the task order, not just a set-membership assertion: the primary
+  // reading action is followed by the cover editor and shelf chooser, then two
+  // compact personal actions. The spacer leaves Settings at the far edge.
+  const visibleActions = await actions.locator('a, button').evaluateAll((nodes) =>
+    nodes
+      .filter((node) => {
+        const style = getComputedStyle(node);
+        return style.display !== 'none' && style.visibility !== 'hidden';
+      })
+      .map((node) => ({
+        name: node.getAttribute('aria-label') || node.textContent?.trim(),
+        title: node.getAttribute('title'),
+        icon: node.querySelector('svg')?.getAttribute('class') ?? '',
+      })),
+  );
+  expect(visibleActions.slice(0, 6).map((action) => action.name)).toEqual([
+    'Read now', 'Edit cover', 'Add to shelf',
+    expect.stringMatching(/^(Add to favorites|Remove from favorites)$/),
+    'Remove from my library', 'Settings',
+  ]);
+
+  const remove = actions.getByRole('button', { name: 'Remove from my library' });
+  await expect(remove).toHaveAttribute('title', 'Remove from my library');
+  await expect(remove.locator('svg')).toHaveClass(/lucide-book-x/);
+  // Do not make a personal membership action look like the global delete path.
+  await expect(remove).not.toContainText(/delete/i);
 });
 
 test('the delete section is admin-only: a delete-role non-admin never sees it', async ({ page }) => {
@@ -167,7 +208,7 @@ test('the menu drives focus by keyboard: open, arrows, Escape restores the trigg
   await expect(trigger).toBeFocused();
 });
 
-test('the Edit cover pill on the artwork opens the cover editor', async ({ page }) => {
+test('the Edit cover action opens the cover editor', async ({ page }) => {
   await page.goto('/app');
   const bookId = await firstBookWithFormats(page);
   test.skip(bookId == null, 'seed has no book with files');
@@ -175,13 +216,11 @@ test('the Edit cover pill on the artwork opens the cover editor', async ({ page 
 
   const errors = collectPageErrors(page);
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
-  const pill = page.getByTestId('edit-cover-pill');
-  await expect(pill).toBeVisible({ timeout: 10_000 });
-  // Fine-pointer layouts reveal the pill on hover; coarse layouts always show it.
-  await pill.locator('xpath=..').hover();
-  await pill.click();
+  const action = page.getByTestId('edit-cover-action');
+  await expect(action).toBeVisible({ timeout: 10_000 });
+  await action.click();
   await expect(page).toHaveURL(new RegExp(`/app/book/${bookId}/cover`), { timeout: 10_000 });
-  await expect(page.getByRole('heading', { name: /library cover|own cover/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Edit shared library cover' })).toBeVisible();
 
   assertNoPageErrors(errors);
 });
@@ -196,13 +235,14 @@ test('the cover editor scope switch exposes the personal flow', async ({ page })
   const scopeSwitch = page.getByTestId('cover-scope-switch');
   await expect(scopeSwitch).toBeVisible({ timeout: 10_000 });
 
-  await scopeSwitch.getByRole('button', { name: 'My own cover' }).click();
-  await expect(page.getByRole('heading', { name: 'Use my own cover' })).toBeVisible();
-  await expect(page.getByText(/private to you and your e-reader deliveries/)).toBeVisible();
+  await scopeSwitch.getByRole('button', { name: 'My private cover' }).click();
+  await expect(page.getByRole('heading', { name: 'Edit my private cover' })).toBeVisible();
+  await expect(page.getByText(/only your view of this book and copies delivered/)).toBeVisible();
+  await expect(page.getByText(/API keys belong to this server/)).toBeVisible();
   expect(page.url()).toContain('personal=1');
 
-  await scopeSwitch.getByRole('button', { name: 'Library cover' }).click();
-  await expect(page.getByRole('heading', { name: 'Change library cover' })).toBeVisible();
+  await scopeSwitch.getByRole('button', { name: 'Shared cover' }).click();
+  await expect(page.getByRole('heading', { name: 'Edit shared library cover' })).toBeVisible();
   expect(page.url()).not.toContain('personal=1');
 });
 
@@ -220,7 +260,7 @@ test('a reader without the edit role lands in the personal scope, no switch show
   });
 
   await page.goto(`/app/book/${bookId}/cover`, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'Use my own cover' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('heading', { name: 'Edit my private cover' })).toBeVisible({ timeout: 10_000 });
   await expect(page.getByTestId('cover-scope-switch')).toHaveCount(0);
 });
 

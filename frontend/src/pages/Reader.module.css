@@ -183,6 +183,9 @@
 
 @media (max-width: 600px) {
   .navZone { width: 44px; }
+  .bar { gap: 2px; padding-inline: 2px; }
+  .bookTitle { display: none; }
+  .barControls { gap: 0; margin-left: auto; }
 }
 
 .viewerOverlay {
@@ -217,6 +220,72 @@
   overflow-y: auto;
   animation: slideIn var(--dur-base) var(--ease-out) both;
 }
+
+.placesPanel {
+  position: fixed;
+  inset: 0 0 0 auto;
+  width: min(420px, 94vw);
+  z-index: calc(var(--z-overlay) + 1);
+  overflow-y: auto;
+  padding: var(--sp-4);
+  color: var(--text);
+  background: var(--surface-1);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--elev-3);
+  animation: settingsIn var(--dur-base) var(--ease-out) both;
+}
+
+.placesIntro {
+  max-width: 32rem;
+  margin: var(--sp-1) 0 0;
+  color: var(--text-muted);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-base);
+}
+
+.placesList { display: grid; gap: var(--sp-3); margin: var(--sp-4) 0; padding: 0; list-style: none; }
+.place, .placeSelected {
+  padding: var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+}
+.placeSelected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.placeHeading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-3); }
+.placeHeading strong { color: var(--text); }
+.placeHeading > span { color: var(--text); font-weight: var(--fw-bold); white-space: nowrap; }
+.placeTags { display: flex; flex-wrap: wrap; gap: var(--sp-1); margin-top: var(--sp-2); }
+.placeTags span {
+  padding: 2px var(--sp-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-full);
+  color: var(--text-muted);
+  background: var(--surface-1);
+  font-size: var(--fs-xs);
+}
+.place small, .placeSelected small { display: block; margin-top: var(--sp-2); color: var(--text-muted); }
+.placeOpen {
+  width: 100%;
+  min-height: 44px;
+  margin-top: var(--sp-3);
+  padding: 0 var(--sp-4);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+  color: var(--accent-text);
+  background: var(--accent-soft);
+  font-weight: var(--fw-medium);
+}
+.placeOpen:not(:disabled):hover { background: var(--surface-3); }
+.placeOpen:disabled { cursor: wait; opacity: .65; }
+.placesError {
+  margin: var(--sp-4) 0;
+  padding: var(--sp-3);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--r-md);
+  color: var(--text);
+  background: var(--danger-soft);
+}
+.placesFootnote { color: var(--text-muted); font-size: var(--fs-xs); line-height: var(--lh-base); }
 
 .settingsPanel {
   position: fixed;
@@ -622,6 +691,11 @@
   color: var(--text);
   box-shadow: 0 2px 12px #0003;
 }
+.resumeNotice > span {
+  align-self: center;
+  padding: 10px 12px;
+  font-size: var(--fs-sm);
+}
 .resumeNotice button {
   background: transparent;
   color: inherit;
@@ -629,6 +703,17 @@
   padding: 12px;
   min-height: 44px;
   cursor: pointer;
+}
+.resumeNotice button + button { border-left: 1px solid var(--border); }
+
+@media (max-width: 600px) {
+  .resumeNotice {
+    bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+    flex-wrap: wrap;
+    width: calc(100% - 24px);
+  }
+  .resumeNotice > span { flex: 1 0 100%; }
+  .resumeNotice button { flex: 1 1 auto; border-top: 1px solid var(--border); }
 }
 .resumeNotice button:focus-visible {
   outline: 2px solid currentColor;

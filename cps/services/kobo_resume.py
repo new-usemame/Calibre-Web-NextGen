@@ -1,15 +1,27 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Optional Kobo resume conversion: bounded admission, off-hub I/O, no writes."""
 import logging
+import hashlib
+import io
 import math
 import os
+import posixpath
 import sqlite3
+import stat
 import threading
 import time
 from collections import OrderedDict
 from pathlib import Path
+from urllib.parse import unquote
+import zipfile
 
 from .parallel import cooperative_sleep
+from .kobo_position import (
+    MAX_RESUME_ARCHIVE_BYTES,
+    MAX_RESUME_DIRECTORY_ENTRIES,
+    MAX_RESUME_HREF_CHARS,
+    _resume_directory_start,
+)
 
 log = logging.getLogger(__name__)
 # A stalled filesystem can occupy at most two daemon workers. There is no queue,
@@ -33,6 +45,88 @@ _CACHE_MAX_ENTRIES = 256
 _CACHE_TTL_SECONDS = 300
 _CACHE = OrderedDict()
 _CACHE_LOCK = threading.Lock()
+
+
+def chapter_resume(epub_path, source, kind, value, chapter_percent):
+    """Return one fingerprinted chapter approximation without blocking the hub."""
+    deadline = time.monotonic() + RESUME_TIMEOUT_SECONDS
+    if (epub_path is None or kind != 'KoboSpan' or not source or not value
+            or isinstance(chapter_percent, bool)
+            or not isinstance(chapter_percent, (int, float))
+            or not 0.0 <= float(chapter_percent) <= 100.0):
+        return None
+    if not _SLOTS.acquire(blocking=False):
+        return None
+    done = threading.Event()
+    result = []
+
+    def worker():
+        try:
+            result.append(_chapter_snapshot(epub_path, source, chapter_percent))
+        except Exception:
+            log.debug('Could not resolve chapter resume', exc_info=True)
+        finally:
+            done.set()
+            _SLOTS.release()
+
+    try:
+        threading.Thread(target=worker, name='kobo-chapter-resume', daemon=True).start()
+    except Exception:
+        _SLOTS.release()
+        return None
+    while not done.is_set():
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return None
+        cooperative_sleep(min(0.001, remaining))
+    return result[0] if result else None
+
+
+def _chapter_snapshot(epub_path, source, chapter_percent):
+    """Admit a Kobo chapter-local approximation against one stable EPUB.
+
+    KEPUB-only span ids normally do not exist in the source EPUB. The browser
+    can still map the reported chapter progression after it rechecks this
+    whole-archive fingerprint.
+    """
+    if not isinstance(source, str) or len(source) > MAX_RESUME_HREF_CHARS:
+        return None
+    href = unquote(source).lstrip('/')
+    if (not href or '\\' in href or '#' in href
+            or href != posixpath.normpath(href)
+            or any(part in ('', '.', '..') for part in href.split('/'))):
+        return None
+    path = Path(epub_path)
+    with path.open('rb') as stream:
+        before = os.fstat(stream.fileno())
+        if not stat.S_ISREG(before.st_mode) or before.st_size > MAX_RESUME_ARCHIVE_BYTES:
+            return None
+        raw = stream.read(MAX_RESUME_ARCHIVE_BYTES + 1)
+        after = os.fstat(stream.fileno())
+    identity = lambda item: (
+        item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns, item.st_ctime_ns,
+    )
+    if (len(raw) > MAX_RESUME_ARCHIVE_BYTES or identity(before) != identity(after)
+            or identity(after) != identity(path.stat())):
+        return None
+    _resume_directory_start(raw)
+    with zipfile.ZipFile(io.BytesIO(raw)) as archive:
+        names = set()
+        for info in archive.infolist():
+            name = info.filename.removesuffix('/')
+            if (not name or name.startswith('/') or '\\' in name
+                    or info.filename != info.orig_filename
+                    or any(part in ('', '.', '..') for part in name.split('/'))
+                    or name in names or len(names) >= MAX_RESUME_DIRECTORY_ENTRIES):
+                return None
+            names.add(name)
+        if href not in names:
+            return None
+    return {
+        'chapter_href': href,
+        'chapter_progression': float(chapter_percent) / 100.0,
+        'epub_sha256': hashlib.sha256(raw).hexdigest(),
+    }
 
 
 def exact_resume(book_id, source, kind, value):

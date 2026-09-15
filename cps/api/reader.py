@@ -8,15 +8,16 @@ progress is shared between the legacy reader and the SPA reader: open a book in
 one, resume in the other. The bookmark_key is the epub.js CFI string.
 """
 from datetime import datetime, timezone
+from pathlib import Path
 
 from flask import g, jsonify, request
 from sqlalchemy import and_
 from sqlalchemy.orm.attributes import flag_modified
 
 from . import api_v1
-from .. import logger, ub
+from .. import calibre_db, config, logger, ub
 from ..cw_login import current_user
-from ..services import reading_position
+from ..services import reading_position, reading_sources, storyteller_source
 from ..usermanagement import login_required_if_no_ano
 from ..reader_settings import merged_reader_settings, resolved_reader_settings
 
@@ -31,6 +32,14 @@ def _require_real_user():
     if not current_user.is_authenticated or current_user.is_anonymous:
         return _err("unauthorized", "You must be signed in", 401)
     return None
+
+
+def _can_browse_global():
+    """Mirror the book-detail role gate without weakening content filters."""
+    try:
+        return bool(current_user.role_browse_global())
+    except (AttributeError, RuntimeError):
+        return False
 
 
 def _bookmark_filter(book_id, fmt):
@@ -105,6 +114,10 @@ def save_bookmark(book_id):
                     percentage,
                     origin_device_id=g.annotation_origin_device_id,
                     cfi=bookmark_key,
+                    # A named-source preview is a read-only inspection. When
+                    # the reader chooses to continue there, create/update only
+                    # the Browser source rather than rewriting device carriers.
+                    share_with_devices=data.get("share_with_devices", True) is not False,
                 )
             except Exception as e:
                 # Position sharing must never cost the user their bookmark.
@@ -118,6 +131,96 @@ def save_bookmark(book_id):
     if not ub.session_commit("Bookmark for user {} in book {} via api".format(current_user.id, book_id)):
         return "", 500
     return "", 204
+
+
+def _book_epub_path(book):
+    """Return the visible book's contained EPUB path, or ``None``."""
+    data_rows = getattr(book, "data", None) or ()
+    if not any(str(data.format).lower() == "epub" for data in data_rows):
+        return None
+    root = Path(config.get_book_path()).resolve()
+    for data in data_rows:
+        if str(data.format).lower() != "epub":
+            continue
+        path = (root / book.path / (data.name + ".epub")).resolve()
+        if path.is_relative_to(root) and path.is_file():
+            return path
+    return None
+
+
+@api_v1.route("/books/<int:book_id>/reading-sources")
+@login_required_if_no_ano
+def get_reading_sources(book_id):
+    """Return selectable, attributed positions for one visible EPUB.
+
+    Device rows are last reports. The resolved Kobo bookmark is intentionally a
+    separate source because its storage table cannot prove which device caused
+    the winning value. External connectors are read-only and best effort.
+    """
+    guard = _require_real_user()
+    if guard:
+        return guard
+    # Match the authorized reader/book-detail surface: hidden and archived are
+    # listing states, while a curator may deep-link into the global catalogue.
+    # common_filters() still enforces language/content/role restrictions.
+    book = calibre_db.get_filtered_book(
+        book_id,
+        allow_show_archived=True,
+        allow_show_hidden=True,
+        allow_show_global=_can_browse_global(),
+    )
+    if book is None:
+        return _err("not_found", "Book not found", 404)
+
+    user_id = int(current_user.id)
+    devices = (ub.session.query(ub.Device)
+               .filter(ub.Device.user_id == user_id)
+               .order_by(ub.Device.active.desc(), ub.Device.id)
+               .all())
+    positions = (ub.session.query(ub.DeviceReadingPosition)
+                 .filter(
+                     ub.DeviceReadingPosition.device_id.in_([row.id for row in devices]),
+                     ub.DeviceReadingPosition.book_id == book_id,
+                 ).all()) if devices else []
+    epub_path = _book_epub_path(book)
+    sources = reading_sources.device_source_rows(
+        devices, positions, book_id=book_id, epub_path=epub_path,
+    )
+
+    integration = {"configured": False, "reachable": None}
+    client = storyteller_source.configured_client(user_id)
+    if client is not None:
+        integration["configured"] = True
+        if epub_path is not None:
+            try:
+                source = storyteller_source.read_source(
+                    client,
+                    title=book.title,
+                    authors=[author.name for author in getattr(book, "authors", ())],
+                    epub_path=epub_path,
+                )
+                integration["reachable"] = True
+                if source is not None:
+                    sources.append(source)
+            except Exception:
+                integration["reachable"] = False
+                log.warning(
+                    "Could not read configured Storyteller position for user %s book %s",
+                    user_id, book_id, exc_info=True,
+                )
+
+    state = (ub.session.query(ub.KoboReadingState)
+             .filter_by(user_id=user_id, book_id=book_id).first())
+    resolved = reading_sources.resolved_source_row(
+        state.current_bookmark if state else None, book_id=book_id,
+    )
+    if resolved is not None:
+        sources.append(resolved)
+    return jsonify({
+        "book_id": book_id,
+        "sources": sources,
+        "integrations": {"storyteller": integration},
+    })
 
 
 @api_v1.route("/reader/settings")

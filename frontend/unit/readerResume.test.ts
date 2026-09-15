@@ -1,7 +1,38 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as delay } from 'node:timers/promises';
-import { resumeCfi } from '../src/lib/readerResume.ts';
+import { chapterProgressCfi, resumeCfi } from '../src/lib/readerResume.ts';
+
+test('same-edition chapter progression chooses a CFI inside that chapter', () => {
+  const cfiSpine = new Map([
+    ['preface-0', 0], ['chapter-0', 1], ['chapter-1', 1],
+    ['chapter-2', 1], ['chapter-3', 1], ['next-0', 2],
+  ]);
+  const spineItems = [
+    { index: 0, href: 'preface.xhtml' },
+    { index: 1, href: 'chapter001.xhtml' },
+    { index: 2, href: 'chapter002.xhtml' },
+  ];
+  const book = {
+    spine: {
+      spineItems,
+      get: (target: string | number) => typeof target === 'number'
+        ? spineItems[target]
+        : spineItems.find(row => row.href === target)
+          ?? (cfiSpine.has(target) ? spineItems[cfiSpine.get(target)!] : null),
+    },
+    locations: {
+      save: () => JSON.stringify([...cfiSpine.keys()]),
+      cfiFromLocation: (location: number) => [...cfiSpine.keys()][location],
+    },
+  };
+
+  assert.equal(chapterProgressCfi(
+    book, 'OEBPS/chapter001.xhtml', 0.74,
+  ), 'chapter-2');
+  assert.equal(chapterProgressCfi(book, 'missing.xhtml', 0.5), undefined);
+  assert.equal(chapterProgressCfi(book, 'chapter001.xhtml', 2), undefined);
+});
 
 test('portable percentages reach epub.js as fractions, including zero and completion', () => {
   const fractions: number[] = [];
@@ -38,6 +69,17 @@ test('exact resume belongs to the archive actually opened, including concurrent 
   assert.equal(resumeCfi({ cfiFromPercentage: p => `percentage:${p}` }, changed), 'percentage:0.95');
   const fallback = { percentage: 37.5, mode: 'offer' as const, synced_at: '' };
   assert.equal(await resumeForArchive(fallback, archive), fallback);
+});
+
+test('Storyteller href admission requires the archive fingerprint', async () => {
+  const { archiveMatchesFingerprint } = await import('../src/lib/readerResume.ts');
+  const archive = new TextEncoder().encode('identical Storyteller EPUB').buffer;
+  const digest = await crypto.subtle.digest('SHA-256', archive);
+  const fingerprint = Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
+
+  assert.equal(await archiveMatchesFingerprint(archive, fingerprint), true);
+  assert.equal(await archiveMatchesFingerprint(archive, '0'.repeat(64)), false);
+  assert.equal(await archiveMatchesFingerprint(archive, undefined), false);
 });
 
 for (const failure of ['null', 'undefined', 'throw'] as const) {

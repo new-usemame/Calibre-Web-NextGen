@@ -13769,7 +13769,6 @@ msgid "Support Calibre-Web NextGen"
 msgstr ""
 
 #: cps/templates/layout.html cps/templates/read.html cps/templates/readcbr.html
-#, fuzzy
 msgid "Settings"
 msgstr "Instellingen"
 
@@ -15937,3 +15936,47 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py
+msgid ""
+"Cover sources and their API keys belong to this server, not to either cover "
+"choice. They help search for images; choosing one here saves it only in the "
+"scope selected above."
+msgstr ""
+"Omslagbronnen en hun API-sleutels horen bij deze server, niet bij een van beide "
+"omslagkeuzes. Ze helpen bij het zoeken naar afbeeldingen; als je hier een "
+"afbeelding kiest, wordt die alleen opgeslagen binnen het hierboven gekozen "
+"bereik."
+
+#: cps/spa_strings.py
+msgid "Edit my private cover"
+msgstr "Mijn privéomslag bewerken"
+
+#: cps/spa_strings.py
+msgid "Edit shared library cover"
+msgstr "Gedeelde bibliotheekomslag bewerken"
+
+#: cps/spa_strings.py
+msgid "My private cover"
+msgstr "Mijn privéomslag"
+
+#: cps/spa_strings.py
+msgid "Shared cover"
+msgstr "Gedeelde omslag"
+
+#: cps/spa_strings.py
+msgid ""
+"This changes only your view of this book and copies delivered to your "
+"e-readers. The shared book cover and everyone else’s view stay unchanged."
+msgstr ""
+"Dit wijzigt alleen jouw weergave van dit boek en de exemplaren die naar je "
+"e-readers worden gestuurd. De gedeelde boekomslag en de weergave van alle "
+"anderen blijven ongewijzigd."
+
+#: cps/spa_strings.py
+msgid ""
+"This changes the cover stored with the book. Everyone who can access the book "
+"sees it."
+msgstr ""
+"Dit wijzigt de omslag die bij het boek is opgeslagen. Iedereen die toegang "
+"tot het boek heeft, ziet deze."

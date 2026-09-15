@@ -14507,3 +14507,37 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid ""
+"Cover sources and their API keys belong to this server, not to either cover "
+"choice. They help search for images; choosing one here saves it only in the "
+"scope selected above."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Edit my private cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Edit shared library cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "My private cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Shared cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This changes only your view of this book and copies delivered to your "
+"e-readers. The shared book cover and everyone else’s view stay unchanged."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This changes the cover stored with the book. Everyone who can access the book "
+"sees it."
+msgstr ""

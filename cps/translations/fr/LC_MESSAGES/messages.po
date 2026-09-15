@@ -16448,3 +16448,47 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid ""
+"Cover sources and their API keys belong to this server, not to either cover "
+"choice. They help search for images; choosing one here saves it only in the "
+"scope selected above."
+msgstr ""
+"Les sources de couvertures et leurs clés API appartiennent à ce serveur, et "
+"non à l’un ou l’autre choix de couverture. Elles servent à rechercher des "
+"images ; le choix effectué ici enregistre l’image uniquement dans la portée "
+"sélectionnée ci-dessus."
+
+#: cps/spa_strings.py
+msgid "Edit my private cover"
+msgstr "Modifier ma couverture privée"
+
+#: cps/spa_strings.py
+msgid "Edit shared library cover"
+msgstr "Modifier la couverture partagée de la bibliothèque"
+
+#: cps/spa_strings.py
+msgid "My private cover"
+msgstr "Ma couverture privée"
+
+#: cps/spa_strings.py
+msgid "Shared cover"
+msgstr "Couverture partagée"
+
+#: cps/spa_strings.py
+msgid ""
+"This changes only your view of this book and copies delivered to your "
+"e-readers. The shared book cover and everyone else’s view stay unchanged."
+msgstr ""
+"Cela modifie uniquement votre affichage de ce livre et les copies envoyées à "
+"vos liseuses. La couverture partagée du livre et l’affichage des autres "
+"utilisateurs restent inchangés."
+
+#: cps/spa_strings.py
+msgid ""
+"This changes the cover stored with the book. Everyone who can access the book "
+"sees it."
+msgstr ""
+"Cela modifie la couverture enregistrée avec le livre. Toute personne ayant "
+"accès au livre la voit."

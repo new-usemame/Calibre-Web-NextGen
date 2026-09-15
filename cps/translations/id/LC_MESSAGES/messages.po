@@ -13471,7 +13471,6 @@ msgid "Support Calibre-Web NextGen"
 msgstr ""
 
 #: cps/templates/layout.html cps/templates/read.html cps/templates/readcbr.html
-#, fuzzy
 msgid "Settings"
 msgstr "Pengaturan"
 

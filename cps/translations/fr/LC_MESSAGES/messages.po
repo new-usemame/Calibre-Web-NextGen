@@ -7898,6 +7898,10 @@ msgid "Show Read now and edit buttons"
 msgstr "Afficher les boutons Lire et Modifier"
 
 #: cps/spa_strings.py
+msgid "Show Reading tags"
+msgstr "Afficher les étiquettes de lecture"
+
+#: cps/spa_strings.py
 msgid "Show Table view"
 msgstr "Afficher la vue en tableau"
 

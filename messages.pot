@@ -7424,6 +7424,10 @@ msgid "Show Read now and edit buttons"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Show Reading tags"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Show Table view"
 msgstr ""
 
@@ -14506,4 +14510,3 @@ msgstr ""
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr ""
-

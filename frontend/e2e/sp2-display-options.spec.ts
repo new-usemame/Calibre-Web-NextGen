@@ -1,5 +1,117 @@
 import { test, expect } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { assertNoHorizontalOverflow } from './utils';
+
+function preferenceWrite(
+  response: import('@playwright/test').Response,
+  name: string,
+  value: boolean,
+) {
+  if (!response.url().includes('/api/v1/account/preferences')
+      || response.request().method() !== 'POST') return false;
+  const body = response.request().postDataJSON() as {
+    preferences?: Record<string, boolean>;
+  };
+  return body.preferences?.[name] === value;
+}
+
+test('Reading tags stay visible by default and the account preference hides them persistently', async ({ page }) => {
+  const csrf = await page.request.get('/api/v1/auth/csrf').then((response) => response.json()) as {
+    csrf_token: string;
+  };
+  const headers = { 'X-CSRFToken': csrf.csrf_token };
+  await page.request.post('/api/v1/account/preferences', {
+    headers,
+    data: { preferences: { reading_tags_hidden: false } },
+  });
+  await page.addInitScript(() => localStorage.removeItem('cwng:reading-tags-hidden-v1'));
+  await page.route(/\/api\/v1\/books\?.*/, async (route) => {
+    const response = await route.fetch();
+    const payload = await response.json() as { items?: Array<Record<string, unknown>> };
+    if (payload.items?.[0]) {
+      payload.items[0].in_progress = true;
+      payload.items[0].read = false;
+    }
+    await route.fulfill({ response, json: payload });
+  });
+
+  await page.goto('/app');
+  await expect(page.getByTestId('reading-badge').first()).toBeVisible();
+  await page.getByTestId('catalog-view-settings').click();
+  const toggle = page.getByTestId('show-reading-tags');
+  await expect(toggle).toBeChecked();
+
+  const hiddenSaved = page.waitForResponse((response) =>
+    preferenceWrite(response, 'reading_tags_hidden', true));
+  await toggle.click();
+  expect((await hiddenSaved).ok()).toBeTruthy();
+  await expect(toggle).not.toBeChecked();
+  await expect(page.getByTestId('reading-badge')).toHaveCount(0);
+  expect(await page.evaluate(() =>
+    localStorage.getItem('cwng:reading-tags-hidden-v1'))).toBe('1');
+
+  await page.reload();
+  await expect(page.getByTestId('reading-badge')).toHaveCount(0);
+  await page.getByTestId('catalog-view-settings').click();
+  const restoredToggle = page.getByTestId('show-reading-tags');
+  await expect(restoredToggle).not.toBeChecked();
+
+  const visibleSaved = page.waitForResponse((response) =>
+    preferenceWrite(response, 'reading_tags_hidden', false));
+  await restoredToggle.click();
+  expect((await visibleSaved).ok()).toBeTruthy();
+  await expect(restoredToggle).toBeChecked();
+  await expect(page.getByTestId('reading-badge').first()).toBeVisible();
+  await page.unrouteAll({ behavior: 'wait' });
+});
+
+test('View settings radios use the active theme accent', async ({ page }) => {
+  await page.goto('/app');
+  await page.getByTestId('catalog-view-settings').click();
+  await page.getByRole('radio', { name: 'Dense' }).check();
+  await page.getByRole('radio', { name: '3' }).check();
+
+  for (const radio of [
+    page.getByRole('radio', { name: 'Dense' }),
+    page.getByRole('radio', { name: '3' }),
+  ]) {
+    const colors = await radio.evaluate((input) => {
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--accent)';
+      document.body.append(probe);
+      const themeAccent = getComputedStyle(probe).color;
+      probe.remove();
+      return { radio: getComputedStyle(input).accentColor, themeAccent };
+    });
+    expect(colors.radio).toBe(colors.themeAccent);
+  }
+
+  await page.getByRole('radio', { name: 'Dense' }).focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByRole('radio', { name: 'Compact' })).toBeChecked();
+  await page.getByRole('radio', { name: '3' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('radio', { name: '4' })).toBeChecked();
+
+  // The extra preference makes the menu taller than short desktop and mobile
+  // viewports. Keyboard focus must reveal the final option inside the menu.
+  const menu = page.getByTestId('catalog-view-settings-menu');
+  const lastRowCount = page.getByRole('radio', { name: '6', exact: true });
+  await lastRowCount.focus();
+  await expect(lastRowCount).toBeInViewport();
+  const bounds = await Promise.all([menu.boundingBox(), lastRowCount.boundingBox()]);
+  expect(bounds[0]).not.toBeNull();
+  expect(bounds[1]).not.toBeNull();
+  expect(bounds[1]!.y + bounds[1]!.height)
+    .toBeLessThanOrEqual(bounds[0]!.y + bounds[0]!.height);
+
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+  expect(results.violations
+    .filter((violation) => ['critical', 'serious'].includes(violation.impact ?? ''))
+    .map((violation) => violation.id)).toEqual([]);
+});
 
 test('library density control persists and produces a denser mobile grid', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });

@@ -15,6 +15,7 @@ import type { Book } from '../lib/api';
 import { ApiError } from '../lib/api';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
+import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import {
   canonicalMagicShelfSortAdoption,
   customMagicShelfSortOptions,
@@ -41,6 +42,7 @@ function dedupAppend(prev: Book[], next: Book[]): Book[] {
 /** Native view of a saved smart shelf's matching books, with duplicate/delete. */
 export function MagicShelfView({ id }: { id: string }) {
   const [cardActionsHidden] = useCardActionsHidden();
+  const [readingTagsHidden] = useReadingTagsHidden();
   const t = useT();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
@@ -295,7 +297,8 @@ export function MagicShelfView({ id }: { id: string }) {
             {books.map((b, i) => (
               <BookCard key={b.id} book={b}
                 selectable={selecting} selectionDisabled={bulkBusy} selected={selected.has(b.id)} onToggleSelect={toggleSelect}
-                hideActions={cardActionsHidden} canRead={!!me?.role?.viewer}
+                hideActions={cardActionsHidden} hideReadingTags={readingTagsHidden}
+                canRead={!!me?.role?.viewer}
                 style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }} />
             ))}
           </div>

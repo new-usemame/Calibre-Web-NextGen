@@ -7750,6 +7750,10 @@ msgid "Show Read now and edit buttons"
 msgstr "Knoppen Nu lezen en bewerken tonen"
 
 #: cps/spa_strings.py
+msgid "Show Reading tags"
+msgstr "Leesstatuslabels tonen"
+
+#: cps/spa_strings.py
 msgid "Show Table view"
 msgstr "Tabelweergave tonen"
 

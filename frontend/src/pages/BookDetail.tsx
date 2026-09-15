@@ -26,6 +26,7 @@ import { getPrimaryReadTarget } from '../lib/readerTarget';
 import { canDeleteBooks, canDownloadBooks, canReadBooks, canUploadBooks } from '../lib/permissions';
 import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
+import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { BookUserNotices } from '../components/UserNotices';
 import { backTarget } from '../lib/backLink';
 import { useAnnouncer } from '../lib/a11y/announcer';
@@ -375,6 +376,7 @@ function DescriptionBlock({ html, bookId }: { html: string; bookId: number }) {
 
 export function BookDetail() {
   const [cardActionsHidden] = useCardActionsHidden();
+  const [readingTagsHidden] = useReadingTagsHidden();
   const t = useT();
   const announce = useAnnouncer();
   const params = useParams<{ id: string }>();
@@ -1019,6 +1021,7 @@ export function BookDetail() {
       {book.authors.length > 0 && (
         <MoreByAuthor
           hideActions={cardActionsHidden}
+          hideReadingTags={readingTagsHidden}
           canRead={canReadBooks(me)}
           key={book.id}
           authorId={book.authors[0].id}

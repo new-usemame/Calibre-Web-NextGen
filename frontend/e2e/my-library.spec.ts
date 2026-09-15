@@ -563,9 +563,8 @@ test.describe('My Library', () => {
       annotationId = await createBrowserHighlight(page, book.id, marker);
 
       // Drive the same confirmation and membership mutation a person uses; the
-      // control is the gear menu's "Remove from library" item.
+      // control is the visible "Remove from my library" action.
       await page.goto(`/app/book/${book.id}`);
-      await page.getByTestId('book-actions-menu').click();
       const confirmation = page.waitForEvent('dialog').then(async (dialog) => {
         expect(dialog.message()).toContain(`Remove "${book.title}" from your library?`);
         expect(dialog.message()).toContain('your highlights, notes and reading progress are kept');
@@ -573,7 +572,7 @@ test.describe('My Library', () => {
       });
       await Promise.all([
         confirmation,
-        page.getByRole('menuitem', { name: 'Remove from library' }).click(),
+        page.getByRole('button', { name: 'Remove from my library', exact: true }).click(),
       ]);
       await expect(page.getByText('Removed from your library', { exact: true })).toBeAttached();
       await expect.poll(async () => {
@@ -671,14 +670,13 @@ test.describe('My Library', () => {
       const acknowledged = await koboSync(page, token, deviceId, delivered.syncToken);
 
       await page.goto(`/app/book/${detail!.id}`);
-      await page.getByTestId('book-actions-menu').click();
       const confirmation = page.waitForEvent('dialog').then(async (dialog) => {
         expect(dialog.message()).toContain("it also leaves your Kobo at its next sync");
         await dialog.accept();
       });
       await Promise.all([
         confirmation,
-        page.getByRole('menuitem', { name: 'Remove from library' }).click(),
+        page.getByRole('button', { name: 'Remove from my library', exact: true }).click(),
       ]);
       await expect(page.getByText('Removed from your library', { exact: true })).toBeAttached();
 
@@ -745,12 +743,11 @@ test.describe('My Library', () => {
     await keepOnlyMembership(page, book.id);
     await page.goto(`/app/book/${book.id}`);
 
-    // The detail action is the same gear-menu item for mouse, keyboard and
+    // The detail action is the same visible button for mouse, keyboard and
     // touch. The card's compact remove affordance is intentionally
     // hover/disclosure-driven on some viewports and is not the right
     // cross-modality oracle for this cell.
-    await page.getByTestId('book-actions-menu').click();
-    const removeItem = page.getByRole('menuitem', { name: 'Remove from library' });
+    const removeItem = page.getByRole('button', { name: 'Remove from my library', exact: true });
     const confirmation = page.waitForEvent('dialog').then(async (dialog) => {
       expect(dialog.message()).toContain(`Remove "${book.title}" from your library?`);
       expect(dialog.message()).toContain('the book stays in the global library');

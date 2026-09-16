@@ -29,7 +29,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from cps import config, db, helper, logger
 from cps.constants import REFLOW_DIR
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED
-from cps.services.reflow import build_epub, ledger as ledger_mod, model, pipeline, report
+from cps.services.reflow import admission, build_epub, ledger as ledger_mod, model, \
+    pipeline, report
 
 log = logger.create()
 
@@ -149,6 +150,16 @@ class TaskReflowPdf(CalibreTask):
     # ---------------------------------------------------------------------- run
 
     def run(self, worker_thread):
+        try:
+            self._run(worker_thread)
+        finally:
+            # The book's admission reservation ends with the task, however it ends
+            # -- success, failure, or cancel. A task cancelled while still queued
+            # never reaches this method; its entry is evicted by the next admission
+            # attempt, which reads the task's terminal state (admission.reserve).
+            admission.release(self.book_id, self)
+
+    def _run(self, worker_thread):
         import pymupdf
 
         local_db = db.CalibreDB(expire_on_commit=False, init=True)

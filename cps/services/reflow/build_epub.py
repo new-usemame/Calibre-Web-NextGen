@@ -43,7 +43,7 @@ from urllib.parse import unquote
 from xml.etree import ElementTree
 from xml.sax.saxutils import escape, quoteattr
 
-from . import assemble, extract
+from . import assemble, extract, gate
 
 log = logging.getLogger(__name__)
 
@@ -855,6 +855,30 @@ def _readable_characters(page_html):
     return pages, records
 
 
+def _refuse_unsafe_pages(page_html, book):
+    """The final markup boundary: nothing active or remote reaches the reader.
+
+    A page the pipeline adopted has already passed the gate's markup contract, so
+    a violation here means the bytes arrived by another road -- a cache written
+    before the contract existed, or a caller that never went through the gate. The
+    fragment is not repaired and passed off as the answer: it is refused, and the
+    book ships the page's own deterministic text with the refusal disclosed, which
+    is the same answer a page that fails the gate gets.
+    """
+    cleaned, refused = {}, []
+    for pno, html in page_html.items():
+        reasons = gate.check_markup_safety(html)
+        if not reasons:
+            cleaned[pno] = html
+            continue
+        if pno not in book.pages:
+            raise ValueError("page %d is not in the book; refusing to drop its text"
+                             % pno)
+        cleaned[pno] = page_fragment(book, pno)
+        refused.append((pno, reasons))
+    return cleaned, refused
+
+
 def build(book, out_path, page_html=None, metadata=None, doc=None,
           report_html=None, sidecar=None, identifier=None):
     """Write one EPUB 3 and say what went into it.
@@ -868,6 +892,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     if page_html is None:
         page_html = {pno: page_fragment(book, pno) for pno in sorted(book.pages)}
     page_html, unrepresentable = _readable_characters(page_html)
+    page_html, refused = _refuse_unsafe_pages(page_html, book)
 
     pages = _page_blocks(page_html)
     joins = _join_page_turns(pages)
@@ -890,6 +915,13 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     documents = {}
 
     losses = _losses(dropped, missing)
+    if refused:
+        losses.append(_count(
+            len(refused),
+            "One page's markup could not be trusted and the page is kept as its "
+            "plain text.",
+            "%d pages' markup could not be trusted and they are kept as their "
+            "plain text."))
     if unrepresentable:
         count = sum(item["count"] for item in unrepresentable)
         losses.append(
@@ -927,6 +959,9 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         warnings.append("%d note links had no target and were disarmed" % len(dropped))
     if missing:
         warnings.append("%d figure images could not be extracted" % len(missing))
+    for pno, reasons in refused:
+        warnings.append("page %d's markup was not trusted (%s); the page ships as "
+                        "its plain text" % (pno, reasons[0]))
 
     _write_epub(out_path, {
         "opf": _opf(metadata, manifest, spine, identifier, modified),

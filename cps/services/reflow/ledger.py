@@ -30,8 +30,8 @@ class CapExceeded(Exception):
         self.cap = cap
         self.projected = projected
         super(CapExceeded, self).__init__(
-            "cost cap reached: $%.4f spent of $%.2f, next page needs about $%.4f"
-            % (spent, cap, projected))
+            "cost cap reached: $%.4f spent of $%.2f, and the next page could cost "
+            "up to $%.4f at the allowed rates" % (spent, cap, projected))
 
 
 class Ledger(object):

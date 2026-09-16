@@ -308,6 +308,156 @@ def test_a_cap_above_the_administrators_ceiling_is_brought_back_down(
 
 
 @pytest.mark.unit
+def test_a_cap_that_cannot_fund_even_one_page_is_refused_with_the_figure(
+        mod, monkeypatch, pdf_on_disk):
+    """Preflight shares the request bound. A cap that passes the estimate but
+    cannot fund the cheapest possible paid page would start a job that stops at
+    the first reservation -- refuse it up front, with the figure."""
+    _wire(mod, monkeypatch, pdf_on_disk, quote=_quote(routed=1, pages=400))
+    floor = mod.model.min_request_bound_usd("standard")
+    cap = round((0.0022 + floor) / 2, 4)   # above the $0.0022 estimate, below the floor
+    resp, added = _start(mod, {"mode": "full", "model_tier": "standard",
+                               "consent": True, "cost_cap_usd": cap})
+    assert _status(resp) == 400
+    assert _json(resp)["error"]["code"] == "cap_below_request_floor"
+    assert "%.4f" % floor in _json(resp)["error"]["message"]
+    added.assert_not_called()
+
+
+@pytest.mark.unit
+def test_the_estimate_publishes_the_cheapest_paid_request_per_tier(
+        mod, monkeypatch, pdf_on_disk):
+    """The page that collects consent shows the bound the cap is enforced with."""
+    _wire(mod, monkeypatch, pdf_on_disk)
+    with _ctx("/api/v1/books/5/reflow/estimate"):
+        with patch.object(mod, "current_user", _user()):
+            body = _json(inspect.unwrap(mod.reflow_estimate)(5))
+
+    tiers = {entry["tier"]: entry for entry in body["tiers"]}
+    for tier, spec in mod.model.TIERS.items():
+        assert tiers[tier]["min_request_usd"] == pytest.approx(
+            mod.model.min_request_bound_usd(tier)), tier
+
+
+@pytest.mark.unit
+def test_two_simultaneous_starts_admit_exactly_one_conversion(
+        mod, monkeypatch, pdf_on_disk):
+    """The finding's repro as a regression. Check-then-enqueue let both requests
+    pass the running-task scan before either published; reserve-through-enqueue
+    closes the gap, and the barrier in the fake add holds the gap open so a
+    regression to the old shape cannot pass by scheduling luck."""
+    import threading
+
+    _wire(mod, monkeypatch, pdf_on_disk)
+    worker = SimpleNamespace(tasks=[])
+    queued = []
+    barrier = threading.Barrier(2)
+
+    def add(_user, task):
+        try:
+            barrier.wait(timeout=2)
+        except threading.BrokenBarrierError:
+            pass
+        queued.append(task)
+
+    monkeypatch.setattr(mod.WorkerThread, "get_instance",
+                        staticmethod(lambda: worker))
+    monkeypatch.setattr(mod.WorkerThread, "add", staticmethod(add))
+
+    outcomes = []
+
+    def start():
+        with _ctx("/api/v1/books/5/reflow", method="POST",
+                  body={"mode": "full", "model_tier": "standard", "consent": True,
+                        "cost_cap_usd": 1.0}):
+            with patch.object(mod, "current_user", _user()):
+                outcomes.append(_status(inspect.unwrap(mod.reflow_start)(5)))
+
+    threads = [threading.Thread(target=start) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=15)
+    assert not any(thread.is_alive() for thread in threads)
+
+    assert sorted(outcomes) == [202, 409], outcomes
+    assert len(queued) == 1
+
+
+@pytest.mark.unit
+def test_a_book_is_reserved_for_other_users_and_other_modes_too(
+        mod, monkeypatch, pdf_on_disk):
+    """The reservation is the book's, not the user's or the mode's: a sample
+    started by one user blocks a full conversion started by another."""
+    _wire(mod, monkeypatch, pdf_on_disk)
+    worker = SimpleNamespace(tasks=[])
+    monkeypatch.setattr(mod.WorkerThread, "get_instance",
+                        staticmethod(lambda: worker))
+    monkeypatch.setattr(mod.WorkerThread, "add", staticmethod(lambda u, t: None))
+
+    with _ctx("/api/v1/books/5/reflow", method="POST",
+              body={"mode": "sample", "model_tier": "standard", "consent": True,
+                    "cost_cap_usd": 1.0}):
+        with patch.object(mod, "current_user", _user(uid=7)):
+            assert _status(inspect.unwrap(mod.reflow_start)(5)) == 202
+    with _ctx("/api/v1/books/5/reflow", method="POST",
+              body={"mode": "full", "model_tier": "standard", "consent": True,
+                    "cost_cap_usd": 1.0}):
+        with patch.object(mod, "current_user", _user(uid=9)):
+            assert _status(inspect.unwrap(mod.reflow_start)(5)) == 409
+
+
+@pytest.mark.unit
+def test_an_unrelated_book_is_never_blocked(mod, monkeypatch, pdf_on_disk):
+    _wire(mod, monkeypatch, pdf_on_disk)
+    books = {5: _book(5), 6: _book(6)}
+    monkeypatch.setattr(mod, "calibre_db", SimpleNamespace(
+        get_filtered_book=lambda bid, **kw: books.get(int(bid)),
+        get_book=lambda bid: books.get(int(bid)),
+        get_book_format=lambda bid, fmt: (
+            SimpleNamespace(name=pdf_on_disk["name"], format=fmt)
+            if fmt == "PDF" else None)))
+    monkeypatch.setattr(mod.WorkerThread, "get_instance",
+                        staticmethod(lambda: SimpleNamespace(tasks=[])))
+    monkeypatch.setattr(mod.WorkerThread, "add", staticmethod(lambda u, t: None))
+
+    statuses = []
+    for book_id in (5, 6):
+        with _ctx("/api/v1/books/%d/reflow" % book_id, method="POST",
+                  body={"mode": "full", "model_tier": "standard", "consent": True,
+                        "cost_cap_usd": 1.0}):
+            with patch.object(mod, "current_user", _user()):
+                statuses.append(_status(inspect.unwrap(mod.reflow_start)(book_id)))
+    assert statuses == [202, 202]
+
+
+@pytest.mark.unit
+def test_a_start_whose_enqueue_fails_releases_the_book(mod, monkeypatch, pdf_on_disk):
+    """A reservation with no task behind it would lock the book forever."""
+    _wire(mod, monkeypatch, pdf_on_disk)
+    monkeypatch.setattr(mod.WorkerThread, "get_instance",
+                        staticmethod(lambda: SimpleNamespace(tasks=[])))
+
+    def broken_add(_user, _task):
+        raise RuntimeError("the queue is gone")
+
+    monkeypatch.setattr(mod.WorkerThread, "add", staticmethod(broken_add))
+    with _ctx("/api/v1/books/5/reflow", method="POST",
+              body={"mode": "full", "model_tier": "standard", "consent": True,
+                    "cost_cap_usd": 1.0}):
+        with patch.object(mod, "current_user", _user()):
+            with pytest.raises(RuntimeError):
+                inspect.unwrap(mod.reflow_start)(5)
+
+    monkeypatch.setattr(mod.WorkerThread, "add", staticmethod(lambda u, t: None))
+    with _ctx("/api/v1/books/5/reflow", method="POST",
+              body={"mode": "full", "model_tier": "standard", "consent": True,
+                    "cost_cap_usd": 1.0}):
+        with patch.object(mod, "current_user", _user()):
+            assert _status(inspect.unwrap(mod.reflow_start)(5)) == 202
+
+
+@pytest.mark.unit
 def test_a_second_conversion_of_the_same_book_is_refused_while_one_is_running(
         mod, monkeypatch, pdf_on_disk):
     _wire(mod, monkeypatch, pdf_on_disk)

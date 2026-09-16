@@ -83,6 +83,53 @@ def test_unprintable_source_characters_do_not_make_a_whole_chapter_unreadable(
     assert any("replacement character" in warning for warning in losses)
 
 
+def test_a_hostile_cached_page_is_refused_at_the_packaging_boundary(tmp_path):
+    """The final boundary. A page written to the cache before the adoption gate
+    learned this check -- or planted there -- must not ship either: the builder
+    refuses the fragment, ships the page's own deterministic text, and says so."""
+    book = _book(F.prose_page)
+    source = assemble.page_source_text(book, 0)
+    hostile = ('<p>%s</p><img src="https://example.invalid/reflow-pixel.gif" '
+               'onerror="fetch(\'https://example.invalid/event\')" alt=""/>') % source
+
+    built = _build(book, tmp_path, page_html={0: hostile})
+
+    assert build_epub.validate(built.path) == []
+    with zipfile.ZipFile(built.path) as zf:
+        chapters = "".join(zf.read(n).decode("utf-8")
+                           for n in zf.namelist()
+                           if n.startswith("OEBPS/ch") and n.endswith(".xhtml"))
+    assert "example.invalid" not in chapters
+    assert "onerror" not in chapters
+    # The reader still gets the page itself, word for word.
+    assert source.split()[0] in chapters
+    assert source.split()[-1] in chapters
+    assert any("not trusted" in warning for warning in built.warnings), built.warnings
+    assert built.sidecar.get("unplaced"), "the refusal is disclosed, not silent"
+
+
+def test_legitimate_model_markup_survives_the_packaging_boundary_unchanged(tmp_path):
+    """The control that matters: a packaging gate that mangles legitimate markup
+    would fail the pages the adoption gate exists to let through. Uncertainty
+    marks, tables and figure references come out the far side byte for byte."""
+    book = _book(F.prose_page)
+    source = assemble.page_source_text(book, 0)
+    fragment = ('<p>%s</p><table><tbody><tr><td colspan="2">x</td></tr></tbody></table>'
+                '<p>a <span class="reflow-uncertain" title="likely: well">wel1</span> b</p>'
+                % source)
+
+    built = _build(book, tmp_path, page_html={0: fragment})
+
+    assert build_epub.validate(built.path) == []
+    with zipfile.ZipFile(built.path) as zf:
+        chapters = "".join(zf.read(n).decode("utf-8")
+                           for n in zf.namelist()
+                           if n.startswith("OEBPS/ch") and n.endswith(".xhtml"))
+    assert '<span class="reflow-uncertain" title="likely: well">wel1</span>' in chapters
+    assert '<td colspan="2">x</td>' in chapters
+    assert not built.warnings
+
+
 def test_a_marked_uncertain_reading_reaches_the_reader_looking_marked(tmp_path):
     """R3 ends here. A mark that the builder's block splitting mangles, or that the
     book's stylesheet says nothing about, is an annotation nobody can see -- and an

@@ -64,12 +64,105 @@ def completion_budget(page_text):
     return max(COMPLETION_TOKENS_FLOOR, min(COMPLETION_TOKENS_CEILING, needed))
 
 
+def _utf8_bytes(text):
+    return len((text or "").encode("utf-8"))
+
+
+def _jpeg_dimensions(data):
+    """(width, height) of a JPEG, read off its SOF marker. None when unreadable.
+
+    The image's token price is a function of its pixels on every upstream that
+    bills by token, so the bound reads the real dimensions of the bytes that will
+    actually be sent rather than trusting what the caller meant to render.
+    """
+    try:
+        if not data or len(data) < 4 or data[0] != 0xFF or data[1] != 0xD8:
+            return None
+        index = 2
+        while index + 9 < len(data):
+            if data[index] != 0xFF:
+                index += 1
+                continue
+            marker = data[index + 1]
+            if marker == 0xD8 or marker == 0xD9 or 0xD0 <= marker <= 0xD7:
+                index += 2                       # payload-free markers
+                continue
+            length = (data[index + 2] << 8) + data[index + 3]
+            if length < 2:
+                return None
+            if 0xC0 <= marker <= 0xCF and marker not in (0xC4, 0xC8, 0xCC):
+                height = (data[index + 5] << 8) + data[index + 6]
+                width = (data[index + 7] << 8) + data[index + 8]
+                return (width, height) if width and height else None
+            index += 2 + length
+    except (IndexError, TypeError):
+        return None
+    return None
+
+
+def image_token_bound(image_jpeg):
+    """The most tokens the image half of a request can be billed for.
+
+    Pixels over 750, doubled -- see the accounting note above -- with a floor for
+    providers that rescale small images up, and the pipeline's largest legal raster
+    for an image whose own dimensions could not be read.
+    """
+    dimensions = _jpeg_dimensions(image_jpeg)
+    if dimensions is None:
+        return UNKNOWN_IMAGE_TOKENS
+    width, height = dimensions
+    tokens = IMAGE_TOKEN_HEADROOM * (-(-width * height // IMAGE_PIXELS_PER_TOKEN))
+    return max(IMAGE_TOKEN_MINIMUM, tokens)
+
+
 #: What one page of a real book costs in tokens. MEASURED 2026-09-13 on the
 #: acceptance book: prompt 1,878-2,029 (the page's text plus its raster) and
 #: completion 892-1,293. These carry about 10% over the worst page measured, and they
-#: are what every dollar figure shown to a user is built from.
+#: are what every dollar figure shown to a user is built from. They are ESTIMATES:
+#: the cap does not reserve against them, it reserves against the strict bound of
+#: each request (see ``request_bound``) -- a measured average is not a ceiling.
 PAGE_PROMPT_TOKENS = 2100
 PAGE_COMPLETION_TOKENS = 1400
+
+#: How the strict request bound counts its tokens. Every rate a request can be
+#: billed at is capped by ``provider.max_price`` -- but max_price limits RATES, not
+#: the total, so the bound has to count the most the request can ever contain:
+#:
+#: * prompt text: one token per UTF-8 byte. The tier models all run byte-level
+#:   tokenizers (byte-pair encodings with byte fallback), where merges only ever
+#:   reduce the count, so the byte count is a hard ceiling rather than a guess.
+#: * prompt scaffolding: a flat allowance per message for role/wrapper tokens.
+#: * the image: pixels / 750, doubled. The densest published per-pixel accounting
+#:   among vision upstreams is Anthropic's (width x height) / 750; OpenAI's tiling
+#:   (85 + 170 per 512px tile after scaling under 2048px) and the Qwen/BytePlus
+#:   patch accounting (pixels / 784, with a merge that quarters it) both come out
+#:   lower for the rasters this pipeline sends. Doubling the densest one is the
+#:   headroom for an upstream that tokenizes more finely or rescales the image
+#:   upward to a minimum size. It is a documented bound with a stated provenance,
+#:   not an unlimited assumption -- and it is why ``max_price`` also carries the
+#:   ``image`` ceiling, so an upstream that prices an image flat instead of by
+#:   token cannot bill that mode outside the cap either.
+#: * completion: exactly the ``max_tokens`` sent. Reasoning is disabled in the
+#:   payload, so the whole output budget is the visible answer; OpenRouter routes
+#:   only to providers that can honour the requested length.
+#:
+#: What remains outside the bound, honestly: a provider that bills MORE tokens than
+#: a byte-per-token of the prompt it was sent, or beyond the max_tokens it was
+#: given, is outside its own contract -- and a non-200 response is treated as
+#: unbilled, which is OpenRouter's documented shape for errors (no completion is
+#: produced). The ledger still records the provider's own reported figure when one
+#: arrives, so an over-bound bill would be visible in the job's record rather than
+#: hidden.
+MESSAGE_OVERHEAD_TOKENS = 16
+IMAGE_PIXELS_PER_TOKEN = 750
+IMAGE_TOKEN_HEADROOM = 2
+#: Providers that rescale an image upward to their minimum size make a tiny image
+#: cost more than its pixels say. The floor prices that rescale.
+IMAGE_TOKEN_MINIMUM = 1024
+#: An image whose dimensions cannot be read from its bytes is priced at the largest
+#: raster the pipeline is allowed to allocate (extract.MAX_RASTER_PIXELS), at the
+#: bound density above: 2 * ceil(4096*4096 / 750) = 44,740.
+UNKNOWN_IMAGE_TOKENS = 48000
 
 
 @dataclass
@@ -89,7 +182,13 @@ class ModelSpec(object):
 
     @property
     def price_per_page(self):
-        """The most one page of a book can cost at this tier's ceiling."""
+        """The expected cost of one page at this tier's ceiling rate.
+
+        This is the ESTIMATE every dollar figure shown to a user is built from. It
+        is not the most a page can cost -- a dense page's request permits more
+        completion tokens than this counts -- so the cap reserves the strict bound
+        of each request instead (``OpenRouterClient.request_bound``).
+        """
         return round((PAGE_PROMPT_TOKENS * self.prompt_usd_per_mtok
                       + PAGE_COMPLETION_TOKENS * self.completion_usd_per_mtok) / 1e6, 6)
 
@@ -234,6 +333,41 @@ class OpenRouterClient(object):
     def price_per_page(self):
         return self.spec.price_per_page
 
+    # ------------------------------------------------------- the strict bound
+
+    def request_bound(self, page_text, image_jpeg=None, max_tokens=None,
+                      ladder=(1, 2, 3, 4), hints=None, page_label=None, headings=()):
+        """The most the request for this page can be billed, in USD.
+
+        The number the cap reserves. max_price caps the RATES, not the total, so
+        the bound counts the most the request can contain -- every prompt byte, the
+        image's pixels, the full answer allowance -- at those ceiling rates. See the
+        accounting note at ``MESSAGE_OVERHEAD_TOKENS`` for what is counted and what
+        is honestly outside it.
+        """
+        max_tokens = int(max_tokens or completion_budget(page_text))
+        payload = self._payload(page_text, image_jpeg, ladder, hints, page_label,
+                                max_tokens, headings=headings)
+        return self._request_bound_for(payload, image_jpeg, max_tokens)
+
+    def _request_bound_for(self, payload, image_jpeg, max_tokens):
+        messages = payload.get("messages") or []
+        text_bytes = 0
+        for message in messages:
+            content = message.get("content")
+            if isinstance(content, str):
+                text_bytes += _utf8_bytes(content)
+            elif isinstance(content, list):
+                text_bytes += sum(_utf8_bytes(part.get("text")) for part in content
+                                  if part.get("type") == "text")
+        prompt_tokens = text_bytes + MESSAGE_OVERHEAD_TOKENS * len(messages)
+        if image_jpeg:
+            prompt_tokens += image_token_bound(image_jpeg)
+        # No rounding: rounding the reservation DOWN would admit a bill past the
+        # cap by the rounding, which is the bug this number exists to close.
+        return (prompt_tokens * self.spec.prompt_usd_per_mtok
+                + int(max_tokens) * self.spec.completion_usd_per_mtok) / 1e6
+
     # ------------------------------------------------------------------- calling
 
     def edit_page(self, page_text, image_jpeg=None, ladder=(1, 2, 3, 4), hints=None,
@@ -243,17 +377,21 @@ class OpenRouterClient(object):
         ``headings`` is what the deterministic reader read as a heading on this page
         (``assemble.page_headings``); the model is told rather than asked, and
         ``gate.check_structure`` refuses an answer that marks anything else.
-        """
-        if ledger is not None:
-            ledger.reserve(self.spec.price_per_page)
 
+        The cap is reserved against the strict bound of THIS request before any
+        attempt leaves the machine -- never against the measured average page,
+        which is an estimate, not a ceiling.
+        """
         if self.dry_run:
             return self._dry_run_result(page_text)
 
+        max_tokens = int(max_tokens or completion_budget(page_text))
         payload = self._payload(page_text, image_jpeg, ladder, hints, page_label,
-                                max_tokens or completion_budget(page_text),
-                                headings=headings)
-        data, attempts = self._post(payload)
+                                max_tokens, headings=headings)
+        bound = self._request_bound_for(payload, image_jpeg, max_tokens)
+        if ledger is not None:
+            ledger.reserve(bound)
+        data, attempts = self._post(payload, ledger=ledger, bound=bound)
         return self._parse(data, attempts)
 
     def _payload(self, page_text, image_jpeg, ladder, hints, page_label, max_tokens,
@@ -261,9 +399,17 @@ class OpenRouterClient(object):
         content = [{"type": "text",
                     "text": user_prompt(page_text, ladder=ladder, hints=hints,
                                         page_label=page_label, headings=headings)}]
+        max_price = dict(self.spec.max_price)
         if image_jpeg:
             content.insert(0, {"type": "image_url", "image_url": {
                 "url": "data:image/jpeg;base64," + _b64(image_jpeg)}})
+            # Some upstreams price an image flat instead of by token. Uncapped,
+            # that whole billing mode would sit outside the user's cap; the ceiling
+            # is the image's token bound at this tier's prompt rate, so a provider
+            # that would charge more is excluded by routing rather than discovered
+            # on the bill.
+            max_price["image"] = round(image_token_bound(image_jpeg)
+                                       * self.spec.prompt_usd_per_mtok / 1e6, 6)
         return {
             "model": self.model_id,
             "messages": [{"role": "system", "content": structure_prompt()},
@@ -279,16 +425,22 @@ class OpenRouterClient(object):
             # The user consented to a dollar figure computed from these rates. Sent
             # as a ceiling, they stop the request reaching an upstream that would
             # bill more than the figure they agreed to.
-            "provider": {"max_price": self.spec.max_price},
+            "provider": {"max_price": max_price},
         }
 
-    def _post(self, payload):
+    def _post(self, payload, ledger=None, bound=None):
         session = self._session or requests
         headers = {"Authorization": "Bearer %s" % self._api_key,
                    "Content-Type": "application/json",
                    "HTTP-Referer": REFERER, "X-Title": TITLE}
         last_error = None
         for attempt in range(1, self.max_retries + 1):
+            if ledger is not None and bound is not None:
+                # EVERY attempt is checked, not just the first: a retry is another
+                # request. Retried statuses produce no completion and are not
+                # billed, so nothing is recorded between attempts and the repeated
+                # check costs nothing -- it keeps the invariant literal.
+                ledger.reserve(bound)
             try:
                 response = session.post(OPENROUTER_URL, json=payload, headers=headers,
                                         timeout=self.timeout)
@@ -430,9 +582,23 @@ def _b64(data):
     return base64.b64encode(data).decode("ascii")
 
 
+def min_request_bound_usd(tier=DEFAULT_TIER):
+    """The strict bound of the cheapest paid request this tier can make.
+
+    No image, an empty page, the completion floor -- the smallest request the
+    pipeline ever sends. A cap below it cannot fund even one page, whatever the
+    book, so the start endpoint refuses such a cap with this figure rather than
+    letting the job die at its first reservation.
+    """
+    client = OpenRouterClient(None, tier=tier)     # unconfigured: nothing leaves
+    return client.request_bound("", image_jpeg=None,
+                                max_tokens=COMPLETION_TOKENS_FLOOR)
+
+
 def tier_choices():
     """What the Reflow page shows in its cost card."""
     return [{"tier": name, "model": spec.model_id, "label": spec.label,
-             "price_per_page": spec.price_per_page}
+             "price_per_page": spec.price_per_page,
+             "min_request_usd": min_request_bound_usd(name)}
             for name, spec in sorted(TIERS.items(),
                                      key=lambda kv: kv[1].price_per_page)]

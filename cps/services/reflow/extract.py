@@ -55,7 +55,19 @@ INK_MIN = 0.004
 #: path boxes are noise rather than diagram evidence.
 MAX_DRAWING_RECTS = 2500
 
+#: The most pixels one render may allocate. The check belongs BEFORE get_pixmap:
+#: a pixmap is the allocation, and measuring after it exists is how a hostile
+#: geometry (a 20000pt page at 1.5x is ~2.7 GB) gets to consume it. 4096x4096 is
+#: ~50 MB of RGB -- far above any page a book printer has ever set (a letter page
+#: at the pipeline's 1.5x is 1.1 Mpx), low enough to be a working bound rather
+#: than a formality.
+MAX_RASTER_PIXELS = 4096 * 4096
+
 _WS = re.compile(r"\s+")
+
+
+class RasterTooLarge(Exception):
+    """The page or its encoding exceeds what Reflow will hold in memory."""
 
 
 def _is_bold_font(font):
@@ -325,38 +337,71 @@ def read_pages(doc, page_numbers=None):
     return [read_page(doc, pno) for pno in page_numbers]
 
 
+def _bounded_scale(rect, scale):
+    """The largest scale at or under *scale* whose render fits the pixel budget.
+
+    The budget is computed from the rectangle that will actually be rendered -- the
+    page's own rect (rotation included) or the crop clip -- so the cap lands on the
+    matrix before a single pixel is allocated.
+    """
+    area = abs(rect.width) * abs(rect.height)
+    if area <= 0:
+        return scale
+    fit = (MAX_RASTER_PIXELS / float(area)) ** 0.5
+    return min(float(scale), fit)
+
+
 def render_page_jpeg(doc, pno, scale=1.5, quality=80, max_bytes=None, clip=None):
     """A JPEG of the page for the vision model.
 
     ``max_bytes`` steps the scale down rather than the quality: a model reading small
-    superscripts needs resolution more than it needs smooth gradients.
+    superscripts needs resolution more than it needs smooth gradients. A page whose
+    final attempt still exceeds the limit raises :class:`RasterTooLarge` -- the old
+    behavior of returning the oversized bytes anyway made the ceiling advisory.
 
     ``clip`` narrows the picture to part of the page -- the pipeline uses it to leave
     the running head and the folio out, because they were taken out of the words.
     Cropping also buys resolution: the same byte budget over fewer pixels.
+
+    The rendered geometry is bounded by ``MAX_RASTER_PIXELS`` BEFORE any pixmap is
+    allocated: on a page whose size says the render would exceed the budget, the
+    scale is brought under it first.
     """
+    page = doc[pno]
     rect = pymupdf.Rect(*clip) if clip else None
-    for attempt_scale in _scale_ladder(scale):
+    budgeted = _bounded_scale(rect if rect is not None else page.rect, scale)
+    for attempt_scale in _scale_ladder(budgeted):
         matrix = pymupdf.Matrix(attempt_scale, attempt_scale)
-        pix = doc[pno].get_pixmap(matrix=matrix, alpha=False, clip=rect)
+        pix = page.get_pixmap(matrix=matrix, alpha=False, clip=rect)
         buf = io.BytesIO(pix.tobytes("jpg", jpg_quality=quality))
         data = buf.getvalue()
         if max_bytes is None or len(data) <= max_bytes:
             return data
-    return data
+    raise RasterTooLarge(
+        "page %d renders over %d bytes at every permitted scale (last: %d bytes at "
+        "%.2fx)" % (pno, max_bytes, len(data), attempt_scale))
 
 
 def _scale_ladder(scale):
+    """The starting scale and each quarter-step down, ending at a quarter.
+
+    The ladder always offers the first scale -- the geometry bound may have brought
+    it below the old half-scale floor -- and one last step at 0.25 before giving up.
+    """
     step = scale
-    while step >= 0.5:
+    while True:
         yield step
         step -= 0.25
+        if step < 0.25:
+            break
 
 
 def crop_jpeg(doc, pno, rect, scale=2.0, quality=85):
     """A JPEG of one region — a chart, a table, a full-page scan used as a figure."""
     clip = pymupdf.Rect(*rect)
-    pix = doc[pno].get_pixmap(matrix=pymupdf.Matrix(scale, scale), clip=clip, alpha=False)
+    bounded = _bounded_scale(clip, scale)
+    pix = doc[pno].get_pixmap(matrix=pymupdf.Matrix(bounded, bounded), clip=clip,
+                              alpha=False)
     return pix.tobytes("jpg", jpg_quality=quality)
 
 

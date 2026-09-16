@@ -25,6 +25,7 @@ import hashlib
 import json
 import logging
 import os
+import uuid
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
@@ -152,10 +153,21 @@ class PageCache(object):
         directory = os.path.dirname(path)
         if not os.path.isdir(directory):
             os.makedirs(directory, exist_ok=True)
-        tmp = path + ".tmp"
-        with open(tmp, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False)
-        os.replace(tmp, path)
+        # A fixed "key.tmp" name is shared by every concurrent writer of this key:
+        # interleaved dumps write through each other's file, and one writer's
+        # os.replace can rename the temporary away under the other. Each write gets
+        # its own temporary file, so a writer only ever publishes a complete payload.
+        tmp = "%s.%s.tmp" % (path, uuid.uuid4().hex)
+        try:
+            with open(tmp, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, ensure_ascii=False)
+            os.replace(tmp, path)
+        except BaseException:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            raise
         return path
 
 

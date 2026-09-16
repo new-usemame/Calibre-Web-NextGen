@@ -235,6 +235,68 @@ def test_a_conversion_the_model_service_ended_early_does_not_say_it_finished(rig
     assert row["status"] == "incomplete", row
 
 
+def test_a_finished_conversion_releases_the_books_reservation(rig):
+    """The book's admission reservation lives from enqueue to terminal state."""
+    from cps.services.reflow import admission
+
+    task = rig.mod.TaskReflowPdf(5, 7, {"mode": "sample", "sample_pages": 2,
+                                        "cost_cap_usd": 1.0})
+    worker = object()
+    assert admission.reserve(5, worker, task)
+    assert not admission.reserve(5, worker, rig.mod.TaskReflowPdf(5, 7, {})), \
+        "the book is held while the task runs"
+
+    task.run(None)
+
+    assert task.stat == STAT_FINISH_SUCCESS, task.error
+    assert admission.reserve(5, worker, rig.mod.TaskReflowPdf(5, 7, {})), \
+        "a finished conversion must give the book back"
+
+
+def test_a_failed_conversion_releases_the_books_reservation_too(rig):
+    """Failure is a terminal state: the book is not locked by a dead job."""
+    from cps.services.reflow import admission
+
+    rig.formats["EPUB"] = SimpleNamespace(name="Book - Author", format="EPUB")
+    task = rig.mod.TaskReflowPdf(5, 7, {"mode": "full", "cost_cap_usd": 1.0})
+    worker = object()
+    assert admission.reserve(5, worker, task)
+
+    task.run(None)
+
+    assert task.stat == STAT_FAIL
+    assert admission.reserve(5, worker, rig.mod.TaskReflowPdf(5, 7, {}))
+
+
+def test_a_task_cancelled_before_it_ever_ran_does_not_hold_the_book(rig):
+    """A WAITING task cancelled from the queue never reaches run(), so the
+    reservation cannot rely on it: the next admission evicts the stale entry by
+    the task's terminal state."""
+    from cps.services.reflow import admission
+    from cps.services.worker import STAT_CANCELLED
+
+    task = rig.mod.TaskReflowPdf(5, 7, {"mode": "full", "cost_cap_usd": 1.0})
+    worker = object()
+    assert admission.reserve(5, worker, task)
+    task.stat = STAT_CANCELLED          # what WorkerThread.end_task does
+
+    assert admission.reserve(5, worker, rig.mod.TaskReflowPdf(5, 7, {}))
+
+
+def test_only_the_reservations_own_task_can_release_it(rig):
+    from cps.services.reflow import admission
+
+    first = rig.mod.TaskReflowPdf(5, 7, {})
+    second = rig.mod.TaskReflowPdf(5, 7, {})
+    worker = object()
+    assert admission.reserve(5, worker, first)
+
+    admission.release(5, second)        # not its reservation to give back
+    assert not admission.reserve(5, worker, second)
+    admission.release(5, first)
+    assert admission.reserve(5, worker, second)
+
+
 def test_a_job_that_failed_says_so_rather_than_disappearing(rig):
     from cps.services.reflow import report as report_mod
 

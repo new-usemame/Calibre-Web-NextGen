@@ -45,6 +45,7 @@ every figure carries a caption.
 
 import difflib
 import html as html_module
+import html.parser
 import re
 import unicodedata
 from collections import namedtuple
@@ -440,6 +441,132 @@ _HEADING = re.compile(r"<h([1-6])\b", re.I)
 _HEADING_BLOCK = re.compile(r"<h([1-6])\b[^>]*>(.*?)</h\1\s*>", re.I | re.S)
 
 
+# ── the attribute and URL contract ─────────────────────────────────────────────
+#
+# The tag allowlist above answers "which elements". It cannot answer "an <img>
+# pulling https://example.invalid/pixel.gif with an onerror handler" -- every word
+# of such a fragment is the page's own, so the word gate cannot see it either, and
+# the EPUB reader's webview is where the request would fire. So attributes and
+# URLs are checked against the shapes this pipeline itself writes, on a real parse
+# of the fragment rather than another regex over its bytes.
+#
+# The schema is per tag. A missing rule for an attribute is a refusal, not an
+# allowance: the prompt contract (prompts/structure.txt) and the deterministic
+# fragment writer (build_epub.page_fragment) between them produce every attribute
+# listed here, so anything else in an answer is something the model invented.
+
+#: An in-book reference only: "#fn_160", "#fnref_160_2", or the disarmed "#" the
+#: link binder writes for a note that is not in the book. Never a scheme, never a
+#: host, never a path out of the book.
+_HREF_FRAGMENT = re.compile(r"#[A-Za-z0-9._-]*\Z")
+#: The only image source there is: a figure this pipeline cropped out of the PDF.
+_FIGURE_SRC = re.compile(r"images/fig_p\d+_\d+\.jpg\Z")
+_NOTE_ID = re.compile(r"fn_\d+(_\d+)?\Z")
+_NOTEREF_ID = re.compile(r"fnref_\d+(_\d+)?\Z")
+_SMALL_SPAN = re.compile(r"[1-9]\d{0,2}\Z")
+
+#: None as a rule means "any text" -- the words of an alt or a title are content,
+#: judged by the word gate like everything else the model wrote.
+MARKUP_SCHEMA = {
+    "h1": {}, "h2": {}, "h3": {}, "h4": {}, "h5": {}, "h6": {},
+    "p": {"class": {"caption"}},
+    "blockquote": {},
+    "aside": {"class": {"footnote"}, "id": _NOTE_ID, "epub:type": {"footnote"}},
+    "a": {"class": {"noteref"}, "href": _HREF_FRAGMENT, "id": _NOTEREF_ID,
+          "epub:type": {"noteref"}},
+    "figure": {},
+    "figcaption": {"class": {"reflow-no-caption"}},
+    "img": {"src": _FIGURE_SRC, "alt": None},
+    "table": {}, "thead": {}, "tbody": {}, "tr": {}, "caption": {},
+    "td": {"colspan": _SMALL_SPAN, "rowspan": _SMALL_SPAN},
+    "th": {"colspan": _SMALL_SPAN, "rowspan": _SMALL_SPAN},
+    "ul": {}, "ol": {}, "li": {},
+    "em": {}, "i": {}, "strong": {}, "b": {}, "sub": {},
+    "sup": {"class": {"noteref-unresolved"}},
+    "br": {},
+    "span": {"class": {"reflow-uncertain"}, "title": None},
+    "section": {}, "div": {},
+}
+
+
+class _MarkupContract(html.parser.HTMLParser):
+    """Collects every way a fragment's markup leaves the contract."""
+
+    def __init__(self):
+        html.parser.HTMLParser.__init__(self, convert_charrefs=True)
+        self.reasons = []
+
+    def handle_starttag(self, tag, attrs):
+        self._check(tag, attrs)
+
+    def handle_startendtag(self, tag, attrs):
+        self._check(tag, attrs)
+
+    def _check(self, tag, attrs):
+        schema = MARKUP_SCHEMA.get(tag)
+        if schema is None:
+            return      # an unknown tag is already refused by the tag pass
+        seen = set()
+        for raw_name, value in attrs:
+            name = (raw_name or "").lower()
+            if name.startswith("on"):
+                self.reasons.append("event attribute %r on <%s>" % (name, tag))
+                continue
+            if name in seen:
+                self.reasons.append("<%s> repeats the attribute %r" % (tag, name))
+                continue
+            seen.add(name)
+            if name not in schema:
+                # This covers the dangerous classes by construction: style, srcset,
+                # formaction, xmlns and namespace attributes, data-*, tabindex --
+                # none of them are anything this pipeline writes.
+                self.reasons.append("<%s> attribute %r is not in the markup contract"
+                                    % (tag, name))
+                continue
+            rule = schema[name]
+            if rule is None:
+                continue
+            text = (value or "").strip()
+            if isinstance(rule, frozenset) or isinstance(rule, set):
+                if text not in rule:
+                    self.reasons.append("<%s> %s %r is not one of %s"
+                                        % (tag, name, text, sorted(rule)))
+            elif not rule.match(text):
+                if name in ("href", "src"):
+                    self.reasons.append(
+                        "<%s> %s %r is not an in-book reference: remote, data and "
+                        "script URLs are not allowed" % (tag, name, text[:80]))
+                else:
+                    self.reasons.append("<%s> %s %r does not fit the markup contract"
+                                        % (tag, name, text[:80]))
+
+    def handle_comment(self, _data):
+        self.reasons.append("an HTML comment is not in the markup contract")
+
+    def handle_decl(self, _decl):
+        self.reasons.append("a DOCTYPE declaration is not in the markup contract")
+
+    def unknown_decl(self, _data):
+        self.reasons.append("an unknown declaration is not in the markup contract")
+
+    def handle_pi(self, _data):
+        self.reasons.append("a processing instruction is not in the markup contract")
+
+
+def check_markup_safety(model_html):
+    """The attribute and URL half of G3: the reasons a fragment is unsafe.
+
+    Empty when the fragment's markup is exactly the contract. A refusal here is a
+    refusal of the whole page further up -- the page ships its deterministic text
+    and the reason is recorded -- rather than a stripped version of the answer
+    being adopted and reported as the model's own.
+    """
+    parser = _MarkupContract()
+    parser.feed(model_html or "")
+    parser.close()
+    return parser.reasons
+
+
 def _heading_key(level, text):
     """A heading as the gate compares it: its level and the words it prints.
 
@@ -512,6 +639,8 @@ def check_structure(model_html, ladder=(1, 2, 3, 4), require_figure_caption=True
     tags = {name.lower() for _, name in _TAG_NAME.findall(html)}
     for name in sorted(tags - ALLOWED_TAGS):
         reasons.append("disallowed tag <%s>" % name)
+
+    reasons.extend(check_markup_safety(html))
 
     allowed_levels = {int(x) for x in ladder} or {1}
     for level in sorted({int(m) for m in _HEADING.findall(html)}):

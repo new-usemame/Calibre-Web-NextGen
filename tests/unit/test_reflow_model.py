@@ -405,6 +405,140 @@ def test_the_page_price_the_estimate_multiplies_is_the_ceiling_rate():
         assert spec.price_per_page == pytest.approx(worst, rel=1e-6), tier
 
 
+# ------------------------------------- the reservation is the request's strict bound
+
+def _jpeg(width, height):
+    """A real JPEG of known dimensions, so the image bound is read off the bytes."""
+    import pymupdf
+    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, width, height))
+    return pix.tobytes("jpg")
+
+
+def test_a_dense_page_under_a_small_cap_is_refused_before_any_request(tmp_path):
+    """The P0 repro, closed. A $0.003 cap admitted a page that then billed $0.020,
+    because the reservation priced a measured-average page (2,100 + 1,400 tokens)
+    while the request itself permitted 12,048 completion tokens. The reservation
+    has to be the strict bound of the request about to be sent, computed before
+    the socket opens -- a cap checked after billing is not a cap."""
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=0.003)
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, json=_reply(usage={"prompt_tokens": 2100,
+                                            "completion_tokens": 16384}))
+        with pytest.raises(model.CapExceeded):
+            _client(max_retries=1).edit_page("word " * 4000, ledger=book)
+        assert m.call_count == 0
+    assert book.spent() == 0.0
+
+
+def test_the_reserved_bound_covers_the_worst_bill_the_request_permits(tmp_path):
+    """The finding's figures, against the bound: at the allowed rates the dense
+    page's worst permitted bill is $0.020291 (2,100 prompt + 12,048 completion).
+    A bound below that number is the bug coming back."""
+    bound = _client().request_bound("word " * 4000)
+    assert bound >= 0.020291
+
+
+def test_a_cap_below_the_bound_refuses_and_the_bound_itself_admits(tmp_path):
+    """The reservation is exact, not padded to the ceiling: one micro-dollar under
+    the strict bound refuses, and the bound itself lets the call through."""
+    client = _client()
+    bound = client.request_bound("text of the page[160]", ladder=(1,))
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, json=_reply())
+        short = ledger_mod.Ledger(tmp_path / "short.jsonl",
+                                  cap_usd=round(bound - 1e-6, 6))
+        with pytest.raises(model.CapExceeded):
+            client.edit_page("text of the page[160]", image_jpeg=None, ladder=(1,),
+                             ledger=short)
+        assert m.call_count == 0
+
+        exact = ledger_mod.Ledger(tmp_path / "exact.jsonl", cap_usd=bound)
+        client.edit_page("text of the page[160]", image_jpeg=None, ladder=(1,),
+                         ledger=exact)
+        assert m.call_count == 1
+
+
+def test_the_bound_is_computed_from_the_request_that_went_out(tmp_path):
+    """Every UTF-8 byte of the prompt (a byte-level tokenizer can do no worse), the
+    image's pixels at the densest published accounting, and the full max_tokens --
+    at the ceiling rates, because max_price limits rates and not the total."""
+    image = _jpeg(918, 1188)
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, json=_reply())
+        client = _client()
+        client.edit_page("text of the page[160]", image_jpeg=image, ladder=(1, 2, 3),
+                         ledger=None)
+        sent = m.last_request.json()
+
+    text_bytes = 0
+    for message in sent["messages"]:
+        content = message["content"]
+        parts = content if isinstance(content, list) else [{"type": "text",
+                                                            "text": content}]
+        text_bytes += sum(len(p["text"].encode("utf-8")) for p in parts
+                          if p.get("type") == "text")
+    spec = model.TIERS["standard"]
+    prompt_tokens = (text_bytes
+                     + model.MESSAGE_OVERHEAD_TOKENS * len(sent["messages"])
+                     + model.image_token_bound(image))
+    expected = (prompt_tokens * spec.prompt_usd_per_mtok
+                + sent["max_tokens"] * spec.completion_usd_per_mtok) / 1e6
+    assert client.request_bound("text of the page[160]", image_jpeg=image,
+                                ladder=(1, 2, 3)) == pytest.approx(expected, rel=1e-6)
+
+
+def test_the_image_riding_along_is_priced_into_the_bound():
+    image = _jpeg(918, 1188)
+    with_image = _client().request_bound("text", image_jpeg=image)
+    without = _client().request_bound("text", image_jpeg=None)
+    assert with_image > without
+    # The densest published per-pixel accounting (Anthropic's width*height/750),
+    # doubled, with a floor for providers that rescale small images upward.
+    assert model.image_token_bound(image) == 2 * (-(-918 * 1188 // 750))
+
+
+def test_an_image_whose_pixels_cannot_be_read_is_priced_at_the_pipeline_maximum():
+    """No unlimited assumptions: an undecodable image is bounded by the largest
+    raster the pipeline is allowed to allocate, not by optimism."""
+    unknown = model.image_token_bound(b"\xff\xd8not really a jpeg")
+    assert unknown >= model.image_token_bound(_jpeg(4096, 4096))
+
+
+def test_the_price_ceiling_caps_per_image_billing_as_well():
+    """OpenRouter's max_price has an `image` dimension for upstreams that price an
+    image flat instead of by token. Left unset, that whole billing mode would sit
+    outside the user's cap."""
+    with requests_mock.Mocker() as m:
+        m.post(ENDPOINT, json=_reply())
+        _edit(_client())
+        ceiling = m.last_request.json()["provider"]["max_price"]
+
+    spec = model.TIERS["standard"]
+    assert "image" in ceiling
+    assert ceiling["image"] == pytest.approx(
+        model.image_token_bound(b"\xff\xd8fake") * spec.prompt_usd_per_mtok / 1e6)
+
+
+def test_the_cap_refusal_says_the_figure_is_a_worst_case(tmp_path):
+    """Conservative refusal, explained: the user is told the number is a ceiling,
+    not that the next page would have cost exactly that."""
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=0.0001)
+    with pytest.raises(model.CapExceeded) as caught:
+        _client().edit_page("text of the page[160]", image_jpeg=None, ledger=book)
+    assert "up to" in str(caught.value)
+
+
+def test_the_cheapest_possible_request_bound_is_shared_with_preflight():
+    """The floor the start endpoint validates caps against: a cap below it can
+    never fund even one paid page, whatever the book."""
+    floor = model.min_request_bound_usd("standard")
+    assert floor > 0
+    spec = model.TIERS["standard"]
+    assert floor == pytest.approx(
+        _client().request_bound("", image_jpeg=None,
+                                max_tokens=model.COMPLETION_TOKENS_FLOOR), rel=1e-6)
+
+
 def test_a_note_that_came_back_without_its_number_comes_out_with_it():
     """The answer is put into one shape here, so the gate, the cache and the EPUB all
     see the same note. MEASURED on the acceptance book: providers differ on whether

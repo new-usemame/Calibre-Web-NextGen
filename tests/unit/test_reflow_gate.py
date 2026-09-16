@@ -327,6 +327,81 @@ def test_curly_and_straight_quotes_are_the_same_word():
     assert gate.check_word_preservation(src, out).verdict == "PASS"
 
 
+class TestMarkupSafetyGate:
+    """G3's attribute half. The word gate compares text and cannot see an
+    attribute at all: a fragment whose every word is the page's own could carry a
+    remote URL or an event handler straight into the reader's webview. Tags are
+    parsed, not regexed, and every attribute and URL is checked against the markup
+    contract the pipeline itself writes."""
+
+    def test_an_image_from_the_network_is_refused(self):
+        html = ('<p>text of the page</p>'
+                '<img src="https://example.invalid/reflow-pixel.gif" alt=""/>')
+        result = gate.check_structure(html, ladder=[1, 2, 3], headings=[])
+
+        assert not result.ok
+        assert any("src" in reason for reason in result.reasons), result.reasons
+
+    def test_an_event_handler_is_refused(self):
+        html = ('<p>text of the page</p>'
+                '<img src="images/fig_p0000_0.jpg" alt="" '
+                'onerror="fetch(\'https://example.invalid/event\')"/>')
+        result = gate.check_structure(html, ladder=[1, 2, 3], headings=[])
+
+        assert not result.ok
+        assert any("onerror" in reason for reason in result.reasons), result.reasons
+
+    def test_a_javascript_href_is_refused(self):
+        html = '<p>text <a href="javascript:alert(1)">of the page</a></p>'
+        result = gate.check_structure(html, ladder=[1, 2, 3], headings=[])
+
+        assert not result.ok
+        assert any("href" in reason for reason in result.reasons), result.reasons
+
+    def test_a_data_url_is_refused(self):
+        html = ('<p>text of the page</p>'
+                '<img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt=""/>')
+        assert not gate.check_structure(html, ladder=[1, 2, 3], headings=[]).ok
+
+    def test_a_style_attribute_is_refused(self):
+        """CSS is network access too: url() in a style loads from anywhere."""
+        html = '<p style="background-image: url(https://example.invalid)">text</p>'
+        result = gate.check_structure(html, ladder=[1, 2, 3], headings=[])
+
+        assert not result.ok
+        assert any("style" in reason for reason in result.reasons), result.reasons
+
+    def test_an_attribute_the_contract_never_writes_is_refused(self):
+        html = '<p formaction="https://example.invalid">text of the page</p>'
+        result = gate.check_structure(html, ladder=[1, 2, 3], headings=[])
+
+        assert not result.ok
+        assert any("formaction" in reason for reason in result.reasons), result.reasons
+
+    def test_a_processing_instruction_is_refused(self):
+        html = '<p>text of the page</p><?xml-stylesheet href="https://example.invalid"?>'
+        assert not gate.check_structure(html, ladder=[1, 2, 3], headings=[]).ok
+
+    def test_the_markup_the_pipeline_writes_itself_is_accepted(self):
+        """The control: internal note links, an uncertainty mark, a figure reference
+        and a table are the contract, not casualties. Refusing these would be the
+        gate failing the pages it exists to let through."""
+        html = ('<p>text<a class="noteref" epub:type="noteref" id="fnref_47" '
+                'href="#fn_47"><sup>47</sup></a> of the page<sup '
+                'class="noteref-unresolved">12</sup> and '
+                '<span class="reflow-uncertain" title="likely: well">wel1</span></p>'
+                '<figure><img src="images/fig_p0000_0.jpg" alt=""/>'
+                '<figcaption class="reflow-no-caption"></figcaption></figure>'
+                '<table><thead><tr><th colspan="2">t</th></tr></thead>'
+                '<tbody><tr><td>a</td><td>b</td></tr></tbody></table>'
+                '<aside class="footnote" epub:type="footnote" id="fn_47">'
+                '<p><a href="#fnref_47">47</a> Valens, Anthology.</p></aside>')
+
+        result = gate.check_structure(html, ladder=[1, 2, 3], headings=[])
+
+        assert result.ok, result.reasons
+
+
 class TestStructuralSchemaGate:
     """G3: the markup contract. A noteref with no aside is a dead link on a Kobo."""
 

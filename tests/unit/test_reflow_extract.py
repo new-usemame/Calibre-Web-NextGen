@@ -1,0 +1,153 @@
+# -*- coding: utf-8 -*-
+# Calibre-Web Automated – fork of Calibre-Web
+# Copyright (C) 2024-2026 Calibre-Web-NextGen contributors
+# SPDX-License-Identifier: GPL-3.0-or-later
+# See CONTRIBUTORS for full list of authors.
+
+"""Stage 1's raster boundary.
+
+The page image is rendered before it is measured, so an oversized page used to be
+ALLOCATED before anyone asked how big it was, and the byte ceiling was consulted
+only after the pixmap existed -- with the last, still-oversized attempt handed to
+the caller anyway. The geometry tests here use fake pages whose pixmap calls are
+recorded, so oversized geometry is exercised without allocating dangerous memory
+on the host.
+"""
+
+import pymupdf
+import pytest
+
+from cps.services.reflow import extract, model
+from tests.fixtures import reflow_pdfs as F
+
+pytestmark = pytest.mark.unit
+
+
+class _Pixmap(object):
+    def __init__(self, data):
+        self._data = data
+
+    def tobytes(self, *_args, **_kwargs):
+        return self._data
+
+
+class _Page(object):
+    """A page whose "pixmap" costs nothing, so a hostile size can be tested."""
+
+    def __init__(self, width, height, size_for_scale=None):
+        self.rect = pymupdf.Rect(0, 0, width, height)
+        self.calls = []
+        self._size_for_scale = size_for_scale or (lambda _scale: 64)
+
+    def get_pixmap(self, matrix=None, clip=None, **_kwargs):
+        scale = matrix.a if matrix is not None else 1.0
+        self.calls.append({"scale": scale, "clip": clip})
+        return _Pixmap(b"\xff\xd8" + b"x" * self._size_for_scale(scale))
+
+
+class _Doc(object):
+    page_count = 1
+
+    def __init__(self, page):
+        self._page = page
+
+    def __getitem__(self, _pno):
+        return self._page
+
+
+def _rendered_pixels(page, call):
+    """The pixels a get_pixmap call would have allocated, clip included."""
+    rect = call["clip"] if call["clip"] is not None else page.rect
+    return rect.width * call["scale"] * rect.height * call["scale"]
+
+
+def test_pixmap_geometry_is_bounded_before_any_pixel_is_allocated():
+    """A 20000 x 20000 pt page at 1.5x is a 900-megapixel, ~2.7 GB allocation.
+    The bound has to land on the matrix BEFORE get_pixmap, not on the bytes after."""
+    page = _Page(20000, 20000)
+    data = extract.render_page_jpeg(_Doc(page), 0, scale=1.5, quality=80)
+
+    assert page.calls, "nothing was rendered at all"
+    for call in page.calls:
+        assert _rendered_pixels(page, call) <= extract.MAX_RASTER_PIXELS, \
+            "scale %.2f would allocate %d pixels" % (call["scale"],
+                                                     _rendered_pixels(page, call))
+    assert data.startswith(b"\xff\xd8")
+
+
+def test_a_still_oversized_encoding_is_a_failure_not_a_return_value():
+    """The finding's shape: every ladder step over the byte ceiling used to end
+    with the oversized bytes returned to the caller. That is a clear failure now."""
+    page = _Page(612, 792, size_for_scale=lambda _scale: 900 * 1024)
+
+    with pytest.raises(extract.RasterTooLarge):
+        extract.render_page_jpeg(_Doc(page), 0, scale=1.5, quality=80,
+                                 max_bytes=900 * 1024)
+
+
+def test_an_oversized_encoding_still_steps_down_until_it_fits():
+    """The preserved behavior: byte pressure walks the scale down, smallest first
+    attempt wins -- resolution is kept before gradients are."""
+    page = _Page(612, 792, size_for_scale=lambda s: int(612 * 792 * s * s * 0.05))
+
+    data = extract.render_page_jpeg(_Doc(page), 0, scale=1.5, quality=80,
+                                    max_bytes=20 * 1024)
+
+    assert [call["scale"] for call in page.calls] == [1.5, 1.25, 1.0, 0.75]
+    assert len(data) <= 20 * 1024
+
+
+def test_the_clip_is_part_of_the_bounded_geometry():
+    """The pipeline crops furniture out of the picture; a clip must shrink the
+    budget, and a hostile clip must be bounded by it."""
+    page = _Page(20000, 20000)
+    clip = pymupdf.Rect(0, 0, 1000, 1000)
+    extract.render_page_jpeg(_Doc(page), 0, scale=1.5, quality=80, clip=clip)
+    assert page.calls[0]["scale"] == 1.5, "a small clip on a huge page fits whole"
+    assert page.calls[0]["clip"] == clip
+
+    page2 = _Page(612, 792)
+    big_clip = pymupdf.Rect(0, 0, 20000, 20000)
+    extract.render_page_jpeg(_Doc(page2), 0, scale=1.5, quality=80, clip=big_clip)
+    assert _rendered_pixels(page2, page2.calls[0]) <= extract.MAX_RASTER_PIXELS
+
+
+def test_crop_jpeg_bounds_its_allocation_too():
+    """Figure crops take the same bound: a hostile figure box is not a back door."""
+    page = _Page(612, 792)
+    data = extract.crop_jpeg(_Doc(page), 0, (0, 0, 50000, 40000), scale=2.0)
+
+    assert _rendered_pixels(page, page.calls[0]) <= extract.MAX_RASTER_PIXELS
+    assert data.startswith(b"\xff\xd8")
+
+
+def test_an_ordinary_page_is_rendered_exactly_as_before():
+    """A real PDF at the pipeline's own settings: full scale, real JPEG, the size
+    the vision model has always been sent."""
+    doc = F.new_doc()
+    F.prose_page(doc)
+    try:
+        width, height = doc[0].rect.width, doc[0].rect.height
+        data = extract.render_page_jpeg(doc, 0, scale=1.5, quality=80,
+                                        max_bytes=900 * 1024)
+    finally:
+        doc.close()
+
+    assert data[:2] == b"\xff\xd8"
+    assert len(data) <= 900 * 1024
+    assert model._jpeg_dimensions(data) == (round(width * 1.5), round(height * 1.5))
+
+
+def test_rotation_is_part_of_the_rendered_geometry():
+    """The bound reads the page as it will be rendered; a rotated page's rendered
+    size swaps its axes."""
+    doc = F.new_doc()
+    F.prose_page(doc)
+    try:
+        width, height = doc[0].rect.width, doc[0].rect.height
+        doc[0].set_rotation(90)
+        data = extract.render_page_jpeg(doc, 0, scale=1.5, quality=80)
+    finally:
+        doc.close()
+
+    assert model._jpeg_dimensions(data) == (round(height * 1.5), round(width * 1.5))

@@ -627,7 +627,72 @@ def test_an_answer_that_keeps_the_pages_figure_is_adopted(tmp_path):
     assert result.outcomes[0].source == "model"
 
 
+def test_an_answer_carrying_active_or_remote_markup_is_refused_whole(tmp_path):
+    """The adoption boundary, end to end: every word in the answer is the page's
+    own, so the word gate cannot see the problem -- the answer is refused at the
+    structure gate, the page ships its deterministic text, and the refusal is
+    recorded. Stripping the markup and adopting the page anyway would report a
+    PASS for markup the reader never actually receives."""
+    doc = _doc(F.ambiguous_residue_page)
+    client = FakeClient(answer=lambda text: (
+        "<p>%s</p><img src=\"https://example.invalid/pixel.gif\" alt=\"\" "
+        "onerror=\"fetch('https://example.invalid/ev')\"/>" % text))
+    try:
+        result, book = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.outcomes[0].gate == "FAIL", result.outcomes[0].gate_reasons
+    assert result.outcomes[0].source == "deterministic"
+    assert "example.invalid" not in result.page_html[0]
+    assert any("onerror" in reason or "src" in reason
+               for reason in result.outcomes[0].gate_reasons), \
+        result.outcomes[0].gate_reasons
+    entry = [e for e in book.entries("page") if e.get("page") == 0][0]
+    assert entry["gate"] == "FAIL"
+
+
 # ------------------------------------------------------------------- what resumes
+
+def test_concurrent_cache_writes_for_one_key_never_torn_or_lost(tmp_path):
+    """Two writers on one cache key used to share a single fixed ``.tmp`` name:
+    interleaved dumps wrote through each other's file, and the second
+    ``os.replace`` could rename the winner away under the loser. Each write now
+    gets its own temporary file, so a writer can only ever replace the published
+    file with its own complete payload."""
+    import threading
+
+    cache = pipeline.PageCache(str(tmp_path / "cache"))
+    # Many keys, so json.dump makes many small write() calls and genuinely
+    # interleaves with another thread writing the same file.
+    payloads = [{"html": "<p>page %d</p>" % n,
+                 "rows": {"%d" % i: "word %d" % i for i in range(300)},
+                 "n": n} for n in range(4)]
+    failures = []
+
+    def write(payload):
+        try:
+            for _ in range(10):
+                cache.put("fp", 3, "test/model", "source", payload)
+        except Exception as exc:                                    # noqa: BLE001
+            failures.append(exc)
+
+    threads = [threading.Thread(target=write, args=(payload,))
+               for payload in payloads]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=30)
+
+    assert not failures, failures
+    stored = cache.get("fp", 3, "test/model", "source")
+    assert stored in payloads, "the published file is one writer's whole payload"
+    import os as _os
+    leftovers = []
+    for _dirpath, _dirnames, names in _os.walk(str(tmp_path / "cache")):
+        leftovers.extend(n for n in names if n.endswith(".tmp"))
+    assert leftovers == [], leftovers
+
 
 def test_a_second_run_spends_nothing_on_the_pages_already_paid_for(tmp_path):
     """Resumability is not a nicety. A crash, a cancel or a cap stop halfway through

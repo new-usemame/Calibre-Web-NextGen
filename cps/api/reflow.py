@@ -34,6 +34,7 @@ import hashlib
 import json
 import os
 import re
+import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 from flask import jsonify, request, send_file
@@ -49,7 +50,7 @@ from . import api_v1, log
 from .. import calibre_db, config
 from ..constants import REFLOW_DIR
 from ..cw_login import current_user
-from ..services.reflow import build_epub, ledger as ledger_mod, model, pipeline
+from ..services.reflow import admission, build_epub, ledger as ledger_mod, model, pipeline
 from ..services.worker import STAT_STARTED, STAT_WAITING, WorkerThread
 from ..tasks import reflow as tasks_reflow
 from ..usermanagement import login_required_if_no_ano
@@ -176,9 +177,20 @@ def _survey_cached(path):
     quote["cached"] = False
     try:
         os.makedirs(os.path.dirname(cached), exist_ok=True)
-        with open(cached + ".tmp", "w", encoding="utf-8") as handle:
-            json.dump(quote, handle)
-        os.replace(cached + ".tmp", cached)
+        # Unique temporary name: two estimates of the same PDF on concurrent
+        # requests share a cache file, and a fixed .tmp would let one writer's
+        # rename pull the file from under the other.
+        tmp = "%s.%s.tmp" % (cached, uuid.uuid4().hex)
+        try:
+            with open(tmp, "w", encoding="utf-8") as handle:
+                json.dump(quote, handle)
+            os.replace(tmp, cached)
+        except BaseException:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+            raise
     except (IOError, OSError):                                    # pragma: no cover
         log.warning("reflow: could not cache the estimate for %s", path)
     return quote
@@ -342,12 +354,36 @@ def reflow_start(book_id):
                     "$%.2f. Raise the cap or choose a cheaper model."
                     % (needed, options.cost_cap_usd), 400)
 
+    # The cap is enforced per request against the strict bound of that request,
+    # not against the estimate above. A cap under the cheapest possible paid page
+    # would start a job that stops at its first reservation: refuse it here, with
+    # the figure, instead of letting an underfunded request be attempted.
+    floor = model.min_request_bound_usd(options.model_tier)
+    if options.cost_cap_usd + 1e-9 < floor:
+        return _err("cap_below_request_floor",
+                    "One page of this conversion can cost up to $%.4f at the "
+                    "allowed rates, and the cap you set is $%.2f. Raise the cap "
+                    "to at least $%.4f or choose a cheaper model."
+                    % (floor, options.cost_cap_usd, floor), 400)
+
     if _running_task(book_id) is not None:
         return _err("already_queued",
                     "A conversion of this book is already running", 409)
 
     task = tasks_reflow.TaskReflowPdf(book_id, current_user.id, options)
-    WorkerThread.add(current_user.name, task)
+    # Check-then-enqueue was the admission race: two requests inside the same gap
+    # both saw a free book and both spent. The book is reserved before the task is
+    # published, and the reservation -- not the queue scan -- is what serializes
+    # admissions. The task releases it at its terminal state; a failure to enqueue
+    # releases it here so a book is never locked by a job that does not exist.
+    if not admission.reserve(book_id, WorkerThread.get_instance(), task):
+        return _err("already_queued",
+                    "A conversion of this book is already running", 409)
+    try:
+        WorkerThread.add(current_user.name, task)
+    except Exception:
+        admission.release(book_id, task)
+        raise
     return jsonify({"task_id": task.id, "job_id": task.job_id,
                     "mode": options.mode, "model_tier": options.model_tier,
                     "cost_cap_usd": options.cost_cap_usd,

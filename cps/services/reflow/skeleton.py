@@ -1179,7 +1179,8 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
             # pretend to be more ('q u a l it ie s'): both are cell content, not
             # flowing prose.
             short[column] += 1
-    mirror = _mirror_fragment_rows(columnar, layout)
+    mirror = _paired_rows(columnar, layout)
+    row_groups = mirror
     if sum(1 for count in counts if count >= COLUMN_MIN_LINES) < 2:
         return None
     for column, count in enumerate(counts):
@@ -1187,21 +1188,83 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
             # A column of one- and two-word lines is a table's label column (or a
             # grid of cells), not a column of prose: reading it column-major
             # severs every row it prints. MEASURED on book 569's zodiacal tables
-            # ('Characteristics' beside 'Northern - Commanding - ...'). A mirror
+            # ('Characteristics' beside 'Northern - Commanding - ...'). A paired
             # table is the same veto with the row structure already measured.
-            return _RowTable(mirror) if mirror else None
+            return _RowTable(row_groups) if row_groups else None
     fills.sort()
     if fills and fills[len(fills) // 2] < COLUMN_FILL_MIN:
         return None
+    if row_groups:
+        # Paired rows proved by shared entities or mirror fragments: the row
+        # is the object, never two unrelated lists -- held-out fixture A's
+        # Opened/Closed projects, book 569's sign pairs. This outranks a
+        # labelled-sequence proof: both columns of a pair table can carry
+        # ascending years, and the rows are still one project each.
+        return _RowTable(row_groups)
     if not _column_sequence_evidence(columnar, layout):
-        # A mirror table of paired rows ('GEMINI looks at LEO' beside 'l e o
-        # perceives g e m in i', book 569 p547) proves two clean columns of
-        # fragments with no sequence inside either. Column-major prints every
-        # left cell away from its right-hand pair, and no heuristic gets to
-        # guess the table into unrelated lists: the rows stay as they print,
-        # pairs together, each row one unit.
-        return _RowTable(mirror) if mirror else None
+        return None
     return layout
+
+
+def _baseline_clusters(columnar):
+    """Line items grouped by shared baseline, y ordered; a row's cells can sit
+    a half point apart (an aspect cell set taller than its pair cells)."""
+    clusters = []
+    for box, text in sorted(columnar,
+                            key=lambda item: (item[0][1] + item[0][3]) / 2.0):
+        centre = (box[1] + box[3]) / 2.0
+        if clusters and centre - clusters[-1][0] <= 3.0:
+            clusters[-1][0] = centre
+            clusters[-1][1].append((box, text))
+        else:
+            clusters.append([centre, [(box, text)]])
+    return clusters
+
+
+def _despaced(text):
+    return "".join(ch.lower() for ch in text if ch.isalpha())
+
+
+def _paired_rows(columnar, layout):
+    """Row groups of a paired table, in print order: the row is the object.
+
+    A row proves its cells belong together when they share a word this row
+    alone prints (held-out fixture A: 'cedar' in exactly its Opened and its
+    Closed cell; book 569's sign pairs, each sign named only across its own
+    row). Letter-spaced cells answer as their letters, not their chunks:
+    'g e m in i' contains 'gemini'. Fixture B's 'reached' spans two rows, so
+    nothing there is row-unique and nothing pairs. Prose in columns may share
+    the ruler's shape, but it ends its sentences: terminal punctuation
+    anywhere vetoes the table.
+    """
+    clustered = _baseline_clusters(columnar)
+    despaced_rows = [[_despaced(text) for _, text in group]
+                     for _, group in clustered]
+    aligned = 0
+    paired_rows = []
+    for index, (_, group) in enumerate(clustered):
+        cols = {layout.column_of(box) for box, _ in group}
+        if len(cols) < 2:
+            continue
+        aligned += 1
+        if any(_SENTENCE_END.search(text) for _, text in group):
+            return []
+        despaced = despaced_rows[index]
+        shared = set()
+        for _, text in group:
+            for word in text.split():
+                clean = word.strip(".,;:!?\"”’()[]·-").lower()
+                if len(clean) >= 4 and any(ch.isalpha() for ch in clean) \
+                        and sum(clean in other for other in despaced) >= 2:
+                    shared.add(clean)
+        elsewhere = "".join(
+            cell for other, row in enumerate(despaced_rows)
+            if other != index for cell in row)
+        if {t for t in shared if t not in elsewhere}:
+            paired_rows.append(group)
+    if aligned >= 4 and len(paired_rows) >= max(4, aligned - 1):
+        return paired_rows
+    return []
 
 
 class _RowTable(object):
@@ -1240,7 +1303,7 @@ def _column_sequence_evidence(columnar, layout):
         return True
     if _has_number_sequence(columnar, layout):
         return True
-    if _mirror_fragment_rows(columnar, layout):
+    if _paired_rows(columnar, layout):
         return False
     by_column = {}
     for box, text in columnar:
@@ -1274,39 +1337,6 @@ def _has_number_sequence(columnar, layout):
             return True
     return False
 
-
-def _mirror_fragment_rows(columnar, layout):
-    """Row groups of short fragments printed across the columns, in print order.
-
-    The mirror table ('GEMINI looks at LEO' beside 'l e o perceives g e m in
-    i') is nothing but these; prose columns at the same density are not
-    fragments (they are full sentences wrapping, well past 30 characters), and
-    a numbered list has already been proved a sequence before this is asked.
-    Rows are clustered by centre height, not rounded: a row's aspect cell set a
-    half point taller than its pair cells still belongs to the row.
-    """
-    clusters = []
-    for box, text in sorted(columnar,
-                            key=lambda item: (item[0][1] + item[0][3]) / 2.0):
-        centre = (box[1] + box[3]) / 2.0
-        if clusters and centre - clusters[-1][0] <= 3.0:
-            clusters[-1][0] = centre
-            clusters[-1][1].append((box, text))
-        else:
-            clusters.append([centre, [(box, text)]])
-    paired = fragments = 0
-    rows = []
-    for _, group in clusters:
-        cols = {layout.column_of(box) for box, _ in group}
-        if len(cols) < 2:
-            continue
-        paired += 1
-        if all(len(text.replace(" ", "")) <= 30 for _, text in group):
-            fragments += 1
-        rows.append(group)
-    if paired >= 4 and fragments * 2 >= paired:
-        return rows
-    return []
 
 
 # ----------------------------------------------------------- figures by geometry

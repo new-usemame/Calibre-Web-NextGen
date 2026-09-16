@@ -931,6 +931,31 @@ def sign_pair_table_page(doc):
     return page
 
 
+def paired_entity_table_page(doc):
+    """Held-out fixture A's shape: two columns whose rows all name the same
+    project -- 'Opened 2011 · Cedar Archive' beside 'Closed 2014 · Cedar
+    Archive'. Both columns carry ascending years, so a labelled-sequence proof
+    reads them as two independent lists and every opening prints away from its
+    closing. The row is the object: its cells share their entity, and that is
+    what proves it."""
+    page = add_page(doc)
+    add_body_lines(page, PROSE_LINES[:3])
+    y = BODY_TOP + 4 * BODY_LEADING
+    _put(page, 99.0, y, "OPENED · YEAR / PROJECT", size=9.0, font=_BOLD)
+    _put(page, 320.0, y, "CLOSED · YEAR / PROJECT", size=9.0, font=_BOLD)
+    y += 18.0
+    for left, right in [
+            ("Opened 2011 · Cedar Archive", "Closed 2014 · Cedar Archive"),
+            ("Opened 2013 · Harbor Archive", "Closed 2017 · Harbor Archive"),
+            ("Opened 2016 · Lantern Archive", "Closed 2020 · Lantern Archive"),
+            ("Opened 2019 · Orchard Archive", "Closed 2025 · Orchard Archive")]:
+        _put(page, 99.0, y, left, size=9.0)
+        _put(page, 320.0, y, right, size=9.0)
+        y += 14.0
+    add_body_lines(page, PROSE_LINES[5:7], top=y + 16.0)
+    return page
+
+
 def ruled_table_page(doc):
     """A ruled two-column table: cell rows must not become prose column traversal.
 

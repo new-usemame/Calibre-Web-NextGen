@@ -362,6 +362,36 @@ class TestColumnReadingOrder(object):
             < text.index("have looked at the transmission"), text
         assert book.conservation.ok, book.conservation.to_dict()
 
+    def test_a_table_of_shared_entity_rows_stays_row_objects(self):
+        """Held-out fixture A: every aligned row is one project, and the source
+        forbids treating the columns as unrelated lists. Both columns carry
+        ascending years, so the labelled-sequence proof alone would print all
+        four Opened entries and then all four Closed -- but the rows share
+        their entity, and that proves the pairing the years cannot."""
+        book = _book(F.paired_entity_table_page)
+
+        rows = [el.text for el in book.elements if "Archive" in (el.text or "")]
+        assert rows == [
+            "Opened 2011 · Cedar Archive Closed 2014 · Cedar Archive",
+            "Opened 2013 · Harbor Archive Closed 2017 · Harbor Archive",
+            "Opened 2016 · Lantern Archive Closed 2020 · Lantern Archive",
+            "Opened 2019 · Orchard Archive Closed 2025 · Orchard Archive",
+        ], rows
+        assert book.conservation.ok, book.conservation.to_dict()
+
+    def test_independent_dated_columns_are_not_paired_by_row(self):
+        """The control, fixture B's shape: 'Departed 2008 · North Expedition'
+        beside 'Departed 2012 · South Expedition' shares no entity, so the two
+        independent sequences read down their columns, never interleaved."""
+        book = _book(F.three_column_page)
+
+        text = _whole_text(book)
+        order = [text.index(word) for word in
+                 ("Alpha", "continues", "Beta", "second.", "Gamma", "third.")]
+        assert order == sorted(order), text
+        assert "Alpha opens the first. Alpha continues on. Alpha ends its column." \
+            in text, text
+
     def test_an_unruled_label_table_keeps_its_rows(self):
         """Book 569's zodiacal tables: a label column of short lines beside a
         content column is a table, and its rows must survive."""

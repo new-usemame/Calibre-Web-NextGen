@@ -67,6 +67,19 @@ LADDER_MAX_LEVELS = 4
 #: A gutter this wide (share of page width) with no line crossing it reads as columns.
 GUTTER_MIN = 0.06
 
+#: A line this wide (share of the page's text span) bridges every column gutter:
+#: it is a band of its own -- a full-width heading, a rule, a plate.
+FULL_SPAN = 0.70
+#: Column layout is only believed when at least two columns each hold this many
+#: lines. Anything thinner is a caption pair or a stray, not a typeset column.
+COLUMN_MIN_LINES = 3
+#: Prose fills its measure: the median column line is at least this full. A grid
+#: of short cells is a table wearing a column's shape, and is left row-major.
+COLUMN_FILL_MIN = 0.45
+#: A page carrying at least this many vector paths may be holding ruled tables;
+#: column traversal of a ruled grid destroys its rows, so it is left alone.
+RULED_MIN_PATHS = 4
+
 FOLIO = re.compile(r"^(?:page\s*)?[\divxlcdmIVXLCDM]{1,8}[.)]?$")
 CAPTION_LINE = re.compile(r"^(?:fig(?:ure|\.)|table|chart|plate|map|diagram)\s*\d", re.I)
 _DIGITS = re.compile(r"\d+")
@@ -87,6 +100,11 @@ class Region(object):
     reason: str = ""
     bbox: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
     image: Optional[extract.Image] = None
+    #: Reading-order coordinates: a full-width band breaks the page, and columns
+    #: read top-to-bottom within a band, left-to-right across it. Both zero on an
+    #: ordinary single-column page, which is what makes this backward compatible.
+    band: int = 0
+    column: int = 0
 
     @property
     def text(self):
@@ -453,9 +471,7 @@ def page_skeleton(raw, style):
 
     body_blocks, note_regions = _split_off_notes(raw, style, skel)
 
-    if _looks_multi_column(body_blocks, raw):
-        skel.reasons.append("multi_column")
-
+    kept_blocks = []
     for blk in body_blocks:
         kept = []
         for ln in blk.lines:
@@ -466,11 +482,26 @@ def page_skeleton(raw, style):
             else:
                 kept.append(ln)
         if kept:
+            kept_blocks.append((blk, kept))
+
+    embedded = [img for img in raw.images if img.substantial and not img.full_page]
+
+    layout = _column_layout(kept_blocks, embedded, raw)
+    if layout is not None:
+        skel.reasons.append("columns_reordered")
+        for blk, kept in kept_blocks:
+            for band, column, group in layout.groups(kept):
+                _classify_body(group, blk, style, skel, band=band, column=column)
+    else:
+        if _looks_multi_column([blk for blk, _ in kept_blocks], raw):
+            skel.reasons.append("multi_column")
+        for blk, kept in kept_blocks:
             _classify_body(kept, blk, style, skel)
 
-    for img in raw.images:
-        if img.substantial and not img.full_page:
-            skel.regions.append(Region(kind="figure", bbox=img.bbox, image=img))
+    for img in embedded:
+        band, column = layout.place(img.bbox) if layout else (0, 0)
+        skel.regions.append(Region(kind="figure", bbox=img.bbox, image=img,
+                                   band=band, column=column))
 
     skel.regions.extend(note_regions)
     skel.regions.sort(key=_region_order)
@@ -478,8 +509,8 @@ def page_skeleton(raw, style):
 
 
 def _region_order(region):
-    return (0 if region.kind != "note" else 1, round(region.bbox[1], 1),
-            round(region.bbox[0], 1))
+    return (0 if region.kind != "note" else 1, region.band, region.column,
+            round(region.bbox[1], 1), round(region.bbox[0], 1))
 
 
 def _lines_bbox(lines, fallback):
@@ -674,7 +705,7 @@ def _is_caps(text):
     return any(ch.isalpha() for ch in text) and text == text.upper()
 
 
-def _classify_body(lines, blk, style, skel):
+def _classify_body(lines, blk, style, skel, band=0, column=0):
     """Split a block into headings and prose, honouring run-in sub-headings."""
     if len(lines) >= 2 and heading_ish(lines[0], style) \
             and not any(heading_ish(ln, style) for ln in lines[1:]):
@@ -682,7 +713,8 @@ def _classify_body(lines, blk, style, skel):
         if acceptable_heading(head) and not continues_lowercase(lines[1]):
             skel.regions.append(Region(kind="heading", lines=[lines[0]],
                                        level=style.level_for(lines[0].size),
-                                       reason="run_in", bbox=lines[0].bbox))
+                                       reason="run_in", bbox=lines[0].bbox,
+                                       band=band, column=column))
             lines = lines[1:]
         elif acceptable_heading(head):
             # Bold, short, well-formed — but its sentence carries on underneath. The
@@ -694,7 +726,8 @@ def _classify_body(lines, blk, style, skel):
         if acceptable_heading(joined):
             skel.regions.append(Region(kind="heading", lines=list(lines),
                                        level=style.level_for(lines[0].size),
-                                       bbox=_lines_bbox(lines, blk.bbox)))
+                                       bbox=_lines_bbox(lines, blk.bbox),
+                                       band=band, column=column))
             return
         skel.reasons.append("large_type_not_a_heading")
 
@@ -702,7 +735,8 @@ def _classify_body(lines, blk, style, skel):
         return
     kind = "caption" if CAPTION_LINE.match(lines[0].stripped) else "body"
     skel.regions.append(Region(kind=kind, lines=list(lines),
-                               bbox=_lines_bbox(lines, blk.bbox)))
+                               bbox=_lines_bbox(lines, blk.bbox),
+                               band=band, column=column))
 
 
 def _looks_multi_column(blocks, raw):
@@ -724,6 +758,143 @@ def _looks_multi_column(blocks, raw):
         if not any(x0 < cut + gutter and x1 > cut - gutter for x0, x1 in spans):
             return True
     return False
+
+
+# ------------------------------------------------------------------ column order
+
+def _gutters(boxes, left, span, full=FULL_SPAN):
+    """x positions of vertical whitespace channels wide enough to be column gutters.
+
+    Read from LINE boxes, not block boxes: on a page whose columns share baselines
+    MuPDF hands both columns back as one block of interleaved lines, which is the
+    exact shape the readiness probe failed on. A line spanning most of the text
+    measure bridges every gutter and votes for none of them -- it is a band of its
+    own (a full-width heading, a plate), not evidence against the columns.
+    """
+    bins = 240
+    occupied = bytearray(bins)
+    for box in boxes:
+        if (box[2] - box[0]) >= full * span:
+            continue
+        a = int((box[0] - left) / span * (bins - 1))
+        z = int((box[2] - left) / span * (bins - 1))
+        for i in range(max(0, a), min(bins - 1, z) + 1):
+            occupied[i] = 1
+    gaps, i = [], 0
+    while i < bins:
+        if occupied[i]:
+            i += 1
+            continue
+        j = i
+        while j < bins and not occupied[j]:
+            j += 1
+        if i > bins * 0.12 and j < bins * 0.88 and (j - i) >= bins * 0.03:
+            gaps.append(left + (i + j) / 2.0 / bins * span)
+        i = j
+    return gaps
+
+
+class _ColumnLayout(object):
+    """The page's columns and bands, measured once and shared by every region.
+
+    A *band* is a horizontal slice delimited by anything spanning the text
+    measure; within a band the columns read top-to-bottom, left-to-right, and the
+    spanning item itself sits between the band above and the band below. Regions
+    carry (band, column) so the final page sort is the reading order rather than
+    the (y, x) interleave that destroyed the probe.
+    """
+
+    def __init__(self, left, right, bounds, spanning_ys):
+        self.left = left
+        self.right = right
+        self.bounds = bounds            # gutter bounds: ncols + 1 edges
+        self.spanning_ys = spanning_ys  # centre-y of each spanning item, sorted
+        self.span = right - left
+
+    @property
+    def ncols(self):
+        return len(self.bounds) - 1
+
+    def column_of(self, bbox):
+        centre = (bbox[0] + bbox[2]) / 2.0
+        for k in range(self.ncols):
+            if self.bounds[k] <= centre < self.bounds[k + 1]:
+                return k
+        return self.ncols - 1
+
+    def band_of(self, bbox):
+        centre = (bbox[1] + bbox[3]) / 2.0
+        return sum(1 for y in self.spanning_ys if y < centre)
+
+    def place(self, bbox):
+        """(band, column) for a region-sized box: spanning boxes close their band."""
+        if (bbox[2] - bbox[0]) >= FULL_SPAN * self.span:
+            return self.band_of(bbox), self.ncols
+        return self.band_of(bbox), self.column_of(bbox)
+
+    def groups(self, lines):
+        """A block's lines split into (band, column, lines) runs, in reading order.
+
+        The block that arrives holding both columns' same-baseline lines leaves
+        here as one run per column, each still in its own y order -- which is what
+        makes the downstream classifier safe to join the lines of a run at all.
+        """
+        runs = {}
+        for ln in lines:
+            key = self.place(ln.bbox)
+            runs.setdefault(key, []).append(ln)
+        return [(band, column, group)
+                for (band, column), group in sorted(runs.items())]
+
+
+def _column_layout(kept_blocks, embedded, raw):
+    """The page's column layout, or None when the page does not prove one.
+
+    Fail closed on purpose: a page that only *might* be columns keeps the
+    status-quo (y, x) order and its ``multi_column`` routing reason, because the
+    cost of reading a table or a ragged page column-major is higher than the cost
+    of asking. What is proved gets fixed; what is not gets looked at.
+    """
+    items = [ln.bbox for _, kept in kept_blocks for ln in kept]
+    items.extend(img.bbox for img in embedded)
+    if len(items) < 6:
+        return None
+    left = min(box[0] for box in items)
+    right = max(box[2] for box in items)
+    span = right - left
+    if span < raw.width * 0.4:
+        return None
+
+    gutters = _gutters(items, left, span)
+    if not gutters:
+        return None
+    if raw.drawings >= RULED_MIN_PATHS:
+        # Ruled lines across the gutter: a grid, not prose columns. Column-major
+        # traversal of a ruled table destroys every row it prints.
+        return None
+
+    bounds = [left - 1.0] + gutters + [right + 1.0]
+    layout = _ColumnLayout(
+        left, right, bounds,
+        sorted((box[1] + box[3]) / 2.0 for box in items
+               if (box[2] - box[0]) >= FULL_SPAN * span))
+
+    columnar = [box for box in items if (box[2] - box[0]) < FULL_SPAN * span]
+    counts = [0] * layout.ncols
+    fills = []
+    for box in columnar:
+        column = layout.column_of(box)
+        counts[column] += 1
+        width = bounds[column + 1] - bounds[column]
+        if width > 0:
+            fills.append((box[2] - box[0]) / width)
+    if sum(1 for count in counts if count >= COLUMN_MIN_LINES) < 2:
+        return None
+    fills.sort()
+    if fills and fills[len(fills) // 2] < COLUMN_FILL_MIN:
+        return None
+    return layout
+
 
 
 def is_marker_span(span, line_size):

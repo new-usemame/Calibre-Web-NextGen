@@ -645,6 +645,134 @@ def image_only_page(doc, png_bytes):
     return page
 
 
+# --------------------------------------------------------------------- two columns
+
+COL_LEFT = 54.0
+COL_RIGHT = 300.0
+
+
+def _column_rows(page, rows, top=BODY_TOP, size=BODY_SIZE, left=COL_LEFT,
+                 right=COL_RIGHT):
+    """Alternating rows of left/right column lines on shared baselines.
+
+    Written row by row on purpose, because that is how MuPDF comes to hand both
+    columns back as one block of same-baseline lines -- the exact shape that
+    interleaved the readiness two-column probe.
+    """
+    y = top
+    for left_line, right_line in rows:
+        if left_line:
+            _put(page, left, y, left_line, size=size)
+        if right_line:
+            _put(page, right, y, right_line, size=size)
+        y += BODY_LEADING
+    return y
+
+
+TWO_COLUMN_ROWS = [
+    ("First we read the left column.", "Next we read the right column."),
+    ("The argument begins with evidence.", "A different argument starts here."),
+    ("Its second step follows the first.", "This evidence belongs with the next."),
+    ("We finish this column before moving.", "Finally the second column concludes."),
+]
+
+
+def two_column_page(doc):
+    """The readiness probe's shape: two prose columns whose lines share baselines."""
+    page = add_page(doc)
+    _column_rows(page, TWO_COLUMN_ROWS)
+    return page
+
+
+def three_column_page(doc):
+    """Three clear prose columns: left-to-right column order must survive."""
+    page = add_page(doc)
+    y = BODY_TOP
+    for row in [
+        ("Alpha opens the first.", "Beta opens the second.", "Gamma opens the third."),
+        ("Alpha continues on.", "Beta continues on.", "Gamma continues on."),
+        ("Alpha ends its column.", "Beta ends its column.", "Gamma ends its column."),
+    ]:
+        _put(page, 54.0, y, row[0])
+        _put(page, 204.0, y, row[1])
+        _put(page, 354.0, y, row[2])
+        y += BODY_LEADING
+    return page
+
+
+def column_bands_page(doc):
+    """Full-width headings between two-column bands: bands must not absorb them."""
+    page = add_page(doc)
+    _put(page, LEFT, BODY_TOP,
+         "The Doctrine of Sect in Day and Night Charts Across the Whole Tradition",
+         size=HEAD_SIZE, font=_BOLD)
+    y = _column_rows(page, [
+        ("Day charts are read first.", "Night charts are read second."),
+        ("The sect light leads the day.", "The sect light leaves at night."),
+    ], top=BODY_TOP + 24.0)
+    _put(page, LEFT, y + 6.0,
+         "How the Remaining Planets Behave When the Chart Changes Sect Entirely",
+         size=HEAD_SIZE, font=_BOLD)
+    _column_rows(page, [
+        ("Saturn behaves by day then.", "Mars behaves by night then."),
+        ("Jupiter witnesses the day.", "Venus witnesses the night."),
+    ], top=y + 30.0)
+    return page
+
+
+def column_continuity_page(doc):
+    """A paragraph that crosses the column break mid-sentence is one paragraph."""
+    page = add_page(doc)
+    _column_rows(page, [
+        ("The doctrine continues across the", "should never notice the seam at"),
+        ("column boundary without any pause,", "all. The second column closes"),
+        ("and the careful reader", "the argument here."),
+    ])
+    return page
+
+
+CONTINUITY_TEXT = ("The doctrine continues across the column boundary without "
+                   "any pause, and the careful reader should never notice the "
+                   "seam at all. The second column closes the argument here.")
+
+
+def column_notes_page(doc):
+    """Two prose columns over a footnote zone: the notes stay a side channel."""
+    page = add_page(doc)
+    x = COL_LEFT
+    x += _put(page, x, BODY_TOP, "the account is given by Diodorus")
+    add_marker(page, x, BODY_TOP, "24")
+    _column_rows(page, [
+        (None, "A different argument starts here."),
+        ("and repeated later in the work.", "This evidence belongs with the next."),
+        ("Its second step follows the first.", "The right column adds its point."),
+        ("We finish this column before moving.", "Finally the second column concludes."),
+    ], top=BODY_TOP + BODY_LEADING)
+    add_notes(page, [(24, "Diodorus Siculus, Library of History, 17: 112.")])
+    return page
+
+
+def ruled_table_page(doc):
+    """A ruled two-column table: cell rows must not become prose column traversal.
+
+    The ruling is the signal a reader's eye uses: this is a grid, not two columns
+    of prose. A converter that reads it column-major prints every first cell and
+    then every second cell, and no row survives.
+    """
+    page = add_page(doc)
+    rows = [("Day", "Night"), ("Sun", "Moon"), ("Venus", "Mars"),
+            ("Jupiter", "Saturn")]
+    top = BODY_TOP
+    _column_rows(page, rows)
+    bottom = top + BODY_LEADING * len(rows)
+    for x in (48.0, 280.0, 460.0):
+        page.draw_line((x, top - 12.0), (x, bottom), color=(0, 0, 0), width=0.7)
+    for y in (top - 12.0, top + 2.0, bottom):
+        page.draw_line((48.0, y), (460.0, y), color=(0, 0, 0), width=0.7)
+    return page
+
+
+
 def illustrated_page(doc, png_bytes):
     """Prose with a plate set into it, and no caption under the plate.
 

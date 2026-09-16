@@ -15175,6 +15175,91 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+
+# Reading sources
+
+msgid "Approximate"
+msgstr "Bij benadering"
+
+msgid "Choose another place"
+msgstr "Een andere positie kiezen"
+
+msgid "Could not load reading places."
+msgstr "Kan leesposities niet laden."
+
+msgid "Could not open that reading position."
+msgstr "Kan die leespositie niet openen."
+
+msgid "Device positions are read-only here. Continue reading to save a new Browser position."
+msgstr "Apparaatposities zijn hier alleen-lezen. Lees verder om een nieuwe browserpositie op te slaan."
+
+msgid "Different edition"
+msgstr "Andere editie"
+
+msgid "Exact place"
+msgstr "Exacte positie"
+
+msgid "Last reported"
+msgstr "Laatst gemeld"
+
+#, python-brace-format
+msgid "Last reported {time}"
+msgstr "Laatst gemeld {time}"
+
+msgid "Loading reading places…"
+msgstr "Leesposities laden…"
+
+msgid "No saved reading places yet."
+msgstr "Nog geen leesposities opgeslagen."
+
+#, python-brace-format
+msgid "Opened {source} at {percent}%."
+msgstr "{source} geopend op {percent}%."
+
+msgid "Opening…"
+msgstr "Openen…"
+
+msgid "Other saved position"
+msgstr "Andere opgeslagen positie"
+
+msgid "Place saved"
+msgstr "Positie opgeslagen"
+
+msgid "Preview a saved place in this reader. The device’s saved position will not change."
+msgstr "Bekijk een opgeslagen positie in deze lezer. De opgeslagen positie van het apparaat verandert niet."
+
+msgid "Preview in reader"
+msgstr "In lezer bekijken"
+
+msgid "Preview this place"
+msgstr "Deze positie bekijken"
+
+#, python-brace-format
+msgid "Previewing {source}. Its saved position will not change."
+msgstr "Voorvertoning van {source}. De opgeslagen positie verandert niet."
+
+msgid "Read from here"
+msgstr "Vanaf hier lezen"
+
+msgid "Reading from here. This is now your Browser position."
+msgstr "Je leest vanaf hier. Dit is nu je browserpositie."
+
+msgid "Reading places"
+msgstr "Leesposities"
+
+#, python-brace-format
+msgid "Saved {time}"
+msgstr "Opgeslagen {time}"
+
+msgid "Source not recorded"
+msgstr "Bron niet vastgelegd"
+
+msgid "Storyteller is configured but could not be reached."
+msgstr "Storyteller is ingesteld maar kon niet worden bereikt."
+
+msgid "The book is still opening. Try again in a moment."
+msgstr "Het boek wordt nog geopend. Probeer het zo opnieuw."
+
 #~ msgid "Change library cover"
 #~ msgstr "Bibliotheekomslag wijzigen"
 

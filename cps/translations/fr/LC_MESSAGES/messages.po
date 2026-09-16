@@ -15524,6 +15524,91 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+
+# Reading sources
+
+msgid "Approximate"
+msgstr "Approximatif"
+
+msgid "Choose another place"
+msgstr "Choisir une autre position"
+
+msgid "Could not load reading places."
+msgstr "Impossible de charger les positions de lecture."
+
+msgid "Could not open that reading position."
+msgstr "Impossible d’ouvrir cette position de lecture."
+
+msgid "Device positions are read-only here. Continue reading to save a new Browser position."
+msgstr "Les positions des appareils sont en lecture seule ici. Continuez à lire pour enregistrer une nouvelle position dans le navigateur."
+
+msgid "Different edition"
+msgstr "Édition différente"
+
+msgid "Exact place"
+msgstr "Position exacte"
+
+msgid "Last reported"
+msgstr "Dernier signalement"
+
+#, python-brace-format
+msgid "Last reported {time}"
+msgstr "Dernier signalement : {time}"
+
+msgid "Loading reading places…"
+msgstr "Chargement des positions de lecture…"
+
+msgid "No saved reading places yet."
+msgstr "Aucune position de lecture enregistrée pour le moment."
+
+#, python-brace-format
+msgid "Opened {source} at {percent}%."
+msgstr "{source} ouvert à {percent} %."
+
+msgid "Opening…"
+msgstr "Ouverture…"
+
+msgid "Other saved position"
+msgstr "Autre position enregistrée"
+
+msgid "Place saved"
+msgstr "Position enregistrée"
+
+msgid "Preview a saved place in this reader. The device’s saved position will not change."
+msgstr "Prévisualisez une position enregistrée dans ce lecteur. La position enregistrée de l’appareil ne changera pas."
+
+msgid "Preview in reader"
+msgstr "Prévisualiser dans le lecteur"
+
+msgid "Preview this place"
+msgstr "Prévisualiser cette position"
+
+#, python-brace-format
+msgid "Previewing {source}. Its saved position will not change."
+msgstr "Aperçu de {source}. Sa position enregistrée ne changera pas."
+
+msgid "Read from here"
+msgstr "Lire à partir d’ici"
+
+msgid "Reading from here. This is now your Browser position."
+msgstr "Lecture à partir d’ici. C’est maintenant votre position dans le navigateur."
+
+msgid "Reading places"
+msgstr "Positions de lecture"
+
+#, python-brace-format
+msgid "Saved {time}"
+msgstr "Enregistré {time}"
+
+msgid "Source not recorded"
+msgstr "Source non enregistrée"
+
+msgid "Storyteller is configured but could not be reached."
+msgstr "Storyteller est configuré, mais reste inaccessible."
+
+msgid "The book is still opening. Try again in a moment."
+msgstr "Le livre est encore en cours d’ouverture. Réessayez dans un instant."
+
 #~ msgid "Change library cover"
 #~ msgstr "Modifier la couverture de la bibliothèque"
 

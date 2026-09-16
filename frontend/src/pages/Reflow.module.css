@@ -80,7 +80,7 @@
 .overTarget {
   margin: var(--sp-3) 0 0; padding: var(--sp-3);
   background: var(--danger-soft); border: 1px solid var(--danger-border);
-  border-radius: var(--r-md); color: var(--danger); font-size: var(--fs-sm);
+  border-radius: var(--r-md); color: var(--text); font-size: var(--fs-sm);
   line-height: var(--lh-base);
 }
 
@@ -161,7 +161,7 @@
 .error {
   padding: var(--sp-3); border-radius: var(--r-md);
   background: var(--danger-soft); border: 1px solid var(--danger-border);
-  color: var(--danger); font-size: var(--fs-sm); line-height: var(--lh-base);
+  color: var(--text); font-size: var(--fs-sm); line-height: var(--lh-base);
 }
 .notConfigured {
   display: flex; align-items: flex-start; gap: var(--sp-3);

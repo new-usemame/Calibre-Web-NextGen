@@ -14,7 +14,7 @@ export type {
   ReflowEstimate, ReflowJobCounts, ReflowMode, ReflowTier, ReflowTierChoice,
 } from './reflowMoney.ts';
 export {
-  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, requiredUsd,
+  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, ledgerUsd, requiredUsd,
   routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
 } from './reflowMoney.ts';
 
@@ -147,4 +147,3 @@ export function useCancelReflow() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['reflow-jobs'] }),
   });
 }
-

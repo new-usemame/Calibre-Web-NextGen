@@ -6,7 +6,7 @@ import {
 import { useBook } from '../lib/queries';
 import {
   useReflowEstimate, useReflowJobs, useStartReflow, useCancelReflow,
-  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, requiredUsd,
+  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, ledgerUsd, requiredUsd,
   routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
   type ReflowJob, type ReflowMode,
 } from '../lib/reflow';
@@ -391,14 +391,14 @@ export function Reflow({ id }: { id: string }) {
           <>
             <p className={styles.capWarn} role="alert">
               {t('An earlier job left {amount} unconfirmed: a request was sent and its answer never came back, so the provider may still charge it. It is not part of this new cap, and starting again does not settle or erase it.')
-                .replace('{amount}', usd(hold))}
+                .replace('{amount}', ledgerUsd(hold))}
             </p>
             <label className={styles.consent}>
               <input type="checkbox" className={styles.check} checked={holdAcknowledged}
                 onChange={(e) => setHoldAcknowledged(e.target.checked)} />
               <span>
                 {t('I understand the unconfirmed {amount} from the earlier job may still be charged, and it is not covered by this consent.')
-                  .replace('{amount}', usd(hold))}
+                  .replace('{amount}', ledgerUsd(hold))}
               </span>
             </label>
           </>
@@ -531,10 +531,10 @@ function JobResult({ job, bookId, t, onConvertAll }: {
       )}
 
       <dl className={styles.facts}>
-        <Fact label={t('Spent')} value={usd(job.spend_usd)} />
+        <Fact label={t('Spent')} value={ledgerUsd(job.spend_usd)} />
         {heldUsd(job) > 0 && (
           <Fact label={t('Unconfirmed, may still be charged')}
-            value={usd(heldUsd(job))} />
+            value={ledgerUsd(heldUsd(job))} />
         )}
         <Fact label={t('Pages sent to a model')} value={String(sent)} />
         {job.reused > 0 && (

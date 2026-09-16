@@ -114,7 +114,7 @@ async function anyBookId(page: Page): Promise<number | null> {
 
 async function openReflow(page: Page) {
   // Let the catalog's auth/browse requests settle before navigating away;
-  // WebKit reports their navigation cancellation as access-control errors.
+  // Rapid navigation can report cancelled requests as access-control errors.
   await page.goto('/app', { waitUntil: 'networkidle' });
   const book = await anyBookId(page);
   test.skip(book == null, 'this lane has no books at all');

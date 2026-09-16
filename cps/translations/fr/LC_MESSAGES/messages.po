@@ -15678,6 +15678,10 @@ msgid "There is no text in this PDF at all, only images. Every page has to be re
 msgstr "Ce PDF ne contient aucun texte, seulement des images. Chaque page doit être lue par le modèle, ce qui coûte le plus cher."
 
 #: cps/spa_strings.py
+msgid "There is no usable text in this PDF, only page images. Text recovery settings determine how those pages are read; review a sample for recognition errors."
+msgstr "Ce PDF ne contient aucun texte exploitable, seulement des images de pages. Les réglages de récupération du texte déterminent comment ces pages sont lues ; examinez un échantillon pour repérer les erreurs de reconnaissance."
+
+#: cps/spa_strings.py
 msgid "There is very little text on each page. This is usually a sparse scan, or two printed pages photographed as one."
 msgstr "Il y a très peu de texte sur chaque page. C’est généralement une numérisation clairsemée, ou deux pages imprimées photographiées comme une seule."
 

@@ -31,7 +31,7 @@ function verdictSentence(verdict: string, t: TFunction): string {
     case 'THIN_TEXT':
       return t('There is very little text on each page. This is usually a sparse scan, or two printed pages photographed as one.');
     case 'NO_TEXT_LAYER':
-      return t('There is no text in this PDF at all, only images. Every page has to be read by the model, which costs the most.');
+      return t('There is no usable text in this PDF, only page images. Text recovery settings determine how those pages are read; review a sample for recognition errors.');
     case 'GARBAGE_TEXT':
       return t('This PDF has a text layer, but it is not readable words. It has to be treated as if there were no text at all.');
     default:

@@ -179,3 +179,37 @@ export function suggestedCap(estimate: number, hardCap: number): number {
   const padded = Math.ceil(estimate * 1.25 * 100) / 100;
   return Math.min(Math.max(padded, 0.01), hardCap);
 }
+
+/** The billing fields a job row carries, kept apart from one another. */
+export interface ReflowBillingLike {
+  status?: string | null;
+  spend_usd?: number | null;
+  pending_usd?: number | null;
+}
+
+/** The amount a job may still be charged, held because an answer was lost.
+ *
+ *  `ledger.totals` keeps confirmed spend (`spend_usd`) and unresolved liability
+ *  (`pending_usd`) in separate fields for exactly this read: a lost reply is not
+ *  a confirmed charge and it is not zero. A job row that predates the field, or
+ *  one whose liability resolved, holds nothing. */
+export function heldUsd(job: ReflowBillingLike): number {
+  const pending = job.pending_usd;
+  return typeof pending === 'number' && Number.isFinite(pending) && pending > 0
+    ? pending : 0;
+}
+
+/** The hold a fresh-spend decision must acknowledge, in a newest-first job list.
+ *
+ *  The first row still holding anything is the liability on the table: the
+ *  consent for the next job has to name it, and the start stays blocked until
+ *  the reader says they understand it is not part of the new cap. The amount is
+ *  the gate, not the status: a row written after the liability resolved reads
+ *  0, and 0 means the way is clear -- no row may be treated as if it resolved. */
+export function holdRequiringAcknowledgment(jobs: ReflowBillingLike[]): number {
+  for (const job of jobs || []) {
+    const held = heldUsd(job);
+    if (held > 0) return held;
+  }
+  return 0;
+}

@@ -9,8 +9,8 @@ import test from 'node:test';
 
 import type { ReflowEstimate } from '../src/lib/reflowMoney.ts';
 import {
-  consentUsd, jobCounts, requiredUsd, routedPagesAreProjected, sampleRoutedPages,
-  suggestedCap, usd,
+  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, requiredUsd,
+  routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
 } from '../src/lib/reflowMoney.ts';
 
 /** Per page, at the ceilings `cps/services/reflow/model.py` prices a tier by. */
@@ -289,3 +289,40 @@ test('a job summary written before calls were recorded is not read as a purchase
        assert.equal(counts.sent, 210);
        assert.equal(counts.checked, 422);
      });
+
+/* ── unresolved billing: the held amount and the acknowledgment gate ── */
+
+test('a job with unresolved billing holds the amount, apart from confirmed spend',
+     () => {
+       // The API regression row: $0.0022 confirmed, $0.0217 held after a lost reply.
+       const job = { status: 'billing_unknown', spend_usd: 0.0022, pending_usd: 0.0217 };
+       assert.equal(heldUsd(job), 0.0217);
+     });
+
+test('a finished job holds nothing, and a row from before the field reads as none',
+     () => {
+       assert.equal(heldUsd({ status: 'done', spend_usd: 0.42, pending_usd: 0 }), 0);
+       assert.equal(heldUsd({ status: 'capped', spend_usd: 0.5 }), 0);
+       assert.equal(heldUsd({ status: 'billing_unknown', spend_usd: 0.001, pending_usd: -3 }),
+                    0);
+     });
+
+test('fresh spend after an unresolved job must acknowledge the hold first', () => {
+  // Newest first, as the server lists them: the unresolved row is what the next
+  // consent has to name, however many clean rows came after it.
+  const jobs = [
+    { status: 'done', spend_usd: 0.31, pending_usd: 0 },
+    { status: 'billing_unknown', spend_usd: 0.001, pending_usd: 0.0217 },
+  ];
+  assert.equal(holdRequiringAcknowledgment(jobs), 0.0217);
+  assert.equal(holdRequiringAcknowledgment(jobs.slice(0, 1)), 0);
+  assert.equal(holdRequiringAcknowledgment([]), 0);
+});
+
+test('a job whose liability resolved needs no acknowledgment', () => {
+  // The amount is the gate, not the status: a row written after resolution
+  // reads 0, and a row from a build that predates the field reads as none.
+  assert.equal(holdRequiringAcknowledgment(
+      [{ status: 'done', spend_usd: 0.31, pending_usd: 0 }]), 0);
+  assert.equal(holdRequiringAcknowledgment([{ status: 'done', spend_usd: 0.31 }]), 0);
+});

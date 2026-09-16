@@ -14,8 +14,8 @@ export type {
   ReflowEstimate, ReflowJobCounts, ReflowMode, ReflowTier, ReflowTierChoice,
 } from './reflowMoney.ts';
 export {
-  consentUsd, jobCounts, requiredUsd, routedPagesAreProjected, sampleRoutedPages,
-  suggestedCap, usd,
+  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, requiredUsd,
+  routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
 } from './reflowMoney.ts';
 
 export interface ReflowJob {
@@ -24,13 +24,19 @@ export interface ReflowJob {
   /** ``capped`` and ``incomplete`` both stopped early with a file in hand: the
    *  pages bought before the stop were written, the rest were not. The first is
    *  the cap the user set, the second is the model service going away mid-book.
-   *  Only ``done`` is a conversion that did what it was asked for.
+   *  ``billing_unknown`` stopped when a dispatched request's billing could not
+   *  be proven either way: its bound stays held, and ``pending_usd`` says how
+   *  much. Only ``done`` is a conversion that did what it was asked for.
    *  See STOP_STATUS in cps/tasks/reflow.py. */
   status: 'waiting' | 'running' | 'done' | 'capped' | 'incomplete' | 'failed'
-    | 'cancelled';
+    | 'cancelled' | 'billing_unknown';
   started: number | null;
   finished: number | null;
+  /** Confirmed spend, reconciled against the provider. */
   spend_usd: number;
+  /** Possible charge held because an answer was lost: money the provider may
+   *  still bill. Kept out of ``spend_usd`` on purpose; 0 means resolved. */
+  pending_usd: number;
   cap_usd: number;
   pages: number;
   calls: number;

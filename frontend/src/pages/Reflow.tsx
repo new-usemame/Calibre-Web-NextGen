@@ -6,8 +6,8 @@ import {
 import { useBook } from '../lib/queries';
 import {
   useReflowEstimate, useReflowJobs, useStartReflow, useCancelReflow,
-  consentUsd, jobCounts, requiredUsd, routedPagesAreProjected, sampleRoutedPages,
-  suggestedCap, usd,
+  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, requiredUsd,
+  routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
   type ReflowJob, type ReflowMode,
 } from '../lib/reflow';
 import { Button } from '../components/Button';
@@ -45,6 +45,7 @@ const STATUS_LABEL = (status: string, t: TFunction): string => ({
   done: t('Finished'),
   capped: t('Stopped at the cap'),
   incomplete: t('The model service stopped answering'),
+  billing_unknown: t('A charge could not be confirmed'),
   failed: t('Failed'),
   // Not the classic task list's "Cancelled": a conversion has two ways of
   // stopping early and the bill is different, so each says which one it was.
@@ -114,11 +115,19 @@ export function Reflow({ id }: { id: string }) {
   // The server lists jobs newest first (ledger.read_summaries).
   const latest = jobsQ.data?.items?.[0] ?? null;
 
+  // An earlier job may still hold an unconfirmed charge. The next consent has
+  // to name it and the start stays blocked until the reader acknowledges it --
+  // the hold is not part of this job's cap, and starting again neither settles
+  // nor erases it. It re-arms if the held amount ever changes.
+  const hold = holdRequiringAcknowledgment(jobsQ.data?.items ?? []);
+  const [holdAcknowledged, setHoldAcknowledged] = useState(false);
+  useEffect(() => setHoldAcknowledged(false), [hold]);
+
   const capValid = Number.isFinite(capNumber) && capNumber > 0
     && (!est || capNumber <= est.hard_cap_usd + 1e-9);
   const capTooLow = capValid && capNumber + 1e-9 < needed;
   const blocked = !est?.configured || running || !consent || !capValid || capTooLow
-    || engineBlocks || start.isPending;
+    || engineBlocks || start.isPending || (hold > 0 && !holdAcknowledged);
 
   const onStart = () => {
     if (!est || blocked) return;
@@ -377,6 +386,23 @@ export function Reflow({ id }: { id: string }) {
           </p>
         )}
 
+        {hold > 0 && (
+          <>
+            <p className={styles.capWarn} role="alert">
+              {t('An earlier job left {amount} unconfirmed: a request was sent and its answer never came back, so the provider may still charge it. It is not part of this new cap, and starting again does not settle or erase it.')
+                .replace('{amount}', usd(hold))}
+            </p>
+            <label className={styles.consent}>
+              <input type="checkbox" className={styles.check} checked={holdAcknowledged}
+                onChange={(e) => setHoldAcknowledged(e.target.checked)} />
+              <span>
+                {t('I understand the unconfirmed {amount} from the earlier job may still be charged, and it is not covered by this consent.')
+                  .replace('{amount}', usd(hold))}
+              </span>
+            </label>
+          </>
+        )}
+
         <label className={styles.consent}>
           <input type="checkbox" className={styles.check} checked={consent}
             disabled={!est.configured} onChange={(e) => setConsent(e.target.checked)} />
@@ -492,9 +518,18 @@ function JobResult({ job, bookId, t, onConvertAll }: {
           {t('The model service stopped answering partway through, so this ended early. The pages converted before it stopped are in the file and the rest kept the text read straight out of the PDF. Starting it again re-uses every page that was accepted, so none of those is paid for twice.')}
         </p>
       )}
+      {job.status === 'billing_unknown' && (
+        <p className={styles.capWarn} role="alert">
+          {t('This stopped when a request’s answer never came back, so its charge could not be confirmed either way. Spent below is confirmed; the unconfirmed amount may still be charged by the provider and stays on record here until it is resolved. Reloading does not settle or erase it, and no new job covers it.')}
+        </p>
+      )}
 
       <dl className={styles.facts}>
         <Fact label={t('Spent')} value={usd(job.spend_usd)} />
+        {heldUsd(job) > 0 && (
+          <Fact label={t('Unconfirmed, may still be charged')}
+            value={usd(heldUsd(job))} />
+        )}
         <Fact label={t('Pages sent to a model')} value={String(sent)} />
         {job.reused > 0 && (
           <Fact label={t('Pages reused from an earlier run')} value={String(job.reused)} />

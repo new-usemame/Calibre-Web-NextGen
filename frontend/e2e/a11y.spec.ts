@@ -14,6 +14,8 @@ const isPhoneProject = () => test.info().project.name === 'mobile';
  * add a rule id ONLY with a tracking note and a follow-up, never to silence a red.
  *
  * See ~/.claude/skills/CWNG_a11y (the growing a11y skill) for how to grow this.
+ * Reflow's interrupted-job, sub-cent billing and over-target warning state is
+ * also scanned in both themes by reflow-money.spec.ts with stubbed job data.
  */
 const FAIL_IMPACTS = ['critical', 'serious'];
 

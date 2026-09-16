@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { requireRouteCapability } from './capabilities';
 import { collectPageErrors, assertNoPageErrors } from './utils';
 
@@ -121,6 +122,39 @@ test.describe('Reflow quotes money the reader can hold it to', () => {
       pinnedBy: 'tests/unit/test_reflow_api.py',
     });
   });
+
+  test('an interrupted job exposes small charges and readable recovery in both themes',
+       async ({ page }) => {
+         await page.emulateMedia({ reducedMotion: 'reduce' });
+         await stubReflow(page, estimatePayload(), [{
+           ...RESUMED_JOB, status: 'interrupted', mode: 'sample',
+           spend_usd: 0.0022, pending_usd: 0.0217, calls: 1,
+           error: 'The application restarted before this conversion finished.',
+         }]);
+         const { errors } = await openReflow(page);
+         const result = page.locator('section[aria-labelledby="reflow-result"]');
+         await expect(result.getByRole('alert')).toBeVisible();
+         await expect(result.getByRole('status')).toBeVisible();
+         await expect(result.getByText('$0.0022', { exact: true })).toBeVisible();
+         await expect(result.getByText('$0.0217', { exact: true })).toBeVisible();
+         await expect(page.locator('label').filter({
+           hasText: 'I understand the unconfirmed $0.0217',
+         }).getByRole('checkbox')).toBeVisible();
+         for (const theme of ['dark', 'light']) {
+           await page.evaluate(async (value) => {
+             document.documentElement.setAttribute('data-theme', value);
+             await new Promise<void>((resolve) => requestAnimationFrame(() =>
+               requestAnimationFrame(() => resolve())));
+           }, theme);
+           const results = await new AxeBuilder({ page })
+             .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+             .analyze();
+           expect(results.violations.filter((v) =>
+             v.impact === 'serious' || v.impact === 'critical'),
+           `Interrupted conversion / ${theme}`).toEqual([]);
+         }
+         assertNoPageErrors(errors);
+       });
 
   test('a page count scaled up from a survey is shown as an estimate, and a counted one is not',
        async ({ page }) => {

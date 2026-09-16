@@ -14,7 +14,7 @@ The reader sees a sentence stop mid-clause at every page turn.
 
 import pytest
 
-from cps.services.reflow import assemble, extract
+from cps.services.reflow import assemble, build_epub, extract
 from tests.fixtures import reflow_pdfs as F
 
 pytestmark = pytest.mark.unit
@@ -108,6 +108,37 @@ def test_a_real_wrap_heals_and_an_ordinary_boundary_keeps_its_space():
     ]
     texts = [_assembled_text(*shape) for shape in boundaries]
     assert texts == ["quick brown fox"] * 3, texts
+
+
+# ----------------------------------------------------- damaged note identities
+
+def test_a_repair_over_a_scan_marks_the_note_identity_as_uncertain():
+    """Book 567 index 220's shape: the layer prints 1 for 188, quote residue
+    stands for the marker, and the pairing that binds them is still made --
+    but on a scan it is an uncertain reading of a damaged layer, kept as read
+    and marked, never an authoritative identity (DECISIONS 4/5)."""
+    book = _book(lambda d: F.scan_note_identity_page(d, F.solid_png()))
+
+    fragment = build_epub.page_fragment(book, 0)
+
+    assert 'class="reflow-uncertain"' in fragment
+    assert "damaged text layer" in fragment
+    note = next(n for n in book.notes if n.num == 1)
+    assert note.uncertain, "the note's identity leans on the residue pairing"
+    assert note.marked, "the pairing still binds marker to note"
+    assert note.text.startswith("Firmicus"), "the note's text is kept as read"
+
+
+def test_the_same_repair_on_a_clean_layer_is_not_marked_uncertain():
+    """The control: no scan underneath, nothing damaged -- the same pairing is
+    just a repair, with no uncertainty to show."""
+    book = _book(F.born_digital_note_identity_page)
+
+    fragment = build_epub.page_fragment(book, 0)
+
+    assert "reflow-uncertain" not in fragment
+    note = next(n for n in book.notes if n.num == 1)
+    assert not note.uncertain
 
 
 # ----------------------------------------------------------- page-turn joins (defect B)

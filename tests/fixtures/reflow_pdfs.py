@@ -1761,6 +1761,29 @@ def degree_in_the_note_zone_page(doc):
     return page
 
 
+def scan_note_identity_page(doc, png_bytes):
+    """Book 567 index 220's shape: on a scan-backed page the layer prints 1
+    where 188 is visible, and quote residue stands where the marker was. The
+    residue pairing still binds them -- and on a scan that binding is an
+    uncertain reading of a damaged layer, never an authoritative identity."""
+    page = add_page(doc)
+    page.insert_image(pymupdf.Rect(0, 0, PAGE_W, PAGE_H), stream=png_bytes)
+    y = add_body_lines(page, PROSE_LINES[:4])
+    _put(page, LEFT, y, "Firmicus tells the story the same way.'\"")
+    add_notes(page, [(1, "Firmicus, Mathesis 2.24, trans. Holden.")])
+    return page
+
+
+def born_digital_note_identity_page(doc):
+    """The same shape with no scan under it: a repair on a clean layer is just
+    a repair, with nothing damaged to be uncertain about."""
+    page = add_page(doc)
+    y = add_body_lines(page, PROSE_LINES[:4])
+    _put(page, LEFT, y, "Firmicus tells the story the same way.'\"")
+    add_notes(page, [(1, "Firmicus, Mathesis 2.24, trans. Holden.")])
+    return page
+
+
 def own_line_note_number_page(doc):
     """Book 569 page 355's footnote: the scan put the note's number on a line
     of its own at the note's own size, and the note's sentence on the next

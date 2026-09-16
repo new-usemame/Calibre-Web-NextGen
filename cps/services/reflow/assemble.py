@@ -101,6 +101,9 @@ class Note(object):
     text: str
     pno: int
     marked: bool = False
+    #: The number leans on a repair from a damaged scan-backed layer: kept as
+    #: read, shown as an uncertain reading.
+    uncertain: bool = False
 
     def to_dict(self):
         return {"num": self.num, "text": self.text, "pno": self.pno,
@@ -623,9 +626,18 @@ def _recover_glyph_markers(elements, skel, claimed, repairs, reasons,
                 index += 1
                 continue
             match, number = found
-            element.runs[index:index + 1] = [["t", text[:match.start()]],
-                                             ["sup", str(number), skel.pno],
-                                             ["t", text[match.end():]]]
+            if skel.is_scan:
+                # The reading came back from the scan's own noise: the marker
+                # exists, and its number is an uncertain reading of a damaged
+                # layer, never an authoritative one.
+                for region in skel.regions:
+                    if region.kind == "note" and region.number == number:
+                        region.uncertain = True
+            element.runs[index:index + 1] = [
+                ["t", text[:match.start()]],
+                ["sup", str(number), skel.pno] + (["uncertain"]
+                                                  if skel.is_scan else []),
+                ["t", text[match.end():]]]
             claimed.add(number)
             unclaimed.remove(number)
             repairs.append(Repair("marker_glyphs", skel.pno,
@@ -661,9 +673,15 @@ def _recover_residue_markers(elements, skel, claimed, repairs, reasons):
 
     for (element, index, match), number in zip(reversed(slots), reversed(missing)):
         text = element.runs[index][1]
-        element.runs[index:index + 1] = [["t", text[:match.start()]],
-                                         ["sup", str(number), skel.pno],
-                                         ["t", text[match.end():]]]
+        if skel.is_scan:
+            for region in skel.regions:
+                if region.kind == "note" and region.number == number:
+                    region.uncertain = True
+        element.runs[index:index + 1] = [
+            ["t", text[:match.start()]],
+            ["sup", str(number), skel.pno] + (["uncertain"]
+                                              if skel.is_scan else []),
+            ["t", text[match.end():]]]
         claimed.add(number)
         repairs.append(Repair("marker_residue", skel.pno,
                               "paired quote residue %r with unmarked note %d"
@@ -872,6 +890,10 @@ def repair_note_numbers(skeletons, repairs):
             continue
         for index, number in pairs:
             skel, region = regions[index]
+            if skel.is_scan:
+                # A computed identity over a scan is plausible, not printed:
+                # kept, and shown as the uncertain reading it is.
+                region.uncertain = True
             repairs.append(Repair(
                 kind="note_number", pno=skel.pno,
                 detail="note %s reads as %d between notes %d and %d"
@@ -1135,7 +1157,8 @@ def assemble(skeletons, style, raw_pages=None):
                                        text=note_text(region, book.repairs, skel.pno,
                                                       vocab=vocab),
                                        pno=skel.pno,
-                                       marked=region.number in claimed))
+                                       marked=region.number in claimed,
+                                       uncertain=bool(region.uncertain)))
             elif region.kind == "artwork":
                 book.artwork.append({"pno": skel.pno, "bbox": list(region.bbox),
                                      "text": region.text})

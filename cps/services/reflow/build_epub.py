@@ -174,17 +174,31 @@ def _runs_html(runs, available, ref_ids):
             parts.append(escape(run[1]))
             continue
         number = str(run[1])
+        # A marker established by a repair over a scan is an uncertain reading:
+        # the number the layer gave, kept and marked, never an authoritative one.
+        uncertain = len(run) > 3 and run[3] == "uncertain"
         if number in available:
             ref = "fnref_%s" % number
             if number in ref_ids:
                 ref = "%s_%d" % (ref, len(ref_ids) + 1)
             ref_ids.setdefault(number, ref)
+            if uncertain:
+                parts.append('<a class="noteref" epub:type="noteref" id="%s" '
+                             'href="#fn_%s"><sup class="reflow-uncertain" '
+                             'title="number read from a damaged text layer">%s'
+                             '</sup></a>' % (ref, number, escape(number)))
+                continue
             parts.append('<a class="noteref" epub:type="noteref" id="%s" '
                          'href="#fn_%s"><sup>%s</sup></a>'
                          % (ref, number, escape(number)))
         else:
             # The note is set on another page, or was never found. A link here is a
             # footnote button that opens nothing, so the marker stays a marker.
+            if uncertain:
+                parts.append('<sup class="noteref-unresolved reflow-uncertain" '
+                             'title="number read from a damaged text layer">%s'
+                             '</sup>' % escape(number))
+                continue
             parts.append('<sup class="noteref-unresolved">%s</sup>' % escape(number))
     return "".join(parts)
 
@@ -195,6 +209,9 @@ def _aside_html(note, ref_ids, available):
         return '<aside class="footnote" epub:type="footnote"><p>%s</p></aside>' % body
     number = str(note.num)
     label = escape(number)
+    if getattr(note, "uncertain", False):
+        label = ('<span class="reflow-uncertain" title="number read from a '
+                 'damaged text layer">%s</span>' % label)
     if number in ref_ids:
         label = '<a href="#%s">%s</a>' % (ref_ids[number], label)
     return ('<aside class="footnote" epub:type="footnote" id="fn_%s">'

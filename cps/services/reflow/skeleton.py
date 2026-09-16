@@ -134,6 +134,11 @@ class Region(object):
     #: Figures found by geometry rather than by an embedded image: the crop must
     #: prove it holds ink before it is emitted, so blank paper is never artwork.
     needs_ink: bool = False
+    #: Notes only: the note's number leans on a repair read out of a damaged
+    #: scan-backed layer, never on a number the page cleanly prints. It stays
+    #: the number the layer gave, shown as an uncertain reading, because a
+    #: known-uncertain label may not wear authority it did not earn.
+    uncertain: bool = False
 
     @property
     def text(self):

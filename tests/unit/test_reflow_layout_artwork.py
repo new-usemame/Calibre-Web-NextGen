@@ -175,6 +175,18 @@ class TestColumnReadingOrder(object):
         assert text.index("Day") < text.index("Night") < text.index("Sun") \
                < text.index("Moon"), text
 
+    def test_a_sign_pair_table_keeps_its_pairs_together(self):
+        """Book 569 p547's shape: a mirror table is not two lists. Column-major
+        would print every 'looks at' away from its 'perceives'; the rows are the
+        unit, and no heuristic may guess the table into unrelated lists."""
+        book = _book(F.sign_pair_table_page)
+
+        text = _whole_text(book)
+        assert text.index("GEMINI looks at LEO") < text.index("perceives"), text
+        assert text.index("perceives") < text.index("TAURUS looks at VIRGO"), text
+        assert "columns_reordered" not in (book.page_reasons(0) or [])
+        assert book.conservation.ok, book.conservation.to_dict()
+
     def test_an_unruled_label_table_keeps_its_rows(self):
         """Book 569's zodiacal tables: a label column of short lines beside a
         content column is a table, and its rows must survive."""

@@ -983,7 +983,95 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
     fills.sort()
     if fills and fills[len(fills) // 2] < COLUMN_FILL_MIN:
         return None
+    if not _column_sequence_evidence(columnar, layout):
+        # A mirror table of paired rows ('GEMINI looks at LEO' beside 'l e o
+        # perceives g e m in i', book 569 p547) proves two clean columns of
+        # fragments with no sequence inside either. Column-major prints every
+        # left cell away from its right-hand pair, and no heuristic gets to
+        # guess the table into unrelated lists: without sequence evidence the
+        # rows stay as they print, pairs together.
+        return None
     return layout
+
+
+_SENTENCE_END = re.compile(r"[.!?;:\"”’)\]]\s*$")
+_LIST_OPENER = re.compile(r"^\s*(?:\d|[•\-*–—])")
+_YEAR = re.compile(r"\d{4}")
+
+
+def _column_sequence_evidence(columnar, layout):
+    """True when the columns read as independent sequences, not mirror rows.
+
+    In order: a labelled sequence (numbers, bullets, sentence punctuation, or
+    years in most lines, or an ascending numbered run down a column) is proof
+    on its own. Without one, a page whose rows are paired fragments in both
+    columns at shared baselines is a mirror table -- reading it column-major
+    severs every pair, which is exactly the failure to avoid. Real prose is
+    neither fragmented nor paired: it flows, and flow is the third proof.
+    """
+    labeled = sum(1 for _, text in columnar
+                  if _LIST_OPENER.match(text) or _SENTENCE_END.search(text)
+                  or _YEAR.search(text))
+    if labeled * 5 >= len(columnar) * 3:
+        return True
+    if _has_number_sequence(columnar, layout):
+        return True
+    if _mirror_fragment_rows(columnar, layout):
+        return False
+    by_column = {}
+    for box, text in columnar:
+        by_column.setdefault(layout.column_of(box), []).append((box, text))
+    for lines in by_column.values():
+        lines.sort(key=lambda item: (item[0][1], item[0][0]))
+        for (_, prev), (__, nxt) in zip(lines, lines[1:]):
+            last = prev.rstrip(".,;:!?\"”’").rsplit(" ", 1)[-1] if prev else ""
+            if prev and nxt and not _SENTENCE_END.search(prev) \
+                    and nxt[:1].islower() \
+                    and len(last) >= 2 and last.islower():
+                return True
+    return False
+
+
+def _has_number_sequence(columnar, layout):
+    """A column of numbered items ascending down the page: a sequence of its
+    own (a GOOD/BAD list's 1..13, a timeline's ascending years)."""
+    by_column = {}
+    for box, text in columnar:
+        by_column.setdefault(layout.column_of(box), []).append((box, text))
+    for lines in by_column.values():
+        lines.sort(key=lambda item: (item[0][1], item[0][0]))
+        numbers = []
+        for _, text in lines:
+            match = re.match(r"\s*(\d{1,4})\b", text)
+            if match:
+                numbers.append(int(match.group(1)))
+        ascending = sum(1 for a, b in zip(numbers, numbers[1:]) if b > a)
+        if len(numbers) >= 3 and ascending * 2 >= len(numbers) - 1:
+            return True
+    return False
+
+
+def _mirror_fragment_rows(columnar, layout):
+    """Rows of short fragments printed in both columns at shared baselines.
+
+    The mirror table ('GEMINI looks at LEO' beside 'l e o perceives g e m in
+    i') is nothing but these; prose columns at the same density are not
+    fragments (they are full sentences wrapping, well past 30 characters), and
+    a numbered list has already been proved a sequence before this is asked.
+    """
+    rows = {}
+    for box, text in columnar:
+        key = round((box[1] + box[3]) / 2.0)
+        rows.setdefault(key, []).append((box, text))
+    paired = fragments = 0
+    for key in sorted(rows):
+        cols = {layout.column_of(box) for box, _ in rows[key]}
+        if len(cols) < 2:
+            continue
+        paired += 1
+        if all(len(text.replace(" ", "")) <= 30 for _, text in rows[key]):
+            fragments += 1
+    return paired >= 4 and fragments * 2 >= paired
 
 
 # ----------------------------------------------------------- figures by geometry

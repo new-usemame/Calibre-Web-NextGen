@@ -831,6 +831,25 @@ def column_notes_page(doc):
     return page
 
 
+def sign_pair_table_page(doc):
+    """Book 569 page 547's shape: a mirror table of sign pairs.
+
+    'GEMINI looks at LEO' beside 'l e o perceives g e m in i': each row is a
+    pair, and reading the left list down and then the right list prints every
+    'looks at' away from its 'perceives'. Neither column is an independent
+    sequence -- the row is the unit -- so the reading keeps them row by row.
+    """
+    page = add_page(doc)
+    add_body_lines(page, PROSE_LINES[:5])
+    _column_rows(page, [
+        ("GEMINI looks at LEO", "l e o perceives g e m in i"),
+        ("TAURUS looks at VIRGO", "v ir g o perceives t a u r u s"),
+        ("ARIES looks at LIBRA", "l i b r a perceives a r i e s"),
+        ("SCORPIO looks at PISCES", "p i s c e s perceives s c o r p i o"),
+    ], left=99.0, right=250.0, top=BODY_TOP + 6 * BODY_LEADING)
+    return page
+
+
 def ruled_table_page(doc):
     """A ruled two-column table: cell rows must not become prose column traversal.
 

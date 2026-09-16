@@ -408,6 +408,90 @@ def test_a_page_the_gate_refused_carries_no_marks(tmp_path):
     assert result.outcomes[1].marked == 0
 
 
+# --------------------------------------- R3: recovered source evidence survives
+
+def _recovery_with_uncertain(pno, token, score=20.0):
+    """The recovery state a local OCR run leaves when its engine was unsure of
+    one word on the page: provenance, and the word as a source-evidence record."""
+    from cps.services.reflow import ocr, source
+    word = ocr.OCRWord(token, (0, 0, 30, 10), (0, 0, 30, 10), (0, 0, 30, 10),
+                       score, 1, 1, 1)
+    spans = source.uncertain_spans(types.SimpleNamespace(words=(word,)))
+    recovery = source.Recovery()
+    recovery.provenance[pno] = source.PageRecovery(
+        pno=pno, layer="ocr", words=1, uncertain_words=1, uncertain=spans)
+    return recovery
+
+
+def _run_with_recovery(doc, client, tmp_path, recovery, cache=None):
+    from cps.services.reflow import source
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=1.0)
+    cache = cache or pipeline.PageCache(str(tmp_path / "cache"))
+
+    def fake_recover(_doc, raw_pages, fingerprint, **kwargs):
+        recovery.pages = raw_pages
+        return recovery
+
+    original = source.recover
+    source.recover = fake_recover
+    try:
+        result = pipeline.run(doc, client=client, ledger=book, cache=cache)
+    finally:
+        source.recover = original
+    return result
+
+
+def test_a_model_answer_keeps_the_recovered_uncertain_readings(tmp_path):
+    """A valid, word-conserving model reply cannot silently strip the OCR layer's
+    own low-confidence evidence: the adopted page keeps the visible mark and the
+    reportable source record (independent repro: low_confidence_marks=0)."""
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    recovery = _recovery_with_uncertain(1, "Rhetorius")
+    try:
+        result = _run_with_recovery(doc, FakeClient(), tmp_path, recovery)
+    finally:
+        doc.close()
+
+    outcome = result.outcomes[1]
+    assert outcome.gate == "PASS", outcome.gate_reasons
+    assert outcome.marked >= 1
+    assert 'class="reflow-uncertain"' in result.page_html[1]
+    evidence = [record for record in outcome.uncertain
+                if record.get("token") == "Rhetorius"]
+    assert evidence, outcome.uncertain
+    assert evidence[0].get("score") == 20.0
+    assert evidence[0].get("source_bbox")
+
+
+def test_a_warm_cache_replay_keeps_the_recovered_uncertain_readings(tmp_path):
+    """The cache stores the model's own list, which may be empty. A warm resume
+    must re-derive the same source evidence at adoption, not replay the empty
+    list and ship the page unmarked."""
+    cache = pipeline.PageCache(str(tmp_path / "cache"))
+    recovery = _recovery_with_uncertain(1, "Rhetorius")
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    try:
+        cold = _run_with_recovery(doc, FakeClient(), tmp_path, recovery, cache=cache)
+    finally:
+        doc.close()
+    assert cold.outcomes[1].gate == "PASS"
+
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    client = FakeClient()
+    try:
+        warm = _run_with_recovery(doc, client, tmp_path, recovery, cache=cache)
+    finally:
+        doc.close()
+
+    assert client.calls == [], "the second run must come from the warm cache"
+    outcome = warm.outcomes[1]
+    assert outcome.cached and outcome.gate == "PASS"
+    assert outcome.marked >= 1
+    assert 'class="reflow-uncertain"' in warm.page_html[1]
+    assert any(record.get("token") == "Rhetorius" and record.get("score") == 20.0
+               for record in outcome.uncertain), outcome.uncertain
+
+
 def test_a_marker_the_gate_says_came_back_is_not_also_called_unresolved(tmp_path):
     """MEASURED on the acceptance book: 19 of 28 flagged readings were superscripts
     the same answer had already put back as noterefs. Listing those on the about

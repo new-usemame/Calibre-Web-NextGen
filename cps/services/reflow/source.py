@@ -90,6 +90,9 @@ class PageRecovery(object):
     page_rect: tuple = ()        # displayed-page rect, for crop transforms
     derotation: tuple = ()       # displayed -> unrotated PDF space
     seconds: float = 0.0
+    #: The engine's own low-confidence words as annotation records, kept for the
+    #: adoption seam: a model answer is not allowed to strip them (see pipeline).
+    uncertain: list = field(default_factory=list)
 
     def to_dict(self):
         return {"pno": self.pno, "layer": self.layer, "reason": self.reason,
@@ -362,6 +365,7 @@ def recover(doc, raw_pages, fingerprint, *, mode="auto",
         prov.words = len(result.words)
         prov.uncertain_words = sum(
             1 for word in result.words if word.confidence < UNCERTAIN_SCORE)
+        prov.uncertain = uncertain_spans(result)
         prov.reused = bool(getattr(result, "reused", False))
         prov.derotation = tuple(doc[raw.pno].derotation_matrix)
         prov.seconds = time.monotonic() - page_started

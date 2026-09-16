@@ -62,6 +62,7 @@ def uncertain_record(item):
     """
     if isinstance(item, str):
         token, candidates = item, []
+        extras = {}
     elif isinstance(item, dict):
         token = next((str(item[key]) for key in _TOKEN_KEYS
                       if isinstance(item.get(key), str) and item[key].strip()), "")
@@ -71,12 +72,16 @@ def uncertain_record(item):
             raw = [raw]
         candidates = [str(one) for one in raw if str(one).strip()] \
             if isinstance(raw, (list, tuple)) else []
+        # Extra keys ride along: a source-evidence record's score and where on
+        # the printed page it points are reportable, not noise.
+        extras = {key: value for key, value in item.items()
+                  if key not in _TOKEN_KEYS + _CANDIDATE_KEYS}
     else:
         return None
     token = token.strip()
     if not token:
         return None
-    return {"token": token, "candidates": candidates}
+    return dict(extras, token=token, candidates=candidates)
 
 
 def uncertain_readings(span):

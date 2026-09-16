@@ -528,6 +528,38 @@ def page_hints(book, pno, reasons=None):
     return hints
 
 
+def _source_uncertainty(result, pno):
+    """The low-confidence readings the OCR recovery left on this page.
+
+    Re-derived at adoption time, never read back out of the model's cache:
+    the cache stores the model's own list, which may be empty, while the
+    recovery state is rebuilt on every run -- so a cold answer and its warm
+    replay merge the same source evidence.
+    """
+    recovery = result.recovery
+    if recovery is None:
+        return []
+    prov = recovery.provenance.get(pno)
+    return list(getattr(prov, "uncertain", None) or ())
+
+
+def _merge_uncertainty(model_spans, evidence):
+    """Model-reported readings first, then every recovered low-confidence
+    source record the model did not also name. A word-conserving answer is
+    not allowed to strip the engine's own doubts from the page it adopted."""
+    merged = list(model_spans or [])
+    have = set()
+    for span in merged:
+        token = span.get("token") if isinstance(span, dict) else span
+        have.add(str(token or "").strip().lower())
+    for span in evidence:
+        token = str(span.get("token", "")).strip().lower()
+        if token and token not in have:
+            have.add(token)
+            merged.append(span)
+    return merged
+
+
 def _edit_one_page(doc, book, pno, client, ledger, cache, result, ladder,
                    require_figure_caption, hints=None, should_stop=None):
     outcome = PageOutcome(pno=pno, reasons=list(book.page_reasons(pno)),
@@ -597,7 +629,8 @@ def _adopt(result, book, pno, outcome, html, uncertain, ladder,
                                      figures_expected=figures,
                                      headings=assemble.page_headings(book, pno))
 
-    outcome.uncertain = list(uncertain or [])
+    outcome.uncertain = _merge_uncertainty(list(uncertain or []),
+                                           _source_uncertainty(result, pno))
     outcome.recovered_markers = list(words.recovered_markers)
     if words.ok and structure.ok:
         outcome.gate = "PASS"

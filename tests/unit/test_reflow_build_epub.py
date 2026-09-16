@@ -130,6 +130,32 @@ def test_legitimate_model_markup_survives_the_packaging_boundary_unchanged(tmp_p
     assert not built.warnings
 
 
+def test_a_direct_fragment_with_a_disallowed_tag_is_refused_at_the_packaging_boundary(
+        tmp_path):
+    """The retest finding, closed: the final boundary checked attributes and URLs
+    but left tag names to the adoption gate, so a direct (or historical-cache)
+    fragment carrying <script> shipped unchanged. The last boundary now refuses
+    the whole forbidden markup -- tag included -- and the book still gets the
+    page's own text, with the refusal disclosed."""
+    book = _book(F.prose_page)
+    source = assemble.page_source_text(book, 0)
+    hostile = '<p>%s</p><script>window.__reflow_probe__=1</script>' % source
+
+    built = _build(book, tmp_path, page_html={0: hostile})
+
+    assert build_epub.validate(built.path) == []
+    with zipfile.ZipFile(built.path) as zf:
+        chapters = "".join(zf.read(n).decode("utf-8")
+                           for n in zf.namelist()
+                           if n.startswith("OEBPS/ch") and n.endswith(".xhtml"))
+    assert "<script" not in chapters
+    assert "__reflow_probe__" not in chapters
+    assert source.split()[0] in chapters
+    assert source.split()[-1] in chapters
+    assert any("not trusted" in warning for warning in built.warnings), built.warnings
+    assert built.sidecar.get("unplaced"), "the refusal is disclosed, not silent"
+
+
 def test_a_marked_uncertain_reading_reaches_the_reader_looking_marked(tmp_path):
     """R3 ends here. A mark that the builder's block splitting mangles, or that the
     book's stylesheet says nothing about, is an annotation nobody can see -- and an

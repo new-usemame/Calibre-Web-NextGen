@@ -382,6 +382,27 @@ class TestMarkupSafetyGate:
         html = '<p>text of the page</p><?xml-stylesheet href="https://example.invalid"?>'
         assert not gate.check_structure(html, ladder=[1, 2, 3], headings=[]).ok
 
+    def test_an_unknown_tag_is_refused_by_the_markup_contract_itself(self):
+        """The final builder boundary calls check_markup_safety directly, so the
+        tag half of the contract has to live here -- leaving it to the caller is
+        what let a direct <script> fragment through the packaging boundary."""
+        assert gate.check_markup_safety("<script>alert(1)</script>")
+        assert gate.check_markup_safety("<iframe></iframe>")
+        assert gate.check_markup_safety("</script>")
+        assert gate.check_markup_safety("<svg><script>x</script></svg>")
+
+    def test_a_disallowed_tag_is_reported_once_no_matter_how_often_it_appears(self):
+        reasons = gate.check_markup_safety(
+            "<p>text</p><script>a()</script><p>more</p><script>b()</script>")
+
+        assert len([r for r in reasons if "script" in r]) == 1, reasons
+
+    def test_a_legitimate_url_on_a_disallowed_tag_is_still_refused(self):
+        """The tag decides, not its attributes: an iframe pointing at a real
+        pipeline figure is still an iframe."""
+        assert gate.check_markup_safety(
+            '<iframe src="images/fig_p0000_0.jpg"></iframe>')
+
     def test_the_markup_the_pipeline_writes_itself_is_accepted(self):
         """The control: internal note links, an uncertainty mark, a figure reference
         and a table are the contract, not casualties. Refusing these would be the

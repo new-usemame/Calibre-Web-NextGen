@@ -72,14 +72,6 @@ MIN_SOURCE_TOKENS = 5
 
 Difference = namedtuple("Difference", "kind source output")
 
-ALLOWED_TAGS = frozenset({
-    "h1", "h2", "h3", "h4", "h5", "h6", "p", "blockquote", "aside", "a",
-    "figure", "figcaption", "img", "table", "thead", "tbody", "tr", "td", "th",
-    "ul", "ol", "li", "em", "i", "strong", "b", "sup", "sub", "br", "span",
-    "section", "div", "caption",
-})
-
-
 class GateResult(object):
     """The verdict plus everything a reviewer needs to second-guess it."""
 
@@ -433,7 +425,6 @@ def check_word_preservation(source_text, model_html, recoverable_markers=()):
                       recovered_markers=comparison.recovered if verdict == "PASS" else [])
 
 
-_TAG_NAME = re.compile(r"<\s*(/?)\s*([A-Za-z][A-Za-z0-9]*)")
 _NOTEREF = re.compile(r'<a[^>]*class="[^"]*noteref[^"]*"[^>]*href="#(fn_[^"]+)"', re.I)
 _ASIDE_ID = re.compile(r'<aside[^>]*id="(fn_[^"]+)"', re.I)
 _FIGURE = re.compile(r"<figure\b.*?</figure>", re.I | re.S)
@@ -443,12 +434,14 @@ _HEADING_BLOCK = re.compile(r"<h([1-6])\b[^>]*>(.*?)</h\1\s*>", re.I | re.S)
 
 # ── the attribute and URL contract ─────────────────────────────────────────────
 #
-# The tag allowlist above answers "which elements". It cannot answer "an <img>
-# pulling https://example.invalid/pixel.gif with an onerror handler" -- every word
-# of such a fragment is the page's own, so the word gate cannot see it either, and
-# the EPUB reader's webview is where the request would fire. So attributes and
-# URLs are checked against the shapes this pipeline itself writes, on a real parse
-# of the fragment rather than another regex over its bytes.
+# "Which elements" is no longer a separate list: the schema's keys ARE the allowed
+# tags, so a caller that checks only this parser -- the final packaging boundary
+# does -- still refuses a disallowed element. The attributes and URLs of the
+# allowed ones are checked against the shapes this pipeline itself writes, on a
+# real parse of the fragment rather than another regex over its bytes: an <img>
+# pulling https://example.invalid/pixel.gif with an onerror handler is a fragment
+# whose every word is the page's own, so the word gate cannot see it, and the
+# EPUB reader's webview is where the request would fire.
 #
 # The schema is per tag. A missing rule for an attribute is a refusal, not an
 # allowance: the prompt contract (prompts/structure.txt) and the deterministic
@@ -489,23 +482,50 @@ MARKUP_SCHEMA = {
 }
 
 
+#: The tags the contract allows are exactly the tags the schema has rules for:
+#: one list, owned here.
+ALLOWED_TAGS = frozenset(MARKUP_SCHEMA)
+
+
 class _MarkupContract(html.parser.HTMLParser):
     """Collects every way a fragment's markup leaves the contract."""
 
     def __init__(self):
         html.parser.HTMLParser.__init__(self, convert_charrefs=True)
         self.reasons = []
+        self._unknown_tags = set()
 
     def handle_starttag(self, tag, attrs):
+        if self._disallowed(tag):
+            return
         self._check(tag, attrs)
 
     def handle_startendtag(self, tag, attrs):
+        if self._disallowed(tag):
+            return
         self._check(tag, attrs)
 
+    def handle_endtag(self, tag):
+        # A stray closing tag of a disallowed element is the same refusal: left
+        # alone it is invalid XHTML in the finished book.
+        self._disallowed(tag)
+
+    def _disallowed(self, tag):
+        """Unknown elements are refused here, once each.
+
+        This used to be left to ``check_structure``'s tag pass -- which meant the
+        final packaging boundary, calling this parser directly, let a ``<script>``
+        straight through. The last boundary must hold the whole contract.
+        """
+        if tag in MARKUP_SCHEMA:
+            return False
+        if tag not in self._unknown_tags:
+            self._unknown_tags.add(tag)
+            self.reasons.append("disallowed tag <%s>" % tag)
+        return True
+
     def _check(self, tag, attrs):
-        schema = MARKUP_SCHEMA.get(tag)
-        if schema is None:
-            return      # an unknown tag is already refused by the tag pass
+        schema = MARKUP_SCHEMA[tag]
         seen = set()
         for raw_name, value in attrs:
             name = (raw_name or "").lower()
@@ -636,10 +656,9 @@ def check_structure(model_html, ladder=(1, 2, 3, 4), require_figure_caption=True
     reasons = []
     html = model_html or ""
 
-    tags = {name.lower() for _, name in _TAG_NAME.findall(html)}
-    for name in sorted(tags - ALLOWED_TAGS):
-        reasons.append("disallowed tag <%s>" % name)
-
+    # Tags, attributes and URLs come from one parse of the fragment: the builder
+    # runs the same check at packaging, so a tag that is refused here cannot slip
+    # into the book through a direct or cached fragment either.
     reasons.extend(check_markup_safety(html))
 
     allowed_levels = {int(x) for x in ladder} or {1}

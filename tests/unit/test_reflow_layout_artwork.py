@@ -883,3 +883,15 @@ def test_separate_caption_units_do_not_expand_into_one_sidebar_chart():
         SimpleNamespace(width=550,height=800,text_blocks=[_block(0,captions)]),450,
         lambda x0,y0,x1,y1,*a,**kw:found.append((x0,y0,x1,y1)))
     assert found and found[0][3]<=195, 'independent caption units must not merge'
+
+
+def test_caption_above_a_sidebar_run_does_not_reassign_the_previous_chart():
+    from types import SimpleNamespace
+    run=[(50,320+i*15,250,332+i*15) for i in range(8)]
+    above=(70,195,250.8,207)
+    caption=_line('Chart 1 - Earlier independent wheel',300,150,490,162,10)
+    found=[]
+    skeleton._side_territory(run,'right',[(195,207,[above]),(320,437,run)],50,500,
+        SimpleNamespace(width=550,height=800,text_blocks=[_block(0,[caption])]),450,
+        lambda x0,y0,x1,y1,*a,**kw:found.append((x0,y0,x1,y1)))
+    assert found and found[0][0]==250, 'an earlier chart caption is not evidence for this crop'

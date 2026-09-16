@@ -1657,8 +1657,7 @@ def _side_territory(run, side, rows, left, right, raw, span, add):
     # establishes a figure unit beyond the existing caption-attachment reach.
     # Multiple captions establish independent units: expanding across them would
     # merge stacked charts. A complete or unlabelled candidate needs no change.
-    detached_caption = len(captions) == 1 and (
-        captions[0].bbox[1] > bottom + 30.0 or captions[0].bbox[3] < top - 30.0)
+    detached_caption = len(captions) == 1 and captions[0].bbox[1] > bottom + 30.0
     if detached_caption:
         edge_slop = min(median(box[3] - box[1] for box in run) * 0.15,
                         (x1 - x0) * 0.02)

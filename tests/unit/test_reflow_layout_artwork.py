@@ -759,12 +759,14 @@ class TestPlateAndCaptionFidelity:
         caption = _line('figure 68.', 94, 330, 130, 338, 5.6)
         title = _line('RIGHT- AND LEFT-SIDED ASPECT FIGURES', 94, 341, 230, 347, 6)
         prose = _line('Porphyry explains the separate paragraph.', 250, 342, 450, 351, 9)
-        candidate = skeleton.Region(kind='figure', bbox=(84,161,249,338))
-        blocks = [(_block(i,[ln]),[ln]) for i,ln in enumerate([title,prose,caption])]
+        explanation = _line('The explanation continues over several lines.', 94, 355, 235, 362, 7)
+        candidate = skeleton.Region(kind='figure', bbox=(84,161,249,341))
+        blocks = [(_block(i,[ln]),[ln])
+                  for i,ln in enumerate([title,prose,caption,explanation])]
         import types
         rest = skeleton._attach_caption(candidate, blocks, types.SimpleNamespace(body_size=9))
         assert [ln.text for ln in candidate.caption_lines] == [caption.text,title.text]
-        assert [ln.text for _,lines in rest for ln in lines] == [prose.text]
+        assert [ln.text for _,lines in rest for ln in lines] == [prose.text, explanation.text]
 
     def test_split_scan_caption_keeps_printed_gap_and_qualifies_transcription(self):
         caption = _line('figure 9.', 90, 330, 135, 338, 5)

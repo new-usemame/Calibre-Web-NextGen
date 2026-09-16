@@ -1746,7 +1746,7 @@ def _attach_caption(candidate, kept_blocks, style):
             continue
         if found and y0 <= last_y + 16.0 \
                 and style.body_size and ln.size < style.body_size * 0.98 \
-                and ln.size <= found[0].size * 1.3:
+                and ln.size <= found[0].size * 1.2:
             found.append(ln)
             last_y = y1
     if not found:

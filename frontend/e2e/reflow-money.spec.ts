@@ -79,6 +79,7 @@ const RESUMED_JOB = {
   error: null,
   sample_url: null,
   sample_ready: false,
+  recovery: {},
 };
 
 async function stubReflow(page: Page, estimate: Record<string, unknown>,

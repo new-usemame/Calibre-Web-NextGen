@@ -147,6 +147,10 @@ def page_fragment(book, pno, style=None):
             caption = ""
             if index < len(elements) and elements[index].kind == "caption":
                 caption = _runs_html(elements[index].runs, available, ref_ids)
+                if elements[index].caption_uncertain:
+                    caption = ('<span class="reflow-uncertain" title="Caption '
+                               'transcription uncertain; compare the printed caption '
+                               'in the image.">%s (?)</span>' % caption)
                 index += 1
             blocks.append(_figure_html(pno, figure_index, caption))
             figure_index += 1

@@ -134,10 +134,8 @@ class Region(object):
     #: Figures found by geometry rather than by an embedded image: the crop must
     #: prove it holds ink before it is emitted, so blank paper is never artwork.
     needs_ink: bool = False
-    #: Notes only: the note's number leans on a repair read out of a damaged
-    #: scan-backed layer, never on a number the page cleanly prints. It stays
-    #: the number the layer gave, shown as an uncertain reading, because a
-    #: known-uncertain label may not wear authority it did not earn.
+    #: A note identity or caption transcription depends on damaged extraction.
+    #: Keep its reading, but visibly qualify it instead of asserting certainty.
     uncertain: bool = False
 
     @property
@@ -539,6 +537,18 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     if cover is not None:
         skel.regions.append(Region(kind="figure", bbox=cover.bbox, image=cover,
                                    needs_ink=True))
+        # Uncertain OCR over artwork is retained in the intact plate, not
+        # promoted to reading prose. Credible titles and real notes still read.
+        retained = []
+        for blk, lines in kept_blocks:
+            credible = [ln for ln in lines if _credible_line(ln)]
+            uncertain = [ln for ln in lines if not _credible_line(ln)]
+            if credible:
+                retained.append((blk, credible))
+            if uncertain:
+                skel.regions.append(Region(kind="artwork", lines=uncertain,
+                    bbox=_lines_bbox(uncertain, blk.bbox), reason="plate_lettering"))
+        kept_blocks = retained
 
     # Artwork that no embedded image claims: on a scan it is ink inside the page
     # raster; on a born-digital page it is a cluster of vector paths. Either way
@@ -654,6 +664,11 @@ PLATE_PROSE_MAX = 8
 PLATE_INK_COVER = 0.4
 
 
+def _credible_line(line):
+    return (sum(len(sp.text.split()) for sp in line.spans if not sp.uncertain)
+            > sum(len(sp.text.split()) for sp in line.spans) / 2)
+
+
 def _full_bleed_plate(raw, kept_blocks, pixel_probe):
     """The page's own full-page image when the page IS the picture: a cover or
     plate with a little text over it, inked across the whole page.
@@ -669,7 +684,10 @@ def _full_bleed_plate(raw, kept_blocks, pixel_probe):
     images = [img for img in raw.images if img.full_page]
     if not images:
         return None
-    if sum(len(kept) for _, kept in kept_blocks) > PLATE_PROSE_MAX:
+    # Low-confidence OCR fragments over a design are not evidence of prose.
+    # Native lines count normally; the pixel gate still proves full-page art.
+    credible = sum(_credible_line(ln) for _, kept in kept_blocks for ln in kept)
+    if credible > PLATE_PROSE_MAX:
         return None
     rect = (0.0, 0.0, raw.width, raw.height)
     try:
@@ -1650,6 +1668,23 @@ def _squashed_caption(text):
     return CAPTION_LINE.match(text.replace(" ", ""))
 
 
+def _caption_order(line):
+    # Different faces on one baseline have different ascenders. Keep fragments
+    # on that baseline in left-to-right order, even across extraction blocks.
+    return (round(max((sp.origin_y or line.bbox[3]) for sp in line.spans), 1),
+            line.bbox[0])
+
+
+def _caption_has_gap(lines):
+    for left, right in zip(lines, lines[1:]):
+        overlap = min(left.bbox[3], right.bbox[3]) - max(left.bbox[1], right.bbox[1])
+        if overlap > min(left.bbox[3] - left.bbox[1],
+                         right.bbox[3] - right.bbox[1]) * 0.5 \
+                and right.bbox[0] - left.bbox[2] > max(left.size, right.size):
+            return True
+    return False
+
+
 def _attach_caption(candidate, kept_blocks, style):
     """A figure's printed title, with its display subtitle, just under the
     territory and inside its column rides with the figure.
@@ -1662,22 +1697,24 @@ def _attach_caption(candidate, kept_blocks, style):
     """
     found = []
     last_y = None
-    for blk, lines in kept_blocks:
-        for ln in lines:
-            x0, y0, x1, y1 = ln.bbox
-            if y0 < candidate.bbox[3] - 2.0 or y0 > candidate.bbox[3] + 30.0:
-                continue
-            centre = (x0 + x1) / 2.0
-            if centre < candidate.bbox[0] or centre > candidate.bbox[2]:
-                continue
-            if not found and _squashed_caption(ln.stripped):
-                found.append(ln)
-                last_y = y1
-                continue
-            if found and y0 <= last_y + 16.0 \
-                    and style.body_size and ln.size < style.body_size * 0.98:
-                found.append(ln)
-                last_y = y1
+    # Extractors group blocks independently of printed vertical order.
+    for ln in sorted((ln for _, lines in kept_blocks for ln in lines),
+                     key=_caption_order):
+        x0, y0, x1, y1 = ln.bbox
+        if y0 < candidate.bbox[1] or y0 > candidate.bbox[3] + 30.0:
+            continue
+        centre = (x0 + x1) / 2.0
+        if centre < candidate.bbox[0] or centre > candidate.bbox[2]:
+            continue
+        if not found and _squashed_caption(ln.stripped):
+            found.append(ln)
+            last_y = y1
+            continue
+        if found and y0 <= last_y + 16.0 \
+                and style.body_size and ln.size < style.body_size * 0.98 \
+                and ln.size <= found[0].size * 1.3:
+            found.append(ln)
+            last_y = y1
     if not found:
         return kept_blocks
     wanted = {id(ln) for ln in found}
@@ -1722,9 +1759,20 @@ def _absorb_figure_content(kept_blocks, candidates, style):
             if outside:
                 kept.append((blk, outside))
         kept_blocks = kept
+        captions.sort(key=_caption_order)
         candidate.caption_lines = captions
-        if captions:
+        candidate.uncertain = _caption_has_gap(captions)
+        if captions and not candidate.uncertain:
             candidate.bbox = _crop_around_caption(candidate.bbox, captions)
+        elif captions:
+            # A broken baseline can hide a symbol absent from the text layer.
+            # Keep its printed pixels and qualify the transcription instead of
+            # inventing a character. Include the complete caption, not a sliver.
+            candidate.bbox = (min(candidate.bbox[0], min(l.bbox[0] for l in captions)),
+                              min(candidate.bbox[1], min(l.bbox[1] for l in captions)),
+                              max(candidate.bbox[2], max(l.bbox[2] for l in captions)),
+                              max(candidate.bbox[3], max(l.bbox[3] for l in captions)) + 2)
+
 
     artwork = []
     for candidate in candidates:

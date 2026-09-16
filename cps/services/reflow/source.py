@@ -236,7 +236,8 @@ def _page_from_ocr(result, original):
                 text = word.text + (" " if index + 1 < len(words) else "")
                 spans.append(extract.Span(
                     text=text, size=size_of(word), font="ocr", flags=0,
-                    bbox=tuple(word.bbox), origin_y=float(word.bbox[3])))
+                    bbox=tuple(word.bbox), origin_y=float(word.bbox[3]),
+                    uncertain=word.confidence < UNCERTAIN_SCORE))
             x0 = min(w.bbox[0] for w in words)
             y0 = min(w.bbox[1] for w in words)
             x1 = max(w.bbox[2] for w in words)

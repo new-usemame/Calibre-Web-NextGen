@@ -646,3 +646,72 @@ class TestScanArtwork(object):
         report = book.conservation
         assert report.ok, report.to_dict()
         assert report.source_total == report.output_total, report.to_dict()
+
+class TestPlateAndCaptionFidelity:
+    def test_noisy_ocr_does_not_split_a_full_bleed_plate(self):
+        # Linux OCR can invent many lines over artwork. They are retained in
+        # the facsimile's accounting, rather than promoted to reading prose.
+        from cps.services.reflow import source
+        import types
+        words = []
+        for i, text in enumerate(['TITLE', 'AUTHOR'] + ['noise'] * 12):
+            words.append(types.SimpleNamespace(text=text, confidence=96 if i < 2 else 10,
+                                  bbox=(40, 40+i*25, 180, 55+i*25),
+                                  block=i, paragraph=1, line=1))
+        import types
+        original = extract.RawPage(pno=0, width=500, height=700, blocks=[],
+            images=[extract.Image(bbox=(0, 0, 500, 700), area_ratio=1.0)])
+        result = types.SimpleNamespace(words=words, page_index=0, width=500, height=700)
+        raw = source._page_from_ocr(result, original)
+        class Probe:
+            def coverage(self, rect): return 1.0
+        style = skeleton.book_style([raw])
+        skel = skeleton.page_skeleton(raw, style, pixel_probe=Probe())
+        book = assemble.assemble([skel], style, [raw])
+        assert len(book.figures) == 1 and book.figures[0]['full_page']
+        assert "noise" not in _whole_text(book)
+        assert "TITLE" in _whole_text(book) and "AUTHOR" in _whole_text(book)
+        assert 'noise' in ' '.join(item['text'] for item in book.artwork)
+        assert book.conservation.ok
+        # Confident prose on the same background must not become a plate.
+        for word in words: word.confidence = 96
+        raw = source._page_from_ocr(result, original)
+        skel = skeleton.page_skeleton(raw, style, pixel_probe=Probe())
+        assert not any(r.kind == 'figure' and r.image and r.image.full_page
+                       for r in skel.regions)
+
+    def test_caption_title_follows_geometry_not_extractor_block_order(self):
+        caption = _line('figure 68.', 94, 330, 130, 338, 5.6)
+        title = _line('RIGHT- AND LEFT-SIDED ASPECT FIGURES', 94, 341, 230, 347, 6)
+        prose = _line('Porphyry explains the separate paragraph.', 250, 342, 450, 351, 9)
+        candidate = skeleton.Region(kind='figure', bbox=(84,161,249,338))
+        blocks = [(_block(i,[ln]),[ln]) for i,ln in enumerate([title,prose,caption])]
+        import types
+        rest = skeleton._attach_caption(candidate, blocks, types.SimpleNamespace(body_size=9))
+        assert [ln.text for ln in candidate.caption_lines] == [caption.text,title.text]
+        assert [ln.text for _,lines in rest for ln in lines] == [prose.text]
+
+    def test_split_scan_caption_keeps_printed_gap_and_qualifies_transcription(self):
+        caption = _line('figure 9.', 90, 330, 135, 338, 5)
+        left = _line('(ANCIENT', 95, 341.3, 140, 347, 5)
+        right = _line('modern)', 149, 341, 189, 347, 5.6)
+        # Same printed baseline, different bounding tops/faces; a missing glyph
+        # can occupy the gap. No invented token may fill it.
+        left.spans[0].origin_y = right.spans[0].origin_y = 346
+        candidate = skeleton.Region(kind='figure', bbox=(84,161,249,338))
+        blocks = [(_block(i,[ln]),[ln]) for i,ln in enumerate([right,caption,left])]
+        import types
+        rest, art = skeleton._absorb_figure_content(blocks, [candidate],
+                                                   types.SimpleNamespace(body_size=9))
+        assert not rest
+        assert candidate.bbox[3] >= right.bbox[3], 'printed caption was cropped away'
+        skel = skeleton.PageSkeleton(pno=0,width=500,height=700,regions=[candidate])
+        raw = extract.RawPage(pno=0,width=500,height=700,
+                             blocks=[blk for blk,_ in blocks],images=[])
+        style = skeleton.book_style([raw])
+        book = assemble.assemble([skel],style,[raw])
+        html = build_epub.page_fragment(book,0)
+        assert html.index('ANCIENT') < html.index('modern')
+        assert 'reflow-uncertain' in html and 'printed caption' in html
+        assert '(?)' in html
+        assert book.conservation.ok

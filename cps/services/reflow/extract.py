@@ -92,6 +92,7 @@ class Span(object):
     flags: int
     bbox: Tuple[float, float, float, float]
     origin_y: float = 0.0
+    uncertain: bool = False  # OCR engine confidence, never inferred for native text
 
     @property
     def bold(self):

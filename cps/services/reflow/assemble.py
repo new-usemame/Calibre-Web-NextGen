@@ -91,6 +91,8 @@ class Element(object):
     #: whole box would white the artwork out with it.
     line_boxes: List[Tuple[float, float, float, float]] = field(
         default_factory=list)
+    #: Caption has a broken extraction baseline; printed pixels are retained.
+    caption_uncertain: bool = False
 
     @property
     def text(self):
@@ -958,6 +960,7 @@ def _copy_element(element):
                    pages=list(element.pages), placed=element.placed,
                    band=element.band, column=element.column,
                    table_row=element.table_row,
+                   caption_uncertain=element.caption_uncertain,
                    line_boxes=list(element.line_boxes))
 
 
@@ -1053,6 +1056,7 @@ def _page_elements(skel, repairs, reasons, vocab=None):
                 if plain_text(runs):
                     elements.append(Element(kind="caption", runs=runs, pno=skel.pno,
                                             bbox=_region_caption_box(region),
+                                            caption_uncertain=region.uncertain,
                                             pages=[skel.pno]))
             continue
         if region.kind not in ("heading", "body", "caption"):

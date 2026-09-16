@@ -882,6 +882,48 @@ def repair_note_numbers(skeletons, repairs):
     return renumbered
 
 
+def _x_overlaps(a, b):
+    return a[0] < b[2] and b[0] < a[2]
+
+
+def _join_within_page(elements, vocab):
+    """The page as it reads, not as the printer's blocks broke it.
+
+    The stream below has always joined paragraphs across regions; the page the
+    reader gets had not -- one <p> per scanned line, a sentence chopped around
+    every column break (book 569's 'as'/'pects'). The same rules join it here:
+    a finished sentence always wins, a wrap heals only into a word of this
+    book, and a mirror-table row never joins. A figure (or its caption) breaks
+    a sentence only where the text after it crosses its ground; text that
+    flows *beside* it does not break at all -- the figure keeps its printed
+    spot and the joined paragraph is simply whole (book 569 p471, where
+    'phras-' and 'es such as' are one panel's word with the diagram to its
+    left).
+    """
+    out = []
+    for element in elements:
+        if element.kind == "p" and not element.table_row:
+            anchor = None
+            barriers = []
+            for prev in reversed(out):
+                if prev.kind == "p" and not prev.table_row:
+                    anchor = prev
+                    break
+                if prev.kind in ("fig", "caption"):
+                    barriers.append(prev.bbox)
+                else:
+                    break
+            if anchor is not None \
+                    and all(not _x_overlaps(element.bbox, box) for box in barriers) \
+                    and continues(anchor.text, element.text):
+                anchor.runs = tidy(stitch_runs(
+                    anchor.runs, element.runs, heal=True, vocab=vocab))
+                anchor.pages = sorted(set(anchor.pages + element.pages))
+                continue
+        out.append(element)
+    return out
+
+
 def _copy_element(element):
     return Element(kind=element.kind, runs=[list(run) for run in element.runs],
                    pno=element.pno, level=element.level, bbox=element.bbox,
@@ -1076,8 +1118,11 @@ def assemble(skeletons, style, raw_pages=None):
         # Two views of the same page, and the difference matters. ``pages`` is the
         # page as it was printed, which is what a model is shown and what its answer
         # is gated against; the stream below is the book as it reads, with sentences
-        # carried over the page turns. Joining mutates runs, so the stream gets its
-        # own copies.
+        # carried over the page turns. Within the page both views read the same:
+        # the wraps the printer broke at a column or region edge are joined before
+        # either view is taken. Joining mutates runs, so the stream gets its own
+        # copies.
+        elements = _join_within_page(elements, vocab)
         book.pages[skel.pno] = elements
         book.body_boxes[skel.pno] = skel.body_box()
         elements = [_copy_element(el) for el in elements]
@@ -1220,21 +1265,33 @@ def _heal_page_columns(skel, vocab):
     with the stitcher's own seam rule, and every side channel counted the way
     the output side counts it -- notes healed within their region, furniture
     and artwork verbatim. Hard seams are the ones the reading never joins: a
-    mirror-table row boundary, and anything across a figure -- the figure (or
-    its caption) is an element of its own kind and paragraphs cannot join
-    through it, so the counter must not heal through it either.
+    mirror-table row boundary, and a figure (or caption) whose ground the
+    following text crosses. Text that flows *beside* a figure joins right past
+    it, so the figure's own caption is held out of the seam's way too and
+    counted beside the stream, never between two halves of a word.
     """
     counter = Counter()
     content = []
     frozen = set()
-    barrier = False
+    pending = []          # bboxes of figure/caption regions since the last prose line
+    held = []             # their caption lines, counted once the seam is decided
     previous_table = False
+
+    def decide(next_box):
+        """Whether the pending figures stand in the seam's way: only where the
+        text after them crosses their ground."""
+        return bool(pending) and any(_x_overlaps(next_box, seen)
+                                     for seen in pending)
+
     for region in skel.regions:
-        if region.kind in ("heading", "body", "caption"):
+        if region.kind in ("heading", "body"):
             lines = list(region.lines)
-        elif region.kind == "figure":
-            barrier = True
-            lines = list(region.caption_lines)
+            box = region.bbox
+        elif region.kind in ("figure", "caption"):
+            pending.append(region.bbox)
+            held.extend(region.caption_lines if region.kind == "figure"
+                        else region.lines)
+            continue
         elif region.kind == "note":
             counter.update(_WORD.findall(_heal_linebreaks(region.text, vocab)))
             continue
@@ -1244,12 +1301,30 @@ def _heal_page_columns(skel, vocab):
         else:
             continue
         is_table = region.reason == "table_row"
-        if lines and content and (barrier or is_table or previous_table):
-            frozen.add(len(content) - 1)
+        if lines and content:
+            if is_table or previous_table or decide(box):
+                frozen.add(len(content) - 1)
+        if held:
+            # A blocking figure's caption sits in the stream with frozen seams;
+            # beside one it never interrupts, so its words count beside it.
+            if decide(box):
+                if content:
+                    frozen.add(len(content) - 1)
+                content.extend(held)
+                if lines:
+                    frozen.add(len(content) - 1)
+            else:
+                counter.update(_WORD.findall(_heal_line_stream(
+                    [ln.text for ln in held], vocab)))
+            held = []
         if lines:
             content.extend(lines)
             previous_table = is_table
-            barrier = is_table or region.kind == "figure"
+            if region.kind in ("heading", "body"):
+                pending = []
+    if held:
+        counter.update(_WORD.findall(_heal_line_stream(
+            [ln.text for ln in held], vocab)))
     counter.update(_WORD.findall(_heal_line_stream(
         [ln.text for ln in content], vocab, frozen)))
     return counter

@@ -487,8 +487,14 @@ def heading_ish(line, style):
 
 # ----------------------------------------------------------------------- the skeleton
 
-def page_skeleton(raw, style, layer_trusted=True):
-    """Classify one page's regions, recording a reason for every uncertain call."""
+def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
+    """Classify one page's regions, recording a reason for every uncertain call.
+
+    ``pixel_probe`` answers the two questions geometry cannot (an
+    ``extract.ScanPixelProbe``): whether an edge gap's pixels hold marks at
+    all, and where a band's truly empty columns split two side-by-side charts.
+    Without one, edge gaps stay proposals for the build's ink proof and bands
+    are never split."""
     skel = PageSkeleton(pno=raw.pno, width=raw.width, height=raw.height,
                         is_scan=raw.is_page_scan)
 
@@ -529,7 +535,7 @@ def page_skeleton(raw, style, layer_trusted=True):
     # called garbage does not describe where the ink is, and territory measured
     # from it crops whole prose regions as 'figures' (book 561's shape).
     if raw.is_page_scan and layer_trusted:
-        candidates = _scan_figures(kept_blocks, raw, style)
+        candidates = _scan_figures(kept_blocks, raw, style, pixel_probe)
     elif raw.drawings and not raw.is_page_scan:
         candidates = _vector_figures(raw)
     else:
@@ -1324,7 +1330,7 @@ def _prose_rows(kept_blocks, raw, style):
     spans = []
     for _, kept in kept_blocks:
         for ln in kept:
-            if _chart_lettering(ln, style) or CAPTION_LINE.match(ln.stripped):
+            if _chart_lettering(ln, style) or _squashed_caption(ln.stripped):
                 continue
             y0, y1 = max(ln.bbox[1], top), min(ln.bbox[3], bottom)
             if y1 > y0:
@@ -1347,7 +1353,7 @@ def _prose_rows(kept_blocks, raw, style):
     return rows, top, bottom
 
 
-def _scan_figures(kept_blocks, raw, style):
+def _scan_figures(kept_blocks, raw, style, pixel_probe=None):
     """Figure territory inside a full-page scan, from where the prose is not.
 
     A full-page scan carries all of its art inside the page raster, and the old
@@ -1369,36 +1375,74 @@ def _scan_figures(kept_blocks, raw, style):
 
     candidates = []
 
+    def has_caption(bx0, bx1, y1):
+        return any(_squashed_caption(ln.stripped)
+                   and ln.bbox[1] >= y1 - 12 and ln.bbox[1] <= y1 + 30
+                   and (ln.bbox[0] + ln.bbox[2]) / 2.0 >= bx0
+                   and (ln.bbox[0] + ln.bbox[2]) / 2.0 <= bx1
+                   for ln in lines)
+
     def add(x0, y0, x1, y1, why, pad_x0=4.0, pad_x1=4.0):
         if y1 - y0 < raw.height * SCAN_GAP or x1 - x0 < span * 0.2:
             return
-        # The pad breathes into empty territory only: padding across the prose's
-        # own edge pulls a sliver of every line into the crop.
-        candidates.append(Region(
-            kind="figure", reason=why, needs_ink=True,
-            bbox=(max(0.0, x0 - pad_x0), max(0.0, y0 - 2.0),
-                  min(raw.width, x1 + pad_x1), min(raw.height, y1 + 2.0))))
+        boxes = [(x0, x1)]
+        if pixel_probe is not None and why == "scan_figure_band":
+            # Two charts side by side are two figures, one two-panel chart is
+            # not: a truly empty column from the band's top to its bottom,
+            # measured from pixels, AND each side answering with its own
+            # caption. A probe failure fails closed: no split, never no figure.
+            try:
+                channels = pixel_probe.channels((x0, y0, x1, y1)) or []
+            except Exception:
+                channels = []
+            halves = list(zip([x0] + channels, channels + [x1])) \
+                if channels else []
+            if len(halves) >= 2 \
+                    and sum(1 for bx0, bx1 in halves
+                            if has_caption(bx0, bx1, y1)) >= 2:
+                boxes = halves
+        for bx0, bx1 in boxes:
+            # The pad breathes into empty territory only: padding across the
+            # prose's own edge pulls a sliver of every line into the crop.
+            candidates.append(Region(
+                kind="figure", reason=why, needs_ink=True,
+                bbox=(max(0.0, bx0 - pad_x0), max(0.0, y0 - 2.0),
+                      min(raw.width, bx1 + pad_x1), min(raw.height, y1 + 2.0))))
 
     # Full-width bands. A gap BETWEEN two prose rows is territory proved on both
-    # sides. A gap at the edge of the page is weaker evidence -- the top and
-    # bottom margins of a scan are blank paper with enough texture to fake ink --
-    # so an edge gap is territory only when the OCR layer read lettering off the
-    # figure inside it, and a LONE big line does not count: one piece of display
-    # type over white space is a chapter opening (book 567 p93's 'CHAPTER 4'),
-    # not a chart. The sect chart's sparse glyphs fill the gap with a dozen.
+    # sides. An edge gap is the weakest evidence there is -- the margins of a
+    # scan are blank paper -- so two kinds are still refused at the door: ONE
+    # piece of display type over white space is a chapter opening (book 567
+    # p93's 'CHAPTER 4'), not a chart, and a margin whose pixels hold no marks
+    # is not proposed at all. A chart with no readable lettering (book 569's
+    # circular pair) passes on the same pixel proof.
     first, last = rows[0], rows[-1]
-    edge_lettering = [ln for ln in lines if _chart_lettering(ln, style)]
-    if first[0] - top > raw.height * SCAN_GAP and sum(
-            1 for ln in edge_lettering
-            if ln.bbox[1] >= top - 2 and ln.bbox[3] <= first[0] + 2) >= 2:
+
+    def lone_display(y0, y1):
+        display = [ln for ln in lines
+                   if _chart_lettering(ln, style)
+                   and ln.bbox[1] >= y0 - 2 and ln.bbox[3] <= y1 + 2]
+        return len(display) == 1
+
+    def edge_has_ink(x0, y0, x1, y1):
+        if pixel_probe is None:
+            return True
+        try:
+            return bool(pixel_probe.has_ink((x0, y0, x1, y1)))
+        except Exception:
+            return True
+
+    if first[0] - top > raw.height * SCAN_GAP \
+            and not lone_display(top, first[0]) \
+            and edge_has_ink(left, top, right, first[0]):
         add(left, top, right, first[0], "scan_figure_band")
     for row, following in zip(rows, rows[1:]):
         gap = following[0] - row[1]
         if gap > raw.height * SCAN_GAP:
             add(left, row[1], right, following[0], "scan_figure_band")
-    if bottom - last[1] > raw.height * SCAN_GAP and sum(
-            1 for ln in edge_lettering
-            if ln.bbox[1] >= last[1] - 2 and ln.bbox[3] <= bottom + 2) >= 2:
+    if bottom - last[1] > raw.height * SCAN_GAP \
+            and not lone_display(last[1], bottom) \
+            and edge_has_ink(left, last[1], right, bottom):
         add(left, last[1], right, bottom, "scan_figure_band")
 
     # Side channels: a tall run of prose lines that all leave the same wide
@@ -1503,6 +1547,54 @@ def _vector_figures(raw):
     return out
 
 
+def _squashed_caption(text):
+    """A caption line even when the printer letter-spaced it: ``F IG U R E 4 4 .``
+    is FIGURE 44, ``f ig u r e 68.`` is figure 68."""
+    return CAPTION_LINE.match(text.replace(" ", ""))
+
+
+def _attach_caption(candidate, kept_blocks, style):
+    """A figure's printed title, with its display subtitle, just under the
+    territory and inside its column rides with the figure.
+
+    The circular charts this is for (book 569's figure 44/45 pair, figure 68)
+    print their titles one step below the artwork; left in the prose they
+    render as stray fragments far from the image. A title must read as a
+    caption after the squash; the lines right under it attach while they are
+    set smaller than the body (the subtitle), never a body-sized explanation.
+    """
+    found = []
+    last_y = None
+    for blk, lines in kept_blocks:
+        for ln in lines:
+            x0, y0, x1, y1 = ln.bbox
+            if y0 < candidate.bbox[3] - 2.0 or y0 > candidate.bbox[3] + 30.0:
+                continue
+            centre = (x0 + x1) / 2.0
+            if centre < candidate.bbox[0] or centre > candidate.bbox[2]:
+                continue
+            if not found and _squashed_caption(ln.stripped):
+                found.append(ln)
+                last_y = y1
+                continue
+            if found and y0 <= last_y + 16.0 \
+                    and style.body_size and ln.size < style.body_size * 0.98:
+                found.append(ln)
+                last_y = y1
+    if not found:
+        return kept_blocks
+    wanted = {id(ln) for ln in found}
+    out = []
+    for blk, lines in kept_blocks:
+        remainder = [ln for ln in lines if id(ln) not in wanted]
+        if remainder:
+            out.append((blk, remainder))
+    candidate.caption_lines = list(candidate.caption_lines) + found
+    candidate.bbox = (candidate.bbox[0], candidate.bbox[1], candidate.bbox[2],
+                      max(candidate.bbox[3], max(ln.bbox[3] for ln in found)))
+    return out
+
+
 def _absorb_figure_content(kept_blocks, candidates, style):
     """Move lettering and captions inside figure territory out of the prose.
 
@@ -1516,14 +1608,15 @@ def _absorb_figure_content(kept_blocks, candidates, style):
     build time would be gone from the reader's book.
     """
     for candidate in candidates:
-        captions = []
+        kept_blocks = _attach_caption(candidate, kept_blocks, style)
+        captions = list(candidate.caption_lines)
         kept = []
         for blk, lines in kept_blocks:
             inside, outside = [], []
             for ln in lines:
                 (inside if _inside(ln.bbox, candidate.bbox) else outside).append(ln)
             for ln in inside:
-                if CAPTION_LINE.match(ln.stripped):
+                if _squashed_caption(ln.stripped):
                     captions.append(ln)
                 elif _chart_lettering(ln, style):
                     candidate.lines.append(ln)

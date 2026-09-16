@@ -49,7 +49,14 @@ MIN_FIG_PX = 90
 #: A sampled crop with less than this share of dark pixels is blank paper, not a
 #: figure. MEASURED against the v4 corpus: clean scan margins sit under it, printed
 #: ink sits far above it.
+#: Obsolete global dark-share floor, kept for callers passing it explicitly.
 INK_MIN = 0.004
+#: Render scale for ink analysis.
+INK_SCALE = 0.35
+#: A 10x10 cell holding at least this share of dark pixels is print, not paper:
+#: measured 3.2% on sparse 12pt figure lettering, 2.8% on the worst blank-paper
+#: margin sliver in the corpus audit, 28%+ on real line art.
+INK_BLOCK_MIN = 0.03
 
 #: Above this many vector paths a page is a dense table or a traced scan, and its
 #: path boxes are noise rather than diagram evidence.
@@ -309,30 +316,129 @@ def drawing_rects(page):
     return len(drawings), rects
 
 
-def region_has_ink(doc, pno, rect, thresh=INK_MIN):
+#: How far past a line's box its glyphs reach: antialiasing and ascenders
+#: overshoot the measured rectangle, so a mask padded by this much does not
+#: leave a sliver of the line behind.
+MASK_PAD = 2.0
+
+
+def ink_channel(doc, pno, rect, min_px=8, mask=()):
+    """The centre x of a full-height empty channel inside ``rect``, if one exists.
+
+    Two charts side by side are two figures; one chart never has a truly empty
+    column from top to bottom of its territory (antialiasing sees to that).
+    The split line is measured from pixels, not guessed from whitespace
+    geometry: columns of the bounded render holding no print at all, with up
+    to a dusting of single-pixel crossings allowed for a circle's edge passing
+    through. ``mask`` whites out the page's text lines first -- a running head
+    that crosses the gap between two charts is furniture, not a third artwork.
+    Returns PDF-space x positions of every qualifying channel (usually none or
+    one), empty when the territory has no marks or no clean channel.
+    """
+    clip = pymupdf.Rect(*rect)
+    scale = _bounded_scale(clip, INK_SCALE)
+    pix = doc[pno].get_pixmap(matrix=pymupdf.Matrix(scale, scale),
+                              clip=clip, alpha=False)
+    n, w, h = pix.n, pix.width, pix.height
+    if not w or not h:
+        return []
+    data = bytearray(pix.samples)
+    for box in mask:
+        x0 = max(0, int((box[0] - MASK_PAD - clip.x0) * scale))
+        y0 = max(0, int((box[1] - MASK_PAD - clip.y0) * scale))
+        x1 = min(w, int((box[2] + MASK_PAD - clip.x0) * scale + 0.5) + 1)
+        y1 = min(h, int((box[3] + MASK_PAD - clip.y0) * scale + 0.5) + 1)
+        for y in range(y0, max(y0, y1)):
+            row = y * w * n
+            for x in range(x0, max(x0, x1)):
+                data[row + x * n] = 255
+    dust = max(2, int(h * 0.08))
+    counts = []
+    any_dark = False
+    for x in range(w):
+        dark = sum(1 for y in range(h) if data[y * w * n + x * n] < 200)
+        any_dark = any_dark or dark > dust
+        counts.append(dark)
+    if not any_dark:
+        return []
+    channels = []
+    run = None
+    for x, dark in enumerate(counts):
+        if dark > dust:
+            if run is not None and x - run >= min_px:
+                channels.append((run + x) / 2.0)
+            run = None
+        elif run is None:
+            run = x
+    inset = w * 0.1
+    return [clip.x0 + (centre / scale) for centre in channels
+            if centre >= inset and centre <= w - inset]
+
+
+class ScanPixelProbe(object):
+    """The pixel questions a scan figure pass asks of one page, answered from
+    the document: does this rectangle hold marks, and where are its
+    full-height empty channels? The page's text lines are masked for both --
+    prose and furniture are not artwork, whatever they print over."""
+
+    def __init__(self, doc, pno, mask=()):
+        self._doc = doc
+        self._pno = pno
+        self._mask = list(mask)
+
+    def channels(self, rect):
+        return ink_channel(self._doc, self._pno, rect, mask=self._mask)
+
+    def has_ink(self, rect):
+        return region_has_ink(self._doc, self._pno, rect, mask=self._mask)
+
+
+def region_has_ink(doc, pno, rect, thresh=INK_MIN, mask=()):
     """True when something is actually printed inside ``rect`` on the page.
 
-    Rendered small and sampled: the question is "blank paper or not", and a wrong
-    answer in either direction costs a figure -- a blank crop emitted as artwork,
-    or real artwork dropped as blank. Cheap enough to ask about every candidate.
-    The render takes the same pre-allocation bound as every other raster: a
+    Blankness is the absence of marks, never a low dark share: a 12pt line of
+    figure lettering inside a 1000pt box reads 0.04% dark globally and is
+    exactly as meaningful as a dense plate, so the question is asked
+    block-locally -- does any cell of the territory hold real print (thin
+    strokes, small type, line art), rather than is the territory dark overall.
+    Blank paper answers no everywhere and still drops. ``mask`` whites out the
+    page's own prose boxes first: a margin whose only marks are the clipped
+    edge of a line that already reads in the flow is not a figure either. The
+    render takes the same pre-allocation bound as every other raster: a
     hostile clip is scaled down on the matrix before a single pixel exists.
     """
     clip = pymupdf.Rect(*rect)
-    scale = _bounded_scale(clip, 0.35)
+    scale = _bounded_scale(clip, INK_SCALE)
     pix = doc[pno].get_pixmap(matrix=pymupdf.Matrix(scale, scale),
                               clip=clip, alpha=False)
-    data, n = pix.samples, pix.n
-    total = pix.width * pix.height
-    if not total:
+    n = pix.n
+    data = bytearray(pix.samples)
+    if not pix.width or not pix.height:
         return False
-    step = max(1, total // 20000)
-    dark = sampled = 0
-    for i in range(0, total, step):
-        sampled += 1
-        if data[i * n] < 200:
-            dark += 1
-    return bool(sampled) and dark / sampled > thresh
+    for box in mask:
+        x0 = max(0, int((box[0] - MASK_PAD - clip.x0) * scale))
+        y0 = max(0, int((box[1] - MASK_PAD - clip.y0) * scale))
+        x1 = min(pix.width, int((box[2] + MASK_PAD - clip.x0) * scale + 0.5) + 1)
+        y1 = min(pix.height, int((box[3] + MASK_PAD - clip.y0) * scale + 0.5) + 1)
+        for y in range(y0, max(y0, y1)):
+            row = y * pix.width * n
+            for x in range(x0, max(x0, x1)):
+                data[row + x * n] = 255
+    cells = 10
+    for cy in range(cells):
+        y0, y1 = pix.height * cy // cells, pix.height * (cy + 1) // cells
+        for cx in range(cells):
+            x0, x1 = pix.width * cx // cells, pix.width * (cx + 1) // cells
+            dark = 0
+            for y in range(y0, y1):
+                row = y * pix.width * n
+                for x in range(x0, x1):
+                    if data[row + x * n] < 200:
+                        dark += 1
+            total = (y1 - y0) * (x1 - x0)
+            if total and dark / total >= INK_BLOCK_MIN:
+                return True
+    return False
 
 
 def read_pages(doc, page_numbers=None):

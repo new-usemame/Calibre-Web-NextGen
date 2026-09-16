@@ -153,6 +153,71 @@ def test_the_ink_check_bounds_its_allocation_before_any_pixel():
                 call["scale"], _rendered_pixels(page, call))
 
 
+def _text_doc(text, size=12, box=(0, 0, 1000, 1000), insert=True):
+    doc = pymupdf.open()
+    page = doc.new_page(width=box[2] - box[0], height=box[3] - box[1])
+    if insert:
+        page.insert_text((40, 60), text, fontsize=size)
+    return doc
+
+
+def test_sparse_but_meaningful_print_is_not_diluted_into_blank():
+    """The confirmed ink-boundary block: 12pt 'Figure 7: Mars' alone inside a
+    1000x1000pt territory reads 0.044% dark globally and was silently dropped
+    exactly like a blank page. Sparse content must be read by whether marks
+    exist at all, never by how much of the territory they cover."""
+    doc = _text_doc("Figure 7: Mars")
+    try:
+        assert extract.region_has_ink(doc, 0, (0, 0, 1000, 1000)) is True
+    finally:
+        doc.close()
+
+
+def test_a_truly_blank_territory_still_drops():
+    """The control the dilution defect shares its shape with: blank paper is
+    blank, and keeping it must not be the price of keeping sparse print."""
+    doc = _text_doc("", insert=False)
+    try:
+        assert extract.region_has_ink(doc, 0, (0, 0, 1000, 1000)) is False
+    finally:
+        doc.close()
+
+
+def _blobs_doc(boxes, size=(600, 400)):
+    doc = pymupdf.open()
+    page = doc.new_page(width=size[0], height=size[1])
+    for box in boxes:
+        page.draw_rect(box, fill=(0, 0, 0), color=None)
+    return doc
+
+
+def test_two_charts_have_one_empty_channel_between_them():
+    """The 355 shape: two diagrams side by side split at the one column of
+    paper that is empty from the territory's top to its bottom."""
+    doc = _blobs_doc([(40, 40, 200, 360), (360, 40, 560, 360)])
+    try:
+        channels = extract.ink_channel(doc, 0, (20, 20, 580, 380))
+        assert len(channels) == 1, channels
+        assert 200 < channels[0] < 360
+    finally:
+        doc.close()
+
+
+def test_one_chart_has_no_empty_channel_and_blank_paper_has_none():
+    """The wheel control: one solid diagram never has a truly empty column, and
+    blank paper has no channel because it has no marks to be between."""
+    doc = _blobs_doc([(40, 40, 560, 360)])
+    try:
+        assert extract.ink_channel(doc, 0, (20, 20, 580, 380)) == []
+    finally:
+        doc.close()
+    doc = _blobs_doc([])
+    try:
+        assert extract.ink_channel(doc, 0, (20, 20, 580, 380)) == []
+    finally:
+        doc.close()
+
+
 def test_an_ordinary_page_is_rendered_exactly_as_before():
     """A real PDF at the pipeline's own settings: full scale, real JPEG, the size
     the vision model has always been sent."""

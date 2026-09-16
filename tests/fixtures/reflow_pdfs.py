@@ -1148,6 +1148,35 @@ def solid_png(width=60, height=80, colour=(20, 20, 20)):
     return pix.tobytes("png")
 
 
+def marked_png(marks, width=120, height=160, paper=(245, 245, 245),
+               ink=(20, 20, 20)):
+    """Paper with ink only where the test says the art is.
+
+    A solid page is ink everywhere, including the margins a real scan leaves
+    blank; edge-gap territory rules can then not tell a margin from a figure.
+    ``marks`` are (x0, y0, x1, y1) rectangles in PNG pixels.
+    """
+    pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, width, height), False)
+    pix.set_rect(pix.irect, paper)
+    for x0, y0, x1, y1 in marks:
+        pix.set_rect(pymupdf.IRect(x0, y0, x1, y1), ink)
+    return pix.tobytes("png")
+
+
+#: Where each scan fixture's artwork sits, in PDF points, so the page raster
+#: carries ink there and paper everywhere else.
+CHART_BAND_ART = (90.0, 100.0, 345.0, 395.0)
+SIDEBAR_WHEEL_ART = (250.0, 130.0, 440.0, 320.0)
+PANEL_DIAGRAM_ART = (54.0, 140.0, 290.0, 430.0)
+
+
+def art_png(*pdf_rects):
+    """The marked page for one fixture: ink in the art zones, blank margins."""
+    sx, sy = 120.0 / PAGE_W, 160.0 / PAGE_H
+    return marked_png([(int(x0 * sx), int(y0 * sy), int(x1 * sx), int(y1 * sy))
+                       for x0, y0, x1, y1 in pdf_rects])
+
+
 #: Lowercase, word-shaped, and not English: what a bad OCR pass leaves on a page of
 #: foxed type. A character counter sees a full page of text. A word counter sees a
 #: full page of words. Only the *common* words are missing, which is the one signal

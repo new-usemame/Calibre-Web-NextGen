@@ -294,7 +294,7 @@ class TestColumnReadingOrder(object):
         line as its own band, no band was tall enough to measure the channel,
         and the diagram the panel describes never became a figure."""
         book = _chart_book(lambda d: F.scan_panel_diagram_ocr_leading_page(
-            d, F.solid_png()))
+            d, F.art_png(F.PANEL_DIAGRAM_ART)))
 
         figures = [f for f in book.figures if f["pno"] == 1]
         assert figures, "the diagram beside the panel is lost"
@@ -407,19 +407,27 @@ def _chart_book(builder):
 class TestScanArtwork(object):
     """Diagrams that live only inside a page scan are cropped from the source."""
 
-    def test_a_chart_band_becomes_a_figure(self):
+    def test_a_chart_band_becomes_a_figure(self, tmp_path):
         """Index 220's shape: the sect chart must arrive as a figure crop, not as
-        nothing plus its OCR wreckage reading as prose."""
-        book = _chart_book(lambda d: F.scan_chart_band_page(d, F.solid_png()))
+        nothing plus its OCR wreckage reading as prose. The ink proof is the
+        arbiter for everything around it: blank margins propose and drop."""
+        doc = _doc(F.prose_page,
+                   lambda d: F.scan_chart_band_page(d, F.art_png(F.CHART_BAND_ART)))
+        try:
+            book = assemble.deterministic_book(doc)
+            result = _build(book, tmp_path, doc)
+        finally:
+            doc.close()
 
-        figures = [f for f in book.figures if f["pno"] == 1]
-        assert len(figures) == 1, book.figures
+        names = [name.rsplit("/", 1)[-1] for name in _epub_images(result.path)
+                 if "fig_p0001" in name]
+        assert names == ["fig_p0001_0.jpg"], names
         assert any(el.kind == "fig" and el.pno == 1 for el in book.elements)
 
     def test_the_charts_ocr_labels_do_not_read_as_prose(self):
         """'DAY CHART a 9 -5 e' is lettering inside the diagram: it rides with the
         artwork and is accounted there, never duplicated into the reading flow."""
-        book = _chart_book(lambda d: F.scan_chart_band_page(d, F.solid_png()))
+        book = _chart_book(lambda d: F.scan_chart_band_page(d, F.art_png(F.CHART_BAND_ART)))
 
         assert "DAY CHART" not in _whole_text(book)
         assert book.artwork, "the labels are accounted, not silently discarded"
@@ -427,7 +435,7 @@ class TestScanArtwork(object):
         assert book.conservation.ok, book.conservation.to_dict()
 
     def test_the_caption_next_to_the_chart_stays_its_caption(self):
-        book = _chart_book(lambda d: F.scan_chart_band_page(d, F.solid_png()))
+        book = _chart_book(lambda d: F.scan_chart_band_page(d, F.art_png(F.CHART_BAND_ART)))
 
         fragment = build_epub.page_fragment(book, 1)
         assert "<figure>" in fragment
@@ -437,7 +445,7 @@ class TestScanArtwork(object):
     def test_the_crop_is_the_chart_and_not_the_prose(self):
         """Close-to-body boundary: the crop stops where the prose starts, so no
         body line is amputated into the picture and none is lost from the text."""
-        book = _chart_book(lambda d: F.scan_chart_band_page(d, F.solid_png()))
+        book = _chart_book(lambda d: F.scan_chart_band_page(d, F.art_png(F.CHART_BAND_ART)))
 
         figure = next(f for f in book.figures if f["pno"] == 1)
         bottom = figure["bbox"][3]
@@ -447,13 +455,21 @@ class TestScanArtwork(object):
         assert first_prose.text.startswith("The astrologers of this period")
         assert book.conservation.ok, book.conservation.to_dict()
 
-    def test_a_sidebar_wheel_beside_the_prose_is_recovered(self):
+    def test_a_sidebar_wheel_beside_the_prose_is_recovered(self, tmp_path):
         """Index 485's shape: the natal wheel occupies the empty region beside a
         narrow prose column, with its caption printed under the wheel."""
-        book = _chart_book(lambda d: F.scan_sidebar_figure_page(d, F.solid_png()))
+        doc = _doc(F.prose_page,
+                   lambda d: F.scan_sidebar_figure_page(
+                       d, F.art_png(F.SIDEBAR_WHEEL_ART)))
+        try:
+            book = assemble.deterministic_book(doc)
+            result = _build(book, tmp_path, doc)
+        finally:
+            doc.close()
 
-        figures = [f for f in book.figures if f["pno"] == 1]
-        assert len(figures) == 1, book.figures
+        names = [name.rsplit("/", 1)[-1] for name in _epub_images(result.path)
+                 if "fig_p0001" in name]
+        assert names == ["fig_p0001_0.jpg"], names
         fragment = build_epub.page_fragment(book, 1)
         assert "Chart 45 - John F. Kennedy Jr." in fragment
         assert "figcaption" in fragment
@@ -463,7 +479,7 @@ class TestScanArtwork(object):
     def test_the_crop_of_a_real_chart_is_not_blank(self, tmp_path):
         """Source image decode integrity: what lands in the EPUB is the ink."""
         doc = _doc(F.prose_page,
-                   lambda d: F.scan_chart_band_page(d, F.solid_png()))
+                   lambda d: F.scan_chart_band_page(d, F.art_png(F.CHART_BAND_ART)))
         try:
             book = assemble.deterministic_book(doc)
             result = _build(book, tmp_path, doc)
@@ -519,32 +535,45 @@ class TestScanArtwork(object):
         with zipfile.ZipFile(result.path) as zf:
             assert _ink_share(zf.read(names[0])) > 0.01
 
-    def test_a_lone_display_line_is_a_chapter_opening_not_a_figure(self):
+    def test_a_lone_display_line_is_a_chapter_opening_not_a_figure(self, tmp_path):
         """Page 93's shape: 'CHAPTER 4' over white space is a chapter opening.
-        The white space above a title is not figure territory, and the display
-        line must stay in the book's text."""
-        book = _chart_book(lambda d: F.scan_chapter_opening_page(d, F.solid_png()))
+        The white space above a title is not figure territory, the display
+        line must stay in the book's text, and the blank margins around it
+        propose and drop -- nothing ships."""
+        doc = _doc(F.prose_page,
+                   lambda d: F.scan_chapter_opening_page(d, F.art_png()))
+        try:
+            book = assemble.deterministic_book(doc)
+            result = _build(book, tmp_path, doc)
+        finally:
+            doc.close()
 
         assert "CHAPTER 4" in _whole_text(book)
-        assert not [f for f in book.figures if f["pno"] == 1
-                    and f.get("found") != "embedded"], book.figures
+        assert [name for name in _epub_images(result.path)
+                if "fig_p0001" in name] == []
 
-    def test_a_body_sized_date_line_is_not_absorbed_as_artwork(self):
+    def test_a_body_sized_date_line_is_not_absorbed_as_artwork(self, tmp_path):
         """Page 18's shape: a body-sized date line is the book's prose, not chart
         lettering -- it must stay in the reading flow, not vanish into a blank
         territory that is dropped at build time."""
-        book = _chart_book(lambda d: F.scan_date_tail_page(d, F.solid_png()))
+        doc = _doc(F.prose_page,
+                   lambda d: F.scan_date_tail_page(d, F.art_png()))
+        try:
+            book = assemble.deterministic_book(doc)
+            result = _build(book, tmp_path, doc)
+        finally:
+            doc.close()
 
         assert "November 2016" in _whole_text(book)
         assert not any("November" in a["text"] for a in book.artwork)
-        assert not [f for f in book.figures if f["pno"] == 1
-                    and f.get("found") != "embedded"], book.figures
+        assert [name for name in _epub_images(result.path)
+                if "fig_p0001" in name] == []
 
     def test_prose_words_are_still_conserved_with_the_artwork_moved(self):
         """The conservation contract, stated: every source word is accounted in
         body, notes, furniture, captions, or preserved artwork -- never silently
         discarded."""
-        book = _chart_book(lambda d: F.scan_chart_band_page(d, F.solid_png()))
+        book = _chart_book(lambda d: F.scan_chart_band_page(d, F.art_png(F.CHART_BAND_ART)))
 
         report = book.conservation
         assert report.ok, report.to_dict()

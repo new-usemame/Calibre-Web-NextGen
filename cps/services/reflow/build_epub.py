@@ -777,11 +777,18 @@ def _figure_images(chapters, doc, book, figure_transform=None):
             continue
         figure = page_figures[index]
         bbox = figure["bbox"]
+        mask = []
+        for element in (getattr(book, "pages", None) or {}).get(pno) or ():
+            if element.kind in ("p", "h", "caption") and element.bbox:
+                box = element.bbox
+                if figure_transform is not None:
+                    box = figure_transform(pno, box)
+                mask.append(box)
         if figure_transform is not None:
             bbox = figure_transform(pno, bbox)
         try:
             if figure.get("needs_ink") and not extract.region_has_ink(
-                    doc, pno, bbox):
+                    doc, pno, bbox, mask=mask):
                 blanks.append(src)
                 continue
             images[src] = extract.crop_jpeg(doc, pno, bbox)

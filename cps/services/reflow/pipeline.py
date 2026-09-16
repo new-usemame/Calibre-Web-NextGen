@@ -315,8 +315,13 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
                                outline if skeleton.outline_is_useful(outline) else None)
     result.style = style
     trusted = result.assessment.layer_is_trusted if result.assessment else True
-    skeletons = [skeleton.page_skeleton(raw, style, layer_trusted=trusted)
-                 for raw in raw_pages]
+    skeletons = [
+        skeleton.page_skeleton(
+            raw, style, layer_trusted=trusted,
+            pixel_probe=extract.ScanPixelProbe(
+                doc, raw.pno,
+                mask=[ln.bbox for blk in raw.text_blocks for ln in blk.lines]))
+        for raw in raw_pages]
 
     report(Progress(stage="assemble", message="putting the text back together"))
     book = assemble.assemble(skeletons, style, raw_pages)

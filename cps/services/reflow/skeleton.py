@@ -952,7 +952,10 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
         width = bounds[column + 1] - bounds[column]
         if width > 0:
             fills.append((box[2] - box[0]) / width)
-        if len(text.split()) <= 2:
+        if len(text.split()) <= 2 or len(text.replace(" ", "")) <= 12:
+            # One- and two-word lines, and letter-spaced display words that only
+            # pretend to be more ('q u a l it ie s'): both are cell content, not
+            # flowing prose.
             short[column] += 1
     if sum(1 for count in counts if count >= COLUMN_MIN_LINES) < 2:
         return None

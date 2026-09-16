@@ -526,7 +526,7 @@ function JobResult({ job, bookId, t, onConvertAll }: {
       )}
       {job.status === 'interrupted' && (
         <p className={styles.capWarn} role="status">
-          {t('The application restarted while this conversion was running, so it stopped where it was. The original PDF is unchanged and nothing was filed. Starting the conversion again reuses every page already converted, so none of those is paid for twice.')}
+          {t('The app restarted before this job recorded completion. Your original PDF is unchanged. Pages already converted may be reused if you retry. Any unresolved charges remain recorded for review; a lost response may still have been charged.')}
         </p>
       )}
 

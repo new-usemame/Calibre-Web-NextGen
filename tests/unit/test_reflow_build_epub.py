@@ -55,6 +55,34 @@ def _build(book, tmp_path, **kwargs):
     return build_epub.build(book, str(tmp_path / "out.epub"), **kwargs)
 
 
+@pytest.mark.parametrize("control", ["\x00", "\x0b", "\ufffe"])
+def test_unprintable_source_characters_do_not_make_a_whole_chapter_unreadable(
+        tmp_path, control):
+    """Real PDFs 561 and 568 expose NULs through their font mappings.
+
+    Preserve the surrounding words, display an explicit replacement for the
+    unrepresentable character, and disclose it in the report and its sidecar.
+    """
+    book = _book(F.prose_page)
+    losses = []
+
+    def report(links, warnings):
+        losses.extend(warnings)
+        return "<p>Conversion report</p>"
+
+    built = _build(book, tmp_path, page_html={0: "<p>before%safter</p>" % control},
+                   report_html=report)
+    assert build_epub.validate(built.path) == []
+    with zipfile.ZipFile(built.path) as archive:
+        text = " ".join("".join(ET.fromstring(archive.read(name)).itertext())
+                        for name in archive.namelist() if name.startswith("OEBPS/ch")
+                        and name.endswith(".xhtml"))
+    assert "before\ufffdafter" in text
+    assert built.sidecar["unrepresentable_characters"] == [
+        {"page": 0, "codepoint": "U+%04X" % ord(control), "count": 1}]
+    assert any("replacement character" in warning for warning in losses)
+
+
 def test_a_marked_uncertain_reading_reaches_the_reader_looking_marked(tmp_path):
     """R3 ends here. A mark that the builder's block splitting mangles, or that the
     book's stylesheet says nothing about, is an annotation nobody can see -- and an

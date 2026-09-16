@@ -791,6 +791,27 @@ def _count(n, one, many):
     return one if n == 1 else many % n
 
 
+# XML 1.0 cannot carry these characters even as numeric character references.
+# A corrupt PDF font mapping can return them among otherwise readable prose.
+_UNREPRESENTABLE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\ud800-\udfff\ufffe\uffff]")
+
+
+def _readable_characters(page_html):
+    pages, records = {}, []
+    for pno, html in page_html.items():
+        counts = {}
+
+        def replace(match):
+            codepoint = "U+%04X" % ord(match.group())
+            counts[codepoint] = counts.get(codepoint, 0) + 1
+            return "\ufffd"
+
+        pages[pno] = _UNREPRESENTABLE.sub(replace, html)
+        records.extend({"page": pno, "codepoint": codepoint, "count": count}
+                       for codepoint, count in sorted(counts.items()))
+    return pages, records
+
+
 def build(book, out_path, page_html=None, metadata=None, doc=None,
           report_html=None, sidecar=None, identifier=None):
     """Write one EPUB 3 and say what went into it.
@@ -803,6 +824,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     language = metadata.get("language") or "en"
     if page_html is None:
         page_html = {pno: page_fragment(book, pno) for pno in sorted(book.pages)}
+    page_html, unrepresentable = _readable_characters(page_html)
 
     pages = _page_blocks(page_html)
     joins = _join_page_turns(pages)
@@ -825,6 +847,13 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     documents = {}
 
     losses = _losses(dropped, missing)
+    if unrepresentable:
+        count = sum(item["count"] for item in unrepresentable)
+        losses.append(
+            "%d unprintable characters in the PDF text layer could not be represented "
+            "in an EPUB. Each is shown as the replacement character (\ufffd); the "
+            "surrounding text is kept. Consult the source PDF at those locations."
+            % count)
     if callable(report_html):
         report_html = report_html(_page_homes(chapters), losses)
     if report_html:
@@ -846,6 +875,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         manifest.append({"id": "img%03d" % index, "href": src, "type": "image/jpeg"})
 
     payload = _sidecar(book, pages, chapters, images, joins, sidecar)
+    if unrepresentable:
+        payload["unrepresentable_characters"] = unrepresentable
     if losses:
         payload["unplaced"] = list(payload.get("unplaced") or []) + losses
     warnings = []

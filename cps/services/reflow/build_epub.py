@@ -643,11 +643,21 @@ def _document(title, body, language="en"):
         % (quoteattr(language), quoteattr(language), escape(title or ""), body))
 
 
-def _nav(entries, language="en"):
+def _nav(entries, language="en", page_homes=None):
     items = "\n".join('    <li><a href="%s">%s</a></li>' % (href, escape(title))
                       for href, title in entries)
     body = ('<nav epub:type="toc" id="toc">\n  <h1>Contents</h1>\n  <ol>\n%s\n  </ol>\n'
             "</nav>" % items)
+    if page_homes:
+        # Resolve the actual marker location: one PDF page can span chapters.
+        # Keep original PDF indexes in samples instead of renumbering the subset.
+        page_items = "\n".join(
+            '<li><a href=%s>PDF page %d</a></li>'
+            % (quoteattr("%s#pg_%04d" % (href, pno)), pno + 1)
+            for pno, href in sorted(page_homes.items()))
+        body += ('\n<nav epub:type="page-list" id="page-list" hidden="hidden">'
+                 '<h2>Source PDF pages</h2>'
+                 '<ol>%s</ol></nav>' % page_items)
     return _document("Contents", body, language)
 
 
@@ -920,7 +930,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
 
     _write_epub(out_path, {
         "opf": _opf(metadata, manifest, spine, identifier, modified),
-        "nav": _nav(entries, language),
+        "nav": _nav(entries, language, _page_homes(chapters)),
         "ncx": _ncx(entries, identifier, metadata.get("title") or ""),
         "documents": documents,
         "images": images,

@@ -356,7 +356,12 @@ def test_the_navigation_documents_agree_with_the_spine(tmp_path):
         nav = zf.read(posixpath.join(base, "nav.xhtml")).decode("utf-8")
         ncx = ET.fromstring(zf.read(posixpath.join(base, "toc.ncx")))
 
-    nav_targets = re.findall(r'<a[^>]+href="([^"#]+)', nav)
+    # The navigation document also contains a source page list; compare the
+    # chapter table of contents, not unrelated navigation destinations.
+    toc = next(node for node in ET.fromstring(nav).iter(XHTML + "nav")
+               if node.get("{http://www.idpf.org/2007/ops}type") == "toc")
+    nav_targets = [node.get("href").split("#")[0]
+                   for node in toc.iter(XHTML + "a")]
     ncx_targets = [c.get("src").split("#")[0]
                    for c in ncx.iter("%scontent" % NCX)]
 
@@ -1116,9 +1121,9 @@ def _nav_labels(path):
     """The table of contents as a reader reads it, in order."""
     with zipfile.ZipFile(path) as zf:
         nav = zf.read("OEBPS/nav.xhtml").decode("utf-8")
-    import html as _html
-    return [_html.unescape(re.sub(r"<[^>]+>", "", label)).strip()
-            for label in re.findall(r"<a [^>]*>(.*?)</a>", nav, re.S)]
+    toc = next(node for node in ET.fromstring(nav).iter(XHTML + "nav")
+               if node.get("{http://www.idpf.org/2007/ops}type") == "toc")
+    return ["".join(node.itertext()).strip() for node in toc.iter(XHTML + "a")]
 
 
 class TestADocumentWithNoHeadingOfItsOwn(object):

@@ -297,6 +297,30 @@ def test_only_the_reservations_own_task_can_release_it(rig):
     assert admission.reserve(5, worker, second)
 
 
+def test_a_job_with_unresolved_billing_stops_safely_and_holds_the_amount(
+        rig, monkeypatch):
+    """A lost answer after dispatch: the book still ships (its pages keep their
+    deterministic text), and the job record tells the truth -- stopped early,
+    with the unresolved amount held rather than reported as spent or as zero."""
+    import requests
+
+    class _Lost(object):
+        def post(self, *_args, **_kwargs):
+            raise requests.exceptions.ReadTimeout("the answer was lost")
+
+    monkeypatch.setattr(rig.mod, "make_client",
+                        lambda _tier: model_mod.OpenRouterClient(
+                            "key", session=_Lost(), max_retries=2, backoff=0.0))
+    task = _run(rig, mode="full", cost_cap_usd=1.0)
+
+    assert task.stat == STAT_FINISH_SUCCESS, task.error
+    assert "unresolved" in task.message
+    row = _ledger_rows(rig)[0]
+    assert row["status"] == "billing_unknown"
+    assert row["pending_usd"] > 0
+    assert row["spend_usd"] == 0.0, "nothing was confirmed"
+
+
 def test_a_job_that_failed_says_so_rather_than_disappearing(rig):
     from cps.services.reflow import report as report_mod
 

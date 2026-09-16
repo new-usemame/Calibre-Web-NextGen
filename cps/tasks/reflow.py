@@ -29,8 +29,8 @@ from sqlalchemy.exc import SQLAlchemyError
 from cps import config, db, helper, logger
 from cps.constants import REFLOW_DIR
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED
-from cps.services.reflow import admission, build_epub, ledger as ledger_mod, model, \
-    ocr, pipeline, report
+from cps.services.reflow import admission, build_epub, extract, ledger as ledger_mod, \
+    model, ocr, pipeline, report
 
 log = logger.create()
 
@@ -45,7 +45,10 @@ SAMPLE_PAGES_MAX = 60
 #: ends holding a file that is less than the book it was asked for. Neither of them
 #: is ``done``: a run that stopped is a run the user has a reason to start again,
 #: and a jobs list that reports both endings with one word takes that reason away.
-STOP_STATUS = {"cost_cap": "capped", "model_errors": "incomplete"}
+#: ``billing_uncertain`` ends the same way but for a different cause: a dispatched
+#: request's billing could not be proven either way, and its bound stays held.
+STOP_STATUS = {"cost_cap": "capped", "model_errors": "incomplete",
+               "billing_uncertain": "billing_unknown"}
 
 
 def reflow_dir(*parts):
@@ -202,7 +205,9 @@ class TaskReflowPdf(CalibreTask):
                                "mode": self.options.mode, "title": book.title,
                                "tier": self.options.model_tier,
                                "cap_usd": self.options.cost_cap_usd,
-                               "pages": document.page_count})
+                               "pages": document.page_count,
+                               # The record is tied to the exact file it spent on.
+                               "source": extract.document_fingerprint(document)})
                 result = self._convert(document, client, ledger, cache)
                 if result.recovery is not None:
                     summary = result.recovery.summary()
@@ -214,9 +219,11 @@ class TaskReflowPdf(CalibreTask):
                     # book. Cancel means cancel, not "file whatever was ready".
                     ledger.record({"kind": "job", "event": "finish",
                                    "status": "cancelled"})
-                    self.message = ("cancelled after %d of %d pages · $%.2f"
+                    pending = ledger.pending_usd()
+                    held = (" · up to $%.4f unresolved" % pending) if pending else ""
+                    self.message = ("cancelled after %d of %d pages · $%.2f%s"
                                     % (result.pages_done, len(result.routed),
-                                       result.spend_usd))
+                                       result.spend_usd, held))
                     return self._finish_cancelled()
                 built = self._write_epub(document, result, ledger, client, book,
                                          local_db)
@@ -369,6 +376,12 @@ class TaskReflowPdf(CalibreTask):
         self.message = "%s%s" % (event.message or event.stage, spend)
 
     def _summary(self, result):
+        if result.stopped == "billing_uncertain":
+            return ("stopped after %d of %d pages: a model answer was lost after "
+                    "dispatch and its billing could not be confirmed · $%.2f "
+                    "confirmed · up to $%.4f unresolved"
+                    % (result.pages_done, len(result.routed), result.spend_usd,
+                       result.pending_usd))
         if result.stopped == "cost_cap":
             return ("stopped at the cost cap after %d pages · $%.2f"
                     % (result.pages_done, result.spend_usd))

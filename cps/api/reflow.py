@@ -475,6 +475,9 @@ def reflow_jobs(book_id):
             "started": row.get("started"),
             "finished": row.get("finished"),
             "spend_usd": row.get("spend_usd", 0.0),
+            # Held, not spent: strict bounds of dispatched requests whose billing
+            # is unresolved. Never folded into spend_usd, never dropped.
+            "pending_usd": row.get("pending_usd", 0.0),
             "cap_usd": row.get("cap_usd", 0.0),
             "pages": row.get("pages", 0),
             "calls": row.get("calls", 0),

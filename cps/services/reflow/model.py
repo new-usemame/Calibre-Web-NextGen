@@ -23,11 +23,13 @@ import json
 import logging
 import random
 import re
+import socket
 import time
 from dataclasses import dataclass, field
 from typing import Optional
 
 import requests
+from urllib3.exceptions import NameResolutionError, NewConnectionError
 
 from .annotate import uncertain_record
 from .gate import number_the_notes
@@ -263,6 +265,35 @@ class CapExceeded(Exception):
     """Re-exported so callers need not import the ledger to catch the cap."""
 
 
+class UncertainBilling(ModelError):
+    """The request was dispatched and its billing state is unknown.
+
+    A timeout, a reset mid-transfer, a lost response, a malformed success or a
+    gateway 5xx all share one shape: the provider may have accepted and billed the
+    request while we hold no answer. OpenRouter's own error contract says a
+    provider that produces no content may still charge prompt processing, so none
+    of these is proof of no charge. The strict bound stays held in the ledger as
+    unresolved liability, and ``cost_usd`` is None rather than 0: a possible
+    charge is never written down as a free call.
+    """
+
+    def __init__(self, message, held_usd=0.0, attempt=None):
+        ModelError.__init__(self, message)
+        self.cost_usd = None
+        self.cost_source = "unresolved"
+        self.held_usd = float(held_usd or 0.0)
+        self.attempt = attempt
+
+
+class AttemptCancelled(ModelError):
+    """The caller cancelled between attempts: nothing new was dispatched.
+
+    Cancelling our wait is not cancelling the provider's already-accepted
+    request, so this is only ever raised before an attempt is sent; anything
+    already dispatched stays held in the ledger.
+    """
+
+
 try:  # keep one exception type across the package
     from .ledger import CapExceeded as _LedgerCapExceeded
     CapExceeded = _LedgerCapExceeded  # noqa: F811
@@ -371,7 +402,8 @@ class OpenRouterClient(object):
     # ------------------------------------------------------------------- calling
 
     def edit_page(self, page_text, image_jpeg=None, ladder=(1, 2, 3, 4), hints=None,
-                  page_label=None, ledger=None, max_tokens=None, headings=()):
+                  page_label=None, ledger=None, max_tokens=None, headings=(),
+                  should_stop=None):
         """Ask the model to mark up one page. Words in, the same words out.
 
         ``headings`` is what the deterministic reader read as a heading on this page
@@ -380,7 +412,9 @@ class OpenRouterClient(object):
 
         The cap is reserved against the strict bound of THIS request before any
         attempt leaves the machine -- never against the measured average page,
-        which is an estimate, not a ceiling.
+        which is an estimate, not a ceiling. The reservation is durable and
+        per-attempt: an answer lost after dispatch stays held as unresolved
+        liability instead of being retried as free.
         """
         if self.dry_run:
             return self._dry_run_result(page_text)
@@ -389,10 +423,11 @@ class OpenRouterClient(object):
         payload = self._payload(page_text, image_jpeg, ladder, hints, page_label,
                                 max_tokens, headings=headings)
         bound = self._request_bound_for(payload, image_jpeg, max_tokens)
-        if ledger is not None:
-            ledger.reserve(bound)
-        data, attempts = self._post(payload, ledger=ledger, bound=bound)
-        return self._parse(data, attempts)
+        data, attempts, attempt_id = self._post(payload, ledger=ledger, bound=bound,
+                                                page_label=page_label,
+                                                should_stop=should_stop)
+        return self._parse(data, attempts, ledger=ledger, attempt_id=attempt_id,
+                           bound=bound)
 
     def _payload(self, page_text, image_jpeg, ladder, hints, page_label, max_tokens,
                  headings=()):
@@ -428,36 +463,60 @@ class OpenRouterClient(object):
             "provider": {"max_price": max_price},
         }
 
-    def _post(self, payload, ledger=None, bound=None):
+    def _post(self, payload, ledger=None, bound=None, page_label=None,
+              should_stop=None):
         session = self._session or requests
         headers = {"Authorization": "Bearer %s" % self._api_key,
                    "Content-Type": "application/json",
                    "HTTP-Referer": REFERER, "X-Title": TITLE}
         last_error = None
         for attempt in range(1, self.max_retries + 1):
+            if should_stop is not None and should_stop():
+                raise AttemptCancelled(
+                    "cancelled before this attempt; nothing new was dispatched")
+            attempt_id = None
             if ledger is not None and bound is not None:
-                # EVERY attempt is checked, not just the first: a retry is another
-                # request. Retried statuses produce no completion and are not
-                # billed, so nothing is recorded between attempts and the repeated
-                # check costs nothing -- it keeps the invariant literal.
-                ledger.reserve(bound)
+                # The strict bound is durably held BEFORE the socket opens, so a
+                # lost response after dispatch -- or a crash -- cannot turn a
+                # possibly-billed request into a free one.
+                attempt_id = ledger.reserve_attempt(page_label, bound,
+                                                    model_id=self.model_id,
+                                                    prompt_version=PROMPT_VERSION)
             try:
                 response = session.post(OPENROUTER_URL, json=payload, headers=headers,
                                         timeout=self.timeout)
             except requests.RequestException as exc:
-                last_error = "network error: %s" % exc
-                if attempt == self.max_retries:
-                    raise ModelError(last_error)
-                self._sleep(attempt, response=None)
-                continue
+                if _transport_was_pre_dispatch(exc):
+                    if ledger is not None and attempt_id is not None:
+                        ledger.release_attempt(attempt_id, "pre_dispatch")
+                    last_error = "network error: %s" % exc
+                    if attempt == self.max_retries:
+                        raise ModelError(last_error)
+                    self._sleep(attempt, response=None)
+                    continue
+                raise UncertainBilling(
+                    "the request was dispatched and its answer was lost: %s. Up to "
+                    "$%.4f may still be billed; the bound stays held as unresolved"
+                    % (exc, bound or 0.0), held_usd=bound or 0.0, attempt=attempt_id)
 
             if response.status_code == 200:
                 try:
-                    return response.json(), attempt
+                    return response.json(), attempt, attempt_id
                 except ValueError:
-                    raise ModelError("the provider returned a non-JSON body")
+                    raise UncertainBilling(
+                        "the provider returned a 200 whose body we cannot parse; the "
+                        "request may have been billed. The bound stays held as "
+                        "unresolved", held_usd=bound or 0.0, attempt=attempt_id)
 
             detail = _error_detail(response)
+            if not _rejection_was_pre_generation(response):
+                raise UncertainBilling(
+                    "OpenRouter %s after the request may have been accepted: %s. Up "
+                    "to $%.4f may still be billed; the bound stays held as "
+                    "unresolved" % (response.status_code, detail, bound or 0.0),
+                    held_usd=bound or 0.0, attempt=attempt_id)
+            if ledger is not None and attempt_id is not None:
+                ledger.release_attempt(attempt_id, "rejected_before_generation")
             if response.status_code not in RETRY_STATUS or attempt == self.max_retries:
                 raise ModelError("OpenRouter %s: %s" % (response.status_code, detail))
             last_error = detail
@@ -479,15 +538,28 @@ class OpenRouterClient(object):
 
     # ------------------------------------------------------------------ answering
 
-    def _parse(self, data, attempts):
+    def _parse(self, data, attempts, ledger=None, attempt_id=None, bound=0.0):
         # The bill first, because every way out of this method is a call that has
         # already been answered and therefore already been charged. Working the cost
         # out only on the path that produces a page is how an answer nobody can use
         # becomes an answer nobody paid for.
-        usage = data.get("usage") or {}
+        raw_usage = data.get("usage")
+        trustworthy = isinstance(raw_usage, dict) and any(
+            key in raw_usage for key in ("prompt_tokens", "completion_tokens", "cost"))
+        if not trustworthy:
+            # We ask for usage on every request; its absence on a 200 is a bill we
+            # cannot reconcile. The answer is refused and the bound stays held.
+            raise UncertainBilling(
+                "the provider answered without a usage record; the call cannot be "
+                "reconciled, so its bound stays held as unresolved",
+                held_usd=bound, attempt=attempt_id)
+        usage = raw_usage
         prompt_tokens = int(usage.get("prompt_tokens") or 0)
         completion_tokens = int(usage.get("completion_tokens") or 0)
         cost, source = self._cost(usage, prompt_tokens, completion_tokens)
+        if ledger is not None and attempt_id is not None:
+            # The held bound becomes the metered cost: never both, never neither.
+            ledger.reconcile_attempt(attempt_id, cost)
 
         def unusable(message):
             return UnusableAnswer(message, cost_usd=cost, cost_source=source,
@@ -574,6 +646,61 @@ def _error_detail(response):
     if isinstance(error, dict):
         return str(error.get("message") or error)[:200]
     return str(error or body)[:200]
+
+
+def _walk_causes(exc):
+    """The exception and everything it wraps, as exception objects (requests and
+    urllib3 both chain through args and __cause__/__context__)."""
+    seen = set()
+    stack = [exc]
+    while stack:
+        current = stack.pop()
+        if current is None or id(current) in seen:
+            continue
+        seen.add(id(current))
+        yield current
+        stack.extend(arg for arg in getattr(current, "args", ())
+                     if isinstance(arg, BaseException))
+        stack.append(getattr(current, "__cause__", None))
+        stack.append(getattr(current, "__context__", None))
+
+
+def _transport_was_pre_dispatch(exc):
+    """True only when the request provably never left this machine.
+
+    A connect timeout, a refused connection or an unresolvable name mean no bytes
+    were sent, so no provider saw the request: safely unbilled. A read timeout, a
+    reset mid-transfer or anything murkier means the request may already be with
+    the provider -- unknown, and unknown is not free.
+    """
+    if isinstance(exc, requests.exceptions.ConnectTimeout):
+        return True
+    return any(isinstance(cause, (NewConnectionError, NameResolutionError,
+                                  socket.gaierror, ConnectionRefusedError))
+               for cause in _walk_causes(exc))
+
+
+def _rejection_was_pre_generation(response):
+    """True only when the response proves the request never reached a provider.
+
+    OpenRouter's error contract: request-validation, auth, credit and guardrail
+    rejections happen before any work begins, and post-Router errors carry the
+    generation's id. So an error body WITH an id means a provider accepted the
+    request (possibly billed), and a 408 or 5xx is the gateway answering for a
+    provider that may have -- unknown either way, and unknown is not free.
+    """
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    if body.get("id"):
+        return False
+    if response.status_code in (400, 401, 402, 403, 404, 413, 422):
+        return True
+    # Edge rate/conflict checks run before dispatch (OpenRouter documents their
+    # Retry-After semantics for exactly this); without a generation id they never
+    # reached a provider.
+    return response.status_code in (409, 425, 429)
 
 
 def _b64(data):

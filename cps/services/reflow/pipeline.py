@@ -32,7 +32,7 @@ from typing import Dict, List, Optional
 from . import (annotate, assemble, assess, build_epub, extract, gate, prompts, route,
                skeleton, source)
 from .ledger import CapExceeded
-from .model import ModelError, UnusableAnswer
+from .model import AttemptCancelled, ModelError, UncertainBilling, UnusableAnswer
 
 log = logging.getLogger(__name__)
 
@@ -99,6 +99,7 @@ class ReflowResult(object):
     reused: int = 0
     gate_failures: int = 0
     spend_usd: float = 0.0
+    pending_usd: float = 0.0
     stopped: Optional[str] = None
     fingerprint: str = ""
 
@@ -110,7 +111,8 @@ class ReflowResult(object):
         return {"pages": self.pages, "routed": len(self.routed),
                 "pages_done": self.pages_done, "reused": self.reused,
                 "gate_failures": self.gate_failures,
-                "spend_usd": round(self.spend_usd, 6), "stopped": self.stopped,
+                "spend_usd": round(self.spend_usd, 6),
+                "pending_usd": round(self.pending_usd, 6), "stopped": self.stopped,
                 "routing": self.routing,
                 "verdict": self.assessment.verdict if self.assessment else "",
                 "outcomes": [o.to_dict() for o in self.outcomes.values()]}
@@ -358,10 +360,27 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
         try:
             outcome = _edit_one_page(doc, book, pno, client, ledger, cache, result,
                                      ladder, require_figure_caption,
-                                     hints=page_hints(book, pno, why.get(pno)))
+                                     hints=page_hints(book, pno, why.get(pno)),
+                                     should_stop=should_stop)
         except CapExceeded as exc:
             log.info("reflow: %s", exc)
             result.stopped = "cost_cap"
+            break
+        except UncertainBilling as exc:
+            # A dispatched request whose billing we cannot prove did not happen.
+            # The bound stays held; the run stops here rather than spending under
+            # an encumbered cap; the liability is reported, not written off.
+            log.info("reflow: page %d billing is unresolved: %s", pno, exc)
+            result.outcomes[pno] = _refused(book, pno, exc, ledger, client)
+            result.gate_failures += 1
+            result.stopped = "billing_uncertain"
+            break
+        except AttemptCancelled as exc:
+            # Cancel landed between attempts: nothing new was dispatched. Anything
+            # already dispatched stays held in the ledger as unresolved.
+            log.info("reflow: page %d cancelled mid-call: %s", pno, exc)
+            result.outcomes[pno] = _refused(book, pno, exc, ledger, client)
+            result.stopped = "cancelled"
             break
         except ModelError as exc:
             # One page the provider would not answer is one page that keeps its
@@ -390,6 +409,8 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
                         message="page %d of %d reviewed" % (index, len(result.routed))))
 
     result.spend_usd = _spent(result, ledger)
+    if ledger is not None:
+        result.pending_usd = ledger.pending_usd()
     report(Progress(stage="build", page=pages_total, pages=pages_total,
                     spend_usd=result.spend_usd))
     return result
@@ -423,18 +444,32 @@ def _refused(book, pno, exc, ledger, client):
     bookkeeping -- ``Ledger.spent()`` is the number the cap reserves against and the
     number the reader is shown, so a real charge recorded here as $0.00 is money the
     reader's ceiling cannot stop and money the finished job does not admit to.
+
+    The one other shape is ``UncertainBilling``: a request dispatched whose billing
+    we cannot prove either way. Its ``cost_usd`` is None -- never a possible charge
+    written as $0.00 -- and the held bound travels with the entry.
     """
-    cost = float(getattr(exc, "cost_usd", 0.0) or 0.0)
+    cost = getattr(exc, "cost_usd", 0.0)
     outcome = PageOutcome(pno=pno, reasons=list(book.page_reasons(pno)),
                           model=getattr(client, "model_id", ""),
-                          gate="FAIL", cost_usd=cost,
-                          gate_reasons=["the model could not answer: %s" % exc])
+                          gate="FAIL",
+                          cost_usd=float(cost) if cost is not None else 0.0)
+    if isinstance(exc, UncertainBilling):
+        outcome.gate_reasons = ["the provider's answer was lost after dispatch; up "
+                                "to $%.4f may still be billed and is held as "
+                                "unresolved" % exc.held_usd]
+    else:
+        outcome.gate_reasons = ["the model could not answer: %s" % exc]
     if ledger is not None:
-        entry = {"kind": "page", "page": pno, "cost_usd": round(cost, 6),
+        entry = {"kind": "page", "page": pno,
+                 "cost_usd": round(cost, 6) if cost is not None else None,
                  "cached": False, "gate": "FAIL", "model": outcome.model,
                  "reasons": outcome.reasons,
                  "gate_reasons": outcome.gate_reasons,
                  "error": str(exc)}
+        if cost is None:
+            entry["billing"] = "unresolved"
+            entry["held_usd"] = round(float(getattr(exc, "held_usd", 0.0) or 0.0), 6)
         if getattr(exc, "cost_source", ""):
             entry["cost_source"] = exc.cost_source
         for key in ("prompt_tokens", "completion_tokens"):
@@ -490,7 +525,7 @@ def page_hints(book, pno, reasons=None):
 
 
 def _edit_one_page(doc, book, pno, client, ledger, cache, result, ladder,
-                   require_figure_caption, hints=None):
+                   require_figure_caption, hints=None, should_stop=None):
     outcome = PageOutcome(pno=pno, reasons=list(book.page_reasons(pno)),
                           model=getattr(client, "model_id", ""))
     source_text = assemble.page_source_text(book, pno)
@@ -517,7 +552,7 @@ def _edit_one_page(doc, book, pno, client, ledger, cache, result, ladder,
     image = _raster(doc, pno, book.page_box(pno))
     answer = client.edit_page(source_text, image_jpeg=image, ladder=ladder,
                               hints=hints, page_label=str(pno + 1), ledger=ledger,
-                              headings=headings)
+                              headings=headings, should_stop=should_stop)
     outcome.cost_usd = float(getattr(answer, "cost_usd", 0.0) or 0.0)
     outcome.model = getattr(answer, "model", outcome.model)
 

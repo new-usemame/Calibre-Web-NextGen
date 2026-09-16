@@ -1147,6 +1147,43 @@ def test_a_level_below_the_ladders_last_rung_is_still_refused(tmp_path):
     assert "<h4>" not in result.page_html[3]
 
 
+class _AmbiguousBillingClient(FakeClient):
+    """A provider whose answer was lost after the second dispatch: the request may
+    have been billed, and the run must not treat that as free or keep spending."""
+
+    def edit_page(self, page_text, ledger=None, **kwargs):
+        if len(self.calls) == 1:
+            self.calls.append(page_text)
+            raise model.UncertainBilling(
+                "the request was dispatched and its answer was lost",
+                held_usd=self.spec.price_per_page * 3)
+        return FakeClient.edit_page(self, page_text, ledger=ledger, **kwargs)
+
+
+def test_an_answer_lost_after_dispatch_stops_the_run_holding_the_liability(tmp_path):
+    """The ambiguous failure is not a refusal to note and walk past: the run stops
+    at the page, the liability stays held, and the page's record never calls a
+    possible charge $0.00."""
+    doc = _doc(*([F.ambiguous_residue_page] * 3))
+    client = _AmbiguousBillingClient()
+    try:
+        result, book = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert result.stopped == "billing_uncertain"
+    assert len(client.calls) == 2, "the run stops at the ambiguous page"
+    outcome = result.outcomes[1]
+    assert outcome.gate == "FAIL"
+    assert any("billing" in reason or "unresolved" in reason
+               for reason in outcome.gate_reasons), outcome.gate_reasons
+    entry = [e for e in book.entries("page") if e.get("page") == 1][0]
+    assert entry["gate"] == "FAIL"
+    assert entry["cost_usd"] is None, "a possible charge is never written as $0.00"
+    assert entry["billing"] == "unresolved"
+    assert entry["held_usd"] > 0
+
+
 class _UnusableAnswerClient(FakeClient):
     """A provider that is answering, and answering something this page cannot use.
 

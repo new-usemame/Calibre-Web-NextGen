@@ -506,6 +506,36 @@ def test_a_reader_without_edit_permission_cannot_spend_the_instances_money(
     added.assert_not_called()
 
 
+@pytest.mark.unit
+def test_a_job_with_unresolved_billing_shows_the_held_amount(
+        mod, monkeypatch, pdf_on_disk):
+    """Confirmed spend and held liability are different numbers in the jobs list:
+    one is what was billed, the other is what may still be billed."""
+    _wire(mod, monkeypatch, pdf_on_disk)
+    from cps.services.reflow import ledger as ledger_mod
+
+    path = os.path.join(mod.REFLOW_DIR, "jobs", "5", "d1b2c3d4e5f60006.jsonl")
+    job = ledger_mod.Ledger(path, cap_usd=1.0, job_id="d1b2c3d4e5f60006")
+    job.record({"kind": "job", "event": "start", "mode": "full", "user_id": 7,
+                "tier": "standard"})
+    job.record({"kind": "page", "page": 1, "cost_usd": 0.0022, "gate": "PASS",
+                "model": "deepseek/deepseek-v4.1-flash"})
+    job.reserve_attempt("3", 0.0217, model_id="deepseek/deepseek-v4.1-flash",
+                        prompt_version="reflow-structure-6")
+    job.record({"kind": "job", "event": "finish", "status": "billing_unknown"})
+
+    with _ctx("/api/v1/books/5/reflow/jobs"):
+        with patch.object(mod, "current_user", _user(uid=7)):
+            with patch.object(mod.WorkerThread, "get_instance",
+                              staticmethod(lambda: SimpleNamespace(tasks=[]))):
+                body = _json(inspect.unwrap(mod.reflow_jobs)(5))
+
+    row = body["items"][0]
+    assert row["status"] == "billing_unknown"
+    assert row["spend_usd"] == pytest.approx(0.0022)
+    assert row["pending_usd"] == pytest.approx(0.0217)
+
+
 # ── the sample file ──────────────────────────────────────────────────────────
 
 @pytest.mark.unit

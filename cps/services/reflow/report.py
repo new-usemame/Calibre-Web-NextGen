@@ -43,6 +43,10 @@ STOP_REASONS = {
     "model_errors": "The conversion stopped because the model service refused "
                     "several pages in a row. The pages already reviewed are in "
                     "this book; the rest keep the text read from the PDF.",
+    "billing_uncertain": "The conversion stopped because a model request's answer "
+                         "was lost in transit and what it billed could not be "
+                         "confirmed. The pages already reviewed are in this book; "
+                         "the possibly owed amount is held as unresolved.",
 }
 
 
@@ -141,6 +145,11 @@ def numbers(result, ledger=None, client=None):
         "routing": dict(result.routing or {}),
         "spend": {
             "usd": round(result.spend_usd, 6),
+            # Confirmed spend and held amounts are different things and stay
+            # separate everywhere they are shown: pending is the strict bound of
+            # dispatched requests whose billing is unresolved.
+            "pending_usd": totals.get("pending_usd", 0.0),
+            "unresolved_attempts": totals.get("unresolved_attempts", 0),
             "cap_usd": totals.get("cap_usd"),
             "calls": totals.get("calls", 0),
             "reused": totals.get("reused", 0),
@@ -527,6 +536,14 @@ def _spend_section(payload):
     out = ["<h2>What this cost</h2>",
            "<p>$%.4f in model calls over %s.</p>"
            % (spend["usd"], _count(spend["calls"], "one page", "%d pages"))]
+    pending = float(spend.get("pending_usd") or 0.0)
+    if pending:
+        out.append("<p>Up to $%.4f more is unresolved: %s had answers lost in "
+                   "transit and may still be billed. That amount is not confirmed "
+                   "and is not included in the figure above; check the provider's "
+                   "dashboard before re-running.</p>"
+                   % (pending, _count(spend.get("unresolved_attempts") or 1,
+                                      "one request", "%d requests")))
     if payload["model"]["model"]:
         out.append("<p>Model: %s. Prompt version: %s.</p>"
                    % (escape(payload["model"]["model"]),

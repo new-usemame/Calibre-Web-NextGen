@@ -16,6 +16,7 @@ that would silently delete the reader's text.
 import json
 
 import pytest
+import requests
 import requests_mock
 
 from cps.services.reflow import ledger as ledger_mod
@@ -25,6 +26,38 @@ pytestmark = pytest.mark.unit
 
 ENDPOINT = model.OPENROUTER_URL
 FAKE_KEY = "sk-or-v1-not-a-real-key-0000"
+
+
+class _Response(object):
+    """Just enough of a requests.Response for the client under test."""
+
+    def __init__(self, status_code, payload=None, headers=None):
+        self.status_code = status_code
+        self._payload = payload
+        self.headers = headers or {}
+        self.text = "" if payload is None else json.dumps(payload)
+
+    def json(self):
+        if self._payload is None:
+            raise ValueError("no JSON")
+        return self._payload
+
+
+class _Session(object):
+    """Answers or raises exactly what the test script says, and counts calls."""
+
+    def __init__(self, *behaviors):
+        self.behaviors = list(behaviors)
+        self.calls = 0
+
+    def post(self, *_args, **kwargs):
+        self.calls += 1
+        behavior = self.behaviors.pop(0) if self.behaviors else None
+        if isinstance(behavior, Exception):
+            raise behavior
+        if callable(behavior):
+            return behavior()
+        return behavior
 
 PAGE_HTML = ('<h3>Serapio of Alexandria</h3>\n<p>text of the page'
              '<a class="noteref" href="#fn_160">160</a></p>\n'
@@ -537,6 +570,211 @@ def test_the_cheapest_possible_request_bound_is_shared_with_preflight():
     assert floor == pytest.approx(
         _client().request_bound("", image_jpeg=None,
                                 max_tokens=model.COMPLETION_TOKENS_FLOOR), rel=1e-6)
+
+
+# --------------------------------------- billing we cannot prove did not happen
+
+def test_a_lost_answer_after_dispatch_is_held_not_written_off(tmp_path):
+    """The P0 repro: a ReadTimeout after dispatch means the provider may have
+    accepted and billed the request while we lost the response. Three silent
+    retries under one cap spent three strict bounds with the ledger at $0. Now:
+    one dispatch, the bound stays held, nothing is retried as free, and the held
+    amount counts against the next page's reservation."""
+    text = "word " * 400
+    client = model.OpenRouterClient(FAKE_KEY, session=_Session(), max_retries=3,
+                                    backoff=0.0)
+    bound = client.request_bound(text)
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=bound + 0.0001)
+    session = _Session(requests.exceptions.ReadTimeout("lost"))
+    client = model.OpenRouterClient(FAKE_KEY, session=session, max_retries=3,
+                                    backoff=0.0)
+
+    with pytest.raises(model.UncertainBilling) as caught:
+        client.edit_page(text, ledger=book)
+
+    assert session.calls == 1, "a lost response is not a licence to retry for free"
+    assert book.spent() == 0.0, "nothing is confirmed"
+    assert book.pending_usd() == pytest.approx(bound)
+    assert caught.value.held_usd == pytest.approx(bound)
+    with pytest.raises(model.CapExceeded):
+        client.edit_page(text, ledger=book)
+    assert session.calls == 1, "the held amount is part of the cap check"
+
+
+def test_a_connection_that_never_happened_is_free_and_retried(tmp_path):
+    """The safe half, kept safe: a connect timeout means the request never left
+    the machine, so the reservation is released and the retry may proceed."""
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
+    session = _Session(requests.exceptions.ConnectTimeout("no route"),
+                       _Response(200, _reply()))
+    client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
+
+    result = client.edit_page("text of the page[160]", image_jpeg=None, ledger=book)
+
+    assert session.calls == 2
+    assert book.pending_usd() == 0.0
+    reconciled = [e for e in book.entries("reservation")
+                  if e.get("event") == "reconciled"]
+    assert [e["reconciled_usd"] for e in reconciled] == \
+        [pytest.approx(result.cost_usd)]
+    # The hold became the metered cost, once: the pipeline's page record is the
+    # spend, and nothing was counted twice.
+    book.record({"kind": "page", "page": 0, "cost_usd": result.cost_usd})
+    assert book.spent() == pytest.approx(result.cost_usd)
+
+
+def test_a_gateway_failure_after_dispatch_is_held(tmp_path):
+    """A 502 is the gateway answering for a provider that may have accepted the
+    request: unknown billing, held and not retried."""
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
+    session = _Session(_Response(502, {"error": {"message": "bad gateway"}}),
+                       _Response(200, _reply()))
+    client = model.OpenRouterClient(FAKE_KEY, session=session, max_retries=3,
+                                    backoff=0.0)
+
+    with pytest.raises(model.UncertainBilling):
+        client.edit_page("text of the page[160]", image_jpeg=None, ledger=book)
+
+    assert session.calls == 1
+    assert book.pending_usd() > 0
+    assert book.spent() == 0.0
+
+
+def test_an_edge_rate_limit_rejection_is_free_and_retried(tmp_path):
+    """A 429 with no generation id is OpenRouter's edge refusing before any work
+    began (their docs: rate-limit checks happen before work starts)."""
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
+    session = _Session(_Response(429, {"error": {"code": 429, "message": "slow down"}}),
+                       _Response(200, _reply()))
+    client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
+
+    result = client.edit_page("text of the page[160]", image_jpeg=None, ledger=book)
+
+    assert session.calls == 2
+    assert book.pending_usd() == 0.0
+    book.record({"kind": "page", "page": 0, "cost_usd": result.cost_usd})
+    assert book.spent() == pytest.approx(result.cost_usd)
+
+
+def test_a_rate_limit_from_a_provider_that_accepted_the_request_is_held(tmp_path):
+    """The same 429 with a generation id was rejected AFTER a provider accepted
+    the request -- post-Router errors carry the generation id. Not free."""
+    body = {"id": "gen-abc123",
+            "error": {"code": 429, "message": "provider rate limit",
+                      "metadata": {"error_type": "rate_limit_exceeded"}}}
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
+    session = _Session(_Response(429, body))
+    client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
+
+    with pytest.raises(model.UncertainBilling):
+        client.edit_page("text of the page[160]", image_jpeg=None, ledger=book)
+
+    assert session.calls == 1
+    assert book.pending_usd() > 0
+
+
+def test_a_malformed_success_is_held(tmp_path):
+    """A 200 we cannot parse could be a billed answer we failed to read. The one
+    thing it is not is proof of no charge."""
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
+    session = _Session(_Response(200, None))
+    client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
+
+    with pytest.raises(model.UncertainBilling):
+        client.edit_page("text of the page[160]", image_jpeg=None, ledger=book)
+
+    assert session.calls == 1
+    assert book.pending_usd() > 0
+
+
+def test_a_successful_answer_reconciles_the_reservation_to_the_actual_bill(tmp_path):
+    """Reconciliation: the held bound is released to the provider's metered cost,
+    and the cap sees the actual figure, not the bound, from then on."""
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
+    session = _Session(_Response(200, _reply()))
+    client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
+
+    result = client.edit_page("text of the page[160]", image_jpeg=None, ledger=book)
+
+    assert book.pending_usd() == 0.0
+    reconciled = [e for e in book.entries("reservation")
+                  if e.get("event") == "reconciled"]
+    assert [e["reconciled_usd"] for e in reconciled] == \
+        [pytest.approx(result.cost_usd)]
+    book.record({"kind": "page", "page": 0, "cost_usd": result.cost_usd})
+    assert book.spent() == pytest.approx(result.cost_usd)
+    assert book.remaining() == pytest.approx(5.0 - result.cost_usd)
+
+
+def test_a_success_without_a_usage_record_cannot_be_priced_so_it_is_held(tmp_path):
+    """We ask for usage on every call; a 200 with an answer but no usage block is
+    a bill we cannot reconcile, so the bound stays held."""
+    payload = _reply()
+    del payload["usage"]
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
+    session = _Session(_Response(200, payload))
+    client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
+
+    with pytest.raises(model.UncertainBilling):
+        client.edit_page("text of the page[160]", image_jpeg=None, ledger=book)
+
+    assert book.pending_usd() > 0
+
+
+def test_cancellation_between_attempts_dispatches_nothing_new(tmp_path):
+    """Cancel after admission: the attempt already dispatched stays held (its
+    billing is unknown), and no further attempt is made."""
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
+    state = {"stop": False}
+
+    def rejected_then_stop():
+        state["stop"] = True
+        return _Response(429, {"error": {"code": 429, "message": "slow down"}})
+
+    session = _Session(rejected_then_stop, _Response(200, _reply()))
+    client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
+
+    with pytest.raises(model.AttemptCancelled):
+        client.edit_page("text of the page[160]", image_jpeg=None, ledger=book,
+                         should_stop=lambda: state["stop"])
+
+    assert session.calls == 1
+    assert book.pending_usd() == 0.0, "the 429 was a known-unbilled rejection"
+    assert book.spent() == 0.0
+
+
+def test_pending_liability_survives_a_ledger_reload(tmp_path):
+    """Crash/restart: a pending reservation written before a crash still counts
+    against the cap after the ledger is reopened, and a reconciled attempt is
+    never double-counted."""
+    path = tmp_path / "job.jsonl"
+    book = ledger_mod.Ledger(path, cap_usd=1.0)
+    attempt = book.reserve_attempt("12", 0.02, model_id="m", prompt_version="v")
+
+    reopened = ledger_mod.Ledger(path, cap_usd=1.0)
+    assert reopened.pending_usd() == pytest.approx(0.02)
+    assert reopened.would_exceed(0.99), "pending counts against the cap"
+
+    reopened.reconcile_attempt(attempt, 0.002)
+    again = ledger_mod.Ledger(path, cap_usd=1.0)
+    assert again.pending_usd() == 0.0
+    again.reconcile_attempt(attempt, 0.002)   # idempotent: a duplicate reconcile
+    assert ledger_mod.Ledger(path, cap_usd=1.0).pending_usd() == 0.0
+
+
+def test_the_ledger_file_carries_no_key_material_or_page_text(tmp_path):
+    """The durable record is evidence in an incident: the request's bound, page
+    and model, never the key and never the page's words."""
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
+    session = _Session(_Response(200, _reply()))
+    client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
+    client.edit_page("secret words of the page[160]", image_jpeg=None, ledger=book,
+                     page_label="7")
+
+    text = (tmp_path / "job.jsonl").read_text()
+    assert FAKE_KEY not in text
+    assert "secret words" not in text
+    assert "reservation" in text
 
 
 def test_a_note_that_came_back_without_its_number_comes_out_with_it():

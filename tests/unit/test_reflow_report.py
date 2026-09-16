@@ -309,6 +309,31 @@ def test_the_spend_is_in_the_sidecar_whether_or_not_the_page_shows_it(tmp_path):
     assert payload["spend"]["calls"] == 1
 
 
+def test_held_liability_is_told_apart_from_confirmed_spend(tmp_path):
+    """A request whose answer was lost after dispatch is not a $0.00 line: the
+    sidecar carries the held amount beside the confirmed spend, and the about
+    page says it is unresolved rather than folding it into the total."""
+    result, ledger, _ = _run(tmp_path, F.prose_page, F.ambiguous_residue_page,
+                             client=FakeClient())
+    ledger.reserve_attempt("2", 0.0217, model_id="test/model",
+                           prompt_version="reflow-structure-1")
+    payload = report.numbers(result, ledger)
+
+    assert payload["spend"]["usd"] == pytest.approx(0.002)
+    assert payload["spend"]["pending_usd"] == pytest.approx(0.0217)
+    text = _text(_page(payload, show_cost=True))
+    assert "0.0217" in text
+    assert "not confirmed" in text.lower()
+
+    settled = report.numbers(result, ledger)
+    ledger.reconcile_attempt(
+        [e["attempt"] for e in ledger.entries("reservation")
+         if e.get("event") == "pending"][0], 0.0021)
+    settled = report.numbers(result, ledger)
+    assert settled["spend"]["pending_usd"] == 0.0
+    assert "unresolved" not in _text(_page(settled, show_cost=True)).lower()
+
+
 # --------------------------------------------------------------------- G4
 
 def test_the_reports_counts_are_the_ledgers_counts(tmp_path):

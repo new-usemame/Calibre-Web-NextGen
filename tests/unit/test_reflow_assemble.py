@@ -152,6 +152,46 @@ def test_a_line_break_hyphen_is_repaired_but_a_printed_compound_is_kept():
     assert "Sun-Moon" in text
 
 
+def test_a_hyphenated_word_split_across_spans_is_still_one_word():
+    """562's shape: the same break set as word-per-span runs. The trailing space
+    run must not survive between the halves."""
+    book = _book(F.hyphenated_multispan_page)
+
+    text = " ".join(_paras(book))
+
+    assert "triplicity" in text, text
+    assert "tripli city" not in text
+    assert book.conservation.ok, book.conservation.to_dict()
+
+
+def test_a_page_turn_hyphen_keeps_its_hyphen():
+    """563's shape: the source counter never heals across a page turn, so the
+    output may not either -- a wrap-break and a printed compound cannot be told
+    apart there, and the hyphen the page printed stays."""
+    book = _book(F.page_turn_compound_hyphen_pages)
+
+    text = " ".join(_paras(book))
+
+    assert "spear-bearing" in text, text
+    assert "spearbearing" not in text
+    assert book.conservation.ok, book.conservation.to_dict()
+
+
+def test_a_hyphen_heals_only_into_a_word_of_this_book():
+    """The corpus residual class: ``eighth-is`` is a sentence break (``eighthis``
+    is not a word of this book) and must keep its hyphen; ``under-standing``
+    wraps ``understanding``, which the book prints whole nearby, and must heal.
+    """
+    book = _book(F.hyphen_heal_needs_a_real_word_pages)
+
+    text = " ".join(_paras(book))
+
+    assert "eighth-is" in text, text
+    assert "eighthis" not in text
+    assert "understanding of the chart follows" in text, text
+    assert book.conservation.ok, book.conservation.to_dict()
+
+
 # ------------------------------------------------------------------ nothing is lost
 
 def test_no_printed_word_disappears_without_being_accounted_for():

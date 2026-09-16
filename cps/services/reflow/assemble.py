@@ -61,6 +61,7 @@ GLYPH_MARKER = re.compile("(?<=[.,;:!?)\\]])([%s]{2,4})(?=\\s|$)"
 NOTE_WINDOW = (0, 100, 200, 300)
 
 _WORD = re.compile(r"[A-Za-z][A-Za-z'’]*")
+_HEAD_WORD = re.compile(r"[A-Za-z'’]+")
 _LINEBREAK_HYPHEN = re.compile(r"(\w)[" + HYPHENS + r"]\s*\n\s*([a-z])")
 
 
@@ -247,28 +248,110 @@ def tidy(runs):
     return out
 
 
-def stitch_runs(prev, nxt):
+#: A hyphen an OCR layer set as its own span, possibly after space spans of
+#: its own: ``[Anti][ ][­]`` belongs to the word it ends before any of the
+#: rules below read it (book 570's shape).
+_HYPHEN_RUN = re.compile(r"[" + HYPHENS + r"]+$")
+
+
+def stitch_runs(prev, nxt, heal=True, vocab=None):
     """Join two run lists the way a typesetter's line break joins two lines.
 
     A line-break hyphen before a lowercase continuation is dropped (``conjunc-`` +
     ``tion``); a printed compound keeps its hyphen (``Sun-`` + ``Moon``); an em dash
     takes no space; anything else takes one.
+
+    A heal has to be earned. The joined form must be a word *of this book* --
+    printed whole somewhere in it -- because ``eighth-is`` is a sentence break,
+    not a wrapped ``eighthis``, and no shipped dictionary knows ``Albubater``.
+    The halves stay words either way; what the book never says whole is never
+    invented. The heal also eats any space runs the span segmentation put
+    between the halves (book 562's shape: the space as its own span), and does
+    nothing when a non-space run (a note marker) follows the hyphen.
+
+    ``heal`` is False only at a page turn: the source counter never joins a
+    hyphenated word across pages, so the output may not either -- a wrap-break
+    and a printed compound cannot be told apart at the turn, and the hyphen the
+    page printed stays (``spear-bearing``, never ``spearbearing``).
     """
     prev = [list(r) for r in prev]
     nxt = [list(r) for r in nxt]
+    if prev:
+        # A hyphen the OCR set as its own span, possibly with space spans of its
+        # own around it: ``[acron][-][ ]`` and ``[Anti][ ][­]`` both belong to
+        # the word they end (books 570's and 631's shapes).
+        k = len(prev) - 1
+        while k >= 0 and prev[k][0] == "t" and not prev[k][1].strip():
+            k -= 1
+        if k >= 0 and prev[k][0] == "t" and _HYPHEN_RUN.fullmatch(prev[k][1].strip()):
+            j = k - 1
+            while j >= 0 and prev[j][0] == "t" and not prev[j][1].strip():
+                j -= 1
+            if j >= 0 and prev[j][0] == "t":
+                prev[j][1] = prev[j][1].rstrip() + prev[k][1].strip()
+                del prev[j + 1:]
     head = next((r[1] for r in nxt if r[0] == "t" and r[1].strip()), "")
     index = next((k for k in range(len(prev) - 1, -1, -1)
                   if prev[k][0] == "t" and prev[k][1].strip()), None)
     if index is not None:
         tail = prev[index][1].rstrip()
         hyphen = DEHYPH.search(tail)
-        if hyphen and head.lstrip()[:1].islower():
-            prev[index] = ["t", tail[:hyphen.end(1)]]
-            return prev + nxt
+        if heal and hyphen and head.lstrip()[:1].islower() and all(
+                run[0] == "t" and not run[1].strip()
+                for run in prev[index + 1:]):
+            # The check is on the exact string the join would print, apostrophes
+            # and all: "Aphrodite’" is earned only if the book prints it so,
+            # and "people’s" is not "people". No prefix word, no heal either --
+            # "are" alone is not evidence of anything.
+            head_word = _first_word(nxt)
+            prefix_text = "".join(
+                run[1] for run in prev[:index + 1] if run[0] == "t").rstrip()
+            prefix = re.search(r"[\w'’]+$", prefix_text.rstrip(HYPHENS))
+            if vocab is None or (prefix and head_word and
+                                 (prefix.group(0) + head_word).lower() in vocab):
+                prev[index] = ["t", tail[:hyphen.end(1)]]
+                del prev[index + 1:]
+                return prev + nxt
         if hyphen or ENDDASH.search(tail):
             prev[index] = ["t", tail]
             return prev + nxt
     return prev + [["t", " "]] + nxt
+
+
+
+def _first_word(nxt):
+    """The first word of a run list, including a trailing contraction.
+
+    The span segmentation cuts ``ple’s`` as ``[ple][’][s]``; judged as ``ple``
+    it heals into ``people`` against a book that only ever prints ``people’s``.
+    But the next word is not part of it either: letter-spaced ``s a t u r n``
+    must not glue ``nals`` out of a wrapped ``Diur-/nal``.
+    """
+    word = ""
+    for run in nxt:
+        if run[0] != "t":
+            break
+        text = run[1].strip()
+        if not text:
+            if word:
+                break
+            continue
+        if not word:
+            token = _HEAD_WORD.match(text)
+            if not token:
+                return ""
+            word = token.group(0)
+            if token.end() < len(text):
+                return word
+            continue
+        if text in ("’", "'") and not word.endswith(("’", "'")):
+            word += text
+            continue
+        if text == "s" and word.endswith(("’", "'")):
+            word += text
+            continue
+        break
+    return word
 
 
 def continues(prev_text, next_text):
@@ -683,7 +766,7 @@ def _opening_number(text, number, repairs, pno):
     return _OPENING_NUMBER.sub("", text, count=1)
 
 
-def note_text(region, repairs=None, pno=None):
+def note_text(region, repairs=None, pno=None, vocab=None):
     """A footnote's text, assembled the way a paragraph is.
 
     Notes go down a side channel, and for a while that meant they skipped the line
@@ -700,7 +783,7 @@ def note_text(region, repairs=None, pno=None):
         if not text:
             continue
         piece = [["t", text]]
-        runs = stitch_runs(runs, piece) if runs else piece
+        runs = stitch_runs(runs, piece, vocab=vocab) if runs else piece
     return plain_text(tidy(runs))
 
 
@@ -870,7 +953,7 @@ def page_headings(book, pno):
             for element in book.pages.get(pno, []) if element.kind == "h"]
 
 
-def _page_elements(skel, repairs, reasons):
+def _page_elements(skel, repairs, reasons, vocab=None):
     page_notes = skel.note_numbers
     claimed = set()
     elements = []
@@ -885,7 +968,8 @@ def _page_elements(skel, repairs, reasons):
                 for line in region.caption_lines:
                     line_runs = _line_runs(line, skel.pno, page_notes, claimed,
                                            repairs, reasons)
-                    runs = line_runs if not runs else stitch_runs(runs, line_runs)
+                    runs = line_runs if not runs else stitch_runs(runs, line_runs,
+                                                                  vocab=vocab)
                 runs = tidy(runs)
                 if plain_text(runs):
                     elements.append(Element(kind="caption", runs=runs, pno=skel.pno,
@@ -897,7 +981,8 @@ def _page_elements(skel, repairs, reasons):
         runs = []
         for line in region.lines:
             line_runs = _line_runs(line, skel.pno, page_notes, claimed, repairs, reasons)
-            runs = line_runs if not runs else stitch_runs(runs, line_runs)
+            runs = line_runs if not runs else stitch_runs(runs, line_runs,
+                                                          vocab=vocab)
         runs = tidy(runs)
         if not plain_text(runs):
             continue
@@ -937,6 +1022,7 @@ def assemble(skeletons, style, raw_pages=None):
     book = Book(style=style)
     stitched = 0
     refused = 0
+    vocab = book_vocabulary(raw_pages) if raw_pages is not None else None
 
     # Before anything else, because a damaged note number is what a damaged marker
     # would otherwise be fitted to, and the evidence for it is spread over pages.
@@ -944,7 +1030,8 @@ def assemble(skeletons, style, raw_pages=None):
 
     for skel in skeletons:
         page_reasons = list(skel.reasons)
-        elements, claimed = _page_elements(skel, book.repairs, page_reasons)
+        elements, claimed = _page_elements(skel, book.repairs, page_reasons,
+                                           vocab=vocab)
         runover = _runover_note(elements, book, skel)
         if runover is not None:
             book.notes.append(runover)
@@ -967,7 +1054,8 @@ def assemble(skeletons, style, raw_pages=None):
                 book.furniture.append(region.text)
             elif region.kind == "note":
                 book.notes.append(Note(num=region.number,
-                                       text=note_text(region, book.repairs, skel.pno),
+                                       text=note_text(region, book.repairs, skel.pno,
+                                                      vocab=vocab),
                                        pno=skel.pno,
                                        marked=region.number in claimed))
             elif region.kind == "artwork":
@@ -983,7 +1071,9 @@ def assemble(skeletons, style, raw_pages=None):
             previous = book.elements[-1] if book.elements else None
             if previous is not None and element.kind == "p" and previous.kind == "p" \
                     and continues(previous.text, element.text):
-                previous.runs = tidy(stitch_runs(previous.runs, element.runs))
+                previous.runs = tidy(stitch_runs(
+                    previous.runs, element.runs,
+                    heal=element.pno in previous.pages, vocab=vocab))
                 previous.pages = sorted(set(previous.pages + element.pages))
                 stitched += 1
                 continue
@@ -1006,7 +1096,7 @@ def assemble(skeletons, style, raw_pages=None):
             book.reasons[skel.pno] = sorted(set(page_reasons))
 
     if raw_pages is not None:
-        book.source_words = source_word_counter(raw_pages)
+        book.source_words = source_word_counter(raw_pages, vocab=vocab)
         book.conservation = check_conservation(book.source_words, book.elements,
                                                book.notes, book.furniture,
                                                book.repairs, artwork=book.artwork)
@@ -1050,18 +1140,79 @@ def deterministic_book(doc, page_numbers=None):
 
 # ---------------------------------------------------------------- the invariant
 
-def source_word_counter(raw_pages):
+def source_word_counter(raw_pages, vocab=None):
     """Every alphabetic word the text layer printed, with line-break hyphens healed.
 
     Digits and punctuation are excluded deliberately: the marker repairs move those
     around on purpose, and a conservation check that trips on its own repairs is a
     check nobody will read.
+
+    ``vocab`` gates the heal the same way the element stitcher is gated: only a
+    joined form the book itself prints whole is one word. Healing with any other
+    rule on either side of the comparison would manufacture mismatches that are
+    not losses (``eighthis`` against the printed ``eighth-is``).
     """
     counter = Counter()
     for raw in raw_pages:
-        text = _LINEBREAK_HYPHEN.sub(r"\1\2", raw.text)
+        text = _heal_linebreaks(raw.text, None) if vocab is None \
+            else _heal_page(raw, vocab)
         counter.update(_WORD.findall(text))
     return counter
+
+
+def book_vocabulary(raw_pages):
+    """The lowercase words this book prints, hyphens unhealed: the heal's proof.
+
+    A wrapped word that appears nowhere whole is never joined on either side of
+    the conservation comparison, so one-off wraps cost readability nothing and
+    the count stays honest.
+    """
+    words = set()
+    for raw in raw_pages:
+        words.update(word.lower() for word in _WORD.findall(raw.text))
+    return words
+
+
+_LINEBREAK_TOKEN = re.compile(r"([\w'’]+)[" + HYPHENS + r"]\s*\n\s*([a-z][A-Za-z'’]*)")
+
+
+def _heal_linebreaks(text, vocab):
+    if vocab is None:
+        return _LINEBREAK_HYPHEN.sub(r"\1\2", text)
+
+    def repl(match):
+        whole = match.group(1) + match.group(2)
+        # The exact string, apostrophes and all, must be a word of this book:
+        # "Aphrodite’" only joins if the book prints it so, and "people’s" is
+        # not "people".
+        return whole if whole.lower() in vocab else match.group(0)
+
+    return _LINEBREAK_TOKEN.sub(repl, text)
+
+
+def _heal_page(raw, vocab):
+    """The page's text with the wraps the reading itself would join, healed.
+
+    Within a block the rule is the stitcher's (vocab-gated). Across blocks the
+    rule is the paragraph join's: a block whose last line does not end a
+    sentence, a block that opens lowercase, and a joined form the book prints
+    whole -- the three things ``continues`` and the stitcher ask together. Any
+    other seam keeps its hyphen on both sides of the conservation comparison.
+    """
+    parts = [_heal_linebreaks(block.text, vocab) for block in raw.text_blocks]
+    for index in range(len(parts) - 1):
+        tail = parts[index].rstrip()
+        nxt = parts[index + 1].lstrip()
+        if not nxt[:1].islower() or SENT_END.search(tail):
+            continue
+        match = re.search(r"([\w'’]+)[" + HYPHENS + r"]$", tail)
+        if not match:
+            continue
+        head = _HEAD_WORD.match(nxt)
+        if head and (match.group(1) + head.group(0)).lower() in vocab:
+            parts[index] = tail[:match.end(1)] + head.group(0)
+            parts[index + 1] = nxt[len(head.group(0)):]
+    return "\n".join(parts)
 
 
 def check_conservation(source_words, elements, notes, furniture, repairs=(),

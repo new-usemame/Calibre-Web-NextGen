@@ -136,6 +136,19 @@ class TestColumnReadingOrder(object):
         paragraphs = [el.text for el in book.elements if el.kind == "p"]
         assert paragraphs == [F.CONTINUITY_TEXT], paragraphs
 
+    def test_a_background_photo_does_not_veto_the_two_pages(self):
+        """Book 566 page 20's shape: the facsimile photograph crosses the gutter,
+        and the two logical pages must still read left then right while the
+        photograph is kept as the page's figure."""
+        book = _book(lambda d: F.spread_with_background_photo_page(d, F.solid_png()))
+
+        left = " ".join(line for line, _ in F.TWO_COLUMN_ROWS)
+        right = " ".join(line for _, line in F.TWO_COLUMN_ROWS)
+        text = re.sub(r"\s+", " ", _whole_text(book)).strip()
+        assert text == left + " " + right, text
+        assert any(el.kind == "fig" for el in book.elements), "the photo stays"
+        assert book.conservation.ok, book.conservation.to_dict()
+
     def test_notes_stay_a_side_channel_on_a_column_page(self):
         """Columns must not push bottom-zone prose into the notes, and the marker
         still binds its note."""
@@ -175,12 +188,14 @@ class TestColumnReadingOrder(object):
 
     def test_a_ragged_single_column_page_is_not_shredded(self):
         """Book 565 page 158's shape: ragged short lines are not a column, and
-        a hyphenated word across the line break heals exactly once."""
+        a hyphenated pair the book never prints whole stays exactly as printed --
+        ``Christian-so``, never an invented ``Christianso``."""
         book = _book(F.ragged_single_column_page)
 
         text = _whole_text(book)
         assert text.index("Christianity was abolished.") < text.index("Mohammed"), text
-        assert "Christianso" in text
+        assert "Christian-so" in text
+        assert "Christianso" not in text
         assert "columns_reordered" not in (book.page_reasons(0) or [])
         assert book.conservation.ok, book.conservation.to_dict()
 

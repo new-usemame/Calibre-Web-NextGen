@@ -606,14 +606,80 @@ def balanced_quotation_page(doc):
 
 
 def hyphenated_page(doc):
-    """A line-break hyphen that must be repaired, and a compound that must not."""
+    """A line-break hyphen that must be repaired, and a compound that must not.
+
+    ``conjunction`` is printed whole later in the same paragraph, which is how
+    the book's own vocabulary earns the heal: the wrapped form and the compound
+    cannot be told apart by shape, only by what this book says.
+    """
     page = add_page(doc)
     add_body_lines(page, [
         "the planets are said to be in conjunc-",
         "tion when they occupy the same degree, and the Sun-",
-        "Moon relationship is called a syzygy.",
+        "Moon relationship is called a syzygy. A conjunction",
+        "is the word the older sources use for it.",
     ])
     return page
+
+
+def hyphenated_multispan_page(doc):
+    """Book 562's OCR-layer shape: a hyphenated word at a line end, set as
+    word-per-span runs with the space as its own span.
+
+    The stitcher healed the single-span shape and lost this one: the trailing
+    space run stayed between the halves and the page read ``tripli city`` for
+    ``triplicity`` -- two words printed where the source has one. The tiny size
+    alternation is what a real OCR layer's per-word spans look like to MuPDF.
+    """
+    page = add_page(doc)
+    y = BODY_TOP
+    x = LEFT
+    for index, word in enumerate(["looked", "at", "the", "lords", "of",
+                                  "the", "tripli-"]):
+        x += _put(page, x, y, word, size=BODY_SIZE + (index % 2) * 0.01)
+        x += _put(page, x, y, " ", size=BODY_SIZE + 0.03)
+    y += BODY_LEADING
+    _put(page, LEFT, y, "city of the Moon, the first of which is Mars,")
+    y += BODY_LEADING
+    _put(page, LEFT, y, "and whose triplicity is read first by day.")
+    return page
+
+
+def hyphen_heal_needs_a_real_word_pages(doc):
+    """The residual hyphen class from the OCR corpus: the heal must be earned.
+
+    ``eighth-`` + ``is`` is a sentence break, not a wrapped word (``eighthis``
+    is not a word of this book); ``under-`` + ``standing`` wraps
+    ``understanding``, which the book prints whole three lines later. A
+    dictionary nobody ships cannot tell these apart; the book's own vocabulary
+    can: only the second heals.
+    """
+    page = add_page(doc)
+    add_body_lines(page, [
+        "the eighth house is where the sect light",
+        "rests, and every planet placed there reads",
+        "differently. This is the basic understanding",
+        "of the doctrine. The eighth-",
+        "is angular in the day chart. A full under-",
+        "standing of the chart follows from it.",
+    ])
+    return page
+
+
+def page_turn_compound_hyphen_pages(doc):
+    """Book 563's shape: ``spear-`` ends one page and ``bearing`` opens the next.
+
+    The source counter heals line-break hyphens within a page, never across a
+    page turn, so an output that heals there invents ``spearbearing`` against
+    the printed ``spear-bearing``: a wrap-break and a printed compound cannot be
+    told apart at the turn, and the honest reading keeps the hyphen.
+    """
+    tail = add_page(doc)
+    add_body_lines(tail, PROSE_LINES[:4] + [
+        "the hunting party carried a spear-"])
+    head = add_page(doc)
+    add_body_lines(head, ["bearing that marked him as their leader, and"] + PROSE_LINES[:6])
+    return tail, head
 
 
 def hyphenated_note_page(doc):
@@ -680,6 +746,19 @@ TWO_COLUMN_ROWS = [
 def two_column_page(doc):
     """The readiness probe's shape: two prose columns whose lines share baselines."""
     page = add_page(doc)
+    _column_rows(page, TWO_COLUMN_ROWS)
+    return page
+
+
+def spread_with_background_photo_page(doc, png_bytes):
+    """Book 566 page 20's shape: two logical pages side by side, and behind the
+    left one the facsimile photograph itself, whose box crosses the gutter.
+
+    The photograph is not a column: it must be kept as the page's figure while
+    the two logical pages read left then right, never interleaved.
+    """
+    page = add_page(doc)
+    page.insert_image(pymupdf.Rect(40.0, 80.0, 265.0, 380.0), stream=png_bytes)
     _column_rows(page, TWO_COLUMN_ROWS)
     return page
 

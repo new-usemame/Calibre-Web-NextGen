@@ -918,7 +918,21 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
     if span < raw.width * 0.4:
         return None
 
-    gutters = _gutters(items, left, span)
+    # Gutters are read from line boxes alone. The page's own photograph (a
+    # facsimile behind the text of a two-up spread) spans the gutter and would
+    # veto columns that are plainly there, leaving the two logical pages
+    # interleaved (book 566 p20's shape). A real floating figure still votes:
+    # it blocks the gutter it crosses, because a column boundary drawn through
+    # a plate is no boundary at all.
+    line_boxes = [box for box, _ in line_items]
+    gutter_items = list(line_boxes)
+    for img in embedded:
+        if any(img.bbox[0] < box[2] and img.bbox[2] > box[0]
+               and img.bbox[1] < box[3] and img.bbox[3] > box[1]
+               for box in line_boxes):
+            continue
+        gutter_items.append(img.bbox)
+    gutters = _gutters(gutter_items, left, span)
     if not gutters:
         return None
     if raw.drawings >= RULED_MIN_PATHS and not candidates:

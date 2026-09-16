@@ -541,6 +541,13 @@ def page_skeleton(raw, style, layer_trusted=True):
         skel.regions.extend(artwork)
 
     layout = _column_layout(kept_blocks, embedded, candidates, raw)
+    if isinstance(layout, _RowTable):
+        # The rows are measured, and the page keeps the printed (y, x) order --
+        # but each row's cells are emitted as one region, because the paragraph
+        # join across a row boundary fuses whole rows into each other.
+        skel.reasons.append("mirror_table")
+        kept_blocks = _emit_table_rows(layout, kept_blocks, skel)
+        layout = None
     if layout is not None:
         skel.reasons.append("columns_reordered")
         for blk, kept in kept_blocks:
@@ -571,6 +578,35 @@ def _region_order(region):
             round(region.bbox[1], 1), round(region.bbox[0], 1))
 
 
+def _emit_table_rows(table, kept_blocks, skel):
+    """Each measured fragment row as one body region, in x order within the row.
+
+    The blocks the cells arrived in are irrelevant here -- MuPDF and Tesseract
+    both scatter a row's cells across blocks. What is left of the kept blocks
+    once the table's lines are lifted out classifies exactly as before.
+    """
+    wanted = {box for group in table.rows for box, _ in group}
+    by_box = {}
+    rest = []
+    for blk, kept in kept_blocks:
+        remainder = []
+        for ln in kept:
+            if ln.bbox in wanted:
+                by_box[ln.bbox] = ln
+            else:
+                remainder.append(ln)
+        if remainder:
+            rest.append((blk, remainder))
+    for group in table.rows:
+        lines = sorted((by_box[box] for box, _ in group if box in by_box),
+                       key=lambda ln: (ln.bbox[0], ln.bbox[1]))
+        if lines:
+            skel.regions.append(Region(kind="body", lines=lines,
+                                       reason="table_row",
+                                       bbox=_lines_bbox(lines, lines[0].bbox)))
+    return rest
+
+
 def _lines_bbox(lines, fallback):
     """The box the given lines actually occupy.
 
@@ -590,32 +626,85 @@ def _lines_bbox(lines, fallback):
 
 
 def _split_off_notes(raw, style, skel):
-    """Separate the footnote zone from the body, keeping multi-block notes together."""
-    body, notes = [], []
-    seen_note = False
-    zone_top = raw.height * FN_ZONE_NUMBERED
+    """Separate the footnote zone from the body, keeping multi-block notes together.
 
+    The zone's start is chosen, not just found: a number read out of glyphs is
+    the weakest evidence there is (``24° Sagittarius.`` decodes to note 240),
+    so a glyph-read opening stands only when every later opening ascends from
+    it. A later, smaller note proves the "opening" was prose -- book 569 page
+    355, where two degree readings opened a zone that swallowed 24 lines of
+    body and the real note 10 under them. Raised digit spans and merged digits
+    carry their own evidence and do not ask for the corroboration.
+    """
+    body, notes = [], []
+    zone_top = raw.height * FN_ZONE_NUMBERED
+    eligible = []
     for blk in raw.text_blocks:
         if blk.bbox[1] < zone_top or not style.body_size:
             body.append(blk)
-            continue
-        if blk.size > style.body_size * FN_SIZE_RATIO:
+        elif blk.size > style.body_size * FN_SIZE_RATIO:
             body.append(blk)
+        else:
+            eligible.append(blk)
+
+    openings = []
+    for blk in eligible:
+        per_block = []
+        for pos, ln in enumerate(blk.lines):
+            number = _note_number(ln, blk.size, opening=(pos == 0), after=None)
+            if number is not None:
+                per_block.append((pos, number, _opening_strength(ln, blk.size)))
+        openings.append(per_block)
+    flat = [(bi, pos, number, strength)
+            for bi, per_block in enumerate(openings)
+            for pos, number, strength in per_block]
+    start = None
+    for index, (bi, pos, number, strength) in enumerate(flat):
+        if strength == "glyph" and any(n <= number for _, _, n, _ in flat[index + 1:]):
             continue
-        known = [r.number for r in notes if r.number is not None]
-        opened = _note_number(blk.lines[0], blk.size, opening=True,
-                              after=known[-1] if known else None)
-        if opened is None and not seen_note:
-            body.append(blk)
-            continue
-        seen_note = True
-        notes.extend(_notes_in_block(blk, notes))
+        start = (bi, pos)
+        break
+
+    if start is None:
+        body.extend(eligible)
+    else:
+        bi, pos = start
+        body.extend(eligible[:bi])
+        first = eligible[bi]
+        if pos:
+            # The zone opens mid-block: the lines above the first number are
+            # body the false opening would have swallowed with it.
+            body.append(extract.Block(
+                number=first.number,
+                bbox=_lines_bbox(first.lines[:pos], first.bbox),
+                lines=first.lines[:pos]))
+            first = extract.Block(
+                number=first.number,
+                bbox=_lines_bbox(first.lines[pos:], first.bbox),
+                lines=first.lines[pos:])
+        notes.extend(_notes_in_block(first, notes))
+        for blk in eligible[bi + 1:]:
+            notes.extend(_notes_in_block(blk, notes))
 
     if notes:
         numbers = [n.number for n in notes if n.number is not None]
         if len(numbers) != len(set(numbers)):
             skel.reasons.append("duplicate_note_numbers")
     return body, notes
+
+
+def _opening_strength(line, block_size):
+    """How a zone-opening number was read: a raised digit span of its own, digits
+    merged into the note's text, or glyphs that only spell digits -- the reading
+    that asks the rest of the zone to corroborate it. Mirrors ``_note_number``:
+    a full-size digit span is not a raised number, whatever it spells."""
+    spans = [sp for sp in line.spans if sp.text.strip()]
+    if spans and re.fullmatch(r"\d{1,3}", spans[0].text.strip()):
+        if not (block_size and spans[0].size > MARGIN_SIZE * block_size):
+            return "raised"
+    if _MERGED_NOTE_NUMBER.match(line.stripped):
+        return "merged"
+    return "glyph"
 
 
 def _notes_in_block(blk, existing):
@@ -731,12 +820,25 @@ def _note_number(line, block_size, opening=False, after=None):
         digits = glyph_number(glyphed.group(1))
         if digits and 0 < len(digits) <= 3 and int(digits) > 0:
             value = int(digits)
+            # The weakest reading asks for one more witness: a citation opens
+            # with a name and a comma ("9° Tarrant, ..."), not with a finished
+            # sentence. "24° Sagittarius. Once ..." is a degree in running
+            # prose -- glyph-decoded to 240 it would open a zone that swallows
+            # the body under it (book 569 page 355).
+            rest = line.stripped[glyphed.end(1):].lstrip()
+            if _PROSE_SENTENCE.match(rest):
+                return None
             if after is None:
                 if opening:
                     return value
             elif value > after:
                 return value
     return None
+
+
+#: What follows a glyph-read number when the line is prose, not a citation: the
+#: first word after it ends with sentence punctuation ("Sagittarius. Once ...").
+_PROSE_SENTENCE = re.compile(r"[A-Z\u201c\u2018\"']\S*[.!?](?:\s|$)")
 
 
 def _furniture_reason(line, raw, style, top_y=None):
@@ -748,14 +850,19 @@ def _furniture_reason(line, raw, style, top_y=None):
         # A scan's margins can push the running head below the strict band
         # (book 570's index: head at 11% of the page height). The page's
         # topmost line is still furniture when it reads as one -- caps,
-        # carrying its folio, set smaller than the body, and title-sized.
+        # carrying its folio, set smaller than the body, and title-sized --
+        # or when it is nothing but the folio (book 569's '516' and '324').
         # Anything less specific stays content: a wrong yes here drops a
         # real line from the book while the counter stays green.
         if top_y is None or y0 > top_y + line.size:
             return None
         if not text or len(text) > BAND_TEXT_MAX:
             return None
-        if not style.body_size or line.size >= style.body_size * 0.98:
+        if style.body_size and line.size > style.body_size * 1.02:
+            return None
+        if FOLIO.match(text):
+            return "folio"
+        if line.size >= style.body_size * 0.98:
             return None
         if sum(ch.isalpha() for ch in text) < 6:
             return None
@@ -1048,6 +1155,7 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
             # pretend to be more ('q u a l it ie s'): both are cell content, not
             # flowing prose.
             short[column] += 1
+    mirror = _mirror_fragment_rows(columnar, layout)
     if sum(1 for count in counts if count >= COLUMN_MIN_LINES) < 2:
         return None
     for column, count in enumerate(counts):
@@ -1055,8 +1163,9 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
             # A column of one- and two-word lines is a table's label column (or a
             # grid of cells), not a column of prose: reading it column-major
             # severs every row it prints. MEASURED on book 569's zodiacal tables
-            # ('Characteristics' beside 'Northern - Commanding - ...').
-            return None
+            # ('Characteristics' beside 'Northern - Commanding - ...'). A mirror
+            # table is the same veto with the row structure already measured.
+            return _RowTable(mirror) if mirror else None
     fills.sort()
     if fills and fills[len(fills) // 2] < COLUMN_FILL_MIN:
         return None
@@ -1065,10 +1174,24 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
         # perceives g e m in i', book 569 p547) proves two clean columns of
         # fragments with no sequence inside either. Column-major prints every
         # left cell away from its right-hand pair, and no heuristic gets to
-        # guess the table into unrelated lists: without sequence evidence the
-        # rows stay as they print, pairs together.
-        return None
+        # guess the table into unrelated lists: the rows stay as they print,
+        # pairs together, each row one unit.
+        return _RowTable(mirror) if mirror else None
     return layout
+
+
+class _RowTable(object):
+    """A mirror table measured and refused as prose columns: the row is the unit.
+
+    Carries the paired fragment rows as clustered line groups so the page pass
+    can emit each row as one region. Without that, the printed (y, x) order is
+    kept but the paragraph join glues every cell to the lowercase letter-spaced
+    cell after it -- book 569 p547 read 'Sextile t a u r u s looks at v ir g o':
+    row one's aspect fused with row two's signs.
+    """
+
+    def __init__(self, rows):
+        self.rows = [list(group) for group in rows]
 
 
 _SENTENCE_END = re.compile(r"[.!?;:\"”’)\]]\s*$")
@@ -1129,26 +1252,37 @@ def _has_number_sequence(columnar, layout):
 
 
 def _mirror_fragment_rows(columnar, layout):
-    """Rows of short fragments printed in both columns at shared baselines.
+    """Row groups of short fragments printed across the columns, in print order.
 
     The mirror table ('GEMINI looks at LEO' beside 'l e o perceives g e m in
     i') is nothing but these; prose columns at the same density are not
     fragments (they are full sentences wrapping, well past 30 characters), and
     a numbered list has already been proved a sequence before this is asked.
+    Rows are clustered by centre height, not rounded: a row's aspect cell set a
+    half point taller than its pair cells still belongs to the row.
     """
-    rows = {}
-    for box, text in columnar:
-        key = round((box[1] + box[3]) / 2.0)
-        rows.setdefault(key, []).append((box, text))
+    clusters = []
+    for box, text in sorted(columnar,
+                            key=lambda item: (item[0][1] + item[0][3]) / 2.0):
+        centre = (box[1] + box[3]) / 2.0
+        if clusters and centre - clusters[-1][0] <= 3.0:
+            clusters[-1][0] = centre
+            clusters[-1][1].append((box, text))
+        else:
+            clusters.append([centre, [(box, text)]])
     paired = fragments = 0
-    for key in sorted(rows):
-        cols = {layout.column_of(box) for box, _ in rows[key]}
+    rows = []
+    for _, group in clusters:
+        cols = {layout.column_of(box) for box, _ in group}
         if len(cols) < 2:
             continue
         paired += 1
-        if all(len(text.replace(" ", "")) <= 30 for _, text in rows[key]):
+        if all(len(text.replace(" ", "")) <= 30 for _, text in group):
             fragments += 1
-    return paired >= 4 and fragments * 2 >= paired
+        rows.append(group)
+    if paired >= 4 and fragments * 2 >= paired:
+        return rows
+    return []
 
 
 # ----------------------------------------------------------- figures by geometry
@@ -1196,9 +1330,16 @@ def _prose_rows(kept_blocks, raw, style):
             if y1 > y0:
                 spans.append([y0, y1, ln.bbox])
     spans.sort()
+    # Two lines belong to one band when the gap between them is a leading, not a
+    # space. The OCR layer's own leading runs wider than the native layer's --
+    # book 569's panels measure two and a half points on a seven-point line -- so
+    # the tolerance follows the page's line height, bounded both ways.
+    heights = sorted(y1 - y0 for y0, y1, _ in spans)
+    tolerance = 2.0 if not heights else max(
+        2.0, min(4.0, heights[len(heights) // 2] * 0.5))
     rows = []
     for y0, y1, bbox in spans:
-        if rows and y0 <= rows[-1][1] + 2:
+        if rows and y0 <= rows[-1][1] + tolerance:
             rows[-1][1] = max(rows[-1][1], y1)
             rows[-1][2].append(bbox)
         else:

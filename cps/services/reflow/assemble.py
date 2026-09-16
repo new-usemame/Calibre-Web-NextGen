@@ -81,6 +81,10 @@ class Element(object):
     placed: str = ""
     band: int = 0
     column: int = 0
+    #: A measured mirror-table row: one unit of paired cells. Rows are never
+    #: joined into paragraphs -- the join across a row boundary fuses whole
+    #: rows into each other (book 569 p547's 'Sextile t a u r u s ...').
+    table_row: bool = False
 
     @property
     def text(self):
@@ -882,7 +886,8 @@ def _copy_element(element):
     return Element(kind=element.kind, runs=[list(run) for run in element.runs],
                    pno=element.pno, level=element.level, bbox=element.bbox,
                    pages=list(element.pages), placed=element.placed,
-                   band=element.band, column=element.column)
+                   band=element.band, column=element.column,
+                   table_row=element.table_row)
 
 
 def _runover_note(elements, book, skel):
@@ -993,7 +998,8 @@ def _page_elements(skel, repairs, reasons, vocab=None):
         elements.append(Element(kind=kind, runs=runs, pno=skel.pno,
                                 level=region.level, bbox=region.bbox,
                                 pages=[skel.pno],
-                                band=region.band, column=region.column))
+                                band=region.band, column=region.column,
+                                table_row=region.reason == "table_row"))
 
     # A 'heading' that ends with a hyphen is prose misread by size: headings do
     # not end mid-word, and paragraphs cannot join into headings, so the wrap
@@ -1097,6 +1103,7 @@ def assemble(skeletons, style, raw_pages=None):
         for position, element in enumerate(elements):
             previous = book.elements[-1] if book.elements else None
             if previous is not None and element.kind == "p" and previous.kind == "p" \
+                    and not previous.table_row and not element.table_row \
                     and continues(previous.text, element.text):
                 previous.runs = tidy(stitch_runs(
                     previous.runs, element.runs,
@@ -1188,8 +1195,14 @@ def source_word_counter(raw_pages, vocab=None, skeletons=None):
     """
     column_pages = {}
     if skeletons is not None and vocab is not None:
-        column_pages = {skel.pno: skel for skel in skeletons
-                        if "columns_reordered" in skel.reasons}
+        column_pages = {
+            skel.pno: skel for skel in skeletons
+            if "columns_reordered" in skel.reasons
+            or "mirror_table" in skel.reasons
+            # A figure element between two paragraphs blocks the reading's join
+            # just like a column boundary: the counter has to see the same
+            # barrier or it heals a wrap the reading kept (book 569 p471).
+            or any(region.kind == "figure" for region in skel.regions)}
     counter = Counter()
     for raw in raw_pages:
         skel = column_pages.get(raw.pno)
@@ -1206,32 +1219,53 @@ def _heal_page_columns(skel, vocab):
     """The reordered page's words: the content stream in region (reading) order
     with the stitcher's own seam rule, and every side channel counted the way
     the output side counts it -- notes healed within their region, furniture
-    and artwork verbatim.
+    and artwork verbatim. Hard seams are the ones the reading never joins: a
+    mirror-table row boundary, and anything across a figure -- the figure (or
+    its caption) is an element of its own kind and paragraphs cannot join
+    through it, so the counter must not heal through it either.
     """
     counter = Counter()
     content = []
+    frozen = set()
+    barrier = False
+    previous_table = False
     for region in skel.regions:
         if region.kind in ("heading", "body", "caption"):
-            content.extend(region.lines)
+            lines = list(region.lines)
         elif region.kind == "figure":
-            content.extend(region.caption_lines)
+            barrier = True
+            lines = list(region.caption_lines)
         elif region.kind == "note":
             counter.update(_WORD.findall(_heal_linebreaks(region.text, vocab)))
+            continue
         elif region.kind in ("furniture", "artwork"):
             counter.update(_WORD.findall(region.text))
+            continue
+        else:
+            continue
+        is_table = region.reason == "table_row"
+        if lines and content and (barrier or is_table or previous_table):
+            frozen.add(len(content) - 1)
+        if lines:
+            content.extend(lines)
+            previous_table = is_table
+            barrier = is_table or region.kind == "figure"
     counter.update(_WORD.findall(_heal_line_stream(
-        [ln.text for ln in content], vocab)))
+        [ln.text for ln in content], vocab, frozen)))
     return counter
 
 
-def _heal_line_stream(lines, vocab):
+def _heal_line_stream(lines, vocab, frozen_seams=()):
     """One seam rule over the reading-ordered lines: a hyphen at the end of a
     line, a lowercase head after it, and a joined form the book prints whole.
     Within a block, at a block seam and at a column seam the output asks the
-    same three things, so the count matches the reading word for word.
+    same three things, so the count matches the reading word for word. Seams
+    in ``frozen_seams`` are never healed: the reading does not join there.
     """
     parts = list(lines)
     for index in range(len(parts) - 1):
+        if index in frozen_seams:
+            continue
         tail = parts[index].rstrip()
         match = re.search(r"([\w'’]+)[" + HYPHENS + r"]$", tail)
         if not match:

@@ -289,6 +289,17 @@ class TestColumnReadingOrder(object):
         assert any(el.kind == "fig" for el in book.elements), "the photo stays"
         assert book.conservation.ok, book.conservation.to_dict()
 
+    def test_a_panel_beside_a_diagram_at_ocr_leading_recovers_the_diagram(self):
+        """Book 569 page 547's panel: the OCR layer's loose leading read every
+        line as its own band, no band was tall enough to measure the channel,
+        and the diagram the panel describes never became a figure."""
+        book = _chart_book(lambda d: F.scan_panel_diagram_ocr_leading_page(
+            d, F.solid_png()))
+
+        figures = [f for f in book.figures if f["pno"] == 1]
+        assert figures, "the diagram beside the panel is lost"
+        assert any(el.kind == "fig" and el.pno == 1 for el in book.elements)
+
     def test_notes_stay_a_side_channel_on_a_column_page(self):
         """Columns must not push bottom-zone prose into the notes, and the marker
         still binds its note."""
@@ -325,6 +336,30 @@ class TestColumnReadingOrder(object):
         assert text.index("GEMINI looks at LEO") < text.index("perceives"), text
         assert text.index("perceives") < text.index("TAURUS looks at VIRGO"), text
         assert "columns_reordered" not in (book.page_reasons(0) or [])
+        assert book.conservation.ok, book.conservation.to_dict()
+
+    def test_a_sign_pair_table_keeps_each_aspect_on_its_own_row(self):
+        """The real page's third column is the aspect, and the letter-spaced
+        lowercase cells make every row 'continue' into the next: the measured
+        output printed 'Sextile t a u r u s looks at v ir g o' -- row one's
+        aspect glued to row two's signs. Each row is one unit holding its pair
+        and its own aspect, in print order, and the prose after the table does
+        not fuse with the last row either."""
+        book = _book(F.sign_pair_table_page)
+
+        rows = [el.text for el in book.elements
+                if "looks at" in (el.text or "") or "perceives" in (el.text or "")]
+        assert rows == [
+            "GEMINI looks at LEO l e o perceives g e m in i Sextile",
+            "TAURUS looks at VIRGO v ir g o perceives t a u r u s Trine",
+            "ARIES looks at LIBRA l i b r a perceives a r i e s Opposition",
+            "SCORPIO looks at PISCES pis c e s perceives Sc o r pio Trine",
+            "SAGITTARIUS looks at AQUARIUS a q u a r iu s perceives "
+            "Sa g it t a r iu s Sextile",
+        ], rows
+        text = _whole_text(book)
+        assert text.index("Sextile", text.index("SAGITTARIUS")) \
+            < text.index("have looked at the transmission"), text
         assert book.conservation.ok, book.conservation.to_dict()
 
     def test_an_unruled_label_table_keeps_its_rows(self):

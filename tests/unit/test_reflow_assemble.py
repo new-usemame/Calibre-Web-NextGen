@@ -14,7 +14,7 @@ The reader sees a sentence stop mid-clause at every page turn.
 
 import pytest
 
-from cps.services.reflow import assemble
+from cps.services.reflow import assemble, extract
 from tests.fixtures import reflow_pdfs as F
 
 pytestmark = pytest.mark.unit
@@ -32,6 +32,82 @@ def _book(*builders):
 
 def _paras(book):
     return [el.text for el in book.elements if el.kind == "p"]
+
+
+# --------------------------------------------------- run-shape invariance at the seam
+
+def _assembled_text(*lines, vocab=None):
+    """The assembly seam exactly as `_page_elements` drives it: per-line runs,
+    stitched across the line boundaries, tidied, read. A contract about the
+    seam itself: the same visible line, however the spans fragment it, must
+    come out with the same words and the same intentional spaces."""
+    runs = []
+    for spans in lines:
+        line = extract.Line(
+            spans=[extract.Span(text=text, size=11.3, font="n", flags=0,
+                                bbox=(0.0, 0.0, 10.0, 10.0))
+                   for text in spans],
+            bbox=(0.0, 0.0, 10.0, 10.0))
+        line_runs = assemble._line_runs(line, 0, {}, set(), [], [])
+        runs = line_runs if not runs else assemble.stitch_runs(
+            runs, line_runs, vocab=vocab)
+    return assemble.plain_text(assemble.tidy(runs))
+
+
+def test_a_line_reads_the_same_as_a_run_a_word_list_or_formatting_fragments():
+    shapes = [
+        ["The quick brown fox"],
+        ["The ", "quick ", "brown ", "fox"],
+        ["The", " ", "qu", "ick", " ", "brown", " ", "fox"],
+    ]
+    texts = [_assembled_text(shape) for shape in shapes]
+
+    assert texts == ["The quick brown fox"] * 3, texts
+
+
+def test_leading_trailing_and_whitespace_only_runs_change_nothing():
+    shapes = [
+        ["The fox"],
+        [" ", "The fox"],
+        ["The fox", "  "],
+        ["The", " ", "fox"],
+    ]
+    texts = [_assembled_text(shape) for shape in shapes]
+
+    assert texts == ["The fox"] * 4, texts
+
+
+def test_separate_hyphen_and_apostrophe_runs_stay_with_their_words():
+    """A hard hyphen, a soft hyphen and an apostrophe as spans of their own are
+    parts of the words they touch, not word boundaries."""
+    shapes = [
+        ["well-read, don’t stop"],
+        ["well", "-", "read, ", "don", "’", "t stop"],
+        ["well­", "read,", " don’t ", "stop"],
+    ]
+    texts = [_assembled_text(shape) for shape in shapes]
+
+    assert texts[0] == "well-read, don’t stop"
+    assert texts[1] == texts[0], texts
+    assert texts[2] == "well­read, don’t stop", texts
+
+
+def test_a_real_wrap_heals_and_an_ordinary_boundary_keeps_its_space():
+    shapes = [
+        [["can’t com-"], ["municate in the way"]],
+        [["can’t com", "-"], ["municate in the way"]],
+        [["can’t com­"], ["municate in the way"]],
+    ]
+    texts = [_assembled_text(*shape, vocab={"communicate"}) for shape in shapes]
+    assert texts == ["can’t communicate in the way"] * 3, texts
+
+    boundaries = [
+        [["quick"], ["brown fox"]],
+        [["quick "], ["brown fox"]],
+        [["quick"], [" brown fox"]],
+    ]
+    texts = [_assembled_text(*shape) for shape in boundaries]
+    assert texts == ["quick brown fox"] * 3, texts
 
 
 # ----------------------------------------------------------- page-turn joins (defect B)

@@ -152,6 +152,18 @@ def test_a_below_band_caps_line_without_a_folio_is_content():
     assert book.conservation.ok, book.conservation.to_dict()
 
 
+def test_a_below_band_folio_is_furniture():
+    """A bare number as the page's topmost line is the folio wherever the scan
+    put it (book 569's '516' and '324' read as body paragraphs)."""
+    book = _book(F.below_band_folio_page)
+
+    body = " ".join(el.text for el in book.elements if el.kind in ("p", "h"))
+
+    assert "516" not in body
+    assert "516" in " ".join(book.furniture)
+    assert book.conservation.ok, book.conservation.to_dict()
+
+
 # ------------------------------------------------------------------ notes as a channel
 
 def test_footnotes_are_a_page_side_channel_not_inline_elements():
@@ -509,6 +521,17 @@ class TestANoteWhoseOwnNumberTheScannerAte(object):
         skel = self._regions(F.lowercase_word_in_the_note_zone_page)
 
         assert 50 not in [r.number for r in skel.note_regions]
+
+    def test_a_degree_in_body_prose_is_not_a_note_number(self):
+        """Book 569 page 355: ``24° Sagittarius.`` glyph-decodes to 240, and the
+        false opening swallowed 24 lines of body and the real note 10. The word
+        after a degree ends its own sentence; a citation's first word does not."""
+        skel = self._regions(F.degree_in_the_note_zone_page)
+
+        assert [r.number for r in skel.note_regions] == [10]
+        body = " ".join(r.text for r in skel.body_regions)
+        assert "Sagittarius" in body, body
+        assert "applying aspect" in body, body
 
 
 class TestTypeThatIsOnlyBiggerBecauseTheScannerSaidSo(object):

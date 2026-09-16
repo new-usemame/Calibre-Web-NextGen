@@ -854,6 +854,43 @@ def below_band_caps_line_without_folio_page(doc):
     return page
 
 
+def below_band_folio_page(doc):
+    """The same scan shape with only the folio below the band: a bare number at
+    the top of the page is furniture too (book 569's '516' and '324')."""
+    page = add_page(doc)
+    _put(page, COL_RIGHT, 62.0, "516", size=9.4)
+    add_body_lines(page, PROSE_LINES[:6])
+    return page
+
+
+def scan_panel_diagram_ocr_leading_page(doc, png_bytes):
+    """Book 569 page 547's figure panel: a right-hand prose panel beside a
+    left-hand diagram, at the OCR layer's own leading -- twelve points on a
+    seven-point line, where a two-point band tolerance reads every line as its
+    own band and the diagram's channel is never measured."""
+    page = add_page(doc)
+    page.insert_image(pymupdf.Rect(0, 0, PAGE_W, PAGE_H), stream=png_bytes)
+    add_running_head(page, "516", "CHAPTER 53")
+    add_body_lines(page, PROSE_LINES[:3])
+    y = BODY_TOP + 5 * BODY_LEADING
+    for line in ["Planets that see and perceive one an-",
+                 "other intensify their existing aspect re-",
+                 "lationship. Here, the sextile between",
+                 "Venus in Gemini and Jupiter in Leo is",
+                 "intensified due to the planets being",
+                 "equidistant from the solstitial axis.",
+                 "Venus sees Jupiter, and Jupiter",
+                 "perceives Venus. Similarly, the trine",
+                 "between Mars in Pisces and Saturn in",
+                 "Scorpio is made more potent here.",
+                 "Mars sees Saturn, and Saturn",
+                 "perceives Mars at the same degree."]:
+        _put(page, 300.0, y, line, size=7.0)
+        y += 12.0
+    add_body_lines(page, PROSE_LINES[5:8], top=y + 30.0)
+    return page
+
+
 def column_notes_page(doc):
     """Two prose columns over a footnote zone: the notes stay a side channel."""
     page = add_page(doc)
@@ -871,21 +908,26 @@ def column_notes_page(doc):
 
 
 def sign_pair_table_page(doc):
-    """Book 569 page 547's shape: a mirror table of sign pairs.
-
-    'GEMINI looks at LEO' beside 'l e o perceives g e m in i': each row is a
-    pair, and reading the left list down and then the right list prints every
-    'looks at' away from its 'perceives'. Neither column is an independent
-    sequence -- the row is the unit -- so the reading keeps them row by row.
-    """
+    """Book 569 page 547's shape: a mirror table of sign pairs with its aspect
+    column -- five rows, each 'A looks at B' beside 'b perceives a' beside the
+    aspect the row belongs to. The row is the unit: column-major prints every
+    'looks at' away from its 'perceives', and a lowercase-driven paragraph join
+    glues every aspect to the NEXT row's signs."""
     page = add_page(doc)
     add_body_lines(page, PROSE_LINES[:5])
-    _column_rows(page, [
-        ("GEMINI looks at LEO", "l e o perceives g e m in i"),
-        ("TAURUS looks at VIRGO", "v ir g o perceives t a u r u s"),
-        ("ARIES looks at LIBRA", "l i b r a perceives a r i e s"),
-        ("SCORPIO looks at PISCES", "p i s c e s perceives s c o r p i o"),
-    ], left=99.0, right=250.0, top=BODY_TOP + 6 * BODY_LEADING)
+    y = BODY_TOP + 6 * BODY_LEADING
+    for left, mid, aspect in [
+            ("GEMINI looks at LEO", "l e o perceives g e m in i", "Sextile"),
+            ("TAURUS looks at VIRGO", "v ir g o perceives t a u r u s", "Trine"),
+            ("ARIES looks at LIBRA", "l i b r a perceives a r i e s", "Opposition"),
+            ("SCORPIO looks at PISCES", "pis c e s perceives Sc o r pio", "Trine"),
+            ("SAGITTARIUS looks at AQUARIUS",
+             "a q u a r iu s perceives Sa g it t a r iu s", "Sextile")]:
+        _put(page, 99.0, y, left, size=6.0)
+        _put(page, 215.0, y, mid, size=6.0)
+        _put(page, 334.0, y, aspect, size=6.5)
+        y += 10.0
+    add_body_lines(page, PROSE_LINES[5:8], top=y + 22.0)
     return page
 
 
@@ -1604,6 +1646,26 @@ def lowercase_word_in_the_note_zone_page(doc):
     y = add_body_lines(page, PROSE_LINES[:5])
     add_notes(page, [("so", "Tarrant argues, was already an old position by then."),
                      (91, "Cramer explored the potential lineage of the family.")])
+    return page
+
+
+def degree_in_the_note_zone_page(doc):
+    """Book 569 page 355's shape: an astrological degree in body prose, set at
+    note size below the zone line. ``24° Sagittarius.`` reads to the glyph rule
+    as note 240, and every body line under it -- plus the real note at the
+    bottom -- becomes footnote text. A degree is not a note number: the word
+    after it ends its own sentence, and a citation does not do that."""
+    page = add_page(doc)
+    add_running_head(page, "324", "CHAPTER 28")
+    y = add_body_lines(page, PROSE_LINES[:4])
+    y = add_body_lines(page, [
+        "Saturn at 24° Sagittarius. Because it will not make any more",
+    ], top=max(y, NOTE_TOP - 40.0), size=NOTE_TEXT_SIZE)
+    add_body_lines(page, [
+        "24° Sagittarius. Once it enters the next sign, it has until",
+        "2° Taurus to make an applying aspect to another planet here.",
+    ], top=y + 8.0, size=NOTE_TEXT_SIZE)
+    add_notes(page, [(10, "Ibn Sahl, The Fifty Judgments 6.")])
     return page
 
 

@@ -639,8 +639,7 @@ def _adopt(result, book, pno, outcome, html, uncertain, ladder,
     # or fill a caption's missing printed glyph merely by conserving tokens.
     # Keep the deterministic source-evidence presentation until that evidence
     # can be resolved; never launder it into an unqualified model success.
-    protected_source = (any(el.caption_uncertain for el in book.pages.get(pno, []))
-                        or any(note.uncertain for note in book.notes if note.pno == pno))
+    protected_source = book.needs_source_evidence(pno)
     if protected_source:
         structure.ok = False
         structure.reasons.append(

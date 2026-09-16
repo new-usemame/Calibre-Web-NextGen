@@ -812,3 +812,20 @@ class TestPlateAndCaptionFidelity:
         assert [ln.text for ln in candidate.caption_lines] == [number.text,title.text] + [ln.text for ln in caption]
         assert [ln.text for _,ls in rest for ln in ls] == [right.text,bottom.text]
         assert candidate.bbox[3] <= number.bbox[1], 'caption must not distort the chart crop'
+
+    def test_scan_caption_has_source_evidence_and_keeps_source_italics(self):
+        number = _line('Figure 3. Original caption.', 50, 330, 190, 338, 6)
+        explanation = _line('Unverified symbols appear in this explanation.', 50, 345, 190, 353, 6.5)
+        explanation.spans[0].flags = extract.FLAG_ITALIC
+        figure = skeleton.Region(kind='figure',bbox=(40,100,210,325),
+                                 caption_lines=[number,explanation])
+        raw = extract.RawPage(pno=0,width=500,height=700,
+                             blocks=[_block(0,[number,explanation])],images=[])
+        skel = skeleton.PageSkeleton(pno=0,width=500,height=700,is_scan=True,regions=[figure])
+        book = assemble.assemble([skel],skeleton.book_style([raw]),[raw])
+        caption=next(el for el in book.pages[0] if el.kind=='caption')
+        assert caption.caption_uncertain, 'a native scan layer does not verify the printed glyphs'
+        html=build_epub.page_fragment(book,0)
+        assert '<em>Unverified symbols appear in this explanation.</em>' in html
+        assert 'reflow-uncertain' in html and '(?)' in html
+        assert book.conservation.ok

@@ -63,3 +63,43 @@ def test_source_page_navigation_resolves_to_real_starts_without_renumbering(tmp_
                     if node.get("href") == index_href)
         spine = list(opf.iter(ns + "itemref"))
         assert spine[-1].get("idref") == item.get("id"), "The index must not interrupt the book"
+
+
+def test_uncertain_notes_expose_original_pixels_and_only_disarm_ambiguous_links(tmp_path):
+    from cps.services.reflow import extract
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=500,height=700)
+        page.insert_text((50,90),'Original body marker 188 and reliable note 2.',fontsize=12)
+        page.insert_text((50,580),'188 Original printed reference.',fontsize=10)
+        page.insert_text((50,610),'2 Reliable printed reference.',fontsize=10)
+        elements = [assemble.Element(kind='p',pno=0,runs=[
+            ['t','A damaged association '],['sup','1',0,'uncertain'],
+            ['t',' and a reliable association '],['sup','2',0],['t','.']])]
+        notes = [assemble.Note(num=1,text='Misread extracted reference.',pno=0,marked=True,uncertain=True),
+                 assemble.Note(num=2,text='Reliable printed reference.',pno=0,marked=True)]
+        for note in notes: note.bbox=(50,565,400,620)
+        book = assemble.Book(elements=elements,pages={0:elements},notes=notes)
+        target=tmp_path/'evidence.epub'
+        result=build_epub.build(book,str(target),doc=doc)
+        original=extract.render_page_jpeg(doc,0,scale=1.5,quality=85)
+    assert build_epub.validate(str(target)) == []
+    with zipfile.ZipFile(target) as z:
+        chapter=ET.fromstring(z.read('OEBPS/'+result.chapters[0]['href']))
+        links=list(chapter.iter(XHTML+'a'))
+        assert not any('#fn_p0000_1' in a.get('href','') for a in links)
+        assert any(a.get('href','').endswith('#fn_p0000_2') for a in links)
+        evidence=next((a for a in links if 'original-p0000.xhtml' in a.get('href','')),None)
+        assert evidence is not None, 'a touch reader cannot reach original source pixels'
+        assert 'uncertain' in ''.join(chapter.itertext()).lower()
+        original_doc=ET.fromstring(z.read('OEBPS/original-p0000.xhtml'))
+        images=list(original_doc.iter(XHTML+'img'))
+        assert len(images)>=2, 'full page plus readable note-context detail are required'
+        assert z.read('OEBPS/'+images[0].get('src'))==original
+        assert any('notes' in img.get('alt','').lower() for img in images)
+        assert any(a.get('href','').endswith('#pg_0000') for a in original_doc.iter(XHTML+'a'))
+        index=ET.fromstring(z.read('OEBPS/source-pages.xhtml'))
+        assert any('original-p0000.xhtml' in a.get('href','') for a in index.iter(XHTML+'a'))
+        sidecar=build_epub.read_sidecar(str(target))
+        assert sidecar['notes_ambiguous']==1
+        assert sidecar['source_evidence'][0]['page']==0
+        assert sidecar['source_evidence'][0]['bytes']>0

@@ -112,10 +112,11 @@ class Note(object):
     #: The number leans on a repair from a damaged scan-backed layer: kept as
     #: read, shown as an uncertain reading.
     uncertain: bool = False
+    bbox: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
 
     def to_dict(self):
         return {"num": self.num, "text": self.text, "pno": self.pno,
-                "marked": self.marked}
+                "marked": self.marked, "uncertain": self.uncertain, "bbox": self.bbox}
 
 
 @dataclass
@@ -173,6 +174,21 @@ class Book(object):
 
     def page_reasons(self, pno):
         return list(self.reasons.get(pno, []))
+
+    def ambiguous_note_numbers(self, pno):
+        notes = [note for note in self.notes if note.pno == pno and note.num is not None]
+        counts = Counter(note.num for note in notes)
+        uncertain = {str(note.num) for note in notes
+                     if note.uncertain or counts[note.num] > 1}
+        for element in self.pages.get(pno, []):
+            uncertain.update(str(run[1]) for run in element.runs
+                             if run[0] in ("sup", "mark") and len(run) > 3
+                             and run[3] == "uncertain")
+        return uncertain
+
+    def needs_source_evidence(self, pno):
+        return bool(self.ambiguous_note_numbers(pno)) or any(
+            element.caption_uncertain for element in self.pages.get(pno, []))
 
     def page_box(self, pno):
         """What to photograph for this page: the part its words came from."""
@@ -254,8 +270,8 @@ def tidy(runs):
         if run[0] == "t":
             if not run[1]:
                 continue
-            if out and out[-1][0] == "t":
-                out[-1] = ["t", out[-1][1] + run[1]]
+            if out and out[-1][0] == "t" and out[-1][2:] == run[2:]:
+                out[-1] = ["t", out[-1][1] + run[1]] + run[2:]
                 continue
         out.append(list(run))
     while out and out[0][0] == "t" and not out[0][1].strip():
@@ -326,11 +342,11 @@ def stitch_runs(prev, nxt, heal=True, vocab=None):
             prefix = re.search(r"[\w'’]+$", prefix_text.rstrip(HYPHENS))
             if vocab is None or (prefix and head_word and
                                  (prefix.group(0) + head_word).lower() in vocab):
-                prev[index] = ["t", tail[:hyphen.end(1)]]
+                prev[index] = ["t", tail[:hyphen.end(1)]] + prev[index][2:]
                 del prev[index + 1:]
                 return prev + nxt
         if hyphen or ENDDASH.search(tail):
-            prev[index] = ["t", tail]
+            prev[index] = ["t", tail] + prev[index][2:]
             return prev + nxt
     return prev + [["t", " "]] + nxt
 
@@ -437,7 +453,7 @@ def fit_note(seen, unclaimed, exact_only=False, printed=None):
     return near[0] if len(near) == 1 else None
 
 
-def _line_runs(line, pno, page_notes, claimed, repairs, reasons):
+def _line_runs(line, pno, page_notes, claimed, repairs, reasons, preserve_style=False):
     """One physical line's runs, with inline markers bound to their notes."""
     spans = [sp for sp in line.spans if sp.text]
     texts = [sp.text for sp in spans]
@@ -472,7 +488,7 @@ def _line_runs(line, pno, page_notes, claimed, repairs, reasons):
                 runs.append(["mark", text.strip()])
                 index += 1
                 continue
-        runs.append(["t", text])
+        runs.append(["t", text] + (["italic"] if preserve_style and span.italic else []))
         index += 1
     return runs
 
@@ -1049,14 +1065,14 @@ def _page_elements(skel, repairs, reasons, vocab=None):
                 runs = []
                 for line in region.caption_lines:
                     line_runs = _line_runs(line, skel.pno, page_notes, claimed,
-                                           repairs, reasons)
+                                           repairs, reasons, preserve_style=True)
                     runs = line_runs if not runs else stitch_runs(runs, line_runs,
                                                                   vocab=vocab)
                 runs = tidy(runs)
                 if plain_text(runs):
                     elements.append(Element(kind="caption", runs=runs, pno=skel.pno,
                                             bbox=_region_caption_box(region),
-                                            caption_uncertain=region.uncertain,
+                                            caption_uncertain=region.uncertain or skel.is_scan,
                                             pages=[skel.pno]))
             continue
         if region.kind not in ("heading", "body", "caption"):
@@ -1170,7 +1186,8 @@ def assemble(skeletons, style, raw_pages=None):
                                                       vocab=vocab),
                                        pno=skel.pno,
                                        marked=region.number in claimed,
-                                       uncertain=bool(region.uncertain)))
+                                       uncertain=bool(region.uncertain),
+                                       bbox=region.bbox))
             elif region.kind == "artwork":
                 book.artwork.append({"pno": skel.pno, "bbox": list(region.bbox),
                                      "text": region.text})
@@ -1227,6 +1244,8 @@ def assemble(skeletons, style, raw_pages=None):
                              for item in book.artwork),
         "notes": len([n for n in book.notes if n.num is not None]),
         "notes_unmarked": len(unmarked),
+        "notes_ambiguous": sum(str(n.num) in book.ambiguous_note_numbers(n.pno)
+                               for n in book.notes if n.num is not None),
         # Notes the page printed and the text layer never returned. Counted here
         # because it is the one footnote defect no other number in this dict can
         # show: the note is not unmarked, it is not unresolved, and no word was lost.

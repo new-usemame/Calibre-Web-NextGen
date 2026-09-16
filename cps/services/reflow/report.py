@@ -122,6 +122,7 @@ def numbers(result, ledger=None, client=None):
             "footnotes": stats.get("notes", 0),
             "footnotes_unmarked": max(0, stats.get("notes_unmarked", 0) - unmarked_back),
             "footnotes_unmarked_before_review": stats.get("notes_unmarked", 0),
+            "footnotes_ambiguous": stats.get("notes_ambiguous", 0),
             "footnotes_swept": max(0, stats.get("notes_swept", 0) - swept_back),
             "footnotes_swept_before_review": stats.get("notes_swept", 0),
             "footnotes_swept_restored": swept_back,
@@ -239,6 +240,10 @@ def _unplaced(payload, result):
     """What the conversion could not do, in the reader's terms rather than ours."""
     out = []
     structure = payload["structure"]
+    if structure.get("footnotes_ambiguous"):
+        out.append("%d note labels or associations remain uncertain; ambiguous links "
+                   "are not used. Original printed evidence is linked from those pages."
+                   % structure["footnotes_ambiguous"])
     if structure["footnotes_unmarked"]:
         out.append(_count(
             structure["footnotes_unmarked"],

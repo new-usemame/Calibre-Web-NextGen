@@ -94,6 +94,7 @@ img { max-width: 100%; }
 .source-pages { list-style: none; padding: 0; text-align: left; }
 .source-pages li { display: inline-block; width: 9em; }
 .source-pages a { display: block; padding: 0.35em 0.25em; }
+.source-evidence img { width: 100%; height: auto; }
 """
 
 
@@ -134,7 +135,8 @@ def page_fragment(book, pno, style=None):
     """One page as it was printed: the unit the model edits and the gate measures."""
     elements = list(book.pages.get(pno) or [])
     notes = [n for n in book.notes if n.pno == pno]
-    available = {str(n.num) for n in notes if n.num is not None}
+    ambiguous = book.ambiguous_note_numbers(pno)
+    available = {str(n.num) for n in notes if n.num is not None} - ambiguous
     ref_ids = {}
     blocks = []
     figure_index = 0
@@ -146,16 +148,16 @@ def page_fragment(book, pno, style=None):
         if element.kind == "fig":
             caption = ""
             if index < len(elements) and elements[index].kind == "caption":
-                caption = _runs_html(elements[index].runs, available, ref_ids)
+                caption = _runs_html(elements[index].runs, available, ref_ids, ambiguous)
                 if elements[index].caption_uncertain:
                     caption = ('<span class="reflow-uncertain" title="Caption '
-                               'transcription uncertain; compare the printed caption '
-                               'in the image.">%s (?)</span>' % caption)
+                               'transcription uncertain; compare the original printed '
+                               'caption.">%s (?)</span>' % caption)
                 index += 1
             blocks.append(_figure_html(pno, figure_index, caption))
             figure_index += 1
             continue
-        inner = _runs_html(element.runs, available, ref_ids)
+        inner = _runs_html(element.runs, available, ref_ids, ambiguous)
         if not inner.strip():
             continue
         if element.kind == "h":
@@ -167,20 +169,22 @@ def page_fragment(book, pno, style=None):
             blocks.append("<p>%s</p>" % inner)
 
     for note in notes:
-        blocks.append(_aside_html(note, ref_ids, available))
+        blocks.append(_aside_html(note, ref_ids, available, str(note.num) in ambiguous))
     return "\n".join(blocks)
 
 
-def _runs_html(runs, available, ref_ids):
+def _runs_html(runs, available, ref_ids, ambiguous=()):
     parts = []
     for run in runs:
         if run[0] == "t":
-            parts.append(escape(run[1]))
+            text = escape(run[1])
+            parts.append("<em>%s</em>" % text
+                         if len(run) > 2 and run[2] == "italic" else text)
             continue
         number = str(run[1])
         # A marker established by a repair over a scan is an uncertain reading:
         # the number the layer gave, kept and marked, never an authoritative one.
-        uncertain = len(run) > 3 and run[3] == "uncertain"
+        uncertain = number in ambiguous or (len(run) > 3 and run[3] == "uncertain")
         if number in available:
             ref = "fnref_%s" % number
             if number in ref_ids:
@@ -199,23 +203,23 @@ def _runs_html(runs, available, ref_ids):
             # The note is set on another page, or was never found. A link here is a
             # footnote button that opens nothing, so the marker stays a marker.
             if uncertain:
-                parts.append('<sup class="noteref-unresolved reflow-uncertain" '
-                             'title="number read from a damaged text layer">%s'
-                             '</sup>' % escape(number))
+                parts.append('<sup class="noteref-unresolved"><span class="reflow-uncertain" '
+                             'title="number or association read from a damaged text layer">%s (?)'
+                             '</span></sup>' % escape(number))
                 continue
             parts.append('<sup class="noteref-unresolved">%s</sup>' % escape(number))
     return "".join(parts)
 
 
-def _aside_html(note, ref_ids, available):
+def _aside_html(note, ref_ids, available, ambiguous=False):
     body = escape(note.text)
     if note.num is None:
         return '<aside class="footnote" epub:type="footnote"><p>%s</p></aside>' % body
     number = str(note.num)
     label = escape(number)
-    if getattr(note, "uncertain", False):
+    if ambiguous or getattr(note, "uncertain", False):
         label = ('<span class="reflow-uncertain" title="number read from a '
-                 'damaged text layer">%s</span>' % label)
+                 'damaged text layer">%s (?)</span>' % label)
     if number in ref_ids:
         label = '<a href="#%s">%s</a>' % (ref_ids[number], label)
     return ('<aside class="footnote" epub:type="footnote" id="fn_%s">'
@@ -677,15 +681,21 @@ def _source_page_items(page_homes):
         for pno, href in sorted(page_homes.items()))
 
 
-def _source_index(page_homes, language):
+def _source_index(page_homes, language, evidence=None):
+    originals = ""
+    if evidence:
+        originals = ('<h2>Original printed evidence</h2><p>These original images '
+                     'help check uncertain transcriptions and note associations.</p><ol>%s</ol>'
+                     % "".join('<li><a href="original-p%04d.xhtml">Original PDF page %d</a></li>'
+                               % (pno, pno + 1) for pno in sorted(evidence)))
     return _document("Source PDF pages", (
         '<section epub:type="index"><h1>Source PDF pages</h1>'
         '<p>These numbers count from the first page of the source PDF. They may '
         'differ from its printed page numbers and this reader\'s page count. '
         'Only pages included in this conversion are listed. Choose a link to '
-        'go to that page\'s content.</p>'
-        '<ol class="source-pages">%s</ol></section>'
-    ) % _source_page_items(page_homes), language)
+        'go to that page\'s reflowed content.</p>'
+        '<ol class="source-pages">%s</ol>%s</section>'
+    ) % (_source_page_items(page_homes), originals), language)
 
 
 def _nav(entries, language="en", page_homes=None):
@@ -934,6 +944,107 @@ def _refuse_unsafe_pages(page_html, book):
     return cleaned, refused
 
 
+def _original_evidence(book, page_html, doc, figure_transform=None):
+    """Package original pixels, never a re-render of the extracted reading.
+
+    Detail crops retain adjacent printed context; the full original page lets a
+    reader resolve associations outside a crop. All rendering uses extract's
+    existing pre-allocation and encoded-byte bounds. These links are generated
+    after the model markup boundary, not accepted from model output.
+    """
+    evidence, images = {}, {}
+    for pno in page_html:
+        specs = []
+        ambiguous = book.ambiguous_note_numbers(pno)
+        if ambiguous:
+            boxes = [note.bbox for note in book.notes if note.pno == pno
+                     and note.bbox[2] > note.bbox[0] and note.bbox[3] > note.bbox[1]]
+            box = (min(b[0] for b in boxes), min(b[1] for b in boxes),
+                   max(b[2] for b in boxes), max(b[3] for b in boxes)) if boxes else None
+            specs.append(("notes", "Original notes and neighboring context", box))
+        figure_index = -1
+        for element in book.pages.get(pno, []):
+            if element.kind == "fig":
+                figure_index += 1
+            elif element.kind == "caption" and element.caption_uncertain:
+                specs.append(("caption_%d" % figure_index,
+                              "Original printed caption", element.bbox))
+        if not specs:
+            continue
+        if doc is None:
+            raise ValueError("Original PDF required for uncertain source evidence on page %d" % pno)
+        started = time.monotonic()
+        full = "images/original_p%04d.jpg" % pno
+        images[full] = extract.render_page_jpeg(doc, pno, scale=1.5, quality=85,
+                                               max_bytes=2 * 1024 * 1024)
+        details = []
+        page_rect = doc[pno].rect
+        for key, label, box in specs:
+            if box and figure_transform:
+                box = figure_transform(pno, box)
+            # A missing note box falls back to the lower half plus the complete
+            # original page, never to an inferred note number or textual rewrite.
+            rect = extract.pymupdf.Rect(*box) if box else extract.pymupdf.Rect(
+                page_rect.x0, page_rect.y0 + page_rect.height * 0.5,
+                page_rect.x1, page_rect.y1)
+            pad = 12 if key == "notes" else 4
+            rect = extract.pymupdf.Rect(rect.x0 - pad, rect.y0 - pad,
+                                        rect.x1 + pad, rect.y1 + pad) & page_rect
+            if rect.is_empty or rect.is_infinite:
+                raise ValueError("Invalid original source evidence geometry on page %d" % pno)
+            src = "images/original_p%04d_%s.jpg" % (pno, key)
+            images[src] = extract.render_page_jpeg(
+                doc, pno, scale=3.0, quality=90, clip=rect, max_bytes=2 * 1024 * 1024)
+            details.append({"id": key, "label": label, "src": src, "bbox": list(rect)})
+        evidence[pno] = {"page": pno, "href": "original-p%04d.xhtml" % pno,
+                         "full": full, "details": details,
+                         "ambiguous_notes": sorted(ambiguous),
+                         "bytes": len(images[full]) + sum(len(images[d["src"]]) for d in details),
+                         "render_seconds": round(time.monotonic() - started, 4)}
+        html = page_html[pno]
+        href = evidence[pno]["href"]
+        if ambiguous:
+            link = '<a href="%s#notes">Original printed notes and context</a>' % href
+            html = ('<div class="source-evidence-notice"><p>Some note labels or associations '
+                    'are uncertain. Ambiguous links are not used. %s.</p></div>\n' % link) + html
+
+            def note_link(match):
+                ident = _ID.search(match.group("attrs"))
+                if ident and ident.group(1).removeprefix("fn_") in ambiguous:
+                    return '<aside%s>%s<p>%s</p></aside>' % (
+                        match.group("attrs"), match.group("inner"), link)
+                return match.group(0)
+            html = _NOTE_ASIDE.sub(note_link, html)
+        caption_ids = {detail["id"] for detail in details}
+
+        def caption_link(match):
+            if "caption_%s" % match.group(2) not in caption_ids:
+                return match.group(0)
+            return ('%s%s<br/><a href="%s#caption_%s">Original printed caption '
+                    '(transcription uncertain)</a>%s' % (
+                        match.group(1), match.group(3), href, match.group(2), match.group(4)))
+        html = re.sub(r'(<figure>.*?images/fig_p\d+_(\d+)\.jpg.*?<figcaption[^>]*>)(.*?)(</figcaption>)',
+                      caption_link, html, flags=re.S)
+        page_html[pno] = html
+    return evidence, images
+
+
+def _original_document(record, home, language):
+    pno = record["page"]
+    back = '<p><a href="%s#pg_%04d">Return to reflowed PDF page %d</a></p>' % (home, pno, pno + 1)
+    body = ('<h1>Original PDF page %d</h1><p>These are original printed pixels. '
+            'Extracted labels and glyphs may be wrong; no note identity is inferred '
+            'from the transcription. The details below preserve printed context.</p>%s'
+            '<section class="source-evidence" id="page"><h2>Complete original page</h2>'
+            '<img src="%s" alt="Complete original PDF page %d"/></section>'
+            % (pno + 1, back, record["full"], pno + 1))
+    for detail in record["details"]:
+        body += ('<section class="source-evidence" id="%s"><h2>%s</h2>%s<img src="%s" alt="%s"/>%s</section>'
+                 % (detail["id"], escape(detail["label"]), back, detail["src"],
+                    escape(detail["label"]), back))
+    return _document("Original PDF page %d" % (pno + 1), body, language)
+
+
 def build(book, out_path, page_html=None, metadata=None, doc=None,
           report_html=None, sidecar=None, identifier=None, figure_transform=None):
     """Write one EPUB 3 and say what went into it.
@@ -946,8 +1057,13 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     language = metadata.get("language") or "en"
     if page_html is None:
         page_html = {pno: page_fragment(book, pno) for pno in sorted(book.pages)}
+    # Source evidence also governs direct builder callers. Do this before XML
+    # character filtering, so no raw source character is reintroduced afterward.
+    page_html = {pno: page_fragment(book, pno) if book.needs_source_evidence(pno) else html
+                 for pno, html in page_html.items()}
     page_html, unrepresentable = _readable_characters(page_html)
     page_html, refused = _refuse_unsafe_pages(page_html, book)
+    evidence, original_images = _original_evidence(book, page_html, doc, figure_transform)
 
     pages = _page_blocks(page_html)
     joins = _join_page_turns(pages)
@@ -956,6 +1072,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     images, missing, blanks = _figure_images(chapters, doc, book,
                                              figure_transform=figure_transform)
     _drop_images(chapters, missing + blanks)
+    images.update(original_images)
 
     identifier = identifier or "urn:uuid:%s" % uuid.uuid4()
     modified = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -1006,16 +1123,24 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     # An ordinary spine item also works in readers which ignore EPUB page-list.
     # Keep this generated reference after the book, never inside its prose.
     if page_homes:
-        documents[SOURCE_INDEX_HREF] = _source_index(page_homes, language)
+        documents[SOURCE_INDEX_HREF] = _source_index(page_homes, language, evidence)
         manifest.append({"id": "source-pages", "href": SOURCE_INDEX_HREF,
                          "type": "application/xhtml+xml"})
         spine.append("source-pages")
         entries.append((SOURCE_INDEX_HREF, "Source PDF pages"))
 
+    for pno, record in sorted(evidence.items()):
+        ident = "original-p%04d" % pno
+        documents[record["href"]] = _original_document(record, page_homes[pno], language)
+        manifest.append({"id": ident, "href": record["href"], "type": "application/xhtml+xml"})
+        spine.append(ident)
+
     for index, src in enumerate(sorted(images)):
         manifest.append({"id": "img%03d" % index, "href": src, "type": "image/jpeg"})
 
     payload = _sidecar(book, pages, chapters, images, joins, sidecar, blanks)
+    if evidence:
+        payload["source_evidence"] = list(evidence.values())
     if unrepresentable:
         payload["unrepresentable_characters"] = unrepresentable
     if losses:
@@ -1060,6 +1185,8 @@ def _sidecar(book, pages, chapters, images, joins, extra, blanks=()):
         "notes": sum(1 for n in book.notes if n.num is not None),
         "notes_unmarked": sum(1 for n in book.notes
                               if n.num is not None and not n.marked),
+        "notes_ambiguous": sum(str(n.num) in book.ambiguous_note_numbers(n.pno)
+                               for n in book.notes if n.num is not None),
         "figures": len(book.figures),
         "figures_recovered": sum(1 for figure in book.figures
                                  if figure.get("found") not in (None, "embedded")),

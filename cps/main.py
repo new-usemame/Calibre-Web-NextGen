@@ -149,6 +149,24 @@ def register_blueprints(app):
 
 
 def _start_runtime_tasks(app):
+    # A conversion whose process did not finish it still reads "running" in its
+    # ledger, and the worker's queue -- the other half of that answer -- is
+    # in-memory. Settle those records before the server takes a request, so the
+    # jobs list tells the truth and the book can be converted again. No task of
+    # this process exists yet, so nothing live can be settled by mistake.
+    try:
+        from .tasks.reflow import recover_interrupted_jobs
+        recovered = recover_interrupted_jobs()
+        if recovered:
+            from . import logger
+            logger.create().info(
+                "reflow: settled %d conversion(s) interrupted by the last "
+                "shutdown: %s", len(recovered), ", ".join(recovered))
+    except Exception as ex:
+        from . import logger
+        logger.create().error_or_exception(
+            f"Could not settle interrupted reflow conversions: {ex}")
+
     # Annotation sync-target pushes are blocking HTTPS calls; on the request
     # greenlet they freeze the whole (unpatched-gevent) app, so hand them to
     # the WorkerThread instead (#920).

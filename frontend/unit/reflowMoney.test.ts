@@ -9,7 +9,7 @@ import test from 'node:test';
 
 import type { ReflowEstimate } from '../src/lib/reflowMoney.ts';
 import {
-  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, requiredUsd,
+  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, ledgerUsd, requiredUsd,
   routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
 } from '../src/lib/reflowMoney.ts';
 
@@ -17,6 +17,15 @@ import {
 const PRICE: Record<string, number> = {
   cheap: 0.001094, standard: 0.00294, quality: 0.00286,
 };
+
+test('confirmed microcharges and pending liabilities remain visible', () => {
+  assert.equal(ledgerUsd(0.0022), '$0.0022');
+  assert.equal(ledgerUsd(0.0217), '$0.0217');
+  assert.equal(ledgerUsd(0), '$0.00');
+  assert.equal(ledgerUsd(12.5), '$12.50');
+  assert.equal(ledgerUsd(0.00000001), '$0.00000001');
+  assert.equal(ledgerUsd(0.000000001), '<$0.00000001');
+});
 const TIERS = Object.keys(PRICE);
 
 /** A payload shaped as `cps/api/reflow.py::_estimate_payload` builds one.

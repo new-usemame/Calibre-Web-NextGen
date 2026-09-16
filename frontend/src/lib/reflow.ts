@@ -14,7 +14,7 @@ export type {
   ReflowEstimate, ReflowJobCounts, ReflowMode, ReflowTier, ReflowTierChoice,
 } from './reflowMoney.ts';
 export {
-  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, requiredUsd,
+  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, ledgerUsd, requiredUsd,
   routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
 } from './reflowMoney.ts';
 
@@ -26,10 +26,14 @@ export interface ReflowJob {
    *  the cap the user set, the second is the model service going away mid-book.
    *  ``billing_unknown`` stopped when a dispatched request's billing could not
    *  be proven either way: its bound stays held, and ``pending_usd`` says how
-   *  much. Only ``done`` is a conversion that did what it was asked for.
+   *  much. ``interrupted`` is a restart: the process died mid-conversion and
+   *  startup recovery settled the record without claiming publication or
+   *  resolving unknown charges. A fresh start may reuse cached pages.
+   *  Only ``done`` is a conversion that
+   *  did what it was asked for.
    *  See STOP_STATUS in cps/tasks/reflow.py. */
   status: 'waiting' | 'running' | 'done' | 'capped' | 'incomplete' | 'failed'
-    | 'cancelled' | 'billing_unknown';
+    | 'cancelled' | 'billing_unknown' | 'interrupted';
   started: number | null;
   finished: number | null;
   /** Confirmed spend, reconciled against the provider. */
@@ -144,4 +148,3 @@ export function useCancelReflow() {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['reflow-jobs'] }),
   });
 }
-

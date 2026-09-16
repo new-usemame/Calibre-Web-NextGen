@@ -434,3 +434,104 @@ def test_a_sample_nobody_downloaded_does_not_live_forever(rig):
     assert rig.mod.cleanup_samples(max_age_days=7) == 1
     assert os.path.isfile(keep)
     assert not os.path.exists(drop)
+
+
+# ── a restart mid-conversion ─────────────────────────────────────────────────
+
+def _orphan_ledger(rig, job_id="df83053b791743a1", book_id=5):
+    """The record a job leaves when its process dies: a start, some spend, and
+    no finish -- the shape Terra's restart repro left on disk (a sample stopped
+    at "page 4 of 20", the container restarted under it)."""
+    directory = os.path.join(rig.root, "jobs", str(book_id))
+    os.makedirs(directory, exist_ok=True)
+    led = ledger_mod.Ledger(os.path.join(directory, "%s.jsonl" % job_id),
+                            cap_usd=5.0, job_id=job_id)
+    led.record({"kind": "job", "event": "start", "mode": "sample", "user_id": 7,
+                "tier": "cheap", "cap_usd": 5.0, "pages": 20})
+    led.record({"kind": "page", "page": 3, "cost_usd": 0.0009, "gate": "PASS",
+                "model": "deepseek/deepseek-v4.1-flash"})
+    return led
+
+
+def test_a_job_the_process_died_during_is_terminalized_as_interrupted(rig):
+    """A start with no finish means the process is gone (the worker's queue is
+    in-memory, so a restarted app has no task for the job). Startup settles the
+    record as interrupted -- with when -- instead of advertising it as running
+    forever. What it had confirmed spending is the job's own history and stays."""
+    _orphan_ledger(rig)
+
+    recovered = rig.mod.recover_interrupted_jobs(worker=SimpleNamespace(tasks=[]))
+
+    assert recovered == ["df83053b791743a1"]
+    row = _ledger_rows(rig)[0]
+    assert row["status"] == "interrupted"
+    assert row["finished"] is not None
+    assert row.get("error")
+    assert row["spend_usd"] == pytest.approx(0.0009)
+
+
+def test_recovery_never_settles_or_erases_a_charge_the_provider_may_still_bill(rig):
+    """A request dispatched before the death may still be billed: its bound stays
+    held across recovery. No release, no reconcile, no zeroing -- the reservation
+    history is byte-for-byte what the dead process left."""
+    led = _orphan_ledger(rig)
+    led.reserve_attempt("4", 0.0217, model_id="deepseek/deepseek-v4.1-flash",
+                        prompt_version="reflow-structure-6")
+
+    rig.mod.recover_interrupted_jobs(worker=SimpleNamespace(tasks=[]))
+
+    row = _ledger_rows(rig)[0]
+    assert row["status"] == "interrupted"
+    assert row["pending_usd"] == pytest.approx(0.0217)
+    assert row["spend_usd"] == pytest.approx(0.0009)
+    reread = ledger_mod.Ledger(led.path, cap_usd=5.0, job_id=led.job_id)
+    assert [e.get("event") for e in reread.entries("reservation")] == ["pending"]
+
+
+def test_a_job_that_already_ended_is_not_rewritten(rig):
+    """Recovery is for the orphaned record only. A job that reached its own
+    ending -- done, capped, failed, cancelled -- is left exactly as it filed
+    itself, and a repeated sweep is a no-op."""
+    led = _orphan_ledger(rig)
+    led.record({"kind": "job", "event": "finish", "status": "done"})
+    with open(led.path, "rb") as handle:
+        before = handle.read()
+
+    worker = SimpleNamespace(tasks=[])
+    assert rig.mod.recover_interrupted_jobs(worker=worker) == []
+    assert rig.mod.recover_interrupted_jobs(worker=worker) == []
+    with open(led.path, "rb") as handle:
+        assert handle.read() == before
+    assert _ledger_rows(rig)[0]["status"] == "done"
+
+
+def test_recovery_is_idempotent_for_the_orphan_too(rig):
+    led = _orphan_ledger(rig)
+    worker = SimpleNamespace(tasks=[])
+
+    assert rig.mod.recover_interrupted_jobs(worker=worker) == ["df83053b791743a1"]
+    assert rig.mod.recover_interrupted_jobs(worker=worker) == []
+
+    reread = ledger_mod.Ledger(led.path, cap_usd=5.0, job_id=led.job_id)
+    finishes = [e for e in reread.entries("job") if e.get("event") == "finish"]
+    assert len(finishes) == 1
+
+
+def test_a_job_still_running_in_this_process_is_never_interrupted(rig):
+    """The ownership guard: a start without a finish is only an orphan when no
+    live task owns it. A sweep that runs while a conversion is genuinely under
+    way -- the wrong ordering this whole boundary exists to prevent -- must not
+    touch the record."""
+    from cps.services.worker import STAT_STARTED
+
+    _orphan_ledger(rig)
+    live = SimpleNamespace(is_reflow=True, job_id="df83053b791743a1",
+                           stat=STAT_STARTED)
+    worker = SimpleNamespace(tasks=[(0, "ed", 0, live, False)])
+
+    assert rig.mod.recover_interrupted_jobs(worker=worker) == []
+    assert _ledger_rows(rig)[0]["status"] == "running"
+
+
+def test_a_book_that_never_ran_has_nothing_to_recover(rig):
+    assert rig.mod.recover_interrupted_jobs(worker=SimpleNamespace(tasks=[])) == []

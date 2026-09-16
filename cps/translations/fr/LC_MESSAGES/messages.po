@@ -15678,6 +15678,10 @@ msgid "There is no text in this PDF at all, only images. Every page has to be re
 msgstr "Ce PDF ne contient aucun texte, seulement des images. Chaque page doit être lue par le modèle, ce qui coûte le plus cher."
 
 #: cps/spa_strings.py
+msgid "There is no usable text in this PDF, only page images. Text recovery settings determine how those pages are read; review a sample for recognition errors."
+msgstr "Ce PDF ne contient aucun texte exploitable, seulement des images de pages. Les réglages de récupération du texte déterminent comment ces pages sont lues ; examinez un échantillon pour repérer les erreurs de reconnaissance."
+
+#: cps/spa_strings.py
 msgid "There is very little text on each page. This is usually a sparse scan, or two printed pages photographed as one."
 msgstr "Il y a très peu de texte sur chaque page. C’est généralement une numérisation clairsemée, ou deux pages imprimées photographiées comme une seule."
 
@@ -15760,6 +15764,81 @@ msgstr "Ce nombre est calculé à partir de {sampled} pages réparties dans le l
 #, python-brace-format
 msgid "about {pages} ({percent}%)"
 msgstr "environ {pages} ({percent} %)"
+
+#: cps/spa_strings.py
+msgid "Interrupted by a restart"
+msgstr "Interrompu par un redémarrage"
+
+#: cps/spa_strings.py
+msgid "The app restarted before this job recorded completion. Your original PDF is unchanged. Pages already converted may be reused if you retry. Any unresolved charges remain recorded for review; a lost response may still have been charged."
+msgstr "L’application a redémarré avant que cette tâche n’enregistre sa fin. Votre PDF d’origine est inchangé. Les pages déjà converties peuvent être réutilisées si vous réessayez. Les frais non résolus restent enregistrés pour examen ; une réponse perdue peut tout de même avoir entraîné une facturation."
+
+msgid "A charge could not be confirmed"
+msgstr "Un débit n’a pas pu être confirmé"
+msgid "An administrator must install it before text can be recovered, or you can keep a facsimile of the page images."
+msgstr "Un administrateur doit l’installer avant de pouvoir récupérer le texte ; vous pouvez aussi conserver un fac-similé des images des pages."
+#, python-brace-format
+msgid "An earlier job left {amount} unconfirmed: a request was sent and its answer never came back, so the provider may still charge it. It is not part of this new cap, and starting again does not settle or erase it."
+msgstr "Une tâche précédente a laissé {amount} non confirmé : une requête a été envoyée, mais sa réponse n’est jamais revenue ; le fournisseur peut donc encore facturer ce montant. Il ne fait pas partie de ce nouveau plafond, et recommencer ne le règle ni ne l’efface."
+msgid "An installed language code, for example eng, deu, fra, ell."
+msgstr "Un code de langue installé, par exemple eng, deu, fra, ell."
+msgid "Build the facsimile EPUB"
+msgstr "Créer l’EPUB fac-similé"
+msgid "Damaged layer — recovery required"
+msgstr "Couche endommagée — récupération requise"
+#, python-brace-format
+msgid "I understand the unconfirmed {amount} from the earlier job may still be charged, and it is not covered by this consent."
+msgstr "Je comprends que les {amount} non confirmés de la tâche précédente peuvent encore être facturés et qu’ils ne sont pas couverts par ce consentement."
+msgid "Keep the page images as they are. This is a facsimile of the book, not reflowed text."
+msgstr "Conserver les images des pages telles quelles. Il s’agit d’un fac-similé du livre, pas de texte recomposé."
+msgid "Language data"
+msgstr "Données de langue"
+msgid "Local OCR of every page that needs it, before any structural work. The original words stay annotated wherever the engine is unsure."
+msgstr "OCR local de chaque page qui en a besoin, avant tout travail structurel. Les mots d’origine restent annotés partout où le moteur n’est pas sûr de lui."
+msgid "Local time (no OpenRouter credit)"
+msgstr "Temps local (sans crédit OpenRouter)"
+msgid "Most of this PDF is not Latin-alphabet text. The selected recognition language will misread it unless a matching language pack is installed."
+msgstr "La majeure partie de ce PDF n’est pas en alphabet latin. La langue de reconnaissance sélectionnée le lira mal, sauf si un pack linguistique correspondant est installé."
+msgid "No recovery — facsimile only"
+msgstr "Aucune récupération — fac-similé uniquement"
+msgid "Not installed"
+msgstr "Non installé"
+msgid "Pages read with local OCR"
+msgstr "Pages lues avec l’OCR local"
+msgid "Pictures only — recovery required"
+msgstr "Images uniquement — récupération requise"
+msgid "Read only the pages with no text at all; the damaged layer is kept exactly as printed."
+msgstr "Lire uniquement les pages sans aucun texte ; la couche endommagée est conservée exactement comme imprimée."
+msgid "Recognition engine"
+msgstr "Moteur de reconnaissance"
+msgid "Recognition language"
+msgstr "Langue de reconnaissance"
+msgid "Recover pictures only"
+msgstr "Récupérer uniquement les images"
+msgid "Recover the text"
+msgstr "Récupérer le texte"
+msgid "Source recovery"
+msgstr "Récupération de la source"
+msgid "Source text"
+msgstr "Texte source"
+msgid "This keeps the page images as they are — a facsimile of the book, not reflowed text."
+msgstr "Les images des pages restent telles quelles — un fac-similé du livre, pas du texte recomposé."
+msgid "This stopped when a request’s answer never came back, so its charge could not be confirmed either way. Spent below is confirmed; the unconfirmed amount may still be charged by the provider and stays on record here until it is resolved. Reloading does not settle or erase it, and no new job covers it."
+msgstr "Cette tâche s’est arrêtée car la réponse à une requête n’est jamais revenue ; son débit n’a donc pas pu être confirmé. Le montant dépensé ci-dessous est confirmé ; le montant non confirmé peut encore être facturé par le fournisseur et reste enregistré ici jusqu’à sa résolution. Recharger ne le règle ni ne l’efface, et aucune nouvelle tâche ne le couvre."
+msgid "Uncertain readings marked"
+msgstr "Lectures incertaines signalées"
+msgid "Unconfirmed, may still be charged"
+msgstr "Non confirmé, peut encore être facturé"
+msgid "Verified in the PDF"
+msgstr "Vérifié dans le PDF"
+msgid "about {seconds}s for {pages} pages"
+msgstr "environ {seconds}s pour {pages} pages"
+#, python-brace-format
+msgid "{pages} pages are only pictures of pages. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite."
+msgstr "{pages} pages ne contiennent que des images. Elles sont lues depuis la page imprimée avec une reconnaissance de texte locale — une transcription de la source, jamais une réécriture."
+#, python-brace-format
+msgid "{pages} pages have a text layer that is not readable words. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite."
+msgstr "{pages} pages ont une couche de texte qui ne contient pas de mots lisibles. Elles sont lues depuis la page imprimée avec une reconnaissance de texte locale — une transcription de la source, jamais une réécriture."
 
 #~ msgid "Change my cover"
 #~ msgstr "Modifier ma couverture"

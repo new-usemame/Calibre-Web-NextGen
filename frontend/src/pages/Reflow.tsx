@@ -6,7 +6,7 @@ import {
 import { useBook } from '../lib/queries';
 import {
   useReflowEstimate, useReflowJobs, useStartReflow, useCancelReflow,
-  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, requiredUsd,
+  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, ledgerUsd, requiredUsd,
   routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
   type ReflowJob, type ReflowMode,
 } from '../lib/reflow';
@@ -31,7 +31,7 @@ function verdictSentence(verdict: string, t: TFunction): string {
     case 'THIN_TEXT':
       return t('There is very little text on each page. This is usually a sparse scan, or two printed pages photographed as one.');
     case 'NO_TEXT_LAYER':
-      return t('There is no text in this PDF at all, only images. Every page has to be read by the model, which costs the most.');
+      return t('There is no usable text in this PDF, only page images. Text recovery settings determine how those pages are read; review a sample for recognition errors.');
     case 'GARBAGE_TEXT':
       return t('This PDF has a text layer, but it is not readable words. It has to be treated as if there were no text at all.');
     default:
@@ -46,6 +46,7 @@ const STATUS_LABEL = (status: string, t: TFunction): string => ({
   capped: t('Stopped at the cap'),
   incomplete: t('The model service stopped answering'),
   billing_unknown: t('A charge could not be confirmed'),
+  interrupted: t('Interrupted by a restart'),
   failed: t('Failed'),
   // Not the classic task list's "Cancelled": a conversion has two ways of
   // stopping early and the bill is different, so each says which one it was.
@@ -390,14 +391,14 @@ export function Reflow({ id }: { id: string }) {
           <>
             <p className={styles.capWarn} role="alert">
               {t('An earlier job left {amount} unconfirmed: a request was sent and its answer never came back, so the provider may still charge it. It is not part of this new cap, and starting again does not settle or erase it.')
-                .replace('{amount}', usd(hold))}
+                .replace('{amount}', ledgerUsd(hold))}
             </p>
             <label className={styles.consent}>
               <input type="checkbox" className={styles.check} checked={holdAcknowledged}
                 onChange={(e) => setHoldAcknowledged(e.target.checked)} />
               <span>
                 {t('I understand the unconfirmed {amount} from the earlier job may still be charged, and it is not covered by this consent.')
-                  .replace('{amount}', usd(hold))}
+                  .replace('{amount}', ledgerUsd(hold))}
               </span>
             </label>
           </>
@@ -523,12 +524,17 @@ function JobResult({ job, bookId, t, onConvertAll }: {
           {t('This stopped when a request’s answer never came back, so its charge could not be confirmed either way. Spent below is confirmed; the unconfirmed amount may still be charged by the provider and stays on record here until it is resolved. Reloading does not settle or erase it, and no new job covers it.')}
         </p>
       )}
+      {job.status === 'interrupted' && (
+        <p className={styles.capWarn} role="status">
+          {t('The app restarted before this job recorded completion. Your original PDF is unchanged. Pages already converted may be reused if you retry. Any unresolved charges remain recorded for review; a lost response may still have been charged.')}
+        </p>
+      )}
 
       <dl className={styles.facts}>
-        <Fact label={t('Spent')} value={usd(job.spend_usd)} />
+        <Fact label={t('Spent')} value={ledgerUsd(job.spend_usd)} />
         {heldUsd(job) > 0 && (
           <Fact label={t('Unconfirmed, may still be charged')}
-            value={usd(heldUsd(job))} />
+            value={ledgerUsd(heldUsd(job))} />
         )}
         <Fact label={t('Pages sent to a model')} value={String(sent)} />
         {job.reused > 0 && (

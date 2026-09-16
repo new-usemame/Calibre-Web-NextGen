@@ -1,4 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
+import type { ReflowEstimate, ReflowJob } from '../src/lib/reflow';
 import { requireRouteCapability } from './capabilities';
 import { collectPageErrors, assertNoPageErrors } from './utils';
 
@@ -27,7 +29,7 @@ import { collectPageErrors, assertNoPageErrors } from './utils';
  */
 
 /** The rig's own estimate for the acceptance book, field for field. */
-function estimatePayload(over: Record<string, unknown> = {}) {
+function estimatePayload(over: Partial<ReflowEstimate> = {}): ReflowEstimate {
   return {
     book_id: 1,
     title: 'a book somebody is about to pay to convert',
@@ -56,19 +58,25 @@ function estimatePayload(over: Record<string, unknown> = {}) {
     sampled: 40,
     reasons: { note_marker_mismatch: 11 },
     cached: true,
+    recovery: {
+      ocr_candidates: 0, image_only: 0, damaged: 0, estimated_seconds: 0,
+      engine_available: true, engine_version: 'tesseract 5.3.4', engine_detail: '',
+      language: 'eng', dpi: 300, pdf_sha256: '0'.repeat(64), non_latin_share: 0,
+    },
     ...over,
   };
 }
 
 /** The resumed whole-book run of the acceptance report: 210 bought, 212 replayed,
  *  422 judged. Only the first of those three was sent anywhere. */
-const RESUMED_JOB = {
+const RESUMED_JOB: ReflowJob = {
   job_id: '1e485e5c73e24435',
   mode: 'full',
   status: 'done',
   started: 1789375000,
   finished: 1789376331,
   spend_usd: 0.279521,
+  pending_usd: 0,
   cap_usd: 0.9,
   pages: 698,
   calls: 210,
@@ -78,9 +86,10 @@ const RESUMED_JOB = {
   error: null,
   sample_url: null,
   sample_ready: false,
+  recovery: {},
 };
 
-async function stubReflow(page: Page, estimate: Record<string, unknown>,
+async function stubReflow(page: Page, estimate: ReflowEstimate,
                           jobs: unknown[] = []) {
   await page.route('**/api/v1/books/*/reflow/estimate*', (route) => route.fulfill({
     status: 200, contentType: 'application/json', body: JSON.stringify(estimate),
@@ -104,7 +113,9 @@ async function anyBookId(page: Page): Promise<number | null> {
 }
 
 async function openReflow(page: Page) {
-  await page.goto('/app');
+  // Let the catalog's auth/browse requests settle before navigating away;
+  // Rapid navigation can report cancelled requests as access-control errors.
+  await page.goto('/app', { waitUntil: 'networkidle' });
   const book = await anyBookId(page);
   test.skip(book == null, 'this lane has no books at all');
   const errors = collectPageErrors(page);
@@ -121,6 +132,39 @@ test.describe('Reflow quotes money the reader can hold it to', () => {
       pinnedBy: 'tests/unit/test_reflow_api.py',
     });
   });
+
+  test('an interrupted job exposes small charges and readable recovery in both themes',
+       async ({ page }) => {
+         await page.emulateMedia({ reducedMotion: 'reduce' });
+         await stubReflow(page, estimatePayload(), [{
+           ...RESUMED_JOB, status: 'interrupted', mode: 'sample',
+           spend_usd: 0.0022, pending_usd: 0.0217, calls: 1,
+           error: 'The application restarted before this conversion finished.',
+         }]);
+         const { errors } = await openReflow(page);
+         const result = page.locator('section[aria-labelledby="reflow-result"]');
+         await expect(result.getByRole('alert')).toBeVisible();
+         await expect(result.getByRole('status')).toBeVisible();
+         await expect(result.getByText('$0.0022', { exact: true })).toBeVisible();
+         await expect(result.getByText('$0.0217', { exact: true })).toBeVisible();
+         await expect(page.locator('label').filter({
+           hasText: 'I understand the unconfirmed $0.0217',
+         }).getByRole('checkbox')).toBeVisible();
+         for (const theme of ['dark', 'light']) {
+           await page.evaluate(async (value) => {
+             document.documentElement.setAttribute('data-theme', value);
+             await new Promise<void>((resolve) => requestAnimationFrame(() =>
+               requestAnimationFrame(() => resolve())));
+           }, theme);
+           const results = await new AxeBuilder({ page })
+             .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+             .analyze();
+           expect(results.violations.filter((v) =>
+             v.impact === 'serious' || v.impact === 'critical'),
+           `Interrupted conversion / ${theme}`).toEqual([]);
+         }
+         assertNoPageErrors(errors);
+       });
 
   test('a page count scaled up from a survey is shown as an estimate, and a counted one is not',
        async ({ page }) => {

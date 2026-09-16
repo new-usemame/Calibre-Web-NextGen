@@ -120,6 +120,18 @@ export function usd(amount: number): string {
   return `$${(Math.round((amount + Number.EPSILON) * 100) / 100).toFixed(2)}`;
 }
 
+const ledgerCurrency = new Intl.NumberFormat('en-US', {
+  style: 'currency', currency: 'USD',
+  minimumFractionDigits: 2, maximumFractionDigits: 8,
+});
+
+/** Provider charges can be smaller than a cent. Never display a positive
+ * confirmed charge or unresolved liability as zero. */
+export function ledgerUsd(amount: number): string {
+  if (amount > 0 && amount < 0.00000001) return '<$0.00000001';
+  return ledgerCurrency.format(amount);
+}
+
 /** Whether "pages a model will read" is a measurement or a projection.
  *
  *  `pipeline.survey` runs the deterministic pass over at most SURVEY_PAGES pages

@@ -152,6 +152,21 @@ def test_a_line_break_hyphen_is_repaired_but_a_printed_compound_is_kept():
     assert "Sun-Moon" in text
 
 
+def test_a_heading_that_ends_mid_word_is_prose_again():
+    """The OCR shape where a bold block of prose reads as a heading: the element
+    ends with a hyphen, and a real heading never ends mid-word. Demoted, the
+    wrap heals exactly once."""
+    book = _book(F.bold_body_block_page)
+
+    headings = [el for el in book.elements if el.kind == "h"]
+    text = " ".join(el.text for el in book.elements)
+
+    assert "political elites" in text, text
+    assert "politi-cal" not in text
+    assert book.conservation.ok, book.conservation.to_dict()
+    assert not any(h.text.rstrip().endswith("-") for h in headings)
+
+
 def test_a_hyphenated_word_split_across_spans_is_still_one_word():
     """562's shape: the same break set as word-per-span runs. The trailing space
     run must not survive between the halves."""

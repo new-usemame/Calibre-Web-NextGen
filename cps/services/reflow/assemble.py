@@ -79,6 +79,8 @@ class Element(object):
     #: scan) needs no caption to place it by; one from an embedded image still
     #: raises figure_without_caption, because the caption is its only anchor.
     placed: str = ""
+    band: int = 0
+    column: int = 0
 
     @property
     def text(self):
@@ -879,7 +881,8 @@ def repair_note_numbers(skeletons, repairs):
 def _copy_element(element):
     return Element(kind=element.kind, runs=[list(run) for run in element.runs],
                    pno=element.pno, level=element.level, bbox=element.bbox,
-                   pages=list(element.pages))
+                   pages=list(element.pages), placed=element.placed,
+                   band=element.band, column=element.column)
 
 
 def _runover_note(elements, book, skel):
@@ -989,7 +992,31 @@ def _page_elements(skel, repairs, reasons, vocab=None):
         kind = {"heading": "h", "caption": "caption"}.get(region.kind, "p")
         elements.append(Element(kind=kind, runs=runs, pno=skel.pno,
                                 level=region.level, bbox=region.bbox,
-                                pages=[skel.pno]))
+                                pages=[skel.pno],
+                                band=region.band, column=region.column))
+
+    # A 'heading' that ends with a hyphen is prose misread by size: headings do
+    # not end mid-word, and paragraphs cannot join into headings, so the wrap
+    # would print as two halves of a word forever. Demotion needs the next
+    # region in the same printed column to continue the word (lowercase) and
+    # the joined form to be a word of this book -- the same proof the stitcher
+    # asks for. On a two-up spread the pages interleave in the element list, so
+    # 'next' is found by column geometry, never by list position.
+    for index, element in enumerate(elements):
+        if element.kind != "h" or not element.text.rstrip().endswith(tuple(HYPHENS)):
+            continue
+        prefix = re.search(r"[\w'’]+$",
+                           element.text.rstrip().rstrip("".join(HYPHENS)))
+        for nxt in elements[index + 1:]:
+            if nxt.kind not in ("p", "caption"):
+                continue
+            if nxt.bbox[0] >= element.bbox[2] or nxt.bbox[2] <= element.bbox[0]:
+                continue
+            head_word = _first_word(nxt.runs)
+            if (prefix and head_word and nxt.text[:1].islower()
+                    and (prefix.group(0) + head_word).lower() in vocab):
+                element.kind = "p"
+            break
 
     # Strongest evidence first. A run that reads back as a note number exactly is
     # that note; then a page whose residue count matches its unreferenced notes has
@@ -1096,7 +1123,8 @@ def assemble(skeletons, style, raw_pages=None):
             book.reasons[skel.pno] = sorted(set(page_reasons))
 
     if raw_pages is not None:
-        book.source_words = source_word_counter(raw_pages, vocab=vocab)
+        book.source_words = source_word_counter(raw_pages, vocab=vocab,
+                                                skeletons=skeletons)
         book.conservation = check_conservation(book.source_words, book.elements,
                                                book.notes, book.furniture,
                                                book.repairs, artwork=book.artwork)
@@ -1140,7 +1168,7 @@ def deterministic_book(doc, page_numbers=None):
 
 # ---------------------------------------------------------------- the invariant
 
-def source_word_counter(raw_pages, vocab=None):
+def source_word_counter(raw_pages, vocab=None, skeletons=None):
     """Every alphabetic word the text layer printed, with line-break hyphens healed.
 
     Digits and punctuation are excluded deliberately: the marker repairs move those
@@ -1151,13 +1179,71 @@ def source_word_counter(raw_pages, vocab=None):
     joined form the book itself prints whole is one word. Healing with any other
     rule on either side of the comparison would manufacture mismatches that are
     not losses (``eighthis`` against the printed ``eighth-is``).
+
+    On a page whose columns were proved and reordered, the raw block order can
+    interleave the columns line by line (book 569's one-line OCR blocks) or park
+    a running head between two half words (book 566's spreads). The reading
+    joins those halves, so the counter must read the page in the same proven
+    region order -- or it reports the reading's own join as a loss.
     """
+    column_pages = {}
+    if skeletons is not None and vocab is not None:
+        column_pages = {skel.pno: skel for skel in skeletons
+                        if "columns_reordered" in skel.reasons}
     counter = Counter()
     for raw in raw_pages:
+        skel = column_pages.get(raw.pno)
+        if skel is not None:
+            counter.update(_heal_page_columns(skel, vocab))
+            continue
         text = _heal_linebreaks(raw.text, None) if vocab is None \
             else _heal_page(raw, vocab)
         counter.update(_WORD.findall(text))
     return counter
+
+
+def _heal_page_columns(skel, vocab):
+    """The reordered page's words: the content stream in region (reading) order
+    with the stitcher's own seam rule, and every side channel counted the way
+    the output side counts it -- notes healed within their region, furniture
+    and artwork verbatim.
+    """
+    counter = Counter()
+    content = []
+    for region in skel.regions:
+        if region.kind in ("heading", "body", "caption"):
+            content.extend(region.lines)
+        elif region.kind == "figure":
+            content.extend(region.caption_lines)
+        elif region.kind == "note":
+            counter.update(_WORD.findall(_heal_linebreaks(region.text, vocab)))
+        elif region.kind in ("furniture", "artwork"):
+            counter.update(_WORD.findall(region.text))
+    counter.update(_WORD.findall(_heal_line_stream(
+        [ln.text for ln in content], vocab)))
+    return counter
+
+
+def _heal_line_stream(lines, vocab):
+    """One seam rule over the reading-ordered lines: a hyphen at the end of a
+    line, a lowercase head after it, and a joined form the book prints whole.
+    Within a block, at a block seam and at a column seam the output asks the
+    same three things, so the count matches the reading word for word.
+    """
+    parts = list(lines)
+    for index in range(len(parts) - 1):
+        tail = parts[index].rstrip()
+        match = re.search(r"([\w'’]+)[" + HYPHENS + r"]$", tail)
+        if not match:
+            continue
+        nxt = parts[index + 1].lstrip()
+        if not nxt[:1].islower():
+            continue
+        head = _HEAD_WORD.match(nxt)
+        if head and (match.group(1) + head.group(0)).lower() in vocab:
+            parts[index] = tail[:match.end(1)] + head.group(0)
+            parts[index + 1] = nxt[len(head.group(0)):]
+    return "\n".join(parts)
 
 
 def book_vocabulary(raw_pages):

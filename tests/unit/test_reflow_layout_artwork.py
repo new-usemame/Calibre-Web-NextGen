@@ -52,6 +52,30 @@ def _whole_text(book):
     return " ".join(_elements_text(book))
 
 
+def _line(text, x0, y0, x1, y1, size):
+    span = extract.Span(text=text, size=size, font="Times-Roman", flags=0,
+                        bbox=(x0, y0, x1, y1), origin_y=y1)
+    return extract.Line(spans=[span], bbox=(x0, y0, x1, y1))
+
+
+def _block(number, lines):
+    return extract.Block(
+        number=number,
+        bbox=(min(ln.bbox[0] for ln in lines), min(ln.bbox[1] for ln in lines),
+              max(ln.bbox[2] for ln in lines), max(ln.bbox[3] for ln in lines)),
+        lines=lines)
+
+
+def _raw_book(*raw_pages):
+    """The deterministic pass over pages whose blocks are already known -- the
+    shape a local OCR layer hands back, where each block is one column rather
+    than MuPDF's row-interleave of both."""
+    pages = list(raw_pages)
+    style = skeleton.book_style(pages)
+    skeletons = [skeleton.page_skeleton(raw, style) for raw in pages]
+    return assemble.assemble(skeletons, style, pages)
+
+
 def _build(book, tmp_path, doc):
     page_html = {pno: build_epub.page_fragment(book, pno)
                  for pno in sorted(book.pages)}
@@ -135,6 +159,122 @@ class TestColumnReadingOrder(object):
 
         paragraphs = [el.text for el in book.elements if el.kind == "p"]
         assert paragraphs == [F.CONTINUITY_TEXT], paragraphs
+
+    def test_a_column_wrap_heals_past_a_below_band_running_head(self):
+        """Book 570 page 686, measured: the index entry wraps off the left
+        column as 'Chaldean or-' and resumes atop the right as 'der 24-25',
+        with the scan's running head between them at 11% of the page height
+        -- below the 7.5% furniture band. The head is furniture, not the
+        paragraph the entry continues, so the halves join and the wrap heals
+        into a word the book prints whole ('the order', left column)."""
+        raw = extract.RawPage(
+            pno=0, width=403.0, height=606.0,
+            blocks=[
+                _block(1, [_line("SATURN—SATURN 1257",
+                                 166.8, 61.2, 343.0, 67.0, 6.3)]),
+                _block(2, [
+                    _line("bound lord 129, 133-144, 209-211, 213-214,",
+                          62.9, 78.7, 191.0, 85.9, 7.0),
+                    _line("216-217, 231-232, 234-235, 550, 1163, Con-",
+                          62.2, 88.8, 185.3, 95.3, 7.3),
+                    _line("finement, isolation 797-798, 801, danger,",
+                          62.6, 97.0, 186.2, 104.9, 8.0),
+                    _line("destruction 400, 449, 976, darkness 175,",
+                          62.2, 106.3, 171.4, 113.5, 8.7),
+                    _line("800, death 370-371, 726, 798, 1141, the order",
+                          62.2, 115.9, 190.0, 122.9, 7.0),
+                    _line("of the spheres 222, planetary spheres/Chaldean or-",
+                          58.8, 124.8, 184.6, 132.7, 11.0),
+                ]),
+                _block(3, [
+                    _line("der 24-25 (fig. 1), 45, 222, 249, 1164, Pre-",
+                          215.0, 78.7, 336.7, 86.4, 6.7),
+                    _line("dominator 1056 n.14, 1067 n.10, reception",
+                          215.0, 88.1, 340.6, 95.8, 8.3),
+                    _line("239, rejoicing 89, 91-92, 96-104 (fig. 13),",
+                          215.0, 97.2, 336.2, 104.9, 7.0),
+                    _line("106-108, 151, 175, 538, 575, retrograde 986,",
+                          215.3, 106.6, 340.6, 114.2, 10.7),
+                    _line("Sagittarius 158, 181-182, 194, 370, 409,",
+                          215.3, 116.2, 342.2, 123.4, 7.0),
+                    _line("sect (hairesis) 27, 35, 53, 73-109.",
+                          214.3, 125.0, 333.1, 132.7, 8.7),
+                ]),
+            ])
+
+        book = _raw_book(raw)
+
+        assert "planetary spheres/Chaldean order 24-25 (fig. 1), 45, 222," \
+            in _whole_text(book), _whole_text(book)
+        assert "SATURN—SATURN 1257" in book.furniture
+        assert book.conservation.ok, book.conservation.to_dict()
+
+    def test_the_counter_reads_a_reordered_page_in_reading_order(self):
+        """Book 569 page 355's shape: the OCR layer hands both columns back as
+        one-line blocks that interleave row by row. The reading proves the
+        columns and joins each column's wraps; the counter must heal the same
+        seams in the same proven order, or it reports the reading's own joins
+        as losses (missing 'pect', added 'aspect')."""
+        raw = extract.RawPage(
+            pno=0, width=472.0, height=688.0,
+            blocks=[
+                _block(1, [_line("The Moon will not make any applying as­",
+                                 93.0, 290.0, 223.0, 297.0, 7.0)]),
+                _block(2, [_line("The Sun will not make any applying as­",
+                                 253.0, 290.0, 385.0, 297.0, 7.0)]),
+                _block(3, [_line("pects before it leaves its sign (Aries).",
+                                 93.0, 302.0, 223.0, 309.0, 7.0)]),
+                _block(4, [_line("pects for the next join. The Sun’s last as­",
+                                 253.0, 302.0, 385.0, 309.0, 7.0)]),
+                _block(5, [_line("Moon at 250 Aries made its last aspect to Saturn. Aspects",
+                                 93.0, 314.0, 223.0, 321.0, 7.0)]),
+                _block(6, [_line("pect while in Aries was a trine to Saturn at",
+                                 253.0, 314.0, 385.0, 321.0, 7.0)]),
+            ])
+
+        book = _raw_book(raw)
+
+        text = _whole_text(book)
+        assert "applying aspects before it leaves its sign" in text, text
+        assert "applying aspects for the next join" in text, text
+        assert "last aspect while in Aries" in text, text
+        assert book.conservation.ok, book.conservation.to_dict()
+
+    def test_the_counter_sees_past_furniture_between_half_words(self):
+        """Book 566 page 18's shape: a two-up spread whose running head sits
+        between the left page's last line ('can’t com-') and the right page's
+        first ('municate ...') in the raw block order. The reading removes the
+        head and joins the halves; the counter must see past the same head --
+        and still count its words."""
+        raw = extract.RawPage(
+            pno=0, width=842.0, height=595.0,
+            blocks=[
+                _block(1, [
+                    _line("everything we communicate with a body will go",
+                          110.0, 100.0, 380.0, 108.0, 9.0),
+                    _line("wrong in it when our bodies are sick, we are",
+                          110.0, 116.0, 388.0, 124.0, 9.0),
+                    _line("unknown and ignored, are weak or incompetent, insecure, and can’t com-",
+                          110.0, 530.0, 388.0, 540.0, 9.0),
+                ]),
+                _block(2, [_line("ASTROLOGY FOR YOURSELF 24",
+                                 560.0, 60.0, 736.0, 66.0, 6.3)]),
+                _block(3, [
+                    _line("municate in the way we want. These functional",
+                          457.0, 76.0, 736.0, 85.0, 9.0),
+                    _line("conditions of the planets are meant to help us",
+                          457.0, 92.0, 730.0, 100.0, 9.0),
+                    _line("live full lives, and each one has its own voice.",
+                          457.0, 108.0, 728.0, 116.0, 9.0),
+                ]),
+            ])
+
+        book = _raw_book(raw)
+
+        assert "can’t communicate in the way we want" in _whole_text(book), \
+            _whole_text(book)
+        assert "ASTROLOGY FOR YOURSELF 24" in book.furniture
+        assert book.conservation.ok, book.conservation.to_dict()
 
     def test_a_background_photo_does_not_veto_the_two_pages(self):
         """Book 566 page 20's shape: the facsimile photograph crosses the gutter,

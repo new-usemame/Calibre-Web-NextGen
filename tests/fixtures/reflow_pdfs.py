@@ -605,6 +605,28 @@ def balanced_quotation_page(doc):
     return page
 
 
+def bold_body_block_page(doc):
+    """A block of body text the size machinery promotes to a heading.
+
+    On an OCR'd page the type sizes are estimated from glyph boxes, and a
+    full-bold block of prose reads as all-heading: the element ends with a
+    hyphen, 'politi-', and the wrap can never join because paragraphs do not
+    join into headings. A real heading never ends mid-word.
+    """
+    page = add_page(doc)
+    y = BODY_TOP
+    for line in [
+        "In the 13 Century, astrology was widely supported by military and politi-",
+        "cal elites, and was commented and theorized upon by academics like St.",
+        "Thomas Aquinas and his teacher, St. Albert the Great.",
+    ]:
+        _put(page, LEFT, y, line, font=_BOLD)
+        y += BODY_LEADING
+    add_body_lines(page, ["The political reading of the chart follows from it."]
+                   + PROSE_LINES[:4], top=y + BODY_LEADING)
+    return page
+
+
 def hyphenated_page(doc):
     """A line-break hyphen that must be repaired, and a compound that must not.
 
@@ -813,6 +835,23 @@ def column_continuity_page(doc):
 CONTINUITY_TEXT = ("The doctrine continues across the column boundary without "
                    "any pause, and the careful reader should never notice the "
                    "seam at all. The second column closes the argument here.")
+
+
+def below_band_running_head_page(doc):
+    """The same below-band head over one plain column: still furniture."""
+    page = add_page(doc)
+    _put(page, COL_RIGHT, 62.0, "SATURN - SATURN 1257", size=9.4)
+    add_body_lines(page, PROSE_LINES[:6])
+    return page
+
+
+def below_band_caps_line_without_folio_page(doc):
+    """A caps line below the band that carries no folio is content, however
+    small and however high on the page."""
+    page = add_page(doc)
+    _put(page, COL_RIGHT, 62.0, "SATURN WITNESSES THE DAY CHART", size=9.4)
+    add_body_lines(page, PROSE_LINES[:6])
+    return page
 
 
 def column_notes_page(doc):

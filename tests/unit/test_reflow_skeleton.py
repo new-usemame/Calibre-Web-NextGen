@@ -130,6 +130,28 @@ def test_dropped_furniture_is_recorded_rather_than_silently_discarded():
     assert "CHAPTER 4: THE HELLENISTIC ASTROLOGERS" in dropped
 
 
+def test_a_running_head_below_the_band_is_still_furniture():
+    """Book 570's index: the scan's margins push the running head to 11% of the
+    page height, below the 7.5% band, where it sat over the right column's
+    first line and read as the paragraph that line continues."""
+    book = _book(F.below_band_running_head_page)
+
+    body = " ".join(el.text for el in book.elements if el.kind in ("p", "h"))
+
+    assert "SATURN - SATURN" not in body
+    assert "SATURN - SATURN 1257" in " ".join(book.furniture)
+    assert book.conservation.ok, book.conservation.to_dict()
+
+
+def test_a_below_band_caps_line_without_a_folio_is_content():
+    """The below-band rule is for running heads, not for anything small and
+    caps: no folio at either edge, no furniture."""
+    book = _book(F.below_band_caps_line_without_folio_page)
+
+    assert "SATURN WITNESSES THE DAY CHART" in _all_text(book)
+    assert book.conservation.ok, book.conservation.to_dict()
+
+
 # ------------------------------------------------------------------ notes as a channel
 
 def test_footnotes_are_a_page_side_channel_not_inline_elements():

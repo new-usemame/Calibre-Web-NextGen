@@ -70,6 +70,10 @@ GUTTER_MIN = 0.06
 #: A line this wide (share of the page's text span) bridges every column gutter:
 #: it is a band of its own -- a full-width heading, a rule, a plate.
 FULL_SPAN = 0.70
+#: A single line at least this wide (share of the measure) that crosses a
+#: channel is a band element and does not veto the gutter: section heads sit
+#: inside columned pages.
+BAND_MIN = 0.55
 #: Column layout is only believed when at least two columns each hold this many
 #: lines. Anything thinner is a caption pair or a stray, not a typeset column.
 COLUMN_MIN_LINES = 3
@@ -499,11 +503,14 @@ def page_skeleton(raw, style, layer_trusted=True):
 
     body_blocks, note_regions = _split_off_notes(raw, style, skel)
 
+    top_y = min((ln.bbox[1] for blk in raw.text_blocks for ln in blk.lines),
+                default=None)
+
     kept_blocks = []
     for blk in body_blocks:
         kept = []
         for ln in blk.lines:
-            reason = _furniture_reason(ln, raw, style)
+            reason = _furniture_reason(ln, raw, style, top_y)
             if reason:
                 skel.regions.append(Region(kind="furniture", lines=[ln], reason=reason,
                                            bbox=ln.bbox))
@@ -732,13 +739,29 @@ def _note_number(line, block_size, opening=False, after=None):
     return None
 
 
-def _furniture_reason(line, raw, style):
+def _furniture_reason(line, raw, style, top_y=None):
     y0, y1 = line.bbox[1], line.bbox[3]
     in_head = y1 <= raw.height * HEADER_BAND
     in_foot = y0 >= raw.height * FOOTER_BAND
-    if not (in_head or in_foot):
-        return None
     text = line.stripped
+    if not (in_head or in_foot):
+        # A scan's margins can push the running head below the strict band
+        # (book 570's index: head at 11% of the page height). The page's
+        # topmost line is still furniture when it reads as one -- caps,
+        # carrying its folio, set smaller than the body, and title-sized.
+        # Anything less specific stays content: a wrong yes here drops a
+        # real line from the book while the counter stays green.
+        if top_y is None or y0 > top_y + line.size:
+            return None
+        if not text or len(text) > BAND_TEXT_MAX:
+            return None
+        if not style.body_size or line.size >= style.body_size * 0.98:
+            return None
+        if sum(ch.isalpha() for ch in text) < 6:
+            return None
+        if not _is_caps(text) or not _carries_folio(text):
+            return None
+        return "running_caps"
     if not text or len(text) > BAND_TEXT_MAX:
         return None
     if style.body_size and line.size > style.body_size * 1.02:
@@ -750,6 +773,13 @@ def _furniture_reason(line, raw, style):
     if _is_caps(text) and style.body_size and line.size < style.body_size * 0.98:
         return "running_caps"
     return None
+
+
+def _carries_folio(text):
+    """A running head's one stable part is the folio at either edge."""
+    tokens = text.split()
+    return bool(tokens) and (FOLIO.match(tokens[0]) is not None
+                             or FOLIO.match(tokens[-1]) is not None)
 
 
 def _is_caps(text):
@@ -813,7 +843,7 @@ def _looks_multi_column(blocks, raw):
 
 # ------------------------------------------------------------------ column order
 
-def _gutters(boxes, left, span, full=FULL_SPAN):
+def _gutters(boxes, left, span, full=FULL_SPAN, max_crossings=0):
     """x positions of vertical whitespace channels wide enough to be column gutters.
 
     Read from LINE boxes, not block boxes: on a page whose columns share baselines
@@ -821,16 +851,32 @@ def _gutters(boxes, left, span, full=FULL_SPAN):
     exact shape the readiness probe failed on. A line spanning most of the text
     measure bridges every gutter and votes for none of them -- it is a band of its
     own (a full-width heading, a plate), not evidence against the columns.
+
+    A bin is empty unless some line covers it -- EXCEPT a bin covered by exactly
+    one line at least BAND_MIN of the measure wide: a full-width section head
+    is a band, and one band line must not veto the gutter it crosses (book
+    570's index, where 'OPPOSITION' bridges the channel). Ordinary ragged
+    short lines are not that, and they still block, which is what keeps a
+    single-column page from being shredded (book 565 p158's shape).
     """
     bins = 240
-    occupied = bytearray(bins)
-    for box in boxes:
-        if (box[2] - box[0]) >= full * span:
+    covering = [[] for _ in range(bins)]
+    for index, box in enumerate(boxes):
+        width = box[2] - box[0]
+        if width >= full * span:
             continue
         a = int((box[0] - left) / span * (bins - 1))
         z = int((box[2] - left) / span * (bins - 1))
         for i in range(max(0, a), min(bins - 1, z) + 1):
-            occupied[i] = 1
+            covering[i].append(index)
+    occupied = bytearray(bins)
+    for i, lines in enumerate(covering):
+        if not lines:
+            continue
+        if len(lines) == 1 and (boxes[lines[0]][2] - boxes[lines[0]][0]) \
+                >= BAND_MIN * span:
+            continue
+        occupied[i] = 1
     gaps, i = [], 0
     while i < bins:
         if occupied[i]:
@@ -840,7 +886,13 @@ def _gutters(boxes, left, span, full=FULL_SPAN):
         while j < bins and not occupied[j]:
             j += 1
         if i > bins * 0.12 and j < bins * 0.88 and (j - i) >= bins * 0.03:
-            gaps.append(left + (i + j) / 2.0 / bins * span)
+            centre = left + (i + j) / 2.0 / bins * span
+            crossings = sum(1 for box in boxes
+                            if (box[2] - box[0]) < full * span
+                            and box[0] < centre - span * GUTTER_MIN / 2.0
+                            and box[2] > centre + span * GUTTER_MIN / 2.0)
+            if crossings <= max_crossings:
+                gaps.append(centre)
         i = j
     return gaps
 
@@ -853,14 +905,21 @@ class _ColumnLayout(object):
     spanning item itself sits between the band above and the band below. Regions
     carry (band, column) so the final page sort is the reading order rather than
     the (y, x) interleave that destroyed the probe.
+
+    When NO text line spans the measure the page is a set of independent
+    columns (a two-up spread): each column is a page of its own and reads to
+    its end before the next begins. Bands then belong to their own column: a
+    section head or a photo on one side of the spread does not interleave the
+    other side's paragraph with its own continuation.
     """
 
-    def __init__(self, left, right, bounds, spanning_ys):
+    def __init__(self, left, right, bounds, spanning_ys, band_major=True):
         self.left = left
         self.right = right
         self.bounds = bounds            # gutter bounds: ncols + 1 edges
         self.spanning_ys = spanning_ys  # centre-y of each spanning item, sorted
         self.span = right - left
+        self.band_major = band_major
 
     @property
     def ncols(self):
@@ -873,15 +932,26 @@ class _ColumnLayout(object):
                 return k
         return self.ncols - 1
 
+    def column_width(self, column):
+        return self.bounds[column + 1] - self.bounds[column]
+
     def band_of(self, bbox):
         centre = (bbox[1] + bbox[3]) / 2.0
         return sum(1 for y in self.spanning_ys if y < centre)
 
+    def _local_band_of(self, bbox, column):
+        centre = (bbox[1] + bbox[3]) / 2.0
+        return sum(1 for y in self.spanning_ys
+                   if y < centre and self.column_of(
+                       (self.left, 0, self.right, 1)) == column)
+
     def place(self, bbox):
         """(band, column) for a region-sized box: spanning boxes close their band."""
-        if (bbox[2] - bbox[0]) >= FULL_SPAN * self.span:
-            return self.band_of(bbox), self.ncols
-        return self.band_of(bbox), self.column_of(bbox)
+        if self.band_major:
+            if (bbox[2] - bbox[0]) >= FULL_SPAN * self.span:
+                return self.band_of(bbox), self.ncols
+            return self.band_of(bbox), self.column_of(bbox)
+        return 0, self.column_of(bbox)
 
     def groups(self, lines):
         """A block's lines split into (band, column, lines) runs, in reading order.
@@ -932,7 +1002,8 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
                for box in line_boxes):
             continue
         gutter_items.append(img.bbox)
-    gutters = _gutters(gutter_items, left, span)
+    gutters = _gutters(gutter_items, left, span,
+                       max_crossings=max(1, len(line_items) // 10))
     if not gutters:
         return None
     if raw.drawings >= RULED_MIN_PATHS and not candidates:
@@ -952,10 +1023,16 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
         # measure -- that is what makes them columns.
         return None
 
+    # A full-width TEXT line makes bands meaningful (headings between column
+    # bands). When nothing textual spans the measure the page is a set of
+    # independent columns -- a two-up spread -- and each one reads to its end
+    # before the next begins. A photo between the pages is paper, not a band.
+    band_major = any((box[2] - box[0]) >= FULL_SPAN * span for box, _ in line_items)
     bounds = [left - 1.0] + gutters + [right + 1.0]
     layout = _ColumnLayout(
         left, right, bounds,
-        sorted((box[1] + box[3]) / 2.0 for box in spanning))
+        sorted((box[1] + box[3]) / 2.0 for box in spanning),
+        band_major=band_major)
 
     counts = [0] * layout.ncols
     fills = []

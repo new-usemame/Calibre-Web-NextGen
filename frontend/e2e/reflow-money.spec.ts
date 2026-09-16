@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
+import type { ReflowEstimate, ReflowJob } from '../src/lib/reflow';
 import { requireRouteCapability } from './capabilities';
 import { collectPageErrors, assertNoPageErrors } from './utils';
 
@@ -28,7 +29,7 @@ import { collectPageErrors, assertNoPageErrors } from './utils';
  */
 
 /** The rig's own estimate for the acceptance book, field for field. */
-function estimatePayload(over: Record<string, unknown> = {}) {
+function estimatePayload(over: Partial<ReflowEstimate> = {}): ReflowEstimate {
   return {
     book_id: 1,
     title: 'a book somebody is about to pay to convert',
@@ -57,19 +58,25 @@ function estimatePayload(over: Record<string, unknown> = {}) {
     sampled: 40,
     reasons: { note_marker_mismatch: 11 },
     cached: true,
+    recovery: {
+      ocr_candidates: 0, image_only: 0, damaged: 0, estimated_seconds: 0,
+      engine_available: true, engine_version: 'tesseract 5.3.4', engine_detail: '',
+      language: 'eng', dpi: 300, pdf_sha256: '0'.repeat(64), non_latin_share: 0,
+    },
     ...over,
   };
 }
 
 /** The resumed whole-book run of the acceptance report: 210 bought, 212 replayed,
  *  422 judged. Only the first of those three was sent anywhere. */
-const RESUMED_JOB = {
+const RESUMED_JOB: ReflowJob = {
   job_id: '1e485e5c73e24435',
   mode: 'full',
   status: 'done',
   started: 1789375000,
   finished: 1789376331,
   spend_usd: 0.279521,
+  pending_usd: 0,
   cap_usd: 0.9,
   pages: 698,
   calls: 210,
@@ -82,7 +89,7 @@ const RESUMED_JOB = {
   recovery: {},
 };
 
-async function stubReflow(page: Page, estimate: Record<string, unknown>,
+async function stubReflow(page: Page, estimate: ReflowEstimate,
                           jobs: unknown[] = []) {
   await page.route('**/api/v1/books/*/reflow/estimate*', (route) => route.fulfill({
     status: 200, contentType: 'application/json', body: JSON.stringify(estimate),

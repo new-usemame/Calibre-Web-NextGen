@@ -27,8 +27,9 @@ export interface ReflowJob {
    *  ``billing_unknown`` stopped when a dispatched request's billing could not
    *  be proven either way: its bound stays held, and ``pending_usd`` says how
    *  much. ``interrupted`` is a restart: the process died mid-conversion and
-   *  startup recovery settled the record, so nothing new was filed and a fresh
-   *  start reuses the pages already bought. Only ``done`` is a conversion that
+   *  startup recovery settled the record without claiming publication or
+   *  resolving unknown charges. A fresh start may reuse cached pages.
+   *  Only ``done`` is a conversion that
    *  did what it was asked for.
    *  See STOP_STATUS in cps/tasks/reflow.py. */
   status: 'waiting' | 'running' | 'done' | 'capped' | 'incomplete' | 'failed'

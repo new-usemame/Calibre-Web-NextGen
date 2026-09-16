@@ -237,14 +237,14 @@ class TaskReflowPdf(CalibreTask):
             ledger.record({"kind": "job", "event": "finish",
                            "status": STOP_STATUS.get(result.stopped, "done")})
             self._handleSuccess()
-        except ocr.OCRCancelled:
+        except (ocr.OCRCancelled, build_epub.BuildCancelled):
             # The user stopped the recognition stage: nothing was filed, the
             # original is untouched, and the identity cache keeps what was
             # already recognized, so a resume spends nothing twice.
             if ledger is not None:
                 ledger.record({"kind": "job", "event": "finish",
                                "status": "cancelled"})
-            self.message = ("cancelled during source recovery; the original is "
+            self.message = ("cancelled during source recovery or EPUB assembly; the original is "
                             "unchanged and compatible recovery may resume")
             return self._finish_cancelled()
         except Exception as exc:                                  # noqa: BLE001
@@ -313,7 +313,12 @@ class TaskReflowPdf(CalibreTask):
                                  metadata=_metadata(book), doc=document,
                                  report_html=page, sidecar=payload,
                                  figure_transform=(result.recovery.figure_rect
-                                                   if result.recovery else None))
+                                                   if result.recovery else None),
+                                 should_stop=lambda: self.cancelled,
+                                 evidence_progress=lambda done, total: self._on_progress(
+                                     pipeline.Progress("evidence", page=done, pages=total,
+                                         spend_usd=result.spend_usd,
+                                         message="preserving original evidence %d/%d" % (done, total))))
         for warning in built.warnings:
             # The reader is told the same thing in their own book, on the report
             # page; this is the terser half, for whoever has to find out why.

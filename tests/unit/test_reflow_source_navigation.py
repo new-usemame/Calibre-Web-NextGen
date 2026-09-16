@@ -100,6 +100,42 @@ def test_uncertain_notes_expose_original_pixels_and_only_disarm_ambiguous_links(
         index=ET.fromstring(z.read('OEBPS/source-pages.xhtml'))
         assert any('original-p0000.xhtml' in a.get('href','') for a in index.iter(XHTML+'a'))
         sidecar=build_epub.read_sidecar(str(target))
+        opf=ET.fromstring(z.read('OEBPS/content.opf'))
+        refs=list(opf.iter('{http://www.idpf.org/2007/opf}itemref'))
+        assert next(r for r in refs if r.get('idref')=='original-p0000').get('linear')=='no'
         assert sidecar['notes_ambiguous']==1
         assert sidecar['source_evidence'][0]['page']==0
         assert sidecar['source_evidence'][0]['bytes']>0
+
+
+def test_original_caption_details_are_unique_and_linked_per_caption(tmp_path):
+    with pymupdf.open() as doc:
+        page=doc.new_page(width=400,height=600)
+        page.insert_text((50,300),'First printed caption')
+        page.insert_text((50,400),'Second printed caption')
+        elements=[assemble.Element(kind='fig',pno=0),
+                  assemble.Element(kind='caption',pno=0,runs=[['t','First extracted caption']],
+                                   bbox=(40,280,250,310),caption_uncertain=True),
+                  assemble.Element(kind='caption',pno=0,runs=[['t','Second extracted caption']],
+                                   bbox=(40,380,250,410),caption_uncertain=True)]
+        book=assemble.Book(elements=elements,pages={0:elements})
+        fragments={0:build_epub.page_fragment(book,0)}
+        evidence,images=build_epub._original_evidence(book,fragments,doc)
+        details=evidence[0]['details']
+        assert len({d['id'] for d in details})==2
+        assert len({d['src'] for d in details})==2
+        assert images[details[0]['src']] != images[details[1]['src']]
+        for d in details:
+            assert 'original-p0000.xhtml#'+d['id'] in fragments[0]
+        assert fragments[0].count('transcription uncertain') >= 2
+
+
+def test_original_evidence_rejects_empty_transformed_geometry_before_padding():
+    with pymupdf.open() as doc:
+        doc.new_page(width=400,height=600)
+        caption=assemble.Element(kind='caption',pno=0,runs=[['t','Caption']],
+                                 bbox=(40,280,250,310),caption_uncertain=True)
+        book=assemble.Book(elements=[caption],pages={0:[caption]})
+        with pytest.raises(ValueError,match='geometry'):
+            build_epub._original_evidence(book,{0:build_epub.page_fragment(book,0)},doc,
+                                          figure_transform=lambda p,b:(0,0,0,0))

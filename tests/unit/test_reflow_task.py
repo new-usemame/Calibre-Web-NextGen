@@ -535,3 +535,30 @@ def test_a_job_still_running_in_this_process_is_never_interrupted(rig):
 
 def test_a_book_that_never_ran_has_nothing_to_recover(rig):
     assert rig.mod.recover_interrupted_jobs(worker=SimpleNamespace(tasks=[])) == []
+
+
+def test_cancel_during_original_evidence_stops_rendering_without_filing(rig, monkeypatch):
+    from cps.services.reflow import assemble
+    task = rig.mod.TaskReflowPdf(5, 7, {"mode": "full", "cost_cap_usd": 1.0})
+    convert = task._convert
+    def uncertain_pages(*args, **kwargs):
+        result = convert(*args, **kwargs)
+        for pno in result.book.pages:
+            result.book.notes.append(assemble.Note(num=1, text='Uncertain reference',
+                pno=pno, uncertain=True, bbox=(40,500,350,550)))
+        monkeypatch.setattr(rig.mod.build_epub.extract, 'render_page_jpeg', cancel_after_first)
+        return result
+    monkeypatch.setattr(task, '_convert', uncertain_pages)
+    render = rig.mod.build_epub.extract.render_page_jpeg
+    rendered = []
+    def cancel_after_first(*args, **kwargs):
+        rendered.append(args[1])
+        pixels = render(*args, **kwargs)
+        task.stat = STAT_ENDED
+        return pixels
+    task.run(None)
+    assert rendered == [0], 'cancellation must stop before another evidence raster'
+    assert rig.local_db.session.commits == 0
+    assert not os.path.exists(str(rig.folder / 'Book - Author.epub'))
+    rows = _ledger_rows(rig)
+    assert len(rows) == 1 and rows[0]['status'] == 'cancelled'

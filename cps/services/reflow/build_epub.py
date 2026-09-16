@@ -164,6 +164,8 @@ def page_fragment(book, pno, style=None):
             level = min(6, max(1, int(element.level or 1)))
             blocks.append("<h%d>%s</h%d>" % (level, inner, level))
         elif element.kind == "caption":
+            if element.caption_uncertain:
+                inner = '<span class="reflow-uncertain">%s (?)</span>' % inner
             blocks.append('<p class="caption">%s</p>' % inner)
         else:
             blocks.append("<p>%s</p>" % inner)
@@ -732,7 +734,7 @@ def _ncx(entries, identifier, title):
         % (quoteattr(identifier), escape(title or ""), "\n".join(points)))
 
 
-def _opf(metadata, manifest, spine, identifier, modified):
+def _opf(metadata, manifest, spine, identifier, modified, nonlinear=()):
     meta_lines = [
         '    <dc:identifier id="bookid">%s</dc:identifier>' % escape(identifier),
         "    <dc:title>%s</dc:title>" % escape(metadata.get("title") or "Untitled"),
@@ -758,7 +760,8 @@ def _opf(metadata, manifest, spine, identifier, modified):
         % (item["id"], item["href"], item["type"],
            ' properties="%s"' % item["properties"] if item.get("properties") else "")
         for item in manifest)
-    refs = "\n".join('    <itemref idref="%s"/>' % ref for ref in spine)
+    refs = "\n".join('    <itemref idref="%s"%s/>'
+                     % (ref, ' linear="no"' if ref in nonlinear else '') for ref in spine)
     return (
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" '
@@ -944,7 +947,17 @@ def _refuse_unsafe_pages(page_html, book):
     return cleaned, refused
 
 
-def _original_evidence(book, page_html, doc, figure_transform=None):
+class BuildCancelled(Exception):
+    """The requested EPUB was stopped before it was written."""
+
+
+def _check_cancelled(should_stop):
+    if should_stop is not None and should_stop():
+        raise BuildCancelled("EPUB assembly was cancelled.")
+
+
+def _original_evidence(book, page_html, doc, figure_transform=None,
+                       should_stop=None, progress=None):
     """Package original pixels, never a re-render of the extracted reading.
 
     Detail crops retain adjacent printed context; the full original page lets a
@@ -953,7 +966,11 @@ def _original_evidence(book, page_html, doc, figure_transform=None):
     after the model markup boundary, not accepted from model output.
     """
     evidence, images = {}, {}
-    for pno in page_html:
+    wanted = [pno for pno in page_html if book.needs_source_evidence(pno)]
+    for index, pno in enumerate(wanted):
+        _check_cancelled(should_stop)
+        if progress is not None:
+            progress(index, len(wanted))
         specs = []
         ambiguous = book.ambiguous_note_numbers(pno)
         if ambiguous:
@@ -962,13 +979,19 @@ def _original_evidence(book, page_html, doc, figure_transform=None):
             box = (min(b[0] for b in boxes), min(b[1] for b in boxes),
                    max(b[2] for b in boxes), max(b[3] for b in boxes)) if boxes else None
             specs.append(("notes", "Original notes and neighboring context", box))
+        caption_keys, caption_counts = [], {}
         figure_index = -1
         for element in book.pages.get(pno, []):
             if element.kind == "fig":
                 figure_index += 1
-            elif element.kind == "caption" and element.caption_uncertain:
-                specs.append(("caption_%d" % figure_index,
-                              "Original printed caption", element.bbox))
+            if element.kind == "caption":
+                ordinal = caption_counts.get(figure_index, 0)
+                caption_counts[figure_index] = ordinal + 1
+                base = "caption_%d" % figure_index if figure_index >= 0 else "caption_orphan"
+                key = base + ("_%d" % ordinal if ordinal else "") if element.caption_uncertain else None
+                caption_keys.append(key)
+                if key is not None:
+                    specs.append((key, "Original printed caption", element.bbox))
         if not specs:
             continue
         if doc is None:
@@ -980,6 +1003,7 @@ def _original_evidence(book, page_html, doc, figure_transform=None):
         details = []
         page_rect = doc[pno].rect
         for key, label, box in specs:
+            _check_cancelled(should_stop)
             if box and figure_transform:
                 box = figure_transform(pno, box)
             # A missing note box falls back to the lower half plus the complete
@@ -987,6 +1011,9 @@ def _original_evidence(book, page_html, doc, figure_transform=None):
             rect = extract.pymupdf.Rect(*box) if box else extract.pymupdf.Rect(
                 page_rect.x0, page_rect.y0 + page_rect.height * 0.5,
                 page_rect.x1, page_rect.y1)
+            rect = rect & page_rect
+            if rect.is_empty or rect.is_infinite:
+                raise ValueError("Invalid original source evidence geometry on page %d" % pno)
             pad = 12 if key == "notes" else 4
             rect = extract.pymupdf.Rect(rect.x0 - pad, rect.y0 - pad,
                                         rect.x1 + pad, rect.y1 + pad) & page_rect
@@ -1015,17 +1042,21 @@ def _original_evidence(book, page_html, doc, figure_transform=None):
                         match.group("attrs"), match.group("inner"), link)
                 return match.group(0)
             html = _NOTE_ASIDE.sub(note_link, html)
-        caption_ids = {detail["id"] for detail in details}
+        caption_links = iter(caption_keys)
 
         def caption_link(match):
-            if "caption_%s" % match.group(2) not in caption_ids:
+            key = next(caption_links, None)
+            if key is None:
                 return match.group(0)
-            return ('%s%s<br/><a href="%s#caption_%s">Original printed caption '
+            return ('%s%s<br/><a href="%s#%s">Original printed caption '
                     '(transcription uncertain)</a>%s' % (
-                        match.group(1), match.group(3), href, match.group(2), match.group(4)))
-        html = re.sub(r'(<figure>.*?images/fig_p\d+_(\d+)\.jpg.*?<figcaption[^>]*>)(.*?)(</figcaption>)',
+                        match.group(1), match.group(2), href, key, match.group(3)))
+        html = re.sub(r'(<figcaption\b[^>]*>|<p class="caption">)(.*?)(</figcaption>|</p>)',
                       caption_link, html, flags=re.S)
         page_html[pno] = html
+        if progress is not None:
+            progress(index + 1, len(wanted))
+    _check_cancelled(should_stop)
     return evidence, images
 
 
@@ -1046,7 +1077,8 @@ def _original_document(record, home, language):
 
 
 def build(book, out_path, page_html=None, metadata=None, doc=None,
-          report_html=None, sidecar=None, identifier=None, figure_transform=None):
+          report_html=None, sidecar=None, identifier=None, figure_transform=None,
+          should_stop=None, evidence_progress=None):
     """Write one EPUB 3 and say what went into it.
 
     ``report_html`` is called last, with the document each page marker landed in and
@@ -1063,7 +1095,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
                  for pno, html in page_html.items()}
     page_html, unrepresentable = _readable_characters(page_html)
     page_html, refused = _refuse_unsafe_pages(page_html, book)
-    evidence, original_images = _original_evidence(book, page_html, doc, figure_transform)
+    evidence, original_images = _original_evidence(
+        book, page_html, doc, figure_transform, should_stop, evidence_progress)
 
     pages = _page_blocks(page_html)
     joins = _join_page_turns(pages)
@@ -1154,8 +1187,10 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         warnings.append("page %d's markup was not trusted (%s); the page ships as "
                         "its plain text" % (pno, reasons[0]))
 
+    _check_cancelled(should_stop)
     _write_epub(out_path, {
-        "opf": _opf(metadata, manifest, spine, identifier, modified),
+        "opf": _opf(metadata, manifest, spine, identifier, modified,
+                    nonlinear={"original-p%04d" % pno for pno in evidence}),
         "nav": _nav(entries, language, page_homes),
         "ncx": _ncx(entries, identifier, metadata.get("title") or ""),
         "documents": documents,

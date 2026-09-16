@@ -85,6 +85,7 @@ def numbers(result, ledger=None, client=None):
         "converter_version": CONVERTER_VERSION,
         "generated": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "source": _source(result),
+        "source_recovery": _recovery(result),
         "fidelity": {
             "pages": len(result.page_html),
             "pages_deterministic": len(result.page_html) - len(adopted),
@@ -152,6 +153,41 @@ def numbers(result, ledger=None, client=None):
     }
     payload["unplaced"] = _unplaced(payload, result)
     return payload
+
+
+def _recovery(result):
+    """The source-layer story for the report and the sidecar, in plain counts.
+
+    Pages the PDF could not answer for itself were read off the printed page by
+    local OCR: that is a different kind of fidelity from the native layer's
+    word-identity, and the two are never summed into one number. An OCR page's
+    honesty is its engine, its language, its orientation fixes and its uncertain
+    readings, with crops named as evidence — not a conservation claim.
+    """
+    recovery = getattr(result, "recovery", None)
+    if recovery is None:
+        return {"performed": False}
+    pages_ocr = [prov for _, prov in sorted(recovery.provenance.items())
+                 if prov.layer == "ocr" and prov.words]
+    engines = sorted({prov.engine for prov in pages_ocr if prov.engine})
+    languages = sorted({prov.language for prov in pages_ocr if prov.language})
+    return {
+        "performed": True,
+        "pages_ocr": len(pages_ocr),
+        "pages_recovered_for_damage": sum(
+            1 for prov in pages_ocr if prov.reason == "damaged_layer"),
+        "pages_recovered_image_only": sum(
+            1 for prov in pages_ocr if prov.reason == "image_only"),
+        "pages_failed": recovery.failed,
+        "pages_reused": recovery.reused,
+        "attempted": recovery.attempted,
+        "words": recovery.ocr_words,
+        "uncertain_words": recovery.uncertain_words,
+        "engine": engines[0] if len(engines) == 1 else engines,
+        "language": languages[0] if len(languages) == 1 else languages,
+        "engine_unavailable": recovery.engine_unavailable,
+        "seconds": round(recovery.seconds, 2),
+    }
 
 
 def _source(result):
@@ -288,6 +324,7 @@ def about_page(payload, show_cost=False, links=None, losses=()):
     if source.get("fonts"):
         out.append("<p>Type seen on the page: %s.</p>"
                    % escape(", ".join(sorted(source["fonts"]))))
+    out.extend(_recovery_section(payload))
 
     out.extend(_fidelity_section(payload))
     out.extend(_structure_section(payload))
@@ -299,6 +336,57 @@ def about_page(payload, show_cost=False, links=None, losses=()):
     if show_cost:
         out.extend(_spend_section(payload))
     return "\n".join(out)
+
+
+def _recovery_section(payload):
+    """The source-layer story, told straight: which pages are the PDF's own text
+    and which were read off the printed page by a local engine, with the honest
+    limits of the second kind."""
+    recovery = payload.get("source_recovery") or {}
+    if not recovery.get("performed"):
+        return []
+    pages = recovery.get("pages_ocr", 0)
+    failed = recovery.get("pages_failed", 0)
+    out = ["<h2>Source text recovery</h2>"]
+    if recovery.get("engine_unavailable"):
+        out.append("<p>The local text recognition engine or its language data is "
+                   "not installed on this server, so pages that are only pictures "
+                   "kept their images and any damaged layer was left as printed. "
+                   "They are facsimiles, not reflowed text.</p>")
+        return out
+    if pages:
+        damaged = recovery.get("pages_recovered_for_damage", 0)
+        image_only = recovery.get("pages_recovered_image_only", 0)
+        parts = []
+        if image_only:
+            parts.append(_count(image_only,
+                                "one was only a picture of a page",
+                                "%d were only pictures of pages"))
+        if damaged:
+            parts.append(_count(damaged,
+                                "one had a damaged text layer",
+                                "%d had a damaged text layer"))
+        out.append(
+            "<p>%s, and read off the printed page with local text recognition "
+            "(%s, %s). Those words are a transcription of the scan, not the PDF's "
+            "own text layer: reading order and structure were rebuilt from it, but "
+            "no sentence was rewritten. Uncertain readings are marked where the "
+            "engine was unsure.</p>"
+            % (_count(pages, "One page", "%d pages had no usable text")
+               + (" (%s)" % " and ".join(parts) if parts else ""),
+               escape(str(recovery.get("engine", ""))),
+               escape(str(recovery.get("language", "")))))
+        if recovery.get("uncertain_words"):
+            out.append("<p>%s.</p>" % _count(
+                recovery["uncertain_words"],
+                "One word was read with low confidence by the engine",
+                "%d words were read with low confidence by the engine"))
+    if failed:
+        out.append("<p>%s; those pages were kept as they printed.</p>" % _count(
+            failed,
+            "One page could not be recognized",
+            "%d pages could not be recognized"))
+    return out
 
 
 def _fidelity_section(payload):

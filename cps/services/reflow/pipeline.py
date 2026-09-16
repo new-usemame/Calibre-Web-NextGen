@@ -238,7 +238,10 @@ def survey(doc, sample=SURVEY_PAGES):
     The deterministic pass runs on a sample of pages and the routed share is scaled
     to the book. The number the user consents to is therefore this book's own
     routing rate, not a fixed percentage — but it is an estimate from a sample, and
-    ``sampled`` says how big the sample was so the page can say so.
+    ``sampled`` says how big the sample was so the page can say so. Pages that need
+    OCR are recovered during the survey, so the routing rate is the recovered book's
+    own, and the local time that stage takes is measured and quoted separately from
+    the model's price.
     """
     pages = survey_pages(doc.page_count, sample)
     result = run(doc, page_numbers=pages)
@@ -246,6 +249,13 @@ def survey(doc, sample=SURVEY_PAGES):
     share = routed / float(len(pages)) if pages else 0.0
     projected = int(round(share * doc.page_count))
     quote = route.estimate(projected, doc.page_count)
+    # The whole book's recovery census is text-layer geometry only: no page is
+    # recognized twice for it.
+    raw_all = extract.read_pages(doc)
+    wanted = source.candidates(raw_all)
+    ocr_seconds = result.recovery.seconds if result.recovery else 0.0
+    attempted = result.recovery.attempted if result.recovery else 0
+    per_page = (ocr_seconds / attempted) if attempted else 0.0
     quote.update({
         "sampled": len(pages),
         "sampled_routed": routed,
@@ -253,6 +263,14 @@ def survey(doc, sample=SURVEY_PAGES):
         "text_layer": bool(result.assessment and result.assessment.verdict
                            not in ("NO_TEXT_LAYER", "GARBAGE_TEXT")),
         "reasons": dict((result.routing or {}).get("reasons") or {}),
+        "non_latin_share": (result.assessment.non_latin_share
+                            if result.assessment else 0.0),
+        "ocr_candidates": len(wanted),
+        "ocr_image_only": sum(1 for _, reason in wanted if reason == "image_only"),
+        "ocr_damaged": sum(1 for _, reason in wanted if reason == "damaged_layer"),
+        "ocr_estimated_seconds": int(round(per_page * len(wanted))),
+        "ocr_engine_unavailable": bool(result.recovery
+                                       and result.recovery.engine_unavailable),
     })
     return quote
 

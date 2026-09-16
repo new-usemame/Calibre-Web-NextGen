@@ -74,13 +74,24 @@ class ReflowOptions(object):
         self.include_report_page = options.get("include_report_page", True) is not False
         self.show_cost_in_report = bool(options.get("show_cost_in_report"))
         self.replace_existing_epub = bool(options.get("replace_existing_epub"))
+        # Source recovery: local OCR of picture-only pages and demonstrably
+        # damaged scan layers. "auto" recovers both; "textless" only the pages
+        # with no text at all (a damaged layer is kept as printed); "off" keeps
+        # everything native (image-only pages stay a labelled facsimile).
+        recovery = options.get("source_recovery") or "auto"
+        self.source_recovery = recovery if recovery in ("auto", "textless", "off") \
+            else "auto"
+        language = str(options.get("ocr_language") or "eng").strip() or "eng"
+        self.ocr_language = language[:64]
 
     def to_dict(self):
         return {"mode": self.mode, "model_tier": self.model_tier,
                 "sample_pages": self.sample_pages, "cost_cap_usd": self.cost_cap_usd,
                 "include_report_page": self.include_report_page,
                 "show_cost_in_report": self.show_cost_in_report,
-                "replace_existing_epub": self.replace_existing_epub}
+                "replace_existing_epub": self.replace_existing_epub,
+                "source_recovery": self.source_recovery,
+                "ocr_language": self.ocr_language}
 
 
 def config_default_tier():
@@ -235,9 +246,16 @@ class TaskReflowPdf(CalibreTask):
         pages = None
         if self.options.mode == "sample":
             pages = self._sample_pages(document)
+        recovery_opts = {
+            "mode": self.options.source_recovery,
+            "language": self.options.ocr_language,
+            "cache_dir": reflow_dir("ocr-cache"),
+            "scratch_dir": reflow_dir("ocr-scratch"),
+        }
         return pipeline.run(document, client=client, ledger=ledger, cache=cache,
                             page_numbers=pages, progress=self._on_progress,
-                            should_stop=lambda: self.cancelled)
+                            should_stop=lambda: self.cancelled,
+                            recovery_opts=recovery_opts)
 
     def _sample_pages(self, document):
         """A sample of the body, not of the front matter.
@@ -271,7 +289,9 @@ class TaskReflowPdf(CalibreTask):
                                          links=links, losses=losses)
         built = build_epub.build(result.book, target, page_html=result.page_html,
                                  metadata=_metadata(book), doc=document,
-                                 report_html=page, sidecar=payload)
+                                 report_html=page, sidecar=payload,
+                                 figure_transform=(result.recovery.figure_rect
+                                                   if result.recovery else None))
         for warning in built.warnings:
             # The reader is told the same thing in their own book, on the report
             # page; this is the terser half, for whoever has to find out why.

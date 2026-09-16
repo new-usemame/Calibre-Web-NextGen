@@ -720,7 +720,7 @@ def _opf(metadata, manifest, spine, identifier, modified):
         "</package>\n" % (REFLOW_NS, "\n".join(meta_lines), items, refs))
 
 
-def _figure_images(chapters, doc, book):
+def _figure_images(chapters, doc, book, figure_transform=None):
     """Crop each figure the fragments referred to; drop the ones we cannot make.
 
     Two drops are not the same event. A crop that *fails* is a loss: the page
@@ -729,6 +729,10 @@ def _figure_images(chapters, doc, book):
     readiness corpus is a visibly empty leaf that the baseline emitted as one of
     its thirteen 'figures' -- and leaving it out is the correct outcome, disclosed
     in the sidecar rather than mourned on the report page.
+
+    ``figure_transform`` maps a figure's box from the page's reading space into
+    unrotated PDF space before cropping: on a rotated spread the skeleton measured
+    in the upright reading space, and the ink is stored sideways.
     """
     wanted = []
     for chapter in chapters:
@@ -754,12 +758,15 @@ def _figure_images(chapters, doc, book):
             missing.append(src)
             continue
         figure = page_figures[index]
+        bbox = figure["bbox"]
+        if figure_transform is not None:
+            bbox = figure_transform(pno, bbox)
         try:
             if figure.get("needs_ink") and not extract.region_has_ink(
-                    doc, pno, figure["bbox"]):
+                    doc, pno, bbox):
                 blanks.append(src)
                 continue
-            images[src] = extract.crop_jpeg(doc, pno, figure["bbox"])
+            images[src] = extract.crop_jpeg(doc, pno, bbox)
         except Exception as exc:                                  # pragma: no cover
             log.warning("reflow: figure %s could not be cropped: %s", src, exc)
             if figure.get("needs_ink"):
@@ -880,7 +887,7 @@ def _refuse_unsafe_pages(page_html, book):
 
 
 def build(book, out_path, page_html=None, metadata=None, doc=None,
-          report_html=None, sidecar=None, identifier=None):
+          report_html=None, sidecar=None, identifier=None, figure_transform=None):
     """Write one EPUB 3 and say what went into it.
 
     ``report_html`` is called last, with the document each page marker landed in and
@@ -898,7 +905,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     joins = _join_page_turns(pages)
     chapters = _chapters(pages)
     dropped = _bind_links(chapters)
-    images, missing, blanks = _figure_images(chapters, doc, book)
+    images, missing, blanks = _figure_images(chapters, doc, book,
+                                             figure_transform=figure_transform)
     _drop_images(chapters, missing + blanks)
 
     identifier = identifier or "urn:uuid:%s" % uuid.uuid4()

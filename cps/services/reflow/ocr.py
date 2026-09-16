@@ -8,7 +8,7 @@ displayed PDF page, and ``pdf_bbox`` is that page's unrotated coordinate space.
 Tesseract scores are engine scores, not probabilities of a correct transcription.
 """
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field, replace
 from functools import lru_cache
 import csv
 import hashlib
@@ -72,6 +72,11 @@ class OCRResult:
     height: float
     words: tuple
     flags: tuple
+    #: Set when this answer came back out of the identity cache rather than being
+    #: recognized just now. Not part of the cache identity or of result equality:
+    #: a stored answer always reads False, and the hit branch replaces it with
+    #: True on the way out.
+    reused: bool = field(default=False, compare=False)
 
     def to_dict(self):
         return asdict(self)
@@ -353,7 +358,7 @@ def recognize_page(page, *, source_sha256, language="eng", dpi=300,
         cached = _load_cache(cache_path, key, options)
         if cached is not None:
             _stopped(should_stop)
-            return cached
+            return replace(cached, reused=True)
     zoom = min(dpi / 72., math.sqrt(max_pixels / (rect.width * rect.height)))
     # MuPDF rounds the raster outward. Include that rounding before allocation.
     while math.ceil(rect.width * zoom) * math.ceil(rect.height * zoom) > max_pixels:

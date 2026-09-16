@@ -41,14 +41,38 @@ SCAN_SHARE = 0.50
 VERDICTS = ("BORN_DIGITAL", "OCR_LAYER", "THIN_TEXT", "NO_TEXT_LAYER", "GARBAGE_TEXT")
 
 _WORDS = re.compile(r"[a-z']+")
+#: Letter runs in ANY script: what "this page is words" means outside English.
+_ANY_WORDS = re.compile(r"[^\W\d_]+", re.UNICODE)
+
+
+def script_share(text):
+    """Share of a page's letters that are not ASCII.
+
+    Greek, Cyrillic and most other non-Latin books score high; mojibake — random
+    Latin glyphs, which is what the garbage verdict exists to catch — scores near
+    zero. This is a script measurement, never a language identification.
+    """
+    letters = [ch for ch in text or "" if ch.isalpha()]
+    if not letters:
+        return 0.0
+    return sum(1 for ch in letters if ord(ch) > 127) / len(letters)
 
 
 def looks_like_prose(text):
-    """Distinguish real text from OCR garbage."""
+    """Distinguish real text from OCR garbage.
+
+    The stopword test only knows English. A page of legitimate Greek fails it
+    exactly the way mojibake does, and an English-word heuristic may not call a
+    real book garbage for not being English: a page whose letters are mostly
+    outside ASCII and which is full of words is prose its own language.
+    """
     words = _WORDS.findall((text or "").lower())
-    if len(words) < PROSE_MIN_WORDS:
+    if len(words) >= PROSE_MIN_WORDS and \
+            sum(1 for w in words if w in STOPWORDS) / len(words) >= STOPWORD_MIN:
+        return True
+    if script_share(text) < 0.5:
         return False
-    return sum(1 for w in words if w in STOPWORDS) / len(words) >= STOPWORD_MIN
+    return len(_ANY_WORDS.findall((text or "").lower())) >= PROSE_MIN_WORDS
 
 
 @dataclass
@@ -80,6 +104,7 @@ class Assessment(object):
     fonts: dict = field(default_factory=dict)
     census: List[PageCensus] = field(default_factory=list)
     reasons: List[str] = field(default_factory=list)
+    non_latin_share: float = 0.0
 
     @property
     def layer_is_trusted(self):
@@ -93,6 +118,7 @@ class Assessment(object):
                 "empty_share": round(self.empty_share, 4),
                 "drawings_total": self.drawings_total,
                 "thin_text": self.thin_text,
+                "non_latin_share": self.non_latin_share,
                 "layer_is_trusted": self.layer_is_trusted,
                 "fonts": self.fonts, "reasons": self.reasons}
 
@@ -156,8 +182,14 @@ def assess_pages(raw_pages):
     empty_share = sum(1 for c in census if c.chars < 20) / pages
     drawings_total = sum(c.drawings for c in census)
     thin_text = median_chars < THIN_TEXT_CHARS
+    wordy = [c for c in census if c.chars >= 20]
+    non_latin = (sum(script_share(raw.text) for raw in raw_pages if raw.chars >= 20)
+                 / len(wordy)) if wordy else 0.0
 
     reasons = []
+    if non_latin >= 0.5:
+        reasons.append("mostly non-Latin text: the English OCR language will misread "
+                       "it unless a matching language pack is selected")
     if empty_share >= 0.9:
         verdict = "NO_TEXT_LAYER"
         reasons.append("%d%% of pages carry almost no extractable text" % round(empty_share * 100))
@@ -183,4 +215,5 @@ def assess_pages(raw_pages):
                       prose_share=prose_share, scan_share=scan_share,
                       empty_share=empty_share, drawings_total=drawings_total,
                       thin_text=thin_text, fonts=font_census(raw_pages),
-                      census=census, reasons=reasons)
+                      census=census, reasons=reasons,
+                      non_latin_share=round(non_latin, 4))

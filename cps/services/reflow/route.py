@@ -67,16 +67,24 @@ class PageRoute(object):
                 "why": [PAGE_REASONS.get(r, r) for r in self.reasons]}
 
 
-def route_pages(book, skeletons, assessment=None, window=BOUNDARY_WINDOW):
-    """One decision per page, with its reasons, in page order."""
+def route_pages(book, skeletons, assessment=None, window=BOUNDARY_WINDOW,
+                recovered=()):
+    """One decision per page, with its reasons, in page order.
+
+    ``recovered`` holds the pages whose source was rebuilt by local OCR: the
+    verdict that would have routed them for having no usable layer was measured
+    on the ORIGINAL layer, and a recovered page has words to work from now.
+    """
     routes = [PageRoute(pno=skel.pno) for skel in skeletons]
     by_pno = {r.pno: r for r in routes}
+    recovered = set(recovered)
 
     for skel in skeletons:
         target = by_pno[skel.pno]
         reasons = set(book.page_reasons(skel.pno)) | set(skel.reasons)
 
-        if assessment is not None and assessment.verdict in ("NO_TEXT_LAYER", "GARBAGE_TEXT"):
+        if assessment is not None and assessment.verdict in ("NO_TEXT_LAYER", "GARBAGE_TEXT") \
+                and skel.pno not in recovered:
             reasons.add("no_text_layer")
 
         for reason in sorted(reasons):

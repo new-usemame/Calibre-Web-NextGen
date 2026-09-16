@@ -77,6 +77,19 @@ def test_a_noise_text_layer_is_not_mistaken_for_text():
     assert assessment.verdict == "GARBAGE_TEXT"
 
 
+def test_legitimate_greek_text_is_not_garbage_because_it_is_not_english():
+    """An English stopword heuristic cannot tell a real Greek book from mojibake —
+    both score zero. The book must not be treated as if it had no usable layer."""
+    greek = ("Οι πλανήτες στην ένατη οικία σημαίνουν ταξίδια μακρινά και "
+             "η σελήνη κυβερνά την τέταρτη οικία του γενεθλίου χάρτη. ") * 8
+    mojibake = ("aenlm rtoiu cdhes ngiol rtaem uqsli pnoew mtchi rvael ") * 8
+
+    assert assess.looks_like_prose(greek)
+    assert not assess.looks_like_prose(mojibake)
+    assert assess.script_share(greek) > 0.5
+    assert assess.script_share(mojibake) < 0.5
+
+
 def test_a_scan_with_an_ocr_layer_is_named_as_a_scan():
     """The acceptance book's own shape: readable words over a photograph of the page.
     Told apart from a born-digital PDF it is not, the user is promised a structure

@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from . import (annotate, assemble, assess, build_epub, extract, gate, prompts, route,
-               skeleton)
+               skeleton, source)
 from .ledger import CapExceeded
 from .model import ModelError, UnusableAnswer
 
@@ -43,7 +43,8 @@ RASTER_QUALITY = 80
 #: A page image larger than this is re-encoded harder rather than sent as it is.
 RASTER_MAX_BYTES = 900 * 1024
 
-STAGES = ("read", "assess", "skeleton", "assemble", "route", "model", "build")
+STAGES = ("read", "assess", "recover", "skeleton", "assemble", "route", "model",
+          "build")
 
 
 @dataclass
@@ -89,6 +90,7 @@ class ReflowResult(object):
     book: object = None
     assessment: object = None
     style: object = None
+    recovery: object = None
     page_html: Dict[int, str] = field(default_factory=dict)
     outcomes: Dict[int, PageOutcome] = field(default_factory=dict)
     routed: List[int] = field(default_factory=list)
@@ -256,7 +258,8 @@ def survey(doc, sample=SURVEY_PAGES):
 
 
 def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
-        progress=None, should_stop=None, require_figure_caption=True):
+        progress=None, should_stop=None, require_figure_caption=True,
+        recovery_opts=None):
     """Convert one document. Returns what happened as well as what was produced."""
     report = _reporter(progress)
     result = ReflowResult()
@@ -267,6 +270,24 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
 
     report(Progress(stage="assess", message="looking at the text layer"))
     result.assessment = assess.assess_pages(raw_pages)
+
+    # The source layer is chosen before any structure is built: pages that are
+    # only pictures, or whose embedded layer is demonstrably damaged, are read
+    # off the printed page by local OCR. Everything after this line sees exactly
+    # one layer per page, native or recovered, with its provenance. The default
+    # is best-effort; an explicit choice (task/UI) names its mode and stops on a
+    # missing engine before paid work.
+    opts = {"mode": "auto_if_available", "language": "eng", "dpi": 300}
+    opts.update(recovery_opts or {})
+    if opts.get("mode") != "off":
+        report(Progress(stage="recover", message="recovering the source text"))
+        result.recovery = source.recover(
+            doc, raw_pages, result.fingerprint,
+            progress=lambda done, total: report(Progress(
+                stage="recover", page=done, pages=total,
+                message="page %d of %d recognized" % (done, total))),
+            should_stop=should_stop, **opts)
+        raw_pages = result.recovery.pages
 
     report(Progress(stage="skeleton", message="measuring the page geometry"))
     outline = extract.outline(doc)
@@ -282,7 +303,9 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
     result.book = book
 
     report(Progress(stage="route", message="deciding which pages need a model"))
-    routes = route.route_pages(book, skeletons, result.assessment)
+    routes = route.route_pages(book, skeletons, result.assessment,
+                               recovered=(result.recovery.recovered_pnos
+                                          if result.recovery is not None else ()))
     result.routing = route.summarise(routes)
     result.routed = route.routed_pages(routes)
     why = {page.pno: list(page.reasons) for page in routes}

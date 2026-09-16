@@ -76,11 +76,14 @@ def test_uncertain_notes_expose_original_pixels_and_only_disarm_ambiguous_links(
             ['t','A damaged association '],['sup','1',0,'uncertain'],
             ['t',' and a reliable association '],['sup','2',0],['t','.']])]
         notes = [assemble.Note(num=1,text='Misread extracted reference.',pno=0,marked=True,uncertain=True),
-                 assemble.Note(num=2,text='Reliable printed reference.',pno=0,marked=True)]
+                 assemble.Note(num=2,text='Reliable printed reference.',pno=0,marked=True),
+                 assemble.Note(num=3,text='Ordinary-looking unmatched neighbor.',pno=0),
+                 assemble.Note(num=4,text='Another unmatched neighbor.',pno=0)]
         for note in notes: note.bbox=(50,565,400,620)
         book = assemble.Book(elements=elements,pages={0:elements},notes=notes)
         target=tmp_path/'evidence.epub'
-        result=build_epub.build(book,str(target),doc=doc)
+        result=build_epub.build(book,str(target),doc=doc,
+                               page_html={0:'<p>Unqualified replacement rendering.</p>'})
         original=extract.render_page_jpeg(doc,0,scale=1.5,quality=85)
     assert build_epub.validate(str(target)) == []
     with zipfile.ZipFile(target) as z:
@@ -103,7 +106,15 @@ def test_uncertain_notes_expose_original_pixels_and_only_disarm_ambiguous_links(
         opf=ET.fromstring(z.read('OEBPS/content.opf'))
         refs=list(opf.iter('{http://www.idpf.org/2007/opf}itemref'))
         assert next(r for r in refs if r.get('idref')=='original-p0000').get('linear')=='no'
-        assert sidecar['notes_ambiguous']==1
+        assert sidecar['notes_ambiguous']==3
+        for number in (1,3,4):
+            note=next(n for n in chapter.iter(XHTML+'aside')
+                      if n.get('id')=='fn_p0000_%d'%number)
+            assert '%d (?)'%number in ''.join(note.itertext())
+            assert any(a.get('href')=='original-p0000.xhtml#notes'
+                       for a in note.iter(XHTML+'a')), 'each detached note needs its own evidence link'
+        reliable=next(n for n in chapter.iter(XHTML+'aside') if n.get('id')=='fn_p0000_2')
+        assert '(?)' not in ''.join(reliable.itertext())
         assert sidecar['source_evidence'][0]['page']==0
         assert sidecar['source_evidence'][0]['bytes']>0
 
@@ -139,3 +150,10 @@ def test_original_evidence_rejects_empty_transformed_geometry_before_padding():
         with pytest.raises(ValueError,match='geometry'):
             build_epub._original_evidence(book,{0:build_epub.page_fragment(book,0)},doc,
                                           figure_transform=lambda p,b:(0,0,0,0))
+
+
+def test_unmatched_notes_without_damaged_source_group_remain_unqualified():
+    book=assemble.Book(notes=[assemble.Note(num=3,text='Unmatched but undamaged.',pno=0)],
+                       pages={0:[]})
+    assert book.ambiguous_note_numbers(0)==set()
+    assert '(?)' not in build_epub.page_fragment(book,0)

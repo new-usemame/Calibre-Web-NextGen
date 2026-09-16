@@ -184,6 +184,12 @@ class Book(object):
             uncertain.update(str(run[1]) for run in element.runs
                              if run[0] in ("sup", "mark") and len(run) > 3
                              and run[3] == "uncertain")
+        # A damaged source group cannot establish the identities of its other
+        # unmatched labels merely because their OCR tokens look like digits.
+        # Qualify those labels locally too; independently matched neighbors keep
+        # their usable links. An unmatched note alone is not evidence of damage.
+        if uncertain:
+            uncertain.update(str(note.num) for note in notes if not note.marked)
         return uncertain
 
     def needs_source_evidence(self, pno):

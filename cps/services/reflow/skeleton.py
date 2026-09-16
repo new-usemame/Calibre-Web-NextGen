@@ -977,18 +977,14 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
 def _chart_lettering(line, style):
     """True for the lettering an OCR layer reads off a diagram on a scanned page.
 
-    Set far larger than the body and not a rung of the book's own heading ladder:
-    on a scan the chart's captions come back two to four times the prose size,
-    which no real line of the book's prose ever does. Size alone may speak,
-    because the one thing a scan measures reliably is how big the ink is -- the
-    junk-glyph shapes change from chart to chart, and a body-sized date like
-    ``November 2016`` failing the junk veto is a line of the book, not lettering:
-    absorbed as artwork it would vanish from the reader when its blank territory
-    is dropped.
+    Set far larger than the body: on a scan the chart's captions and glyphs come
+    back two to four times the prose size, which no line of this book's prose
+    ever reaches (its top heading rung measures below the cut). Size alone may
+    speak, because the one thing a scan measures reliably is how big the ink is
+    -- a body-sized date like ``November 2016`` failing the junk veto is a line
+    of the book, not lettering, and must never be absorbed out of it.
     """
-    if not style.body_size or line.size < style.body_size * CHART_LABEL_RATIO:
-        return False
-    return not style.on_the_ladder(line.size)
+    return bool(style.body_size) and line.size >= style.body_size * CHART_LABEL_RATIO
 
 
 def _inside(bbox, rect, share=FIG_LINE_OVERLAP):
@@ -1067,20 +1063,22 @@ def _scan_figures(kept_blocks, raw, style):
     # sides. A gap at the edge of the page is weaker evidence -- the top and
     # bottom margins of a scan are blank paper with enough texture to fake ink --
     # so an edge gap is territory only when the OCR layer read lettering off the
-    # figure inside it (a sect chart's giant sparse glyphs). An empty margin
-    # stays empty.
+    # figure inside it, and a LONE big line does not count: one piece of display
+    # type over white space is a chapter opening (book 567 p93's 'CHAPTER 4'),
+    # not a chart. The sect chart's sparse glyphs fill the gap with a dozen.
     first, last = rows[0], rows[-1]
-    if first[0] - top > raw.height * SCAN_GAP and any(
-            _chart_lettering(ln, style) for ln in lines
-            if ln.bbox[1] >= top - 2 and ln.bbox[3] <= first[0] + 2):
+    edge_lettering = [ln for ln in lines if _chart_lettering(ln, style)]
+    if first[0] - top > raw.height * SCAN_GAP and sum(
+            1 for ln in edge_lettering
+            if ln.bbox[1] >= top - 2 and ln.bbox[3] <= first[0] + 2) >= 2:
         add(left, top, right, first[0], "scan_figure_band")
     for row, following in zip(rows, rows[1:]):
         gap = following[0] - row[1]
         if gap > raw.height * SCAN_GAP:
             add(left, row[1], right, following[0], "scan_figure_band")
-    if bottom - last[1] > raw.height * SCAN_GAP and any(
-            _chart_lettering(ln, style) for ln in lines
-            if ln.bbox[1] >= last[1] - 2 and ln.bbox[3] <= bottom + 2):
+    if bottom - last[1] > raw.height * SCAN_GAP and sum(
+            1 for ln in edge_lettering
+            if ln.bbox[1] >= last[1] - 2 and ln.bbox[3] <= bottom + 2) >= 2:
         add(left, last[1], right, bottom, "scan_figure_band")
 
     # Side channels: a tall run of prose lines that all leave the same wide

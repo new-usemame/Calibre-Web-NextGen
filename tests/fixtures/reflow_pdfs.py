@@ -917,6 +917,21 @@ def garbage_scan_page(doc, png_bytes):
     return page
 
 
+def scan_chapter_opening_page(doc, png_bytes):
+    """Book 567 page 93's shape: one line of display type over white space.
+
+    A chapter opening is not a chart: the lone 'CHAPTER 4' must stay text, not
+    become a mostly-blank figure crop with two words of artwork riding under it.
+    """
+    page = add_page(doc)
+    page.insert_image(pymupdf.Rect(0, 0, PAGE_W, PAGE_H), stream=png_bytes)
+    add_running_head(page, "93", "CHAPTER 4: THE HELLENISTIC ASTROLOGERS")
+    _put(page, 144.0, 200.0, "CHAPTER 4", size=19.0, font=_BOLD)
+    _put(page, 144.0, 240.0, "The Hellenistic Astrologers", size=16.0, font=_BOLD)
+    add_body_lines(page, PROSE_LINES[:8], top=306.0)
+    return page
+
+
 def scan_date_tail_page(doc, png_bytes):
     """Book 567 page 18's shape: a paragraph, air, and a body-sized date line.
 

@@ -317,6 +317,16 @@ class TestScanArtwork(object):
         with zipfile.ZipFile(result.path) as zf:
             assert _ink_share(zf.read(names[0])) > 0.01
 
+    def test_a_lone_display_line_is_a_chapter_opening_not_a_figure(self):
+        """Page 93's shape: 'CHAPTER 4' over white space is a chapter opening.
+        The white space above a title is not figure territory, and the display
+        line must stay in the book's text."""
+        book = _chart_book(lambda d: F.scan_chapter_opening_page(d, F.solid_png()))
+
+        assert "CHAPTER 4" in _whole_text(book)
+        assert not [f for f in book.figures if f["pno"] == 1
+                    and f.get("found") != "embedded"], book.figures
+
     def test_a_body_sized_date_line_is_not_absorbed_as_artwork(self):
         """Page 18's shape: a body-sized date line is the book's prose, not chart
         lettering -- it must stay in the reading flow, not vanish into a blank

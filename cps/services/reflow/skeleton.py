@@ -1636,37 +1636,40 @@ def _side_territory(run, side, rows, left, right, raw, span, add):
     if x1 - x0 < span * SIDE_CHANNEL_MIN * 0.8:
         return
 
-    # Adjacent paragraphs can have slightly different extracted column edges.
-    # A sub-glyph protrusion is not prose running underneath the picture. Move
-    # the crop edge outward to contain that small drift in the prose column,
-    # rather than either cutting the picture short or photographing text slivers.
-    # A real intrusion still ends the channel; the allowance is bounded by both
-    # the seed's line height and the channel width, not a page-specific distance.
-    edge_slop = min(median(box[3] - box[1] for box in run) * 0.15,
-                    (x1 - x0) * 0.02)
-    boxes = [box for _, _, row_boxes in rows for box in row_boxes]
-    if side == "right":
-        x0 = max([x0] + [box[2] for box in boxes
-                         if box[0] < x0 and x0 < box[2] <= x0 + edge_slop])
-    else:
-        x1 = min([x1] + [box[0] for box in boxes
-                         if box[2] > x1 and x1 - edge_slop <= box[0] < x1])
+    def bounds():
+        top = raw.height * HEADER_BAND
+        bottom = raw.height * FOOTER_BAND
+        for _, _, boxes in rows:
+            for box in boxes:
+                if not (box[2] > x0 and box[0] < x1):
+                    continue
+                if box[1] < run[0][1]:
+                    top = max(top, box[3])
+                if box[3] > run[-1][3]:
+                    bottom = min(bottom, box[1])
+        return top, bottom
 
-    def crosses(box):
-        return box[2] > x0 and box[0] < x1
-
-    top = raw.height * HEADER_BAND
-    bottom = raw.height * FOOTER_BAND
-    for row_top, row_bottom, boxes in rows:
-        for box in boxes:
-            if not crosses(box):
-                continue
-            if box[1] < run[0][1]:
-                # Above the run -- including a line straddling the run's first
-                # line, which would otherwise have its middle cropped through.
-                top = max(top, box[3])
-            if box[3] > run[-1][3]:
-                bottom = min(bottom, box[1])
+    top, bottom = bounds()
+    captions = [ln for blk in getattr(raw, "text_blocks", ()) for ln in blk.lines
+                if _squashed_caption(ln.stripped)
+                and x0 <= (ln.bbox[0] + ln.bbox[2]) / 2.0 <= x1]
+    # Repair a sub-glyph column-edge mismatch only when one printed caption
+    # establishes a figure unit beyond the existing caption-attachment reach.
+    # Multiple captions establish independent units: expanding across them would
+    # merge stacked charts. A complete or unlabelled candidate needs no change.
+    detached_caption = len(captions) == 1 and (
+        captions[0].bbox[1] > bottom + 30.0 or captions[0].bbox[3] < top - 30.0)
+    if detached_caption:
+        edge_slop = min(median(box[3] - box[1] for box in run) * 0.15,
+                        (x1 - x0) * 0.02)
+        boxes = [box for _, _, row_boxes in rows for box in row_boxes]
+        if side == "right":
+            x0 = max([x0] + [box[2] for box in boxes
+                             if box[0] < x0 and x0 < box[2] <= x0 + edge_slop])
+        else:
+            x1 = min([x1] + [box[0] for box in boxes
+                             if box[2] > x1 and x1 - edge_slop <= box[0] < x1])
+        top, bottom = bounds()
     if side == "left":
         add(x0, top + 2.0, x1, bottom - 2.0, "scan_figure_side",
             pad_x0=4.0, pad_x1=0.0)

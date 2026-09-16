@@ -843,9 +843,12 @@ def test_sidebar_chart_survives_subglyph_column_edge_drift(side):
         flip=lambda b:(550-b[2],b[1],550-b[0],b[3])
         run,neighbor,lower=([flip(b) for b in group] for group in (run,neighbor,lower))
     rows=[(60,177,run),(195,297,neighbor),(315,327,lower)]
+    caption=_line('Chart 3 - Complete source wheel',310 if side=='right' else 60,
+                  299,490 if side=='right' else 240,312,10)
     found=[]
     skeleton._side_territory(run,side,rows,50,500,
-                            SimpleNamespace(width=550,height=800),450,
+                            SimpleNamespace(width=550,height=800,
+                                text_blocks=[_block(0,[caption])]),450,
                             lambda x0,y0,x1,y1,*a,**kw:found.append((x0,y0,x1,y1)))
     assert len(found)==1
     box=found[0]
@@ -867,3 +870,16 @@ def test_sidebar_growth_stops_at_real_prose_even_beside_a_thin_gutter(intrusion)
                             50,500,SimpleNamespace(width=550,height=800),450,
                             lambda x0,y0,x1,y1,*a,**kw:found.append((x0,y0,x1,y1)))
     assert found and found[0][3]<=195, 'neighboring prose cannot be swallowed as artwork'
+
+
+def test_separate_caption_units_do_not_expand_into_one_sidebar_chart():
+    from types import SimpleNamespace
+    run=[(50,60+i*15,250,72+i*15) for i in range(8)]
+    neighbor=[(70,195+i*15,250.8,207+i*15) for i in range(12)]
+    captions=[_line('Chart 1 - First independent wheel',300,180,490,192,10),
+              _line('Chart 2 - Second independent wheel',300,380,490,392,10)]
+    found=[]
+    skeleton._side_territory(run,'right',[(60,177,run),(195,372,neighbor)],50,500,
+        SimpleNamespace(width=550,height=800,text_blocks=[_block(0,captions)]),450,
+        lambda x0,y0,x1,y1,*a,**kw:found.append((x0,y0,x1,y1)))
+    assert found and found[0][3]<=195, 'independent caption units must not merge'

@@ -1698,6 +1698,34 @@ def degree_in_the_note_zone_page(doc):
     return page
 
 
+def own_line_note_number_page(doc):
+    """Book 569 page 355's footnote: the scan put the note's number on a line
+    of its own at the note's own size, and the note's sentence on the next
+    line. The raised-number rule refuses a full-size span, so the note never
+    opened: its text printed as a stray body paragraph and the body's marker
+    had nothing to link to."""
+    page = add_page(doc)
+    add_running_head(page, "324", "CHAPTER 28")
+    y = add_body_lines(page, PROSE_LINES[:5])
+    y = add_line_with_marker(page, y, "the impediments of that same purpose.",
+                             "10", "", superscript=True)
+    add_body_lines(page, PROSE_LINES[5:7], top=y)
+    _put(page, LEFT + 4, NOTE_TOP, "10", size=NOTE_TEXT_SIZE)
+    _put(page, LEFT + 4, NOTE_TOP + 12.0, "Ibn Sahl, The Fifty Judgments 6.",
+         size=NOTE_TEXT_SIZE)
+    return page
+
+
+def bare_number_is_not_an_own_line_note_page(doc):
+    """The control: a bare number at the bottom of the page with no sentence
+    after it is a folio, not a note opening."""
+    page = add_page(doc)
+    add_running_head(page, "325", "CHAPTER 28")
+    add_body_lines(page, PROSE_LINES[:8])
+    _put(page, LEFT + 4, NOTE_TOP + 48.0, "391", size=NOTE_TEXT_SIZE)
+    return page
+
+
 def glyph_note_number_page(doc):
     """Page 119 of book 567: a note whose own printed number the scan read as letters.
 

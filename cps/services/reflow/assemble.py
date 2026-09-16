@@ -1293,7 +1293,8 @@ def _heal_page_columns(skel, vocab):
                         else region.lines)
             continue
         elif region.kind == "note":
-            counter.update(_WORD.findall(_heal_linebreaks(region.text, vocab)))
+            counter.update(_WORD.findall(_heal_line_stream(
+                [ln.text for ln in region.lines], vocab)))
             continue
         elif region.kind in ("furniture", "artwork"):
             counter.update(_WORD.findall(region.text))

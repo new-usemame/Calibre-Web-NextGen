@@ -533,6 +533,23 @@ class TestANoteWhoseOwnNumberTheScannerAte(object):
         assert "Sagittarius" in body, body
         assert "applying aspect" in body, body
 
+    def test_a_number_on_its_own_line_opens_its_note(self):
+        """The own-line shape: full-size digits alone on a line, the note's
+        sentence on the next. The note opens, keeps its text, and the marker
+        in the body binds it -- the link the reader follows."""
+        skel = self._regions(F.own_line_note_number_page)
+
+        assert [r.number for r in skel.note_regions] == [10]
+        note = skel.note_regions[0]
+        assert "Ibn Sahl" in note.text
+        body = " ".join(r.text for r in skel.body_regions)
+        assert "Ibn Sahl" not in body, body
+
+    def test_a_bare_number_without_a_sentence_after_is_not_a_note(self):
+        skel = self._regions(F.bare_number_is_not_an_own_line_note_page)
+
+        assert skel.note_regions == []
+
 
 class TestTypeThatIsOnlyBiggerBecauseTheScannerSaidSo(object):
     """DIAGNOSIS A has a mirror image. A converter that reads a drifted measurement as

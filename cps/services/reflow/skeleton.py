@@ -657,7 +657,9 @@ def _split_off_notes(raw, style, skel):
     for blk in eligible:
         per_block = []
         for pos, ln in enumerate(blk.lines):
-            number = _note_number(ln, blk.size, opening=(pos == 0), after=None)
+            number = _note_number(
+                ln, blk.size, opening=(pos == 0), after=None,
+                following=blk.lines[pos + 1] if pos + 1 < len(blk.lines) else None)
             if number is not None:
                 per_block.append((pos, number, _opening_strength(ln, blk.size)))
         openings.append(per_block)
@@ -701,14 +703,16 @@ def _split_off_notes(raw, style, skel):
 
 def _opening_strength(line, block_size):
     """How a zone-opening number was read: a raised digit span of its own, digits
-    merged into the note's text, or glyphs that only spell digits -- the reading
-    that asks the rest of the zone to corroborate it. Mirrors ``_note_number``:
-    a full-size digit span is not a raised number, whatever it spells."""
+    merged into the note's text or set on a line of their own, or glyphs that
+    only spell digits -- the reading that asks the rest of the zone to
+    corroborate it. Mirrors ``_note_number``: a full-size digit span is not a
+    raised number, whatever it spells."""
     spans = [sp for sp in line.spans if sp.text.strip()]
     if spans and re.fullmatch(r"\d{1,3}", spans[0].text.strip()):
         if not (block_size and spans[0].size > MARGIN_SIZE * block_size):
             return "raised"
-    if _MERGED_NOTE_NUMBER.match(line.stripped):
+    if _MERGED_NOTE_NUMBER.match(line.stripped) \
+            or re.fullmatch(r"\d{1,3}", line.stripped):
         return "merged"
     return "glyph"
 
@@ -723,8 +727,11 @@ def _notes_in_block(blk, existing):
     current = None
     seen = [r.number for r in existing if r.number is not None]
     for position, ln in enumerate(blk.lines):
-        number = _note_number(ln, blk.size, opening=(position == 0),
-                              after=seen[-1] if seen else None)
+        number = _note_number(
+            ln, blk.size, opening=(position == 0),
+            after=seen[-1] if seen else None,
+            following=blk.lines[position + 1] if position + 1 < len(blk.lines)
+            else None)
         if number is not None:
             seen.append(number)
             current = Region(kind="note", lines=[ln], number=number, bbox=ln.bbox)
@@ -790,14 +797,18 @@ _GLYPH_NOTE_NUMBER = re.compile("^(\\S{2,4})[ \\t]+(?=[A-Z\u201c\u2018\"\'])")
 _MERGED_NOTE_NUMBER = re.compile(r"^(\d{1,3})[ \t]+(?=[A-Z\u201c\u2018\"\'])")
 
 
-def _note_number(line, block_size, opening=False, after=None):
+def _note_number(line, block_size, opening=False, after=None, following=None):
     """The note's own number when the line opens one.
 
-    Two printed shapes reach us. The raised number survives as its own small span —
-    the strong signal, and the only one accepted mid-block. Or the scanner merged it
-    into the first text span at full size, which MEASURED costs 138 footnotes on 70
-    of the acceptance book's 698 pages; that shape is only read at the first line of
-    a block already inside the footnote zone, where a number can only be a number.
+    Three printed shapes reach us. The raised number survives as its own small
+    span — the strong signal, and the only one accepted mid-block. Or the scanner
+    merged it into the first text span at full size, which MEASURED costs 138
+    footnotes on 70 of the acceptance book's 698 pages; that shape is only read
+    at the first line of a block already inside the footnote zone, where a
+    number can only be a number. Or the number sits on a line of its own at the
+    note's own size, the note's sentence on the line under it -- book 569's
+    '10' above 'I b N Sa h l , The Fifty Judgments 6.'; that shape asks for the
+    sentence, so a bare folio cannot open a note.
     """
     spans = [sp for sp in line.spans if sp.text.strip()]
     if not spans:
@@ -806,8 +817,15 @@ def _note_number(line, block_size, opening=False, after=None):
     text = first.text.strip()
     if re.fullmatch(r"\d{1,3}", text):
         if block_size and first.size > MARGIN_SIZE * block_size:
-            return None
-        return int(text)
+            pass
+        else:
+            return int(text)
+    if following is not None and re.fullmatch(r"\d{1,3}", line.stripped):
+        head = following.stripped
+        if (head[:1].isupper() or head[:1] in "“‘\"'") and len(head.split()) >= 2:
+            value = int(line.stripped)
+            if value > 0 and (after is None or value > after):
+                return value
     merged = _MERGED_NOTE_NUMBER.match(line.stripped)
     if merged:
         value = int(merged.group(1))

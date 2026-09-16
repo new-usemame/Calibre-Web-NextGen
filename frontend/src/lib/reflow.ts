@@ -37,6 +37,18 @@ export interface ReflowJob {
   reused: number;
   gate: Record<string, number>;
   models: Record<string, number>;
+  /** The source-recovery summary recorded with the job (empty object when the
+   *  job predates recovery or none was needed). */
+  recovery: {
+    attempted?: number;
+    reused?: number;
+    failed?: number;
+    ocr_words?: number;
+    uncertain_words?: number;
+    mode_pages?: number;
+    seconds?: number;
+    engine_unavailable?: boolean;
+  };
   error: string | null;
   sample_url: string | null;
   sample_ready?: boolean;
@@ -64,6 +76,8 @@ export interface ReflowStartBody {
   consent: true;
   replace_existing_epub?: boolean;
   include_report_page?: boolean;
+  source_recovery?: 'auto' | 'textless' | 'off';
+  ocr_language?: string;
 }
 
 export interface ReflowStarted {

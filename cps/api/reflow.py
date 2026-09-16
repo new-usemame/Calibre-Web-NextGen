@@ -34,6 +34,7 @@ import hashlib
 import json
 import os
 import re
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -50,7 +51,8 @@ from . import api_v1, log
 from .. import calibre_db, config
 from ..constants import REFLOW_DIR
 from ..cw_login import current_user
-from ..services.reflow import admission, build_epub, ledger as ledger_mod, model, pipeline
+from ..services.reflow import (admission, build_epub, extract,
+                               ledger as ledger_mod, model, ocr, pipeline)
 from ..services.worker import STAT_STARTED, STAT_WAITING, WorkerThread
 from ..tasks import reflow as tasks_reflow
 from ..usermanagement import login_required_if_no_ano
@@ -223,6 +225,32 @@ def _target_usd():
     return round(target, 4)
 
 
+#: The engine probe costs two short subprocesses; a minute between checks is
+#: fresh enough for a settings page and cheap enough for every page open.
+_ENGINE_TTL = 60.0
+_engine_checks = {}
+
+
+def _ocr_engine_state(language):
+    """Is the local text recognition usable for ``language`` — and if not, why.
+
+    The detail sentence is the adapter's own: it names the missing component
+    (the engine, the language data, or the orientation data), which is what an
+    administrator has to act on. Never probed with secrets in reach (ocr._env).
+    """
+    now = time.monotonic()
+    cached = _engine_checks.get(language)
+    if cached and now - cached[0] < _ENGINE_TTL:
+        return cached[1]
+    try:
+        __, version, __ = ocr._engine(language)
+        state = {"available": True, "detail": "", "version": version}
+    except ocr.OCRUnavailable as exc:
+        state = {"available": False, "detail": str(exc), "version": ""}
+    _engine_checks[language] = (now, state)
+    return state
+
+
 def _estimate_payload(book, source):
     quote = _survey(source)
     pages = int(quote.get("pages") or 0)
@@ -233,6 +261,7 @@ def _estimate_payload(book, source):
     default_tier = tasks_reflow.config_default_tier()
     target = _target_usd()
     over = tiers.get(default_tier, 0.0) > target
+    engine = _ocr_engine_state("eng")
     return {
         "book_id": book.id,
         "title": book.title,
@@ -259,6 +288,19 @@ def _estimate_payload(book, source):
         "sampled": int(quote.get("sampled") or 0),
         "reasons": dict(quote.get("reasons") or {}),
         "cached": bool(quote.get("cached")),
+        "recovery": {
+            "ocr_candidates": int(quote.get("ocr_candidates") or 0),
+            "image_only": int(quote.get("ocr_image_only") or 0),
+            "damaged": int(quote.get("ocr_damaged") or 0),
+            "estimated_seconds": int(quote.get("ocr_estimated_seconds") or 0),
+            "engine_available": bool(engine["available"]),
+            "engine_version": engine["version"],
+            "engine_detail": engine["detail"],
+            "language": "eng",
+            "dpi": 300,
+            "pdf_sha256": extract.document_fingerprint(source)[:16],
+            "non_latin_share": float(quote.get("non_latin_share") or 0.0),
+        },
     }
 
 
@@ -346,6 +388,21 @@ def reflow_start(book_id):
                     "This book already has an EPUB. Choose 'replace the existing "
                     "EPUB' if you want Reflow to overwrite it.", 409)
 
+    # A chosen recovery with no engine to do it fails here, before consent or
+    # spend, naming the missing component -- never page by page after the money.
+    recovery = payload.get("recovery") or {}
+    recoverable = recovery.get("image_only", 0) + (
+        recovery.get("damaged", 0) if options.source_recovery == "auto" else 0)
+    if options.source_recovery != "off" and recoverable:
+        engine = _ocr_engine_state(options.ocr_language)
+        if not engine["available"]:
+            return _err(
+                "ocr_unavailable",
+                "This PDF has %d pages that need local text recognition, and %s "
+                "An administrator must install it, or the conversion can keep a "
+                "facsimile of the page images instead (Source recovery: none)."
+                % (recoverable, engine["detail"]), 422)
+
     needed = _required_usd(payload, options.model_tier, options.mode,
                            options.sample_pages)
     if options.cost_cap_usd + 1e-9 < needed:
@@ -424,6 +481,7 @@ def reflow_jobs(book_id):
             "reused": row.get("reused", 0),
             "gate": row.get("gate", {}),
             "models": row.get("models", {}),
+            "recovery": row.get("recovery", {}),
             "error": row.get("error"),
             "sample_url": None,
         }

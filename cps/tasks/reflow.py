@@ -30,7 +30,7 @@ from cps import config, db, helper, logger
 from cps.constants import REFLOW_DIR
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED
 from cps.services.reflow import admission, build_epub, ledger as ledger_mod, model, \
-    pipeline, report
+    ocr, pipeline, report
 
 log = logger.create()
 
@@ -204,6 +204,10 @@ class TaskReflowPdf(CalibreTask):
                                "cap_usd": self.options.cost_cap_usd,
                                "pages": document.page_count})
                 result = self._convert(document, client, ledger, cache)
+                if result.recovery is not None:
+                    summary = result.recovery.summary()
+                    summary.pop("pages", None)
+                    ledger.record(dict(kind="recovery", **summary))
                 if self.cancelled:
                     # The pages already paid for stay in the cache, so restarting is
                     # cheap — but a conversion nobody waited for does not become the
@@ -225,6 +229,16 @@ class TaskReflowPdf(CalibreTask):
             ledger.record({"kind": "job", "event": "finish",
                            "status": STOP_STATUS.get(result.stopped, "done")})
             self._handleSuccess()
+        except ocr.OCRCancelled:
+            # The user stopped the recognition stage: nothing was filed, the
+            # original is untouched, and the identity cache keeps what was
+            # already recognized, so a resume spends nothing twice.
+            if ledger is not None:
+                ledger.record({"kind": "job", "event": "finish",
+                               "status": "cancelled"})
+            self.message = ("cancelled during source recovery; the original is "
+                            "unchanged and compatible recovery may resume")
+            return self._finish_cancelled()
         except Exception as exc:                                  # noqa: BLE001
             log.error_or_exception(exc)
             if ledger is not None:

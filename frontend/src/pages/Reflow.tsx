@@ -64,6 +64,8 @@ export function Reflow({ id }: { id: string }) {
   const [capTouched, setCapTouched] = useState(false);
   const [consent, setConsent] = useState(false);
   const [replaceEpub, setReplaceEpub] = useState(false);
+  const [recovery, setRecovery] = useState<'auto' | 'textless' | 'off'>('auto');
+  const [ocrLang, setOcrLang] = useState<string>('eng');
   const [error, setError] = useState<string | null>(null);
 
   const start = useStartReflow(id);
@@ -76,7 +78,15 @@ export function Reflow({ id }: { id: string }) {
     setTier((current) => current || est.default_tier);
     setSamplePages(est.sample_pages_default);
     setMode(est.sample_suggested ? 'sample' : 'full');
+    setOcrLang(est.recovery.language);
   }, [est]);
+
+  const rec = est?.recovery;
+  const needsRecovery = !!rec && rec.ocr_candidates > 0;
+  // A chosen recovery with no engine is refused by the server; say so here,
+  // before the consent box is even offered.
+  const engineBlocks = needsRecovery && recovery !== 'off' && !rec?.engine_available;
+  const facsimile = needsRecovery && recovery === 'off';
 
   const needed = est && tier ? requiredUsd(est, tier, mode, samplePages) : 0;
   const capNumber = Number.parseFloat(cap);
@@ -108,7 +118,7 @@ export function Reflow({ id }: { id: string }) {
     && (!est || capNumber <= est.hard_cap_usd + 1e-9);
   const capTooLow = capValid && capNumber + 1e-9 < needed;
   const blocked = !est?.configured || running || !consent || !capValid || capTooLow
-    || start.isPending;
+    || engineBlocks || start.isPending;
 
   const onStart = () => {
     if (!est || blocked) return;
@@ -116,6 +126,7 @@ export function Reflow({ id }: { id: string }) {
     start.mutate({
       mode, model_tier: tier, sample_pages: samplePages, cost_cap_usd: capNumber,
       consent: true, replace_existing_epub: replaceEpub, include_report_page: true,
+      source_recovery: recovery, ocr_language: ocrLang,
     }, {
       onError: (err) => setError(err instanceof ApiError ? err.message
         : t('The conversion could not be started.')),
@@ -151,7 +162,7 @@ export function Reflow({ id }: { id: string }) {
           <KeyRound size={16} aria-hidden="true" focusable={false} />
           <span>
             {t('No OpenRouter key is configured, so nothing can be converted yet.')}{' '}
-            <Link href="/admin" className={styles.adminLink}>{t('Open admin settings')}</Link>
+            <Link href="/admin/config" className={styles.adminLink}>{t('Open admin settings')}</Link>
           </span>
         </div>
       )}
@@ -167,8 +178,12 @@ export function Reflow({ id }: { id: string }) {
                   { pages: est.routed_pages_estimate,
                     percent: Math.round(est.routed_share * 100) })
               : `${est.routed_pages_estimate} (${Math.round(est.routed_share * 100)}%)`} />
-          <Fact label={t('Text layer')}
-            value={est.text_layer ? t('Yes') : t('No')} />
+          <Fact label={t('Source text')}
+            value={!needsRecovery
+              ? t('Verified in the PDF')
+              : rec.damaged > 0
+                ? t('Damaged layer — recovery required')
+                : t('Pictures only — recovery required')} />
         </dl>
         <p className={styles.note}>
           {t('Every other page is converted by reading the PDF itself, which costs nothing. A page only goes to a model when the layout cannot be settled without one.')}
@@ -181,6 +196,86 @@ export function Reflow({ id }: { id: string }) {
           )}
         </p>
       </section>
+
+      {needsRecovery && rec && (
+        <section className={styles.card} aria-labelledby="reflow-recovery">
+          <h2 className={styles.cardTitle} id="reflow-recovery">{t('Source recovery')}</h2>
+          <p className={styles.verdict}>
+            {rec.damaged > 0
+              ? t('{pages} pages have a text layer that is not readable words. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite.')
+                  .replace('{pages}', String(rec.damaged))
+              : t('{pages} pages are only pictures of pages. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite.')
+                  .replace('{pages}', String(rec.image_only))}
+          </p>
+          <dl className={styles.facts}>
+            <Fact label={t('Recognition engine')}
+              value={rec.engine_available
+                ? rec.engine_version
+                : t('Not installed')} />
+            <Fact label={t('Language data')} value={ocrLang} />
+            <Fact label={t('Local time (no OpenRouter credit)')}
+              value={t('about {seconds}s for {pages} pages')
+                .replace('{seconds}', String(rec.estimated_seconds))
+                .replace('{pages}', String(rec.ocr_candidates))} />
+          </dl>
+          {rec.non_latin_share >= 0.5 && (
+            <p className={styles.capWarn} role="status">
+              {t('Most of this PDF is not Latin-alphabet text. The selected recognition language will misread it unless a matching language pack is installed.')}
+            </p>
+          )}
+          {!rec.engine_available && (
+            <p className={styles.capWarn} role="alert">
+              <AlertTriangle size={15} aria-hidden="true" focusable={false} />
+              {' '}{rec.engine_detail}{' '}
+              {t('An administrator must install it before text can be recovered, or you can keep a facsimile of the page images.')}
+            </p>
+          )}
+          <div className={styles.modes} role="radiogroup" aria-label={t('Source recovery')}>
+            <label className={recovery === 'auto' ? styles.modeOn : styles.mode}>
+              <input type="radio" name="reflow-recovery" className={styles.radio}
+                checked={recovery === 'auto'}
+                disabled={!rec.engine_available}
+                onChange={() => setRecovery('auto')} />
+              <span className={styles.modeLabel}>{t('Recover the text')}</span>
+              <span className={styles.modeHint}>
+                {t('Local OCR of every page that needs it, before any structural work. The original words stay annotated wherever the engine is unsure.')}
+              </span>
+            </label>
+            {rec.damaged > 0 && (
+              <label className={recovery === 'textless' ? styles.modeOn : styles.mode}>
+                <input type="radio" name="reflow-recovery" className={styles.radio}
+                  checked={recovery === 'textless'}
+                  disabled={!rec.engine_available}
+                  onChange={() => setRecovery('textless')} />
+                <span className={styles.modeLabel}>{t('Recover pictures only')}</span>
+                <span className={styles.modeHint}>
+                  {t('Read only the pages with no text at all; the damaged layer is kept exactly as printed.')}
+                </span>
+              </label>
+            )}
+            <label className={recovery === 'off' ? styles.modeOn : styles.mode}>
+              <input type="radio" name="reflow-recovery" className={styles.radio}
+                checked={recovery === 'off'}
+                onChange={() => setRecovery('off')} />
+              <span className={styles.modeLabel}>{t('No recovery — facsimile only')}</span>
+              <span className={styles.modeHint}>
+                {t('Keep the page images as they are. This is a facsimile of the book, not reflowed text.')}
+              </span>
+            </label>
+          </div>
+          {rec.engine_available && (
+            <label className={styles.field}>
+              <span className={styles.label}>{t('Recognition language')}</span>
+              <input className={styles.inputNarrow} type="text" value={ocrLang}
+                maxLength={64}
+                onChange={(e) => setOcrLang(e.target.value.trim() || 'eng')} />
+              <span className={styles.fieldHint}>
+                {t('An installed language code, for example eng, deu, fra, ell.')}
+              </span>
+            </label>
+          )}
+        </section>
+      )}
 
       <section className={styles.card} aria-labelledby="reflow-cost">
         <h2 className={styles.cardTitle} id="reflow-cost">{t('What it will cost')}</h2>
@@ -295,8 +390,15 @@ export function Reflow({ id }: { id: string }) {
 
         <Button onClick={onStart} disabled={blocked}>
           <Sparkles size={15} aria-hidden="true" focusable={false} />
-          {mode === 'sample' ? t('Convert the sample') : t('Convert the book')}
+          {facsimile
+            ? t('Build the facsimile EPUB')
+            : mode === 'sample' ? t('Convert the sample') : t('Convert the book')}
         </Button>
+        {facsimile && (
+          <p className={styles.note} role="status">
+            {t('This keeps the page images as they are — a facsimile of the book, not reflowed text.')}
+          </p>
+        )}
       </section>
 
       {running && active.map((task) => (
@@ -399,6 +501,14 @@ function JobResult({ job, bookId, t, onConvertAll }: {
         )}
         <Fact label={t('Pages the check accepted')}
           value={`${adopted} (${sharePct}%)`} />
+        {(job.recovery.mode_pages ?? 0) > 0 && (
+          <Fact label={t('Pages read with local OCR')}
+            value={String(job.recovery.mode_pages)} />
+        )}
+        {(job.recovery.uncertain_words ?? 0) > 0 && (
+          <Fact label={t('Uncertain readings marked')}
+            value={String(job.recovery.uncertain_words)} />
+        )}
       </dl>
       {refused > 0 && (
         <p className={styles.note}>

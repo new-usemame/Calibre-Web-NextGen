@@ -55,6 +55,19 @@ function estimateFor(pages: number, routed: number, hardCap = 5,
     sampled,
     reasons: { footnotes: routed },
     cached: false,
+    recovery: {
+      ocr_candidates: 0,
+      image_only: 0,
+      damaged: 0,
+      estimated_seconds: 0,
+      engine_available: true,
+      engine_version: 'tesseract 5.5.3',
+      engine_detail: '',
+      language: 'eng',
+      dpi: 300,
+      pdf_sha256: '0'.repeat(16),
+      non_latin_share: 0,
+    },
   };
 }
 

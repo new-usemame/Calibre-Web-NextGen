@@ -42,6 +42,21 @@ export interface ReflowEstimate {
   sampled: number;
   reasons: Record<string, number>;
   cached: boolean;
+  /** The source-recovery picture for this book: which pages need local OCR,
+   *  whether the engine can do it, and what it costs in local time. */
+  recovery: {
+    ocr_candidates: number;
+    image_only: number;
+    damaged: number;
+    estimated_seconds: number;
+    engine_available: boolean;
+    engine_version: string;
+    engine_detail: string;
+    language: string;
+    dpi: number;
+    pdf_sha256: string;
+    non_latin_share: number;
+  };
 }
 
 /** The counts a finished job's card shows, kept apart from one another.

@@ -124,6 +124,8 @@ class Ledger(object):
         calls = sum(1 for e in self._entries
                     if e.get("cost_usd") is not None and not e.get("cached"))
         reused = sum(1 for e in self._entries if e.get("cached"))
+        recovery = next((dict(e) for e in self._entries
+                         if e.get("kind") == "recovery"), None)
         return {
             "calls": calls,
             "reused": reused,
@@ -135,6 +137,7 @@ class Ledger(object):
             "gate": dict(gate),
             "models": dict(models),
             "pages": len(self.pages_done()),
+            "recovery": recovery or {},
         }
 
 

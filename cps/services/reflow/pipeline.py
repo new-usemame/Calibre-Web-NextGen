@@ -261,7 +261,9 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
     style = skeleton.book_style(raw_pages,
                                outline if skeleton.outline_is_useful(outline) else None)
     result.style = style
-    skeletons = [skeleton.page_skeleton(raw, style) for raw in raw_pages]
+    trusted = result.assessment.layer_is_trusted if result.assessment else True
+    skeletons = [skeleton.page_skeleton(raw, style, layer_trusted=trusted)
+                 for raw in raw_pages]
 
     report(Progress(stage="assemble", message="putting the text back together"))
     book = assemble.assemble(skeletons, style, raw_pages)

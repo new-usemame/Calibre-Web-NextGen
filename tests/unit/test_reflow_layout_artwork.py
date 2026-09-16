@@ -162,6 +162,28 @@ class TestColumnReadingOrder(object):
         assert text.index("Day") < text.index("Night") < text.index("Sun") \
                < text.index("Moon"), text
 
+    def test_an_unruled_label_table_keeps_its_rows(self):
+        """Book 569's zodiacal tables: a label column of short lines beside a
+        content column is a table, and its rows must survive."""
+        book = _book(F.unruled_label_table_page)
+
+        text = _whole_text(book)
+        assert text.index("Astronomical features") < text.index("Northern"), text
+        assert text.index("Northern") < text.index("Characteristics"), text
+        assert text.index("Rulerships") < text.index("domicile Venus"), text
+        assert "columns_reordered" not in (book.page_reasons(0) or [])
+
+    def test_a_ragged_single_column_page_is_not_shredded(self):
+        """Book 565 page 158's shape: ragged short lines are not a column, and
+        a hyphenated word across the line break heals exactly once."""
+        book = _book(F.ragged_single_column_page)
+
+        text = _whole_text(book)
+        assert text.index("Christianity was abolished.") < text.index("Mohammed"), text
+        assert "Christianso" in text
+        assert "columns_reordered" not in (book.page_reasons(0) or [])
+        assert book.conservation.ok, book.conservation.to_dict()
+
     def test_an_ordinary_page_keeps_its_order(self):
         """The single-column control: nothing about a normal page may change."""
         book = _book(F.prose_page)

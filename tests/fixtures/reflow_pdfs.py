@@ -772,6 +772,47 @@ def ruled_table_page(doc):
     return page
 
 
+def unruled_label_table_page(doc):
+    """Book 569's zodiacal tables: a label column of one- and two-word lines
+    beside a content column, with no ruling at all.
+
+    Row relationships here are carried by position alone, so they are the easiest
+    to destroy and the most important to keep: read column-major, 'Rulerships'
+    prints six lines away from the rulers it names.
+    """
+    page = add_page(doc)
+    _column_rows(page, [
+        ("Astronomical features", "Northern, Commanding, Short Ascension, Crooked"),
+        ("Characteristics", "Bestial, Quadrupedal, Terrestrial, Unprolific"),
+        ("Places/Winds", "Babylon, South Wind"),
+        ("Classifications", "Feminine, Nocturnal, Solid, Spring, Earth"),
+        ("Rulerships", "domicile Venus, detriment Mars, exaltation Moon"),
+        ("Triplicities", "Venus by day, Moon by night, participates Saturn"),
+    ], left=97.0, right=167.0)
+    return page
+
+
+def ragged_single_column_page(doc):
+    """Book 565 page 158's shape: an ordinary page of prose whose ragged short
+    lines open fake gutters between their right edges.
+
+    Most lines fill the measure; a handful of short ones (a paragraph tail, a
+    date line) do not. Those few are not a column, and the page must read
+    straight through in print order.
+    """
+    page = add_page(doc)
+    y = add_body_lines(page, PROSE_LINES[:9])
+    _put(page, LEFT, y, "Christianity was abolished.")
+    y += BODY_LEADING
+    y = add_body_lines(page, PROSE_LINES[9:15], top=y)
+    _put(page, LEFT, y, "Mohammed and Augustine) who had strong influence upon the Christian-")
+    y += BODY_LEADING
+    _put(page, LEFT + 70, y, "so there would be individuals who would particularly")
+    y += BODY_LEADING
+    add_body_lines(page, PROSE_LINES[15:22], top=y)
+    return page
+
+
 # ------------------------------------------------------- artwork inside a page scan
 
 def scan_chart_band_page(doc, png_bytes):
@@ -857,6 +898,22 @@ def vector_diagram_page(doc):
         page.draw_line((x0, y0), (x1, y1), color=(0, 0, 0), width=0.6)
     _put(page, 168.9, 556.0, "Figure 8.1 - The Twelve Places")
     add_body_lines(page, PROSE_LINES[8:12], top=580.0)
+    return page
+
+
+def garbage_scan_page(doc, png_bytes):
+    """A photographed page whose OCR layer is noise, over a real scan.
+
+    Book 561's shape. The text layer's boxes do not describe where the ink is, so
+    any 'gap' measured from them is fiction: the layer must be trusted before
+    figure territory is measured from it, or whole prose regions ship as crops.
+    """
+    page = add_page(doc)
+    page.insert_image(pymupdf.Rect(0, 0, PAGE_W, PAGE_H), stream=png_bytes)
+    y = BODY_TOP
+    for line in GARBAGE_LINES * 3:
+        _put(page, LEFT, y, line)
+        y += BODY_LEADING
     return page
 
 

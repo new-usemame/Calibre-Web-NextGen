@@ -483,7 +483,7 @@ def heading_ish(line, style):
 
 # ----------------------------------------------------------------------- the skeleton
 
-def page_skeleton(raw, style):
+def page_skeleton(raw, style, layer_trusted=True):
     """Classify one page's regions, recording a reason for every uncertain call."""
     skel = PageSkeleton(pno=raw.pno, width=raw.width, height=raw.height,
                         is_scan=raw.is_page_scan)
@@ -517,10 +517,13 @@ def page_skeleton(raw, style):
     # Artwork that no embedded image claims: on a scan it is ink inside the page
     # raster; on a born-digital page it is a cluster of vector paths. Either way
     # the region is cut out of the page render, and the lettering the text layer
-    # read off it rides with it instead of reading as prose.
-    if raw.is_page_scan:
+    # read off it rides with it instead of reading as prose. The territory is
+    # measured FROM the text layer's geometry, though -- a layer the census
+    # called garbage does not describe where the ink is, and territory measured
+    # from it crops whole prose regions as 'figures' (book 561's shape).
+    if raw.is_page_scan and layer_trusted:
         candidates = _scan_figures(kept_blocks, raw, style)
-    elif raw.drawings:
+    elif raw.drawings and not raw.is_page_scan:
         candidates = _vector_figures(raw)
     else:
         candidates = []
@@ -903,7 +906,8 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
     cost of reading a table or a ragged page column-major is higher than the cost
     of asking. What is proved gets fixed; what is not gets looked at.
     """
-    items = [ln.bbox for _, kept in kept_blocks for ln in kept]
+    line_items = [(ln.bbox, ln.stripped) for _, kept in kept_blocks for ln in kept]
+    items = [box for box, _ in line_items]
     items.extend(img.bbox for img in embedded)
     items.extend(candidate.bbox for candidate in candidates)
     if len(items) < 6:
@@ -923,23 +927,42 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
         # beside it may still be ordered.)
         return None
 
+    spanning = [box for box in items if (box[2] - box[0]) >= FULL_SPAN * span]
+    columnar = [(box, text) for box, text in line_items
+                if (box[2] - box[0]) < FULL_SPAN * span]
+    if len(spanning) >= len(columnar):
+        # Most lines fill the measure: a single-column page whose ragged short
+        # lines opened fake gutters between their right edges. MEASURED on book
+        # 565 page 158: an ordinary page shredded into 33 'bands' and three
+        # 'columns' of one-line paragraphs. Real columns almost never span the
+        # measure -- that is what makes them columns.
+        return None
+
     bounds = [left - 1.0] + gutters + [right + 1.0]
     layout = _ColumnLayout(
         left, right, bounds,
-        sorted((box[1] + box[3]) / 2.0 for box in items
-               if (box[2] - box[0]) >= FULL_SPAN * span))
+        sorted((box[1] + box[3]) / 2.0 for box in spanning))
 
-    columnar = [box for box in items if (box[2] - box[0]) < FULL_SPAN * span]
     counts = [0] * layout.ncols
     fills = []
-    for box in columnar:
+    short = [0] * layout.ncols
+    for box, text in columnar:
         column = layout.column_of(box)
         counts[column] += 1
         width = bounds[column + 1] - bounds[column]
         if width > 0:
             fills.append((box[2] - box[0]) / width)
+        if len(text.split()) <= 2:
+            short[column] += 1
     if sum(1 for count in counts if count >= COLUMN_MIN_LINES) < 2:
         return None
+    for column, count in enumerate(counts):
+        if count >= COLUMN_MIN_LINES and short[column] * 2 >= count:
+            # A column of one- and two-word lines is a table's label column (or a
+            # grid of cells), not a column of prose: reading it column-major
+            # severs every row it prints. MEASURED on book 569's zodiacal tables
+            # ('Characteristics' beside 'Northern - Commanding - ...').
+            return None
     fills.sort()
     if fills and fills[len(fills) // 2] < COLUMN_FILL_MIN:
         return None
@@ -1027,13 +1050,15 @@ def _scan_figures(kept_blocks, raw, style):
 
     candidates = []
 
-    def add(x0, y0, x1, y1, why):
+    def add(x0, y0, x1, y1, why, pad_x0=4.0, pad_x1=4.0):
         if y1 - y0 < raw.height * SCAN_GAP or x1 - x0 < span * 0.2:
             return
+        # The pad breathes into empty territory only: padding across the prose's
+        # own edge pulls a sliver of every line into the crop.
         candidates.append(Region(
             kind="figure", reason=why, needs_ink=True,
-            bbox=(max(0.0, x0 - 4.0), max(0.0, y0 - 2.0),
-                  min(raw.width, x1 + 4.0), min(raw.height, y1 + 2.0))))
+            bbox=(max(0.0, x0 - pad_x0), max(0.0, y0 - 2.0),
+                  min(raw.width, x1 + pad_x1), min(raw.height, y1 + 2.0))))
 
     # Full-width bands. A gap BETWEEN two prose rows is territory proved on both
     # sides. A gap at the edge of the page is weaker evidence -- the top and
@@ -1105,11 +1130,18 @@ def _side_territory(run, side, rows, left, right, raw, span, add):
         for box in boxes:
             if not crosses(box):
                 continue
-            if box[3] <= run[0][1]:
+            if box[1] < run[0][1]:
+                # Above the run -- including a line straddling the run's first
+                # line, which would otherwise have its middle cropped through.
                 top = max(top, box[3])
-            elif box[1] >= run[-1][3]:
+            if box[3] > run[-1][3]:
                 bottom = min(bottom, box[1])
-    add(x0, top + 2.0, x1, bottom - 2.0, "scan_figure_side")
+    if side == "left":
+        add(x0, top + 2.0, x1, bottom - 2.0, "scan_figure_side",
+            pad_x0=4.0, pad_x1=0.0)
+    else:
+        add(x0, top + 2.0, x1, bottom - 2.0, "scan_figure_side",
+            pad_x0=0.0, pad_x1=4.0)
 
 
 def _vector_figures(raw):

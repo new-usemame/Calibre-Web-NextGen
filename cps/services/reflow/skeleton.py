@@ -1735,18 +1735,18 @@ def _attach_caption(candidate, kept_blocks, style):
     for ln in sorted((ln for _, lines in kept_blocks for ln in lines),
                      key=_caption_order):
         x0, y0, x1, y1 = ln.bbox
-        if y0 < candidate.bbox[1] or y0 > candidate.bbox[3] + 30.0:
+        if y0 < candidate.bbox[1] or (not found and y0 > candidate.bbox[3] + 30.0):
             continue
-        centre = (x0 + x1) / 2.0
-        if centre < candidate.bbox[0] or centre > candidate.bbox[2]:
+        if x0 < candidate.bbox[0] - 4 or x1 > candidate.bbox[2] + 4:
             continue
+        if found and y0 > last_y + 16.0:
+            break
         if not found and _squashed_caption(ln.stripped):
             found.append(ln)
             last_y = y1
             continue
         if found and y0 <= last_y + 16.0 \
-                and style.body_size and ln.size < style.body_size * 0.98 \
-                and ln.size <= found[0].size * 1.2:
+                and style.body_size and ln.size < style.body_size * 0.98:
             found.append(ln)
             last_y = y1
     if not found:
@@ -1776,6 +1776,7 @@ def _absorb_figure_content(kept_blocks, candidates, style):
     build time would be gone from the reader's book.
     """
     for candidate in candidates:
+        image_box = candidate.bbox
         kept_blocks = _attach_caption(candidate, kept_blocks, style)
         captions = list(candidate.caption_lines)
         kept = []
@@ -1797,7 +1798,7 @@ def _absorb_figure_content(kept_blocks, candidates, style):
         candidate.caption_lines = captions
         candidate.uncertain = _caption_has_gap(captions)
         if captions and not candidate.uncertain:
-            candidate.bbox = _crop_around_caption(candidate.bbox, captions)
+            candidate.bbox = _crop_around_caption(image_box, captions)
         elif captions:
             # A broken baseline can hide a symbol absent from the text layer.
             # Keep its printed pixels and qualify the transcription instead of

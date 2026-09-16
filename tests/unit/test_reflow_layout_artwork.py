@@ -759,7 +759,7 @@ class TestPlateAndCaptionFidelity:
         caption = _line('figure 68.', 94, 330, 130, 338, 5.6)
         title = _line('RIGHT- AND LEFT-SIDED ASPECT FIGURES', 94, 341, 230, 347, 6)
         prose = _line('Porphyry explains the separate paragraph.', 250, 342, 450, 351, 9)
-        explanation = _line('The explanation continues over several lines.', 94, 355, 235, 362, 7)
+        explanation = _line('The explanation continues over several lines.', 94, 355, 235, 362, 9)
         candidate = skeleton.Region(kind='figure', bbox=(84,161,249,341))
         blocks = [(_block(i,[ln]),[ln])
                   for i,ln in enumerate([title,prose,caption,explanation])]
@@ -792,3 +792,23 @@ class TestPlateAndCaptionFidelity:
         assert 'reflow-uncertain' in html and 'printed caption' in html
         assert '(?)' in html
         assert book.conservation.ok
+
+
+    def test_full_italic_caption_stays_with_figure_across_extractor_blocks(self):
+        number = _line('figure 68.', 94, 330, 130, 338, 5.6)
+        title = _line('RIGHT AND LEFT ASPECT FIGURES', 94, 341, 230, 347, 6)
+        caption = [_line('Caption line %d continues the explanation.' % n,
+                         94, 353+n*9, 235, 359.5+n*9, 6.5) for n in range(11)]
+        for line in caption:
+            line.spans[0].flags = extract.FLAG_ITALIC
+        right = _line('Porphyry explains the right panel.', 250, 355, 383, 364, 9)
+        bottom = _line('The full-width bottom continuation stays prose.', 90, 461, 383, 470, 9)
+        lines = [title, right, *caption[5:], bottom, number, *caption[:5]]
+        blocks = [(_block(i,[ln]),[ln]) for i,ln in enumerate(lines)]
+        candidate = skeleton.Region(kind='figure',bbox=(84,161,249,341))
+        import types
+        rest, _ = skeleton._absorb_figure_content(blocks,[candidate],
+                                                  types.SimpleNamespace(body_size=9))
+        assert [ln.text for ln in candidate.caption_lines] == [number.text,title.text] + [ln.text for ln in caption]
+        assert [ln.text for _,ls in rest for ln in ls] == [right.text,bottom.text]
+        assert candidate.bbox[3] <= number.bbox[1], 'caption must not distort the chart crop'

@@ -179,6 +179,9 @@ def main():
     _start_runtime_tasks(app)
 
     from . import web_server
+    from . import content_server
 
+    content_server.start()
     success = web_server.start()
+    content_server.stop()
     sys.exit(0 if success else 1)

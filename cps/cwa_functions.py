@@ -7,7 +7,7 @@
 from flask import Blueprint, redirect, flash, url_for, request, send_from_directory, abort, jsonify, current_app
 from flask_babel import gettext as _, lazy_gettext as _l
 
-from . import logger, config, constants, csrf, helper, ub, calibre_db
+from . import logger, config, constants, csrf, helper, ub, calibre_db, content_server
 from .constants import LOG_ARCHIVE
 from .metadata_constants import DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON
 from .usermanagement import login_required_if_no_ano, user_login_required
@@ -57,6 +57,11 @@ from .tasks.ops import TaskConvertLibraryRun, TaskEpubFixerRun
 
 switch_theme = Blueprint('switch_theme', __name__)
 library_refresh = Blueprint('library_refresh', __name__)
+def _restart_content_server_when_done(process):
+    process.wait()
+    content_server.start()
+
+
 convert_library = Blueprint('convert_library', __name__)
 epub_fixer = Blueprint('epub_fixer', __name__)
 cover_enforcer_ui = Blueprint('cover_enforcer_ui', __name__)
@@ -2001,7 +2006,10 @@ def _service_log_path(filename: str) -> str:
 ##———————————————————END OF SHARED VARIABLES & FUNCTIONS———————————————————————##
 
 def convert_library_start(queue):
+    # convert_library works on the format files on disk, so it needs the library to itself
+    content_server.stop()
     cl_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'convert_library.py')])
+    Thread(target=_restart_content_server_when_done, args=(cl_process,), daemon=True).start()
     queue.put(cl_process)
 
 def get_tmp_conversion_dir() -> str:

@@ -829,3 +829,41 @@ class TestPlateAndCaptionFidelity:
         assert '<em>Unverified symbols appear in this explanation.</em>' in html
         assert 'reflow-uncertain' in html and '(?)' in html
         assert book.conservation.ok
+
+
+@pytest.mark.parametrize('side', ['right', 'left'])
+def test_sidebar_chart_survives_subglyph_column_edge_drift(side):
+    """A second narrow paragraph must not cut through the source circle merely
+    because its extracted line ends protrude by less than a glyph's width."""
+    from types import SimpleNamespace
+    run=[(50,60+i*15,250,72+i*15) for i in range(8)]
+    neighbor=[(70,195+i*15,250.8,207+i*15) for i in range(7)]
+    lower=[(50,315,500,327)]
+    if side=='left':
+        flip=lambda b:(550-b[2],b[1],550-b[0],b[3])
+        run,neighbor,lower=([flip(b) for b in group] for group in (run,neighbor,lower))
+    rows=[(60,177,run),(195,297,neighbor),(315,327,lower)]
+    found=[]
+    skeleton._side_territory(run,side,rows,50,500,
+                            SimpleNamespace(width=550,height=800),450,
+                            lambda x0,y0,x1,y1,*a,**kw:found.append((x0,y0,x1,y1)))
+    assert len(found)==1
+    box=found[0]
+    # The original source wheel occupies y70..290. Its lower circumference
+    # cannot be inferred from its upper half: all of those pixels must survive.
+    assert box[1]<=70 and box[3]>=290, box
+    assert box[3]<=315, 'the real full-width continuation must remain prose'
+    if side=='right':assert box[0]>=250.8, 'do not crop a sliver of adjacent prose'
+    else:assert box[2]<=299.2
+
+
+@pytest.mark.parametrize('intrusion', [5.0, 100.0])
+def test_sidebar_growth_stops_at_real_prose_even_beside_a_thin_gutter(intrusion):
+    from types import SimpleNamespace
+    run=[(50,60+i*15,250,72+i*15) for i in range(8)]
+    crossing=(70,195,250+intrusion,207)
+    found=[]
+    skeleton._side_territory(run,'right',[(60,177,run),(195,207,[crossing])],
+                            50,500,SimpleNamespace(width=550,height=800),450,
+                            lambda x0,y0,x1,y1,*a,**kw:found.append((x0,y0,x1,y1)))
+    assert found and found[0][3]<=195, 'neighboring prose cannot be swallowed as artwork'

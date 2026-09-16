@@ -22,6 +22,7 @@ chart labels actually are — stray single glyphs and columns of numbers.
 import re
 from collections import Counter
 from dataclasses import dataclass, field
+from statistics import median
 from typing import List, Optional, Tuple
 
 from . import extract
@@ -1634,6 +1635,22 @@ def _side_territory(run, side, rows, left, right, raw, span, add):
         x0, x1 = max(box[2] for box in run), right
     if x1 - x0 < span * SIDE_CHANNEL_MIN * 0.8:
         return
+
+    # Adjacent paragraphs can have slightly different extracted column edges.
+    # A sub-glyph protrusion is not prose running underneath the picture. Move
+    # the crop edge outward to contain that small drift in the prose column,
+    # rather than either cutting the picture short or photographing text slivers.
+    # A real intrusion still ends the channel; the allowance is bounded by both
+    # the seed's line height and the channel width, not a page-specific distance.
+    edge_slop = min(median(box[3] - box[1] for box in run) * 0.15,
+                    (x1 - x0) * 0.02)
+    boxes = [box for _, _, row_boxes in rows for box in row_boxes]
+    if side == "right":
+        x0 = max([x0] + [box[2] for box in boxes
+                         if box[0] < x0 and x0 < box[2] <= x0 + edge_slop])
+    else:
+        x1 = min([x1] + [box[0] for box in boxes
+                         if box[2] > x1 and x1 - edge_slop <= box[0] < x1])
 
     def crosses(box):
         return box[2] > x0 and box[0] < x1

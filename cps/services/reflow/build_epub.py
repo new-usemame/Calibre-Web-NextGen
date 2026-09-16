@@ -711,36 +711,69 @@ def _opf(metadata, manifest, spine, identifier, modified):
 
 
 def _figure_images(chapters, doc, book):
-    """Crop each figure the fragments referred to; drop the ones we cannot make."""
+    """Crop each figure the fragments referred to; drop the ones we cannot make.
+
+    Two drops are not the same event. A crop that *fails* is a loss: the page
+    printed a figure and the book does not have it, so it is reported. A candidate
+    region that proves to hold no ink is blank paper -- source 344 of the
+    readiness corpus is a visibly empty leaf that the baseline emitted as one of
+    its thirteen 'figures' -- and leaving it out is the correct outcome, disclosed
+    in the sidecar rather than mourned on the report page.
+    """
     wanted = []
     for chapter in chapters:
         wanted.extend(_IMG_SRC.findall("\n".join(chapter.blocks)))
     wanted = [src for src in dict.fromkeys(wanted) if src.startswith("images/")]
     if not wanted:
-        return {}, []
+        return {}, [], []
 
     boxes = {}
     for index, figure in enumerate(book.figures):
         seen = boxes.setdefault(figure["pno"], [])
-        seen.append(figure["bbox"])
+        seen.append(figure)
 
-    images, missing = {}, []
+    images, missing, blanks = {}, [], []
     for src in wanted:
         match = re.match(r"images/fig_p(\d+)_(\d+)\.jpg$", src)
         if not match or doc is None:
             missing.append(src)
             continue
         pno, index = int(match.group(1)), int(match.group(2))
-        page_boxes = boxes.get(pno) or []
-        if index >= len(page_boxes):
+        page_figures = boxes.get(pno) or []
+        if index >= len(page_figures):
             missing.append(src)
             continue
+        figure = page_figures[index]
         try:
-            images[src] = extract.crop_jpeg(doc, pno, page_boxes[index])
+            if figure.get("needs_ink") and not extract.region_has_ink(
+                    doc, pno, figure["bbox"]):
+                blanks.append(src)
+                continue
+            images[src] = extract.crop_jpeg(doc, pno, figure["bbox"])
         except Exception as exc:                                  # pragma: no cover
             log.warning("reflow: figure %s could not be cropped: %s", src, exc)
+            if figure.get("needs_ink"):
+                # Fail closed on the visible source, not on silence: when the
+                # measured territory cannot be cut, the whole printed page is the
+                # honest remainder -- the reader loses nothing that was there.
+                try:
+                    images[src] = extract.crop_jpeg(doc, pno, _page_rect(doc, pno))
+                    continue
+                except Exception:                                 # pragma: no cover
+                    pass
             missing.append(src)
-    return images, missing
+    return images, missing, blanks
+
+
+def _page_rect(doc, pno):
+    rect = doc[pno].rect
+    return (rect.x0, rect.y0, rect.x1, rect.y1)
+
+
+def _drop_images(chapters, missing):
+    if not missing:
+        return
+    gone = set(missing)
 
 
 def _drop_images(chapters, missing):
@@ -830,8 +863,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     joins = _join_page_turns(pages)
     chapters = _chapters(pages)
     dropped = _bind_links(chapters)
-    images, missing = _figure_images(chapters, doc, book)
-    _drop_images(chapters, missing)
+    images, missing, blanks = _figure_images(chapters, doc, book)
+    _drop_images(chapters, missing + blanks)
 
     identifier = identifier or "urn:uuid:%s" % uuid.uuid4()
     modified = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -874,7 +907,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     for index, src in enumerate(sorted(images)):
         manifest.append({"id": "img%03d" % index, "href": src, "type": "image/jpeg"})
 
-    payload = _sidecar(book, pages, chapters, images, joins, sidecar)
+    payload = _sidecar(book, pages, chapters, images, joins, sidecar, blanks)
     if unrepresentable:
         payload["unrepresentable_characters"] = unrepresentable
     if losses:
@@ -901,7 +934,9 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
                                   "pages": list(c.pages)} for c in chapters])
 
 
-def _sidecar(book, pages, chapters, images, joins, extra):
+def _sidecar(book, pages, chapters, images, joins, extra, blanks=()):
+    artwork_words = sum(len(re.findall(r"[A-Za-z][A-Za-z'’]*", item["text"]))
+                        for item in getattr(book, "artwork", []) or [])
     payload = {
         "converter": CONVERTER,
         "converter_version": CONVERTER_VERSION,
@@ -915,7 +950,22 @@ def _sidecar(book, pages, chapters, images, joins, extra):
         "notes_unmarked": sum(1 for n in book.notes
                               if n.num is not None and not n.marked),
         "figures": len(book.figures),
+        "figures_recovered": sum(1 for figure in book.figures
+                                 if figure.get("found") not in (None, "embedded")),
+        "figures_blank_dropped": len(blanks),
         "images_embedded": len(images),
+        "artwork_words": artwork_words,
+        # What conservation means here, exactly: every alphabetic word of the PDF
+        # text layer is accounted for in the reading flow (body, headings,
+        # captions), the notes, the removed running furniture (counted, since it
+        # is dropped on purpose), or the preserved artwork crops (counted here as
+        # artwork_words) -- minus only the characters a recorded repair declares
+        # it consumed. Nothing is silently discarded; a word in none of those
+        # places fails the conservation check.
+        "conservation_semantics": (
+            "every source word is accounted in body/notes/captions, removed "
+            "furniture, or preserved artwork crops; only recorded repairs "
+            "subtract, itemised"),
         "page_joins": joins,
         "repairs": [r.to_dict() for r in book.repairs[:200]],
         "repair_count": len(book.repairs),

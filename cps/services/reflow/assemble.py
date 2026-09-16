@@ -74,6 +74,10 @@ class Element(object):
     level: int = 0
     bbox: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
     pages: List[int] = field(default_factory=list)
+    #: A figure whose position was settled by geometry (a chart found in a page
+    #: scan) needs no caption to place it by; one from an embedded image still
+    #: raises figure_without_caption, because the caption is its only anchor.
+    placed: str = ""
 
     @property
     def text(self):
@@ -137,6 +141,10 @@ class Book(object):
     pages: dict = field(default_factory=dict)         # pno -> [Element] as printed
     body_boxes: dict = field(default_factory=dict)    # pno -> the page minus its furniture
     figures: List[dict] = field(default_factory=list)
+    #: Lettering the text layer read off a figure, kept with the figure instead of
+    #: the prose: pno, text, bbox. Counted into conservation so the words are
+    #: accounted -- in the crop and here -- never silently discarded.
+    artwork: List[dict] = field(default_factory=list)
     reasons: dict = field(default_factory=dict)       # pno -> [reason, ...]
     style: Optional[skeleton.BookStyle] = None
     source_words: Counter = field(default_factory=Counter)
@@ -870,7 +878,19 @@ def _page_elements(skel, repairs, reasons):
     for region in skel.regions:
         if region.kind == "figure":
             elements.append(Element(kind="fig", runs=[], pno=skel.pno,
-                                    bbox=region.bbox))
+                                    bbox=region.bbox,
+                                    placed="geometry" if region.reason else ""))
+            if region.caption_lines:
+                runs = []
+                for line in region.caption_lines:
+                    line_runs = _line_runs(line, skel.pno, page_notes, claimed,
+                                           repairs, reasons)
+                    runs = line_runs if not runs else stitch_runs(runs, line_runs)
+                runs = tidy(runs)
+                if plain_text(runs):
+                    elements.append(Element(kind="caption", runs=runs, pno=skel.pno,
+                                            bbox=_region_caption_box(region),
+                                            pages=[skel.pno]))
             continue
         if region.kind not in ("heading", "body", "caption"):
             continue
@@ -893,14 +913,23 @@ def _page_elements(skel, repairs, reasons):
     _recover_residue_markers(elements, skel, claimed, repairs, reasons)
     _recover_glyph_markers(elements, skel, claimed, repairs, reasons)
     # A plate with no caption under it has nothing to place it by, which is a page
-    # worth a second look rather than a silent <figcaption></figcaption>.
+    # worth a second look rather than a silent <figcaption></figcaption>. A figure
+    # found by geometry is placed already: its position is the evidence.
     for index, element in enumerate(elements):
-        if element.kind != "fig":
+        if element.kind != "fig" or element.placed == "geometry":
             continue
         following = elements[index + 1] if index + 1 < len(elements) else None
         if following is None or following.kind != "caption":
             reasons.append("figure_without_caption")
     return elements, claimed
+
+
+def _region_caption_box(region):
+    boxes = [ln.bbox for ln in region.caption_lines if ln.bbox]
+    if not boxes:
+        return region.bbox
+    return (min(b[0] for b in boxes), min(b[1] for b in boxes),
+            max(b[2] for b in boxes), max(b[3] for b in boxes))
 
 
 def assemble(skeletons, style, raw_pages=None):
@@ -941,9 +970,14 @@ def assemble(skeletons, style, raw_pages=None):
                                        text=note_text(region, book.repairs, skel.pno),
                                        pno=skel.pno,
                                        marked=region.number in claimed))
+            elif region.kind == "artwork":
+                book.artwork.append({"pno": skel.pno, "bbox": list(region.bbox),
+                                     "text": region.text})
             elif region.kind == "figure":
                 book.figures.append({"pno": skel.pno, "bbox": list(region.bbox),
-                                     "full_page": bool(region.image and region.image.full_page)})
+                                     "full_page": bool(region.image and region.image.full_page),
+                                     "needs_ink": bool(region.needs_ink),
+                                     "found": region.reason or "embedded"})
 
         for position, element in enumerate(elements):
             previous = book.elements[-1] if book.elements else None
@@ -975,7 +1009,7 @@ def assemble(skeletons, style, raw_pages=None):
         book.source_words = source_word_counter(raw_pages)
         book.conservation = check_conservation(book.source_words, book.elements,
                                                book.notes, book.furniture,
-                                               book.repairs)
+                                               book.repairs, artwork=book.artwork)
 
     unmarked = [n for n in book.notes if n.num is not None and not n.marked]
     book.stats = {
@@ -984,6 +1018,8 @@ def assemble(skeletons, style, raw_pages=None):
         "paragraphs": sum(1 for el in book.elements if el.kind == "p"),
         "headings": sum(1 for el in book.elements if el.kind == "h"),
         "figures": len(book.figures),
+        "artwork_words": sum(len(_WORD.findall(item["text"]))
+                             for item in book.artwork),
         "notes": len([n for n in book.notes if n.num is not None]),
         "notes_unmarked": len(unmarked),
         # Notes the page printed and the text layer never returned. Counted here
@@ -1028,12 +1064,18 @@ def source_word_counter(raw_pages):
     return counter
 
 
-def check_conservation(source_words, elements, notes, furniture, repairs=()):
+def check_conservation(source_words, elements, notes, furniture, repairs=(),
+                       artwork=()):
     """SPEC §3: the assembled output's words are the source's words.
 
     Furniture is removed on purpose, so it is counted here rather than forgiven — a
     running head that stops being recognised as furniture shows up as *added*, and a
     paragraph that falls out of the stream shows up as *missing*.
+
+    Artwork lettering is counted the same way: words the text layer read off a
+    chart travel with the chart's crop, not with the prose, and are disclosed in
+    the sidecar. A label that stops being recognised as artwork shows up as
+    *missing* rather than vanishing into the picture.
 
     ``repairs`` are the only subtractions. A marker repair reads ``s°`` as the number
     50 and the ``s`` stops being a word, so the characters each repair declares it
@@ -1048,6 +1090,8 @@ def check_conservation(source_words, elements, notes, furniture, repairs=()):
         output.update(_WORD.findall(note.text))
     for line in furniture:
         output.update(_WORD.findall(line))
+    for item in artwork:
+        output.update(_WORD.findall(item["text"] if isinstance(item, dict) else item))
 
     for repair in repairs:
         for word in _WORD.findall(repair.consumed):

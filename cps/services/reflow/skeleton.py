@@ -80,6 +80,24 @@ COLUMN_FILL_MIN = 0.45
 #: column traversal of a ruled grid destroys its rows, so it is left alone.
 RULED_MIN_PATHS = 4
 
+#: A text-free band this tall (share of page height) inside a page scan is figure
+#: territory -- on this kind of book the diagrams live inside the page raster.
+SCAN_GAP = 0.14
+#: An empty side channel at least this wide (share of the text span) beside a
+#: prose column is sidebar figure territory (a natal wheel next to its reading).
+SIDE_CHANNEL_MIN = 0.25
+#: On a scan, lettering set at least this far above the body is chart lettering,
+#: not prose -- the sparse giant glyphs an OCR layer reads off a diagram.
+CHART_LABEL_RATIO = 1.5
+#: A line at least this much inside a figure region is lettering on the figure.
+FIG_LINE_OVERLAP = 0.80
+
+#: A vector diagram needs at least this many paths clustered together ...
+VEC_MIN_PATHS = 25
+#: ... covering at least this much of the page, and at most this much.
+VEC_MIN_AREA = 0.04
+VEC_MAX_AREA = 0.75
+
 FOLIO = re.compile(r"^(?:page\s*)?[\divxlcdmIVXLCDM]{1,8}[.)]?$")
 CAPTION_LINE = re.compile(r"^(?:fig(?:ure|\.)|table|chart|plate|map|diagram)\s*\d", re.I)
 _DIGITS = re.compile(r"\d+")
@@ -93,7 +111,7 @@ _STRIP_EDGES = "()[]{}<>«»\"'‘’“”.,:;!?—–-"
 class Region(object):
     """One classified run of lines on a page."""
 
-    kind: str                       # heading | body | note | furniture | caption | figure
+    kind: str                       # heading | body | note | furniture | caption | figure | artwork
     lines: List[extract.Line] = field(default_factory=list)
     level: int = 0                  # headings only
     number: Optional[int] = None    # notes only
@@ -105,6 +123,13 @@ class Region(object):
     #: ordinary single-column page, which is what makes this backward compatible.
     band: int = 0
     column: int = 0
+    #: Caption lines absorbed into a figure: printed inside its territory (a chart
+    #: title under a wheel), carried here so the figure keeps its caption without
+    #: the words reading twice.
+    caption_lines: List[extract.Line] = field(default_factory=list)
+    #: Figures found by geometry rather than by an embedded image: the crop must
+    #: prove it holds ink before it is emitted, so blank paper is never artwork.
+    needs_ink: bool = False
 
     @property
     def text(self):
@@ -466,7 +491,10 @@ def page_skeleton(raw, style):
     if not raw.text_blocks:
         skel.reasons.append("no_text_layer" if raw.images else "empty_page")
         for img in raw.images:
-            skel.regions.append(Region(kind="figure", bbox=img.bbox, image=img))
+            # A textless leaf may be a plate or may be blank paper; the build
+            # proves ink before either is emitted as a figure.
+            skel.regions.append(Region(kind="figure", bbox=img.bbox, image=img,
+                                       needs_ink=True))
         return skel
 
     body_blocks, note_regions = _split_off_notes(raw, style, skel)
@@ -486,7 +514,22 @@ def page_skeleton(raw, style):
 
     embedded = [img for img in raw.images if img.substantial and not img.full_page]
 
-    layout = _column_layout(kept_blocks, embedded, raw)
+    # Artwork that no embedded image claims: on a scan it is ink inside the page
+    # raster; on a born-digital page it is a cluster of vector paths. Either way
+    # the region is cut out of the page render, and the lettering the text layer
+    # read off it rides with it instead of reading as prose.
+    if raw.is_page_scan:
+        candidates = _scan_figures(kept_blocks, raw, style)
+    elif raw.drawings:
+        candidates = _vector_figures(raw)
+    else:
+        candidates = []
+    artwork = []
+    if candidates:
+        kept_blocks, artwork = _absorb_figure_content(kept_blocks, candidates)
+        skel.regions.extend(artwork)
+
+    layout = _column_layout(kept_blocks, embedded, candidates, raw)
     if layout is not None:
         skel.reasons.append("columns_reordered")
         for blk, kept in kept_blocks:
@@ -502,6 +545,10 @@ def page_skeleton(raw, style):
         band, column = layout.place(img.bbox) if layout else (0, 0)
         skel.regions.append(Region(kind="figure", bbox=img.bbox, image=img,
                                    band=band, column=column))
+    for candidate in candidates:
+        if layout is not None:
+            candidate.band, candidate.column = layout.place(candidate.bbox)
+        skel.regions.append(candidate)
 
     skel.regions.extend(note_regions)
     skel.regions.sort(key=_region_order)
@@ -847,7 +894,7 @@ class _ColumnLayout(object):
                 for (band, column), group in sorted(runs.items())]
 
 
-def _column_layout(kept_blocks, embedded, raw):
+def _column_layout(kept_blocks, embedded, candidates, raw):
     """The page's column layout, or None when the page does not prove one.
 
     Fail closed on purpose: a page that only *might* be columns keeps the
@@ -857,6 +904,7 @@ def _column_layout(kept_blocks, embedded, raw):
     """
     items = [ln.bbox for _, kept in kept_blocks for ln in kept]
     items.extend(img.bbox for img in embedded)
+    items.extend(candidate.bbox for candidate in candidates)
     if len(items) < 6:
         return None
     left = min(box[0] for box in items)
@@ -868,9 +916,10 @@ def _column_layout(kept_blocks, embedded, raw):
     gutters = _gutters(items, left, span)
     if not gutters:
         return None
-    if raw.drawings >= RULED_MIN_PATHS:
-        # Ruled lines across the gutter: a grid, not prose columns. Column-major
-        # traversal of a ruled table destroys every row it prints.
+    if raw.drawings >= RULED_MIN_PATHS and not candidates:
+        # Ruled lines across the gutter: a grid, not prose columns. (A candidate
+        # has already claimed the drawing territory as artwork, so prose left
+        # beside it may still be ordered.)
         return None
 
     bounds = [left - 1.0] + gutters + [right + 1.0]
@@ -895,6 +944,264 @@ def _column_layout(kept_blocks, embedded, raw):
         return None
     return layout
 
+
+# ----------------------------------------------------------- figures by geometry
+
+def _chart_lettering(line, style):
+    """True for the lettering an OCR layer reads off a diagram on a scanned page.
+
+    Two shapes: the wreckage ``looks_like_chart_junk`` already knows (stray glyphs,
+    columns of numbers), and lettering set far larger than the body -- on a scan
+    the chart's captions come back two to four times the prose size, which no real
+    line of the book's prose ever does inside a page the ladder has measured.
+    """
+    if looks_like_chart_junk(line.stripped):
+        return True
+    return bool(style.body_size) and line.size >= style.body_size * CHART_LABEL_RATIO
+
+
+def _inside(bbox, rect, share=FIG_LINE_OVERLAP):
+    """True when ``bbox`` sits at least ``share`` inside ``rect``."""
+    x0 = max(bbox[0], rect[0])
+    y0 = max(bbox[1], rect[1])
+    x1 = min(bbox[2], rect[2])
+    y1 = min(bbox[3], rect[3])
+    if x1 <= x0 or y1 <= y0:
+        return False
+    area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
+    return area > 0 and (x1 - x0) * (y1 - y0) / area >= share
+
+
+def _prose_rows(kept_blocks, raw, style):
+    """The page's prose, merged into horizontal bands of (top, bottom, [line boxes]).
+
+    Chart lettering and caption lines are not prose: the first lives inside the
+    figure and must not slice its territory into strips, the second rides with
+    the figure it names. What remains is the text a figure cannot overlap, which
+    is what the figure territory is measured from.
+    """
+    top, bottom = raw.height * HEADER_BAND, raw.height * FOOTER_BAND
+    spans = []
+    for _, kept in kept_blocks:
+        for ln in kept:
+            if _chart_lettering(ln, style) or CAPTION_LINE.match(ln.stripped):
+                continue
+            y0, y1 = max(ln.bbox[1], top), min(ln.bbox[3], bottom)
+            if y1 > y0:
+                spans.append([y0, y1, ln.bbox])
+    spans.sort()
+    rows = []
+    for y0, y1, bbox in spans:
+        if rows and y0 <= rows[-1][1] + 2:
+            rows[-1][1] = max(rows[-1][1], y1)
+            rows[-1][2].append(bbox)
+        else:
+            rows.append([y0, y1, [bbox]])
+    return rows, top, bottom
+
+
+def _scan_figures(kept_blocks, raw, style):
+    """Figure territory inside a full-page scan, from where the prose is not.
+
+    A full-page scan carries all of its art inside the page raster, and the old
+    branch threw the raster away whenever an OCR layer existed -- which is how
+    book 567 lost every chart printed between its paragraphs. The text layer
+    still says where the text is not: a tall full-width band with no prose in it,
+    or a wide empty channel beside a prose column, is figure territory. What is
+    found is cropped from the source render at build time, never redrawn.
+    """
+    rows, top, bottom = _prose_rows(kept_blocks, raw, style)
+    if not rows:
+        return []
+    lines = [ln for _, kept in kept_blocks for ln in kept]
+    left = min(ln.bbox[0] for ln in lines)
+    right = max(ln.bbox[2] for ln in lines)
+    span = right - left
+    if span <= 1:
+        return []
+
+    candidates = []
+
+    def add(x0, y0, x1, y1, why):
+        if y1 - y0 < raw.height * SCAN_GAP or x1 - x0 < span * 0.2:
+            return
+        candidates.append(Region(
+            kind="figure", reason=why, needs_ink=True,
+            bbox=(max(0.0, x0 - 4.0), max(0.0, y0 - 2.0),
+                  min(raw.width, x1 + 4.0), min(raw.height, y1 + 2.0))))
+
+    # Full-width bands. A gap BETWEEN two prose rows is territory proved on both
+    # sides. A gap at the edge of the page is weaker evidence -- the top and
+    # bottom margins of a scan are blank paper with enough texture to fake ink --
+    # so an edge gap is territory only when the OCR layer read lettering off the
+    # figure inside it (a sect chart's giant sparse glyphs). An empty margin
+    # stays empty.
+    first, last = rows[0], rows[-1]
+    if first[0] - top > raw.height * SCAN_GAP and any(
+            _chart_lettering(ln, style) for ln in lines
+            if ln.bbox[1] >= top - 2 and ln.bbox[3] <= first[0] + 2):
+        add(left, top, right, first[0], "scan_figure_band")
+    for row, following in zip(rows, rows[1:]):
+        gap = following[0] - row[1]
+        if gap > raw.height * SCAN_GAP:
+            add(left, row[1], right, following[0], "scan_figure_band")
+    if bottom - last[1] > raw.height * SCAN_GAP and any(
+            _chart_lettering(ln, style) for ln in lines
+            if ln.bbox[1] >= last[1] - 2 and ln.bbox[3] <= bottom + 2):
+        add(left, last[1], right, bottom, "scan_figure_band")
+
+    # Side channels: a tall run of prose lines that all leave the same wide
+    # channel empty on one side (a natal wheel beside its reading). One line
+    # running full width does not disprove the channel -- the prose resumes under
+    # the figure, which is exactly how a floated plate is set -- so the channel is
+    # measured over the longest contiguous run of lines that leave it open, and
+    # the territory is then grown against the prose around it.
+    for row_top, row_bottom, boxes in rows:
+        if row_bottom - row_top < raw.height * SCAN_GAP:
+            continue
+        ordered = sorted(boxes, key=lambda box: (box[1], box[0]))
+        for side in ("left", "right"):
+            run = []
+            for box in ordered + [None]:
+                open_side = box is not None and (
+                    (box[0] - left >= span * SIDE_CHANNEL_MIN) if side == "left"
+                    else (right - box[2] >= span * SIDE_CHANNEL_MIN))
+                if open_side:
+                    run.append(box)
+                    continue
+                if run:
+                    _side_territory(run, side, rows, left, right, raw, span, add)
+                    run = []
+    return candidates
+
+
+def _side_territory(run, side, rows, left, right, raw, span, add):
+    """One side-channel seed, grown against the prose, emitted if it is tall.
+
+    The seed is the run's own rectangle; its top and bottom then grow past
+    anything that does not reach into the channel (a section head set beside the
+    wheel is not the wheel), stopping where prose actually crosses the channel.
+    """
+    if run[-1][3] - run[0][1] < raw.height * SCAN_GAP:
+        return
+    if side == "left":
+        x0, x1 = left, min(box[0] for box in run)
+    else:
+        x0, x1 = max(box[2] for box in run), right
+    if x1 - x0 < span * SIDE_CHANNEL_MIN * 0.8:
+        return
+
+    def crosses(box):
+        return box[2] > x0 and box[0] < x1
+
+    top = raw.height * HEADER_BAND
+    bottom = raw.height * FOOTER_BAND
+    for row_top, row_bottom, boxes in rows:
+        for box in boxes:
+            if not crosses(box):
+                continue
+            if box[3] <= run[0][1]:
+                top = max(top, box[3])
+            elif box[1] >= run[-1][3]:
+                bottom = min(bottom, box[1])
+    add(x0, top + 2.0, x1, bottom - 2.0, "scan_figure_side")
+
+
+def _vector_figures(raw):
+    """Cluster a born-digital page's vector paths into diagram regions.
+
+    Charts and geometric figures are drawn, not embedded: extracting only embedded
+    images loses them whole. The guards are the v4 tool's, proven on the corpus:
+    enough paths to be a drawing rather than a rule, not so many the page is a
+    dense table or a traced scan, and a cluster of believable area.
+    """
+    rects = [r for r in raw.drawing_rects
+             if (r[2] - r[0]) > 4 and (r[3] - r[1]) > 4]
+    if len(rects) < VEC_MIN_PATHS:
+        return []
+    clusters = []
+    for rect in rects:
+        placed = False
+        for cluster in clusters:
+            box = cluster[0]
+            near = abs(box[0] - rect[0]) < 40 and abs(box[1] - rect[1]) < 40
+            overlap = not (rect[2] < box[0] or rect[0] > box[2]
+                           or rect[3] < box[1] or rect[1] > box[3])
+            if overlap or near:
+                cluster[0] = (min(box[0], rect[0]), min(box[1], rect[1]),
+                              max(box[2], rect[2]), max(box[3], rect[3]))
+                cluster[1] += 1
+                placed = True
+                break
+        if not placed:
+            clusters.append([tuple(rect), 1])
+    parea = raw.width * raw.height or 1.0
+    out = []
+    for box, count in clusters:
+        area = (box[2] - box[0]) * (box[3] - box[1]) / parea
+        if count >= VEC_MIN_PATHS and VEC_MIN_AREA <= area <= VEC_MAX_AREA:
+            out.append(Region(kind="figure", reason="vector_figure",
+                              bbox=box))
+    return out
+
+
+def _absorb_figure_content(kept_blocks, candidates):
+    """Move lettering and captions inside figure territory out of the prose.
+
+    The text layer reads a chart's labels as words; left in place they print as
+    prose next to the crop that already shows them -- duplicate chart junk in the
+    reading flow. Captions printed inside the territory (a chart title under a
+    wheel) ride with their figure instead, so the words are kept once, as text.
+    Lines only partly inside stay prose: eating a body line is the worse error.
+    """
+    for candidate in candidates:
+        captions = []
+        kept = []
+        for blk, lines in kept_blocks:
+            inside, outside = [], []
+            for ln in lines:
+                (inside if _inside(ln.bbox, candidate.bbox) else outside).append(ln)
+            for ln in inside:
+                if CAPTION_LINE.match(ln.stripped):
+                    captions.append(ln)
+                else:
+                    candidate.lines.append(ln)
+            if outside:
+                kept.append((blk, outside))
+        kept_blocks = kept
+        candidate.caption_lines = captions
+        if captions:
+            candidate.bbox = _crop_around_caption(candidate.bbox, captions)
+
+    artwork = []
+    for candidate in candidates:
+        if candidate.lines:
+            artwork.append(Region(kind="artwork", lines=candidate.lines,
+                                  bbox=_lines_bbox(candidate.lines, candidate.bbox),
+                                  reason="figure_lettering",
+                                  band=candidate.band, column=candidate.column))
+        candidate.lines = []
+    return kept_blocks, artwork
+
+
+def _crop_around_caption(bbox, captions):
+    """Shrink a figure's crop so its absorbed caption prints as text, not twice.
+
+    A caption at the territory's edge (under the wheel, over the chart) leaves a
+    single clean piece. One printed in the diagram's middle does not, and there
+    the whole territory is kept: a caption visible in the crop AND set as text is
+    a small cosmetic price, and losing it would be a content one.
+    """
+    top = min(ln.bbox[1] for ln in captions)
+    bottom = max(ln.bbox[3] for ln in captions)
+    height = bbox[3] - bbox[1]
+    above = (bbox[0], bbox[1], bbox[2], top - 1.0)
+    below = (bbox[0], bottom + 1.0, bbox[2], bbox[3])
+    pieces = sorted((above, below), key=lambda piece: piece[3] - piece[1],
+                    reverse=True)
+    if pieces[0][3] - pieces[0][1] >= height * 0.8:
+        return pieces[0]
+    return bbox
 
 
 def is_marker_span(span, line_size):

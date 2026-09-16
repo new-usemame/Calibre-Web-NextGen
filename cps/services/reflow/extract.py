@@ -46,6 +46,15 @@ FULLPAGE = 0.80
 #: Images smaller than this on either axis are rules, bullets and glyph art.
 MIN_FIG_PX = 90
 
+#: A sampled crop with less than this share of dark pixels is blank paper, not a
+#: figure. MEASURED against the v4 corpus: clean scan margins sit under it, printed
+#: ink sits far above it.
+INK_MIN = 0.004
+
+#: Above this many vector paths a page is a dense table or a traced scan, and its
+#: path boxes are noise rather than diagram evidence.
+MAX_DRAWING_RECTS = 2500
+
 _WS = re.compile(r"\s+")
 
 
@@ -201,6 +210,8 @@ class RawPage(object):
     blocks: List[Block] = field(default_factory=list)
     images: List[Image] = field(default_factory=list)
     drawings: int = 0
+    drawing_rects: List[Tuple[float, float, float, float]] = field(
+        default_factory=list)
 
     @property
     def text_blocks(self):
@@ -262,21 +273,50 @@ def read_page(doc, pno):
         if lines:
             raw.blocks.append(Block(number=blk.get("number", 0), bbox=bbox, lines=lines))
 
-    raw.drawings = count_drawings(page)
+    raw.drawings, raw.drawing_rects = drawing_rects(page)
     raw.blocks.sort(key=lambda b: (round(b.bbox[1], 1), round(b.bbox[0], 1)))
     return raw
 
 
-def count_drawings(page):
-    """Vector path count. Zero on every page of a scan; non-zero on born-digital
-    pages with rules, tables or diagrams."""
+def drawing_rects(page):
+    """(count, boxes) of the page's vector paths.
+
+    The count alone says a page carries rules or a diagram; the boxes say where.
+    Above ``MAX_DRAWING_RECTS`` the page is a dense table or a traced scan and the
+    boxes would be noise, so the count is kept and the boxes are not."""
     try:
-        return len(page.get_cdrawings())
+        drawings = page.get_cdrawings()
     except Exception:
         try:
-            return len(page.get_drawings())
+            drawings = page.get_drawings()
         except Exception:
-            return 0
+            return 0, []
+    rects = [tuple(d["rect"]) for d in drawings
+             if d.get("rect") is not None] if len(drawings) <= MAX_DRAWING_RECTS \
+        else []
+    return len(drawings), rects
+
+
+def region_has_ink(doc, pno, rect, thresh=INK_MIN):
+    """True when something is actually printed inside ``rect`` on the page.
+
+    Rendered small and sampled: the question is "blank paper or not", and a wrong
+    answer in either direction costs a figure -- a blank crop emitted as artwork,
+    or real artwork dropped as blank. Cheap enough to ask about every candidate.
+    """
+    pix = doc[pno].get_pixmap(matrix=pymupdf.Matrix(0.35, 0.35),
+                              clip=pymupdf.Rect(*rect), alpha=False)
+    data, n = pix.samples, pix.n
+    total = pix.width * pix.height
+    if not total:
+        return False
+    step = max(1, total // 20000)
+    dark = sampled = 0
+    for i in range(0, total, step):
+        sampled += 1
+        if data[i * n] < 200:
+            dark += 1
+    return bool(sampled) and dark / sampled > thresh
 
 
 def read_pages(doc, page_numbers=None):

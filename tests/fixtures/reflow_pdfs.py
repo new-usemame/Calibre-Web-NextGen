@@ -772,6 +772,93 @@ def ruled_table_page(doc):
     return page
 
 
+# ------------------------------------------------------- artwork inside a page scan
+
+def scan_chart_band_page(doc, png_bytes):
+    """Book 567 index 220's shape: the chart is ink inside a full-page scan, and
+    the OCR layer returns the chart's own labels as giant sparse lines.
+
+    The labels are the trap: taken at face value they are 'text', so the gap the
+    chart sits in never appears, and the diagram is dropped while its wreckage
+    reads as prose. They are set two to four times the body size, which on a scan
+    is what separates chart lettering from the book's prose."""
+    page = add_page(doc)
+    page.insert_image(pymupdf.Rect(0, 0, PAGE_W, PAGE_H), stream=png_bytes)
+    add_running_head(page, "194", "CHAPTER 7: THE PLANETS")
+    _put(page, 179.6, 108.0, "DAY CHART", size=20.0, font=_BOLD)
+    _put(page, 120.1, 155.0, "a", size=36.0)
+    _put(page, 187.3, 156.0, "9", size=36.0)
+    _put(page, 254.0, 156.0, "-5", size=36.0)
+    _put(page, 325.3, 155.0, "e", size=36.0)
+    _put(page, 96.8, 200.0, "+ 1 I", size=30.0)
+    _put(page, 165.5, 250.0, "NIGHT CHART", size=20.0, font=_BOLD)
+    _put(page, 122.3, 300.0, "9", size=36.0)
+    _put(page, 96.8, 335.0, "+ 1", size=30.0)
+    _put(page, 168.9, 388.0, "Figure 7.4 - Sect as a Spectrum")
+    add_body_lines(page, PROSE_LINES[:8], top=416.0)
+    return page
+
+
+def scan_sidebar_figure_page(doc, png_bytes):
+    """Book 567 index 485's shape: a natal wheel set beside a narrow prose column,
+    its caption printed under the wheel, and no OCR glyphs inside the wheel."""
+    page = add_page(doc)
+    page.insert_image(pymupdf.Rect(0, 0, PAGE_W, PAGE_H), stream=png_bytes)
+    add_running_head(page, "459", "THE RULER OF THE TWELFTH PLACE")
+    y = add_body_lines(page, PROSE_LINES[:3])
+    _put(page, LEFT, y + 8.0, "JOHN F. KENNEDY JR.", size=HEAD_SIZE, font=_BOLD)
+    top = y + 8.0 + BODY_LEADING * 1.8
+    column = [
+        "The native was the son of U.S.",
+        "President John F. Kennedy, and",
+        "he was born seventeen days",
+        "after his father was elected",
+        "President in November 1960.",
+        "He had a night chart with",
+        "Virgo rising, Leo occupying",
+        "the twelfth place, and the",
+        "Sun in Sagittarius in the",
+        "fourth, close to the IC.",
+    ]
+    y = top
+    for line in column:
+        _put(page, LEFT, y, line)
+        y += BODY_LEADING
+    _put(page, 303.0, top + 6 * BODY_LEADING, "Chart 45 - John F. Kennedy Jr.")
+    add_body_lines(page, PROSE_LINES[8:11], top=y + 20.0)
+    return page
+
+
+def vector_diagram_page(doc):
+    """A born-digital page whose diagram is drawn, not embedded: vector paths.
+
+    Nothing about this page is an image -- extract finds no embedded raster and a
+    text layer around the drawing. A converter that only keeps embedded images
+    loses the diagram whole.
+    """
+    import math
+    page = add_page(doc)
+    add_running_head(page, "301", "CHAPTER 8: THE DOCTRINE OF SECT")
+    add_body_lines(page, PROSE_LINES[:4])
+    cx, cy, radius = 252.0, 420.0, 110.0
+    page.draw_circle((cx, cy), radius, color=(0, 0, 0), width=0.8)
+    page.draw_circle((cx, cy), radius * 0.55, color=(0, 0, 0), width=0.8)
+    for k in range(12):
+        angle = k * math.pi / 6
+        dx, dy = radius * math.cos(angle), radius * math.sin(angle)
+        page.draw_line((cx - dx, cy - dy), (cx + dx, cy + dy),
+                       color=(0, 0, 0), width=0.6)
+    for k in range(48):
+        angle = k * math.pi / 24
+        x0 = cx + radius * 0.92 * math.cos(angle)
+        y0 = cy + radius * 0.92 * math.sin(angle)
+        x1 = cx + radius * math.cos(angle)
+        y1 = cy + radius * math.sin(angle)
+        page.draw_line((x0, y0), (x1, y1), color=(0, 0, 0), width=0.6)
+    _put(page, 168.9, 556.0, "Figure 8.1 - The Twelve Places")
+    add_body_lines(page, PROSE_LINES[8:12], top=580.0)
+    return page
+
 
 def illustrated_page(doc, png_bytes):
     """Prose with a plate set into it, and no caption under the plate.

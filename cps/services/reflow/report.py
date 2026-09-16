@@ -125,6 +125,10 @@ def numbers(result, ledger=None, client=None):
             "markers_recovered_notes_total": len(recovered),
             "markers_unresolved": stats.get("markers_unresolved", 0),
             "figures": stats.get("figures", 0),
+            "figures_recovered": sum(1 for figure in (book.figures or [])
+                                     if figure.get("found") not in (None, "embedded"))
+            if book is not None else 0,
+            "artwork_words": stats.get("artwork_words", 0),
             "tables": len(_TABLE.findall(markup)),
             "blockquotes": len(_BLOCKQUOTE.findall(markup)),
             "page_joins": stats.get("page_joins", 0),
@@ -361,6 +365,15 @@ def _structure_section(payload):
             ("Paragraphs rejoined across a page turn", structure["page_joins"]),
             ("Damaged footnote numbers read from the page",
              structure["repairs"] + structure.get("markers_recovered", 0))]
+    if structure.get("figures_recovered"):
+        rows.append(("Figures cropped from the scanned pages themselves",
+                     structure["figures_recovered"]))
+    if structure.get("artwork_words"):
+        # Lettering the text layer read off a chart travels with the chart's crop.
+        # The word check counts it there, and this row says so, or a reader
+        # comparing counts is left to find the difference on their own.
+        rows.append(("Words kept with the artwork they were printed on",
+                     structure["artwork_words"]))
     if structure.get("markers_recovered"):
         rows.append((_repaired_markers_label(structure), structure["markers_recovered"]))
     body = "".join("<tr><td>%s</td><td>%s</td></tr>" % (escape(label), value)

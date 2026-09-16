@@ -186,7 +186,8 @@ def _xhtml_names(zf):
 def _content_names(zf):
     """The documents that carry the book's text: not the machine navigation."""
     return [n for n in _xhtml_names(zf)
-            if posixpath.basename(n) not in ("nav.xhtml", "reflow-about.xhtml")]
+            if posixpath.basename(n) not in ("nav.xhtml", "reflow-about.xhtml",
+                                            "source-pages.xhtml")]
 
 
 _BODY = re.compile(r"<body[^>]*>(.*)</body>", re.S)
@@ -1190,13 +1191,14 @@ def test_the_link_a_note_never_had_is_still_a_book_that_opens(tmp_path):
     assert build_epub.validate(disarmed) == []
 
 
-def _nav_labels(path):
+def _nav_labels(path, hrefs=None):
     """The table of contents as a reader reads it, in order."""
     with zipfile.ZipFile(path) as zf:
         nav = zf.read("OEBPS/nav.xhtml").decode("utf-8")
     toc = next(node for node in ET.fromstring(nav).iter(XHTML + "nav")
                if node.get("{http://www.idpf.org/2007/ops}type") == "toc")
-    return ["".join(node.itertext()).strip() for node in toc.iter(XHTML + "a")]
+    return ["".join(node.itertext()).strip() for node in toc.iter(XHTML + "a")
+            if hrefs is None or node.get("href") in hrefs]
 
 
 class TestADocumentWithNoHeadingOfItsOwn(object):
@@ -1243,7 +1245,8 @@ class TestADocumentWithNoHeadingOfItsOwn(object):
         book = _book(lambda doc: F.chapter_opening_page(doc, "The Hellenistic Astrologers"),
                      F.prose_page, F.prose_page, F.prose_page)
 
-        labels = _nav_labels(_build(book, tmp_path).path)
+        result = _build(book, tmp_path)
+        labels = _nav_labels(result.path, {chapter["href"] for chapter in result.chapters})
 
         assert len(labels) > 1, labels
         assert all(label.startswith("The Hellenistic Astrologers") for label in labels[1:]), \

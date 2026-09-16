@@ -42,3 +42,24 @@ def test_source_page_navigation_resolves_to_real_starts_without_renumbering(tmp_
             markers = [node for node in chapter.iter() if node.get("id") == ident]
             assert len(markers) == 1
             assert markers[0].get(EPUB_TYPE) == "pagebreak"
+
+        # Nickel ignores the standard page-list. An ordinary, visible spine
+        # document must offer the same destinations through its normal ToC.
+        toc = next(node for node in nav.iter(XHTML + "nav")
+                   if node.get(EPUB_TYPE) == "toc")
+        index_entry = next((node for node in toc.iter(XHTML + "a")
+                            if node.text == "Source PDF pages"), None)
+        assert index_entry is not None, "Readers ignoring page-list have no source-page index"
+        index_href = index_entry.get("href")
+        source_index = ET.fromstring(archive.read("OEBPS/" + index_href))
+        assert not any(node.get("hidden") or node.get("aria-hidden") == "true"
+                       for node in source_index.iter())
+        index_links = list(source_index.iter(XHTML + "a"))
+        assert [(node.text, node.get("href")) for node in index_links] == [
+            (node.text, node.get("href")) for node in links]
+        opf = ET.fromstring(archive.read("OEBPS/content.opf"))
+        ns = "{http://www.idpf.org/2007/opf}"
+        item = next(node for node in opf.iter(ns + "item")
+                    if node.get("href") == index_href)
+        spine = list(opf.iter(ns + "itemref"))
+        assert spine[-1].get("idref") == item.get("id"), "The index must not interrupt the book"

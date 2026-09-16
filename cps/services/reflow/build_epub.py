@@ -53,6 +53,7 @@ REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
 ABOUT_HREF = "reflow-about.xhtml"
+SOURCE_INDEX_HREF = "source-pages.xhtml"
 
 #: Chapters split on the ladder's top two levels, per SPEC §3.
 SPLIT_LEVELS = (1, 2)
@@ -90,6 +91,9 @@ span.reflow-uncertain { border-bottom: 1px dotted currentColor; }
 figure { margin: 1em 0; text-align: center; page-break-inside: avoid; }
 figcaption { font-size: 0.85em; text-align: center; }
 img { max-width: 100%; }
+.source-pages { list-style: none; padding: 0; text-align: left; }
+.source-pages li { display: inline-block; width: 9em; }
+.source-pages a { display: block; padding: 0.35em 0.25em; }
 """
 
 
@@ -643,21 +647,35 @@ def _document(title, body, language="en"):
         % (quoteattr(language), quoteattr(language), escape(title or ""), body))
 
 
+def _source_page_items(page_homes):
+    # A marker can land before a chapter break within its PDF page. Resolve its
+    # actual home, and retain PDF numbering when a sample omits intervening pages.
+    return "\n".join(
+        '<li><a href=%s>PDF page %d</a></li>'
+        % (quoteattr("%s#pg_%04d" % (href, pno)), pno + 1)
+        for pno, href in sorted(page_homes.items()))
+
+
+def _source_index(page_homes, language):
+    return _document("Source PDF pages", (
+        '<section epub:type="index"><h1>Source PDF pages</h1>'
+        '<p>These numbers count from the first page of the source PDF. They may '
+        'differ from its printed page numbers and this reader\'s page count. '
+        'Only pages included in this conversion are listed. Choose a link to '
+        'go to that page\'s content.</p>'
+        '<ol class="source-pages">%s</ol></section>'
+    ) % _source_page_items(page_homes), language)
+
+
 def _nav(entries, language="en", page_homes=None):
     items = "\n".join('    <li><a href="%s">%s</a></li>' % (href, escape(title))
                       for href, title in entries)
     body = ('<nav epub:type="toc" id="toc">\n  <h1>Contents</h1>\n  <ol>\n%s\n  </ol>\n'
             "</nav>" % items)
     if page_homes:
-        # Resolve the actual marker location: one PDF page can span chapters.
-        # Keep original PDF indexes in samples instead of renumbering the subset.
-        page_items = "\n".join(
-            '<li><a href=%s>PDF page %d</a></li>'
-            % (quoteattr("%s#pg_%04d" % (href, pno)), pno + 1)
-            for pno, href in sorted(page_homes.items()))
         body += ('\n<nav epub:type="page-list" id="page-list" hidden="hidden">'
                  '<h2>Source PDF pages</h2>'
-                 '<ol>%s</ol></nav>' % page_items)
+                 '<ol>%s</ol></nav>' % _source_page_items(page_homes))
     return _document("Contents", body, language)
 
 
@@ -921,6 +939,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     ]
     spine = []
     documents = {}
+    page_homes = _page_homes(chapters)
 
     losses = _losses(dropped, missing)
     if refused:
@@ -938,7 +957,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
             "surrounding text is kept. Consult the source PDF at those locations."
             % count)
     if callable(report_html):
-        report_html = report_html(_page_homes(chapters), losses)
+        report_html = report_html(page_homes, losses)
     if report_html:
         documents[ABOUT_HREF] = _document("About this conversion", report_html, language)
         manifest.append({"id": "reflow-about", "href": ABOUT_HREF,
@@ -953,6 +972,15 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
                          "type": "application/xhtml+xml"})
         spine.append(chapter.item_id)
         entries.append((chapter.href, chapter.title))
+
+    # An ordinary spine item also works in readers which ignore EPUB page-list.
+    # Keep this generated reference after the book, never inside its prose.
+    if page_homes:
+        documents[SOURCE_INDEX_HREF] = _source_index(page_homes, language)
+        manifest.append({"id": "source-pages", "href": SOURCE_INDEX_HREF,
+                         "type": "application/xhtml+xml"})
+        spine.append("source-pages")
+        entries.append((SOURCE_INDEX_HREF, "Source PDF pages"))
 
     for index, src in enumerate(sorted(images)):
         manifest.append({"id": "img%03d" % index, "href": src, "type": "image/jpeg"})
@@ -973,7 +1001,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
 
     _write_epub(out_path, {
         "opf": _opf(metadata, manifest, spine, identifier, modified),
-        "nav": _nav(entries, language, _page_homes(chapters)),
+        "nav": _nav(entries, language, page_homes),
         "ncx": _ncx(entries, identifier, metadata.get("title") or ""),
         "documents": documents,
         "images": images,

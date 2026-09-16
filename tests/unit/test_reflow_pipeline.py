@@ -668,6 +668,55 @@ def test_a_changed_prompt_invalidates_what_was_cached(tmp_path, monkeypatch):
     assert len(client.calls) == 2
 
 
+def test_changed_page_instructions_are_not_answered_by_an_old_cached_reply(
+        tmp_path, monkeypatch):
+    """The words can stay the same while the reader learns where a note belongs.
+
+    Resume must send the newly measured instructions, not repeatedly reject an
+    answer bought for the old geometry or note hints.
+    """
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    client = FakeClient()
+    real_hints = pipeline.page_hints
+    try:
+        _run(doc, client, tmp_path)
+        monkeypatch.setattr(pipeline, "page_hints", lambda *args, **kwargs:
+                            real_hints(*args, **kwargs) + ["The note starts below the rule."])
+        second, _ = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert len(client.calls) == 2, "new instructions were replaced with an old answer"
+    assert client.hints[-1][-1] == "The note starts below the rule."
+    assert second.reused == 0
+    assert second.outcomes[1].gate == "PASS"
+
+
+def test_a_provider_resolved_model_name_does_not_charge_again_on_resume(tmp_path):
+    """A response's concrete model name need not equal the requested alias."""
+    class ResolvedModel(FakeClient):
+        def edit_page(self, *args, **kwargs):
+            answer = super().edit_page(*args, **kwargs)
+            answer.model = "test/resolved-model-version"
+            return answer
+
+    doc = _doc(F.prose_page, F.ambiguous_residue_page)
+    client = ResolvedModel()
+    try:
+        first, _ = _run(doc, client, tmp_path)
+        second, log = _run(doc, client, tmp_path)
+    finally:
+        doc.close()
+
+    assert first.outcomes[1].gate == "PASS"
+    assert len(client.calls) == 1, "the alias missed its own paid answer"
+    assert second.reused == 1
+    assert second.outcomes[1].model == "test/resolved-model-version"
+    assert second.outcomes[1].source == "model"
+    assert second.outcomes[1].cost_usd == 0
+    assert log.totals()["calls"] == 1
+
+
 def test_a_page_the_reader_now_reads_differently_is_not_answered_from_the_cache(
         tmp_path, monkeypatch):
     """The other half of the same rule, and the half that actually fires.

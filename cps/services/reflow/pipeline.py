@@ -123,30 +123,32 @@ class PageCache(object):
     stitched over a page turn -- each of those makes the page a different question,
     and an answer bought for the old one is not an answer to it. So the words go into
     the key, and a reader that has learned something invalidates exactly the pages it
-    now reads differently.
+    now reads differently. Per-page headings, hints, ladder and raster parameters
+    identify the rest of the question: equal words do not imply equal instructions.
     """
 
     def __init__(self, directory):
         self.directory = str(directory)
 
-    def key(self, fingerprint, pno, model_id, source_text):
+    def key(self, fingerprint, pno, model_id, source_text, context=None):
         raw = "|".join([fingerprint, str(pno), model_id or "", prompts.PROMPT_VERSION,
-                        hashlib.sha256((source_text or "").encode("utf-8")).hexdigest()])
+                        hashlib.sha256((source_text or "").encode("utf-8")).hexdigest(),
+                        json.dumps(context, sort_keys=True, ensure_ascii=False)])
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
 
     def _path(self, key):
         return os.path.join(self.directory, key[:2], key + ".json")
 
-    def get(self, fingerprint, pno, model_id, source_text):
-        path = self._path(self.key(fingerprint, pno, model_id, source_text))
+    def get(self, fingerprint, pno, model_id, source_text, context=None):
+        path = self._path(self.key(fingerprint, pno, model_id, source_text, context))
         try:
             with open(path, "r", encoding="utf-8") as handle:
                 return json.load(handle)
         except (IOError, OSError, ValueError):
             return None
 
-    def put(self, fingerprint, pno, model_id, source_text, payload):
-        path = self._path(self.key(fingerprint, pno, model_id, source_text))
+    def put(self, fingerprint, pno, model_id, source_text, payload, context=None):
+        path = self._path(self.key(fingerprint, pno, model_id, source_text, context))
         directory = os.path.dirname(path)
         if not os.path.isdir(directory):
             os.makedirs(directory, exist_ok=True)
@@ -438,10 +440,19 @@ def _edit_one_page(doc, book, pno, client, ledger, cache, result, ladder,
                           model=getattr(client, "model_id", ""))
     source_text = assemble.page_source_text(book, pno)
 
-    cached = (cache.get(result.fingerprint, pno, outcome.model, source_text)
+    # A page's words alone do not identify the question: its measured headings,
+    # note hints and image crop can change while every word stays the same.
+    headings = assemble.page_headings(book, pno)
+    request_model = outcome.model
+    context = {"headings": headings, "hints": hints, "ladder": ladder,
+               "crop": book.page_box(pno),
+               "raster": [RASTER_SCALE, RASTER_QUALITY, RASTER_MAX_BYTES]}
+
+    cached = (cache.get(result.fingerprint, pno, request_model, source_text, context)
               if cache else None)
     if cached is not None:
         outcome.cached = True
+        outcome.model = cached.get("model") or request_model
         result.reused += 1
         _adopt(result, book, pno, outcome, cached.get("html") or "",
                cached.get("uncertain") or [], ladder, require_figure_caption,
@@ -451,7 +462,7 @@ def _edit_one_page(doc, book, pno, client, ledger, cache, result, ladder,
     image = _raster(doc, pno, book.page_box(pno))
     answer = client.edit_page(source_text, image_jpeg=image, ladder=ladder,
                               hints=hints, page_label=str(pno + 1), ledger=ledger,
-                              headings=assemble.page_headings(book, pno))
+                              headings=headings)
     outcome.cost_usd = float(getattr(answer, "cost_usd", 0.0) or 0.0)
     outcome.model = getattr(answer, "model", outcome.model)
 
@@ -460,9 +471,10 @@ def _edit_one_page(doc, book, pno, client, ledger, cache, result, ladder,
            answer=answer)
 
     if cache is not None and outcome.gate == "PASS":
-        cache.put(result.fingerprint, pno, outcome.model, source_text,
+        cache.put(result.fingerprint, pno, request_model, source_text,
                   {"html": answer.html, "uncertain": list(answer.uncertain),
-                   "model": outcome.model, "prompt_version": prompts.PROMPT_VERSION})
+                   "model": outcome.model, "prompt_version": prompts.PROMPT_VERSION},
+                  context=context)
     return outcome
 
 

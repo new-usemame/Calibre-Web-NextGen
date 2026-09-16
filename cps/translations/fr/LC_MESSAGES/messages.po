@@ -15761,6 +15761,22 @@ msgstr "Ce nombre est calculé à partir de {sampled} pages réparties dans le l
 msgid "about {pages} ({percent}%)"
 msgstr "environ {pages} ({percent} %)"
 
+#: cps/spa_strings.py
+msgid "Interrupted by a restart"
+msgstr "Interrompu par un redémarrage"
+
+#: cps/spa_strings.py
+msgid ""
+"The application restarted while this conversion was running, so it stopped "
+"where it was. The original PDF is unchanged and nothing was filed. Starting "
+"the conversion again reuses every page already converted, so none of those "
+"is paid for twice."
+msgstr ""
+"L’application a redémarré pendant cette conversion, qui s’est donc arrêtée "
+"là où elle en était. Le PDF d’origine est inchangé et rien n’a été ajouté à "
+"la bibliothèque. Relancer la conversion réutilise toutes les pages déjà "
+"converties : aucune n’est payée deux fois."
+
 #~ msgid "Change my cover"
 #~ msgstr "Modifier ma couverture"
 

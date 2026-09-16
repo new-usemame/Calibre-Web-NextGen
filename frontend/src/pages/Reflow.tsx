@@ -46,6 +46,7 @@ const STATUS_LABEL = (status: string, t: TFunction): string => ({
   capped: t('Stopped at the cap'),
   incomplete: t('The model service stopped answering'),
   billing_unknown: t('A charge could not be confirmed'),
+  interrupted: t('Interrupted by a restart'),
   failed: t('Failed'),
   // Not the classic task list's "Cancelled": a conversion has two ways of
   // stopping early and the bill is different, so each says which one it was.
@@ -521,6 +522,11 @@ function JobResult({ job, bookId, t, onConvertAll }: {
       {job.status === 'billing_unknown' && (
         <p className={styles.capWarn} role="alert">
           {t('This stopped when a request’s answer never came back, so its charge could not be confirmed either way. Spent below is confirmed; the unconfirmed amount may still be charged by the provider and stays on record here until it is resolved. Reloading does not settle or erase it, and no new job covers it.')}
+        </p>
+      )}
+      {job.status === 'interrupted' && (
+        <p className={styles.capWarn} role="status">
+          {t('The application restarted while this conversion was running, so it stopped where it was. The original PDF is unchanged and nothing was filed. Starting the conversion again reuses every page already converted, so none of those is paid for twice.')}
         </p>
       )}
 

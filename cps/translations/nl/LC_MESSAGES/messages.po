@@ -15413,6 +15413,22 @@ msgstr "Dat aantal is berekend op basis van {sampled} pagina's verspreid over he
 msgid "about {pages} ({percent}%)"
 msgstr "ongeveer {pages} ({percent}%)"
 
+#: cps/spa_strings.py
+msgid "Interrupted by a restart"
+msgstr "Onderbroken door een herstart"
+
+#: cps/spa_strings.py
+msgid ""
+"The application restarted while this conversion was running, so it stopped "
+"where it was. The original PDF is unchanged and nothing was filed. Starting "
+"the conversion again reuses every page already converted, so none of those "
+"is paid for twice."
+msgstr ""
+"De applicatie is herstart terwijl deze conversie liep en is daarom gestopt "
+"waar hij was. De originele PDF is ongewijzigd en er is niets aan de "
+"bibliotheek toegevoegd. Opnieuw starten hergebruikt elke al geconverteerde "
+"pagina, dus geen daarvan wordt dubbel betaald."
+
 #~ msgid "Change my cover"
 #~ msgstr "Mijn omslag wijzigen"
 

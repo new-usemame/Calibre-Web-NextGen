@@ -28,7 +28,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from cps import config, db, helper, logger
 from cps.constants import REFLOW_DIR
-from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED
+from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED, \
+    STAT_STARTED, STAT_WAITING
 from cps.services.reflow import admission, build_epub, extract, ledger as ledger_mod, \
     model, ocr, pipeline, report
 
@@ -416,6 +417,71 @@ def _metadata(book):
             "tags": [tag.name for tag in (book.tags or [])]}
 
 
+#: How a conversion the process did not survive is filed. ``cancelled`` is the
+#: user's act and ``failed`` is the job's own error; an interrupted run is
+#: neither -- the app stopped underneath it, mid-conversion.
+INTERRUPTED_STATUS = "interrupted"
+
+
+def recover_interrupted_jobs(worker=None):
+    """Settle the record of every conversion its process did not finish.
+
+    A reflow job's durable state is its ledger, and a ``start`` with no
+    ``finish`` reads as "running" forever. The other half of that answer -- the
+    worker's queue -- is in-memory, so the process that comes up after a
+    restart inherits ledgers for jobs nobody is running, and the jobs list
+    would keep advertising them as live conversions with no way past. Called
+    once at startup, before the server takes requests, so no task of this
+    process can own a job yet. ``worker`` is accepted all the same so the
+    ownership guard holds if the sweep is ever run late: a job a live task of
+    this process owns is never terminalized.
+
+    Recovery appends the terminal record and nothing else. Confirmed spend and
+    unresolved holds are the job's own history: no reservation is released,
+    reconciled, or zeroed because the process that wrote it is gone. A retry is
+    a new job that reuses the page cache, never a silent resumption of this
+    one's provider work.
+
+    Idempotent: the appended ``finish`` is the marker the next sweep reads, so
+    a repeated run -- or a second process racing boot -- adds nothing. Returns
+    the recovered job ids, for the startup log line.
+    """
+    root = os.path.join(REFLOW_DIR, "jobs")
+    if not os.path.isdir(root):
+        return []
+    active_ids = set()
+    if worker is not None:
+        for __, __, __, task, __ in worker.tasks:
+            if not getattr(task, "is_reflow", False):
+                continue
+            if task.stat not in (STAT_WAITING, STAT_STARTED):
+                continue
+            job_id = getattr(task, "job_id", None)
+            if job_id:
+                active_ids.add(job_id)
+    recovered = []
+    for book_id in sorted(os.listdir(root)):
+        directory = os.path.join(root, book_id)
+        if not os.path.isdir(directory):
+            continue
+        for name in sorted(os.listdir(directory)):
+            if not name.endswith(".jsonl"):
+                continue
+            job_id = name[:-len(".jsonl")]
+            led = ledger_mod.Ledger(os.path.join(directory, name),
+                                    cap_usd=0.0, job_id=job_id)
+            if led.job().get("status") != "running":
+                continue
+            if job_id in active_ids:
+                continue
+            led.record({"kind": "job", "event": "finish",
+                        "status": INTERRUPTED_STATUS,
+                        "error": "The application restarted while this "
+                                 "conversion was running."})
+            recovered.append(job_id)
+    return recovered
+
+
 def cleanup_samples(max_age_days=7):
     """A sample is a preview, not a library. Old ones go."""
     root = os.path.join(REFLOW_DIR, "samples")
@@ -438,5 +504,6 @@ def cleanup_samples(max_age_days=7):
 
 
 __all__ = ["TaskReflowPdf", "ReflowOptions", "sample_path", "cleanup_samples",
-           "hard_cap_usd", "config_default_tier", "make_client", "reflow_dir",
+           "recover_interrupted_jobs", "hard_cap_usd", "config_default_tier",
+           "make_client", "reflow_dir", "INTERRUPTED_STATUS",
            "SAMPLE_PAGES_DEFAULT", "SAMPLE_PAGES_MAX"]

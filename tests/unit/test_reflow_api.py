@@ -670,6 +670,52 @@ def test_another_users_job_is_not_in_my_list(mod, monkeypatch, pdf_on_disk):
     assert [row["job_id"] for row in admin_body["items"]] == ["c1b2c3d4e5f60003"]
 
 
+@pytest.mark.unit
+def test_a_restart_interrupted_job_is_shown_as_over_not_running(
+        mod, monkeypatch, pdf_on_disk):
+    """Terra's restart repro: the container was stopped at "page 4 of 20" and
+    started healthy, and the jobs endpoint answered the dead job as
+    ``running`` with ``finished: null`` and ``active: []`` forever -- a stale
+    "Converting" on the page with no way past it. Startup recovery settles the
+    record: the list then tells the truth (interrupted, with when), and a fresh
+    start is admissible because nothing is active."""
+    _wire(mod, monkeypatch, pdf_on_disk)
+    from cps.services.reflow import ledger as ledger_mod
+
+    path = os.path.join(mod.REFLOW_DIR, "jobs", "5", "df83053b791743a1.jsonl")
+    job = ledger_mod.Ledger(path, cap_usd=5.0, job_id="df83053b791743a1")
+    job.record({"kind": "job", "event": "start", "mode": "sample", "user_id": 7,
+                "tier": "cheap", "cap_usd": 5.0, "pages": 20})
+
+    # The symptom itself, before the new process has recovered anything: the
+    # orphan still reads as a live conversion.
+    with _ctx("/api/v1/books/5/reflow/jobs"):
+        with patch.object(mod, "current_user", _user(uid=7)):
+            with patch.object(mod.WorkerThread, "get_instance",
+                              staticmethod(lambda: SimpleNamespace(tasks=[]))):
+                stale = _json(inspect.unwrap(mod.reflow_jobs)(5))
+    assert stale["items"][0]["status"] == "running"
+    assert stale["items"][0]["finished"] is None
+    assert stale["active"] == []
+
+    # Process startup settles the records of the jobs the last process left.
+    mod.tasks_reflow.recover_interrupted_jobs(worker=SimpleNamespace(tasks=[]))
+
+    with _ctx("/api/v1/books/5/reflow/jobs"):
+        with patch.object(mod, "current_user", _user(uid=7)):
+            with patch.object(mod.WorkerThread, "get_instance",
+                              staticmethod(lambda: SimpleNamespace(tasks=[]))):
+                body = _json(inspect.unwrap(mod.reflow_jobs)(5))
+
+    row = body["items"][0]
+    assert row["job_id"] == "df83053b791743a1"
+    assert row["status"] == "interrupted"
+    assert row["finished"] is not None
+    # No partial sample was published for a conversion that never built one.
+    assert row["sample_ready"] is False
+    assert body["active"] == []
+
+
 # ── the report of the book that is in the library ────────────────────────────
 
 def _epub_with_sidecar(path, payload):

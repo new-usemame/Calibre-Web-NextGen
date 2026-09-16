@@ -632,6 +632,11 @@ _("Middle of the wash")
 _("All three text blocks")
 _("Unused by this arrangement")
 
+# Reflow restart-recovery (2026-09): a conversion whose process died mid-run is
+# settled as "interrupted" at startup; these are its label and its explanation.
+_("Interrupted by a restart")
+_("The application restarted while this conversion was running, so it stopped where it was. The original PDF is unchanged and nothing was filed. Starting the conversion again reuses every page already converted, so none of those is paid for twice.")
+
 
 # ==== BEGIN AUTOGEN (scripts/extract_spa_strings.py --write) ====
 # Auto-anchored SPA-only msgids — every t('literal') and static label

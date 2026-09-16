@@ -796,11 +796,13 @@ def _figure_images(chapters, doc, book, figure_transform=None):
         bbox = figure["bbox"]
         mask = []
         for element in (getattr(book, "pages", None) or {}).get(pno) or ():
-            if element.kind in ("p", "h", "caption") and element.bbox:
-                box = element.bbox
-                if figure_transform is not None:
-                    box = figure_transform(pno, box)
-                mask.append(box)
+            if element.kind in ("p", "h", "caption"):
+                boxes = element.line_boxes or ([element.bbox]
+                                               if element.bbox else [])
+                for box in boxes:
+                    if figure_transform is not None:
+                        box = figure_transform(pno, box)
+                    mask.append(box)
         if figure_transform is not None:
             bbox = figure_transform(pno, bbox)
         try:

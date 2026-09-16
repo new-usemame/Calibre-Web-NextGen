@@ -85,6 +85,12 @@ class Element(object):
     #: joined into paragraphs -- the join across a row boundary fuses whole
     #: rows into each other (book 569 p547's 'Sextile t a u r u s ...').
     table_row: bool = False
+    #: The element's own line boxes, tight to the text. The ink check masks
+    #: prose at this granularity: a joined paragraph's outer box can reach
+    #: across a figure's ground (book 567's wheel at 485), and masking that
+    #: whole box would white the artwork out with it.
+    line_boxes: List[Tuple[float, float, float, float]] = field(
+        default_factory=list)
 
     @property
     def text(self):
@@ -951,7 +957,8 @@ def _copy_element(element):
                    pno=element.pno, level=element.level, bbox=element.bbox,
                    pages=list(element.pages), placed=element.placed,
                    band=element.band, column=element.column,
-                   table_row=element.table_row)
+                   table_row=element.table_row,
+                   line_boxes=list(element.line_boxes))
 
 
 def _runover_note(elements, book, skel):
@@ -1063,7 +1070,8 @@ def _page_elements(skel, repairs, reasons, vocab=None):
                                 level=region.level, bbox=region.bbox,
                                 pages=[skel.pno],
                                 band=region.band, column=region.column,
-                                table_row=region.reason == "table_row"))
+                                table_row=region.reason == "table_row",
+                                line_boxes=[ln.bbox for ln in region.lines]))
 
     # A 'heading' that ends with a hyphen is prose misread by size: headings do
     # not end mid-word, and paragraphs cannot join into headings, so the wrap

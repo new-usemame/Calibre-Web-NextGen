@@ -46,27 +46,44 @@ class Ledger(object):
 
     # ------------------------------------------------------------------ the cap
 
-    def spent(self):
-        return round(sum(float(e.get("cost_usd") or 0.0) for e in self._entries), 6)
+    def _financial_state(self):
+        """(confirmed spend, held bounds), rebuilt from the file's own history.
 
-    def _reservation_state(self):
-        """Attempt id -> bound still held, rebuilt from the file's own history.
-
-        Append-only and recomputed on every read: a crash between the reservation
-        and its resolution leaves the reservation held, which is the whole point.
+        Confirmed spend is every page record's cost PLUS every reconciled
+        reservation whose attempt no page record references. That second term is
+        the crash window: the reconcile write is itself the durable metered debit,
+        so a death between it and the pipeline's page record loses nothing -- and
+        the attempt identity on both records is what keeps a normal run from
+        counting the same charge twice.
         """
         pending = {}
+        committed = {}
+        page_costs = 0.0
+        page_attempts = set()
         for entry in self._entries:
-            if entry.get("kind") != "reservation":
+            if entry.get("kind") == "reservation":
+                attempt = entry.get("attempt")
+                if not attempt:
+                    continue
+                event = entry.get("event")
+                if event == "pending":
+                    pending[attempt] = float(entry.get("bound_usd") or 0.0)
+                elif event == "released":
+                    pending.pop(attempt, None)
+                elif event == "reconciled":
+                    pending.pop(attempt, None)
+                    committed[attempt] = float(entry.get("cost_usd") or 0.0)
                 continue
-            attempt = entry.get("attempt")
-            if not attempt:
-                continue
-            if entry.get("event") == "pending":
-                pending[attempt] = float(entry.get("bound_usd") or 0.0)
-            elif entry.get("event") in ("released", "reconciled"):
-                pending.pop(attempt, None)
-        return pending
+            if entry.get("attempt"):
+                page_attempts.add(entry["attempt"])
+            if entry.get("cost_usd") is not None:
+                page_costs += float(entry["cost_usd"])
+        orphaned = {attempt: cost for attempt, cost in committed.items()
+                    if attempt not in page_attempts}
+        return page_costs + sum(orphaned.values()), pending, orphaned
+
+    def spent(self):
+        return round(self._financial_state()[0], 6)
 
     def pending_usd(self):
         """The strict bounds of dispatched requests whose billing is unresolved.
@@ -75,15 +92,15 @@ class Ledger(object):
         it is shown as held until it is reconciled or released. Full precision:
         a liability is never rounded down. Display rounding lives in ``totals``.
         """
-        return sum(self._reservation_state().values())
+        return sum(self._financial_state()[1].values())
 
     def remaining(self):
         return max(0.0, round(self.cap_usd - self.spent() - self.pending_usd(), 6))
 
     def would_exceed(self, projected_usd):
-        committed = sum(float(e.get("cost_usd") or 0.0) for e in self._entries) \
-            + self.pending_usd()
-        return committed + float(projected_usd or 0.0) > self.cap_usd + 1e-9
+        committed, pending, _orphaned = self._financial_state()
+        return (committed + sum(pending.values()) + float(projected_usd or 0.0)
+                > self.cap_usd + 1e-9)
 
     def reserve(self, projected_usd):
         """Check before the call, not after the bill."""
@@ -120,14 +137,16 @@ class Ledger(object):
                      "reason": reason})
 
     def reconcile_attempt(self, attempt, cost_usd):
-        """A trustworthy usage record arrived: the hold becomes the metered cost.
+        """A trustworthy usage record arrived: the hold becomes the metered debit.
 
-        The metered figure is ``reconciled_usd``, not ``cost_usd``: the page's own
-        entry records the actual spend, and counting it here too would double it.
+        This record IS the durable spend: if the process dies before the page's
+        own record is written, the charge still counts (``_financial_state``).
+        The page record references the same attempt id, so a completed run counts
+        the charge once either way -- never zero, never twice.
         """
         self.record({"kind": "reservation", "event": "reconciled",
                      "attempt": attempt,
-                     "reconciled_usd": round(float(cost_usd or 0.0), 6)})
+                     "cost_usd": round(float(cost_usd or 0.0), 6)})
 
     # --------------------------------------------------------------- the record
 
@@ -188,21 +207,23 @@ class Ledger(object):
         gate = Counter(e.get("gate") for e in self._entries if e.get("gate"))
         models = Counter(e.get("model") for e in self._entries
                          if e.get("model") and e.get("kind") != "reservation")
+        _committed, pending, orphaned = self._financial_state()
         # A page served from the cache is evidence and belongs in the file, but it
         # is not a call: counting it would make a resumed job look like it spent
-        # again at $0.00 a page.
+        # again at $0.00 a page. An orphaned reconcile is the opposite: a call that
+        # billed and crashed before its page record -- it counts exactly once.
         calls = sum(1 for e in self._entries
-                    if e.get("cost_usd") is not None and not e.get("cached"))
+                    if e.get("cost_usd") is not None and not e.get("cached")
+                    and e.get("kind") != "reservation") + len(orphaned)
         reused = sum(1 for e in self._entries if e.get("cached"))
         recovery = next((dict(e) for e in self._entries
                          if e.get("kind") == "recovery"), None)
-        unresolved = self._reservation_state()
         return {
             "calls": calls,
             "reused": reused,
             "spend_usd": self.spent(),
-            "pending_usd": round(sum(unresolved.values()), 6),
-            "unresolved_attempts": len(unresolved),
+            "pending_usd": round(sum(pending.values()), 6),
+            "unresolved_attempts": len(pending),
             "cap_usd": self.cap_usd,
             "remaining_usd": self.remaining(),
             "prompt_tokens": sum(int(e.get("prompt_tokens") or 0) for e in self._entries),

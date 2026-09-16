@@ -297,6 +297,42 @@ def test_only_the_reservations_own_task_can_release_it(rig):
     assert admission.reserve(5, worker, second)
 
 
+def test_a_successful_bill_is_debited_exactly_once_across_every_boundary(
+        rig, monkeypatch):
+    """client → ledger → pipeline → job row: reconciliation is the durable debit,
+    the page record references the same attempt, and a reload counts the charge
+    once -- never zero, never twice."""
+    class _Answered(object):
+        def post(self, *_args, **_kwargs):
+            return SimpleNamespace(
+                status_code=200, headers={}, text="",
+                json=lambda: {
+                    "model": "deepseek/deepseek-v4.1-flash",
+                    "choices": [{"message": {"content": "no markup in this answer"},
+                                 "finish_reason": "stop"}],
+                    "usage": {"prompt_tokens": 1500, "completion_tokens": 12,
+                              "cost": 0.0031}})
+
+    monkeypatch.setattr(rig.mod, "make_client",
+                        lambda _tier: model_mod.OpenRouterClient(
+                            "key", session=_Answered(), backoff=0.0))
+    task = _run(rig, mode="full", cost_cap_usd=1.0)
+
+    assert task.stat == STAT_FINISH_SUCCESS, task.error
+    row = _ledger_rows(rig)[0]
+    path = os.path.join(rig.root, "jobs", "5", "%s.jsonl" % task.job_id)
+    entries = ledger_mod.Ledger(path, cap_usd=1.0).entries()
+    page_sum = sum(e["cost_usd"] for e in entries
+                   if e.get("kind") == "page" and e.get("cost_usd") is not None)
+    reconciled = [e for e in entries
+                  if e.get("kind") == "reservation" and e.get("event") == "reconciled"]
+    assert reconciled, "every answered attempt reconciled durably"
+    assert row["spend_usd"] == pytest.approx(page_sum)
+    assert row["spend_usd"] == pytest.approx(sum(e["cost_usd"] for e in reconciled))
+    assert row["pending_usd"] == 0.0
+    assert row["status"] == "done"
+
+
 def test_a_job_with_unresolved_billing_stops_safely_and_holds_the_amount(
         rig, monkeypatch):
     """A lost answer after dispatch: the book still ships (its pages keep their

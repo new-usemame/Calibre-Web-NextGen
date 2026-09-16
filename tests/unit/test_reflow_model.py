@@ -218,9 +218,11 @@ def test_every_request_carries_an_explicit_timeout():
         assert all(isinstance(v, (int, float)) and v > 0 for v in m.last_request.timeout)
 
 
-def test_a_rate_limited_call_is_retried_and_then_succeeds():
+def test_a_pre_dispatch_transport_failure_is_released_and_retried():
+    """The only retryable failure left: the request provably never left the
+    machine, so retrying it spends nothing."""
     with requests_mock.Mocker() as m:
-        m.post(ENDPOINT, [{"status_code": 429, "json": {"error": "slow down"}},
+        m.post(ENDPOINT, [{"exc": requests.exceptions.ConnectTimeout},
                           {"status_code": 200, "json": _reply()}])
         result = _edit(_client(backoff=0.0))
 
@@ -615,11 +617,12 @@ def test_a_connection_that_never_happened_is_free_and_retried(tmp_path):
     assert book.pending_usd() == 0.0
     reconciled = [e for e in book.entries("reservation")
                   if e.get("event") == "reconciled"]
-    assert [e["reconciled_usd"] for e in reconciled] == \
+    assert [e["cost_usd"] for e in reconciled] == \
         [pytest.approx(result.cost_usd)]
-    # The hold became the metered cost, once: the pipeline's page record is the
-    # spend, and nothing was counted twice.
-    book.record({"kind": "page", "page": 0, "cost_usd": result.cost_usd})
+    # The hold became the metered debit at reconciliation; the pipeline's page
+    # record references the same attempt, and nothing is counted twice.
+    book.record({"kind": "page", "page": 0, "cost_usd": result.cost_usd,
+                 "attempt": result.attempt})
     assert book.spent() == pytest.approx(result.cost_usd)
 
 
@@ -638,22 +641,6 @@ def test_a_gateway_failure_after_dispatch_is_held(tmp_path):
     assert session.calls == 1
     assert book.pending_usd() > 0
     assert book.spent() == 0.0
-
-
-def test_an_edge_rate_limit_rejection_is_free_and_retried(tmp_path):
-    """A 429 with no generation id is OpenRouter's edge refusing before any work
-    began (their docs: rate-limit checks happen before work starts)."""
-    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
-    session = _Session(_Response(429, {"error": {"code": 429, "message": "slow down"}}),
-                       _Response(200, _reply()))
-    client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
-
-    result = client.edit_page("text of the page[160]", image_jpeg=None, ledger=book)
-
-    assert session.calls == 2
-    assert book.pending_usd() == 0.0
-    book.record({"kind": "page", "page": 0, "cost_usd": result.cost_usd})
-    assert book.spent() == pytest.approx(result.cost_usd)
 
 
 def test_a_rate_limit_from_a_provider_that_accepted_the_request_is_held(tmp_path):
@@ -699,9 +686,10 @@ def test_a_successful_answer_reconciles_the_reservation_to_the_actual_bill(tmp_p
     assert book.pending_usd() == 0.0
     reconciled = [e for e in book.entries("reservation")
                   if e.get("event") == "reconciled"]
-    assert [e["reconciled_usd"] for e in reconciled] == \
+    assert [e["cost_usd"] for e in reconciled] == \
         [pytest.approx(result.cost_usd)]
-    book.record({"kind": "page", "page": 0, "cost_usd": result.cost_usd})
+    book.record({"kind": "page", "page": 0, "cost_usd": result.cost_usd,
+                 "attempt": result.attempt})
     assert book.spent() == pytest.approx(result.cost_usd)
     assert book.remaining() == pytest.approx(5.0 - result.cost_usd)
 
@@ -721,17 +709,74 @@ def test_a_success_without_a_usage_record_cannot_be_priced_so_it_is_held(tmp_pat
     assert book.pending_usd() > 0
 
 
+def test_a_rate_limited_answer_is_held_not_retried(tmp_path):
+    """A 429 used to be retried as free. Terra's correction: nothing about a 429
+    proves the request never reached a provider -- no Chat-Completions contract
+    says so -- and OpenRouter documents that even an answer with no content may
+    bill prompt processing. Absence of a generation id is not evidence of
+    absence. So the bound stays held and nothing is retried under an encumbered
+    cap."""
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
+    session = _Session(_Response(429, {"error": {"code": 429,
+                                                 "message": "slow down"}}),
+                       _Response(200, _reply()))
+    client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
+
+    with pytest.raises(model.UncertainBilling):
+        client.edit_page("text of the page[160]", image_jpeg=None, ledger=book)
+
+    assert session.calls == 1, "a possibly-billed rejection is not retried as free"
+    assert book.pending_usd() > 0
+    assert book.spent() == 0.0
+
+
+def test_a_rejection_carrying_the_generation_header_is_held(tmp_path):
+    """The documented X-Generation-Id header is the provider saying the request
+    was accepted. A response must not be downgraded to free because one
+    representation of that identity (the body id) is absent."""
+    body = {"error": {"code": 429, "message": "rate limited"}}
+    for header in ("X-Generation-Id", "x-generation-id"):
+        book = ledger_mod.Ledger(tmp_path / ("job-%s.jsonl" % header), cap_usd=5.0)
+        session = _Session(_Response(429, body, {header: "gen-accepted"}),
+                           _Response(200, _reply()))
+        client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
+
+        with pytest.raises(model.UncertainBilling):
+            client.edit_page("text of the page[160]", image_jpeg=None, ledger=book)
+
+        assert session.calls == 1, header
+        assert book.pending_usd() > 0, header
+
+
+def test_a_documented_request_rejection_is_released_not_retried(tmp_path):
+    """The releasable set is exactly the documented request errors: invalid
+    request, credentials, credits, guardrail, no provider, payload, unprocessable
+    -- OpenRouter's contract says those form before any work begins, and they
+    carry no generation identity."""
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
+    session = _Session(_Response(400, {"error": {"message": "bad model"}}))
+    client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
+
+    with pytest.raises(model.ModelError):
+        client.edit_page("text of the page[160]", image_jpeg=None, ledger=book)
+
+    assert session.calls == 1
+    assert book.pending_usd() == 0.0, "a documented pre-generation rejection is free"
+    assert book.spent() == 0.0
+
+
 def test_cancellation_between_attempts_dispatches_nothing_new(tmp_path):
-    """Cancel after admission: the attempt already dispatched stays held (its
-    billing is unknown), and no further attempt is made."""
+    """Cancel after admission: nothing new is dispatched once the caller stops the
+    job, and the attempt that provably never left the machine is released."""
     book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
     state = {"stop": False}
 
-    def rejected_then_stop():
+    def never_connected_then_stop():
         state["stop"] = True
-        return _Response(429, {"error": {"code": 429, "message": "slow down"}})
+        raise requests.exceptions.ConnectTimeout("could not connect")
 
-    session = _Session(rejected_then_stop, _Response(200, _reply()))
+    session = _Session(never_connected_then_stop,
+                       _Response(200, _reply()))
     client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
 
     with pytest.raises(model.AttemptCancelled):
@@ -739,8 +784,58 @@ def test_cancellation_between_attempts_dispatches_nothing_new(tmp_path):
                          should_stop=lambda: state["stop"])
 
     assert session.calls == 1
-    assert book.pending_usd() == 0.0, "the 429 was a known-unbilled rejection"
+    assert book.pending_usd() == 0.0, "the released attempt holds nothing"
     assert book.spent() == 0.0
+
+
+def test_a_crash_after_reconciliation_loses_nothing_and_reopens_nothing(tmp_path):
+    """Terra's crash reproducer as a regression. _parse reconciles the reservation
+    and the pipeline's page record lands later; death in that window used to read
+    as pending 0 AND spent 0 -- a confirmed charge lost, the cap reopened. The
+    reconciliation itself is now the durable metered debit."""
+    client = _client()
+    text = "word " * 4000
+    bound = client.request_bound(text)
+    path = tmp_path / "job.jsonl"
+    book = ledger_mod.Ledger(path, cap_usd=bound)
+    payload = _reply(usage={"prompt_tokens": 1, "completion_tokens": 1,
+                            "cost": 0.001})
+    attempt = book.reserve_attempt("1", bound, model_id=client.model_id,
+                                   prompt_version="test")
+
+    original = book.reconcile_attempt
+
+    def reconcile_then_crash(*args, **kwargs):
+        original(*args, **kwargs)
+        raise SystemExit("simulated process death after reconciliation")
+
+    book.reconcile_attempt = reconcile_then_crash
+    with pytest.raises(SystemExit):
+        client._parse(payload, 1, ledger=book, attempt_id=attempt, bound=bound)
+
+    reopened = ledger_mod.Ledger(path, cap_usd=bound)
+    assert reopened.pending_usd() == 0.0
+    assert reopened.spent() == pytest.approx(0.001), "the confirmed debit survives"
+    with pytest.raises(ledger_mod.CapExceeded):
+        reopened.reserve_attempt("1-retry", bound)
+
+
+def test_a_reconciled_attempt_is_never_counted_twice(tmp_path):
+    """The other side of the same invariant: when the pipeline's page record does
+    land, it references the same attempt, and the ledger counts the charge once --
+    on write, and again after a reload."""
+    book = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
+    session = _Session(_Response(200, _reply()))
+    client = model.OpenRouterClient(FAKE_KEY, session=session, backoff=0.0)
+    result = client.edit_page("text of the page[160]", image_jpeg=None, ledger=book)
+
+    assert result.attempt, "the answer carries its attempt identity"
+    book.record({"kind": "page", "page": 0, "cost_usd": result.cost_usd,
+                 "attempt": result.attempt})
+    assert book.spent() == pytest.approx(result.cost_usd)
+    reopened = ledger_mod.Ledger(tmp_path / "job.jsonl", cap_usd=5.0)
+    assert reopened.spent() == pytest.approx(result.cost_usd)
+    assert reopened.pending_usd() == 0.0
 
 
 def test_pending_liability_survives_a_ledger_reload(tmp_path):

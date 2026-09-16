@@ -470,6 +470,10 @@ def _refused(book, pno, exc, ledger, client):
         if cost is None:
             entry["billing"] = "unresolved"
             entry["held_usd"] = round(float(getattr(exc, "held_usd", 0.0) or 0.0), 6)
+        if getattr(exc, "attempt", None):
+            # The reservation's identity, so a reconciled debit and this record
+            # are one charge counted once -- even across a crash between them.
+            entry["attempt"] = exc.attempt
         if getattr(exc, "cost_source", ""):
             entry["cost_source"] = exc.cost_source
         for key in ("prompt_tokens", "completion_tokens"):
@@ -626,6 +630,10 @@ def _adopt(result, book, pno, outcome, html, uncertain, ladder,
             entry["completion_tokens"] = answer.completion_tokens
             entry["attempts"] = answer.attempts
             entry["cost_source"] = answer.cost_source
+            if getattr(answer, "attempt", None):
+                # The reservation this answer reconciled: one charge, counted once,
+                # durable even if the crash lands between reconcile and this record.
+                entry["attempt"] = answer.attempt
         ledger.record(entry)
     return outcome
 

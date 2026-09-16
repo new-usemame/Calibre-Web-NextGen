@@ -48,7 +48,11 @@ PRICE_TABLE_MEASURED = "2026-09-13"
 REFERER = "https://github.com/new-usemame/Calibre-Web-NextGen"
 TITLE = "Calibre-Web-NextGen Reflow"
 
-RETRY_STATUS = (408, 409, 425, 429, 500, 502, 503, 504)
+#: Retry is reserved for failures that provably never left the machine
+#: (pre-dispatch transport errors). Every HTTP response is answered by something
+#: that saw the request: a documented request-error rejection is released but
+#: pointless to retry unchanged, and anything else is unknown billing -- held,
+#: never silently retried as free. So there is no retryable status list any more.
 
 #: The answer is the page's own text again with markup around it, so the room it
 #: needs is a function of the page. MEASURED on the acceptance book: a dense page of
@@ -253,12 +257,13 @@ class UnusableAnswer(ModelError):
     """
 
     def __init__(self, message, cost_usd=0.0, cost_source="", prompt_tokens=0,
-                 completion_tokens=0):
+                 completion_tokens=0, attempt=None):
         ModelError.__init__(self, message)
         self.cost_usd = float(cost_usd or 0.0)
         self.cost_source = str(cost_source or "")
         self.prompt_tokens = int(prompt_tokens or 0)
         self.completion_tokens = int(completion_tokens or 0)
+        self.attempt = attempt
 
 
 class CapExceeded(Exception):
@@ -316,6 +321,9 @@ class ModelResult(object):
     #: are only explainable next to this.
     provider: str = ""
     attempts: int = 1
+    #: The ledger reservation this answer reconciled, so the page record can
+    #: reference the same attempt and the charge is counted exactly once.
+    attempt: str = ""
     prompt_version: str = PROMPT_VERSION
     dry_run: bool = False
 
@@ -515,12 +523,11 @@ class OpenRouterClient(object):
                     "to $%.4f may still be billed; the bound stays held as "
                     "unresolved" % (response.status_code, detail, bound or 0.0),
                     held_usd=bound or 0.0, attempt=attempt_id)
+            # A documented request-error rejection: pre-generation, known unbilled,
+            # never worth retrying as-is.
             if ledger is not None and attempt_id is not None:
                 ledger.release_attempt(attempt_id, "rejected_before_generation")
-            if response.status_code not in RETRY_STATUS or attempt == self.max_retries:
-                raise ModelError("OpenRouter %s: %s" % (response.status_code, detail))
-            last_error = detail
-            self._sleep(attempt, response)
+            raise ModelError("OpenRouter %s: %s" % (response.status_code, detail))
         raise ModelError(last_error or "the request could not be completed")
 
     def _sleep(self, attempt, response):
@@ -558,13 +565,16 @@ class OpenRouterClient(object):
         completion_tokens = int(usage.get("completion_tokens") or 0)
         cost, source = self._cost(usage, prompt_tokens, completion_tokens)
         if ledger is not None and attempt_id is not None:
-            # The held bound becomes the metered cost: never both, never neither.
+            # The held bound becomes the metered debit, durably, HERE: a crash
+            # before the pipeline's page record still counts the charge (the page
+            # record references the same attempt, so a completed run counts once).
             ledger.reconcile_attempt(attempt_id, cost)
 
         def unusable(message):
             return UnusableAnswer(message, cost_usd=cost, cost_source=source,
                                   prompt_tokens=prompt_tokens,
-                                  completion_tokens=completion_tokens)
+                                  completion_tokens=completion_tokens,
+                                  attempt=attempt_id)
 
         try:
             choice = data["choices"][0]
@@ -596,7 +606,8 @@ class OpenRouterClient(object):
                            prompt_tokens=prompt_tokens,
                            completion_tokens=completion_tokens,
                            cost_usd=cost, cost_source=source,
-                           provider=str(data.get("provider") or ""), attempts=attempts)
+                           provider=str(data.get("provider") or ""), attempts=attempts,
+                           attempt=attempt_id or "")
 
     def _cost(self, usage, prompt_tokens, completion_tokens):
         reported = usage.get("cost")
@@ -684,23 +695,38 @@ def _rejection_was_pre_generation(response):
     """True only when the response proves the request never reached a provider.
 
     OpenRouter's error contract: request-validation, auth, credit and guardrail
-    rejections happen before any work begins, and post-Router errors carry the
-    generation's id. So an error body WITH an id means a provider accepted the
-    request (possibly billed), and a 408 or 5xx is the gateway answering for a
-    provider that may have -- unknown either way, and unknown is not free.
+    rejections happen before any work begins. Everything else -- 408, 409, 425,
+    429, every 5xx -- lacks a documented pre-generation proof for Chat
+    Completions: OpenRouter says even a no-content answer may bill prompt
+    processing, and the ABSENCE of a generation id is not evidence of absence.
+    Any response carrying a generation identity (the body id, or the documented
+    X-Generation-Id header) was accepted by a provider by definition.
+    """
+    if _generation_id(response):
+        return False
+    return response.status_code in (400, 401, 402, 403, 404, 413, 422)
+
+
+def _generation_id(response):
+    """The generation's identity, in either representation it can arrive in.
+
+    The body field is ``id``; the documented tracking header is
+    ``X-Generation-Id``. Header names are case-insensitive on the wire, so they
+    are compared case-insensitively here, whatever mapping type the response
+    object carries.
     """
     try:
         body = response.json()
     except ValueError:
-        return False
-    if body.get("id"):
-        return False
-    if response.status_code in (400, 401, 402, 403, 404, 413, 422):
-        return True
-    # Edge rate/conflict checks run before dispatch (OpenRouter documents their
-    # Retry-After semantics for exactly this); without a generation id they never
-    # reached a provider.
-    return response.status_code in (409, 425, 429)
+        body = None
+    if isinstance(body, dict) and body.get("id"):
+        return str(body["id"])
+    headers = getattr(response, "headers", None) or {}
+    items = headers.items() if hasattr(headers, "items") else []
+    for name, value in items:
+        if str(name).lower() == "x-generation-id" and value:
+            return str(value)
+    return None
 
 
 def _b64(data):

@@ -65,6 +65,17 @@ class TestNeedsRecovery(object):
         finally:
             doc.close()
 
+    def test_a_cover_of_short_fragments_is_a_damaged_layer(self):
+        """Book 567 index 0: sixty-one 'words', one of four letters or more. The
+        stopword test passes the cover's misread artwork on 'if' and 'a', so
+        the garbage printed as trusted prose and the cover art underneath --
+        the page's whole content -- measured as a strip."""
+        doc, pages = _raw(lambda d: F.cover_garbage_page(d, F.art_png()))
+        try:
+            assert source.needs_recovery(pages[0]) == "damaged_layer"
+        finally:
+            doc.close()
+
     def test_garbage_without_pixels_is_not_recovered(self):
         """A born-digital page of noise has no better source underneath: OCR of
         the same garbage would only make garbage of it."""

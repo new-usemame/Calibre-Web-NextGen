@@ -45,6 +45,11 @@ UNCERTAIN_SCORE = 85
 #: A sparse page is thin, not damaged: below this many tokens the stopword test
 #: says nothing, and only clearly non-word tokens may mark a layer as damaged.
 _SPARSE_TOKENS = 30
+#: A scan page whose words are nearly all fragments is a misread, not prose:
+#: the stopword test can pass it on 'if' and 'a' while almost nothing on it is
+#: a word of four letters or more (book 567's cover: 61 words, one long token,
+#: unreadable as printed and worthless as the source the artwork is measured by).
+_LONG_TOKENS_MIN = 8
 
 _TOKEN = re.compile(r"[A-Za-z]{4,}")
 _VOWELS = re.compile(r"[aeiouy]", re.I)
@@ -171,6 +176,10 @@ def needs_recovery(raw):
     if not raw.text_blocks:
         return "image_only" if raw.images else ""
     if assess.looks_like_prose(raw.text):
+        if raw.is_page_scan and assess.script_share(raw.text) < 0.5 \
+                and len(raw.text.split()) >= _SPARSE_TOKENS \
+                and len(_TOKEN.findall(raw.text)) < _LONG_TOKENS_MIN:
+            return "damaged_layer"
         return ""
     if not raw.is_page_scan:
         return ""

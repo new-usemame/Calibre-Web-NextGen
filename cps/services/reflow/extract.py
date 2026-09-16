@@ -377,9 +377,10 @@ def ink_channel(doc, pno, rect, min_px=8, mask=()):
 
 class ScanPixelProbe(object):
     """The pixel questions a scan figure pass asks of one page, answered from
-    the document: does this rectangle hold marks, and where are its
-    full-height empty channels? The page's text lines are masked for both --
-    prose and furniture are not artwork, whatever they print over."""
+    the document: does this rectangle hold marks, where are its full-height
+    empty channels, and what share of it is printed? The page's text lines are
+    masked for all three -- prose and furniture are not artwork, whatever they
+    print over."""
 
     def __init__(self, doc, pno, mask=()):
         self._doc = doc
@@ -391,6 +392,53 @@ class ScanPixelProbe(object):
 
     def has_ink(self, rect):
         return region_has_ink(self._doc, self._pno, rect, mask=self._mask)
+
+    def coverage(self, rect):
+        """The share of this rectangle's blocks that hold print: near 1.0 on a
+        full-bleed cover, near 0 on a text or blank page."""
+        data, n, w, h = _ink_render(self._doc, self._pno, rect, self._mask)
+        if not w or not h:
+            return 0.0
+        cells = 10
+        inking = 0
+        for cy in range(cells):
+            y0, y1 = h * cy // cells, h * (cy + 1) // cells
+            for cx in range(cells):
+                x0, x1 = w * cx // cells, w * (cx + 1) // cells
+                dark = 0
+                for y in range(y0, y1):
+                    row = y * w * n
+                    for x in range(x0, x1):
+                        if data[row + x * n] < 200:
+                            dark += 1
+                if dark / float((y1 - y0) * (x1 - x0) or 1) >= INK_BLOCK_MIN:
+                    inking += 1
+        return inking / float(cells * cells)
+
+
+def _ink_render(doc, pno, rect, mask=()):
+    """The bounded raster of a clip with the page's text whited out.
+
+    One render for every ink question -- has_ink, channel, coverage -- so the
+    scale bound and the mask pad are set in exactly one place. Prose and
+    furniture are not artwork, whatever they print over.
+    """
+    clip = pymupdf.Rect(*rect)
+    scale = _bounded_scale(clip, INK_SCALE)
+    pix = doc[pno].get_pixmap(matrix=pymupdf.Matrix(scale, scale),
+                              clip=clip, alpha=False)
+    n, w, h = pix.n, pix.width, pix.height
+    data = bytearray(pix.samples)
+    for box in mask:
+        x0 = max(0, int((box[0] - MASK_PAD - clip.x0) * scale))
+        y0 = max(0, int((box[1] - MASK_PAD - clip.y0) * scale))
+        x1 = min(w, int((box[2] + MASK_PAD - clip.x0) * scale + 0.5) + 1)
+        y1 = min(h, int((box[3] + MASK_PAD - clip.y0) * scale + 0.5) + 1)
+        for y in range(y0, max(y0, y1)):
+            row = y * w * n
+            for x in range(x0, max(x0, x1)):
+                data[row + x * n] = 255
+    return data, n, w, h
 
 
 def region_has_ink(doc, pno, rect, thresh=INK_MIN, mask=()):
@@ -407,31 +455,17 @@ def region_has_ink(doc, pno, rect, thresh=INK_MIN, mask=()):
     render takes the same pre-allocation bound as every other raster: a
     hostile clip is scaled down on the matrix before a single pixel exists.
     """
-    clip = pymupdf.Rect(*rect)
-    scale = _bounded_scale(clip, INK_SCALE)
-    pix = doc[pno].get_pixmap(matrix=pymupdf.Matrix(scale, scale),
-                              clip=clip, alpha=False)
-    n = pix.n
-    data = bytearray(pix.samples)
-    if not pix.width or not pix.height:
+    data, n, w, h = _ink_render(doc, pno, rect, mask)
+    if not w or not h:
         return False
-    for box in mask:
-        x0 = max(0, int((box[0] - MASK_PAD - clip.x0) * scale))
-        y0 = max(0, int((box[1] - MASK_PAD - clip.y0) * scale))
-        x1 = min(pix.width, int((box[2] + MASK_PAD - clip.x0) * scale + 0.5) + 1)
-        y1 = min(pix.height, int((box[3] + MASK_PAD - clip.y0) * scale + 0.5) + 1)
-        for y in range(y0, max(y0, y1)):
-            row = y * pix.width * n
-            for x in range(x0, max(x0, x1)):
-                data[row + x * n] = 255
     cells = 10
     for cy in range(cells):
-        y0, y1 = pix.height * cy // cells, pix.height * (cy + 1) // cells
+        y0, y1 = h * cy // cells, h * (cy + 1) // cells
         for cx in range(cells):
-            x0, x1 = pix.width * cx // cells, pix.width * (cx + 1) // cells
+            x0, x1 = w * cx // cells, w * (cx + 1) // cells
             dark = 0
             for y in range(y0, y1):
-                row = y * pix.width * n
+                row = y * w * n
                 for x in range(x0, x1):
                     if data[row + x * n] < 200:
                         dark += 1

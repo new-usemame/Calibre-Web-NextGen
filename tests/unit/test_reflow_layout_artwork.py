@@ -599,6 +599,44 @@ class TestScanArtwork(object):
         assert [name for name in _epub_images(result.path)
                 if "fig_p0001" in name] == []
 
+    def test_a_full_bleed_cover_is_one_figure_not_strips(self, tmp_path):
+        """Book 567 index 0's shape after the cover's text is read: a title, an
+        author, and the whole page is the design. The full-bleed plate is the
+        page itself as one figure, with the text reading over it -- never
+        strips measured around the title."""
+        doc = _doc(F.prose_page,
+                   lambda d: F.cover_plate_page(
+                       d, F.art_png((8.0, 8.0, 470.0, 660.0))))
+        try:
+            book = assemble.deterministic_book(doc)
+            result = _build(book, tmp_path, doc)
+        finally:
+            doc.close()
+
+        figures = [f for f in book.figures if f["pno"] == 1 and f.get("full_page")]
+        assert figures, ("the cover is not one whole figure", book.figures)
+        assert [name for name in _epub_images(result.path)
+                if "fig_p0001" in name], "the cover image did not ship"
+        assert "HELLENISTIC ASTROLOGY" in _whole_text(book)
+        assert "Chris Brennan" in _whole_text(book)
+
+    def test_a_text_page_with_a_page_raster_is_not_a_plate(self):
+        """The control: a page full of prose with a scan behind it is text, not
+        a cover -- the full-page raster stays the background it is."""
+        doc = _doc(F.prose_page,
+                   lambda d: F.cover_plate_page(
+                       d, F.art_png((8.0, 8.0, 470.0, 660.0))))
+        try:
+            for line in F.PROSE_LINES[:10]:
+                F._put(doc[1], F.LEFT, 300.0 + F.PROSE_LINES.index(line) * 15.0,
+                       line)
+            book = assemble.deterministic_book(doc)
+        finally:
+            doc.close()
+
+        assert not [f for f in book.figures
+                    if f["pno"] == 1 and f.get("full_page")], book.figures
+
     def test_prose_words_are_still_conserved_with_the_artwork_moved(self):
         """The conservation contract, stated: every source word is accounted in
         body, notes, furniture, captions, or preserved artwork -- never silently

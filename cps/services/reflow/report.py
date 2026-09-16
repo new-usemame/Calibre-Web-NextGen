@@ -196,6 +196,12 @@ def _recovery(result):
         "language": languages[0] if len(languages) == 1 else languages,
         "engine_unavailable": recovery.engine_unavailable,
         "seconds": round(recovery.seconds, 2),
+        # The per-page record: which pages are not the PDF's own layer, and
+        # why -- the claim a global verdict can never make truthfully (book
+        # 567's cover is OCR at index 0 and native everywhere it matters).
+        "pages_detail": {str(pno): prov.to_dict()
+                         for pno, prov in sorted(recovery.provenance.items())
+                         if prov.layer != "native" or prov.failed},
     }
 
 

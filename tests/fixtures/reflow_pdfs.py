@@ -1206,6 +1206,44 @@ def art_png(*pdf_rects):
 #: foxed type. A character counter sees a full page of text. A word counter sees a
 #: full page of words. Only the *common* words are missing, which is the one signal
 #: that separates a text layer worth having from one that has to be thrown away.
+COVER_GARBAGE_LINES = [
+    ", ill .ts ? 4.1 I I -i.o.,, i, 1 4",
+    "„,.... 4..• *,..... -,, A if i” V' I ;7 4 A'F,4 n prir TOP EE",
+    "*•.,,i`JT.I. 4, ' -7 ' -1 4. vim irk ftA-'",
+    "\"N.,,,.„-if,-,41 '''• 1., t ‘-',,,, • so,, —et.41! I ' it 2",
+    "., \"As4;*: ff\" ..r.i 3 c • 1\"w 7(r.--,t,„{a T 0 r",
+]
+
+
+def cover_garbage_page(doc, png_bytes):
+    """Book 567 index 0's shape: a full-color cover whose text layer is the
+    artwork misread into short punctuation-heavy fragments.
+
+    Sixty-one 'words', one token of four letters or more: the stopword test
+    passes it on 'if' and 'a', so the cover prints as garbage prose while the
+    artwork underneath -- the whole point of the page -- is measured as a
+    strip. A page of real short words this is not: it is a damaged layer."""
+    page = add_page(doc)
+    page.insert_image(pymupdf.Rect(0, 0, PAGE_W, PAGE_H), stream=png_bytes)
+    y = 108.0
+    for line in COVER_GARBAGE_LINES * 3:
+        _put(page, LEFT + 40, y, line)
+        y += 24.0
+    return page
+
+
+def cover_plate_page(doc, png_bytes):
+    """The same cover with its text read: a title, an author, and the whole
+    page is the design. A full-bleed cover/plate with a little text is one
+    figure, the page itself -- never strips measured around the title."""
+    page = add_page(doc)
+    page.insert_image(pymupdf.Rect(0, 0, PAGE_W, PAGE_H), stream=png_bytes)
+    _put(page, 150.0, 200.0, "HELLENISTIC ASTROLOGY", size=HEAD_SIZE, font=_BOLD)
+    _put(page, 196.0, 420.0, "Chris Brennan", size=HEAD_SIZE)
+    _put(page, 170.0, 600.0, "Amor Fati Publications", size=BODY_SIZE)
+    return page
+
+
 GARBAGE_LINES = [
     "aenlm rtoiu cdhes ngiol rtaem uqsli pnoew mtchi rvael",
     "sdlku ngtae rmoib phlcs evtam nrsiq dolge twhca pmrei",

@@ -527,6 +527,14 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
 
     embedded = [img for img in raw.images if img.substantial and not img.full_page]
 
+    # A full-bleed cover or plate is the page itself with a little text over
+    # it: one figure, nothing left to slice. Evidence is the pixels and the
+    # prose together, so a text page with a scan behind it can never qualify.
+    cover = _full_bleed_plate(raw, kept_blocks, pixel_probe)
+    if cover is not None:
+        skel.regions.append(Region(kind="figure", bbox=cover.bbox, image=cover,
+                                   needs_ink=True))
+
     # Artwork that no embedded image claims: on a scan it is ink inside the page
     # raster; on a born-digital page it is a cluster of vector paths. Either way
     # the region is cut out of the page render, and the lettering the text layer
@@ -534,7 +542,7 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     # measured FROM the text layer's geometry, though -- a layer the census
     # called garbage does not describe where the ink is, and territory measured
     # from it crops whole prose regions as 'figures' (book 561's shape).
-    if raw.is_page_scan and layer_trusted:
+    if raw.is_page_scan and layer_trusted and cover is None:
         candidates = _scan_figures(kept_blocks, raw, style, pixel_probe)
     elif raw.drawings and not raw.is_page_scan:
         candidates = _vector_figures(raw)
@@ -629,6 +637,42 @@ def _lines_bbox(lines, fallback):
         return fallback
     return (min(b[0] for b in boxes), min(b[1] for b in boxes),
             max(b[2] for b in boxes), max(b[3] for b in boxes))
+
+
+#: A full-bleed cover or plate holds at most this many prose lines; more and
+#: the page is text with a picture behind it, which is the background's job.
+PLATE_PROSE_MAX = 8
+#: ... and at least this share of its blocks inked with the prose masked: a
+#: cover is art across the whole page (1.0 measured on book 567 index 0), an
+#: end-of-chapter page or a title page with two art bands is mostly paper
+#: (0.0 and 0.22 measured).
+PLATE_INK_COVER = 0.4
+
+
+def _full_bleed_plate(raw, kept_blocks, pixel_probe):
+    """The page's own full-page image when the page IS the picture: a cover or
+    plate with a little text over it, inked across the whole page.
+
+    A text page with a scan behind it is not this: the full-page raster is
+    excluded from embedded figures on purpose, and it only becomes the figure
+    when the pixels and the prose both say the page is its artwork. Measured
+    on book 567's cover: full-bleed art under a few title lines -- without
+    the rule the cover prints as fragments and ships as a strip.
+    """
+    if pixel_probe is None or not raw.is_page_scan:
+        return None
+    images = [img for img in raw.images if img.full_page]
+    if not images:
+        return None
+    if sum(len(kept) for _, kept in kept_blocks) > PLATE_PROSE_MAX:
+        return None
+    rect = (0.0, 0.0, raw.width, raw.height)
+    try:
+        if pixel_probe.coverage(rect) < PLATE_INK_COVER:
+            return None
+    except Exception:
+        return None
+    return images[0]
 
 
 def _split_off_notes(raw, style, skel):

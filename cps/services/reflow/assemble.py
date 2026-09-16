@@ -1214,7 +1214,13 @@ def deterministic_book(doc, page_numbers=None):
     outline = extract.outline(doc)
     style = skeleton.book_style(
         raw_pages, outline=outline if skeleton.outline_is_useful(outline) else None)
-    skeletons = [skeleton.page_skeleton(raw, style) for raw in raw_pages]
+    skeletons = [
+        skeleton.page_skeleton(
+            raw, style,
+            pixel_probe=extract.ScanPixelProbe(
+                doc, raw.pno,
+                mask=[ln.bbox for blk in raw.text_blocks for ln in blk.lines]))
+        for raw in raw_pages]
     return assemble(skeletons, style, raw_pages)
 
 

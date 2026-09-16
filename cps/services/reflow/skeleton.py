@@ -526,7 +526,8 @@ def page_skeleton(raw, style):
         candidates = []
     artwork = []
     if candidates:
-        kept_blocks, artwork = _absorb_figure_content(kept_blocks, candidates)
+        kept_blocks, artwork = _absorb_figure_content(kept_blocks, candidates,
+                                                      style)
         skel.regions.extend(artwork)
 
     layout = _column_layout(kept_blocks, embedded, candidates, raw)
@@ -950,14 +951,18 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
 def _chart_lettering(line, style):
     """True for the lettering an OCR layer reads off a diagram on a scanned page.
 
-    Two shapes: the wreckage ``looks_like_chart_junk`` already knows (stray glyphs,
-    columns of numbers), and lettering set far larger than the body -- on a scan
-    the chart's captions come back two to four times the prose size, which no real
-    line of the book's prose ever does inside a page the ladder has measured.
+    Set far larger than the body and not a rung of the book's own heading ladder:
+    on a scan the chart's captions come back two to four times the prose size,
+    which no real line of the book's prose ever does. Size alone may speak,
+    because the one thing a scan measures reliably is how big the ink is -- the
+    junk-glyph shapes change from chart to chart, and a body-sized date like
+    ``November 2016`` failing the junk veto is a line of the book, not lettering:
+    absorbed as artwork it would vanish from the reader when its blank territory
+    is dropped.
     """
-    if looks_like_chart_junk(line.stripped):
-        return True
-    return bool(style.body_size) and line.size >= style.body_size * CHART_LABEL_RATIO
+    if not style.body_size or line.size < style.body_size * CHART_LABEL_RATIO:
+        return False
+    return not style.on_the_ladder(line.size)
 
 
 def _inside(bbox, rect, share=FIG_LINE_OVERLAP):
@@ -1145,14 +1150,17 @@ def _vector_figures(raw):
     return out
 
 
-def _absorb_figure_content(kept_blocks, candidates):
+def _absorb_figure_content(kept_blocks, candidates, style):
     """Move lettering and captions inside figure territory out of the prose.
 
     The text layer reads a chart's labels as words; left in place they print as
     prose next to the crop that already shows them -- duplicate chart junk in the
     reading flow. Captions printed inside the territory (a chart title under a
     wheel) ride with their figure instead, so the words are kept once, as text.
-    Lines only partly inside stay prose: eating a body line is the worse error.
+    Only lettering is absorbed: a prose-sized line that strays into the territory
+    stays prose, because a line of the book that is visible twice beats one that
+    is visible nowhere -- an absorbed line whose blank territory is dropped at
+    build time would be gone from the reader's book.
     """
     for candidate in candidates:
         captions = []
@@ -1164,8 +1172,10 @@ def _absorb_figure_content(kept_blocks, candidates):
             for ln in inside:
                 if CAPTION_LINE.match(ln.stripped):
                     captions.append(ln)
-                else:
+                elif _chart_lettering(ln, style):
                     candidate.lines.append(ln)
+                else:
+                    outside.append(ln)
             if outside:
                 kept.append((blk, outside))
         kept_blocks = kept

@@ -860,6 +860,20 @@ def vector_diagram_page(doc):
     return page
 
 
+def scan_date_tail_page(doc, png_bytes):
+    """Book 567 page 18's shape: a paragraph, air, and a body-sized date line.
+
+    ``November 2016`` fails the junk veto (one word and a number), and it is a
+    line of the book, not lettering on a diagram: absorbed as artwork it would
+    leave the visible book when the blank territory under it is dropped."""
+    page = add_page(doc)
+    page.insert_image(pymupdf.Rect(0, 0, PAGE_W, PAGE_H), stream=png_bytes)
+    add_running_head(page, "18", "ACKNOWLEDGMENTS")
+    add_body_lines(page, PROSE_LINES[:4])
+    _put(page, 340.0, BODY_TOP + 9 * BODY_LEADING, "November 2016")
+    return page
+
+
 def illustrated_page(doc, png_bytes):
     """Prose with a plate set into it, and no caption under the plate.
 

@@ -295,6 +295,17 @@ class TestScanArtwork(object):
         with zipfile.ZipFile(result.path) as zf:
             assert _ink_share(zf.read(names[0])) > 0.01
 
+    def test_a_body_sized_date_line_is_not_absorbed_as_artwork(self):
+        """Page 18's shape: a body-sized date line is the book's prose, not chart
+        lettering -- it must stay in the reading flow, not vanish into a blank
+        territory that is dropped at build time."""
+        book = _chart_book(lambda d: F.scan_date_tail_page(d, F.solid_png()))
+
+        assert "November 2016" in _whole_text(book)
+        assert not any("November" in a["text"] for a in book.artwork)
+        assert not [f for f in book.figures if f["pno"] == 1
+                    and f.get("found") != "embedded"], book.figures
+
     def test_prose_words_are_still_conserved_with_the_artwork_moved(self):
         """The conservation contract, stated: every source word is accounted in
         body, notes, furniture, captions, or preserved artwork -- never silently

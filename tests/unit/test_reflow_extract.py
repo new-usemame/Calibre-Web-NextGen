@@ -121,6 +121,38 @@ def test_crop_jpeg_bounds_its_allocation_too():
     assert data.startswith(b"\xff\xd8")
 
 
+class _InkPixmap(object):
+    width = height = 8
+    n = 1
+    samples = b"\xff" * 64
+
+
+class _InkPage(_Page):
+    """The blank-versus-artwork question needs samples, not bytes."""
+
+    def __init__(self):
+        super().__init__(612, 792)
+
+    def get_pixmap(self, matrix=None, clip=None, **_kwargs):
+        scale = matrix.a if matrix is not None else 1.0
+        self.calls.append({"scale": scale, "clip": clip})
+        return _InkPixmap()
+
+
+def test_the_ink_check_bounds_its_allocation_before_any_pixel():
+    """The ink check rendered its clip at a fixed 0.35 with no budget, so a
+    hostile figure rectangle could ask for ~1.2 billion pixels before any cap
+    applied (independent repro). The bound lands on the matrix first here too."""
+    page = _InkPage()
+    extract.region_has_ink(_Doc(page), 0, (0, 0, 100000, 100000))
+
+    assert page.calls, "nothing was rendered at all"
+    for call in page.calls:
+        assert _rendered_pixels(page, call) <= extract.MAX_RASTER_PIXELS, \
+            "scale %.4f would allocate %d pixels" % (
+                call["scale"], _rendered_pixels(page, call))
+
+
 def test_an_ordinary_page_is_rendered_exactly_as_before():
     """A real PDF at the pipeline's own settings: full scale, real JPEG, the size
     the vision model has always been sent."""

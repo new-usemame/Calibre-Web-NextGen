@@ -315,9 +315,13 @@ def region_has_ink(doc, pno, rect, thresh=INK_MIN):
     Rendered small and sampled: the question is "blank paper or not", and a wrong
     answer in either direction costs a figure -- a blank crop emitted as artwork,
     or real artwork dropped as blank. Cheap enough to ask about every candidate.
+    The render takes the same pre-allocation bound as every other raster: a
+    hostile clip is scaled down on the matrix before a single pixel exists.
     """
-    pix = doc[pno].get_pixmap(matrix=pymupdf.Matrix(0.35, 0.35),
-                              clip=pymupdf.Rect(*rect), alpha=False)
+    clip = pymupdf.Rect(*rect)
+    scale = _bounded_scale(clip, 0.35)
+    pix = doc[pno].get_pixmap(matrix=pymupdf.Matrix(scale, scale),
+                              clip=clip, alpha=False)
     data, n = pix.samples, pix.n
     total = pix.width * pix.height
     if not total:

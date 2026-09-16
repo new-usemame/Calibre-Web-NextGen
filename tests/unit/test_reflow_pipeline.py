@@ -1377,3 +1377,50 @@ def test_a_run_of_answers_the_provider_billed_for_still_stops_at_the_cap(tmp_pat
     assert result.stopped == "cost_cap", result.stopped
     assert len(client.calls) == 2, client.calls
     assert book.spent() <= 0.005
+
+@pytest.mark.parametrize('kind', ['caption', 'note'])
+@pytest.mark.parametrize('cached', [False, True])
+def test_native_source_evidence_cannot_be_erased_by_model_or_cache(tmp_path, kind, cached):
+    """A native scan layer can be damaged without having gone through OCR.
+    Preserve its source-qualified presentation on both adoption paths."""
+    from cps.services.reflow import build_epub
+    if kind == 'caption':
+        elements = [assemble.Element(kind='fig', pno=0),
+                    assemble.Element(kind='caption', pno=0,
+                        runs=[['t', 'Figure 9. The ancient and modern worlds.']])]
+        notes = []
+        protected = elements[1]
+        field = 'caption_uncertain'
+    else:
+        elements = [assemble.Element(kind='p',pno=0,
+            runs=[['t','Reading the older source says '], ['sup','1',0],
+                  ['t',' in this account.']])]
+        notes = [assemble.Note(num=1,pno=0,marked=True,
+                               text='The damaged reference cannot establish this identity.')]
+        protected = notes[0]
+        field = 'uncertain'
+    book = assemble.Book(elements=elements,pages={0:elements},notes=notes)
+    clean = build_epub.page_fragment(book,0)
+    result = pipeline.ReflowResult(book=book,fingerprint='a'*64,page_html={0:clean})
+    cache = pipeline.PageCache(str(tmp_path/'cache'))
+    client = FakeClient(answer=lambda text: clean)
+    doc = _doc(F.prose_page)
+    try:
+        if cached:
+            primed = pipeline._edit_one_page(doc,book,0,client,None,cache,result,(),True)
+            assert primed.gate == 'PASS', primed.gate_reasons
+            client.calls.clear()
+        setattr(protected,field,True)
+        baseline = build_epub.page_fragment(book,0)
+        assert 'reflow-uncertain' in baseline
+        result.page_html[0] = baseline
+        outcome = pipeline._edit_one_page(doc,book,0,client,None,cache,result,(),True)
+    finally:
+        doc.close()
+    assert result.recovery is None, 'this is native evidence, not OCR confidence'
+    assert bool(client.calls) is not cached
+    assert outcome.cached is cached
+    assert outcome.gate == 'FAIL', 'an unqualified answer must not replace source evidence'
+    assert outcome.source == 'deterministic'
+    assert result.page_html[0] == baseline
+    assert any('source-backed' in reason for reason in outcome.gate_reasons)

@@ -634,6 +634,18 @@ def _adopt(result, book, pno, outcome, html, uncertain, ladder,
                                      figures_expected=figures,
                                      headings=assemble.page_headings(book, pno))
 
+    # These are structural source claims, not uncertain OCR words. A model
+    # answer (including a cached one) cannot establish a damaged note identity
+    # or fill a caption's missing printed glyph merely by conserving tokens.
+    # Keep the deterministic source-evidence presentation until that evidence
+    # can be resolved; never launder it into an unqualified model success.
+    protected_source = (any(el.caption_uncertain for el in book.pages.get(pno, []))
+                        or any(note.uncertain for note in book.notes if note.pno == pno))
+    if protected_source:
+        structure.ok = False
+        structure.reasons.append(
+            "source-backed caption or note uncertainty requires the deterministic presentation")
+
     outcome.uncertain = _merge_uncertainty(list(uncertain or []),
                                            _source_uncertainty(result, pno))
     outcome.recovered_markers = list(words.recovered_markers)

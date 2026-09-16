@@ -2,6 +2,9 @@
 """Behavioral contracts for local recognition, source geometry and containment."""
 import hashlib
 import json
+import os
+import signal
+import time
 import shutil
 import sys
 
@@ -45,7 +48,7 @@ def test_real_scan_orientation_order_and_original_source_coordinates(angle):
 
 
 @real_ocr
-@pytest.mark.parametrize('corruption', ['confidence', 'source_identity'])
+@pytest.mark.parametrize('corruption', ['confidence', 'source_identity', 'text', 'geometry', 'pdf_transform'])
 def test_atomic_cache_roundtrip_and_corrupt_cache_miss(tmp_path, monkeypatch, corruption):
     with _scan() as document:
         digest = hashlib.sha256(document.tobytes()).hexdigest()
@@ -59,8 +62,20 @@ def test_atomic_cache_roundtrip_and_corrupt_cache_miss(tmp_path, monkeypatch, co
         payload = json.loads(cache.read_text())
         if corruption == 'confidence':
             payload['result']['words'][0]['confidence'] = 'invalid'
-        else:
+        elif corruption == 'source_identity':
             payload['result']['source_sha256'] = 'f' * 64
+        elif corruption == 'text':
+            payload['result']['words'][0]['text'] = 'CORRUPTED'
+        elif corruption == 'geometry':
+            payload['result']['words'][0]['source_bbox'] = [-10, -10, 900, 900]
+        else:
+            box = payload['result']['words'][0]['pdf_bbox']
+            payload['result']['words'][0]['pdf_bbox'] = [x + 10 for x in box]
+        if corruption != 'text':
+            # A valid digest cannot excuse invalid geometry or provenance.
+            canonical = json.dumps(payload['result'], sort_keys=True,
+                                   separators=(',', ':'), ensure_ascii=False, allow_nan=False).encode()
+            payload['digest'] = hashlib.sha256(canonical).hexdigest()
         cache.write_text(json.dumps(payload))
         monkeypatch.setattr(ocr, '_invoke', invoke)
         assert ocr.recognize_page(document[0], source_sha256=digest, cache_dir=tmp_path) == first
@@ -135,3 +150,55 @@ def test_rotated_cropped_pdf_maps_back_to_unrotated_page_coordinates(metadata_ro
         assert 15 < first.pdf_bbox[0] < 30
         assert 30 < first.pdf_bbox[1] < 65
         assert result.source_rotation == metadata_rotation
+
+
+@pytest.mark.skipif(os.name != 'posix', reason='POSIX process containment contract')
+@pytest.mark.parametrize('finish', ['timeout', 'cancel', 'normal'])
+def test_engine_descendants_stop_with_the_owned_invocation(tmp_path, finish):
+    heartbeat = tmp_path / 'heartbeat'
+    pidfile = tmp_path / 'child.pid'
+    child_code = ("import sys,time; f=open(sys.argv[1], 'wb', buffering=0); "
+                  "exec('while True:\\n f.write(b\"x\"); time.sleep(.02)')")
+    parent_code = ("import subprocess,sys,time; from pathlib import Path; "
+                   f"child=subprocess.Popen([sys.executable,'-c',{child_code!r},sys.argv[1]]); "
+                   "Path(sys.argv[2]).write_text(str(child.pid)); "
+                   "time.sleep(.3 if sys.argv[3]=='normal' else 30)")
+    stop = (lambda: heartbeat.exists()) if finish == 'cancel' else None
+    try:
+        args = [sys.executable, '-c', parent_code, str(heartbeat), str(pidfile), finish]
+        if finish == 'normal':
+            status, _, _ = ocr._invoke(args, tmp_path, timeout=2, should_stop=stop)
+            assert status == 0
+        else:
+            expected = ocr.OCRCancelled if finish == 'cancel' else ocr.OCRFailed
+            with pytest.raises(expected):
+                ocr._invoke(args, tmp_path, timeout=.7, should_stop=stop)
+        assert heartbeat.exists(), 'the descendant must have actually started'
+        size = heartbeat.stat().st_size
+        time.sleep(.2)
+        assert heartbeat.stat().st_size == size, 'descendant continued after invocation ended'
+    finally:
+        if pidfile.exists():
+            try:
+                os.kill(int(pidfile.read_text()), signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+
+
+@real_ocr
+def test_equal_size_crop_at_a_new_origin_cannot_reuse_old_source_words(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "scratch").mkdir()
+    with _scan() as document:
+        source_digest = hashlib.sha256(document.tobytes()).hexdigest()
+        page = document[0]
+        page.set_cropbox(pymupdf.Rect(0, 0, 400, 500))
+        first = ocr.recognize_page(page, source_sha256=source_digest, cache_dir=tmp_path, scratch_dir="scratch")
+        assert LEFT[0] in ' '.join(word.text for word in first.words)
+        page.set_cropbox(pymupdf.Rect(50, 100, 450, 600))
+        second = ocr.recognize_page(page, source_sha256=source_digest, cache_dir=tmp_path, scratch_dir="scratch")
+        assert (first.width, first.height) == (second.width, second.height)
+        # The first printed line is outside the new crop; cached old words would
+        # falsely put it back into this logically different source region.
+        assert LEFT[0] not in ' '.join(word.text for word in second.words)
+        assert len(list(tmp_path.glob('*.json'))) == 2

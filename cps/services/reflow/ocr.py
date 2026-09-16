@@ -18,13 +18,14 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 import time
 
 import pymupdf
 
-ADAPTER_VERSION = "1"
+ADAPTER_VERSION = "2"
 MAX_PIXELS = 12_000_000
 MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 MAX_WORDS = 100_000
@@ -95,9 +96,12 @@ def _file_digest(path, size, modified_ns):
 
 
 def _engine(language):
+    if os.name != "posix":
+        raise OCRUnavailable("Local OCR requires POSIX process containment (including the Docker image).")
     executable = shutil.which("tesseract")
     if not executable:
         raise OCRUnavailable("Local text recognition requires Tesseract.")
+    executable = str(Path(executable).resolve())
     requested = language.split("+") if isinstance(language, str) else []
     if not requested or len(requested) > 4 or any(not LANGUAGE.fullmatch(x) for x in requested):
         raise OCRUnavailable("Choose one to four installed OCR languages.")
@@ -135,10 +139,16 @@ def _stopped(should_stop):
 
 def _invoke(args, directory, *, timeout, should_stop, watched=()):
     """Bound both execution and disk output; always reap our child on failure."""
+    if os.name != "posix":
+        raise OCRUnavailable("Local OCR requires POSIX process containment.")
+    directory = Path(directory).resolve()
     stdout, stderr = directory / "stdout", directory / "stderr"
     started = time.monotonic()
     with stdout.open("wb") as out, stderr.open("wb") as err:
-        process = subprocess.Popen(args, stdout=out, stderr=err, env=_env())
+        environment = _env()
+        environment["TMPDIR"] = str(directory)
+        process = subprocess.Popen(args, stdout=out, stderr=err, env=environment,
+                                   cwd=directory, start_new_session=True)
         try:
             while True:
                 _stopped(should_stop)
@@ -159,8 +169,12 @@ def _invoke(args, directory, *, timeout, should_stop, watched=()):
                     *[(path, MAX_OUTPUT_BYTES) for path in watched]]):
                 raise OCRFailed("Text recognition exceeded its output limit.")
         finally:
-            if process.poll() is None:
-                process.kill()
+            # The direct child may already have exited while a helper remains.
+            # This session belongs only to this invocation, including on success.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
             process.wait()
     return status, stdout.read_text(errors="replace"), stderr.read_text(errors="replace")
 
@@ -212,6 +226,11 @@ def _parse_words(path, zoom, source_rect, angle, derotation):
     return tuple(words)
 
 
+def _canonical_result(data):
+    return json.dumps(data, sort_keys=True, separators=(",", ":"),
+                      ensure_ascii=False, allow_nan=False).encode("utf-8")
+
+
 def _load_cache(path, key, options):
     try:
         if path.stat().st_size > MAX_OUTPUT_BYTES:
@@ -220,6 +239,10 @@ def _load_cache(path, key, options):
         if payload["key"] != key:
             return None
         data = payload["result"]
+        # Detect accidental valid-JSON corruption, not an authorized local writer
+        # who can replace both the result and this unkeyed checksum.
+        if payload["digest"] != hashlib.sha256(_canonical_result(data)).hexdigest():
+            return None
         expected = dict(source_sha256=options["source"], page_index=options["page"],
                         engine_version=options["engine"], language=options["language"],
                         language_identity=options["data"], requested_dpi=options["dpi"],
@@ -228,11 +251,17 @@ def _load_cache(path, key, options):
             return None
         if data["orientation_clockwise"] not in (0, 90, 180, 270):
             return None
+        rect = pymupdf.Rect(options["rect"])
+        angle = data["orientation_clockwise"]
+        width, height = ((rect.height, rect.width) if angle % 180 else (rect.width, rect.height))
+        derotation = pymupdf.Matrix(options["derotation"])
         for name in ("effective_dpi", "width", "height", "orientation_confidence"):
             value = data[name]
             if not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
                 return None
         if not 0 < data["effective_dpi"] <= options["dpi"] or min(data["width"], data["height"]) <= 0:
+            return None
+        if not math.isclose(data["width"], width, abs_tol=.001) or not math.isclose(data["height"], height, abs_tol=.001):
             return None
         if len(data["words"]) > MAX_WORDS or not isinstance(data["flags"], list):
             return None
@@ -250,6 +279,18 @@ def _load_cache(path, key, options):
                 if box[0] > box[2] or box[1] > box[3]:
                     return None
                 word[name] = tuple(box)
+            box, source = word["bbox"], word["source_bbox"]
+            rounding = 72 / data["effective_dpi"]
+            if min(box) < 0 or box[2] > width + rounding or box[3] > height + rounding:
+                return None
+            if min(source) < 0 or source[2] > rect.width or source[3] > rect.height:
+                return None
+            expected_source = _source_box(box, rect.width, rect.height, angle)
+            expected_pdf = tuple(pymupdf.Rect(expected_source) * derotation)
+            if any(not math.isclose(a, b, rel_tol=0, abs_tol=.001)
+                   for actual, expected in ((source, expected_source), (word["pdf_bbox"], expected_pdf))
+                   for a, b in zip(actual, expected)):
+                return None
             if not isinstance(word["confidence"], (int, float)) or not 0 <= word["confidence"] <= 100:
                 return None
             if any(not isinstance(word[name], int) or word[name] < 0
@@ -267,7 +308,10 @@ def _save_cache(path, key, result):
     fd, name = tempfile.mkstemp(prefix=path.stem + "-", suffix=".tmp", dir=path.parent)
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as stream:
-            json.dump({"key": key, "result": result.to_dict()}, stream, ensure_ascii=False)
+            data = result.to_dict()
+            digest = hashlib.sha256(_canonical_result(data)).hexdigest()
+            json.dump({"key": key, "digest": digest, "result": data}, stream,
+                      ensure_ascii=False, allow_nan=False)
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(name, path)
@@ -300,6 +344,8 @@ def recognize_page(page, *, source_sha256, language="eng", dpi=300,
     executable, version, data_identity = _engine(language)
     options = dict(adapter=ADAPTER_VERSION, source=source_sha256, page=page.number,
                    rect=tuple(rect), rotation=page.rotation, engine=version,
+                   cropbox=tuple(page.cropbox), derotation=tuple(page.derotation_matrix),
+                   renderer=pymupdf.VersionBind,
                    language=language, data=data_identity, dpi=dpi, max_pixels=max_pixels)
     key = hashlib.sha256(json.dumps(options, sort_keys=True).encode()).hexdigest()
     cache_path = Path(cache_dir) / (key + ".json") if cache_dir else None
@@ -316,7 +362,7 @@ def recognize_page(page, *, source_sha256, language="eng", dpi=300,
         raise OCRFailed("The page cannot be recognized within the raster limit.")
     flags = [] if zoom == dpi / 72. else ["resolution_limited"]
     with tempfile.TemporaryDirectory(prefix="reflow-ocr-", dir=scratch_dir) as temporary:
-        directory = Path(temporary)
+        directory = Path(temporary).resolve()
         image = directory / "page.jpg"
         _stopped(should_stop)
         page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False).save(str(image))

@@ -218,6 +218,63 @@ def test_one_chart_has_no_empty_channel_and_blank_paper_has_none():
         doc.close()
 
 
+def _rules_doc(rule_ys, vertical_ys=None):
+    """A page carrying ruling and nothing else: horizontal rules at the given
+    y positions, optionally one vertical divider."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=504.0, height=720.0)
+    for y in rule_ys:
+        page.draw_line((48.0, y), (460.0, y), color=(0.3, 0.3, 0.32), width=0.7)
+    if vertical_ys is not None:
+        page.draw_line((264.0, vertical_ys[0]), (264.0, vertical_ys[1]),
+                       color=(0.3, 0.3, 0.32), width=0.7)
+    return doc
+
+
+def test_rule_rows_reports_the_strokes_a_scan_carries():
+    """A ruled grid's strokes are a point tall at most: the ink proof's 10x10
+    cells cannot see them, so the row question is asked of the raster directly --
+    which device rows stay dark across the territory's width."""
+    doc = _rules_doc([134.0, 168.0, 250.0])
+    try:
+        rows = extract.rule_rows(doc, 0, (40.0, 90.0, 470.0, 300.0))
+    finally:
+        doc.close()
+
+    assert len(rows) == 3, rows
+    for got, want in zip(rows, (134.0, 168.0, 250.0)):
+        assert abs(got - want) <= 2.0, (rows, want)
+
+
+def test_rule_rows_sees_neither_blank_paper_nor_a_vertical_divider():
+    """The controls: blank paper holds no rules, and a two-column page's
+    vertical divider is not a row separator -- ruling that pairs nothing must
+    not veto anything."""
+    doc = _rules_doc([])
+    try:
+        assert extract.rule_rows(doc, 0, (40.0, 90.0, 470.0, 300.0)) == []
+    finally:
+        doc.close()
+    doc = _rules_doc([], vertical_ys=(100.0, 500.0))
+    try:
+        assert extract.rule_rows(doc, 0, (40.0, 90.0, 470.0, 550.0)) == []
+    finally:
+        doc.close()
+
+
+def test_the_rule_query_bounds_its_allocation_before_any_pixel():
+    """The rule query renders at a stroke-resolving scale, far above the ink
+    proof's 0.35: the pixel budget lands on the matrix first here as well."""
+    page = _InkPage()
+    extract.rule_rows(_Doc(page), 0, (0, 0, 100000, 100000))
+
+    assert page.calls, "nothing was rendered at all"
+    for call in page.calls:
+        assert _rendered_pixels(page, call) <= extract.MAX_RASTER_PIXELS, \
+            "scale %.4f would allocate %d pixels" % (
+                call["scale"], _rendered_pixels(page, call))
+
+
 def test_an_ordinary_page_is_rendered_exactly_as_before():
     """A real PDF at the pipeline's own settings: full scale, real JPEG, the size
     the vision model has always been sent."""

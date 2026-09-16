@@ -996,6 +996,179 @@ def unruled_label_table_page(doc):
     return page
 
 
+# ------------------------------------------------------------- ruled scan register
+
+def _scan_raster(rule_ys=(), divider_x=None, divider_ys=(0.0, 0.0)):
+    """A page raster carrying only ruling: the horizontal rules (and optionally
+    one vertical divider) rendered to pixels at scan scale, no text at all --
+    what a scan of a ruled page actually is once the text layer is separated
+    from it."""
+    art = new_doc()
+    page = add_page(art)
+    for y in rule_ys:
+        page.draw_line((48.0, y), (460.0, y), color=(0.3, 0.3, 0.32), width=0.7)
+    if divider_x is not None:
+        page.draw_line((divider_x, divider_ys[0]), (divider_x, divider_ys[1]),
+                       color=(0.45, 0.45, 0.48), width=0.5)
+    pix = page.get_pixmap(matrix=pymupdf.Matrix(2, 2), alpha=False)
+    data = pix.tobytes("png")
+    art.close()
+    return data
+
+
+#: The register's rows: (record lines, grant lines). Fresh wording on purpose --
+#: the behaviour under test is the measured row relationship, not these labels.
+REGISTER_ROWS = [
+    (["Hollow Lane bridge: rebuild the",
+      "cracked southern abutment before the",
+      "winter fair, keeping the sound arches."],
+     ["Granted 12 April 1998. The mason",
+      "may start once the warden signs the",
+      "traffic plan; inspect in September."]),
+    (["Fen Causeway path: raise the sunken",
+      "boardwalk between the alder gate and",
+      "the landing, proof against floods."],
+     ["Granted with conditions. Funds are",
+      "held through 2001, provided the ferry",
+      "landing stays open on fair days."]),
+    (["Old Quarry sluice: gauge the north",
+      "gate and log the oak timbers before",
+      "any works raise the water upstream."],
+     ["Survey allowed for one season. Send",
+      "the measured drawings to the manor",
+      "court by 3 March; no rebuild follows."]),
+    (["Chapel Green lamps: keep the three",
+      "original iron posts, then fit lanterns",
+      "where the night path is still dark."],
+     ["Granted for a five-year term. The",
+      "village trust holds the inspection",
+      "book and may ask for taller posts."]),
+]
+
+#: Each record's opening words beside its grant's opening words, in row order.
+REGISTER_PAIR_ANCHORS = [
+    ("Hollow Lane bridge", "Granted 12 April 1998"),
+    ("Fen Causeway path", "Granted with conditions"),
+    ("Old Quarry sluice", "Survey allowed for one season"),
+    ("Chapel Green lamps", "Granted for a five-year term"),
+]
+
+_REGISTER_TOP = 186.0
+_REGISTER_ROW_H = 78.0
+_REGISTER_LEADING = 13.0
+
+
+def _register_scan_page(doc, rule_ys):
+    """A ruled paired register as a full-page scan with an OCR text layer over it.
+
+    Held-out case A's image-only shape: two headed columns of prose cells whose
+    rows share baselines, every cell ending in sentence punctuation, the cells
+    handed back in column order (every left cell before every right cell). The
+    ruling that pairs each record with its grant survives only in the page
+    raster, where the born-digital veto's vector path count cannot see it."""
+    page = add_page(doc)
+    page.insert_image(pymupdf.Rect(0, 0, PAGE_W, PAGE_H),
+                      stream=_scan_raster(rule_ys, divider_x=264.0,
+                                          divider_ys=(145.0, 500.0)))
+    _put(page, 48.0, 90.0, "Parish Bridge Register: Grants and Conditions",
+         size=13.0, font=_BOLD)
+    _put(page, 48.0, 116.0,
+         "Each right-hand grant belongs to the record aligned with it on the same ruled line.",
+         size=9.6)
+    _put(page, 53.0, 150.0, "Bridge record and scope", size=10.4, font=_BOLD)
+    _put(page, 300.0, 150.0, "Grant, term, and next inspection", size=10.4,
+         font=_BOLD)
+    y = _REGISTER_TOP
+    for record, grant in REGISTER_ROWS:
+        for index, line in enumerate(record):
+            _put(page, 53.0, y + index * _REGISTER_LEADING, line, size=9.6)
+        for index, line in enumerate(grant):
+            _put(page, 300.0, y + index * _REGISTER_LEADING, line, size=9.6)
+        y += _REGISTER_ROW_H
+    _put(page, 48.0, 530.0,
+         "Register note: bridge names appear in the left column only; "
+         "the ruling defines each grant.",
+         size=8.8)
+    return page
+
+
+def scan_ruled_register_page(doc):
+    """The register scan WITH its ruling: six rules bound the headed cells."""
+    rules = [134.0, 168.0]
+    rules += [_REGISTER_TOP + index * _REGISTER_ROW_H + 64.0
+              for index in range(len(REGISTER_ROWS))]
+    return _register_scan_page(doc, rules)
+
+
+def scan_unruled_register_page(doc):
+    """The same register wording on a raster WITHOUT ruling: the text shape is
+    identical, so whatever the reading does here is decided by the text alone."""
+    return _register_scan_page(doc, [])
+
+
+def scan_independent_columns_page(doc):
+    """Held-out case B's image-only shape: two headed, independent prose
+    accounts over a raster that carries one deck rule and a vertical divider --
+    no row ruling at all. Mixed paragraph lengths, baselines unshared; nothing
+    here pairs, and the columns must keep reading down, never interleaved."""
+    page = add_page(doc)
+    page.insert_image(pymupdf.Rect(0, 0, PAGE_W, PAGE_H),
+                      stream=_scan_raster([134.0], divider_x=264.0,
+                                          divider_ys=(145.0, 700.0)))
+    _put(page, 48.0, 90.0, "Aldermoor Papers: Two Separate Accounts of the Harbour",
+         size=13.0, font=_BOLD)
+    _put(page, 48.0, 116.0,
+         "The notes share a harbour and several years, but each column is its own account.",
+         size=9.6)
+    _put(page, 53.0, 150.0, "Harbour log: Aldermoor pier", size=10.4, font=_BOLD)
+    _put(page, 300.0, 150.0, "Oral history: Aldermoor crews", size=10.4,
+         font=_BOLD)
+    left = [
+        (186.0, ["In 1911 the harbour log marked the",
+                 "pier as shallow at the lower ladder.",
+                 "It noted tide, rot, and the distance",
+                 "to the warehouse drain."]),
+        (276.0, ["The 1913 sheet repeats the pier name",
+                 "because the sounding began at the same",
+                 "bollard; a margin note mentions a",
+                 "mended gauge."]),
+        (366.0, ["By 1917 the keeper asked for another",
+                 "sounding after storms. No crew list",
+                 "appears in this file."]),
+    ]
+    right = [
+        (186.0, ["Marta Elwin remembered joining the",
+                 "crews in 1911, when loading moved off",
+                 "the pier after rain. Her account follows",
+                 "suppers, shifts, and kin, not depths."]),
+        (290.0, ["In 1913 she described a lantern kept",
+                 "by the waiting room, not the bollard."]),
+        (382.0, ["The 1917 interview is brief: 'We left",
+                 "before the first hard frost.' It names",
+                 "no instrument and makes no request."]),
+    ]
+    for top, lines in left:
+        for index, line in enumerate(lines):
+            _put(page, 53.0, top + index * _REGISTER_LEADING, line, size=9.6)
+    for top, lines in right:
+        for index, line in enumerate(lines):
+            _put(page, 300.0, top + index * _REGISTER_LEADING, line, size=9.6)
+    _put(page, 48.0, 505.0,
+         "Editorial note: shared years and names are context between the two "
+         "accounts, never matching rows.",
+         size=8.8)
+    return page
+
+
+#: The two columns' own opening anchors, in each column's print order.
+INDEPENDENT_LEFT_ANCHORS = ["In 1911 the harbour log",
+                            "The 1913 sheet repeats",
+                            "By 1917 the keeper asked"]
+INDEPENDENT_RIGHT_ANCHORS = ["Marta Elwin remembered",
+                             "In 1913 she described",
+                             "The 1917 interview is brief"]
+
+
 def ragged_single_column_page(doc):
     """Book 565 page 158's shape: an ordinary page of prose whose ragged short
     lines open fake gutters between their right edges.

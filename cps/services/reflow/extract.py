@@ -379,8 +379,8 @@ def ink_channel(doc, pno, rect, min_px=8, mask=()):
 class ScanPixelProbe(object):
     """The pixel questions a scan figure pass asks of one page, answered from
     the document: does this rectangle hold marks, where are its full-height
-    empty channels, and what share of it is printed? The page's text lines are
-    masked for all three -- prose and furniture are not artwork, whatever they
+    empty channels, which horizontal rules it carries, and what share is printed?
+    The page's text lines are masked for these probes -- prose and furniture are not artwork, whatever they
     print over."""
 
     def __init__(self, doc, pno, mask=()):
@@ -393,6 +393,9 @@ class ScanPixelProbe(object):
 
     def has_ink(self, rect):
         return region_has_ink(self._doc, self._pno, rect, mask=self._mask)
+
+    def rules(self, rect):
+        return rule_rows(self._doc, self._pno, rect, mask=self._mask)
 
     def coverage(self, rect):
         """The share of this rectangle's blocks that hold print: near 1.0 on a
@@ -474,6 +477,67 @@ def region_has_ink(doc, pno, rect, thresh=INK_MIN, mask=()):
             if total and dark / total >= INK_BLOCK_MIN:
                 return True
     return False
+
+
+#: Render scale for the rule query. A ruled grid's strokes are a point or two
+#: tall and can be printed faint: the held-out register's inter-row rules are
+#: 0.45pt of 0.65 gray, which antialiases away below 3x (MEASURED on the
+#: frozen pack's raster). The ink proof's 0.35 renders them away entirely,
+#: which is why that proof cannot report them.
+RULE_SCALE = 3.0
+#: A device row at least this dark across at least RULE_ROW_MIN of the
+#: territory's width is a rule stroke, not prose. Ruling is printed light on
+#: purpose, so the darkness bar sits far above the ink proof's 200; what
+#: proves the stroke is the full-width row shape, which no line of set text --
+#: masked out here -- and no paper shadow fills the same way.
+RULE_ROW_DARK = 240
+#: A device row dark across at least this share of the territory's width is a
+#: rule stroke, not prose: antialiasing and the mask take the stroke's ends.
+RULE_ROW_MIN = 0.6
+
+
+def rule_rows(doc, pno, rect, mask=()):
+    """Y centres (PDF space) of the horizontal rules printed inside ``rect``.
+
+    A scanned register's ruling survives rasterization as thin strokes running
+    the width of the measure, and the ink proof's 10x10 cells cannot see them:
+    a one-point stroke lights no whole cell. This asks the rule's own question
+    -- which device rows stay dark across the territory once the text is
+    masked out -- from ONE grayscale render, pre-bounded on the matrix like
+    every other raster before a single pixel is allocated.
+    """
+    clip = pymupdf.Rect(*rect)
+    scale = _bounded_scale(clip, RULE_SCALE)
+    pix = doc[pno].get_pixmap(matrix=pymupdf.Matrix(scale, scale),
+                              clip=clip, alpha=False,
+                              colorspace=pymupdf.csGRAY)
+    n, w, h = pix.n, pix.width, pix.height
+    if not w or not h:
+        return []
+    data = bytearray(pix.samples)
+    for box in mask:
+        x0 = max(0, int((box[0] - MASK_PAD - clip.x0) * scale))
+        y0 = max(0, int((box[1] - MASK_PAD - clip.y0) * scale))
+        x1 = min(w, int((box[2] + MASK_PAD - clip.x0) * scale + 0.5) + 1)
+        y1 = min(h, int((box[3] + MASK_PAD - clip.y0) * scale + 0.5) + 1)
+        for y in range(y0, max(y0, y1)):
+            row = y * w * n
+            for x in range(x0, max(x0, x1)):
+                data[row + x * n] = 255
+    strokes = []
+    run = None
+    for y in range(h):
+        row = y * w * n
+        dark = sum(1 for x in range(w) if data[row + x * n] < RULE_ROW_DARK)
+        if dark >= RULE_ROW_MIN * w:
+            if run is None:
+                run = y
+        elif run is not None:
+            strokes.append((run + y - 1) / 2.0)
+            run = None
+    if run is not None:
+        strokes.append((run + h - 1) / 2.0)
+    return [clip.y0 + centre / scale for centre in strokes]
 
 
 def read_pages(doc, page_numbers=None):

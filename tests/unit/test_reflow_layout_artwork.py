@@ -425,6 +425,81 @@ class TestColumnReadingOrder(object):
         assert "multi_column" not in (book.page_reasons(0) or [])
 
 
+# ------------------------------------------------------------- ruled scan rows
+
+def _probed_book(*builders):
+    """The deterministic pass with the pipeline's pixel probe wired -- the seam
+    pipeline.run builds one ScanPixelProbe per page for, where a scan's ruling
+    is measured from the page raster rather than from a vector path count."""
+    doc = F.new_doc()
+    for build in builders:
+        build(doc)
+    try:
+        raw_pages = extract.read_pages(doc)
+        style = skeleton.book_style(raw_pages)
+        skeletons = [
+            skeleton.page_skeleton(
+                raw, style,
+                pixel_probe=extract.ScanPixelProbe(
+                    doc, raw.pno,
+                    mask=[ln.bbox for blk in raw.text_blocks
+                          for ln in blk.lines]))
+            for raw in raw_pages]
+        return assemble.assemble(skeletons, style, raw_pages)
+    finally:
+        doc.close()
+
+
+class TestRuledScanRows(object):
+    """A ruled register read off its raster: the rows are the relationships."""
+
+    def test_a_ruled_register_scan_keeps_each_record_with_its_grant(self):
+        """Held-out case A's image-only defect (readiness-20260915): the OCR
+        layer survived whole, yet the reading printed all four records and then
+        all four grants -- the ruling that pairs them lives in the page raster,
+        where the vector ruled-grid veto cannot see it, and the prose cells end
+        their sentences, which the mirror-row guard reads as independent
+        columns. The ruling is the source's own evidence: each record must be
+        followed by its own grant, the way the born-digital page already reads."""
+        book = _probed_book(F.scan_ruled_register_page)
+
+        text = _whole_text(book)
+        positions = [text.index(anchor) for pair in F.REGISTER_PAIR_ANCHORS
+                     for anchor in pair]
+        assert positions == sorted(positions), \
+            "every record must be followed by its own grant, in row order: " + text
+        assert book.conservation.ok, book.conservation.to_dict()
+
+    def test_an_unruled_register_scan_is_not_read_as_rows(self):
+        """The pixel gate, not the text shape, decides: the same register wording
+        on a raster WITHOUT ruling cannot prove its rows, so the columns keep the
+        status-quo reading rather than a guessed table. Aligned prose alone is
+        not a table."""
+        book = _probed_book(F.scan_unruled_register_page)
+
+        text = _whole_text(book)
+        records = [text.index(pair[0]) for pair in F.REGISTER_PAIR_ANCHORS]
+        grants = [text.index(pair[1]) for pair in F.REGISTER_PAIR_ANCHORS]
+        assert max(records) < min(grants), \
+            "no ruling measured: the status-quo column reading keeps: " + text
+        assert book.conservation.ok, book.conservation.to_dict()
+
+    def test_independent_columns_on_a_scan_stay_independent(self):
+        """The control that must not move (case B's shape): two headed,
+        independent prose accounts whose raster carries one deck rule and a
+        vertical divider -- no row ruling -- keep reading down their own
+        columns; no cross-column pairing is fabricated."""
+        book = _probed_book(F.scan_independent_columns_page)
+
+        text = _whole_text(book)
+        left = [text.index(anchor) for anchor in F.INDEPENDENT_LEFT_ANCHORS]
+        right = [text.index(anchor) for anchor in F.INDEPENDENT_RIGHT_ANCHORS]
+        assert left == sorted(left) and right == sorted(right), text
+        assert max(left) < min(right), \
+            "independent accounts read down their own columns: " + text
+        assert book.conservation.ok, book.conservation.to_dict()
+
+
 # --------------------------------------------------------- artwork in a page scan
 
 #: The body size is a book-level measurement, and a chart page on its own is mostly

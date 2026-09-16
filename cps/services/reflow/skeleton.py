@@ -83,6 +83,11 @@ COLUMN_FILL_MIN = 0.45
 #: A page carrying at least this many vector paths may be holding ruled tables;
 #: column traversal of a ruled grid destroys its rows, so it is left alone.
 RULED_MIN_PATHS = 4
+#: The raster counterpart of the ruled veto: a scan's ruling lives in the page
+#: raster, invisible to the path count. At least this many measure-spanning
+#: rule strokes say the page is a ruled grid all the same -- one deck rule
+#: under a heading pairs nothing, and a ruled register rules its rows.
+RULE_SCAN_MIN = 3
 
 #: A text-free band this tall (share of page height) inside a page scan is figure
 #: territory -- on this kind of book the diagrams live inside the page raster.
@@ -493,11 +498,12 @@ def heading_ish(line, style):
 def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     """Classify one page's regions, recording a reason for every uncertain call.
 
-    ``pixel_probe`` answers the two questions geometry cannot (an
+    ``pixel_probe`` answers the questions geometry cannot (an
     ``extract.ScanPixelProbe``): whether an edge gap's pixels hold marks at
-    all, and where a band's truly empty columns split two side-by-side charts.
-    Without one, edge gaps stay proposals for the build's ink proof and bands
-    are never split."""
+    all, where a band's truly empty columns split two side-by-side charts, and
+    which horizontal rules a scan's raster still carries. Without one, edge
+    gaps stay proposals for the build's ink proof, bands are never split, and
+    a raster's ruling cannot veto a column reading."""
     skel = PageSkeleton(pno=raw.pno, width=raw.width, height=raw.height,
                         is_scan=raw.is_page_scan)
 
@@ -569,7 +575,8 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
                                                       style)
         skel.regions.extend(artwork)
 
-    layout = _column_layout(kept_blocks, embedded, candidates, raw)
+    layout = _column_layout(kept_blocks, embedded, candidates, raw,
+                            pixel_probe=pixel_probe)
     if isinstance(layout, _RowTable):
         # The rows are measured, and the page keeps the printed (y, x) order --
         # but each row's cells are emitted as one region, because the paragraph
@@ -1166,7 +1173,7 @@ class _ColumnLayout(object):
                 for (band, column), group in sorted(runs.items())]
 
 
-def _column_layout(kept_blocks, embedded, candidates, raw):
+def _column_layout(kept_blocks, embedded, candidates, raw, pixel_probe=None):
     """The page's column layout, or None when the page does not prove one.
 
     Fail closed on purpose: a page that only *might* be columns keeps the
@@ -1208,6 +1215,14 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
         # Ruled lines across the gutter: a grid, not prose columns. (A candidate
         # has already claimed the drawing territory as artwork, so prose left
         # beside it may still be ordered.)
+        return None
+    if raw.is_page_scan and pixel_probe is not None \
+            and _scan_ruled(pixel_probe, line_boxes, left, right):
+        # The same veto measured from pixels: a scan's ruling lives in the page
+        # raster, invisible to the path count, and column traversal of a ruled
+        # register destroys its rows exactly the same way. (A figure candidate
+        # does not lift this veto: on a scan the candidate's territory is raster
+        # too, and ruling between the rows is not artwork.)
         return None
 
     spanning = [box for box in items if (box[2] - box[0]) >= FULL_SPAN * span]
@@ -1271,6 +1286,25 @@ def _column_layout(kept_blocks, embedded, candidates, raw):
     if not _column_sequence_evidence(columnar, layout):
         return None
     return layout
+
+
+def _scan_ruled(pixel_probe, line_boxes, left, right):
+    """True when the page raster carries repeated rules across the measure.
+
+    The territory is the text's own box, breathed by two line heights so the
+    grid's outermost rules -- which bound the first and last cells rather than
+    sitting between lines -- are still seen. A probe failure fails closed: no
+    veto, and the status-quo column reading keeps.
+    """
+    heights = sorted(box[3] - box[1] for box in line_boxes if box[3] > box[1])
+    pad = 2.0 * (heights[len(heights) // 2] if heights else 12.0)
+    top = min(box[1] for box in line_boxes) - pad
+    bottom = max(box[3] for box in line_boxes) + pad
+    try:
+        strokes = pixel_probe.rules((left, top, right, bottom))
+    except Exception:
+        return False
+    return len(strokes) >= RULE_SCAN_MIN
 
 
 def _baseline_clusters(columnar):

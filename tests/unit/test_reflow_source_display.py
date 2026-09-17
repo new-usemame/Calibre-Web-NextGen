@@ -146,3 +146,33 @@ def test_grid_extent_follows_connected_ruling_beyond_inward_ocr_box():
     region=grid_regions(book,doc,0,{'layer':'ocr','orientation':0})[0]['reading_bbox']
     assert region[0]<=20 and region[1]<=30 and region[2]>=260 and region[3]>=240
     doc.close()
+
+
+@pytest.mark.parametrize('shared',[True,False])
+def test_physical_grid_groups_keep_all_ocr_atoms_without_dropping_distinct_equal_grids(tmp_path,shared):
+    import zipfile
+    from cps.services.reflow import assemble,build_epub,structural_ops as ops
+    from cps.services.reflow.enriched_source import prepare_source_page
+    doc=pymupdf.open();page=doc.new_page(width=400,height=520)
+    offsets=[0] if shared else [0,250]
+    for offset in offsets:
+        for y in range(30,211,30):page.draw_line((20,y+offset),(260,y+offset),width=1)
+        for x in range(20,261,40):page.draw_line((x,30+offset),(x,210+offset),width=1)
+    doc.save(tmp_path/'source.pdf');doc.close();doc=pymupdf.open(tmp_path/'source.pdf')
+    elements=[assemble.Element('p',runs=[['t','Alpha "first readings"']],bbox=(60,60,220,150)),
+              assemble.Element('p',runs=[['t','Beta "second readings"']],bbox=(60,120 if shared else 310,220,210 if shared else 400))]
+    book=assemble.Book(elements=elements,pages={0:elements})
+    source=prepare_source_page(book,0,{'layer':'ocr','orientation':0},
+          [{'token':'Alpha','confidence':40},{'token':'Beta','confidence':40}])
+    prepared=ops.prepare(book,doc,0,'group-test',json.loads(source.provenance_json),source_page=source)
+    assert prepared.candidates()==[]
+    target=tmp_path/'groups.epub';result=build_epub.build(book,str(target),doc=doc,source_pages={0:source})
+    with zipfile.ZipFile(target) as z:
+        layouts=[n for n in z.namelist() if '_layout_' in n and n.endswith('.jpg')]
+        assert len(layouts)==(1 if shared else 2)
+        chapter=z.read('OEBPS/'+result.chapters[0]['href']).decode()
+        assert chapter.index('_layout_')<chapter.index('Alpha')<chapter.index('Beta')
+        assert chapter.count('title="uncertain reading"')==source.html.count('title="uncertain reading"')==2
+        assert chapter.count('OCR transcription. Read the original above')==(1 if shared else 2)
+    assert build_epub.validate(str(target))==[]
+    doc.close()

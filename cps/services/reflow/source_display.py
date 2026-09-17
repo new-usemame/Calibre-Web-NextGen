@@ -1,5 +1,7 @@
 """Bounded original pixels in the source's established upright reading space."""
 import math
+import hashlib
+import json
 from . import extract, ocr
 
 VERSION = 'source-display-1'
@@ -167,12 +169,24 @@ def grid_regions(book,doc,pno,provenance,check_cancelled=None):
             matching=[bound for bound in extents if (bound & rect).get_area()>=rect.get_area()*.8
                       and bound.width>=rect.width*.8 and bound.height>=rect.height*.8]
             if matching:
-                rect=min(matching,key=lambda bound:bound.get_area()) | rect
+                complete=min(matching,key=lambda bound:bound.get_area())
+                rect=complete | rect
                 proof['extent_method']='connected_original_ruling'
             else:
-                rect=display.rect
+                complete=rect=display.rect
                 proof['extent_method']='complete_original_context'
+            proof['region_id']=hashlib.sha256(json.dumps([VERSION,pno,display.angle,
+                display.page.rotation,[round(v,6) for v in complete]],separators=(',',':')).encode()).hexdigest()
             proof['reading_bbox']=list(rect)
             proof['displayed_pdf_bbox']=list(display.source_rect(rect))
             regions[index]=proof
+    grouped={}
+    for index,proof in regions.items():grouped.setdefault(proof['region_id'],[]).append(index)
+    for members in grouped.values():
+        rect=extract.pymupdf.Rect(regions[members[0]]['reading_bbox'])
+        for index in members[1:]:rect |= extract.pymupdf.Rect(regions[index]['reading_bbox'])
+        for index in members:
+            regions[index]['element_indices']=members
+            regions[index]['reading_bbox']=list(rect)
+            regions[index]['displayed_pdf_bbox']=list(display.source_rect(rect))
     return regions

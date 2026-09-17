@@ -1054,6 +1054,7 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
         from .source_display import grid_regions
         grids = grid_regions(book, doc, pno, provenance, lambda: _check_cancelled(should_stop))
         for element_index, proof in grids.items():
+            if element_index != proof['element_indices'][0]:continue
             key = "layout_%d" % element_index
             src = "images/original_p%04d_%s.jpg" % (pno, key)
             images[src] = display.jpeg(proof['reading_bbox'])
@@ -1127,7 +1128,8 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
             source = source_pages[pno]
             canonical_blocks = split_blocks(source.html)
             mapping = json.loads(source.blocks_json)
-            for element_index in grids:
+            for element_index, proof in grids.items():
+                if element_index != proof['element_indices'][0]:continue
                 block = canonical_blocks[mapping[str(element_index)]]
                 key = "layout_%d" % element_index
                 src = "images/original_p%04d_%s.jpg" % (pno, key)

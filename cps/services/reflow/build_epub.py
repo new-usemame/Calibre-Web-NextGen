@@ -162,6 +162,8 @@ def page_fragment(book, pno, style=None, wrappers=None):
             from .structural_ops import render_element
             blocks.append(render_element(element, wrappers[element_index],
                 lambda runs: _runs_html(runs, available, ref_ids, ambiguous)))
+            if element.punctuation_uncertain:
+                blocks.append(_punctuation_notice(pno, element_index))
             continue
         inner = _runs_html(element.runs, available, ref_ids, ambiguous)
         if not inner.strip():
@@ -175,10 +177,18 @@ def page_fragment(book, pno, style=None, wrappers=None):
             blocks.append('<p class="caption">%s</p>' % inner)
         else:
             blocks.append("<p>%s</p>" % inner)
+        if element.punctuation_uncertain:
+            blocks.append(_punctuation_notice(pno, element_index))
 
     for note in notes:
         blocks.append(_aside_html(note, ref_ids, available, str(note.num) in ambiguous))
     return "\n".join(blocks)
+
+
+def _punctuation_notice(pno, index):
+    return ('<p class="source-evidence-notice reflow-uncertain">Original punctuation '
+            'may differ from this transcription. <a href="original-p%04d.xhtml#text_%d">'
+            'View original passage</a>.</p>' % (pno, index))
 
 
 def _runs_html(runs, available, ref_ids, ambiguous=()):
@@ -986,6 +996,9 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
             box = (min(b[0] for b in boxes), min(b[1] for b in boxes),
                    max(b[2] for b in boxes), max(b[3] for b in boxes)) if boxes else None
             specs.append(("notes", "Original notes and neighboring context", box))
+        for element_index, element in enumerate(book.pages.get(pno, [])):
+            if element.punctuation_uncertain:
+                specs.append(("text_%d" % element_index, "Original punctuation and passage", element.bbox))
         caption_keys, caption_counts = [], {}
         figure_index = -1
         for element in book.pages.get(pno, []):

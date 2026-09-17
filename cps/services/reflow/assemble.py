@@ -93,6 +93,7 @@ class Element(object):
         default_factory=list)
     #: Caption has a broken extraction baseline; printed pixels are retained.
     caption_uncertain: bool = False
+    punctuation_uncertain: bool = False
 
     @property
     def text(self):
@@ -194,7 +195,8 @@ class Book(object):
 
     def needs_source_evidence(self, pno):
         return bool(self.ambiguous_note_numbers(pno)) or any(
-            element.caption_uncertain for element in self.pages.get(pno, []))
+            element.caption_uncertain or element.punctuation_uncertain
+            for element in self.pages.get(pno, []))
 
     def page_box(self, pno):
         """What to photograph for this page: the part its words came from."""
@@ -971,6 +973,12 @@ def _join_within_page(elements, vocab):
                 anchor.runs = tidy(stitch_runs(
                     anchor.runs, element.runs, heal=True, vocab=vocab))
                 anchor.pages = sorted(set(anchor.pages + element.pages))
+                anchor.punctuation_uncertain |= element.punctuation_uncertain
+                if anchor.punctuation_uncertain:
+                    anchor.bbox = (min(anchor.bbox[0], element.bbox[0]),
+                                   min(anchor.bbox[1], element.bbox[1]),
+                                   max(anchor.bbox[2], element.bbox[2]),
+                                   max(anchor.bbox[3], element.bbox[3]))
                 continue
         out.append(element)
     return out
@@ -983,6 +991,7 @@ def _copy_element(element):
                    band=element.band, column=element.column,
                    table_row=element.table_row,
                    caption_uncertain=element.caption_uncertain,
+                   punctuation_uncertain=element.punctuation_uncertain,
                    line_boxes=list(element.line_boxes))
 
 
@@ -1078,7 +1087,9 @@ def _page_elements(skel, repairs, reasons, vocab=None):
                 if plain_text(runs):
                     elements.append(Element(kind="caption", runs=runs, pno=skel.pno,
                                             bbox=_region_caption_box(region),
-                                            caption_uncertain=region.uncertain or skel.is_scan,
+                                            caption_uncertain=region.uncertain or skel.is_scan or any(
+                                                sp.punctuation_uncertain for ln in region.caption_lines
+                                                for sp in ln.spans),
                                             pages=[skel.pno]))
             continue
         if region.kind not in ("heading", "body", "caption"):
@@ -1097,7 +1108,9 @@ def _page_elements(skel, repairs, reasons, vocab=None):
                                 pages=[skel.pno],
                                 band=region.band, column=region.column,
                                 table_row=region.reason == "table_row",
-                                line_boxes=[ln.bbox for ln in region.lines]))
+                                line_boxes=[ln.bbox for ln in region.lines],
+                                punctuation_uncertain=any(sp.punctuation_uncertain
+                                    for ln in region.lines for sp in ln.spans)))
 
     # A 'heading' that ends with a hyphen is prose misread by size: headings do
     # not end mid-word, and paragraphs cannot join into headings, so the wrap
@@ -1212,6 +1225,7 @@ def assemble(skeletons, style, raw_pages=None):
                     previous.runs, element.runs,
                     heal=element.pno in previous.pages, vocab=vocab))
                 previous.pages = sorted(set(previous.pages + element.pages))
+                previous.punctuation_uncertain |= element.punctuation_uncertain
                 stitched += 1
                 continue
             if position == 0 and previous is not None and previous.kind == "p" \

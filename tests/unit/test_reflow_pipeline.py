@@ -1378,7 +1378,7 @@ def test_a_run_of_answers_the_provider_billed_for_still_stops_at_the_cap(tmp_pat
     assert len(client.calls) == 2, client.calls
     assert book.spent() <= 0.005
 
-@pytest.mark.parametrize('kind', ['caption', 'note', 'note_group'])
+@pytest.mark.parametrize('kind', ['caption', 'note', 'note_group', 'punctuation'])
 @pytest.mark.parametrize('cached', [False, True])
 def test_native_source_evidence_cannot_be_erased_by_model_or_cache(tmp_path, kind, cached):
     """A native scan layer can be damaged without having gone through OCR.
@@ -1399,6 +1399,9 @@ def test_native_source_evidence_cannot_be_erased_by_model_or_cache(tmp_path, kin
                                text='The damaged reference cannot establish this identity.')]
         protected = notes[0]
         field = 'uncertain'
+    if kind == 'punctuation':
+        protected = elements[0]
+        field = 'punctuation_uncertain'
     if kind == 'note_group':
         notes.extend([assemble.Note(num=3,pno=0,text='An ordinary unmatched neighboring label.'),
                       assemble.Note(num=4,pno=0,text='Another ordinary unmatched label.')])

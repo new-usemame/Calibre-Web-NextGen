@@ -96,6 +96,7 @@ class Span(object):
     bbox: Tuple[float, float, float, float]
     origin_y: float = 0.0
     uncertain: bool = False  # OCR engine confidence, never inferred for native text
+    punctuation_uncertain: bool = False  # distinct native quote glyphs share ASCII Unicode
 
     @property
     def bold(self):
@@ -112,7 +113,8 @@ class Span(object):
     def to_dict(self):
         return {"text": self.text, "size": round(self.size, 2), "font": self.font,
                 "flags": self.flags, "bbox": [round(v, 2) for v in self.bbox],
-                "origin_y": round(self.origin_y, 2)}
+                "origin_y": round(self.origin_y, 2),
+                "punctuation_uncertain": self.punctuation_uncertain}
 
 
 @dataclass
@@ -277,6 +279,7 @@ def read_page(doc, pno):
     raw = RawPage(pno=pno, width=rect.width, height=rect.height)
 
     payload = page.get_text("dict")
+    quote_fonts = _native_quote_variants(page)
     for blk in payload.get("blocks", []):
         bbox = tuple(blk.get("bbox", (0, 0, 0, 0)))
         if blk.get("type") == 1:
@@ -289,7 +292,9 @@ def read_page(doc, pno):
             spans = [Span(text=sp.get("text", ""), size=float(sp.get("size", 0.0)),
                           font=sp.get("font", ""), flags=int(sp.get("flags", 0)),
                           bbox=tuple(sp.get("bbox", (0, 0, 0, 0))),
-                          origin_y=float((sp.get("origin") or (0, 0))[1]))
+                          origin_y=float((sp.get("origin") or (0, 0))[1]),
+                          punctuation_uncertain=sp.get("font", "") in quote_fonts
+                          and '"' in sp.get("text", ""))
                      for sp in ln.get("spans", [])]
             if any(sp.text.strip() for sp in spans):
                 lines.append(Line(spans=spans, bbox=tuple(ln.get("bbox", bbox))))
@@ -299,6 +304,28 @@ def read_page(doc, pno):
     raw.drawings, raw.drawing_rects = drawing_rects(page)
     raw.blocks.sort(key=lambda b: (round(b.bbox[1], 1), round(b.bbox[0], 1)))
     return raw
+
+
+def _native_quote_variants(page):
+    """Fonts whose distinct printed double-quote glyphs collapse to ASCII.
+
+    Glyph IDs are not alternate Unicode readings. This only signals that the
+    extracted punctuation may not preserve the printed forms; it never repairs
+    a token. Repeated copies of one glyph and correctly mapped curly quotes do
+    not trigger. Apostrophe variants alone are common and are not this signal.
+    """
+    glyphs = {}
+    try:
+        traces = page.get_texttrace()
+    except (AttributeError, RuntimeError):
+        return set()
+    for span in traces:
+        if span.get("type") == 3 or span.get("opacity", 1) == 0:
+            continue
+        for char in span.get("chars", ()):
+            if char[0] == 34 and char[1] >= 0:
+                glyphs.setdefault(span.get("font", ""), set()).add(char[1])
+    return {font for font, ids in glyphs.items() if len(ids) > 1}
 
 
 def drawing_rects(page):

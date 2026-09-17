@@ -16,6 +16,7 @@ geometry stage 2 needs.
 """
 
 import io
+import math
 import os
 import re
 from collections import Counter
@@ -393,6 +394,34 @@ class ScanPixelProbe(object):
 
     def has_ink(self, rect):
         return region_has_ink(self._doc, self._pno, rect, mask=self._mask)
+
+    def ink_bounds(self, rect):
+        """Conservative PDF-space extent of source artwork in a bounded clip.
+
+        Text masks remove surrounding prose and captions; one raster-pixel pad
+        keeps faint antialiased edges inside the reported territory.
+        """
+        if len(rect) != 4 or not all(math.isfinite(float(v)) for v in rect):
+            raise ValueError("invalid ink geometry")
+        if rect[2] <= rect[0] or rect[3] <= rect[1]:
+            raise ValueError("empty ink geometry")
+        clip = pymupdf.Rect(*rect) & self._doc[self._pno].rect
+        if clip.is_empty:
+            return None
+        data, n, w, h = _ink_render(self._doc, self._pno, clip, self._mask)
+        xs, ys = [], []
+        for y in range(h):
+            dark = [x for x in range(w) if data[(y * w + x) * n] < 200]
+            if dark:
+                xs.extend((dark[0], dark[-1]))
+                ys.append(y)
+        if not xs:
+            return None
+        scale = _bounded_scale(clip, INK_SCALE)
+        return (max(clip.x0, clip.x0 + (min(xs) - 1) / scale),
+                max(clip.y0, clip.y0 + (ys[0] - 1) / scale),
+                min(clip.x1, clip.x0 + (max(xs) + 2) / scale),
+                min(clip.y1, clip.y0 + (ys[-1] + 2) / scale))
 
     def rules(self, rect):
         return rule_rows(self._doc, self._pno, rect, mask=self._mask)

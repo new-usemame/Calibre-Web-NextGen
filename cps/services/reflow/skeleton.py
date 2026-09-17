@@ -718,6 +718,19 @@ def _split_off_notes(raw, style, skel):
     carry their own evidence and do not ask for the corroboration.
     """
     body, notes = [], []
+
+    def keep_adjacent_captions(block, anchor):
+        # A page-bottom note does not own a printed caption in another column.
+        captions = [ln for ln in block.lines if _squashed_caption(ln.stripped)
+                    and (ln.bbox[0] >= anchor[2] or ln.bbox[2] <= anchor[0])]
+        if not captions:
+            return block
+        body.append(extract.Block(number=block.number, lines=captions,
+                                  bbox=_lines_bbox(captions, block.bbox)))
+        kept = [ln for ln in block.lines if ln not in captions]
+        return extract.Block(number=block.number, lines=kept,
+                             bbox=_lines_bbox(kept, block.bbox)) if kept else None
+
     zone_top = raw.height * FN_ZONE_NUMBERED
     eligible = []
     for blk in raw.text_blocks:
@@ -765,9 +778,12 @@ def _split_off_notes(raw, style, skel):
                 number=first.number,
                 bbox=_lines_bbox(first.lines[pos:], first.bbox),
                 lines=first.lines[pos:])
+        first = keep_adjacent_captions(first, first.lines[0].bbox)
         notes.extend(_notes_in_block(first, notes))
         for blk in eligible[bi + 1:]:
-            notes.extend(_notes_in_block(blk, notes))
+            blk = keep_adjacent_captions(blk, notes[-1].bbox)
+            if blk is not None:
+                notes.extend(_notes_in_block(blk, notes))
 
     if notes:
         numbers = [n.number for n in notes if n.number is not None]
@@ -1524,6 +1540,7 @@ def _scan_figures(kept_blocks, raw, style, pixel_probe=None):
         return []
 
     candidates = []
+    side_seeds = []
 
     def has_caption(bx0, bx1, y1):
         return any(_squashed_caption(ln.stripped)
@@ -1532,7 +1549,7 @@ def _scan_figures(kept_blocks, raw, style, pixel_probe=None):
                    and (ln.bbox[0] + ln.bbox[2]) / 2.0 <= bx1
                    for ln in lines)
 
-    def add(x0, y0, x1, y1, why, pad_x0=4.0, pad_x1=4.0):
+    def add(x0, y0, x1, y1, why, pad_x0=4.0, pad_x1=4.0, side=None):
         if y1 - y0 < raw.height * SCAN_GAP or x1 - x0 < span * 0.2:
             return
         boxes = [(x0, x1)]
@@ -1558,6 +1575,8 @@ def _scan_figures(kept_blocks, raw, style, pixel_probe=None):
                 kind="figure", reason=why, needs_ink=True,
                 bbox=(max(0.0, bx0 - pad_x0), max(0.0, y0 - 2.0),
                       min(raw.width, bx1 + pad_x1), min(raw.height, y1 + 2.0))))
+            if side:
+                side_seeds.append((side, candidates[-1]))
 
     # Full-width bands. A gap BETWEEN two prose rows is territory proved on both
     # sides. An edge gap is the weakest evidence there is -- the margins of a
@@ -1617,7 +1636,90 @@ def _scan_figures(kept_blocks, raw, style, pixel_probe=None):
                 if run:
                     _side_territory(run, side, rows, left, right, raw, span, add)
                     run = []
-    return candidates
+    return _partition_captioned_sides(candidates, side_seeds, lines, raw, pixel_probe)
+
+
+def _partition_captioned_sides(candidates, seeds, lines, raw, pixel_probe):
+    """Resolve overlapping side seeds into complete, independently captioned art.
+
+    Prose paragraphs locate an empty side column, not individual chart bounds.
+    Printed captions partition that column; source pixels establish each unit's
+    extent, including artwork wider than its extracted caption text.
+    """
+    if pixel_probe is None or not hasattr(pixel_probe, "ink_bounds"):
+        return candidates
+    groups = []
+    for side, candidate in seeds:
+        matched = []
+        for index, (group_side, members) in enumerate(groups):
+            if side != group_side:
+                continue
+            for other in members:
+                a, b = candidate.bbox, other.bbox
+                overlap = min(a[2], b[2]) - max(a[0], b[0])
+                if overlap >= min(a[2]-a[0], b[2]-b[0]) * 0.8 \
+                        and min(a[3], b[3]) > max(a[1], b[1]):
+                    matched.append(index)
+                    break
+        members = [candidate]
+        for index in reversed(matched):
+            members.extend(groups.pop(index)[1])
+        groups.append((side, members))
+    replacements = {}
+    removed = set()
+    for side, members in groups:
+        left = min(c.bbox[0] for c in members)
+        right = max(c.bbox[2] for c in members)
+        top = min(c.bbox[1] for c in members)
+        bottom = max(c.bbox[3] for c in members)
+        anchors = sorted([ln for ln in lines if _squashed_caption(ln.stripped)
+                          and left <= (ln.bbox[0]+ln.bbox[2])/2 <= right
+                          and top <= ln.bbox[1] <= bottom + 30], key=_caption_order)
+        if len(anchors) < 2 or any(a.bbox[3] >= b.bbox[1]
+                                  for a, b in zip(anchors, anchors[1:])):
+            continue
+        # Only the outward page margin is widened. The inward edge is the most
+        # conservative proven prose boundary of this connected group.
+        x0 = max(c.bbox[0] for c in members) if side == "right" else 0.0
+        x1 = min(c.bbox[2] for c in members) if side == "left" else raw.width
+        if any(ln.bbox[0] < x0-4 or ln.bbox[2] > x1+4 for ln in anchors):
+            continue
+        units = []
+        cursor = top
+        try:
+            for caption in anchors:
+                if caption.bbox[1] <= cursor:
+                    break
+                ink = pixel_probe.ink_bounds((x0, cursor, x1, caption.bbox[1]))
+                if not ink or ink[3]-ink[1] < raw.height * SCAN_GAP:
+                    break
+                units.append(Region(kind="figure", reason="scan_figure_side", needs_ink=True,
+                    bbox=(max(x0, min(ink[0]-4, caption.bbox[0])),
+                          max(cursor, ink[1]-4),
+                          min(x1, max(ink[2]+4, caption.bbox[2])),
+                          max(ink[3], caption.bbox[3]))))
+                cursor = caption.bbox[3]
+            if len(units) != len(anchors):
+                continue
+            # A final unlabelled picture must not disappear just because the
+            # pictures above it carried readable captions.
+            if bottom > cursor:
+                ink = pixel_probe.ink_bounds((x0, cursor, x1, bottom))
+                if ink and ink[3]-ink[1] >= raw.height * SCAN_GAP:
+                    units.append(Region(kind="figure", reason="scan_figure_side", needs_ink=True,
+                        bbox=(max(x0, ink[0]-4), max(cursor, ink[1]-4),
+                              min(x1, ink[2]+4), min(bottom, ink[3]+4))))
+        except (ValueError, RuntimeError, AttributeError):
+            continue
+        replacements[id(members[0])] = units
+        removed.update(id(c) for c in members)
+    result = []
+    for candidate in candidates:
+        if id(candidate) in replacements:
+            result.extend(replacements[id(candidate)])
+        elif id(candidate) not in removed:
+            result.append(candidate)
+    return result
 
 
 def _side_territory(run, side, rows, left, right, raw, span, add):
@@ -1671,10 +1773,10 @@ def _side_territory(run, side, rows, left, right, raw, span, add):
         top, bottom = bounds()
     if side == "left":
         add(x0, top + 2.0, x1, bottom - 2.0, "scan_figure_side",
-            pad_x0=4.0, pad_x1=0.0)
+            pad_x0=4.0, pad_x1=0.0, side=side)
     else:
         add(x0, top + 2.0, x1, bottom - 2.0, "scan_figure_side",
-            pad_x0=0.0, pad_x1=4.0)
+            pad_x0=0.0, pad_x1=4.0, side=side)
 
 
 def _vector_figures(raw):

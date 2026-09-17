@@ -305,3 +305,20 @@ def test_rotation_is_part_of_the_rendered_geometry():
         doc.close()
 
     assert model._jpeg_dimensions(data) == (round(height * 1.5), round(width * 1.5))
+
+
+def test_ink_extent_rejects_invalid_geometry_before_render_and_caps_large_clips():
+    class EmptyPixmap:
+        samples=b''
+        n=1
+        width=height=0
+    class InkPage(_Page):
+        def get_pixmap(self, **kwargs):
+            super().get_pixmap(**kwargs)
+            return EmptyPixmap()
+    page=InkPage(20000,20000);probe=extract.ScanPixelProbe(_Doc(page),0)
+    for rect in [(0,0,0,100),(0,0,100,float('inf'))]:
+        with pytest.raises(ValueError):probe.ink_bounds(rect)
+    assert not page.calls
+    assert probe.ink_bounds((0,0,20000,20000)) is None
+    assert page.calls and all(_rendered_pixels(page,c)<=extract.MAX_RASTER_PIXELS for c in page.calls)

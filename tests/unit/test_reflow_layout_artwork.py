@@ -895,3 +895,61 @@ def test_caption_above_a_sidebar_run_does_not_reassign_the_previous_chart():
         SimpleNamespace(width=550,height=800,text_blocks=[_block(0,[caption])]),450,
         lambda x0,y0,x1,y1,*a,**kw:found.append((x0,y0,x1,y1)))
     assert found and found[0][0]==250, 'an earlier chart caption is not evidence for this crop'
+
+
+@pytest.mark.parametrize("caption_count", [2, 3])
+def test_stacked_sidebar_charts_are_complete_disjoint_caption_units(caption_count):
+    """Overlapping prose seeds cannot duplicate wheels or use short caption width
+    as the right edge of wider printed artwork."""
+    from types import SimpleNamespace
+    doc=pymupdf.open();page=doc.new_page(width=500,height=720)
+    for y in (130,330,530):page.draw_circle((350,y),70,width=1.5)
+    body=[]
+    for start,count,right in [(60,9,230),(205,11,230.6),(395,14,230.3)]:
+        body.extend(_line('Ordinary surrounding prose remains in its column.',
+                          50,start+i*13,right,start+i*13+11,12) for i in range(count))
+    captions=[_line('Chart %d - Unit %s'%(i+1,chr(65+i)),310,205+i*200,375,217+i*200,9)
+              for i in range(caption_count)]
+    blocks=[(_block(0,body),body),(_block(1,captions),captions)]
+    raw=SimpleNamespace(width=500,height=720,text_blocks=[b for b,_ in blocks])
+    probe=extract.ScanPixelProbe(doc,0,mask=[ln.bbox for _,ls in blocks for ln in ls])
+    try:
+        figures=skeleton._scan_figures(blocks,raw,SimpleNamespace(body_size=12),probe)
+        remaining,_=skeleton._absorb_figure_content(blocks,figures,SimpleNamespace(body_size=12))
+    finally:doc.close()
+    figures.sort(key=lambda r:r.bbox[1])
+    assert len(figures)==3,[(f.bbox,[l.text for l in f.caption_lines]) for f in figures]
+    for i,(figure,y) in enumerate(zip(figures,(130,330,530))):
+        x0,y0,x1,y1=figure.bbox
+        assert x0<=280 and x1>=420 and y0<=y-70 and y1>=y+70, figure.bbox
+        assert [ln.text for ln in figure.caption_lines]==([captions[i].text] if i < caption_count else [])
+    assert all(a.bbox[3]<=b.bbox[1] for a,b in zip(figures,figures[1:])), 'duplicate source territory'
+    assert [ln for _,lines in remaining for ln in lines]==body
+
+
+def test_adjacent_column_caption_is_not_a_footnote_continuation():
+    """A caption at the same page-bottom height as a real note remains with its
+    figure; a continuation in the note's own column remains a note."""
+    from types import SimpleNamespace
+    prose=_line('Normal body prose establishes the larger face.',50,400,240,413,12)
+    note=_line('3 Author, Printed Book, page 4.',50,631,190,641,9)
+    continuation=_line('The same source continues here.',50,644,190,654,9)
+    caption=_line('Chart 7 - An independent printed unit',280,636,440,646,9)
+    raw=extract.RawPage(pno=0,width=500,height=720,
+        blocks=[_block(0,[prose]),_block(1,[note,caption,continuation])])
+    skel=skeleton.PageSkeleton(pno=0,width=500,height=720)
+    body,notes=skeleton._split_off_notes(raw,SimpleNamespace(body_size=12),skel)
+    assert len(notes)==1 and notes[0].number==3
+    assert [ln.text for ln in notes[0].lines]==[note.text,continuation.text]
+    assert caption in [ln for block in body for ln in block.lines]
+
+
+def test_caption_wording_in_the_note_column_remains_a_note_continuation():
+    from types import SimpleNamespace
+    note=_line('3 Author, Printed Book, page 4.',50,631,190,641,9)
+    continuation=_line('Chart 7 - referenced by this note.',50,644,190,654,9)
+    raw=extract.RawPage(pno=0,width=500,height=720,blocks=[_block(0,[note,continuation])])
+    skel=skeleton.PageSkeleton(pno=0,width=500,height=720)
+    body,notes=skeleton._split_off_notes(raw,SimpleNamespace(body_size=12),skel)
+    assert not body
+    assert len(notes)==1 and [ln.text for ln in notes[0].lines]==[note.text,continuation.text]

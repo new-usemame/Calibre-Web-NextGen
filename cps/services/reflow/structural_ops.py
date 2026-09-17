@@ -266,3 +266,82 @@ def render_element(element, specs, render_runs):
     if any(str(r[1]).strip() for r in tail):
         out.append("<p>%s</p>" % render_runs(tail))
     return "\n".join(out)
+
+
+VERIFICATION_PROTOCOL = "cwng-source-wrapper-approval-v1"
+
+
+def proposal_identity(snapshot_id, proposed_ids):
+    """Bind an order-independent proposal set to its immutable source snapshot."""
+    return _digest([VERIFICATION_PROTOCOL, snapshot_id, sorted(proposed_ids)])
+
+
+@dataclass(frozen=True)
+class VerificationDecision:
+    """A failed verifier never supplies the proposer plan as a fallback."""
+    plan: object = None
+    rejected: bool = False
+    reason: str = ""
+
+    @property
+    def operation_plans(self):
+        return () if self.plan is None else (self.plan,)
+
+
+@dataclass(frozen=True)
+class Verification:
+    proposal: OperationPlan
+
+    @property
+    def proposal_id(self):
+        return proposal_identity(self.proposal.prepared.snapshot_id, self.proposal.selected)
+
+    def model_view(self):
+        view = self.proposal.prepared.model_view()
+        view['verification'] = {'protocol': VERIFICATION_PROTOCOL,
+            'proposal_id': self.proposal_id, 'proposed_ids': sorted(self.proposal.selected)}
+        return view
+
+    def empty_response(self):
+        return {'protocol': VERIFICATION_PROTOCOL,
+                'snapshot_id': self.proposal.prepared.snapshot_id,
+                'proposal_id': self.proposal_id, 'approve': []}
+
+    def accept(self, book, doc, response):
+        """Admit only an approved subset; protocol rejection is atomic.
+
+        Semantic correctness is still a model judgment, not proven by this guard.
+        The returned plan retains the existing final-builder stale-source check.
+        """
+        self.proposal.compile(book, doc)
+        expected = self.empty_response()
+        if not isinstance(response, dict) or set(response) != set(expected):
+            raise ContractError('unsupported verification response fields')
+        if any(response[k] != expected[k] for k in expected if k != 'approve'):
+            raise ContractError('stale verification protocol, snapshot or proposal')
+        approved = response['approve']
+        if not isinstance(approved, list) or any(not isinstance(cid, str) for cid in approved):
+            raise ContractError('invalid approval list')
+        if any(cid not in self.proposal.selected for cid in approved):
+            raise ContractError('approval contains an unproposed candidate')
+        p = self.proposal.prepared
+        return p.accept(book, doc, {'protocol': PROTOCOL,
+            'snapshot_id': p.snapshot_id, 'select': approved})
+
+    def resolve(self, book, doc, response):
+        """Explicit deterministic fallback for a rejected/unparseable response.
+
+        Transport failure supplies no response. Billing and transport handling
+        remain caller responsibilities; this pure seam does not make requests.
+        """
+        try:
+            return VerificationDecision(plan=self.accept(book, doc, response))
+        except ContractError as exc:
+            return VerificationDecision(rejected=True, reason=str(exc))
+
+
+def prepare_verification(book, doc, proposal):
+    if not isinstance(proposal, OperationPlan):
+        raise ContractError('an admitted operation proposal is required')
+    proposal.compile(book, doc)
+    return Verification(proposal)

@@ -154,3 +154,73 @@ def test_builder_refuses_to_overwrite_enriched_current_html(source):
     with pytest.raises(ops.ContractError):
         build_epub.build(book,str(target),doc=doc,page_html={0:current},operation_plans=[plan])
     assert not target.exists()
+
+
+@pytest.mark.parametrize('mode', ['none', 'subset', 'all'])
+def test_verifier_approved_subset_is_the_only_rendered_source_and_nav_change(source, mode):
+    book, doc, tmp = source
+    p = prepared(source)
+    ids = [choose(p, 'e0', 'heading'), choose(p, 'e1', 'quote')]
+    verification = ops.prepare_verification(book, doc, p.accept(book, doc, response(p, ids)))
+    approved = [] if mode == 'none' else ids[:1] if mode == 'subset' else ids
+    reply = dict(verification.empty_response(), approve=approved)
+    plan = verification.accept(book, doc, reply)
+    assert set(plan.selected) == set(approved)
+    before = copy.deepcopy(asdict(book))
+    target = tmp / ('verified-' + mode + '.epub')
+    build_epub.build(book, str(target), doc=doc, operation_plans=[plan])
+    assert build_epub.validate(str(target)) == [] and asdict(book) == before
+    roots = texts(target)
+    assert sum(1 for r in roots for h in r.iter(X+'h2') if h.text == 'Learning the sky') == bool(approved)
+    assert sum(1 for r in roots for q in r.iter(X+'blockquote')) == (mode == 'all')
+    with zipfile.ZipFile(target) as z:
+        nav = ET.fromstring(z.read('OEBPS/nav.xhtml'))
+        assert ('Learning the sky' in ''.join(nav.itertext())) == bool(approved)
+    assert any('original-p0000.xhtml#notes' == a.get('href') for r in roots for a in r.iter(X+'a'))
+    baseline = tmp / 'verification-baseline.epub'
+    build_epub.build(book, str(baseline), doc=doc)
+    words = lambda rs: re.findall(r'\w+', ' '.join(''.join(r.itertext()) for r in rs))
+    assert words(roots) == words(texts(baseline))
+    assert any(e.text == 'source' for r in roots for e in r.iter(X+'em'))
+    with zipfile.ZipFile(baseline) as a, zipfile.ZipFile(target) as b:
+        assert {n:a.read(n) for n in a.namelist() if n.endswith('.jpg')} == {
+            n:b.read(n) for n in b.namelist() if n.endswith('.jpg')}
+
+
+@pytest.mark.parametrize('attack', ['malformed', 'duplicate', 'unknown', 'unproposed',
+                                    'snapshot', 'proposal', 'protocol', 'extra', 'source'])
+def test_verifier_atomic_rejection_never_falls_back_to_proposal(source, attack):
+    book, doc, tmp = source
+    p = prepared(source); cid = choose(p, 'e0', 'heading')
+    verification = ops.prepare_verification(book, doc, p.accept(book, doc, response(p, [cid])))
+    reply = dict(verification.empty_response(), approve=[cid])
+    if attack == 'malformed': reply = 'not JSON'
+    elif attack == 'duplicate': reply['approve'] *= 2
+    elif attack == 'unknown': reply['approve'] = ['op-unknown']
+    elif attack == 'unproposed': reply['approve'] = [choose(p, 'e1', 'quote')]
+    elif attack == 'snapshot': reply['snapshot_id'] = 'stale'
+    elif attack == 'proposal': reply['proposal_id'] = 'stale'
+    elif attack == 'protocol': reply['protocol'] = ops.PROTOCOL
+    elif attack == 'extra': reply['select'] = [cid]
+    else: book.pages[0][0].punctuation_uncertain = True
+    with pytest.raises(ops.ContractError): verification.accept(book, doc, reply)
+    result = verification.resolve(book, doc, reply)
+    assert result.rejected and result.reason and result.plan is None
+    target = tmp / 'fallback.epub'
+    build_epub.build(book, str(target), doc=doc, operation_plans=result.operation_plans)
+    assert not any(h.text == 'Learning the sky' for r in texts(target) for h in r.iter(X+'h2'))
+
+
+def test_verifier_proposal_binding_rechecks_overlap_and_final_staleness(source):
+    book, doc, tmp = source; p = prepared(source)
+    ids = [choose(p, 'e0', 'heading'), choose(p, 'e0', 'quote')]
+    with pytest.raises(ops.ContractError):
+        ops.prepare_verification(book, doc, ops.OperationPlan(p, tuple(ids)))
+    v = ops.prepare_verification(book, doc, p.accept(book, doc, response(p, ids[:1])))
+    changed = ops.prepare_verification(book, doc, p.accept(book, doc, response(p, ids[1:])))
+    assert v.proposal_id != changed.proposal_id
+    plan = v.accept(book, doc, dict(v.empty_response(), approve=ids[:1]))
+    book.notes[0].uncertain = False
+    with pytest.raises(ops.ContractError):
+        build_epub.build(book, str(tmp/'stale-verified.epub'), doc=doc, operation_plans=[plan])
+    assert not (tmp/'stale-verified.epub').exists()

@@ -20,6 +20,7 @@ exactly is what makes the gate pass on a faithful edit.
 import os
 
 from .operations import OPERATION_PROMPT_VERSION, operation_request
+from .verification import VERIFICATION_PROMPT_VERSION, verification_request
 
 #: Bump on ANY change to the system prompt or the response contract.
 PROMPT_VERSION = "reflow-structure-6"

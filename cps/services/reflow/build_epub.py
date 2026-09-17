@@ -1095,6 +1095,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     language = metadata.get("language") or "en"
     if page_html is None:
         page_html = {pno: page_fragment(book, pno) for pno in sorted(book.pages)}
+    current_page_html = dict(page_html) if operation_plans else {}
     # Source evidence also governs direct builder callers. Do this before XML
     # character filtering, so no raw source character is reintroduced afterward.
     page_html = {pno: page_fragment(book, pno) if book.needs_source_evidence(pno) else html
@@ -1109,6 +1110,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         pno = plan.prepared.page
         if pno in seen_pages or pno not in page_html:
             raise ContractError("duplicate or absent operation page")
+        if current_page_html[pno] != page_fragment(book, pno):
+            raise ContractError("wrapper plan does not bind enriched current HTML")
         seen_pages.add(pno)
         wrappers = plan.compile(book, doc)
         if wrappers:

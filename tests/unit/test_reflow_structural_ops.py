@@ -135,3 +135,22 @@ def test_bounds_and_abstention_are_coverage_not_semantic_success(source):
     assert coverage['omitted_element_ids'] and coverage['unsupported_operation_kinds']
     assert 'source_ambiguous' not in coverage
     plan=p.accept(book,doc,response(p,[]));assert plan.compile(book,doc)=={}
+
+
+def test_ocr_word_uncertainty_without_a_preserving_renderer_is_unsupported(source):
+    """The Book cannot bind Recovery-only word annotations; do not erase them."""
+    book,doc,_=source
+    with pytest.raises(ops.ContractError):
+        ops.prepare(book,doc,0,'revision-1',{'layer':'ocr','uncertain_words':1})
+
+
+def test_builder_refuses_to_overwrite_enriched_current_html(source):
+    """A source Book plan does not authorize erasing another current HTML state."""
+    book,doc,tmp=source;p=prepared(source)
+    plan=p.accept(book,doc,response(p,[choose(p,'e0','heading')]))
+    current=build_epub.page_fragment(book,0).replace('Following',
+        '<span class="reflow-uncertain">Following (?)</span>')
+    target=tmp/'enriched.epub'
+    with pytest.raises(ops.ContractError):
+        build_epub.build(book,str(target),doc=doc,page_html={0:current},operation_plans=[plan])
+    assert not target.exists()

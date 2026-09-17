@@ -193,6 +193,10 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
         raise ContractError("source page, revision and provenance are required")
     if not 1 <= max_candidates <= MAX_CANDIDATES or not 1 <= max_context_chars <= MAX_CONTEXT_CHARS:
         raise ContractError("invalid preparation bounds")
+    # Word-level OCR confidence lives outside Book. Until this seam can bind
+    # and render those records, this is unsupported context, not an abstention.
+    if source_layer.get("uncertain_words") or source_layer.get("uncertain") or source_layer.get("failed"):
+        raise ContractError("source word uncertainty is not supported by wrapper operations")
     source_layer = {k: copy.deepcopy(v) for k, v in source_layer.items()
                     if k in PROVENANCE_KEYS}
     if len(json.dumps(source_layer)) > 4096:

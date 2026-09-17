@@ -791,7 +791,7 @@ def _opf(metadata, manifest, spine, identifier, modified, nonlinear=()):
         "</package>\n" % (REFLOW_NS, "\n".join(meta_lines), items, refs))
 
 
-def _figure_images(chapters, doc, book, figure_transform=None):
+def _figure_images(chapters, doc, book, figure_transform=None, owned_images=()):
     """Crop each figure the fragments referred to; drop the ones we cannot make.
 
     Two drops are not the same event. A crop that *fails* is a loss: the page
@@ -808,7 +808,7 @@ def _figure_images(chapters, doc, book, figure_transform=None):
     wanted = []
     for chapter in chapters:
         wanted.extend(_IMG_SRC.findall("\n".join(chapter.blocks)))
-    wanted = [src for src in dict.fromkeys(wanted) if src.startswith("images/")]
+    wanted = [src for src in dict.fromkeys(wanted) if src.startswith("images/") and src not in owned_images]
     if not wanted:
         return {}, [], []
 
@@ -986,7 +986,9 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
     """
     evidence, images = {}, {}
     recovered = {pno for pno, source in (source_pages or {}).items() if source.report()['uncertain']}
-    wanted = [pno for pno in page_html if book.needs_source_evidence(pno) or pno in recovered]
+    scanned = {pno for pno, source in (source_pages or {}).items()
+               if json.loads(source.provenance_json).get('layer') == 'ocr'}
+    wanted = [pno for pno in page_html if book.needs_source_evidence(pno) or pno in recovered or pno in scanned]
     for index, pno in enumerate(wanted):
         _check_cancelled(should_stop)
         if progress is not None:
@@ -1015,16 +1017,18 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
                 caption_keys.append(key)
                 if key is not None:
                     specs.append((key, "Original printed caption", element.bbox))
-        if not specs and pno not in recovered:
+        if not specs and pno not in recovered and pno not in scanned:
             continue
         if doc is None:
             raise ValueError("Original PDF required for uncertain source evidence on page %d" % pno)
         started = time.monotonic()
+        from .source_display import SourceDisplay, inspection_tiles
+        provenance = json.loads(source_pages[pno].provenance_json) if source_pages and pno in source_pages else {}
+        display = SourceDisplay(doc, pno, provenance)
         full = "images/original_p%04d.jpg" % pno
-        images[full] = extract.render_page_jpeg(doc, pno, scale=1.5, quality=85,
-                                               max_bytes=2 * 1024 * 1024)
+        images[full] = display.jpeg(scale=1.5, quality=85)
         details = []
-        page_rect = doc[pno].rect
+        page_rect = doc[pno].rect * doc[pno].derotation_matrix
         for key, label, box in specs:
             _check_cancelled(should_stop)
             if box and figure_transform:
@@ -1043,11 +1047,35 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
             if rect.is_empty or rect.is_infinite:
                 raise ValueError("Invalid original source evidence geometry on page %d" % pno)
             src = "images/original_p%04d_%s.jpg" % (pno, key)
-            images[src] = extract.render_page_jpeg(
-                doc, pno, scale=3.0, quality=90, clip=rect, max_bytes=2 * 1024 * 1024)
-            details.append({"id": key, "label": label, "src": src, "bbox": list(rect)})
+            reading_rect = display.reading_rect(rect)
+            images[src] = display.jpeg(reading_rect)
+            details.append({"id": key, "label": label, "src": src, "bbox": list(rect),
+                            "reading_bbox": list(reading_rect)})
+        from .source_display import grid_regions
+        grids = grid_regions(book, doc, pno, provenance, lambda: _check_cancelled(should_stop))
+        for element_index, proof in grids.items():
+            key = "layout_%d" % element_index
+            src = "images/original_p%04d_%s.jpg" % (pno, key)
+            images[src] = display.jpeg(proof['reading_bbox'])
+            details.append({"id": key, "label": "Original layout and labels", "src": src, **proof})
+        if provenance.get('layer') == 'ocr':
+            for tile_index, tile in enumerate(inspection_tiles(display.rect)):
+                _check_cancelled(should_stop)
+                key = "inspection_%d" % tile_index
+                src = "images/original_p%04d_%s.jpg" % (pno, key)
+                images[src] = display.jpeg(tile)
+                details.append({"id": key, "label": "Original detail %d (row order)" % (tile_index + 1),
+                    "src": src, "reading_bbox": list(tile), "displayed_pdf_bbox": list(display.source_rect(tile))})
+        inspection = [d for d in details if d['id'].startswith('inspection_')]
+        for detail in details:
+            if detail not in inspection and detail.get('reading_bbox'):
+                region = extract.pymupdf.Rect(detail['reading_bbox'])
+                detail['inspection_ids'] = [d['id'] for d in inspection
+                    if not (region & extract.pymupdf.Rect(d['reading_bbox'])).is_empty]
         evidence[pno] = {"page": pno, "href": "original-p%04d.xhtml" % pno,
                          "full": full, "details": details,
+                         "orientation": display.angle, "source_rotation": doc[pno].rotation,
+                         "reading_rect": list(display.rect),
                          "ambiguous_notes": sorted(ambiguous),
                          "bytes": len(images[full]) + sum(len(images[d["src"]]) for d in details),
                          "render_seconds": round(time.monotonic() - started, 4)}
@@ -1093,6 +1121,20 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
                         match.group(1), match.group(2), href, key, match.group(3)))
         html = re.sub(r'(<figcaption\b[^>]*>|<p class="caption">)(.*?)(</figcaption>|</p>)',
                       caption_link, html, flags=re.S)
+        if grids and source_pages and pno in source_pages:
+            # Canonical marked atoms are retained exactly, after their original
+            # layout. Do not infer cells or relabel a chart as a semantic table.
+            source = source_pages[pno]
+            canonical_blocks = split_blocks(source.html)
+            mapping = json.loads(source.blocks_json)
+            for element_index in grids:
+                block = canonical_blocks[mapping[str(element_index)]]
+                key = "layout_%d" % element_index
+                src = "images/original_p%04d_%s.jpg" % (pno, key)
+                prefix = ('<figure class="source-evidence"><img src="%s" alt="Original layout and labels"/>'
+                          '<figcaption><a href="%s#%s">Inspect original layout and page details</a></figcaption></figure>'
+                          '<p class="source-evidence-notice">OCR transcription. Read the original above for the layout and labels.</p>' % (src, href, key))
+                html = html.replace(block, prefix + block, 1)
         page_html[pno] = html
         if progress is not None:
             progress(index + 1, len(wanted))
@@ -1109,6 +1151,10 @@ def _original_document(record, home, language):
             '<section class="source-evidence" id="page"><h2>Complete original page</h2>'
             '<img src="%s" alt="Complete original PDF page %d"/></section>'
             % (pno + 1, back, record["full"], pno + 1))
+    if record["details"]:
+        body += '<nav aria-label="Original source details"><h2>Inspect original details</h2><ol>'
+        body += ''.join('<li><a href="#%s">%s</a></li>' % (d['id'], escape(d['label'])) for d in record['details'])
+        body += '</ol></nav>'
     if record.get('source_uncertainty'):
         report = record['source_uncertainty']
         body += '<section class="source-evidence"><h2>OCR readings to check</h2><p>These tokens are retained as extracted. Some could not be highlighted in the reflowed text.</p><ul>'
@@ -1117,9 +1163,12 @@ def _original_document(record, home, language):
             body += '<li>%s (%s)</li>' % (escape(item['token']), state)
         body += '</ul></section>'
     for detail in record["details"]:
+        links = '<p>Inspect overlapping original details: ' + ' · '.join(
+            '<a href="#%s">%s</a>' % (key, escape(next(d['label'] for d in record['details'] if d['id'] == key)))
+            for key in detail.get('inspection_ids', [])) + '</p>' if detail.get('inspection_ids') else ''
         body += ('<section class="source-evidence" id="%s"><h2>%s</h2>%s<img src="%s" alt="%s"/>%s</section>'
                  % (detail["id"], escape(detail["label"]), back, detail["src"],
-                    escape(detail["label"]), back))
+                    escape(detail["label"]), links + back))
     return _document("Original PDF page %d" % (pno + 1), body, language)
 
 
@@ -1162,6 +1211,11 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
             raise ContractError("wrapper plan does not bind enriched current HTML")
         seen_pages.add(pno)
         wrappers = plan.compile(book, doc, source_page=source_pages.get(pno))
+        if pno in source_pages and wrappers:
+            from .source_display import grid_regions
+            source_layer = json.loads(source_pages[pno].provenance_json)
+            if set(wrappers).intersection(grid_regions(book, doc, pno, source_layer, lambda: _check_cancelled(should_stop))):
+                raise ContractError("source grid requires its original layout, not structural wrappers")
         if wrappers:
             page_html[pno] = (source_pages[pno].render(book, wrappers) if pno in source_pages
                               else page_fragment(book, pno, wrappers=wrappers))
@@ -1175,7 +1229,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     chapters = _chapters(pages)
     dropped = _bind_links(chapters)
     images, missing, blanks = _figure_images(chapters, doc, book,
-                                             figure_transform=figure_transform)
+                                             figure_transform=figure_transform, owned_images=original_images)
     _drop_images(chapters, missing + blanks)
     images.update(original_images)
 

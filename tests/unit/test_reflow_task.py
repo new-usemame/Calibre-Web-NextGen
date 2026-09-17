@@ -539,6 +539,7 @@ def test_a_book_that_never_ran_has_nothing_to_recover(rig):
 
 def test_cancel_during_original_evidence_stops_rendering_without_filing(rig, monkeypatch):
     from cps.services.reflow import assemble
+    from cps.services.reflow.source_display import SourceDisplay
     task = rig.mod.TaskReflowPdf(5, 7, {"mode": "full", "cost_cap_usd": 1.0})
     convert = task._convert
     def uncertain_pages(*args, **kwargs):
@@ -546,13 +547,13 @@ def test_cancel_during_original_evidence_stops_rendering_without_filing(rig, mon
         for pno in result.book.pages:
             result.book.notes.append(assemble.Note(num=1, text='Uncertain reference',
                 pno=pno, uncertain=True, bbox=(40,500,350,550)))
-        monkeypatch.setattr(rig.mod.build_epub.extract, 'render_page_jpeg', cancel_after_first)
+        monkeypatch.setattr(SourceDisplay, 'jpeg', cancel_after_first)
         return result
     monkeypatch.setattr(task, '_convert', uncertain_pages)
-    render = rig.mod.build_epub.extract.render_page_jpeg
+    render = SourceDisplay.jpeg
     rendered = []
     def cancel_after_first(*args, **kwargs):
-        rendered.append(args[1])
+        rendered.append(args[0].pno)
         pixels = render(*args, **kwargs)
         task.stat = STAT_ENDED
         return pixels

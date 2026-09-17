@@ -216,6 +216,8 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
         raise ContractError("source provenance exceeds preparation bound")
     pdf_digest = _pdf_digest(doc)
     state_digest = _digest(_state(book, pno))
+    from .source_display import grid_regions
+    relational_regions = grid_regions(book, doc, pno, source_layer)
     context, omitted, specs, used = [], [], [], 0
     for index, element in enumerate(book.pages[pno]):
         record = {"id": "e%d" % index, **asdict(element)}
@@ -230,18 +232,24 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
             continue
         used += size
         context.append(record)
-        for spec in _proposals(element, index):
+        for spec in (() if index in relational_regions else _proposals(element, index)):
             if source_page is not None:
                 from .enriched_source import wrap
                 try: wrap(record['canonical_xhtml'], element, [spec])
                 except ContractError: continue
             specs.append(spec)
-    raster = extract.render_page_jpeg(doc, pno, scale=1.5, quality=85,
-                                      max_bytes=2 * 1024 * 1024)
+    if source_layer.get('layer') == 'ocr':
+        from .source_display import SourceDisplay
+        raster = SourceDisplay(doc, pno, source_layer).jpeg(scale=1.5, quality=85)
+    else:
+        raster = extract.render_page_jpeg(doc, pno, scale=1.5, quality=85,
+                                          max_bytes=2 * 1024 * 1024)
     snapshot_id = _digest([PROTOCOL, revision, pdf_digest, pno, state_digest,
                            hashlib.sha256(raster).hexdigest(), source_layer])
     if source_page is not None:
         snapshot_id = _digest([snapshot_id, source_page.identity])
+    if relational_regions:
+        snapshot_id = _digest([snapshot_id, relational_regions])
     total = len(specs)
     random.Random(seed).shuffle(specs)
     specs = specs[:max_candidates]
@@ -262,6 +270,7 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
             used += size
             group.append(record)
     coverage["omitted_inventory_records"] = omitted_inventory
+    coverage["source_grid_elements"] = ["e%d" % i for i in relational_regions]
     coverage["supplied_book_scope"] = ("full_book" if set(book.pages) == set(range(len(doc)))
                                       else "selected_pages")
     coverage["available_book_pages"] = len(book.pages)

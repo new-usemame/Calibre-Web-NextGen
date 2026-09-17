@@ -19,7 +19,7 @@ MAX_CANDIDATES = 64
 MAX_CONTEXT_CHARS = 24000
 PROVENANCE_KEYS = {"layer", "reason", "engine", "language", "language_identity",
                    "requested_dpi", "effective_dpi", "orientation", "orientation_confidence",
-                   "flags", "words", "uncertain_words", "reused", "failed", "pno"}
+                   "flags", "words", "uncertain_words", "failed", "pno"}
 
 
 class ContractError(ValueError):

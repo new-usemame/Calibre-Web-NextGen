@@ -21,6 +21,7 @@ only counts what is in front of it, and the page's text would be silently delete
 
 import json
 import logging
+import math
 import random
 import re
 import socket
@@ -472,7 +473,7 @@ class OpenRouterClient(object):
         }
 
     def _post(self, payload, ledger=None, bound=None, page_label=None,
-              should_stop=None):
+              should_stop=None, prompt_version=PROMPT_VERSION, attempt_context=None, safe_errors=False, payload_bytes=None):
         session = self._session or requests
         headers = {"Authorization": "Bearer %s" % self._api_key,
                    "Content-Type": "application/json",
@@ -489,15 +490,16 @@ class OpenRouterClient(object):
                 # possibly-billed request into a free one.
                 attempt_id = ledger.reserve_attempt(page_label, bound,
                                                     model_id=self.model_id,
-                                                    prompt_version=PROMPT_VERSION)
+                                                    prompt_version=prompt_version, context=attempt_context)
             try:
-                response = session.post(OPENROUTER_URL, json=payload, headers=headers,
-                                        timeout=self.timeout)
+                body = {"data": payload_bytes} if payload_bytes is not None else {"json": payload}
+                response = session.post(OPENROUTER_URL, headers=headers,
+                                        timeout=self.timeout, **body)
             except requests.RequestException as exc:
                 if _transport_was_pre_dispatch(exc):
                     if ledger is not None and attempt_id is not None:
                         ledger.release_attempt(attempt_id, "pre_dispatch")
-                    last_error = "network error: %s" % exc
+                    last_error = "network error: %s" % (type(exc).__name__ if safe_errors else exc)
                     if attempt == self.max_retries:
                         raise ModelError(last_error)
                     self._sleep(attempt, response=None)
@@ -505,7 +507,7 @@ class OpenRouterClient(object):
                 raise UncertainBilling(
                     "the request was dispatched and its answer was lost: %s. Up to "
                     "$%.4f may still be billed; the bound stays held as unresolved"
-                    % (exc, bound or 0.0), held_usd=bound or 0.0, attempt=attempt_id)
+                    % (type(exc).__name__ if safe_errors else exc, bound or 0.0), held_usd=bound or 0.0, attempt=attempt_id)
 
             if response.status_code == 200:
                 try:
@@ -516,7 +518,11 @@ class OpenRouterClient(object):
                         "request may have been billed. The bound stays held as "
                         "unresolved", held_usd=bound or 0.0, attempt=attempt_id)
 
-            detail = _error_detail(response)
+            detail = 'request refused' if safe_errors else _error_detail(response)
+            if safe_errors and ledger is not None and attempt_id is not None:
+                ledger.record({'kind': 'attempt_diagnostic', 'attempt': attempt_id,
+                               'http_status': response.status_code,
+                               'generation_present': bool(_generation_id(response))})
             if not _rejection_was_pre_generation(response):
                 raise UncertainBilling(
                     "OpenRouter %s after the request may have been accepted: %s. Up "
@@ -545,12 +551,12 @@ class OpenRouterClient(object):
 
     # ------------------------------------------------------------------ answering
 
-    def _parse(self, data, attempts, ledger=None, attempt_id=None, bound=0.0):
+    def _settle(self, data, ledger=None, attempt_id=None, bound=0.0, require_reported=False):
         # The bill first, because every way out of this method is a call that has
         # already been answered and therefore already been charged. Working the cost
         # out only on the path that produces a page is how an answer nobody can use
         # becomes an answer nobody paid for.
-        raw_usage = data.get("usage")
+        raw_usage = data.get("usage") if isinstance(data, dict) else None
         trustworthy = isinstance(raw_usage, dict) and any(
             key in raw_usage for key in ("prompt_tokens", "completion_tokens", "cost"))
         if not trustworthy:
@@ -561,14 +567,30 @@ class OpenRouterClient(object):
                 "reconciled, so its bound stays held as unresolved",
                 held_usd=bound, attempt=attempt_id)
         usage = raw_usage
-        prompt_tokens = int(usage.get("prompt_tokens") or 0)
-        completion_tokens = int(usage.get("completion_tokens") or 0)
-        cost, source = self._cost(usage, prompt_tokens, completion_tokens)
+        try:
+            prompt_tokens = int(usage.get("prompt_tokens") or 0)
+            completion_tokens = int(usage.get("completion_tokens") or 0)
+            if prompt_tokens < 0 or completion_tokens < 0:
+                raise ValueError('negative token usage')
+            if require_reported and (isinstance(usage.get('cost'), bool) or usage.get('cost') is None):
+                raise ValueError('missing provider cost')
+            cost, source = self._cost(usage, prompt_tokens, completion_tokens)
+            if not math.isfinite(cost) or cost < 0 or (require_reported and source != 'provider'):
+                raise ValueError('invalid provider cost')
+        except (TypeError, ValueError, OverflowError):
+            raise UncertainBilling('provider usage cannot be reconciled; bound remains held',
+                                   held_usd=bound, attempt=attempt_id)
         if ledger is not None and attempt_id is not None:
             # The held bound becomes the metered debit, durably, HERE: a crash
             # before the pipeline's page record still counts the charge (the page
             # record references the same attempt, so a completed run counts once).
             ledger.reconcile_attempt(attempt_id, cost)
+
+        return prompt_tokens, completion_tokens, cost, source
+
+    def _parse(self, data, attempts, ledger=None, attempt_id=None, bound=0.0):
+        prompt_tokens, completion_tokens, cost, source = self._settle(
+            data, ledger=ledger, attempt_id=attempt_id, bound=bound)
 
         def unusable(message):
             return UnusableAnswer(message, cost_usd=cost, cost_source=source,

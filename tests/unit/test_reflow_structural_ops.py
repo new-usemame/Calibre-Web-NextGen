@@ -327,3 +327,20 @@ def test_enriched_verifier_and_full_recovery_provenance_round_trip(source):
     v=ops.prepare_verification(book,doc,plan,source_page=canonical)
     assert v.accept(book,doc,dict(v.empty_response(),approve=[cid]),source_page=canonical).selected==(cid,)
     assert v.resolve(book,doc,dict(v.empty_response(),approve=[cid])).rejected
+
+
+def test_recovery_cache_observation_does_not_change_semantic_snapshot_or_erase_current_provenance(source):
+    from cps.services.reflow.enriched_source import prepare_recovery_page
+    from cps.services.reflow.source import Recovery,PageRecovery
+    book,doc,_=source
+    recovery=Recovery(provenance={0:PageRecovery(pno=0,layer='ocr',uncertain_words=1,
+        uncertain=[{'token':'source','score':23,'source_bbox':[1,2,3,4]}],seconds=1.2,reused=False)})
+    cold=prepare_recovery_page(book,0,recovery)
+    p=ops.prepare(book,doc,0,'stable-contract',asdict(recovery.provenance[0]),source_page=cold)
+    recovery.provenance[0].seconds=.001;recovery.provenance[0].reused=True
+    warm=prepare_recovery_page(book,0,recovery)
+    q=ops.prepare(book,doc,0,'stable-contract',asdict(recovery.provenance[0]),source_page=warm)
+    assert cold.identity==warm.identity and p.model_view()==q.model_view()
+    assert json.loads(cold.provenance_json)['reused'] is False
+    assert json.loads(warm.provenance_json)['reused'] is True
+    assert p.accept(book,doc,response(p,[choose(p,'e1','heading')]),source_page=warm).selected

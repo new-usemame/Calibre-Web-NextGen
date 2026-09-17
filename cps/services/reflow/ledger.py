@@ -58,7 +58,7 @@ class Ledger(object):
         """
         pending = {}
         committed = {}
-        page_costs = 0.0
+        page_records = []
         page_attempts = set()
         for entry in self._entries:
             if entry.get("kind") == "reservation":
@@ -74,16 +74,19 @@ class Ledger(object):
                     pending.pop(attempt, None)
                     committed[attempt] = float(entry.get("cost_usd") or 0.0)
                 continue
-            if entry.get("attempt"):
+            if entry.get("attempt") and entry.get("cost_usd") is not None:
                 page_attempts.add(entry["attempt"])
             if entry.get("cost_usd") is not None:
-                page_costs += float(entry["cost_usd"])
+                page_records.append((entry.get("attempt"), float(entry["cost_usd"])))
         orphaned = {attempt: cost for attempt, cost in committed.items()
                     if attempt not in page_attempts}
-        return page_costs + sum(orphaned.values()), pending, orphaned
+        # Explicit metered settlements are authoritative; a rounded page summary
+        # or diagnostic cannot replace that charge, even when it carries an ID.
+        legacy_costs = sum(cost for attempt, cost in page_records if attempt not in committed)
+        return legacy_costs + sum(committed.values()), pending, orphaned
 
     def spent(self):
-        return round(self._financial_state()[0], 6)
+        return self._financial_state()[0]
 
     def pending_usd(self):
         """The strict bounds of dispatched requests whose billing is unresolved.
@@ -109,7 +112,7 @@ class Ledger(object):
                               self.cap_usd, projected_usd)
         return self.remaining()
 
-    def reserve_attempt(self, page_label, bound_usd, model_id="", prompt_version=""):
+    def reserve_attempt(self, page_label, bound_usd, model_id="", prompt_version="", context=None):
         """Durably hold the strict bound of one request BEFORE it is dispatched.
 
         The entry is in the same line-atomic file as the spend, so a worker crash
@@ -128,7 +131,9 @@ class Ledger(object):
         self.record({"kind": "reservation", "event": "pending", "attempt": attempt,
                      "page_label": str(page_label or ""),
                      "bound_usd": float(bound_usd),
-                     "model": model_id or "", "prompt_version": prompt_version or ""})
+                     "model": model_id or "", "prompt_version": prompt_version or "",
+                     **{k: v for k, v in (context or {}).items() if k in
+                        ("stage", "request_sha256", "snapshot_id", "proposal_id", "route_version")}})
         return attempt
 
     def release_attempt(self, attempt, reason=""):
@@ -146,7 +151,7 @@ class Ledger(object):
         """
         self.record({"kind": "reservation", "event": "reconciled",
                      "attempt": attempt,
-                     "cost_usd": round(float(cost_usd or 0.0), 6)})
+                     "cost_usd": float(cost_usd or 0.0)})
 
     # --------------------------------------------------------------- the record
 

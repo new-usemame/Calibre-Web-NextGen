@@ -10,7 +10,7 @@ from xml.dom import Node, minidom
 
 from . import annotate
 
-VERSION = 'reflow-enriched-source-1'
+VERSION = 'reflow-enriched-source-2'
 
 
 def _json(value):
@@ -30,7 +30,13 @@ class SourcePage:
 
     @property
     def identity(self):
-        return self.seal
+        from .structural_ops import _digest
+        provenance = json.loads(self.provenance_json)
+        # Cache timing/hit observations remain in the sealed current report but
+        # do not change source meaning, confidence, raster or request identity.
+        for key in ('seconds', 'reused'): provenance.pop(key, None)
+        return _digest([VERSION, self.page, self.state_digest, self.html,
+                        self.blocks_json, provenance, self.records_json, self.report_json])
 
     def _identity(self):
         from .structural_ops import _digest

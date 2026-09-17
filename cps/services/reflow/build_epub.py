@@ -238,8 +238,9 @@ def _figure_html(pno, index, caption):
     src = "images/fig_p%04d_%d.jpg" % (pno, index)
     # SPEC §3: a figure always carries a figcaption, empty when the page printed no
     # caption, so "no caption found" is stated rather than left to be inferred.
-    return ('<figure><img src="%s" alt=""/><figcaption%s>%s</figcaption></figure>'
-            % (src, "" if caption else ' class="reflow-no-caption"', caption))
+    alt = "" if caption else "Original figure from PDF page %d" % (pno + 1)
+    return ('<figure><img src="%s" alt="%s"/><figcaption%s>%s</figcaption></figure>'
+            % (src, alt, "" if caption else ' class="reflow-no-caption"', caption))
 
 
 # ------------------------------------------------------------- markup primitives

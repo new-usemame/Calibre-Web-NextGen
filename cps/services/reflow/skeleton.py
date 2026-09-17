@@ -1856,6 +1856,33 @@ def _caption_order(line):
             line.bbox[0])
 
 
+def _caption_reading_order(lines):
+    """Read distinct neighboring printed captions by column, including subtitles.
+
+    Shared or spanning text has no unambiguous column association and keeps its
+    physical order. This does not infer captions or alter their style/words.
+    """
+    anchors = sorted((ln for ln in lines if _squashed_caption(ln.stripped)),
+                     key=lambda ln: ln.bbox[0])
+    if len(anchors) < 2:
+        return lines
+    if max(ln.bbox[1] for ln in anchors) >= min(ln.bbox[3] for ln in anchors):
+        return lines
+    if any(a.bbox[2] >= b.bbox[0] for a, b in zip(anchors, anchors[1:])):
+        return lines
+    boundaries = [(a.bbox[2] + b.bbox[0]) / 2
+                  for a, b in zip(anchors, anchors[1:])]
+    groups = [[] for _ in anchors]
+    for ln in lines:
+        if any(ln.bbox[0] < boundary < ln.bbox[2] for boundary in boundaries):
+            return lines
+        column = sum(ln.bbox[0] >= boundary for boundary in boundaries)
+        if ln.bbox[1] < anchors[column].bbox[1] - 1:
+            return lines
+        groups[column].append(ln)
+    return [ln for group in groups for ln in sorted(group, key=_caption_order)]
+
+
 def _caption_has_gap(lines):
     for left, right in zip(lines, lines[1:]):
         overlap = min(left.bbox[3], right.bbox[3]) - max(left.bbox[1], right.bbox[1])
@@ -1942,7 +1969,7 @@ def _absorb_figure_content(kept_blocks, candidates, style):
                 kept.append((blk, outside))
         kept_blocks = kept
         captions.sort(key=_caption_order)
-        candidate.caption_lines = captions
+        candidate.caption_lines = _caption_reading_order(captions)
         candidate.uncertain = _caption_has_gap(captions)
         if captions and not candidate.uncertain:
             candidate.bbox = _crop_around_caption(image_box, captions)

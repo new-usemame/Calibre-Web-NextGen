@@ -983,3 +983,32 @@ def test_a_line_above_a_sidebar_chart_cannot_cut_its_inner_circumference(real_in
     assert box[0]<=280 and box[2]>=420 and box[1]<=150 and box[3]>=290,box
     assert box[1]>111, 'the preceding line stays outside the figure crop'
     assert [ln.text for ln in figures[0].caption_lines]==[caption.text]
+
+
+def test_composite_caption_keeps_each_printed_title_with_its_subtitle():
+    """A two-wheel row reads each source caption in full before its neighbor."""
+    left=_line('Figure 2. Fire',100,240,190,246,6)
+    right=_line('Figure 3. Air',250,239.5,340,245.5,6)
+    left_sub=_line('Leo, Sagittarius, Aries',110,249,185,256,7)
+    right_sub=_line('Gemini, Libra, Aquarius',260,249,335,256,7)
+    region=skeleton.Region(kind='figure',reason='scan_figure_band',bbox=(90,50,360,260),
+                           caption_lines=[right,left,left_sub,right_sub])
+    skeleton._absorb_figure_content([], [region], skeleton.BookStyle(body_size=12))
+    assert [ln.text for ln in region.caption_lines]==[left.text,left_sub.text,right.text,right_sub.text]
+
+
+def test_uncaptioned_original_figure_is_accessible_as_content():
+    from lxml import etree
+    figure=etree.fromstring(build_epub._figure_html(5,0,''))
+    assert figure.find('img').get('alt')=='Original figure from PDF page 6'
+    assert figure.find('figcaption').get('class')=='reflow-no-caption'
+
+
+def test_a_shared_composite_caption_is_not_assigned_to_one_panel():
+    left=_line('Figure 2. Fire',100,240,190,246,6)
+    right=_line('Figure 3. Air',250,240,340,246,6)
+    shared=_line('An explanation applying to both diagrams',100,249,340,256,7)
+    lines=[left,right,shared]
+    region=skeleton.Region(kind='figure',reason='scan_figure_band',bbox=(90,50,360,260),caption_lines=lines)
+    skeleton._absorb_figure_content([], [region], skeleton.BookStyle(body_size=12))
+    assert region.caption_lines==lines

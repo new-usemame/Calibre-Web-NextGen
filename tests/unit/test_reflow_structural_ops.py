@@ -224,3 +224,106 @@ def test_verifier_proposal_binding_rechecks_overlap_and_final_staleness(source):
     with pytest.raises(ops.ContractError):
         build_epub.build(book, str(tmp/'stale-verified.epub'), doc=doc, operation_plans=[plan])
     assert not (tmp/'stale-verified.epub').exists()
+
+
+@pytest.fixture
+def enriched(source):
+    from cps.services.reflow.enriched_source import prepare_source_page
+    book, doc, _ = source
+    records = [{'token':'source','score':22,'source_bbox':[1,2,3,4]},
+               {'token':'source','score':31,'source_bbox':[5,6,7,8]},
+               {'token':'.s','score':7,'source_bbox':[9,10,11,12]}]
+    layer = {'layer':'ocr','uncertain_words':3,'orientation':90}
+    canonical = prepare_source_page(book,0,layer,records)
+    p = ops.prepare(book,doc,0,'enriched-1',layer,source_page=canonical)
+    return canonical,p,layer,records
+
+
+def test_enriched_marks_records_survive_actual_approved_and_fallback_builder(source,enriched,monkeypatch):
+    book,doc,tmp=source;canonical,p,layer,records=enriched
+    report=canonical.report()
+    assert report['marked']==1 and report['unplaced_record_indices']==[1,2]
+    assert report['uncertain'][0]['score']!=report['uncertain'][1]['score']
+    assert json.loads(canonical.records_json)==records
+    assert p.model_view()['context']['source_enrichment']['marked']==1
+    def forbidden(*a,**kw):raise AssertionError('annotator must not run after canonical preparation')
+    from cps.services.reflow import annotate
+    monkeypatch.setattr(annotate,'annotate_page',forbidden)
+    for selection in ([],[choose(p,'e1','heading')],[choose(p,'e1','quote')]):
+        plan=p.accept(book,doc,response(p,selection),source_page=canonical)
+        target=tmp/('enriched-'+str(len(selection))+str(bool(selection and selection[0]==choose(p,'e1','heading')))+'.epub')
+        build_epub.build(book,str(target),doc=doc,source_pages={0:canonical},operation_plans=[plan])
+        assert build_epub.validate(str(target))==[]
+        roots=texts(target)
+        marks=[e for r in roots for e in r.iter(X+'span') if e.get('class')=='reflow-uncertain' and ''.join(e.itertext())=='source']
+        assert len(marks)==1
+        assert any(''.join(e.itertext())=='source' for r in roots for e in r.iter(X+'em'))
+        assert any(a.get('href')=='original-p0000.xhtml#page' for r in roots for a in r.iter(X+'a'))
+        if selection and selection[0]==choose(p,'e1','heading'):
+            chapter=next(r for r in roots if any('Attribution:' in ''.join(h.itertext()) for h in r.iter(X+'h2')))
+            assert 'Some note labels or associations' in ''.join(chapter.itertext())
+            assert 'OCR readings are uncertain' in ''.join(chapter.itertext())
+    fallback=tmp/'enriched-fallback.epub'
+    build_epub.build(book,str(fallback),doc=doc,source_pages={0:canonical},page_html={0:'<script>bad</script>'})
+    assert any('source'==''.join(e.itertext()) for r in texts(fallback) for e in r.iter(X+'span'))
+
+
+@pytest.mark.parametrize('change',['score','bbox','html','missing'])
+def test_enriched_cache_and_final_builder_require_current_confidence(source,enriched,change):
+    from cps.services.reflow.enriched_source import prepare_source_page
+    from dataclasses import replace
+    book,doc,tmp=source;canonical,p,layer,records=enriched
+    cid=choose(p,'e1','heading');reply=response(p,[cid])
+    plan=p.accept(book,doc,reply,source_page=canonical)
+    if change=='score':records[0]['score']=99
+    if change=='bbox':records[0]['source_bbox']=[11,12,13,14]
+    current=prepare_source_page(book,0,layer,records)
+    if change=='html':current=replace(current,html=current.html.replace('reflow-uncertain','removed'))
+    if change=='missing':current=None
+    with pytest.raises(ops.ContractError):p.accept(book,doc,reply,source_page=current)
+    target=tmp/'stale-enriched.epub'
+    with pytest.raises(ops.ContractError):
+        build_epub.build(book,str(target),doc=doc,operation_plans=[plan],source_pages={0:current} if current else {})
+    assert not target.exists()
+
+
+def test_canonical_duplicate_occurrence_cross_style_entity_and_atomic_boundary(source):
+    from cps.services.reflow.enriched_source import prepare_source_page, wrap
+    book,doc,_=source
+    e=book.pages[0][0]
+    e.runs=[['t','same same & “one. two” '],['t','cross','italic'],['t','style']]
+    records=[{'token':'same','score':20}, {'token':'one. two','score':15},
+             {'token':'crossstyle','score':9}, {'token':'.s','score':4}]
+    layer={'layer':'ocr','uncertain_words':4}
+    canonical=prepare_source_page(book,0,layer,records)
+    report=canonical.report();assert report['marked']==2 and report['unplaced_record_indices']==[2,3]
+    # Mark occurrence, escaping and style are established before wrapping.
+    fragment=build_epub.split_blocks(canonical.html)[0]
+    assert '<span class="reflow-uncertain" title="uncertain reading">same</span> same &amp;' in fragment
+    with pytest.raises(ops.ContractError):wrap(fragment,e,[ops._Spec(0,'quote',0,len('same same & “one.'))])
+    p=ops.prepare(book,doc,0,'enriched-1',layer,source_page=canonical)
+    assert all(c['source_range'][1]!=len('same same & “one.') for c in p.candidates() if c['element_id']=='e0')
+    plan=p.accept(book,doc,response(p,[choose(p,'e0','quote',len(e.text))]),source_page=canonical)
+    rendered=canonical.render(book,plan.compile(book,doc,source_page=canonical))
+    assert fragment in rendered, 'full quote must move the already enriched paragraph unchanged'
+    replay=prepare_source_page(book,0,layer,records)
+    assert replay.identity==canonical.identity
+    assert p.accept(book,doc,response(p,[]),source_page=replay).selected==()
+
+
+def test_enriched_verifier_and_full_recovery_provenance_round_trip(source):
+    from cps.services.reflow.enriched_source import prepare_recovery_page
+    from cps.services.reflow.source import Recovery,PageRecovery
+    book,doc,_=source
+    recovery=Recovery(provenance={0:PageRecovery(pno=0,layer='ocr',uncertain_words=1,
+        uncertain=[{'token':'source','score':23,'source_bbox':[1,2,3,4]}],
+        page_rect=(0,0,500,700),derotation=(1,0,0,1,0,0),orientation=90)})
+    canonical=prepare_recovery_page(book,0,recovery)
+    provenance=asdict(recovery.provenance[0])
+    assert json.loads(canonical.provenance_json)['derotation']==[1,0,0,1,0,0]
+    p=ops.prepare(book,doc,0,'new-source-contract',provenance,source_page=canonical)
+    cid=choose(p,'e1','heading')
+    plan=p.accept(book,doc,response(p,[cid]),source_page=canonical)
+    v=ops.prepare_verification(book,doc,plan,source_page=canonical)
+    assert v.accept(book,doc,dict(v.empty_response(),approve=[cid]),source_page=canonical).selected==(cid,)
+    assert v.resolve(book,doc,dict(v.empty_response(),approve=[cid])).rejected

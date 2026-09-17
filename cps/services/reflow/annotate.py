@@ -264,7 +264,7 @@ def is_recovered_marker(span, recovered):
                for reading in readings for run in _DIGITS.findall(reading))
 
 
-def annotate_page(html, spans, recovered=()):
+def annotate_page(html, spans, recovered=(), with_placements=False):
     """The whole of R3 for one page. Returns ``(html, uncertain, marked)``.
 
     ``uncertain`` is what the reader should still be told about: everything that
@@ -275,9 +275,12 @@ def annotate_page(html, spans, recovered=()):
     spans = [record for record in (uncertain_record(s) for s in spans or ())
              if record is not None]
     if not spans:
-        return html, [], 0
+        return (html, [], 0, []) if with_placements else (html, [], 0)
     html, placed = mark_uncertain(html, spans)
     marked = [id(record) for record in placed]
     uncertain = [record for record in spans
                  if id(record) in marked or not is_recovered_marker(record, recovered)]
-    return html, uncertain, len(placed)
+    result = (html, uncertain, len(placed))
+    if with_placements:
+        return (*result, [i for i, record in enumerate(uncertain) if id(record) in marked])
+    return result

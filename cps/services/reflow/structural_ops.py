@@ -123,6 +123,7 @@ class Prepared:
     raster: bytes
     seed: int
     coverage_json: str
+    source_page: object = None
 
     def candidates(self):
         rows = []
@@ -145,7 +146,12 @@ class Prepared:
                 "source_image": {"sha256": hashlib.sha256(self.raster).hexdigest(),
                     "data_url": "data:image/jpeg;base64," + base64.b64encode(self.raster).decode()}}
 
-    def accept(self, book, doc, response):
+    def accept(self, book, doc, response, source_page=None):
+        bound = getattr(self, "source_page", None)
+        if bound is not None:
+            if source_page is None or source_page.identity != bound.identity:
+                raise ContractError("current enriched source identity is required")
+            source_page.validate(book)
         if _digest(_state(book, self.page)) != self.state_digest or _pdf_digest(doc) != self.pdf_digest:
             raise ContractError("stale source or current state")
         if not isinstance(response, dict) or set(response) != {"protocol", "snapshot_id", "select"}:
@@ -173,11 +179,11 @@ class OperationPlan:
     prepared: Prepared
     selected: tuple
 
-    def compile(self, book, doc):
+    def compile(self, book, doc, source_page=None):
         # Re-admit at the final publication seam, including source/inventory and
         # uncertainty metadata. A previously accepted plan can become stale.
         self.prepared.accept(book, doc, {"protocol": PROTOCOL,
-            "snapshot_id": self.prepared.snapshot_id, "select": list(self.selected)})
+            "snapshot_id": self.prepared.snapshot_id, "select": list(self.selected)}, source_page=source_page)
         by_id = {row["candidate_id"]: spec
                  for row, spec in zip(self.prepared.candidates(), self.prepared.specs)}
         result = {}
@@ -188,15 +194,22 @@ class OperationPlan:
 
 
 def prepare(book, doc, pno, revision, source_layer, seed=0,
-            max_candidates=MAX_CANDIDATES, max_context_chars=MAX_CONTEXT_CHARS):
+            max_candidates=MAX_CANDIDATES, max_context_chars=MAX_CONTEXT_CHARS, source_page=None):
     if pno not in book.pages or not revision or not isinstance(source_layer, dict):
         raise ContractError("source page, revision and provenance are required")
     if not 1 <= max_candidates <= MAX_CANDIDATES or not 1 <= max_context_chars <= MAX_CONTEXT_CHARS:
         raise ContractError("invalid preparation bounds")
     # Word-level OCR confidence lives outside Book. Until this seam can bind
     # and render those records, this is unsupported context, not an abstention.
-    if source_layer.get("uncertain_words") or source_layer.get("uncertain") or source_layer.get("failed"):
+    if source_layer.get("failed") or (source_page is None and (source_layer.get("uncertain_words") or source_layer.get("uncertain"))):
         raise ContractError("source word uncertainty is not supported by wrapper operations")
+    if source_page is not None:
+        from .enriched_source import SourcePage
+        if not isinstance(source_page, SourcePage) or source_page.page != pno:
+            raise ContractError('canonical source page required')
+        source_page.validate(book)
+        if _digest(json.loads(source_page.provenance_json)) != _digest(source_layer):
+            raise ContractError('current Recovery provenance differs')
     source_layer = {k: copy.deepcopy(v) for k, v in source_layer.items()
                     if k in PROVENANCE_KEYS}
     if len(json.dumps(source_layer)) > 4096:
@@ -206,17 +219,29 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
     context, omitted, specs, used = [], [], [], 0
     for index, element in enumerate(book.pages[pno]):
         record = {"id": "e%d" % index, **asdict(element)}
+        if source_page is not None:
+            from .build_epub import split_blocks
+            mapping = json.loads(source_page.blocks_json)
+            if str(index) in mapping:
+                record['canonical_xhtml'] = split_blocks(source_page.html)[mapping[str(index)]]
         size = len(json.dumps(record))
         if used + size > max_context_chars:
             omitted.append("e%d" % index)
             continue
         used += size
         context.append(record)
-        specs.extend(_proposals(element, index))
+        for spec in _proposals(element, index):
+            if source_page is not None:
+                from .enriched_source import wrap
+                try: wrap(record['canonical_xhtml'], element, [spec])
+                except ContractError: continue
+            specs.append(spec)
     raster = extract.render_page_jpeg(doc, pno, scale=1.5, quality=85,
                                       max_bytes=2 * 1024 * 1024)
     snapshot_id = _digest([PROTOCOL, revision, pdf_digest, pno, state_digest,
                            hashlib.sha256(raster).hexdigest(), source_layer])
+    if source_page is not None:
+        snapshot_id = _digest([snapshot_id, source_page.identity])
     total = len(specs)
     random.Random(seed).shuffle(specs)
     specs = specs[:max_candidates]
@@ -245,8 +270,16 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
              "source_layer": source_layer, "page_rect": list(doc[pno].rect),
              "page_rotation": doc[pno].rotation,
              "source_context": "current page; immutable inventories bound to supplied Book"}
+    if source_page is not None:
+        report = source_page.report()
+        state['source_enrichment'] = {'version': report['version'], 'identity': source_page.identity,
+            'records_sha256': report['records_sha256'], 'raw_records': report['raw_records'],
+            'marked': report['marked'], 'unplaced': [report['uncertain'][i]
+                for i in report['unplaced_record_indices']]}
+        if used + len(json.dumps(state['source_enrichment'])) > max_context_chars:
+            raise ContractError('enriched confidence context exceeds preparation bound')
     return Prepared(pno, revision, state_digest, pdf_digest, snapshot_id, tuple(specs),
-                    json.dumps(state), raster, seed, json.dumps(coverage))
+                    json.dumps(state), raster, seed, json.dumps(coverage), source_page)
 
 
 def render_element(element, specs, render_runs):
@@ -307,13 +340,13 @@ class Verification:
                 'snapshot_id': self.proposal.prepared.snapshot_id,
                 'proposal_id': self.proposal_id, 'approve': []}
 
-    def accept(self, book, doc, response):
+    def accept(self, book, doc, response, source_page=None):
         """Admit only an approved subset; protocol rejection is atomic.
 
         Semantic correctness is still a model judgment, not proven by this guard.
         The returned plan retains the existing final-builder stale-source check.
         """
-        self.proposal.compile(book, doc)
+        self.proposal.compile(book, doc, source_page=source_page)
         expected = self.empty_response()
         if not isinstance(response, dict) or set(response) != set(expected):
             raise ContractError('unsupported verification response fields')
@@ -326,22 +359,22 @@ class Verification:
             raise ContractError('approval contains an unproposed candidate')
         p = self.proposal.prepared
         return p.accept(book, doc, {'protocol': PROTOCOL,
-            'snapshot_id': p.snapshot_id, 'select': approved})
+            'snapshot_id': p.snapshot_id, 'select': approved}, source_page=source_page)
 
-    def resolve(self, book, doc, response):
+    def resolve(self, book, doc, response, source_page=None):
         """Explicit deterministic fallback for a rejected/unparseable response.
 
         Transport failure supplies no response. Billing and transport handling
         remain caller responsibilities; this pure seam does not make requests.
         """
         try:
-            return VerificationDecision(plan=self.accept(book, doc, response))
+            return VerificationDecision(plan=self.accept(book, doc, response, source_page=source_page))
         except ContractError as exc:
             return VerificationDecision(rejected=True, reason=str(exc))
 
 
-def prepare_verification(book, doc, proposal):
+def prepare_verification(book, doc, proposal, source_page=None):
     if not isinstance(proposal, OperationPlan):
         raise ContractError('an admitted operation proposal is required')
-    proposal.compile(book, doc)
+    proposal.compile(book, doc, source_page=source_page)
     return Verification(proposal)

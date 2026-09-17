@@ -131,7 +131,7 @@ class BuildResult(object):
 
 # ------------------------------------------------------------------ one page
 
-def page_fragment(book, pno, style=None, wrappers=None):
+def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
     """One page as it was printed: the unit the model edits and the gate measures."""
     elements = list(book.pages.get(pno) or [])
     notes = [n for n in book.notes if n.pno == pno]
@@ -168,6 +168,8 @@ def page_fragment(book, pno, style=None, wrappers=None):
         inner = _runs_html(element.runs, available, ref_ids, ambiguous)
         if not inner.strip():
             continue
+        if element_blocks is not None:
+            element_blocks[element_index] = len(blocks)
         if element.kind == "h":
             level = min(6, max(1, int(element.level or 1)))
             blocks.append("<h%d>%s</h%d>" % (level, inner, level))
@@ -940,7 +942,7 @@ def _readable_characters(page_html):
     return pages, records
 
 
-def _refuse_unsafe_pages(page_html, book):
+def _refuse_unsafe_pages(page_html, book, source_pages=None):
     """The final markup boundary: nothing active or remote reaches the reader.
 
     A page the pipeline adopted has already passed the gate's markup contract, so
@@ -959,7 +961,7 @@ def _refuse_unsafe_pages(page_html, book):
         if pno not in book.pages:
             raise ValueError("page %d is not in the book; refusing to drop its text"
                              % pno)
-        cleaned[pno] = page_fragment(book, pno)
+        cleaned[pno] = source_pages[pno].html if source_pages and pno in source_pages else page_fragment(book, pno)
         refused.append((pno, reasons))
     return cleaned, refused
 
@@ -974,7 +976,7 @@ def _check_cancelled(should_stop):
 
 
 def _original_evidence(book, page_html, doc, figure_transform=None,
-                       should_stop=None, progress=None):
+                       should_stop=None, progress=None, source_pages=None):
     """Package original pixels, never a re-render of the extracted reading.
 
     Detail crops retain adjacent printed context; the full original page lets a
@@ -983,7 +985,8 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
     after the model markup boundary, not accepted from model output.
     """
     evidence, images = {}, {}
-    wanted = [pno for pno in page_html if book.needs_source_evidence(pno)]
+    recovered = {pno for pno, source in (source_pages or {}).items() if source.report()['uncertain']}
+    wanted = [pno for pno in page_html if book.needs_source_evidence(pno) or pno in recovered]
     for index, pno in enumerate(wanted):
         _check_cancelled(should_stop)
         if progress is not None:
@@ -1012,7 +1015,7 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
                 caption_keys.append(key)
                 if key is not None:
                     specs.append((key, "Original printed caption", element.bbox))
-        if not specs:
+        if not specs and pno not in recovered:
             continue
         if doc is None:
             raise ValueError("Original PDF required for uncertain source evidence on page %d" % pno)
@@ -1048,6 +1051,8 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
                          "ambiguous_notes": sorted(ambiguous),
                          "bytes": len(images[full]) + sum(len(images[d["src"]]) for d in details),
                          "render_seconds": round(time.monotonic() - started, 4)}
+        if pno in recovered:
+            evidence[pno]['source_uncertainty'] = source_pages[pno].report()
         html = page_html[pno]
         href = evidence[pno]["href"]
         if ambiguous:
@@ -1062,6 +1067,21 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
                         match.group("attrs"), match.group("inner"), link)
                 return match.group(0)
             html = _NOTE_ASIDE.sub(note_link, html)
+        # New canonical callers retain page warnings at heading/nav entry too.
+        # These source-backed notices are generated after untrusted markup admission.
+        if source_pages and pno in source_pages:
+            notices = []
+            if ambiguous:
+                notices.append('<p class="source-evidence-notice">Some note labels or associations '
+                               'are uncertain. %s.</p>' % link)
+            if pno in recovered:
+                notice = ('<p class="source-evidence-notice reflow-uncertain">OCR readings are uncertain; '
+                          'highlighted words preserve the transcription. '
+                          '<a href="%s#page">View original page</a>.</p>' % href)
+                notices.append(notice)
+                html = notice + '\n' + html
+            if notices:
+                html = re.sub(r'(</h[1-6]>)', lambda m: m.group(0) + '\n' + '\n'.join(notices), html)
         caption_links = iter(caption_keys)
 
         def caption_link(match):
@@ -1089,6 +1109,13 @@ def _original_document(record, home, language):
             '<section class="source-evidence" id="page"><h2>Complete original page</h2>'
             '<img src="%s" alt="Complete original PDF page %d"/></section>'
             % (pno + 1, back, record["full"], pno + 1))
+    if record.get('source_uncertainty'):
+        report = record['source_uncertainty']
+        body += '<section class="source-evidence"><h2>OCR readings to check</h2><p>These tokens are retained as extracted. Some could not be highlighted in the reflowed text.</p><ul>'
+        for index, item in enumerate(report['uncertain']):
+            state = 'highlighted' if index in report['placed_record_indices'] else 'not highlighted'
+            body += '<li>%s (%s)</li>' % (escape(item['token']), state)
+        body += '</ul></section>'
     for detail in record["details"]:
         body += ('<section class="source-evidence" id="%s"><h2>%s</h2>%s<img src="%s" alt="%s"/>%s</section>'
                  % (detail["id"], escape(detail["label"]), back, detail["src"],
@@ -1098,7 +1125,7 @@ def _original_document(record, home, language):
 
 def build(book, out_path, page_html=None, metadata=None, doc=None,
           report_html=None, sidecar=None, identifier=None, figure_transform=None,
-          should_stop=None, evidence_progress=None, operation_plans=()):
+          should_stop=None, evidence_progress=None, operation_plans=(), source_pages=None):
     """Write one EPUB 3 and say what went into it.
 
     ``report_html`` is called last, with the document each page marker landed in and
@@ -1107,12 +1134,19 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     """
     metadata = dict(metadata or {})
     language = metadata.get("language") or "en"
+    source_pages = dict(source_pages or {})
+    for pno, source in source_pages.items():
+        from .enriched_source import SourcePage
+        if not isinstance(source, SourcePage) or source.page != pno:
+            raise ValueError('canonical source pages required')
+        source.validate(book)
+    canonical = lambda pno: source_pages[pno].html if pno in source_pages else page_fragment(book, pno)
     if page_html is None:
-        page_html = {pno: page_fragment(book, pno) for pno in sorted(book.pages)}
+        page_html = {pno: canonical(pno) for pno in sorted(book.pages)}
     current_page_html = dict(page_html) if operation_plans else {}
     # Source evidence also governs direct builder callers. Do this before XML
     # character filtering, so no raw source character is reintroduced afterward.
-    page_html = {pno: page_fragment(book, pno) if book.needs_source_evidence(pno) else html
+    page_html = {pno: canonical(pno) if book.needs_source_evidence(pno) or pno in source_pages else html
                  for pno, html in page_html.items()}
     # Inactive opt-in seam: only source-bound wrapper plans are admitted here.
     # Recheck cached plans before producing any output or rendering evidence.
@@ -1124,16 +1158,17 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         pno = plan.prepared.page
         if pno in seen_pages or pno not in page_html:
             raise ContractError("duplicate or absent operation page")
-        if current_page_html[pno] != page_fragment(book, pno):
+        if current_page_html[pno] != canonical(pno):
             raise ContractError("wrapper plan does not bind enriched current HTML")
         seen_pages.add(pno)
-        wrappers = plan.compile(book, doc)
+        wrappers = plan.compile(book, doc, source_page=source_pages.get(pno))
         if wrappers:
-            page_html[pno] = page_fragment(book, pno, wrappers=wrappers)
+            page_html[pno] = (source_pages[pno].render(book, wrappers) if pno in source_pages
+                              else page_fragment(book, pno, wrappers=wrappers))
     page_html, unrepresentable = _readable_characters(page_html)
-    page_html, refused = _refuse_unsafe_pages(page_html, book)
+    page_html, refused = _refuse_unsafe_pages(page_html, book, source_pages)
     evidence, original_images = _original_evidence(
-        book, page_html, doc, figure_transform, should_stop, evidence_progress)
+        book, page_html, doc, figure_transform, should_stop, evidence_progress, source_pages)
 
     pages = _page_blocks(page_html)
     joins = _join_page_turns(pages)
@@ -1209,6 +1244,10 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         manifest.append({"id": "img%03d" % index, "href": src, "type": "image/jpeg"})
 
     payload = _sidecar(book, pages, chapters, images, joins, sidecar, blanks)
+    if source_pages:
+        payload['source_enrichment'] = {str(pno): dict(source.report(), identity=source.identity,
+            provenance=json.loads(source.provenance_json), raw_records=json.loads(source.records_json))
+            for pno, source in source_pages.items() if pno in page_html}
     if evidence:
         payload["source_evidence"] = list(evidence.values())
     if unrepresentable:

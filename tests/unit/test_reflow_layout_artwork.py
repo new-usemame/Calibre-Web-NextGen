@@ -953,3 +953,33 @@ def test_caption_wording_in_the_note_column_remains_a_note_continuation():
     body,notes=skeleton._split_off_notes(raw,SimpleNamespace(body_size=12),skel)
     assert not body
     assert len(notes)==1 and [ln.text for ln in notes[0].lines]==[note.text,continuation.text]
+
+
+@pytest.mark.parametrize("real_intrusion", [False, True])
+def test_a_line_above_a_sidebar_chart_cannot_cut_its_inner_circumference(real_intrusion):
+    """A ragged last line above the wheel joins the side-channel prose run but
+    does not define the wheel's inward edge farther down the printed page."""
+    from types import SimpleNamespace
+    doc=pymupdf.open();page=doc.new_page(width=500,height=720)
+    page.draw_circle((350,220),70,width=1.5)
+    body=[_line('The preceding full-width paragraph ends here.',50,100,320,111,12)]
+    body.extend(_line('Adjacent prose in a narrower column.',50,113+i*13,230,124+i*13,12)
+                for i in range(15))
+    if real_intrusion:
+        body.append(_line("Actual prose intrudes into this territory.",50,190,300,201,12))
+    caption=_line('Figure 4 - Complete circular diagram',350,310,440,322,9)
+    blocks=[(_block(0,body),body),(_block(1,[caption]),[caption])]
+    raw=SimpleNamespace(width=500,height=720,text_blocks=[b for b,_ in blocks])
+    probe=extract.ScanPixelProbe(doc,0,mask=[ln.bbox for _,ls in blocks for ln in ls])
+    try:
+        figures=skeleton._scan_figures(blocks,raw,SimpleNamespace(body_size=12),probe)
+        skeleton._absorb_figure_content(blocks,figures,SimpleNamespace(body_size=12))
+    finally:doc.close()
+    assert len(figures)==1
+    box=figures[0].bbox
+    if real_intrusion:
+        assert box[0]>=300, "real prose vetoes inward expansion"
+        return
+    assert box[0]<=280 and box[2]>=420 and box[1]<=150 and box[3]>=290,box
+    assert box[1]>111, 'the preceding line stays outside the figure crop'
+    assert [ln.text for ln in figures[0].caption_lines]==[caption.text]

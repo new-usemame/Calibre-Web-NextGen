@@ -322,3 +322,26 @@ def test_ink_extent_rejects_invalid_geometry_before_render_and_caps_large_clips(
     assert not page.calls
     assert probe.ink_bounds((0,0,20000,20000)) is None
     assert page.calls and all(_rendered_pixels(page,c)<=extract.MAX_RASTER_PIXELS for c in page.calls)
+
+
+def test_ink_extent_keeps_thin_pale_colored_source_annotations():
+    """Low-resolution dark-only sampling loses pale relationship arcs outside
+    the strong central wheel; the source extent must include those too."""
+    doc=pymupdf.open();page=doc.new_page(width=500,height=720)
+    page.draw_circle((350,220),70,color=(0,0,0),width=1)
+    page.draw_circle((350,220),82,color=(0.70,0.85,0.85),width=0.5)
+    try:box=extract.ScanPixelProbe(doc,0).ink_bounds((230,120,470,330))
+    finally:doc.close()
+    assert box and box[0]<=268 and box[2]>=432 and box[1]<=138 and box[3]>=302,box
+
+
+def test_colored_ink_extent_excludes_masked_prose_in_every_channel():
+    """A color-aware extent must not rediscover text through unmasked G/B."""
+    doc=pymupdf.open();page=doc.new_page(width=500,height=720)
+    page.insert_text((220,150),'Surrounding prose',fontsize=12)
+    page.draw_circle((350,220),70,color=(0,0,0),width=1)
+    masks=[line['bbox'] for block in page.get_text('dict')['blocks']
+           for line in block.get('lines',[])]
+    try:box=extract.ScanPixelProbe(doc,0,mask=masks).ink_bounds((200,120,470,330))
+    finally:doc.close()
+    assert box and box[0]>275 and box[1]>145,box

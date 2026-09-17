@@ -54,6 +54,8 @@ MIN_FIG_PX = 90
 INK_MIN = 0.004
 #: Render scale for ink analysis.
 INK_SCALE = 0.35
+#: Extent measurement must see pale, thin annotations beyond strong diagram ink.
+INK_EXTENT_SCALE = 1.5
 #: A 10x10 cell holding at least this share of dark pixels is print, not paper:
 #: measured 3.2% on sparse 12pt figure lettering, 2.8% on the worst blank-paper
 #: margin sliver in the corpus audit, 28%+ on real line art.
@@ -408,16 +410,19 @@ class ScanPixelProbe(object):
         clip = pymupdf.Rect(*rect) & self._doc[self._pno].rect
         if clip.is_empty:
             return None
-        data, n, w, h = _ink_render(self._doc, self._pno, clip, self._mask)
+        data, n, w, h = _ink_render(self._doc, self._pno, clip, self._mask,
+                                    scale=INK_EXTENT_SCALE)
         xs, ys = [], []
+        channels = min(n, 3)
         for y in range(h):
-            dark = [x for x in range(w) if data[(y * w + x) * n] < 200]
+            dark = [x for x in range(w)
+                    if min(data[(y*w+x)*n:(y*w+x)*n+channels]) < 230]
             if dark:
                 xs.extend((dark[0], dark[-1]))
                 ys.append(y)
         if not xs:
             return None
-        scale = _bounded_scale(clip, INK_SCALE)
+        scale = _bounded_scale(clip, INK_EXTENT_SCALE)
         return (max(clip.x0, clip.x0 + (min(xs) - 1) / scale),
                 max(clip.y0, clip.y0 + (ys[0] - 1) / scale),
                 min(clip.x1, clip.x0 + (max(xs) + 2) / scale),
@@ -449,7 +454,7 @@ class ScanPixelProbe(object):
         return inking / float(cells * cells)
 
 
-def _ink_render(doc, pno, rect, mask=()):
+def _ink_render(doc, pno, rect, mask=(), scale=INK_SCALE):
     """The bounded raster of a clip with the page's text whited out.
 
     One render for every ink question -- has_ink, channel, coverage -- so the
@@ -457,7 +462,7 @@ def _ink_render(doc, pno, rect, mask=()):
     furniture are not artwork, whatever they print over.
     """
     clip = pymupdf.Rect(*rect)
-    scale = _bounded_scale(clip, INK_SCALE)
+    scale = _bounded_scale(clip, scale)
     pix = doc[pno].get_pixmap(matrix=pymupdf.Matrix(scale, scale),
                               clip=clip, alpha=False)
     n, w, h = pix.n, pix.width, pix.height
@@ -470,7 +475,7 @@ def _ink_render(doc, pno, rect, mask=()):
         for y in range(y0, max(y0, y1)):
             row = y * w * n
             for x in range(x0, max(x0, x1)):
-                data[row + x * n] = 255
+                data[row + x * n:row + (x + 1) * n] = b"\xff" * n
     return data, n, w, h
 
 

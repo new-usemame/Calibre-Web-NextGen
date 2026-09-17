@@ -1636,10 +1636,10 @@ def _scan_figures(kept_blocks, raw, style, pixel_probe=None):
                 if run:
                     _side_territory(run, side, rows, left, right, raw, span, add)
                     run = []
-    return _partition_captioned_sides(candidates, side_seeds, lines, raw, pixel_probe)
+    return _partition_captioned_sides(candidates, side_seeds, lines, rows, raw, pixel_probe)
 
 
-def _partition_captioned_sides(candidates, seeds, lines, raw, pixel_probe):
+def _partition_captioned_sides(candidates, seeds, lines, rows, raw, pixel_probe):
     """Resolve overlapping side seeds into complete, independently captioned art.
 
     Prose paragraphs locate an empty side column, not individual chart bounds.
@@ -1675,24 +1675,42 @@ def _partition_captioned_sides(candidates, seeds, lines, raw, pixel_probe):
         anchors = sorted([ln for ln in lines if _squashed_caption(ln.stripped)
                           and left <= (ln.bbox[0]+ln.bbox[2])/2 <= right
                           and top <= ln.bbox[1] <= bottom + 30], key=_caption_order)
-        if len(anchors) < 2 or any(a.bbox[3] >= b.bbox[1]
+        if not anchors or any(a.bbox[3] >= b.bbox[1]
                                   for a, b in zip(anchors, anchors[1:])):
             continue
-        # Only the outward page margin is widened. The inward edge is the most
-        # conservative proven prose boundary of this connected group.
         x0 = max(c.bbox[0] for c in members) if side == "right" else 0.0
         x1 = min(c.bbox[2] for c in members) if side == "left" else raw.width
-        if any(ln.bbox[0] < x0-4 or ln.bbox[2] > x1+4 for ln in anchors):
-            continue
         units = []
+        ink_extents = []
         cursor = top
+        base_x0, base_x1 = x0, x1
         try:
             for caption in anchors:
+                x0, x1 = base_x0, base_x1
                 if caption.bbox[1] <= cursor:
+                    break
+                centre = (caption.bbox[0]+caption.bbox[2])/2
+                prose = [box for _, _, boxes in rows for box in boxes
+                         if box[3] > cursor and box[1] < caption.bbox[1]
+                         and ((box[0]+box[2])/2 < centre if side == "right"
+                              else (box[0]+box[2])/2 > centre)]
+                # A ragged line above the art may reach farther than the actual
+                # neighboring column. Broaden the query to its typical edge;
+                # pixels locate the art, and prose intersection vetoes adoption.
+                if prose:
+                    if side == "right":
+                        x0 = min(x0, median(box[2] for box in prose))
+                    else:
+                        x1 = max(x1, median(box[0] for box in prose))
+                if caption.bbox[0] < x0-4 or caption.bbox[2] > x1+4:
                     break
                 ink = pixel_probe.ink_bounds((x0, cursor, x1, caption.bbox[1]))
                 if not ink or ink[3]-ink[1] < raw.height * SCAN_GAP:
                     break
+                if any(min(ink[2], box[2]) > max(ink[0], box[0])
+                       and min(ink[3], box[3]) > max(ink[1], box[1]) for box in prose):
+                    break
+                ink_extents.append(ink)
                 units.append(Region(kind="figure", reason="scan_figure_side", needs_ink=True,
                     bbox=(max(x0, min(ink[0]-4, caption.bbox[0])),
                           max(cursor, ink[1]-4),
@@ -1711,6 +1729,14 @@ def _partition_captioned_sides(candidates, seeds, lines, raw, pixel_probe):
                               min(x1, ink[2]+4), min(bottom, ink[3]+4))))
         except (ValueError, RuntimeError, AttributeError):
             continue
+        # Avoid churning already complete single-caption crops. Repartition
+        # multiple seeds/units, or repair a single crop only when source ink
+        # proves that its current bounds exclude printed content.
+        if len(members) == 1 and len(units) == 1:
+            box = ink_extents[0]
+            if not (box[0] < left-2 or box[1] < top-2
+                    or box[2] > right+2 or box[3] > bottom+2):
+                continue
         replacements[id(members[0])] = units
         removed.update(id(c) for c in members)
     result = []

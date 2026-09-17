@@ -131,7 +131,7 @@ class BuildResult(object):
 
 # ------------------------------------------------------------------ one page
 
-def page_fragment(book, pno, style=None):
+def page_fragment(book, pno, style=None, wrappers=None):
     """One page as it was printed: the unit the model edits and the gate measures."""
     elements = list(book.pages.get(pno) or [])
     notes = [n for n in book.notes if n.pno == pno]
@@ -143,6 +143,7 @@ def page_fragment(book, pno, style=None):
 
     index = 0
     while index < len(elements):
+        element_index = index
         element = elements[index]
         index += 1
         if element.kind == "fig":
@@ -156,6 +157,11 @@ def page_fragment(book, pno, style=None):
                 index += 1
             blocks.append(_figure_html(pno, figure_index, caption))
             figure_index += 1
+            continue
+        if wrappers and element_index in wrappers:
+            from .structural_ops import render_element
+            blocks.append(render_element(element, wrappers[element_index],
+                lambda runs: _runs_html(runs, available, ref_ids, ambiguous)))
             continue
         inner = _runs_html(element.runs, available, ref_ids, ambiguous)
         if not inner.strip():
@@ -1078,7 +1084,7 @@ def _original_document(record, home, language):
 
 def build(book, out_path, page_html=None, metadata=None, doc=None,
           report_html=None, sidecar=None, identifier=None, figure_transform=None,
-          should_stop=None, evidence_progress=None):
+          should_stop=None, evidence_progress=None, operation_plans=()):
     """Write one EPUB 3 and say what went into it.
 
     ``report_html`` is called last, with the document each page marker landed in and
@@ -1093,6 +1099,20 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     # character filtering, so no raw source character is reintroduced afterward.
     page_html = {pno: page_fragment(book, pno) if book.needs_source_evidence(pno) else html
                  for pno, html in page_html.items()}
+    # Inactive opt-in seam: only source-bound wrapper plans are admitted here.
+    # Recheck cached plans before producing any output or rendering evidence.
+    seen_pages = set()
+    for plan in operation_plans:
+        from .structural_ops import ContractError, OperationPlan
+        if not isinstance(plan, OperationPlan):
+            raise ContractError("a validated operation plan is required")
+        pno = plan.prepared.page
+        if pno in seen_pages or pno not in page_html:
+            raise ContractError("duplicate or absent operation page")
+        seen_pages.add(pno)
+        wrappers = plan.compile(book, doc)
+        if wrappers:
+            page_html[pno] = page_fragment(book, pno, wrappers=wrappers)
     page_html, unrepresentable = _readable_characters(page_html)
     page_html, refused = _refuse_unsafe_pages(page_html, book)
     evidence, original_images = _original_evidence(

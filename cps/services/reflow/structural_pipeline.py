@@ -73,6 +73,10 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
     ``prepared_result`` is an explicit local-rig reuse seam, never an API pickle
     input. It must match the current PDF and contain its complete Book context.
     """
+    if client is not None and client.enabled and client.configured:
+        from .ledger import Ledger
+        if not isinstance(cache, (pipeline.PageCache, OperationCache)) or not isinstance(ledger, Ledger):
+            raise ops.ContractError('enabled structural dispatch requires a durable shared claim store and ledger')
     result = prepared_result or pipeline.run(doc, client=None, progress=progress,
                     should_stop=should_stop, recovery_opts=recovery_opts)
     if result.fingerprint != extract.document_fingerprint(doc) or set(result.book.pages) != set(range(len(doc))):
@@ -94,7 +98,7 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
             result.source_pages[pno]=source;result.page_html[pno]=source.html
             outcome=result.outcomes[pno];outcome.uncertain=source.report()['uncertain'];outcome.marked=source.report()['marked']
         except ops.ContractError as exc:canonical_errors[pno]=str(exc)
-    stage_cache=OperationCache(cache.directory) if cache else None
+    stage_cache=cache if isinstance(cache, OperationCache) else OperationCache(cache.directory) if cache else None
     halted = 'not_configured' if client is None or not client.configured else 'quality_gate' if not client.enabled else None
     for index,pno in enumerate(selected):
         outcome=result.outcomes[pno];reviewed=False;source=result.source_pages.get(pno)

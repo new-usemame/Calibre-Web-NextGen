@@ -108,3 +108,34 @@ def test_two_jobs_same_source_cannot_race_into_two_paid_proposals(source):
     assert other.spend_usd==0 and other.pending_usd==0
     assert 'first-private-job' not in json.dumps(other.structural)
     assert len(first.calls)==2 and completed.structural['approved_operations']==1
+
+
+def test_two_enabled_jobs_without_durable_claim_store_refuse_before_preflight(source):
+    from cps.services.reflow.structural_pipeline import run_structural,TwoStageClient
+    from cps.services.reflow.structural_ops import ContractError
+    from concurrent.futures import ThreadPoolExecutor
+    _,doc,tmp=source
+    class NoNetwork(WorkflowSession):
+        def get(self,*args,**kwargs):raise AssertionError('preflight must not run without durable claims')
+    def run(index):
+        session=NoNetwork();ledger=Ledger(str(tmp/('uncached-job-%d'%index)),cap_usd=1)
+        with pytest.raises(ContractError,match='durable'):
+            run_structural(doc,client=TwoStageClient('test',enabled=True,session=session),
+                           ledger=ledger,prepared_result=prepared_result(source))
+        assert session.calls==[] and ledger.entries()==[]
+    with ThreadPoolExecutor(max_workers=2) as pool:list(pool.map(run,range(2)))
+
+
+def test_enabled_claim_store_also_requires_durable_billing_ledger(source):
+    from cps.services.reflow.structural_pipeline import run_structural,TwoStageClient
+    from cps.services.reflow.structural_ops import ContractError
+    from cps.services.reflow.operation_cache import OperationCache
+    _,doc,tmp=source;session=WorkflowSession();cache=OperationCache(tmp/'typed-cache')
+    client=TwoStageClient('test',enabled=True,session=session)
+    with pytest.raises(ContractError,match='ledger'):
+        run_structural(doc,client=client,cache=cache,prepared_result=prepared_result(source))
+    assert session.calls==[] and not cache.directory.exists()
+    result=run_structural(doc,client=client,cache=cache,ledger=Ledger(str(tmp/'billed'),cap_usd=1),
+                          prepared_result=prepared_result(source))
+    assert result.structural['approved_operations']==1 and len(session.calls)==2
+    assert len(list(cache.directory.glob('*/*.json')))==2

@@ -144,6 +144,11 @@ class LibraryConverter:
 
         self.current_book = 1
         self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs(str(app_paths.dirs_json()))
+        # ingest_processor.py removes this directory outright when it finishes and
+        # recreates it on its next run, so it is absent for every Convert Library
+        # run that follows an ingest. Own it here rather than depending on another
+        # service having left one behind.
+        self.ensure_tmp_conversion_dir()
 
         # Calibre subprocess environment. Operator-opt-in plugin loading
         # (CWA_CALIBRE_USER_PLUGINS=true) routes HOME to /config so any
@@ -415,19 +420,7 @@ class LibraryConverter:
             else:
                 try: # Convert Book to target format (target is not kepub)
                     target_filepath = f"{self.tmp_conversion_dir}{Path(file).stem}.{self.target_format}"
-                    with subprocess.Popen(
-                        ["ebook-convert", file, target_filepath],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT,
-                        env=self.calibre_env,
-                        text=True,
-                        encoding='utf-8'
-                    ) as process:
-                        for line in process.stdout: # Read from the combined stdout (which includes stderr)
-                            if self.verbose:
-                                print_and_log(line)
-                            else:
-                                print(line)
+                    self._run_streaming(["ebook-convert", file, target_filepath], env=self.calibre_env)
 
                     if self.cwa_settings['auto_backup_conversions']:
                         self.backup(file, backup_type="converted")
@@ -451,19 +444,9 @@ class LibraryConverter:
                     print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) An error occurred while processing {os.path.basename(target_filepath)} with the kindle-epub-fixer. See the following error:\n{e}")
 
             try: # Import converted book to library. As of V3.0.0, "add_format" is used instead of "add"
-                with subprocess.Popen(
+                self._run_streaming(
                     ["calibredb", "add_format", book_id, target_filepath, f"--library-path={self.library_dir}"],
-                    env=self.calibre_env,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    encoding='utf-8'
-                ) as process:
-                    for line in process.stdout: # Read from the combined stdout (which includes stderr)
-                        if self.verbose:
-                            print_and_log(line)
-                        else:
-                            print(line)
+                    env=self.calibre_env)
 
                 if self.cwa_settings['auto_backup_imports']:
                     self.backup(target_filepath, backup_type="imported")
@@ -504,18 +487,7 @@ class LibraryConverter:
             print_and_log(f"\n[convert-library]: ({self.current_book}/{len(self.to_convert)}) *** NOTICE TO USER: Kepubify is limited in that it can only convert from epubs. To get around this, CWA will automatically convert other supported formats to epub using the Calibre's conversion tools & then use Kepubify to produce your desired kepubs. Obviously multi-step conversions aren't ideal so if you notice issues with your converted files, bare in mind starting with epubs will ensure the best possible results***\n")
             try: # Convert book to epub format so it can then be converted to kepub
                 epub_filepath = f"{self.tmp_conversion_dir}{Path(filepath).stem}.epub"
-                with subprocess.Popen(
-                    ["ebook-convert", filepath, epub_filepath],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    env=self.calibre_env,
-                    text=True
-                ) as process:
-                    for line in process.stdout: # Read from the combined stdout (which includes stderr)
-                        if self.verbose:
-                            print_and_log(line)
-                        else:
-                            print(line)
+                self._run_streaming(["ebook-convert", filepath, epub_filepath], env=self.calibre_env)
 
                 if self.cwa_settings['auto_backup_conversions']:
                     self.backup(filepath, backup_type="converted")
@@ -530,18 +502,8 @@ class LibraryConverter:
             epub_filepath = Path(epub_filepath)
             target_filepath = f"{self.tmp_conversion_dir}{epub_filepath.stem}.kepub"
             try:
-                with subprocess.Popen(
-                    ['kepubify', '--inplace', '--calibre', '--output', self.tmp_conversion_dir, epub_filepath],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    text=True,
-                    encoding='utf-8'
-                ) as process:
-                    for line in process.stdout: # Read from the combined stdout (which includes stderr)
-                        if self.verbose:
-                            print_and_log(line)
-                        else:
-                            print(line)
+                self._run_streaming(
+                    ['kepubify', '--inplace', '--calibre', '--output', self.tmp_conversion_dir, epub_filepath])
 
                 if self.cwa_settings['auto_backup_conversions']:
                     self.backup(filepath, backup_type="converted")
@@ -561,8 +523,58 @@ class LibraryConverter:
             return False, ""
 
 
+    def ensure_tmp_conversion_dir(self):
+        """Create the temp conversion directory if it is missing.
+
+        ingest_processor.py ends each run with shutil.rmtree() on this same path,
+        so it disappears out from under a Convert Library run that is already
+        going as well as before one starts.
+        """
+        try:
+            Path(self.tmp_conversion_dir).mkdir(parents=True, exist_ok=True)
+        except OSError as error:
+            print_and_log(
+                f"[convert-library]: WARN - Could not prepare the temp conversion "
+                f"directory {self.tmp_conversion_dir}: {error}")
+            return
+        service_user.chown_to_service_user(
+            self.tmp_conversion_dir, "[convert-library]:", recursive=False,
+            log=print_and_log)
+
+
+    def _run_streaming(self, args, env=None) -> None:
+        """Run a command, stream its combined output, and raise on a non-zero exit.
+
+        subprocess.Popen never raises CalledProcessError, so the callers wrapping
+        these commands in `except subprocess.CalledProcessError` treated a failed
+        command as a successful one and printed the success message anyway.
+        """
+        args = [str(a) for a in args]
+        output_lines = []
+        with subprocess.Popen(
+            args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            env=env,
+            text=True,
+            encoding='utf-8'
+        ) as process:
+            for line in process.stdout:  # Read from the combined stdout (which includes stderr)
+                output_lines.append(line)
+                if self.verbose:
+                    print_and_log(line)
+                else:
+                    print(line)
+
+        if process.returncode != 0:
+            output = ''.join(output_lines)
+            raise subprocess.CalledProcessError(
+                process.returncode, args, output=output, stderr=output)
+
+
     def empty_tmp_con_dir(self):
         try:
+            self.ensure_tmp_conversion_dir()
             files = os.listdir(self.tmp_conversion_dir)
             for file in files:
                 file_path = os.path.join(self.tmp_conversion_dir, file)

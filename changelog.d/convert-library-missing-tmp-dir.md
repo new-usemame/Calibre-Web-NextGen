@@ -1,0 +1,3 @@
+### Fixed
+
+- **Convert Library actually converts again after an ingest, and a failed conversion is reported as failed.** The ingest processor removes the shared temp conversion directory when it finishes, and Convert Library never recreated it, so every run after the first ingest wrote conversions into a path that did not exist and added nothing to the library. The run still reported each book as converted and imported, because the conversion and import commands could not raise the error their handlers were written to catch. Convert Library now creates that directory itself, recreates it if an ingest removes it mid-run, and reports a non-zero exit from ebook-convert, calibredb or kepubify as a failure.

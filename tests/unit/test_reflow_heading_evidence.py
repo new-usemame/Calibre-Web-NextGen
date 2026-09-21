@@ -147,3 +147,34 @@ def test_prepared_heading_requires_bound_source_and_rechecks_before_publication(
     with pytest.raises(ops.ContractError):build_epub.build(book,str(target),doc=doc,operation_plans=[plan])
     assert not target.exists()
     doc.close()
+
+@pytest.mark.parametrize('split_marker',[True,False])
+def test_numbered_reference_rows_are_not_a_single_heading_despite_larger_type(tmp_path,split_marker):
+    import pymupdf
+    from cps.services.reflow import assemble,extract,skeleton,structural_ops as ops
+    document=pymupdf.open();page=document.new_page(width=450,height=670)
+    page.insert_text((100,70),'A genuine displayed heading',fontsize=16)
+    for y in (120,135,150):page.insert_text((50,y),'Ordinary source body supplies its measured typographic reference.',fontsize=8.6)
+    page.draw_line((50,565),(180,565))
+    for number,y in enumerate((590,602,614),3):
+        if split_marker:
+            page.insert_text((50,y),str(number)+'.',fontsize=9.1)
+            page.insert_text((80,y),'Reference text.',fontsize=9.1)
+        else:page.insert_text((50,y),str(number)+'. Reference text.',fontsize=9.1)
+    path=tmp_path/'references.pdf';document.save(path);document.close();document=pymupdf.open(path)
+    raw=extract.read_page(document,0)
+    def element(lines):
+        box=(min(l.bbox[0] for l in lines),min(l.bbox[1] for l in lines),max(l.bbox[2] for l in lines),max(l.bbox[3] for l in lines))
+        return assemble.Element(kind='p',pno=0,bbox=box,line_boxes=[l.bbox for l in lines],runs=[['t',' '.join(l.stripped for l in lines)]])
+    lines=[l for b in raw.text_blocks for l in b.lines]
+    title=element([l for l in lines if l.bbox[1]<90])
+    body=element([l for l in lines if 90<l.bbox[1]<200])
+    references=element([l for l in lines if l.bbox[1]>550])
+    book=assemble.Book(elements=[title,body,references],pages={0:[title,body,references]},style=skeleton.BookStyle(body_size=8.6))
+    prepared=ops.prepare(book,document,0,'reference-test',{'layer':'native'},raw_page=raw)
+    choices=prepared.candidates()
+    assert any(c['element_id']=='e0' and c['kind']=='heading' for c in choices)
+    assert not any(c['element_id']=='e2' and c['kind']=='heading' for c in choices)
+    proof=prepared.model_view()['context']['elements'][2]['heading_evidence']
+    assert proof['reason']=='source_numbered_rows'
+    document.close()

@@ -7,7 +7,7 @@ from collections import Counter
 
 from . import assemble,extract,skeleton
 
-VERSION='source-heading-evidence-3'
+VERSION='source-heading-evidence-4'
 BOX_TOLERANCE=.02  # two units of serialized source-coordinate precision
 ALIGNMENT_EM=.5
 ISOLATION_LEADING=.5
@@ -68,6 +68,33 @@ def _continued(book,pno,index):
     return len(set(elements[index].pages or [pno]))>1
 
 
+def _numbered_rows(lines):
+    """Repeated aligned source labels/body rows cannot be one displayed heading.
+
+    Native text extraction may split each marker and its body into separate PDF
+    lines. Pair them by actual vertical overlap and hanging alignment; do not
+    depend on font size, page number, citation wording, or guessed note identity.
+    """
+    rows=[]
+    for line in lines:
+        text=_text(line).strip();box=line['bbox']
+        if re.match(r'^\d+[.)]\s+\S',text):
+            rows.append(box);continue
+        if not re.fullmatch(r'\d+[.)]',text):continue
+        for following in lines:
+            other=following['bbox']
+            if following is line or other[0]<=box[2]+BOX_TOLERANCE:continue
+            overlap=min(box[3],other[3])-max(box[1],other[1])
+            if overlap>=ALIGNMENT_EM*min(box[3]-box[1],other[3]-other[1]) and _text(following).strip():
+                rows.append(box);break
+    for index,left in enumerate(rows):
+        height=left[3]-left[1]
+        for right in rows[index+1:]:
+            if abs(left[0]-right[0])<=ALIGNMENT_EM*height and abs(left[1]-right[1])>=ALIGNMENT_EM*height:
+                return rows
+    return []
+
+
 def heading_evidence(book,pno,raw_page,layer,source_rotation=0,reading_size=None):
     raw=raw_page.to_dict() if hasattr(raw_page,'to_dict') else raw_page
     elements=book.pages[pno];result={}
@@ -95,6 +122,10 @@ def heading_evidence(book,pno,raw_page,layer,source_rotation=0,reading_size=None
         mapped,error=_map(element,lines)
         proof['source_line_boxes']=[line['bbox'] for line in mapped]
         if error:proof['reason']=error;continue
+        numbered_rows=_numbered_rows(mapped)
+        if numbered_rows:
+            proof.update(reason='source_numbered_rows',numbered_row_boxes=numbered_rows)
+            continue
         if units:
             mapped_indices={i for i,line in enumerate(lines) if line in mapped}
             joined=[group for group in units if mapped_indices.intersection(group)]

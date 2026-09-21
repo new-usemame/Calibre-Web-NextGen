@@ -10,7 +10,7 @@ from xml.dom import Node, minidom
 
 from . import annotate
 
-VERSION = 'reflow-enriched-source-2'
+VERSION = 'reflow-enriched-source-3'
 
 
 def _json(value):
@@ -64,6 +64,37 @@ class SourcePage:
         return '\n'.join(blocks)
 
 
+def _image_owned_records(book,pno,provenance,records):
+    """Do not relocate image/caption confidence onto equal surviving tokens."""
+    from . import extract
+    from .heading_evidence import _valid, _inside
+    if provenance.get('layer')!='ocr':return [],[]
+    angle=provenance.get('orientation',0)
+    if angle not in (0,90,180,270):return [],[]
+    frame=provenance.get('page_rect')
+    if angle and not _valid(frame):return [],[]
+    matrix=extract.pymupdf.Matrix(1,1).prerotate(angle)
+    origin=extract.pymupdf.Rect(frame)*matrix if frame else extract.pymupdf.Rect(0,0,0,0)
+    figures=[f for f in book.figures if f['pno']==pno and
+             f.get('source_geometry',{}).get('space')=='reading']
+    artwork=[a['bbox'] for a in book.artwork if a['pno']==pno and _valid(a['bbox'])
+             and any(_inside(a['bbox'],f['bbox']) for f in figures)]
+    elements=book.pages[pno]
+    art,qualified=[],[]
+    for index,record in enumerate(records):
+        box=record.get('source_bbox')
+        if not _valid(box):continue
+        mapped=extract.pymupdf.Rect(box)*matrix
+        mapped=(mapped.x0-origin.x0,mapped.y0-origin.y0,mapped.x1-origin.x0,mapped.y1-origin.y0)
+        owners=[e for e in elements if e.kind in ('p','h','caption') and
+                _valid(e.bbox) and _inside(mapped,e.bbox)]
+        if any(e.kind=='caption' and e.caption_uncertain for e in owners):
+            qualified.append(index)
+        elif not owners and any(_inside(mapped,box) for box in artwork):
+            art.append(index)
+    return art,qualified
+
+
 def prepare_source_page(book, pno, provenance, records=()):
     """Capture actual Recovery provenance/records; callers regenerate on replay.
 
@@ -81,11 +112,17 @@ def prepare_source_page(book, pno, provenance, records=()):
         raise ContractError('Recovery uncertainty records are missing or incomplete')
     mapping = {}
     html = build_epub.page_fragment(book, pno, element_blocks=mapping)
-    html, normalized, marked, placed = annotate.annotate_page(html, raw, with_placements=True)
+    normalized=[record for record in (annotate.uncertain_record(r) for r in raw) if record is not None]
+    artwork,qualified=_image_owned_records(book,pno,provenance,normalized)
+    excluded=set(artwork+qualified)
+    active=[i for i in range(len(normalized)) if i not in excluded]
+    html, _, marked, placements = annotate.annotate_page(html,[normalized[i] for i in active],with_placements=True)
+    placed=[active[i] for i in placements]
     report = {'version': VERSION, 'records_sha256': _digest(raw), 'raw_records': len(raw),
               'normalized_raw_indices': [i for i, r in enumerate(raw) if annotate.uncertain_record(r) is not None],
               'record_ids': [_digest([i, record]) for i, record in enumerate(raw)],
               'uncertain': normalized, 'marked': marked, 'placed_record_indices': placed,
+              'artwork_record_indices': artwork, 'qualified_caption_record_indices': qualified,
               'unplaced_record_indices': [i for i in range(len(normalized)) if i not in placed]}
     page = SourcePage(pno, _digest(_state(book, pno)), html, _json(mapping),
                       _json(provenance), _json(raw), _json(report))

@@ -321,19 +321,22 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
         geometry=getattr(raw,'source_geometry',{})
         if geometry.get('space')=='reading':
             from .source_display import SourceDisplay
-            return SourceDisplay(doc,raw.pno,dict(geometry,layer='ocr')).query_document()
+            return SourceDisplay(doc,raw.pno,dict(geometry,layer='ocr')).query_document(isolate=True)
         return doc
     skeletons = []
     for done, raw in enumerate(raw_pages):
         if should_stop is not None and should_stop():
             raise build_epub.BuildCancelled('Source geometry preparation was cancelled.')
-        skeletons.append(skeleton.page_skeleton(
-            raw, style, layer_trusted=trusted or (
-                getattr(raw,'source_geometry',{}).get('space')=='reading' and
-                assess.looks_like_prose(raw.text)),
-            pixel_probe=extract.ScanPixelProbe(
-                pixel_document(raw), raw.pno,
-                mask=[ln.bbox for blk in raw.text_blocks for ln in blk.lines])))
+        pixel_doc=pixel_document(raw)
+        try:
+            skeletons.append(skeleton.page_skeleton(
+                raw, style, layer_trusted=trusted or (
+                    getattr(raw,'source_geometry',{}).get('space')=='reading' and
+                    assess.looks_like_prose(raw.text)),
+                pixel_probe=extract.ScanPixelProbe(pixel_doc,raw.pno,
+                    mask=[ln.bbox for blk in raw.text_blocks for ln in blk.lines])))
+        finally:
+            if pixel_doc is not doc:pixel_doc.close()
         report(Progress(stage='skeleton',page=done+1,pages=len(raw_pages),
                         message='measured page %d of %d' % (done+1,len(raw_pages))))
 

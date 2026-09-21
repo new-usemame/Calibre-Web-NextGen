@@ -854,9 +854,12 @@ def _figure_images(chapters, doc, book, figure_transform=None, owned_images=()):
                 mask.append(transform(pno,note.bbox) if transform else note.bbox)
         if transform is not None:
             bbox = transform(pno, bbox)
+        ink_doc=render_doc
+        if figure.get('needs_ink') and geometry.get('space')=='reading':
+            ink_doc=SourceDisplay(doc,pno,dict(geometry,layer='ocr')).query_document(isolate=True)
         try:
             if figure.get("needs_ink") and not extract.region_has_ink(
-                    render_doc, pno, bbox, mask=mask):
+                    ink_doc, pno, bbox, mask=mask):
                 blanks.append(src)
                 continue
             images[src] = extract.crop_jpeg(render_doc, pno, bbox)
@@ -872,6 +875,8 @@ def _figure_images(chapters, doc, book, figure_transform=None, owned_images=()):
                 except Exception:                                 # pragma: no cover
                     pass
             missing.append(src)
+        finally:
+            if ink_doc is not render_doc:ink_doc.close()
     return images, missing, blanks
 
 
@@ -1175,6 +1180,8 @@ def _original_document(record, home, language):
         body += '<section class="source-evidence"><h2>OCR readings to check</h2><p>These tokens are retained as extracted. Some could not be highlighted in the reflowed text.</p><ul>'
         for index, item in enumerate(report['uncertain']):
             state = 'highlighted' if index in report['placed_record_indices'] else 'not highlighted'
+            if index in report.get('artwork_record_indices',[]):state='in original figure; not highlighted in reflow text'
+            elif index in report.get('qualified_caption_record_indices',[]):state='covered by the caption uncertainty notice'
             body += '<li>%s (%s)</li>' % (escape(item['token']), state)
         body += '</ul></section>'
     for detail in record["details"]:

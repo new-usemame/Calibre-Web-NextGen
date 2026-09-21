@@ -137,3 +137,74 @@ def test_source_geometry_loop_stops_before_another_page_after_cancellation(monke
         pipeline.run(doc,recovery_opts={'mode':'off'},should_stop=lambda:bool(measured))
     assert measured==[0]
     doc.close()
+
+
+def test_artwork_record_cannot_consume_equal_token_in_surviving_body_or_caption():
+    from cps.services.reflow.enriched_source import prepare_source_page
+    figure={'pno':0,'bbox':(0,0,100,100),'source_geometry':{'space':'reading',
+        'orientation':0,'source_rotation':0,'page_rect':[0,0,200,300]}}
+    elements=[assemble.Element('fig',pno=0,bbox=figure['bbox']),
+        assemble.Element('caption',pno=0,bbox=(10,110,100,130),runs=[['t','6 caption']],caption_uncertain=True),
+        assemble.Element('p',pno=0,bbox=(10,200,150,220),runs=[['t','6 units remain in body']])]
+    book=assemble.Book(elements=elements,pages={0:elements},figures=[figure],
+        artwork=[{'pno':0,'bbox':(10,10,50,50),'text':'6'}])
+    records=[{'token':'6','score':3,'source_bbox':[20,20,30,30]},
+             {'token':'6','score':70,'source_bbox':[20,200,30,210]},
+             {'token':'6','score':9,'source_bbox':[20,110,30,120]}]
+    page=prepare_source_page(book,0,{'layer':'ocr','orientation':0,'uncertain_words':3},records)
+    report=page.report()
+    assert report['placed_record_indices']==[1], 'artwork confidence was moved to body'
+    assert report['artwork_record_indices']==[0]
+    assert report['qualified_caption_record_indices']==[2]
+    assert report['raw_records']==3 and report['unplaced_record_indices']==[0,2]
+    assert 'Caption transcription uncertain' in page.html
+    assert '6</span> units remain in body' in page.html
+
+
+@pytest.mark.parametrize('rotation,orientation',[(0,0),(90,0),(0,90),(90,270)])
+def test_isolated_query_retains_pixels_and_closes_only_its_owned_page(rotation,orientation):
+    doc=pymupdf.open();doc.new_page(width=400,height=600)
+    page=doc.new_page(width=400,height=600)
+    page.draw_rect((40,60,170,220),color=(1,0,0),fill=(1,0,0));page.set_rotation(rotation)
+    display=SourceDisplay(doc,1,{'layer':'ocr','orientation':orientation,'source_rotation':rotation})
+    baseline=display.pixmap(scale=1)
+    with display.query_document(isolate=True) as query:
+        actual=query[1].get_pixmap(matrix=pymupdf.Matrix(1,1))
+        assert (actual.width,actual.height,actual.samples)==(baseline.width,baseline.height,baseline.samples)
+    with pytest.raises((ValueError,RuntimeError,AssertionError)):
+        query[1].get_pixmap(matrix=pymupdf.Matrix(1,1))
+    assert not doc.is_closed and display.pixmap(scale=1).samples==baseline.samples
+    query.close();doc.close()
+
+
+@pytest.mark.parametrize('failure',[build_epub.BuildCancelled,ValueError])
+def test_pipeline_closes_owned_probe_on_cancel_or_geometry_error(monkeypatch,failure):
+    from cps.services.reflow import pipeline,skeleton
+    from tests.fixtures import reflow_pdfs as F
+    doc=F.new_doc();F.prose_page(doc)
+    prov=source.PageRecovery(pno=0,layer='ocr',words=100,page_rect=tuple(doc[0].rect))
+    chosen=source.normalize_recovery_geometry(extract.read_page(doc,0),doc,asdict(prov))
+    monkeypatch.setattr(source,'recover',lambda *a,**kw:source.Recovery(pages=[chosen],provenance={0:prov}))
+    closed=[];original=SourceDisplay.query_document
+    def query(self,*a,**kw):
+        value=original(self,*a,**kw);close=value.close
+        def record_close():closed.append(True);close()
+        value.close=record_close
+        return value
+    monkeypatch.setattr(SourceDisplay,'query_document',query)
+    def fail(*a,**kw):raise failure('stop during source geometry')
+    monkeypatch.setattr(skeleton,'page_skeleton',fail)
+    with pytest.raises(failure):pipeline.run(doc)
+    assert closed==[True] and not doc.is_closed
+    doc.close()
+
+
+def test_failed_query_copy_closes_new_document(monkeypatch):
+    doc=pymupdf.open();doc.new_page(width=100,height=200)
+    display=SourceDisplay(doc,0);doc.close()
+    opened=[];original=pymupdf.open
+    def capture(*a,**kw):
+        value=original(*a,**kw);opened.append(value);return value
+    monkeypatch.setattr(pymupdf,'open',capture)
+    with pytest.raises(ValueError):display.query_document(isolate=True)
+    assert len(opened)==1 and opened[0].is_closed

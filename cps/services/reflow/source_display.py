@@ -73,12 +73,26 @@ class SourceDisplay:
             if len(data)<=max_bytes:return data
         raise extract.RasterTooLarge('source display exceeds encoded-byte bound')
 
-    def query_document(self):
+    def query_document(self,isolate=False):
         """Existing pixel questions in reading coordinates, without a second renderer."""
         display=self
+        original_pno=self.pno
+        owned=None
+        if isolate:
+            # MuPDF image decoding can be affected by previous render sizes.
+            # Probes get a separate page object; emitted source pixels keep the
+            # original document's render state. No pixels are resampled here.
+            owned=extract.pymupdf.open()
+            try:
+                owned.insert_pdf(self.doc,from_page=self.pno,to_page=self.pno)
+                display=SourceDisplay(owned,0,self.provenance)
+            except Exception:
+                owned.close()
+                raise
         class ReadingPage:
             rect=display.rect
             def get_pixmap(self,matrix,clip=None,alpha=False,colorspace=None):
+                if owned is not None and owned.is_closed:raise ValueError('source query is closed')
                 if alpha or matrix.b or matrix.c or matrix.a!=matrix.d:
                     raise ValueError('unsupported reading-space pixel query')
                 if colorspace not in (None,extract.pymupdf.csRGB,extract.pymupdf.csGRAY):
@@ -86,8 +100,12 @@ class SourceDisplay:
                 return display.pixmap(clip,scale=matrix.a,gray=colorspace==extract.pymupdf.csGRAY)
         class ReadingDocument:
             def __getitem__(self,pno):
-                if pno!=display.pno:raise IndexError('wrong source page')
+                if pno!=original_pno:raise IndexError('wrong source page')
                 return ReadingPage()
+            def close(self):
+                if owned is not None and not owned.is_closed:owned.close()
+            def __enter__(self):return self
+            def __exit__(self,*args):self.close()
         return ReadingDocument()
 
 

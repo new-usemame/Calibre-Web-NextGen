@@ -382,8 +382,12 @@ def about_page(payload, show_cost=False, links=None, losses=()):
               ('Approved operations',values['approved_operations']),('Proposer abstentions',values['proposer_abstained']),
               ('Verifier abstentions',values['verifier_abstained']),('Rejected pages',values['rejected']),
               ('Requests attempted',values['attempted_stages']),('Cached stage results',values['cached_stages'])]
-        out.append('<h2>AI formatting review</h2><p>Only approved source-bound heading or quotation formatting is applied. An unchanged page or an abstention is not an improvement. Counts describe mechanical admission, not independent semantic correctness.</p><table><tbody>%s</tbody></table>'
-                   % ''.join('<tr><td>%s</td><td>%d</td></tr>'%(escape(label),value) for label,value in rows))
+        if values.get('eligibility_measured',True):
+            out.append('<h2>AI formatting review</h2><p>Only approved source-bound heading or quotation formatting is applied. An unchanged page or an abstention is not an improvement. Counts describe mechanical admission, not independent semantic correctness.</p><table><tbody>%s</tbody></table>'
+                       % ''.join('<tr><td>%s</td><td>%d</td></tr>'%(escape(label),value) for label,value in rows))
+        else:
+            out.append('<h2>AI formatting review</h2><p>AI review was not requested. Eligibility was not measured. This file uses the complete source conversion for the selected pages, including its original evidence and uncertainty disclosures.</p>')
+
     unplaced = list(payload.get("unplaced") or []) + list(losses or ())
     if unplaced:
         out.append("<h2>What could not be placed</h2><ul>%s</ul>"

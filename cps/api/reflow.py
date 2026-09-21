@@ -9,16 +9,14 @@
 This is the boundary where a user authorises somebody's money to be spent, so three
 things are deliberate and worth stating.
 
-*The estimate is measured, not assumed.* ``pipeline.survey`` runs the real
-deterministic pass over a spread of pages and scales that book's own routing rate.
-That costs seconds of CPU, which under gevent-without-monkey-patching would freeze
-every other request, so it runs on the gevent-aware thread pool and its answer is
-cached against the PDF's size and mtime — the page that shows it is reopened often
-and the file rarely changes.
+*The fast assessment is source-only.* Full current source preparation happens
+in a bounded, cancellable local process. Typed reservation ceilings use the exact
+shared proposer and verifier request serializers, never the legacy router prices.
 
-*Consent is checked against the number the user was shown.* A start with no consent
-flag, or with a cap below what the chosen tier would cost, is refused with the
-figure in the message rather than quietly clamped upward.
+*Consent names the current route and source.* Deterministic conversion needs no
+key or paid cap. Optional review requires a current owner-scoped prepared quote,
+explicit two-stage consent and a finite cap. A smaller cap permits partial review;
+remaining pages retain complete deterministic output.
 
 *A sample belongs to whoever paid for it.* The download path is built from
 ``current_user.id`` and a validated job id; no part of it comes from the URL, so
@@ -36,6 +34,8 @@ import os
 import re
 import time
 import uuid
+import math
+import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from flask import jsonify, request, send_file
@@ -52,7 +52,7 @@ from .. import calibre_db, config
 from ..constants import REFLOW_DIR
 from ..cw_login import current_user
 from ..services.reflow import (admission, build_epub, extract,
-                               ledger as ledger_mod, model, ocr, pipeline)
+                               ledger as ledger_mod, model, ocr, pipeline, structural_quote, typed_model, quote_preparation)
 from ..services.worker import STAT_STARTED, STAT_WAITING, WorkerThread
 from ..tasks import reflow as tasks_reflow
 from ..usermanagement import login_required_if_no_ano
@@ -251,57 +251,91 @@ def _ocr_engine_state(language):
     return state
 
 
+CONSENT_CONTRACT='source-review-1'
+_PREPARATION_STORES={}
+_PREPARATION_LOCK=threading.Lock()
+
+
+def _source_options(body):
+    recovery=body.get('source_recovery','auto');language=body.get('ocr_language','eng')
+    if recovery not in ('auto','textless','off') or not isinstance(language,str) or len(language)>64:
+        raise ValueError('invalid source recovery options')
+    parts=language.split('+')
+    if not 1<=len(parts)<=4 or any(not ocr.LANGUAGE.fullmatch(p) for p in parts):
+        raise ValueError('invalid OCR language')
+    return {'source_recovery':recovery,'ocr_language':language}
+
+
+def _quote_store():
+    root=os.path.abspath(REFLOW_DIR)
+    with _PREPARATION_LOCK:
+        if root not in _PREPARATION_STORES:
+            _PREPARATION_STORES[root]=quote_preparation.PreparationStore(os.path.join(root,'typed-quotes'))
+        return _PREPARATION_STORES[root]
+
+
+def _quote_work(path,options,progress,stop,cache_root):
+    return quote_preparation.measure_isolated(path,options,progress,stop,cache_root)
+
+
 def _estimate_payload(book, source):
-    quote = _survey(source)
-    pages = int(quote.get("pages") or 0)
-    routed = int(quote.get("routed_pages") or 0)
-    tiers = {name: float(quote.get(name) or 0.0) for name in model.TIERS}
-    worst = {name: float((quote.get("worst_case") or {}).get(name) or 0.0)
-             for name in model.TIERS}
-    default_tier = tasks_reflow.config_default_tier()
-    target = _target_usd()
-    over = tiers.get(default_tier, 0.0) > target
-    engine = _ocr_engine_state("eng")
+    # This fast assessment describes the source. Typed prices only come from
+    # complete source preparation and the actual two-stage request serializers.
+    quote=_survey(source);engine=_ocr_engine_state('eng')
+    pages=int(quote.get('pages') or 0)
     return {
-        "book_id": book.id,
-        "title": book.title,
-        "verdict": quote.get("verdict", ""),
-        "pages": pages,
-        "text_layer": bool(quote.get("text_layer")),
-        "routed_pages_estimate": routed,
-        "routed_share": round(routed / float(pages), 4) if pages else 0.0,
-        "estimate_usd": tiers,
-        "worst_case_usd": worst,
-        "target_usd": target,
-        "over_target": bool(over),
-        # An expensive book is exactly the one a person should look at before they
-        # buy all of it, so the suggestion follows the price rather than the length.
-        "sample_suggested": bool(over),
-        "existing_epub": calibre_db.get_book_format(book.id, "EPUB") is not None,
-        "configured": bool(config.resolved_openrouter_key()),
-        "default_tier": default_tier,
-        "hard_cap_usd": tasks_reflow.hard_cap_usd(),
-        "sample_pages_default": tasks_reflow.SAMPLE_PAGES_DEFAULT,
-        "sample_pages_max": tasks_reflow.SAMPLE_PAGES_MAX,
-        "tiers": model.tier_choices(),
-        "priced_on": quote.get("priced_on", ""),
-        "sampled": int(quote.get("sampled") or 0),
-        "reasons": dict(quote.get("reasons") or {}),
-        "cached": bool(quote.get("cached")),
-        "recovery": {
-            "ocr_candidates": int(quote.get("ocr_candidates") or 0),
-            "image_only": int(quote.get("ocr_image_only") or 0),
-            "damaged": int(quote.get("ocr_damaged") or 0),
-            "estimated_seconds": int(quote.get("ocr_estimated_seconds") or 0),
-            "engine_available": bool(engine["available"]),
-            "engine_version": engine["version"],
-            "engine_detail": engine["detail"],
-            "language": "eng",
-            "dpi": 300,
-            "pdf_sha256": extract.document_fingerprint(source)[:16],
-            "non_latin_share": float(quote.get("non_latin_share") or 0.0),
-        },
+        'book_id':book.id,'title':book.title,'verdict':quote.get('verdict',''),
+        'pages':pages,'text_layer':bool(quote.get('text_layer')),
+        'source_sha256':extract.document_fingerprint(source),'consent_contract':CONSENT_CONTRACT,
+        'existing_epub':calibre_db.get_book_format(book.id,'EPUB') is not None,
+        'configured':bool(config.resolved_openrouter_key()),'hard_cap_usd':tasks_reflow.hard_cap_usd(),
+        'sample_pages_default':tasks_reflow.SAMPLE_PAGES_DEFAULT,'sample_pages_max':tasks_reflow.SAMPLE_PAGES_MAX,
+        'sample_suggested':pages>tasks_reflow.SAMPLE_PAGES_DEFAULT,
+        'sampled':int(quote.get('sampled') or 0),'cached':bool(quote.get('cached')),
+        'review':{'quality_released':typed_model.QUALITY_RELEASED,'route_version':typed_model.ROUTE_VERSION,
+            'source_revision':typed_model.SOURCE_REVISION,'provider':'openai/flex','service_tier':'flex',
+            'proposer':typed_model.STAGES['proposer'].model_id,'verifier':typed_model.STAGES['verifier'].model_id,
+            'max_output_tokens':typed_model.MAX_OUTPUT_TOKENS},
+        'recovery':{'ocr_candidates':int(quote.get('ocr_candidates') or 0),
+            'image_only':int(quote.get('ocr_image_only') or 0),'damaged':int(quote.get('ocr_damaged') or 0),
+            'estimated_seconds':int(quote.get('ocr_estimated_seconds') or 0),
+            'engine_available':bool(engine['available']),'engine_version':engine['version'],'engine_detail':engine['detail'],
+            'language':'eng','dpi':300,'pdf_sha256':extract.document_fingerprint(source)[:16],
+            'non_latin_share':float(quote.get('non_latin_share') or 0)},
     }
+
+
+@api_v1.route('/books/<int:book_id>/reflow/estimate/prepare',methods=['POST'])
+@login_required_if_no_ano
+def reflow_prepare_estimate(book_id):
+    guard=_require_edit()
+    if guard:return guard
+    _book,source,failure=_source_or_error(book_id)
+    if failure:return failure
+    body=request.get_json(silent=True)
+    if not isinstance(body,dict):return _err('invalid_options','Source preparation options are required.',400)
+    try:options=_source_options(body)
+    except ValueError:return _err('invalid_options','Source recovery options are invalid.',400)
+    cache_root=REFLOW_DIR
+    try:
+        job=_quote_store().start(current_user.id,book_id,source,options,
+            lambda path,opts,progress,stop:_quote_work(path,opts,progress,stop,cache_root))
+    except quote_preparation.PreparationBusy:return _err('preparation_busy','Local source preparation is busy. Try again shortly.',503)
+    return jsonify(job),200 if job['status']=='ready' else 202
+
+
+@api_v1.route('/books/<int:book_id>/reflow/estimate/preparations/<identifier>',methods=['GET','DELETE'])
+@login_required_if_no_ano
+def reflow_estimate_preparation(book_id,identifier):
+    guard=_require_edit()
+    if guard:return guard
+    _book,_source,failure=_source_or_error(book_id)
+    if failure:return failure
+    try:
+        store=_quote_store()
+        job=store.cancel(current_user.id,book_id,identifier) if request.method=='DELETE' else store.get(current_user.id,book_id,identifier)
+    except KeyError:return _err('preparation_missing','This source preparation is unavailable. Prepare the estimate again.',404)
+    return jsonify(job)
 
 
 @api_v1.route("/books/<int:book_id>/reflow/estimate")
@@ -364,23 +398,41 @@ def reflow_start(book_id):
     if failure:
         return failure
 
-    body = request.get_json(silent=True) or {}
-    if body.get("consent") is not True:
-        return _err("consent_required",
-                    "Start the conversion from the Reflow page so the cost is agreed "
-                    "before anything is sent", 400)
-    if not config.resolved_openrouter_key():
-        return _err("not_configured",
-                    "No OpenRouter key is configured, so there is nothing to convert "
-                    "with. An administrator can add one in Admin → Reflow.", 400)
-
-    options = tasks_reflow.ReflowOptions(body)
+    body = request.get_json(silent=True)
+    if not isinstance(body,dict):return _err('invalid_options','Conversion options are required.',400)
+    if body.get('consent') is not True:
+        return _err('consent_required','Agree to the current conversion settings before starting.',400)
+    if body.get('consent_contract')!=CONSENT_CONTRACT or body.get('review_mode') not in ('deterministic','source_verified'):
+        return _err('current_consent_required','Refresh Reflow and choose the current conversion settings.',409)
+    fingerprint=extract.document_fingerprint(source)
+    if body.get('source_sha256')!=fingerprint:
+        return _err('source_changed','The PDF changed. Refresh its assessment before starting.',409)
     try:
-        payload = _estimate_payload(book, source)
-    except Exception as exc:                                      # noqa: BLE001
-        log.error_or_exception("reflow: could not price book %s: %s" % (book_id, exc))
-        return _err("estimate_failed",
-                    "This PDF could not be read well enough to price a conversion", 422)
+        source_options=_source_options(body)
+        if body.get('mode') not in ('full','sample'):raise ValueError()
+        sample=body.get('sample_pages',tasks_reflow.SAMPLE_PAGES_DEFAULT)
+        if isinstance(sample,bool) or not isinstance(sample,int) or not 1<=sample<=tasks_reflow.SAMPLE_PAGES_MAX:raise ValueError()
+        options=tasks_reflow.ReflowOptions(dict(body,**source_options))
+    except (TypeError,ValueError,OverflowError):return _err('invalid_options','Conversion options are invalid.',400)
+    needed=0.0;quote=None
+    if options.review_mode=='source_verified':
+        if not typed_model.QUALITY_RELEASED:return _err('review_unavailable','AI formatting review is not available in this build. Source-only conversion is available.',409)
+        if not config.resolved_openrouter_key():return _err('not_configured','AI review needs a configured provider key. Source-only conversion is available.',400)
+        cap=body.get('cost_cap_usd')
+        if isinstance(cap,bool) or not isinstance(cap,(int,float)) or not math.isfinite(cap) or not 0<cap<=tasks_reflow.hard_cap_usd():
+            return _err('invalid_cap','Choose a finite positive cap within the administrator limit.',400)
+        identifier=body.get('preparation_id')
+        if not isinstance(identifier,str) or not _JOB_ID.fullmatch(identifier):
+            return _err('estimate_stale','Prepare a current source estimate before AI review.',409)
+        try:quote=_quote_store().ready(current_user.id,book_id,body.get('preparation_id'),source,source_options)
+        except (KeyError,ValueError):return _err('estimate_stale','Prepare a current estimate for these source recovery settings.',409)
+        selected=(range(quote['first_body_page'],min(quote['source_context_pages'],quote['first_body_page']+options.sample_pages))
+                  if options.mode=='sample' else range(quote['source_context_pages']))
+        needed=sum(p['proposer_bound_usd']+p['verifier_bound_usd'] for p in quote['pages'] if p['page_index0'] in selected)
+        options.consent_quote=quote
+    options.source_sha256=fingerprint
+    try:payload=_estimate_payload(book,source)
+    except Exception:return _err('estimate_failed','This PDF could not be assessed.',422)
 
     if payload["existing_epub"] and options.mode == "full" \
             and not options.replace_existing_epub:
@@ -403,26 +455,8 @@ def reflow_start(book_id):
                 "facsimile of the page images instead (Source recovery: none)."
                 % (recoverable, engine["detail"]), 422)
 
-    needed = _required_usd(payload, options.model_tier, options.mode,
-                           options.sample_pages)
-    if options.cost_cap_usd + 1e-9 < needed:
-        return _err("cap_below_estimate",
-                    "This conversion is estimated at $%.2f and the cap you set is "
-                    "$%.2f. Raise the cap or choose a cheaper model."
-                    % (needed, options.cost_cap_usd), 400)
-
-    # The cap is enforced per request against the strict bound of that request,
-    # not against the estimate above. A cap under the cheapest possible paid page
-    # would start a job that stops at its first reservation: refuse it here, with
-    # the figure, instead of letting an underfunded request be attempted.
-    floor = model.min_request_bound_usd(options.model_tier)
-    if options.cost_cap_usd + 1e-9 < floor:
-        return _err("cap_below_request_floor",
-                    "One page of this conversion can cost up to $%.4f at the "
-                    "allowed rates, and the cap you set is $%.2f. Raise the cap "
-                    "to at least $%.4f or choose a cheaper model."
-                    % (floor, options.cost_cap_usd, floor), 400)
-
+    # A smaller cap authorizes a partial paid review. Every actual stage reserves
+    # its current bound; remaining pages retain complete deterministic output.
     if _running_task(book_id) is not None:
         return _err("already_queued",
                     "A conversion of this book is already running", 409)
@@ -442,9 +476,9 @@ def reflow_start(book_id):
         admission.release(book_id, task)
         raise
     return jsonify({"task_id": task.id, "job_id": task.job_id,
-                    "mode": options.mode, "model_tier": options.model_tier,
+                    "mode": options.mode, "review_mode":options.review_mode,
                     "cost_cap_usd": options.cost_cap_usd,
-                    "estimate_usd": needed}), 202
+                    "reservation_ceiling_usd": needed,"partial_review_possible":options.review_mode=="source_verified" and options.cost_cap_usd<needed}), 202
 
 
 # ── what happened ────────────────────────────────────────────────────────────
@@ -485,6 +519,8 @@ def reflow_jobs(book_id):
             "gate": row.get("gate", {}),
             "models": row.get("models", {}),
             "recovery": row.get("recovery", {}),
+            "structural": row.get("structural"),
+            "artifact": row.get("artifact"),
             "error": row.get("error"),
             "sample_url": None,
         }

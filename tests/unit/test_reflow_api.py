@@ -108,31 +108,23 @@ def _wire(mod, monkeypatch, pdf_on_disk, book=None, epub=False, quote=None,
 # ── the estimate ─────────────────────────────────────────────────────────────
 
 @pytest.mark.unit
-def test_the_estimate_prices_the_pages_the_router_would_actually_send(
-        mod, monkeypatch, pdf_on_disk):
-    _wire(mod, monkeypatch, pdf_on_disk, quote=_quote(routed=100, pages=400))
-    with _ctx("/api/v1/books/5/reflow/estimate"):
-        with patch.object(mod, "current_user", _user()):
-            body = _json(inspect.unwrap(mod.reflow_estimate)(5))
-
-    assert body["routed_pages_estimate"] == 100
-    assert body["pages"] == 400
-    # 100 routed pages at the measured $0.0022 a page, not a quarter of the book.
-    assert body["estimate_usd"]["standard"] == pytest.approx(0.22)
-    assert body["worst_case_usd"]["standard"] == pytest.approx(0.88)
+def test_fast_source_assessment_does_not_present_legacy_router_prices_as_typed_quote(mod,monkeypatch,pdf_on_disk):
+    _wire(mod,monkeypatch,pdf_on_disk,quote=_quote(routed=100,pages=400))
+    with _ctx('/api/v1/books/5/reflow/estimate'),patch.object(mod,'current_user',_user()):
+        body=_json(inspect.unwrap(mod.reflow_estimate)(5))
+    assert body['pages']==400 and body['source_sha256']
+    assert body['consent_contract']==mod.CONSENT_CONTRACT
+    assert 'estimate_usd' not in body and 'routed_pages_estimate' not in body
+    assert body['review']['proposer']==mod.typed_model.STAGES['proposer'].model_id
+    assert body['review']['verifier']==mod.typed_model.STAGES['verifier'].model_id
 
 
 @pytest.mark.unit
-def test_an_estimate_over_the_target_says_so_and_suggests_a_sample(
-        mod, monkeypatch, pdf_on_disk):
-    _wire(mod, monkeypatch, pdf_on_disk, quote=_quote(routed=500, pages=700), target=0.5)
-    with _ctx("/api/v1/books/5/reflow/estimate"):
-        with patch.object(mod, "current_user", _user()):
-            body = _json(inspect.unwrap(mod.reflow_estimate)(5))
-
-    assert body["estimate_usd"]["standard"] > body["target_usd"]
-    assert body["over_target"] is True
-    assert body["sample_suggested"] is True
+def test_large_source_suggests_a_sample_without_assuming_any_paid_coverage(mod,monkeypatch,pdf_on_disk):
+    _wire(mod,monkeypatch,pdf_on_disk,quote=_quote(routed=500,pages=700),target=.5)
+    with _ctx('/api/v1/books/5/reflow/estimate'),patch.object(mod,'current_user',_user()):
+        body=_json(inspect.unwrap(mod.reflow_estimate)(5))
+    assert body['sample_suggested'] and 'over_target' not in body
 
 
 @pytest.mark.unit
@@ -144,7 +136,7 @@ def test_the_estimate_is_computed_with_no_key_configured(mod, monkeypatch, pdf_o
             body = _json(inspect.unwrap(mod.reflow_estimate)(5))
 
     assert body["configured"] is False
-    assert body["estimate_usd"]["standard"] > 0
+    assert body["review"]["quality_released"] is False
 
 
 @pytest.mark.unit
@@ -191,7 +183,7 @@ def test_the_second_view_of_the_same_pdf_does_not_read_it_again(
             with patch.object(mod, "current_user", _user()):
                 body = _json(inspect.unwrap(mod.reflow_estimate)(5))
     assert len(wired.surveys) == 1
-    assert body["routed_pages_estimate"] == 100
+    assert body["pages"] == 400
 
 
 @pytest.mark.unit
@@ -237,7 +229,23 @@ def test_an_edited_pdf_is_surveyed_again(mod, monkeypatch, pdf_on_disk):
 
 # ── starting a job ───────────────────────────────────────────────────────────
 
-def _start(mod, body, user=None, tasks=()):
+def _current_body(mod,body):
+    source=os.path.join(mod.config.get_book_path(),'Author/Book (5)','Book - Author.pdf')
+    return dict({'mode':'full','review_mode':'deterministic','consent_contract':mod.CONSENT_CONTRACT,
+                 'source_sha256':mod.extract.document_fingerprint(source),'preparation_id':'a'*32},**body)
+
+
+def _paid(mod,monkeypatch):
+    """An already measured server quote; transport/source measurement has its own seam tests."""
+    monkeypatch.setattr(mod.typed_model,'QUALITY_RELEASED',True)
+    quote={'source_context_pages':400,'first_body_page':4,
+           'pages':[{'page_index0':p,'proposer_bound_usd':.01,'verifier_bound_usd':.05} for p in range(400)]}
+    monkeypatch.setattr(mod,'_quote_store',lambda:SimpleNamespace(ready=lambda *args:quote))
+    return quote
+
+
+def _start(mod, body, user=None, tasks=(), current=True):
+    if current:body=_current_body(mod,body)
     with _ctx("/api/v1/books/5/reflow", method="POST", body=body):
         with patch.object(mod, "current_user", user or _user()):
             with patch.object(mod.WorkerThread, "get_instance",
@@ -258,27 +266,20 @@ def test_a_conversion_does_not_start_without_consent(mod, monkeypatch, pdf_on_di
 
 
 @pytest.mark.unit
-def test_a_cap_below_the_estimate_is_refused_rather_than_silently_raised(
-        mod, monkeypatch, pdf_on_disk):
-    _wire(mod, monkeypatch, pdf_on_disk, quote=_quote(routed=100, pages=400))
-    resp, added = _start(mod, {"mode": "full", "model_tier": "standard",
-                               "consent": True, "cost_cap_usd": 0.10})
-    assert _status(resp) == 400
-    assert _json(resp)["error"]["code"] == "cap_below_estimate"
-    assert "0.22" in _json(resp)["error"]["message"]
-    added.assert_not_called()
+def test_cap_below_full_typed_ceiling_allows_honest_partial_review(mod,monkeypatch,pdf_on_disk):
+    _wire(mod,monkeypatch,pdf_on_disk);_paid(mod,monkeypatch)
+    resp,added=_start(mod,{'mode':'full','review_mode':'source_verified','consent':True,'cost_cap_usd':.10})
+    assert _status(resp)==202
+    assert added.call_args[0][1].options.cost_cap_usd==.10
+    assert _json(resp)['partial_review_possible'] and _json(resp)['reservation_ceiling_usd']==pytest.approx(24)
 
 
 @pytest.mark.unit
-def test_a_sample_is_priced_as_a_sample_and_not_as_the_whole_book(
-        mod, monkeypatch, pdf_on_disk):
-    """A 20-page look at a book that would cost $0.22 must not demand a $0.22 cap."""
-    _wire(mod, monkeypatch, pdf_on_disk, quote=_quote(routed=100, pages=400))
-    resp, added = _start(mod, {"mode": "sample", "sample_pages": 20,
-                               "model_tier": "standard", "consent": True,
-                               "cost_cap_usd": 0.05})
-    assert _status(resp) == 202
-    added.assert_called_once()
+def test_sample_ceiling_uses_only_actual_selected_page_wires(mod,monkeypatch,pdf_on_disk):
+    _wire(mod,monkeypatch,pdf_on_disk);_paid(mod,monkeypatch)
+    resp,added=_start(mod,{'mode':'sample','sample_pages':20,'review_mode':'source_verified','consent':True,'cost_cap_usd':.5})
+    assert _status(resp)==202 and _json(resp)['reservation_ceiling_usd']==pytest.approx(1.2)
+    assert added.call_args[0][1].options.consent_quote['first_body_page']==4
 
 
 @pytest.mark.unit
@@ -291,52 +292,36 @@ def test_a_started_job_carries_the_book_and_what_was_consented_to(
     task = added.call_args[0][1]
     assert task.book_id == 5
     assert task.user_id == 7
-    assert task.options.model_tier == "quality"
-    assert task.options.cost_cap_usd == 1.0
+    assert task.options.review_mode == "deterministic"
+    assert task.options.cost_cap_usd == 0.0
     assert task.options.show_cost_in_report is True
     assert _json(resp)["job_id"] == task.job_id
 
 
 @pytest.mark.unit
-def test_a_cap_above_the_administrators_ceiling_is_brought_back_down(
-        mod, monkeypatch, pdf_on_disk):
-    _wire(mod, monkeypatch, pdf_on_disk, hard_cap=2.0)
-    resp, added = _start(mod, {"mode": "full", "model_tier": "standard", "consent": True,
-                               "cost_cap_usd": 40.0})
-    assert _status(resp) == 202
-    assert added.call_args[0][1].options.cost_cap_usd == 2.0
+def test_invalid_typed_cap_is_refused_without_silently_changing_consent(mod,monkeypatch,pdf_on_disk):
+    _wire(mod,monkeypatch,pdf_on_disk,hard_cap=2);_paid(mod,monkeypatch)
+    for cap in (40,0,-1,True,'1',float('nan'),float('inf')):
+        resp,added=_start(mod,{'review_mode':'source_verified','consent':True,'cost_cap_usd':cap})
+        assert _status(resp)==400 and _json(resp)['error']['code']=='invalid_cap'
+        added.assert_not_called()
 
 
 @pytest.mark.unit
-def test_a_cap_that_cannot_fund_even_one_page_is_refused_with_the_figure(
-        mod, monkeypatch, pdf_on_disk):
-    """Preflight shares the request bound. A cap that passes the estimate but
-    cannot fund the cheapest possible paid page would start a job that stops at
-    the first reservation -- refuse it up front, with the figure."""
-    _wire(mod, monkeypatch, pdf_on_disk, quote=_quote(routed=1, pages=400))
-    floor = mod.model.min_request_bound_usd("standard")
-    cap = round((0.0022 + floor) / 2, 4)   # above the $0.0022 estimate, below the floor
-    resp, added = _start(mod, {"mode": "full", "model_tier": "standard",
-                               "consent": True, "cost_cap_usd": cap})
-    assert _status(resp) == 400
-    assert _json(resp)["error"]["code"] == "cap_below_request_floor"
-    assert "%.4f" % floor in _json(resp)["error"]["message"]
-    added.assert_not_called()
+def test_tiny_cap_never_gets_silently_increased_to_a_request_floor(mod,monkeypatch,pdf_on_disk):
+    _wire(mod,monkeypatch,pdf_on_disk);_paid(mod,monkeypatch)
+    resp,added=_start(mod,{'review_mode':'source_verified','consent':True,'cost_cap_usd':.00001})
+    assert _status(resp)==202 and added.call_args[0][1].options.cost_cap_usd==.00001
+    assert _json(resp)['partial_review_possible']
 
 
 @pytest.mark.unit
-def test_the_estimate_publishes_the_cheapest_paid_request_per_tier(
-        mod, monkeypatch, pdf_on_disk):
-    """The page that collects consent shows the bound the cap is enforced with."""
-    _wire(mod, monkeypatch, pdf_on_disk)
-    with _ctx("/api/v1/books/5/reflow/estimate"):
-        with patch.object(mod, "current_user", _user()):
-            body = _json(inspect.unwrap(mod.reflow_estimate)(5))
-
-    tiers = {entry["tier"]: entry for entry in body["tiers"]}
-    for tier, spec in mod.model.TIERS.items():
-        assert tiers[tier]["min_request_usd"] == pytest.approx(
-            mod.model.min_request_bound_usd(tier)), tier
+def test_assessment_advertises_only_actual_current_two_stage_route(mod,monkeypatch,pdf_on_disk):
+    _wire(mod,monkeypatch,pdf_on_disk)
+    with _ctx('/api/v1/books/5/reflow/estimate'),patch.object(mod,'current_user',_user()):
+        body=_json(inspect.unwrap(mod.reflow_estimate)(5))
+    assert 'tiers' not in body and 'default_tier' not in body
+    assert body['review']['provider']=='openai/flex' and body['review']['max_output_tokens']==4096
 
 
 @pytest.mark.unit
@@ -368,8 +353,8 @@ def test_two_simultaneous_starts_admit_exactly_one_conversion(
 
     def start():
         with _ctx("/api/v1/books/5/reflow", method="POST",
-                  body={"mode": "full", "model_tier": "standard", "consent": True,
-                        "cost_cap_usd": 1.0}):
+                  body=_current_body(mod,{"mode": "full", "model_tier": "standard", "consent": True,
+                        "cost_cap_usd": 1.0})):
             with patch.object(mod, "current_user", _user()):
                 outcomes.append(_status(inspect.unwrap(mod.reflow_start)(5)))
 
@@ -396,13 +381,13 @@ def test_a_book_is_reserved_for_other_users_and_other_modes_too(
     monkeypatch.setattr(mod.WorkerThread, "add", staticmethod(lambda u, t: None))
 
     with _ctx("/api/v1/books/5/reflow", method="POST",
-              body={"mode": "sample", "model_tier": "standard", "consent": True,
-                    "cost_cap_usd": 1.0}):
+              body=_current_body(mod,{"mode": "sample", "model_tier": "standard", "consent": True,
+                    "cost_cap_usd": 1.0})):
         with patch.object(mod, "current_user", _user(uid=7)):
             assert _status(inspect.unwrap(mod.reflow_start)(5)) == 202
     with _ctx("/api/v1/books/5/reflow", method="POST",
-              body={"mode": "full", "model_tier": "standard", "consent": True,
-                    "cost_cap_usd": 1.0}):
+              body=_current_body(mod,{"mode": "full", "model_tier": "standard", "consent": True,
+                    "cost_cap_usd": 1.0})):
         with patch.object(mod, "current_user", _user(uid=9)):
             assert _status(inspect.unwrap(mod.reflow_start)(5)) == 409
 
@@ -424,8 +409,8 @@ def test_an_unrelated_book_is_never_blocked(mod, monkeypatch, pdf_on_disk):
     statuses = []
     for book_id in (5, 6):
         with _ctx("/api/v1/books/%d/reflow" % book_id, method="POST",
-                  body={"mode": "full", "model_tier": "standard", "consent": True,
-                        "cost_cap_usd": 1.0}):
+                  body=_current_body(mod,{"mode": "full", "model_tier": "standard", "consent": True,
+                        "cost_cap_usd": 1.0})):
             with patch.object(mod, "current_user", _user()):
                 statuses.append(_status(inspect.unwrap(mod.reflow_start)(book_id)))
     assert statuses == [202, 202]
@@ -443,16 +428,16 @@ def test_a_start_whose_enqueue_fails_releases_the_book(mod, monkeypatch, pdf_on_
 
     monkeypatch.setattr(mod.WorkerThread, "add", staticmethod(broken_add))
     with _ctx("/api/v1/books/5/reflow", method="POST",
-              body={"mode": "full", "model_tier": "standard", "consent": True,
-                    "cost_cap_usd": 1.0}):
+              body=_current_body(mod,{"mode": "full", "model_tier": "standard", "consent": True,
+                    "cost_cap_usd": 1.0})):
         with patch.object(mod, "current_user", _user()):
             with pytest.raises(RuntimeError):
                 inspect.unwrap(mod.reflow_start)(5)
 
     monkeypatch.setattr(mod.WorkerThread, "add", staticmethod(lambda u, t: None))
     with _ctx("/api/v1/books/5/reflow", method="POST",
-              body={"mode": "full", "model_tier": "standard", "consent": True,
-                    "cost_cap_usd": 1.0}):
+              body=_current_body(mod,{"mode": "full", "model_tier": "standard", "consent": True,
+                    "cost_cap_usd": 1.0})):
         with patch.object(mod, "current_user", _user()):
             assert _status(inspect.unwrap(mod.reflow_start)(5)) == 202
 
@@ -485,14 +470,10 @@ def test_a_finished_conversion_does_not_block_the_next_one(
 
 
 @pytest.mark.unit
-def test_a_conversion_cannot_start_with_no_key_configured(
-        mod, monkeypatch, pdf_on_disk):
-    """Starting would burn the wait and produce a deterministic-only book."""
-    _wire(mod, monkeypatch, pdf_on_disk, key="")
-    resp, added = _start(mod, {"mode": "full", "model_tier": "standard", "consent": True,
-                               "cost_cap_usd": 1.0})
-    assert _status(resp) == 400
-    assert _json(resp)["error"]["code"] == "not_configured"
+def test_optional_paid_review_needs_a_key_even_after_quality_release(mod,monkeypatch,pdf_on_disk):
+    _wire(mod,monkeypatch,pdf_on_disk,key='');_paid(mod,monkeypatch)
+    resp,added=_start(mod,{'review_mode':'source_verified','consent':True,'cost_cap_usd':1})
+    assert _status(resp)==400 and _json(resp)['error']['code']=='not_configured'
     added.assert_not_called()
 
 

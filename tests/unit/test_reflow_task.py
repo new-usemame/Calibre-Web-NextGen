@@ -104,6 +104,7 @@ def rig(tmp_path, monkeypatch):
 
 
 def _run(rig, **options):
+    options.setdefault("review_mode","source_verified")
     task = rig.mod.TaskReflowPdf(5, 7, options)
     task.stat = STAT_ENDED if options.pop("_cancelled", False) else task.stat
     task.run(None)
@@ -187,7 +188,7 @@ def test_the_job_says_what_it_was_and_how_it_ended(rig):
     assert row["job_id"] == task.job_id
     assert row["mode"] == "sample"
     assert row["user_id"] == 7
-    assert row["status"] == "done"
+    assert row["status"] == "limited"  # Explicit review was requested, but no key was configured.
     assert row["cap_usd"] == pytest.approx(0.75)
     assert row["started"] and row["finished"]
 
@@ -344,10 +345,10 @@ def test_a_job_that_failed_says_so_rather_than_disappearing(rig):
 
 def test_a_cap_cannot_be_raised_past_the_administrators_ceiling(rig, monkeypatch):
     monkeypatch.setattr(rig.mod.config, "config_reflow_hard_cap_usd", 2.0)
-    assert rig.mod.ReflowOptions({"cost_cap_usd": 99.0}).cost_cap_usd == 2.0
-    assert rig.mod.ReflowOptions({"cost_cap_usd": 0.25}).cost_cap_usd == 0.25
+    assert rig.mod.ReflowOptions({"review_mode":"source_verified","cost_cap_usd": 99.0}).cost_cap_usd == 2.0
+    assert rig.mod.ReflowOptions({"review_mode":"source_verified","cost_cap_usd": 0.25}).cost_cap_usd == 0.25
     # No cap named at all is the ceiling, never "unlimited".
-    assert rig.mod.ReflowOptions({}).cost_cap_usd == 2.0
+    assert rig.mod.ReflowOptions({"review_mode":"source_verified"}).cost_cap_usd == 2.0
 
 
 def test_a_tier_nobody_offers_falls_back_to_the_configured_default(rig, monkeypatch):
@@ -744,3 +745,47 @@ def test_existing_epub_filename_is_the_actual_replacement_target(rig):
     assert task.results['path']==str(target)
     assert rig.local_db.session.existing.name=='Alternate'
     assert not (rig.folder/'Book - Author.epub').exists()
+
+
+def test_explicit_deterministic_job_needs_no_key_or_model_candidate_preparation(rig,monkeypatch):
+    from cps.services.reflow import structural_ops
+    def forbidden(*args,**kwargs):raise AssertionError('deterministic conversion prepared AI candidates')
+    monkeypatch.setattr(structural_ops,'prepare',forbidden)
+    task=rig.mod.TaskReflowPdf(5,7,{'mode':'sample','sample_pages':1,'review_mode':'deterministic','cost_cap_usd':4})
+    task.run(None)
+    assert task.stat==STAT_FINISH_SUCCESS,task.error
+    assert task.results['report']['stopped'] is None
+    assert task.options.cost_cap_usd==0
+    structural=task.results['report']['structural']
+    assert structural['review_mode']=='deterministic' and structural['eligibility_measured'] is False
+    assert structural['approved_operations']==0 and structural['attempted_stages']==0
+    assert os.path.isfile(task.results['path'])
+    import zipfile
+    with zipfile.ZipFile(task.results['path']) as epub:
+        reports=''.join(epub.read(name).decode() for name in epub.namelist() if name.endswith('.xhtml'))
+    assert 'Eligibility was not measured' in reports and 'Eligible pages</td>' not in reports
+
+
+def test_changed_queued_source_is_rejected_before_preparation_or_dispatch(rig,monkeypatch):
+    task=rig.mod.TaskReflowPdf(5,7,{'mode':'sample'})
+    path=rig.folder/'Book - Author.pdf'
+    task.options.source_sha256=rig.mod.extract.document_fingerprint(str(path))
+    path.write_bytes(path.read_bytes()+b'\n% changed after consent\n')
+    def forbidden(*args,**kwargs):raise AssertionError('changed consent must stop before preparation')
+    monkeypatch.setattr(task,'_convert',forbidden)
+    task.run(None)
+    assert task.stat==STAT_FAIL and 'source changed' in (task.error or '').lower()
+    assert not os.path.isfile(rig.mod.sample_path(7,task.job_id))
+
+
+def test_sample_source_change_during_build_never_publishes(rig,monkeypatch):
+    original=rig.mod.build_epub.build
+    def changed(*args,**kwargs):
+        built=original(*args,**kwargs)
+        path=rig.folder/'Book - Author.pdf'
+        path.write_bytes(path.read_bytes()+b'\n% replaced during build\n')
+        return built
+    monkeypatch.setattr(rig.mod.build_epub,'build',changed)
+    task=_run(rig,mode='sample',review_mode='deterministic')
+    assert task.stat==STAT_FAIL and 'source changed' in (task.error or '').lower()
+    assert not os.path.isfile(rig.mod.sample_path(7,task.job_id))

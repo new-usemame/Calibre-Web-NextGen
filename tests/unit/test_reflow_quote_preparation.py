@@ -1,0 +1,86 @@
+"""Local preparation is bounded, owner-scoped, cancellable and never a paid retry."""
+import threading
+import pytest
+from cps.services.reflow import model
+
+pytestmark=pytest.mark.unit
+
+
+def test_preparation_returns_without_waiting_and_cancel_is_owner_scoped(tmp_path):
+    from cps.services.reflow.quote_preparation import PreparationStore
+    source=tmp_path/'source.pdf';source.write_bytes(b'source')
+    entered=threading.Event();release=threading.Event();stopped=threading.Event()
+    def work(path,options,progress,stop):
+        entered.set();release.wait(3)
+        if stop():stopped.set();raise model.AttemptCancelled('stopped')
+        raise AssertionError('cancel was not observed')
+    store=PreparationStore(tmp_path/'cache',workers=1)
+    try:
+        job=store.start(7,5,str(source),{'mode':'off'},work)
+        assert job['status'] in ('waiting','preparing') and entered.wait(1)
+        with pytest.raises(KeyError):store.cancel(8,5,job['preparation_id'])
+        assert store.cancel(7,5,job['preparation_id'])['status']=='cancelling'
+        release.set();assert stopped.wait(1)
+    finally:release.set();store.close()
+    assert store.get(7,5,job['preparation_id'])['status']=='cancelled'
+    assert not list((tmp_path/'cache').glob('*.json'))
+
+
+def test_parallel_preparations_are_bounded_and_same_owner_request_reuses_work(tmp_path):
+    from cps.services.reflow.quote_preparation import PreparationStore,PreparationBusy
+    source=tmp_path/'source.pdf';source.write_bytes(b'source');release=threading.Event()
+    def work(path,options,progress,stop):
+        release.wait(3);raise model.AttemptCancelled('end test')
+    store=PreparationStore(tmp_path/'cache',workers=1)
+    try:
+        first=store.start(7,5,str(source),{'mode':'off'},work)
+        assert store.start(7,5,str(source),{'mode':'off'},work)['preparation_id']==first['preparation_id']
+        with pytest.raises(PreparationBusy):store.start(8,5,str(source),{'mode':'off'},work)
+    finally:release.set();store.close()
+
+
+def test_actual_isolated_source_preparation_produces_reusable_owner_scoped_quote(tmp_path):
+    import time
+    from tests.fixtures import reflow_pdfs as F
+    from cps.services.reflow.quote_preparation import PreparationStore,measure_isolated
+    source=tmp_path/'source.pdf';doc=F.new_doc();F.chapter_opening_page(doc,'A complete source title');F.prose_page(doc)
+    doc.save(source);doc.close();options={'source_recovery':'off','ocr_language':'eng'}
+    cache=tmp_path/'cache';store=PreparationStore(cache)
+    events=[]
+    def work(path,opts,progress,stop):
+        def observed(event):events.append(event.stage);progress(event)
+        return measure_isolated(path,opts,observed,stop,tmp_path)
+    try:
+        job=store.start(7,5,str(source),options,work)
+        # This is a bounded test wait, not a production operation deadline.
+        deadline=time.monotonic()+20
+        while job['status'] not in ('ready','failed') and time.monotonic()<deadline:
+            time.sleep(.02);job=store.get(7,5,job['preparation_id'])
+        assert job['status']=='ready',job
+        quote=store.ready(7,5,job['preparation_id'],str(source),options)
+        assert quote['source_context_pages']==2 and quote['confirmed_usd']==quote['held_usd']==0
+        with pytest.raises(KeyError):store.ready(8,5,job['preparation_id'],str(source),options)
+        with pytest.raises(KeyError):store.ready(7,5,job['preparation_id'],str(source),dict(options,source_recovery='auto'))
+    finally:store.close()
+    # A new application lifetime uses completed data, not another paid request or
+    # another owner's job handle. Source modification invalidates the handle.
+    other=PreparationStore(cache)
+    try:
+        def forbidden(*args):raise AssertionError('completed source quote must reuse cache')
+        reused=other.start(8,5,str(source),options,forbidden)
+        assert reused['status']=='ready' and reused['quote']==quote
+        assert reused['preparation_id']!=job['preparation_id']
+        source.write_bytes(source.read_bytes()+b'\n% changed source')
+        with pytest.raises(KeyError):other.ready(8,5,reused['preparation_id'],str(source),options)
+    finally:other.close()
+
+
+def test_actual_isolated_preparation_cancels_before_publishing_quote(tmp_path):
+    from tests.fixtures import reflow_pdfs as F
+    from cps.services.reflow.quote_preparation import measure_isolated
+    source=tmp_path/'source.pdf';doc=F.new_doc()
+    for _ in range(12):F.prose_page(doc)
+    doc.save(source);doc.close()
+    with pytest.raises(model.AttemptCancelled):
+        measure_isolated(source,{'source_recovery':'off','ocr_language':'eng'},None,lambda:True,tmp_path)
+    assert list((tmp_path/'quote-scratch').iterdir())==[]

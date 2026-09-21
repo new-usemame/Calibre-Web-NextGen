@@ -25,6 +25,7 @@ import uuid
 import hashlib
 import tempfile
 import shutil
+import math
 
 from flask_babel import lazy_gettext as N_
 from sqlalchemy.exc import SQLAlchemyError
@@ -34,7 +35,7 @@ from cps.constants import REFLOW_DIR
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED, \
     STAT_STARTED, STAT_WAITING
 from cps.services.reflow import admission, build_epub, extract, ledger as ledger_mod, \
-    model, ocr, pipeline, publication, report, structural_pipeline
+    model, ocr, pipeline, publication, report, structural_pipeline, typed_model
 
 log = logger.create()
 
@@ -53,7 +54,7 @@ SAMPLE_PAGES_MAX = 60
 #: request's billing could not be proven either way, and its bound stays held.
 STOP_STATUS = {"cost_cap": "capped", "model_errors": "incomplete", "model_rejections": "incomplete",
                "billing_uncertain": "billing_unknown", "prior_request_pending": "billing_unknown",
-               "quality_gate": "limited", "billing_bound": "incomplete", "route_mismatch": "incomplete"}
+               "quality_gate": "limited", "not_configured": "limited", "estimate_stale": "limited", "source_changed": "incomplete", "billing_bound": "incomplete", "route_mismatch": "incomplete"}
 
 
 def reflow_dir(*parts):
@@ -73,12 +74,13 @@ class ReflowOptions(object):
     def __init__(self, options=None):
         options = dict(options or {})
         self.mode = "sample" if options.get("mode") == "sample" else "full"
+        self.review_mode = "source_verified" if options.get("review_mode")=="source_verified" else "deterministic"
         tier = options.get("model_tier")
         self.model_tier = tier if tier in model.TIERS else config_default_tier()
         self.sample_pages = max(1, min(SAMPLE_PAGES_MAX,
                                        int(options.get("sample_pages")
                                            or SAMPLE_PAGES_DEFAULT)))
-        self.cost_cap_usd = _clamp_cap(options.get("cost_cap_usd"))
+        self.cost_cap_usd = _clamp_cap(options.get("cost_cap_usd")) if self.review_mode=="source_verified" else 0.0
         self.include_report_page = options.get("include_report_page", True) is not False
         self.show_cost_in_report = bool(options.get("show_cost_in_report"))
         self.replace_existing_epub = bool(options.get("replace_existing_epub"))
@@ -93,7 +95,7 @@ class ReflowOptions(object):
         self.ocr_language = language[:64]
 
     def to_dict(self):
-        return {"mode": self.mode, "model_tier": self.model_tier,
+        return {"mode": self.mode, "review_mode":self.review_mode,"model_tier": self.model_tier,
                 "sample_pages": self.sample_pages, "cost_cap_usd": self.cost_cap_usd,
                 "include_report_page": self.include_report_page,
                 "show_cost_in_report": self.show_cost_in_report,
@@ -113,7 +115,7 @@ def hard_cap_usd():
         cap = float(getattr(config, "config_reflow_hard_cap_usd", 0) or 0)
     except (TypeError, ValueError):
         cap = 0.0
-    return cap if cap > 0 else 5.0
+    return cap if math.isfinite(cap) and cap > 0 else 5.0
 
 
 def _clamp_cap(value):
@@ -122,14 +124,16 @@ def _clamp_cap(value):
     except (TypeError, ValueError):
         cap = 0.0
     ceiling = hard_cap_usd()
-    if cap <= 0:
+    if not math.isfinite(cap) or cap <= 0:
         return ceiling
     return min(cap, ceiling)
 
 
-def make_client(tier):
-    """The model client for a job, or one that is configured not to spend."""
-    return structural_pipeline.TwoStageClient(config.resolved_openrouter_key() or None)
+def make_client(review_mode):
+    """Only explicit current two-stage review can enable the conditional route."""
+    return structural_pipeline.TwoStageClient(
+        (config.resolved_openrouter_key() or None) if review_mode=='source_verified' else None,
+        enabled=review_mode=='source_verified' and typed_model.QUALITY_RELEASED)
 
 
 class TaskReflowPdf(CalibreTask):
@@ -195,16 +199,20 @@ class TaskReflowPdf(CalibreTask):
                     "This book already has an EPUB. Choose 'replace the existing "
                     "EPUB' if you want Reflow to overwrite it.")
 
+            if getattr(self.options,"source_sha256",None) and extract.document_fingerprint(source)!=self.options.source_sha256:
+                raise ValueError("Source changed after consent; prepare the current PDF again.")
             self.results["title"] = book.title
             ledger = ledger_mod.Ledger(
                 os.path.join(reflow_dir("jobs", str(self.book_id)),
                              "%s.jsonl" % self.job_id),
                 cap_usd=self.options.cost_cap_usd, job_id=self.job_id)
             cache = pipeline.PageCache(reflow_dir("cache"))
-            client = make_client(self.options.model_tier)
+            client = make_client(self.options.review_mode)
 
             document = pymupdf.open(source)
             try:
+                if getattr(self.options,"source_sha256",None) and extract.document_fingerprint(document)!=self.options.source_sha256:
+                    raise ValueError("Source changed after consent; prepare the current PDF again.")
                 ledger.record({"kind": "job", "event": "start", "user_id": self.user_id,
                                "mode": self.options.mode, "title": book.title,
                                "tier": client.describe().get("tier",self.options.model_tier),
@@ -274,10 +282,17 @@ class TaskReflowPdf(CalibreTask):
             "cache_dir": reflow_dir("ocr-cache"),
             "scratch_dir": reflow_dir("ocr-scratch"),
         }
-        return structural_pipeline.run_structural(document,client=client,ledger=ledger,cache=cache,
+        from ..services.reflow.structural_quote import consent_observer
+        quote=getattr(self.options,"consent_quote",None)
+        observer=consent_observer(quote,document) if quote is not None else None
+        result = structural_pipeline.run_structural(document,client=client,ledger=ledger,cache=cache,
                             sample_count=self.options.sample_pages if self.options.mode=='sample' else None,
                             progress=self._on_progress,should_stop=lambda:self.cancelled,
-                            recovery_opts=recovery_opts)
+                            recovery_opts=recovery_opts,prepared_observer=observer,measure_eligibility=self.options.review_mode=="source_verified")
+        result.structural["review_mode"]=self.options.review_mode
+        # The task/report ledger records the same final user-facing scope.
+        ledger.record({"kind":"structural_summary","summary":result.structural})
+        return result
 
     def _sample_pages(self, document):
         """A sample of the body, not of the front matter.
@@ -351,6 +366,8 @@ class TaskReflowPdf(CalibreTask):
             artifact={'sha256':digest.hexdigest(),'bytes':os.path.getsize(built.path)}
             if self.cancelled:
                 raise build_epub.BuildCancelled('cancelled before publication')
+            if extract.document_fingerprint(self._pdf_path(local_db,book))!=result.fingerprint:
+                raise ValueError("Source changed during conversion; no EPUB was published.")
             if self.options.mode == "sample":
                 os.replace(built.path,target)
                 ledger.record(dict(kind='artifact',**artifact))

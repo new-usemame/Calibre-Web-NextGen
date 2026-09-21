@@ -8,6 +8,10 @@ from .operation_cache import OperationCache, PriorRequestPending
 from .typed_model import TypedStageClient, TypedStageRejected, QUALITY_RELEASED, SOURCE_REVISION, ROUTE_VERSION
 
 
+class EstimateStale(Exception):
+    """The current prepared source no longer matches the consented request ceiling."""
+
+
 class TwoStageClient:
     def __init__(self, api_key, enabled=QUALITY_RELEASED, session=None):
         self.enabled = bool(enabled)
@@ -70,7 +74,7 @@ def _stage(client, stage, prepared, request, ledger, cache, pno, records, should
 
 def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
                    sample_count=None, progress=None, should_stop=None,
-                   recovery_opts=None, prepared_result=None):
+                   recovery_opts=None, prepared_result=None, prepared_observer=None, measure_eligibility=True):
     """Read full source context before selecting output/paid pages.
 
     ``prepared_result`` is an explicit local-rig reuse seam, never an API pickle
@@ -107,6 +111,13 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
         (result.recovery.pages if result.recovery else []))}
     for index,pno in enumerate(selected):
         outcome=result.outcomes[pno];reviewed=False;source=result.source_pages.get(pno)
+        if should_stop and should_stop():raise model.AttemptCancelled('cancelled during source choices')
+        if progress:
+            progress(pipeline.Progress('source_choices',page=index+1,pages=len(selected),
+                message='preparing source choices %d/%d'%(index+1,len(selected))))
+        if not measure_eligibility:
+            counts['unreviewed']+=1;states[pno]={'status':'unreviewed','reason':'not_requested'}
+            continue
         try:
             if pno in canonical_errors:raise ops.ContractError(canonical_errors[pno])
             import json
@@ -120,6 +131,10 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
         if not p.candidates():
             counts['no_choices']+=1;states[pno]={'status':'no_choices'};continue
         counts['eligible']+=1;result.routed.append(pno)
+        if p.pdf_digest!=result.fingerprint:halted='source_changed'
+        if prepared_observer is not None and halted not in ('estimate_stale','source_changed'):
+            try:prepared_observer(result.book,p,source)
+            except EstimateStale:halted='estimate_stale'
         if should_stop and should_stop():halted='cancelled'
         if halted:
             counts['unreviewed']+=1;states[pno]={'status':'unreviewed','reason':halted};continue
@@ -175,10 +190,10 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
     for plan in result.operation_plans:
         pno=plan.prepared.page
         result.preview_html[pno]=result.source_pages[pno].render(result.book,plan.compile(result.book,doc,source_page=result.source_pages[pno]))
-    result.structural=dict(counts,pages=[dict(page=p,**row) for p,row in states.items()],
+    result.structural=dict(counts,eligibility_measured=measure_eligibility,pages=[dict(page=p,**row) for p,row in states.items()],
                            route_version=ROUTE_VERSION,source_revision=SOURCE_REVISION)
     if ledger:ledger.record({'kind':'structural_summary','summary':result.structural})
-    result.stopped=halted or ('model_rejections' if counts['rejected'] else None);result.pages_done=sum(o.gate=='PASS' for o in result.outcomes.values())
+    result.stopped=(halted or ('model_rejections' if counts['rejected'] else None)) if measure_eligibility else None;result.pages_done=sum(o.gate=='PASS' for o in result.outcomes.values())
     result.spend_usd=ledger.spent() if ledger else sum(r['cost_usd'] for r in result.stage_records)
     result.pending_usd=ledger.pending_usd() if ledger else 0
     result.reused=counts['cached_stages']

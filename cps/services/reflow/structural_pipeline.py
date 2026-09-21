@@ -100,12 +100,15 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
         except ops.ContractError as exc:canonical_errors[pno]=str(exc)
     stage_cache=cache if isinstance(cache, OperationCache) else OperationCache(cache.directory) if cache else None
     halted = 'not_configured' if client is None or not client.configured else 'quality_gate' if not client.enabled else None
+    raw_pages = {raw.pno: raw for raw in (getattr(result, 'raw_pages', None) or
+        (result.recovery.pages if result.recovery else []))}
     for index,pno in enumerate(selected):
         outcome=result.outcomes[pno];reviewed=False;source=result.source_pages.get(pno)
         try:
             if pno in canonical_errors:raise ops.ContractError(canonical_errors[pno])
             import json
-            p=ops.prepare(result.book,doc,pno,SOURCE_REVISION,json.loads(source.provenance_json),source_page=source)
+            p=ops.prepare(result.book,doc,pno,SOURCE_REVISION,json.loads(source.provenance_json),
+                          source_page=source,raw_page=raw_pages.get(pno))
         except ops.ContractError as exc:
             counts['unsupported']+=1;states[pno]={'status':'unsupported','reason':str(exc)};continue
         coverage=p.model_view()['coverage']

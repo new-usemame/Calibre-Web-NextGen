@@ -26,7 +26,8 @@ class WorkflowSession:
 
 def prepared_result(source):
     book,doc,_=source
-    return pipeline.ReflowResult(book=book,page_html={0:build_epub.page_fragment(book,0)},fingerprint=extract.document_fingerprint(doc))
+    return pipeline.ReflowResult(book=book,raw_pages=[extract.read_page(doc,0)],
+        page_html={0:build_epub.page_fragment(book,0)},fingerprint=extract.document_fingerprint(doc))
 
 
 @pytest.mark.parametrize('approve',[True,False])

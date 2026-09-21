@@ -12,7 +12,7 @@ import random
 import re
 from dataclasses import asdict, dataclass
 
-from . import extract
+from . import extract, heading_evidence
 
 PROTOCOL = "cwng-source-wrappers-v1"
 MAX_CANDIDATES = 64
@@ -80,8 +80,7 @@ def _proposals(element, index):
     text = "".join(str(run[1]) for run in element.runs)
     end = _length(element.runs)
     specs = [_Spec(index, "quote", 0, end)]
-    if len(text.split()) <= 40:
-        specs.append(_Spec(index, "heading", 0, end))
+    specs.append(_Spec(index, "heading", 0, end))
     # Full paragraph, prefix, and quoted substring are distinct legal choices.
     # A prefix may include an attribution; source pixels decide whether it is
     # part of the printed quotation. A complete paragraph can be overlong.
@@ -124,6 +123,8 @@ class Prepared:
     seed: int
     coverage_json: str
     source_page: object = None
+    heading_source_json: str = ""
+    heading_source_digest: str = ""
 
     def candidates(self):
         rows = []
@@ -168,6 +169,20 @@ class Prepared:
         if any(cid not in by_id for cid in selected):
             raise ContractError("unknown or unsupported candidate")
         picked = sorted((by_id[cid] for cid in selected), key=lambda s: (s.element, s.start, s.end))
+        headings = [spec for spec in picked if spec.kind == 'heading']
+        if headings:
+            try:
+                geometry = json.loads(self.heading_source_json)
+                if (_digest(geometry) != self.heading_source_digest or
+                        geometry['version'] != heading_evidence.VERSION):
+                    raise ValueError('stale geometry')
+                proofs = heading_evidence.heading_evidence(book, self.page,
+                    geometry['raw_page'], geometry['layer'], geometry['source_rotation'], geometry['reading_size'])
+                if _digest(proofs) != geometry['proofs_digest'] or any(
+                        not proofs[spec.element]['supported'] for spec in headings):
+                    raise ValueError('unsupported current source role')
+            except (ValueError, KeyError, TypeError, AttributeError) as exc:
+                raise ContractError('current source heading evidence is required') from exc
         for left, right in zip(picked, picked[1:]):
             if left.element == right.element and left.end > right.start:
                 raise ContractError("overlapping selections")
@@ -194,7 +209,8 @@ class OperationPlan:
 
 
 def prepare(book, doc, pno, revision, source_layer, seed=0,
-            max_candidates=MAX_CANDIDATES, max_context_chars=MAX_CONTEXT_CHARS, source_page=None):
+            max_candidates=MAX_CANDIDATES, max_context_chars=MAX_CONTEXT_CHARS, source_page=None,
+            raw_page=None):
     if pno not in book.pages or not revision or not isinstance(source_layer, dict):
         raise ContractError("source page, revision and provenance are required")
     if not 1 <= max_candidates <= MAX_CANDIDATES or not 1 <= max_context_chars <= MAX_CONTEXT_CHARS:
@@ -218,9 +234,24 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
     state_digest = _digest(_state(book, pno))
     from .source_display import grid_regions
     relational_regions = grid_regions(book, doc, pno, source_layer)
+    # Retain the already-extracted source, including Recovery geometry. Never
+    # recreate native spans to stand in for OCR provenance or missing context.
+    raw = raw_page.to_dict() if hasattr(raw_page, 'to_dict') else raw_page
+    raw = json.loads(json.dumps(raw))
+    from .source_display import SourceDisplay
+    reading_rect = SourceDisplay(doc, pno, source_layer).rect
+    reading_size = [reading_rect.width, reading_rect.height]
+    proofs = heading_evidence.heading_evidence(book, pno, raw, source_layer.get('layer'),
+                                              doc[pno].rotation, reading_size)
+    geometry = {'version': heading_evidence.VERSION, 'raw_page': raw,
+                'layer': source_layer.get('layer'), 'source_rotation': doc[pno].rotation,
+                'reading_size': reading_size,
+                'proofs_digest': _digest(proofs)}
+    geometry_digest = _digest(geometry)
     context, omitted, specs, used = [], [], [], 0
     for index, element in enumerate(book.pages[pno]):
         record = {"id": "e%d" % index, **asdict(element)}
+        record['heading_evidence'] = proofs[index]
         if source_page is not None:
             from .build_epub import split_blocks
             mapping = json.loads(source_page.blocks_json)
@@ -233,6 +264,8 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
         used += size
         context.append(record)
         for spec in (() if index in relational_regions else _proposals(element, index)):
+            if spec.kind == 'heading' and not proofs[index]['supported']:
+                continue
             if source_page is not None:
                 from .enriched_source import wrap
                 try: wrap(record['canonical_xhtml'], element, [spec])
@@ -250,6 +283,7 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
         snapshot_id = _digest([snapshot_id, source_page.identity])
     if relational_regions:
         snapshot_id = _digest([snapshot_id, relational_regions])
+    snapshot_id = _digest([snapshot_id, geometry_digest])
     total = len(specs)
     random.Random(seed).shuffle(specs)
     specs = specs[:max_candidates]
@@ -271,6 +305,11 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
             group.append(record)
     coverage["omitted_inventory_records"] = omitted_inventory
     coverage["source_grid_elements"] = ["e%d" % i for i in relational_regions]
+    coverage['heading_evidence_version'] = heading_evidence.VERSION
+    coverage['heading_supported_elements'] = ['e%d' % i for i, proof in proofs.items()
+        if proof['supported'] and i not in relational_regions and book.pages[pno][i].kind == 'p']
+    coverage['heading_unsupported_elements'] = ['e%d' % i for i, proof in proofs.items()
+        if not proof['supported'] and book.pages[pno][i].kind == 'p']
     coverage["supplied_book_scope"] = ("full_book" if set(book.pages) == set(range(len(doc)))
                                       else "selected_pages")
     coverage["available_book_pages"] = len(book.pages)
@@ -278,6 +317,7 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
     state = {"elements": context, "notes": notes, "figures": figures,
              "source_layer": source_layer, "page_rect": list(doc[pno].rect),
              "page_rotation": doc[pno].rotation,
+             "heading_source_sha256": geometry_digest,
              "source_context": "current page; immutable inventories bound to supplied Book"}
     if source_page is not None:
         report = source_page.report()
@@ -288,7 +328,8 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
         if used + len(json.dumps(state['source_enrichment'])) > max_context_chars:
             raise ContractError('enriched confidence context exceeds preparation bound')
     return Prepared(pno, revision, state_digest, pdf_digest, snapshot_id, tuple(specs),
-                    json.dumps(state), raster, seed, json.dumps(coverage), source_page)
+                    json.dumps(state), raster, seed, json.dumps(coverage), source_page,
+                    json.dumps(geometry), geometry_digest)
 
 
 def render_element(element, specs, render_runs):

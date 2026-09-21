@@ -91,6 +91,7 @@ class ReflowResult(object):
     assessment: object = None
     style: object = None
     recovery: object = None
+    raw_pages: list = field(default_factory=list)
     page_html: Dict[int, str] = field(default_factory=dict)
     outcomes: Dict[int, PageOutcome] = field(default_factory=dict)
     routed: List[int] = field(default_factory=list)
@@ -309,6 +310,7 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
             should_stop=should_stop, **opts)
         raw_pages = result.recovery.pages
 
+    result.raw_pages = raw_pages
     report(Progress(stage="skeleton", message="measuring the page geometry"))
     outline = extract.outline(doc)
     style = skeleton.book_style(raw_pages,

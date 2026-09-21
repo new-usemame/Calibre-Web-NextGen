@@ -7,7 +7,7 @@ from collections import Counter
 
 from . import assemble,extract,skeleton
 
-VERSION='source-heading-evidence-1'
+VERSION='source-heading-evidence-2'
 BOX_TOLERANCE=.02  # two units of serialized source-coordinate precision
 ALIGNMENT_EM=.5
 ISOLATION_LEADING=.5
@@ -73,6 +73,8 @@ def heading_evidence(book,pno,raw_page,layer,source_rotation=0,reading_size=None
     elements=book.pages[pno];result={}
     lines=[line for block in (raw or {}).get('blocks',[]) if block.get('kind','text')=='text'
            for line in block.get('lines',[]) if _valid(line['bbox']) and line.get('spans')]
+    from .heading_units import native_units, VERSION as UNIT_VERSION
+    units=native_units(lines) if layer=='native' else []
     for index,element in enumerate(elements):
         proof={'version':VERSION,'supported':False,'reason':'missing_source_geometry','source_line_boxes':[]}
         result[index]=proof
@@ -89,6 +91,13 @@ def heading_evidence(book,pno,raw_page,layer,source_rotation=0,reading_size=None
         mapped,error=_map(element,lines)
         proof['source_line_boxes']=[line['bbox'] for line in mapped]
         if error:proof['reason']=error;continue
+        if units:
+            mapped_indices={i for i,line in enumerate(lines) if line in mapped}
+            joined=[group for group in units if mapped_indices.intersection(group)]
+            proof['visual_unit_version']=UNIT_VERSION
+            proof['visual_unit_line_boxes']=[lines[i]['bbox'] for group in joined for i in group]
+            if any(not set(group).issubset(mapped_indices) for group in joined):
+                proof['reason']='incomplete_visual_source_unit';continue
         box=element.bbox
         if _continued(book,pno,index):proof['reason']='known_source_continuation';continue
         if box[3]<=raw['height']*skeleton.HEADER_BAND or box[1]>=raw['height']*skeleton.FOOTER_BAND:

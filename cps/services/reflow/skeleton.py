@@ -586,6 +586,8 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
         skel.reasons.append("mirror_table")
         kept_blocks = _emit_table_rows(layout, kept_blocks, skel)
         layout = None
+    if not raw.is_page_scan:
+        kept_blocks = _regroup_native_titles(kept_blocks, style)
     if layout is not None:
         skel.reasons.append("columns_reordered")
         for blk, kept in kept_blocks:
@@ -1009,8 +1011,52 @@ def _is_caps(text):
     return any(ch.isalpha() for ch in text) and text == text.upper()
 
 
+def _regroup_native_titles(kept_blocks, style):
+    """Lift complete display runs from heterogeneous native extraction blocks."""
+    from .heading_units import native_units
+    flat=[ln for _,lines in kept_blocks for ln in lines]
+    groups=native_units([ln.to_dict() for ln in flat])
+    titles=[[flat[i] for i in group] for group in groups if len(group)>1
+            and all(heading_ish(flat[i],style) for i in group)]
+    owned={id(ln) for group in titles for ln in group}
+    out=[]
+    for blk,lines in kept_blocks:
+        rest=[ln for ln in lines if id(ln) not in owned]
+        if rest:out.append((blk,rest))
+    # A display initial can share the removed title's extraction block.
+    # Bind it to the first adjacent body line before raised markers can move
+    # that paragraph ahead of the initial in source-coordinate sorting.
+    for blk,lines in list(out):
+        if len(lines)!=1:continue
+        initial=lines[0]
+        if not (len(initial.stripped)==1 and initial.stripped.isalpha()
+                and initial.size>=2*style.body_size):continue
+        neighbors=[]
+        for other,body in out:
+            if other is blk:continue
+            regular=[ln for ln in body if abs(ln.size/style.body_size-1)<=LADDER_TOL]
+            if not regular:continue
+            first=min(regular,key=lambda ln:ln.bbox[1])
+            if (0<=first.bbox[0]-initial.bbox[2]<=style.body_size and
+                    abs(first.bbox[1]-initial.bbox[1])<=style.body_size):
+                neighbors.append((other,body))
+        if len(neighbors)!=1:continue
+        other,body=neighbors[0]
+        out.remove((blk,lines));out.remove((other,body))
+        combined=lines+body;box=_lines_bbox(combined,other.bbox)
+        out.append((extract.Block(other.number,box,combined),combined))
+    for lines in titles:
+        box=_lines_bbox(lines,lines[0].bbox)
+        out.append((extract.Block(-1,box,lines),lines))
+    return out
+
+
 def _classify_body(lines, blk, style, skel, band=0, column=0):
     """Split a block into headings and prose, honouring run-in sub-headings."""
+    if lines and CAPTION_LINE.match(lines[0].stripped):
+        skel.regions.append(Region(kind="caption",lines=list(lines),
+            bbox=_lines_bbox(lines,blk.bbox),band=band,column=column))
+        return
     if len(lines) >= 2 and heading_ish(lines[0], style) \
             and not any(heading_ish(ln, style) for ln in lines[1:]):
         head = lines[0].stripped

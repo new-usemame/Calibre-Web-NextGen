@@ -125,3 +125,87 @@ def test_prose_heading_about_tables_is_not_a_numbered_caption():
     raw=extract.RawPage(0,500,700,blocks=[extract.Block(0,heading.bbox,[heading])])
     regions=skeleton.page_skeleton(raw,skeleton.BookStyle(body_size=10)).regions
     assert [(r.kind,r.lines) for r in regions]==[('heading',[heading])]
+
+
+def opening_source(layout='centered'):
+    # One display unit with a chapter line, prominent title and smaller subtitle.
+    lines=[line('CHAPTER 8',210,100,size=8,width=80),
+           line('A Complete Display Title',125,118,size=20,font='Times',width=250),
+           line('A smaller subtitle,',180,148,size=8,width=140),
+           line('continued on its own line',170,160,size=8,width=160)]
+    if layout=='left':
+        for ln in lines:
+            delta=50-ln.bbox[0];ln.bbox=tuple(v+delta if i%2==0 else v for i,v in enumerate(ln.bbox))
+            for span in ln.spans:span.bbox=ln.bbox
+    body=[line('Ordinary paragraph source words remain in their own reading order.',50,y,size=10,font='Times',width=400)
+          for y in (220,234,248)]
+    raw=extract.RawPage(0,500,700,blocks=[extract.Block(i,ln.bbox,[ln]) for i,ln in enumerate(lines+body)])
+    return raw,lines,body
+
+@pytest.mark.parametrize('layout',['centered','left'])
+def test_opening_display_keeps_all_lines_one_identity_and_relative_presentation(layout):
+    from cps.services.reflow import build_epub
+    raw,title,body=opening_source(layout);style=skeleton.BookStyle(body_size=10)
+    sk=skeleton.page_skeleton(raw,style);book=assemble.assemble([sk],style,[raw])
+    heads=[e for e in book.pages[0] if e.kind=='h']
+    assert len(heads)==1
+    assert heads[0].text==' '.join(ln.stripped for ln in title)
+    assert len(heads[0].display_lines)==4
+    html=build_epub.page_fragment(book,0)
+    assert html.count('class="source-title-line"')==4
+    assert 'font-size:1.000em' in html and 'font-size:0.400em' in html
+    assert book.conservation.ok
+    assert [ln.bbox for ln in title]==heads[0].line_boxes
+
+@pytest.mark.parametrize('negative',['body','dropcap','caption','columns','separate'])
+def test_opening_prose_captions_and_distinct_groups_are_not_coalesced(negative):
+    from cps.services.reflow.heading_units import opening_display_unit
+    raw,title,body=opening_source()
+    if negative=='body':
+        for ln in title:
+            ln.bbox=(*ln.bbox[:3],ln.bbox[1]+10)
+            for sp in ln.spans:sp.size=10;sp.font='Times';sp.flags=4;sp.bbox=ln.bbox
+    elif negative=='dropcap':title[:]=[line('Q',50,100,size=36,width=20),line('uartz and ordinary body text',75,100,size=10,font='Times',width=300)]
+    elif negative=='caption':title[1]=line('Table 8: A visual source label',125,118,size=20,width=250)
+    elif negative=='columns':title[2]=line('Other column title',370,148,size=16,width=100)
+    elif negative=='separate':title[2]=line('A separate section',170,200,size=16,width=160)
+    proof=opening_display_unit([ln.to_dict() for ln in title+body],10,500,700)
+    assert not proof or (negative in ("columns","separate") and not set(range(4)).issubset(proof["indices"]))
+
+
+def test_subtitle_fragment_cannot_be_admitted_from_a_mixed_display_group():
+    from cps.services.reflow.heading_evidence import heading_evidence
+    raw,title,body=opening_source();ln=title[2]
+    e=assemble.Element('p',runs=[['t',ln.text]],bbox=ln.bbox,line_boxes=[ln.bbox])
+    book=assemble.Book(elements=[e],pages={0:[e]},style=skeleton.BookStyle(body_size=10))
+    proof=heading_evidence(book,0,raw,'native')[0]
+    assert not proof['supported'] and proof['reason']=='incomplete_visual_source_unit'
+
+
+def test_grouped_heading_final_epub_keeps_uncertain_atom_complete_nav_and_original_access(tmp_path):
+    import pymupdf,zipfile,json
+    from cps.services.reflow import build_epub
+    from cps.services.reflow.enriched_source import prepare_source_page
+    raw,title,body=opening_source();style=skeleton.BookStyle(body_size=10)
+    book=assemble.assemble([skeleton.page_skeleton(raw,style)],style,[raw])
+    doc=pymupdf.open();page=doc.new_page(width=500,height=700)
+    for ln in title+body:page.insert_text((ln.bbox[0],ln.bbox[3]),ln.text,fontsize=ln.size)
+    records=[{'token':'smaller','score':20}]
+    canonical=prepare_source_page(book,0,{'layer':'native'},records)
+    assert canonical.report()['marked']==1
+    path=tmp_path/'title.epub'
+    build_epub.build(book,str(path),doc=doc,page_html={0:canonical.html},source_pages={0:canonical})
+    assert not build_epub.validate(str(path))
+    with zipfile.ZipFile(path) as z:
+        nav=z.read('OEBPS/nav.xhtml').decode();ncx=z.read('OEBPS/toc.ncx').decode()
+        text=' '.join(ln.stripped for ln in title)
+        assert text in nav and text in ncx
+        chapters=''.join(z.read(n).decode() for n in z.namelist() if '/ch' in n and n.endswith('.xhtml'))
+        assert chapters.count('class="source-title-line"')==4
+        assert 'reflow-uncertain' in chapters and '>smaller</span>' in chapters
+        original=z.read('OEBPS/original-p0000.xhtml').decode()
+        assert '#title_0' in chapters and 'id="title_0"' in original
+        assert 'Return' in original
+        assert any('original_p0000_title_0.jpg' in n for n in z.namelist())
+    assert json.loads(canonical.records_json)==records
+    doc.close()

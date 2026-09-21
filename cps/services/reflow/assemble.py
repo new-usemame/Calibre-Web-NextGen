@@ -94,6 +94,8 @@ class Element(object):
     #: Caption has a broken extraction baseline; printed pixels are retained.
     caption_uncertain: bool = False
     punctuation_uncertain: bool = False
+    display_lines: tuple = ()
+    display_group: Optional[dict] = None
 
     @property
     def text(self):
@@ -195,7 +197,7 @@ class Book(object):
 
     def needs_source_evidence(self, pno):
         return bool(self.ambiguous_note_numbers(pno)) or any(
-            element.caption_uncertain or element.punctuation_uncertain
+            element.caption_uncertain or element.punctuation_uncertain or bool(getattr(element,"display_group",{}))
             for element in self.pages.get(pno, []))
 
     def page_box(self, pno):
@@ -1096,8 +1098,14 @@ def _page_elements(skel, repairs, reasons, vocab=None):
             continue
         runs = []
         initial_join=getattr(region,'initial_join',{})
+        display_group=getattr(region,'display_group',{})
+        display_lines=[]
         for line_index,line in enumerate(region.lines):
             line_runs = _line_runs(line, skel.pno, page_notes, claimed, repairs, reasons)
+            if display_group:
+                display_lines.append({'runs':tidy(line_runs),
+                    'scale':display_group['relative_sizes'][line_index],
+                    'bold':line.bold if display_group['typography']=='native_spans' else None})
             if line_index==1 and initial_join:
                 runs += line_runs
             else:
@@ -1111,6 +1119,7 @@ def _page_elements(skel, repairs, reasons, vocab=None):
         kind = {"heading": "h", "caption": "caption"}.get(region.kind, "p")
         elements.append(Element(kind=kind, runs=runs, pno=skel.pno,
                                 level=region.level, bbox=region.bbox,
+                                display_lines=display_lines,display_group=display_group,
                                 pages=[skel.pno],
                                 band=region.band, column=region.column,
                                 table_row=region.reason == "table_row",

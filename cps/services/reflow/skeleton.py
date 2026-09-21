@@ -144,6 +144,7 @@ class Region(object):
     #: Keep its reading, but visibly qualify it instead of asserting certainty.
     uncertain: bool = False
     initial_join: dict = field(default_factory=dict)
+    display_group: dict = field(default_factory=dict)
 
     @property
     def text(self):
@@ -523,11 +524,15 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     top_y = min((ln.bbox[1] for blk in raw.text_blocks for ln in blk.lines),
                 default=None)
 
+    from .heading_units import opening_display_unit
+    opening_lines=[ln for blk in body_blocks for ln in blk.lines]
+    opening=opening_display_unit([ln.to_dict() for ln in opening_lines],style.body_size,raw.width,raw.height,scan=raw.is_page_scan)
+    opening_owned={id(opening_lines[i]) for i in opening.get('indices',[])}
     kept_blocks = []
     for blk in body_blocks:
         kept = []
         for ln in blk.lines:
-            reason = _furniture_reason(ln, raw, style, top_y)
+            reason = None if id(ln) in opening_owned else _furniture_reason(ln, raw, style, top_y)
             if reason:
                 skel.regions.append(Region(kind="furniture", lines=[ln], reason=reason,
                                            bbox=ln.bbox))
@@ -587,6 +592,17 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
         skel.reasons.append("mirror_table")
         kept_blocks = _emit_table_rows(layout, kept_blocks, skel)
         layout = None
+    from .heading_units import opening_display_unit
+    flat=[ln for _,lines in kept_blocks for ln in lines]
+    display=opening_display_unit([ln.to_dict() for ln in flat],style.body_size,raw.width,raw.height,scan=raw.is_page_scan) if layout is None else {}
+    if display:
+        title=[flat[i] for i in display['indices']]
+        owned={id(ln) for ln in title}
+        kept_blocks=[(blk,[ln for ln in lines if id(ln) not in owned]) for blk,lines in kept_blocks]
+        kept_blocks=[(blk,lines) for blk,lines in kept_blocks if lines]
+        skel.regions.append(Region(kind='heading',lines=title,
+            level=style.level_for(max(ln.size for ln in title)),bbox=_lines_bbox(title,title[0].bbox),
+            display_group=display))
     if not raw.is_page_scan:
         kept_blocks = _regroup_native_titles(kept_blocks, style, getattr(pixel_probe,"_doc",None),raw.pno)
     if layout is not None:

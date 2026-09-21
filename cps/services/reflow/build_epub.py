@@ -26,6 +26,7 @@ blocks and never rewrites them.
 """
 
 import json
+import math
 import logging
 import os
 import posixpath
@@ -172,7 +173,30 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
             element_blocks[element_index] = len(blocks)
         if element.kind == "h":
             level = min(6, max(1, int(element.level or 1)))
-            blocks.append("<h%d>%s</h%d>" % (level, inner, level))
+            if getattr(element,'display_lines',[]):
+                from .assemble import plain_text
+                parts=element.display_lines
+                visible=' '.join(plain_text(p['runs']).strip() for p in parts)
+                if visible!=element.text:
+                    raise ValueError('Source display-line text differs from heading inventory')
+                styled=[]
+                for part in parts:
+                    size=part['scale']
+                    if not isinstance(size,(int,float)) or not math.isfinite(size) or not 0<size<=4:
+                        raise ValueError('Invalid source display scale')
+                    weight='' if part['bold'] is None else ';font-weight:%s' % ('700' if part['bold'] else '400')
+                    styled.append('<span class="source-title-line" style="display:block;font-size:%.3fem%s">%s</span>' % (
+                        size,weight,_runs_html(part['runs'],available,ref_ids,ambiguous)))
+                inner=' '.join(styled)
+            attrs=''
+            if getattr(element,'display_group',{}):
+                alignment=element.display_group.get('alignment')
+                if alignment not in ('left','center'):raise ValueError('Invalid source title alignment')
+                attrs=' style="text-align:%s;font-weight:normal"' % alignment
+            blocks.append("<h%d%s>%s</h%d>" % (level, attrs, inner, level))
+            if getattr(element,'display_group',{}):
+                copy=('Transcribed title; original typography may differ. ' if element.display_group.get('typography')=='fitted_geometry' else '')
+                blocks.append('<p class="source-evidence-notice">%s<a href="original-p%04d.xhtml#title_%d">View original title and layout</a>.</p>' % (copy,pno,element_index))
         elif element.kind == "caption":
             if element.caption_uncertain:
                 inner = '<span class="reflow-uncertain">%s (?)</span>' % inner
@@ -1020,6 +1044,8 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
                    max(b[2] for b in boxes), max(b[3] for b in boxes)) if boxes else None
             specs.append(("notes", "Original notes and neighboring context", box))
         for element_index, element in enumerate(book.pages.get(pno, [])):
+            if getattr(element,'display_group',{}):
+                specs.append(("title_%d" % element_index, "Original title and neighboring layout", element.bbox))
             if element.punctuation_uncertain:
                 specs.append(("text_%d" % element_index, "Original punctuation and passage", element.bbox))
         caption_keys, caption_counts = [], {}

@@ -562,14 +562,15 @@ def recover_interrupted_jobs(worker=None):
             if job_id in active_ids:
                 continue
             settled=_recover_publication(led)
-            if led.job().get("status") != "running":
-                continue
             if settled is None:
                 continue
             if not settled:
-                led.record({"kind":"job","event":"finish","status":"failed",
-                            "error":"Publication recovery needs review; existing files were preserved."})
-                recovered.append(job_id)
+                error="Publication recovery needs review; existing files were preserved."
+                if led.job().get('error')!=error:
+                    led.record({"kind":"job","event":"finish","status":"failed","error":error})
+                    recovered.append(job_id)
+                continue
+            if led.job().get("status") != "running":
                 continue
             led.record({"kind": "job", "event": "finish",
                         "status": INTERRUPTED_STATUS,

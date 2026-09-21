@@ -726,6 +726,9 @@ def test_restart_preserves_later_user_changes_instead_of_rolling_them_back(rig,m
         (staging/'previous.epub').unlink();(staging/'previous.epub').write_bytes(b'later backup')
     else:(staging/'user-file').write_bytes(b'later user evidence')
     before={str(p):p.read_bytes() for p in rig.folder.rglob('*') if p.is_file()}
+    if changed=='metadata':
+        ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),5,task.job_id).record(
+            {'kind':'job','event':'finish','status':'failed','error':'earlier commit failure'})
     rig.mod.recover_interrupted_jobs()
     assert before=={str(p):p.read_bytes() for p in rig.folder.rglob('*') if p.is_file()}
     row=_ledger_rows(rig)[0]

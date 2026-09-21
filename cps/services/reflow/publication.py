@@ -74,10 +74,19 @@ def pending(ledger):
     return prepared
 
 
+def _owned_target(root,target,book_path,desired_format):
+    folder=os.path.abspath(os.path.join(root,book_path))
+    relative(root,folder)
+    name=desired_format.get('name') if isinstance(desired_format,dict) else None
+    if not isinstance(name,str) or os.path.dirname(target)!=folder or os.path.basename(target)!=name+'.epub':
+        raise PublicationConflict('publication target does not belong to the current book format')
+
+
 def prepare(ledger,root,book_id,book_path,source,target,staging,previous_format,desired_format,expected_source=None):
     candidate=os.path.join(staging,'candidate.epub')
     backup=os.path.join(staging,'previous.epub')
     for path in (source,target,staging,candidate,backup):relative(root,path)
+    _owned_target(root,target,book_path,desired_format)
     old=identity(target);new=identity(candidate)
     source_identity=identity(source)
     if source_identity is None:raise PublicationConflict('publication source PDF is missing')
@@ -105,6 +114,7 @@ def reconcile(ledger,root,record,current_format,book_path,source):
     if record.get('version')!=1 or record.get('book_path')!=book_path:
         raise PublicationConflict('publication book identity changed')
     target=resolve(root,record['target']);staging=resolve(root,record['staging'])
+    _owned_target(root,target,book_path,record['desired_format'])
     expected_prefix='.reflow-'+str(ledger.job_id)+'-'
     if os.path.dirname(staging)!=os.path.dirname(target) or not os.path.basename(staging).startswith(expected_prefix):
         raise PublicationConflict('publication staging is not owned by this job')

@@ -69,3 +69,15 @@ def test_symlink_target_is_refused_before_backup_or_journal_mutation(tmp_path):
     source=root/'source.pdf';source.write_bytes(b'PDF');led=l.Ledger(tmp_path/'ledger',5,'job')
     with pytest.raises(p.PublicationConflict):p.prepare(led,str(root),1,'',str(source),str(target),str(stage),None,{'name':'book','size':9})
     assert not led.entries() and not (stage/'previous.epub').exists() and outside.read_bytes()==b'user'
+
+
+def test_matching_bytes_in_another_book_folder_are_not_owned_by_this_journal(prepared):
+    root,source,target,stage,led,record=prepared
+    other=root/'another-book';other.mkdir()
+    other_target=other/'book.epub';other_target.write_bytes((stage/'candidate.epub').read_bytes())
+    other_stage=other/'.reflow-job-other';other_stage.mkdir()
+    (other_stage/'previous.epub').write_bytes(target.read_bytes())
+    forged=dict(record,target='another-book/book.epub',staging='another-book/.reflow-job-other')
+    before=other_target.read_bytes()
+    with pytest.raises(p.PublicationConflict):p.reconcile(led,str(root),forged,record['previous_format'],'',str(source))
+    assert other_target.read_bytes()==before

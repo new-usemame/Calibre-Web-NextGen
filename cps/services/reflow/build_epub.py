@@ -984,7 +984,7 @@ def _readable_characters(page_html):
     return pages, records
 
 
-def _refuse_unsafe_pages(page_html, book, source_pages=None):
+def _refuse_unsafe_pages(page_html, book, source_pages=None, generated_pages=None):
     """The final markup boundary: nothing active or remote reaches the reader.
 
     A page the pipeline adopted has already passed the gate's markup contract, so
@@ -996,6 +996,12 @@ def _refuse_unsafe_pages(page_html, book, source_pages=None):
     """
     cleaned, refused = {}, []
     for pno, html in page_html.items():
+        # Only bytes generated inside build from the current sealed source and
+        # recompiled plan bypass the external HTML grammar. This is exact tree
+        # identity, not a style/attribute allowlist transferable to other nodes.
+        if generated_pages is not None and pno in generated_pages and html==generated_pages[pno]:
+            cleaned[pno]=html
+            continue
         reasons = gate.check_markup_safety(html)
         if not reasons:
             cleaned[pno] = html
@@ -1245,6 +1251,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     # character filtering, so no raw source character is reintroduced afterward.
     page_html = {pno: canonical(pno) if book.needs_source_evidence(pno) or pno in source_pages else html
                  for pno, html in page_html.items()}
+    generated_pages={pno:html for pno,html in page_html.items()
+                     if book.needs_source_evidence(pno) or pno in source_pages}
     # Inactive opt-in seam: only source-bound wrapper plans are admitted here.
     # Recheck cached plans before producing any output or rendering evidence.
     seen_pages = set()
@@ -1267,8 +1275,10 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         if wrappers:
             page_html[pno] = (source_pages[pno].render(book, wrappers) if pno in source_pages
                               else page_fragment(book, pno, wrappers=wrappers))
+        generated_pages[pno]=page_html[pno]
     page_html, unrepresentable = _readable_characters(page_html)
-    page_html, refused = _refuse_unsafe_pages(page_html, book, source_pages)
+    generated_pages, _ = _readable_characters(generated_pages)
+    page_html, refused = _refuse_unsafe_pages(page_html, book, source_pages, generated_pages)
     evidence, original_images = _original_evidence(
         book, page_html, doc, figure_transform, should_stop, evidence_progress, source_pages)
 

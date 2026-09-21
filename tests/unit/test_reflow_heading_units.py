@@ -209,3 +209,41 @@ def test_grouped_heading_final_epub_keeps_uncertain_atom_complete_nav_and_origin
         assert any('original_p0000_title_0.jpg' in n for n in z.namelist())
     assert json.loads(canonical.records_json)==records
     doc.close()
+
+
+def test_source_title_styles_do_not_discard_an_approved_quote_on_the_same_page(tmp_path):
+    import pymupdf,zipfile,json
+    from cps.services.reflow import build_epub,structural_ops as ops
+    from cps.services.reflow.enriched_source import prepare_source_page
+    raw,title,body=opening_source()
+    title[1].spans[0].text='A Complete <tag onclick="x"> Display Title'
+    quote=line('"The displayed source quotation remains complete."',70,300,size=10,font='Times',width=360)
+    raw.blocks.append(extract.Block(20,quote.bbox,[quote]))
+    style=skeleton.BookStyle(body_size=10)
+    book=assemble.assemble([skeleton.page_skeleton(raw,style)],style,[raw])
+    doc=pymupdf.open();page=doc.new_page(width=500,height=700)
+    for ln in title+body+[quote]:page.insert_text((ln.bbox[0],ln.bbox[3]),ln.text,fontsize=ln.size)
+    source_path=tmp_path/'source.pdf';doc.save(source_path);doc.close();doc=pymupdf.open(source_path)
+    canonical=prepare_source_page(book,0,{'layer':'native'})
+    p=ops.prepare(book,doc,0,'test',{'layer':'native'},source_page=canonical,raw_page=raw)
+    choice=next(c['candidate_id'] for c in p.candidates() if c['kind']=='quote')
+    plan=p.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[choice]),source_page=canonical)
+    path=tmp_path/'approved.epub'
+    built=build_epub.build(book,str(path),doc=doc,source_pages={0:canonical},operation_plans=[plan])
+    with zipfile.ZipFile(path) as z:
+        html=''.join(z.read(n).decode() for n in z.namelist() if '/ch' in n and n.endswith('.xhtml'))
+    assert '<blockquote>' in html and html.count('class="source-title-line"')==4
+    assert not built.warnings,built.warnings
+    assert '&lt;tag onclick="x"&gt;' in html and '<tag ' not in html
+    # The same finite style on externally supplied markup is still untrusted.
+    from cps.services.reflow import gate
+    assert gate.check_markup_safety('<h2 style="text-align:center;font-weight:normal">A heading</h2>')
+    from dataclasses import replace
+    with pytest.raises(ops.ContractError):
+        build_epub.build(book,str(tmp_path/'tampered.epub'),doc=doc,source_pages={0:replace(canonical,html=canonical.html.replace('text-align:center','text-align:left'))},operation_plans=[plan])
+    with pytest.raises(ops.ContractError):
+        build_epub.build(book,str(tmp_path/'moved.epub'),doc=doc,source_pages={0:canonical},operation_plans=[plan],page_html={0:canonical.html.replace('style="text-align:center;font-weight:normal"','')})
+    book.pages[0][0].display_group['alignment']='left'
+    with pytest.raises(ops.ContractError):
+        build_epub.build(book,str(tmp_path/'stale.epub'),doc=doc,source_pages={0:canonical},operation_plans=[plan])
+    doc.close()

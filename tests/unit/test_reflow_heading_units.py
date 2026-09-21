@@ -151,6 +151,11 @@ def test_opening_display_keeps_all_lines_one_identity_and_relative_presentation(
     assert len(heads)==1
     assert heads[0].text==' '.join(ln.stripped for ln in title)
     assert len(heads[0].display_lines)==4
+    stream_head=next(e for e in book.elements if e.kind=='h')
+    assert stream_head.display_lines==heads[0].display_lines
+    assert stream_head.display_group==heads[0].display_group
+    assert stream_head.display_group is not heads[0].display_group
+    assert stream_head.display_lines[0] is not heads[0].display_lines[0]
     html=build_epub.page_fragment(book,0)
     assert html.count('class="source-title-line"')==4
     assert 'font-size:1.000em' in html and 'font-size:0.400em' in html

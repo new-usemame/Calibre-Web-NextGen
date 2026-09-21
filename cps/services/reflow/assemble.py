@@ -25,6 +25,7 @@ its evidence, and each is paired with printed text it must leave alone.
 """
 
 import bisect
+from copy import deepcopy
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -994,7 +995,9 @@ def _copy_element(element):
                    table_row=element.table_row,
                    caption_uncertain=element.caption_uncertain,
                    punctuation_uncertain=element.punctuation_uncertain,
-                   line_boxes=list(element.line_boxes))
+                   line_boxes=list(element.line_boxes),
+                   display_lines=deepcopy(element.display_lines),
+                   display_group=deepcopy(element.display_group))
 
 
 def _runover_note(elements, book, skel):

@@ -199,6 +199,38 @@ def candidates(raw_pages):
     return out
 
 
+def normalize_recovery_geometry(raw, doc, provenance):
+    """Bind OCR lines and native artwork to one reading frame, exactly once.
+
+    Recovery has already chosen the words. This only maps the original image
+    and vector bounds; it neither reruns OCR nor changes its marked atoms.
+    """
+    from dataclasses import replace
+    from .source_display import SourceDisplay
+    if provenance.get('layer')!='ocr':return raw
+    display=SourceDisplay(doc,raw.pno,provenance)
+    geometry={'space':'reading','orientation':display.angle,
+              'source_rotation':display.page.rotation,'page_rect':list(display.page.rect)}
+    saved=getattr(raw,'source_geometry',{})
+    if saved:
+        if saved!=geometry:raise ValueError('stale Recovery artwork geometry')
+        return raw
+    lines=[line for block in raw.text_blocks for line in block.lines]
+    prose=assess.looks_like_prose(raw.text)
+    images=[]
+    for image in raw.images:
+        box=tuple(display.reading_rect(image.bbox))
+        # An inset bitmap can be the source page without covering 80% of the
+        # physical PDF. Complete containment of its recovered prose establishes
+        # that relationship; leave unrelated embedded pictures independent.
+        background=bool(prose and lines and all(
+            box[0]-.02<=line.bbox[0] and box[1]-.02<=line.bbox[1] and
+            box[2]+.02>=line.bbox[2] and box[3]+.02>=line.bbox[3] for line in lines))
+        images.append(replace(image,bbox=box,page_background=background))
+    return replace(raw,images=images,drawing_rects=[tuple(display.reading_rect(box))
+        for box in raw.drawing_rects],source_geometry=geometry)
+
+
 def _page_from_ocr(result, original):
     """One OCR result as a RawPage the rest of the pipeline already understands.
 
@@ -382,7 +414,8 @@ def recover(doc, raw_pages, fingerprint, *, mode="auto",
         recovery.ocr_words += prov.words
         recovery.uncertain_words += prov.uncertain_words
         recovery.reused += 1 if prov.reused else 0
-        chosen.append(_page_from_ocr(result, raw))
+        from dataclasses import asdict
+        chosen.append(normalize_recovery_geometry(_page_from_ocr(result, raw), doc, asdict(prov)))
         recovery.provenance[raw.pno] = prov
         done += 1
         if progress is not None:

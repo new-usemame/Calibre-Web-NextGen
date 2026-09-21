@@ -317,13 +317,25 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
                                outline if skeleton.outline_is_useful(outline) else None)
     result.style = style
     trusted = result.assessment.layer_is_trusted if result.assessment else True
-    skeletons = [
-        skeleton.page_skeleton(
-            raw, style, layer_trusted=trusted,
+    def pixel_document(raw):
+        geometry=getattr(raw,'source_geometry',{})
+        if geometry.get('space')=='reading':
+            from .source_display import SourceDisplay
+            return SourceDisplay(doc,raw.pno,dict(geometry,layer='ocr')).query_document()
+        return doc
+    skeletons = []
+    for done, raw in enumerate(raw_pages):
+        if should_stop is not None and should_stop():
+            raise build_epub.BuildCancelled('Source geometry preparation was cancelled.')
+        skeletons.append(skeleton.page_skeleton(
+            raw, style, layer_trusted=trusted or (
+                getattr(raw,'source_geometry',{}).get('space')=='reading' and
+                assess.looks_like_prose(raw.text)),
             pixel_probe=extract.ScanPixelProbe(
-                doc, raw.pno,
-                mask=[ln.bbox for blk in raw.text_blocks for ln in blk.lines]))
-        for raw in raw_pages]
+                pixel_document(raw), raw.pno,
+                mask=[ln.bbox for blk in raw.text_blocks for ln in blk.lines])))
+        report(Progress(stage='skeleton',page=done+1,pages=len(raw_pages),
+                        message='measured page %d of %d' % (done+1,len(raw_pages))))
 
     report(Progress(stage="assemble", message="putting the text back together"))
     book = assemble.assemble(skeletons, style, raw_pages)

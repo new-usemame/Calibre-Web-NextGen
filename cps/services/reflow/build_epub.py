@@ -829,6 +829,13 @@ def _figure_images(chapters, doc, book, figure_transform=None, owned_images=()):
             missing.append(src)
             continue
         figure = page_figures[index]
+        render_doc=doc
+        transform=figure_transform
+        geometry=figure.get('source_geometry',{})
+        if geometry.get('space')=='reading':
+            from .source_display import SourceDisplay
+            render_doc=SourceDisplay(doc,pno,dict(geometry,layer='ocr')).query_document()
+            transform=None
         bbox = figure["bbox"]
         mask = []
         for element in (getattr(book, "pages", None) or {}).get(pno) or ():
@@ -836,17 +843,23 @@ def _figure_images(chapters, doc, book, figure_transform=None, owned_images=()):
                 line_boxes = element.line_boxes or ([element.bbox]
                                                     if element.bbox else [])
                 for box in line_boxes:
-                    if figure_transform is not None:
-                        box = figure_transform(pno, box)
+                    if transform is not None:
+                        box = transform(pno, box)
                     mask.append(box)
-        if figure_transform is not None:
-            bbox = figure_transform(pno, bbox)
+        # Notes are retained reading text too. They must not make an otherwise
+        # empty figure territory look like artwork; masks affect ink admission,
+        # never the emitted source crop or the note body.
+        for note in book.notes:
+            if note.pno==pno and note.bbox:
+                mask.append(transform(pno,note.bbox) if transform else note.bbox)
+        if transform is not None:
+            bbox = transform(pno, bbox)
         try:
             if figure.get("needs_ink") and not extract.region_has_ink(
-                    doc, pno, bbox, mask=mask):
+                    render_doc, pno, bbox, mask=mask):
                 blanks.append(src)
                 continue
-            images[src] = extract.crop_jpeg(doc, pno, bbox)
+            images[src] = extract.crop_jpeg(render_doc, pno, bbox)
         except Exception as exc:                                  # pragma: no cover
             log.warning("reflow: figure %s could not be cropped: %s", src, exc)
             if figure.get("needs_ink"):
@@ -854,7 +867,7 @@ def _figure_images(chapters, doc, book, figure_transform=None, owned_images=()):
                 # measured territory cannot be cut, the whole printed page is the
                 # honest remainder -- the reader loses nothing that was there.
                 try:
-                    images[src] = extract.crop_jpeg(doc, pno, _page_rect(doc, pno))
+                    images[src] = extract.crop_jpeg(render_doc, pno, _page_rect(render_doc, pno))
                     continue
                 except Exception:                                 # pragma: no cover
                     pass

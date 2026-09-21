@@ -203,6 +203,7 @@ class Block(object):
 class Image(object):
     bbox: Tuple[float, float, float, float]
     area_ratio: float
+    page_background: bool = False
 
     @property
     def width(self):
@@ -221,8 +222,10 @@ class Image(object):
         return self.width >= MIN_FIG_PX and self.height >= MIN_FIG_PX
 
     def to_dict(self):
-        return {"bbox": [round(v, 2) for v in self.bbox],
-                "area_ratio": round(self.area_ratio, 4)}
+        value = {"bbox": [round(v, 2) for v in self.bbox],
+                 "area_ratio": round(self.area_ratio, 4)}
+        if self.page_background:value['page_background'] = True
+        return value
 
 
 @dataclass
@@ -237,6 +240,7 @@ class RawPage(object):
     drawings: int = 0
     drawing_rects: List[Tuple[float, float, float, float]] = field(
         default_factory=list)
+    source_geometry: dict = field(default_factory=dict)
 
     @property
     def text_blocks(self):
@@ -253,13 +257,15 @@ class RawPage(object):
     @property
     def is_page_scan(self):
         """A single image covering the page: the page is a picture of itself."""
-        return any(img.full_page for img in self.images)
+        return any(img.full_page or getattr(img,'page_background',False) for img in self.images)
 
     def to_dict(self):
-        return {"pno": self.pno, "width": round(self.width, 2),
+        value = {"pno": self.pno, "width": round(self.width, 2),
                 "height": round(self.height, 2), "drawings": self.drawings,
                 "blocks": [b.to_dict() for b in self.blocks],
                 "images": [i.to_dict() for i in self.images]}
+        if getattr(self,'source_geometry',{}):value['source_geometry'] = self.source_geometry
+        return value
 
 
 def open_document(source):

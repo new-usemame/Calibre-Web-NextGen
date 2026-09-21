@@ -535,7 +535,8 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
         if kept:
             kept_blocks.append((blk, kept))
 
-    embedded = [img for img in raw.images if img.substantial and not img.full_page]
+    embedded = [img for img in raw.images if img.substantial and not img.full_page
+                and not getattr(img,'page_background',False)]
 
     # A full-bleed cover or plate is the page itself with a little text over
     # it: one figure, nothing left to slice. Evidence is the pixels and the

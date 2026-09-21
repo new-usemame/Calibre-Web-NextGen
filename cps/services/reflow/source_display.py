@@ -73,6 +73,23 @@ class SourceDisplay:
             if len(data)<=max_bytes:return data
         raise extract.RasterTooLarge('source display exceeds encoded-byte bound')
 
+    def query_document(self):
+        """Existing pixel questions in reading coordinates, without a second renderer."""
+        display=self
+        class ReadingPage:
+            rect=display.rect
+            def get_pixmap(self,matrix,clip=None,alpha=False,colorspace=None):
+                if alpha or matrix.b or matrix.c or matrix.a!=matrix.d:
+                    raise ValueError('unsupported reading-space pixel query')
+                if colorspace not in (None,extract.pymupdf.csRGB,extract.pymupdf.csGRAY):
+                    raise ValueError('unsupported reading-space colorspace')
+                return display.pixmap(clip,scale=matrix.a,gray=colorspace==extract.pymupdf.csGRAY)
+        class ReadingDocument:
+            def __getitem__(self,pno):
+                if pno!=display.pno:raise IndexError('wrong source page')
+                return ReadingPage()
+        return ReadingDocument()
+
 
 def inspection_tiles(rect,width=240,height=320,overlap=24):
     rect=_rect(rect)

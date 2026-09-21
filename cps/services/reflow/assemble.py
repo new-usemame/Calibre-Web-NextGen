@@ -1167,6 +1167,7 @@ def assemble(skeletons, style, raw_pages=None):
     stitched = 0
     refused = 0
     vocab = book_vocabulary(raw_pages) if raw_pages is not None else None
+    source_geometry = {raw.pno:getattr(raw,'source_geometry',{}) for raw in (raw_pages or [])}
 
     # Before anything else, because a damaged note number is what a damaged marker
     # would otherwise be fitted to, and the evidence for it is spread over pages.
@@ -1215,6 +1216,8 @@ def assemble(skeletons, style, raw_pages=None):
                                      "full_page": bool(region.image and region.image.full_page),
                                      "needs_ink": bool(region.needs_ink),
                                      "found": region.reason or "embedded"})
+                if source_geometry.get(skel.pno):
+                    book.figures[-1]['source_geometry']=dict(source_geometry[skel.pno])
 
         for position, element in enumerate(elements):
             previous = book.elements[-1] if book.elements else None

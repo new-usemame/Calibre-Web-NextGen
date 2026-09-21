@@ -143,6 +143,7 @@ class Region(object):
     #: A note identity or caption transcription depends on damaged extraction.
     #: Keep its reading, but visibly qualify it instead of asserting certainty.
     uncertain: bool = False
+    initial_join: dict = field(default_factory=dict)
 
     @property
     def text(self):
@@ -587,7 +588,7 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
         kept_blocks = _emit_table_rows(layout, kept_blocks, skel)
         layout = None
     if not raw.is_page_scan:
-        kept_blocks = _regroup_native_titles(kept_blocks, style)
+        kept_blocks = _regroup_native_titles(kept_blocks, style, getattr(pixel_probe,"_doc",None),raw.pno)
     if layout is not None:
         skel.reasons.append("columns_reordered")
         for blk, kept in kept_blocks:
@@ -1011,7 +1012,7 @@ def _is_caps(text):
     return any(ch.isalpha() for ch in text) and text == text.upper()
 
 
-def _regroup_native_titles(kept_blocks, style):
+def _regroup_native_titles(kept_blocks, style, doc=None, pno=0):
     """Lift complete display runs from heterogeneous native extraction blocks."""
     from .heading_units import native_units
     flat=[ln for _,lines in kept_blocks for ln in lines]
@@ -1044,7 +1045,12 @@ def _regroup_native_titles(kept_blocks, style):
         other,body=neighbors[0]
         out.remove((blk,lines));out.remove((other,body))
         combined=lines+body;box=_lines_bbox(combined,other.bbox)
-        out.append((extract.Block(other.number,box,combined),combined))
+        joined=extract.Block(other.number,box,combined)
+        from .heading_units import initial_spacing
+        first=min((ln for ln in body if abs(ln.size/style.body_size-1)<=LADDER_TOL),key=lambda ln:ln.bbox[1])
+        if body[0] is first:
+            joined.initial_join=initial_spacing(doc,pno,initial,first)
+        out.append((joined,combined))
     for lines in titles:
         box=_lines_bbox(lines,lines[0].bbox)
         out.append((extract.Block(-1,box,lines),lines))
@@ -1086,7 +1092,8 @@ def _classify_body(lines, blk, style, skel, band=0, column=0):
     kind = "caption" if CAPTION_LINE.match(lines[0].stripped) else "body"
     skel.regions.append(Region(kind=kind, lines=list(lines),
                                bbox=_lines_bbox(lines, blk.bbox),
-                               band=band, column=column))
+                               band=band, column=column,
+                               initial_join=getattr(blk,"initial_join",{})))
 
 
 def _looks_multi_column(blocks, raw):

@@ -98,3 +98,23 @@ def test_final_builder_rechecks_complete_units_even_for_previously_admitted_plan
         build_epub.build(book,str(target),doc=doc,operation_plans=[plan])
     assert not target.exists()
     doc.close()
+
+
+@pytest.mark.parametrize('initial,word,gap,joined',[('Q','uartz',.5,True),('A','young',3.,False),('É','lan',.5,True)])
+def test_native_dropcap_uses_measured_space_not_grammar(initial,word,gap,joined):
+    import pymupdf
+    doc=pymupdf.open();page=doc.new_page(width=500,height=700)
+    font=pymupdf.Font('tiro')
+    end=50+font.text_length(initial,fontsize=36)
+    page.insert_text((50,180),initial,fontname='tiro',fontsize=36)
+    page.insert_text((end+gap,156),word+' people preserve the original wording.',fontname='tiro',fontsize=12)
+    for y in (220,235,250):page.insert_text((50,y),'Ordinary body reference has real printed spaces.',fontname='tiro',fontsize=12)
+    raw=extract.read_page(doc,0);style=skeleton.BookStyle(body_size=12)
+    sk=skeleton.page_skeleton(raw,style,pixel_probe=extract.ScanPixelProbe(doc,0))
+    book=assemble.assemble([sk],style,[raw])
+    expected=initial+('' if joined else ' ')+word
+    assert book.pages[0][0].text.startswith(expected),book.pages[0][0].text
+    repairs=[r for r in book.repairs if r.kind=='source_initial_join']
+    assert bool(repairs) is joined
+    assert book.conservation.ok,book.conservation.to_dict()
+    doc.close()

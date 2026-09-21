@@ -1095,10 +1095,16 @@ def _page_elements(skel, repairs, reasons, vocab=None):
         if region.kind not in ("heading", "body", "caption"):
             continue
         runs = []
-        for line in region.lines:
+        initial_join=getattr(region,'initial_join',{})
+        for line_index,line in enumerate(region.lines):
             line_runs = _line_runs(line, skel.pno, page_notes, claimed, repairs, reasons)
-            runs = line_runs if not runs else stitch_runs(runs, line_runs,
-                                                          vocab=vocab)
+            if line_index==1 and initial_join:
+                runs += line_runs
+            else:
+                runs = line_runs if not runs else stitch_runs(runs,line_runs,vocab=vocab)
+        if initial_join:
+            import json
+            repairs.append(Repair('source_initial_join',skel.pno,json.dumps(initial_join,sort_keys=True)))
         runs = tidy(runs)
         if not plain_text(runs):
             continue
@@ -1340,6 +1346,15 @@ def source_word_counter(raw_pages, vocab=None, skeletons=None):
         text = _heal_linebreaks(raw.text, None) if vocab is None \
             else _heal_page(raw, vocab)
         counter.update(_WORD.findall(text))
+    for skel in skeletons or ():
+        for region in skel.regions:
+            proof=getattr(region,'initial_join',{})
+            if not proof:continue
+            initial,word=proof['initial'],proof['following_word']
+            consumed=Counter(_WORD.findall(initial+' '+word))
+            if consumed-counter:
+                raise ValueError('native initial source words are missing')
+            counter.subtract(consumed);counter.update(_WORD.findall(initial+word))
     return counter
 
 

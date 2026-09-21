@@ -65,3 +65,28 @@ def native_units(lines):
         groups.append(group)
     groups.extend([[i] for i in range(len(lines)) if i not in seen])
     return groups
+
+
+def initial_spacing(doc,pno,initial,following):
+    """Compare the native initial gap with actual printed spaces in that face."""
+    if doc is None:return {}
+    if initial.text!=initial.text.strip() or following.text!=following.text.lstrip():return {}
+    if not initial.stripped.isalpha() or len(initial.stripped)!=1:return {}
+    word=following.stripped.split()[0]
+    if not word.isalpha():return {}
+    face=following.spans[0];gap=following.bbox[0]-initial.bbox[2]
+    widths=[]
+    for block in doc[pno].get_text('rawdict').get('blocks',[]):
+        for line in block.get('lines',[]):
+            for span in line.get('spans',[]):
+                if span.get('font')!=face.font or abs(span.get('size',0)-face.size)>PRECISION:continue
+                widths.extend(char['bbox'][2]-char['bbox'][0] for char in span.get('chars',[])
+                              if char.get('c')==' ')
+    widths=[w for w in widths if math.isfinite(w) and w>0]
+    if not widths or max(widths)-min(widths)>PRECISION:return {}
+    if not 0<=gap<min(widths)-PRECISION:return {}
+    return {'version':'native-initial-spacing-1','initial':initial.stripped,
+            'following_word':word,'initial_bbox':list(initial.bbox),
+            'following_bbox':list(following.bbox),'gap':gap,
+            'font':face.font,'size':face.size,'space_width':statistics.median(widths),
+            'observed_spaces':len(widths)}

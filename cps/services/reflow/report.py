@@ -37,12 +37,17 @@ _TABLE = re.compile(r"<table\b", re.I)
 _BLOCKQUOTE = re.compile(r"<blockquote\b", re.I)
 
 STOP_REASONS = {
+    "model_rejections": "Some formatting responses failed admission. Those pages retain their deterministic presentation.",
     "cost_cap": "The conversion stopped when it reached its cost cap.",
     "cancelled": "The conversion was cancelled before every page was reviewed.",
     "not_configured": "No model was configured, so no page was reviewed.",
     "model_errors": "The conversion stopped because the model service refused "
                     "several pages in a row. The pages already reviewed are in "
                     "this book; the rest keep the text read from the PDF.",
+    "quality_gate": "The complete deterministic conversion is preserved. AI formatting review is not enabled; eligible pages remain unreviewed.",
+    "prior_request_pending": "An earlier request for this source is unresolved. No duplicate request was sent; deterministic output is preserved.",
+    "billing_bound": "A reported charge exceeded its reserved bound. The exact charge is recorded and further review stopped; deterministic output is preserved.",
+    "route_mismatch": "A model answer used an unexpected route or service tier. It was not adopted, and further review stopped.",
     "billing_uncertain": "The conversion stopped because a model request's answer "
                          "was lost in transit and what it billed could not be "
                          "confirmed. The pages already reviewed are in this book; "
@@ -64,7 +69,7 @@ def numbers(result, ledger=None, client=None):
         else {}
     model_id = described.get("model") or next((o.model for o in answered if o.model), "")
 
-    markup = "\n".join(result.page_html.values())
+    markup = "\n".join(getattr(result,'preview_html',result.page_html).values())
     stats = dict(book.stats or {}) if book is not None else {}
     totals = ledger.totals() if ledger is not None else {}
     # ``notes_unmarked`` is counted while the book is assembled, before any page has
@@ -161,6 +166,19 @@ def numbers(result, ledger=None, client=None):
         "stopped": result.stopped,
         "statement": STATEMENT,
     }
+    if hasattr(result,'structural'):
+        payload['structural']=dict(result.structural)
+        payload['structure']['scope']='full_source_book'
+        payload['rendered_structure']={'headings':len(re.findall(r'<h[1-6]\b',markup,re.I)),
+            'blockquotes':len(_BLOCKQUOTE.findall(markup))}
+        payload['model']['used']=bool(result.structural['attempted_stages'] or result.stage_records)
+        payload['model']['pages_sent']=result.structural['attempted_pages']
+        payload['model']['pages_reused']=sum(o.cached for o in outcomes)
+        payload['spend']['usd']=result.spend_usd
+        payload['spend']['pending_usd']=result.pending_usd
+        payload['model']['approval_prompt_version']=described.get('approval_prompt_version','')
+        payload['model']['route_version']=described.get('route_version','')
+        payload['model']['quality_released']=described.get('quality_released',False)
     payload["unplaced"] = _unplaced(payload, result)
     return payload
 
@@ -311,13 +329,18 @@ def check_completion(payload, ledger):
         ("pages refused", model.get("pages_refused"),
          gate.get("FAIL", 0) + gate.get("NOT_APPLICABLE", 0)),
     ]
+    if 'structural' in payload:
+        checks=[('structural decisions',payload['structural'],totals.get('structural'))]
     for label, reported, recorded in checks:
         if reported != recorded:
             problems.append("%s: the report says %s and the ledger says %s"
                             % (label, reported, recorded))
-    if round(float(spend.get("usd") or 0.0), 6) != round(totals.get("spend_usd", 0.0), 6):
+    if ('structural' in payload and float(spend.get('usd') or 0)!=ledger.spent()) or (
+            'structural' not in payload and round(float(spend.get("usd") or 0.0),6)!=round(totals.get("spend_usd",0.0),6)):
         problems.append("spend: the report says %s and the ledger says %s"
                         % (spend.get("usd"), totals.get("spend_usd")))
+    if 'structural' in payload and spend.get('pending_usd')!=ledger.pending_usd():
+        problems.append('held spend does not match the durable ledger')
     return problems
 
 
@@ -344,10 +367,23 @@ def about_page(payload, show_cost=False, links=None, losses=()):
     if source.get("fonts"):
         out.append("<p>Type seen on the page: %s.</p>"
                    % escape(", ".join(sorted(source["fonts"]))))
+    if 'structural' in payload:
+        out.append('<p>Source preparation covers the complete PDF (%d pages). This file contains %d selected pages.</p>'
+                   % (payload['structural']['source_context_pages'],payload['fidelity']['pages']))
     out.extend(_recovery_section(payload))
 
     out.extend(_fidelity_section(payload))
     out.extend(_structure_section(payload))
+    if 'structural' in payload:
+        values=payload['structural']
+        rows=[('Eligible pages',values['eligible']),('Coverage-limited pages',values['limited']),
+              ('Unsupported pages',values['unsupported']),('Pages with no supported choices',values['no_choices']),
+              ('Pages left unreviewed',values['unreviewed']),('Proposed operations',values['proposed_operations']),
+              ('Approved operations',values['approved_operations']),('Proposer abstentions',values['proposer_abstained']),
+              ('Verifier abstentions',values['verifier_abstained']),('Rejected pages',values['rejected']),
+              ('Requests attempted',values['attempted_stages']),('Cached stage results',values['cached_stages'])]
+        out.append('<h2>AI formatting review</h2><p>Only approved source-bound heading or quotation formatting is applied. An unchanged page or an abstention is not an improvement. Counts describe mechanical admission, not independent semantic correctness.</p><table><tbody>%s</tbody></table>'
+                   % ''.join('<tr><td>%s</td><td>%d</td></tr>'%(escape(label),value) for label,value in rows))
     unplaced = list(payload.get("unplaced") or []) + list(losses or ())
     if unplaced:
         out.append("<h2>What could not be placed</h2><ul>%s</ul>"
@@ -458,8 +494,9 @@ def _fidelity_section(payload):
                                               "The run ended first."))))
     conservation = fidelity.get("conservation")
     if conservation:
-        out.append("<p>Word check: %s of %s words of the PDF's text are in this book.</p>"
-                   % (conservation.get("output_total"), conservation.get("source_total")))
+        message=("Word check during full source preparation: %s output words for %s source words."
+                 if 'structural' in payload else "Word check: %s of %s words of the PDF's text are in this book.")
+        out.append('<p>%s</p>'%(message%(conservation.get('output_total'),conservation.get('source_total'))))
     return out
 
 
@@ -471,7 +508,7 @@ def _structure_section(payload):
             ("Tables", structure["tables"]),
             ("Block quotations", structure["blockquotes"]),
             ("Paragraphs rejoined across a page turn", structure["page_joins"]),
-            ("Damaged footnote numbers read from the page",
+            ("Source-backed text or structure repairs",
              structure["repairs"] + structure.get("markers_recovered", 0))]
     if structure.get("figures_recovered"):
         rows.append(("Figures cropped from the scanned pages themselves",
@@ -486,7 +523,7 @@ def _structure_section(payload):
         rows.append((_repaired_markers_label(structure), structure["markers_recovered"]))
     body = "".join("<tr><td>%s</td><td>%s</td></tr>" % (escape(label), value)
                    for label, value in rows)
-    return ["<h2>What was recovered</h2>",
+    return ["<h2>%s</h2>"%('Structure found in the full source PDF' if structure.get('scope')=='full_source_book' else 'What was recovered'),
             "<table><tbody>%s</tbody></table>" % body]
 
 

@@ -32,6 +32,9 @@ def _stage(client, stage, prepared, request, ledger, cache, pno, records, should
     if saved is not None:
         records.append({'page':pno,'stage':stage,'cached':True,'cost_usd':0,
                         'status':saved['state'],'request_sha256':wire.sha256})
+        if ledger:
+            ledger.record({'kind':'typed_stage','page':pno,'stage':stage,'cached':True,
+                           'request_sha256':wire.sha256,'status':saved['state']})
         if saved['state']=='rejected':
             raise TypedStageRejected('cached stage response was rejected', reason_code=saved.get('failure_code','response_rejected'))
         return saved['response']
@@ -152,7 +155,9 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
         if not reviewed:
             counts['unreviewed']+=1
             states.setdefault(pno,{'status':'unreviewed','reason':halted or 'rejected'})
-        outcome.cost_usd=sum(r.get('cost_usd') or 0 for r in result.stage_records if r['page']==pno)
+        page_records=[r for r in result.stage_records if r['page']==pno]
+        outcome.cost_usd=sum(r.get('cost_usd') or 0 for r in page_records)
+        outcome.cached=bool(page_records) and all(r['cached'] for r in page_records)
         if ledger and ledger.would_exceed(0) and not halted:halted='cost_cap'
         if progress:
             progress(pipeline.Progress('review',page=index+1,pages=len(selected),
@@ -162,9 +167,18 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
                  'verifier_abstained','rejected'):counts.setdefault(name,0)
     counts['cached_stages']=sum(r['cached'] for r in result.stage_records)
     counts['answered_stages']=len(result.stage_records)
+    counts['source_context_pages']=len(result.book.pages)
+    attempts=[e for e in ledger.entries('reservation') if e.get('event')=='pending'] if ledger else []
+    counts['attempted_stages']=len(attempts)
+    counts['attempted_pages']=len({e['page_label'] for e in attempts})
+    result.preview_html=dict(result.page_html)
+    for plan in result.operation_plans:
+        pno=plan.prepared.page
+        result.preview_html[pno]=result.source_pages[pno].render(result.book,plan.compile(result.book,doc,source_page=result.source_pages[pno]))
     result.structural=dict(counts,pages=[dict(page=p,**row) for p,row in states.items()],
                            route_version=ROUTE_VERSION,source_revision=SOURCE_REVISION)
-    result.stopped=halted;result.pages_done=sum(o.gate=='PASS' for o in result.outcomes.values())
+    if ledger:ledger.record({'kind':'structural_summary','summary':result.structural})
+    result.stopped=halted or ('model_rejections' if counts['rejected'] else None);result.pages_done=sum(o.gate=='PASS' for o in result.outcomes.values())
     result.spend_usd=ledger.spent() if ledger else sum(r['cost_usd'] for r in result.stage_records)
     result.pending_usd=ledger.pending_usd() if ledger else 0
     result.reused=counts['cached_stages']

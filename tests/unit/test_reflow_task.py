@@ -191,48 +191,19 @@ def test_the_job_says_what_it_was_and_how_it_ended(rig):
     assert row["started"] and row["finished"]
 
 
-class _DeadProvider(object):
-    """A provider that has gone away: it takes every page and answers none of them."""
-
-    def __init__(self):
-        self.calls = 0
-        self.model_id = "test/model"
-        self.tier = "standard"
-        self.dry_run = False
-        self.spec = SimpleNamespace(price_per_page=0.002, model_id="test/model")
-
-    def describe(self):
-        return {"model": self.model_id, "tier": self.tier, "configured": True,
-                "dry_run": False, "prompt_version": "test-1"}
-
-    def edit_page(self, *_args, **_kwargs):
-        self.calls += 1
-        raise model_mod.ModelError("OpenRouter 503: upstream is unavailable")
-
-
-def test_a_conversion_the_model_service_ended_early_does_not_say_it_finished(rig,
-                                                                            monkeypatch):
-    """A book that stopped is not a book that finished.
-
-    The conversion walks away from the model after a run of refusals, which is the
-    right thing to do with a service that has died -- but every page after the walk
-    away keeps the text read straight out of the PDF, and the user is never told.
-    MEASURED on the acceptance book: a 698-page run ended twenty routed pages early
-    and the jobs list called it done, so the only place the truth appeared was a
-    sentence inside the EPUB nobody had a reason to open.
-    """
-    provider = _DeadProvider()
-    monkeypatch.setattr(rig.mod, "make_client", lambda _tier: provider)
-
-    task = _run(rig, mode="full", cost_cap_usd=1.0)
-
-    # Every page still has its deterministic text, so the book is worth filing.
-    assert task.stat == STAT_FINISH_SUCCESS, task.error
-    assert provider.calls == rig.mod.pipeline.MAX_CONSECUTIVE_REFUSALS
-    assert os.path.isfile(str(rig.folder / "Book - Author.epub"))
-    # What it may not do is call itself a finished conversion.
-    row = _ledger_rows(rig)[0]
-    assert row["status"] == "incomplete", row
+def test_a_conversion_with_rejected_model_answers_does_not_say_it_finished(rig, monkeypatch):
+    from cps.services.reflow.structural_pipeline import TwoStageClient
+    from tests.unit.test_reflow_typed_transport import Session,reply
+    session=Session(reply('not a protocol response'))
+    monkeypatch.setattr(rig.mod,'make_client',lambda tier:TwoStageClient('inert',enabled=True,session=session))
+    task=_run(rig,mode='full',cost_cap_usd=1)
+    assert task.stat==STAT_FINISH_SUCCESS,task.error
+    assert session.calls
+    assert os.path.isfile(str(rig.folder/'Book - Author.epub'))
+    row=_ledger_rows(rig)[0]
+    assert row['structural']['rejected']>0
+    assert row['structural']['approved_operations']==0
+    assert row['status']=='incomplete'
 
 
 def test_a_finished_conversion_releases_the_books_reservation(rig):
@@ -302,34 +273,28 @@ def test_a_successful_bill_is_debited_exactly_once_across_every_boundary(
     """client → ledger → pipeline → job row: reconciliation is the durable debit,
     the page record references the same attempt, and a reload counts the charge
     once -- never zero, never twice."""
-    class _Answered(object):
-        def post(self, *_args, **_kwargs):
-            return SimpleNamespace(
-                status_code=200, headers={}, text="",
-                json=lambda: {
-                    "model": "deepseek/deepseek-v4.1-flash",
-                    "choices": [{"message": {"content": "no markup in this answer"},
-                                 "finish_reason": "stop"}],
-                    "usage": {"prompt_tokens": 1500, "completion_tokens": 12,
-                              "cost": 0.0031}})
-
-    monkeypatch.setattr(rig.mod, "make_client",
-                        lambda _tier: model_mod.OpenRouterClient(
-                            "key", session=_Answered(), backoff=0.0))
+    import json
+    from cps.services.reflow.structural_pipeline import TwoStageClient
+    from tests.unit.test_reflow_typed_transport import Session,reply
+    class Answered(Session):
+        def post(self,*args,**kwargs):
+            payload=json.loads(kwargs['data'])
+            body=json.loads(payload['messages'][1]['content'][1]['text'])
+            self.data=reply(json.dumps(body['empty_response']))
+            return super().post(*args,**kwargs)
+    monkeypatch.setattr(rig.mod,'make_client',lambda tier:TwoStageClient('inert',enabled=True,session=Answered()))
     task = _run(rig, mode="full", cost_cap_usd=1.0)
 
     assert task.stat == STAT_FINISH_SUCCESS, task.error
     row = _ledger_rows(rig)[0]
     path = os.path.join(rig.root, "jobs", "5", "%s.jsonl" % task.job_id)
     entries = ledger_mod.Ledger(path, cap_usd=1.0).entries()
-    page_sum = sum(e["cost_usd"] for e in entries
-                   if e.get("kind") == "page" and e.get("cost_usd") is not None)
     reconciled = [e for e in entries
                   if e.get("kind") == "reservation" and e.get("event") == "reconciled"]
     assert reconciled, "every answered attempt reconciled durably"
-    assert row["spend_usd"] == pytest.approx(page_sum)
     assert row["spend_usd"] == pytest.approx(sum(e["cost_usd"] for e in reconciled))
     assert row["pending_usd"] == 0.0
+    assert all("cost_usd" not in e for e in entries if e.get("kind")=="typed_stage")
     assert row["status"] == "done"
 
 
@@ -340,13 +305,10 @@ def test_a_job_with_unresolved_billing_stops_safely_and_holds_the_amount(
     with the unresolved amount held rather than reported as spent or as zero."""
     import requests
 
-    class _Lost(object):
-        def post(self, *_args, **_kwargs):
-            raise requests.exceptions.ReadTimeout("the answer was lost")
-
-    monkeypatch.setattr(rig.mod, "make_client",
-                        lambda _tier: model_mod.OpenRouterClient(
-                            "key", session=_Lost(), max_retries=2, backoff=0.0))
+    from cps.services.reflow.structural_pipeline import TwoStageClient
+    from tests.unit.test_reflow_typed_transport import Session
+    session=Session(error=requests.ReadTimeout('lost answer'))
+    monkeypatch.setattr(rig.mod,'make_client',lambda tier:TwoStageClient('inert',enabled=True,session=session))
     task = _run(rig, mode="full", cost_cap_usd=1.0)
 
     assert task.stat == STAT_FINISH_SUCCESS, task.error
@@ -547,6 +509,10 @@ def test_cancel_during_original_evidence_stops_rendering_without_filing(rig, mon
         for pno in result.book.pages:
             result.book.notes.append(assemble.Note(num=1, text='Uncertain reference',
                 pno=pno, uncertain=True, bbox=(40,500,350,550)))
+        from cps.services.reflow.enriched_source import prepare_source_page
+        for pno in result.page_html:
+            canonical=prepare_source_page(result.book,pno,{'layer':'native'})
+            result.source_pages[pno]=canonical;result.page_html[pno]=canonical.html
         monkeypatch.setattr(SourceDisplay, 'jpeg', cancel_after_first)
         return result
     monkeypatch.setattr(task, '_convert', uncertain_pages)
@@ -563,3 +529,113 @@ def test_cancel_during_original_evidence_stops_rendering_without_filing(rig, mon
     assert not os.path.exists(str(rig.folder / 'Book - Author.epub'))
     rows = _ledger_rows(rig)
     assert len(rows) == 1 and rows[0]['status'] == 'cancelled'
+
+
+def test_actual_task_prepares_full_source_for_sample_and_files_exact_hash(rig,monkeypatch):
+    import hashlib
+    from cps.services.reflow import structural_pipeline
+    observed={}
+    real=structural_pipeline.run_structural
+    def run(*args,**kwargs):
+        result=real(*args,**kwargs)
+        observed.update(source_pages=set(result.book.pages),output_pages=set(result.page_html),
+                        evidence=set(result.source_pages),plans=result.operation_plans)
+        return result
+    monkeypatch.setattr(structural_pipeline,'run_structural',run)
+    task=_run(rig,mode='sample',sample_pages=1,cost_cap_usd=1)
+    assert task.stat==STAT_FINISH_SUCCESS,task.error
+    assert len(observed['source_pages'])==3
+    assert len(observed['output_pages'])==1 and observed['output_pages']==observed['evidence']
+    assert observed['plans']==[]
+    with open(task.results['path'],'rb') as f:data=f.read()
+    assert task.results['sha256']==hashlib.sha256(data).hexdigest()
+    assert task.results['bytes']==len(data)
+    ledger=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),cap_usd=1)
+    assert ledger.entries('artifact')[-1]['sha256']==task.results['sha256']
+    assert rig.local_db.session.commits==0
+
+
+def test_actual_task_quality_gate_prevents_both_typed_stages_with_configured_key(rig,monkeypatch):
+    import requests
+    monkeypatch.setattr(rig.mod.config,'resolved_openrouter_key',lambda:'inert-configured-key')
+    def forbidden(*args,**kwargs):raise AssertionError('quality-gated task attempted network')
+    monkeypatch.setattr(requests.sessions.Session,'request',forbidden)
+    task=_run(rig,mode='full',cost_cap_usd=1)
+    assert task.stat==STAT_FINISH_SUCCESS,task.error
+    assert task.results['report']['stopped']=='quality_gate'
+    structural=task.results['report']['structural']
+    assert structural['approved_operations']==0
+    assert structural['unreviewed']==structural['eligible']
+    assert task.results['report']['spend']['usd']==0
+
+
+@pytest.mark.parametrize('decision',['decline','approve','stale'])
+def test_actual_task_records_two_stage_decision_and_only_builds_approved_subset(rig,monkeypatch,decision):
+    approve=decision=='approve'
+    import json,zipfile
+    from cps.services.reflow.structural_pipeline import TwoStageClient
+    from tests.unit.test_reflow_typed_transport import Session,reply
+    doc=F.new_doc();page=doc.new_page(width=500,height=700)
+    page.insert_text((50,100),'"Original displayed words remain exactly as printed."',fontsize=12)
+    for y in (180,195,210):page.insert_text((50,y),'Ordinary body context supports the source display.',fontsize=12)
+    doc.save(str(rig.folder/'Book - Author.pdf'));doc.close()
+    class Answering:
+        def __init__(self):self.calls=[]
+        def get(self,url,**kw):return Session().get(url,**kw)
+        def post(self,*args,**kwargs):
+            payload=json.loads(kwargs['data']);self.calls.append(payload)
+            body=json.loads(payload['messages'][1]['content'][1]['text'])
+            response=body['empty_response'].copy()
+            if payload['model'].endswith('luna'):
+                response['select']=[next(c['candidate_id'] for c in body['source']['candidates'] if c['kind']=='quote')]
+            else:
+                response['approve']=body['source']['verification']['proposed_ids'] if decision!='decline' else []
+                if decision=='stale':response['snapshot_id']='0'*64
+            data=reply(json.dumps(response));data['model']=payload['model']
+            return Session(data).post()
+    session=Answering()
+    monkeypatch.setattr(rig.mod,'make_client',lambda tier:TwoStageClient('inert',enabled=True,session=session))
+    task=_run(rig,mode='full',cost_cap_usd=1)
+    assert task.stat==STAT_FINISH_SUCCESS,task.error
+    assert len(session.calls)==2
+    payload=task.results['report']
+    assert payload['structural']['proposed_operations']==1
+    assert payload['structural']['approved_operations']==int(approve)
+    assert payload['structural']['verifier_abstained']==int(decision=='decline')
+    assert payload['structural']['rejected']==int(decision=='stale')
+    assert payload['spend']['usd']==2*.000123456789
+    row=_ledger_rows(rig)[0]
+    assert row['spend_usd']==payload['spend']['usd']
+    assert row['structural']['verifier_abstained']==int(decision=='decline')
+    with zipfile.ZipFile(task.results['path']) as z:
+        body=''.join(z.read(n).decode() for n in z.namelist() if '/ch' in n and n.endswith('.xhtml'))
+    assert ('<blockquote' in body)==approve
+    import hashlib
+    assert task.results['sha256']==hashlib.sha256(open(task.results['path'],'rb').read()).hexdigest()
+    assert rig.local_db.session.commits==1
+
+@pytest.mark.parametrize('failure',['validation','database','cancel'])
+@pytest.mark.parametrize('existing',[False,True])
+def test_failed_publication_preserves_previous_file_and_no_partial_format(rig,monkeypatch,failure,existing):
+    from sqlalchemy.exc import SQLAlchemyError
+    target=rig.folder/'Book - Author.epub'
+    original=b'Existing user EPUB bytes'
+    if existing:
+        target.write_bytes(original)
+        rig.formats['EPUB']=SimpleNamespace(name='Book - Author',format='EPUB')
+    task=rig.mod.TaskReflowPdf(5,7,{'mode':'full','replace_existing_epub':existing})
+    validate=rig.mod.build_epub.validate
+    if failure=='validation':monkeypatch.setattr(rig.mod.build_epub,'validate',lambda path:['injected invalid XML'])
+    elif failure=='database':
+        def fail():raise SQLAlchemyError('database refused commit')
+        monkeypatch.setattr(rig.local_db.session,'commit',fail)
+    else:
+        def cancel(path):
+            errors=validate(path);task.stat=STAT_ENDED;return errors
+        monkeypatch.setattr(rig.mod.build_epub,'validate',cancel)
+    task.run(None)
+    assert task.stat==(STAT_ENDED if failure=='cancel' else STAT_FAIL)
+    assert rig.local_db.session.commits==0
+    assert target.read_bytes()==original if existing else not target.exists()
+    assert not list(rig.folder.glob('.reflow-*'))
+    assert _ledger_rows(rig)[0].get('artifact') is None

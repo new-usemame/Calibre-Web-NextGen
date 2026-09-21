@@ -237,6 +237,10 @@ class Ledger(object):
             "models": dict(models),
             "pages": len(self.pages_done()),
             "recovery": recovery or {},
+            "structural": next((e['summary'] for e in reversed(self._entries)
+                                if e.get('kind')=='structural_summary'),None),
+            "artifact": next(({k:e[k] for k in ('sha256','bytes')} for e in reversed(self._entries)
+                              if e.get('kind')=='artifact'),None),
         }
 
 

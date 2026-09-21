@@ -22,6 +22,9 @@ volume and hands back a download, so a user can look before they commit.
 
 import os
 import uuid
+import hashlib
+import tempfile
+import shutil
 
 from flask_babel import lazy_gettext as N_
 from sqlalchemy.exc import SQLAlchemyError
@@ -31,7 +34,7 @@ from cps.constants import REFLOW_DIR
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED, \
     STAT_STARTED, STAT_WAITING
 from cps.services.reflow import admission, build_epub, extract, ledger as ledger_mod, \
-    model, ocr, pipeline, report
+    model, ocr, pipeline, report, structural_pipeline
 
 log = logger.create()
 
@@ -48,8 +51,9 @@ SAMPLE_PAGES_MAX = 60
 #: and a jobs list that reports both endings with one word takes that reason away.
 #: ``billing_uncertain`` ends the same way but for a different cause: a dispatched
 #: request's billing could not be proven either way, and its bound stays held.
-STOP_STATUS = {"cost_cap": "capped", "model_errors": "incomplete",
-               "billing_uncertain": "billing_unknown"}
+STOP_STATUS = {"cost_cap": "capped", "model_errors": "incomplete", "model_rejections": "incomplete",
+               "billing_uncertain": "billing_unknown", "prior_request_pending": "billing_unknown",
+               "quality_gate": "limited", "billing_bound": "incomplete", "route_mismatch": "incomplete"}
 
 
 def reflow_dir(*parts):
@@ -125,8 +129,7 @@ def _clamp_cap(value):
 
 def make_client(tier):
     """The model client for a job, or one that is configured not to spend."""
-    return model.OpenRouterClient(api_key=config.resolved_openrouter_key() or None,
-                                  tier=tier)
+    return structural_pipeline.TwoStageClient(config.resolved_openrouter_key() or None)
 
 
 class TaskReflowPdf(CalibreTask):
@@ -204,7 +207,7 @@ class TaskReflowPdf(CalibreTask):
             try:
                 ledger.record({"kind": "job", "event": "start", "user_id": self.user_id,
                                "mode": self.options.mode, "title": book.title,
-                               "tier": self.options.model_tier,
+                               "tier": client.describe().get("tier",self.options.model_tier),
                                "cap_usd": self.options.cost_cap_usd,
                                "pages": document.page_count,
                                # The record is tied to the exact file it spent on.
@@ -232,12 +235,12 @@ class TaskReflowPdf(CalibreTask):
                 document.close()
 
             self.results.update(built)
-            self.results["spend_usd"] = round(result.spend_usd, 6)
+            self.results["spend_usd"] = result.spend_usd
             self.message = self._summary(result)
             ledger.record({"kind": "job", "event": "finish",
                            "status": STOP_STATUS.get(result.stopped, "done")})
             self._handleSuccess()
-        except (ocr.OCRCancelled, build_epub.BuildCancelled):
+        except (ocr.OCRCancelled, build_epub.BuildCancelled, model.AttemptCancelled):
             # The user stopped the recognition stage: nothing was filed, the
             # original is untouched, and the identity cache keeps what was
             # already recognized, so a resume spends nothing twice.
@@ -265,18 +268,15 @@ class TaskReflowPdf(CalibreTask):
     # ------------------------------------------------------------------ stages
 
     def _convert(self, document, client, ledger, cache):
-        pages = None
-        if self.options.mode == "sample":
-            pages = self._sample_pages(document)
         recovery_opts = {
             "mode": self.options.source_recovery,
             "language": self.options.ocr_language,
             "cache_dir": reflow_dir("ocr-cache"),
             "scratch_dir": reflow_dir("ocr-scratch"),
         }
-        return pipeline.run(document, client=client, ledger=ledger, cache=cache,
-                            page_numbers=pages, progress=self._on_progress,
-                            should_stop=lambda: self.cancelled,
+        return structural_pipeline.run_structural(document,client=client,ledger=ledger,cache=cache,
+                            sample_count=self.options.sample_pages if self.options.mode=='sample' else None,
+                            progress=self._on_progress,should_stop=lambda:self.cancelled,
                             recovery_opts=recovery_opts)
 
     def _sample_pages(self, document):
@@ -309,40 +309,68 @@ class TaskReflowPdf(CalibreTask):
                 return report.about_page(_payload,
                                          show_cost=self.options.show_cost_in_report,
                                          links=links, losses=losses)
-        built = build_epub.build(result.book, target, page_html=result.page_html,
-                                 metadata=_metadata(book), doc=document,
-                                 report_html=page, sidecar=payload,
-                                 figure_transform=(result.recovery.figure_rect
-                                                   if result.recovery else None),
-                                 should_stop=lambda: self.cancelled,
-                                 evidence_progress=lambda done, total: self._on_progress(
-                                     pipeline.Progress("evidence", page=done, pages=total,
-                                         spend_usd=result.spend_usd,
-                                         message="preserving original evidence %d/%d" % (done, total))))
-        for warning in built.warnings:
-            # The reader is told the same thing in their own book, on the report
-            # page; this is the terser half, for whoever has to find out why.
-            log.warning("reflow: %s", warning)
-        problems = build_epub.validate(built.path)
-        if problems:
-            # A document a reader's parser stops on is not a chapter with a mistake
-            # in it; it is a chapter the reader never sees. Filing that as the book
-            # is worse than failing, and it costs the user nothing to fail: every
-            # page a model was paid for is in the cache, so a second run after a fix
-            # buys nothing. Same stance as G4 above -- what cannot be trusted does
-            # not ship.
-            log.error("reflow: the EPUB just built does not open: %s", problems)
+        staging=tempfile.mkdtemp(prefix='.reflow-'+self.job_id+'-',dir=os.path.dirname(target))
+        candidate=os.path.join(staging,'candidate.epub')
+        try:
+            built = build_epub.build(result.book, candidate, page_html=result.page_html,
+                                     metadata=_metadata(book), doc=document,
+                                     report_html=page, sidecar=payload,
+                                     source_pages=getattr(result,'source_pages',None),
+                                     operation_plans=getattr(result,'operation_plans',None),
+                                     figure_transform=(result.recovery.figure_rect
+                                                       if result.recovery else None),
+                                     should_stop=lambda: self.cancelled,
+                                     evidence_progress=lambda done, total: self._on_progress(
+                                         pipeline.Progress("evidence", page=done, pages=total,
+                                             spend_usd=result.spend_usd,
+                                             message="preserving original evidence %d/%d" % (done, total))))
+            for warning in built.warnings:
+                # The reader is told the same thing in their own book, on the report
+                # page; this is the terser half, for whoever has to find out why.
+                log.warning("reflow: %s", warning)
+            problems = build_epub.validate(built.path)
+            if problems:
+                # A document a reader's parser stops on is not a chapter with a mistake
+                # in it; it is a chapter the reader never sees. Filing that as the book
+                # is worse than failing, and it costs the user nothing to fail: every
+                # page a model was paid for is in the cache, so a second run after a fix
+                # buys nothing. Same stance as G4 above -- what cannot be trusted does
+                # not ship.
+                log.error("reflow: the EPUB just built does not open: %s", problems)
+                try:
+                    os.remove(built.path)
+                except OSError:                                       # pragma: no cover
+                    pass
+                raise ValueError("the EPUB Reflow built is not a book a reader can "
+                                 "open: %s" % "; ".join(problems[:3]))
+            digest=hashlib.sha256()
+            with open(built.path,'rb') as handle:
+                for chunk in iter(lambda:handle.read(1024*1024),b''):digest.update(chunk)
+            artifact={'sha256':digest.hexdigest(),'bytes':os.path.getsize(built.path)}
+            if self.cancelled:
+                raise build_epub.BuildCancelled('cancelled before publication')
+            if self.options.mode == "sample":
+                os.replace(built.path,target)
+                ledger.record(dict(kind='artifact',**artifact))
+                return dict(artifact,sample=os.path.basename(target),path=target,report=payload)
+            backup=os.path.join(staging,'previous.epub')
+            had_previous=os.path.exists(target)
+            if had_previous:
+                # Same filesystem; a hard link preserves the old bytes without a
+                # second large copy while the new file is published atomically.
+                os.link(target,backup)
+            os.replace(built.path,target)
+            built.path=target
             try:
-                os.remove(built.path)
-            except OSError:                                       # pragma: no cover
-                pass
-            raise ValueError("the EPUB Reflow built is not a book a reader can "
-                             "open: %s" % "; ".join(problems[:3]))
-        if self.options.mode == "sample":
-            return {"sample": os.path.basename(built.path), "path": built.path,
-                    "report": payload}
-        self._add_format(local_db, book, built)
-        return {"path": built.path, "report": payload}
+                self._add_format(local_db,book,built)
+            except Exception:
+                if had_previous:os.replace(backup,target)
+                else:os.remove(target)
+                raise
+            ledger.record(dict(kind='artifact',**artifact))
+            return dict(artifact,path=target,report=payload)
+        finally:
+            shutil.rmtree(staging,ignore_errors=True)
 
     def _target_path(self, book, local_db):
         if self.options.mode == "sample":
@@ -382,6 +410,10 @@ class TaskReflowPdf(CalibreTask):
         self.message = "%s%s" % (event.message or event.stage, spend)
 
     def _summary(self, result):
+        if hasattr(result,'structural'):
+            counts=result.structural
+            return ("%d pages prepared · %d formatting changes approved · %d eligible pages not reviewed · $%.6f confirmed · up to $%.6f unresolved"
+                % (result.pages,counts['approved_operations'],counts['unreviewed'],result.spend_usd,result.pending_usd))
         if result.stopped == "billing_uncertain":
             return ("stopped after %d of %d pages: a model answer was lost after "
                     "dispatch and its billing could not be confirmed · $%.2f "

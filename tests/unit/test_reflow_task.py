@@ -49,6 +49,7 @@ class _Session(object):
 
     def commit(self):
         self.commits += 1
+        if self.merged:self.existing=self.merged[-1]
 
     def rollback(self):                                           # pragma: no cover
         pass
@@ -639,3 +640,104 @@ def test_failed_publication_preserves_previous_file_and_no_partial_format(rig,mo
     assert target.read_bytes()==original if existing else not target.exists()
     assert not list(rig.folder.glob('.reflow-*'))
     assert _ledger_rows(rig)[0].get('artifact') is None
+
+@pytest.mark.parametrize('existing',[False,True])
+def test_process_death_after_publication_restores_consistent_library(rig,monkeypatch,existing):
+    import multiprocessing
+    target=rig.folder/'Book - Author.epub'
+    if existing:
+        target.write_bytes(b'previous private EPUB')
+        rig.formats['EPUB']=SimpleNamespace(name='Book - Author',format='EPUB')
+        rig.local_db.session.existing=SimpleNamespace(name='Book - Author',uncompressed_size=target.stat().st_size)
+    previous=target.read_bytes() if existing else None
+    task=rig.mod.TaskReflowPdf(5,7,{'mode':'full','replace_existing_epub':existing})
+    real_replace=os.replace
+    def die_after_publish(src,dst):
+        real_replace(src,dst)
+        if os.fspath(dst)==str(target):os._exit(86)
+    def child():
+        monkeypatch.setattr(rig.mod.os,'replace',die_after_publish)
+        task.run(None)
+    process=multiprocessing.get_context('fork').Process(target=child)
+    process.start();process.join(30)
+    assert process.exitcode==86
+    assert target.exists() and target.read_bytes()!=previous
+    with rig.mod.publication.lock(os.path.join(rig.root,'publication-locks'),str(target)):
+        assert rig.mod.recover_interrupted_jobs()==[]
+        assert _ledger_rows(rig)[0]['status']=='running'
+    rig.mod.recover_interrupted_jobs()
+    assert (target.read_bytes() if target.exists() else None)==previous
+    before=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),0).entries()
+    assert rig.mod.recover_interrupted_jobs()==[]
+    assert ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),0).entries()==before
+    assert not list(rig.folder.glob('.reflow-*'))
+
+@pytest.mark.parametrize('crash_after_receipt',[False,True])
+def test_process_death_after_database_commit_retains_exact_new_file(rig,monkeypatch,crash_after_receipt):
+    import multiprocessing,json,hashlib
+    marker=rig.folder/'format-state.json'
+    target=rig.folder/'Book - Author.epub'
+    target.write_bytes(b'old EPUB')
+    task=rig.mod.TaskReflowPdf(5,7,{'mode':'full','replace_existing_epub':True})
+    def commit():
+        row=rig.local_db.session.merged[-1]
+        marker.write_text(json.dumps({'name':row.name,'uncompressed_size':row.uncompressed_size}))
+        if not crash_after_receipt:os._exit(86)
+    monkeypatch.setattr(rig.local_db.session,'commit',commit)
+    monkeypatch.setattr(rig.local_db.session,'one_or_none',lambda:SimpleNamespace(**json.loads(marker.read_text())) if marker.exists() else None)
+    real_committed=rig.mod.publication.committed
+    def committed(led):
+        real_committed(led);os._exit(86)
+    if crash_after_receipt:monkeypatch.setattr(rig.mod.publication,'committed',committed)
+    process=multiprocessing.get_context('fork').Process(target=task.run,args=(None,))
+    process.start();process.join(30);assert process.exitcode==86
+    expected=hashlib.sha256(target.read_bytes()).hexdigest()
+    ledpath=os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl')
+    led=ledger_mod.Ledger(ledpath,5,task.job_id)
+    led.record({'kind':'reservation','event':'pending','attempt':'unresolved','bound_usd':.123456789})
+    led.record({'kind':'reservation','event':'reconciled','attempt':'billed','cost_usd':.0123456789})
+    assert rig.mod.recover_interrupted_jobs()==[task.job_id]
+    assert hashlib.sha256(target.read_bytes()).hexdigest()==expected
+    after=ledger_mod.Ledger(ledpath,5,task.job_id)
+    assert after.spent()==.0123456789 and after.pending_usd()==.123456789
+    assert after.entries('artifact')[-1]['sha256']==expected
+    assert not list(rig.folder.glob('.reflow-*'))
+    assert rig.mod.recover_interrupted_jobs()==[]
+
+@pytest.mark.parametrize('changed',['target','metadata','source','backup','extra-staging'])
+def test_restart_preserves_later_user_changes_instead_of_rolling_them_back(rig,monkeypatch,changed):
+    import multiprocessing
+    target=rig.folder/'Book - Author.epub';target.write_bytes(b'old EPUB')
+    task=rig.mod.TaskReflowPdf(5,7,{'mode':'full','replace_existing_epub':True})
+    real_replace=os.replace
+    def child():
+        def replace(src,dst):
+            real_replace(src,dst)
+            if os.fspath(dst)==str(target):os._exit(86)
+        monkeypatch.setattr(rig.mod.os,'replace',replace);task.run(None)
+    process=multiprocessing.get_context('fork').Process(target=child)
+    process.start();process.join(30);assert process.exitcode==86
+    staging=next(rig.folder.glob('.reflow-*'))
+    if changed=='target':target.write_bytes(b'later user EPUB')
+    elif changed=='metadata':rig.local_db.session.existing=SimpleNamespace(name='other user format',uncompressed_size=123)
+    elif changed=='source':(rig.folder/'Book - Author.pdf').write_bytes(b'later user source')
+    elif changed=='backup':
+        # Break the old hard link before editing its replacement.
+        (staging/'previous.epub').unlink();(staging/'previous.epub').write_bytes(b'later backup')
+    else:(staging/'user-file').write_bytes(b'later user evidence')
+    before={str(p):p.read_bytes() for p in rig.folder.rglob('*') if p.is_file()}
+    rig.mod.recover_interrupted_jobs()
+    assert before=={str(p):p.read_bytes() for p in rig.folder.rglob('*') if p.is_file()}
+    row=_ledger_rows(rig)[0]
+    assert row['status']=='failed' and 'recovery' in row['error'].lower()
+
+
+def test_existing_epub_filename_is_the_actual_replacement_target(rig):
+    target=rig.folder/'Alternate.epub';target.write_bytes(b'old indexed EPUB')
+    rig.formats['EPUB']=SimpleNamespace(name='Alternate',format='EPUB')
+    rig.local_db.session.existing=SimpleNamespace(name='Alternate',uncompressed_size=16)
+    task=_run(rig,mode='full',replace_existing_epub=True)
+    assert task.stat==STAT_FINISH_SUCCESS
+    assert task.results['path']==str(target)
+    assert rig.local_db.session.existing.name=='Alternate'
+    assert not (rig.folder/'Book - Author.epub').exists()

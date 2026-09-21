@@ -155,7 +155,7 @@ class Ledger(object):
 
     # --------------------------------------------------------------- the record
 
-    def record(self, entry):
+    def record(self, entry, durable=False):
         entry = dict(entry)
         entry.setdefault("ts", round(time.time(), 3))
         if self.job_id:
@@ -166,6 +166,15 @@ class Ledger(object):
             os.makedirs(directory, exist_ok=True)
         with open(self.path, "a", encoding="utf-8") as handle:
             handle.write(line + "\n")
+            if durable:
+                handle.flush()
+                os.fsync(handle.fileno())
+        if durable and directory:
+            fd = os.open(directory, os.O_RDONLY)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
         self._entries.append(entry)
         return entry
 

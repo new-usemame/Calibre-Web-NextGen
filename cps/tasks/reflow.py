@@ -34,7 +34,7 @@ from cps.constants import REFLOW_DIR
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED, \
     STAT_STARTED, STAT_WAITING
 from cps.services.reflow import admission, build_epub, extract, ledger as ledger_mod, \
-    model, ocr, pipeline, report, structural_pipeline
+    model, ocr, pipeline, publication, report, structural_pipeline
 
 log = logger.create()
 
@@ -303,6 +303,7 @@ class TaskReflowPdf(CalibreTask):
                              % "; ".join(problems))
 
         target = self._target_path(book, local_db)
+        if self.options.mode=='full':publication.relative(config.get_book_path(),target)
         page = None
         if self.options.include_report_page:
             def page(links=None, losses=(), _payload=payload):
@@ -311,6 +312,7 @@ class TaskReflowPdf(CalibreTask):
                                          links=links, losses=losses)
         staging=tempfile.mkdtemp(prefix='.reflow-'+self.job_id+'-',dir=os.path.dirname(target))
         candidate=os.path.join(staging,'candidate.epub')
+        publication_prepared=False
         try:
             built = build_epub.build(result.book, candidate, page_html=result.page_html,
                                      metadata=_metadata(book), doc=document,
@@ -353,29 +355,40 @@ class TaskReflowPdf(CalibreTask):
                 os.replace(built.path,target)
                 ledger.record(dict(kind='artifact',**artifact))
                 return dict(artifact,sample=os.path.basename(target),path=target,report=payload)
-            backup=os.path.join(staging,'previous.epub')
-            had_previous=os.path.exists(target)
-            if had_previous:
-                # Same filesystem; a hard link preserves the old bytes without a
-                # second large copy while the new file is published atomically.
-                os.link(target,backup)
-            os.replace(built.path,target)
-            built.path=target
-            try:
-                self._add_format(local_db,book,built)
-            except Exception:
-                if had_previous:os.replace(backup,target)
-                else:os.remove(target)
-                raise
-            ledger.record(dict(kind='artifact',**artifact))
-            return dict(artifact,path=target,report=payload)
+            with publication.lock(os.path.join(REFLOW_DIR,'publication-locks'),target):
+                if os.path.exists(target) and not self.options.replace_existing_epub:
+                    raise ValueError('An EPUB already exists; explicit replacement is required.')
+                previous_format=_format_state(local_db,self.book_id)
+                desired_format=dict(name=os.path.splitext(os.path.basename(target))[0],size=artifact['bytes'])
+                record=publication.prepare(ledger,config.get_book_path(),self.book_id,book.path,
+                    self._pdf_path(local_db,book),target,staging,previous_format,desired_format,expected_source=result.fingerprint)
+                publication_prepared=True
+                os.replace(built.path,target)
+                publication.sync(target);publication.sync(os.path.dirname(target))
+                built.path=target
+                try:
+                    self._add_format(local_db,book,built)
+                    publication.committed(ledger)
+                except Exception:
+                    # Re-read committed metadata: a commit may have succeeded even
+                    # when its caller did not receive a successful return.
+                    publication.reconcile(ledger,config.get_book_path(),record,
+                        _format_state(local_db,self.book_id),book.path,self._pdf_path(local_db,book))
+                    raise
+                publication.reconcile(ledger,config.get_book_path(),record,
+                    _format_state(local_db,self.book_id),book.path,self._pdf_path(local_db,book))
+                return dict(artifact,path=target,report=payload)
         finally:
-            shutil.rmtree(staging,ignore_errors=True)
+            # A prepared publication owns durable recovery evidence. Never destroy
+            # its backup on an unhandled failure or conflicting later mutation.
+            if not publication_prepared:
+                shutil.rmtree(staging,ignore_errors=True)
 
     def _target_path(self, book, local_db):
         if self.options.mode == "sample":
             return sample_path(self.user_id, self.job_id)
-        data = local_db.get_book_format(self.book_id, "PDF")
+        data = (local_db.get_book_format(self.book_id, "EPUB")
+                or local_db.get_book_format(self.book_id, "PDF"))
         folder = os.path.join(config.get_book_path(), book.path)
         return os.path.join(folder, "%s.epub" % data.name)
 
@@ -390,6 +403,7 @@ class TaskReflowPdf(CalibreTask):
                           book_format="EPUB", book=self.book_id,
                           uncompressed_size=size)
         else:
+            row.name = os.path.splitext(os.path.basename(built.path))[0]
             row.uncompressed_size = size
         try:
             local_db.session.merge(row)
@@ -460,6 +474,43 @@ def _metadata(book):
 INTERRUPTED_STATUS = "interrupted"
 
 
+def _format_state(local_db,book_id):
+    row=local_db.session.query(db.Data).filter(db.Data.book==book_id).filter(db.Data.format=='EPUB').one_or_none()
+    return None if row is None else dict(name=row.name,size=int(row.uncompressed_size))
+
+
+def _recover_publication(led):
+    record=publication.pending(led)
+    if record is None:return True
+    local_db=None
+    try:
+        target=publication.resolve(config.get_book_path(),record['target'])
+        with publication.lock(os.path.join(REFLOW_DIR,'publication-locks'),target,blocking=False) as acquired:
+            if not acquired:return None
+            # A worker may have completed while startup waited for its lock.
+            led._entries=ledger_mod.Ledger(led.path,led.cap_usd,led.job_id).entries()
+            record=publication.pending(led)
+            if record is None:return True
+            book_id=int(record['book_id'])
+            if str(book_id)!=os.path.basename(os.path.dirname(led.path)):
+                raise publication.PublicationConflict('publication ledger book identity differs')
+            local_db=db.CalibreDB(expire_on_commit=False,init=True)
+            book=local_db.get_book(book_id)
+            data=local_db.get_book_format(book_id,'PDF')
+            if book is None or data is None:raise publication.PublicationConflict('publication source book is unavailable')
+            source=os.path.join(config.get_book_path(),book.path,data.name+'.pdf')
+            publication.reconcile(led,config.get_book_path(),record,_format_state(local_db,book_id),book.path,source)
+            return True
+    except (OSError,ValueError,KeyError,TypeError,SQLAlchemyError) as exc:
+        reason=str(exc)
+        if not any(e.get('event')=='conflict' and e.get('reason')==reason for e in led.entries('publication')):
+            led.record(dict(kind='publication',event='conflict',reason=reason),durable=True)
+        log.error('reflow publication recovery needs review for job %s: %s',led.job_id,reason)
+        return False
+    finally:
+        if local_db is not None:local_db.session.close()
+
+
 def recover_interrupted_jobs(worker=None):
     """Settle the record of every conversion its process did not finish.
 
@@ -473,7 +524,8 @@ def recover_interrupted_jobs(worker=None):
     ownership guard holds if the sweep is ever run late: a job a live task of
     this process owns is never terminalized.
 
-    Recovery appends the terminal record and nothing else. Confirmed spend and
+    Recovery first reconciles prepared file publication against current library
+    identities and format metadata, then appends the terminal job record. Confirmed spend and
     unresolved holds are the job's own history: no reservation is released,
     reconciled, or zeroed because the process that wrote it is gone. A retry is
     a new job that reuses the page cache, never a silent resumption of this
@@ -507,9 +559,17 @@ def recover_interrupted_jobs(worker=None):
             job_id = name[:-len(".jsonl")]
             led = ledger_mod.Ledger(os.path.join(directory, name),
                                     cap_usd=0.0, job_id=job_id)
+            if job_id in active_ids:
+                continue
+            settled=_recover_publication(led)
             if led.job().get("status") != "running":
                 continue
-            if job_id in active_ids:
+            if settled is None:
+                continue
+            if not settled:
+                led.record({"kind":"job","event":"finish","status":"failed",
+                            "error":"Publication recovery needs review; existing files were preserved."})
+                recovered.append(job_id)
                 continue
             led.record({"kind": "job", "event": "finish",
                         "status": INTERRUPTED_STATUS,

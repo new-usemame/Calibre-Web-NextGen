@@ -93,7 +93,7 @@ class Ledger(object):
 
         Not confirmed spend -- but not zero either. It counts against the cap and
         it is shown as held until it is reconciled or released. Full precision:
-        a liability is never rounded down. Display rounding lives in ``totals``.
+        a liability is never rounded down. Display formatting belongs to the caller; reports retain this precision.
         """
         return sum(self._financial_state()[1].values())
 
@@ -236,7 +236,7 @@ class Ledger(object):
             "calls": calls,
             "reused": reused,
             "spend_usd": self.spent(),
-            "pending_usd": round(sum(pending.values()), 6),
+            "pending_usd": sum(pending.values()),
             "unresolved_attempts": len(pending),
             "cap_usd": self.cap_usd,
             "remaining_usd": self.remaining(),

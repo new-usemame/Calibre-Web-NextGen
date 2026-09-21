@@ -13,7 +13,7 @@ from types import SimpleNamespace
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import extract,model,structural_quote,typed_model,prompts
+from . import extract,model,structural_quote,typed_model,prompts,ocr,build_epub,enriched_source,heading_units
 
 
 class PreparationBusy(Exception):
@@ -28,7 +28,14 @@ class PreparationStore:
 
     def _key(self,source,options):
         fingerprint=extract.document_fingerprint(source)
+        recovery_identity=None
+        if options.get('source_recovery','auto')!='off':
+            try:
+                _executable,version,data=ocr._engine(options.get('ocr_language','eng'))
+                recovery_identity=[ocr.ADAPTER_VERSION,version,data]
+            except ocr.OCRUnavailable:recovery_identity=[ocr.ADAPTER_VERSION,'unavailable']
         context=[fingerprint,options,structural_quote.VERSION,typed_model.SOURCE_REVISION,
+                 build_epub.CONVERTER_VERSION,enriched_source.VERSION,heading_units.VERSION,recovery_identity,
                  typed_model.ROUTE_VERSION,prompts.OPERATION_PROMPT_VERSION,prompts.VERIFICATION_PROMPT_VERSION,
                  [(s,m.model_id,m.prompt_usd_per_mtok,m.completion_usd_per_mtok) for s,m in typed_model.STAGES.items()]]
         return hashlib.sha256(json.dumps(context,sort_keys=True).encode()).hexdigest(),fingerprint

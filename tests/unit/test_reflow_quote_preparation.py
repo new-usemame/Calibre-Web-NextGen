@@ -84,3 +84,26 @@ def test_actual_isolated_preparation_cancels_before_publishing_quote(tmp_path):
     with pytest.raises(model.AttemptCancelled):
         measure_isolated(source,{'source_recovery':'off','ocr_language':'eng'},None,lambda:True,tmp_path)
     assert list((tmp_path/'quote-scratch').iterdir())==[]
+
+
+def test_recovery_runtime_change_invalidates_ready_quote_without_reusing_old_context(tmp_path,monkeypatch):
+    import json,hashlib,time
+    from cps.services.reflow import extract,ocr,structural_quote
+    from cps.services.reflow.quote_preparation import PreparationStore
+    source=tmp_path/'source.pdf';source.write_bytes(b'source');version=['engine-1']
+    monkeypatch.setattr(ocr,'_engine',lambda language:('/inert/tesseract',version[0],'language-data-1'))
+    options={'source_recovery':'auto','ocr_language':'eng'}
+    def work(*args):
+        quote={'version':structural_quote.VERSION,'source_sha256':extract.document_fingerprint(str(source))}
+        quote['identity']=hashlib.sha256(json.dumps(quote,sort_keys=True,ensure_ascii=False,separators=(',',':')).encode()).hexdigest()
+        return quote
+    store=PreparationStore(tmp_path/'cache')
+    try:
+        job=store.start(7,5,str(source),options,work)
+        deadline=time.monotonic()+2
+        while job['status']!='ready' and time.monotonic()<deadline:
+            time.sleep(.01);job=store.get(7,5,job['preparation_id'])
+        assert job['status']=='ready'
+        version[0]='engine-2'
+        with pytest.raises(KeyError):store.ready(7,5,job['preparation_id'],str(source),options)
+    finally:store.close()

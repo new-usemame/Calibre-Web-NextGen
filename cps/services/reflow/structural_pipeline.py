@@ -190,7 +190,8 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
     for plan in result.operation_plans:
         pno=plan.prepared.page
         result.preview_html[pno]=result.source_pages[pno].render(result.book,plan.compile(result.book,doc,source_page=result.source_pages[pno]))
-    result.structural=dict(counts,eligibility_measured=measure_eligibility,pages=[dict(page=p,**row) for p,row in states.items()],
+    result.structural=dict(counts,requested_models=dict(Counter(e['model'] for e in attempts if e.get('model'))),
+                           eligibility_measured=measure_eligibility,pages=[dict(page=p,**row) for p,row in states.items()],
                            route_version=ROUTE_VERSION,source_revision=SOURCE_REVISION)
     if ledger:ledger.record({'kind':'structural_summary','summary':result.structural})
     result.stopped=(halted or ('model_rejections' if counts['rejected'] else None)) if measure_eligibility else None;result.pages_done=sum(o.gate=='PASS' for o in result.outcomes.values())

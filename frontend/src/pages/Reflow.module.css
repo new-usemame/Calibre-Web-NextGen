@@ -87,15 +87,16 @@
 /* ---- mode ---- */
 .modes { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin-bottom: var(--sp-3); }
 .mode, .modeOn {
-  display: inline-flex; align-items: center; gap: var(--sp-2);
-  padding: var(--sp-2) var(--sp-3); border: 1px solid var(--border);
-  border-radius: var(--r-full); background: var(--surface-2); cursor: pointer;
+  display: grid; grid-template-columns: 1rem minmax(0, 1fr); align-items: start; gap: var(--sp-2);
+  flex: 1 1 16rem; min-width: 0;
+  padding: var(--sp-3); border: 1px solid var(--border);
+  border-radius: var(--r-md); background: var(--surface-2); cursor: pointer;
 }
 .mode:focus-within, .modeOn:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 .modeOn { border-color: var(--accent); background: var(--accent-soft); }
 .modeLabel { color: var(--text); font-size: var(--fs-sm); }
 .modeOn .modeLabel { color: var(--accent-text); font-weight: var(--fw-medium); }
-.modeHint { color: var(--text-muted); font-size: var(--fs-sm); margin: 0 0 var(--sp-3); line-height: var(--lh-base); }
+.modeHint { grid-column: 2; color: var(--text-muted); font-size: var(--fs-sm); margin: 0; line-height: var(--lh-base); }
 
 .field { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-3); }
 .label { color: var(--text); font-size: var(--fs-sm); }
@@ -178,3 +179,7 @@
   .tierPrice { grid-column: 2; }
   .facts { gap: var(--sp-3) var(--sp-4); }
 }
+
+/* Persistent live regions stay mounted without empty error boxes. */
+.error:empty { padding: 0; border: 0; margin: 0; background: transparent; }
+.note, .factValue { overflow-wrap: anywhere; }

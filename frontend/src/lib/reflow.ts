@@ -4,9 +4,12 @@
  * transaction: an estimate the user is shown, a consent they give to a figure,
  * and a job that is watched until it stops. Shapes mirror cps/api/reflow.py. */
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { apiGet, apiPost } from './api';
+import { apiGet, apiPost, apiDelete } from './api';
 
-import type { ReflowEstimate, ReflowMode } from './reflowMoney.ts';
+import type { ReflowMode } from './reflowMoney.ts';
+import { preparationActive, type SourceAssessment, type ReviewMode, type ReviewPreparation, type SourceRecovery, type StructuralSummary } from './sourceReview.ts';
+export { selectedReview, preparationActive } from './sourceReview.ts';
+export type { ReviewMode, ReviewQuote, ReviewPreparation, SourceAssessment } from './sourceReview.ts';
 
 // The shapes and the sums are one subject with the endpoints, and every caller
 // reaches them through this module; only the file they are written in moved.
@@ -22,7 +25,7 @@ export interface ReflowJob {
   job_id: string;
   mode: ReflowMode;
   /** ``capped`` and ``incomplete`` both stopped early with a file in hand: the
-   *  pages bought before the stop were written, the rest were not. The first is
+   *  approved changes before the stop were written; all selected pages retain the complete source conversion. The first is
    *  the cap the user set, the second is the model service going away mid-book.
    *  ``billing_unknown`` stopped when a dispatched request's billing could not
    *  be proven either way: its bound stays held, and ``pending_usd`` says how
@@ -33,7 +36,7 @@ export interface ReflowJob {
    *  did what it was asked for.
    *  See STOP_STATUS in cps/tasks/reflow.py. */
   status: 'waiting' | 'running' | 'done' | 'capped' | 'incomplete' | 'failed'
-    | 'cancelled' | 'billing_unknown' | 'interrupted';
+    | 'cancelled' | 'billing_unknown' | 'interrupted' | 'limited';
   started: number | null;
   finished: number | null;
   /** Confirmed spend, reconciled against the provider. */
@@ -62,6 +65,8 @@ export interface ReflowJob {
   error: string | null;
   sample_url: string | null;
   sample_ready?: boolean;
+  structural?: StructuralSummary | null;
+  artifact?: { sha256: string; bytes: number } | null;
 }
 
 export interface ReflowActive {
@@ -80,7 +85,10 @@ export interface ReflowJobs {
 
 export interface ReflowStartBody {
   mode: ReflowMode;
-  model_tier: string;
+  review_mode: ReviewMode;
+  consent_contract: string;
+  source_sha256: string;
+  preparation_id?: string;
   sample_pages?: number;
   cost_cap_usd: number;
   consent: true;
@@ -94,18 +102,19 @@ export interface ReflowStarted {
   task_id: number | string;
   job_id: string;
   mode: ReflowMode;
-  model_tier: string;
+  review_mode: ReviewMode;
   cost_cap_usd: number;
-  estimate_usd: number;
+  reservation_ceiling_usd: number;
+  partial_review_possible: boolean;
 }
 
 /** The deterministic pass reads the PDF, so this is slow the first time and
  *  cached on the server afterwards. Never refetched on focus: re-reading a
  *  700-page PDF because somebody switched tabs is not free of CPU. */
 export function useReflowEstimate(id: string | number) {
-  return useQuery<ReflowEstimate>({
+  return useQuery<SourceAssessment>({
     queryKey: ['reflow-estimate', String(id)],
-    queryFn: () => apiGet<ReflowEstimate>(`/api/v1/books/${id}/reflow/estimate`),
+    queryFn: () => apiGet<SourceAssessment>(`/api/v1/books/${id}/reflow/estimate`),
     refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000,
     retry: false,
@@ -146,5 +155,30 @@ export function useCancelReflow() {
     mutationFn: (taskId: number | string) =>
       apiPost(`/api/v1/tasks/${encodeURIComponent(String(taskId))}/cancel`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['reflow-jobs'] }),
+  });
+}
+
+
+export function usePrepareReflow(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (options: { source_recovery: SourceRecovery; ocr_language: string }) =>
+      apiPost<ReviewPreparation>(`/api/v1/books/${id}/reflow/estimate/prepare`, options),
+    onSuccess: (data) => qc.setQueryData(['reflow-preparation', String(id), data.preparation_id], data),
+  });
+}
+export function useReflowPreparation(id: string | number, preparationId?: string) {
+  return useQuery<ReviewPreparation>({
+    queryKey: ['reflow-preparation', String(id), preparationId],
+    queryFn: () => apiGet(`/api/v1/books/${id}/reflow/estimate/preparations/${preparationId}`),
+    enabled: !!preparationId, retry: false, refetchOnWindowFocus: false,
+    refetchInterval: (q) => preparationActive(q.state.data?.status) ? 1000 : false,
+  });
+}
+export function useCancelPreparation(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (preparationId: string) => apiDelete<ReviewPreparation>(`/api/v1/books/${id}/reflow/estimate/preparations/${preparationId}`),
+    onSuccess: (data) => qc.setQueryData(['reflow-preparation', String(id), data.preparation_id], data),
   });
 }

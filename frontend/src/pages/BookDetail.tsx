@@ -1106,8 +1106,8 @@ function FilesSection({ id }: { id: string }) {
 
       {canEdit && formats.some((f) => f.toLowerCase() === 'pdf') && (
         <p className={styles.reflowLine}>
-          <Link href={`/book/${id}/reflow`} className={styles.reflowLink}>{t('Reflow this PDF with AI…')}</Link>
-          {' '}{t('A scanned PDF converts badly. Reflow rebuilds its chapters, paragraphs and footnotes with a model, at a cost you agree to first.')}
+          <Link href={`/book/${id}/reflow`} className={styles.reflowLink}>{t('Convert this PDF to EPUB…')}</Link>
+          {' '}{t('Create a source-based EPUB with original evidence for uncertain text. Optional AI formatting review has its own estimate and consent.')}
         </p>
       )}
 

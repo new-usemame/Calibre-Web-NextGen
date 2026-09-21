@@ -44,6 +44,7 @@ STOP_REASONS = {
     "model_errors": "The conversion stopped because the model service refused "
                     "several pages in a row. The pages already reviewed are in "
                     "this book; the rest keep the text read from the PDF.",
+    "estimate_stale": "Source preparation no longer matches the consented estimate. Further AI review stopped; the complete source conversion is preserved.",
     "quality_gate": "The complete deterministic conversion is preserved. AI formatting review is not enabled; eligible pages remain unreviewed.",
     "prior_request_pending": "An earlier request for this source is unresolved. No duplicate request was sent; deterministic output is preserved.",
     "billing_bound": "A reported charge exceeded its reserved bound. The exact charge is recorded and further review stopped; deterministic output is preserved.",
@@ -168,6 +169,7 @@ def numbers(result, ledger=None, client=None):
     }
     if hasattr(result,'structural'):
         payload['structural']=dict(result.structural)
+        payload['statement']='Formatting operations preserve the chosen source words. Extraction and OCR can differ from the printed page; uncertainty disclosures and original evidence remain available.'
         payload['structure']['scope']='full_source_book'
         payload['rendered_structure']={'headings':len(re.findall(r'<h[1-6]\b',markup,re.I)),
             'blockquotes':len(_BLOCKQUOTE.findall(markup))}
@@ -357,7 +359,7 @@ def about_page(payload, show_cost=False, links=None, losses=()):
     out = ["<h1>About this conversion</h1>",
            "<p>This book was made from a PDF by %s %s on %s. %s</p>"
            % (escape(CONVERTER), escape(CONVERTER_VERSION),
-              escape(payload.get("generated", "")), escape(STATEMENT))]
+              escape(payload.get("generated", "")), escape(payload.get("statement",STATEMENT)))]
 
     out.append("<h2>The PDF this came from</h2>")
     source = payload["source"]
@@ -385,6 +387,7 @@ def about_page(payload, show_cost=False, links=None, losses=()):
         if values.get('eligibility_measured',True):
             out.append('<h2>AI formatting review</h2><p>Only approved source-bound heading or quotation formatting is applied. An unchanged page or an abstention is not an improvement. Counts describe mechanical admission, not independent semantic correctness.</p><table><tbody>%s</tbody></table>'
                        % ''.join('<tr><td>%s</td><td>%d</td></tr>'%(escape(label),value) for label,value in rows))
+            out.append('<p>Models requested by this job: %s.</p>' % escape(', '.join(values.get('requested_models',{})) or 'none'))
         else:
             out.append('<h2>AI formatting review</h2><p>AI review was not requested. Eligibility was not measured. This file uses the complete source conversion for the selected pages, including its original evidence and uncertainty disclosures.</p>')
 

@@ -38,6 +38,7 @@ def test_real_two_stage_pipeline_only_builds_verifier_decision_and_cache_replays
     result=run_structural(doc,client=client,ledger=ledger,cache=cache,prepared_result=prepared_result(source))
     assert len(session.calls)==2 and ledger.spent()==pytest.approx(2*.000123456789)
     assert result.structural['proposed_operations']==1
+    assert result.structural['requested_models']=={stage.model_id:1 for stage in client.stages.values()}
     assert result.structural['approved_operations']==int(approve)
     target=tmp/'result.epub'
     build_epub.build(book,str(target),doc=doc,page_html=result.page_html,source_pages=result.source_pages,operation_plans=result.operation_plans)

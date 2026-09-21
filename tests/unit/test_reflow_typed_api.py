@@ -69,3 +69,16 @@ def test_job_api_preserves_actual_scope_and_exact_filed_identity(mod,monkeypatch
     row=_json(response)['items'][0]
     assert row['structural']==summary and row['artifact']=={'sha256':'b'*64,'bytes':1234}
     assert row['spend_usd']==row['pending_usd']==0 and row['cap_usd']==.5
+
+
+def test_job_api_never_rounds_away_unresolved_liability(mod,monkeypatch,pdf_on_disk):
+    from cps.services.reflow.ledger import Ledger
+    from types import SimpleNamespace
+    _wire(mod,monkeypatch,pdf_on_disk)
+    ledger=Ledger(os.path.join(mod.REFLOW_DIR,'jobs','5','b'*32+'.jsonl'),cap_usd=1,job_id='b'*32)
+    ledger.record({'kind':'job','event':'start','mode':'full','user_id':7,'cap_usd':1})
+    bound=.000000123456789
+    ledger.reserve_attempt('0',bound,model_id='inert/model')
+    with _ctx('/api/v1/books/5/reflow/jobs'),patch.object(mod,'current_user',_user()),patch.object(mod.WorkerThread,'get_instance',lambda:SimpleNamespace(tasks=[])):
+        row=_json(inspect.unwrap(mod.reflow_jobs)(5))['items'][0]
+    assert row['pending_usd']==bound and row['spend_usd']==0

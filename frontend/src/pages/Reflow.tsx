@@ -6,9 +6,9 @@ import {
 import { useBook } from '../lib/queries';
 import {
   useReflowEstimate, useReflowJobs, useStartReflow, useCancelReflow,
-  consentUsd, heldUsd, holdRequiringAcknowledgment, jobCounts, ledgerUsd, requiredUsd,
-  routedPagesAreProjected, sampleRoutedPages, suggestedCap, usd,
-  type ReflowJob, type ReflowMode,
+  heldUsd, holdRequiringAcknowledgment, jobCounts, ledgerUsd,
+  selectedReview, preparationActive, usePrepareReflow, useReflowPreparation, useCancelPreparation, usd,
+  type ReflowJob, type ReflowMode, type ReviewMode,
 } from '../lib/reflow';
 import { Button } from '../components/Button';
 import { SpinnerCentered } from '../components/Spinner';
@@ -16,6 +16,7 @@ import { EmptyState } from '../components/EmptyState';
 import { ApiError, resourceUrl } from '../lib/api';
 import { useT, type TFunction } from '../lib/i18n';
 import styles from './Reflow.module.css';
+import { useAnnouncer } from '../lib/a11y/announcer';
 
 /** The assessment, in the reader's language.
  *
@@ -25,7 +26,7 @@ import styles from './Reflow.module.css';
 function verdictSentence(verdict: string, t: TFunction): string {
   switch (verdict) {
     case 'BORN_DIGITAL':
-      return t('This PDF has a real text layer. Most pages will convert without asking a model anything.');
+      return t('This PDF has a native text layer. Extraction and punctuation may still differ from the printed page; original-source evidence remains available.');
     case 'OCR_LAYER':
       return t('Every page is a picture of the page with OCR text behind it. The words are readable, but the structure has to be rebuilt.');
     case 'THIN_TEXT':
@@ -47,6 +48,7 @@ const STATUS_LABEL = (status: string, t: TFunction): string => ({
   incomplete: t('The model service stopped answering'),
   billing_unknown: t('A charge could not be confirmed'),
   interrupted: t('Interrupted by a restart'),
+  limited: t('Source conversion ready; AI review limited'),
   failed: t('Failed'),
   // Not the classic task list's "Cancelled": a conversion has two ways of
   // stopping early and the bill is different, so each says which one it was.
@@ -55,12 +57,14 @@ const STATUS_LABEL = (status: string, t: TFunction): string => ({
 
 export function Reflow({ id }: { id: string }) {
   const t = useT();
+  const announce = useAnnouncer();
   const { data: book } = useBook(id);
   const estimateQ = useReflowEstimate(id);
   const est = estimateQ.data;
 
   const [mode, setMode] = useState<ReflowMode>('sample');
-  const [tier, setTier] = useState<string>('');
+  const [reviewMode, setReviewMode] = useState<ReviewMode>('deterministic');
+  const [preparation, setPreparation] = useState<{ id: string; key: string } | null>(null);
   const [samplePages, setSamplePages] = useState<number>(20);
   const [cap, setCap] = useState<string>('');
   const [capTouched, setCapTouched] = useState(false);
@@ -72,12 +76,34 @@ export function Reflow({ id }: { id: string }) {
 
   const start = useStartReflow(id);
   const cancel = useCancelReflow();
+  const prepare = usePrepareReflow(id);
+  const cancelPreparation = useCancelPreparation(id);
+  const sourceKey = JSON.stringify([id, est?.source_sha256, recovery, ocrLang]);
+  const preparationId = preparation?.key === sourceKey ? preparation.id : undefined;
+  const preparationQ = useReflowPreparation(id, preparationId);
+  const preparing = preparationActive(preparationQ.data?.status) || prepare.isPending;
+  const quote = preparationQ.data?.status === 'ready' && preparationQ.data.quote?.source_sha256 === est?.source_sha256
+    ? preparationQ.data.quote : undefined;
+  const paid = reviewMode === 'source_verified';
+  const selected = selectedReview(quote, mode, samplePages);
+  const needed = selected.bound;
+  const capNumber = Number(cap);
+  const authorised = Number.isFinite(capNumber) && capNumber > 0 ? capNumber : 0;
+  const paidAvailable = !!est?.configured && !!est.review.quality_released;
 
-  // Defaults come from the server: which tier the administrator chose, how long a
-  // sample is, and whether this book is expensive enough to sample first.
+  // Stale preparation can never supply consent. Cancel owned obsolete local work;
+  // an in-flight HTTP reply is also bound to its original source/options key.
+  useEffect(() => {
+    if (preparation && preparation.key !== sourceKey) {
+      cancelPreparation.mutate(preparation.id);
+      setPreparation(null);
+    }
+  }, [sourceKey, preparation]);
+
+
+  // Source assessment supplies the initial sample length and recognition language.
   useEffect(() => {
     if (!est) return;
-    setTier((current) => current || est.default_tier);
     setSamplePages(est.sample_pages_default);
     setMode(est.sample_suggested ? 'sample' : 'full');
     setOcrLang(est.recovery.language);
@@ -90,31 +116,21 @@ export function Reflow({ id }: { id: string }) {
   const engineBlocks = needsRecovery && recovery !== 'off' && !rec?.engine_available;
   const facsimile = needsRecovery && recovery === 'off';
 
-  const needed = est && tier ? requiredUsd(est, tier, mode, samplePages) : 0;
-  const capNumber = Number.parseFloat(cap);
-  // What the checkbox beside it actually authorises: the cap, which is what stops
-  // a conversion, and not the estimate the cap was filled in from.
-  const authorised = consentUsd(needed, capNumber);
-
-  // The cap follows the estimate until the user types one of their own, and then
-  // it is theirs: silently rewriting a number somebody set is how a job spends
-  // more than they meant it to.
   useEffect(() => {
     if (!est || capTouched) return;
-    setCap(suggestedCap(needed, est.hard_cap_usd).toFixed(2));
+    setCap(Math.min(est.hard_cap_usd, Math.max(.01, Math.ceil((needed - Number.EPSILON) * 100) / 100)).toFixed(2));
   }, [est, needed, capTouched]);
 
-  // Consent is to one figure. Change the figure and it has to be given again —
-  // including when it changed because the reader raised the cap, which is the only
-  // one of these the server does not re-derive for itself.
   useEffect(() => { setConsent(false); },
-            [authorised, needed, mode, tier, samplePages]);
+    [authorised, needed, mode, reviewMode, samplePages, sourceKey, quote?.identity, replaceEpub]);
 
   const jobsQ = useReflowJobs(id);
   const active = jobsQ.data?.active ?? [];
   const running = active.length > 0;
   // The server lists jobs newest first (ledger.read_summaries).
   const latest = jobsQ.data?.items?.[0] ?? null;
+  useEffect(() => { if (latest && !running) announce(STATUS_LABEL(latest.status, t)); },
+    [latest?.job_id, latest?.status, running, announce, t]);
 
   // An earlier job may still hold an unconfirmed charge. The next consent has
   // to name it and the start stays blocked until the reader acknowledges it --
@@ -126,20 +142,27 @@ export function Reflow({ id }: { id: string }) {
 
   const capValid = Number.isFinite(capNumber) && capNumber > 0
     && (!est || capNumber <= est.hard_cap_usd + 1e-9);
-  const capTooLow = capValid && capNumber + 1e-9 < needed;
-  const blocked = !est?.configured || running || !consent || !capValid || capTooLow
-    || engineBlocks || start.isPending || (hold > 0 && !holdAcknowledged);
+  const capTooLow = paid && !!quote && capValid && capNumber + 1e-12 < needed;
+  const blocked = running || !consent || engineBlocks || start.isPending
+    || (mode === 'full' && !!est?.existing_epub && !replaceEpub)
+    || (paid && (!paidAvailable || !quote || !capValid || (hold > 0 && !holdAcknowledged)));
 
   const onStart = () => {
     if (!est || blocked) return;
     setError(null);
     start.mutate({
-      mode, model_tier: tier, sample_pages: samplePages, cost_cap_usd: capNumber,
+      mode, review_mode: reviewMode, sample_pages: samplePages, cost_cap_usd: paid ? capNumber : 0,
+      consent_contract: est.consent_contract, source_sha256: est.source_sha256,
+      preparation_id: paid ? preparationId : undefined,
       consent: true, replace_existing_epub: replaceEpub, include_report_page: true,
       source_recovery: recovery, ocr_language: ocrLang,
     }, {
-      onError: (err) => setError(err instanceof ApiError ? err.message
-        : t('The conversion could not be started.')),
+      onError: (err) => {
+        setError(err instanceof ApiError ? err.message : t('The conversion could not be started.'));
+        if (err instanceof ApiError && ['source_changed', 'estimate_stale', 'current_consent_required'].includes(String(err.detail?.code))) {
+          setPreparation(null); setConsent(false); void estimateQ.refetch();
+        }
+      },
     });
   };
 
@@ -159,9 +182,6 @@ export function Reflow({ id }: { id: string }) {
     );
   }
 
-  // Past the guard above `est` is the server's payload: say whether its page count
-  // was measured over the book or scaled up from the survey's sample.
-  const projectedPages = routedPagesAreProjected(est);
 
   return (
     <div className={styles.container}>
@@ -171,7 +191,7 @@ export function Reflow({ id }: { id: string }) {
         <div className={styles.notConfigured} role="status">
           <KeyRound size={16} aria-hidden="true" focusable={false} />
           <span>
-            {t('No OpenRouter key is configured, so nothing can be converted yet.')}{' '}
+            {t('Source conversion is available without a provider key. Optional AI formatting review needs an OpenRouter key.')}{' '}
             <Link href="/admin/config" className={styles.adminLink}>{t('Open admin settings')}</Link>
           </span>
         </div>
@@ -182,28 +202,15 @@ export function Reflow({ id }: { id: string }) {
         <p className={styles.verdict}>{verdictSentence(est.verdict, t)}</p>
         <dl className={styles.facts}>
           <Fact label={t('Pages')} value={String(est.pages)} />
-          <Fact label={t('Pages a model will read')}
-            value={projectedPages
-              ? t('about {pages} ({percent}%)',
-                  { pages: est.routed_pages_estimate,
-                    percent: Math.round(est.routed_share * 100) })
-              : `${est.routed_pages_estimate} (${Math.round(est.routed_share * 100)}%)`} />
           <Fact label={t('Source text')}
             value={!needsRecovery
-              ? t('Verified in the PDF')
+              ? t('Native text layer (not proofread)')
               : rec.damaged > 0
                 ? t('Damaged layer — recovery required')
                 : t('Pictures only — recovery required')} />
         </dl>
         <p className={styles.note}>
-          {t('Every other page is converted by reading the PDF itself, which costs nothing. A page only goes to a model when the layout cannot be settled without one.')}
-          {projectedPages && (
-            <>
-              {' '}
-              {t('That count is worked out from {sampled} pages spread through the book, so the rest of it may need a few more or a few fewer.',
-                 { sampled: est.sampled })}
-            </>
-          )}
+          {t('Every selected page gets a source conversion. Optional AI review can suggest supported heading and displayed quotation formatting; it does not rewrite words, repair OCR, or reconstruct tables and notes.')}
         </p>
       </section>
 
@@ -248,7 +255,7 @@ export function Reflow({ id }: { id: string }) {
                 onChange={() => setRecovery('auto')} />
               <span className={styles.modeLabel}>{t('Recover the text')}</span>
               <span className={styles.modeHint}>
-                {t('Local OCR of every page that needs it, before any structural work. The original words stay annotated wherever the engine is unsure.')}
+                {t('Local OCR runs before formatting. Uncertain readings remain disclosed with original-source access; some readings cannot be marked at an exact word.')}
               </span>
             </label>
             {rec.damaged > 0 && (
@@ -259,7 +266,7 @@ export function Reflow({ id }: { id: string }) {
                   onChange={() => setRecovery('textless')} />
                 <span className={styles.modeLabel}>{t('Recover pictures only')}</span>
                 <span className={styles.modeHint}>
-                  {t('Read only the pages with no text at all; the damaged layer is kept exactly as printed.')}
+                  {t('Read pages with no text at all. Existing text layers stay unchanged, including any extraction errors, with source evidence available.')}
                 </span>
               </label>
             )}
@@ -288,39 +295,67 @@ export function Reflow({ id }: { id: string }) {
       )}
 
       <section className={styles.card} aria-labelledby="reflow-cost">
-        <h2 className={styles.cardTitle} id="reflow-cost">{t('What it will cost')}</h2>
-        <div className={styles.tiers} role="radiogroup" aria-label={t('Model')}>
-          {est.tiers.map((choice) => (
-            <label key={choice.tier}
-              className={choice.tier === tier ? styles.tierOn : styles.tier}>
-              <input type="radio" name="reflow-tier" value={choice.tier}
-                checked={choice.tier === tier} className={styles.radio}
-                onChange={() => setTier(choice.tier)} />
-              <span className={styles.tierLabel}>{choice.label}</span>
-              <span className={styles.tierPrice}>
-                {usd(est.estimate_usd[choice.tier] ?? 0)}
-              </span>
-              <span className={styles.tierModel}>{choice.model}</span>
-            </label>
-          ))}
+        <h2 className={styles.cardTitle} id="reflow-cost">{t('Formatting review')}</h2>
+        <div className={styles.modes} role="radiogroup" aria-label={t('Formatting review')}>
+          <label className={!paid ? styles.modeOn : styles.mode}>
+            <input type="radio" name="reflow-review" className={styles.radio} checked={!paid}
+              onChange={() => setReviewMode('deterministic')} />
+            <span className={styles.modeLabel}>{t('Source conversion')}</span>
+            <span className={styles.modeHint}>{t('No model requests or provider charges. Keep source text, images, navigation and uncertainty evidence.')}</span>
+          </label>
+          <label className={paid ? styles.modeOn : styles.mode}>
+            <input type="radio" name="reflow-review" className={styles.radio} checked={paid}
+              disabled={!paidAvailable} aria-describedby="reflow-review-availability"
+              onChange={() => setReviewMode('source_verified')} />
+            <span className={styles.modeLabel}>{t('Add AI formatting review')}</span>
+            <span className={styles.modeHint}>{t('Luna proposes heading and quotation formatting. Terra reviews each proposal; only approved changes can reach the EPUB.')}</span>
+          </label>
         </div>
-        <p className={styles.targetLine}>
-          {t('The whole book, at the model you picked:')}{' '}
-          <strong>{usd(est.estimate_usd[tier] ?? 0)}</strong>
-          {' · '}
-          {t('Your administrator set a target of {amount} a book.')
-            .replace('{amount}', usd(est.target_usd))}
+        <p className={styles.note} id="reflow-review-availability">
+          {!est.review.quality_released
+            ? t('AI review is not available in this build. Source conversion remains available.')
+            : !est.configured ? t('Configure an OpenRouter key to use optional AI review.')
+              : t('Optional review uses the two models below, with no automatic alternative route.')}
         </p>
-        {est.over_target && (
-          <p className={styles.overTarget} role="status">
-            <AlertTriangle size={15} aria-hidden="true" focusable={false} />
-            {t('This book costs more than the target. Convert a sample first and see whether the result is worth the rest.')}
-          </p>
-        )}
-        <p className={styles.note}>
-          {t('Prices measured on {date}. What you are charged is capped below — a conversion stops when it reaches the cap, and keeps the pages already paid for.')
-            .replace('{date}', est.priced_on)}
+        <dl className={styles.facts}>
+          <Fact label={t('Planned proposer')} value={est.review.proposer} />
+          <Fact label={t('Planned reviewer')} value={est.review.verifier} />
+          <Fact label={t('Provider route')} value={est.review.provider} />
+        </dl>
+        {paid && <>
+          <p className={styles.note}>{t('Prepare a local estimate before consenting to review. This reads complete source context and may take time, but sends nothing to a model and reserves no provider credit.')}</p>
+          <Button variant="ghost" disabled={preparing || engineBlocks || running} onClick={() => {
+            setError(null);
+            const key = sourceKey;
+            prepare.mutate({ source_recovery: recovery, ocr_language: ocrLang }, {
+              onSuccess: (data) => setPreparation({ id: data.preparation_id, key }),
+              onError: (err) => setError(err instanceof ApiError ? err.message : t('Source estimate preparation failed. No model request was sent.')),
+            });
+          }}>{t('Prepare AI estimate')}</Button>
+          {preparing && preparationId && <Button variant="ghost" disabled={cancelPreparation.isPending}
+            onClick={() => cancelPreparation.mutate(preparationId, {
+              onError: () => setError(t('The preparation could not be stopped. Try again.')),
+            })}>{t('Stop preparation')}</Button>}
+        </>}
+        <p className={styles.note} role="status">
+          {paid && (preparing ? t('Preparing source context: {page} of {pages}', {
+            page: preparationQ.data?.progress.page ?? 0, pages: preparationQ.data?.progress.pages ?? est.pages })
+            : preparationQ.data?.status === 'cancelled' ? t('Source preparation stopped. No model request was sent.')
+              : preparationQ.data?.status === 'failed' || preparationQ.error ? t('Source estimate preparation failed. No model request was sent.')
+                : quote ? t('Source estimate ready. No credit has been reserved.') : '')}
         </p>
+        {paid && quote && <>
+          <dl className={styles.facts}>
+            <Fact label={t('Source pages prepared')} value={String(quote.source_context_pages)} />
+            <Fact label={t('Eligible pages in this selection')} value={String(selected.eligible)} />
+            <Fact label={t('Coverage-limited pages')} value={String(selected.limited)} />
+            <Fact label={t('Unsupported pages')} value={String(selected.unsupported)} />
+            <Fact label={t('Pages with no supported choices')} value={String(selected.noChoices)} />
+            <Fact label={t('Full-review reservation ceiling')} value={ledgerUsd(needed)} />
+          </dl>
+          <p className={styles.note}>{t('This ceiling assumes a proposal and a review request for every eligible page, with no cached responses. It is not an expected bill or money already held. Actual charges and coverage may be lower; your cap limits new requests.')}</p>
+          <p className={styles.note}>{t('Eligibility is not an improvement. Unsupported, limited, declined and unreviewed pages keep the source conversion and its uncertainty evidence.')}</p>
+        </>}
       </section>
 
       <section className={styles.card} aria-labelledby="reflow-start">
@@ -357,8 +392,7 @@ export function Reflow({ id }: { id: string }) {
               onChange={(e) => setSamplePages(Math.max(1, Math.min(
                 est.sample_pages_max, Number.parseInt(e.target.value, 10) || 1)))} />
             <span className={styles.fieldHint}>
-              {t('About {pages} of them will need a model.')
-                .replace('{pages}', String(sampleRoutedPages(est, samplePages)))}
+              {t('The sample starts at the first body page and keeps the full source context for note and figure associations.')}
             </span>
           </label>
         )}
@@ -371,23 +405,25 @@ export function Reflow({ id }: { id: string }) {
           </label>
         )}
 
-        <label className={styles.field}>
+        {paid && <label className={styles.field}>
           <span className={styles.label}>{t('Stop after spending')}</span>
-          <input className={styles.inputNarrow} type="number" min="0.01" step="0.01"
+          <input className={styles.inputNarrow} type="number" min="0.000001" step="0.000001"
+            aria-invalid={capTouched && !capValid} aria-describedby="reflow-cap-help reflow-cap-error"
             max={est.hard_cap_usd} value={cap}
             onChange={(e) => { setCapTouched(true); setCap(e.target.value); }} />
-          <span className={styles.fieldHint}>
+          <span className={styles.fieldHint} id="reflow-cap-help">
             {t('Your administrator allows at most {amount} for one conversion.')
               .replace('{amount}', usd(est.hard_cap_usd))}
           </span>
-        </label>
+        </label>}
+        <p id="reflow-cap-error" className={styles.error} role="alert">{paid && capTouched && !capValid ? t('Enter a positive cap within the administrator limit.') : ''}</p>
         {capTooLow && (
           <p className={styles.capWarn} role="status">
-            {t('That is below the estimate, so the conversion would stop before it finished.')}
+            {t('This cap may cover only part of the AI review. The complete source conversion will still be produced; pages left unreviewed will be counted explicitly.')}
           </p>
         )}
 
-        {hold > 0 && (
+        {paid && hold > 0 && (
           <>
             <p className={styles.capWarn} role="alert">
               {t('An earlier job left {amount} unconfirmed: a request was sent and its answer never came back, so the provider may still charge it. It is not part of this new cap, and starting again does not settle or erase it.')
@@ -406,14 +442,14 @@ export function Reflow({ id }: { id: string }) {
 
         <label className={styles.consent}>
           <input type="checkbox" className={styles.check} checked={consent}
-            disabled={!est.configured} onChange={(e) => setConsent(e.target.checked)} />
+            disabled={paid && (!paidAvailable || !quote)} onChange={(e) => setConsent(e.target.checked)} />
           <span>
-            {t('I agree to spend up to {amount} of my own OpenRouter credit on this conversion.')
-              .replace('{amount}', usd(authorised))}
+            {paid ? t('I authorize Luna proposals and Terra reviews through OpenRouter openai/flex, up to {amount} for this job. Unreviewed pages keep the source conversion.', { amount: ledgerUsd(authorised) })
+              : t('Create this source conversion without model requests or provider charges.')}
           </span>
         </label>
 
-        {error && <p className={styles.error} role="alert">{error}</p>}
+        <p className={styles.error} role="alert">{error}</p>
 
         <Button onClick={onStart} disabled={blocked}>
           <Sparkles size={15} aria-hidden="true" focusable={false} />
@@ -487,17 +523,10 @@ function Fact({ label, value }: { label: string; value: string }) {
 function JobResult({ job, bookId, t, onConvertAll }: {
   job: ReflowJob; bookId: string; t: TFunction; onConvertAll: () => void;
 }) {
-  // Three endings leave a file in the library: the book was converted, the money
-  // ran out, or the model service went away mid-book. All three are worth opening
-  // and all three are worth starting again — but only the first did what it was
-  // asked, and a heading that calls the other two a conversion is how a truncated
-  // book gets closed as done.
-  const produced = job.status === 'done' || job.status === 'capped'
-    || job.status === 'incomplete';
+  const produced = !!job.artifact || (job.structural == null && ['done', 'capped', 'incomplete'].includes(job.status));
   const whole = job.status === 'done';
-  // `sent` is the pages this run bought, not the pages it judged: a resumed job
-  // replays everything an earlier one got right, and those were sent to nobody.
-  const { sent, adopted, refused, sharePct } = jobCounts(job);
+  const legacy = jobCounts(job);
+  const scope = job.structural;
 
   return (
     <section className={styles.card} aria-labelledby="reflow-result">
@@ -510,13 +539,13 @@ function JobResult({ job, bookId, t, onConvertAll }: {
       {job.error && <p className={styles.error} role="alert">{job.error}</p>}
       {job.status === 'capped' && (
         <p className={styles.capWarn} role="status">
-          {t('This stopped at the {amount} cap. The pages converted before it was reached are in the file; the rest were left as they were.')
+          {t('AI review stopped at the {amount} cap. The complete source conversion remains in the file; approved changes are included and the remaining pages are unreviewed.')
             .replace('{amount}', usd(job.cap_usd))}
         </p>
       )}
       {job.status === 'incomplete' && (
         <p className={styles.capWarn} role="status">
-          {t('The model service stopped answering partway through, so this ended early. The pages converted before it stopped are in the file and the rest kept the text read straight out of the PDF. Starting it again re-uses every page that was accepted, so none of those is paid for twice.')}
+          {t('AI review ended before all eligible pages were reviewed. A completed file retains the full source conversion and any approved changes. Compatible responses may be reused; unresolved requests are not retried automatically.')}
         </p>
       )}
       {job.status === 'billing_unknown' && (
@@ -531,34 +560,54 @@ function JobResult({ job, bookId, t, onConvertAll }: {
       )}
 
       <dl className={styles.facts}>
-        <Fact label={t('Spent')} value={ledgerUsd(job.spend_usd)} />
+        <Fact label={t('Confirmed spend')} value={ledgerUsd(job.spend_usd)} />
         {heldUsd(job) > 0 && (
           <Fact label={t('Unconfirmed, may still be charged')}
             value={ledgerUsd(heldUsd(job))} />
         )}
-        <Fact label={t('Pages sent to a model')} value={String(sent)} />
-        {job.reused > 0 && (
-          <Fact label={t('Pages reused from an earlier run')} value={String(job.reused)} />
-        )}
-        <Fact label={t('Pages the check accepted')}
-          value={`${adopted} (${sharePct}%)`} />
+        <Fact label={t('Job cap')} value={ledgerUsd(job.cap_usd)} />
+        {scope ? <>
+          <Fact label={t('Source pages prepared')} value={String(scope.source_context_pages)} />
+          <Fact label={t('Pages in this file')} value={String(scope.total_pages)} />
+          {scope.eligibility_measured && <>
+            <Fact label={t('Eligible pages')} value={String(scope.eligible)} />
+            <Fact label={t('Coverage-limited pages')} value={String(scope.limited)} />
+            <Fact label={t('Unsupported pages')} value={String(scope.unsupported)} />
+            <Fact label={t('Pages with no supported choices')} value={String(scope.no_choices)} />
+            <Fact label={t('Pages left unreviewed')} value={String(scope.unreviewed)} />
+            <Fact label={t('Proposed operations')} value={String(scope.proposed_operations)} />
+            <Fact label={t('Approved operations')} value={String(scope.approved_operations)} />
+            <Fact label={t('Pages with approved changes')} value={String(scope.approved_pages)} />
+            <Fact label={t('Proposer abstentions')} value={String(scope.proposer_abstained)} />
+            <Fact label={t('Reviewer abstentions')} value={String(scope.verifier_abstained)} />
+            <Fact label={t('Rejected pages')} value={String(scope.rejected)} />
+            <Fact label={t('Requests attempted')} value={String(scope.attempted_stages)} />
+            <Fact label={t('Models requested')} value={Object.keys(scope.requested_models ?? {}).join(', ') || t('None')} />
+            <Fact label={t('Pages sent to a model')} value={String(scope.attempted_pages)} />
+            <Fact label={t('Cached stage results')} value={String(scope.cached_stages)} />
+          </>}
+        </> : <>
+          <Fact label={t('Legacy requests recorded')} value={String(legacy.sent)} />
+          <Fact label={t('Legacy gate acceptances')} value={String(legacy.adopted)} />
+        </>}
         {(job.recovery.mode_pages ?? 0) > 0 && (
           <Fact label={t('Pages read with local OCR')}
             value={String(job.recovery.mode_pages)} />
         )}
         {(job.recovery.uncertain_words ?? 0) > 0 && (
-          <Fact label={t('Uncertain readings marked')}
+          <Fact label={t('Uncertain readings recorded')}
             value={String(job.recovery.uncertain_words)} />
         )}
       </dl>
-      {refused > 0 && (
-        <p className={styles.note}>
-          {refused === 1
-            ? t('One page did not pass the word check and kept the text read straight out of the PDF. Nothing was rewritten.')
-            : t('{count} pages did not pass the word check and kept the text read straight out of the PDF. Nothing was rewritten.')
-              .replace('{count}', String(refused))}
-        </p>
-      )}
+      <p className={styles.note}>
+        {scope?.eligibility_measured
+          ? t('Approval counts describe formatting adopted after source and reviewer checks, not independent proof of correctness. An abstention or unchanged page is not an improvement.')
+          : scope ? t('AI review was not requested. Eligibility was not measured; this file uses source conversion and preserves its uncertainty evidence.')
+            : t('This older job predates the current two-stage review. Its counts are historical and do not establish current review coverage.')}
+      </p>
+      {job.artifact && <p className={styles.note}>
+        {t('Filed EPUB SHA-256: {hash}', { hash: job.artifact.sha256 })}
+      </p>}
 
       <div className={styles.actions}>
         {job.sample_url && job.sample_ready && (

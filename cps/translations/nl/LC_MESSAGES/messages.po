@@ -16263,3 +16263,263 @@ msgstr "{pages} pagina’s hebben een tekstlaag die geen leesbare woorden bevat.
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py
+msgid "AI review ended before all eligible pages were reviewed. A completed file retains the full source conversion and any approved changes. Compatible responses may be reused; unresolved requests are not retried automatically."
+msgstr "De AI-controle stopte voordat alle geschikte pagina’s waren beoordeeld. Een voltooid bestand behoudt de volledige bronconversie en goedgekeurde wijzigingen. Compatibele antwoorden kunnen opnieuw worden gebruikt; onopgeloste verzoeken worden niet automatisch herhaald."
+
+#: cps/spa_strings.py
+msgid "AI review is not available in this build. Source conversion remains available."
+msgstr "AI-controle is niet beschikbaar in deze versie. Bronconversie blijft beschikbaar."
+
+#: cps/spa_strings.py
+msgid "AI review stopped at the {amount} cap. The complete source conversion remains in the file; approved changes are included and the remaining pages are unreviewed."
+msgstr "De AI-controle stopte bij de limiet van {amount}. De volledige bronconversie blijft in het bestand; goedgekeurde wijzigingen zijn opgenomen en de overige pagina’s zijn niet beoordeeld."
+
+#: cps/spa_strings.py
+msgid "AI review was not requested. Eligibility was not measured; this file uses source conversion and preserves its uncertainty evidence."
+msgstr "AI-controle is niet aangevraagd. Geschiktheid is niet beoordeeld; dit bestand gebruikt bronconversie en behoudt het bronmateriaal bij onzekerheden."
+
+#: cps/spa_strings.py
+msgid "Add AI formatting review"
+msgstr "AI-controle van de opmaak toevoegen"
+
+#: cps/spa_strings.py
+msgid "Approval counts describe formatting adopted after source and reviewer checks, not independent proof of correctness. An abstention or unchanged page is not an improvement."
+msgstr "Goedkeuringsaantallen beschrijven opmaak die na bron- en beoordelaarscontroles is overgenomen, geen onafhankelijk bewijs van juistheid. Een onthouding of ongewijzigde pagina is geen verbetering."
+
+#: cps/spa_strings.py
+msgid "Approved operations"
+msgstr "Goedgekeurde bewerkingen"
+
+#: cps/spa_strings.py
+msgid "Cached stage results"
+msgstr "Faseresultaten uit de cache"
+
+#: cps/spa_strings.py
+msgid "Configure an OpenRouter key to use optional AI review."
+msgstr "Stel een OpenRouter-sleutel in om optionele AI-controle te gebruiken."
+
+#: cps/spa_strings.py
+msgid "Confirmed spend"
+msgstr "Bevestigde uitgaven"
+
+#: cps/spa_strings.py
+msgid "Convert this PDF to EPUB…"
+msgstr "Deze PDF naar EPUB converteren…"
+
+#: cps/spa_strings.py
+msgid "Coverage-limited pages"
+msgstr "Pagina’s met beperkte dekking"
+
+#: cps/spa_strings.py
+msgid "Create a source-based EPUB with original evidence for uncertain text. Optional AI formatting review has its own estimate and consent."
+msgstr "Maak een EPUB op basis van de bron, met origineel bronmateriaal bij onzekere tekst. Optionele AI-controle van de opmaak heeft een eigen kostenraming en toestemming."
+
+#: cps/spa_strings.py
+msgid "Create this source conversion without model requests or provider charges."
+msgstr "Deze bronconversie maken zonder modelverzoeken of providerkosten."
+
+#: cps/spa_strings.py
+msgid "Eligibility is not an improvement. Unsupported, limited, declined and unreviewed pages keep the source conversion and its uncertainty evidence."
+msgstr "Geschiktheid is geen verbetering. Niet-ondersteunde, beperkte, afgewezen en niet-beoordeelde pagina’s behouden de bronconversie en het bronmateriaal bij onzekerheden."
+
+#: cps/spa_strings.py
+msgid "Eligible pages"
+msgstr "Geschikte pagina’s"
+
+#: cps/spa_strings.py
+msgid "Eligible pages in this selection"
+msgstr "Geschikte pagina’s in deze selectie"
+
+#: cps/spa_strings.py
+msgid "Enter a positive cap within the administrator limit."
+msgstr "Voer een positieve limiet in binnen de beheerderslimiet."
+
+#: cps/spa_strings.py
+msgid "Every selected page gets a source conversion. Optional AI review can suggest supported heading and displayed quotation formatting; it does not rewrite words, repair OCR, or reconstruct tables and notes."
+msgstr "Elke geselecteerde pagina krijgt een bronconversie. Optionele AI-controle kan ondersteunde opmaak voor koppen en blokcitaten voorstellen; woorden worden niet herschreven, OCR wordt niet hersteld en tabellen en noten worden niet gereconstrueerd."
+
+#: cps/spa_strings.py
+msgid "Filed EPUB SHA-256: {hash}"
+msgstr "SHA-256 van opgeslagen EPUB: {hash}"
+
+#: cps/spa_strings.py
+msgid "Formatting review"
+msgstr "Opmaakcontrole"
+
+#: cps/spa_strings.py
+msgid "Full-review reservation ceiling"
+msgstr "Reserveringsplafond voor volledige controle"
+
+#: cps/spa_strings.py
+msgid "I authorize Luna proposals and Terra reviews through OpenRouter openai/flex, up to {amount} for this job. Unreviewed pages keep the source conversion."
+msgstr "Ik geef toestemming voor Luna-voorstellen en Terra-controles via OpenRouter openai/flex, tot {amount} voor deze taak. Niet-beoordeelde pagina’s behouden de bronconversie."
+
+#: cps/spa_strings.py
+msgid "Job cap"
+msgstr "Taaklimiet"
+
+#: cps/spa_strings.py
+msgid "Legacy gate acceptances"
+msgstr "Acceptaties door de oude controle"
+
+#: cps/spa_strings.py
+msgid "Legacy requests recorded"
+msgstr "Geregistreerde oude verzoeken"
+
+#: cps/spa_strings.py
+msgid "Local OCR runs before formatting. Uncertain readings remain disclosed with original-source access; some readings cannot be marked at an exact word."
+msgstr "Lokale OCR wordt vóór de opmaak uitgevoerd. Onzekere lezingen blijven vermeld met toegang tot de oorspronkelijke bron; sommige kunnen niet bij een exact woord worden gemarkeerd."
+
+#: cps/spa_strings.py
+msgid "Luna proposes heading and quotation formatting. Terra reviews each proposal; only approved changes can reach the EPUB."
+msgstr "Luna stelt opmaak voor koppen en citaten voor. Terra beoordeelt elk voorstel; alleen goedgekeurde wijzigingen kunnen in de EPUB terechtkomen."
+
+#: cps/spa_strings.py
+msgid "Native text layer (not proofread)"
+msgstr "Oorspronkelijke tekstlaag (niet nagelezen)"
+
+#: cps/spa_strings.py
+msgid "No model requests or provider charges. Keep source text, images, navigation and uncertainty evidence."
+msgstr "Geen modelverzoeken of providerkosten. Behoud de brontekst, afbeeldingen, navigatie en bronmateriaal bij onzekerheden."
+
+#: cps/spa_strings.py
+msgid "Optional review uses the two models below, with no automatic alternative route."
+msgstr "Optionele controle gebruikt de twee onderstaande modellen, zonder automatische alternatieve route."
+
+#: cps/spa_strings.py
+msgid "Pages in this file"
+msgstr "Pagina’s in dit bestand"
+
+#: cps/spa_strings.py
+msgid "Pages left unreviewed"
+msgstr "Niet-beoordeelde pagina’s"
+
+#: cps/spa_strings.py
+msgid "Pages with approved changes"
+msgstr "Pagina’s met goedgekeurde wijzigingen"
+
+#: cps/spa_strings.py
+msgid "Pages with no supported choices"
+msgstr "Pagina’s zonder ondersteunde keuzes"
+
+#: cps/spa_strings.py
+msgid "Planned proposer"
+msgstr "Gepland voorstelmodel"
+
+#: cps/spa_strings.py
+msgid "Planned reviewer"
+msgstr "Gepland beoordelingsmodel"
+
+#: cps/spa_strings.py
+msgid "Prepare AI estimate"
+msgstr "AI-kostenraming voorbereiden"
+
+#: cps/spa_strings.py
+msgid "Prepare a local estimate before consenting to review. This reads complete source context and may take time, but sends nothing to a model and reserves no provider credit."
+msgstr "Bereid een lokale kostenraming voor voordat u toestemming geeft voor controle. Dit leest de volledige broncontext en kan tijd kosten, maar stuurt niets naar een model en reserveert geen providertegoed."
+
+#: cps/spa_strings.py
+msgid "Preparing source context: {page} of {pages}"
+msgstr "Broncontext voorbereiden: {page} van {pages}"
+
+#: cps/spa_strings.py
+msgid "Proposed operations"
+msgstr "Voorgestelde bewerkingen"
+
+#: cps/spa_strings.py
+msgid "Proposer abstentions"
+msgstr "Onthoudingen door het voorstelmodel"
+
+#: cps/spa_strings.py
+msgid "Provider route"
+msgstr "Providerroute"
+
+#: cps/spa_strings.py
+msgid "Read pages with no text at all. Existing text layers stay unchanged, including any extraction errors, with source evidence available."
+msgstr "Lees pagina’s zonder tekst. Bestaande tekstlagen blijven ongewijzigd, inclusief eventuele extractiefouten, met toegang tot het bronmateriaal."
+
+#: cps/spa_strings.py
+msgid "Rejected pages"
+msgstr "Afgewezen pagina’s"
+
+#: cps/spa_strings.py
+msgid "Requests attempted"
+msgstr "Geprobeerde verzoeken"
+
+#: cps/spa_strings.py
+msgid "Reviewer abstentions"
+msgstr "Onthoudingen door het beoordelingsmodel"
+
+#: cps/spa_strings.py
+msgid "Source conversion"
+msgstr "Bronconversie"
+
+#: cps/spa_strings.py
+msgid "Source conversion is available without a provider key. Optional AI formatting review needs an OpenRouter key."
+msgstr "Bronconversie is beschikbaar zonder providersleutel. Optionele AI-controle van de opmaak vereist een OpenRouter-sleutel."
+
+#: cps/spa_strings.py
+msgid "Source conversion ready; AI review limited"
+msgstr "Bronconversie gereed; AI-controle beperkt"
+
+#: cps/spa_strings.py
+msgid "Source estimate preparation failed. No model request was sent."
+msgstr "Voorbereiding van de bronraming mislukt. Er is geen modelverzoek verstuurd."
+
+#: cps/spa_strings.py
+msgid "Source estimate ready. No credit has been reserved."
+msgstr "Bronraming gereed. Er is geen tegoed gereserveerd."
+
+#: cps/spa_strings.py
+msgid "Source pages prepared"
+msgstr "Voorbereide bronpagina’s"
+
+#: cps/spa_strings.py
+msgid "Source preparation stopped. No model request was sent."
+msgstr "Bronvoorbereiding gestopt. Er is geen modelverzoek verstuurd."
+
+#: cps/spa_strings.py
+msgid "Stop preparation"
+msgstr "Voorbereiding stoppen"
+
+#: cps/spa_strings.py
+msgid "The preparation could not be stopped. Try again."
+msgstr "De voorbereiding kon niet worden gestopt. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "The sample starts at the first body page and keeps the full source context for note and figure associations."
+msgstr "Het voorbeeld begint bij de eerste inhoudelijke pagina en behoudt de volledige broncontext voor verbanden tussen noten en figuren."
+
+#: cps/spa_strings.py
+msgid "This PDF has a native text layer. Extraction and punctuation may still differ from the printed page; original-source evidence remains available."
+msgstr "Deze PDF heeft een oorspronkelijke tekstlaag. Extractie en interpunctie kunnen nog steeds afwijken van de gedrukte pagina; het oorspronkelijke bronmateriaal blijft beschikbaar."
+
+#: cps/spa_strings.py
+msgid "This cap may cover only part of the AI review. The complete source conversion will still be produced; pages left unreviewed will be counted explicitly."
+msgstr "Deze limiet dekt mogelijk slechts een deel van de AI-controle. De volledige bronconversie wordt wel gemaakt; niet-beoordeelde pagina’s worden expliciet geteld."
+
+#: cps/spa_strings.py
+msgid "This ceiling assumes a proposal and a review request for every eligible page, with no cached responses. It is not an expected bill or money already held. Actual charges and coverage may be lower; your cap limits new requests."
+msgstr "Dit plafond gaat uit van een voorstel- en controleverzoek voor elke geschikte pagina, zonder antwoorden uit de cache. Het is geen verwachte rekening of al gereserveerd bedrag. Werkelijke kosten en dekking kunnen lager zijn; uw limiet begrenst nieuwe verzoeken."
+
+#: cps/spa_strings.py
+msgid "This older job predates the current two-stage review. Its counts are historical and do not establish current review coverage."
+msgstr "Deze oudere taak dateert van vóór de huidige controle in twee stappen. De aantallen zijn historisch en tonen niet de huidige controledekking aan."
+
+#: cps/spa_strings.py
+msgid "Uncertain readings recorded"
+msgstr "Geregistreerde onzekere lezingen"
+
+#: cps/spa_strings.py
+msgid "Unsupported pages"
+msgstr "Niet-ondersteunde pagina’s"
+
+#: cps/spa_strings.py
+msgid "Optional. Source conversion needs no provider key. When available, AI formatting review uses Luna proposals and Terra approvals through OpenRouter openai/flex, with an estimate and explicit consent for each job. The key is stored encrypted and is never shown again."
+msgstr "Optioneel. Bronconversie vereist geen providersleutel. Indien beschikbaar gebruikt AI-controle van de opmaak Luna-voorstellen en Terra-goedkeuringen via OpenRouter openai/flex, met een kostenraming en expliciete toestemming voor elke taak. De sleutel wordt versleuteld opgeslagen en nooit opnieuw getoond."
+
+#: cps/spa_strings.py
+msgid "Models requested"
+msgstr "Aangeroepen modellen"

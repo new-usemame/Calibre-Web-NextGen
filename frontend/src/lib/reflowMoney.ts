@@ -1,9 +1,7 @@
-/* What a conversion costs, and the shapes a price is quoted in.
- *
- * Split out of reflow.ts so it can be read and tested without the query layer:
- * these four sums are a second implementation of arithmetic cps/api/reflow.py also
- * does, and the server refuses a start whose cap falls below its own figure. The
- * endpoints live next door in reflow.ts, which re-exports all of this. */
+/* Historical whole-HTML quote arithmetic and legacy job accounting. Current
+ * typed source review uses sourceReview.ts and actual prepared page wire bounds.
+ * Currency and unresolved-liability formatting are shared by both generations.
+ */
 
 export type ReflowTier = 'cheap' | 'standard' | 'quality';
 export type ReflowMode = 'sample' | 'full';
@@ -213,15 +211,11 @@ export function heldUsd(job: ReflowBillingLike): number {
 
 /** The hold a fresh-spend decision must acknowledge, in a newest-first job list.
  *
- *  The first row still holding anything is the liability on the table: the
+ *  All rows still holding anything contribute to the liability on the table: the
  *  consent for the next job has to name it, and the start stays blocked until
  *  the reader says they understand it is not part of the new cap. The amount is
  *  the gate, not the status: a row written after the liability resolved reads
  *  0, and 0 means the way is clear -- no row may be treated as if it resolved. */
 export function holdRequiringAcknowledgment(jobs: ReflowBillingLike[]): number {
-  for (const job of jobs || []) {
-    const held = heldUsd(job);
-    if (held > 0) return held;
-  }
-  return 0;
+  return (jobs || []).reduce((total, job) => total + heldUsd(job), 0);
 }

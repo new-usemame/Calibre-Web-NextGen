@@ -16774,3 +16774,263 @@ msgstr "{pages} pages ont une couche de texte qui ne contient pas de mots lisibl
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "AI review ended before all eligible pages were reviewed. A completed file retains the full source conversion and any approved changes. Compatible responses may be reused; unresolved requests are not retried automatically."
+msgstr "La révision par IA s’est arrêtée avant d’examiner toutes les pages admissibles. Un fichier terminé conserve la conversion complète du document source et les modifications approuvées. Les réponses compatibles peuvent être réutilisées ; les requêtes non résolues ne sont pas relancées automatiquement."
+
+#: cps/spa_strings.py
+msgid "AI review is not available in this build. Source conversion remains available."
+msgstr "La révision par IA n’est pas disponible dans cette version. La conversion du document source reste disponible."
+
+#: cps/spa_strings.py
+msgid "AI review stopped at the {amount} cap. The complete source conversion remains in the file; approved changes are included and the remaining pages are unreviewed."
+msgstr "La révision par IA s’est arrêtée au plafond de {amount}. La conversion complète du document source reste dans le fichier ; les modifications approuvées sont incluses et les autres pages n’ont pas été révisées."
+
+#: cps/spa_strings.py
+msgid "AI review was not requested. Eligibility was not measured; this file uses source conversion and preserves its uncertainty evidence."
+msgstr "Aucune révision par IA n’a été demandée. L’admissibilité n’a pas été évaluée ; ce fichier utilise la conversion du document source et conserve les éléments signalant ses incertitudes."
+
+#: cps/spa_strings.py
+msgid "Add AI formatting review"
+msgstr "Ajouter une révision de la mise en forme par IA"
+
+#: cps/spa_strings.py
+msgid "Approval counts describe formatting adopted after source and reviewer checks, not independent proof of correctness. An abstention or unchanged page is not an improvement."
+msgstr "Les nombres d’approbations décrivent la mise en forme adoptée après vérification de la source et du réviseur, sans constituer une preuve indépendante d’exactitude. Une abstention ou une page inchangée n’est pas une amélioration."
+
+#: cps/spa_strings.py
+msgid "Approved operations"
+msgstr "Opérations approuvées"
+
+#: cps/spa_strings.py
+msgid "Cached stage results"
+msgstr "Résultats d’étape en cache"
+
+#: cps/spa_strings.py
+msgid "Configure an OpenRouter key to use optional AI review."
+msgstr "Configurez une clé OpenRouter pour utiliser la révision facultative par IA."
+
+#: cps/spa_strings.py
+msgid "Confirmed spend"
+msgstr "Dépenses confirmées"
+
+#: cps/spa_strings.py
+msgid "Convert this PDF to EPUB…"
+msgstr "Convertir ce PDF en EPUB…"
+
+#: cps/spa_strings.py
+msgid "Coverage-limited pages"
+msgstr "Pages à couverture limitée"
+
+#: cps/spa_strings.py
+msgid "Create a source-based EPUB with original evidence for uncertain text. Optional AI formatting review has its own estimate and consent."
+msgstr "Créez un EPUB à partir de la source, avec les passages originaux pour les textes incertains. La révision facultative de la mise en forme par IA nécessite son propre devis et consentement."
+
+#: cps/spa_strings.py
+msgid "Create this source conversion without model requests or provider charges."
+msgstr "Créer cette conversion du document source sans requêtes aux modèles ni frais de fournisseur."
+
+#: cps/spa_strings.py
+msgid "Eligibility is not an improvement. Unsupported, limited, declined and unreviewed pages keep the source conversion and its uncertainty evidence."
+msgstr "L’admissibilité n’est pas une amélioration. Les pages non prises en charge, limitées, refusées ou non révisées conservent la conversion du document source et les éléments signalant ses incertitudes."
+
+#: cps/spa_strings.py
+msgid "Eligible pages"
+msgstr "Pages admissibles"
+
+#: cps/spa_strings.py
+msgid "Eligible pages in this selection"
+msgstr "Pages admissibles dans cette sélection"
+
+#: cps/spa_strings.py
+msgid "Enter a positive cap within the administrator limit."
+msgstr "Saisissez un plafond positif dans la limite fixée par l’administrateur."
+
+#: cps/spa_strings.py
+msgid "Every selected page gets a source conversion. Optional AI review can suggest supported heading and displayed quotation formatting; it does not rewrite words, repair OCR, or reconstruct tables and notes."
+msgstr "Chaque page sélectionnée est convertie à partir de la source. La révision facultative par IA peut proposer une mise en forme prise en charge pour les titres et citations en bloc ; elle ne réécrit pas les mots, ne corrige pas l’OCR et ne reconstruit pas les tableaux ni les notes."
+
+#: cps/spa_strings.py
+msgid "Filed EPUB SHA-256: {hash}"
+msgstr "SHA-256 de l’EPUB enregistré : {hash}"
+
+#: cps/spa_strings.py
+msgid "Formatting review"
+msgstr "Révision de la mise en forme"
+
+#: cps/spa_strings.py
+msgid "Full-review reservation ceiling"
+msgstr "Plafond de réservation pour une révision complète"
+
+#: cps/spa_strings.py
+msgid "I authorize Luna proposals and Terra reviews through OpenRouter openai/flex, up to {amount} for this job. Unreviewed pages keep the source conversion."
+msgstr "J’autorise les propositions de Luna et les révisions de Terra via OpenRouter openai/flex, jusqu’à {amount} pour cette tâche. Les pages non révisées conservent la conversion du document source."
+
+#: cps/spa_strings.py
+msgid "Job cap"
+msgstr "Plafond de la tâche"
+
+#: cps/spa_strings.py
+msgid "Legacy gate acceptances"
+msgstr "Acceptations de l’ancien contrôle"
+
+#: cps/spa_strings.py
+msgid "Legacy requests recorded"
+msgstr "Anciennes requêtes enregistrées"
+
+#: cps/spa_strings.py
+msgid "Local OCR runs before formatting. Uncertain readings remain disclosed with original-source access; some readings cannot be marked at an exact word."
+msgstr "L’OCR local précède la mise en forme. Les lectures incertaines restent signalées avec un accès à la source originale ; certaines ne peuvent pas être marquées sur un mot précis."
+
+#: cps/spa_strings.py
+msgid "Luna proposes heading and quotation formatting. Terra reviews each proposal; only approved changes can reach the EPUB."
+msgstr "Luna propose une mise en forme des titres et citations. Terra examine chaque proposition ; seules les modifications approuvées peuvent être intégrées à l’EPUB."
+
+#: cps/spa_strings.py
+msgid "Native text layer (not proofread)"
+msgstr "Couche de texte native (non relue)"
+
+#: cps/spa_strings.py
+msgid "No model requests or provider charges. Keep source text, images, navigation and uncertainty evidence."
+msgstr "Aucune requête aux modèles ni frais de fournisseur. Conserve le texte source, les images, la navigation et les éléments signalant les incertitudes."
+
+#: cps/spa_strings.py
+msgid "Optional review uses the two models below, with no automatic alternative route."
+msgstr "La révision facultative utilise les deux modèles ci-dessous, sans autre routage automatique."
+
+#: cps/spa_strings.py
+msgid "Pages in this file"
+msgstr "Pages dans ce fichier"
+
+#: cps/spa_strings.py
+msgid "Pages left unreviewed"
+msgstr "Pages non révisées"
+
+#: cps/spa_strings.py
+msgid "Pages with approved changes"
+msgstr "Pages avec des modifications approuvées"
+
+#: cps/spa_strings.py
+msgid "Pages with no supported choices"
+msgstr "Pages sans choix pris en charge"
+
+#: cps/spa_strings.py
+msgid "Planned proposer"
+msgstr "Modèle de proposition prévu"
+
+#: cps/spa_strings.py
+msgid "Planned reviewer"
+msgstr "Modèle de révision prévu"
+
+#: cps/spa_strings.py
+msgid "Prepare AI estimate"
+msgstr "Préparer le devis IA"
+
+#: cps/spa_strings.py
+msgid "Prepare a local estimate before consenting to review. This reads complete source context and may take time, but sends nothing to a model and reserves no provider credit."
+msgstr "Préparez un devis local avant de consentir à la révision. Cela lit tout le contexte source et peut prendre du temps, mais n’envoie rien à un modèle et ne réserve aucun crédit fournisseur."
+
+#: cps/spa_strings.py
+msgid "Preparing source context: {page} of {pages}"
+msgstr "Préparation du contexte source : {page} sur {pages}"
+
+#: cps/spa_strings.py
+msgid "Proposed operations"
+msgstr "Opérations proposées"
+
+#: cps/spa_strings.py
+msgid "Proposer abstentions"
+msgstr "Abstentions du proposant"
+
+#: cps/spa_strings.py
+msgid "Provider route"
+msgstr "Route du fournisseur"
+
+#: cps/spa_strings.py
+msgid "Read pages with no text at all. Existing text layers stay unchanged, including any extraction errors, with source evidence available."
+msgstr "Lit les pages dépourvues de texte. Les couches de texte existantes restent inchangées, y compris leurs erreurs d’extraction, avec accès à la source originale."
+
+#: cps/spa_strings.py
+msgid "Rejected pages"
+msgstr "Pages rejetées"
+
+#: cps/spa_strings.py
+msgid "Requests attempted"
+msgstr "Requêtes tentées"
+
+#: cps/spa_strings.py
+msgid "Reviewer abstentions"
+msgstr "Abstentions du réviseur"
+
+#: cps/spa_strings.py
+msgid "Source conversion"
+msgstr "Conversion du document source"
+
+#: cps/spa_strings.py
+msgid "Source conversion is available without a provider key. Optional AI formatting review needs an OpenRouter key."
+msgstr "La conversion du document source est disponible sans clé fournisseur. La révision facultative de la mise en forme par IA nécessite une clé OpenRouter."
+
+#: cps/spa_strings.py
+msgid "Source conversion ready; AI review limited"
+msgstr "Conversion du document source prête ; révision IA limitée"
+
+#: cps/spa_strings.py
+msgid "Source estimate preparation failed. No model request was sent."
+msgstr "La préparation du devis source a échoué. Aucune requête n’a été envoyée à un modèle."
+
+#: cps/spa_strings.py
+msgid "Source estimate ready. No credit has been reserved."
+msgstr "Devis source prêt. Aucun crédit n’a été réservé."
+
+#: cps/spa_strings.py
+msgid "Source pages prepared"
+msgstr "Pages source préparées"
+
+#: cps/spa_strings.py
+msgid "Source preparation stopped. No model request was sent."
+msgstr "Préparation de la source arrêtée. Aucune requête n’a été envoyée à un modèle."
+
+#: cps/spa_strings.py
+msgid "Stop preparation"
+msgstr "Arrêter la préparation"
+
+#: cps/spa_strings.py
+msgid "The preparation could not be stopped. Try again."
+msgstr "La préparation n’a pas pu être arrêtée. Réessayez."
+
+#: cps/spa_strings.py
+msgid "The sample starts at the first body page and keeps the full source context for note and figure associations."
+msgstr "L’extrait commence à la première page du corps du livre et conserve tout le contexte source pour les associations de notes et de figures."
+
+#: cps/spa_strings.py
+msgid "This PDF has a native text layer. Extraction and punctuation may still differ from the printed page; original-source evidence remains available."
+msgstr "Ce PDF possède une couche de texte native. L’extraction et la ponctuation peuvent toutefois différer de la page imprimée ; la source originale reste accessible."
+
+#: cps/spa_strings.py
+msgid "This cap may cover only part of the AI review. The complete source conversion will still be produced; pages left unreviewed will be counted explicitly."
+msgstr "Ce plafond peut ne couvrir qu’une partie de la révision par IA. La conversion complète du document source sera tout de même produite ; les pages non révisées seront comptées explicitement."
+
+#: cps/spa_strings.py
+msgid "This ceiling assumes a proposal and a review request for every eligible page, with no cached responses. It is not an expected bill or money already held. Actual charges and coverage may be lower; your cap limits new requests."
+msgstr "Ce plafond suppose une requête de proposition et une requête de révision pour chaque page admissible, sans réponses en cache. Ce n’est ni une facture prévisionnelle ni un montant déjà réservé. Les frais et la couverture réels peuvent être inférieurs ; votre plafond limite les nouvelles requêtes."
+
+#: cps/spa_strings.py
+msgid "This older job predates the current two-stage review. Its counts are historical and do not establish current review coverage."
+msgstr "Cette ancienne tâche précède la révision actuelle en deux étapes. Ses nombres sont historiques et ne prouvent pas la couverture de la révision actuelle."
+
+#: cps/spa_strings.py
+msgid "Uncertain readings recorded"
+msgstr "Lectures incertaines enregistrées"
+
+#: cps/spa_strings.py
+msgid "Unsupported pages"
+msgstr "Pages non prises en charge"
+
+#: cps/spa_strings.py
+msgid "Optional. Source conversion needs no provider key. When available, AI formatting review uses Luna proposals and Terra approvals through OpenRouter openai/flex, with an estimate and explicit consent for each job. The key is stored encrypted and is never shown again."
+msgstr "Facultatif. La conversion du document source ne nécessite pas de clé fournisseur. Lorsqu’elle est disponible, la révision de la mise en forme par IA utilise les propositions de Luna et les approbations de Terra via OpenRouter openai/flex, avec un devis et un consentement explicite pour chaque tâche. La clé est stockée chiffrée et n’est jamais réaffichée."
+
+#: cps/spa_strings.py
+msgid "Models requested"
+msgstr "Modèles sollicités"

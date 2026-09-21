@@ -5,12 +5,19 @@ that tree; they never place confidence marks again against changed text nodes.
 """
 import copy
 import json
+import weakref
 from dataclasses import dataclass, replace, asdict
 from xml.dom import Node, minidom
 
 from . import annotate
 
 VERSION = 'reflow-enriched-source-3'
+
+# A public content digest detects corruption, but cannot prove who rendered it.
+# Only the factory below issues authority for canonical bytes in this process.
+# Weak keys retain no completed books. A restarted process prepares source once
+# from its current Book/Recovery records; persisted HTML never grants authority.
+_issued = weakref.WeakKeyDictionary()
 
 
 def _json(value):
@@ -45,7 +52,10 @@ class SourcePage:
 
     def validate(self, book):
         from .structural_ops import _digest, _state, ContractError
-        if self._identity() != self.seal:
+        identity=self._identity()
+        if _issued.get(self) != identity:
+            raise ContractError('canonical source requires current factory preparation')
+        if identity != self.seal:
             raise ContractError('canonical source bytes or records changed')
         if _digest(_state(book, self.page)) != self.state_digest:
             raise ContractError('stale canonical source page')
@@ -126,7 +136,9 @@ def prepare_source_page(book, pno, provenance, records=()):
               'unplaced_record_indices': [i for i in range(len(normalized)) if i not in placed]}
     page = SourcePage(pno, _digest(_state(book, pno)), html, _json(mapping),
                       _json(provenance), _json(raw), _json(report))
-    return replace(page, seal=page._identity())
+    page=replace(page, seal=page._identity())
+    _issued[page]=page._identity()
+    return page
 
 
 def prepare_recovery_page(book, pno, recovery):

@@ -247,3 +247,38 @@ def test_source_title_styles_do_not_discard_an_approved_quote_on_the_same_page(t
     with pytest.raises(ops.ContractError):
         build_epub.build(book,str(tmp_path/'stale.epub'),doc=doc,source_pages={0:canonical},operation_plans=[plan])
     doc.close()
+
+@pytest.mark.parametrize('mutation',['script','style','location'])
+def test_recomputed_public_source_digest_is_not_renderer_provenance(tmp_path,mutation):
+    from dataclasses import replace
+    import pymupdf
+    from cps.services.reflow import build_epub,structural_ops as ops
+    from cps.services.reflow.enriched_source import prepare_source_page
+    raw,_,_=opening_source();style=skeleton.BookStyle(body_size=10)
+    book=assemble.assemble([skeleton.page_skeleton(raw,style)],style,[raw])
+    canonical=prepare_source_page(book,0,{'layer':'native'})
+    html=canonical.html
+    if mutation=='script':html+='<script>alert(1)</script>'
+    elif mutation=='style':html=html.replace('text-align:center','text-align:left')
+    else:html=html.replace('class="source-title-line"','class="source-title-line" onclick="alert(1)"',1)
+    forged=replace(canonical,html=html);forged=replace(forged,seal=forged._identity())
+    doc=pymupdf.open();doc.new_page(width=500,height=700)
+    path=tmp_path/'forged.epub'
+    with pytest.raises(ops.ContractError):build_epub.build(book,str(path),doc=doc,source_pages={0:forged})
+    assert not path.exists();doc.close()
+
+
+def test_source_authority_is_recreated_from_records_after_process_state_is_lost(monkeypatch):
+    import weakref
+    from cps.services.reflow import enriched_source as source,structural_ops as ops
+    raw,_,_=opening_source();style=skeleton.BookStyle(body_size=10)
+    book=assemble.assemble([skeleton.page_skeleton(raw,style)],style,[raw])
+    records=[{'token':'smaller','score':20}]
+    before=source.prepare_source_page(book,0,{'layer':'native'},records)
+    with monkeypatch.context() as m:
+        m.setattr(source,'_issued',weakref.WeakKeyDictionary())
+        with pytest.raises(ops.ContractError):before.validate(book)
+        after=source.prepare_source_page(book,0,{'layer':'native'},records)
+        after.validate(book)
+        assert after.identity==before.identity and after.html==before.html
+        assert after.records_json==before.records_json

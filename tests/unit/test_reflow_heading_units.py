@@ -118,3 +118,10 @@ def test_native_dropcap_uses_measured_space_not_grammar(initial,word,gap,joined)
     assert bool(repairs) is joined
     assert book.conservation.ok,book.conservation.to_dict()
     doc.close()
+
+
+def test_prose_heading_about_tables_is_not_a_numbered_caption():
+    heading=line('Tables in practice',100,100)
+    raw=extract.RawPage(0,500,700,blocks=[extract.Block(0,heading.bbox,[heading])])
+    regions=skeleton.page_skeleton(raw,skeleton.BookStyle(body_size=10)).regions
+    assert [(r.kind,r.lines) for r in regions]==[('heading',[heading])]

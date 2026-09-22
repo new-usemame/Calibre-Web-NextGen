@@ -82,6 +82,14 @@ def test_warning_before_the_json_does_not_hide_the_library(tmp_path, log_lines):
         7: BOOKS[0]["formats"], 1228: BOOKS[1]["formats"]}
 
 
+def test_a_bracketed_diagnostic_before_the_json_is_not_taken_for_the_list(tmp_path, log_lines):
+    stdout_text = "[1] " + WARNING + "\n" + json.dumps(BOOKS, indent=2) + "\n"
+    converter = _converter_with_fake_calibredb(tmp_path, stdout_text)
+
+    assert converter.get_library_book_formats() == {
+        7: BOOKS[0]["formats"], 1228: BOOKS[1]["formats"]}
+
+
 def test_output_with_no_book_list_is_still_reported_unparseable(tmp_path, log_lines):
     converter = _converter_with_fake_calibredb(tmp_path, WARNING + "\n")
 

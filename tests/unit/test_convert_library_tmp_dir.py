@@ -98,6 +98,76 @@ def test_run_streaming_raises_on_a_failed_command(tmp_path):
         "e.stderr when it reports a failed conversion")
 
 
-def test_run_streaming_is_quiet_on_success(tmp_path):
+def test_a_command_that_cannot_start_fails_the_book_not_the_run(tmp_path):
     converter = _converter(tmp_path / "tmp")
-    converter._run_streaming([sys.executable, "-c", "print('fine')"])
+    with pytest.raises(subprocess.CalledProcessError) as excinfo:
+        converter._run_streaming([str(tmp_path / "no-such-kepubify"), "--inplace"])
+
+    assert excinfo.value.returncode == 127
+
+
+def test_undecodable_command_output_does_not_abort_the_run(tmp_path):
+    converter = _converter(tmp_path / "tmp")
+    with pytest.raises(subprocess.CalledProcessError) as excinfo:
+        converter._run_streaming(
+            [sys.executable, "-c",
+             "import sys; sys.stdout.buffer.write(b'Livre \\xe9crit\\n'); sys.exit(1)"])
+
+    assert "Livre" in excinfo.value.output
+
+
+def _write_tool(bin_dir, name, body):
+    tool = bin_dir / name
+    tool.write_text("#!/bin/sh\n" + body, encoding="utf-8")
+    tool.chmod(0o755)
+
+
+def test_a_failed_book_is_reported_and_the_next_book_still_converts(tmp_path, monkeypatch):
+    """Book 1's ebook-convert fails after an ingest removed the temp directory
+    (and skips the per-book cleanup). Book 1 must be reported as failed, and
+    book 2 must still find a directory, convert and import. Runs the real
+    command path with fake tools on PATH."""
+    target = tmp_path / "cwa_conversion_tmp"
+    converter = _converter(target)
+    library = tmp_path / "library"
+    books = []
+    for number, title in ((1, "First"), (2, "Second")):
+        folder = library / "Author" / f"{title} ({number})"
+        folder.mkdir(parents=True)
+        (folder / f"{title}.mobi").write_text("x", encoding="utf-8")
+        books.append(str(folder / f"{title}.mobi"))
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _write_tool(bin_dir, "ebook-convert",
+                'case "$1" in *First*) rm -rf "$(dirname "$2")"; echo "First.mobi is DRM locked"; exit 1;; esac\n'
+                'echo converted > "$2" || exit 2\n')
+    _write_tool(bin_dir, "calibredb", 'test -f "$3" || exit 3\n')
+
+    converter.to_convert = books
+    converter.target_format = "epub"
+    converter.kindle_epub_fixer = False
+    converter.library_dir = str(library) + "/"
+    converter.calibre_env = {"PATH": f"{bin_dir}:/usr/bin:/bin"}
+    converter.cwa_settings = {"auto_backup_conversions": False, "auto_backup_imports": False}
+
+    class _Db:
+        def conversion_add_entry(self, *args):
+            pass
+
+        def import_add_entry(self, *args):
+            pass
+
+    converter.db = _Db()
+    monkeypatch.setattr(converter, "set_library_permissions", lambda: None)
+    log = []
+    monkeypatch.setattr(convert_library, "print_and_log", lambda message, *a, **k: log.append(str(message)))
+    converter.ensure_tmp_conversion_dir()
+
+    converter.convert_library()
+
+    text = "\n".join(log)
+    assert "Conversion of First.mobi was unsuccessful" in text
+    assert "DRM locked" in text, "the tool's own reason must reach the log file"
+    assert "Conversion of First.mobi to epub format successful" not in text
+    assert "Import of Second.epub successfully completed" in text, text

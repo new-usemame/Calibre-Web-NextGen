@@ -15,6 +15,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import atexit
+from collections import deque
 from datetime import datetime
 import sqlite3
 
@@ -291,25 +292,30 @@ class LibraryConverter:
         commonly "No write access to <dir> using a temporary dir instead" when
         its config directory is not writable, and they can land before or after
         the JSON (#1954). Returns (document, diagnostic_lines); raises
-        json.JSONDecodeError when no line starts a decodable JSON document.
+        json.JSONDecodeError when no line starts a decodable list of book objects.
         """
         decoder = json.JSONDecoder()
         first_error = None
         offset = 0
         for line in raw_output.splitlines(keepends=True):
             stripped = line.lstrip()
-            if stripped[:1] in ('[', '{'):
+            if stripped[:1] == '[':
                 start = offset + len(line) - len(stripped)
                 try:
                     document, end = decoder.raw_decode(raw_output, start)
                 except json.JSONDecodeError as error:
                     first_error = first_error or error
                 else:
+                    # A diagnostic such as "[1] warning" decodes too; the listing
+                    # is a list of book objects (or empty for an empty library).
+                    if not all(isinstance(item, dict) for item in document):
+                        offset += len(line)
+                        continue
                     surrounding = raw_output[:start] + "\n" + raw_output[end:]
                     diagnostics = [text.strip() for text in surrounding.splitlines() if text.strip()]
                     return document, diagnostics
             offset += len(line)
-        raise first_error or json.JSONDecodeError("No JSON document in calibredb output", raw_output, 0)
+        raise first_error or json.JSONDecodeError("No book list in calibredb output", raw_output, 0)
 
 
     def get_books_to_convert(self):
@@ -426,6 +432,9 @@ class LibraryConverter:
             file_extension = Path(file).suffix
 
             print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Converting {filename} from {file_extension} format to {self.target_format} format...")
+            # An ingest can remove the directory at any point, and a failed book
+            # skips empty_tmp_con_dir(), so check before every book.
+            self.ensure_tmp_conversion_dir()
 
             try: # Get Calibre Library Book ID from the immediate book folder (e.g., "Title (6120)")
                 book_folder = os.path.basename(os.path.dirname(file))
@@ -464,7 +473,7 @@ class LibraryConverter:
 
                     print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Conversion of {os.path.basename(file)} to {self.target_format} format successful!") # Removed as of V3.0.0 - Removing old version from library...
                 except subprocess.CalledProcessError as e:
-                    print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Conversion of {os.path.basename(file)} was unsuccessful. See the following error:\n{e}")
+                    print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Conversion of {os.path.basename(file)} was unsuccessful. See the following error:\n{e}{self._output_tail(e)}")
                     self.current_book += 1
                     continue
 
@@ -491,11 +500,11 @@ class LibraryConverter:
                 output_path = os.path.join(
                     failed_backup_dir(), os.path.basename(target_filepath)
                 )
-                print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Import of {os.path.basename(target_filepath)} was not successfully completed. Converted file moved to {output_path}. See the following error:\n{e}")
+                print_and_log(f"[convert-library]: ({self.current_book}/{len(self.to_convert)}) Import of {os.path.basename(target_filepath)} was not successfully completed. Converted file moved to {output_path}. See the following error:\n{e}{self._output_tail(e)}")
                 try:
                     shutil.move(target_filepath, output_path)
                 except Exception as e:
-                    print_and_log(f"[convert-library]: ERROR - The following error occurred when trying to copy {file} to {output_path}:\n{e}")
+                    print_and_log(f"[convert-library]: ERROR - The following error occurred when trying to copy {target_filepath} to {output_path}:\n{e}")
                 self.current_book += 1
                 continue
 
@@ -562,6 +571,8 @@ class LibraryConverter:
         so it disappears out from under a Convert Library run that is already
         going as well as before one starts.
         """
+        if os.path.isdir(self.tmp_conversion_dir):
+            return
         try:
             Path(self.tmp_conversion_dir).mkdir(parents=True, exist_ok=True)
         except OSError as error:
@@ -582,26 +593,43 @@ class LibraryConverter:
         command as a successful one and printed the success message anyway.
         """
         args = [str(a) for a in args]
-        output_lines = []
-        with subprocess.Popen(
-            args,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            env=env,
-            text=True,
-            encoding='utf-8'
-        ) as process:
-            for line in process.stdout:  # Read from the combined stdout (which includes stderr)
-                output_lines.append(line)
-                if self.verbose:
-                    print_and_log(line)
-                else:
-                    print(line)
+        # Only the tail is needed to explain a failure; a verbose conversion of
+        # a large PDF can print tens of thousands of lines.
+        output_tail = deque(maxlen=200)
+        try:
+            with subprocess.Popen(
+                args,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env=env,
+                text=True,
+                encoding='utf-8',
+                errors='replace'
+            ) as process:
+                for line in process.stdout:  # Read from the combined stdout (which includes stderr)
+                    output_tail.append(line)
+                    if self.verbose:
+                        print_and_log(line)
+                    else:
+                        print(line)
+        except OSError as error:
+            # A missing or unexecutable tool fails this book, not the whole run.
+            raise subprocess.CalledProcessError(127, args, output=str(error), stderr=str(error)) from error
 
         if process.returncode != 0:
-            output = ''.join(output_lines)
+            output = ''.join(output_tail)
             raise subprocess.CalledProcessError(
                 process.returncode, args, output=output, stderr=output)
+
+
+    @staticmethod
+    def _output_tail(error, lines=20) -> str:
+        """The last lines a failed command printed, for the log file. Without
+        --verbose the command's own output only reaches the container's stdout."""
+        output = (getattr(error, "output", None) or "").strip()
+        if not output:
+            return ""
+        return "\n" + "\n".join(output.splitlines()[-lines:])
 
 
     def empty_tmp_con_dir(self):

@@ -164,8 +164,9 @@ def test_a_failed_book_is_reported_and_the_next_book_still_converts(tmp_path, mo
     monkeypatch.setattr(convert_library, "print_and_log", lambda message, *a, **k: log.append(str(message)))
     converter.ensure_tmp_conversion_dir()
 
-    converter.convert_library()
+    converted = converter.convert_library()
 
+    assert converted == 1, "the run summary must not count the failed book as converted"
     text = "\n".join(log)
     assert "Conversion of First.mobi was unsuccessful" in text
     assert "DRM locked" in text, "the tool's own reason must reach the log file"

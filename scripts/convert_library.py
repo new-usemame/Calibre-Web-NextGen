@@ -426,7 +426,9 @@ class LibraryConverter:
             print_and_log(f"[convert-library]: ERROR - The following error occurred when trying to copy {input_file} to {output_path}:\n{e}")
 
 
-    def convert_library(self):
+    def convert_library(self) -> int:
+        """Convert every book in to_convert; returns how many were converted and imported."""
+        converted = 0
         for file in self.to_convert:
             filename = os.path.basename(file)
             file_extension = Path(file).suffix
@@ -510,8 +512,11 @@ class LibraryConverter:
 
             self.set_library_permissions()
             self.empty_tmp_con_dir()
+            converted += 1
             self.current_book += 1
             continue
+
+        return converted
 
 
     def convert_to_kepub(self, filepath:str ,import_format:str) -> tuple[bool, str]:
@@ -664,13 +669,17 @@ def main():
     logger.info(f"NextGen Convert Library Service - Run Started: {datetime.now()}\n")
     converter = LibraryConverter(args)
     if len(converter.to_convert) > 0:
-        converter.convert_library()
+        converted = converter.convert_library()
     else:
         print_and_log(f'[convert-library]: No books found in library without a copy in the target format ({converter.target_format}). Exiting now...')
         logger.info(f"\nNextGen Convert Library Service - Run Ended: {datetime.now()}")
         sys.exit(0)
 
-    print_and_log(f"\n[convert-library]: Library conversion complete! {len(converter.to_convert)} books converted! Exiting now...")
+    failed = len(converter.to_convert) - converted
+    if failed:
+        print_and_log(f"\n[convert-library]: Library conversion complete. {converted} of {len(converter.to_convert)} books converted; {failed} failed, see the errors above. Exiting now...")
+    else:
+        print_and_log(f"\n[convert-library]: Library conversion complete! {converted} books converted! Exiting now...")
     logger.info(f"\nNextGen Convert Library Service - Run Ended: {datetime.now()}")
     sys.exit(0)
 

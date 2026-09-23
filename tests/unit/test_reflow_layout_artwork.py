@@ -675,6 +675,37 @@ class TestScanArtwork(object):
         with zipfile.ZipFile(result.path) as zf:
             assert _ink_share(zf.read(names[0])) > 0.01
 
+    def test_compact_vector_ignores_long_rule_touching_its_edge(self, tmp_path):
+        """A page rule can touch a diagram without owning the intervening prose."""
+        doc = pymupdf.open()
+        page = doc.new_page(width=612, height=792)
+        prose = 'Unrelated left column prose remains reflowable.'
+        page.insert_text((45, 405), prose, fontsize=9)
+        center = pymupdf.Point(378, 432)
+        for radius in (61, 31):
+            page.draw_circle(center, radius, color=(0, 0, 0), width=.5)
+        for dx, dy in ((61, 0), (0, 61), (53, 31), (53, -31), (31, 53), (31, -53)):
+            page.draw_line((center.x - dx, center.y - dy),
+                           (center.x + dx, center.y + dy), color=(0, 0, 0), width=.5)
+        for offset in range(-7, 8):
+            page.draw_line((center.x + offset * 4, 499),
+                           (center.x + offset * 4 + 2, 502), color=(0, 0, 0), width=.5)
+        page.draw_line((40, 500), (570, 500), color=(0, 0, 0), width=.5)
+        try:
+            book = assemble.deterministic_book(doc)
+            figures = [f for f in book.figures if f['pno'] == 0]
+            assert len(figures) == 1, book.figures
+            assert not pymupdf.Rect(figures[0]['bbox']).intersects(page.search_for(prose)[0])
+            assert prose in _whole_text(book)
+            result = _build(book, tmp_path, doc)
+        finally:
+            doc.close()
+        with zipfile.ZipFile(result.path) as zf:
+            chapter = '\n'.join(zf.read(n).decode() for n in zf.namelist()
+                                if re.fullmatch(r'OEBPS/ch\d+\.xhtml', n))
+            assert prose in chapter
+            assert len(_epub_images(result.path)) == 1
+
     def test_short_vector_rules_beside_prose_do_not_become_a_diagram(self):
         """Dense small marks without a circle are page furniture, not artwork."""
         doc = pymupdf.open()

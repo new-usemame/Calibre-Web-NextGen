@@ -1605,8 +1605,17 @@ def _classify_body(lines, blk, style, skel, band=0, column=0):
         skel.regions.append(Region(kind="caption",lines=list(lines),
             bbox=_lines_bbox(lines,blk.bbox),band=band,column=column))
         return
+    # A PDF extractor may put an entire section (including later bold emphasis)
+    # in one block. A centered, separated first line still has its own printed
+    # heading territory; later emphasis does not make that title prose.
+    display_first = (len(lines) >= 2 and lines[0].bold
+        and abs((lines[0].bbox[0] + lines[0].bbox[2]
+                 - blk.bbox[0] - blk.bbox[2]) / 2) <= lines[0].size
+        and lines[0].bbox[0] - blk.bbox[0] >= lines[0].size
+        and lines[1].bbox[0] - blk.bbox[0] <= lines[0].size
+        and lines[1].bbox[1] - lines[0].bbox[3] >= .65 * lines[0].size)
     if len(lines) >= 2 and heading_ish(lines[0], style) \
-            and not any(heading_ish(ln, style) for ln in lines[1:]):
+            and (display_first or not any(heading_ish(ln, style) for ln in lines[1:])):
         head = lines[0].stripped
         if acceptable_heading(head) and not continues_lowercase(lines[1]):
             skel.regions.append(Region(kind="heading", lines=[lines[0]],
@@ -2439,9 +2448,13 @@ def _vector_figures(raw):
                               bbox=box))
         elif count >= VEC_COMPACT_MIN_PATHS and VEC_COMPACT_MIN_AREA <= area <= VEC_MAX_AREA:
             reach = VEC_COMPACT_REACH
+            # Supporting thin strokes can extend beyond the core, but a page
+            # rule that merely touches its edge must not drag the crop across
+            # unrelated live prose. Only complete strokes inside the measured
+            # core's small outer territory may enlarge the figure.
             nearby = [rect for rect in all_rects
-                      if rect[2] >= box[0] - reach and rect[0] <= box[2] + reach
-                      and rect[3] >= box[1] - reach and rect[1] <= box[3] + reach]
+                      if rect[0] >= box[0] - reach and rect[2] <= box[2] + reach
+                      and rect[1] >= box[1] - reach and rect[3] <= box[3] + reach]
             if len(nearby) >= VEC_COMPACT_MIN_STROKES:
                 extent = (min(r[0] for r in nearby), min(r[1] for r in nearby),
                           max(r[2] for r in nearby), max(r[3] for r in nearby))

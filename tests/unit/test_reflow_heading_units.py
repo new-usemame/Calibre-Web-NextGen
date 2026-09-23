@@ -66,6 +66,37 @@ def test_same_size_centered_title_uses_complete_geometry_without_invented_font_c
     assert native_units([a.to_dict(),b.to_dict()])==[[0,1]]
 
 
+def test_centered_bold_appendix_opens_navigation_despite_later_bold_prose(tmp_path):
+    """A PDF block may contain a displayed title, body, and a bold closing line."""
+    from cps.services.reflow import build_epub
+    import zipfile
+    title=line('Appendix 1 – A Source Topic',186,145,size=9,width=238)
+    body=line('Ordinary discussion begins here and continues.',162,168,size=9,font='Times',width=288)
+    tail=line('A bold closing phrase.',162,292,size=9,width=95)
+    block=extract.Block(0,(162,145,450,301),[title,body,tail])
+    raw=extract.RawPage(0,612,792,blocks=[block])
+    style=skeleton.BookStyle(body_size=9,ladder=[12])
+    sk=skeleton.page_skeleton(raw,style)
+    assert [(r.kind,[l.text for l in r.lines]) for r in sk.regions if r.lines]==[
+        ('heading',[title.text]),('body',[body.text,tail.text])]
+    book=assemble.assemble([sk],style,[raw])
+    assert [e.kind for e in book.elements]==['h','p']
+    target=tmp_path/'appendix.epub'
+    build_epub.build(book,str(target))
+    with zipfile.ZipFile(target) as z:
+        assert title.text in z.read('OEBPS/toc.ncx').decode()
+
+
+def test_left_aligned_bold_body_lead_stays_prose_with_later_emphasis():
+    lead=line('Emphasized lead-in',162,145,size=9,width=92)
+    body=line('Ordinary discussion continues here.',162,157,size=9,font='Times',width=288)
+    tail=line('A bold closing phrase.',162,292,size=9,width=95)
+    raw=extract.RawPage(0,612,792,blocks=[extract.Block(0,(162,145,450,301),
+                                                       [lead,body,tail])])
+    sk=skeleton.page_skeleton(raw,skeleton.BookStyle(body_size=9,ladder=[12]))
+    assert not any(r.kind=='heading' for r in sk.regions)
+
+
 def test_title_split_keeps_dropcap_before_body_with_raised_marker():
     raw,first,second,drop,body=source()
     marker=line('1',120,158,size=6,font='Times',width=3)

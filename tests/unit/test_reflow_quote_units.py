@@ -13,6 +13,9 @@ def fixture(tmp_path,kind='multi'):
     if kind=='attribution':
         prefix='(from an earlier source) ';page.insert_text((70,160),prefix.strip(),fontsize=11,fontname='tiit')
         lines=['"First complete sentence. The next sentence continues','across the printed block and ends here."'];ys=[174,188]
+    elif kind in ('annotation','all_italic_annotation'):
+        lines=['A complete verse ends here.', '(A separate observation occupies', 'two printed lines.)'];ys=[160,174,188]
+    elif kind=='inline_parenthetical':lines=['A complete verse (with its own aside) ends here.'];ys=[160]
     elif kind=='short':lines=['"Stay."'];ys=[160]
     elif kind=='inline':lines=['Ordinary prose calls this "a name" inside its sentence.'];ys=[160]
     else:lines=['First complete sentence. The next sentence continues','across the printed block. The final sentence must stay.'];ys=[160,174]
@@ -20,7 +23,7 @@ def fixture(tmp_path,kind='multi'):
     if kind=='opening_only':lines[0]='\"'+lines[0]
     for i,(y,text) in enumerate(zip(ys,lines)):
         x=40 if kind=='inline' or (kind=='ordinary_indent' and i>0) else 95 if kind=='display_first_indent' and i==0 else 70
-        page.insert_text((x,y),text,fontsize=11,fontname='tiro')
+        page.insert_text((x,y),text,fontsize=11,fontname='tiit' if kind=='all_italic_annotation' or (kind=='annotation' and i>0) else 'tiro')
     if kind=='note':page.insert_text((70+pymupdf.get_text_length(lines[-1],fontname='tiro',fontsize=11),ys[-1]-3),'7',fontsize=7,fontname='tiro')
     for y,text in [(240,'Ordinary source body resumes with the original column.'),(254,'The following text remains distinct from the display.')]:page.insert_text((40,y),text,fontsize=11,fontname='tiro')
     path=tmp_path/(kind+'.pdf');doc.save(path);doc.close();doc=pymupdf.open(path);raw=extract.read_page(doc,0)
@@ -241,3 +244,51 @@ def test_centered_terminal_fragment_uses_recovered_neighbor_lines(tmp_path):
     with pytest.raises(ops.ContractError,match='complete source quote evidence'):
         build_epub.build(book,str(tmp_path/'centered-fragment.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
     doc.close()
+
+
+@pytest.mark.parametrize('seam',['candidates','admission','builder'])
+def test_separate_italic_parenthetical_is_outside_quote_unit(tmp_path,seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    data=fixture(tmp_path,'annotation');book,doc,raw,start,end=data;p=prepare(data)
+    if seam=='candidates':
+        assert [c['source_range'] for c in p.candidates() if c['kind']=='quote' and c['element_id']=='e1']==[[0,len('A complete verse ends here.')]]
+    else:
+        forged=replace(p,specs=(ops._Spec(1,'quote',0,end),));cid=forged.candidates()[0]['candidate_id']
+        with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+            if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+            else:build_epub.build(book,str(tmp_path/'mixed.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+    doc.close()
+
+
+def test_annotation_words_remain_outside_emitted_quote(tmp_path):
+    from cps.services.reflow import build_epub
+    import zipfile
+    from xml.etree import ElementTree as ET
+    data=fixture(tmp_path,'annotation');book,doc,raw,*_=data;p=prepare(data)
+    choice=next(c for c in p.candidates() if c['kind']=='quote' and c['element_id']=='e1')
+    plan=p.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[choice['candidate_id']]))
+    target=tmp_path/'annotation.epub';before=copy.deepcopy(book.pages[0][1].runs)
+    build_epub.build(book,str(target),doc=doc,operation_plans=[plan])
+    assert book.pages[0][1].runs==before
+    with zipfile.ZipFile(target) as z:
+        roots=[ET.fromstring(z.read(n)) for n in z.namelist() if n.endswith('.xhtml')]
+    blocks=[b for root in roots for b in root.iter('{http://www.w3.org/1999/xhtml}blockquote')]
+    assert len(blocks)==1 and ''.join(blocks[0].itertext()).strip()=='A complete verse ends here.'
+    bodies=[' '.join(''.join(b.itertext()).split()) for root in roots for b in root.iter('{http://www.w3.org/1999/xhtml}body')]
+    assert any('A complete verse ends here.' in text and '(A separate observation occupies two printed lines.)' in text for text in bodies)
+    doc.close()
+
+
+@pytest.mark.parametrize('kind',['all_italic_annotation','inline_parenthetical'])
+def test_parentheses_without_contrasting_source_line_style_are_not_split(tmp_path,kind):
+    data=fixture(tmp_path,kind)
+    assert [c['source_range'] for c in prepare(data).candidates() if c['kind']=='quote' and c['element_id']=='e1']==[[0,data[4]]]
+    data[1].close()
+
+
+@pytest.mark.parametrize('layer,uncertain',[('ocr',False),('native',True)])
+def test_mixed_annotation_boundary_needs_reliable_native_source(tmp_path,layer,uncertain):
+    data=fixture(tmp_path,'annotation');data[0].pages[0][1].punctuation_uncertain=uncertain
+    assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in prepare(data,layer).candidates())
+    data[1].close()

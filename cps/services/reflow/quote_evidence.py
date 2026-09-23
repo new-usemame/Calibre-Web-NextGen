@@ -8,7 +8,7 @@ import re
 import statistics
 from . import assemble,extract,heading_evidence as geometry
 
-VERSION='source-quote-units-4'
+VERSION='source-quote-units-5'
 
 
 def _normal_positions(text):
@@ -199,6 +199,25 @@ def quote_evidence(book,pno,raw_page,layer,source_rotation=0,uncertain=False):
                 proof['reason']='multiple_source_display_units';continue
         content_end=end
         atomic_end=len(text)
+        # A distinct trailing parenthetical in contrasting native italics is
+        # annotation, not part of the preceding display. Require whole mapped
+        # source lines and one balanced parenthetical; never split an inline
+        # aside or a consistently italic quotation. OCR/uncertain punctuation
+        # cannot establish this boundary and must abstain for this mixed unit.
+        annotation=False
+        split=len(mapped)
+        while split and _italic(mapped[split-1]):split-=1
+        if 0<split<len(mapped) and not any(_italic(line) for line in mapped[:split]):
+            suffix=text[ranges[split][0]:end].strip()
+            depth=0;balanced=suffix.startswith('(') and suffix.endswith(')')
+            for i,char in enumerate(suffix):
+                if char=='(':depth+=1
+                elif char==')':depth-=1
+                if depth<0 or (depth==0 and i<len(suffix)-1):balanced=False
+            if balanced and depth==0:
+                if layer!='native' or element.punctuation_uncertain or uncertain:
+                    proof['reason']='uncertain_annotation_boundary';continue
+                end=ranges[split-1][1];annotation=True
         body=text[start:end]
         # A complete outer quoted range can be separated from an attribution only
         # at actual source line boundaries, with native contrasting typography.
@@ -233,5 +252,5 @@ def quote_evidence(book,pno,raw_page,layer,source_rotation=0,uncertain=False):
         proof.update(supported=True,reason='complete_source_display_unit',units=[{
             'source_range':[start,end],'text':text[start:end],
             'source_line_boxes':[line['bbox'] for line,(a,b) in zip(mapped,ranges) if a<end and b>start],
-            'boundary':'delimited_source_lines' if delimited else 'complete_display_paragraph'}])
+            'boundary':'delimited_source_lines' if delimited else 'annotation_source_lines' if annotation else 'complete_display_paragraph'}])
     return result

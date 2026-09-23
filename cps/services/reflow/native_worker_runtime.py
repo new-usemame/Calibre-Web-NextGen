@@ -60,6 +60,7 @@ def serve(parent, cache_root, control):
                         if set(args) - allowed: raise ValueError('prepare fields')
                         opts = args.setdefault('recovery_opts', {})
                         if set(opts) - {'mode', 'language', 'dpi'}: raise ValueError('recovery fields')
+                        (root / 'ocr-scratch').mkdir(mode=0o700, exist_ok=True)
                         opts.update(cache_dir=str(Path(cache_root) / 'ocr-cache') if cache_root else str(root / 'ocr-cache'),
                                     scratch_dir=str(root / 'ocr-scratch'))
                         value = pipeline.run(doc, client=None, progress=progress, should_stop=stop, **args)

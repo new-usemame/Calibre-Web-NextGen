@@ -37,11 +37,15 @@ def test_native_death_during_actual_task_fails_job_keeps_web_alive_and_prior_fil
     assert rig.local_db.session.commits == 0
     assert not list(rig.folder.glob('.reflow-*-staging'))
     assert not list((Path(rig.root) / 'native-scratch').iterdir())
-    from cps import app
+    from cps import app, web
     # This lightweight unit process has not registered the complete web module.
     # Restore Flask's test-only initialization state for later API fixtures.
     with monkeypatch.context() as context:
         context.setattr(app, '_got_first_request', app._got_first_request)
+        # Earlier API tests may have registered real web response hooks, while
+        # this unit rig deliberately never initializes the application config DB.
+        # Initialize their small config surface, not an order-dependent 500.
+        context.setattr(web, 'config', SimpleNamespace(config_trustedhosts='', config_use_google_drive=False))
         with app.test_client() as client:
             assert client.get('/__native-containment-alive__').status_code == 404
     monkeypatch.setattr(ipc.NativeDocument, 'call', real)
@@ -327,3 +331,25 @@ def test_parent_rejects_forged_source_authority_before_native_preparation(rig, t
             structural_ops.prepare(result.book, doc, pno, typed_model.SOURCE_REVISION,
                 json.loads(canonical.provenance_json), source_page=forged)
         assert doc.seq == sequence, 'parent must not send a forged source for native or paid work'
+
+
+def test_native_recovery_cache_miss_has_owned_scratch_and_keeps_failure_pixels(tmp_path, monkeypatch):
+    from tests.unit.test_reflow_ocr_adapter import _scan
+    executable = tmp_path / 'tesseract'
+    executable.write_text('#!/bin/sh\ncase "$1" in\n'
+        ' --version) echo "tesseract diagnostic-no-recognition";;\n'
+        ' --list-langs) printf "List of available languages in \\\"%s\\\" (2):\\neng\\nosd\\n" "$TESSDATA_PREFIX";;\n'
+        ' *) exit 97;;\nesac\n')
+    executable.chmod(0o700)
+    (tmp_path / 'eng.traineddata').write_bytes(b'engine identity fixture')
+    (tmp_path / 'osd.traineddata').write_bytes(b'orientation identity fixture')
+    monkeypatch.setenv('TESSDATA_PREFIX', str(tmp_path))
+    monkeypatch.setenv('PATH', str(tmp_path) + os.pathsep + os.environ['PATH'])
+    path = tmp_path / 'scan.pdf'
+    with _scan() as doc: doc.save(path)
+    with ipc.NativeDocument(path, scratch_root=tmp_path / 'scratch') as doc:
+        result = structural_pipeline.run_structural(doc, recovery_opts={'mode': 'auto'}, measure_eligibility=False)
+        assert result.recovery.failed == 1
+        assert result.recovery.provenance[0].failed
+        assert result.book.figures, 'failed recognition must retain the complete scanned source'
+    assert not list((tmp_path / 'scratch').iterdir())

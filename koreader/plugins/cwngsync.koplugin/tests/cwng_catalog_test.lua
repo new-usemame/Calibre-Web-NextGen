@@ -1,0 +1,116 @@
+package.path = table.concat({
+    "./?.lua",
+    "../?.lua",
+    package.path,
+}, ";")
+
+local Catalog = require("cwng_catalog")
+
+local function assertEqual(actual, expected, message)
+    if actual ~= expected then
+        error(string.format("%s\nexpected: %s\nactual: %s",
+            message, tostring(expected), tostring(actual)), 2)
+    end
+end
+
+local function titles(list)
+    local out = {}
+    for i, e in ipairs(list) do out[i] = e.title end
+    return table.concat(out, "|")
+end
+
+local ROOT = "/mnt/us/cwng-library"
+
+local BOOKS = {
+    { book_id = 1, title = "Guards! Guards!", authors = { "Terry Pratchett" }, series = "Discworld",
+      series_index = 8, filename = "Guards [1].epub", added = "2026-01-05T00:00:00Z",
+      read_status = "finished", shelves = { "s1" } },
+    { book_id = 2, title = "The Colour of Magic", authors = { "Terry Pratchett" }, series = "Discworld",
+      series_index = 1, filename = "Colour [2].epub", added = "2026-03-01T00:00:00Z",
+      read_status = "reading", last_read = "2026-09-20T10:00:00Z", shelves = {} },
+    { book_id = 3, title = "Good Omens", authors = { "Terry Pratchett", "Neil Gaiman" },
+      filename = "Omens [3].epub", added = "2026-09-01T00:00:00Z", read_status = "unread",
+      shelves = { "s1", "s2" } },
+    { book_id = 4, title = "Coraline", authors = { "Neil Gaiman" }, filename = "Coraline [4].epub",
+      added = "2026-02-01T00:00:00Z", read_status = "reading", last_read = "2026-09-22T09:00:00Z",
+      shelves = {} },
+    { book_id = 5, title = "Mort", authors = { "Terry Pratchett" }, series = "Discworld",
+      series_index = 4, filename = "Mort [5].epub", added = "2026-04-01T00:00:00Z",
+      read_status = "unread", shelves = { "s2" } },
+    { book_id = 6, title = "A Broken Compass", filename = "Broken.epub" }, -- no authors, no dates
+    { title = "No id", filename = "x.epub" },                   -- skipped
+}
+local SHELVES = { { id = "s1", name = "Favorites" }, { id = "s2", name = "Beach reads" } }
+local KNOWN = { ["4"] = { kind = "downloaded", path = ROOT .. "/Coraline [4].epub" },
+                ["5"] = { kind = "placeholder", path = ROOT .. "/Mort [5].epub" } }
+
+local function entries() return Catalog.entries(BOOKS, KNOWN, ROOT) end
+
+local function testEntriesKnowWhatIsOnTheDevice()
+    local list = entries()
+    assertEqual(#list, 6, "a book without an id is not listed")
+    assertEqual(list[4].downloaded, true, "the downloaded book")
+    assertEqual(list[5].downloaded, false, "a cover is not a download")
+    assertEqual(list[1].path, ROOT .. "/Guards [1].epub", "path from the library folder")
+    assertEqual(list[6].title, "A Broken Compass", "a book with little metadata is still listed")
+end
+
+local function testRecentlyAddedNewestFirst()
+    assertEqual(titles(Catalog.recentlyAdded(entries(), 3)), "Good Omens|Mort|The Colour of Magic",
+        "newest three")
+end
+
+local function testContinueReadingPutsThisDeviceFirstAndDropsFinished()
+    local history = { ROOT .. "/Guards [1].epub", ROOT .. "/Coraline [4].epub" }
+    local list = Catalog.continueReading(entries(), history, 5, function(path)
+        if path == ROOT .. "/Coraline [4].epub" then return "reading" end
+    end)
+    assertEqual(titles(list), "Coraline|The Colour of Magic",
+        "opened here first; Guards is finished; Colour is being read elsewhere")
+
+    local finished_here = Catalog.continueReading(entries(), history, 5, function(path)
+        if path == ROOT .. "/Coraline [4].epub" then return "complete" end
+    end)
+    assertEqual(titles(finished_here), "The Colour of Magic", "finishing it here takes it off the row")
+end
+
+local function testGroupsAndTheirMembersInReadingOrder()
+    local authors = Catalog.groups(entries(), "author")
+    assertEqual(#authors, 2, "two authors")
+    assertEqual(authors[1].name, "Neil Gaiman", "sorted by name")
+    assertEqual(authors[2].count, 4, "co-written books count for each author")
+    local series = Catalog.groups(entries(), "series")
+    assertEqual(#series, 1, "books without a series make no group")
+    assertEqual(titles(Catalog.members(entries(), "series", series[1].key)),
+        "The Colour of Magic|Mort|Guards! Guards!", "series in number order, not title order")
+    assertEqual(titles(Catalog.members(entries(), "author", authors[2].key)),
+        "The Colour of Magic|Mort|Guards! Guards!|Good Omens",
+        "an author's series first in order, then the rest by title")
+    local shelves = Catalog.groups(entries(), "shelf", SHELVES)
+    assertEqual(shelves[1].name .. "=" .. shelves[1].count, "Beach reads=2", "shelf names from the manifest")
+    assertEqual(titles(Catalog.members(entries(), "shelf", "s1")), "Good Omens|Guards! Guards!", "shelf by title")
+end
+
+local function testSearchFindsEveryWordAnywhereAndRanksTitles()
+    assertEqual(titles(Catalog.search(entries(), "gaiman")), "Coraline|Good Omens", "by author")
+    assertEqual(titles(Catalog.search(entries(), "discworld mort")), "Mort", "all words must match")
+    assertEqual(titles(Catalog.search(entries(), "co")), "Coraline|A Broken Compass|The Colour of Magic",
+        "title start before title middle")
+    assertEqual(titles(Catalog.search(entries(), "ma")), "The Colour of Magic|Coraline|Good Omens",
+        "a title match before an author match")
+    assertEqual(#Catalog.search(entries(), "   "), 0, "nothing typed, nothing found")
+    local accents = Catalog.search(entries(), "CORALINE", function(s) return (s or ""):lower() end)
+    assertEqual(titles(accents), "Coraline", "matching goes through the fold")
+end
+
+local function testDownloadedOnly()
+    assertEqual(titles(Catalog.downloadedOnly(entries())), "Coraline", "only the real book")
+end
+
+testEntriesKnowWhatIsOnTheDevice()
+testRecentlyAddedNewestFirst()
+testContinueReadingPutsThisDeviceFirstAndDropsFinished()
+testGroupsAndTheirMembersInReadingOrder()
+testSearchFindsEveryWordAnywhereAndRanksTitles()
+testDownloadedOnly()
+print("cwng_catalog_test.lua: all tests passed")

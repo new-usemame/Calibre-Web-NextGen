@@ -378,14 +378,15 @@ RUN \
   cd /app/calibre-web-automated/koreader/plugins && \
   # Calculate digest of all files in the plugin for debugging purposes
   echo "Calculating digest of plugin files..." && \
-  PLUGIN_DIGEST=$(find cwngsync.koplugin -type f -name "*.lua" -o -name "*.json" | sort | xargs sha256sum | sha256sum | cut -d' ' -f1) && \
+  PLUGIN_DIGEST=$(find cwngsync.koplugin -path cwngsync.koplugin/tests -prune -o -type f \( -name "*.lua" -o -name "*.json" \) -print | sort | xargs sha256sum | sha256sum | cut -d' ' -f1) && \
   echo "Plugin digest: $PLUGIN_DIGEST" && \
   # Create a file named after the digest inside the plugin folder
   echo "Plugin files digest: $PLUGIN_DIGEST" > cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
   echo "Build date: $(date)" >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
   echo "Files included:" >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
-  find cwngsync.koplugin -type f -name "*.lua" -o -name "*.json" | sort >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
-  zip -r koplugin.zip cwngsync.koplugin/ && \
+  find cwngsync.koplugin -path cwngsync.koplugin/tests -prune -o -type f \( -name "*.lua" -o -name "*.json" \) -print | sort >> cwngsync.koplugin/${PLUGIN_DIGEST}.digest && \
+  # The plugin's tests stay out of the zip users install.
+  zip -r koplugin.zip cwngsync.koplugin/ -x 'cwngsync.koplugin/tests/*' && \
   echo "Created koplugin.zip from cwngsync.koplugin folder with digest file: ${PLUGIN_DIGEST}.digest"; \
   else \
   echo "Warning: cwngsync.koplugin folder not found, skipping zip creation"; \

@@ -20,6 +20,7 @@ make is observable here.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -230,6 +231,19 @@ def test_dry_run_never_touches_either_release(sandbox):
     assert _app_uploads(calls) == [], "a dry run attached an asset to a published release"
     assert _dedicated_creates(calls) == []
     assert _pushes(calls) == []
+
+
+def test_the_installable_zip_leaves_the_plugin_tests_out(sandbox):
+    """Users unzip it straight into KOReader's plugins folder."""
+    (sandbox.source / "tests").mkdir()
+    (sandbox.source / "tests" / "sync_test.lua").write_text("-- test\n")
+    sandbox.ships(None)
+    proc, _ = sandbox.run()
+    assert proc.returncode == 0, proc.stderr
+    # `unzip -l` rows: size, date, time, name. The repository mirror keeps its tests.
+    zipped = re.findall(r"^\s*\d+\s+\S+\s+\S+\s+(cwngsync\.koplugin/\S*)$", proc.stdout, re.M)
+    assert "cwngsync.koplugin/main.lua" in zipped, proc.stdout
+    assert not [name for name in zipped if "/tests/" in name], zipped
 
 
 def test_unchanged_plugin_under_auto_attaches_nothing(sandbox):

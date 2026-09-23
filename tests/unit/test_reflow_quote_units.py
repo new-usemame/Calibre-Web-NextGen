@@ -173,3 +173,71 @@ def test_opening_only_quote_does_not_prove_its_terminal_boundary(tmp_path):
     data=fixture(tmp_path,'opening_only')
     assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in prepare(data).candidates())
     data[1].close()
+
+
+def cross_page_display(tmp_path):
+    doc=pymupdf.open();raws=[];pages={}
+    for pno in (0,1):
+        page=doc.new_page(width=500,height=700)
+        specs=([('body',40,80,['Ordinary body establishes the full printed text column.'],11),
+                ('quote',70,180,['A displayed quotation continues across the page break','and leaves an unfinished thought in'],11),
+                ('footer',40,650,['12 A smaller reference printed below the quotation.'],8)] if pno==0 else
+               [('header',160,40,['Running title'],10),
+                ('quote',70,180,['the same source display on the next page, ending here.'],11),
+                ('body',40,300,['Ordinary body resumes after the complete quotation.'],11)])
+        for name,x,y,texts,size in specs:
+            for i,text in enumerate(texts):page.insert_text((x,y+i*14),text,fontsize=size,fontname='tiro')
+    path=tmp_path/'continued.pdf';doc.save(path);doc.close();doc=pymupdf.open(path)
+    for pno in (0,1):
+        raw=extract.read_page(doc,pno);raws.append(raw);elements=[]
+        for block in raw.text_blocks:
+            elements.append(assemble.Element('p',pno=pno,bbox=block.bbox,line_boxes=[l.bbox for l in block.lines],runs=[['t',' '.join(l.text.strip() for l in block.lines)]]))
+        pages[pno]=elements
+    book=assemble.Book(elements=pages[0]+pages[1],pages=pages,style=skeleton.BookStyle(body_size=11))
+    return book,doc,raws
+
+
+@pytest.mark.parametrize('seam',['candidates','admission','builder'])
+def test_footer_and_running_header_cannot_hide_cross_page_quote_continuation(tmp_path,seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    book,doc,raws=cross_page_display(tmp_path)
+    for pno in (0,1):
+        p=ops.prepare(book,doc,pno,'cross-page',{'layer':'native'},raw_page=raws[pno])
+        if seam=='candidates':assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in p.candidates())
+        else:
+            e=book.pages[pno][1];forged=replace(p,specs=(ops._Spec(1,'quote',0,len(e.text)),));cid=forged.candidates()[0]['candidate_id']
+            target=tmp_path/('cross-'+str(pno)+'.epub')
+            with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+                if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+                else:build_epub.build(book,str(target),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+            assert not target.exists()
+    doc.close()
+
+
+def test_centered_terminal_fragment_uses_recovered_neighbor_lines(tmp_path):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    doc=pymupdf.open();page=doc.new_page(width=500,height=700)
+    page.insert_text((40,90),'Ordinary body text establishes a broad source text column.',fontsize=11,fontname='tiro')
+    lines=['"A centered quotation begins and continues through','another complete source line before reaching','its actual ending."']
+    for i,text in enumerate(lines):page.insert_text((230-pymupdf.get_text_length(text,fontname='tiro',fontsize=11)/2,180+i*14),text,fontsize=11,fontname='tiro')
+    page.insert_text((40,300),'Ordinary body text resumes after the full source quotation.',fontsize=11,fontname='tiro')
+    path=tmp_path/'centered.pdf';doc.save(path);doc.close();doc=pymupdf.open(path);raw=extract.read_page(doc,0).to_dict()
+    source=[l for b in raw['blocks'] for l in b.get('lines',[])]
+    quoted=[l for l in source if 150<l['bbox'][1]<220]
+    def element(chosen,text):
+        return assemble.Element('p',pno=0,bbox=chosen[0]['bbox'],line_boxes=[chosen[0]['bbox']],runs=[['t',text]])
+    before=element([source[0]],''.join(s['text'] for s in source[0]['spans']))
+    prefix=element(quoted[:2],' '.join(lines[:2]));tail=element(quoted[2:],lines[2])
+    after=element([source[-1]],''.join(s['text'] for s in source[-1]['spans']))
+    raw['blocks']=[dict(b,lines=[l],bbox=l['bbox']) for b in raw['blocks'] for l in b.get('lines',[])]
+    elements=[before,prefix,tail,after];book=assemble.Book(elements=elements,pages={0:elements},style=skeleton.BookStyle(body_size=11))
+    p=ops.prepare(book,doc,0,'centered',{'layer':'native'},raw_page=raw)
+    assert not any(c['kind']=='quote' and c['element_id']=='e2' for c in p.candidates())
+    forged=replace(p,specs=(ops._Spec(2,'quote',0,len(tail.text)),));cid=forged.candidates()[0]['candidate_id']
+    with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+        forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+    with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+        build_epub.build(book,str(tmp_path/'centered-fragment.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+    doc.close()

@@ -6,9 +6,9 @@ never a boundary, and typography from OCR is not treated as native evidence.
 """
 import re
 import statistics
-from . import extract,heading_evidence as geometry
+from . import assemble,extract,heading_evidence as geometry
 
-VERSION='source-quote-units-3'
+VERSION='source-quote-units-4'
 
 
 def _normal_positions(text):
@@ -98,13 +98,48 @@ def _same_page_continuation(elements,index,mapped,lines):
         if not 0<=neighbor_index<len(elements):continue
         neighbor=elements[neighbor_index]
         if neighbor.kind!='p' or neighbor.table_row or neighbor.column!=element.column:continue
-        adjacent,_=geometry._map(neighbor,lines)
+        adjacent,_,error=_source_lines(neighbor,lines)
+        if error:adjacent,_=geometry._map(neighbor,lines)
         if not adjacent:continue
         prior,following=(adjacent[-1],mapped[0]) if neighbor_index<index else (mapped[-1],adjacent[0])
         a,b=prior['bbox'],following['bbox']
         em=max(a[3]-a[1],b[3]-b[1])
-        if 0<b[1]-a[1]<=em*1.7 and abs(a[0]-b[0])<=em*.5:
+        aligned=(abs(a[0]-b[0])<=em*.5 or abs((a[0]+a[2]-b[0]-b[2])/2)<=em*.5)
+        if 0<b[1]-a[1]<=em*1.7 and aligned:
             return True
+    return False
+
+
+def _cross_page_continuation(book,pno,index,mapped):
+    """Bounded neighboring source context outranks incidental element order.
+
+    A citation/footer may follow the last display, or a running header/figure
+    may precede its tail. Match the display's inset relative to each page's body
+    column, then use the existing unfinished-text continuation rule. This never
+    merges or rewrites the two fragments; uncertain complete boundaries abstain.
+    """
+    element=book.pages[pno][index]
+    em=statistics.median(line['bbox'][3]-line['bbox'][1] for line in mapped)
+    def column(page):
+        return [e for e in book.pages.get(page,[]) if e.kind=='p' and not e.table_row
+                and e.column==element.column and geometry._valid(e.bbox)]
+    current=column(pno)
+    if not current:return False
+    left=min(e.bbox[0] for e in current)
+    inset=min(line['bbox'][0] for line in mapped)-left
+    if inset<=em*.5:return False
+    def edge(page,last):
+        paragraphs=column(page)
+        if not paragraphs:return None
+        body_left=min(e.bbox[0] for e in paragraphs)
+        display=[e for e in paragraphs if abs(e.bbox[0]-body_left-inset)<=em*.5]
+        return (display[-1] if last else display[0]) if display else None
+    if edge(pno,True) is element:
+        following=edge(pno+1,False)
+        if following is not None and assemble.continues(element.text,following.text):return True
+    if edge(pno,False) is element:
+        previous=edge(pno-1,True)
+        if previous is not None and assemble.continues(previous.text,element.text):return True
     return False
 
 
@@ -128,7 +163,9 @@ def quote_evidence(book,pno,raw_page,layer,source_rotation=0,uncertain=False):
         containing=[block for block in raw.get('blocks',[]) if any(line in mapped for line in block.get('lines',[]))]
         if any(any(line not in mapped for line in block.get('lines',[])) for block in containing):
             proof['reason']='incomplete_source_display_unit';continue
-        if geometry._continued(book,pno,index) or _same_page_continuation(elements,index,mapped,lines):
+        if (geometry._continued(book,pno,index) or
+            _same_page_continuation(elements,index,mapped,lines) or
+            _cross_page_continuation(book,pno,index,mapped)):
             proof['reason']='known_source_continuation';continue
         text=''.join(str(run[1]) for run in element.runs)
         end=len(text)

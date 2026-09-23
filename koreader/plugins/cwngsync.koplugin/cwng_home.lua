@@ -252,6 +252,7 @@ local function groupItems(groups, kind)
     for i, group in ipairs(groups) do
         items[i] = {
             text = group.name,
+            sort_text = group.sort_name,
             mandatory = tostring(group.count),
             group = { kind = kind, key = group.key, name = group.name },
         }
@@ -384,6 +385,22 @@ function Home:setDownloadedOnly(on)
     self.plugin.settings.home_downloaded_only = on or nil
     self:clearStack()
     self:render({ tab = self.view and self.view.tab or "recent" })
+end
+
+-- "Go to letter" (tap the page number) follows the list's order: authors
+-- by surname, accents ignored.
+function Home:goToMenuItemMatching(search_string, goto_letter)
+    if not goto_letter then
+        return BookList.goToMenuItemMatching(self, search_string, goto_letter)
+    end
+    local prefix = self.fold(search_string)
+    for i, item in ipairs(self.item_table) do
+        if self.fold(item.sort_text or item.text):sub(1, #prefix) == prefix then
+            self.itemnumber = i
+            self:onGotoPage(self:getPageNumber(i))
+            return
+        end
+    end
 end
 
 function Home:onMenuSelect(item)

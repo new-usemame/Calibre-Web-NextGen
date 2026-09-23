@@ -79,7 +79,8 @@ end
 local function testGroupsAndTheirMembersInReadingOrder()
     local authors = Catalog.groups(entries(), "author")
     assertEqual(#authors, 2, "two authors")
-    assertEqual(authors[1].name, "Neil Gaiman", "sorted by name")
+    assertEqual(authors[1].name, "Neil Gaiman", "sorted by surname, shown as written")
+    assertEqual(authors[1].sort_name, "Gaiman, Neil", "filed under the surname")
     assertEqual(authors[2].count, 4, "co-written books count for each author")
     local series = Catalog.groups(entries(), "series")
     assertEqual(#series, 1, "books without a series make no group")
@@ -91,6 +92,25 @@ local function testGroupsAndTheirMembersInReadingOrder()
     local shelves = Catalog.groups(entries(), "shelf", SHELVES)
     assertEqual(shelves[1].name .. "=" .. shelves[1].count, "Beach reads=2", "shelf names from the manifest")
     assertEqual(titles(Catalog.members(entries(), "shelf", "s1")), "Good Omens|Guards! Guards!", "shelf by title")
+end
+
+local function testAuthorsAreFiledBySurname()
+    assertEqual(Catalog.authorSortName("Terry Pratchett"), "Pratchett, Terry", "surname first")
+    assertEqual(Catalog.authorSortName("Martin Luther King Jr."), "King, Martin Luther Jr.", "suffix stays")
+    assertEqual(Catalog.authorSortName("Homer"), "Homer", "one name")
+    assertEqual(Catalog.authorSortName("Pratchett, Terry"), "Pratchett, Terry", "already filed")
+    local books = {
+        { book_id = 1, title = "A", authors = { "Anna Zola" }, filename = "a.epub" },
+        { book_id = 2, title = "B", authors = { "Zed Adams" }, filename = "b.epub" },
+        { book_id = 3, title = "C", authors = { "Mary Shelley", "Percy Shelley" },
+          author_sort = "Shelley, Mary Wollstonecraft & Shelley, Percy Bysshe", filename = "c.epub" },
+    }
+    local groups = Catalog.groups(Catalog.entries(books, {}, ROOT), "author")
+    local names = {}
+    for i, g in ipairs(groups) do names[i] = g.name end
+    assertEqual(table.concat(names, "|"), "Zed Adams|Mary Shelley|Percy Shelley|Anna Zola",
+        "by surname, not first name")
+    assertEqual(groups[2].sort_name, "Shelley, Mary Wollstonecraft", "the server's author_sort wins")
 end
 
 local function testSearchFindsEveryWordAnywhereAndRanksTitles()
@@ -127,6 +147,7 @@ testEntriesKnowWhatIsOnTheDevice()
 testRecentlyAddedNewestFirst()
 testContinueReadingPutsThisDeviceFirstAndDropsFinished()
 testGroupsAndTheirMembersInReadingOrder()
+testAuthorsAreFiledBySurname()
 testSearchFindsEveryWordAnywhereAndRanksTitles()
 testAccentsMatchTheirPlainLetters()
 testDownloadedOnly()

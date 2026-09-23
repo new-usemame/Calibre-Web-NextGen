@@ -56,6 +56,37 @@ function Catalog.memoize(fold)
     end
 end
 
+-- An author's name as a library files it, surname first ("Pratchett,
+-- Terry"), the way calibre derives author_sort when nobody set one.
+local NAME_SUFFIXES = { jr = true, sr = true, ii = true, iii = true, iv = true, phd = true, md = true }
+function Catalog.authorSortName(name)
+    if type(name) ~= "string" or name:find(",", 1, true) then return name end
+    local words = {}
+    for word in name:gmatch("%S+") do words[#words + 1] = word end
+    local last = #words
+    while last > 1 and NAME_SUFFIXES[words[last]:lower():gsub("%.", "")] do last = last - 1 end
+    if last <= 1 then return name end
+    local rest = {}
+    for i = 1, last - 1 do rest[#rest + 1] = words[i] end
+    for i = last + 1, #words do rest[#rest + 1] = words[i] end
+    return words[last] .. ", " .. table.concat(rest, " ")
+end
+
+-- The sort name for each of a book's authors: the server's author_sort
+-- ("Pratchett, Terry & Gaiman, Neil") when it lines up with the authors,
+-- else derived.
+local function authorSorts(book, authors)
+    local given = {}
+    if type(book.author_sort) == "string" and book.author_sort ~= "" then
+        for part in (book.author_sort .. " & "):gmatch("(.-) & ") do given[#given + 1] = part end
+    end
+    local sorts = {}
+    for i, author in ipairs(authors) do
+        sorts[i] = (#given == #authors and given[i] ~= "") and given[i] or Catalog.authorSortName(author)
+    end
+    return sorts
+end
+
 local function join(root, name)
     return (root:gsub("/+$", "")) .. "/" .. name
 end
@@ -68,10 +99,12 @@ function Catalog.entries(books, known_books, root)
         if type(book) == "table" and type(book.book_id) == "number"
                 and type(book.filename) == "string" and book.filename ~= "" then
             local known = known_books and known_books[tostring(book.book_id)]
+            local authors = type(book.authors) == "table" and book.authors or {}
             out[#out + 1] = {
                 book_id = book.book_id,
                 title = type(book.title) == "string" and book.title ~= "" and book.title or book.filename,
-                authors = type(book.authors) == "table" and book.authors or {},
+                authors = authors,
+                author_sorts = authorSorts(book, authors),
                 series = type(book.series) == "string" and book.series ~= "" and book.series or nil,
                 series_index = tonumber(book.series_index),
                 shelves = type(book.shelves) == "table" and book.shelves or {},
@@ -150,15 +183,17 @@ function Catalog.continueReading(entries, history_paths, limit, local_status)
     return list
 end
 
--- Groups for the Authors, Series and Shelves lists: { key, name, count },
--- sorted by name. `shelves` is the manifest's [{id, name}].
+-- Groups for the Authors, Series and Shelves lists: { key, name, count,
+-- sort_name }, sorted by sort_name: authors by surname ("Pratchett, Terry"),
+-- the rest by name. `shelves` is the manifest's [{id, name}].
 function Catalog.groups(entries, kind, shelves, fold)
     fold = fold or defaultFold
-    local counts, names = {}, {}
-    local function add(key, name)
+    local counts, names, sort_names = {}, {}, {}
+    local function add(key, name, sort_name)
         if key == nil or name == nil or name == "" then return end
         counts[key] = (counts[key] or 0) + 1
         names[key] = names[key] or name
+        sort_names[key] = sort_names[key] or sort_name or name
     end
     local shelf_names = {}
     for _, shelf in ipairs(shelves or {}) do
@@ -166,7 +201,7 @@ function Catalog.groups(entries, kind, shelves, fold)
     end
     for _, e in ipairs(entries) do
         if kind == "author" then
-            for _, author in ipairs(e.authors) do add(fold(author), author) end
+            for i, author in ipairs(e.authors) do add(fold(author), author, e.author_sorts[i]) end
         elseif kind == "series" then
             if e.series then add(fold(e.series), e.series) end
         elseif kind == "shelf" then
@@ -178,10 +213,10 @@ function Catalog.groups(entries, kind, shelves, fold)
     end
     local list = {}
     for key, count in pairs(counts) do
-        list[#list + 1] = { key = key, name = names[key], count = count }
+        list[#list + 1] = { key = key, name = names[key], sort_name = sort_names[key], count = count }
     end
     table.sort(list, function(a, b)
-        local na, nb = fold(a.name), fold(b.name)
+        local na, nb = fold(a.sort_name), fold(b.sort_name)
         if na ~= nb then return na < nb end
         return tostring(a.key) < tostring(b.key)
     end)

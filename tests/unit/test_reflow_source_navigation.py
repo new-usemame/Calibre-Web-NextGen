@@ -134,6 +134,41 @@ def test_page_turn_with_a_prior_note_keeps_its_marker_after_the_note():
     assert 'pg_0001' in pages[1]['anchor']
 
 
+@pytest.mark.parametrize('details', [
+    [],
+    [{'id': 'notes', 'label': 'Printed note context',
+      'src': 'images/original_p0015_notes.jpg', 'inspection_ids': ['inspection_0']},
+     {'id': 'inspection_0', 'label': 'Original detail 1 (row order)',
+      'src': 'images/original_p0015_inspection_0.jpg'}],
+])
+def test_original_page_fragment_has_return_at_entry_and_after_final_image(details):
+    """A fragment jump and the last image both expose an explicit return route.
+
+    Breaks when #page lands below the sole return link, or when a reader finishing
+    a full-page image or inspection tile has no later link back to reflowed text.
+    """
+    record = {'page': 15, 'full': 'images/original_p0015.jpg', 'details': details}
+    root = ET.fromstring(build_epub._original_document(record, 'ch015.xhtml', 'en'))
+    body = root.find(XHTML + 'body')
+    children = list(body)
+    entry = next(el for el in body.iter() if el.get('id') == 'page')
+    entry_index = next(i for i, el in enumerate(children) if entry in el.iter())
+    assert entry_index == 0, 'fragment target misses the original-page entry'
+    nodes = list(body.iter())
+    images = [el for el in nodes if el.tag == XHTML + 'img']
+    returns = [el for el in nodes if el.tag == XHTML + 'a'
+               and el.get('href') == 'ch015.xhtml#pg_0015']
+    assert len(images) == 1 + len(details)
+    assert all(img.get('alt') for img in images)
+    assert returns
+    first_return_owner = next(i for i, el in enumerate(children) if returns[0] in el.iter())
+    assert first_return_owner <= entry_index + 1, 'the return is not at fragment entry'
+    assert nodes.index(returns[0]) < nodes.index(images[0])
+    assert nodes.index(returns[-1]) > nodes.index(images[-1]), 'image end has no return'
+    assert {el.get('id') for el in nodes if el.get('id')} >= {'page'} | {d['id'] for d in details}
+    assert {img.get('src') for img in images} == {record['full']} | {d['src'] for d in details}
+
+
 def test_uncertain_notes_expose_original_pixels_and_only_disarm_ambiguous_links(tmp_path):
     from cps.services.reflow import extract
     with pymupdf.open() as doc:

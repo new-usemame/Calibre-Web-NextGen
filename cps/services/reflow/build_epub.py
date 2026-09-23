@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.10"
+CONVERTER_VERSION = "1.11"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -1322,10 +1322,14 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
 def _original_document(record, home, language):
     pno = record["page"]
     back = '<p><a href="%s#pg_%04d">Return to reflowed PDF page %d</a></p>' % (home, pno, pno + 1)
-    body = ('<h1>Original PDF page %d</h1><p>These are original printed pixels. '
+    # A fragment jump must land before the return link. On paginated readers a
+    # target on the image section skips all earlier siblings, including the only
+    # return on an ordinary original page. Keep a route at entry and after the
+    # final source image for readers that continue through the full-page raster.
+    body = ('<h1 id="page">Original PDF page %d</h1>%s<p>These are original printed pixels. '
             'Extracted labels and glyphs may be wrong; no note identity is inferred '
-            'from the transcription. The details below preserve printed context.</p>%s'
-            '<section class="source-evidence" id="page"><h2>Complete original page</h2>'
+            'from the transcription. The details below preserve printed context.</p>'
+            '<section class="source-evidence"><h2>Complete original page</h2>'
             '<img src="%s" alt="Complete original PDF page %d"/></section>'
             % (pno + 1, back, record["full"], pno + 1))
     if record["details"]:
@@ -1348,6 +1352,7 @@ def _original_document(record, home, language):
         body += ('<section class="source-evidence" id="%s"><h2>%s</h2>%s<img src="%s" alt="%s"/>%s</section>'
                  % (detail["id"], escape(detail["label"]), back, detail["src"],
                     escape(detail["label"]), links + back))
+    body += back
     return _document("Original PDF page %d" % (pno + 1), body, language)
 
 

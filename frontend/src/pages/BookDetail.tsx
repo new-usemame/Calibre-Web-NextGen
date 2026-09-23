@@ -23,7 +23,7 @@ import type { CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice } from 
 import { ApiError, resourceUrl, resourceSrcSet } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
-import { canDeleteBooks, canDownloadBooks, canReadBooks, canUploadBooks } from '../lib/permissions';
+import { canConvertWithReflow, canDeleteBooks, canDownloadBooks, canReadBooks, canUploadBooks } from '../lib/permissions';
 import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
@@ -1066,7 +1066,8 @@ function FilesSection({ id }: { id: string }) {
   // role_upload and honours the admin's "Enable Uploads" switch.
   const canUpload = canUploadBooks(me);
   const canEdit = !!me?.role?.edit;
-  if (!canDownload && !canDelete && !canUpload && !canEdit) return null;
+  const canReflow = canConvertWithReflow(me);
+  if (!canDownload && !canDelete && !canUpload && !canEdit && !canReflow) return null;
 
   // Keep the selected source/target normalized to lowercase option values.
   const selectedFrom = (from || sources[0] || '').toLowerCase();
@@ -1174,7 +1175,7 @@ function FilesSection({ id }: { id: string }) {
         </form>
       )}
 
-      {canEdit && formats.some((f) => f.toLowerCase() === 'pdf') && (
+      {canReflow && formats.some((f) => f.toLowerCase() === 'pdf') && (
         <p className={styles.reflowLine}>
           <Link href={`/book/${id}/reflow`} className={styles.reflowLink}>{t('Convert this PDF to EPUB…')}</Link>
           {' '}{t('Create a source-based EPUB with original evidence for uncertain text. Optional AI formatting review has its own estimate and consent.')}

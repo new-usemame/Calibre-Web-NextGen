@@ -84,9 +84,18 @@ def _err(code, message, status):
 
 
 def _require_edit():
+    """Signed in, not the guest, and allowed to edit books.
+
+    "Allowed to edit" is the predicate the rest of the editing surface uses
+    (``editbooks.edit_required``, ``api/duplicates``): the edit role OR the admin
+    role. A conversion files a format onto a book, which an administrator may
+    already do by hand, so refusing one here only made Reflow the one place an
+    admin without the edit bit could not reach. Library restrictions still apply
+    through ``get_filtered_book``.
+    """
     if not current_user.is_authenticated or current_user.is_anonymous:
         return _err("unauthorized", "You must be signed in", 401)
-    if not current_user.role_edit():
+    if not (current_user.role_edit() or current_user.role_admin()):
         return _err("forbidden", "Edit permission is required to convert a book", 403)
     return None
 

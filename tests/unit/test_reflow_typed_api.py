@@ -21,6 +21,25 @@ def test_current_deterministic_consent_starts_without_a_provider_key(mod,monkeyp
     assert task.options.review_mode=='deterministic' and task.options.cost_cap_usd==0
 
 
+def test_an_administrator_without_the_edit_role_may_convert_like_every_other_edit_surface(mod,monkeypatch,pdf_on_disk):
+    """Reflow files a new format onto a book, which the rest of the app lets an
+    administrator do whether or not the account also carries the edit bit
+    (editbooks.edit_required: ``role_edit() or role_admin()``). Refusing only
+    here made an admin able to replace a book's EPUB by hand but not by
+    conversion. Breaks if _require_edit goes back to checking role_edit alone."""
+    _wire(mod,monkeypatch,pdf_on_disk,key='')
+    admin_only=_user(edit=False,admin=True)
+    with _ctx('/api/v1/books/5/reflow/estimate'),patch.object(mod,'current_user',admin_only):
+        assert _status(inspect.unwrap(mod.reflow_estimate)(5))==200
+    response,added=_start(mod,consent(mod,pdf_on_disk),user=admin_only)
+    assert _status(response)==202,_json(response)
+    added.assert_called_once()
+    # Neither role is still no conversion.
+    response,added=_start(mod,consent(mod,pdf_on_disk),user=_user(edit=False,admin=False))
+    assert _status(response)==403
+    added.assert_not_called()
+
+
 def test_legacy_consent_cannot_authorize_the_new_billed_route(mod,monkeypatch,pdf_on_disk):
     _wire(mod,monkeypatch,pdf_on_disk)
     response,added=_start(mod,{'consent':True,'model_tier':'quality','cost_cap_usd':5},current=False)

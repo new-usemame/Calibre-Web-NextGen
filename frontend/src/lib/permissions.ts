@@ -47,3 +47,14 @@ export function canDownloadBooks(me: Me | undefined | null): boolean {
 export function canDeleteBooks(me: Me | undefined | null): boolean {
   return !!me?.role?.delete_books && !!me?.role?.edit;
 }
+
+/**
+ * May this user convert a book's PDF with Reflow?
+ *
+ * Mirrors `cps/api/reflow.py::_require_edit`, which uses the rest of the editing
+ * surface's rule (`editbooks.edit_required`): the edit role OR the admin role.
+ * UI-gating only; the server enforces it on every Reflow endpoint.
+ */
+export function canConvertWithReflow(me: Me | undefined | null): boolean {
+  return !!me?.role?.edit || !!me?.role?.admin;
+}

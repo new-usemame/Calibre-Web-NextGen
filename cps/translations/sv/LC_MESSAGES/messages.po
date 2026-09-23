@@ -11906,6 +11906,11 @@ msgstr "Konvertering av bibliotek har schemalagts"
 msgid "Error scheduling Convert Library"
 msgstr "Fel vid schemaläggning av bibliotekskonvertering"
 
+#: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
+#: cps/templates/cwa_epub_fixer.html
+msgid "Lost contact with the server, retrying..."
+msgstr "Kontakten med servern bröts, försöker igen …"
+
 #: cps/templates/cwa_cover_enforcer.html
 msgid ""
 "This service rewrites the covers and metadata stored inside the ebook files "
@@ -11953,10 +11958,6 @@ msgid ""
 msgstr ""
 "Ingen aktuell eller tidigare körning att visa. Tryck på knappen Starta ovan "
 "för att påbörja en körning."
-
-#: cps/templates/cwa_cover_enforcer.html
-msgid "Lost contact with the server, retrying..."
-msgstr "Kontakten med servern bröts, försöker igen …"
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "The request failed."

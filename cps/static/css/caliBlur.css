@@ -8711,6 +8711,13 @@ button.close {
     }
 }
 
+/* No read icon on a book the reader cannot open (MOBI or AZW3 only, or a user
+   without the viewer role): the server leaves data-book-read-formats empty and the
+   click shows the book's details instead, as the detail page has no "Read now". */
+.book-cover-link[data-book-read-formats=""]:before {
+    display: none !important;
+}
+
 /* Enhanced visual feedback for direct reading pseudo-element */
 .book-cover-link.hovering-read-icon:before {
     background: rgba(255, 255, 255, 0.9) !important;

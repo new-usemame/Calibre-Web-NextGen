@@ -1044,10 +1044,9 @@ $(function() {
                 );
                 
                 // Handle different click areas
-                if (distanceFromReadIcon <= readIconRadius) {
+                if (distanceFromReadIcon <= readIconRadius && handleDirectReading($link)) {
                     // Direct reading functionality
                     e.preventDefault();
-                    handleDirectReading($link);
                 } else if (distanceFromReadToggle <= readToggleRadius) {
                     // Toggle read status
                     e.preventDefault();
@@ -1066,35 +1065,22 @@ $(function() {
         }
     }
     
+    // Opens the reader and returns true, or returns false when the book has nothing
+    // the reader opens, so the click is not cancelled and follows the cover's link to
+    // the detail page like the rest of the cover. The server renders the formats
+    // (the reader_formats filter) in the order the detail page's "Read now" uses.
+    // A MOBI or AZW3 only book used to open a reader tab that read_book() can only
+    // answer with a 404 (#2249).
     function handleDirectReading($link) {
         var bookId = $link.data('book-id');
-        var formatsStr = $link.data('book-formats');
-        
-        if (bookId && formatsStr) {
-            var formats = formatsStr.toLowerCase().split(',').map(function(f) { 
-                return f.trim(); 
-            });
-            
-            var formatPriority = ['epub', 'pdf', 'txt', 'html', 'mobi', 'azw3', 'fb2'];
-            var selectedFormat = null;
-            
-            for (var i = 0; i < formatPriority.length; i++) {
-                if (formats.indexOf(formatPriority[i]) !== -1) {
-                    selectedFormat = formatPriority[i];
-                    break;
-                }
-            }
-            
-            if (!selectedFormat && formats.length > 0) {
-                selectedFormat = formats[0];
-            }
-            
-            if (selectedFormat) {
-                window.open(window.scriptRoot + '/read/' + bookId + '/' + selectedFormat, '_blank');
-            } else {
-                window.location.href = $link.attr('href');
-            }
+        var readFormats = String($link.attr('data-book-read-formats') || '')
+            .split(',').filter(function(f) { return f; });
+
+        if (!bookId || !readFormats.length) {
+            return false;
         }
+        window.open(window.scriptRoot + '/read/' + bookId + '/' + readFormats[0], '_blank');
+        return true;
     }
     
     function handleReadStatusToggle($link) {

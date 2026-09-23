@@ -306,6 +306,18 @@ function setBookMembership(qc: QueryClient, bookId: number, owned: boolean) {
   } : book);
 }
 
+/** Refetch every view that lists or counts books through the per-user
+ *  visibility filter: the catalog, the global library, and each shelf and
+ *  smart-shelf listing and count — the sidebar badges included. Any mutation
+ *  that changes whether the current user can see a book (archive, hide,
+ *  delete, merge, My Library membership) calls this, so no badge keeps
+ *  counting a book its shelf no longer shows (#2235). */
+function invalidateBookVisibilityViews(qc: QueryClient) {
+  for (const key of ['books', 'global-library', 'shelves', 'shelf', 'magicshelf', 'magicshelves']) {
+    void qc.invalidateQueries({ queryKey: [key] });
+  }
+}
+
 export function useAddToMyLibrary() {
   const qc = useQueryClient();
   return useMutation({
@@ -327,10 +339,7 @@ export function useAddToMyLibrary() {
         qc.setQueryData(['book', String(bookId)], context.previousDetail);
       }
     },
-    onSettled: () => {
-      void qc.invalidateQueries({ queryKey: ['global-library'] });
-      void qc.invalidateQueries({ queryKey: ['books'] });
-    },
+    onSettled: () => invalidateBookVisibilityViews(qc),
   });
 }
 
@@ -366,12 +375,7 @@ export function useRemoveFromMyLibrary() {
         qc.setQueryData(['book', String(bookId)], context.previousDetail);
       }
     },
-    onSettled: () => {
-      void qc.invalidateQueries({ queryKey: ['books'] });
-      void qc.invalidateQueries({ queryKey: ['global-library'] });
-      void qc.invalidateQueries({ queryKey: ['shelves'] });
-      void qc.invalidateQueries({ queryKey: ['shelf'] });
-    },
+    onSettled: () => invalidateBookVisibilityViews(qc),
   });
 }
 
@@ -508,7 +512,7 @@ export function useToggleArchived(id: string | number) {
     mutationFn: () => apiPost<{ archived: boolean }>(`/api/v1/books/${id}/archived`),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['book', String(id)] });
-      void qc.invalidateQueries({ queryKey: ['books'] });
+      invalidateBookVisibilityViews(qc);
     },
   });
 }
@@ -521,7 +525,7 @@ export function useToggleHidden(id: string | number) {
       apiPost<{ hidden: boolean }>(`/api/v1/books/${id}/hidden`, { hidden }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['book', String(id)] });
-      void qc.invalidateQueries({ queryKey: ['books'] });
+      invalidateBookVisibilityViews(qc);
     },
   });
 }
@@ -922,14 +926,7 @@ export function useDeleteAdminUser() {
  *  batch). Suitable for the moderate selections the catalog allows. */
 export function useBulkActions() {
   const qc = useQueryClient();
-  const refresh = () => {
-    void qc.invalidateQueries({ queryKey: ['books'] });
-    void qc.invalidateQueries({ queryKey: ['global-library'] });
-    void qc.invalidateQueries({ queryKey: ['shelves'] });
-    void qc.invalidateQueries({ queryKey: ['shelf'] });
-    void qc.invalidateQueries({ queryKey: ['magicshelf'] });
-    void qc.invalidateQueries({ queryKey: ['magicshelves'] });
-  };
+  const refresh = () => invalidateBookVisibilityViews(qc);
   const markRead = useMutation({
     mutationFn: (v: { ids: number[]; read: boolean }) =>
       settleById(v.ids, (id) => apiPost(`/api/v1/books/${id}/read`, { read: v.read })),
@@ -1012,7 +1009,7 @@ export function useMergeBooks() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (ids: number[]) => apiPost('/ajax/mergebooks', { Merge_books: ids }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['books'] }),
+    onSuccess: () => invalidateBookVisibilityViews(qc),
   });
 }
 
@@ -1116,11 +1113,8 @@ export function useDeleteBook(id: string | number) {
       // there), and shelf views/counts. Otherwise the book lingers as a ghost
       // card that 404s on click (#578).
       qc.removeQueries({ queryKey: ['book', String(id)] });
-      void qc.invalidateQueries({ queryKey: ['books'] });
       void qc.invalidateQueries({ queryKey: ['discover-strip'] });
-      void qc.invalidateQueries({ queryKey: ['shelves'] });
-      void qc.invalidateQueries({ queryKey: ['shelf'] });
-      void qc.invalidateQueries({ queryKey: ['magicshelf'] });
+      invalidateBookVisibilityViews(qc);
     },
   });
 }

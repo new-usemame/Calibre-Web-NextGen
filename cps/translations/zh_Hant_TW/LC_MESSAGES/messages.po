@@ -11401,6 +11401,11 @@ msgstr "轉換書庫已成功排程"
 msgid "Error scheduling Convert Library"
 msgstr "排程轉換書庫時發生錯誤"
 
+#: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
+#: cps/templates/cwa_epub_fixer.html
+msgid "Lost contact with the server, retrying..."
+msgstr "與伺服器失去連線，正在重試..."
+
 #: cps/templates/cwa_cover_enforcer.html
 msgid ""
 "This service rewrites the covers and metadata stored inside the ebook files "
@@ -11434,10 +11439,6 @@ msgid ""
 "No current or previous run to display. Press the Start button above to "
 "initiate a run."
 msgstr ""
-
-#: cps/templates/cwa_cover_enforcer.html
-msgid "Lost contact with the server, retrying..."
-msgstr "與伺服器失去連線，正在重試..."
 
 #: cps/templates/cwa_cover_enforcer.html
 msgid "The request failed."

@@ -50,6 +50,7 @@
       <div class="progress-container" style="margin: 20px 0;">
         <div id="progress-bar" style="width: 0%; height: 25px; background-color: green; text-align: center; color: white;"></div>
       </div>
+      <p id="pollMessage" role="status" aria-live="polite" style="font-size: 11px; min-height: 1em;"></p>
       <div class="row">
         <div class="logging_window" style="padding-left: 15px;
                                           padding-right: 15px;
@@ -58,7 +59,11 @@
                                           padding-bottom: 1px;
                                           max-height: calc(100vh - 40rem);
                                           overflow-y: scroll;">
-          <p id="innerStatus" style="color: whitesmoke; font-size: small;">No current or previous run to display. Press the Start button above to initiate a run.</p>
+          {# white-space: pre-wrap renders the log's own newlines, so the status is set
+             with textContent instead of innerHTML. The log echoes text from inside the
+             library's books (EPUB metadata, archive member names, converter output),
+             and anyone who can upload a book controls that text. #}
+          <p id="innerStatus" style="color: whitesmoke; font-size: small; white-space: pre-wrap;">No current or previous run to display. Press the Start button above to initiate a run.</p>
         </div>
       </div>
     </div>
@@ -68,6 +73,7 @@
 {% block js %}
 <script>
   var timeout;
+  var pollFailures = 0;
   
   // Notification helper - creates a dismissible Bootstrap alert
   function showNotification(message, type) {
@@ -207,14 +213,28 @@
     
     try {
       const res = await cwaFetch("{{ url_for('epub_fixer.get_status')}}");
+      if (!res.ok) throw new Error("HTTP " + res.status);
       get = await res.json();
     } catch (e) {
+      // Falling through to get.status on an undefined `get` threw before the
+      // setTimeout at the bottom, so one failed poll stopped the page updating for
+      // the rest of the run. Back off and keep trying instead.
       console.error("Error: ", e);
+      pollFailures += 1;
+      document.getElementById("pollMessage").textContent = "{{ _('Lost contact with the server, retrying...') }}";
+      timeout = setTimeout(getStatus, Math.min(30000, 1000 * Math.pow(2, pollFailures)));
+      return;
     }
-    
-    // Check if get.status is a non-empty string
-    if (get.status && get.status.trim() !== "") {
-      document.getElementById("innerStatus").innerHTML = get.status.replace(/\n/g, "<br>");
+    if (pollFailures > 0) {
+      pollFailures = 0;
+      document.getElementById("pollMessage").textContent = "";
+    }
+
+    const status = get.status || "";
+
+    // textContent, not innerHTML: this is subprocess output containing library metadata.
+    if (status.trim() !== "") {
+      document.getElementById("innerStatus").textContent = status;
     }
 
     if (get.progress) {
@@ -227,9 +247,7 @@
       }
     }
 
-    if (get.status.includes("NextGen EPUB FIXER PROCESS TERMINATED BY USER AT")){
-      // Add finished log
-      document.getElementById("innerStatus").innerHTML;
+    if (status.includes("NextGen EPUB FIXER PROCESS TERMINATED BY USER AT")){
       // Check if run was cancelled, make progress bar red if so
       const progressBar = document.getElementById("progress-bar");
       progressBar.style.backgroundColor = "#D22B2B"; // Cadmium Red
@@ -238,9 +256,7 @@
       return false;
     }
     
-    if (get.status.includes("NextGen Kindle EPUB Fixer Service - Run Ended:")){
-      // Add finished log
-      document.getElementById("innerStatus").innerHTML;
+    if (status.includes("NextGen Kindle EPUB Fixer Service - Run Ended:")){
       // Set the progress bar to 100%
       const percentage = 100;
       const progressBar = document.getElementById("progress-bar");

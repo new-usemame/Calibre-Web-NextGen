@@ -11510,6 +11510,11 @@ msgstr ""
 msgid "Error scheduling Convert Library"
 msgstr ""
 
+#: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
+#: cps/templates/cwa_epub_fixer.html
+msgid "Lost contact with the server, retrying..."
+msgstr ""
+
 #: cps/templates/cwa_cover_enforcer.html
 msgid ""
 "This service rewrites the covers and metadata stored inside the ebook files "
@@ -11542,10 +11547,6 @@ msgstr ""
 msgid ""
 "No current or previous run to display. Press the Start button above to "
 "initiate a run."
-msgstr ""
-
-#: cps/templates/cwa_cover_enforcer.html
-msgid "Lost contact with the server, retrying..."
 msgstr ""
 
 #: cps/templates/cwa_cover_enforcer.html

@@ -164,6 +164,13 @@ class _Settings(_Base):
     # The limit. No job's own cap may be set higher than this, so a user cannot
     # spend the instance's money beyond what its administrator allowed.
     config_reflow_hard_cap_usd = Column(Float, default=5.0)
+    # The largest PDF one conversion reads, in pages and in megabytes. A PDF over
+    # either is refused at the estimate, the preparation and the start, before any
+    # work (Finding 3 of the 7daffa5 retest: nothing bounded a whole-book job).
+    # 2,000 pages is ~2.8x the longest book measured (716); 500 MB holds a long
+    # greyscale 300-dpi scan. See cps/tasks/reflow.py MAX_PAGES_DEFAULT.
+    config_reflow_max_pages = Column(Integer, default=2000)
+    config_reflow_max_pdf_mb = Column(Integer, default=500)
     
     config_register_email = Column(Boolean, default=False)
     config_login_type = Column(Integer, default=0)

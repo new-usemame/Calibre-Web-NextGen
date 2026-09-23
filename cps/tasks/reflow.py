@@ -117,6 +117,38 @@ def hard_cap_usd():
     return cap if math.isfinite(cap) and cap > 0 else 5.0
 
 
+#: The largest PDF one conversion reads when the administrator has not said
+#: otherwise (Finding 3 of the 7daffa5 retest: nothing bounded a whole-book job).
+#: 2,000 pages is ~2.8x the longest book in the measured corpus (716 pages);
+#: 500 MB holds a long greyscale 300-dpi scan and refuses a multi-gigabyte one.
+MAX_PAGES_DEFAULT = 2000
+MAX_PDF_MB_DEFAULT = 500
+
+
+def _limit(name, default):
+    try:
+        value = int(getattr(config, name, 0) or 0)
+    except (TypeError, ValueError):
+        value = 0
+    return value if value > 0 else default
+
+
+def max_pages():
+    """The administrator's limit on one PDF's length, in pages."""
+    return _limit("config_reflow_max_pages", MAX_PAGES_DEFAULT)
+
+
+def max_pdf_mb():
+    """The administrator's limit on one PDF's size, in megabytes (MiB)."""
+    return _limit("config_reflow_max_pdf_mb", MAX_PDF_MB_DEFAULT)
+
+
+def pdf_size_mb(size):
+    """A file size in MB rounded UP to one decimal: a PDF just over the limit is
+    never shown as exactly the limit."""
+    return math.ceil(size * 10 / 1048576.0) / 10
+
+
 def _clamp_cap(value):
     try:
         cap = float(value or 0)
@@ -198,6 +230,15 @@ class TaskReflowPdf(CalibreTask):
                     "This book already has an EPUB. Choose 'replace the existing "
                     "EPUB' if you want Reflow to overwrite it.")
 
+            # The administrator's limits are checked again here, before a byte
+            # of the PDF is read: the API refuses an oversized PDF before queueing
+            # it, but a job may have been queued before the limits were lowered,
+            # or the PDF replaced after (Finding 3).
+            size = os.path.getsize(source)
+            if size > max_pdf_mb() * 1048576:
+                return self._handleError(
+                    "This PDF is %.1f MB, over the limit of %d MB an administrator set "
+                    "for one conversion." % (pdf_size_mb(size), max_pdf_mb()))
             if getattr(self.options,"source_sha256",None) and extract.document_fingerprint(source)!=self.options.source_sha256:
                 raise ValueError("Source changed after consent; prepare the current PDF again.")
             self.results["title"] = book.title
@@ -210,6 +251,10 @@ class TaskReflowPdf(CalibreTask):
 
             document = pymupdf.open(source)
             try:
+                if document.page_count > max_pages():
+                    return self._handleError(
+                        "This PDF has %d pages, over the limit of %d an administrator set "
+                        "for one conversion." % (document.page_count, max_pages()))
                 if getattr(self.options,"source_sha256",None) and extract.document_fingerprint(document)!=self.options.source_sha256:
                     raise ValueError("Source changed after consent; prepare the current PDF again.")
                 ledger.record({"kind": "job", "event": "start", "user_id": self.user_id,
@@ -699,5 +744,6 @@ def cleanup_samples(max_age_days=7):
 
 __all__ = ["TaskReflowPdf", "ReflowOptions", "sample_path", "cleanup_samples",
            "recover_interrupted_jobs", "hard_cap_usd", "config_default_tier",
+           "max_pages", "max_pdf_mb", "pdf_size_mb", "MAX_PAGES_DEFAULT", "MAX_PDF_MB_DEFAULT",
            "make_client", "reflow_dir", "INTERRUPTED_STATUS",
            "SAMPLE_PAGES_DEFAULT", "SAMPLE_PAGES_MAX"]

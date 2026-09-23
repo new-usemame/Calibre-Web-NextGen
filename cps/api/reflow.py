@@ -39,6 +39,7 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 from flask import jsonify, request, send_file
+from flask_babel import format_decimal, gettext as _
 
 try:  # pragma: no cover - selected by the production runtime
     from gevent.threadpool import ThreadPool as _GeventThreadPool
@@ -271,6 +272,21 @@ _fingerprints = {}
 _fingerprint_lock = threading.Lock()
 
 
+def _file_identity(path):
+    """The file as it is on disk now: a changed PDF is a different key."""
+    stat = os.stat(path)
+    return (os.path.realpath(path), stat.st_dev, stat.st_ino, stat.st_size,
+            stat.st_mtime_ns, stat.st_ctime_ns)
+
+
+def _remember(cache, key, value):
+    with _fingerprint_lock:
+        cache[key] = value
+        while len(cache) > _FINGERPRINT_CACHE_SIZE:
+            cache.pop(next(iter(cache)))
+    return value
+
+
 def _fingerprint(path):
     """The PDF's SHA-256, without hashing it on the request greenlet (N3).
 
@@ -283,19 +299,64 @@ def _fingerprint(path):
     re-hashes the file itself before any work and before publication, and the
     lock below guards dictionary reads and writes only, never the hash.
     """
-    stat = os.stat(path)
-    key = (os.path.realpath(path), stat.st_dev, stat.st_ino, stat.st_size,
-           stat.st_mtime_ns, stat.st_ctime_ns)
+    key = _file_identity(path)
     with _fingerprint_lock:
         known = _fingerprints.get(key)
     if known is not None:
         return known
-    digest = parallel.run_blocking(lambda: extract.document_fingerprint(path))
+    return _remember(_fingerprints, key,
+                     parallel.run_blocking(lambda: extract.document_fingerprint(path)))
+
+
+#: Page counts already read by this process, keyed like the fingerprints.
+_page_counts = {}
+
+
+def _page_count_uncached(path):
+    """How many pages the PDF says it has: its cross-reference table, not its pages.
+
+    None when nothing can open it; whatever has to read it next refuses it.
+    """
+    import pymupdf
+    try:
+        with pymupdf.open(path) as document:
+            return document.page_count
+    except Exception:                                              # noqa: BLE001
+        return None
+
+
+def _page_count(path):
+    key = _file_identity(path)
     with _fingerprint_lock:
-        _fingerprints[key] = digest
-        while len(_fingerprints) > _FINGERPRINT_CACHE_SIZE:
-            _fingerprints.pop(next(iter(_fingerprints)))
-    return digest
+        if key in _page_counts:
+            return _page_counts[key]
+    return _remember(_page_counts, key, parallel.run_blocking(lambda: _page_count_uncached(path)))
+
+
+def _over_limit(source):
+    """The refusal for a PDF over the administrator's limits, or None (Finding 3).
+
+    Checked before any work on the PDF -- the estimate's survey, a preparation
+    process, a queued job -- because that work is what the limits bound. The size
+    is a ``stat``; the length is one open of the file on the offload pool,
+    remembered per file identity. The message is in the reader's language.
+    """
+    limit_mb = tasks_reflow.max_pdf_mb()
+    size = os.path.getsize(source)
+    if size > limit_mb * 1048576:
+        return _err("pdf_too_large", _(
+            "This PDF is %(size)s MB. Reflow converts PDFs of up to %(limit)s MB; "
+            "an administrator can change this limit.",
+            size=format_decimal(tasks_reflow.pdf_size_mb(size), format="#,##0.0"),
+            limit=format_decimal(limit_mb)), 422)
+    limit_pages = tasks_reflow.max_pages()
+    pages = _page_count(source)
+    if pages is not None and pages > limit_pages:
+        return _err("pdf_too_many_pages", _(
+            "This PDF has %(pages)s pages. Reflow converts PDFs of up to %(limit)s pages; "
+            "an administrator can change this limit.",
+            pages=format_decimal(pages), limit=format_decimal(limit_pages)), 422)
+    return None
 
 
 CONSENT_CONTRACT='source-review-1'
@@ -355,6 +416,7 @@ def _estimate_payload(book, source):
         'sample_pages_default':tasks_reflow.SAMPLE_PAGES_DEFAULT,'sample_pages_max':tasks_reflow.SAMPLE_PAGES_MAX,
         'sample_suggested':pages>tasks_reflow.SAMPLE_PAGES_DEFAULT,
         'sampled':int(quote.get('sampled') or 0),'cached':bool(quote.get('cached')),
+        'limits':{'max_pages':tasks_reflow.max_pages(),'max_pdf_mb':tasks_reflow.max_pdf_mb()},
         'review':{'quality_released':typed_model.QUALITY_RELEASED,'route_version':typed_model.ROUTE_VERSION,
             'source_revision':typed_model.SOURCE_REVISION,'provider':'openai/flex','service_tier':'flex',
             'proposer':typed_model.STAGES['proposer'].model_id,'verifier':typed_model.STAGES['verifier'].model_id,
@@ -379,6 +441,8 @@ def reflow_prepare_estimate(book_id):
     if not isinstance(body,dict):return _err('invalid_options','Source preparation options are required.',400)
     try:options=_source_options(body)
     except ValueError:return _err('invalid_options','Source recovery options are invalid.',400)
+    refused=_over_limit(source)
+    if refused:return refused
     cache_root=REFLOW_DIR
     try:
         job=_start_preparation(current_user.id,book_id,source,options,
@@ -411,6 +475,9 @@ def reflow_estimate(book_id):
     if failure:
         return failure
     try:
+        refused = _over_limit(source)
+        if refused:
+            return refused
         return jsonify(_estimate_payload(_book, source))
     except Exception as exc:                                      # noqa: BLE001
         log.error_or_exception("reflow: could not estimate book %s: %s" % (book_id, exc))
@@ -460,6 +527,9 @@ def reflow_start(book_id):
     book, source, failure = _source_or_error(book_id)
     if failure:
         return failure
+    refused = _over_limit(source)
+    if refused:
+        return refused
 
     body = request.get_json(silent=True)
     if not isinstance(body,dict):return _err('invalid_options','Conversion options are required.',400)
@@ -667,6 +737,8 @@ def reflow_admin_config():
         "default_tier": tasks_reflow.config_default_tier(),
         "target_usd": _target_usd(),
         "hard_cap_usd": tasks_reflow.hard_cap_usd(),
+        "max_pages": tasks_reflow.max_pages(),
+        "max_pdf_mb": tasks_reflow.max_pdf_mb(),
         "tiers": model.tier_choices(),
         "priced_on": model.PRICE_TABLE_MEASURED,
     })

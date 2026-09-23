@@ -17222,3 +17222,54 @@ msgstr "Modèles sollicités"
 #: cps/spa_strings.py
 msgid "The sample starts at the first body page and reads only the front of the book, so it stays quick however long the PDF is."
 msgstr "L’extrait commence à la première page du corps du livre et ne lit que le début du livre : il reste rapide, quelle que soit la longueur du PDF."
+
+#: cps/api/reflow.py
+#, python-format
+msgid "This PDF is %(size)s MB. Reflow converts PDFs of up to %(limit)s MB; an administrator can change this limit."
+msgstr "Ce PDF fait %(size)s Mo. Reflow convertit les PDF de %(limit)s Mo au plus ; un administrateur peut modifier cette limite."
+
+#: cps/api/reflow.py
+#, python-format
+msgid "This PDF has %(pages)s pages. Reflow converts PDFs of up to %(limit)s pages; an administrator can change this limit."
+msgstr "Ce PDF compte %(pages)s pages. Reflow convertit les PDF de %(limit)s pages au plus ; un administrateur peut modifier cette limite."
+
+#: cps/templates/config_edit.html
+msgid "Reflow maximum PDF length per conversion (pages)"
+msgstr "Longueur maximale d’un PDF par conversion Reflow (pages)"
+
+#: cps/templates/config_edit.html
+msgid "Reflow maximum PDF size per conversion (MB)"
+msgstr "Taille maximale d’un PDF par conversion Reflow (Mo)"
+
+#: cps/templates/config_edit.html
+msgid "A PDF longer or larger than these limits is refused before it is assessed or converted, as a sample or as a whole book, so that one book cannot occupy the server for hours."
+msgstr "Un PDF plus long ou plus volumineux que ces limites est refusé avant d’être évalué ou converti, en extrait comme en livre entier, pour qu’un seul livre ne puisse pas occuper le serveur pendant des heures."
+
+#: cps/templates/config_edit.html
+msgid "Reflow maximum spend per conversion (USD)"
+msgstr "Dépense maximale par conversion Reflow (USD)"
+
+#: cps/templates/config_edit.html
+msgid "A hard limit. No conversion may be started with a cost cap above this figure, and a running conversion stops when it reaches its cap."
+msgstr "Une limite stricte. Aucune conversion ne peut être lancée avec un plafond de coût supérieur à ce montant, et une conversion en cours s’arrête lorsqu’elle atteint son plafond."
+
+#: cps/templates/config_edit.html
+msgid "OpenRouter API Key (Reflow PDF to EPUB)"
+msgstr "Clé API OpenRouter (Reflow, PDF vers EPUB)"
+
+#: cps/templates/config_edit.html
+msgid "A key is saved. Leave blank to keep it."
+msgstr "Une clé est enregistrée. Laissez vide pour la conserver."
+
+#: cps/templates/config_edit.html
+msgid "No key saved"
+msgstr "Aucune clé enregistrée"
+
+#: cps/templates/config_edit.html
+#, python-format
+msgid "A key is currently coming from the environment (%(source)s); it takes effect only while no key is saved here."
+msgstr "Une clé provient actuellement de l’environnement (%(source)s) ; elle ne s’applique que tant qu’aucune clé n’est enregistrée ici."
+
+#: cps/templates/config_edit.html
+msgid "Delete the saved key"
+msgstr "Supprimer la clé enregistrée"

@@ -22,7 +22,8 @@ from sqlalchemy.orm import sessionmaker
 pytestmark = pytest.mark.unit
 
 REFLOW_COLUMNS = ("config_openrouter_key_e", "config_reflow_default_tier",
-                  "config_reflow_target_usd", "config_reflow_hard_cap_usd")
+                  "config_reflow_target_usd", "config_reflow_hard_cap_usd",
+                  "config_reflow_max_pages", "config_reflow_max_pdf_mb")
 
 
 @pytest.fixture(autouse=True)
@@ -123,13 +124,18 @@ def test_an_existing_installation_gains_the_limits_with_their_defaults(tmp_path)
         row = conn.execute(sa_text(
             "SELECT config_reflow_default_tier, config_reflow_target_usd,"
             " typeof(config_reflow_target_usd), config_reflow_hard_cap_usd,"
-            " typeof(config_reflow_hard_cap_usd) FROM settings WHERE id = 1")).first()
+            " typeof(config_reflow_hard_cap_usd), config_reflow_max_pages,"
+            " typeof(config_reflow_max_pages), config_reflow_max_pdf_mb,"
+            " typeof(config_reflow_max_pdf_mb) FROM settings WHERE id = 1")).first()
     session.close()
 
     assert set(REFLOW_COLUMNS) <= present
     assert row[0] == "standard"
     assert row[1] == pytest.approx(0.5) and row[2] == "real"
     assert row[3] == pytest.approx(5.0) and row[4] == "real"
+    # Finding 3: an upgraded instance is bounded from its first start.
+    assert (row[5], row[6]) == (2000, "integer")
+    assert (row[7], row[8]) == (500, "integer")
 
 
 # ── the admin form ───────────────────────────────────────────────────────────
@@ -217,3 +223,70 @@ def test_a_negative_cap_is_not_a_refund(monkeypatch):
     admin_mod._config_float({"config_reflow_hard_cap_usd": "-3"},
                             "config_reflow_hard_cap_usd")
     assert recorder.config_reflow_hard_cap_usd == 0.0
+
+
+@pytest.mark.parametrize("typed,kept", [("lots", 2000), ("", 2000), ("0", 2000),
+                                        ("-5", 2000), ("2.5", 2000), (" 750 ", 750),
+                                        ("1500", 1500)])
+def test_a_limit_is_only_ever_a_positive_whole_number(monkeypatch, typed, kept):
+    """A blank, zero, negative or fractional page limit leaves the stored one: a
+    typo must never remove the bound it was meant to adjust."""
+    from cps import admin as admin_mod
+
+    recorder = _Recorder(config_reflow_max_pages=2000)
+    monkeypatch.setattr(admin_mod, "config", recorder)
+    admin_mod._config_reflow_limit({"config_reflow_max_pages": typed}, "config_reflow_max_pages")
+    assert recorder.config_reflow_max_pages == kept
+
+
+def test_the_settings_form_saves_both_conversion_limits(monkeypatch):
+    """Drives the real Basic Configuration save: both limits reach the store."""
+    from types import SimpleNamespace
+
+    import cps.admin as admin
+    from cps import app
+
+    saved = {}
+    monkeypatch.setattr(admin, "_config_reflow_limit",
+                        lambda form, key: saved.__setitem__(key, form.get(key)))
+    monkeypatch.setattr(admin, "_config_checkbox_int", lambda *_args: False)
+    monkeypatch.setattr(admin, "_config_checkbox", lambda *_args: False)
+    monkeypatch.setattr(admin, "_config_string", lambda *_args: False)
+    monkeypatch.setattr(admin, "_config_int", lambda *_args: False)
+    monkeypatch.setattr(admin, "_config_float", lambda *_args: False)
+    monkeypatch.setattr(admin, "_save_openrouter_key", lambda *_args: False)
+    monkeypatch.setattr(admin, "_configuration_logfile_helper", lambda _form: (False, None))
+    monkeypatch.setattr(admin, "_configuration_result", lambda *_args, **_kwargs: {"saved": True})
+    monkeypatch.setattr(admin, "apply_https_runtime_config", lambda: None)
+    monkeypatch.setattr(admin.schedule, "reconcile_hardcover_configuration",
+                        lambda: (False, "database"))
+    monkeypatch.setattr(admin.schedule, "refresh_hardcover_auto_fetch", lambda: None)
+    monkeypatch.setattr(admin.services, "goodreads_support", None)
+    monkeypatch.setattr(admin.config, "save", lambda: None)
+    monkeypatch.setattr(admin.config, "hardcover_sync_enabled", lambda: False)
+    monkeypatch.setattr(admin.config, "resolved_hardcover_token", lambda: None)
+    monkeypatch.setattr(admin.config, "hardcover_sync_source", lambda: "database")
+    for name, value in {
+        "config_keyfile": "", "config_certfile": "", "config_login_type": 0,
+        "config_remote_login": False, "config_kobo_sync": False,
+        "config_kobo_prefer_kepub": False,
+        "config_reverse_proxy_auto_create_users": False,
+        "config_allow_reverse_proxy_header_login": False,
+        "config_reverse_proxy_login_header_name": "",
+    }.items():
+        monkeypatch.setattr(admin.config, name, value, raising=False)
+
+    class Query:
+        def filter(self, *_args):
+            return self
+
+        def delete(self):
+            return 0
+
+    monkeypatch.setattr(admin.ub, "session",
+                        SimpleNamespace(query=lambda *_args: Query(), rollback=lambda: None))
+    with app.test_request_context("/admin/config", method="POST", data={
+            "config_reflow_max_pages": "1200", "config_reflow_max_pdf_mb": "250",
+            "config_password_min_length": "8", "config_session": "0"}):
+        assert admin._configuration_update_helper() == {"saved": True}
+    assert saved == {"config_reflow_max_pages": "1200", "config_reflow_max_pdf_mb": "250"}

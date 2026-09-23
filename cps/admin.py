@@ -1873,6 +1873,21 @@ def _config_float(to_save, x):
     return config.set_from_dictionary(to_save, x, _parse)
 
 
+def _config_reflow_limit(to_save, x):
+    """A Reflow limit (pages, megabytes) from a form: a positive whole number.
+
+    Blank, zero, negative, fractional or unparseable input leaves the stored limit
+    alone. A typo must never lift the bound on one conversion's work (Finding 3).
+    """
+    def _parse(value):
+        try:
+            number = int(str(value).strip())
+        except (TypeError, ValueError):
+            return getattr(config, x)
+        return number if number > 0 else getattr(config, x)
+    return config.set_from_dictionary(to_save, x, _parse)
+
+
 def _save_openrouter_key(to_save):
     """Store, keep, or clear the Reflow key — in that order of preference.
 
@@ -3021,6 +3036,8 @@ def _configuration_update_helper():
         _config_string(to_save, "config_reflow_default_tier")
         _config_float(to_save, "config_reflow_target_usd")
         _config_float(to_save, "config_reflow_hard_cap_usd")
+        _config_reflow_limit(to_save, "config_reflow_max_pages")
+        _config_reflow_limit(to_save, "config_reflow_max_pdf_mb")
 
         _config_int(to_save, "config_updatechannel")
 

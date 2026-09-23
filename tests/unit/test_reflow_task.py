@@ -450,6 +450,26 @@ def test_a_sample_is_as_long_as_asked_when_the_front_matter_outruns_the_search(r
     assert [row["page"] for row in report["structural"]["pages"]] == [0, 1, 2]
 
 
+@pytest.mark.parametrize("limit", ["pages", "size"])
+def test_a_queued_conversion_over_the_limit_fails_before_reading_a_page(rig, monkeypatch, limit):
+    """The API refuses a PDF over the administrator's limits before queueing it;
+    a job queued before the limits were lowered, or a PDF replaced after, is
+    refused by the job itself before it reads a page (Finding 3)."""
+    from cps.services.reflow import extract
+    read = []
+    monkeypatch.setattr(extract, "read_page", lambda doc, pno: read.append(pno))
+    if limit == "pages":
+        monkeypatch.setattr(rig.mod.config, "config_reflow_max_pages", 2, raising=False)
+    else:
+        monkeypatch.setattr(rig.mod.config, "config_reflow_max_pdf_mb", 1, raising=False)
+        with open(rig.folder / "Book - Author.pdf", "ab") as handle:
+            handle.write(b"\0" * (1024 * 1024))
+    task = _run(rig, mode="full", review_mode="deterministic")
+    assert task.stat == STAT_FAIL
+    assert "limit" in (task.error or "").lower(), task.error
+    assert read == [] and rig.local_db.session.commits == 0
+
+
 # ── housekeeping ─────────────────────────────────────────────────────────────
 
 def test_a_sample_nobody_downloaded_does_not_live_forever(rig):

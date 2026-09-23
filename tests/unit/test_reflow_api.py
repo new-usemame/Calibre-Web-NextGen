@@ -806,3 +806,134 @@ def test_no_reflow_endpoint_answers_a_visitor_who_never_signed_in(
                         answered[name] = _status(view(*args))
                         added.assert_not_called()
     assert answered == dict.fromkeys(views, 401), answered
+
+
+# ── the administrator's limits on one conversion (Finding 3) ────────────────
+
+@pytest.fixture(scope="module")
+def french(tmp_path_factory):
+    """The shipped French catalogue, compiled the way the image compiles it."""
+    import shutil
+    import subprocess
+    if shutil.which("msgfmt") is None:
+        pytest.skip("msgfmt not available on this host")
+    root = tmp_path_factory.mktemp("reflow-limits-i18n")
+    target = root / "fr" / "LC_MESSAGES"
+    target.mkdir(parents=True)
+    source = os.path.join(os.path.dirname(__file__), "..", "..", "cps", "translations",
+                          "fr", "LC_MESSAGES", "messages.po")
+    subprocess.run(["msgfmt", "-o", str(target / "messages.mo"), source], check=True)
+    return str(root)
+
+
+def _ctx_in(locale, translations, path, method="GET", body=None):
+    from flask_babel import Babel
+    app = flask.Flask(__name__)
+    app.config["WTF_CSRF_ENABLED"] = False
+    app.config["BABEL_TRANSLATION_DIRECTORIES"] = translations
+    Babel(app, locale_selector=lambda: locale)
+    kwargs = {"method": method}
+    if body is not None:
+        kwargs["json"] = body
+    return app.test_request_context(path, **kwargs)
+
+
+def _real_pdf(pdf_on_disk, pages):
+    import pymupdf
+    path = os.path.join(pdf_on_disk["library"], "Author/Book (5)", "Book - Author.pdf")
+    doc = pymupdf.open()
+    for _ in range(pages):
+        doc.new_page()
+    doc.save(path)
+    doc.close()
+    return path
+
+
+def _limits(mod, max_pages=None, max_pdf_mb=None):
+    for name, value in (("config_reflow_max_pages", max_pages),
+                        ("config_reflow_max_pdf_mb", max_pdf_mb)):
+        if value is not None:
+            setattr(mod.config, name, value)
+
+
+@pytest.mark.unit
+def test_a_pdf_longer_than_the_administrator_allows_is_refused_before_any_work(
+        mod, monkeypatch, pdf_on_disk, french):
+    """Finding 3 of the 7daffa5 retest: nothing bounded a whole-book job. A PDF over
+    the page limit is refused -- in the reader's language, naming both numbers --
+    at the estimate before it is assessed, at the preparation before a process is
+    started, and at the start before a job is queued. Breaks if any of the three
+    lets it through."""
+    wired = _wire(mod, monkeypatch, pdf_on_disk)
+    _real_pdf(pdf_on_disk, 5)
+    _limits(mod, max_pages=3)
+    started = []
+    monkeypatch.setattr(mod, "_start_preparation", lambda *a, **k: started.append(a))
+
+    with _ctx_in("fr", french, "/api/v1/books/5/reflow/estimate"), \
+            patch.object(mod, "current_user", _user()):
+        estimate = inspect.unwrap(mod.reflow_estimate)(5)
+    with _ctx_in("fr", french, "/api/v1/books/5/reflow/estimate/prepare", "POST",
+                 {"source_recovery": "auto", "ocr_language": "eng"}), \
+            patch.object(mod, "current_user", _user()):
+        prepare = inspect.unwrap(mod.reflow_prepare_estimate)(5)
+    body = _current_body(mod, {"mode": "full", "consent": True})
+    with _ctx_in("fr", french, "/api/v1/books/5/reflow", "POST", body), \
+            patch.object(mod, "current_user", _user()), \
+            patch.object(mod.WorkerThread, "get_instance",
+                         staticmethod(lambda: SimpleNamespace(tasks=[]))), \
+            patch.object(mod.WorkerThread, "add") as added:
+        start = inspect.unwrap(mod.reflow_start)(5)
+
+    for response in (estimate, prepare, start):
+        assert _status(response) == 422
+        error = _json(response)["error"]
+        assert error["code"] == "pdf_too_many_pages"
+        assert error["message"].startswith("Ce PDF"), error["message"]
+        assert " 5 " in error["message"] and " 3 " in error["message"]
+    assert wired.surveys == [] and started == []
+    added.assert_not_called()
+
+
+@pytest.mark.unit
+def test_a_pdf_larger_than_the_administrator_allows_is_refused_without_being_opened(
+        mod, monkeypatch, pdf_on_disk, french):
+    """The size limit is a stat: a multi-gigabyte PDF is refused before anything
+    parses it, and the message names its size (rounded up, never down to the
+    limit) and the limit, in megabytes."""
+    wired = _wire(mod, monkeypatch, pdf_on_disk)
+    path = os.path.join(pdf_on_disk["library"], "Author/Book (5)", "Book - Author.pdf")
+    with open(path, "wb") as handle:
+        handle.write(b"%PDF-1.4\n" + b"\0" * (3 * 1024 * 1024))
+    _limits(mod, max_pdf_mb=2)
+    def never(*_args):
+        raise AssertionError("the PDF was opened")
+    monkeypatch.setattr(mod, "_page_count_uncached", never)
+    with _ctx_in("en", french, "/api/v1/books/5/reflow/estimate"), \
+            patch.object(mod, "current_user", _user()):
+        response = inspect.unwrap(mod.reflow_estimate)(5)
+    assert _status(response) == 422
+    error = _json(response)["error"]
+    assert error["code"] == "pdf_too_large"
+    assert "3.1 MB" in error["message"] and "2 MB" in error["message"]
+    assert wired.surveys == []
+
+
+@pytest.mark.unit
+def test_a_pdf_within_the_limits_is_assessed_as_before(mod, monkeypatch, pdf_on_disk):
+    wired = _wire(mod, monkeypatch, pdf_on_disk)
+    _real_pdf(pdf_on_disk, 3)
+    _limits(mod, max_pages=3, max_pdf_mb=1)
+    with _ctx("/api/v1/books/5/reflow/estimate"), patch.object(mod, "current_user", _user()):
+        response = inspect.unwrap(mod.reflow_estimate)(5)
+    assert _status(response) == 200 and len(wired.surveys) == 1
+    assert _json(response)["limits"] == {"max_pages": 3, "max_pdf_mb": 1}
+
+
+@pytest.mark.unit
+def test_the_administrator_sees_the_conversion_limits(mod, monkeypatch, pdf_on_disk):
+    _wire(mod, monkeypatch, pdf_on_disk)
+    _limits(mod, max_pages=1500, max_pdf_mb=300)
+    with _ctx("/api/v1/admin/reflow"), patch.object(mod, "current_user", _user(admin=True)):
+        body = _json(inspect.unwrap(mod.reflow_admin_config)())
+    assert body["max_pages"] == 1500 and body["max_pdf_mb"] == 300

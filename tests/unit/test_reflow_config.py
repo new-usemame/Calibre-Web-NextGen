@@ -23,6 +23,7 @@ pytestmark = pytest.mark.unit
 
 REFLOW_COLUMNS = ("config_openrouter_key_e", "config_reflow_default_tier",
                   "config_reflow_target_usd", "config_reflow_hard_cap_usd",
+                  "config_reflow_instance_budget_usd",
                   "config_reflow_max_pages", "config_reflow_max_pdf_mb")
 
 
@@ -125,6 +126,7 @@ def test_an_existing_installation_gains_the_limits_with_their_defaults(tmp_path)
             "SELECT config_reflow_default_tier, config_reflow_target_usd,"
             " typeof(config_reflow_target_usd), config_reflow_hard_cap_usd,"
             " typeof(config_reflow_hard_cap_usd), config_reflow_max_pages,"
+            " config_reflow_instance_budget_usd, typeof(config_reflow_instance_budget_usd),"
             " typeof(config_reflow_max_pages), config_reflow_max_pdf_mb,"
             " typeof(config_reflow_max_pdf_mb) FROM settings WHERE id = 1")).first()
     session.close()
@@ -133,9 +135,10 @@ def test_an_existing_installation_gains_the_limits_with_their_defaults(tmp_path)
     assert row[0] == "standard"
     assert row[1] == pytest.approx(0.5) and row[2] == "real"
     assert row[3] == pytest.approx(5.0) and row[4] == "real"
+    assert row[6] == pytest.approx(0.0) and row[7] == "real"
     # Finding 3: an upgraded instance is bounded from its first start.
-    assert (row[5], row[6]) == (2000, "integer")
-    assert (row[7], row[8]) == (500, "integer")
+    assert (row[5], row[8]) == (2000, "integer")
+    assert (row[9], row[10]) == (500, "integer")
 
 
 # ── the admin form ───────────────────────────────────────────────────────────
@@ -225,6 +228,26 @@ def test_a_negative_cap_is_not_a_refund(monkeypatch):
     assert recorder.config_reflow_hard_cap_usd == 0.0
 
 
+@pytest.mark.parametrize("typed", ["nan", "NaN", "inf", "-inf", "Infinity"])
+def test_nonfinite_shared_budget_is_not_saved(monkeypatch, typed):
+    from cps import admin as admin_mod
+    recorder = _Recorder(config_reflow_instance_budget_usd=2.0)
+    monkeypatch.setattr(admin_mod, "config", recorder)
+    admin_mod._config_float({"config_reflow_instance_budget_usd": typed},
+                            "config_reflow_instance_budget_usd")
+    assert recorder.config_reflow_instance_budget_usd == pytest.approx(2.0)
+
+
+def test_zero_is_a_valid_shared_budget_setting_that_disables_paid_review(monkeypatch):
+    from cps import admin as admin_mod
+
+    recorder = _Recorder(config_reflow_instance_budget_usd=2.0)
+    monkeypatch.setattr(admin_mod, "config", recorder)
+    admin_mod._config_float({"config_reflow_instance_budget_usd": "0"},
+                            "config_reflow_instance_budget_usd")
+    assert recorder.config_reflow_instance_budget_usd == pytest.approx(0.0)
+
+
 @pytest.mark.parametrize("typed,kept", [("lots", 2000), ("", 2000), ("0", 2000),
                                         ("-5", 2000), ("2.5", 2000), (" 750 ", 750),
                                         ("1500", 1500)])
@@ -239,21 +262,22 @@ def test_a_limit_is_only_ever_a_positive_whole_number(monkeypatch, typed, kept):
     assert recorder.config_reflow_max_pages == kept
 
 
-def test_the_settings_form_saves_both_conversion_limits(monkeypatch):
-    """Drives the real Basic Configuration save: both limits reach the store."""
+def test_the_settings_form_saves_reflow_limits_and_shared_budget(monkeypatch):
+    """Drives the real Basic Configuration save: all reflow limits reach the store."""
     from types import SimpleNamespace
 
     import cps.admin as admin
     from cps import app
 
     saved = {}
+    saved_floats = []
     monkeypatch.setattr(admin, "_config_reflow_limit",
                         lambda form, key: saved.__setitem__(key, form.get(key)))
     monkeypatch.setattr(admin, "_config_checkbox_int", lambda *_args: False)
     monkeypatch.setattr(admin, "_config_checkbox", lambda *_args: False)
     monkeypatch.setattr(admin, "_config_string", lambda *_args: False)
     monkeypatch.setattr(admin, "_config_int", lambda *_args: False)
-    monkeypatch.setattr(admin, "_config_float", lambda *_args: False)
+    monkeypatch.setattr(admin, "_config_float", lambda _form, key: saved_floats.append(key) or False)
     monkeypatch.setattr(admin, "_save_openrouter_key", lambda *_args: False)
     monkeypatch.setattr(admin, "_configuration_logfile_helper", lambda _form: (False, None))
     monkeypatch.setattr(admin, "_configuration_result", lambda *_args, **_kwargs: {"saved": True})
@@ -290,3 +314,4 @@ def test_the_settings_form_saves_both_conversion_limits(monkeypatch):
             "config_password_min_length": "8", "config_session": "0"}):
         assert admin._configuration_update_helper() == {"saved": True}
     assert saved == {"config_reflow_max_pages": "1200", "config_reflow_max_pdf_mb": "250"}
+    assert "config_reflow_instance_budget_usd" in saved_floats

@@ -10,6 +10,7 @@ function assessment(): SourceAssessment {
   return { book_id: 1, title: 'Source conversion example', verdict: 'BORN_DIGITAL', pages: 60,
     text_layer: true, sample_suggested: true, existing_epub: false, configured: true,
     hard_cap_usd: 5, sample_pages_default: 20, sample_pages_max: 60, sampled: 40, cached: true,
+    instance_budget: { status: 'available', remaining_usd: 2, window_hours: 24 },
     source_sha256: 'a'.repeat(64), consent_contract: 'source-review-1',
     review: { quality_released: true, route_version: 'test-route', source_revision: 'test-source',
       provider: 'openai/flex', service_tier: 'flex', proposer: 'openai/gpt-5.6-luna',
@@ -40,7 +41,7 @@ const reviewed: ReflowJob = {
 };
 async function stub(page: Page, est = assessment(), jobs: ReflowJob[] = []) {
   const state = { starts: [] as Record<string, unknown>[], preparations: 0, cancellations: 0,
-    status: 'ready' as ReviewPreparation['status'] };
+    status: 'ready' as ReviewPreparation['status'], startError: null as { code: string } | null };
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     let body: unknown = { items: [] };
@@ -57,6 +58,11 @@ async function stub(page: Page, est = assessment(), jobs: ReflowJob[] = []) {
     } else if (path.endsWith('/reflow/jobs')) body = { items: jobs, active: [] };
     else if (path.endsWith('/reflow') && route.request().method() === 'POST') {
       const input = route.request().postDataJSON(); state.starts.push(input);
+      if (state.startError) {
+        await route.fulfill({ status: 409, contentType: 'application/json',
+          body: JSON.stringify({ error: state.startError }) });
+        return;
+      }
       body = { task_id: 1, job_id: 'e'.repeat(32), mode: input.mode, review_mode: input.review_mode,
         cost_cap_usd: input.cost_cap_usd, reservation_ceiling_usd: .24, partial_review_possible: true };
     } else if (path.endsWith('/books/1')) body = { id: 1, title: est.title, authors: [], formats: [] };
@@ -94,6 +100,38 @@ test('keyless source conversion remains usable and cannot silently become paid r
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: test.info().outputPath('source-conversion.jpg'), type: 'jpeg', quality: 75, fullPage: true });
   assertNoPageErrors(errors);
+});
+
+test('an unavailable shared budget disables only paid review without exposing other jobs', async ({ page }) => {
+  const est = assessment(); est.instance_budget = { status: 'exhausted', remaining_usd: 0, window_hours: 24 };
+  const { state, errors } = await stub(page, est);
+  await expect(paidChoice(page)).toBeDisabled();
+  await expect(page.getByText('AI review is unavailable because the shared 24-hour budget is exhausted. Source conversion remains available.', { exact: true })).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Create this source conversion without model requests or provider charges.' }).check();
+  await page.getByRole('button', { name: 'Convert the sample', exact: true }).click();
+  await expect.poll(() => state.starts.length).toBe(1);
+  expect(state.starts[0]).toMatchObject({ review_mode: 'deterministic', cost_cap_usd: 0 });
+  expect(await page.locator('body').innerText()).not.toContain('other users');
+  assertNoPageErrors(errors);
+});
+
+test('a budget exhausted during dispatch keeps the source conversion available and explains the retry', async ({ page }) => {
+  const { state, errors } = await stub(page);
+  await preparePaid(page); await consent(page).check();
+  state.startError = { code: 'instance_budget_exhausted' };
+  await page.getByRole('button', { name: 'Convert the sample', exact: true }).click();
+  await expect(page.locator('p[role="alert"]').filter({ hasText: 'AI review is unavailable because the shared 24-hour budget is exhausted.' }))
+    .toHaveText('AI review is unavailable because the shared 24-hour budget is exhausted. Source conversion remains available.');
+  expect(state.starts).toHaveLength(1);
+  state.startError = null;
+  await page.getByRole('radio', { name: /^Source conversion/ }).check();
+  await page.getByRole('checkbox', { name: 'Create this source conversion without model requests or provider charges.' }).check();
+  await page.getByRole('button', { name: 'Convert the sample', exact: true }).click();
+  await expect.poll(() => state.starts.length).toBe(2);
+  expect(state.starts[1]).toMatchObject({ review_mode: 'deterministic', cost_cap_usd: 0 });
+  // The intentionally rejected dispatch is a browser network diagnostic, not a
+  // SPA exception. Keep every other page/console error meaningful.
+  assertNoPageErrors(errors.filter((error) => error !== 'console.error: Failed to load resource: the server responded with a status of 409 (Conflict)'));
 });
 
 test('prepared wire ceiling and cap stay distinct; changing cap or scope resets consent', async ({ page }) => {

@@ -6,6 +6,7 @@
 # See CONTRIBUTORS for full list of authors.
 
 import os
+import math
 import re
 import json
 import operator
@@ -1867,8 +1868,9 @@ def _config_float(to_save, x):
     value alone rather than resetting a spending limit to zero."""
     def _parse(value):
         try:
-            return max(0.0, round(float(value), 4))
-        except (TypeError, ValueError):
+            number = float(value)
+            return max(0.0, round(number, 4)) if math.isfinite(number) else getattr(config, x, 0.0)
+        except (TypeError, ValueError, OverflowError):
             return getattr(config, x, 0.0)
     return config.set_from_dictionary(to_save, x, _parse)
 
@@ -3036,6 +3038,7 @@ def _configuration_update_helper():
         _config_string(to_save, "config_reflow_default_tier")
         _config_float(to_save, "config_reflow_target_usd")
         _config_float(to_save, "config_reflow_hard_cap_usd")
+        _config_float(to_save, "config_reflow_instance_budget_usd")
         _config_reflow_limit(to_save, "config_reflow_max_pages")
         _config_reflow_limit(to_save, "config_reflow_max_pdf_mb")
 

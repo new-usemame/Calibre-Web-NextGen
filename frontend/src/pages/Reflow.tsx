@@ -90,7 +90,8 @@ export function Reflow({ id }: { id: string }) {
   const needed = selected.bound;
   const capNumber = Number(cap);
   const authorised = Number.isFinite(capNumber) && capNumber > 0 ? capNumber : 0;
-  const paidAvailable = !!est?.configured && !!est.review.quality_released;
+  const budget = est?.instance_budget;
+  const paidAvailable = !!est?.configured && !!est.review.quality_released && budget?.status === 'available';
 
   // Stale preparation can never supply consent. Cancel owned obsolete local work;
   // an in-flight HTTP reply is also bound to its original source/options key.
@@ -159,8 +160,14 @@ export function Reflow({ id }: { id: string }) {
       source_recovery: recovery, ocr_language: ocrLang,
     }, {
       onError: (err) => {
-        setError(err instanceof ApiError ? err.message : t('The conversion could not be started.'));
-        if (err instanceof ApiError && ['source_changed', 'estimate_stale', 'current_consent_required'].includes(String(err.detail?.code))) {
+        const code = err instanceof ApiError ? String(err.detail?.code) : '';
+        setError(code === 'instance_budget_unavailable'
+          ? t('AI review is unavailable until an administrator sets a shared 24-hour budget. Source conversion remains available.')
+          : code === 'instance_budget_exhausted'
+            ? t('AI review is unavailable because the shared 24-hour budget is exhausted. Source conversion remains available.')
+            : err instanceof ApiError ? err.message : t('The conversion could not be started.'));
+        if (['source_changed', 'estimate_stale', 'current_consent_required',
+          'instance_budget_unavailable', 'instance_budget_exhausted'].includes(code)) {
           setPreparation(null); setConsent(false); void estimateQ.refetch();
         }
       },
@@ -316,8 +323,19 @@ export function Reflow({ id }: { id: string }) {
           {!est.review.quality_released
             ? t('AI review is not available in this build. Source conversion remains available.')
             : !est.configured ? t('Configure an OpenRouter key to use optional AI review.')
+              : budget?.status === 'disabled' || budget?.status === 'unavailable'
+                ? t('AI review is unavailable until an administrator sets a shared 24-hour budget. Source conversion remains available.')
+                : budget?.status === 'exhausted'
+                  ? t('AI review is unavailable because the shared 24-hour budget is exhausted. Source conversion remains available.')
               : t('Optional review uses the two models below, with no automatic alternative route.')}
         </p>
+        {budget?.status === 'available' && typeof budget.remaining_usd === 'number' && (
+          <p className={styles.note}>
+            {t('{amount} remains in the shared {hours}-hour AI review budget. It is checked again before every request.')
+              .replace('{amount}', ledgerUsd(budget.remaining_usd))
+              .replace('{hours}', String(budget.window_hours))}
+          </p>
+        )}
         <dl className={styles.facts}>
           <Fact label={t('Planned proposer')} value={est.review.proposer} />
           <Fact label={t('Planned reviewer')} value={est.review.verifier} />

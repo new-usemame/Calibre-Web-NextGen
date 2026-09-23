@@ -2,11 +2,13 @@
 import type { ReflowEstimate, ReflowMode } from './reflowMoney.ts';
 export type ReviewMode = 'deterministic' | 'source_verified';
 export type SourceRecovery = 'auto' | 'textless' | 'off';
+export type InstanceBudgetStatus = 'available' | 'disabled' | 'exhausted' | 'unavailable';
 export type SourceAssessment = Pick<ReflowEstimate,
   'book_id' | 'title' | 'verdict' | 'pages' | 'text_layer' | 'sample_suggested' |
   'existing_epub' | 'configured' | 'hard_cap_usd' | 'sample_pages_default' |
   'sample_pages_max' | 'sampled' | 'cached' | 'recovery'> & {
     source_sha256: string;
+    instance_budget: { status: InstanceBudgetStatus; remaining_usd: number | null; window_hours: 24 };
     consent_contract: string;
     review: { quality_released: boolean; route_version: string; source_revision: string;
       provider: string; service_tier: string; proposer: string; verifier: string; max_output_tokens: number };

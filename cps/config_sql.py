@@ -164,6 +164,10 @@ class _Settings(_Base):
     # The limit. No job's own cap may be set higher than this, so a user cannot
     # spend the instance's money beyond what its administrator allowed.
     config_reflow_hard_cap_usd = Column(Float, default=5.0)
+    # A separate rolling instance allowance for paid source review. Zero is an
+    # explicit safe default: it disables paid dispatch until an administrator
+    # decides what the shared provider account may spend.
+    config_reflow_instance_budget_usd = Column(Float, default=0.0)
     # The largest PDF one conversion reads, in pages and in megabytes. A PDF over
     # either is refused at the estimate, the preparation and the start, before any
     # work (Finding 3 of the 7daffa5 retest: nothing bounded a whole-book job).

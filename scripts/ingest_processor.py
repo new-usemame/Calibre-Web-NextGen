@@ -838,6 +838,21 @@ _ACSM_PLUGIN_RAN_GUIDANCE = (
 )
 
 
+def _distinct_book_ids(book_ids):
+    """The distinct integer ids in ``book_ids``, ascending.
+
+    Callers pass whatever calibredb parsing produced: ``None`` entries and
+    duplicates are dropped, and a non-integer id is skipped rather than raising.
+    """
+    ids = set()
+    for book_id in book_ids or []:
+        try:
+            ids.add(int(book_id))
+        except (TypeError, ValueError):
+            continue
+    return sorted(ids)
+
+
 def stamp_books_with_import_time(connection, book_ids, now=None):
     """Set ``books.timestamp`` to the import time for every freshly added book.
 
@@ -862,22 +877,52 @@ def stamp_books_with_import_time(connection, book_ids, now=None):
         current time.
     :return: Number of rows updated.
     """
-    ids = set()
-    for book_id in book_ids or []:
-        try:
-            ids.add(int(book_id))
-        except (TypeError, ValueError):
-            continue
-    if not ids:
+    ordered = _distinct_book_ids(book_ids)
+    if not ordered:
         return 0
     if now is None:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S+00:00")
-    ordered = sorted(ids)
     placeholders = ",".join("?" * len(ordered))
     cur = connection.cursor()
     cur.execute(
         "UPDATE books SET timestamp = ? WHERE id IN ({})".format(placeholders),
         [now, *ordered],
+    )
+    return cur.rowcount
+
+
+def derive_title_sort_for_unsorted_imports(connection, book_ids):
+    """Re-derive ``books.sort`` for freshly added books whose sort is just their title.
+
+    ``calibredb add`` copies a file's embedded title sort (``calibre:title_sort``,
+    or the EPUB 3 ``file-as`` refinement) straight into ``books.sort``; only a
+    file without one gets the title-sort rule. Plenty of EPUBs carry a "title
+    sort" that is the title again, so "The Donkey" files under T while "The Barn
+    Door", which carried none, is derived by the rule and files under B — fork
+    #2219 as @bcsteeve reported it. Nothing corrects it afterwards: calibre's
+    ``books_update_trg`` re-derives ``sort`` only when the title itself changes.
+
+    A stored sort identical to the title, for a title the configured rule would
+    reorder, records no sorting decision, so it is re-derived through the same
+    ``title_sort`` function the library uses. A sort that differs from the title
+    ("Donkey, The", "Tolkien 01") is somebody's deliberate choice and stays, as
+    does every title the rule leaves unchanged.
+
+    :param connection: Open sqlite3 connection to ``metadata.db`` with the
+        ``title_sort`` function registered for the configured regex.
+    :param book_ids: The ids ``calibredb add`` reported. ``None`` entries and
+        duplicates are ignored; a non-integer id is skipped rather than raising.
+    :return: Number of books whose sort was re-derived.
+    """
+    ordered = _distinct_book_ids(book_ids)
+    if not ordered:
+        return 0
+    placeholders = ",".join("?" * len(ordered))
+    cur = connection.cursor()
+    cur.execute(
+        "UPDATE books SET sort = title_sort(title) WHERE id IN ({})"
+        " AND sort = title AND title_sort(title) <> title".format(placeholders),
+        ordered,
     )
     return cur.rowcount
 
@@ -2462,6 +2507,14 @@ class NewBookProcessor:
                             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S+00:00")
                             affected = stamp_books_with_import_time(con, imported_ids, now)
                             print(f"[ingest-processor] INFO: Set timestamp to {now} for {affected} newly imported book(s): {imported_ids}.", flush=True)
+                            # Its own failure must not roll back the stamp above,
+                            # which shares this connection's transaction.
+                            try:
+                                resorted = derive_title_sort_for_unsorted_imports(con, imported_ids)
+                                if resorted:
+                                    print(f"[ingest-processor] INFO: Derived title sort for {resorted} imported book(s) whose embedded sort was the bare title (fork #2219).", flush=True)
+                            except sqlite3.Error as e:
+                                print(f"[ingest-processor] WARN: Could not derive title sort for imported book(s) {imported_ids}: {e}", flush=True)
                 except Exception as e:
                     print(f"[ingest-processor] WARN: Failed to set timestamp for new book: {e}", flush=True)
 

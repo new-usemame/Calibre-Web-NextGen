@@ -9,15 +9,22 @@ KOReader lists and sorts by, and one page explaining that opening the book
 downloads it. The plugin recognises it by ``META-INF/cwng-placeholder.json``.
 
 The bytes depend only on their inputs (fixed zip timestamps), so an unchanged
-book always yields an identical placeholder.
+book always yields an identical placeholder, and :func:`cached` keeps recent
+ones so the same placeholder is not built twice.
 """
 
 import io
 import json
+import threading
 import zipfile
+from collections import OrderedDict
 from xml.sax.saxutils import escape, quoteattr
 
 from PIL import Image, ImageDraw, ImageFont, ImageOps
+
+from .. import logger
+
+log = logger.create()
 
 MIMETYPE = "application/epub+zip"
 MARKER_PATH = "META-INF/cwng-placeholder.json"
@@ -26,6 +33,11 @@ MARKER_PATH = "META-INF/cwng-placeholder.json"
 # typically 20-40 KB.
 COVER_MAX = (400, 600)
 COVER_QUALITY = 75
+# The most pixels a cover may decode to. A JPEG decodes straight to a fraction
+# of its size (draft), so this only turns away covers stored in other formats
+# at sizes no cover needs: a 12000x12000 PNG named cover.jpg took 1.7 s and
+# 760 MB of memory for one placeholder. Such a book gets the plain cover.
+MAX_DECODED_PIXELS = 4096 * 4096
 _ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 
 _CONTAINER = """<?xml version="1.0" encoding="UTF-8"?>
@@ -42,7 +54,13 @@ def _load_cover(cover_path):
         return None
     try:
         with Image.open(cover_path) as source:
-            source.draft("RGB", COVER_MAX)
+            source.draft("RGB", COVER_MAX)  # JPEG: decode at a reduced scale
+            width, height = source.size     # what decoding will now produce
+            if width * height > MAX_DECODED_PIXELS:
+                log.warning("KOReader placeholder: %s is %dx%d %s, too large to "
+                            "decode for a cover; using a plain cover", cover_path,
+                            width, height, source.format)
+                return None
             image = ImageOps.exif_transpose(source).convert("RGB")
     except (OSError, ValueError, Image.DecompressionBombError):
         return None
@@ -263,3 +281,53 @@ def build(*, book_id, rev, title, authors, series, series_index, cover_path,
             info.external_attr = 0o644 << 16
             archive.writestr(info, data)
     return buffer.getvalue()
+
+
+class _RecentBytes:
+    """The most recently used byte strings by key, within a byte budget."""
+
+    def __init__(self, max_bytes):
+        self.max_bytes = max_bytes
+        self._items = OrderedDict()
+        self._size = 0
+        self._lock = threading.Lock()
+
+    def get(self, key):
+        with self._lock:
+            data = self._items.get(key)
+            if data is not None:
+                self._items.move_to_end(key)
+            return data
+
+    def put(self, key, data):
+        if len(data) > self.max_bytes:
+            return
+        with self._lock:
+            previous = self._items.pop(key, None)
+            if previous is not None:
+                self._size -= len(previous)
+            self._items[key] = data
+            self._size += len(data)
+            while self._size > self.max_bytes:
+                _key, dropped = self._items.popitem(last=False)
+                self._size -= len(dropped)
+
+
+# A device fetches each placeholder once and then asks with If-None-Match, but
+# a second device, a device that lost its copy, or a client that never sends
+# the header would have the same placeholder built again: its cover decoded,
+# scaled and compressed. Placeholders are 10-90 KB; 32 MB holds a few hundred.
+_CACHE = _RecentBytes(32 * 1024 * 1024)
+
+
+def cached(key, make):
+    """The placeholder stored under ``key``, made with ``make()`` if not held.
+
+    ``key`` must name everything the bytes depend on (the book, its revision
+    and the language), as the placeholder ETag does.
+    """
+    data = _CACHE.get(key)
+    if data is None:
+        data = make()
+        _CACHE.put(key, data)
+    return data

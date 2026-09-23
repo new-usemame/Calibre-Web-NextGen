@@ -216,7 +216,7 @@ def get_library_placeholder(book_id):
         response.set_etag(etag)
         return response
 
-    data = koreader_placeholder.build(
+    data = koreader_placeholder.cached(etag, lambda: koreader_placeholder.build(
         book_id=book_id,
         rev=entry["rev"],
         title=entry["title"],
@@ -231,7 +231,7 @@ def get_library_placeholder(book_id):
             _("This book is in your library but has not been downloaded to this device."),
             _("Connect to Wi-Fi and open it from your library: it downloads by itself."),
         ],
-    )
+    ))
     response = make_response(data)
     response.headers["Content-Type"] = koreader_placeholder.MIMETYPE
     response.headers["X-CWNG-Placeholder-Rev"] = entry["rev"]

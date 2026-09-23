@@ -375,6 +375,59 @@ def test_placeholder_answers_not_modified_for_the_same_rev(world):
     assert again.status_code == 304
 
 
+def _placeholder_cover(world, book_id):
+    archive = zipfile.ZipFile(io.BytesIO(_placeholder(world, book_id).get_data()))
+    return Image.open(io.BytesIO(archive.read("OEBPS/cover.jpg"))).convert("RGB")
+
+
+def _image_bytes(size, fmt, shade=40):
+    buffer = io.BytesIO()
+    Image.new("L", size, shade).save(buffer, fmt)
+    return buffer.getvalue()
+
+
+def test_a_cover_too_big_to_decode_safely_gets_the_plain_cover(world):
+    """A 12000x12000 PNG saved as cover.jpg cost 1.7 s and 760 MB of memory for
+    one placeholder. A cover that would decode past the cap gets the plain
+    cover instead; a big JPEG is still used, because it decodes straight to a
+    fraction of its size."""
+    world.add_user("reader")
+    world.add_book(1, "Huge Png", cover_image=_image_bytes((4400, 4400), "PNG"))
+    world.add_book(2, "Huge Jpeg", cover_image=_image_bytes((5000, 5000), "JPEG"))
+
+    plain = _placeholder_cover(world, 1)
+    assert plain.getpixel((200, 60)) == pytest.approx((236, 232, 224), abs=12)
+    own = _placeholder_cover(world, 2)
+    assert own.getpixel((60, 60)) == pytest.approx((40, 40, 40), abs=12)
+
+
+def test_a_placeholder_is_built_once_per_revision(world, monkeypatch):
+    """A second device, a device that lost its copy, or a client that never
+    sends If-None-Match asks again for the same placeholder: the bytes built
+    the first time are served, and a change to the book builds anew."""
+    from cps import db
+    from cps.services import koreader_placeholder
+    world.add_user("reader")
+    world.add_book(1, "Once")
+    builds = []
+    build = koreader_placeholder.build
+    monkeypatch.setattr(koreader_placeholder, "build",
+                        lambda **kwargs: builds.append(kwargs["title"]) or build(**kwargs))
+
+    first, second = _placeholder(world, 1), _placeholder(world, 1)
+    assert first.status_code == second.status_code == 200
+    assert first.get_data() == second.get_data()
+    assert builds == ["Once"]
+
+    book = world.session.get(db.Books, 1)
+    book.title = "Twice"
+    book.last_modified = datetime(2026, 9, 2, 8, 0, 0)
+    world.session.commit()
+    third = _placeholder(world, 1)
+    assert builds == ["Once", "Twice"]
+    assert b"Twice" in zipfile.ZipFile(io.BytesIO(third.get_data())).read("OEBPS/content.opf")
+
+
 def _file(world, book_id, user="reader"):
     return world.client.get("/kosync/syncs/library/books/%d/file" % book_id,
                             headers=world.device_headers(user))

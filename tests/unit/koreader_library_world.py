@@ -65,6 +65,11 @@ class LibraryWorld:
 
         self.kosync = sys.modules["cps.progress_syncing.protocols.kosync"]
         self.monkeypatch = monkeypatch
+        # Placeholders are cached in-process by book, revision and language;
+        # each world starts with none, as a fresh server does.
+        from cps.services import koreader_placeholder
+        monkeypatch.setattr(koreader_placeholder, "_CACHE",
+                            koreader_placeholder._RecentBytes(32 * 1024 * 1024))
         self.engine = create_engine("sqlite://")
         event.listen(
             self.engine, "connect",

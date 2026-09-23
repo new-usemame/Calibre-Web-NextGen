@@ -49,6 +49,7 @@ export function KoreaderSetup({ enabled, serverUrl, onCopy, copied, onApproved }
   const codeRef = useRef<HTMLInputElement>(null);
   const pairRef = useRef<HTMLDivElement>(null);
   const requestRef = useRef<HTMLDivElement>(null);
+  const answeredRef = useRef<HTMLParagraphElement>(null);
   const lookupRef = useRef(lookup.mutate);
   lookupRef.current = lookup.mutate;
 
@@ -108,6 +109,13 @@ export function KoreaderSetup({ enabled, serverUrl, onCopy, copied, onApproved }
     if (request) requestRef.current?.focus();
   }, [request]);
 
+  // An answer removes the card and the button that was pressed. Focus goes to
+  // the result instead of falling back to the page, and being read there is
+  // how a screen reader hears it (so it is not also announced).
+  useEffect(() => {
+    if (answered) answeredRef.current?.focus();
+  }, [answered]);
+
   const decide = (approve: boolean) => {
     if (!request) return;
     answer.mutate({ code: request.user_code, approve }, {
@@ -116,16 +124,14 @@ export function KoreaderSetup({ enabled, serverUrl, onCopy, copied, onApproved }
         setRequest(null);
         setCode('');
         forgetDeepLink();
-        if (approve) {
-          announce(t('Approved. {name} is finishing setup; its library appears in a few seconds.', { name: result.device_name }));
-          onApproved();
-        } else {
-          announce(t('Declined. {name} was not connected.', { name: result.device_name }));
-        }
+        if (approve) onApproved();
       },
       onError: (error) => {
         setRequest(null);
         setCodeError(errorText(error));
+        // The card is gone; the code box is where to go next, and it is
+        // described by the error.
+        codeRef.current?.focus();
       },
     });
   };
@@ -263,7 +269,8 @@ export function KoreaderSetup({ enabled, serverUrl, onCopy, copied, onApproved }
           )}
 
           {answered && (
-            <p role="status" className={answered.approved ? styles.koreaderDone : styles.pairingStatus}>
+            <p ref={answeredRef} tabIndex={-1}
+              className={answered.approved ? styles.koreaderDone : styles.pairingStatus}>
               {answered.approved && <Check size={16} aria-hidden="true" focusable={false} />}
               {answered.approved
                 ? t('Approved. {name} is finishing setup; its library appears in a few seconds.', { name: answered.request.device_name })

@@ -115,8 +115,10 @@ test('the short address from the e-reader opens the approval card, and only a cl
   await assertNoHorizontalOverflow(page);
 
   await card.getByRole('button', { name: 'Approve' }).click();
-  await expect(pairing(page).getByRole('status').filter({ hasText: 'Approved.' }))
-    .toHaveText('Approved. Kindle Kids is finishing setup; its library appears in a few seconds.');
+  // The card and the pressed button are gone: focus goes to the result, which
+  // is how a screen reader hears it, instead of falling back to the page.
+  await expect(pairing(page).getByText('Approved. Kindle Kids is finishing setup; its library appears in a few seconds.'))
+    .toBeFocused();
   expect(calls.answers).toEqual([`${CODE}:approved`]);
   await expect(card).toHaveCount(0);
   // A reload must not look the answered code up again.
@@ -166,9 +168,22 @@ test('a typed code is checked before it is sent, and a wrong one is explained', 
   await page.keyboard.press('Enter');
   const card = page.getByRole('group', { name: 'Kindle Kids wants to connect to your account.' });
   await card.getByRole('button', { name: 'Deny' }).click();
-  await expect(pairing(page).getByRole('status').filter({ hasText: 'Declined.' }))
-    .toHaveText('Declined. Kindle Kids was not connected.');
+  await expect(pairing(page).getByText('Declined. Kindle Kids was not connected.')).toBeFocused();
   expect(calls.answers).toEqual([`${CODE}:denied`]);
+});
+
+test('an answer the server refuses is explained, and the code box is ready again', async ({ page }) => {
+  await stubPage(page);
+  // Someone answered this code from another tab a moment earlier.
+  await page.route((url) => url.pathname.endsWith('/approve'), (route) => route.fulfill({
+    status: 409, json: { error: { code: 'already_decided', message: 'This code has already been approved or declined.' } },
+  }));
+  await page.goto(`/app/account/devices?pair=1&code=${CODE}`);
+  const card = page.getByRole('group', { name: 'Kindle Kids wants to connect to your account.' });
+  await card.getByRole('button', { name: 'Approve' }).click();
+  await expect(page.locator('#koreader-code-error')).toHaveText('This code has already been approved or declined.');
+  await expect(card).toHaveCount(0);
+  await expect(page.getByLabel('Code on the e-reader')).toBeFocused();
 });
 
 test('the ready-made plugin downloads for the address shown, which can be changed', async ({ page }) => {

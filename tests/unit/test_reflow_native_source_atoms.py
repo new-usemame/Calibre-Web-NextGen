@@ -1,5 +1,6 @@
 """Source10.1 factory authority and indivisible word images across real exec."""
 import copy
+import json
 import zipfile
 from dataclasses import replace
 from xml.etree import ElementTree as ET
@@ -10,6 +11,27 @@ from cps.services.reflow.native_text import descriptor
 from tests.unit.test_reflow_quote_units import fixture
 
 pytestmark = pytest.mark.unit
+
+
+def test_native_build_retains_distinct_atom_and_legacy_conservation(tmp_path):
+    """The child must not collapse an explicit old lexical failure into the
+    current atom-aware success when transporting Book into publication metadata.
+    This is a transport fixture, not permission to waive source discrepancies.
+    """
+    from cps.services.reflow.assemble import ConservationReport
+    book, original, raw, start, end = fixture(tmp_path)
+    path = original.name
+    original.close()
+    legacy = dict(ok=False, source_total=4, output_total=5,
+                  missing=['physicalwrap'], added=['physical', 'wrap'])
+    book.conservation = ConservationReport(True, 5, 5, legacy_lexical=legacy)
+    with NativeDocument(path, scratch_root=tmp_path / 'scratch') as doc:
+        built = build_epub.build(book, str(tmp_path / 'legacy.epub'), doc=doc)
+        assert build_epub.validate(built.path) == []
+    with zipfile.ZipFile(built.path) as archive:
+        report = json.loads(archive.read('META-INF/reflow.json'))['conservation']
+    assert report == book.conservation.to_dict()
+    assert report['ok'] is True and report['legacy_lexical']['ok'] is False
 
 
 def test_native_quote_atom_roundtrip_reissues_source_authority_and_preserves_pixels(tmp_path, monkeypatch):

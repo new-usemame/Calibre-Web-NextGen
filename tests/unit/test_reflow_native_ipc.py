@@ -127,6 +127,8 @@ def test_real_child_and_direct_pipeline_emit_same_semantic_epub(tmp_path):
     with ipc.NativeDocument(path, scratch_root=tmp_path / 'scratch') as doc:
         remote = make(doc, tmp_path / 'remote.epub')
     assert direct.structural == remote.structural
+    assert direct.book.conservation.legacy_lexical
+    assert remote.book.conservation.to_dict() == direct.book.conservation.to_dict()
     assert codec.dumps(direct.book) == codec.dumps(remote.book)
     with zipfile.ZipFile(tmp_path / 'direct.epub') as a, zipfile.ZipFile(tmp_path / 'remote.epub') as b:
         assert set(a.namelist()) == set(b.namelist())

@@ -40,7 +40,7 @@ from .helper import check_valid_domain, send_test_mail, reset_password, generate
 from .embed_helper import get_calibre_binarypath
 from .gdriveutils import is_gdrive_ready, gdrive_support
 from .render_template import render_title_template, get_sidebar_config
-from .services import file_lock
+from .services import file_lock, koreader_pairing
 from .services.worker import WorkerThread
 from .services.kobo_import import (
     KoboContentDatabaseError,
@@ -3238,6 +3238,11 @@ def _delete_user(content):
             ub.session.query(ub.User).filter(ub.User.id == content.id).delete()
             ub.session.query(ub.RemoteAuthToken).filter(ub.RemoteAuthToken.user_id == content.id).delete()
             ub.session.query(ub.User_Sessions).filter(ub.User_Sessions.user_id == content.id).delete()
+            # Credentials go with the account: its app passwords and any
+            # e-reader pairing it answered.
+            ub.session.query(ub.UserAppPassword).filter(
+                ub.UserAppPassword.user_id == content.id).delete()
+            koreader_pairing.forget_user(content.id)
             ub.session_commit()
             log.info("User {} deleted".format(content.name))
             return _("User '%(nick)s' deleted", nick=content.name)

@@ -115,6 +115,72 @@ class LibraryWorld:
         self.session.close()
         self.engine.dispose()
 
+    # -- the website half ---------------------------------------------------
+
+    def enable_web(self, *, rate_limits=False, spa_available=True):
+        """Add the website: api_v1 and spa blueprints with real session login.
+
+        Call before the first request. ``browser(name)`` then returns a client
+        signed in as that account through the production login manager.
+        """
+        from cps import config, limiter
+        from cps.MyLoginManager import MyLoginManager
+        from cps.api import api_v1
+        from cps.cw_login import login_user
+        from cps.spa import spa
+        import cps.api.auth as api_auth
+        import cps.api.koreader_devices as koreader_devices
+        from cps.progress_syncing.protocols import kosync_pairing
+
+        self.monkeypatch.setattr(config, "config_anonbrowse", 0, raising=False)
+        self.monkeypatch.setattr(koreader_devices, "is_koreader_sync_enabled", lambda: True)
+        self.monkeypatch.setattr(api_auth, "is_koreader_sync_enabled", lambda: True)
+        self.monkeypatch.setattr(kosync_pairing.spa, "spa_available", lambda: spa_available)
+        self.app.config.update(WTF_CSRF_ENABLED=False, RATELIMIT_ENABLED=rate_limits,
+                               RATELIMIT_STORAGE_URI="memory://")
+        limiter.init_app(self.app)
+        if rate_limits:
+            limiter.reset()
+        manager = MyLoginManager(self.app)
+        manager.anonymous_user = ub.Anonymous
+        ub.create_anonymous_user(self.session)  # the Guest row ub.Anonymous reads
+
+        @manager.user_loader
+        def _load_user(user_id, _random, _session_key):
+            return self.session.get(ub.User, int(user_id))
+
+        @self.app.route("/test/login/<name>", methods=["POST"])
+        def _test_login(name):
+            login_user(self.session.query(ub.User).filter(ub.User.name == name).one())
+            return "signed in"
+
+        self.app.register_blueprint(api_v1)
+        self.app.register_blueprint(spa)
+
+    def browser(self, name=None):
+        """A test client, signed in as ``name`` when given."""
+        client = self.app.test_client()
+        if name is not None:
+            assert client.post("/test/login/%s" % name).status_code == 200
+        return client
+
+    def sync_switch(self, enabled):
+        """The admin's KOReader sync switch, as every KOReader route reads it."""
+        import cps.api.auth as api_auth
+        import cps.api.koreader_devices as koreader_devices
+        for module in (self.kosync, koreader_devices, api_auth):
+            self.monkeypatch.setattr(module, "is_koreader_sync_enabled", lambda: enabled)
+
+    def freeze_pairing_clock(self, start=NOW):
+        """Drive the pairing service's clock by hand: ``advance(seconds)``."""
+        from cps.services import koreader_pairing
+        self.pairing_now = start
+        self.monkeypatch.setattr(koreader_pairing, "utcnow", lambda: self.pairing_now)
+
+    def advance(self, seconds):
+        from datetime import timedelta
+        self.pairing_now = self.pairing_now + timedelta(seconds=seconds)
+
     # -- accounts -----------------------------------------------------------
 
     def add_user(self, name, *, password="secret", download=True, shelf_only=False,

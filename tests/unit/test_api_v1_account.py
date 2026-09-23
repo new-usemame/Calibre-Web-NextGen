@@ -156,29 +156,25 @@ def test_create_app_password_empty_label_400():
 
 
 @pytest.mark.unit
-def test_create_app_password_returns_token_once():
-    from cps.api import account as mod
-    mock_ub = MagicMock()
-    created = {}
-
-    class _Row:
-        def __init__(self, **kw):
-            self.id = 9
-            self.created_at = None
-            self.__dict__.update(kw)
-            created.update(kw)
-    mock_ub.UserAppPassword = _Row
-    with _ctx("/api/v1/account/app-passwords", body={"label": "KOReader"}):
-        with patch.object(mod, "current_user", _user(id=1)), \
-             patch.object(mod, "ub", mock_ub), \
-             patch.object(mod, "generate_password_hash", side_effect=lambda p: "H:" + p):
-            resp = inspect.unwrap(mod.create_app_password)()
-    body = json.loads(resp[0].get_data())
-    assert resp[1] == 201
-    assert body["label"] == "KOReader"
-    assert len(body["token"]) > 20            # cleartext returned once
-    assert created["password_hash"].startswith("H:")  # only the hash is stored
-    mock_ub.session.add.assert_called_once()
+def test_create_app_password_returns_a_working_token_once(monkeypatch, tmp_path):
+    """The token signs in where app passwords are accepted; app.db keeps only its hash."""
+    from cps import ub
+    from tests.unit.koreader_library_world import LibraryWorld
+    world = LibraryWorld(monkeypatch, tmp_path)
+    world.enable_web()
+    try:
+        world.add_user("alice")
+        created = world.browser("alice").post("/api/v1/account/app-passwords",
+                                              json={"label": "KOReader"})
+        assert created.status_code == 201
+        body = created.get_json()
+        assert body["label"] == "KOReader"
+        assert world.client.get("/kosync/users/auth",
+                                headers=world.basic("alice", body["token"])).status_code == 200
+        row = world.session.query(ub.UserAppPassword).one()
+        assert body["token"] not in (row.password_hash, row.label)
+    finally:
+        world.close()
 
 
 @pytest.mark.unit

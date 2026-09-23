@@ -8,8 +8,6 @@ rules can't drift. Unlike the legacy form, the password change requires the
 current password (defence against a hijacked session silently changing it) —
 flag for /security-review before this branch merges.
 """
-import secrets
-
 from flask import jsonify, request
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -20,6 +18,7 @@ from ..cw_babel import sanitize_locale_for_write, effective_locale
 from .options import locale_options, book_language_options
 from ..helper import valid_password, valid_email, check_email
 from ..kobo_sync_status import needs_shelf_reconciliation, reconcile_shelves_safely
+from ..services import app_passwords
 from ..ui_themes import ALLOWED_THEME_SLUGS, theme_slug, theme_code
 from ..user_preferences import (NAMED_BOOLEAN_PREFERENCE_PATHS,
                                 serialize_named_preferences,
@@ -285,10 +284,7 @@ def create_app_password():
     label = (data.get("label") or "").strip()
     if not label or len(label) > 64:
         return _err("invalid_request", "Label must be 1-64 characters", 400)
-    cleartext = secrets.token_urlsafe(32)
-    row = ub.UserAppPassword(user_id=current_user.id, label=label,
-                             password_hash=generate_password_hash(cleartext))
-    ub.session.add(row)
+    row, cleartext = app_passwords.mint(current_user.id, label)
     try:
         ub.session.commit()
     except Exception as ex:

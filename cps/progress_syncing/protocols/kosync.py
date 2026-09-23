@@ -2214,3 +2214,6 @@ from . import koreader_annotations  # noqa: E402,F401
 # The KOReader library (manifest, placeholders, book files, read status).
 # Imported at the bottom for the same reason as the annotation routes above.
 from . import kosync_library  # noqa: E402,F401
+
+# Connecting a device with a code (pairing). Same reason again.
+from . import kosync_pairing  # noqa: E402,F401

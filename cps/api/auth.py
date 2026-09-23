@@ -13,6 +13,7 @@ from . import api_v1
 from .serializers import serialize_user
 from .. import ub, config, constants, limiter, services, logger
 from ..config_sql import uploads_enabled
+from ..progress_syncing.settings import is_koreader_sync_enabled
 from ..cw_login import current_user, login_user
 from ..logout import cleanup_local_logout
 from ..ui_themes import config_theme_code
@@ -188,6 +189,9 @@ def _server_features():
         "public_registration": bool(getattr(config, "config_public_reg", False)),
         "anon_browse": bool(getattr(config, "config_anonbrowse", False)),
         "kobo_sync": bool(getattr(config, "config_kobo_sync", False)),
+        # The admin's KOReader sync switch (CWA settings). Pairing a KOReader
+        # by code and the ready-made plugin download both follow it.
+        "koreader_sync": is_koreader_sync_enabled(),
         # Smart shelves only reach a Kobo when the admin has turned the
         # magic-shelf half of Kobo sync on (cps/kobo.py gates the whole
         # collection materialisation on it). Surfaced so the SPA can hide a

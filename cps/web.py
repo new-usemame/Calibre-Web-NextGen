@@ -36,7 +36,7 @@ from . import constants, logger, isoLanguages, services, helper, spa, oauth_auto
 from . import db, ub, config, app, user_library
 from . import calibre_db, kobo_sync_status
 from .services.ereader_send import send_includes_own_address
-from .services import reading_position
+from .services import app_passwords, reading_position
 from .search import render_search_results, render_adv_search_results
 from .gdriveutils import getFileFromEbooksFolder, do_gdrive_download
 from .helper import check_valid_domain, check_email, check_username, \
@@ -3651,8 +3651,6 @@ def profile():
 # prefer not to expose their directory password. Cleartext shown once at create time via
 # Flask flash; only the werkzeug hash is persisted. See `notes/oauth-opds-app-passwords-DESIGN.md`.
 
-import secrets as _secrets
-
 
 @web.route("/me/app-passwords", methods=["POST"])
 @user_login_required
@@ -3663,13 +3661,7 @@ def app_password_create():
         return redirect(url_for("web.profile"))
     if current_user.role_anonymous():
         abort(403)
-    cleartext = _secrets.token_urlsafe(32)
-    row = ub.UserAppPassword(
-        user_id=current_user.id,
-        label=label,
-        password_hash=generate_password_hash(cleartext),
-    )
-    ub.session.add(row)
+    _row, cleartext = app_passwords.mint(current_user.id, label)
     ub.session.commit()
     # Cleartext shown inline on the profile page (fork issue #223). Survives
     # reloads of /me; cleared on navigation to any other route by the

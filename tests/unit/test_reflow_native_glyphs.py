@@ -140,3 +140,30 @@ def test_unmapped_raised_marker_preserves_position_without_guessing_digits():
     html=build_epub._runs_html(runs,set(),{})
     assert '<sup><a class="source-glyph"' in html
     assert 'Ą•' not in html and '>24<' not in html
+
+
+@pytest.mark.parametrize('boundary', ['joined', 'space', 'column', 'raised'])
+def test_invalid_word_crosses_only_adjacent_same_line_font_spans(boundary):
+    from cps.services.reflow.native_text import mark_unmapped_words
+    first='Before Re' + (' ' if boundary=='space' else '')
+    left=extract.Span(first,10,'Latin',0,(0,0,len(first)*5,10),
+        char_boxes=tuple((i,i+1,i*5,0,(i+1)*5,10) for i in range(len(first))))
+    x=45 if boundary in ('joined','raised') else 50 if boundary=='space' else 75
+    y=-5 if boundary=='raised' else 0
+    right=extract.Span('ăase:',10,'BrokenMapped',0,(x,y,x+25,y+10),
+        char_boxes=tuple((i,i+1,x+i*5,y,x+(i+1)*5,y+10) for i in range(5)))
+    trace=[{'font':'BrokenMapped','chars':[(0xfffd,103,(x,y+8),(x,y,x+5,y+10))]}]
+    result=mark_unmapped_words([left,right],trace)
+    affected=[s.text for s in result if s.encoding_unresolved]
+    assert affected==(['Reăase:'] if boundary=='joined' else ['ăase:'])
+    assert ''.join(s.text for s in result)==first+'ăase:'
+    if boundary=='joined':
+        assert ''.join(s.text for s in result if not s.encoding_unresolved)=='Before '
+
+
+def test_whitespace_between_unmapped_words_remains_real_spacing():
+    from cps.services.reflow.native_text import mark_unmapped_words
+    span=extract.Span('AB CD',10,'LegacyGreek',0,(0,0,25,10),encoding_unresolved=True,
+        char_boxes=tuple((i,i+1,i*5,0,(i+1)*5,10) for i in range(5)))
+    result=mark_unmapped_words([span],[])
+    assert [(s.text,s.encoding_unresolved) for s in result]==[('AB',True),(' ',False),('CD',True)]

@@ -38,7 +38,7 @@ def mark_unmapped_words(spans, traces):
            if trace.get('type') != 3 and trace.get('opacity', 1) != 0
            for char in trace.get('chars', ()) if char[0] == 0xfffd]
     if not bad:
-        return spans
+        return _whole_source_words(spans)
     result = []
     for span in spans:
         points = [((box[0]+box[2])/2, (box[1]+box[3])/2)
@@ -62,6 +62,63 @@ def mark_unmapped_words(spans, traces):
             result.append(replace(span, text=token.group(), bbox=box,
                 encoding_unresolved=uncertain,
                 char_boxes=tuple((c[0]-token.start(), c[1]-token.start(), *c[2:]) for c in chars)))
+    return _whole_source_words(result)
+
+
+def _whole_source_words(spans):
+    """Join an unresolved word across native font/style span boundaries.
+
+    Whitespace, a column-sized gap, or a different baseline ends the unit. No
+    word spelling or intended Unicode character participates in this proof.
+    """
+    if not any(span.encoding_unresolved for span in spans):
+        return spans
+    pieces = []
+    for span in spans:
+        if not span.char_boxes:
+            pieces.append(span)
+            continue
+        for token in re.finditer(r'\S+|\s+', span.text):
+            chars = [c for c in span.char_boxes if c[0] >= token.start() and c[1] <= token.end()]
+            if not chars:
+                pieces.append(replace(span, text=token.group(),
+                    encoding_unresolved=span.encoding_unresolved and bool(token.group().strip())))
+                continue
+            box = (min(c[2] for c in chars), min(c[3] for c in chars),
+                   max(c[4] for c in chars), max(c[5] for c in chars))
+            pieces.append(replace(span, text=token.group(), bbox=box,
+                encoding_unresolved=span.encoding_unresolved and bool(token.group().strip()),
+                char_boxes=tuple((c[0]-token.start(), c[1]-token.start(), *c[2:]) for c in chars)))
+    result, group = [], []
+
+    def flush():
+        if len(group) < 2 or not any(s.encoding_unresolved for s in group):
+            result.extend(group)
+            return
+        box = (min(s.bbox[0] for s in group), min(s.bbox[1] for s in group),
+               max(s.bbox[2] for s in group), max(s.bbox[3] for s in group))
+        offsets, chars, flags = 0, [], group[0].flags
+        for span in group:
+            chars.extend((c[0]+offsets, c[1]+offsets, *c[2:]) for c in span.char_boxes)
+            offsets += len(span.text)
+            flags &= span.flags
+        result.append(replace(group[0], text=''.join(s.text for s in group), bbox=box,
+            font=group[0].font if len({s.font for s in group}) == 1 else 'mixed-native-fonts',
+            flags=flags, encoding_unresolved=True, char_boxes=tuple(chars)))
+
+    for piece in pieces:
+        if group:
+            previous = group[-1]
+            em = min(previous.size, piece.size)
+            adjacent = (em > 0 and not any(c.isspace() for c in previous.text+piece.text)
+                and -.15*em <= piece.bbox[0]-previous.bbox[2] <= .25*em
+                and abs(piece.bbox[3]-previous.bbox[3]) <= .2*em
+                and abs(piece.size-previous.size) <= .15*em)
+            if not adjacent:
+                flush()
+                group = []
+        group.append(piece)
+    flush()
     return result
 
 

@@ -61,6 +61,13 @@ local function testStatusIsSentOnlyWhenItSaysSomethingNew()
     assertEqual(Pending.statusToSend("new", "finished"), "unread", "resetting a finished book")
 end
 
+local function testMovedMeansAwayFromWhereTheBookOpened()
+    assertEqual(Pending.movedSince("/body/p[1]", "/body/p[1]"), false, "opened and closed where it opened")
+    assertEqual(Pending.movedSince("/body/p[1]", "/body/p[9]"), true, "read on")
+    assertEqual(Pending.movedSince("12", 12), false, "a page number is the same page as its text")
+    assertEqual(Pending.movedSince(nil, "/body/p[1]"), true, "no starting point: assume reading")
+end
+
 local function testOpeningABookWithoutReadingSendsNoPosition()
     assertEqual(Pending.trimUnmoved({ document = "d1", percentage = 0, progress = "p1",
         status = "reading" }, false), nil, "opened and closed: nothing to say")
@@ -85,6 +92,7 @@ local function testOpeningABookWithoutReadingSendsNoPosition()
     assertEqual(queue.d1.status, "finished", "and the new status added")
 end
 
+testMovedMeansAwayFromWhereTheBookOpened()
 testOpeningABookWithoutReadingSendsNoPosition()
 testLatestCaptureWinsAndALateDeliveryCannotDropIt()
 testUnsentStatusAndHighlightsSurviveALaterPositionOnlyCapture()

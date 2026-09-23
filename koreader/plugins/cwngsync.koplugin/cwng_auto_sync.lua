@@ -109,7 +109,7 @@ function AutoSync:captureOpenBook(with_annotations, explicit)
         status = Pending.statusToSend(summary.status,
             doc_settings and doc_settings:readSetting(PUSHED_STATUS_KEY)),
     }
-    entry = Pending.trimUnmoved(entry, explicit or self.position_moved == true)
+    entry = Pending.trimUnmoved(entry, explicit or Pending.movedSince(self.opened_progress, progress))
     if not entry then return nil end
     if with_annotations and self.settings.sync_annotations then
         local DeviceAnnotations = require("device_annotations")
@@ -124,6 +124,14 @@ function AutoSync:captureOpenBook(with_annotations, explicit)
     end
     if entry.percentage == nil and entry.status == nil and entry.annotations == nil then return nil end
     return entry
+end
+
+-- Where the book stands now, as the point a later capture is compared with
+-- to tell whether the reader moved. Called when the book is ready and after
+-- a position from another device is applied.
+function AutoSync:recordOpenedPosition()
+    local ok, progress = pcall(self.getLastProgress, self)
+    self.opened_progress = (ok and progress ~= nil) and tostring(progress) or nil
 end
 
 -- Queue what the open book owes and deliver it if the device is online.

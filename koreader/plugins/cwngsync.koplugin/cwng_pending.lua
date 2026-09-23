@@ -47,6 +47,16 @@ end
 -- without a page turned says nothing about the position (sending "page 1"
 -- would pull every other device back to the start), and "reading" is the tag
 -- KOReader puts on any book it opens. Returns nil when nothing is left.
+-- Whether the reader moved in the book since it opened (or since a position
+-- from another device was applied): the position now against the one then.
+-- Page events are no guide, KOReader sends them while a book loads and when
+-- a pulled position is applied. With no starting point recorded, assume they
+-- did: losing reading is worse than resending it.
+function Pending.movedSince(baseline, progress)
+    if baseline == nil then return true end
+    return tostring(progress) ~= baseline
+end
+
 function Pending.trimUnmoved(entry, moved)
     if moved then return entry end
     entry.progress, entry.percentage = nil, nil

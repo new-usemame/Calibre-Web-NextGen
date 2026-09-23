@@ -154,3 +154,67 @@ def test_upgrade_waits_for_uninstrumented_paid_worker_to_finish(tmp_path):
     assert store(tmp_path).status()['status']=='unavailable'
     with p.open('a') as f:f.write(json.dumps(dict(kind='job',event='finish',status='interrupted',ts=99950))+'\n')
     assert store(tmp_path).status()['status']=='available'
+
+@pytest.mark.parametrize('mirror_start',[False,True])
+def test_missing_shared_database_cannot_forget_pre_mirror_paid_liability(tmp_path,mirror_start):
+    from cps.services.reflow.shared_budget import BudgetError
+    led=ledger(tmp_path,'a')
+    if mirror_start:led.record(dict(kind='job',event='start',cap_usd=1),durable=True)
+    led.store.reserve('before-mirror',.8,job='a',book='a',user='a',context={},ledger=led.path)
+    led.store.path.replace(tmp_path/'preserved.sqlite3')
+    with pytest.raises(BudgetError):store(tmp_path).reserve('new',.5,job='b',book='b',user='b',context={})
+    assert store(tmp_path).status()['status']=='unavailable'
+    assert not led.store.path.exists()  # never silently create empty replacement
+
+
+def test_older_valid_same_identity_database_cannot_rollback_pending_liability(tmp_path):
+    import shutil
+    from cps.services.reflow.shared_budget import BudgetError
+    s=store(tmp_path);s.reserve('settled',.2,job='a',book='a',user='a',context={});s.finish('settled',.2)
+    shutil.copyfile(s.path,tmp_path/'older.sqlite3')
+    s.reserve('pre-mirror',.7,job='a',book='a',user='a',context={})
+    (tmp_path/'older.sqlite3').replace(s.path)
+    with pytest.raises(BudgetError):store(tmp_path).reserve('new',.7,job='b',book='b',user='b',context={})
+    assert store(tmp_path).status()['status']=='unavailable'
+
+
+def _crash_at_witness_boundary(root,phase):
+    import os
+    from pathlib import Path
+    s=store(Path(root));original=s._write_witness
+    def write(witness):
+        if phase=='genesis_before_ready' and witness['state']=='ready':os._exit(73)
+        original(witness)
+        if phase=='initial_witness' and witness['state']=='initializing':os._exit(73)
+        if phase=='intent_before_commit' and witness['generation']==1:os._exit(73)
+    s._write_witness=write
+    checkpoint=s._checkpoint
+    def committed(db,witness):
+        checkpoint(db,witness)
+        if phase=='committed_before_mirror':os._exit(73)
+    s._checkpoint=committed
+    s.reserve('crashed',.8,job='a',book='a',user='a',context={})
+    os._exit(99)
+
+
+@pytest.mark.parametrize('phase',['initial_witness','genesis_before_ready','intent_before_commit','committed_before_mirror'])
+def test_actual_process_death_at_witness_boundaries_never_restores_empty_allowance(tmp_path,phase):
+    from cps.services.reflow.shared_budget import BudgetError
+    worker=multiprocessing.get_context('spawn').Process(target=_crash_at_witness_boundary,args=(str(tmp_path),phase))
+    worker.start();worker.join(timeout=15);assert worker.exitcode==73
+    s=store(tmp_path)
+    with pytest.raises(BudgetError):s.reserve('next',.5,job='b',book='b',user='b',context={})
+    status=s.status()
+    if phase=='committed_before_mirror':assert status['remaining_usd']==pytest.approx(.2)
+    else:assert status['status']=='unavailable'
+
+
+def test_missing_witness_or_valid_foreign_store_is_not_automatically_adopted(tmp_path):
+    import shutil
+    root=tmp_path/'own';s=store(root);s.reserve('held',.8,job='a',book='a',user='a',context={})
+    witness=s.witness.read_bytes();s.witness.unlink()
+    assert s.status()['status']=='unavailable'
+    s.witness.write_bytes(witness)
+    other=store(tmp_path/'other');assert other.status()['status']=='available'
+    shutil.copyfile(other.path,s.path)
+    assert s.status()['status']=='unavailable'

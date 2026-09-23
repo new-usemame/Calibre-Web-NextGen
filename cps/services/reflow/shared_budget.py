@@ -5,11 +5,13 @@ SQLite contains one state row per attempt, not an ever-growing event replay.
 Expired settlements remain compact idempotency tombstones; unresolved bounds
 never expire. Job JSONL remains the user-facing evidence, not the shared lock.
 """
+import fcntl
 import hashlib
 import json
 import math
 import os
 import sqlite3
+import tempfile
 import time
 import uuid
 from contextlib import contextmanager
@@ -39,6 +41,8 @@ class Store:
     def __init__(self, root, budget, clock=time.time):
         self.root = Path(root)
         self.path = self.root / 'financial-admission.sqlite3'
+        self.witness = self.root / 'financial-admission.witness.json'
+        self.lock_path = self.root / 'financial-admission.lock'
         self.budget = budget
         self.clock = clock
 
@@ -47,14 +51,84 @@ class Store:
         if cap <= 0:raise BudgetError()
         return cap
 
+    def _sync_directory(self):
+        fd = os.open(str(self.root), os.O_RDONLY)
+        try:os.fsync(fd)
+        finally:os.close(fd)
+
+    def _write_witness(self, witness):
+        """Publish a durable intent before SQLite may acknowledge its commit."""
+        fd, temporary = tempfile.mkstemp(prefix='.financial-witness-', dir=self.root)
+        try:
+            with os.fdopen(fd, 'w') as handle:
+                json.dump(witness, handle, sort_keys=True, allow_nan=False)
+                handle.flush();os.fsync(handle.fileno())
+            os.replace(temporary, self.witness)
+            self._sync_directory()
+        finally:
+            if os.path.exists(temporary):os.unlink(temporary)
+
     @contextmanager
-    def _locked(self):
-        db = None
+    def _guard(self):
+        """Serialize initialization and witness/SQLite transitions together.
+
+        Missing, replaced, or rolled-back SQLite cannot silently become a fresh
+        store. An interrupted first initialization is unavailable, never reset.
+        """
         try:
             self.root.mkdir(parents=True, exist_ok=True)
-            db = sqlite3.connect(str(self.path), timeout=30, isolation_level=None)
+            with open(self.lock_path, 'a+b') as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX)
+                if not self.witness.exists():
+                    if self.path.exists():raise BudgetError()
+                    witness = dict(version=1, identity=uuid.uuid4().hex, generation=0, state='initializing')
+                    self._write_witness(witness)
+                    with sqlite3.connect(str(self.path)) as genesis:
+                        genesis.execute('PRAGMA synchronous=FULL')
+                        genesis.execute('CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
+                        genesis.executemany('INSERT INTO meta VALUES (?,?)',
+                            [('store_identity', witness['identity']), ('generation', '0')])
+                    self._sync_directory()
+                    witness['state']='ready';self._write_witness(witness)
+                else:
+                    if self.witness.stat().st_size>4096:raise BudgetError()
+                    witness=json.loads(self.witness.read_text())
+                if (not isinstance(witness,dict) or set(witness)!={'version','identity','generation','state'} or
+                    witness['version']!=1 or witness['state']!='ready' or
+                    not isinstance(witness['identity'],str) or len(witness['identity'])!=32 or
+                    any(c not in '0123456789abcdef' for c in witness['identity']) or
+                    type(witness['generation']) is not int or witness['generation']<0 or
+                    not self.path.is_file()):raise BudgetError()
+                yield witness
+        except (OSError, ValueError, TypeError, KeyError, sqlite3.Error):
+            raise BudgetError() from None
+
+    def _checkpoint(self, db, witness):
+        following=dict(witness,generation=witness['generation']+1)
+        db.execute("UPDATE meta SET value=? WHERE key='generation'",(str(following['generation']),))
+        self._write_witness(following)
+        # A crash before this commit leaves a generation mismatch: conservative
+        # unavailability is preferable to losing a pre-mirror paid reservation.
+        db.commit()
+        self._sync_directory()
+
+    @contextmanager
+    def _locked(self):
+        with self._guard() as witness:
+            with self._transaction(witness) as transaction:
+                yield transaction
+
+    @contextmanager
+    def _transaction(self, witness):
+        db = None;validated = False
+        try:
+            db = sqlite3.connect(self.path.resolve().as_uri()+'?mode=rw', uri=True, timeout=30, isolation_level=None)
             db.execute('PRAGMA synchronous=FULL')
             db.execute('BEGIN IMMEDIATE')
+            identity = dict(db.execute("SELECT key,value FROM meta WHERE key IN ('store_identity','generation')"))
+            if identity != {'store_identity': witness['identity'], 'generation': str(witness['generation'])}:
+                raise BudgetError()
+            validated = True
             db.execute('CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)')
             db.execute("""CREATE TABLE IF NOT EXISTS attempts (id TEXT PRIMARY KEY, state TEXT NOT NULL CHECK(state IN ('pending','settled','released')), bound TEXT NOT NULL, cost TEXT, created REAL NOT NULL CHECK(created>=0 AND created<1e20), settled REAL, identity TEXT NOT NULL, CHECK((state='pending' AND cost IS NULL AND settled IS NULL) OR (state!='pending' AND cost IS NOT NULL AND settled>=0 AND settled<1e20)))""")
             db.execute('CREATE INDEX IF NOT EXISTS liability_window ON attempts(state,settled)')
@@ -70,12 +144,9 @@ class Store:
             # Settled rows remain compact idempotency tombstones; the indexed
             # accounting query touches only pending and the active24h window.
             yield db, now
-            db.commit()
-            fd = os.open(str(self.root), os.O_RDONLY)
-            try:os.fsync(fd)
-            finally:os.close(fd)
+            self._checkpoint(db, witness)
         except BudgetError:
-            if db:db.commit()  # preserve a conflict marker or imported liability
+            if db and validated:self._checkpoint(db, witness)
             raise
         except (OSError, ValueError, TypeError, KeyError, sqlite3.Error, OverflowError):
             if db:db.rollback()

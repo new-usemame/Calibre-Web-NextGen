@@ -16,11 +16,19 @@ def test_legal_owned_quote_still_needs_shared_capacity(mod,monkeypatch,pdf_on_di
     assert _status(response)==202 and added.called
 
 
-def test_corrupt_shared_state_does_not_break_free_estimate_or_settings(mod,monkeypatch,pdf_on_disk):
+@pytest.mark.parametrize('damage',['corrupt','missing','rollback'])
+def test_corrupt_shared_state_does_not_break_free_estimate_or_settings(mod,monkeypatch,pdf_on_disk,damage):
     from pathlib import Path
     _wire(mod,monkeypatch,pdf_on_disk);_paid(mod,monkeypatch)
     monkeypatch.setattr(mod.config,'config_reflow_instance_budget_usd',1,raising=False)
-    p=Path(mod.REFLOW_DIR)/'financial-admission.sqlite3';p.parent.mkdir(parents=True,exist_ok=True);p.write_text('broken financial evidence')
+    import shutil
+    shared=mod.tasks_reflow.instance_budget_store()
+    assert shared.status()['status']=='available'
+    p=shared.path;shutil.copyfile(p,p.with_suffix('.old'))
+    shared.reserve('global-only',.8,job='a',book='a',user='a',context={})
+    if damage=='corrupt':p.write_text('broken financial evidence')
+    elif damage=='missing':p.unlink()
+    else:p.with_suffix('.old').replace(p)
     with _ctx('/api/v1/books/5/reflow/estimate'),patch.object(mod,'current_user',_user()):
         response=inspect.unwrap(mod.reflow_estimate)(5)
     assert _json(response)['instance_budget']==dict(status='unavailable',remaining_usd=None,window_hours=24)

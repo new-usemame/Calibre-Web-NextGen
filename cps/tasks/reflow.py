@@ -34,7 +34,7 @@ from cps.constants import REFLOW_DIR
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED, \
     STAT_STARTED, STAT_WAITING
 from cps.services.reflow import admission, build_epub, extract, ledger as ledger_mod, \
-    model, ocr, pipeline, publication, report, retention, structural_pipeline, typed_model, shared_budget
+    model, ocr, pipeline, publication, report, retention, structural_pipeline, typed_model, shared_budget, operation_audit
 
 log = logger.create()
 
@@ -400,6 +400,8 @@ class TaskReflowPdf(CalibreTask):
         candidate=os.path.join(staging,'candidate.epub')
         publication_prepared=False
         try:
+            audit_rows,audit_matching=operation_audit.capture(result,self.book_id)
+            operation_audit.record(ledger,'validated',operations=audit_rows)
             built = build_epub.build(result.book, candidate, page_html=result.page_html,
                                      metadata=_metadata(book), doc=document,
                                      report_html=page,
@@ -437,6 +439,7 @@ class TaskReflowPdf(CalibreTask):
             with open(built.path,'rb') as handle:
                 for chunk in iter(lambda:handle.read(1024*1024),b''):digest.update(chunk)
             artifact={'sha256':digest.hexdigest(),'bytes':os.path.getsize(built.path)}
+            operation_audit.record(ledger,'emitted',operations=operation_audit.observe(built.path,audit_rows,audit_matching),**artifact)
             if self.cancelled:
                 raise build_epub.BuildCancelled('cancelled before publication')
             if extract.document_fingerprint(self._pdf_path(local_db,book))!=result.fingerprint:
@@ -444,6 +447,7 @@ class TaskReflowPdf(CalibreTask):
             if self.options.mode == "sample":
                 os.replace(built.path,target)
                 ledger.record(dict(kind='artifact',**artifact))
+                operation_audit.record(ledger,'published',mode='sample',**artifact)
                 return dict(artifact,sample=os.path.basename(target),path=target,report=payload)
             with publication.lock(os.path.join(REFLOW_DIR,'publication-locks'),target):
                 if os.path.exists(target) and not self.options.replace_existing_epub:
@@ -467,6 +471,7 @@ class TaskReflowPdf(CalibreTask):
                     raise
                 publication.reconcile(ledger,config.get_book_path(),record,
                     _format_state(local_db,self.book_id),book.path,self._pdf_path(local_db,book))
+                operation_audit.record(ledger,'published',mode='full',**artifact)
                 return dict(artifact,path=target,report=payload)
         finally:
             # A prepared publication owns durable recovery evidence. Never destroy

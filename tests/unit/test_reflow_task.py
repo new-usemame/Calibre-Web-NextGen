@@ -237,6 +237,9 @@ def test_a_conversion_with_rejected_model_answers_does_not_say_it_finished(rig, 
     assert row['structural']['rejected']>0
     assert row['structural']['approved_operations']==0
     assert row['status']=='incomplete'
+    audit=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),1).entries('operation_audit')
+    assert [e['event'] for e in audit]==['validated','emitted','published']
+    assert audit[0]['operations']==audit[1]['operations']==[]
 
 
 def test_a_finished_conversion_releases_the_books_reservation(rig):
@@ -679,20 +682,26 @@ def test_actual_task_quality_gate_prevents_both_typed_stages_with_configured_key
     assert task.results['report']['spend']['usd']==0
 
 
-@pytest.mark.parametrize('decision',['decline','approve','stale'])
+@pytest.mark.parametrize('decision',['decline','approve','stale','audit_failure','partial'])
 def test_actual_task_records_two_stage_decision_and_only_builds_approved_subset(rig,monkeypatch,decision):
-    approve=decision=='approve'
+    approve=decision in ('approve','audit_failure','partial')
     import json,zipfile
     from tests.unit.test_reflow_typed_transport import Session,reply
     doc=F.new_doc();page=doc.new_page(width=500,height=700)
     page.insert_text((80,100),'"Original displayed words remain exactly as printed."',fontsize=12)
     for y in (180,195,210):page.insert_text((50,y),'Ordinary body context supports the source display.',fontsize=12)
+    if decision=='partial':
+        page=doc.new_page(width=500,height=700)
+        page.insert_text((80,100),'"Another displayed quotation remains complete on its source page."',fontsize=12)
+        for y in (180,195,210):page.insert_text((50,y),'Ordinary context also supports this displayed source.',fontsize=12)
     doc.save(str(rig.folder/'Book - Author.pdf'));doc.close()
     class Answering:
         def __init__(self):self.calls=[]
         def get(self,url,**kw):return Session().get(url,**kw)
         def post(self,*args,**kwargs):
             payload=json.loads(kwargs['data']);self.calls.append(payload)
+            if decision=='partial' and len(self.calls)>2:
+                data=reply('invalid response');data['model']=payload['model'];return Session(data).post()
             body=json.loads(payload['messages'][1]['content'][1]['text'])
             response=body['empty_response'].copy()
             if payload['model'].endswith('luna'):
@@ -708,15 +717,23 @@ def test_actual_task_records_two_stage_decision_and_only_builds_approved_subset(
     monkeypatch.setattr(rig.mod.config,'resolved_openrouter_key',lambda:'inert-configured-key')
     monkeypatch.setattr(model_mod.requests,'get',session.get)
     monkeypatch.setattr(model_mod.requests,'post',session.post)
+    real_record=rig.mod.operation_audit.record
+    if decision=='audit_failure':
+        def fail(*args,**kwargs):raise OSError('private audit storage unavailable')
+        monkeypatch.setattr(rig.mod.operation_audit,'record',fail)
+        failed=_run(rig,mode='full',cost_cap_usd=1)
+        assert failed.stat==STAT_FAIL and len(session.calls)==2
+        assert not (rig.folder/'Book - Author.epub').exists()
+        monkeypatch.setattr(rig.mod.operation_audit,'record',real_record)
     task=_run(rig,mode='full',cost_cap_usd=1)
     assert task.stat==STAT_FINISH_SUCCESS,task.error
-    assert len(session.calls)==2
+    assert len(session.calls)==(3 if decision=='partial' else 2)
     payload=task.results['report']
     assert payload['structural']['proposed_operations']==1
     assert payload['structural']['approved_operations']==int(approve)
     assert payload['structural']['verifier_abstained']==int(decision=='decline')
-    assert payload['structural']['rejected']==int(decision=='stale')
-    assert payload['spend']['usd']==2*.000123456789
+    assert payload['structural']['rejected']==int(decision in ('stale','partial'))
+    assert payload['spend']['usd']==(0 if decision=='audit_failure' else (3 if decision=='partial' else 2)*.000123456789)
     row=_ledger_rows(rig)[0]
     assert row['spend_usd']==payload['spend']['usd']
     assert row['structural']['verifier_abstained']==int(decision=='decline')
@@ -726,6 +743,18 @@ def test_actual_task_records_two_stage_decision_and_only_builds_approved_subset(
     import hashlib
     assert task.results['sha256']==hashlib.sha256(open(task.results['path'],'rb').read()).hexdigest()
     assert rig.local_db.session.commits==1
+    audit=list(ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),1).entries('operation_audit'))
+    assert [e['event'] for e in audit]==['validated','emitted','published']
+    assert len(audit[0]['operations'])==int(approve)
+    assert len(audit[1]['operations'])==int(approve)
+    if approve:
+        operation=audit[0]['operations'][0]
+        assert operation['kind']=='quote' and operation['source_range'][0]==0
+        assert len(operation['selected_text_sha256'])==64
+        assert len(operation['requests'])==2
+        assert audit[1]['operations'][0]['status']=='verified'
+        assert audit[1]['operations'][0]['epub_entry'].startswith('OEBPS/ch')
+    assert audit[2]['sha256']==task.results['sha256']
 
 @pytest.mark.parametrize('failure',['validation','database','cancel'])
 @pytest.mark.parametrize('existing',[False,True])
@@ -752,6 +781,10 @@ def test_failed_publication_preserves_previous_file_and_no_partial_format(rig,mo
     assert target.read_bytes()==original if existing else not target.exists()
     assert not list(rig.folder.glob('.reflow-*'))
     assert _ledger_rows(rig)[0].get('artifact') is None
+    audit=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),1).entries('operation_audit')
+    assert audit[0]['event']=='validated'
+    assert not any(e['event']=='published' for e in audit)
+    assert any(e['event']=='emitted' for e in audit)==(failure!='validation')
 
 @pytest.mark.parametrize('existing',[False,True])
 def test_process_death_after_publication_restores_consistent_library(rig,monkeypatch,existing):

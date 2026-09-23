@@ -15,7 +15,10 @@ against, one entry per book:
   cached by path, size and modification time;
 * ``rev`` changes whenever what a placeholder shows (title, authors, series,
   cover) or the chosen file changes;
-* ``read_status`` and ``progress`` are the ones the website shows.
+* ``read_status`` and ``progress`` are the ones the website shows, and
+  ``last_read`` is when the reader last moved in the book on any device
+  (absent for a book never read);
+* ``author_sort`` is Calibre's sort form of the authors ("Pratchett, Terry").
 
 The manifest as a whole carries a ``revision`` that changes when anything a
 device acts on changes, so an unchanged library answers in one small response.
@@ -109,7 +112,7 @@ def _book_rows(cdb, ids):
     rows = {}
     for chunk in _chunks(ids):
         for row in (cdb.session.query(
-                db.Books.id, db.Books.title, db.Books.timestamp,
+                db.Books.id, db.Books.title, db.Books.author_sort, db.Books.timestamp,
                 db.Books.last_modified, db.Books.has_cover, db.Books.path,
                 db.Books.series_index)
                 .filter(db.Books.id.in_(chunk))):
@@ -225,6 +228,35 @@ def positions(user_id, ids, *, session=None):
         fraction = max(0.0, min(1.0, float(percent) / 100.0))
         found[book_id] = (round(fraction, 4), modified)
     return found
+
+
+def last_read_times(user_id, ids, bookmarks, *, session=None):
+    """``{book_id: datetime}``: when the reader last moved in each book.
+
+    The later of two clocks. ``bookmarks`` (from :func:`positions`) carries
+    the shared bookmark's time, which only moves forward: a turn-back leaves
+    it at the furthest place. The KOReader position carrier, keyed on the
+    book id, is written by KOReader, the Kobo mirror and the web reader alike,
+    and takes a device's own turn-back too.
+    """
+    from ..progress_syncing.models import KOSyncProgress
+
+    session = session or ub.session
+    latest = {book_id: _utc(modified)
+              for book_id, (_fraction, modified) in bookmarks.items()
+              if modified is not None}
+    for chunk in _chunks(ids):
+        for document, stamp in (
+                session.query(KOSyncProgress.document, KOSyncProgress.timestamp)
+                .filter(KOSyncProgress.user_id == int(user_id),
+                        KOSyncProgress.document.in_([str(book_id) for book_id in chunk]))):
+            stamp = _utc(stamp)
+            if stamp is None:
+                continue
+            book_id = int(document)
+            if latest.get(book_id) is None or stamp > latest[book_id]:
+                latest[book_id] = stamp
+    return latest
 
 
 def _magic_shelves_for_collections(user_id, session):
@@ -365,6 +397,7 @@ def _describe(ids, *, user, cdb, session, read_column, members):
     statuses = read_statuses(user, present, session=session, cdb=cdb,
                              read_column=read_column)
     where = positions(user.id, present, session=session)
+    last_read = last_read_times(user.id, present, where, session=session)
     entries = []
     paths = {}
     unsupported = 0
@@ -378,7 +411,7 @@ def _describe(ids, *, user, cdb, session, read_column, members):
         book_series = series.get(book_id)
         book_authors = authors.get(book_id, [])
         position = where.get(book_id)
-        entries.append({
+        entry = {
             "book_id": book_id,
             "title": row.title or "",
             "authors": book_authors,
@@ -395,8 +428,12 @@ def _describe(ids, *, user, cdb, session, read_column, members):
             "progress": position[0] if position else None,
             "shelves": list(members.get(book_id, ())),
             "added": iso_z(row.timestamp),
-            "last_read": iso_z(position[1]) if position else None,
-        })
+        }
+        if row.author_sort:
+            entry["author_sort"] = row.author_sort
+        if last_read.get(book_id) is not None:
+            entry["last_read"] = iso_z(last_read[book_id])
+        entries.append(entry)
         paths[book_id] = (row.path, chosen)
     return entries, paths, unsupported
 
@@ -407,7 +444,8 @@ def _revision(scope, scope_shelves, shelves, entries):
         "scope_shelves": scope_shelves,
         "shelves": shelves,
         "books": [[entry["book_id"], entry["rev"], entry["filename"],
-                   entry["read_status"], entry["progress"], entry["shelves"]]
+                   entry["read_status"], entry["progress"], entry["shelves"],
+                   entry.get("author_sort"), entry.get("last_read")]
                   for entry in entries],
     }, 24)
 

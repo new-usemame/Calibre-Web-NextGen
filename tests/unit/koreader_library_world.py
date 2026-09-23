@@ -214,10 +214,11 @@ class LibraryWorld:
         return self._authors[name]
 
     def add_book(self, book_id, title, *, authors=("Ann Author",), formats=("EPUB",),
-                 cover=True, series=None, series_index=1.0, tags=()):
+                 cover=True, series=None, series_index=1.0, tags=(), author_sort=None,
+                 cover_image=None):
         folder = "%s/%s (%d)" % (authors[0], title, book_id)
-        book = db.Books(title, title, authors[0], NOW, NOW, series_index, NOW,
-                        folder, 1 if cover else None, [], [])
+        book = db.Books(title, title, author_sort or authors[0], NOW, NOW, series_index,
+                        NOW, folder, 1 if cover else None, [], [])
         book.id = book_id
         book.uuid = "uuid-%d" % book_id
         for name in authors:
@@ -238,7 +239,7 @@ class LibraryWorld:
             (directory / ("%s.%s" % (stem, fmt.lower()))).write_bytes(payload)
             self.session.add(db.Data(book_id, fmt, len(payload), stem))
         if cover:
-            (directory / "cover.jpg").write_bytes(jpeg_bytes())
+            (directory / "cover.jpg").write_bytes(cover_image or jpeg_bytes())
         self.session.commit()
         return book
 
@@ -263,16 +264,36 @@ class LibraryWorld:
         return shelf
 
     def position(self, user, book_id, percent,
-                 status=ub.ReadBook.STATUS_IN_PROGRESS):
+                 status=ub.ReadBook.STATUS_IN_PROGRESS, at=None):
         """A synced reading position, shaped as every production writer
-        leaves it: the read-status row owning its reading-state graph."""
+        leaves it: the read-status row owning its reading-state graph.
+        ``at`` is when the bookmark last moved (now when omitted)."""
         row = ub.ReadBook(user_id=user.id, book_id=book_id, read_status=status,
                           times_started_reading=1)
         state = ub.KoboReadingState(user_id=user.id, book_id=book_id)
         state.current_bookmark = ub.KoboBookmark(progress_percent=percent)
+        if at is not None:
+            state.current_bookmark.last_modified = at
         state.statistics = ub.KoboStatistics()
         row.kobo_reading_state = state
         self.session.add(row)
+        self.session.commit()
+
+    def carrier_position(self, user, book_id, percent, at, device="Kindle Paperwhite"):
+        """The KOReader position carrier's row for a book, as KOReader, the
+        Kobo mirror and the web reader leave it: keyed on the book id."""
+        from cps.progress_syncing.models import KOSyncProgress
+        row = (self.session.query(KOSyncProgress)
+               .filter(KOSyncProgress.user_id == user.id,
+                       KOSyncProgress.document == str(book_id)).first())
+        if row is None:
+            row = KOSyncProgress(user_id=user.id, document=str(book_id),
+                                 progress="/body/DocFragment[3]/body/p[1]/text().0",
+                                 percentage=percent / 100.0, device=device,
+                                 device_id="kindle-1")
+            self.session.add(row)
+        row.percentage = percent / 100.0
+        row.timestamp = at
         self.session.commit()
 
     def read_row(self, user, book_id):

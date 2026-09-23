@@ -21,7 +21,11 @@ from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 MIMETYPE = "application/epub+zip"
 MARKER_PATH = "META-INF/cwng-placeholder.json"
+# A device downloads one placeholder per book in the library, so the cover is
+# kept to what an e-ink grid shows: about 600 pixels tall at JPEG quality 75,
+# typically 20-40 KB.
 COVER_MAX = (400, 600)
+COVER_QUALITY = 75
 _ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 
 _CONTAINER = """<?xml version="1.0" encoding="UTF-8"?>
@@ -130,7 +134,7 @@ def cover_jpeg(cover_path, title, authors):
     badge = _badge(diameter)
     image.paste(badge, (width - diameter - margin, height - diameter - margin), badge)
     output = io.BytesIO()
-    image.save(output, "JPEG", quality=82, optimize=True, progressive=False)
+    image.save(output, "JPEG", quality=COVER_QUALITY, optimize=True, progressive=False)
     return output.getvalue()
 
 

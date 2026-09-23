@@ -12,6 +12,7 @@ reader's library or rights is refused.
 import io
 import json
 import zipfile
+from datetime import datetime
 from urllib.parse import quote
 
 import pytest
@@ -50,7 +51,7 @@ def _books(world, user="reader"):
 def _standard_library(world):
     reader = world.add_user("reader", denied_tags="secret")
     world.add_book(1, "First Light", authors=("Ann Author", "Bo Second"),
-                   series="Dawn", series_index=2.0)
+                   series="Dawn", series_index=2.0, author_sort="Author, Ann & Second, Bo")
     world.add_book(2, "Paper Only", formats=("PDF",), cover=False)
     world.add_book(3, "Kindle Only", formats=("AZW3",))
     world.add_book(4, "Put Away")
@@ -83,10 +84,13 @@ def test_manifest_lists_the_ereader_scope_as_verifiable_files(world):
     assert first["size"] == path.stat().st_size
     assert first["checksum"] == calculate_koreader_partial_md5(str(path))
     assert first["authors"] == ["Ann Author", "Bo Second"]
+    # Calibre's own sort form, so the device's Authors view sorts by surname.
+    assert first["author_sort"] == "Author, Ann & Second, Bo"
     assert (first["series"], first["series_index"]) == ("Dawn", 2.0)
     assert first["added"] == "2026-09-01T12:00:00Z"
-    assert (first["read_status"], first["progress"], first["last_read"]) == (
-        "unread", None, None)
+    assert (first["read_status"], first["progress"]) == ("unread", None)
+    # Never read anywhere: no reading time at all, rather than a made-up one.
+    assert "last_read" not in first
     assert books[2]["filename"] == "Paper Only - Ann Author [2].pdf"
     assert books[2]["series"] is None and books[2]["series_index"] is None
 
@@ -114,6 +118,39 @@ def test_manifest_carries_the_readers_status_position_and_shelves(world):
     assert books[1]["shelves"] == ["shelf-beach"]
     assert books[2]["shelves"] == ["shelf-beach"]
     assert body["scope_shelves"] == []
+
+
+def test_last_read_is_when_the_reader_last_moved_in_the_book_on_any_device(world):
+    reader = world.add_user("reader")
+    for book_id in (1, 2, 3, 4, 5):
+        world.add_book(book_id, "Book %d" % book_id)
+    at = lambda text: datetime.fromisoformat(text)  # noqa: E731
+
+    # Read forward on a Kobo, then turned back a chapter in KOReader: the
+    # shared bookmark keeps the furthest place and its time; the position
+    # carrier took the later turn-back.
+    world.position(reader, 1, 60.0, at=at("2026-09-10T08:00:00"))
+    world.carrier_position(reader, 1, 55.0, at=at("2026-09-12T20:30:00"))
+    # Only ever read on a Kobo.
+    world.position(reader, 2, 30.0, at=at("2026-09-11T07:15:00"))
+    # Opened in the web reader, which leaves only the carrier row.
+    world.carrier_position(reader, 3, 5.0, at=at("2026-09-09T22:00:00"))
+    # Read on in the web reader after an older KOReader sync: the later
+    # bookmark wins over the older carrier row.
+    world.carrier_position(reader, 5, 20.0, at=at("2026-09-05T18:00:00"))
+    world.position(reader, 5, 40.0, at=at("2026-09-06T21:45:00"))
+
+    books, _body = _books(world)
+
+    assert books[1]["last_read"] == "2026-09-12T20:30:00Z"
+    assert books[2]["last_read"] == "2026-09-11T07:15:00Z"
+    assert books[3]["last_read"] == "2026-09-09T22:00:00Z"
+    assert "last_read" not in books[4]
+    assert books[5]["last_read"] == "2026-09-06T21:45:00Z"
+    # Another reader's activity on the same book is not this reader's.
+    other = world.add_user("other")
+    world.carrier_position(other, 2, 90.0, at=at("2026-09-20T10:00:00"))
+    assert _books(world)[0][2]["last_read"] == "2026-09-11T07:15:00Z"
 
 
 def test_shelf_only_scope_names_its_shelves(world):
@@ -154,8 +191,21 @@ def test_revision_changes_only_when_something_the_device_shows_changes(world):
     assert "unchanged" not in after_status
     assert after_status["revision"] != first
 
-    rev_before = {b["book_id"]: b["rev"] for b in after_status["books"]}
+    # A reading-time change alone (a turn-back on one device) reorders the
+    # device's "Reading" view, so it is news too.
+    world.carrier_position(reader, 1, 10.0, at=datetime(2026, 9, 14, 9, 0, 0))
+    after_reading = _library(world, if_revision=after_status["revision"]).get_json()
+    assert "unchanged" not in after_reading
+    # So is a new author sort: it decides where the book sits under Authors.
     from cps import db
+    resorted = world.session.get(db.Books, 1)
+    resorted.author_sort = "Second, Bo & Author, Ann"
+    world.session.commit()
+    after_sort = _library(world, if_revision=after_reading["revision"]).get_json()
+    assert "unchanged" not in after_sort
+    after_status = after_sort
+
+    rev_before = {b["book_id"]: b["rev"] for b in after_status["books"]}
     retitled = world.session.get(db.Books, 2)
     retitled.title = "Paper Only, Revised"
     world.session.commit()
@@ -258,6 +308,61 @@ def test_placeholder_without_a_cover_still_has_one(world, tmp_path):
 
     assert meta.title == "Paper Only"
     assert Image.open(meta.cover).height <= 600
+
+
+# libjpeg's base luminance table; a file's own table is this scaled by its
+# quality setting, which is how the quality is read back from the bytes.
+STD_LUMINANCE = (16, 11, 10, 16, 24, 40, 51, 61, 12, 12, 14, 19, 26, 58, 60, 55,
+                 14, 13, 16, 24, 40, 57, 69, 56, 14, 17, 22, 29, 51, 87, 80, 62,
+                 18, 22, 37, 56, 68, 109, 103, 77, 24, 35, 55, 64, 81, 104, 113, 92,
+                 49, 64, 78, 87, 103, 121, 120, 101, 72, 92, 95, 98, 112, 100, 103, 99)
+
+
+def jpeg_quality(image):
+    scale = 100.0 * sum(image.quantization[0]) / sum(STD_LUMINANCE)
+    return (200 - scale) / 2 if scale <= 100 else 5000 / scale
+
+
+def busy_cover(size=(1500, 2250)):
+    """A full-size cover with gradients, shapes and grain, like a scanned or
+    illustrated cover, which JPEG cannot shrink by flat colour alone."""
+    import random
+    from PIL import ImageDraw, ImageFilter
+
+    rng = random.Random(7)
+    width, height = size
+    image = Image.new("RGB", size)
+    draw = ImageDraw.Draw(image)
+    for y in range(height):
+        draw.line([(0, y), (width, y)],
+                  fill=(int(30 + 180 * y / height), 60, int(200 - 150 * y / height)))
+    for _ in range(180):
+        x, y, r = rng.randrange(width), rng.randrange(height), rng.randrange(20, 260)
+        draw.ellipse((x - r, y - r, x + r, y + r),
+                     fill=tuple(rng.randrange(256) for _ in range(3)))
+    image = image.filter(ImageFilter.GaussianBlur(3))
+    image = Image.blend(image, Image.effect_noise(size, 24).convert("RGB"), 0.15)
+    buffer = io.BytesIO()
+    image.save(buffer, "JPEG", quality=92)
+    return buffer.getvalue()
+
+
+def test_placeholder_covers_stay_small_enough_for_a_whole_library(world, tmp_path):
+    # A device downloads one placeholder per book: a 2250-pixel cover must
+    # arrive about 600 pixels tall and plainly compressed, not as scanned.
+    # (Not a power-of-two multiple of 600, so decoding at a reduced scale
+    # alone cannot get it there.)
+    world.add_user("reader")
+    source = busy_cover()
+    world.add_book(1, "Big Cover", cover_image=source)
+
+    archive = zipfile.ZipFile(io.BytesIO(_placeholder(world, 1).get_data()))
+    data = archive.read("OEBPS/cover.jpg")
+    cover = Image.open(io.BytesIO(data))
+
+    assert cover.height <= 600 and cover.width <= 400
+    assert 70 <= jpeg_quality(cover) <= 78
+    assert len(data) <= 40 * 1024 < len(source)
 
 
 def test_placeholder_answers_not_modified_for_the_same_rev(world):

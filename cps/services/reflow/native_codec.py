@@ -2,6 +2,8 @@
 
 No import names, constructors or executable values are selected by input. Field
 names come from the explicit class registry, including additive source fields.
+Keys and set members are scalars or bounded flat scalar tuples, not arbitrary
+hashable graphs. Shared graphs remain supported at ordinary value positions.
 """
 import base64
 from collections import Counter
@@ -14,6 +16,7 @@ from functools import lru_cache
 VERSION = 2
 MAX_BYTES = 256 * 1024 * 1024
 MAX_DEPTH = 80
+MAX_KEY_ITEMS = 32
 
 
 @lru_cache(maxsize=1)
@@ -61,6 +64,23 @@ def _primitive(value):
     return False
 
 
+def _key(value):
+    """Bound hashing before inserting decoded mapping keys or set members.
+
+    Source identifiers are scalars or short flat tuples. Nested/shared tuples
+    remain valid as values, but must never reach Python's recursive tuple hash.
+    Exact built-in types also exclude user-defined hash/equality behavior.
+    """
+    def scalar(item):
+        return _primitive(item) or type(item) is bytes
+    if scalar(value):
+        return value
+    if (type(value) is tuple and len(value) <= MAX_KEY_ITEMS
+            and all(scalar(item) for item in value)):
+        return value
+    raise ValueError('unsupported native key/member: expected scalar or bounded flat tuple')
+
+
 def dumps(value):
     """Stream a postorder value DAG into one valid JSON document.
 
@@ -90,9 +110,10 @@ def dumps(value):
             kind, data = 'bytes', base64.b64encode(item).decode('ascii')
         elif isinstance(item, (dict, Counter)):
             kind = 'counter' if isinstance(item, Counter) else 'dict'
-            data = [[child(k), child(v)] for k, v in item.items()]
+            data = [[child(_key(k)), child(v)] for k, v in item.items()]
         elif isinstance(item, (list, tuple, set)):
-            kind, data = type(item).__name__, [child(v) for v in item]
+            kind = type(item).__name__
+            data = [child(_key(v) if isinstance(item, set) else v) for v in item]
         elif is_dataclass(item) and registry().get(type(item).__name__) is type(item):
             kind = type(item).__name__
             allowed = {f.name for f in fields(item)} | EXTRAS.get(kind, set()) | FORWARD.get(kind, set())
@@ -157,13 +178,17 @@ def loads(raw):
             pairs = []
             for pair in data:
                 if type(pair) is not list or len(pair) != 2: raise ValueError('invalid native mapping pair')
-                pairs.append((child(pair[0]), child(pair[1])))
+                pairs.append((_key(child(pair[0])), child(pair[1])))
             item = dict(pairs)
             if len(item) != len(pairs): raise ValueError('duplicate mapping key')
             if kind == 'counter': item = Counter(item)
         elif kind in ('list', 'tuple', 'set'):
             if type(data) is not list: raise ValueError('invalid native sequence')
-            item = {'list': list, 'tuple': tuple, 'set': set}[kind](child(v) for v in data)
+            members = (child(v) for v in data)
+            if kind == 'set':
+                item = set(_key(v) for v in members)
+            else:
+                item = {'list': list, 'tuple': tuple}[kind](members)
         else:
             cls = registry().get(kind)
             if cls is None or type(data) is not dict: raise ValueError('unknown native type')

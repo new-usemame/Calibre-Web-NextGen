@@ -58,3 +58,47 @@ def test_build_needs_recovery_geometry_not_raw_analysis_pages(tmp_path, monkeypa
             figure_transform=result.recovery.figure_rect)
     assert len(built.sidecar['source_evidence']) == 2
     assert build_epub.validate(built.path) == []
+
+
+@pytest.mark.parametrize('kind', ['dict', 'counter', 'set'])
+@pytest.mark.parametrize('direction', ['encode', 'decode'])
+def test_nested_shared_tuple_cannot_be_a_native_key_or_member(kind, direction):
+    """Two tiny tuple nodes must be refused before dict/set hashes the graph."""
+    from collections import Counter
+    inner = ('page', 1)
+    nested = (inner, inner)
+    value = {nested} if kind == 'set' else Counter({nested: 1}) if kind == 'counter' else {nested: 1}
+    if direction == 'encode':
+        with pytest.raises(ValueError, match='native key/member'):
+            codec.dumps(value)
+        return
+    # Handwritten ordinary three-node input also checks the decoder boundary.
+    data = '[{"ref":1}]' if kind == 'set' else '[[{"ref":1},1]]'
+    raw = ('{"version":2,"nodes":[\n[0,"tuple",["page",1]]\n'
+           ',[1,"tuple",[{"ref":0},{"ref":0}]]\n'
+           ',[2,"' + kind + '",' + data + ']\n],"root":{"ref":2}}\n').encode()
+    with pytest.raises(ValueError, match='native key/member'):
+        codec.loads(raw)
+
+
+def test_native_hash_keys_preserve_scalars_flat_identifiers_and_value_aliases():
+    from collections import Counter
+    identifier = ('Times', 12.0, True, None, b'font')
+    shared = ((1, 2), (3, 4))
+    value = [{identifier: shared, 5: shared, b'page': 'source'}, {identifier, 7}, Counter({identifier: 2})]
+    restored = codec.loads(codec.dumps(value))
+    assert restored == value
+    assert restored[0][identifier] is restored[0][5]
+
+
+def test_native_flat_key_width_is_bounded_on_both_sides():
+    key = tuple(range(33))
+    with pytest.raises(ValueError, match='native key/member'):
+        codec.dumps({key: 1})
+    # Encoding a wide tuple as a value remains valid; only using it as a key
+    # requires the bounded contract. There is no deep or large graph here.
+    raw = codec.dumps(key)
+    mapping = raw.replace(b'],"root":{"ref":0}}',
+                          b',[1,"dict",[[{"ref":0},1]]]\n],"root":{"ref":1}}')
+    with pytest.raises(ValueError, match='native key/member'):
+        codec.loads(mapping)

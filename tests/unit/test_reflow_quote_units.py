@@ -18,6 +18,7 @@ def fixture(tmp_path,kind='multi'):
     elif kind in ('annotation','all_italic_annotation','mixed_native_styles'):
         lines=['A complete verse ends here.', '(A separate observation occupies', 'two printed lines.)'];ys=[160,174,188]
     elif kind=='inline_parenthetical':lines=['A complete verse (with its own aside) ends here.'];ys=[160]
+    elif kind=='numeric':lines=['15'];ys=[160]
     elif kind=='short':lines=['"Stay."'];ys=[160]
     elif kind=='inline':lines=['Ordinary prose calls this "a name" inside its sentence.'];ys=[160]
     else:lines=['First complete sentence. The next sentence continues','across the printed block. The final sentence must stay.'];ys=[160,174]
@@ -228,7 +229,7 @@ def test_opening_only_quote_does_not_prove_its_terminal_boundary(tmp_path):
     data[1].close()
 
 
-def cross_page_display(tmp_path, editorial=False, indented_footer=False):
+def cross_page_display(tmp_path, editorial=False, indented_footer=False, interior=False, body_tail=False):
     doc=pymupdf.open();raws=[];pages={}
     for pno in (0,1):
         page=doc.new_page(width=500,height=700)
@@ -236,8 +237,9 @@ def cross_page_display(tmp_path, editorial=False, indented_footer=False):
                 ('quote',92 if editorial else 70,180,['Counting onward leaves an equal'] if editorial else ['A displayed quotation continues across the page break','and leaves an unfinished thought in'],11),
                 ('footer',92 if indented_footer else 40,600,['A footnote citation below the display,', 'continued as a separate complete reference.'] if indented_footer else ['12 A smaller reference printed below the quotation.'],11 if indented_footer else 8)] if pno==0 else
                [('header',160,40,['Running title'],10),
-                ('quote',70,180,['[number] in the next interval, ending here.'] if editorial else ['the same source display on the next page, ending here.'],11),
+                ('quote',40 if body_tail else 70,180,['[number] in the next interval, ending here.'] if editorial else ['the same source display on the next page, ending here.'],11),
                 ('body',40,300,['Ordinary body resumes after the complete quotation.'],11)])
+        if pno==1 and interior:specs.insert(1,('earlier',70,100,['A separate complete source display.'],11))
         for name,x,y,texts,size in specs:
             for i,text in enumerate(texts):page.insert_text((x,y+i*14),text,fontsize=size,fontname='tiro')
     path=tmp_path/'continued.pdf';doc.save(path);doc.close();doc=pymupdf.open(path)
@@ -389,4 +391,40 @@ def test_more_indented_multiline_footnote_cannot_hide_quote_edge(tmp_path,seam):
         with pytest.raises(ops.ContractError,match='complete source quote evidence'):
             if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
             else:build_epub.build(book,str(tmp_path/'footer-fragment.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+    doc.close()
+
+
+def test_interior_lowercase_display_does_not_inherit_unrelated_previous_page_prefix(tmp_path):
+    book,doc,raws=cross_page_display(tmp_path,interior=True)
+    p=ops.prepare(book,doc,1,'interior-display',{'layer':'native'},raw_page=raws[1])
+    assert any(c['kind']=='quote' and c['element_id']=='e2' for c in p.candidates())
+    doc.close()
+
+
+@pytest.mark.parametrize('seam',['candidates','admission','builder'])
+def test_single_line_first_indent_continues_at_next_body_margin(tmp_path,seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    book,doc,raws=cross_page_display(tmp_path,editorial=True,body_tail=True)
+    p=ops.prepare(book,doc,0,'body-margin-tail',{'layer':'native'},raw_page=raws[0])
+    if seam=='candidates':assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in p.candidates())
+    else:
+        forged=replace(p,specs=(ops._Spec(1,'quote',0,len(book.pages[0][1].text)),));cid=forged.candidates()[0]['candidate_id']
+        with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+            if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+            else:build_epub.build(book,str(tmp_path/'first-indent.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+    doc.close()
+
+
+@pytest.mark.parametrize('seam',['candidates','admission','builder'])
+def test_bare_numeric_leaf_is_not_a_quotation_unit(tmp_path,seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    data=fixture(tmp_path,'numeric');book,doc,raw,*_=data;p=prepare(data)
+    if seam=='candidates':assert not any(c['kind']=='quote' for c in p.candidates())
+    else:
+        forged=replace(p,specs=(ops._Spec(1,'quote',0,2),));cid=forged.candidates()[0]['candidate_id']
+        with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+            if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+            else:build_epub.build(book,str(tmp_path/'numeric.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
     doc.close()

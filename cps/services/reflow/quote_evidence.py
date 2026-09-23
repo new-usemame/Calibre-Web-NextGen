@@ -8,7 +8,7 @@ import re
 import statistics
 from . import assemble,extract,note_evidence,heading_evidence as geometry
 
-VERSION='source-quote-units-6.1'
+VERSION='source-quote-units-6.2'
 
 
 def _normal_positions(text):
@@ -128,24 +128,34 @@ def _cross_page_continuation(book,pno,index,mapped):
     left=min(e.bbox[0] for e in current)
     inset=min(line['bbox'][0] for line in mapped)-left
     if inset<=em*.5:return False
-    def neighboring_fragments(page):
+    def edge(page,last):
         paragraphs=column(page)
-        if not paragraphs:return []
+        if not paragraphs:return None
         body_left=min(e.bbox[0] for e in paragraphs)
         def aligned(e):
             offset=e.bbox[0]-body_left-inset
-            # A one-line boundary can carry a paragraph's first-line indent.
-            # Do not widen an entire multi-line citation into the display column.
-            return abs(offset)<=em*.5 or (0<offset<=em*2.5 and len(e.line_boxes)==1)
-        return [e for e in paragraphs if aligned(e) and not re.fullmatch(r'\d{1,4}',e.text.strip())]
-    # A later footer is not evidence that an earlier unfinished source display
-    # ended. Test the fragments themselves, not the last matching list member.
-    if any(note_evidence.may_continue(element.text,e.text)
-           for e in neighboring_fragments(pno+1)):
-        return True
-    if any(note_evidence.may_continue(e.text,element.text)
-           for e in neighboring_fragments(pno-1)):
-        return True
+            if abs(offset)<=em*.5:return True
+            # Only an unfinished one-line boundary can carry additional first-line
+            # indentation. A complete citation does not replace the display edge.
+            return (0<offset<=em*2.5 and len(e.line_boxes)==1 and
+                    (note_evidence.may_continue(e.text,'continuation') if last else
+                     note_evidence.may_continue('unfinished',e.text)))
+        display=[e for e in paragraphs if aligned(e) and not re.fullmatch(r'\d{1,4}',e.text.strip())]
+        return (display[-1] if last else display[0]) if display else None
+    if edge(pno,True) is element:
+        following=edge(pno+1,False)
+        if following is not None and note_evidence.may_continue(element.text,following.text):return True
+        # A one-line paragraph opening can finish on the next page at the body
+        # margin: its first-line indent is not a separate displayed quotation.
+        if len(mapped)==1:
+            neighbors=column(pno+1)
+            if neighbors:
+                margin=min(e.bbox[0] for e in neighbors)
+                body=[e for e in neighbors if abs(e.bbox[0]-margin)<=em*.5 and not re.fullmatch(r'\d{1,4}',e.text.strip())]
+                if body and note_evidence.may_continue(element.text,body[0].text):return True
+    if edge(pno,False) is element:
+        previous=edge(pno-1,True)
+        if previous is not None and note_evidence.may_continue(previous.text,element.text):return True
     return False
 
 
@@ -161,6 +171,8 @@ def quote_evidence(book,pno,raw_page,layer,source_rotation=0,uncertain=False):
             continue
         if element.kind!='p' or element.table_row:
             proof['reason']='unsupported_or_uncertain_source';continue
+        if re.fullmatch(r'\d{1,4}',element.text.strip()):
+            proof['reason']='numeric_furniture_not_quote';continue
         mapped,ranges,error=_source_lines(element,lines)
         if error:proof['reason']=error;continue
         proof['source_line_boxes']=[line['bbox'] for line in mapped]

@@ -428,3 +428,27 @@ def test_bare_numeric_leaf_is_not_a_quotation_unit(tmp_path,seam):
             if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
             else:build_epub.build(book,str(tmp_path/'numeric.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
     doc.close()
+
+
+@pytest.mark.parametrize('seam', ['candidates', 'admission', 'builder'])
+def test_unmapped_native_glyph_unit_cannot_gain_structural_role(tmp_path, seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    from cps.services.reflow.native_text import descriptor
+    data = fixture(tmp_path)
+    book, doc, raw, start, end = data
+    element = book.pages[0][1]
+    element.runs = [['glyph', element.runs[0][1], descriptor(0, element.bbox, 11, 'LegacySymbols')]]
+    prepared = prepare(data)
+    if seam == 'candidates':
+        assert not [c for c in prepared.candidates() if c['element_id'] == 'e1']
+    else:
+        forged = replace(prepared, specs=(ops._Spec(1, 'quote', 0, end),))
+        cid = forged.candidates()[0]['candidate_id']
+        with pytest.raises(ops.ContractError, match='complete source quote evidence'):
+            if seam == 'admission':
+                forged.accept(book, doc, {'protocol': ops.PROTOCOL, 'snapshot_id': forged.snapshot_id, 'select': [cid]})
+            else:
+                build_epub.build(book, str(tmp_path/'forged.epub'), doc=doc,
+                    operation_plans=[ops.OperationPlan(forged, (cid,))])
+    doc.close()

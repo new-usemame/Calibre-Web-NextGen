@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.1"
+CONVERTER_VERSION = "1.2"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -209,6 +209,8 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
     for note in notes:
         blocks.append(_aside_html(note, ref_ids, available, str(note.num) in ambiguous,
             [n for n in book.notes if getattr(n, "continued_from", None) == (pno, note.num)]))
+    if any(r[0]=="glyph" for el in elements for r in el.runs) or any(getattr(n,"glyph_fallback",False) for n in notes):
+        blocks.append('<p class="source-evidence-notice">Some source glyphs are shown as original images because their text encoding is unavailable. <a href="original-p%04d.xhtml#page">Open original page</a>.</p>' % pno)
     return "\n".join(blocks)
 
 
@@ -221,6 +223,13 @@ def _punctuation_notice(pno, index):
 def _runs_html(runs, available, ref_ids, ambiguous=()):
     parts = []
     for run in runs:
+        if run[0] == "glyph":
+            from .native_text import glyph_html
+            parts.append(glyph_html(run[2]))
+            continue
+        if run[0] == "raised":
+            parts.append("<sup>%s</sup>" % escape(run[1]))
+            continue
         if run[0] == "t":
             text = escape(run[1])
             style = run[2] if len(run) > 2 else None
@@ -238,8 +247,11 @@ def _runs_html(runs, available, ref_ids, ambiguous=()):
         uncertain = number in ambiguous or (len(run) > 3 and run[3] == "uncertain")
         if number in available:
             ref = "fnref_%s" % number
-            if number in ref_ids:
-                ref = "%s_%d" % (ref, len(ref_ids) + 1)
+            count_key = ('occurrences', number)
+            count = ref_ids.get(count_key, 0) + 1
+            ref_ids[count_key] = count
+            if count > 1:
+                ref = "%s_%d" % (ref, count)
             ref_ids.setdefault(number, ref)
             if uncertain:
                 parts.append('<a class="noteref" epub:type="noteref" id="%s" '
@@ -264,6 +276,10 @@ def _runs_html(runs, available, ref_ids, ambiguous=()):
 
 def _aside_html(note, ref_ids, available, ambiguous=False, continuations=()):
     body = escape(note.text)
+    if getattr(note,"glyph_fallback",False):
+        from .native_text import glyph_html, descriptor
+        body = (_runs_html(note.glyph_runs, set(), {}) if getattr(note,"glyph_runs",None)
+                else glyph_html(descriptor(note.pno,note.bbox,0,"note"),block=True))
     if note.num is None:
         origin = getattr(note, "continued_from", None)
         if origin is not None:
@@ -1106,7 +1122,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 caption_keys.append(key)
                 if key is not None:
                     specs.append((key, "Original printed caption", element.bbox))
-        if not specs and pno not in recovered and pno not in scanned:
+        if not specs and pno not in recovered and pno not in scanned and not book.needs_source_evidence(pno):
             continue
         if doc is None:
             raise ValueError("Original PDF required for uncertain source evidence on page %d" % pno)
@@ -1331,6 +1347,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     # -- a cancel, a bad page, a full disk -- removes its half-written archive.
     package = _Package(out_path)
     try:
+        from .native_text import package_glyphs
+        package_glyphs(book,page_html,doc,package,should_stop)
         evidence = _original_evidence(book, page_html, doc, package, figure_transform,
                                       should_stop, evidence_progress, source_pages)
 

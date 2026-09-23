@@ -119,10 +119,13 @@ class Note(object):
     bbox: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
 
     continued_from: Optional[tuple] = None
+    glyph_fallback: bool = False
+    glyph_runs: list = field(default_factory=list)
 
     def to_dict(self):
         return {"num": self.num, "text": self.text, "pno": self.pno,
                 "marked": self.marked, "uncertain": self.uncertain, "bbox": self.bbox,
+                "glyph_fallback": self.glyph_fallback, "glyph_runs": self.glyph_runs,
                 "continued_from": self.continued_from}
 
 
@@ -200,8 +203,8 @@ class Book(object):
         return uncertain
 
     def needs_source_evidence(self, pno):
-        return bool(self.ambiguous_note_numbers(pno)) or any(
-            element.caption_uncertain or element.punctuation_uncertain or bool(getattr(element,"display_group",{}))
+        return any(n.pno == pno and getattr(n,"glyph_fallback",False) for n in self.notes) or bool(self.ambiguous_note_numbers(pno)) or any(
+            any(r[0]=="glyph" for r in element.runs) or element.caption_uncertain or element.punctuation_uncertain or bool(getattr(element,"display_group",{}))
             for element in self.pages.get(pno, []))
 
     def page_box(self, pno):
@@ -273,7 +276,7 @@ def plain_text(runs):
     model is shown the same shape either way, and the gate measures the same shape
     back.
     """
-    text = "".join(r[1] if r[0] == "t" else "[%s]" % r[1] for r in runs)
+    text = "".join(r[1] if r[0] in ("t", "raised", "glyph") else "[%s]" % r[1] for r in runs)
     return re.sub(r"[^\S\n]{2,}", " ", text).strip()
 
 
@@ -478,6 +481,16 @@ def _line_runs(line, pno, page_notes, claimed, repairs, reasons, preserve_style=
     while index < len(spans):
         span = spans[index]
         text = texts[index]
+        if preserve_style and getattr(span,"encoding_unresolved",False):
+            from .native_text import descriptor
+            runs.append(["glyph",text,descriptor(pno,span.bbox,span.size,span.font)])
+            reasons.append("unmapped_native_glyphs")
+            index += 1
+            continue
+        if preserve_style and span.superscript and not text.strip().isdigit():
+            runs.append(["raised",text])
+            index += 1
+            continue
         if skeleton.is_marker_span(span, dom):
             following = "".join(texts[index + 1:])
             number, how = resolve_marker(text.strip(), page_notes, claimed, following)
@@ -1278,7 +1291,11 @@ def assemble(skeletons, style, raw_pages=None):
                                        marked=region.number in claimed,
                                        uncertain=bool(region.uncertain),
                                        bbox=region.bbox,
-                                       continued_from=region.continued_from))
+                                       continued_from=region.continued_from,
+                                       glyph_fallback=not skel.is_scan and any(getattr(sp,"encoding_unresolved",False) for ln in region.lines for sp in ln.spans)))
+                if book.notes[-1].glyph_fallback:
+                    from .native_text import note_glyph_runs
+                    book.notes[-1].glyph_runs = note_glyph_runs(region, book.notes[-1].text, skel.pno)
             elif region.kind == "artwork":
                 book.artwork.append({"pno": skel.pno, "bbox": list(region.bbox),
                                      "text": region.text})

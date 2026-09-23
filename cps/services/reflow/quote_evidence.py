@@ -8,7 +8,7 @@ import re
 import statistics
 from . import assemble,extract,note_evidence,heading_evidence as geometry
 
-VERSION='source-quote-units-6.2'
+VERSION='source-quote-units-7'
 
 
 def _normal_positions(text):
@@ -167,6 +167,8 @@ def quote_evidence(book,pno,raw_page,layer,source_rotation=0,uncertain=False):
     for index,element in enumerate(elements):
         proof={'version':VERSION,'supported':False,'reason':'missing_source_geometry','units':[]}
         result[index]=proof
+        if any(run[0]=="glyph" for run in element.runs):
+            proof["reason"]="unmapped_native_glyphs";continue
         if raw is None or raw.get('pno')!=pno or layer not in ('native','ocr') or source_rotation:
             continue
         if element.kind!='p' or element.table_row:

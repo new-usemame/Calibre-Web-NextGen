@@ -241,7 +241,17 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
     quote_proofs=quote_evidence.quote_evidence(book,pno,raw,source_layer.get('layer'),doc[pno].rotation,quote_uncertain)
     quote_binding={'version':quote_evidence.VERSION,'proofs_digest':_digest(quote_proofs),'uncertain':quote_uncertain}
     quote_digest=_digest(quote_binding)
-    context, omitted, specs, used = [], [], [], 0
+    enrichment = None
+    if source_page is not None:
+        report = source_page.report()
+        enrichment = {'version': report['version'], 'identity': source_page.identity,
+            'records_sha256': report['records_sha256'], 'raw_records': report['raw_records'],
+            'marked': report['marked'], 'unplaced': [report['uncertain'][i]
+                for i in report['unplaced_record_indices']]}
+    used = len(json.dumps(enrichment)) if enrichment is not None else 0
+    if used > max_context_chars:
+        raise ContractError('enriched confidence context exceeds preparation bound')
+    context, omitted, specs = [], [], []
     for index, element in enumerate(book.pages[pno]):
         record = {"id": "e%d" % index, **asdict(element)}
         record['heading_evidence'] = proofs[index]
@@ -257,7 +267,7 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
             continue
         used += size
         context.append(record)
-        for spec in (() if index in relational_regions else _proposals(element, index,quote_proofs[index]['units'])):
+        for spec in (() if index in relational_regions or any(r[0]=="glyph" for r in element.runs) else _proposals(element, index,quote_proofs[index]['units'])):
             if spec.kind == 'heading' and not proofs[index]['supported']:
                 continue
             if source_page is not None:
@@ -316,14 +326,8 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
              "page_rotation": doc[pno].rotation,
              "heading_source_sha256": geometry_digest,
              "source_context": "current page; immutable inventories bound to supplied Book"}
-    if source_page is not None:
-        report = source_page.report()
-        state['source_enrichment'] = {'version': report['version'], 'identity': source_page.identity,
-            'records_sha256': report['records_sha256'], 'raw_records': report['raw_records'],
-            'marked': report['marked'], 'unplaced': [report['uncertain'][i]
-                for i in report['unplaced_record_indices']]}
-        if used + len(json.dumps(state['source_enrichment'])) > max_context_chars:
-            raise ContractError('enriched confidence context exceeds preparation bound')
+    if enrichment is not None:
+        state['source_enrichment'] = enrichment
     return Prepared(pno, revision, state_digest, pdf_digest, snapshot_id, tuple(specs),
                     json.dumps(state), raster, seed, json.dumps(coverage), source_page,
                     json.dumps(geometry), geometry_digest,json.dumps(quote_binding),quote_digest)

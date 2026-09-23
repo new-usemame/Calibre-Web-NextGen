@@ -97,6 +97,8 @@ class Span(object):
     origin_y: float = 0.0
     uncertain: bool = False  # OCR engine confidence, never inferred for native text
     punctuation_uncertain: bool = False  # distinct native quote glyphs share ASCII Unicode
+    encoding_unresolved: bool = False
+    char_boxes: tuple = ()
 
     @property
     def bold(self):
@@ -114,7 +116,8 @@ class Span(object):
         return {"text": self.text, "size": round(self.size, 2), "font": self.font,
                 "flags": self.flags, "bbox": [round(v, 2) for v in self.bbox],
                 "origin_y": round(self.origin_y, 2),
-                "punctuation_uncertain": self.punctuation_uncertain}
+                "punctuation_uncertain": self.punctuation_uncertain,
+                "encoding_unresolved": self.encoding_unresolved}
 
 
 @dataclass
@@ -285,7 +288,19 @@ def read_page(doc, pno):
     parea = rect.get_area() or 1.0
     raw = RawPage(pno=pno, width=rect.width, height=rect.height)
 
-    payload = page.get_text("dict")
+    from .native_text import unresolved_fonts, normalize_blocks
+    unknown_fonts = unresolved_fonts(page)
+    payload = page.get_text("rawdict")
+    for block in payload.get("blocks", []):
+        for line in block.get("lines", []):
+            for span in line.get("spans", []):
+                offset, boxes, chars = 0, [], span.get("chars", [])
+                for char in chars:
+                    text = char.get("c", "")
+                    boxes.append((offset, offset+len(text), *char["bbox"]))
+                    offset += len(text)
+                span["text"] = "".join(c.get("c", "") for c in chars)
+                span["char_boxes"] = tuple(boxes)
     quote_fonts = _native_quote_variants(page)
     for blk in payload.get("blocks", []):
         bbox = tuple(blk.get("bbox", (0, 0, 0, 0)))
@@ -300,6 +315,8 @@ def read_page(doc, pno):
                           font=sp.get("font", ""), flags=int(sp.get("flags", 0)),
                           bbox=tuple(sp.get("bbox", (0, 0, 0, 0))),
                           origin_y=float((sp.get("origin") or (0, 0))[1]),
+                          encoding_unresolved=sp.get("font", "") in unknown_fonts,
+                          char_boxes=sp.get("char_boxes",()),
                           punctuation_uncertain=sp.get("font", "") in quote_fonts
                           and '"' in sp.get("text", ""))
                      for sp in ln.get("spans", [])]
@@ -308,6 +325,11 @@ def read_page(doc, pno):
         if lines:
             raw.blocks.append(Block(number=blk.get("number", 0), bbox=bbox, lines=lines))
 
+    if not raw.is_page_scan:
+        raw.blocks = normalize_blocks(raw.blocks)
+    for block in raw.blocks:
+        for line in block.lines:
+            for span in line.spans:span.char_boxes = ()
     raw.drawings, raw.drawing_rects = drawing_rects(page)
     raw.blocks.sort(key=lambda b: (round(b.bbox[1], 1), round(b.bbox[0], 1)))
     return raw

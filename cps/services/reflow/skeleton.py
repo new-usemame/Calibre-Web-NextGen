@@ -586,7 +586,9 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
                         bbox=line.bbox, reason="sequence_folio"))
                 else:
                     kept.append(line)
-            if kept:
+            if len(kept) == len(block.lines):
+                blocks.append(block)
+            elif kept:
                 blocks.append(replace(block, lines=kept,
                     bbox=_lines_bbox(kept, block.bbox)))
         note_raw = replace(raw, blocks=blocks)

@@ -429,3 +429,19 @@ def test_proven_margin_folio_cannot_be_absorbed_into_a_footnote(sequence):
         assert all(n.text.endswith('88. 42') for n in book.notes)
     # Classification must never rewrite/delete the raw source line.
     assert raws[0].text_blocks[-1].lines[-1].text==('7' if sequence else '42')
+
+
+def test_pre_note_folio_filter_preserves_unaffected_source_block_geometry(monkeypatch):
+    body_line=extract.Line([extract.Span('A body paragraph retains its source block boundary.',10,'Times',0,(40,100,280,110))],(40,100,280,110))
+    body=extract.Block(0,(35,95,285,115),[body_line])
+    footer=extract.Line([extract.Span('7',9,'Times',0,(280,580,286,589))],(280,580,286,589))
+    raw=extract.RawPage(0,320,600,[body,extract.Block(1,footer.bbox,[footer])],[],0)
+    style=skeleton.BookStyle(body_size=10,folio_boxes={0:footer.bbox})
+    original=skeleton._split_off_notes
+    observed=[]
+    def inspect(source,*args):
+        observed.extend(b.bbox for b in source.text_blocks)
+        return original(source,*args)
+    monkeypatch.setattr(skeleton,'_split_off_notes',inspect)
+    skeleton.page_skeleton(raw,style)
+    assert observed==[body.bbox]

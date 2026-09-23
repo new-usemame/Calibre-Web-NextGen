@@ -228,13 +228,13 @@ def test_opening_only_quote_does_not_prove_its_terminal_boundary(tmp_path):
     data[1].close()
 
 
-def cross_page_display(tmp_path, editorial=False):
+def cross_page_display(tmp_path, editorial=False, indented_footer=False):
     doc=pymupdf.open();raws=[];pages={}
     for pno in (0,1):
         page=doc.new_page(width=500,height=700)
         specs=([('body',40,80,['Ordinary body establishes the full printed text column.'],11),
                 ('quote',92 if editorial else 70,180,['Counting onward leaves an equal'] if editorial else ['A displayed quotation continues across the page break','and leaves an unfinished thought in'],11),
-                ('footer',40,650,['12 A smaller reference printed below the quotation.'],8)] if pno==0 else
+                ('footer',92 if indented_footer else 40,600,['A footnote citation below the display,', 'continued as a separate complete reference.'] if indented_footer else ['12 A smaller reference printed below the quotation.'],11 if indented_footer else 8)] if pno==0 else
                [('header',160,40,['Running title'],10),
                 ('quote',70,180,['[number] in the next interval, ending here.'] if editorial else ['the same source display on the next page, ending here.'],11),
                 ('body',40,300,['Ordinary body resumes after the complete quotation.'],11)])
@@ -374,4 +374,19 @@ def test_old_quote_proof_cannot_survive_current_boundary_revision(tmp_path,monke
         if seam=='admission':prepared.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=prepared.snapshot_id,select=[choice['candidate_id']]))
         else:build_epub.build(book,str(tmp_path/'stale.epub'),doc=doc,operation_plans=[ops.OperationPlan(prepared,(choice['candidate_id'],))])
     assert not (tmp_path/'stale.epub').exists()
+    doc.close()
+
+
+@pytest.mark.parametrize('seam',['candidates','admission','builder'])
+def test_more_indented_multiline_footnote_cannot_hide_quote_edge(tmp_path,seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    book,doc,raws=cross_page_display(tmp_path,indented_footer=True)
+    p=ops.prepare(book,doc,0,'footer-indent',{'layer':'native'},raw_page=raws[0])
+    if seam=='candidates':assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in p.candidates())
+    else:
+        forged=replace(p,specs=(ops._Spec(1,'quote',0,len(book.pages[0][1].text)),));cid=forged.candidates()[0]['candidate_id']
+        with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+            if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+            else:build_epub.build(book,str(tmp_path/'footer-fragment.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
     doc.close()

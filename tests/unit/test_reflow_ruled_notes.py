@@ -106,3 +106,10 @@ def test_detached_digit_inside_unsplit_text_span_is_not_guessed_as_a_callout():
     assert not book.notes[0].marked
     assert not any(r[0]=='sup' for e in book.pages[0] for r in e.runs)
     assert book.conservation.ok
+
+
+def test_terminal_quote_with_adjacent_printed_note_digit_is_not_unfinished():
+    from cps.services.reflow.note_evidence import may_continue
+    assert not may_continue('A complete source quotation ends here."7 ', 'the next page begins with other text')
+    assert may_continue('The measured value is 3.14', 'and the sentence continues')
+    assert may_continue('The unfinished source reaches an equal', '[number] in the next interval')

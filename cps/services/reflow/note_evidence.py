@@ -8,7 +8,7 @@ a native separator and an identified preceding note.
 import re
 from . import extract
 
-_END = re.compile(r'[.!?][\"\u201d\u2019\)\]]*\s*$')
+_END = re.compile(r'[.!?](?:[\"\u201d\u2019\)\]]*|[\"\u201d\u2019]+\d{1,3})\s*$')
 
 
 def may_continue(previous, following):

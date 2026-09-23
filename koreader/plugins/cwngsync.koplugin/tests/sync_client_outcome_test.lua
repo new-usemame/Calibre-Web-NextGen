@@ -32,6 +32,9 @@ package.preload["logger"] = function()
         err = function() end,
     }
 end
+package.preload["gettext"] = function()
+    return function(text) return text end
+end
 package.preload["socketutil"] = function()
     return { set_timeout = function() end, reset_timeout = function() end }
 end
@@ -133,10 +136,26 @@ local function testNoSyncFailureIsWrittenAtDbg()
     assertTruthy(text:find("logger.warn(", 1, true), "failures are logged at warn")
 end
 
+local function testFailuresReadAsPlainWordsOnScreen()
+    local plain = CWNGSyncClient.plainReason
+    assertEqual(plain("common/Spore/Protocols.lua:85: timeout"), "the server took too long to answer",
+        "a transport timeout, as KOReader 2026.07 raises it on a Kindle")
+    assertEqual(plain("connection refused"), "nothing answered at that address", "nothing listening")
+    assertEqual(plain("host not found"), "that address could not be found", "a mistyped name")
+    assertEqual(plain("405 not expected"), "the server answered with error 405", "lua-Spore's unexpected status")
+    assertEqual(plain("HTTP 503"), "the server answered with error 503", "a status the spec allows")
+    assertEqual(plain(nil), "no response from server", "nothing to go on")
+    assertEqual(plain("checksum mismatch"), "checksum mismatch", "anything else is shown as it is")
+    assertEqual(CWNGSyncClient.statusOf("405 not expected"), 405, "status from lua-Spore's shape")
+    assertEqual(CWNGSyncClient.statusOf("HTTP 409"), 409, "status from finish()'s shape")
+    assertEqual(CWNGSyncClient.statusOf("common/Spore/Protocols.lua:85: timeout"), nil, "no status")
+end
+
 testDescribeFailureNamesEveryShape()
 testNoSyncFailureIsWrittenAtDbg()
 testRaisedCallReportsAReasonAndWarns()
 testNon200ReportsItsStatus()
 testSuccessCarriesNoReason()
+testFailuresReadAsPlainWordsOnScreen()
 
 print("sync_client outcome-reporting tests passed")

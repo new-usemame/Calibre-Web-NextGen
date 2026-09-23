@@ -1,6 +1,7 @@
 local UIManager = require("ui/uimanager")
 local logger = require("logger")
 local socketutil = require("socketutil")
+local _ = require("gettext")
 
 -- Push/Pull
 local PROGRESS_TIMEOUTS = { 2,  5 }
@@ -45,6 +46,33 @@ local function describeFailure(err)
 end
 
 CWNGSyncClient.describeFailure = describeFailure
+
+-- The HTTP status inside a reason, in either shape it arrives: "HTTP 409" from
+-- finish(), or "405 not expected" when lua-Spore meets a status the spec omits.
+function CWNGSyncClient.statusOf(reason)
+    if type(reason) ~= "string" then return nil end
+    return tonumber(reason:match("^HTTP (%d%d%d)$") or reason:match("^(%d%d%d) not expected"))
+end
+
+-- The same reason in words for the screen. crash.log keeps the exact text.
+function CWNGSyncClient.plainReason(reason)
+    if type(reason) ~= "string" or reason == "" then return _("no response from server") end
+    local lower = reason:lower()
+    if lower:find("timeout", 1, true) or lower:find("timed out", 1, true) then
+        return _("the server took too long to answer")
+    elseif lower:find("refused", 1, true) then
+        return _("nothing answered at that address")
+    elseif lower:find("host not found", 1, true) or lower:find("name or service", 1, true) then
+        return _("that address could not be found")
+    elseif lower:find("unreachable", 1, true) or lower:find("no route", 1, true) then
+        return _("this device could not reach that address")
+    end
+    local status = CWNGSyncClient.statusOf(reason)
+    if status then
+        return (_("the server answered with error %1"):gsub("%%1", tostring(status)))
+    end
+    return reason
+end
 
 
 -- Report a completed call. `reason` is nil when it succeeded, and otherwise

@@ -40,8 +40,10 @@ In CWNG, open **E-readers**, then **Pair a Kobo or KOReader**. There are two way
 1. On the e-reader, open **Tools ▸ CWNG library ▸ Connect this device** and choose
    **Connect with a code (easiest)**. A new install asks this by itself. (Tools is the
    wrench in KOReader's menu; CWNG library is near the end of its list.)
-2. The e-reader shows a code like `K7M4-QX2P`, and a QR code.
-3. In CWNG choose **Pair with a code**. Type the code, or scan the QR code with your
+2. Type the address you open CWNG at in a browser, such as `books.example.com` or
+   `192.168.1.20:8083`, and tap **Continue**.
+3. The e-reader shows a code like `K7M4-QX2P`, and a QR code.
+4. In CWNG choose **Pair with a code**. Type the code, or scan the QR code with your
    phone. Check that the device name is yours, then **Approve**.
 
 If you'd rather type, the e-reader also offers **Sign in with username and password**.

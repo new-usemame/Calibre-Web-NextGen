@@ -4,6 +4,7 @@ setup.lua's decisions. Mixed into the CWNGSync plugin class by main.lua.
 ]]
 
 local ButtonDialog = require("ui/widget/buttondialog")
+local CWNGSyncClient = require("CWNGSyncClient")
 local Device = require("device")
 local InfoMessage = require("ui/widget/infomessage")
 local InputDialog = require("ui/widget/inputdialog")
@@ -28,7 +29,6 @@ local function hostOf(server)
 end
 
 local function newClient(plugin, server)
-    local CWNGSyncClient = require("CWNGSyncClient")
     return CWNGSyncClient:new{
         service_url = server .. "/kosync",
         service_spec = plugin.path .. "/api.json",
@@ -216,17 +216,14 @@ function SetupFlow:showConnectChoices()
     UIManager:show(dialog)
 end
 
--- Ask for the server address unless it is already known, then continue.
+-- Ask for the server address, offering the one already known, then continue.
 function SetupFlow:askServer(continue)
-    if self.settings.server and self.settings.server ~= "" then
-        continue(self.settings.server)
-        return
-    end
     local dialog
     dialog = InputDialog:new{
         title = _("Your CWNG address"),
         description = _("The address you open CWNG at in a browser, for example books.example.com or 192.168.1.20:8083."),
-        input = "",
+        -- A known address is offered, not assumed: it may be the one that just failed.
+        input = self.settings.server or "",
         input_hint = "books.example.com",
         buttons = {{
             {
@@ -282,12 +279,16 @@ function SetupFlow:requestPairing(server)
                 or type(body.user_code) ~= "string" then
             stopPairing(pairing)
             local text
-            if reason == "HTTP 409" then
+            local status = CWNGSyncClient.statusOf(reason)
+            if status == 409 then
                 text = T(_("%1 cannot approve devices by code yet. Choose Sign in with username and password instead."),
+                    hostOf(server))
+            elseif status == 404 or status == 405 then
+                text = T(_("%1 did not accept a pairing request. If that is your CWNG address, it may be too old to pair by code: choose Sign in with username and password instead."),
                     hostOf(server))
             else
                 text = T(_("Could not start pairing with %1: %2\n\nCheck the address, and that KOReader sync is switched on in CWNG's settings."),
-                    hostOf(server), reason or _("no response from server"))
+                    hostOf(server), CWNGSyncClient.plainReason(reason))
             end
             UIManager:show(InfoMessage:new{ text = text })
             return

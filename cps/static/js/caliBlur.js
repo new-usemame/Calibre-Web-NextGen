@@ -1068,32 +1068,17 @@ $(function() {
     
     function handleDirectReading($link) {
         var bookId = $link.data('book-id');
-        var formatsStr = $link.data('book-formats');
-        
-        if (bookId && formatsStr) {
-            var formats = formatsStr.toLowerCase().split(',').map(function(f) { 
-                return f.trim(); 
-            });
-            
-            var formatPriority = ['epub', 'pdf', 'txt', 'html', 'mobi', 'azw3', 'fb2'];
-            var selectedFormat = null;
-            
-            for (var i = 0; i < formatPriority.length; i++) {
-                if (formats.indexOf(formatPriority[i]) !== -1) {
-                    selectedFormat = formatPriority[i];
-                    break;
-                }
-            }
-            
-            if (!selectedFormat && formats.length > 0) {
-                selectedFormat = formats[0];
-            }
-            
-            if (selectedFormat) {
-                window.open(window.scriptRoot + '/read/' + bookId + '/' + selectedFormat, '_blank');
-            } else {
-                window.location.href = $link.attr('href');
-            }
+        // The server renders the formats its reader opens, in the order the detail
+        // page's "Read now" uses (the reader_formats filter). A book with none of
+        // them, e.g. MOBI or AZW3 only, opens its detail page instead of a reader
+        // that can only answer "Selected book is unavailable" (#2249).
+        var readFormats = String($link.attr('data-book-read-formats') || '')
+            .split(',').filter(function(f) { return f; });
+
+        if (bookId && readFormats.length) {
+            window.open(window.scriptRoot + '/read/' + bookId + '/' + readFormats[0], '_blank');
+        } else {
+            window.location.href = $link.attr('href');
         }
     }
     

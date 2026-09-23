@@ -279,6 +279,20 @@ def contains_music(book_formats):
     return result
 
 
+@jinjia.app_template_filter('reader_formats')
+def reader_formats_filter(book):
+    """Comma-separated formats of *book* the built-in reader opens, in the order
+    the detail page's "Read now" offers them; empty when the user may not read.
+
+    caliBlur's grid read action uses this instead of a list of its own, so the grid
+    and the detail page cannot disagree about which books are readable (#2249).
+    """
+    if not current_user.role_viewer():
+        return ''
+    from .helper import check_read_formats
+    return ','.join(check_read_formats(book))
+
+
 @jinjia.app_template_filter('first_sentence')
 def first_sentence(text):
     if not text:

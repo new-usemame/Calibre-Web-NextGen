@@ -14652,3 +14652,76 @@ msgstr ""
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "About {pages} pages are projected to be only pictures of pages. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "About {pages} pages are projected to have a text layer that is not readable words. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Assessment scope"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Complete source assessment"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Damaged text observed — recovery may be needed"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Native text observed in the sampled pages (not proofread)"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Not measured until recovery runs"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Page images observed — recovery may be needed"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Recovery counts are projected from {pages} sampled pages. A zero does not prove that no other page needs recovery."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sampled {pages} pages"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "This assessment sampled {pages} pages. Text findings and recovery counts are projected for the rest of the PDF; pages outside the sample may differ."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The sampled pages are pictures of pages with OCR text behind them. The words are readable, but the structure has to be rebuilt."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The sampled pages have a native text layer. Extraction and punctuation may still differ from the printed page; original-source evidence remains available."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No usable text was found in the sampled pages, only page images. Text recovery settings determine how those pages are read; review a sample for recognition errors."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The sampled pages have a text layer, but it is not readable words. They have to be treated as if there were no text at all."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The sampled pages have not been assessed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The sampled pages have very little text. This may be a sparse scan, or two printed pages photographed as one."
+msgstr ""

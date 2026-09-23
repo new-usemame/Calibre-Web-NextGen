@@ -46,7 +46,13 @@ export interface ReflowEstimate {
     ocr_candidates: number;
     image_only: number;
     damaged: number;
-    estimated_seconds: number;
+    /** Recovery totals from a bounded assessment are projections. */
+    counts_estimated: boolean;
+    /** Pages actually observed by the bounded source assessment. */
+    sampled_pages: number;
+    /** A bounded text-layer survey cannot promise OCR duration before recovery
+     *  actually runs. `null` means unmeasured, never an instant recovery. */
+    estimated_seconds: number | null;
     engine_available: boolean;
     engine_version: string;
     engine_detail: string;

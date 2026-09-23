@@ -23,20 +23,30 @@ import { useAnnouncer } from '../lib/a11y/announcer';
  *  The server writes its own copy of these sentences into the EPUB's report page,
  *  which travels inside the book and is not in the reader's UI language. This one
  *  is for the person deciding whether to spend money, so it is translated. */
-function verdictSentence(verdict: string, t: TFunction): string {
+function verdictSentence(verdict: string, t: TFunction, sampled = false): string {
   switch (verdict) {
     case 'BORN_DIGITAL':
-      return t('This PDF has a native text layer. Extraction and punctuation may still differ from the printed page; original-source evidence remains available.');
+      return sampled
+        ? t('The sampled pages have a native text layer. Extraction and punctuation may still differ from the printed page; original-source evidence remains available.')
+        : t('This PDF has a native text layer. Extraction and punctuation may still differ from the printed page; original-source evidence remains available.');
     case 'OCR_LAYER':
-      return t('Every page is a picture of the page with OCR text behind it. The words are readable, but the structure has to be rebuilt.');
+      return sampled
+        ? t('The sampled pages are pictures of pages with OCR text behind them. The words are readable, but the structure has to be rebuilt.')
+        : t('Every page is a picture of the page with OCR text behind it. The words are readable, but the structure has to be rebuilt.');
     case 'THIN_TEXT':
-      return t('There is very little text on each page. This is usually a sparse scan, or two printed pages photographed as one.');
+      return sampled
+        ? t('The sampled pages have very little text. This may be a sparse scan, or two printed pages photographed as one.')
+        : t('There is very little text on each page. This is usually a sparse scan, or two printed pages photographed as one.');
     case 'NO_TEXT_LAYER':
-      return t('There is no usable text in this PDF, only page images. Text recovery settings determine how those pages are read; review a sample for recognition errors.');
+      return sampled
+        ? t('No usable text was found in the sampled pages, only page images. Text recovery settings determine how those pages are read; review a sample for recognition errors.')
+        : t('There is no usable text in this PDF, only page images. Text recovery settings determine how those pages are read; review a sample for recognition errors.');
     case 'GARBAGE_TEXT':
-      return t('This PDF has a text layer, but it is not readable words. It has to be treated as if there were no text at all.');
+      return sampled
+        ? t('The sampled pages have a text layer, but it is not readable words. They have to be treated as if there were no text at all.')
+        : t('This PDF has a text layer, but it is not readable words. It has to be treated as if there were no text at all.');
     default:
-      return t('This PDF has not been assessed.');
+      return sampled ? t('The sampled pages have not been assessed.') : t('This PDF has not been assessed.');
   }
 }
 
@@ -113,6 +123,8 @@ export function Reflow({ id }: { id: string }) {
 
   const rec = est?.recovery;
   const needsRecovery = !!rec && rec.ocr_candidates > 0;
+  const sampledAssessment = est?.assessment_scope === 'sample';
+  const assessmentPages = rec?.sampled_pages ?? est?.sampled ?? 0;
   // A chosen recovery with no engine is refused by the server; say so here,
   // before the consent box is even offered.
   const engineBlocks = needsRecovery && recovery !== 'off' && !rec?.engine_available;
@@ -207,16 +219,32 @@ export function Reflow({ id }: { id: string }) {
 
       <section className={styles.card} aria-labelledby="reflow-assessment">
         <h2 className={styles.cardTitle} id="reflow-assessment">{t('What is in this PDF')}</h2>
-        <p className={styles.verdict}>{verdictSentence(est.verdict, t)}</p>
+        <p className={styles.verdict}>{verdictSentence(est.verdict, t, sampledAssessment)}</p>
         <dl className={styles.facts}>
           <Fact label={t('Pages')} value={String(est.pages)} />
+          <Fact label={t('Assessment scope')}
+            value={sampledAssessment
+              ? t('Sampled {pages} pages').replace('{pages}', String(assessmentPages))
+              : t('Complete source assessment')} />
           <Fact label={t('Source text')}
             value={!needsRecovery
-              ? t('Native text layer (not proofread)')
+              ? sampledAssessment
+                ? t('Native text observed in the sampled pages (not proofread)')
+                : t('Native text layer (not proofread)')
               : rec.damaged > 0
-                ? t('Damaged layer — recovery required')
-                : t('Pictures only — recovery required')} />
+                ? sampledAssessment
+                  ? t('Damaged text observed — recovery may be needed')
+                  : t('Damaged layer — recovery required')
+                : sampledAssessment
+                  ? t('Page images observed — recovery may be needed')
+                  : t('Pictures only — recovery required')} />
         </dl>
+        {sampledAssessment && (
+          <p className={styles.note}>
+            {t('This assessment sampled {pages} pages. Text findings and recovery counts are projected for the rest of the PDF; pages outside the sample may differ.')
+              .replace('{pages}', String(assessmentPages))}
+          </p>
+        )}
         <p className={styles.note}>
           {t('Every selected page gets a source conversion. Optional AI review can suggest supported heading and displayed quotation formatting; it does not rewrite words, repair OCR, or reconstruct tables and notes.')}
         </p>
@@ -225,11 +253,21 @@ export function Reflow({ id }: { id: string }) {
       {needsRecovery && rec && (
         <section className={styles.card} aria-labelledby="reflow-recovery">
           <h2 className={styles.cardTitle} id="reflow-recovery">{t('Source recovery')}</h2>
+          {rec.counts_estimated && (
+            <p className={styles.note}>
+              {t('Recovery counts are projected from {pages} sampled pages. A zero does not prove that no other page needs recovery.')
+                .replace('{pages}', String(rec.sampled_pages))}
+            </p>
+          )}
           <p className={styles.verdict}>
             {rec.damaged > 0
-              ? t('{pages} pages have a text layer that is not readable words. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite.')
+              ? (rec.counts_estimated
+                ? t('About {pages} pages are projected to have a text layer that is not readable words. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite.')
+                : t('{pages} pages have a text layer that is not readable words. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite.'))
                   .replace('{pages}', String(rec.damaged))
-              : t('{pages} pages are only pictures of pages. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite.')
+              : (rec.counts_estimated
+                ? t('About {pages} pages are projected to be only pictures of pages. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite.')
+                : t('{pages} pages are only pictures of pages. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite.'))
                   .replace('{pages}', String(rec.image_only))}
           </p>
           <dl className={styles.facts}>
@@ -239,9 +277,11 @@ export function Reflow({ id }: { id: string }) {
                 : t('Not installed')} />
             <Fact label={t('Language data')} value={ocrLang} />
             <Fact label={t('Local time (no OpenRouter credit)')}
-              value={t('about {seconds}s for {pages} pages')
-                .replace('{seconds}', String(rec.estimated_seconds))
-                .replace('{pages}', String(rec.ocr_candidates))} />
+              value={rec.estimated_seconds === null
+                ? t('Not measured until recovery runs')
+                : t('about {seconds}s for {pages} pages')
+                  .replace('{seconds}', String(rec.estimated_seconds))
+                  .replace('{pages}', String(rec.ocr_candidates))} />
           </dl>
           {rec.non_latin_share >= 0.5 && (
             <p className={styles.capWarn} role="status">

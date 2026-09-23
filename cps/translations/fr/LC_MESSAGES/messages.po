@@ -17343,3 +17343,76 @@ msgstr "Cet échantillon n’est plus conservé"
 #: cps/spa_strings.py
 msgid "Sample EPUB SHA-256: {hash}"
 msgstr "SHA-256 de l’EPUB de l’échantillon : {hash}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "About {pages} pages are projected to be only pictures of pages. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite."
+msgstr "Environ {pages} pages sont estimées ne contenir que des images. Elles sont lues depuis la page imprimée avec une reconnaissance locale du texte — une transcription de la source, jamais une réécriture."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "About {pages} pages are projected to have a text layer that is not readable words. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite."
+msgstr "Environ {pages} pages sont estimées avoir une couche de texte qui ne contient pas de mots lisibles. Elles sont lues depuis la page imprimée avec une reconnaissance locale du texte — une transcription de la source, jamais une réécriture."
+
+#: cps/spa_strings.py
+msgid "Assessment scope"
+msgstr "Portée de l’évaluation"
+
+#: cps/spa_strings.py
+msgid "Complete source assessment"
+msgstr "Évaluation complète de la source"
+
+#: cps/spa_strings.py
+msgid "Damaged text observed — recovery may be needed"
+msgstr "Texte endommagé observé — une récupération peut être nécessaire"
+
+#: cps/spa_strings.py
+msgid "Native text observed in the sampled pages (not proofread)"
+msgstr "Texte natif observé dans les pages échantillonnées (non relu)"
+
+#: cps/spa_strings.py
+msgid "Not measured until recovery runs"
+msgstr "Non mesuré avant l’exécution de la récupération"
+
+#: cps/spa_strings.py
+msgid "Page images observed — recovery may be needed"
+msgstr "Images de pages observées — une récupération peut être nécessaire"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Recovery counts are projected from {pages} sampled pages. A zero does not prove that no other page needs recovery."
+msgstr "Les comptes de récupération sont estimés à partir de {pages} pages échantillonnées. Un zéro ne prouve pas qu’aucune autre page n’a besoin de récupération."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sampled {pages} pages"
+msgstr "{pages} pages échantillonnées"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "This assessment sampled {pages} pages. Text findings and recovery counts are projected for the rest of the PDF; pages outside the sample may differ."
+msgstr "Cette évaluation a échantillonné {pages} pages. Les constats sur le texte et les comptes de récupération sont estimés pour le reste du PDF ; les pages hors de l’échantillon peuvent différer."
+
+#: cps/spa_strings.py
+msgid "The sampled pages are pictures of pages with OCR text behind them. The words are readable, but the structure has to be rebuilt."
+msgstr "Les pages échantillonnées sont des images avec du texte OCR sous-jacent. Les mots sont lisibles, mais la structure doit être reconstruite."
+
+#: cps/spa_strings.py
+msgid "The sampled pages have a native text layer. Extraction and punctuation may still differ from the printed page; original-source evidence remains available."
+msgstr "Les pages échantillonnées ont une couche de texte native. L’extraction et la ponctuation peuvent encore différer de la page imprimée ; la preuve de la source originale reste disponible."
+
+#: cps/spa_strings.py
+msgid "No usable text was found in the sampled pages, only page images. Text recovery settings determine how those pages are read; review a sample for recognition errors."
+msgstr "Aucun texte utilisable n’a été trouvé dans les pages échantillonnées, seulement des images. Les réglages de récupération déterminent comment ces pages sont lues ; examinez un échantillon pour détecter les erreurs de reconnaissance."
+
+#: cps/spa_strings.py
+msgid "The sampled pages have a text layer, but it is not readable words. They have to be treated as if there were no text at all."
+msgstr "Les pages échantillonnées ont une couche de texte, mais elle ne contient pas de mots lisibles. Elles doivent être traitées comme s’il n’y avait pas de texte du tout."
+
+#: cps/spa_strings.py
+msgid "The sampled pages have not been assessed."
+msgstr "Les pages échantillonnées n’ont pas été évaluées."
+
+#: cps/spa_strings.py
+msgid "The sampled pages have very little text. This may be a sparse scan, or two printed pages photographed as one."
+msgstr "Les pages échantillonnées contiennent très peu de texte. Il peut s’agir d’un scan clairsemé ou de deux pages imprimées photographiées ensemble."

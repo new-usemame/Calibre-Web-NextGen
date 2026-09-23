@@ -16828,3 +16828,76 @@ msgstr "Dit voorproefje wordt niet meer bewaard"
 #: cps/spa_strings.py
 msgid "Sample EPUB SHA-256: {hash}"
 msgstr "SHA-256 van de EPUB van het voorproefje: {hash}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "About {pages} pages are projected to be only pictures of pages. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite."
+msgstr "Naar schatting bestaan {pages} pagina’s alleen uit afbeeldingen. Ze worden vanaf de gedrukte pagina gelezen met lokale tekstherkenning — een transcriptie van de bron, nooit een herschrijving."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "About {pages} pages are projected to have a text layer that is not readable words. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite."
+msgstr "Naar schatting hebben {pages} pagina’s een tekstlaag zonder leesbare woorden. Ze worden vanaf de gedrukte pagina gelezen met lokale tekstherkenning — een transcriptie van de bron, nooit een herschrijving."
+
+#: cps/spa_strings.py
+msgid "Assessment scope"
+msgstr "Bereik van de beoordeling"
+
+#: cps/spa_strings.py
+msgid "Complete source assessment"
+msgstr "Volledige bronbeoordeling"
+
+#: cps/spa_strings.py
+msgid "Damaged text observed — recovery may be needed"
+msgstr "Beschadigde tekst waargenomen — herstel kan nodig zijn"
+
+#: cps/spa_strings.py
+msgid "Native text observed in the sampled pages (not proofread)"
+msgstr "Oorspronkelijke tekst waargenomen in de bemonsterde pagina’s (niet nagelezen)"
+
+#: cps/spa_strings.py
+msgid "Not measured until recovery runs"
+msgstr "Niet gemeten totdat herstel wordt uitgevoerd"
+
+#: cps/spa_strings.py
+msgid "Page images observed — recovery may be needed"
+msgstr "Pagina-afbeeldingen waargenomen — herstel kan nodig zijn"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Recovery counts are projected from {pages} sampled pages. A zero does not prove that no other page needs recovery."
+msgstr "Hersteltellingen zijn geschat op basis van {pages} bemonsterde pagina’s. Een nul bewijst niet dat geen andere pagina herstel nodig heeft."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Sampled {pages} pages"
+msgstr "{pages} pagina’s bemonsterd"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "This assessment sampled {pages} pages. Text findings and recovery counts are projected for the rest of the PDF; pages outside the sample may differ."
+msgstr "Deze beoordeling bemonsterde {pages} pagina’s. Tekstbevindingen en hersteltellingen zijn geschat voor de rest van de PDF; pagina’s buiten de steekproef kunnen verschillen."
+
+#: cps/spa_strings.py
+msgid "The sampled pages are pictures of pages with OCR text behind them. The words are readable, but the structure has to be rebuilt."
+msgstr "De bemonsterde pagina’s zijn afbeeldingen met OCR-tekst erachter. De woorden zijn leesbaar, maar de structuur moet opnieuw worden opgebouwd."
+
+#: cps/spa_strings.py
+msgid "The sampled pages have a native text layer. Extraction and punctuation may still differ from the printed page; original-source evidence remains available."
+msgstr "De bemonsterde pagina’s hebben een oorspronkelijke tekstlaag. Extractie en interpunctie kunnen nog afwijken van de gedrukte pagina; bewijs van de oorspronkelijke bron blijft beschikbaar."
+
+#: cps/spa_strings.py
+msgid "No usable text was found in the sampled pages, only page images. Text recovery settings determine how those pages are read; review a sample for recognition errors."
+msgstr "In de bemonsterde pagina’s is geen bruikbare tekst gevonden, alleen pagina-afbeeldingen. Herstelinstellingen bepalen hoe die pagina’s worden gelezen; bekijk een voorbeeld op herkenningsfouten."
+
+#: cps/spa_strings.py
+msgid "The sampled pages have a text layer, but it is not readable words. They have to be treated as if there were no text at all."
+msgstr "De bemonsterde pagina’s hebben een tekstlaag, maar die bevat geen leesbare woorden. Ze moeten worden behandeld alsof er helemaal geen tekst is."
+
+#: cps/spa_strings.py
+msgid "The sampled pages have not been assessed."
+msgstr "De bemonsterde pagina’s zijn niet beoordeeld."
+
+#: cps/spa_strings.py
+msgid "The sampled pages have very little text. This may be a sparse scan, or two printed pages photographed as one."
+msgstr "De bemonsterde pagina’s bevatten heel weinig tekst. Dit kan een ijle scan zijn, of twee gedrukte pagina’s die als één zijn gefotografeerd."

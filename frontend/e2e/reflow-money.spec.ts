@@ -10,12 +10,13 @@ function assessment(): SourceAssessment {
   return { book_id: 1, title: 'Source conversion example', verdict: 'BORN_DIGITAL', pages: 60,
     text_layer: true, sample_suggested: true, existing_epub: false, configured: true,
     hard_cap_usd: 5, sample_pages_default: 20, sample_pages_max: 60, sampled: 40, cached: true,
+    assessment_scope: 'complete',
     instance_budget: { status: 'available', remaining_usd: 2, window_hours: 24 },
     source_sha256: 'a'.repeat(64), consent_contract: 'source-review-1',
     review: { quality_released: true, route_version: 'test-route', source_revision: 'test-source',
       provider: 'openai/flex', service_tier: 'flex', proposer: 'openai/gpt-5.6-luna',
       verifier: 'openai/gpt-5.6-terra', max_output_tokens: 4096 },
-    recovery: { ocr_candidates: 0, image_only: 0, damaged: 0, estimated_seconds: 0,
+    recovery: { ocr_candidates: 0, image_only: 0, damaged: 0, counts_estimated: false, sampled_pages: 60, estimated_seconds: 0,
       engine_available: true, engine_version: 'tesseract 5.3.4', engine_detail: '', language: 'eng',
       dpi: 300, pdf_sha256: 'a'.repeat(16), non_latin_share: 0 } };
 }
@@ -83,6 +84,39 @@ async function preparePaid(page: Page) {
   await page.getByRole('button', { name: 'Prepare AI estimate', exact: true }).click();
   await expect(page.getByText('Source estimate ready. No credit has been reserved.', { exact: true })).toBeVisible();
 }
+
+test('complete and sampled source assessments disclose observed scope and unknown recovery duration', async ({ page }) => {
+  // The complete path keeps concrete facts. A bounded survey must not reuse
+  // those whole-book words or turn its unknown OCR duration into zero seconds.
+  const complete = assessment();
+  complete.recovery = { ...complete.recovery, ocr_candidates: 3, image_only: 3, estimated_seconds: 18 };
+  const completeRun = await stub(page, complete);
+  const assessmentCard = page.locator('section[aria-labelledby="reflow-assessment"]');
+  const recoveryCard = page.locator('section[aria-labelledby="reflow-recovery"]');
+  await expect(assessmentCard).toContainText('Complete source assessment');
+  await expect(assessmentCard).not.toContainText('Text findings and recovery counts are projected');
+  await expect(recoveryCard).toContainText('3 pages are only pictures of pages.');
+  await expect(recoveryCard).toContainText('about 18s for 3 pages');
+  assertNoPageErrors(completeRun.errors);
+
+  const sampled = assessment();
+  sampled.assessment_scope = 'sample'; sampled.sampled = 12;
+  sampled.recovery = { ...sampled.recovery, ocr_candidates: 14, image_only: 14,
+    counts_estimated: true, sampled_pages: 12, estimated_seconds: null };
+  const sampledRun = await stub(page, sampled);
+  const sampledAssessment = page.locator('section[aria-labelledby="reflow-assessment"]');
+  const sampledRecovery = page.locator('section[aria-labelledby="reflow-recovery"]');
+  await expect(sampledAssessment).toContainText('Sampled 12 pages');
+  await expect(sampledAssessment).toContainText('Text findings and recovery counts are projected for the rest of the PDF');
+  await expect(sampledRecovery).toContainText('Recovery counts are projected from 12 sampled pages. A zero does not prove that no other page needs recovery.');
+  await expect(sampledRecovery).toContainText('About 14 pages are projected to be only pictures of pages.');
+  await expect(sampledRecovery).toContainText('Not measured until recovery runs');
+  await expect(sampledRecovery).not.toContainText('about 0s');
+  const findings = await new AxeBuilder({ page }).include('section[aria-labelledby="reflow-assessment"]')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(findings.violations.filter((v) => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
+  assertNoPageErrors(sampledRun.errors);
+});
 
 test('keyless source conversion remains usable and cannot silently become paid review', async ({ page }) => {
   const est = assessment(); est.configured = false; est.review.quality_released = false;

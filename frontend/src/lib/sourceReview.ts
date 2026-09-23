@@ -7,6 +7,9 @@ export type SourceAssessment = Pick<ReflowEstimate,
   'book_id' | 'title' | 'verdict' | 'pages' | 'text_layer' | 'sample_suggested' |
   'existing_epub' | 'configured' | 'hard_cap_usd' | 'sample_pages_default' |
   'sample_pages_max' | 'sampled' | 'cached' | 'recovery'> & {
+    /** Basic assessment reads a bounded text-layer survey on long PDFs. Its
+     *  recovery totals are projections, unlike a complete assessment. */
+    assessment_scope: 'sample' | 'complete';
     source_sha256: string;
     instance_budget: { status: InstanceBudgetStatus; remaining_usd: number | null; window_hours: 24 };
     consent_contract: string;

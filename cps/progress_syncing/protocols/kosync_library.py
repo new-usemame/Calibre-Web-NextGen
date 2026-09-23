@@ -174,17 +174,10 @@ def get_library():
 
 def _cover_path(book):
     root = _library_root()
-    if root is None or not getattr(book, "has_cover", False):
+    if root is None or not getattr(book, "has_cover", False) or not book.path:
         return None
-    base = os.path.realpath(root)
-    directory = os.path.realpath(os.path.join(base, book.path or ""))
-    try:
-        if os.path.commonpath((base, directory)) != base:
-            return None
-    except ValueError:
-        return None
-    path = os.path.join(directory, "cover.jpg")
-    return path if os.path.isfile(path) else None
+    path = koreader_library.inside_library(root, book.path, "cover.jpg")
+    return path if path and os.path.isfile(path) else None
 
 
 def _placeholder_language():

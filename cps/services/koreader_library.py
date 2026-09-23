@@ -335,16 +335,27 @@ _CHECKSUMS_LOCK = threading.Lock()
 _CHECKSUMS_MAX = 50000
 
 
-def library_file_path(library_root, book_path, fmt_row):
-    """Absolute path of one format file, or ``None`` if it escapes the library."""
+def inside_library(library_root, *parts):
+    """The real path of ``parts`` joined under the library, or ``None``.
+
+    The final path is resolved (``..`` and symlinks) and must lie inside the
+    library: checking only the book's folder would let a stored file name such
+    as ``../../x`` lead anywhere.
+    """
     root = os.path.realpath(library_root)
-    directory = os.path.realpath(os.path.join(root, book_path or ""))
+    path = os.path.realpath(os.path.join(root, *[part or "" for part in parts]))
     try:
-        if os.path.commonpath((root, directory)) != root:
+        if path == root or os.path.commonpath((root, path)) != root:
             return None
     except ValueError:
         return None
-    return os.path.join(directory, "%s.%s" % (fmt_row.name, fmt_row.format.lower()))
+    return path
+
+
+def library_file_path(library_root, book_path, fmt_row):
+    """Absolute path of one format file, or ``None`` if it escapes the library."""
+    return inside_library(library_root, book_path,
+                          "%s.%s" % (fmt_row.name, fmt_row.format.lower()))
 
 
 def file_facts(path):

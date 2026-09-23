@@ -419,6 +419,27 @@ def test_books_outside_the_readers_library_or_rights_are_refused(world):
     assert bad.status_code == 401
 
 
+def test_a_file_name_cannot_lead_outside_the_library(world, tmp_path):
+    """The book's folder is checked, and so is the file in it: a format whose
+    stored name climbs out of the folder (as a crafted metadata.db can say) is
+    refused, and nothing outside the library is read for the manifest either."""
+    from cps import db
+    world.add_user("reader")
+    world.add_book(1, "Climber")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "secret.epub").write_bytes(b"not a book of this library " * 40)
+    data = world.session.query(db.Data).filter(db.Data.book == 1).one()
+    data.name = "../../../outside/secret"  # from library/<author>/<title (1)>/
+    world.session.commit()
+
+    response = _file(world, 1)
+    assert response.status_code == 404
+    assert b"not a book of this library" not in response.get_data()
+    books, _body = _books(world)
+    assert books[1]["size"] is None and books[1]["checksum"] is None
+
+
 def test_my_library_bounds_what_a_device_may_fetch(world):
     reader = world.add_user("reader", my_library=True)
     world.add_book(1, "Mine")

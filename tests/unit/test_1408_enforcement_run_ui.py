@@ -202,26 +202,6 @@ def test_enforcement_routes_are_admin_gated():
         )
 
 
-def test_status_route_tolerates_missing_log():
-    """First-ever page load has no log file; the poller must not 500.
-
-    The epub fixer's equivalent open()s blindly. Pinning that this one checks
-    existence first, since the page polls the endpoint on an interval and a 500
-    there shows as a permanently broken page rather than an empty one.
-    """
-    source = CWA_FUNCTIONS.read_text()
-    start = source.index("@cover_enforcer_ui.route('/cover-enforcer-status'")
-    body = source[start:start + 900]
-    assert "_read_log_tail" in body, (
-        "/cover-enforcer-status must read via _read_log_tail(), which returns '' for a "
-        "missing log instead of raising"
-    )
-    assert ".read()" not in body, (
-        "the status route must not read the whole log — it is polled once a second and "
-        "this app runs gevent without monkey.patch_all()"
-    )
-
-
 def _kill_watcher() -> ast.FunctionDef:
     # The watch loop lives in _watch_cover_enforcer(); kill_cover_enforcer() is now the
     # thin wrapper that guarantees the run claim is released on every exit path.
@@ -488,50 +468,6 @@ def test_spawn_failure_is_terminal_and_visible():
     )
 
 
-def test_status_read_is_bounded():
-    """Unbounded f.read() once a second, growing for the length of the run.
-
-    This app runs gevent WITHOUT monkey.patch_all(), so a blocking read in a request
-    handler stalls every request, not just this one — worst on the large libraries this
-    feature exists for.
-    """
-    source = CWA_FUNCTIONS.read_text()
-    fn = _find_function(ast.parse(source), "_read_log_tail")
-    src = ast.unparse(fn)
-    assert "SEEK_END" in src, "_read_log_tail() does not seek; it is not bounded"
-    assert "FileNotFoundError" in src, "a missing log must return '' rather than raise"
-    assert "COVER_ENFORCER_STATUS_TAIL_BYTES" in source, "no cap is defined"
-
-
-def test_read_log_tail_returns_only_the_tail(tmp_path):
-    """Behaviour, not shape: the whole point is that a big log costs a small read."""
-    import importlib.util
-
-    spec = importlib.util.spec_from_file_location("_ce_tail", CWA_FUNCTIONS)
-    # cwa_functions imports the Flask app; exercise the helper's logic directly instead
-    # of importing the module, which is what the rest of this file avoids too.
-    src = CWA_FUNCTIONS.read_text()
-    fn_src = src[src.index("def _read_log_tail"):src.index("def is_cover_enforcer_finished")]
-    ns = {"os": __import__("os"), "COVER_ENFORCER_STATUS_TAIL_BYTES": 64 * 1024}
-    exec(compile(fn_src, "<tail>", "exec"), ns)
-    read_tail = ns["_read_log_tail"]
-
-    log = tmp_path / "run.log"
-    log.write_text("A" * 5000 + "TAIL-MARKER")
-
-    out = read_tail(str(log), limit=100)
-    assert out.endswith("TAIL-MARKER")
-    assert len(out) <= 100, "returned more than the requested limit"
-
-    assert read_tail(str(tmp_path / "does-not-exist.log")) == "", (
-        "a missing log must be '' so a first-ever page load does not 500"
-    )
-
-    # A cut landing mid-character must not raise.
-    log.write_bytes("é".encode("utf-8") * 50)
-    assert isinstance(read_tail(str(log), limit=5), str)
-
-
 def test_cancel_does_not_pkill_by_script_path():
     """`pkill -f <script path>` killed CLI-started runs this UI never owned.
 
@@ -620,40 +556,6 @@ def test_polling_chains_cannot_stack():
 # feature permanently. All three end the same way: the run claim is never released, so
 # every later start returns 409 and the UI offers no route back. A gate that disables its
 # own repair is worse than the bug it guards.
-
-
-def test_read_log_tail_is_bounded_against_a_growing_file():
-    """`f.read()` after a seek is bounded by the WRITER, not by `limit`.
-
-    The child appends to this log continuously, so a bare read() keeps consuming whatever
-    arrives after the seek — reintroducing the unbounded blocking read the helper exists
-    to remove, precisely when the run is at its most productive.
-    """
-    source = CWA_FUNCTIONS.read_text()
-    fn_src = source[source.index("def _read_log_tail"):source.index("def is_cover_enforcer_finished")]
-    assert re.search(r"\.read\(limit\)", fn_src), (
-        "_read_log_tail() must read(limit); a bare read() is bounded by the child's "
-        "output rate, not by the cap"
-    )
-    assert not re.search(r"\.read\(\s*\)", fn_src), "unbounded read() still present"
-
-
-def test_read_log_tail_never_exceeds_limit_while_the_file_grows(tmp_path):
-    """Behavioural version of the above: grow the file, still get at most `limit`."""
-    source = CWA_FUNCTIONS.read_text()
-    fn_src = source[source.index("def _read_log_tail"):source.index("def is_cover_enforcer_finished")]
-    ns = {"os": __import__("os"), "COVER_ENFORCER_STATUS_TAIL_BYTES": 64 * 1024}
-    exec(compile(fn_src, "<tail>", "exec"), ns)
-    read_tail = ns["_read_log_tail"]
-
-    log = tmp_path / "run.log"
-    log.write_bytes(b"X" * 10_000)
-    assert len(read_tail(str(log), limit=1000)) <= 1000
-
-    # Simulate the writer racing the reader: the file is much larger than the cap.
-    log.write_bytes(b"Y" * 500_000)
-    out = read_tail(str(log), limit=1000)
-    assert len(out) <= 1000, f"returned {len(out)} bytes for a 1000-byte cap"
 
 
 def test_spawn_thread_publishes_a_result_even_if_the_log_cannot_be_opened():

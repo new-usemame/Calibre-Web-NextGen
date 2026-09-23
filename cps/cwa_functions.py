@@ -1998,6 +1998,45 @@ def _service_log_path(filename: str) -> str:
     """Resolve a service log beneath the active config directory."""
     return constants.config_path(filename)
 
+# Bytes of log returned to a service page's status poller. The full log stays
+# downloadable; this is only the live view, and the poller replaces its contents on
+# every tick, so anything above the visible scrollback is re-sent for nothing. An
+# unbounded f.read() grows for the length of the run and is re-paid once a second by
+# every open page - and this app runs gevent WITHOUT monkey.patch_all(), so a blocking
+# read in a request handler stalls every other request, not just this one.
+SERVICE_STATUS_TAIL_BYTES = 64 * 1024
+
+def _read_log_tail(log_path: str, limit: int = SERVICE_STATUS_TAIL_BYTES) -> str:
+    """Return at most the last `limit` bytes of `log_path` ("" when absent).
+
+    The one reader behind every service status poll and run-finished check. A service
+    writes its log on its first run, so before then the file does not exist and "" is
+    the honest answer: extract_progress("") is 0/0 and no end marker is present (#2227).
+
+    Seeks to the end and reads backwards rather than reading the whole file, so the
+    cost is constant in the log's size instead of growing for the length of the run.
+    """
+    try:
+        with open(log_path, 'rb') as f:
+            f.seek(0, os.SEEK_END)
+            size = f.tell()
+            f.seek(max(0, size - limit))
+            # read(limit), not read(). The child appends to this file continuously, so a
+            # bare read() keeps consuming whatever arrives after the seek and is bounded
+            # by the child's output rate rather than by `limit` - which is the unbounded
+            # blocking read this helper exists to remove.
+            chunk = f.read(limit)
+    except FileNotFoundError:
+        return ""
+    # A backwards seek can land mid-character; drop the partial one rather than raise.
+    return chunk.decode('utf-8', errors='replace')
+
+def _service_status(log_filename: str):
+    """The JSON a service page polls: the log's tail and the progress parsed from it."""
+    status = _read_log_tail(_service_log_path(log_filename))
+    return jsonify({'status': status,
+                    'progress': extract_progress(status)})
+
 ##———————————————————END OF SHARED VARIABLES & FUNCTIONS———————————————————————##
 
 def convert_library_start(queue):
@@ -2018,12 +2057,8 @@ def empty_tmp_con_dir(tmp_conversion_dir) -> None:
         print(f"[cwa-functions]: An error occurred while emptying {tmp_conversion_dir}. See the following error: {e}")
 
 def is_convert_library_finished() -> bool:
-    log_path = _service_log_path("convert-library.log")
-    with open(log_path, 'r') as log:
-        if "NextGen Convert Library Service - Run Ended: " in log.read():
-            return True
-        else:
-            return False
+    return "NextGen Convert Library Service - Run Ended: " in _read_log_tail(
+        _service_log_path("convert-library.log"))
 
 def kill_convert_library(queue):
     trigger_file = Path(tempfile.gettempdir() + "/.kill_convert_library_trigger")
@@ -2152,12 +2187,7 @@ def cancel_convert_library():
 @login_required_if_no_ano
 @admin_required
 def get_status():
-    with open(_service_log_path("convert-library.log"), 'r') as f:
-        status = f.read()
-    progress = extract_progress(status)
-    statusList = {'status':status,
-                  'progress':progress}
-    return json.dumps(statusList)
+    return _service_status("convert-library.log")
 
 
 ##————————————————————————————————————————————————————————————————————————————##
@@ -2174,12 +2204,8 @@ def epub_fixer_start(queue, input_file: str | None = None):
     queue.put(ef_process)
 
 def is_epub_fixer_finished() -> bool:
-    log_path = _service_log_path("epub-fixer.log")
-    with open(log_path, 'r') as log:
-        if "NextGen Kindle EPUB Fixer Service - Run Ended: " in log.read():
-            return True
-        else:
-            return False
+    return "NextGen Kindle EPUB Fixer Service - Run Ended: " in _read_log_tail(
+        _service_log_path("epub-fixer.log"))
 
 def kill_epub_fixer(queue):
     trigger_file = Path(tempfile.gettempdir() + "/.kill_epub_fixer_trigger")
@@ -2361,12 +2387,7 @@ def cancel_epub_fixer():
 @login_required_if_no_ano
 @admin_required
 def get_status():
-    with open(_service_log_path("epub-fixer.log"), 'r') as f:
-        status = f.read()
-    progress = extract_progress(status)
-    statusList = {'status':status,
-                  'progress':progress}
-    return json.dumps(statusList)
+    return _service_status("epub-fixer.log")
 
 
 ##————————————————————————————————————————————————————————————————————————————##
@@ -2383,15 +2404,6 @@ def get_status():
 # the spawn, so a slow Popen cannot block the status poller.
 _cover_enforcer_lock = Lock()
 _cover_enforcer_run = {'active': False}
-
-# Bytes of log returned to the status poller. The full log stays downloadable via the
-# Download Log button; this is only the live view, and the poller replaces its contents
-# on every tick, so anything above the visible scrollback is re-sent for nothing. The
-# unbounded f.read() this replaces grew for the length of the run and was re-paid once a
-# second by every open page - and this app runs gevent WITHOUT monkey.patch_all(), so a
-# blocking read in a request handler stalls every other request, not just this one.
-COVER_ENFORCER_STATUS_TAIL_BYTES = 64 * 1024
-
 
 def _release_cover_enforcer_run():
     with _cover_enforcer_lock:
@@ -2457,27 +2469,6 @@ def cover_enforcer_start(queue):
                 log.error(f"Failed to close the cover enforcer log: {e}")
         # Exactly one result reaches the watcher on every path.
         queue.put(ce_process)
-
-def _read_log_tail(log_path: str, limit: int = COVER_ENFORCER_STATUS_TAIL_BYTES) -> str:
-    """Return at most the last `limit` bytes of `log_path` ("" when absent).
-
-    Seeks to the end and reads backwards rather than reading the whole file, so the
-    cost is constant in the log's size instead of growing for the length of the run.
-    """
-    try:
-        with open(log_path, 'rb') as f:
-            f.seek(0, os.SEEK_END)
-            size = f.tell()
-            f.seek(max(0, size - limit))
-            # read(limit), not read(). The child appends to this file continuously, so a
-            # bare read() keeps consuming whatever arrives after the seek and is bounded
-            # by the child's output rate rather than by `limit` - which is the unbounded
-            # blocking read this helper exists to remove.
-            chunk = f.read(limit)
-    except FileNotFoundError:
-        return ""
-    # A backwards seek can land mid-character; drop the partial one rather than raise.
-    return chunk.decode('utf-8', errors='replace')
 
 def is_cover_enforcer_finished() -> bool:
     # Only the tail is scanned: the marker is written at the END of the run, so reading
@@ -2724,14 +2715,7 @@ def cancel_cover_enforcer():
 @login_required_if_no_ano
 @admin_required
 def get_status():
-    log_path = _service_log_path("cover-enforcer.log")
-    # Bounded tail, not the whole file - see COVER_ENFORCER_STATUS_TAIL_BYTES. Returns ""
-    # when the log does not exist yet, so a first-ever page load still gets valid JSON.
-    status = _read_log_tail(log_path)
-    progress = extract_progress(status)
-    statusList = {'status':status,
-                  'progress':progress}
-    return jsonify(statusList)
+    return _service_status("cover-enforcer.log")
 
 
 # ################################### Profile Pictures ###################################################

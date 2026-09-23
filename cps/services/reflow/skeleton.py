@@ -628,6 +628,16 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
                                                       style)
         skel.regions.extend(artwork)
 
+    # Preserve source-established columns before uncertain prose becomes images;
+    # the remaining confident words alone may no longer prove the reading order.
+    source_layout = None
+    if any(sp.font=='ocr' and sp.uncertain for _,lines in kept_blocks
+           for ln in lines for sp in ln.spans):
+        source_layout = _column_layout(kept_blocks, embedded, candidates, raw,
+                                       pixel_probe=pixel_probe)
+        if isinstance(source_layout, _RowTable):
+            source_layout = None
+
     # Confidence is not a probability of correctness. Once OCR doubts a word,
     # its paragraph is not a trustworthy transcription, including confident
     # neighbors. Keep that source region as pixels rather than corrected prose.
@@ -646,6 +656,8 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
 
     layout = _column_layout(kept_blocks, embedded, candidates, raw,
                             pixel_probe=pixel_probe)
+    if layout is None and source_layout is not None:
+        layout = source_layout
     if isinstance(layout, _RowTable):
         # The rows are measured, and the page keeps the printed (y, x) order --
         # but each row's cells are emitted as one region, because the paragraph
@@ -744,6 +756,13 @@ def _unverified_column_region(raw):
     lines=[ln for block in raw.text_blocks for ln in block.lines if ln.stripped]
     if not lines:return None
     em=median(ln.size for ln in lines)
+    tabular=[ln for ln in lines if '\t' in ln.text and re.search(r'\d+\s*$',ln.text)]
+    if len(tabular)>=4:
+        right=median(ln.bbox[2] for ln in tabular)
+        aligned=[ln for ln in tabular if abs(ln.bbox[2]-right)<=em*2]
+        if len(aligned)>=4:
+            box=_lines_bbox(aligned,aligned[0].bbox)
+            return (max(0,box[0]-3),max(0,box[1]-3),min(raw.width,box[2]+3),min(raw.height,box[3]+3))
     clusters=[]
     for ln in sorted(lines,key=lambda ln:ln.x0):
         if ln.bbox[2]-ln.x0 > raw.width*.42:continue

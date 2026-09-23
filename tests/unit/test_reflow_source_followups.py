@@ -129,3 +129,37 @@ def test_unverified_three_column_layout_owns_pixels_once_and_preserves_surroundi
             assert tuple(regions[0]['bbox'])==(0,0,440,500)
         path=tmp_path/'layout.epub';build_epub.build(book,str(path),doc=doc)
         assert build_epub.validate(str(path))==[]
+
+
+def test_uncertain_ocr_crops_keep_the_proven_column_reading_order():
+    blocks=[]
+    for x in (30,280):
+        for y in (100,200,300):
+            lines=[]
+            for j,text in enumerate(('This source paragraph begins with words',
+                                      'and continues as ordinary prose in its column.',
+                                      'The final source line ends this paragraph.')):
+                span=extract.Span(text,10,'ocr',0,(x,y+j*13,x+200,y+j*13+10),uncertain=j==1)
+                lines.append(extract.Line([span],span.bbox))
+            blocks.append(extract.Block(len(blocks),(x,y,x+200,y+36),lines))
+    raw=extract.RawPage(pno=0,width=520,height=450,blocks=blocks,
+        images=[extract.Image(bbox=(0,0,520,450),area_ratio=1.0)])
+    style=skeleton.book_style([raw]);book=assemble.assemble([skeleton.page_skeleton(raw,style)],style,[raw])
+    assert book.conservation.ok
+    positions=[f['bbox'][0] for f in book.figures if f['found']=='ocr_uncertain_region']
+    assert len(positions)==6
+    assert max(positions[:3])<min(positions[3:])
+
+
+@pytest.mark.parametrize('invisible',[True,False])
+def test_source_tabular_contents_rows_do_not_flatten_an_unverified_scan(invisible):
+    lines=[]
+    for i,label in enumerate(('The first source chapter in the printed book','The second source chapter in the printed book','The third source chapter in the printed book','The last source chapter in the printed book')):
+        span=extract.Span(label+'\t'+str(20+i*10),10,'Times',0,(30,100+i*18,380,110+i*18))
+        lines.append(extract.Line([span],span.bbox))
+    raw=extract.RawPage(pno=0,width=420,height=400,blocks=[extract.Block(0,(30,100,380,164),lines)],
+        images=[extract.Image(bbox=(0,0,420,400),area_ratio=1.0)],text_layer_invisible=invisible)
+    style=skeleton.book_style([raw]);book=assemble.assemble([skeleton.page_skeleton(raw,style)],style,[raw])
+    assert book.conservation.ok
+    assert bool([f for f in book.figures if f['found']=='unverified_scan_layout']) is invisible
+    assert any('The first source chapter' in e.text for e in book.elements) is not invisible

@@ -189,3 +189,25 @@ def test_glyph_style_exception_does_not_authorize_other_markup(attack):
     else:img.set('alt','')
     names={'OEBPS/'+image_name(record),'OEBPS/images/ordinary.jpg','OEBPS/original-p0000.xhtml','OEBPS/original-p0001.xhtml'}
     assert build_epub._active_markup('OEBPS/ch001.xhtml',root,names)
+
+
+def test_multiple_raised_suffixes_use_independent_native_gaps_on_one_line():
+    body=extract.Span('1 sign and 12 sign',10,'Times',0,(10,20,110,30),
+        char_boxes=((0,1,10,20,15,30),(1,2,22,20,25,30),
+                    (11,12,65,20,70,30),(12,13,70,20,75,30),(13,14,83,20,86,30)))
+    one=extract.Span('st',6,'Times',0,(15.5,18,21,24))
+    two=extract.Span('th',6,'Times',0,(75.5,18,82,24))
+    result=normalize_blocks([extract.Block(0,(10,18,110,30),
+        [extract.Line([body],body.bbox),extract.Line([one],one.bbox),extract.Line([two],two.bbox)])])
+    assert len(result[0].lines)==1
+    spans=result[0].lines[0].spans
+    assert ''.join(s.text for s in spans)=='1st sign and 12th sign'
+    assert [s.text for s in spans if s.superscript]==['st','th']
+
+
+def test_detached_ordinary_letters_are_not_attached_as_an_ordinal():
+    body=extract.Span('a label',10,'Times',0,(10,20,55,30),char_boxes=((0,1,10,20,15,30),))
+    marker=extract.Span('st',6,'Times',0,(15.5,18,21,24))
+    result=normalize_blocks([extract.Block(0,(10,18,55,30),
+        [extract.Line([body],body.bbox),extract.Line([marker],marker.bbox)])])
+    assert [line.text for line in result[0].lines]==['a label','st']

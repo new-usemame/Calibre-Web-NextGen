@@ -197,7 +197,7 @@ def normalize_blocks(blocks):
     """
     from .extract import Line, Block
     lines = [ln for b in blocks for ln in b.lines]
-    replacements, consumed = {}, set()
+    replacements, consumed, proposals = {}, set(), {}
     for marker in lines:
         if len(marker.spans) != 1 or not re.fullmatch(r'(?:\d{1,3}|st|nd|rd|th)', marker.stripped):
             continue
@@ -218,24 +218,33 @@ def normalize_blocks(blocks):
                     next_x = later[0][2] if later else (line.spans[i+1].bbox[0] if i+1<len(line.spans) else None)
                     if next_x is not None and next_x < small.bbox[2] - line.size*.15:
                         continue
+                    if small.text in ('st','nd','rd','th') and not span.text[:end][-1:].isdigit():
+                        continue
                     targets.append((line, i, end))
         if len(targets) != 1:
             continue
         target, index, offset = targets[0]
-        if id(target) in replacements:
-            replacements[id(target)] = None
+        proposals.setdefault(id(target), (target, []))[1].append((marker, index, offset))
+    for key, (target, additions) in proposals.items():
+        positions=[(index,offset) for _,index,offset in additions]
+        if len(set(positions)) != len(positions):
             continue
-        span = target.spans[index]
-        left = replace(span, text=span.text[:offset], char_boxes=())
-        right = replace(span, text=span.text[offset:], char_boxes=())
-        raised = replace(small, flags=small.flags | 1)
-        spans = target.spans[:index]+[left, raised]+([right] if right.text else [])+target.spans[index+1:]
-        replacements[id(target)] = (marker, Line(spans, target.bbox))
-    for value in replacements.values():
-        if value: consumed.add(id(value[0]))
+        spans=[]
+        for index, span in enumerate(target.spans):
+            cursor=0
+            for marker, _, offset in sorted((item for item in additions if item[1]==index), key=lambda item:item[2]):
+                if offset>cursor:
+                    spans.append(replace(span,text=span.text[cursor:offset],char_boxes=()))
+                small=marker.spans[0]
+                spans.append(replace(small,flags=small.flags | 1))
+                cursor=offset
+            if cursor<len(span.text):
+                spans.append(replace(span,text=span.text[cursor:],char_boxes=()))
+        replacements[key]=Line(spans,target.bbox)
+        consumed.update(id(marker) for marker,_,_ in additions)
     out=[]
     for block in blocks:
-        kept=[replacements[id(ln)][1] if replacements.get(id(ln)) else ln
+        kept=[replacements[id(ln)] if replacements.get(id(ln)) else ln
               for ln in block.lines if id(ln) not in consumed]
         if kept:out.append(Block(block.number, block.bbox, kept, block.kind))
         elif block.kind != 'text':out.append(block)

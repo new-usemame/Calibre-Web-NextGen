@@ -2097,6 +2097,8 @@ function CWNGSync:_onPageUpdate(page)
     if self.last_page ~= page then
         self.last_page = page
         self.last_page_turn_timestamp = os.time()
+        -- Only a book the reader actually moved in has a position to send.
+        self.position_moved = true
         self.page_update_counter = self.page_update_counter + 1
         -- If we've already scheduled a push, regardless of the counter's state, delay it until we're *actually* idle
         if self.periodic_push_scheduled or self.settings.pages_before_update and self.page_update_counter >= self.settings.pages_before_update then
@@ -2154,7 +2156,7 @@ function CWNGSync:pushNow()
             else
                 showSyncError()
             end
-        end)
+        end, true)
     end)
 end
 

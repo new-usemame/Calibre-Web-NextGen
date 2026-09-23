@@ -61,6 +61,31 @@ local function testStatusIsSentOnlyWhenItSaysSomethingNew()
     assertEqual(Pending.statusToSend("new", "finished"), "unread", "resetting a finished book")
 end
 
+local function testOpeningABookWithoutReadingSendsNoPosition()
+    assertEqual(Pending.trimUnmoved({ document = "d1", percentage = 0, progress = "p1",
+        status = "reading" }, false), nil, "opened and closed: nothing to say")
+    local finished = Pending.trimUnmoved({ document = "d1", percentage = 0.1, progress = "p",
+        status = "finished" }, false)
+    assertEqual(finished.percentage, nil, "no position from an unmoved book")
+    assertEqual(finished.status, "finished", "but marking it finished still counts")
+    local highlighted = Pending.trimUnmoved({ document = "d1", percentage = 0.1,
+        annotations = { list = {}, deletions = { "x" } } }, false)
+    assertEqual(highlighted.annotations.deletions[1], "x", "a deleted highlight still counts")
+    local read = Pending.trimUnmoved({ document = "d1", percentage = 0.3, status = "reading" }, true)
+    assertEqual(read.percentage, 0.3, "a turned page sends the position")
+    assertEqual(read.status, "reading", "and the status")
+
+    -- Read offline, then reopened and closed without moving: the earlier
+    -- position is still owed.
+    local queue = {}
+    Pending.record(queue, { document = "d1", percentage = 0.5, progress = "p50", captured_at = 10 })
+    Pending.record(queue, { document = "d1", status = "finished", captured_at = 20 })
+    assertEqual(queue.d1.percentage, 0.5, "earlier position kept")
+    assertEqual(queue.d1.captured_at, 10, "with the time it was captured")
+    assertEqual(queue.d1.status, "finished", "and the new status added")
+end
+
+testOpeningABookWithoutReadingSendsNoPosition()
 testLatestCaptureWinsAndALateDeliveryCannotDropIt()
 testUnsentStatusAndHighlightsSurviveALaterPositionOnlyCapture()
 testAQueuedPositionNeverOverwritesNewerReadingElsewhere()

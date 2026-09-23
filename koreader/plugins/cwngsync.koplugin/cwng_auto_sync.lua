@@ -90,7 +90,8 @@ function AutoSync:saveBookSetting(file, key, value)
 end
 
 -- What the open book owes the server, read while it is still open.
-function AutoSync:captureOpenBook(with_annotations)
+-- explicit: the reader asked to send the position, moved or not.
+function AutoSync:captureOpenBook(with_annotations, explicit)
     if not self:hasCurrentDocument() then return nil end
     local digest = self:getDocumentDigest()
     if not digest then return nil end
@@ -108,6 +109,8 @@ function AutoSync:captureOpenBook(with_annotations)
         status = Pending.statusToSend(summary.status,
             doc_settings and doc_settings:readSetting(PUSHED_STATUS_KEY)),
     }
+    entry = Pending.trimUnmoved(entry, explicit or self.position_moved == true)
+    if not entry then return nil end
     if with_annotations and self.settings.sync_annotations then
         local DeviceAnnotations = require("device_annotations")
         local provider = DeviceAnnotations.getProvider(self.ui, digest)
@@ -119,19 +122,27 @@ function AutoSync:captureOpenBook(with_annotations)
             end
         end
     end
+    if entry.percentage == nil and entry.status == nil and entry.annotations == nil then return nil end
     return entry
 end
 
 -- Queue what the open book owes and deliver it if the device is online.
 -- on_done(ok, reason) reports the delivery (or "offline").
-function AutoSync:queueOpenBook(with_annotations, on_done)
+function AutoSync:queueOpenBook(with_annotations, on_done, explicit)
     if not self:isConfigured() then
         if on_done then on_done(false, "not connected") end
         return
     end
-    local entry = self:captureOpenBook(with_annotations)
+    local entry = self:captureOpenBook(with_annotations, explicit)
     if not entry then
-        if on_done then on_done(false, "no book") end
+        -- Nothing new to say is not a failure; still deliver what is queued.
+        if not self:hasCurrentDocument() then
+            if on_done then on_done(false, "no book") end
+        elseif NetworkMgr:isConnected() then
+            self:flushPending(on_done)
+        elseif on_done then
+            on_done(true)
+        end
         return
     end
     local queue = self:readPending()

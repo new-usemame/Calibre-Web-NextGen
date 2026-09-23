@@ -20,6 +20,11 @@ function Pending.record(queue, entry)
     -- A status or highlight change that has not reached the server yet must
     -- survive a later capture that carries no change of its own.
     if previous then
+        if entry.percentage == nil then
+            entry.progress = previous.progress
+            entry.percentage = previous.percentage
+            entry.captured_at = previous.captured_at
+        end
         if entry.status == nil then entry.status = previous.status end
         if entry.annotations == nil then entry.annotations = previous.annotations end
     end
@@ -36,6 +41,18 @@ function Pending.settle(queue, document, seq)
         return true
     end
     return false
+end
+
+-- Trim a capture to what the reader actually did. A book opened and closed
+-- without a page turned says nothing about the position (sending "page 1"
+-- would pull every other device back to the start), and "reading" is the tag
+-- KOReader puts on any book it opens. Returns nil when nothing is left.
+function Pending.trimUnmoved(entry, moved)
+    if moved then return entry end
+    entry.progress, entry.percentage = nil, nil
+    if entry.status == "reading" then entry.status = nil end
+    if entry.status == nil and entry.annotations == nil then return nil end
+    return entry
 end
 
 -- Whether a queued position should still be sent, given what the server holds

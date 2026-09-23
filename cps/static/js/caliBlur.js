@@ -1044,10 +1044,9 @@ $(function() {
                 );
                 
                 // Handle different click areas
-                if (distanceFromReadIcon <= readIconRadius) {
+                if (distanceFromReadIcon <= readIconRadius && handleDirectReading($link)) {
                     // Direct reading functionality
                     e.preventDefault();
-                    handleDirectReading($link);
                 } else if (distanceFromReadToggle <= readToggleRadius) {
                     // Toggle read status
                     e.preventDefault();
@@ -1066,20 +1065,22 @@ $(function() {
         }
     }
     
+    // Opens the reader and returns true, or returns false when the book has nothing
+    // the reader opens, so the click falls through to what the rest of the cover
+    // does (the details modal, or the detail page). The server renders the formats
+    // (the reader_formats filter) in the order the detail page's "Read now" uses.
+    // A MOBI or AZW3 only book used to open a reader tab that read_book() can only
+    // answer with a 404 (#2249).
     function handleDirectReading($link) {
         var bookId = $link.data('book-id');
-        // The server renders the formats its reader opens, in the order the detail
-        // page's "Read now" uses (the reader_formats filter). A book with none of
-        // them, e.g. MOBI or AZW3 only, opens its detail page instead of a reader
-        // tab that read_book() can only answer with a 404 (#2249).
         var readFormats = String($link.attr('data-book-read-formats') || '')
             .split(',').filter(function(f) { return f; });
 
-        if (bookId && readFormats.length) {
-            window.open(window.scriptRoot + '/read/' + bookId + '/' + readFormats[0], '_blank');
-        } else {
-            window.location.href = $link.attr('href');
+        if (!bookId || !readFormats.length) {
+            return false;
         }
+        window.open(window.scriptRoot + '/read/' + bookId + '/' + readFormats[0], '_blank');
+        return true;
     }
     
     function handleReadStatusToggle($link) {

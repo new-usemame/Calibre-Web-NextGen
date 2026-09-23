@@ -64,6 +64,14 @@ def test_filter_renders_the_reader_list_for_a_viewer():
         assert jinjia.reader_formats_filter(_book("MOBI")) == ""
 
 
+def test_filter_offers_the_audio_player_after_any_reading_format():
+    # read_book() plays these through listenmp3.html; the old JS reached it by
+    # falling back to the first format, so an audiobook's read icon must still work.
+    with _viewer(True):
+        assert jinjia.reader_formats_filter(_book("M4B")) == "m4b"
+        assert jinjia.reader_formats_filter(_book("MP3", "EPUB", "MOBI")) == "epub,mp3"
+
+
 def test_filter_offers_nothing_to_a_user_who_may_not_read():
     # read_book() is @viewer_required; the detail page hides "Read now" for them too.
     with _viewer(False):
@@ -89,23 +97,20 @@ const window = { scriptRoot: scenario.scriptRoot || '', open: (url) => opened.pu
                  location: { href: 'about:grid' } };
 // Executes the shipped function verbatim; the input is our own repo file.
 const handleDirectReading = new Function('window', 'return (' + src.slice(start, end).trim() + ');')(window);
-handleDirectReading($link);
-process.stdout.write(JSON.stringify({ opened, location: window.location.href }) + "\n");
+const handled = handleDirectReading($link);
+process.stdout.write(JSON.stringify({ handled, opened, location: window.location.href }) + "\n");
 """
 
 
-def _click(attrs, script_root=""):
-    harness = Path(__file__).parent / "_tmp_2249_harness.js"
+def _click(tmp_path, attrs, script_root=""):
+    harness = tmp_path / "harness.js"
     harness.write_text(HARNESS, encoding="utf-8")
-    try:
-        out = subprocess.run(
-            [NODE, str(harness), str(CALIBLUR_JS),
-             json.dumps({"attrs": attrs, "scriptRoot": script_root})],
-            capture_output=True, text=True, timeout=60)
-        assert out.returncode == 0, out.stderr
-        return json.loads(out.stdout.strip().splitlines()[-1])
-    finally:
-        harness.unlink(missing_ok=True)
+    out = subprocess.run(
+        [NODE, str(harness), str(CALIBLUR_JS),
+         json.dumps({"attrs": attrs, "scriptRoot": script_root})],
+        capture_output=True, text=True, timeout=60)
+    assert out.returncode == 0, out.stderr
+    return json.loads(out.stdout.strip().splitlines()[-1])
 
 
 def _link(book_id, formats, read_formats):
@@ -113,16 +118,30 @@ def _link(book_id, formats, read_formats):
             "data-book-formats": formats, "data-book-read-formats": read_formats}
 
 
-@pytest.mark.skipif(NODE is None, reason="node not available")
+needs_node = pytest.mark.skipif(
+    NODE is None, reason="node missing (2026-09-23, owner: CWNG test suite; CI images ship node)")
+
+
+@needs_node
 @pytest.mark.parametrize("formats", ["mobi", "azw3", "mobi,azw3,fb2,html"])
-def test_clicking_read_on_an_unreadable_book_opens_its_detail_page(formats):
-    result = _click(_link(7, formats, ""))
+def test_read_on_an_unreadable_book_opens_no_reader_and_leaves_the_click_to_the_cover(tmp_path, formats):
+    result = _click(tmp_path, _link(7, formats, ""))
     assert result["opened"] == [], "a reader was opened for %s" % formats
-    assert result["location"] == "/book/7"
-
-
-@pytest.mark.skipif(NODE is None, reason="node not available")
-def test_clicking_read_opens_the_first_format_the_server_offers():
-    result = _click(_link(5, "pdf,mobi,epub", "epub,pdf"), script_root="/calibre")
-    assert result["opened"] == ["/calibre/read/5/epub"]
+    # Not handled, so the caller does not preventDefault: the click does what the
+    # rest of the cover does (details modal, or the detail page).
+    assert result["handled"] is not True
     assert result["location"] == "about:grid"
+
+
+@needs_node
+def test_read_on_a_cover_with_no_book_does_nothing(tmp_path):
+    # The global-library <span class="book-cover-link"> has no id, href or formats.
+    result = _click(tmp_path, {})
+    assert result["opened"] == [] and result["location"] == "about:grid"
+
+
+@needs_node
+def test_read_opens_the_first_format_the_server_offers(tmp_path):
+    result = _click(tmp_path, _link(5, "pdf,mobi,epub", "epub,pdf"), script_root="/calibre")
+    assert result["handled"] is True
+    assert result["opened"] == ["/calibre/read/5/epub"]

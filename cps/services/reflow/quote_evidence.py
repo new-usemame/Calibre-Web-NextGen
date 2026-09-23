@@ -6,9 +6,9 @@ never a boundary, and typography from OCR is not treated as native evidence.
 """
 import re
 import statistics
-from . import assemble,extract,heading_evidence as geometry
+from . import assemble,extract,note_evidence,heading_evidence as geometry
 
-VERSION='source-quote-units-5'
+VERSION='source-quote-units-6'
 
 
 def _normal_positions(text):
@@ -115,7 +115,7 @@ def _cross_page_continuation(book,pno,index,mapped):
 
     A citation/footer may follow the last display, or a running header/figure
     may precede its tail. Match the display's inset relative to each page's body
-    column, then use the existing unfinished-text continuation rule. This never
+    column, allowing a first-line indent, then test conservative boundary uncertainty. This never
     merges or rewrites the two fragments; uncertain complete boundaries abstain.
     """
     element=book.pages[pno][index]
@@ -132,14 +132,15 @@ def _cross_page_continuation(book,pno,index,mapped):
         paragraphs=column(page)
         if not paragraphs:return None
         body_left=min(e.bbox[0] for e in paragraphs)
-        display=[e for e in paragraphs if abs(e.bbox[0]-body_left-inset)<=em*.5]
+        display=[e for e in paragraphs if -em*.5 <= e.bbox[0]-body_left-inset <= em*2.5
+                 and not re.fullmatch(r'\d{1,4}', e.text.strip())]
         return (display[-1] if last else display[0]) if display else None
     if edge(pno,True) is element:
         following=edge(pno+1,False)
-        if following is not None and assemble.continues(element.text,following.text):return True
+        if following is not None and note_evidence.may_continue(element.text,following.text):return True
     if edge(pno,False) is element:
         previous=edge(pno-1,True)
-        if previous is not None and assemble.continues(previous.text,element.text):return True
+        if previous is not None and note_evidence.may_continue(previous.text,element.text):return True
     return False
 
 

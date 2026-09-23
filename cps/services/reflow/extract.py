@@ -262,6 +262,7 @@ class RawPage(object):
     def to_dict(self):
         value = {"pno": self.pno, "width": round(self.width, 2),
                 "height": round(self.height, 2), "drawings": self.drawings,
+                "drawing_rects": [[round(v, 2) for v in rect] for rect in self.drawing_rects],
                 "blocks": [b.to_dict() for b in self.blocks],
                 "images": [i.to_dict() for i in self.images]}
         if getattr(self,'source_geometry',{}):value['source_geometry'] = self.source_geometry

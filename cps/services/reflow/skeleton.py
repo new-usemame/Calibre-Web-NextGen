@@ -143,6 +143,7 @@ class Region(object):
     #: A note identity or caption transcription depends on damaged extraction.
     #: Keep its reading, but visibly qualify it instead of asserting certainty.
     uncertain: bool = False
+    continued_from: Optional[tuple] = None
     initial_join: dict = field(default_factory=dict)
     display_group: dict = field(default_factory=dict)
 
@@ -737,6 +738,16 @@ def _split_off_notes(raw, style, skel):
     body and the real note 10 under them. Raised digit spans and merged digits
     carry their own evidence and do not ask for the corroboration.
     """
+    from . import note_evidence
+    ruled = note_evidence.ruled_region(raw)
+    if ruled is not None and note_evidence.raised_opening(ruled[1][0]):
+        body, notes = ruled[0], []
+        for block in ruled[1]:
+            notes.extend(_notes_in_block(block, notes))
+        for note in notes:
+            note.reason = "native_ruled_note"
+        body = note_evidence.bind_callouts(body, {n.number for n in notes if n.number is not None})
+        return body, notes
     body, notes = [], []
 
     def keep_adjacent_captions(block, anchor):

@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.0"
+CONVERTER_VERSION = "1.1"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -207,7 +207,8 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
             blocks.append(_punctuation_notice(pno, element_index))
 
     for note in notes:
-        blocks.append(_aside_html(note, ref_ids, available, str(note.num) in ambiguous))
+        blocks.append(_aside_html(note, ref_ids, available, str(note.num) in ambiguous,
+            [n for n in book.notes if getattr(n, "continued_from", None) == (pno, note.num)]))
     return "\n".join(blocks)
 
 
@@ -255,9 +256,14 @@ def _runs_html(runs, available, ref_ids, ambiguous=()):
     return "".join(parts)
 
 
-def _aside_html(note, ref_ids, available, ambiguous=False):
+def _aside_html(note, ref_ids, available, ambiguous=False, continuations=()):
     body = escape(note.text)
     if note.num is None:
+        origin = getattr(note, "continued_from", None)
+        if origin is not None:
+            return ('<aside class="footnote" epub:type="footnote" id="note_tail_p%d">'
+                    '<p><a href="#note_source_p%d_%d">Note %d, continued</a>: %s</p></aside>'
+                    % (note.pno, origin[0], origin[1], origin[1], body))
         return '<aside class="footnote" epub:type="footnote"><p>%s</p></aside>' % body
     number = str(note.num)
     label = escape(number)
@@ -266,8 +272,11 @@ def _aside_html(note, ref_ids, available, ambiguous=False):
                  'damaged text layer">%s (?)</span>' % label)
     if number in ref_ids:
         label = '<a href="#%s">%s</a>' % (ref_ids[number], label)
+    links = ''.join(' <a href="#note_tail_p%d">Continued on PDF page %d</a>.'
+                    % (n.pno, n.pno+1) for n in continuations)
     return ('<aside class="footnote" epub:type="footnote" id="fn_%s">'
-            '<p>%s %s</p></aside>' % (number, label, body))
+            '<p id="note_source_p%d_%s">%s %s%s</p></aside>'
+            % (number, note.pno, number, label, body, links))
 
 
 def _figure_html(pno, index, caption):

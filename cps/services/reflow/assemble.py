@@ -118,9 +118,12 @@ class Note(object):
     uncertain: bool = False
     bbox: Tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
 
+    continued_from: Optional[tuple] = None
+
     def to_dict(self):
         return {"num": self.num, "text": self.text, "pno": self.pno,
-                "marked": self.marked, "uncertain": self.uncertain, "bbox": self.bbox}
+                "marked": self.marked, "uncertain": self.uncertain, "bbox": self.bbox,
+                "continued_from": self.continued_from}
 
 
 @dataclass
@@ -1000,6 +1003,38 @@ def _copy_element(element):
                    display_group=deepcopy(element.display_group))
 
 
+def _recover_ruled_continuation(skel, raw, book):
+    from . import note_evidence
+    if raw is None or not book.notes or skel.note_regions:
+        return
+    previous = book.notes[-1]
+    if previous.pno != skel.pno-1 or previous.uncertain:
+        return
+    ruled = note_evidence.ruled_region(raw)
+    if ruled is None or note_evidence.raised_opening(ruled[1][0]):
+        return
+    lines = [ln for block in ruled[1] for ln in block.lines]
+    if any(sp.uncertain for ln in lines for sp in ln.spans):
+        return
+    if not note_evidence.may_continue(previous.text, lines[0].stripped):
+        return
+    owned = {tuple(ln.bbox) for ln in lines}
+    affected = [r for r in skel.regions if r.lines and any(tuple(l.bbox) in owned for l in r.lines)]
+    if not affected or any(r.kind not in ('body', 'heading') or
+                          any(tuple(l.bbox) not in owned for l in r.lines) for r in affected):
+        return
+    if {tuple(l.bbox) for r in affected for l in r.lines} != owned:
+        return
+    origin = previous.continued_from or ((previous.pno, previous.num) if previous.num is not None else None)
+    if origin is None:
+        return
+    skel.regions = [r for r in skel.regions if r not in affected]
+    skel.regions.append(skeleton.Region(kind="note", lines=lines,
+        bbox=(min(l.bbox[0] for l in lines),min(l.bbox[1] for l in lines),
+              max(l.bbox[2] for l in lines),max(l.bbox[3] for l in lines)),
+        reason="native_ruled_note_continuation", continued_from=origin))
+
+
 def _runover_note(elements, book, skel):
     """The tail of the previous page's last note, printed above this page's notes.
 
@@ -1195,7 +1230,9 @@ def assemble(skeletons, style, raw_pages=None):
     # would otherwise be fitted to, and the evidence for it is spread over pages.
     book.renumbered = repair_note_numbers(skeletons, book.repairs)
 
+    raw_by_page = {raw.pno: raw for raw in (raw_pages or [])}
     for skel in skeletons:
+        _recover_ruled_continuation(skel, raw_by_page.get(skel.pno), book)
         page_reasons = list(skel.reasons)
         elements, claimed = _page_elements(skel, book.repairs, page_reasons,
                                            vocab=vocab)
@@ -1229,7 +1266,8 @@ def assemble(skeletons, style, raw_pages=None):
                                        pno=skel.pno,
                                        marked=region.number in claimed,
                                        uncertain=bool(region.uncertain),
-                                       bbox=region.bbox))
+                                       bbox=region.bbox,
+                                       continued_from=region.continued_from))
             elif region.kind == "artwork":
                 book.artwork.append({"pno": skel.pno, "bbox": list(region.bbox),
                                      "text": region.text})

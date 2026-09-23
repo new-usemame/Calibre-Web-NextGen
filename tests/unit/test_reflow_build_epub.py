@@ -156,6 +156,96 @@ def test_a_direct_fragment_with_a_disallowed_tag_is_refused_at_the_packaging_bou
     assert built.sidecar.get("unplaced"), "the refusal is disclosed, not silent"
 
 
+def _active_markup(archive):
+    """Every way a written chapter could act or reach out: event handlers, style,
+    and any image or link that is not a relative in-book reference."""
+    found = []
+    for name in archive.namelist():
+        if not (name.startswith("OEBPS/") and name.endswith(".xhtml")):
+            continue
+        for element in ET.fromstring(archive.read(name)).iter():
+            tag = element.tag.split("}")[-1]
+            for attribute, value in element.attrib.items():
+                local = attribute.split("}")[-1].lower()
+                if local.startswith("on"):
+                    found.append("%s: %s %s=%r" % (name, tag, local, value))
+                if local == "style" and "position" in value:
+                    found.append("%s: %s style=%r" % (name, tag, value))
+                if local in ("src", "href") and re.match(r"^\s*(?:[a-z][a-z0-9+.-]*:|//)", value, re.I):
+                    found.append("%s: %s %s=%r" % (name, tag, local, value))
+    return found
+
+
+def test_uppercase_html_entities_cannot_write_markup_the_boundary_never_saw(tmp_path):
+    """N1 of the 7daffa5 security retest, its probe verbatim. The boundary parsed
+    the fragment with html.parser, which reads ``&QUOT;`` inside a title as a quote
+    *character in the value*; afterwards the builder resolved the same entity to a
+    literal ``"`` in the markup, which closes the attribute and opens new ones --
+    ``onclick``, ``style``, and an ``<img>`` pulling a remote pixel -- in bytes
+    the check never parsed. What is written must be what was checked: a resolved
+    entity keeps meaning a character, never markup. Breaks if entities are
+    resolved to raw markup characters after the boundary check again."""
+    book = _book(F.prose_page)
+    probe = ('<p><span class="reflow-uncertain" title="x&QUOT; onclick=&QUOT;alert(1)&QUOT; '
+             'style=&QUOT;position:fixed">…</span></p><p class="caption"><span '
+             'class="reflow-uncertain" title="&QUOT;&GT;&LT;/span&GT;&LT;img src=&QUOT;'
+             'https://evil.example/p.gif&QUOT;/&GT;&LT;span title=&QUOT;">x</span></p>')
+
+    built = _build(book, tmp_path, page_html={0: probe})
+
+    assert build_epub.validate(built.path) == []
+    with zipfile.ZipFile(built.path) as archive:
+        assert _active_markup(archive) == []
+        images = [element for name in archive.namelist()
+                  if name.startswith("OEBPS/ch") and name.endswith(".xhtml")
+                  for element in ET.fromstring(archive.read(name)).iter(XHTML + "img")]
+    assert images == [], "the probe's <img> was written as markup"
+
+
+def test_a_resolved_html_entity_is_always_a_character_and_never_markup():
+    """The resolver's own promise, independent of the boundary that also guards
+    it: an HTML5 name for an XML-significant character -- upper-case forms and
+    ``&nvlt;`` (``<`` plus a combining mark) included -- comes out as that
+    character inside the same attribute or text node it was written in. Breaks if
+    ``_named_entities`` writes a resolved ``"`` or ``<`` as a raw byte again."""
+    written = build_epub._well_formed_text(
+        '<p><span class="reflow-uncertain" title="a&QUOT;b&LT;c&nvlt;d">&AMP;x&GT;</span></p>')
+    span = ET.fromstring("<r>%s</r>" % written).find("p/span")
+    assert span.attrib == {"class": "reflow-uncertain", "title": 'a"b<c<⃒d'}
+    assert span.text == "&x>"
+
+
+def test_validation_refuses_a_book_whose_written_markup_can_act_or_reach_out(tmp_path):
+    """The last line, on the bytes themselves: whatever road markup takes into a
+    built EPUB, validate() parses every document and refuses an event handler, a
+    script, or a remote image -- so a gap in any earlier check is a failed job,
+    not a filed book. Breaks if validate() goes back to checking only that the
+    documents parse and their internal links land."""
+    book = _book(F.prose_page)
+    built = _build(book, tmp_path)
+    assert build_epub.validate(built.path) == []
+
+    def tampered(original, change, name):
+        path = str(tmp_path / name)
+        with zipfile.ZipFile(original) as source, zipfile.ZipFile(path, "w") as target:
+            for item in source.infolist():
+                data = source.read(item.filename)
+                if item.filename == "OEBPS/ch001.xhtml":
+                    data = change(data.decode("utf-8")).encode("utf-8")
+                target.writestr(item, data)
+        return path
+
+    handler = tampered(built.path, lambda x: x.replace("<p>", '<p onclick="alert(1)">', 1),
+                       "handler.epub")
+    remote = tampered(built.path, lambda x: x.replace(
+        "</p>", '<img src="https://evil.example/p.gif" alt=""/></p>', 1), "remote.epub")
+    script = tampered(built.path, lambda x: x.replace(
+        "</p>", "</p><script>alert(1)</script>", 1), "script.epub")
+    for path in (handler, remote, script):
+        problems = build_epub.validate(path)
+        assert problems, "%s validated clean" % path
+
+
 def test_a_marked_uncertain_reading_reaches_the_reader_looking_marked(tmp_path):
     """R3 ends here. A mark that the builder's block splitting mangles, or that the
     book's stylesheet says nothing about, is an annotation nobody can see -- and an

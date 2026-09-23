@@ -506,13 +506,25 @@ def _named_entities(html):
     and the reader loses the document. Resolving the name to its character keeps the
     mark the model meant; escaping a name that is not an entity at all keeps the
     literal text it typed. Either way nothing the model wrote is dropped.
+
+    A reference names a *character*, never markup. HTML5 also defines upper-case
+    and exotic names for the XML-significant characters -- ``&QUOT;``, ``&LT;``,
+    ``&GT;``, ``&AMP;``, and ``&nvlt;`` for ``<`` plus a combining mark -- and
+    writing one of those out as a bare ``"`` or ``<`` turns text inside an
+    attribute into the end of that attribute and the start of new ones (N1 of the
+    7daffa5 security retest: ``title="x&QUOT; onclick=&QUOT;..."``). So a resolved
+    character that XML gives a meaning is written as the XML reference for it:
+    the reader sees the same character, and the markup is the markup that was
+    checked.
     """
     def one(found):
         name = found.group(1)
         if name in _XML_ENTITIES:
             return found.group(0)
         character = HTML5_ENTITIES.get(name + ";")
-        return character if character is not None else "&amp;%s;" % name
+        if character is None:
+            return "&amp;%s;" % name
+        return escape(character, {'"': "&quot;", "'": "&apos;"})
     return _NAMED_ENTITY.sub(one, html)
 
 
@@ -558,11 +570,13 @@ def page_anchor(pno):
 
 
 def _page_blocks(page_html):
+    """Split each page into blocks. ``page_html`` is already well-formed text:
+    ``build`` normalizes it once, before the markup boundary, so the bytes the
+    boundary checks are the bytes that are written (see ``_well_formed_text``)."""
     pages = []
     for pno in sorted(page_html):
         blocks = split_blocks(
-            _scope_ids(_reader_ready_notes(_well_formed_text(page_html[pno] or "")),
-                       pno))
+            _scope_ids(_reader_ready_notes(page_html[pno] or ""), pno))
         pages.append({"pno": pno, "anchor": page_anchor(pno),
                       "body": [b for b in blocks if not _is_aside(b)],
                       "asides": [b for b in blocks if _is_aside(b)]})
@@ -1278,6 +1292,14 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         generated_pages[pno]=page_html[pno]
     page_html, unrepresentable = _readable_characters(page_html)
     generated_pages, _ = _readable_characters(generated_pages)
+    # Normalize BEFORE the boundary, once: entity resolution and loose-character
+    # escaping rewrite bytes, and a check that ran on the pre-rewrite bytes was a
+    # check of something that was never written (N1). Idempotent, so builder
+    # output -- already escaped -- passes through unchanged and still matches its
+    # generated identity below.
+    page_html = {pno: _well_formed_text(html or "") for pno, html in page_html.items()}
+    generated_pages = {pno: _well_formed_text(html or "")
+                       for pno, html in generated_pages.items()}
     page_html, refused = _refuse_unsafe_pages(page_html, book, source_pages, generated_pages)
     evidence, original_images = _original_evidence(
         book, page_html, doc, figure_transform, should_stop, evidence_progress, source_pages)
@@ -1496,6 +1518,60 @@ def _ids_and_links(root):
     return ids, links
 
 
+#: What a Reflow XHTML document is made of: the page contract's vocabulary
+#: (``gate.MARKUP_SCHEMA``) and the document scaffolding the builder writes
+#: around it. Anything else in a written document came by a road no check owns.
+_DOCUMENT_TAGS = frozenset(gate.ALLOWED_TAGS) | frozenset(
+    ("html", "head", "title", "meta", "link", "body", "nav"))
+#: The only inline styles the builder writes (``page_fragment``): a transcribed
+#: title line's measured scale and weight, and a title group's alignment.
+_WRITTEN_STYLE = re.compile(
+    r"(?:display:block;font-size:\d+(?:\.\d+)?em(?:;font-weight:(?:400|700))?"
+    r"|text-align:(?:left|center);font-weight:normal)\Z")
+#: A URL that leaves the book: any scheme (https:, javascript:, data:), or a
+#: protocol-relative or UNC-style path.
+_LEAVES_THE_BOOK = re.compile(r"^\s*(?:[A-Za-z][A-Za-z0-9+.-]*:|//|\\\\)")
+#: URL-bearing attributes the builder never writes at all.
+_NEVER_WRITTEN_URLS = frozenset(("srcset", "poster", "background", "action",
+                                 "formaction", "data", "http-equiv"))
+
+
+def _active_markup(name, root, names):
+    """The written bytes of one document, held to what the builder writes.
+
+    The markup boundary (``_refuse_unsafe_pages``) judges a page before it is
+    packaged; this judges what was packaged. A document that carries an element
+    outside the vocabulary, an event handler, a style the builder never writes,
+    or an image or link that leaves the book is refused here whatever road it took
+    -- so a gap in an earlier check is a failed job rather than a filed book.
+    """
+    found = []
+    here = posixpath.dirname(name)
+    for element in root.iter():
+        tag = element.tag if isinstance(element.tag, str) else ""
+        local = tag[len(_XHTML_NS):] if tag.startswith(_XHTML_NS) else None
+        if local not in _DOCUMENT_TAGS:
+            found.append("%s contains a <%s> element, which Reflow never writes"
+                         % (name, tag.split("}")[-1] or "?"))
+        for attribute, value in element.attrib.items():
+            key = attribute.split("}")[-1].lower()
+            value = value or ""
+            if key.startswith("on") or key in _NEVER_WRITTEN_URLS:
+                found.append('%s gives <%s> the attribute "%s"' % (name, local, key))
+            elif key == "style" and not _WRITTEN_STYLE.match(value):
+                found.append('%s styles <%s> with "%s"' % (name, local, value[:80]))
+            elif key in ("href", "src") and _LEAVES_THE_BOOK.match(value):
+                found.append('%s points <%s> outside the book: "%s"'
+                             % (name, local, value[:80]))
+            elif key == "src":
+                target = posixpath.normpath(posixpath.join(
+                    here, unquote(value.partition("#")[0])))
+                if target not in names:
+                    found.append('%s shows the image "%s", which is not in the book'
+                                 % (name, value[:80]))
+    return found
+
+
 def _too_many(problems, found, kind):
     for item in found[:_REPORT_LIMIT]:
         problems.append(item)
@@ -1523,6 +1599,10 @@ def validate(path):
     marker whose note is nowhere in the book, ``build`` counts them and warns, and
     refusing a whole conversion over one note the scanner lost would be worse for the
     reader than the dead marker is.
+
+    And the markup has to be the markup the builder writes (``_active_markup``):
+    no event handler, script, foreign element, unknown style, or image or link out
+    of the book, judged on the parsed bytes rather than on what went in.
     """
     problems = []
     try:
@@ -1536,7 +1616,8 @@ def validate(path):
             for required in ("META-INF/container.xml", "%s/content.opf" % OEBPS):
                 if required not in names:
                     problems.append("missing %s" % required)
-            declared, followed = {}, {}
+            declared, followed, active = {}, {}, []
+            present = set(names)
             for name in names:
                 if not name.endswith((".xhtml", ".opf", ".ncx", ".xml")):
                     continue
@@ -1547,6 +1628,7 @@ def validate(path):
                     continue
                 if not name.endswith(".xhtml"):
                     continue
+                active.extend(_active_markup(name, root, present))
                 ids, links = _ids_and_links(root)
                 declared[name] = set(ids)
                 followed[name] = links
@@ -1568,6 +1650,7 @@ def validate(path):
                         nowhere.append('%s links to "%s", and nothing there has '
                                        "that id" % (name, href))
             _too_many(problems, nowhere, "links that land on nothing")
+            _too_many(problems, active, "markup the builder never writes")
     except (zipfile.BadZipFile, IOError, OSError) as exc:
         problems.append("not a readable zip: %s" % exc)
     return problems

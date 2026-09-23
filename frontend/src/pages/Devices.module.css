@@ -162,6 +162,12 @@
   border-radius: var(--r-md); background: var(--surface-2);
 }
 .pairRequestTitle { font-weight: var(--fw-bold); overflow-wrap: anywhere; }
+.pairRequestElsewhere {
+  display: flex; align-items: flex-start; gap: var(--sp-2); margin: 0; padding: var(--sp-3);
+  color: var(--text); background: var(--danger-soft); border: 1px solid var(--danger-border);
+  border-radius: var(--r-md); line-height: var(--lh-base);
+}
+.pairRequestElsewhere svg { flex: 0 0 auto; margin-top: 3px; color: var(--danger); }
 .pairRequestActions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
 .pairRequestActions button { display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2); font-weight: var(--fw-medium); }
 .pairRequestActions button:disabled { opacity: .6; cursor: default; }

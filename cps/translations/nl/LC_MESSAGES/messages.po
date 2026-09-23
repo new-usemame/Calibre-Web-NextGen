@@ -15438,8 +15438,11 @@ msgid "just now"
 msgstr "zojuist"
 
 #, python-brace-format
-msgid "{name} wants to connect to your account."
-msgstr "{name} wil verbinding maken met je account."
+msgid "A device calling itself “{name}” wants to connect to your account."
+msgstr "Een apparaat dat zich ‘{name}’ noemt, wil verbinding maken met je account."
+
+msgid "This request came from a different network than the one you are using. If you did not just ask for a code on your own e-reader, choose Deny."
+msgstr "Dit verzoek kwam van een ander netwerk dan het netwerk dat je nu gebruikt. Heb je niet net zelf een code aangevraagd op je eigen e-reader, kies dan ‘Weigeren’."
 
 # KOReader: the magic shelf sync setting names e-readers
 

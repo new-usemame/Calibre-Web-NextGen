@@ -160,9 +160,11 @@ class LibraryWorld:
         self.app.register_blueprint(api_v1)
         self.app.register_blueprint(spa)
 
-    def browser(self, name=None):
-        """A test client, signed in as ``name`` when given."""
+    def browser(self, name=None, *, address=None):
+        """A test client, signed in as ``name`` when given, at ``address``."""
         client = self.app.test_client()
+        if address is not None:
+            client.environ_base["REMOTE_ADDR"] = address
         if name is not None:
             assert client.post("/test/login/%s" % name).status_code == 200
         return client

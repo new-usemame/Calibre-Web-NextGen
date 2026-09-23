@@ -3,9 +3,10 @@
 """Connect an e-reader with a code: the device's two calls.
 
 The device has no credentials yet, so both are public (and CSRF-exempt like
-every call a device makes). They are rate-limited per client address, and the
-poll additionally per device code by the service's minimum poll spacing,
-which also holds when the admin has switched the rate limiter off.
+every call a device makes). They are rate-limited per network (an IPv4
+address, or an IPv6 /64), and the poll additionally per device code by the
+service's minimum poll spacing, which also holds when the admin has switched
+the rate limiter off, as does the service's limit on waiting codes.
 
     POST /kosync/pair/start {device, device_id}
       200 {user_code: "K7M4-QX2P", device_code, expires_in, interval,
@@ -51,6 +52,13 @@ log = logger.create()
 PAIR_PATH = "/pair"
 
 
+def _network():
+    """The rate-limit key: the caller's network, as the waiting-code limit
+    counts it (an IPv4 address, or an IPv6 /64)."""
+    return koreader_pairing.network_of(
+        koreader_pairing.client_address(get_remote_address())) or "unknown"
+
+
 def _json(payload, status=200):
     response = jsonify(payload)
     response.status_code = status
@@ -84,8 +92,11 @@ def _body():
 
 @csrf.exempt
 @kosync.route("/kosync/pair/start", methods=["POST"])
-@limiter.limit("40/day", key_func=get_remote_address)
-@limiter.limit("6/minute", key_func=get_remote_address)
+# Six a minute per network, and no daily allowance: every device behind one
+# home router or shared address counts together, and a household must never
+# be locked out for a day. The rows a network can keep are bounded by the
+# service's waiting-code limit.
+@limiter.limit("6/minute", key_func=_network)
 def pair_start():
     """Open a pairing request and give the device its code."""
     blocked = _require_kosync_enabled()
@@ -93,7 +104,8 @@ def pair_start():
         return blocked
     if _rate_limited():
         return _json({"error": "rate_limit_exceeded",
-                      "message": "Too many pairing requests. Wait a minute and try again."}, 429)
+                      "message": "Too many pairing requests from this network. "
+                                 "Wait a minute and try again."}, 429)
     if not spa.spa_available():
         # Codes are approved on the web app's e-readers page; without it a
         # code could never be approved.
@@ -110,7 +122,8 @@ def pair_start():
                       "message": "device (and device_id, when sent) must be short non-empty strings."},
                      400)
     try:
-        started = koreader_pairing.start(device, address=request.remote_addr)
+        started = koreader_pairing.start(device, address=request.remote_addr,
+                                         device_id=device_id)
     except koreader_pairing.PairingError as ex:
         return _json({"error": ex.code, "message": ex.message}, ex.status)
     verify_url = request.url_root.rstrip("/") + PAIR_PATH
@@ -128,7 +141,7 @@ def pair_start():
 @kosync.route("/kosync/pair/poll", methods=["POST"])
 # One device polls every 5 seconds for at most 10 minutes: 120 requests. 1000
 # an hour leaves room for several devices behind one household address.
-@limiter.limit("1000/hour", key_func=get_remote_address)
+@limiter.limit("1000/hour", key_func=_network)
 def pair_poll():
     """Tell the device whether its code was approved, and hand over the password once."""
     blocked = _require_kosync_enabled()

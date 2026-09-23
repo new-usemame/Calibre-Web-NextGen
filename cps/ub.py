@@ -545,7 +545,12 @@ class KOReaderPairing(Base):
     user_code = Column(String(8), nullable=False, unique=True)
     device_code_hash = Column(String(64), nullable=False, unique=True)
     device_name = Column(String(100), nullable=False)
+    # The id the device sends with every call: a device asking again replaces
+    # its own waiting code instead of adding another.
+    device_id = Column(String(100))
     requester_ip = Column(String(64))
+    # What the waiting-code limit counts: the IPv4 address, or the IPv6 /64.
+    requester_net = Column(String(64), index=True)
     status = Column(String(16), nullable=False, default="pending")
     user_id = Column(Integer, ForeignKey('user.id', ondelete='CASCADE'),
                      index=True)
@@ -3724,9 +3729,30 @@ def migrate_user_book_cover_table(engine, _session):
 
 
 def migrate_koreader_pairing_table(engine, _session):
-    """Create the e-reader pairing (device grant) table on upgraded app.db files."""
+    """Create the e-reader pairing (device grant) table on upgraded app.db
+    files, and give one made by an earlier build the columns it lacks.
+
+    Rows already there get NULL in the new columns; they live ten minutes.
+    """
     Base.metadata.create_all(
         engine, tables=[KOReaderPairing.__table__], checkfirst=True,
+    )
+    with engine.connect() as connection:
+        columns = {row[1] for row in connection.execute(
+            text("PRAGMA table_info(koreader_pairing)"))}
+    for name, kind in (("device_id", "VARCHAR(100)"), ("requester_net", "VARCHAR(64)")):
+        if name in columns:
+            continue
+        try:
+            _run_ddl_with_retry(
+                engine, "ALTER TABLE koreader_pairing ADD COLUMN %s %s" % (name, kind))
+        except exc.OperationalError as error:
+            if "duplicate column" not in str(error).lower():
+                raise
+    _run_ddl_with_retry(
+        engine,
+        "CREATE INDEX IF NOT EXISTS ix_koreader_pairing_requester_net "
+        "ON koreader_pairing (requester_net)",
     )
 
 

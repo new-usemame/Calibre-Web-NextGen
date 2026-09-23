@@ -72,12 +72,19 @@ def _guard():
 
 
 def _request_payload(row):
+    """A waiting request as the approval card shows it.
+
+    ``device_name`` and ``ip`` are what the device reported and where its
+    request came from, neither proof of anything; ``same_network`` is whether
+    that is the network the person answering is on (None: cannot tell).
+    """
     return {
         "user_code": koreader_pairing.display_user_code(row.user_code),
         "device_name": row.device_name,
         "requested_at": iso_z(row.created_at),
         "expires_at": iso_z(row.expires_at),
         "ip": row.requester_ip,
+        "same_network": koreader_pairing.same_network(row.requester_ip, request.remote_addr),
         "status": row.status,
     }
 

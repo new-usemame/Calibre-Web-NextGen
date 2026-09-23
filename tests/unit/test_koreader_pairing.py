@@ -10,7 +10,10 @@ walked through without sleeping.
 """
 
 import hashlib
+import itertools
 import re
+import time
+from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -34,11 +37,23 @@ def world(monkeypatch, tmp_path):
     w.close()
 
 
-def start(world, device="Kindle Paperwhite", address="192.168.1.23"):
+_DEVICE_IDS = itertools.count(1)
+
+
+def start(world, device="Kindle Paperwhite", address="192.168.1.23", device_id=None):
+    """The device's first call. Each call is a different device unless
+    ``device_id`` says otherwise."""
+    device_id = device_id or "device-%d" % next(_DEVICE_IDS)
     response = world.client.post(
-        "/kosync/pair/start", json={"device": device, "device_id": "kpw-1"},
+        "/kosync/pair/start", json={"device": device, "device_id": device_id},
         environ_base={"REMOTE_ADDR": address})
     return response
+
+
+def look_up(world, user_code, *, name="alice", address="192.168.1.50"):
+    """What the approval card shows a person at ``address``."""
+    return world.browser(name, address=address).get(
+        "/api/v1/devices/koreader/pair/%s" % user_code)
 
 
 def poll(world, device_code, *, wait=5):
@@ -225,17 +240,55 @@ def test_unknown_or_malformed_device_codes_learn_nothing(world):
         assert world.client.post("/kosync/pair/start", json=bad).status_code == 400
 
 
-def test_waiting_codes_are_capped_per_address_even_with_the_limiter_off(world):
-    for _ in range(5):
-        assert start(world).status_code == 200
+def test_waiting_codes_are_capped_per_network_even_with_the_limiter_off(world):
+    codes = [start(world).get_json()["user_code"] for _ in range(5)]
     refused = start(world)
     assert refused.status_code == 429
     assert refused.get_json()["error"] == "too_many_requests"
     assert start(world, address="192.168.1.99").status_code == 200
 
-    # Codes that expired stop counting.
+    # A code answered on the website stops counting at once...
+    answered = world.browser("alice").post("/api/v1/devices/koreader/pair/%s/deny" % codes[0])
+    assert answered.status_code == 200
+    assert start(world).status_code == 200
+    assert start(world).status_code == 429
+    # ...and codes that expired stop counting.
     world.advance(601)
     assert start(world).status_code == 200
+
+
+def test_codes_waiting_elsewhere_never_stop_a_household_from_pairing(world):
+    """Twenty addresses holding five waiting codes each filled a server-wide
+    cap of 100, and every other e-reader was then refused for ten minutes,
+    again and again. Only a network's own waiting codes can hold it back."""
+    for network in range(1, 21):
+        for _ in range(5):
+            assert start(world, address="81.2.69.%d" % network).status_code == 200
+    assert start(world, address="81.2.70.7").status_code == 200
+
+
+def test_an_ipv6_network_counts_as_one_address(world):
+    """One IPv6 connection comes with a whole /64 of addresses to pick from;
+    the waiting-code cap counts the network, not each address in it."""
+    for host in range(1, 6):
+        assert start(world, address="2a02:8070:1:2::%x" % host).status_code == 200
+    assert start(world, address="2a02:8070:1:2:ffff:ffff:ffff:ffff").status_code == 429
+    assert start(world, address="2a02:8070:1:3::1").status_code == 200
+
+
+def test_a_device_asking_again_replaces_its_own_waiting_code(world):
+    """Cancelling on the e-reader tells the server nothing, so every retry
+    left another code waiting, and five retries locked everyone behind that
+    address out for ten minutes. A device's new code replaces its old one."""
+    codes = [start(world, device_id="kindle-kids").get_json()["user_code"]
+             for _ in range(8)]
+    assert [look_up(world, code).status_code for code in codes] == [404] * 7 + [200]
+    # The same device id from another network is another device's business.
+    assert start(world, address="192.168.7.7", device_id="kindle-kids").status_code == 200
+    assert look_up(world, codes[-1]).status_code == 200
+    # Other devices on the network still have their places.
+    for _ in range(4):
+        assert start(world).status_code == 200
 
 
 def test_an_ipv4_device_is_shown_by_its_ipv4_address_on_a_dual_stack_server(world):
@@ -253,6 +306,31 @@ def test_an_ipv4_device_is_shown_by_its_ipv4_address_on_a_dual_stack_server(worl
     other = start(world, address="2001:db8::17").get_json()
     shown = world.browser("alice").get("/api/v1/devices/koreader/pair/%s" % other["user_code"])
     assert shown.get_json()["ip"] == "2001:db8::17"
+
+
+@pytest.mark.parametrize("device, person, same", [
+    # Both on the server's own network, or both behind one home router.
+    ("192.168.1.23", "192.168.1.50", True),
+    ("81.2.69.142", "81.2.69.142", True),
+    ("2a02:8070:1:2::17", "2a02:8070:1:2::99", True),
+    # From the internet while the person is at home, or two places apart.
+    ("81.2.69.142", "192.168.1.50", False),
+    ("192.168.1.23", "81.2.69.142", False),
+    ("81.2.69.142", "81.2.69.160", False),
+    ("2a02:8070:1:2::17", "2a02:8070:9:9::1", False),
+    # A phone on IPv6 and an e-reader on IPv4 cannot be compared, even with
+    # the e-reader on the server's own network: a phone at home reaches a
+    # server with a public IPv6 address over IPv6.
+    ("81.2.69.142", "2a02:8070:1:2::99", None),
+    ("192.168.1.23", "2a02:8070:1:2::99", None),
+])
+def test_the_approval_card_says_whether_the_device_is_on_your_network(world, device, person, same):
+    """The name and address on the card come from the device, so neither
+    proves anything; whether it asked from the network the person approving
+    is on is something the server can see for itself."""
+    body = start(world, address=device).get_json()
+    shown = look_up(world, body["user_code"], address=person).get_json()
+    assert shown["same_network"] is same
 
 
 def test_a_signed_out_visitor_or_guest_cannot_answer_a_code(world, monkeypatch):
@@ -362,17 +440,47 @@ def test_the_web_lookup_is_rate_limited_per_account(monkeypatch, tmp_path):
         w.close()
 
 
-def test_starting_pairing_is_rate_limited_per_address(monkeypatch, tmp_path):
+@pytest.fixture
+def limiter_clock(monkeypatch):
+    """The rate limiter's clock, moved by hand: ``limiter_clock.advance(seconds)``."""
+    import limits.storage.memory as memory
+    clock = SimpleNamespace(now=time.time())
+    clock.advance = lambda seconds: setattr(clock, "now", clock.now + seconds)
+    monkeypatch.setattr(memory, "time", SimpleNamespace(
+        time=lambda: clock.now, monotonic=time.monotonic, sleep=time.sleep))
+    return clock
+
+
+def test_starting_pairing_holds_a_busy_network_back_for_a_minute_at_most(
+        monkeypatch, tmp_path, limiter_clock):
+    """Every device behind one home router, a carrier's shared address or the
+    Docker Desktop network arrives from one address. Too many starts in one
+    minute are refused with "wait a minute", which is then true: there is no
+    daily allowance to run out of."""
     w = LibraryWorld(monkeypatch, tmp_path)
     w.enable_web(rate_limits=True)
     w.freeze_pairing_clock()
     try:
-        answers = []
-        for _ in range(7):
-            answers.append(start(w).status_code)
-            w.advance(601)  # keep the waiting-code cap out of the way
+        answers = [start(w, device_id="kindle").status_code for _ in range(7)]
         assert answers == [200] * 6 + [429]
+        refused = start(w, device_id="kindle").get_json()
+        assert refused == {"error": "rate_limit_exceeded",
+                           "message": "Too many pairing requests from this network. "
+                                      "Wait a minute and try again."}
         assert start(w, address="192.168.1.99").status_code == 200
+
+        limiter_clock.advance(60)
+        assert start(w, device_id="kindle").status_code == 200
+        # An evening of setting e-readers up, one every minute and a bit.
+        for _ in range(60):
+            limiter_clock.advance(61)
+            assert start(w, device_id="kindle").status_code == 200
+
+        # Picking another address from the same IPv6 /64 is the same network.
+        limiter_clock.advance(61)
+        answers = [start(w, address="2a02:8070:1:2::%x" % host, device_id="kindle").status_code
+                   for host in range(1, 8)]
+        assert answers == [200] * 6 + [429]
     finally:
         w.close()
 
@@ -391,3 +499,67 @@ def test_startup_cleanup_drops_expired_codes_only(world):
     ub.clean_database(world.session)
 
     assert [row.user_code for row in world.session.query(ub.KOReaderPairing)] == ["CCCCCCCC"]
+
+
+EARLIER_PAIRING_TABLE = """
+CREATE TABLE koreader_pairing (
+    id INTEGER NOT NULL PRIMARY KEY,
+    user_code VARCHAR(8) NOT NULL UNIQUE,
+    device_code_hash VARCHAR(64) NOT NULL UNIQUE,
+    device_name VARCHAR(100) NOT NULL,
+    requester_ip VARCHAR(64),
+    status VARCHAR(16) NOT NULL,
+    user_id INTEGER REFERENCES user (id) ON DELETE CASCADE,
+    created_at DATETIME NOT NULL,
+    expires_at DATETIME NOT NULL,
+    decided_at DATETIME,
+    claimed_at DATETIME,
+    last_poll_at DATETIME,
+    app_password_id INTEGER REFERENCES user_app_password (id) ON DELETE SET NULL
+)
+"""
+
+
+def test_a_pairing_table_from_an_earlier_build_is_brought_up_to_date(tmp_path, monkeypatch):
+    """Boot the real migrator, twice, on an app.db whose pairing table was
+    made before codes were counted per network, with a code waiting in it."""
+    from datetime import datetime, timedelta
+    from sqlalchemy import create_engine, text
+    from sqlalchemy.orm import sessionmaker
+    from cps import config_sql, constants
+    from cps.services import koreader_pairing
+
+    monkeypatch.setattr(constants, "CONFIG_DIR", str(tmp_path), raising=False)
+    engine = create_engine("sqlite:///%s" % (tmp_path / "app.db"), future=True)
+    ub.Base.metadata.create_all(engine)
+    config_sql._Settings.__table__.create(engine, checkfirst=True)
+    now = datetime(2026, 9, 23, 20, 0, 0)
+    with engine.begin() as connection:
+        connection.execute(text("DROP TABLE koreader_pairing"))
+        connection.execute(text(EARLIER_PAIRING_TABLE))
+        connection.execute(text(
+            "INSERT INTO koreader_pairing (user_code, device_code_hash, device_name, "
+            "requester_ip, status, created_at, expires_at) VALUES ('BBBBCCCC', :hash, "
+            "'Kindle', '192.168.1.23', 'pending', :created, :expires)"),
+            {"hash": "ab" * 32, "created": now, "expires": now + timedelta(minutes=10)})
+
+    session = sessionmaker(bind=engine, future=True)()
+    try:
+        ub.migrate_Database(session)
+        ub.migrate_Database(session)
+        indexes = {row[0] for row in session.execute(text(
+            "SELECT name FROM sqlite_master WHERE type = 'index' "
+            "AND tbl_name = 'koreader_pairing'"))}
+        assert "ix_koreader_pairing_requester_net" in indexes
+
+        # The code already waiting still works, and new ones can be made.
+        assert koreader_pairing.find_waiting("BBBB-CCCC", now=now, session=session)
+        for _ in range(2):
+            koreader_pairing.start("Kindle Kids", address="192.168.1.23", device_id="kk",
+                                   now=now, session=session)
+        waiting = session.query(ub.KOReaderPairing).filter_by(status="pending").all()
+        assert {(row.device_id, row.requester_net) for row in waiting} == {
+            (None, None), ("kk", "192.168.1.23")}
+    finally:
+        session.close()
+        engine.dispose()

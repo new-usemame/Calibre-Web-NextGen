@@ -15,25 +15,31 @@ import { assertNoHorizontalOverflow, assertNoPageErrors, collectPageErrors } fro
 
 const SERVER = 'https://books.example.test';
 const CODE = 'K7M4QX2P';
+// The card names the device only as it calls itself: anyone can call a
+// device "Kindle Kids".
+const CARD = 'A device calling itself “Kindle Kids” wants to connect to your account.';
 
 const minutesFromNow = (minutes: number) =>
   new Date(Date.now() + minutes * 60_000).toISOString().replace(/\.\d+Z$/, 'Z');
 
 /** The waiting device as the server describes it: asked 3 minutes ago. */
-function waitingRequest(status = 'pending') {
+function waitingRequest(status = 'pending', sameNetwork: boolean | null = true) {
   return {
     user_code: 'K7M4-QX2P',
     device_name: 'Kindle Kids',
     requested_at: minutesFromNow(-3),
     expires_at: minutesFromNow(7),
     ip: '192.168.1.23',
+    same_network: sameNetwork,
     status,
   };
 }
 
 type Calls = { lookups: string[]; answers: string[]; bundles: Array<Record<string, unknown>> };
 
-async function stubPage(page: Page, { koreader = true, serverUrl = SERVER } = {}): Promise<Calls> {
+async function stubPage(page: Page, {
+  koreader = true, serverUrl = SERVER, sameNetwork = true as boolean | null,
+} = {}): Promise<Calls> {
   const calls: Calls = { lookups: [], answers: [], bundles: [] };
   await page.route('**/api/v1/auth/me', async (route) => {
     try {
@@ -65,12 +71,12 @@ async function stubPage(page: Page, { koreader = true, serverUrl = SERVER } = {}
         } } });
         return;
       }
-      await route.fulfill({ json: waitingRequest() });
+      await route.fulfill({ json: waitingRequest('pending', sameNetwork) });
       return;
     }
     const verdict = path.endsWith('/approve') ? 'approved' : 'denied';
     calls.answers.push(`${code}:${verdict}`);
-    await route.fulfill({ json: waitingRequest(verdict) });
+    await route.fulfill({ json: waitingRequest(verdict, sameNetwork) });
   });
   await page.route('**/api/v1/devices/koreader/setup-bundle', async (route) => {
     calls.bundles.push(route.request().postDataJSON() ?? {});
@@ -99,10 +105,11 @@ test('the short address from the e-reader opens the approval card, and only a cl
   await page.goto(`/pair?code=${CODE.toLowerCase()}`);
   await expect(page).toHaveURL(/\/app\/account\/devices\?pair=1&code=K7M4QX2P$/);
 
-  const card = page.getByRole('group', { name: 'Kindle Kids wants to connect to your account.' });
+  const card = page.getByRole('group', { name: CARD });
   await expect(card).toBeVisible();
   await expect(card).toContainText('Asked 3 minutes ago from 192.168.1.23.');
   await expect(card).toContainText('Approve only if this is your e-reader.');
+  await expect(card).not.toContainText('different network');
   await expect(card).toBeFocused();
   await expect(page.getByLabel('Code on the e-reader')).toHaveValue('K7M4-QX2P');
   expect(calls.lookups).toEqual([CODE]);
@@ -126,6 +133,31 @@ test('the short address from the e-reader opens the approval card, and only a cl
   assertNoPageErrors(errors);
 });
 
+test('a code asked for from another network says so on the card', async ({ page }) => {
+  // What a stranger's link to approve their device looks like (and, harmlessly,
+  // a phone on mobile data next to its own e-reader): the server saw the
+  // request come from somewhere other than where this browser is.
+  const calls = await stubPage(page, { sameNetwork: false });
+  await page.goto(`/pair?code=${CODE}`);
+  const card = page.getByRole('group', { name: CARD });
+  await expect(card).toBeFocused();
+  const elsewhere = 'This request came from a different network than the one you are using. '
+    + 'If you did not just ask for a code on your own e-reader, choose Deny.';
+  await expect(card).toContainText(elsewhere);
+  // A screen reader hears it with the card, before reaching Approve.
+  await expect(card).toHaveAccessibleDescription(
+    /Approve only if this is your e-reader\. This request came from a different network/);
+
+  const axe = await new AxeBuilder({ page }).include('#kobo-pairing')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze();
+  expect(axe.violations.filter((v) => ['critical', 'serious'].includes(v.impact || ''))).toEqual([]);
+  await assertNoHorizontalOverflow(page);
+
+  await card.getByRole('button', { name: 'Deny' }).click();
+  await expect(pairing(page).getByText('Declined. Kindle Kids was not connected.')).toBeFocused();
+  expect(calls.answers).toEqual([`${CODE}:denied`]);
+});
+
 test('a code found before the page settles keeps focus on who is asking', async ({ page }) => {
   // A slow phone can take longer to paint its first frame than a nearby
   // server takes to answer the lookup. Opening the page must not then pull
@@ -137,7 +169,7 @@ test('a code found before the page settles keeps focus on who is asking', async 
   });
   await stubPage(page);
   await page.goto(`/app/account/devices?pair=1&code=${CODE}`);
-  const card = page.getByRole('group', { name: 'Kindle Kids wants to connect to your account.' });
+  const card = page.getByRole('group', { name: CARD });
   await expect(card).toBeFocused();
   await page.waitForTimeout(600);
   await expect(card).toBeFocused();
@@ -166,7 +198,7 @@ test('a typed code is checked before it is sent, and a wrong one is explained', 
 
   await box.fill('k7m4qx2p');
   await page.keyboard.press('Enter');
-  const card = page.getByRole('group', { name: 'Kindle Kids wants to connect to your account.' });
+  const card = page.getByRole('group', { name: CARD });
   await card.getByRole('button', { name: 'Deny' }).click();
   await expect(pairing(page).getByText('Declined. Kindle Kids was not connected.')).toBeFocused();
   expect(calls.answers).toEqual([`${CODE}:denied`]);
@@ -179,7 +211,7 @@ test('an answer the server refuses is explained, and the code box is ready again
     status: 409, json: { error: { code: 'already_decided', message: 'This code has already been approved or declined.' } },
   }));
   await page.goto(`/app/account/devices?pair=1&code=${CODE}`);
-  const card = page.getByRole('group', { name: 'Kindle Kids wants to connect to your account.' });
+  const card = page.getByRole('group', { name: CARD });
   await card.getByRole('button', { name: 'Approve' }).click();
   await expect(page.locator('#koreader-code-error')).toHaveText('This code has already been approved or declined.');
   await expect(card).toHaveCount(0);
@@ -237,7 +269,7 @@ test('a phone that is not signed in signs in first and still lands on the code',
     await page.getByRole('button', { name: /sign in/i }).click();
 
     await expect(page).toHaveURL(/\/app\/account\/devices\?pair=1&code=K7M4QX2P$/);
-    await expect(page.getByRole('group', { name: 'Kindle Kids wants to connect to your account.' }))
+    await expect(page.getByRole('group', { name: CARD }))
       .toBeVisible();
     expect(calls.answers).toEqual([]);
   } finally {

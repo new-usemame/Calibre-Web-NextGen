@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Copy, Download, KeyRound, Pencil, Usb, X } from 'lucide-react';
+import { AlertTriangle, Check, Copy, Download, KeyRound, Pencil, Usb, X } from 'lucide-react';
 import { apiUrl, ApiError, type KoreaderPairRequest } from '../lib/api';
 import {
   useAnswerKoreaderPair, useKoreaderSetupBundle, useLookupKoreaderPair,
@@ -243,9 +243,13 @@ export function KoreaderSetup({ enabled, serverUrl, onCopy, copied, onApproved }
 
           {request && (
             <div ref={requestRef} tabIndex={-1} className={styles.pairRequest}
-              role="group" aria-labelledby="koreader-request-title" aria-describedby="koreader-request-detail">
+              role="group" aria-labelledby="koreader-request-title"
+              aria-describedby={request.same_network === false
+                ? 'koreader-request-detail koreader-request-elsewhere' : 'koreader-request-detail'}>
+              {/* The name is whatever the device chose to call itself, so it
+                  is shown as a claim, never as who is asking. */}
               <p id="koreader-request-title" className={styles.pairRequestTitle}>
-                {t('{name} wants to connect to your account.', { name: request.device_name })}
+                {t('A device calling itself “{name}” wants to connect to your account.', { name: request.device_name })}
               </p>
               <p id="koreader-request-detail" className={styles.pairingStatus}>
                 {t('Asked {when} from {address}.', {
@@ -255,6 +259,12 @@ export function KoreaderSetup({ enabled, serverUrl, onCopy, copied, onApproved }
                 })}
                 {' '}{t('Approve only if this is your e-reader.')}
               </p>
+              {request.same_network === false && (
+                <p id="koreader-request-elsewhere" className={styles.pairRequestElsewhere}>
+                  <AlertTriangle size={16} aria-hidden="true" focusable={false} />
+                  <span>{t('This request came from a different network than the one you are using. If you did not just ask for a code on your own e-reader, choose Deny.')}</span>
+                </p>
+              )}
               <div className={styles.pairRequestActions}>
                 <button type="button" className={styles.primaryButton} disabled={answer.isPending}
                   onClick={() => decide(true)}>

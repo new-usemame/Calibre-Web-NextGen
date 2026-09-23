@@ -389,13 +389,16 @@ export interface KoboSyncToken {
   is_localhost: boolean;
 }
 
-/** A KOReader device waiting for its pairing code to be answered. */
+/** A KOReader device waiting for its pairing code to be answered. The name is
+ *  whatever the device calls itself; `same_network` is whether it asked from
+ *  the network this browser is on (null when the server cannot tell). */
 export interface KoreaderPairRequest {
   user_code: string;
   device_name: string;
   requested_at: string | null;
   expires_at: string | null;
   ip: string | null;
+  same_network?: boolean | null;
   status: 'pending' | 'approved' | 'denied' | 'claimed';
 }
 

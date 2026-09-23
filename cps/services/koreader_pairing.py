@@ -13,7 +13,13 @@ a copy of the table lets nobody poll. The app password is made inside the
 claim and exists in cleartext only in that one response; app.db keeps its
 werkzeug hash like every other app password. The typed ``user_code`` is short
 on purpose. It is safe because it lives ten minutes, grants nothing until a
-signed-in person approves it, and the number of live codes is capped.
+signed-in person approves it, and each network can hold only a few codes
+waiting at a time.
+
+Limits count networks, not addresses: an IPv4 address (a home router, a
+carrier's shared address) or an IPv6 /64, which one connection can pick
+addresses from at will. There is deliberately no server-wide limit: whoever
+could fill it would lock every other household out.
 
 Every state change is a conditional UPDATE, so two approvals, or two polls
 racing for one approval, cannot both win.
@@ -43,9 +49,10 @@ USER_CODE_LENGTH = 8
 LIFETIME = timedelta(minutes=10)
 POLL_INTERVAL = 5                         # seconds the device is asked to wait
 MIN_POLL_SPACING = timedelta(seconds=2)   # polls closer than this are refused
-MAX_PENDING_PER_ADDRESS = 5
-MAX_PENDING = 100
+MAX_PENDING_PER_NETWORK = 5
+IPV6_NETWORK_PREFIX = 64
 DEVICE_NAME_MAX = 100
+DEVICE_ID_MAX = 100
 
 PENDING = "pending"
 APPROVED = "approved"
@@ -121,19 +128,57 @@ def app_password_label(device_name):
     return app_passwords.clip_label("KOReader: %s" % device_name)
 
 
+def _parsed(text):
+    """``text`` as an IP address (an IPv4-mapped IPv6 one as IPv4), or None."""
+    try:
+        parsed = ipaddress.ip_address((text or "").strip())
+    except ValueError:
+        return None
+    return getattr(parsed, "ipv4_mapped", None) or parsed
+
+
 def client_address(text):
     """The address a device connected from, as a person knows it, or None.
 
     A server listening on IPv6 and IPv4 at once sees an IPv4 device as
     ``::ffff:192.168.1.23``; that is shown, and counted, as 192.168.1.23.
     """
-    text = (text or "").strip()
-    try:
-        parsed = ipaddress.ip_address(text)
-    except ValueError:
-        return text[:64] or None
-    mapped = getattr(parsed, "ipv4_mapped", None)
-    return str(mapped or parsed)
+    parsed = _parsed(text)
+    if parsed is None:
+        return (text or "").strip()[:64] or None
+    return str(parsed)
+
+
+def network_of(address):
+    """The network limits count ``address`` under: an IPv4 address itself,
+    an IPv6 address's /64. Anything else is its own network."""
+    parsed = _parsed(address)
+    if parsed is None:
+        return (address or "").strip()[:64] or None
+    if parsed.version == 6:
+        return str(ipaddress.ip_network((parsed, IPV6_NETWORK_PREFIX), strict=False))
+    return str(parsed)
+
+
+def same_network(device_address, person_address):
+    """Whether a device asked from the network the person answering is on.
+
+    True when both reach the server from its own side (a home network, a
+    VPN: addresses that are not public), or from one public network (the
+    same home router, the same IPv6 /64); False when one is on the server's
+    side and the other on the internet, or they are two public networks;
+    None when it cannot be told: an address is missing, or one is IPv4 and
+    the other IPv6 (a phone at home may reach the server over IPv6 while the
+    e-reader uses IPv4).
+    """
+    device, person = _parsed(device_address), _parsed(person_address)
+    if device is None or person is None:
+        return None
+    if not device.is_global and not person.is_global:
+        return True
+    if device.version != person.version:
+        return None
+    return network_of(str(device)) == network_of(str(person))
 
 
 def _sweep(session, now):
@@ -141,11 +186,14 @@ def _sweep(session, now):
         ub.KOReaderPairing.expires_at <= now).delete(synchronize_session=False)
 
 
-def start(device_name, *, address=None, now=None, session=None):
+def start(device_name, *, address=None, device_id=None, now=None, session=None):
     """Open a pairing request for a device; return :class:`Started`.
 
-    Raises :class:`PairingError` for a missing device name (400) or when too
-    many codes are already waiting, from this address or at all (429).
+    A device that asks again from the same network (it was cancelled, or
+    restarted) gets a new code in place of its earlier one: cancelling on the
+    device tells the server nothing, so otherwise every retry would leave a
+    code waiting. Raises :class:`PairingError` for a missing device name (400)
+    or when too many codes are already waiting from this network (429).
     """
     session = session or ub.session
     now = now or utcnow()
@@ -153,20 +201,22 @@ def start(device_name, *, address=None, now=None, session=None):
     if not name:
         raise PairingError("invalid_request", 400, "The device name is missing.")
     address = client_address(address)
+    network = network_of(address) or "unknown"
+    device_id = device_id[:DEVICE_ID_MAX] if isinstance(device_id, str) and device_id else None
     try:
         _sweep(session, now)
-        waiting = session.query(func.count(ub.KOReaderPairing.id)).filter(
-            ub.KOReaderPairing.status == PENDING)
-        if address is not None and waiting.filter(
-                ub.KOReaderPairing.requester_ip == address).scalar() >= MAX_PENDING_PER_ADDRESS:
+        waiting = session.query(ub.KOReaderPairing).filter(
+            ub.KOReaderPairing.status == PENDING,
+            ub.KOReaderPairing.requester_net == network)
+        if device_id is not None:
+            waiting.filter(ub.KOReaderPairing.device_id == device_id).delete(
+                synchronize_session=False)
+        if waiting.with_entities(func.count(ub.KOReaderPairing.id)).scalar() \
+                >= MAX_PENDING_PER_NETWORK:
             session.commit()
             raise PairingError("too_many_requests", 429,
-                               "Too many codes are waiting from this network. "
-                               "Use one of them or wait ten minutes.")
-        if waiting.scalar() >= MAX_PENDING:
-            session.commit()
-            raise PairingError("too_many_requests", 429,
-                               "Too many codes are waiting. Try again in a few minutes.")
+                               "Too many e-readers on this network are waiting for "
+                               "approval. Approve or deny them, or try again in ten minutes.")
         user_code = None
         for _attempt in range(8):
             candidate = "".join(secrets.choice(USER_CODE_ALPHABET)
@@ -184,7 +234,9 @@ def start(device_name, *, address=None, now=None, session=None):
             user_code=user_code,
             device_code_hash=_digest(device_code),
             device_name=name,
+            device_id=device_id,
             requester_ip=address,
+            requester_net=network,
             status=PENDING,
             created_at=now,
             expires_at=now + LIFETIME,

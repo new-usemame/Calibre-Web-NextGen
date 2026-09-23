@@ -111,6 +111,9 @@ def serve(parent, cache_root, control):
                 # No extracted text or arbitrary paths cross the failure channel.
                 reply = {'seq': sequence, 'ok': False, 'value': type(exc).__name__}
             ipc.write_owned(root, 'response.json', reply)
+            # Do not retain a whole preparation graph while the parent decodes
+            # its reply. Only the explicitly bound operation Book stays live.
+            value = reply = None
             emit({'ready': True})
     finally:
         if doc is not None: doc.close()

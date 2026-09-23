@@ -211,6 +211,11 @@ class NativeDocument:
         if transform is not None and (not isinstance(recovery, Recovery)
                                       or transform.__func__ is not Recovery.figure_rect):
             raise ValueError('native build requires the source recovery geometry transform')
+        if recovery is not None:
+            from dataclasses import replace
+            # The build needs only provenance for figure_rect, not the complete
+            # OCR/native analysis graph already consumed during preparation.
+            recovery = replace(recovery, pages=[])
         if callable(report):
             raise ValueError('native build requires a serializable report recipe')
         def progress(event):

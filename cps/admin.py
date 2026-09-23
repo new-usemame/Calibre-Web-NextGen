@@ -1862,6 +1862,49 @@ def _config_checkbox_int(to_save, x):
     return config.set_from_dictionary(to_save, x, lambda y: 1 if (y == "on") else 0, 0)
 
 
+def _config_float(to_save, x):
+    """A dollar figure from a form. A blank or unparseable field leaves the stored
+    value alone rather than resetting a spending limit to zero."""
+    def _parse(value):
+        try:
+            return max(0.0, round(float(value), 4))
+        except (TypeError, ValueError):
+            return getattr(config, x, 0.0)
+    return config.set_from_dictionary(to_save, x, _parse)
+
+
+def _config_reflow_limit(to_save, x):
+    """A Reflow limit (pages, megabytes) from a form: a positive whole number.
+
+    Blank, zero, negative, fractional or unparseable input leaves the stored limit
+    alone. A typo must never lift the bound on one conversion's work (Finding 3).
+    """
+    def _parse(value):
+        try:
+            number = int(str(value).strip())
+        except (TypeError, ValueError):
+            return getattr(config, x)
+        return number if number > 0 else getattr(config, x)
+    return config.set_from_dictionary(to_save, x, _parse)
+
+
+def _save_openrouter_key(to_save):
+    """Store, keep, or clear the Reflow key — in that order of preference.
+
+    The field is write-only: the form never renders the stored key back, so an
+    empty box means the admin did not retype it, not that they want it gone. That
+    distinction matters more here than for a metadata token, because losing the key
+    silently turns every queued conversion into a deterministic-only one. Clearing
+    it is a separate checkbox somebody has to tick.
+    """
+    if to_save.get("config_openrouter_key_clear") == "on":
+        config.config_openrouter_key_e = ""
+        return True
+    if to_save.get("config_openrouter_key_e", ""):
+        return _config_string(to_save, "config_openrouter_key_e")
+    return False
+
+
 def _config_string(to_save, x):
     return config.set_from_dictionary(to_save, x, lambda y: strip_whitespaces(y) if y else y)
 
@@ -2987,6 +3030,14 @@ def _configuration_update_helper():
         # Google Books API key (lifts the anonymous quota of 1k req/IP/day to
         # the project's authenticated quota, default 100k/day). Optional.
         _config_string(to_save, "config_google_books_api_key")
+
+        # Reflow (PDF -> EPUB).
+        _save_openrouter_key(to_save)
+        _config_string(to_save, "config_reflow_default_tier")
+        _config_float(to_save, "config_reflow_target_usd")
+        _config_float(to_save, "config_reflow_hard_cap_usd")
+        _config_reflow_limit(to_save, "config_reflow_max_pages")
+        _config_reflow_limit(to_save, "config_reflow_max_pdf_mb")
 
         _config_int(to_save, "config_updatechannel")
 

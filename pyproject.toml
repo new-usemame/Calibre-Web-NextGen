@@ -39,6 +39,9 @@ dependencies = [
     "iso-639>=0.4.5,<0.5.0;python_version<'3.12'",
     "pycountry>=24.6.1,<25.0.0;python_version>='3.12'",
     "pypdf>=6.0.0",
+    # Reflow (AI-assisted PDF -> EPUB): span/line geometry and page rasters.
+    # abi3 wheels cover the image's Python 3.13 on x86_64 and aarch64.
+    "pymupdf>=1.24.0,<2.0.0",
     "Pillow>=11.0.0,<13.0.0",
     "pytz>=2016.10",
     "requests>=2.32.4,<2.33.0",

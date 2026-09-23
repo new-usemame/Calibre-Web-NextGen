@@ -51,6 +51,7 @@ _KNOWN_SECRET_FIELDS = frozenset({
     "config_hardcover_token",
     "config_ldap_serv_password",
     "config_ldap_serv_password_e",
+    "config_openrouter_key_e",
     "mail_gmail_token",
     "mail_password",
     "mail_password_e",

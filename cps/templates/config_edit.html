@@ -351,6 +351,35 @@
       <div class="help-block">{{_('Optional. Without a key, Google Books is rate-limited to ~1,000 requests / IP / day, which is easily exhausted on shared servers (HTTP 429). Free key at https://console.cloud.google.com — enable the "Books API" and create an API key.')}}</div>
     </div>
     <div class="form-group">
+      <label for="config_openrouter_key_e">{{_('OpenRouter API Key (Reflow PDF to EPUB)')}}</label>
+      <input type="password" class="form-control" id="config_openrouter_key_e" name="config_openrouter_key_e" value="" autocomplete="new-password" placeholder="{% if config.resolved_openrouter_key() %}{{_('A key is saved. Leave blank to keep it.')}}{% else %}{{_('No key saved')}}{% endif %}">
+      <div class="help-block">{{_('Optional. Source conversion needs no provider key. When available, AI formatting review uses Luna proposals and Terra approvals through OpenRouter openai/flex, with an estimate and explicit consent for each job. The key is stored encrypted and is never shown again.')}}</div>
+      {% if config.openrouter_key_source() and config.openrouter_key_source() != 'database' %}
+      <div class="help-block">{{_('A key is currently coming from the environment (%(source)s); it takes effect only while no key is saved here.', source=config.openrouter_key_source()) }}</div>
+      {% endif %}
+      {% if config.resolved_openrouter_key() %}
+      <input type="checkbox" id="config_openrouter_key_clear" name="config_openrouter_key_clear">
+      <label for="config_openrouter_key_clear">{{_('Delete the saved key')}}</label>
+      {% endif %}
+    </div>
+    {# Preserve retired preferences without presenting them as current routing controls. #}
+    <input type="hidden" name="config_reflow_default_tier" value="{{ config.config_reflow_default_tier or 'standard' }}">
+    <input type="hidden" name="config_reflow_target_usd" value="{{ config.config_reflow_target_usd if config.config_reflow_target_usd != None else 0.5 }}">
+    <div class="form-group">
+      <label for="config_reflow_hard_cap_usd">{{_('Reflow maximum spend per conversion (USD)')}}</label>
+      <input type="number" min="0" step="0.5" class="form-control" id="config_reflow_hard_cap_usd" name="config_reflow_hard_cap_usd" value="{{ config.config_reflow_hard_cap_usd if config.config_reflow_hard_cap_usd != None else 5.0 }}" autocomplete="off">
+      <div class="help-block">{{_('A hard limit. No conversion may be started with a cost cap above this figure, and a running conversion stops when it reaches its cap.')}}</div>
+    </div>
+    <div class="form-group">
+      <label for="config_reflow_max_pages">{{_('Reflow maximum PDF length per conversion (pages)')}}</label>
+      <input type="number" min="1" step="1" class="form-control" id="config_reflow_max_pages" name="config_reflow_max_pages" value="{{ config.config_reflow_max_pages or 2000 }}" autocomplete="off">
+    </div>
+    <div class="form-group">
+      <label for="config_reflow_max_pdf_mb">{{_('Reflow maximum PDF size per conversion (MB)')}}</label>
+      <input type="number" min="1" step="1" class="form-control" id="config_reflow_max_pdf_mb" name="config_reflow_max_pdf_mb" value="{{ config.config_reflow_max_pdf_mb or 500 }}" autocomplete="off">
+      <div class="help-block">{{_('A PDF longer or larger than these limits is refused before it is assessed or converted, as a sample or as a whole book, so that one book cannot occupy the server for hours.')}}</div>
+    </div>
+    <div class="form-group">
       <input type="checkbox" id="config_allow_reverse_proxy_header_login" name="config_allow_reverse_proxy_header_login" data-control="reverse-proxy-login-settings" {% if config.config_allow_reverse_proxy_header_login %}checked{% endif %}>
       <label for="config_allow_reverse_proxy_header_login">{{_('Allow Reverse Proxy Authentication')}}</label>
       <div class="help-block">{{_('Trusts the "Remote-User" header from a reverse proxy for authentication. This is an authentication method, distinct from the HTTPS security setting below.')}}</div>

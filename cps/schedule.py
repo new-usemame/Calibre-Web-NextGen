@@ -70,6 +70,13 @@ def reconcile_hardcover_configuration():
         # details and the downgrade mirror were unavailable.
         return config.hardcover_sync_enabled(), None
 
+def _reflow_housekeeping():
+    # Imported when the task is made, not with this module: the scheduler must
+    # keep working even if the Reflow stack cannot be imported.
+    from .tasks.reflow import TaskReflowHousekeeping
+    return TaskReflowHousekeeping()
+
+
 def get_scheduled_tasks(reconnect=True):
     tasks = list()
     # Reconnect Calibre database (metadata.db) based on config.schedule_reconnect
@@ -78,6 +85,9 @@ def get_scheduled_tasks(reconnect=True):
 
     # Delete temp folder
     tasks.append([lambda: TaskClean(), 'delete temp', True])
+
+    # Settle interrupted Reflow conversions and keep Reflow's data folder bounded
+    tasks.append([_reflow_housekeeping, 'reflow housekeeping', True])
 
     # Generate metadata.opf file for each changed book
     if config.schedule_metadata_backup:

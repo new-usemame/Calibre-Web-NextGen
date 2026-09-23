@@ -15643,6 +15643,339 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+#: cps/spa_strings.py
+msgid "A sample"
+msgstr "Un échantillon"
+
+#: cps/spa_strings.py
+msgid "A scanned PDF converts badly. Reflow rebuilds its chapters, paragraphs and footnotes with a model, at a cost you agree to first."
+msgstr "Un PDF numérisé se convertit mal. Reflow en reconstruit les chapitres, les paragraphes et les notes de bas de page à l’aide d’un modèle, pour un coût que vous acceptez au préalable."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "About {pages} of them will need a model."
+msgstr "Environ {pages} d’entre elles auront besoin d’un modèle."
+
+#: cps/spa_strings.py
+msgid "Back to edit"
+msgstr "Retour à la modification"
+
+#: cps/spa_strings.py
+msgid "Convert the book"
+msgstr "Convertir le livre"
+
+#: cps/spa_strings.py
+msgid "Convert the sample"
+msgstr "Convertir l’échantillon"
+
+#: cps/spa_strings.py
+msgid "Convert the whole book"
+msgstr "Convertir tout le livre"
+
+#: cps/spa_strings.py
+msgid "Converting"
+msgstr "Conversion en cours"
+
+#: cps/spa_strings.py
+msgid "Download the sample"
+msgstr "Télécharger l’échantillon"
+
+#: cps/spa_strings.py
+msgid "Every other page is converted by reading the PDF itself, which costs nothing. A page only goes to a model when the layout cannot be settled without one."
+msgstr "Toutes les autres pages sont converties en lisant le PDF lui-même, ce qui ne coûte rien. Une page n’est envoyée à un modèle que lorsque sa mise en page ne peut pas être établie autrement."
+
+#: cps/spa_strings.py
+msgid "Every page is a picture of the page with OCR text behind it. The words are readable, but the structure has to be rebuilt."
+msgstr "Chaque page est une image de la page, avec du texte OCR derrière. Les mots sont lisibles, mais la structure doit être reconstruite."
+
+#: cps/spa_strings.py
+msgid "How much to convert"
+msgstr "Quelle partie convertir"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "I agree to spend up to {amount} of my own OpenRouter credit on this conversion."
+msgstr "J’accepte de dépenser jusqu’à {amount} de mon propre crédit OpenRouter pour cette conversion."
+
+#: cps/spa_strings.py
+msgid "No OpenRouter key is configured, so nothing can be converted yet."
+msgstr "Aucune clé OpenRouter n’est configurée : rien ne peut donc encore être converti."
+
+#: cps/spa_strings.py
+msgid "Nothing to convert"
+msgstr "Rien à convertir"
+
+#: cps/spa_strings.py
+msgid "Open admin settings"
+msgstr "Ouvrir les paramètres d’administration"
+
+#: cps/spa_strings.py
+msgid "Open the book"
+msgstr "Ouvrir le livre"
+
+#: cps/spa_strings.py
+msgid "Pages"
+msgstr "Pages"
+
+#: cps/spa_strings.py
+msgid "Pages a model will read"
+msgstr "Pages qu’un modèle lira"
+
+#: cps/spa_strings.py
+msgid "Pages in the sample"
+msgstr "Pages dans l’échantillon"
+
+#: cps/spa_strings.py
+msgid "Pages reused from an earlier run"
+msgstr "Pages réutilisées d’une conversion précédente"
+
+#: cps/spa_strings.py
+msgid "Pages sent to a model"
+msgstr "Pages envoyées à un modèle"
+
+#: cps/spa_strings.py
+msgid "Pages the check accepted"
+msgstr "Pages acceptées par la vérification"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Prices measured on {date}. What you are charged is capped below — a conversion stops when it reaches the cap, and keeps the pages already paid for."
+msgstr "Tarifs mesurés le {date}. Le montant qui vous est facturé est plafonné ci-dessous : une conversion s’arrête lorsqu’elle atteint le plafond et conserve les pages déjà payées."
+
+#: cps/spa_strings.py
+msgid "Queued"
+msgstr "En file d’attente"
+
+#: cps/spa_strings.py
+msgid "Reflow PDF to EPUB"
+msgstr "Reflow : du PDF vers l’EPUB"
+
+#: cps/spa_strings.py
+msgid "Reflow this PDF with AI…"
+msgstr "Retraiter ce PDF avec l’IA (Reflow)…"
+
+#: cps/spa_strings.py
+msgid "Replace the EPUB this book already has"
+msgstr "Remplacer l’EPUB que ce livre possède déjà"
+
+#: cps/spa_strings.py
+msgid "Spent"
+msgstr "Dépensé"
+
+#: cps/spa_strings.py
+msgid "Stop"
+msgstr "Arrêter"
+
+#: cps/spa_strings.py
+msgid "Stop after spending"
+msgstr "Arrêter après avoir dépensé"
+
+#: cps/spa_strings.py
+msgid "Stopped at the cap"
+msgstr "Arrêté au plafond"
+
+#: cps/spa_strings.py
+msgid "Stopped before it finished"
+msgstr "Arrêté avant la fin"
+
+#: cps/spa_strings.py
+msgid "Text layer"
+msgstr "Couche de texte"
+
+#: cps/spa_strings.py
+msgid "That is below the estimate, so the conversion would stop before it finished."
+msgstr "C’est en dessous de l’estimation : la conversion s’arrêterait donc avant la fin."
+
+#: cps/spa_strings.py
+msgid "The book was converted"
+msgstr "Le livre a été converti"
+
+#: cps/spa_strings.py
+msgid "The conversion could not be started."
+msgstr "La conversion n’a pas pu être lancée."
+
+#: cps/spa_strings.py
+msgid "The model service stopped answering"
+msgstr "Le service de modèle a cessé de répondre"
+
+#: cps/spa_strings.py
+msgid "The model service stopped answering partway through, so this ended early. The pages converted before it stopped are in the file and the rest kept the text read straight out of the PDF. Starting it again re-uses every page that was accepted, so none of those is paid for twice."
+msgstr "Le service de modèle a cessé de répondre en cours de route, la conversion s’est donc arrêtée avant la fin. Les pages converties avant l’arrêt sont dans le fichier et les autres ont conservé le texte lu directement dans le PDF. En la relançant, chaque page déjà acceptée est réutilisée : aucune d’elles n’est payée deux fois."
+
+#: cps/spa_strings.py
+msgid "The whole book"
+msgstr "Tout le livre"
+
+#: cps/spa_strings.py
+msgid "The whole book, at the model you picked:"
+msgstr "Tout le livre, avec le modèle que vous avez choisi :"
+
+#: cps/spa_strings.py
+msgid "There is no text in this PDF at all, only images. Every page has to be read by the model, which costs the most."
+msgstr "Ce PDF ne contient aucun texte, seulement des images. Chaque page doit être lue par le modèle, ce qui coûte le plus cher."
+
+#: cps/spa_strings.py
+msgid "There is no usable text in this PDF, only page images. Text recovery settings determine how those pages are read; review a sample for recognition errors."
+msgstr "Ce PDF ne contient aucun texte exploitable, seulement des images de pages. Les réglages de récupération du texte déterminent comment ces pages sont lues ; examinez un échantillon pour repérer les erreurs de reconnaissance."
+
+#: cps/spa_strings.py
+msgid "There is very little text on each page. This is usually a sparse scan, or two printed pages photographed as one."
+msgstr "Il y a très peu de texte sur chaque page. C’est généralement une numérisation clairsemée, ou deux pages imprimées photographiées comme une seule."
+
+#: cps/spa_strings.py
+msgid "This PDF has a real text layer. Most pages will convert without asking a model anything."
+msgstr "Ce PDF possède une véritable couche de texte. La plupart des pages seront converties sans rien demander à un modèle."
+
+#: cps/spa_strings.py
+msgid "This PDF has a text layer, but it is not readable words. It has to be treated as if there were no text at all."
+msgstr "Ce PDF possède une couche de texte, mais ce ne sont pas des mots lisibles. Il doit être traité comme s’il n’y avait aucun texte."
+
+#: cps/spa_strings.py
+msgid "This PDF has not been assessed."
+msgstr "Ce PDF n’a pas été évalué."
+
+#: cps/spa_strings.py
+msgid "This book costs more than the target. Convert a sample first and see whether the result is worth the rest."
+msgstr "Ce livre coûte plus que l’objectif fixé. Convertissez d’abord un échantillon et voyez si le résultat vaut le reste."
+
+#: cps/spa_strings.py
+msgid "This book has no PDF to convert."
+msgstr "Ce livre n’a aucun PDF à convertir."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "This stopped at the {amount} cap. The pages converted before it was reached are in the file; the rest were left as they were."
+msgstr "La conversion s’est arrêtée au plafond de {amount}. Les pages converties avant qu’il ne soit atteint sont dans le fichier ; les autres sont restées telles quelles."
+
+#: cps/spa_strings.py
+msgid "What is in this PDF"
+msgstr "Ce que contient ce PDF"
+
+#: cps/spa_strings.py
+msgid "What it will cost"
+msgstr "Ce que cela coûtera"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Your administrator allows at most {amount} for one conversion."
+msgstr "Votre administrateur autorise au maximum {amount} pour une conversion."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Your administrator set a target of {amount} a book."
+msgstr "Votre administrateur a fixé un objectif de {amount} par livre."
+
+#: cps/spa_strings.py
+msgid "Your sample is ready"
+msgstr "Votre échantillon est prêt"
+
+#: cps/spa_strings.py
+msgid "One page did not pass the word check and kept the text read straight out of the PDF. Nothing was rewritten."
+msgstr "Une page n’a pas passé la vérification des mots et a conservé le texte lu directement dans le PDF. Rien n’a été réécrit."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} pages did not pass the word check and kept the text read straight out of the PDF. Nothing was rewritten."
+msgstr "{count} pages n’ont pas passé la vérification des mots et ont conservé le texte lu directement dans le PDF. Rien n’a été réécrit."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{pages} pages, added to this book as an EPUB format."
+msgstr "{pages} pages, ajoutées à ce livre au format EPUB."
+
+#: cps/spa_strings.py
+msgid "One page, downloaded as an EPUB to look at. Nothing is added to your library."
+msgstr "Une page, téléchargée en EPUB pour examen. Rien n’est ajouté à votre bibliothèque."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{pages} pages, downloaded as an EPUB to look at. Nothing is added to your library."
+msgstr "{pages} pages, téléchargées en EPUB pour examen. Rien n’est ajouté à votre bibliothèque."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "That count is worked out from {sampled} pages spread through the book, so the rest of it may need a few more or a few fewer."
+msgstr "Ce nombre est calculé à partir de {sampled} pages réparties dans le livre ; le reste peut en demander un peu plus ou un peu moins."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "about {pages} ({percent}%)"
+msgstr "environ {pages} ({percent} %)"
+
+#: cps/spa_strings.py
+msgid "Interrupted by a restart"
+msgstr "Interrompu par un redémarrage"
+
+#: cps/spa_strings.py
+msgid "The app restarted before this job recorded completion. Your original PDF is unchanged. Pages already converted may be reused if you retry. Any unresolved charges remain recorded for review; a lost response may still have been charged."
+msgstr "L’application a redémarré avant que cette tâche n’enregistre sa fin. Votre PDF d’origine est inchangé. Les pages déjà converties peuvent être réutilisées si vous réessayez. Les frais non résolus restent enregistrés pour examen ; une réponse perdue peut tout de même avoir entraîné une facturation."
+
+msgid "A charge could not be confirmed"
+msgstr "Un débit n’a pas pu être confirmé"
+msgid "An administrator must install it before text can be recovered, or you can keep a facsimile of the page images."
+msgstr "Un administrateur doit l’installer avant de pouvoir récupérer le texte ; vous pouvez aussi conserver un fac-similé des images des pages."
+#, python-brace-format
+msgid "An earlier job left {amount} unconfirmed: a request was sent and its answer never came back, so the provider may still charge it. It is not part of this new cap, and starting again does not settle or erase it."
+msgstr "Une tâche précédente a laissé {amount} non confirmé : une requête a été envoyée, mais sa réponse n’est jamais revenue ; le fournisseur peut donc encore facturer ce montant. Il ne fait pas partie de ce nouveau plafond, et recommencer ne le règle ni ne l’efface."
+msgid "An installed language code, for example eng, deu, fra, ell."
+msgstr "Un code de langue installé, par exemple eng, deu, fra, ell."
+msgid "Build the facsimile EPUB"
+msgstr "Créer l’EPUB fac-similé"
+msgid "Damaged layer — recovery required"
+msgstr "Couche endommagée — récupération requise"
+#, python-brace-format
+msgid "I understand the unconfirmed {amount} from the earlier job may still be charged, and it is not covered by this consent."
+msgstr "Je comprends que les {amount} non confirmés de la tâche précédente peuvent encore être facturés et qu’ils ne sont pas couverts par ce consentement."
+msgid "Keep the page images as they are. This is a facsimile of the book, not reflowed text."
+msgstr "Conserver les images des pages telles quelles. Il s’agit d’un fac-similé du livre, pas de texte recomposé."
+msgid "Language data"
+msgstr "Données de langue"
+msgid "Local OCR of every page that needs it, before any structural work. The original words stay annotated wherever the engine is unsure."
+msgstr "OCR local de chaque page qui en a besoin, avant tout travail structurel. Les mots d’origine restent annotés partout où le moteur n’est pas sûr de lui."
+msgid "Local time (no OpenRouter credit)"
+msgstr "Temps local (sans crédit OpenRouter)"
+msgid "Most of this PDF is not Latin-alphabet text. The selected recognition language will misread it unless a matching language pack is installed."
+msgstr "La majeure partie de ce PDF n’est pas en alphabet latin. La langue de reconnaissance sélectionnée le lira mal, sauf si un pack linguistique correspondant est installé."
+msgid "No recovery — facsimile only"
+msgstr "Aucune récupération — fac-similé uniquement"
+msgid "Not installed"
+msgstr "Non installé"
+msgid "Pages read with local OCR"
+msgstr "Pages lues avec l’OCR local"
+msgid "Pictures only — recovery required"
+msgstr "Images uniquement — récupération requise"
+msgid "Read only the pages with no text at all; the damaged layer is kept exactly as printed."
+msgstr "Lire uniquement les pages sans aucun texte ; la couche endommagée est conservée exactement comme imprimée."
+msgid "Recognition engine"
+msgstr "Moteur de reconnaissance"
+msgid "Recognition language"
+msgstr "Langue de reconnaissance"
+msgid "Recover pictures only"
+msgstr "Récupérer uniquement les images"
+msgid "Recover the text"
+msgstr "Récupérer le texte"
+msgid "Source recovery"
+msgstr "Récupération de la source"
+msgid "Source text"
+msgstr "Texte source"
+msgid "This keeps the page images as they are — a facsimile of the book, not reflowed text."
+msgstr "Les images des pages restent telles quelles — un fac-similé du livre, pas du texte recomposé."
+msgid "This stopped when a request’s answer never came back, so its charge could not be confirmed either way. Spent below is confirmed; the unconfirmed amount may still be charged by the provider and stays on record here until it is resolved. Reloading does not settle or erase it, and no new job covers it."
+msgstr "Cette tâche s’est arrêtée car la réponse à une requête n’est jamais revenue ; son débit n’a donc pas pu être confirmé. Le montant dépensé ci-dessous est confirmé ; le montant non confirmé peut encore être facturé par le fournisseur et reste enregistré ici jusqu’à sa résolution. Recharger ne le règle ni ne l’efface, et aucune nouvelle tâche ne le couvre."
+msgid "Uncertain readings marked"
+msgstr "Lectures incertaines signalées"
+msgid "Unconfirmed, may still be charged"
+msgstr "Non confirmé, peut encore être facturé"
+msgid "Verified in the PDF"
+msgstr "Vérifié dans le PDF"
+msgid "about {seconds}s for {pages} pages"
+msgstr "environ {seconds}s pour {pages} pages"
+#, python-brace-format
+msgid "{pages} pages are only pictures of pages. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite."
+msgstr "{pages} pages ne contiennent que des images. Elles sont lues depuis la page imprimée avec une reconnaissance de texte locale — une transcription de la source, jamais une réécriture."
+#, python-brace-format
+msgid "{pages} pages have a text layer that is not readable words. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite."
+msgstr "{pages} pages ont une couche de texte qui ne contient pas de mots lisibles. Elles sont lues depuis la page imprimée avec une reconnaissance de texte locale — une transcription de la source, jamais une réécriture."
 #~ msgid "Change library cover"
 #~ msgstr "Modifier la couverture de la bibliothèque"
 
@@ -16626,3 +16959,354 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "AI review ended before all eligible pages were reviewed. A completed file retains the full source conversion and any approved changes. Compatible responses may be reused; unresolved requests are not retried automatically."
+msgstr "La révision par IA s’est arrêtée avant d’examiner toutes les pages admissibles. Un fichier terminé conserve la conversion complète du document source et les modifications approuvées. Les réponses compatibles peuvent être réutilisées ; les requêtes non résolues ne sont pas relancées automatiquement."
+
+#: cps/spa_strings.py
+msgid "AI review is not available in this build. Source conversion remains available."
+msgstr "La révision par IA n’est pas disponible dans cette version. La conversion du document source reste disponible."
+
+#: cps/spa_strings.py
+msgid "AI review stopped at the {amount} cap. The complete source conversion remains in the file; approved changes are included and the remaining pages are unreviewed."
+msgstr "La révision par IA s’est arrêtée au plafond de {amount}. La conversion complète du document source reste dans le fichier ; les modifications approuvées sont incluses et les autres pages n’ont pas été révisées."
+
+#: cps/spa_strings.py
+msgid "AI review was not requested. Eligibility was not measured; this file uses source conversion and preserves its uncertainty evidence."
+msgstr "Aucune révision par IA n’a été demandée. L’admissibilité n’a pas été évaluée ; ce fichier utilise la conversion du document source et conserve les éléments signalant ses incertitudes."
+
+#: cps/spa_strings.py
+msgid "Add AI formatting review"
+msgstr "Ajouter une révision de la mise en forme par IA"
+
+#: cps/spa_strings.py
+msgid "Approval counts describe formatting adopted after source and reviewer checks, not independent proof of correctness. An abstention or unchanged page is not an improvement."
+msgstr "Les nombres d’approbations décrivent la mise en forme adoptée après vérification de la source et du réviseur, sans constituer une preuve indépendante d’exactitude. Une abstention ou une page inchangée n’est pas une amélioration."
+
+#: cps/spa_strings.py
+msgid "Approved operations"
+msgstr "Opérations approuvées"
+
+#: cps/spa_strings.py
+msgid "Cached stage results"
+msgstr "Résultats d’étape en cache"
+
+#: cps/spa_strings.py
+msgid "Configure an OpenRouter key to use optional AI review."
+msgstr "Configurez une clé OpenRouter pour utiliser la révision facultative par IA."
+
+#: cps/spa_strings.py
+msgid "Confirmed spend"
+msgstr "Dépenses confirmées"
+
+#: cps/spa_strings.py
+msgid "Convert this PDF to EPUB…"
+msgstr "Convertir ce PDF en EPUB…"
+
+#: cps/spa_strings.py
+msgid "Coverage-limited pages"
+msgstr "Pages à couverture limitée"
+
+#: cps/spa_strings.py
+msgid "Create a source-based EPUB with original evidence for uncertain text. Optional AI formatting review has its own estimate and consent."
+msgstr "Créez un EPUB à partir de la source, avec les passages originaux pour les textes incertains. La révision facultative de la mise en forme par IA nécessite son propre devis et consentement."
+
+#: cps/spa_strings.py
+msgid "Create this source conversion without model requests or provider charges."
+msgstr "Créer cette conversion du document source sans requêtes aux modèles ni frais de fournisseur."
+
+#: cps/spa_strings.py
+msgid "Eligibility is not an improvement. Unsupported, limited, declined and unreviewed pages keep the source conversion and its uncertainty evidence."
+msgstr "L’admissibilité n’est pas une amélioration. Les pages non prises en charge, limitées, refusées ou non révisées conservent la conversion du document source et les éléments signalant ses incertitudes."
+
+#: cps/spa_strings.py
+msgid "Eligible pages"
+msgstr "Pages admissibles"
+
+#: cps/spa_strings.py
+msgid "Eligible pages in this selection"
+msgstr "Pages admissibles dans cette sélection"
+
+#: cps/spa_strings.py
+msgid "Enter a positive cap within the administrator limit."
+msgstr "Saisissez un plafond positif dans la limite fixée par l’administrateur."
+
+#: cps/spa_strings.py
+msgid "Every selected page gets a source conversion. Optional AI review can suggest supported heading and displayed quotation formatting; it does not rewrite words, repair OCR, or reconstruct tables and notes."
+msgstr "Chaque page sélectionnée est convertie à partir de la source. La révision facultative par IA peut proposer une mise en forme prise en charge pour les titres et citations en bloc ; elle ne réécrit pas les mots, ne corrige pas l’OCR et ne reconstruit pas les tableaux ni les notes."
+
+#: cps/spa_strings.py
+msgid "Filed EPUB SHA-256: {hash}"
+msgstr "SHA-256 de l’EPUB enregistré : {hash}"
+
+#: cps/spa_strings.py
+msgid "Formatting review"
+msgstr "Révision de la mise en forme"
+
+#: cps/spa_strings.py
+msgid "Full-review reservation ceiling"
+msgstr "Plafond de réservation pour une révision complète"
+
+#: cps/spa_strings.py
+msgid "I authorize Luna proposals and Terra reviews through OpenRouter openai/flex, up to {amount} for this job. Unreviewed pages keep the source conversion."
+msgstr "J’autorise les propositions de Luna et les révisions de Terra via OpenRouter openai/flex, jusqu’à {amount} pour cette tâche. Les pages non révisées conservent la conversion du document source."
+
+#: cps/spa_strings.py
+msgid "Job cap"
+msgstr "Plafond de la tâche"
+
+#: cps/spa_strings.py
+msgid "Legacy gate acceptances"
+msgstr "Acceptations de l’ancien contrôle"
+
+#: cps/spa_strings.py
+msgid "Legacy requests recorded"
+msgstr "Anciennes requêtes enregistrées"
+
+#: cps/spa_strings.py
+msgid "Local OCR runs before formatting. Uncertain readings remain disclosed with original-source access; some readings cannot be marked at an exact word."
+msgstr "L’OCR local précède la mise en forme. Les lectures incertaines restent signalées avec un accès à la source originale ; certaines ne peuvent pas être marquées sur un mot précis."
+
+#: cps/spa_strings.py
+msgid "Luna proposes heading and quotation formatting. Terra reviews each proposal; only approved changes can reach the EPUB."
+msgstr "Luna propose une mise en forme des titres et citations. Terra examine chaque proposition ; seules les modifications approuvées peuvent être intégrées à l’EPUB."
+
+#: cps/spa_strings.py
+msgid "Native text layer (not proofread)"
+msgstr "Couche de texte native (non relue)"
+
+#: cps/spa_strings.py
+msgid "No model requests or provider charges. Keep source text, images, navigation and uncertainty evidence."
+msgstr "Aucune requête aux modèles ni frais de fournisseur. Conserve le texte source, les images, la navigation et les éléments signalant les incertitudes."
+
+#: cps/spa_strings.py
+msgid "Optional review uses the two models below, with no automatic alternative route."
+msgstr "La révision facultative utilise les deux modèles ci-dessous, sans autre routage automatique."
+
+#: cps/spa_strings.py
+msgid "Pages in this file"
+msgstr "Pages dans ce fichier"
+
+#: cps/spa_strings.py
+msgid "Pages left unreviewed"
+msgstr "Pages non révisées"
+
+#: cps/spa_strings.py
+msgid "Pages with approved changes"
+msgstr "Pages avec des modifications approuvées"
+
+#: cps/spa_strings.py
+msgid "Pages with no supported choices"
+msgstr "Pages sans choix pris en charge"
+
+#: cps/spa_strings.py
+msgid "Planned proposer"
+msgstr "Modèle de proposition prévu"
+
+#: cps/spa_strings.py
+msgid "Planned reviewer"
+msgstr "Modèle de révision prévu"
+
+#: cps/spa_strings.py
+msgid "Prepare AI estimate"
+msgstr "Préparer le devis IA"
+
+#: cps/spa_strings.py
+msgid "Prepare a local estimate before consenting to review. This reads complete source context and may take time, but sends nothing to a model and reserves no provider credit."
+msgstr "Préparez un devis local avant de consentir à la révision. Cela lit tout le contexte source et peut prendre du temps, mais n’envoie rien à un modèle et ne réserve aucun crédit fournisseur."
+
+#: cps/spa_strings.py
+msgid "Preparing source context: {page} of {pages}"
+msgstr "Préparation du contexte source : {page} sur {pages}"
+
+#: cps/spa_strings.py
+msgid "Proposed operations"
+msgstr "Opérations proposées"
+
+#: cps/spa_strings.py
+msgid "Proposer abstentions"
+msgstr "Abstentions du proposant"
+
+#: cps/spa_strings.py
+msgid "Provider route"
+msgstr "Route du fournisseur"
+
+#: cps/spa_strings.py
+msgid "Read pages with no text at all. Existing text layers stay unchanged, including any extraction errors, with source evidence available."
+msgstr "Lit les pages dépourvues de texte. Les couches de texte existantes restent inchangées, y compris leurs erreurs d’extraction, avec accès à la source originale."
+
+#: cps/spa_strings.py
+msgid "Rejected pages"
+msgstr "Pages rejetées"
+
+#: cps/spa_strings.py
+msgid "Requests attempted"
+msgstr "Requêtes tentées"
+
+#: cps/spa_strings.py
+msgid "Reviewer abstentions"
+msgstr "Abstentions du réviseur"
+
+#: cps/spa_strings.py
+msgid "Source conversion"
+msgstr "Conversion du document source"
+
+#: cps/spa_strings.py
+msgid "Source conversion is available without a provider key. Optional AI formatting review needs an OpenRouter key."
+msgstr "La conversion du document source est disponible sans clé fournisseur. La révision facultative de la mise en forme par IA nécessite une clé OpenRouter."
+
+#: cps/spa_strings.py
+msgid "Source conversion ready; AI review limited"
+msgstr "Conversion du document source prête ; révision IA limitée"
+
+#: cps/spa_strings.py
+msgid "Source estimate preparation failed. No model request was sent."
+msgstr "La préparation du devis source a échoué. Aucune requête n’a été envoyée à un modèle."
+
+#: cps/spa_strings.py
+msgid "Source estimate ready. No credit has been reserved."
+msgstr "Devis source prêt. Aucun crédit n’a été réservé."
+
+#: cps/spa_strings.py
+msgid "Source pages prepared"
+msgstr "Pages source préparées"
+
+#: cps/spa_strings.py
+msgid "Source preparation stopped. No model request was sent."
+msgstr "Préparation de la source arrêtée. Aucune requête n’a été envoyée à un modèle."
+
+#: cps/spa_strings.py
+msgid "Stop preparation"
+msgstr "Arrêter la préparation"
+
+#: cps/spa_strings.py
+msgid "The preparation could not be stopped. Try again."
+msgstr "La préparation n’a pas pu être arrêtée. Réessayez."
+
+#: cps/spa_strings.py
+msgid "The sample starts at the first body page and keeps the full source context for note and figure associations."
+msgstr "L’extrait commence à la première page du corps du livre et conserve tout le contexte source pour les associations de notes et de figures."
+
+#: cps/spa_strings.py
+msgid "This PDF has a native text layer. Extraction and punctuation may still differ from the printed page; original-source evidence remains available."
+msgstr "Ce PDF possède une couche de texte native. L’extraction et la ponctuation peuvent toutefois différer de la page imprimée ; la source originale reste accessible."
+
+#: cps/spa_strings.py
+msgid "This cap may cover only part of the AI review. The complete source conversion will still be produced; pages left unreviewed will be counted explicitly."
+msgstr "Ce plafond peut ne couvrir qu’une partie de la révision par IA. La conversion complète du document source sera tout de même produite ; les pages non révisées seront comptées explicitement."
+
+#: cps/spa_strings.py
+msgid "This ceiling assumes a proposal and a review request for every eligible page, with no cached responses. It is not an expected bill or money already held. Actual charges and coverage may be lower; your cap limits new requests."
+msgstr "Ce plafond suppose une requête de proposition et une requête de révision pour chaque page admissible, sans réponses en cache. Ce n’est ni une facture prévisionnelle ni un montant déjà réservé. Les frais et la couverture réels peuvent être inférieurs ; votre plafond limite les nouvelles requêtes."
+
+#: cps/spa_strings.py
+msgid "This older job predates the current two-stage review. Its counts are historical and do not establish current review coverage."
+msgstr "Cette ancienne tâche précède la révision actuelle en deux étapes. Ses nombres sont historiques et ne prouvent pas la couverture de la révision actuelle."
+
+#: cps/spa_strings.py
+msgid "Uncertain readings recorded"
+msgstr "Lectures incertaines enregistrées"
+
+#: cps/spa_strings.py
+msgid "Unsupported pages"
+msgstr "Pages non prises en charge"
+
+#: cps/spa_strings.py
+msgid "Optional. Source conversion needs no provider key. When available, AI formatting review uses Luna proposals and Terra approvals through OpenRouter openai/flex, with an estimate and explicit consent for each job. The key is stored encrypted and is never shown again."
+msgstr "Facultatif. La conversion du document source ne nécessite pas de clé fournisseur. Lorsqu’elle est disponible, la révision de la mise en forme par IA utilise les propositions de Luna et les approbations de Terra via OpenRouter openai/flex, avec un devis et un consentement explicite pour chaque tâche. La clé est stockée chiffrée et n’est jamais réaffichée."
+
+#: cps/spa_strings.py
+msgid "Models requested"
+msgstr "Modèles sollicités"
+
+#: cps/spa_strings.py
+msgid "The sample starts at the first body page and reads only the front of the book, so it stays quick however long the PDF is."
+msgstr "L’extrait commence à la première page du corps du livre et ne lit que le début du livre : il reste rapide, quelle que soit la longueur du PDF."
+
+#: cps/api/reflow.py
+#, python-format
+msgid "This PDF is %(size)s MB. Reflow converts PDFs of up to %(limit)s MB; an administrator can change this limit."
+msgstr "Ce PDF fait %(size)s Mo. Reflow convertit les PDF de %(limit)s Mo au plus ; un administrateur peut modifier cette limite."
+
+#: cps/api/reflow.py
+#, python-format
+msgid "This PDF has %(pages)s pages. Reflow converts PDFs of up to %(limit)s pages; an administrator can change this limit."
+msgstr "Ce PDF compte %(pages)s pages. Reflow convertit les PDF de %(limit)s pages au plus ; un administrateur peut modifier cette limite."
+
+#: cps/templates/config_edit.html
+msgid "Reflow maximum PDF length per conversion (pages)"
+msgstr "Longueur maximale d’un PDF par conversion Reflow (pages)"
+
+#: cps/templates/config_edit.html
+msgid "Reflow maximum PDF size per conversion (MB)"
+msgstr "Taille maximale d’un PDF par conversion Reflow (Mo)"
+
+#: cps/templates/config_edit.html
+msgid "A PDF longer or larger than these limits is refused before it is assessed or converted, as a sample or as a whole book, so that one book cannot occupy the server for hours."
+msgstr "Un PDF plus long ou plus volumineux que ces limites est refusé avant d’être évalué ou converti, en extrait comme en livre entier, pour qu’un seul livre ne puisse pas occuper le serveur pendant des heures."
+
+#: cps/templates/config_edit.html
+msgid "Reflow maximum spend per conversion (USD)"
+msgstr "Dépense maximale par conversion Reflow (USD)"
+
+#: cps/templates/config_edit.html
+msgid "A hard limit. No conversion may be started with a cost cap above this figure, and a running conversion stops when it reaches its cap."
+msgstr "Une limite stricte. Aucune conversion ne peut être lancée avec un plafond de coût supérieur à ce montant, et une conversion en cours s’arrête lorsqu’elle atteint son plafond."
+
+#: cps/templates/config_edit.html
+msgid "OpenRouter API Key (Reflow PDF to EPUB)"
+msgstr "Clé API OpenRouter (Reflow, PDF vers EPUB)"
+
+#: cps/templates/config_edit.html
+msgid "A key is saved. Leave blank to keep it."
+msgstr "Une clé est enregistrée. Laissez vide pour la conserver."
+
+#: cps/templates/config_edit.html
+msgid "No key saved"
+msgstr "Aucune clé enregistrée"
+
+#: cps/templates/config_edit.html
+#, python-format
+msgid "A key is currently coming from the environment (%(source)s); it takes effect only while no key is saved here."
+msgstr "Une clé provient actuellement de l’environnement (%(source)s) ; elle ne s’applique que tant qu’aucune clé n’est enregistrée ici."
+
+#: cps/templates/config_edit.html
+msgid "Delete the saved key"
+msgstr "Supprimer la clé enregistrée"
+
+#: cps/api/reflow.py
+msgid "You already have a source preparation running or waiting. Wait for it to finish, or stop it, before preparing another."
+msgstr "Vous avez déjà une préparation du document source en cours ou en attente. Attendez qu’elle se termine, ou arrêtez-la, avant d’en préparer une autre."
+
+#: cps/api/reflow.py
+msgid "Local source preparation is busy. Try again shortly."
+msgstr "La préparation locale du document source est occupée. Réessayez dans quelques instants."
+
+#: cps/spa_strings.py
+msgid "Waiting for one earlier source preparation to finish."
+msgstr "En attente de la fin d’une préparation du document source lancée avant la vôtre."
+
+#: cps/spa_strings.py
+msgid "Waiting for {count} earlier source preparations to finish."
+msgstr "En attente de la fin de {count} préparations du document source lancées avant la vôtre."
+
+#: cps/spa_strings.py
+msgid "Source preparation stopped at its {minutes}-minute limit so that others can take a turn. Pages already recognized are kept: prepare again to continue."
+msgstr "La préparation du document source s’est arrêtée à sa limite de {minutes} minutes pour laisser leur tour aux autres. Les pages déjà reconnues sont conservées : relancez la préparation pour continuer."
+
+#: cps/spa_strings.py
+msgid "Samples are removed {days} days after they are made. Make a new sample to see it again."
+msgstr "Les échantillons sont supprimés {days} jours après leur création. Créez un nouvel échantillon pour le revoir."
+
+#: cps/tasks/reflow.py
+msgid "Settle interrupted conversions and remove expired Reflow files"
+msgstr "Régler les conversions interrompues et supprimer les fichiers Reflow expirés"
+
+#: cps/spa_strings.py
+msgid "This sample is no longer kept"
+msgstr "Cet échantillon n’est plus conservé"
+
+#: cps/spa_strings.py
+msgid "Sample EPUB SHA-256: {hash}"
+msgstr "SHA-256 de l’EPUB de l’échantillon : {hash}"

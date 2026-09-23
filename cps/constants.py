@@ -179,6 +179,15 @@ CWA_METADATA_TEMP_DIR = os.environ.get(
 # Folder where the log files are stored
 LOG_ARCHIVE = os.path.join(CONFIG_DIR, "log_archive")
 
+# Reflow (cps/services/reflow): the page cache, the per-job ledgers and the sample
+# EPUBs a user asked to look at before committing.
+#
+# This has to live under /config for the same reason the update notice does. The
+# cache is what makes a cancelled or cap-stopped conversion resumable without
+# paying for the finished pages a second time, and /app's writable layer is thrown
+# away every time the image is pulled.
+REFLOW_DIR = os.environ.get("REFLOW_DIR", os.path.join(CONFIG_DIR, "reflow"))
+
 # Where the "update available" banner remembers the date it last fired, so it
 # can hold itself to once per calendar day.
 #

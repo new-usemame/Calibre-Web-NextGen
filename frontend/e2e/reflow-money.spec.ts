@@ -121,6 +121,12 @@ test('complete and sampled source assessments disclose observed scope and unknow
 test('keyless source conversion remains usable and cannot silently become paid review', async ({ page }) => {
   const est = assessment(); est.configured = false; est.review.quality_released = false;
   const { state, errors } = await stub(page, est);
+  const adminSettings = page.getByRole('link', { name: 'Open admin settings', exact: true });
+  await expect(adminSettings).toHaveCSS('text-decoration-line', 'underline');
+  await adminSettings.focus(); await expect(adminSettings).toBeFocused();
+  const accessibility = await new AxeBuilder({ page }).include('div[role="status"]')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(accessibility.violations.filter((v) => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
   await expect(paidChoice(page)).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Prepare AI estimate' })).toHaveCount(0);
   const free = page.getByRole('checkbox', { name: 'Create this source conversion without model requests or provider charges.' });

@@ -175,8 +175,12 @@
   background: var(--surface-2); border: 1px solid var(--border);
   color: var(--text-muted); font-size: var(--fs-base); line-height: var(--lh-base);
 }
-.adminLink { color: var(--accent-text); text-decoration: none; }
-.adminLink:hover { text-decoration: underline; }
+.adminLink {
+  color: var(--accent-text); text-decoration: underline;
+  text-decoration-thickness: .08em; text-underline-offset: .12em;
+}
+.adminLink:hover { color: var(--accent-hover); }
+.adminLink:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
 
 @media (max-width: 560px) {
   .container { padding: var(--sp-4) var(--sp-4) var(--sp-8); }

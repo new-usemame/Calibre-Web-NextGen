@@ -128,7 +128,7 @@ def _whole_source_words(spans):
     Whitespace, a column-sized gap, or a different baseline ends the unit. No
     word spelling or intended Unicode character participates in this proof.
     """
-    if not any(span.encoding_unresolved for span in spans):
+    if not any(span.encoding_unresolved or span.transcription_uncertain for span in spans):
         return spans
     pieces = []
     for span in spans:
@@ -139,17 +139,19 @@ def _whole_source_words(spans):
             chars = [c for c in span.char_boxes if c[0] >= token.start() and c[1] <= token.end()]
             if not chars:
                 pieces.append(replace(span, text=token.group(),
-                    encoding_unresolved=span.encoding_unresolved and bool(token.group().strip())))
+                    encoding_unresolved=span.encoding_unresolved and bool(token.group().strip()),
+                    transcription_uncertain=span.transcription_uncertain and bool(token.group().strip())))
                 continue
             box = (min(c[2] for c in chars), min(c[3] for c in chars),
                    max(c[4] for c in chars), max(c[5] for c in chars))
             pieces.append(replace(span, text=token.group(), bbox=box,
                 encoding_unresolved=span.encoding_unresolved and bool(token.group().strip()),
+                transcription_uncertain=span.transcription_uncertain and bool(token.group().strip()),
                 char_boxes=tuple((c[0]-token.start(), c[1]-token.start(), *c[2:]) for c in chars)))
     result, group = [], []
 
     def flush():
-        if len(group) < 2 or not any(s.encoding_unresolved for s in group):
+        if len(group) < 2 or not any(s.encoding_unresolved or s.transcription_uncertain for s in group):
             result.extend(group)
             return
         box = (min(s.bbox[0] for s in group), min(s.bbox[1] for s in group),
@@ -161,7 +163,8 @@ def _whole_source_words(spans):
             flags &= span.flags
         result.append(replace(group[0], text=''.join(s.text for s in group), bbox=box,
             font=group[0].font if len({s.font for s in group}) == 1 else 'mixed-native-fonts',
-            flags=flags, encoding_unresolved=True, char_boxes=tuple(chars)))
+            flags=flags, encoding_unresolved=any(s.encoding_unresolved for s in group),
+            transcription_uncertain=any(s.transcription_uncertain for s in group),char_boxes=tuple(chars)))
 
     for piece in pieces:
         if group:
@@ -179,9 +182,10 @@ def _whole_source_words(spans):
     return result
 
 
-def descriptor(pno, bbox, size, font='', raised=False):
+def descriptor(pno, bbox, size, font='', raised=False, reason='encoding'):
     return {'page': pno, 'bbox': [round(v, 4) for v in bbox],
-            'size': round(size, 4), 'font': font, 'raised': bool(raised)}
+            'size': round(size, 4), 'font': font, 'raised': bool(raised),
+            **({'reason':'transcript'} if reason=='transcript' else {})}
 
 
 def image_name(record):
@@ -282,7 +286,7 @@ def note_glyph_runs(region, text, pno):
         for span in line.spans:
             start = len(raw)
             raw += span.text
-            if getattr(span, 'encoding_unresolved', False) and span.text.strip():
+            if (getattr(span, 'encoding_unresolved', False) or getattr(span,'transcription_uncertain',False)) and span.text.strip():
                 intervals.append((start, len(raw), span))
     prefix = re.match(r'^\s*' + re.escape(str(region.number)) + r'[.)]?\s*', raw) if region.number is not None else None
     skip = prefix.end() if prefix else len(raw)-len(raw.lstrip())
@@ -305,7 +309,7 @@ def note_glyph_runs(region, text, pno):
         if lo < cursor:
             return []
         runs.append(['t', text[cursor:lo]])
-        runs.append(['glyph', text[lo:hi], descriptor(pno, span.bbox, span.size, span.font)])
+        runs.append(['glyph', text[lo:hi], descriptor(pno, span.bbox, span.size, span.font,reason='transcript' if getattr(span,'transcription_uncertain',False) else 'encoding')])
         cursor = hi
     runs.append(['t', text[cursor:]])
     return [run for run in runs if run[1]]
@@ -315,7 +319,7 @@ def glyph_html(record, block=False):
     """Printed evidence stays inline; the link explains unavailable text encoding."""
     from html import escape
     style='max-width:100%;height:auto' if block else 'height:1em;width:auto;vertical-align:baseline'
-    label='Original source text; Unicode encoding unavailable. Open original page.'
+    label=('Original source text; transcription uncertain. Open original page.' if record.get('reason')=='transcript' else 'Original source text; Unicode encoding unavailable. Open original page.')
     html = ('<a class="source-glyph" href="original-p%04d.xhtml#page" title="%s">'
             '<img src="%s" alt="%s" style="%s"/></a>' %
             (record['page'],escape(label,quote=True),image_name(record),escape(label,quote=True),style))

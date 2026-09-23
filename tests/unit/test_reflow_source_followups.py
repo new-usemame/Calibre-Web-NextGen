@@ -237,3 +237,87 @@ def test_connected_scan_figure_stops_at_source_boundaries(barrier):
     assert figure.bbox==(100,88,250,200)
     assert any(upper is ln for _,lines in kept for ln in lines)
     assert [ln.text for region in art for ln in region.lines]==['X / Y']
+
+def test_captioned_invisible_diagram_keeps_outer_art_and_has_one_owner(tmp_path):
+    def text(p,mode):
+        for x,y,t in [(140,80,'12 y'),(90,110,'Q'),(210,110,'R'),(80,150,'X'),(230,150,'Y'),(100,200,'Z'),(200,200,'0'),(140,220,'20 y')]:
+            p.insert_text((x,y),t,fontsize=9,render_mode=mode)
+        p.insert_text((65,275),'Figure 1 - General periods and subperiods',fontsize=10,render_mode=mode)
+        p.insert_textbox((40,300,360,480),('The surrounding ordinary prose describes the diagram without becoming part of its image. This paragraph must remain readable and selectable below the complete illustration. ')*3,fontsize=10,render_mode=mode)
+    with pymupdf.open() as pixels:
+        p=pixels.new_page(width=400,height=520);p.draw_circle((160,155),100,color=(0,0,0));text(p,0);png=p.get_pixmap().tobytes('png')
+    with pymupdf.open() as doc:
+        p=doc.new_page(width=400,height=520);p.insert_image(p.rect,stream=png);text(p,3)
+        raw=extract.read_page(doc,0);style=skeleton.book_style([raw]);style.body_size=10
+        probe=extract.ScanPixelProbe(doc,0,mask=[ln.bbox for b in raw.text_blocks for ln in b.lines])
+        book=assemble.assemble([skeleton.page_skeleton(raw,style,pixel_probe=probe)],style,[raw])
+        assert book.conservation.ok
+        diagrams=[f for f in book.figures if f['bbox'][1]<250]
+        assert len(diagrams)==1
+        x0,y0,x1,y1=diagrams[0]['bbox']
+        assert x0<61 and x1>259 and y0<56 and y1>254
+        assert not any('12 y' in e.text for e in book.elements)
+        assert any('surrounding ordinary prose' in e.text for e in book.elements)
+        path=tmp_path/'circle.epub';build_epub.build(book,str(path),doc=doc)
+        assert build_epub.validate(str(path))==[]
+
+@pytest.mark.parametrize('dark',[True,False])
+def test_unverified_text_on_full_page_art_preserves_picture_once(dark,tmp_path):
+    prose=('The author describes the history and purpose of this volume in a readable cover paragraph. '
+           'Its portrait and background artwork are part of the source, not optional decoration. ')*5
+    with pymupdf.open() as pixels:
+        p=pixels.new_page(width=400,height=500)
+        if dark:p.draw_rect(p.rect,color=None,fill=(.05,.1,.15))
+        p.insert_textbox((40,40,360,300),prose,fontsize=10,color=(1,1,1) if dark else (0,0,0))
+        if dark:p.draw_rect((250,340,360,460),color=None,fill=(.8,.4,.2))
+        png=p.get_pixmap().tobytes('png')
+    with pymupdf.open() as doc:
+        p=doc.new_page(width=400,height=500);p.insert_image(p.rect,stream=png)
+        p.insert_textbox((40,40,360,300),prose,fontsize=10,render_mode=3)
+        book=assemble.deterministic_book(doc)
+        assert book.conservation.ok
+        if dark:
+            assert any(tuple(f['bbox'])==(0,0,400,500) for f in book.figures)
+            assert not any('The author describes' in e.text for e in book.elements)
+        else:
+            assert any('The author describes' in e.text for e in book.elements)
+        path=tmp_path/'cover.epub';build_epub.build(book,str(path),doc=doc)
+        assert build_epub.validate(str(path))==[]
+
+@pytest.mark.parametrize('references',[True,False])
+def test_unverified_reference_columns_keep_entry_associations(references,tmp_path):
+    def put(p,mode):
+        for col in range(2):
+            for row in range(14):
+                text=f'Term {chr(65+row)}, 125, 273-286, 541' if references else 'This is normal prose with readable words.'
+                p.insert_text((35+col*210,80+row*16),text,fontsize=9,render_mode=mode)
+        p.insert_textbox((35,340,425,600),('Ordinary source prose continues after the reference columns. It remains readable and selectable, with complete sentences that explain the surrounding discussion. ')*6,fontsize=10,render_mode=mode)
+    with pymupdf.open() as pixels:
+        p=pixels.new_page(width=460,height=650);put(p,0);png=p.get_pixmap().tobytes('png')
+    with pymupdf.open() as doc:
+        p=doc.new_page(width=460,height=650);p.insert_image(p.rect,stream=png);put(p,3)
+        book=assemble.deterministic_book(doc);assert book.conservation.ok
+        if references:
+            assert any(f['found']=='unverified_scan_layout' for f in book.figures)
+            assert not any('Term A' in e.text for e in book.elements)
+        else:
+            assert any('normal prose' in e.text for e in book.elements)
+        path=tmp_path/'index.epub';build_epub.build(book,str(path),doc=doc)
+        assert build_epub.validate(str(path))==[]
+
+
+@pytest.mark.parametrize("sequence",[True,False])
+def test_deep_margin_folio_sequence_is_furniture_but_body_digits_are_not(sequence):
+    from cps.services.reflow import extract, skeleton, assemble
+    raws=[]
+    for p in range(4):
+        def line(text,y):
+            return extract.Line([extract.Span(text,10,'Times',0,(40,y,300,y+10),y+10)],(40,y,300,y+10))
+        lines=[line('This is complete ordinary prose continuing across the page.',100),
+               line(str(20+p*3),130),line('This is the final body sentence on the page.',570),line(str(p+1) if sequence else '42',640)]
+        raws.append(extract.RawPage(p,500,800,[extract.Block(i,l.bbox,[l]) for i,l in enumerate(lines)],[],0))
+    style=skeleton.book_style(raws)
+    for raw in raws:
+        skel=skeleton.page_skeleton(raw,style)
+        assert any(r.kind==('furniture' if sequence else 'body') and any(l.text==(str(raw.pno+1) if sequence else '42') for l in r.lines) for r in skel.regions)
+        assert any(r.kind=='body' and any(l.text==str(20+raw.pno*3) for l in r.lines) for r in skel.regions)

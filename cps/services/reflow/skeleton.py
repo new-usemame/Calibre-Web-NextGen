@@ -235,6 +235,7 @@ class BookStyle(object):
     band_hits: dict = field(default_factory=dict)
     page_count: int = 0
     outline: List[dict] = field(default_factory=list)
+    folio_boxes: dict = field(default_factory=dict)
 
     @property
     def boiler_threshold(self):
@@ -316,6 +317,33 @@ def band_key(text):
     return _DIGITS.sub("#", " ".join(text.lower().split()))
 
 
+def _sequence_folios(raw_pages, body_size):
+    """Prove deep-margin folios from repeated geometry and page progression.
+
+    Large PDF margins can place the printed footer well inside a percentage
+    band. An isolated body number is insufficient: require three neighboring
+    pages with the same page/folio offset and detached bottom-row geometry.
+    """
+    candidates=[]
+    for raw in raw_pages:
+        lines=sorted((line for block in raw.text_blocks for line in block.lines
+                      if line.stripped),key=lambda line:line.bbox[1])
+        if len(lines)<2:continue
+        line=lines[-1]
+        if not re.fullmatch(r"[0-9]{1,5}",line.stripped):continue
+        if (line.bbox[1]<raw.height*.7 or line.size>body_size*1.02
+                or line.bbox[1]-max(other.bbox[3] for other in lines[:-1])<line.size*1.5):continue
+        candidates.append((raw.pno,int(line.stripped)-raw.pno,
+                           line.bbox[1]/raw.height,line.bbox))
+    proved={}
+    for page,offset,y,box in candidates:
+        peers=sorted(p for p,o,py,b in candidates if o==offset and abs(py-y)<.01)
+        if any(peers[i+2]-peers[i]==2 and peers[i]<=page<=peers[i+2]
+               for i in range(len(peers)-2)):
+            proved[page]=box
+    return proved
+
+
 def book_style(raw_pages, outline=None):
     """Measure the book once: body size, heading ladder, repeated band strings.
 
@@ -351,7 +379,8 @@ def book_style(raw_pages, outline=None):
     ladder = heading_ladder(body_size, census, pages, len(raw_pages))
 
     return BookStyle(body_size=body_size, ladder=ladder, band_hits=dict(bands),
-                     page_count=len(raw_pages), outline=list(outline or []))
+                     page_count=len(raw_pages), outline=list(outline or []),
+                     folio_boxes=_sequence_folios(raw_pages,body_size))
 
 
 # ------------------------------------------------------------------ heading vetoes
@@ -512,9 +541,9 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     skel = PageSkeleton(pno=raw.pno, width=raw.width, height=raw.height,
                         is_scan=raw.is_page_scan)
 
-    if raw.is_page_scan and getattr(raw, "text_layer_invisible", False):
+    if raw.is_page_scan and (getattr(raw, "text_layer_invisible", False) or getattr(raw, "text_layer_overpainted", False)):
         from .source import needs_recovery
-        if needs_recovery(raw):
+        if needs_recovery(raw) or getattr(raw, "transcript_unverified", False):
             # Recognition was disabled or could not establish a source layer.
             # Preserve the complete page, not an invisible garbage transcript.
             skel.regions.append(Region(kind='artwork',
@@ -571,6 +600,17 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     # it: one figure, nothing left to slice. Evidence is the pixels and the
     # prose together, so a text page with a scan behind it can never qualify.
     cover = _full_bleed_plate(raw, kept_blocks, pixel_probe)
+    if cover is not None and (getattr(raw,'text_layer_invisible',False)
+                              or getattr(raw,'text_layer_overpainted',False)):
+        # Ink across the page proves artwork even when its hidden transcript is
+        # a long, plausible blurb. Preserve the design once, including portraits.
+        owned=[ln for _,lines in kept_blocks for ln in lines]
+        owned.extend(ln for note in note_regions for ln in note.lines)
+        skel.regions.append(Region(kind='artwork',lines=owned,bbox=cover.bbox,
+                                   reason='unverified_scan_layout'))
+        skel.regions.append(Region(kind='figure',bbox=cover.bbox,
+                                   reason='unverified_scan_layout'))
+        return skel
     if cover is not None:
         skel.regions.append(Region(kind="figure", bbox=cover.bbox, image=cover,
                                    needs_ink=True))
@@ -600,6 +640,9 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
         candidates = _vector_figures(raw)
     else:
         candidates = []
+    kept_blocks, candidates, captioned_artwork, note_regions = _complete_captioned_scan_diagrams(
+        raw, kept_blocks, candidates, style, pixel_probe, note_regions)
+    skel.regions.extend(captioned_artwork)
     if unverified_columns:
         # One owner for intersecting source regions; never repeat a figure below
         # a new table crop or leave its final source row outside the crop.
@@ -805,6 +848,17 @@ def _unverified_column_region(raw):
         box=_lines_bbox(group,group[0].bbox)
         if columns and box[0] < columns[-1][0][2]+em*.5:continue
         columns.append((box,group))
+    if len(columns)==2:
+        overlap=min(box[3] for box,_ in columns)-max(box[1] for box,_ in columns)
+        selected=[ln for _,group in columns for ln in group]
+        numbered=sum(bool(re.search(r'\d[\d, n\-.]*$',ln.text)) for ln in selected)
+        digits=sum(ch.isdigit() for ln in selected for ch in ln.text)
+        letters=sum(ch.isalpha() for ln in selected for ch in ln.text)
+        # Dense reference columns are source associations, not aligned prose
+        # rows to interleave. Preserve their printed entries and page numbers.
+        if overlap>=8*em and numbered*2>=len(selected) and digits>letters*.25:
+            box=_lines_bbox(selected,selected[0].bbox)
+            return (max(0,box[0]-3),max(0,box[1]-3),min(raw.width,box[2]+3),min(raw.height,box[3]+3))
     for start in range(len(columns)-2):
         group=columns[start:start+3]
         overlap=min(box[3] for box,_ in group)-max(box[1] for box,_ in group)
@@ -931,6 +985,8 @@ def _preserve_uncertain_ocr_regions(raw, kept_blocks, note_regions, skel, cover,
     regions = []
     for block in raw.text_blocks:
         spans = [sp for ln in block.lines for sp in ln.spans]
+        if any(getattr(ln,"transcription_uncertain",False) for ln in block.lines):
+            regions.append(block);continue
         if not spans or not all(sp.font == "ocr" for sp in spans):
             continue
         if cover is not None or any(sp.uncertain for sp in spans) or not any(c.isalnum() for c in block.text):
@@ -1058,7 +1114,8 @@ def _full_bleed_plate(raw, kept_blocks, pixel_probe):
     # Low-confidence OCR fragments over a design are not evidence of prose.
     # Native lines count normally; the pixel gate still proves full-page art.
     credible = sum(_credible_line(ln) for _, kept in kept_blocks for ln in kept)
-    if credible > PLATE_PROSE_MAX:
+    if credible > PLATE_PROSE_MAX and not (getattr(raw,'text_layer_invisible',False)
+            or getattr(raw,'text_layer_overpainted',False)):
         return None
     rect = (0.0, 0.0, raw.width, raw.height)
     try:
@@ -1330,6 +1387,8 @@ _PROSE_SENTENCE = re.compile(r"[A-Z\u201c\u2018\"']\S*[.!?](?:\s|$)")
 
 
 def _furniture_reason(line, raw, style, top_y=None):
+    if getattr(style,"folio_boxes",{}).get(raw.pno) == line.bbox:
+        return "folio_sequence"
     y0, y1 = line.bbox[1], line.bbox[3]
     in_head = y1 <= raw.height * HEADER_BAND
     in_foot = y0 >= raw.height * FOOTER_BAND
@@ -2380,6 +2439,75 @@ def _attach_caption(candidate, kept_blocks, style):
     candidate.bbox = (candidate.bbox[0], candidate.bbox[1], candidate.bbox[2],
                       max(candidate.bbox[3], max(ln.bbox[3] for ln in found)))
     return out
+
+
+def _complete_captioned_scan_diagrams(raw, kept_blocks, candidates, style, pixel_probe, note_regions):
+    """Source ink, not sparse OCR label boxes, bounds a captioned diagram.
+
+    Only an unverified scan with many tiny non-prose labels above a literal
+    caption qualifies. Prose and previous captions bound the vertical query;
+    a failed pixel probe leaves the previous conservative policy unchanged.
+    """
+    if (pixel_probe is None or not raw.is_page_scan
+            or not (getattr(raw, 'text_layer_invisible', False)
+                    or getattr(raw, 'text_layer_overpainted', False))):
+        return kept_blocks, candidates, [], note_regions
+    from .assess import looks_like_prose
+    # A small chart label can resemble a note opening and pull its following
+    # caption into that note. Reclaim it only after independent diagram proof.
+    available=kept_blocks+[(extract.Block(number=-1,lines=n.lines,bbox=n.bbox),n.lines)
+                            for n in note_regions]
+    lines=[ln for _,group in available for ln in group]
+    captions=[ln for ln in lines if _squashed_caption(ln.stripped)]
+    owned=set();reclaimed=set();recovered_captions=[];artwork=[]
+    original_ids={id(ln) for _,ls in kept_blocks for ln in ls}
+    for caption in captions:
+        if any(other is not caption and abs(other.bbox[1]-caption.bbox[1])<style.body_size
+               for other in captions):
+            continue
+        groups=[]
+        for block,group in sorted(available,key=lambda item:item[0].bbox[1],reverse=True):
+            before=[ln for ln in group if ln.bbox[3]<=caption.bbox[1] and id(ln) not in owned]
+            if not before:continue
+            if (any(_squashed_caption(ln.stripped) for ln in before)
+                    or looks_like_prose(' '.join(ln.text for ln in before))
+                    or any(len(ln.stripped.split())>=8 for ln in before)):
+                break
+            groups.extend(before)
+        if len(groups)<8 or sum(len(ln.stripped)<=3 for ln in groups)<3:
+            continue
+        top=min(ln.bbox[1] for ln in groups)
+        if caption.bbox[1]-top<raw.height*.15:
+            continue
+        query_top=max(raw.height*HEADER_BAND,top-3*max(1,style.body_size))
+        try:
+            ink=pixel_probe.ink_bounds((0,query_top,raw.width,caption.bbox[1]))
+        except (ValueError,RuntimeError,AttributeError):
+            continue
+        if not ink or ink[3]-ink[1]<raw.height*.15:
+            continue
+        box=(max(0,min(ink[0],min(ln.bbox[0] for ln in groups))-2),
+             max(query_top,min(ink[1],top)-2),
+             min(raw.width,max(ink[2],max(ln.bbox[2] for ln in groups))+2),
+             min(caption.bbox[1],max(ink[3],max(ln.bbox[3] for ln in groups))+2))
+        # A competing crop in this same diagram territory cannot own it twice.
+        candidates=[c for c in candidates if not (c.bbox[0]<box[2] and box[0]<c.bbox[2]
+                    and c.bbox[1]<box[3] and box[1]<c.bbox[3])]
+        candidates.append(Region(kind='figure',bbox=box,reason='scan_figure_band',needs_ink=True))
+        owned.update(id(ln) for ln in groups)
+        reclaimed.update(id(ln) for ln in groups+[caption])
+        if id(caption) not in original_ids:recovered_captions.append(caption)
+        artwork.append(Region(kind='artwork',lines=groups,bbox=_lines_bbox(groups,box),
+                              reason='captioned_scan_diagram'))
+    retained=[(block,[ln for ln in group if id(ln) not in owned]) for block,group in kept_blocks]
+    for caption in recovered_captions:
+        retained.append((extract.Block(number=-1,lines=[caption],bbox=caption.bbox),[caption]))
+    notes=[]
+    for note in note_regions:
+        note.lines=[ln for ln in note.lines if id(ln) not in reclaimed]
+        if note.lines:
+            note.bbox=_lines_bbox(note.lines,note.bbox);notes.append(note)
+    return [(block,group) for block,group in retained if group],candidates,artwork,notes
 
 
 def _complete_unverified_figure_tops(raw, kept_blocks, candidates, style):

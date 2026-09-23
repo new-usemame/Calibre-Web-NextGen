@@ -20,8 +20,9 @@ named, rather than failing pages one by one after the money is gone.
 """
 
 import re
+import hashlib
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Tuple
 
 import pymupdf
@@ -98,6 +99,7 @@ class PageRecovery(object):
     #: The engine's own low-confidence words as annotation records, kept for the
     #: adoption seam: a model answer is not allowed to strip them (see pipeline).
     uncertain: list = field(default_factory=list)
+    verification: dict = field(default_factory=dict)
 
     def to_dict(self):
         return {"pno": self.pno, "layer": self.layer, "reason": self.reason,
@@ -110,7 +112,7 @@ class PageRecovery(object):
                 "flags": list(self.flags), "words": self.words,
                 "uncertain_words": self.uncertain_words,
                 "reused": self.reused, "failed": self.failed,
-                "seconds": round(self.seconds, 3)}
+                "seconds": round(self.seconds, 3), "verification": self.verification}
 
 
 @dataclass
@@ -160,7 +162,7 @@ class Recovery(object):
                 "engine_unavailable": self.engine_unavailable,
                 "pages": [prov.to_dict()
                           for _, prov in sorted(self.provenance.items())
-                          if prov.layer == "ocr" or prov.failed]}
+                          if prov.layer == "ocr" or prov.failed or prov.verification]}
 
 
 def needs_recovery(raw):
@@ -191,11 +193,18 @@ def needs_recovery(raw):
     return ""
 
 
+def needs_verification(raw):
+    """A hidden scan transcript needs independent evidence, even if plausible."""
+    return bool(raw.is_page_scan and raw.text_blocks and
+                (getattr(raw, "text_layer_invisible", False) or
+                 getattr(raw, "text_layer_overpainted", False)))
+
+
 def candidates(raw_pages):
     """The (pno, reason) pairs a mode ``auto`` run would attempt."""
     out = []
     for raw in raw_pages:
-        reason = needs_recovery(raw)
+        reason = needs_recovery(raw) or ("verify_scan_transcript" if needs_verification(raw) else "")
         if reason:
             out.append((raw.pno, reason))
     return out
@@ -320,6 +329,8 @@ def recover(doc, raw_pages, fingerprint, *, mode="auto",
         reason = needs_recovery(raw) if mode != "off" else ""
         if mode == "textless" and reason == "damaged_layer":
             reason = ""
+        if not reason and mode in ("auto", "auto_if_available") and needs_verification(raw):
+            reason = "verify_scan_transcript"
         wanted.append(reason)
     total = sum(1 for reason in wanted if reason)
     done = 0
@@ -342,7 +353,7 @@ def recover(doc, raw_pages, fingerprint, *, mode="auto",
                 if reason:
                     recovery.failed += 1
                 recovery.provenance[raw.pno] = prov
-                chosen.append(raw)
+                chosen.append(replace(raw, transcript_unverified=True) if needs_verification(raw) else raw)
             recovery.pages = chosen
             recovery.seconds = time.monotonic() - started
             return recovery
@@ -353,7 +364,7 @@ def recover(doc, raw_pages, fingerprint, *, mode="auto",
         if not reason:
             prov.layer = "native"
             recovery.provenance[raw.pno] = prov
-            chosen.append(raw)
+            chosen.append(replace(raw, transcript_unverified=True) if needs_verification(raw) else raw)
             continue
 
         if should_stop is not None and should_stop():
@@ -378,7 +389,7 @@ def recover(doc, raw_pages, fingerprint, *, mode="auto",
             recovery.failed += 1
             recovery.engine_unavailable = True
             recovery.provenance[raw.pno] = prov
-            chosen.append(raw)
+            chosen.append(replace(raw, transcript_unverified=True) if needs_verification(raw) else raw)
             done += 1
             if progress is not None:
                 progress(done, total)
@@ -389,20 +400,21 @@ def recover(doc, raw_pages, fingerprint, *, mode="auto",
             prov.failed = str(exc)[:200]
             recovery.failed += 1
             recovery.provenance[raw.pno] = prov
-            chosen.append(raw)
+            chosen.append(replace(raw, transcript_unverified=True) if needs_verification(raw) else raw)
             done += 1
             if progress is not None:
                 progress(done, total)
             continue
 
-        prov.layer = "ocr"
+        verify = reason == "verify_scan_transcript"
+        prov.layer = "native" if verify else "ocr"
         prov.reason = reason
         prov.engine = result.engine_version
         prov.language = result.language
         prov.language_identity = result.language_identity
         prov.requested_dpi = result.requested_dpi
         prov.effective_dpi = result.effective_dpi
-        prov.orientation = result.orientation_clockwise
+        prov.orientation = 0 if verify else result.orientation_clockwise
         prov.orientation_confidence = result.orientation_confidence
         prov.source_rotation = result.source_rotation
         prov.flags = tuple(result.flags)
@@ -414,10 +426,26 @@ def recover(doc, raw_pages, fingerprint, *, mode="auto",
         prov.derotation = tuple(doc[raw.pno].derotation_matrix)
         prov.seconds = time.monotonic() - page_started
         recovery.ocr_words += prov.words
-        recovery.uncertain_words += prov.uncertain_words
+        recovery.uncertain_words += prov.uncertain_words if not verify else 0
         recovery.reused += 1 if prov.reused else 0
         from dataclasses import asdict
-        chosen.append(normalize_recovery_geometry(_page_from_ocr(result, raw), doc, asdict(prov)))
+        if verify:
+            from . import transcript
+            detailed = extract.read_page(doc, raw.pno, keep_char_boxes=True)
+            qualified, evidence = transcript.corroborate(detailed, result, UNCERTAIN_SCORE)
+            evidence['recognition_orientation'] = result.orientation_clockwise
+            evidence['recognition_sha256'] = hashlib.sha256(
+                ocr._canonical_result(asdict(replace(result,reused=False)))).hexdigest()
+            prov.verification = evidence
+            # OCR tokens are an independent witness, not this page's source.
+            # Do not attach their alternate spellings as native uncertainty records.
+            prov.uncertain = []
+            prov.uncertain_words = 0
+            prov.flags = tuple(result.flags) + ('native_transcript_corroborated',)
+            recovery.uncertain_words += evidence['uncertain_words']
+            chosen.append(qualified)
+        else:
+            chosen.append(normalize_recovery_geometry(_page_from_ocr(result, raw), doc, asdict(prov)))
         recovery.provenance[raw.pno] = prov
         done += 1
         if progress is not None:

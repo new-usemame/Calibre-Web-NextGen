@@ -483,10 +483,11 @@ def _line_runs(line, pno, page_notes, claimed, repairs, reasons, preserve_style=
     while index < len(spans):
         span = spans[index]
         text = texts[index]
-        if preserve_style and getattr(span,"encoding_unresolved",False):
+        if (preserve_style and getattr(span,"encoding_unresolved",False)) or (getattr(span,"transcription_uncertain",False) and not skeleton.is_marker_span(span,dom)):
             from .native_text import descriptor
             runs.append(["glyph",text,descriptor(pno,span.bbox,span.size,span.font,
-                raised=span.superscript or _is_raised(span,line))])
+                raised=span.superscript or _is_raised(span,line),
+                reason="transcript" if getattr(span,"transcription_uncertain",False) else "encoding")])
             reasons.append("unmapped_native_glyphs")
             index += 1
             continue
@@ -506,7 +507,7 @@ def _line_runs(line, pno, page_notes, claimed, repairs, reasons, preserve_style=
                     texts[index + 1] = _repair_degree(texts[index + 1], repairs, pno,
                                                       text.strip(), number)
                 claimed.add(number)
-                runs.append(["sup", str(number), pno])
+                runs.append(["sup", str(number), pno]+(["uncertain"] if getattr(span,"transcription_uncertain",False) else []))
                 index += 1
                 continue
             if raised and number is None:
@@ -515,7 +516,7 @@ def _line_runs(line, pno, page_notes, claimed, repairs, reasons, preserve_style=
                 # the page reads "set overleaf204." A marker with nothing to point at
                 # is a superscript, not a link, and the reader is told which ones.
                 reasons.append("unresolved_marker")
-                runs.append(["mark", text.strip()])
+                runs.append(["mark", text.strip()]+([pno,"uncertain"] if getattr(span,"transcription_uncertain",False) else []))
                 index += 1
                 continue
         # A native text span can carry independent italic and bold observations.
@@ -1310,7 +1311,7 @@ def assemble(skeletons, style, raw_pages=None):
                                        uncertain=bool(region.uncertain),
                                        bbox=region.bbox,
                                        continued_from=region.continued_from,
-                                       glyph_fallback=not skel.is_scan and any(getattr(sp,"encoding_unresolved",False) for ln in region.lines for sp in ln.spans)))
+                                       glyph_fallback=any((not skel.is_scan and getattr(sp,"encoding_unresolved",False)) or getattr(sp,"transcription_uncertain",False) for ln in region.lines for sp in ln.spans)))
                 if book.notes[-1].glyph_fallback:
                     from .native_text import note_glyph_runs
                     book.notes[-1].glyph_runs = note_glyph_runs(region, book.notes[-1].text, skel.pno)

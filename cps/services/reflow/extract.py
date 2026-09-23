@@ -98,6 +98,7 @@ class Span(object):
     uncertain: bool = False  # OCR engine confidence, never inferred for native text
     punctuation_uncertain: bool = False  # distinct native quote glyphs share ASCII Unicode
     encoding_unresolved: bool = False
+    transcription_uncertain: bool = False
     char_boxes: tuple = ()
 
     @property
@@ -117,7 +118,8 @@ class Span(object):
                 "flags": self.flags, "bbox": [round(v, 2) for v in self.bbox],
                 "origin_y": round(self.origin_y, 2),
                 "punctuation_uncertain": self.punctuation_uncertain,
-                "encoding_unresolved": self.encoding_unresolved}
+                "encoding_unresolved": self.encoding_unresolved,
+                "transcription_uncertain": self.transcription_uncertain}
 
 
 @dataclass
@@ -127,6 +129,7 @@ class Line(object):
     spans: List[Span]
     bbox: Tuple[float, float, float, float]
     spacing_uncertain: bool = False
+    transcription_uncertain: bool = False
 
     @property
     def text(self):
@@ -165,7 +168,8 @@ class Line(object):
     def to_dict(self):
         return {"bbox": [round(v, 2) for v in self.bbox],
                 "spans": [sp.to_dict() for sp in self.spans],
-                "spacing_uncertain": getattr(self, "spacing_uncertain", False)}
+                "spacing_uncertain": getattr(self, "spacing_uncertain", False),
+                "transcription_uncertain": getattr(self, "transcription_uncertain", False)}
 
 
 @dataclass
@@ -248,6 +252,7 @@ class RawPage(object):
     source_geometry: dict = field(default_factory=dict)
     text_layer_overpainted: bool = False
     text_layer_invisible: bool = False
+    transcript_unverified: bool = False
 
     @property
     def text_blocks(self):
@@ -273,7 +278,8 @@ class RawPage(object):
                 "blocks": [b.to_dict() for b in self.blocks],
                 "images": [i.to_dict() for i in self.images],
                 "text_layer_overpainted": getattr(self, "text_layer_overpainted", False),
-                "text_layer_invisible": getattr(self, "text_layer_invisible", False)}
+                "text_layer_invisible": getattr(self, "text_layer_invisible", False),
+                "transcript_unverified": getattr(self, "transcript_unverified", False)}
         if getattr(self,'source_geometry',{}):value['source_geometry'] = self.source_geometry
         return value
 
@@ -287,7 +293,7 @@ def open_document(source):
     return pymupdf.open(source)
 
 
-def read_page(doc, pno):
+def read_page(doc, pno, *, keep_char_boxes=False):
     """Turn one page into a :class:`RawPage`."""
     page = doc[pno]
     rect = page.rect
@@ -341,9 +347,10 @@ def read_page(doc, pno):
 
     if not raw.is_page_scan:
         raw.blocks = normalize_blocks(raw.blocks)
-    for block in raw.blocks:
-        for line in block.lines:
-            for span in line.spans:span.char_boxes = ()
+    if not keep_char_boxes:
+        for block in raw.blocks:
+            for line in block.lines:
+                for span in line.spans:span.char_boxes = ()
     raw.drawings, raw.drawing_rects = drawing_rects(page)
     raw.blocks.sort(key=lambda b: (round(b.bbox[1], 1), round(b.bbox[0], 1)))
     return raw

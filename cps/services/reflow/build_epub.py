@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.4"
+CONVERTER_VERSION = "1.5"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -269,7 +269,7 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
         blocks.append(_aside_html(note, ref_ids, available, str(note.num) in ambiguous,
             [n for n in book.notes if getattr(n, "continued_from", None) == (pno, note.num)]))
     if any(r[0]=="glyph" for el in elements for r in el.runs) or any(getattr(n,"glyph_fallback",False) for n in notes):
-        blocks.append('<p class="source-evidence-notice">Some source glyphs are shown as original images because their text encoding is unavailable. <a href="original-p%04d.xhtml#page">Open original page</a>.</p>' % pno)
+        blocks.append('<p class="source-evidence-notice">Some source words or glyphs are shown as original images because their text encoding or transcription is uncertain. <a href="original-p%04d.xhtml#page">Open original page</a>.</p>' % pno)
     return "\n".join(blocks)
 
 
@@ -1704,8 +1704,9 @@ def _written_glyph_style(element, parent):
         return False
     if parent.get('class') != 'source-glyph' or len(parent) != 1 or parent.text or len(element) or element.text or element.tail:
         return False
-    label = 'Original source text; Unicode encoding unavailable. Open original page.'
-    if element.get('alt') != label or parent.get('title') != label:
+    labels = ('Original source text; Unicode encoding unavailable. Open original page.',
+              'Original source text; transcription uncertain. Open original page.')
+    if element.get('alt') not in labels or parent.get('title') != element.get('alt'):
         return False
     page = re.fullmatch(r'original-p(\d{4,})\.xhtml#page', parent.get('href',''))
     return bool(page and re.fullmatch(r'images/glyph_p'+page.group(1)+r'_[a-f0-9]{20}\.jpg', element.get('src','')))

@@ -57,6 +57,12 @@ class PreparationStore:
 
     def start(self,owner,book_id,source,options,work):
         key,fingerprint=self._key(source,options);now=time.monotonic()
+        # Read a completed quote before taking the lock: the lock guards the job
+        # table only, and a request thread waiting on it must never wait on disk.
+        try:
+            cached=json.loads((self.directory/(key+'.json')).read_text())
+            self._valid_quote(cached,fingerprint)
+        except (OSError,ValueError,TypeError):cached=None
         with self.lock:
             self.jobs={i:j for i,j in self.jobs.items() if j['status'] in ('waiting','preparing','cancelling') or now-j['touched']<600}
             for job in self.jobs.values():
@@ -70,10 +76,7 @@ class PreparationStore:
             job=dict(preparation_id=uuid.uuid4().hex,owner=owner,book_id=book_id,key=key,source=source,
                      fingerprint=fingerprint,options=copy.deepcopy(options),status='waiting',progress={},
                      stop=threading.Event(),touched=now)
-            try:
-                cached=json.loads((self.directory/(key+'.json')).read_text())
-                self._valid_quote(cached,fingerprint);job.update(status='ready',quote=cached)
-            except (OSError,ValueError,TypeError):pass
+            if cached is not None:job.update(status='ready',quote=cached)
             self.jobs[job['preparation_id']]=job
             if job['status']!='ready':job['future']=self.pool.submit(self._run,job,work)
             return self._public(job)

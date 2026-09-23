@@ -51,6 +51,7 @@ from . import api_v1, log
 from .. import calibre_db, config
 from ..constants import REFLOW_DIR
 from ..cw_login import current_user
+from ..services import parallel
 from ..services.reflow import (admission, build_epub, extract,
                                ledger as ledger_mod, model, ocr, pipeline, structural_quote, typed_model, quote_preparation)
 from ..services.worker import STAT_STARTED, STAT_WAITING, WorkerThread
@@ -252,12 +253,49 @@ def _ocr_engine_state(language):
     if cached and now - cached[0] < _ENGINE_TTL:
         return cached[1]
     try:
-        __, version, __ = ocr._engine(language)
+        # Two subprocesses and a hash of the language data: off the request
+        # greenlet (N3), or every other user waits for Tesseract to answer.
+        __, version, __ = parallel.run_blocking(lambda: ocr._engine(language))
         state = {"available": True, "detail": "", "version": version}
     except ocr.OCRUnavailable as exc:
         state = {"available": False, "detail": str(exc), "version": ""}
     _engine_checks[language] = (now, state)
     return state
+
+
+#: Whole-PDF SHA-256s already computed by this process, keyed by the file's
+#: identity on disk. Bounded; a stat change (size, mtime, ctime, inode) is a
+#: different key, so an edited PDF is hashed again.
+_FINGERPRINT_CACHE_SIZE = 64
+_fingerprints = {}
+_fingerprint_lock = threading.Lock()
+
+
+def _fingerprint(path):
+    """The PDF's SHA-256, without hashing it on the request greenlet (N3).
+
+    A page open used to hash the whole file twice, a start three times -- seconds
+    per request for a large scan, during which the unpatched gevent hub serves
+    nobody else. The hash now runs on the shared offload pool
+    (``parallel.run_blocking``) and is remembered against the file's stat
+    identity, so the second and later requests for an unchanged PDF cost a
+    ``stat``. This value is for display and the consent handshake only: the task
+    re-hashes the file itself before any work and before publication, and the
+    lock below guards dictionary reads and writes only, never the hash.
+    """
+    stat = os.stat(path)
+    key = (os.path.realpath(path), stat.st_dev, stat.st_ino, stat.st_size,
+           stat.st_mtime_ns, stat.st_ctime_ns)
+    with _fingerprint_lock:
+        known = _fingerprints.get(key)
+    if known is not None:
+        return known
+    digest = parallel.run_blocking(lambda: extract.document_fingerprint(path))
+    with _fingerprint_lock:
+        _fingerprints[key] = digest
+        while len(_fingerprints) > _FINGERPRINT_CACHE_SIZE:
+            _fingerprints.pop(next(iter(_fingerprints)))
+    return digest
 
 
 CONSENT_CONTRACT='source-review-1'
@@ -287,15 +325,31 @@ def _quote_work(path,options,progress,stop,cache_root):
     return quote_preparation.measure_isolated(path,options,progress,stop,cache_root)
 
 
+def _start_preparation(owner,book_id,source,options,work):
+    """Start (or rejoin) a preparation without hashing on the request greenlet.
+
+    The store keys a preparation by the PDF's SHA-256 and the OCR runtime's
+    identity (two subprocesses); both are blocking work (N3), so the call runs on
+    the shared offload pool while this greenlet waits cooperatively."""
+    store=_quote_store()
+    return parallel.run_blocking(lambda:store.start(owner,book_id,source,options,work))
+
+
+def _ready_quote(owner,book_id,identifier,source,options):
+    """``PreparationStore.ready`` re-derives the same key; same reason as above."""
+    store=_quote_store()
+    return parallel.run_blocking(lambda:store.ready(owner,book_id,identifier,source,options))
+
+
 def _estimate_payload(book, source):
     # This fast assessment describes the source. Typed prices only come from
     # complete source preparation and the actual two-stage request serializers.
     quote=_survey(source);engine=_ocr_engine_state('eng')
-    pages=int(quote.get('pages') or 0)
+    pages=int(quote.get('pages') or 0);fingerprint=_fingerprint(source)
     return {
         'book_id':book.id,'title':book.title,'verdict':quote.get('verdict',''),
         'pages':pages,'text_layer':bool(quote.get('text_layer')),
-        'source_sha256':extract.document_fingerprint(source),'consent_contract':CONSENT_CONTRACT,
+        'source_sha256':fingerprint,'consent_contract':CONSENT_CONTRACT,
         'existing_epub':calibre_db.get_book_format(book.id,'EPUB') is not None,
         'configured':bool(config.resolved_openrouter_key()),'hard_cap_usd':tasks_reflow.hard_cap_usd(),
         'sample_pages_default':tasks_reflow.SAMPLE_PAGES_DEFAULT,'sample_pages_max':tasks_reflow.SAMPLE_PAGES_MAX,
@@ -309,7 +363,7 @@ def _estimate_payload(book, source):
             'image_only':int(quote.get('ocr_image_only') or 0),'damaged':int(quote.get('ocr_damaged') or 0),
             'estimated_seconds':int(quote.get('ocr_estimated_seconds') or 0),
             'engine_available':bool(engine['available']),'engine_version':engine['version'],'engine_detail':engine['detail'],
-            'language':'eng','dpi':300,'pdf_sha256':extract.document_fingerprint(source)[:16],
+            'language':'eng','dpi':300,'pdf_sha256':fingerprint[:16],
             'non_latin_share':float(quote.get('non_latin_share') or 0)},
     }
 
@@ -327,7 +381,7 @@ def reflow_prepare_estimate(book_id):
     except ValueError:return _err('invalid_options','Source recovery options are invalid.',400)
     cache_root=REFLOW_DIR
     try:
-        job=_quote_store().start(current_user.id,book_id,source,options,
+        job=_start_preparation(current_user.id,book_id,source,options,
             lambda path,opts,progress,stop:_quote_work(path,opts,progress,stop,cache_root))
     except quote_preparation.PreparationBusy:return _err('preparation_busy','Local source preparation is busy. Try again shortly.',503)
     return jsonify(job),200 if job['status']=='ready' else 202
@@ -413,7 +467,7 @@ def reflow_start(book_id):
         return _err('consent_required','Agree to the current conversion settings before starting.',400)
     if body.get('consent_contract')!=CONSENT_CONTRACT or body.get('review_mode') not in ('deterministic','source_verified'):
         return _err('current_consent_required','Refresh Reflow and choose the current conversion settings.',409)
-    fingerprint=extract.document_fingerprint(source)
+    fingerprint=_fingerprint(source)
     if body.get('source_sha256')!=fingerprint:
         return _err('source_changed','The PDF changed. Refresh its assessment before starting.',409)
     try:
@@ -433,7 +487,7 @@ def reflow_start(book_id):
         identifier=body.get('preparation_id')
         if not isinstance(identifier,str) or not _JOB_ID.fullmatch(identifier):
             return _err('estimate_stale','Prepare a current source estimate before AI review.',409)
-        try:quote=_quote_store().ready(current_user.id,book_id,body.get('preparation_id'),source,source_options)
+        try:quote=_ready_quote(current_user.id,book_id,body.get('preparation_id'),source,source_options)
         except (KeyError,ValueError):return _err('estimate_stale','Prepare a current estimate for these source recovery settings.',409)
         selected=(range(quote['first_body_page'],min(quote['source_context_pages'],quote['first_body_page']+options.sample_pages))
                   if options.mode=='sample' else range(quote['source_context_pages']))

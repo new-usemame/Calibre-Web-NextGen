@@ -33,7 +33,9 @@ The v4.0.151 fix:
    the inner cursor when `cache.created_at > cursor.lm`.
 3. **Deletion detection stays gated.** Legacy sync-all users still want every
    global book, while shelf-only users and accounts with My Library enabled
-   reconcile the device against their respective sets.
+   reconcile the device against their respective sets. That behaviour is
+   driven through the real handler in all four modes by
+   ``test_ereader_scope_kobo_parity.py``.
 """
 
 import ast
@@ -177,18 +179,3 @@ class TestSyncAllBranchHasMagicShelfArm:
             "BookShelf.date_added > cursor_lm arm (fork #220 "
             "date_added re-match termination)."
         )
-
-
-@pytest.mark.unit
-class TestDeletionDetectionStaysGated:
-    def test_deletion_detection_is_gated_by_shelves_or_my_library(self):
-        """Reconciliation runs for shelf-only sync and for an enabled
-        My Library, but remains absent from legacy sync-all accounts."""
-        src = _function_source(KOBO_PY, "HandleSyncRequest")
-        assert "membership_enabled = bool(getattr(current_user, 'has_own_library', False))" in src
-        assert "if current_user.kobo_only_shelves_sync or membership_enabled:" in src
-        gate = src.split(
-            "if current_user.kobo_only_shelves_sync or membership_enabled:", 1
-        )[1].split("only_kobo_shelves =", 1)[0]
-        assert "synced_book_ids" in gate and "books_to_delete_ids" in gate
-        assert "allowed_book_ids &= library_book_ids" in gate

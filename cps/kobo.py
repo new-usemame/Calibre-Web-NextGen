@@ -50,7 +50,7 @@ from .constants import COVER_THUMBNAIL_SMALL, COVER_THUMBNAIL_MEDIUM, COVER_THUM
 from .kobo_cover_cache import build_cover_image_id, normalize_cover_uuid
 from .helper import get_download_link
 from .services import SyncToken as SyncToken, hardcover
-from .services import cover_preview, parallel, user_cover
+from .services import cover_preview, ereader_scope, parallel, user_cover
 from .services import device_reading_position as device_positions
 from .fs import FileSystem
 from .web import download_required
@@ -1660,11 +1660,7 @@ def HandleSyncRequest():
     # Keep this compatibility input explicit: older integrations and tests
     # construct user-shaped objects without the named-mode helper.
     membership_enabled = bool(getattr(current_user, 'has_own_library', False))
-    personal_library_mode = (
-        membership_enabled
-        or user_library.mode_for_user(current_user)
-        == constants.LIBRARY_MODE_PERSONAL
-    )
+    personal_library_mode = ereader_scope.personal_library(current_user)
     if current_user.kobo_only_shelves_sync or membership_enabled:
         removal_result_start = len(sync_results)
         try:
@@ -1672,25 +1668,19 @@ def HandleSyncRequest():
             synced_books_query = ub.session.query(ub.KoboSyncedBooks.book_id).filter(ub.KoboSyncedBooks.user_id == current_user.id)
             synced_book_ids = {item.book_id for item in synced_books_query}
 
-            if current_user.kobo_only_shelves_sync:
-                # Check all books currently on a Kobo Sync shelf.
-                allowed_books_query = (ub.session.query(ub.BookShelf.book_id)
-                                       .join(ub.Shelf, ub.BookShelf.shelf == ub.Shelf.id)
-                                       .filter(ub.Shelf.user_id == current_user.id,
-                                               ub.Shelf.kobo_sync.is_(True)))
-                allowed_book_ids = {item.book_id for item in allowed_books_query}
-                if magic_shelf_book_ids:
-                    allowed_book_ids |= magic_shelf_book_ids
-            else:
-                allowed_book_ids = set(synced_book_ids)
-
-            if personal_library_mode:
-                library_book_ids = {
-                    row.book_id for row in
-                    ub.session.query(ub.UserLibraryBook.book_id)
-                    .filter(ub.UserLibraryBook.user_id == current_user.id)
-                }
-                allowed_book_ids &= library_book_ids
+            # The books the user's e-reader choices admit: one rule shared
+            # with the KOReader library (cps/services/ereader_scope.py), fed
+            # the magic-shelf ids this request already evaluated.
+            scope = ereader_scope.membership(
+                current_user,
+                session=ub.session,
+                magic_shelf_book_ids=magic_shelf_book_ids,
+                magic_shelf_membership_reliable=magic_shelf_membership_reliable,
+            )
+            allowed_book_ids = (
+                set(synced_book_ids) if scope.book_ids is None
+                else set(scope.book_ids)
+            )
 
             # #468's fail-safe applies only when magic shelves informed this
             # allowed set. With shelf sync off, personal membership is the sole

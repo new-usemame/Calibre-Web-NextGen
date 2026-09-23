@@ -8,9 +8,10 @@ from collections import Counter
 from dataclasses import fields, is_dataclass
 import json
 import math
+import io
 from functools import lru_cache
 
-VERSION = 1
+VERSION = 2
 MAX_BYTES = 256 * 1024 * 1024
 MAX_DEPTH = 80
 
@@ -39,51 +40,7 @@ FORWARD = {'Span': {'transcription_uncertain'}, 'Line': {'transcription_uncertai
            'BookStyle': {'folio_boxes'}}
 
 
-def encode(value, depth=0):
-    if depth > MAX_DEPTH: raise ValueError('native value nesting exceeds bound')
-    enc = lambda v: encode(v, depth + 1)
-    if value is None or type(value) in (str, bool, int): return value
-    if type(value) is float:
-        if not math.isfinite(value): raise ValueError('nonfinite native value')
-        return value
-    if isinstance(value, bytes): return {'type': 'bytes', 'value': base64.b64encode(value).decode('ascii')}
-    if isinstance(value, (dict, Counter)):
-        return {'type': 'counter' if isinstance(value, Counter) else 'dict',
-                'value': [[enc(k), enc(v)] for k, v in value.items()]}
-    if isinstance(value, (list, tuple, set)):
-        return {'type': type(value).__name__, 'value': [enc(v) for v in value]}
-    if is_dataclass(value) and registry().get(type(value).__name__) is type(value):
-        name = type(value).__name__
-        allowed = {f.name for f in fields(value)} | EXTRAS.get(name, set()) | FORWARD.get(name, set())
-        if set(vars(value)) - allowed: raise ValueError('unregistered native fields')
-        return {'type': name, 'value': {k: enc(v) for k, v in vars(value).items()}}
-    raise ValueError('unregistered native value type')
-
-
-def decode(value, depth=0):
-    if depth > MAX_DEPTH: raise ValueError('native value nesting exceeds bound')
-    dec = lambda v: decode(v, depth + 1)
-    if value is None or type(value) in (str, bool, int): return value
-    if type(value) is float and math.isfinite(value): return value
-    if not isinstance(value, dict) or set(value) != {'type', 'value'}: raise ValueError('invalid native value')
-    kind, data = value['type'], value['value']
-    if type(kind) is not str: raise ValueError('invalid native type name')
-    if kind == 'bytes': return base64.b64decode(data, validate=True)
-    if kind in ('dict', 'counter'):
-        if not isinstance(data, list): raise ValueError('invalid mapping')
-        pairs = [(dec(k), dec(v)) for k, v in data]
-        result = dict(pairs)
-        if len(result) != len(pairs): raise ValueError('duplicate mapping key')
-        return Counter(result) if kind == 'counter' else result
-    if kind in ('list', 'tuple', 'set'):
-        if not isinstance(data, list): raise ValueError('invalid sequence')
-        return {'list': list, 'tuple': tuple, 'set': set}[kind](dec(v) for v in data)
-    cls = registry().get(kind)
-    if cls is None or not isinstance(data, dict): raise ValueError('unknown native type')
-    declared = {f.name for f in fields(cls)}
-    if set(data) - declared - EXTRAS.get(kind, set()) - FORWARD.get(kind, set()):
-        raise ValueError('unknown native fields')
-    data = {k: dec(v) for k, v in data.items()}
+def _certainty_fields(kind, data):
     for key in FORWARD.get(kind, ()):
         if key not in data: continue
         item = data[key]
@@ -95,27 +52,127 @@ def decode(value, depth=0):
                    or len(box) != 4 or any(type(n) not in (int, float) for n in box)
                    for p, box in item.items()):
                 raise ValueError('invalid folio geometry')
-    obj = cls(**{k: v for k, v in data.items() if k in declared})
-    for k in set(data) - declared: object.__setattr__(obj, k, data[k])
-    return obj
+
+def _primitive(value):
+    if value is None or type(value) in (str, bool, int): return True
+    if type(value) is float:
+        if not math.isfinite(value): raise ValueError('nonfinite native value')
+        return True
+    return False
 
 
 def dumps(value):
-    raw = json.dumps({'version': VERSION, 'value': encode(value)}, ensure_ascii=True,
-                     allow_nan=False, separators=(',', ':')).encode('ascii')
-    if len(raw) > MAX_BYTES: raise ValueError('native payload exceeds size bound')
-    return raw
+    """Stream a postorder value DAG into one valid JSON document.
+
+    Full source results alias raw_pages and Recovery.pages, plus millions of
+    geometry tuples. Do not first build a second tagged object graph or duplicate
+    shared values. References select only prior values, never code or authority.
+    Each node is a single bounded line, so decoding need not parse the whole graph
+    into temporary JSON containers before constructing its final value objects.
+    """
+    output = io.BytesIO(); memo = {}; active = set()
+    encoder = json.JSONEncoder(ensure_ascii=True, allow_nan=False, separators=(',', ':'))
+    def write(data):
+        if output.tell() + len(data) > MAX_BYTES: raise ValueError('native payload exceeds size bound')
+        output.write(data)
+    def dump(item):
+        for text in encoder.iterencode(item): write(text.encode('ascii'))
+    write(b'{"version":2,"nodes":[\n')
+    def visit(item, depth=0):
+        if depth > MAX_DEPTH: raise ValueError('native value nesting exceeds bound')
+        if _primitive(item): return item
+        identity = id(item)
+        if identity in active: raise ValueError('cyclic native value')
+        if identity in memo: return {'ref': memo[identity]}
+        active.add(identity)
+        child = lambda v: visit(v, depth + 1)
+        if isinstance(item, bytes):
+            kind, data = 'bytes', base64.b64encode(item).decode('ascii')
+        elif isinstance(item, (dict, Counter)):
+            kind = 'counter' if isinstance(item, Counter) else 'dict'
+            data = [[child(k), child(v)] for k, v in item.items()]
+        elif isinstance(item, (list, tuple, set)):
+            kind, data = type(item).__name__, [child(v) for v in item]
+        elif is_dataclass(item) and registry().get(type(item).__name__) is type(item):
+            kind = type(item).__name__
+            allowed = {f.name for f in fields(item)} | EXTRAS.get(kind, set()) | FORWARD.get(kind, set())
+            if set(vars(item)) - allowed: raise ValueError('unregistered native fields')
+            data = {k: child(v) for k, v in vars(item).items()}
+        else: raise ValueError('unregistered native value type')
+        active.remove(identity)
+        index = len(memo)
+        if index: write(b',')
+        dump([index, kind, data]); write(b'\n')
+        memo[identity] = index
+        return {'ref': index}
+    root = visit(value)
+    write(b'],"root":'); dump(root); write(b'}\n')
+    return output.getvalue()
 
 
-def loads(raw):
-    if len(raw) > MAX_BYTES: raise ValueError('native payload exceeds size bound')
+def _json(raw):
     def pairs(rows):
         result = dict(rows)
         if len(result) != len(rows): raise ValueError('duplicate JSON key')
         return result
-    envelope = json.loads(raw, object_pairs_hook=pairs,
-                          parse_constant=lambda _: (_ for _ in ()).throw(ValueError('nonfinite JSON')))
-    if (not isinstance(envelope, dict) or set(envelope) != {'version', 'value'}
-            or type(envelope['version']) is not int or envelope['version'] != VERSION):
+    return json.loads(raw, object_pairs_hook=pairs,
+                      parse_constant=lambda _: (_ for _ in ()).throw(ValueError('nonfinite JSON')))
+
+
+def loads(raw):
+    if len(raw) > MAX_BYTES: raise ValueError('native payload exceeds size bound')
+    stream = io.BytesIO(raw)
+    if stream.readline() != b'{"version":2,"nodes":[\n':
         raise ValueError('native protocol version mismatch')
-    return decode(envelope['value'])
+    values = []; depths = []
+    def resolve(value):
+        if _primitive(value): return value, 0
+        if (type(value) is not dict or set(value) != {'ref'} or type(value['ref']) is not int
+                or not 0 <= value['ref'] < len(values)):
+            raise ValueError('invalid native reference')
+        return values[value['ref']], depths[value['ref']]
+    for line in stream:
+        if line.startswith(b'],"root":'):
+            trailer = _json(b'{' + line[2:])
+            if set(trailer) != {'root'} or stream.read(1): raise ValueError('native trailer schema')
+            return resolve(trailer['root'])[0]
+        if values:
+            if not line.startswith(b','): raise ValueError('native node separator')
+            line = line[1:]
+        row = _json(line)
+        if (type(row) is not list or len(row) != 3 or type(row[0]) is not int
+                or row[0] != len(values) or type(row[1]) is not str):
+            raise ValueError('native node schema')
+        _, kind, data = row; depth = 1
+        def child(value):
+            nonlocal depth
+            result, nested = resolve(value); depth = max(depth, nested + 1)
+            if depth > MAX_DEPTH: raise ValueError('native value nesting exceeds bound')
+            return result
+        if kind == 'bytes':
+            if type(data) is not str: raise ValueError('invalid native bytes')
+            item = base64.b64decode(data, validate=True)
+        elif kind in ('dict', 'counter'):
+            if type(data) is not list: raise ValueError('invalid native mapping')
+            pairs = []
+            for pair in data:
+                if type(pair) is not list or len(pair) != 2: raise ValueError('invalid native mapping pair')
+                pairs.append((child(pair[0]), child(pair[1])))
+            item = dict(pairs)
+            if len(item) != len(pairs): raise ValueError('duplicate mapping key')
+            if kind == 'counter': item = Counter(item)
+        elif kind in ('list', 'tuple', 'set'):
+            if type(data) is not list: raise ValueError('invalid native sequence')
+            item = {'list': list, 'tuple': tuple, 'set': set}[kind](child(v) for v in data)
+        else:
+            cls = registry().get(kind)
+            if cls is None or type(data) is not dict: raise ValueError('unknown native type')
+            declared = {f.name for f in fields(cls)}
+            if set(data) - declared - EXTRAS.get(kind, set()) - FORWARD.get(kind, set()):
+                raise ValueError('unknown native fields')
+            data = {k: child(v) for k, v in data.items()}
+            _certainty_fields(kind, data)
+            item = cls(**{k: v for k, v in data.items() if k in declared})
+            for k in set(data) - declared: object.__setattr__(item, k, data[k])
+        values.append(item); depths.append(depth)
+    raise ValueError('missing native result')

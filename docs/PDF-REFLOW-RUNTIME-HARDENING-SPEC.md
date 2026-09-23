@@ -67,6 +67,16 @@ substitution. A candidate path from a reply cannot choose the parent's read path
 SourcePage authority is reissued from its pure provenance and checked identity in
 each process; wire data alone never receives an adoption seal.
 
+Composition with the full source10.1 corpus exposed JSON memory amplification:
+encoding Book567's preparation result with the original tagged-tree encoder was
+OOM-killed in an isolated 2 GiB container. Protocol version 2 therefore streams a
+postorder value DAG into one valid JSON document, preserving shared raw/recovery
+page references. The decoder constructs one node at a time instead of first
+parsing a second full tagged graph. References select only previously decoded
+values, never forward/cyclic values or executable types; original size/depth and
+class/field validation remain. No v1/v2 interchange is accepted. Parent and child
+must come from the same installed composition.
+
 The child has its own process group. Cancellation is checked while waiting and
 before every progress acknowledgment; cleanup stops only that owned group and
 removes only the parent-created scratch directory. Native stderr is drained into

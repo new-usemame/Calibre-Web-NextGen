@@ -15305,6 +15305,143 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+# KOReader: pairing by code, ready-made plugin, e-reader shelf wording
+
+msgid "Approve"
+msgstr "Goedkeuren"
+
+msgid "Approve only if this is your e-reader."
+msgstr "Keur dit alleen goed als het je eigen e-reader is."
+
+#, python-brace-format
+msgid "Approved. {name} is finishing setup; its library appears in a few seconds."
+msgstr "Goedgekeurd. {name} rondt de installatie af; de bibliotheek verschijnt over een paar seconden."
+
+#, python-brace-format
+msgid "Asked {when} from {address}."
+msgstr "Verzoek {when} verstuurd vanaf {address}."
+
+msgid "Books that are not on an e-reader sync shelf then leave the e-reader's library on its next sync. They stay in your library here."
+msgstr "Boeken die niet op een met e-readers gesynchroniseerde boekenplank staan, verdwijnen dan bij de volgende synchronisatie uit de bibliotheek van de e-reader. Ze blijven wel in je bibliotheek hier."
+
+msgid "Change"
+msgstr "Wijzigen"
+
+msgid "Code on the e-reader"
+msgstr "Code op de e-reader"
+
+msgid "Connect to Wi-Fi and open it from your library: it downloads by itself."
+msgstr "Maak verbinding met wifi en open het vanuit je bibliotheek: het wordt vanzelf gedownload."
+
+msgid "Continue"
+msgstr "Doorgaan"
+
+#, python-brace-format
+msgid "Declined. {name} was not connected."
+msgstr "Geweigerd. {name} is niet gekoppeld."
+
+msgid "Download ready-made plugin"
+msgstr "Kant-en-klare plug-in downloaden"
+
+#, python-brace-format
+msgid "Downloaded {file}. It holds a password for this account: delete the zip once the plugin is on the e-reader."
+msgstr "{file} gedownload. Het bevat een wachtwoord voor dit account: verwijder het zip-bestand zodra de plug-in op de e-reader staat."
+
+msgid "E-reader sync on"
+msgstr "E-reader sync aan"
+
+msgid "Eject the e-reader and restart KOReader with Wi-Fi on. Your library appears in a moment."
+msgstr "Werp de e-reader uit en start KOReader opnieuw met wifi aan. Je bibliotheek verschijnt zo."
+
+msgid "Enable e-reader sync"
+msgstr "Zet e-reader sync aan"
+
+msgid "Enter the 8 letters and digits the e-reader shows, like K7M4-QX2P."
+msgstr "Voer de 8 letters en cijfers in die de e-reader toont, zoals K7M4-QX2P."
+
+msgid "Enter the address as http://host:port or https://host."
+msgstr "Voer het adres in als http://host:poort of https://host."
+
+msgid "Enter the code the e-reader shows, or scan its QR code with your phone."
+msgstr "Voer de code in die de e-reader toont, of scan de QR-code met je telefoon."
+
+msgid "For an e-reader you can plug into this computer. The plugin already knows your server and account: nothing to type on the e-reader."
+msgstr "Voor een e-reader die je op deze computer kunt aansluiten. De plug-in kent je server en account al: je hoeft niets in te typen op de e-reader."
+
+msgid "KOReader sync is not enabled on this server."
+msgstr "KOReader-synchronisatie is niet ingeschakeld op deze server."
+
+msgid "No e-reader is waiting with this code. Check it, or get a new code on the e-reader."
+msgstr "Er wacht geen e-reader met deze code. Controleer de code of vraag een nieuwe aan op de e-reader."
+
+msgid "Not on this device yet"
+msgstr "Nog niet op dit apparaat"
+
+msgid "On the e-reader, open Tools ▸ CWNG library ▸ Connect this device and choose Connect with a code."
+msgstr "Open op de e-reader het menu met het moersleutelpictogram ▸ CWNG library ▸ Connect this device en kies ‘Connect with a code’."
+
+msgid "On the e-reader, open Tools ▸ CWNG library ▸ Connect this device and choose Sign in with username and password."
+msgstr "Open op de e-reader het menu met het moersleutelpictogram ▸ CWNG library ▸ Connect this device en kies ‘Sign in with username and password’."
+
+msgid "Pair with a code"
+msgstr "Koppelen met een code"
+
+msgid "Preparing…"
+msgstr "Voorbereiden…"
+
+msgid "Ready-made plugin (USB)"
+msgstr "Kant-en-klare plug-in (USB)"
+
+msgid "Set up by hand"
+msgstr "Handmatig instellen"
+
+msgid "Sync only selected shelves to e-readers (Kobo and KOReader)"
+msgstr "Alleen geselecteerde boekenplanken synchroniseren met e-readers (Kobo en KOReader)"
+
+msgid "The KOReader plugin is not part of this installation."
+msgstr "De KOReader-plug-in maakt geen deel uit van deze installatie."
+
+msgid "This book is in your library but has not been downloaded to this device."
+msgstr "Dit boek staat in je bibliotheek, maar is nog niet naar dit apparaat gedownload."
+
+msgid "This code has already been approved or declined."
+msgstr "Deze code is al goedgekeurd of geweigerd."
+
+msgid "This is this computer's own address, which the e-reader cannot reach. Choose Change and enter the address the e-reader can use, such as http://192.168.1.20:8083."
+msgstr "Dit is het eigen adres van deze computer, dat de e-reader niet kan bereiken. Kies ‘Wijzigen’ en voer het adres in dat de e-reader kan gebruiken, zoals http://192.168.1.20:8083."
+
+msgid "Too many attempts. Wait a minute and try again."
+msgstr "Te veel pogingen. Wacht een minuut en probeer het opnieuw."
+
+msgid "Two ways to connect. Each gives the e-reader its own app password, which you can revoke on your account page."
+msgstr "Twee manieren om te verbinden. Elk geeft de e-reader een eigen app-wachtwoord, dat je op je accountpagina kunt intrekken."
+
+msgid "Type the address above, then this account's username and its password or one of its app passwords."
+msgstr "Typ het adres hierboven, en daarna de gebruikersnaam van dit account en het wachtwoord of een van de app-wachtwoorden."
+
+msgid "Unzip the download and copy the cwngsync.koplugin folder into koreader/plugins on the e-reader (on a Kobo, .adds/koreader/plugins)."
+msgstr "Pak de download uit en kopieer de map cwngsync.koplugin naar koreader/plugins op de e-reader (op een Kobo: .adds/koreader/plugins)."
+
+msgid "When it asks for your CWNG address, type the address above."
+msgstr "Typ het adres hierboven wanneer om je CWNG-adres wordt gevraagd."
+
+msgid "Your e-reader will connect to"
+msgstr "Je e-reader maakt verbinding met"
+
+msgid "Your e-readers are still set to sync your whole library, so marking this shelf does nothing on its own. Switch your account to shelf-only syncing to make it take effect."
+msgstr "Je e-readers staan nog ingesteld om je hele bibliotheek te synchroniseren, dus het markeren van deze boekenplank doet op zichzelf niets. Schakel je account over naar synchronisatie van alleen boekenplanken om het van kracht te laten worden."
+
+msgid "an unknown address"
+msgstr "een onbekend adres"
+
+msgid "just now"
+msgstr "zojuist"
+
+#, python-brace-format
+msgid "{name} wants to connect to your account."
+msgstr "{name} wil verbinding maken met je account."
+
+
 #~ msgid "Change library cover"
 #~ msgstr "Bibliotheekomslag wijzigen"
 

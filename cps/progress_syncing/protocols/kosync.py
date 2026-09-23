@@ -2210,3 +2210,7 @@ def handle_internal_error(error):
 # Imported at the bottom so kosync is fully defined first (the module imports
 # helpers from here). See koreader_annotations.py.
 from . import koreader_annotations  # noqa: E402,F401
+
+# The KOReader library (manifest, placeholders, book files, read status).
+# Imported at the bottom for the same reason as the annotation routes above.
+from . import kosync_library  # noqa: E402,F401

@@ -29,11 +29,19 @@ In CWNG, open **E-readers**, then **Pair a Kobo or KOReader**. There are two way
 ### Ready-made plugin (USB): nothing to type on the e-reader
 
 1. Click **Download ready-made plugin**. Check the address under *Your e-reader will
-   connect to*: the e-reader must be able to reach it (`localhost` won't work).
-2. Unzip the download. Copy the `cwngsync.koplugin` folder into `koreader/plugins` on the
-   e-reader (on a Kobo, `.adds/koreader/plugins`), replacing any older copy.
-3. Eject the e-reader and start KOReader with Wi-Fi on. Your library appears in a moment.
-4. Delete the zip from your computer. It holds a password for your account.
+   connect to*: the e-reader must be able to reach it (`localhost` won't work). Unzip the
+   download.
+2. On a Kindle, exit KOReader before you plug it in: ☰ ▸ **KOReader menu** ▸ ☰ ▸
+   **Exit** ▸ **Exit**. A Kindle and its USB connection don't mix while KOReader is open.
+3. Connect the e-reader with its USB cable. Windows shows it in File Explorer. On a Mac,
+   Kindles from 2024 on appear only in an MTP app, such as OpenMTP or Amazon's Kindle USB
+   File Manager (it comes with Send to Kindle for Mac); older Kindles and Kobos appear as
+   a drive.
+4. Copy the `cwngsync.koplugin` folder into `koreader/plugins` on the e-reader (on a Kobo,
+   `.adds/koreader/plugins`), replacing any older copy.
+5. Eject the e-reader and start KOReader with Wi-Fi on. It says *Connected to* your CWNG
+   address, and your library appears in a moment.
+6. Delete the zip from your computer. It holds a password for your account.
 
 ### Pair with a code: for an e-reader that already has the plugin
 
@@ -65,6 +73,8 @@ send to the e-reader appear too, even if they aren't on those shelves.
   highlights are sent to CWNG. There's nothing to press.
 - **Open a book** and it picks up where you left off on another device or in the web
   reader.
+- **Highlights and notes made on another KOReader e-reader** appear in the book when you
+  open it. Delete one here and it stays deleted.
 - **No Wi-Fi?** Nothing is lost. It's sent the next time the e-reader is online. The
   plugin never turns Wi-Fi on by itself for this.
 - **Opening a book and closing it without turning a page sends nothing**, so glancing at

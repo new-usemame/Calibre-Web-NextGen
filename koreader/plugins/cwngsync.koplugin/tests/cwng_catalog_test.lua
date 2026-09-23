@@ -62,6 +62,16 @@ local function testRecentlyAddedNewestFirst()
         "newest three")
 end
 
+local function testABookSentHereIsFirstInRecent()
+    local known = {}
+    for id, k in pairs(KNOWN) do known[id] = k end
+    -- Guards joined the library long ago and was just sent to this device.
+    known["1"] = { kind = "downloaded", path = ROOT .. "/Guards [1].epub", arrived = "2099-01-01T00:00:00Z" }
+    local list = Catalog.entries(BOOKS, known, ROOT)
+    assertEqual(titles(Catalog.recentlyAdded(list, 2)), "Guards! Guards!|Good Omens",
+        "Recent is newest to this device as well as to the library")
+end
+
 local function testContinueReadingPutsThisDeviceFirstAndDropsFinished()
     local history = { ROOT .. "/Guards [1].epub", ROOT .. "/Coraline [4].epub" }
     local list = Catalog.continueReading(entries(), history, 5, function(path)
@@ -174,4 +184,5 @@ testSearchFindsEveryWordAnywhereAndRanksTitles()
 testAccentsMatchTheirPlainLetters()
 testBooksSentOrCopiedToTheFolderAreListedToo()
 testDownloadedOnly()
+testABookSentHereIsFirstInRecent()
 print("cwng_catalog_test.lua: all tests passed")

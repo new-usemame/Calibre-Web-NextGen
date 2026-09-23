@@ -575,6 +575,17 @@ function Runtime:downloadLibraryBook(book_id, path, title)
     return true
 end
 
+-- A book sent from the website was installed at `installed.path`. See
+-- Library.noteDelivered.
+function Runtime:noteDelivered(installed)
+    local state = self:getLibraryState()
+    local info = fileInfo(installed.path) or {}
+    info.checksum = installed.checksum
+    if Library.noteDelivered(state, installed.path, info, os.date("!%Y-%m-%dT%H:%M:%SZ")) then
+        self:saveLibraryState()
+    end
+end
+
 local function manifestTitle(state, book_id, path)
     for _, entry in ipairs(state.manifest or {}) do
         if entry.book_id == book_id and type(entry.title) == "string" then return entry.title end

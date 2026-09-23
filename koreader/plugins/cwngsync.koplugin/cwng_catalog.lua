@@ -111,6 +111,8 @@ function Catalog.entries(books, known_books, root)
                 read_status = book.read_status,
                 progress = tonumber(book.progress),
                 added = type(book.added) == "string" and book.added or "",
+                -- When a book sent from the website reached this device.
+                arrived = known and type(known.arrived) == "string" and known.arrived or nil,
                 last_read = type(book.last_read) == "string" and book.last_read or "",
                 path = (known and known.path) or join(root, book.filename),
                 -- On the device as a cover or the real book (not yet, while
@@ -171,11 +173,19 @@ local function byTitle(fold)
     end
 end
 
+-- New to the library or new to this device, whichever is later: a book the
+-- library has had for years is still new here the day it is sent over.
+local function newest(entry)
+    if entry.arrived and entry.arrived > entry.added then return entry.arrived end
+    return entry.added
+end
+
 function Catalog.recentlyAdded(entries, limit)
     local list = {}
     for _, e in ipairs(entries) do list[#list + 1] = e end
     table.sort(list, function(a, b)
-        if a.added ~= b.added then return a.added > b.added end
+        local na, nb = newest(a), newest(b)
+        if na ~= nb then return na > nb end
         return a.book_id > b.book_id
     end)
     if limit and #list > limit then

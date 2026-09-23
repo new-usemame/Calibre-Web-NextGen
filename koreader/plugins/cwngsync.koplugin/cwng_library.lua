@@ -325,6 +325,32 @@ function Library.record(state, action, ok, info)
     return state
 end
 
+-- A book sent from the website landed at `path`. When that is where the
+-- library keeps one of its books as a cover and the bytes are that book's, it
+-- is the book now: recorded as downloaded at once, so the home drops the cloud
+-- badge without waiting for the next sync (which would adopt it the same way).
+-- `arrived` (ISO-8601 UTC) goes on the record, so Recent can show it first.
+-- Returns the book id, or nil when no book of the library is at `path` or the
+-- file is not that book, which is left to the sync's conflict rule.
+function Library.noteDelivered(state, path, info, arrived)
+    for id, known in pairs(state.books or {}) do
+        if known.path == path then
+            if known.kind == "placeholder" then
+                local book
+                for _, entry in ipairs(state.manifest or {}) do
+                    if tostring(entry.book_id) == id then book = entry break end
+                end
+                if not book or (book.checksum and book.checksum ~= info.checksum) then return nil end
+                Library.record(state, { op = "adopt_download", book_id = tonumber(id), path = path, book = book },
+                    true, info)
+            end
+            state.books[id].arrived = arrived
+            return tonumber(id)
+        end
+    end
+    return nil
+end
+
 -- The book a path holds as a placeholder, according to the state. Used on the
 -- open path, where reading the file's own marker would cost a zip open.
 function Library.placeholderAt(state, path)

@@ -288,6 +288,36 @@ testUnknownFileOverThePlaceholderIsAConflictNotAnOverwrite()
 testLeavingScopeRemovesPlaceholderButNeverASentBookThatReplacedIt()
 testLeavingScopeRemovesOnlyUnmodifiedClosedDownloads()
 testReaderDeletingADownloadedBookPutsItBackInTheCloud()
+local function testABookSentOntoItsCoverIsTheBookAtOnce()
+    local disk, state = newDisk(), Library.newState()
+    local manifest = { book(1), book(2) }
+    state.manifest = manifest
+    syncTwice(disk, state, manifest)
+    local path = ROOT .. "/Book 1 [1].epub"
+
+    -- The website sends book 1; it lands on the name its cover had.
+    disk.files[path] = { bytes = "real-1", mtime = 500 }
+    local id = Library.noteDelivered(state, path,
+        { size = 6, mtime = 500, checksum = "md5:real-1" }, "2026-09-23T23:22:18Z")
+    assertEqual(id, 1, "the library knows which of its books arrived")
+    assertEqual(state.books["1"].kind, "downloaded", "it is the book now, not a cover")
+    assertEqual(state.books["1"].arrived, "2026-09-23T23:22:18Z", "and when it reached this device")
+    assertEqual(#Library.plan(manifest, state, ROOT, disk.probe), 0, "so the next sync has nothing to do")
+
+    -- Different bytes from the server's are the reader's file: the sync's
+    -- conflict rule decides, not this.
+    local other = ROOT .. "/Book 2 [2].epub"
+    disk.files[other] = { bytes = "someone else's", mtime = 600 }
+    assertEqual(Library.noteDelivered(state, other,
+        { size = 14, mtime = 600, checksum = "md5:someone else's" }, "2026-09-23T23:30:00Z"), nil,
+        "a file that is not the book is not recorded as it")
+    assertEqual(state.books["2"].kind, "placeholder", "the record is left for the sync to judge")
+
+    assertEqual(Library.noteDelivered(state, ROOT .. "/Not in the library [99].epub",
+        { size = 3, mtime = 700, checksum = "md5:x" }, "2026-09-23T23:31:00Z"), nil,
+        "a book outside the library is listed from the folder instead")
+end
+
 testLostStateIsRebuiltFromDiskWithoutClobbering()
 testRenamedBookMovesItsFileAndKeepsItsPlace()
 testHostileOrDuplicateEntriesNeverTouchTheDisk()
@@ -336,4 +366,5 @@ end
 
 testStateOfAnotherVersionStartsOver()
 testShelvesBecomeCollectionsWithoutTakingTheReadersOwn()
+testABookSentOntoItsCoverIsTheBookAtOnce()
 print("cwng_library_test.lua: all tests passed")

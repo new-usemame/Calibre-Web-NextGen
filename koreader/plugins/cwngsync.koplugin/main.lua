@@ -1452,6 +1452,8 @@ function CWNGSync:collectDeliveries(
                 return
             end
 
+            local noted, note_error = pcall(self.noteDelivered, self, installed)
+            if not noted then logger.warn("CWNGSync: could not note the sent book", note_error) end
             self:refreshLibraryViews({ installed.path })
             Home.bookArrived(installed.path)
             client:complete_delivery(

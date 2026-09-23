@@ -38,6 +38,17 @@ def test_real_child_captures_selected_source_pixels(image_quote,tmp_path):
         assert audit.observe(built.path,rows,matching)[0]['status']=='verified'
         assert 'source_atoms_sha256' in rows[0]
         assert all(len(v)==64 for v in matching[rows[0]['candidate_id']]['resources'].values())
+        # Build reissues equal factory values. They must not survive as stale
+        # weak-key owners that revoke the next freshly reissued audit authority.
+        again, again_matching = audit.capture(result, 567, document=doc)
+        assert again == rows and again_matching == matching
+        with pytest.raises(ops.ContractError):
+            build_epub.build(result.book, str(tmp_path/'rejected.epub'), doc=doc,
+                page_html={0:'<p>not the admitted source</p>'},
+                source_pages={0:result.operation_plans[0].prepared.source_page},
+                operation_plans=result.operation_plans)
+        after_error, error_matching = audit.capture(result, 567, document=doc)
+        assert after_error == rows and error_matching == matching
 
 
 @pytest.mark.parametrize('mutation',['pixels','substitute','reorder','missing','role'])

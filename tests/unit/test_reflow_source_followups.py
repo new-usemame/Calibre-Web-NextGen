@@ -404,3 +404,28 @@ def test_numbered_list_keeps_source_punctuation_qualification_and_passage_route(
                 assert match
                 original=archive.read('OEBPS/original-p0000.xhtml').decode()
                 assert 'id="'+match.group(1)+'"' in original
+
+@pytest.mark.parametrize('sequence',[True,False])
+def test_proven_margin_folio_cannot_be_absorbed_into_a_footnote(sequence):
+    raws=[]
+    for page in range(3):
+        body=extract.Line([extract.Span('Ordinary body prose preserves the numeric citation 88 and marker 3.',10,'Times',0,(100,200,430,210))],(100,200,430,210))
+        citation=extract.Line([extract.Span('3',5,'Times',1,(180,612,183,617)),
+            extract.Span(' A reference, p. 88.',8,'Times',0,(183,613,368,622))],(180,612,368,622))
+        folio=extract.Line([extract.Span(str(7+page) if sequence else '42',9,'Times',0,(439,639,449,648))],(439,639,449,648))
+        raws.append(extract.RawPage(page,612,792,[extract.Block(0,body.bbox,[body]),
+            extract.Block(1,(180,612,449,648),[citation,folio])],[],0))
+    style=skeleton.book_style(raws)
+    pages=[skeleton.page_skeleton(raw,style) for raw in raws]
+    book=assemble.assemble(pages,style,raws)
+    assert book.conservation.ok
+    assert all('numeric citation 88 and marker 3' in e.text for e in book.elements if e.kind=='p')
+    assert len(book.notes)==3 and all(n.num==3 for n in book.notes)
+    if sequence:
+        assert all(n.text=='A reference, p. 88.' for n in book.notes)
+        assert all(str(7+p) in book.furniture for p in range(3))
+    else:
+        assert '42' not in book.furniture
+        assert all(n.text.endswith('88. 42') for n in book.notes)
+    # Classification must never rewrite/delete the raw source line.
+    assert raws[0].text_blocks[-1].lines[-1].text==('7' if sequence else '42')

@@ -21,7 +21,7 @@ chart labels actually are — stray single glyphs and columns of numbers.
 
 import re
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from statistics import median
 from typing import List, Optional, Tuple
 
@@ -569,7 +569,28 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
                                        needs_ink=True))
         return skel
 
-    body_blocks, note_regions = _split_off_notes(raw, style, skel)
+    # A sequence-proven margin folio belongs to furniture before a note zone
+    # can absorb its PDF block. Keep original raw lines for source accounting.
+    note_raw = raw
+    folio_box = getattr(style, "folio_boxes", {}).get(raw.pno)
+    if folio_box is not None:
+        blocks = []
+        for block in raw.blocks:
+            if block.kind != "text" or not block.lines:
+                blocks.append(block)
+                continue
+            kept = []
+            for line in block.lines:
+                if line.bbox == folio_box:
+                    skel.regions.append(Region(kind="furniture", lines=[line],
+                        bbox=line.bbox, reason="sequence_folio"))
+                else:
+                    kept.append(line)
+            if kept:
+                blocks.append(replace(block, lines=kept,
+                    bbox=_lines_bbox(kept, block.bbox)))
+        note_raw = replace(raw, blocks=blocks)
+    body_blocks, note_regions = _split_off_notes(note_raw, style, skel)
 
     top_y = min((ln.bbox[1] for blk in raw.text_blocks for ln in blk.lines),
                 default=None)

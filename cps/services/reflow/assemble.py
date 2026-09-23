@@ -156,11 +156,13 @@ class ConservationReport(object):
     output_total: int
     missing: List[str] = field(default_factory=list)
     added: List[str] = field(default_factory=list)
+    legacy_lexical: dict = field(default_factory=dict)
 
     def to_dict(self):
         return {"ok": self.ok, "source_total": self.source_total,
                 "output_total": self.output_total,
-                "missing": self.missing[:40], "added": self.added[:40]}
+                "missing": self.missing[:40], "added": self.added[:40],
+                "legacy_lexical": self.legacy_lexical}
 
 
 @dataclass
@@ -342,7 +344,13 @@ def stitch_runs(prev, nxt, heal=True, vocab=None):
             if j >= 0 and prev[j][0] == "t":
                 prev[j][1] = prev[j][1].rstrip() + prev[k][1].strip()
                 del prev[j + 1:]
-    head = next((r[1] for r in nxt if r[0] == "t" and r[1].strip()), "")
+    # An immutable printed wrap stays visible. Do not insert a synthetic gap,
+    # search past this atom, or shave its source pixels to satisfy a word join.
+    final = next((r for r in reversed(prev) if r[1].strip()), None)
+    if final and final[0] == "glyph":
+        return prev + ([] if DEHYPH.search(final[1].rstrip()) else [["t", " "]]) + nxt
+    first = next((r for r in nxt if r[1].strip()), None)
+    head = first[1] if first and first[0] in ("t", "glyph") else ""
     index = next((k for k in range(len(prev) - 1, -1, -1)
                   if prev[k][0] == "t" and prev[k][1].strip()), None)
     if index is not None:
@@ -381,7 +389,7 @@ def _first_word(nxt):
     """
     word = ""
     for run in nxt:
-        if run[0] != "t":
+        if run[0] not in ("t", "glyph"):
             break
         text = run[1].strip()
         if not text:
@@ -1369,6 +1377,12 @@ def assemble(skeletons, style, raw_pages=None):
         book.conservation = check_conservation(book.source_words, book.elements,
                                                book.notes, book.furniture,
                                                book.repairs, artwork=book.artwork)
+        legacy = source_word_counter(raw_pages, vocab=vocab, skeletons=skeletons,
+                                     protected_atoms=False)
+        book.conservation.legacy_lexical = check_conservation(
+            legacy, book.elements, book.notes, book.furniture,
+            book.repairs, artwork=book.artwork).to_dict()
+        book.conservation.legacy_lexical.pop("legacy_lexical", None)
 
     unmarked = [n for n in book.notes if n.num is not None and not n.marked]
     book.stats = {
@@ -1417,7 +1431,7 @@ def deterministic_book(doc, page_numbers=None):
 
 # ---------------------------------------------------------------- the invariant
 
-def source_word_counter(raw_pages, vocab=None, skeletons=None):
+def source_word_counter(raw_pages, vocab=None, skeletons=None, protected_atoms=True):
     """Every alphabetic word the text layer printed, with line-break hyphens healed.
 
     Digits and punctuation are excluded deliberately: the marker repairs move those
@@ -1449,10 +1463,10 @@ def source_word_counter(raw_pages, vocab=None, skeletons=None):
     for raw in raw_pages:
         skel = column_pages.get(raw.pno)
         if skel is not None:
-            counter.update(_heal_page_columns(skel, vocab))
+            counter.update(_heal_page_columns(skel, vocab, protected_atoms))
             continue
         text = _heal_linebreaks(raw.text, None) if vocab is None \
-            else _heal_page(raw, vocab)
+            else _heal_page(raw, vocab, protected_atoms)
         counter.update(_WORD.findall(text))
     for skel in skeletons or ():
         for region in skel.regions:
@@ -1466,7 +1480,7 @@ def source_word_counter(raw_pages, vocab=None, skeletons=None):
     return counter
 
 
-def _heal_page_columns(skel, vocab):
+def _heal_page_columns(skel, vocab, protected_atoms=True):
     """The reordered page's words: the content stream in region (reading) order
     with the stitcher's own seam rule, and every side channel counted the way
     the output side counts it -- notes healed within their region, furniture
@@ -1502,12 +1516,10 @@ def _heal_page_columns(skel, vocab):
             # List items are independent source streams, never joined across
             # their printed item boundaries, including beside preserved figures.
             for group in region.list_groups:
-                counter.update(_WORD.findall(_heal_line_stream(
-                    [ln.text for ln in group], vocab)))
+                counter.update(_WORD.findall(_heal_source_lines(group, vocab, protected_atoms=protected_atoms)))
             continue
         elif region.kind == "note":
-            counter.update(_WORD.findall(_heal_line_stream(
-                [ln.text for ln in region.lines], vocab)))
+            counter.update(_WORD.findall(_heal_source_lines(region.lines, vocab, protected_atoms=protected_atoms)))
             continue
         elif region.kind in ("furniture", "artwork"):
             counter.update(_WORD.findall(region.text))
@@ -1528,8 +1540,7 @@ def _heal_page_columns(skel, vocab):
                 if lines:
                     frozen.add(len(content) - 1)
             else:
-                counter.update(_WORD.findall(_heal_line_stream(
-                    [ln.text for ln in held], vocab)))
+                counter.update(_WORD.findall(_heal_source_lines(held, vocab, protected_atoms=protected_atoms)))
             held = []
         if lines:
             content.extend(lines)
@@ -1537,11 +1548,27 @@ def _heal_page_columns(skel, vocab):
             if region.kind in ("heading", "body"):
                 pending = []
     if held:
-        counter.update(_WORD.findall(_heal_line_stream(
-            [ln.text for ln in held], vocab)))
-    counter.update(_WORD.findall(_heal_line_stream(
-        [ln.text for ln in content], vocab, frozen)))
+        counter.update(_WORD.findall(_heal_source_lines(held, vocab, protected_atoms=protected_atoms)))
+    counter.update(_WORD.findall(_heal_source_lines(content, vocab, frozen, protected_atoms)))
     return counter
+
+
+def _pixel_wrap(line):
+    """A source-owned terminal hyphen cannot be deleted from a printed atom.
+
+    Derive this barrier from qualified raw spans, before output assembly. It
+    changes no word spelling and never consults missing/added output words.
+    """
+    span = next((s for s in reversed(line.spans) if s.text.strip()), None)
+    return bool(span and (span.transcription_uncertain or span.encoding_unresolved)
+                and DEHYPH.search(span.text.rstrip()))
+
+
+def _heal_source_lines(lines, vocab, frozen_seams=(), protected_atoms=True):
+    frozen = set(frozen_seams)
+    if protected_atoms:
+        frozen.update(i for i, line in enumerate(lines) if _pixel_wrap(line))
+    return _heal_line_stream([line.text for line in lines], vocab, frozen)
 
 
 def _heal_line_stream(lines, vocab, frozen_seams=()):
@@ -1599,7 +1626,7 @@ def _heal_linebreaks(text, vocab):
     return _LINEBREAK_TOKEN.sub(repl, text)
 
 
-def _heal_page(raw, vocab):
+def _heal_page(raw, vocab, protected_atoms=True):
     """The page's text with the wraps the reading itself would join, healed.
 
     Within a block the rule is the stitcher's (vocab-gated). Across blocks the
@@ -1608,8 +1635,12 @@ def _heal_page(raw, vocab):
     whole -- the three things ``continues`` and the stitcher ask together. Any
     other seam keeps its hyphen on both sides of the conservation comparison.
     """
-    parts = [_heal_linebreaks(block.text, vocab) for block in raw.text_blocks]
+    parts = [_heal_source_lines(block.lines, vocab, protected_atoms=protected_atoms)
+             for block in raw.text_blocks]
     for index in range(len(parts) - 1):
+        if (protected_atoms and raw.text_blocks[index].lines
+                and _pixel_wrap(raw.text_blocks[index].lines[-1])):
+            continue
         tail = parts[index].rstrip()
         nxt = parts[index + 1].lstrip()
         if not nxt[:1].islower() or SENT_END.search(tail):

@@ -168,3 +168,41 @@ def test_marker_repair_cannot_reach_across_an_immutable_source_atom(atom):
     before=__import__('copy').deepcopy(runs);repairs=[]
     assemble._strip_marker_prefix(runs,repairs,0,'36',136)
     assert runs==before and repairs==[]
+
+
+def test_text_wrap_can_join_a_complete_protected_word_without_editing_its_pixels():
+    from copy import deepcopy
+    from cps.services.reflow import assemble
+    from cps.services.reflow.native_text import descriptor
+    atom=['glyph','edge.',descriptor(0,(20,40,45,50),10,'Times',reason='transcript')]
+    before=deepcopy(atom)
+    runs=assemble.stitch_runs([['t','source knowl-']],[atom],vocab={'knowledge'})
+    assert assemble.plain_text(runs)=='source knowledge.'
+    assert runs[-1]==before
+    assert assemble.plain_text(assemble.stitch_runs([['t','source knowl-']],[atom],heal=False,vocab={'knowledge'}))=='source knowl-edge.'
+    assert assemble.plain_text(assemble.stitch_runs([['t','source knowl-']],[atom],vocab=set()))=='source knowl-edge.'
+
+
+def test_pixel_owned_hyphen_stays_immutable_and_source_counter_keeps_physical_words():
+    from copy import deepcopy
+    from cps.services.reflow import assemble
+    from cps.services.reflow.native_text import descriptor
+    first=extract.Line([extract.Span('knowl-',10,'Times',0,(20,20,50,30),transcription_uncertain=True)],(20,20,50,30))
+    second=extract.Line([extract.Span('edge remains',10,'Times',0,(20,40,80,50))],(20,40,80,50))
+    raw=extract.RawPage(0,400,600,[extract.Block(0,(20,20,80,50),[first,second])],[],0)
+    atom=['glyph','knowl-',descriptor(0,first.bbox,10,'Times',reason='transcript')];before=deepcopy(atom)
+    runs=assemble.stitch_runs([atom],[['t','edge remains']],vocab={'knowledge'})
+    assert runs[0]==before
+    assert assemble.plain_text(runs)=='knowl-edge remains'
+    expected=assemble.source_word_counter([raw],vocab={'knowledge'})
+    element=assemble.Element('p',pno=0,runs=runs)
+    assert assemble.check_conservation(expected,[element],[],[]).ok
+    broken=assemble.Element('p',pno=0,runs=[atom,['t',' remains']])
+    assert not assemble.check_conservation(expected,[broken],[],[]).ok
+    duplicate=assemble.Element('p',runs=[atom,['t','edge edge remains']])
+    altered=assemble.Element('p',runs=[atom,['t','evil remains']])
+    assert not assemble.check_conservation(expected,[duplicate],[],[]).ok
+    assert not assemble.check_conservation(expected,[altered],[],[]).ok
+    legacy=assemble.source_word_counter([raw],vocab={'knowledge'},protected_atoms=False)
+    assert legacy['knowledge']==1 and expected['knowledge']==0
+    assert expected['knowl']==expected['edge']==1

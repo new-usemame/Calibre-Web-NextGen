@@ -211,3 +211,16 @@ def test_detached_ordinary_letters_are_not_attached_as_an_ordinal():
     result=normalize_blocks([extract.Block(0,(10,18,55,30),
         [extract.Line([body],body.bbox),extract.Line([marker],marker.bbox)])])
     assert [line.text for line in result[0].lines]==['a label','st']
+
+
+def test_raised_suffix_can_occupy_the_source_whitespace_before_punctuation():
+    number=extract.Span('10',10,'Times',0,(10,20,20,30),
+        char_boxes=((0,1,10,20,15,30),(1,2,15,20,20,30)))
+    space=extract.Span(' ',10,'Times',0,(20,20,27,30),char_boxes=((0,1,20,20,27,30),))
+    rest=extract.Span('. Next',10,'Times',0,(27,20,60,30),char_boxes=((0,1,27,20,30,30),))
+    marker=extract.Span('th',6,'Times',0,(20.5,18,26,24))
+    body=extract.Line([number,space,rest],(10,20,60,30))
+    result=normalize_blocks([extract.Block(0,(10,18,60,30),[body,extract.Line([marker],marker.bbox)])])
+    assert len(result[0].lines)==1
+    assert ''.join(s.text for s in result[0].lines[0].spans)=='10th . Next'
+    assert [s.text for s in result[0].lines[0].spans if s.superscript]==['th']

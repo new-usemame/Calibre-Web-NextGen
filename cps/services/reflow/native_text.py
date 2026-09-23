@@ -214,8 +214,10 @@ def normalize_blocks(blocks):
                     start, end, x0, _, x1, _ = boundary
                     if abs(x1-small.bbox[0]) > line.size*.35:
                         continue
-                    later = [c for c in span.char_boxes if c[0] >= end]
-                    next_x = later[0][2] if later else (line.spans[i+1].bbox[0] if i+1<len(line.spans) else None)
+                    later = [c for c in span.char_boxes if c[0] >= end
+                             and span.text[c[0]:c[1]].strip()]
+                    following = [s for s in line.spans[i+1:] if s.text.strip()]
+                    next_x = later[0][2] if later else (following[0].bbox[0] if following else None)
                     if next_x is not None and next_x < small.bbox[2] - line.size*.15:
                         continue
                     if small.text in ('st','nd','rd','th') and not span.text[:end][-1:].isdigit():

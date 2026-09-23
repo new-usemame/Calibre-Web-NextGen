@@ -770,7 +770,7 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `████████████████░░░░` 80% | 2665/3309 | 181 |
 | Polish (`pl`) | `████████████████░░░░` 78% | 2571/3309 | 0 |
 | Dutch (`nl`) | `██████████████░░░░░░` 70% | 2326/3309 | 288 |
-| German (`de`) | `█████████████░░░░░░░` 65% | 2158/3309 | 12 |
+| German (`de`) | `██████████████░░░░░░` 69% | 2282/3309 | 12 |
 | Hungarian (`hu`) | `██████████░░░░░░░░░░` 49% | 1636/3309 | 119 |
 | Portuguese (Brazil) (`pt_BR`) | `████████░░░░░░░░░░░░` 42% | 1396/3309 | 305 |
 | Japanese (`ja`) | `████████░░░░░░░░░░░░` 40% | 1310/3309 | 244 |

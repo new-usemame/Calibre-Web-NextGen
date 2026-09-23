@@ -1139,6 +1139,12 @@ export function Reader({ id }: { id: string }) {
       });
     } catch { /* same-origin blob content; guard regardless */ }
   }, [fontPct, fontFamily, margin, lineHeight]);
+  // The rendition's 'rendered' listener is attached once per book, yet it
+  // re-applies the appearance to every section rendered after that. It reads
+  // the reader's current choices through this ref: a closure kept the values
+  // from when the book opened and put them back at the next chapter (#2254).
+  const appearanceRef = useRef({ theme, applyTypography });
+  appearanceRef.current = { theme, applyTypography };
 
   // A page turn is the reader moving themselves, so it ends any preview: from
   // here on the relocations are theirs and the position saves again. This is the
@@ -1470,8 +1476,8 @@ export function Reader({ id }: { id: string }) {
           viewerRef.current?.querySelectorAll('iframe').forEach((f) => {
             f.setAttribute('title', t('Book content'));
           });
-          applyTheme(theme);
-          applyTypography();
+          applyTheme(appearanceRef.current.theme);
+          appearanceRef.current.applyTypography();
           // Typography reflows the page, so the link targets are measured after it.
           scheduleLinkSync();
         });

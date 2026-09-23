@@ -508,7 +508,8 @@ class UserAppPassword(Base):
     LDAP users may prefer not to expose their directory password to OPDS / KOSync
     clients. App passwords let any user mint a long random token bound to a
     label (e.g. "Kobo", "KOReader iPad"); the cleartext is shown once at create
-    time and then only its `werkzeug` hash is stored.
+    time. What is kept, and why a fast digest is safe for these secrets, is
+    explained in ``cps/services/app_passwords.py``.
 
     See `notes/oauth-opds-app-passwords-DESIGN.md` and fork issue #95.
     """
@@ -519,6 +520,9 @@ class UserAppPassword(Base):
                      nullable=False, index=True)
     label = Column(String, nullable=False)
     password_hash = Column(String, nullable=False)
+    # SHA-256 hex of the cleartext: how sign-in finds the row. NULL on rows
+    # saved before it existed until their first sign-in fills it in.
+    token_digest = Column(String(64), index=True)
     created_at = Column(DateTime, nullable=False,
                         default=lambda: datetime.now(timezone.utc))
     last_used_at = Column(DateTime)
@@ -3726,6 +3730,34 @@ def migrate_koreader_pairing_table(engine, _session):
     )
 
 
+def migrate_user_app_password_digest(engine, _session):
+    """Give app passwords the digest sign-in looks them up by, on upgraded app.db files.
+
+    Rows already there keep a NULL digest; the first sign-in with each fills
+    it in (``cps/services/app_passwords.py``). ``IF NOT EXISTS`` and the
+    duplicate-column tolerance make this safe on every boot.
+    """
+    with engine.connect() as connection:
+        columns = {row[1] for row in connection.execute(
+            text("PRAGMA table_info(user_app_password)"))}
+    if not columns:
+        return
+    if "token_digest" not in columns:
+        try:
+            _run_ddl_with_retry(
+                engine,
+                "ALTER TABLE user_app_password ADD COLUMN token_digest VARCHAR(64)",
+            )
+        except exc.OperationalError as error:
+            if "duplicate column" not in str(error).lower():
+                raise
+    _run_ddl_with_retry(
+        engine,
+        "CREATE INDEX IF NOT EXISTS ix_user_app_password_token_digest "
+        "ON user_app_password (token_digest)",
+    )
+
+
 def migrate_cover_design_preset_tables(engine, _session):
     """Create the saved-cover-design tables on upgraded app.db files."""
     Base.metadata.create_all(
@@ -5129,6 +5161,7 @@ def migrate_Database(_session):
     migrate_book_cover_preview_table(engine, _session)
     migrate_user_book_cover_table(engine, _session)
     migrate_koreader_pairing_table(engine, _session)
+    migrate_user_app_password_digest(engine, _session)
     migrate_cover_design_preset_tables(engine, _session)
     migrate_notice_tables(engine, _session)
     migrate_kepub_package_repair_disposition(engine, _session)

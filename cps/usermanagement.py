@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-from datetime import datetime, timezone
 from functools import wraps
 
 from sqlalchemy.sql.expression import func
@@ -17,6 +16,7 @@ from werkzeug.datastructures import Authorization
 from werkzeug.security import check_password_hash
 
 from . import lm, ub, config, logger, limiter, constants, services
+from .services import app_passwords
 from .ui_themes import config_theme_code
 
 
@@ -57,33 +57,41 @@ def _http_basic_auth_error(status=401):
     return response
 
 
-def _verify_app_password(user, password):
-    """Check the supplied password against any of the user's non-revoked
-    app passwords. Returns True on match (and stamps `last_used_at`),
-    False otherwise.
+def _used(row):
+    if row is None:
+        return False
+    app_passwords.note_use(row, session=ub.session)
+    return True
 
-    Constant-time per-row comparison via werkzeug; constant-time across
-    rows is best-effort (we still iterate, but the failure path takes
-    similar work as the success path).
 
-    See fork issue #95 and `notes/oauth-opds-app-passwords-DESIGN.md`.
+def _verify_app_password_digest(user, password):
+    """True when ``password`` is one of ``user``'s live app passwords, found by
+    its digest: one indexed lookup, no slow hash, so sign-in tries it first.
+    Stamps ``last_used_at`` (to the minute) on a match.
+
+    See fork issue #95, ``notes/oauth-opds-app-passwords-DESIGN.md`` and
+    ``cps/services/app_passwords.py``.
     """
     if not user or not password:
         return False
-    rows = ub.session.query(ub.UserAppPassword).filter(
-        ub.UserAppPassword.user_id == user.id,
-        ub.UserAppPassword.revoked == False,  # noqa: E712 — SQLAlchemy idiom
-    ).all()
-    for row in rows:
-        if check_password_hash(row.password_hash, password):
-            row.last_used_at = datetime.now(timezone.utc)
-            try:
-                ub.session.commit()
-            except Exception as ex:
-                log.debug("Failed to stamp UserAppPassword last_used_at: %s", ex)
-                ub.session.rollback()
-            return True
-    return False
+    return _used(app_passwords.find(user, password, session=ub.session))
+
+
+def _verify_app_password_older(user, password):
+    """True when ``password`` is one of ``user``'s live app passwords saved
+    before digests existed. Costs a werkzeug hash per such row, so sign-in
+    tries it after the account password; the match gets its digest and takes
+    :func:`_verify_app_password_digest` from then on.
+    """
+    if not user or not password:
+        return False
+    return _used(app_passwords.find_older(user, password, session=ub.session))
+
+
+def _verify_app_password(user, password):
+    """True when ``password`` is any of ``user``'s live app passwords."""
+    return (_verify_app_password_digest(user, password)
+            or _verify_app_password_older(user, password))
 
 
 def create_authenticated_user(username, email=None, auth_source="unknown"):
@@ -172,8 +180,9 @@ def verify_password(username, password):
         # OAuth users have no usable local password and cannot pass through
         # an OAuth redirect flow on OPDS / KOSync; LDAP users may prefer not
         # to expose their directory password to those clients. Try app
-        # passwords first — see fork issue #95.
-        if _verify_app_password(user, password):
+        # passwords first — see fork issue #95. This is the digest lookup:
+        # no slow hash, and an app password never reaches LDAP as a bind.
+        if _verify_app_password_digest(user, password):
             [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
             return user
         if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
@@ -188,6 +197,11 @@ def verify_password(username, password):
             if check_password_hash(str(user.password), password):
                 [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
                 return user
+        # App passwords saved before digests existed cost a slow hash each,
+        # so they come after the account password; each is slow only once.
+        if _verify_app_password_older(user, password):
+            [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+            return user
     
     # Handle new LDAP users (auto-creation for OPDS/API access)
     elif config.config_login_type == constants.LOGIN_LDAP and services.ldap and getattr(config, 'config_ldap_auto_create_users', True):

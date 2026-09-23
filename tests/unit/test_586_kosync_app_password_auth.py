@@ -10,10 +10,11 @@ rejected them, even though the OPDS / web Basic-auth path
 (``verify_password`` -> ``_verify_app_password``) already accepted app
 passwords (fork #95 / #104).
 
-Post-fix: ``authenticate_user()`` also consults ``_verify_app_password``
-before failing, so app passwords authenticate KOReader progress AND
-annotation sync (they share this login path). The local and LDAP paths are
-unchanged (pinned below).
+Post-fix: ``authenticate_user()`` also consults app passwords, so they
+authenticate KOReader progress AND annotation sync (they share this login
+path). The local password path is unchanged (below). What each sign-in
+costs, and the order the checks run in, is covered by
+``test_app_password_signin_cost.py``.
 
 Pattern sources: tests/unit/test_oauth_app_password_auth.py (session
 fixture), tests/unit/test_kosync_read_status_thresholds_312.py (module load
@@ -22,10 +23,8 @@ via sys.modules to dodge the package re-export shadow).
 from __future__ import annotations
 
 import base64
-import re
 import sys
 from datetime import datetime, timezone
-from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine
@@ -33,9 +32,6 @@ from sqlalchemy.orm import sessionmaker
 from werkzeug.security import generate_password_hash
 
 pytestmark = pytest.mark.unit
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-KOSYNC_PY = REPO_ROOT / "cps" / "progress_syncing" / "protocols" / "kosync.py"
 
 
 def _load_kosync():
@@ -148,15 +144,3 @@ def test_no_credentials_still_returns_none(kosync_env, monkeypatch):
     _oauth_user(session)
     monkeypatch.setattr(kosync, "request", _FakeRequest("Basic " + base64.b64encode(b"alva:").decode()))
     assert kosync.authenticate_user() is None
-
-
-def test_app_password_tried_before_invalid_password_return():
-    """Source pin: the app-password check must live inside authenticate_user and
-    precede the invalid-password failure return, or it would be dead code."""
-    src = KOSYNC_PY.read_text(encoding="utf-8")
-    m = re.search(r"^def authenticate_user\(.*?(?=^def |^class |\Z)", src, re.MULTILINE | re.DOTALL)
-    assert m is not None, "authenticate_user not found"
-    body = m.group(0)
-    assert "_verify_app_password" in body, "kosync auth must consult app passwords (#586)"
-    assert body.index("_verify_app_password") < body.index('"KOReader auth: Invalid password'), \
-        "app-password check must precede the invalid-password failure return"

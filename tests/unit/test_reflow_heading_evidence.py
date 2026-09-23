@@ -130,7 +130,7 @@ def test_prepared_heading_requires_bound_source_and_rechecks_before_publication(
     doc,raw,book=fixture('bold')
     path=tmp_path/'source.pdf';doc.save(path);doc.close();doc=pymupdf.open(path)
     absent=ops.prepare(book,doc,0,'test',{'layer':'native'})
-    assert absent.candidates() and all(c['kind']=='quote' for c in absent.candidates())
+    assert not absent.candidates(), 'missing source geometry authorizes neither headings nor quotes'
     p=ops.prepare(book,doc,0,'test',{'layer':'native'},raw_page=raw)
     cid=next(c['candidate_id'] for c in p.candidates() if c['kind']=='heading')
     response={'protocol':ops.PROTOCOL,'snapshot_id':p.snapshot_id,'select':[cid]}

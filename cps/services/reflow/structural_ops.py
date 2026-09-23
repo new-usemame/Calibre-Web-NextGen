@@ -12,7 +12,7 @@ import random
 import re
 from dataclasses import asdict, dataclass
 
-from . import extract, heading_evidence
+from . import extract, heading_evidence, quote_evidence
 
 PROTOCOL = "cwng-source-wrappers-v1"
 MAX_CANDIDATES = 64
@@ -73,41 +73,13 @@ class _Spec:
     end: int
 
 
-def _proposals(element, index):
-    """Boundaries are generic source punctuation, never known-answer strings."""
-    if element.kind != "p" or element.table_row or not element.text.strip():
-        return []
-    text = "".join(str(run[1]) for run in element.runs)
-    end = _length(element.runs)
-    specs = [_Spec(index, "quote", 0, end)]
-    specs.append(_Spec(index, "heading", 0, end))
-    # Full paragraph, prefix, and quoted substring are distinct legal choices.
-    # A prefix may include an attribution; source pixels decide whether it is
-    # part of the printed quotation. A complete paragraph can be overlong.
-    for match in re.finditer(r'[.!?][”\"]?(?=\s|$)|[”\"]', text):
-        boundary = match.end()
-        # A source marker immediately after punctuation belongs to that boundary
-        # as an indivisible atom; never move it to the following sentence.
-        offset = 0
-        for run in element.runs:
-            size = len(str(run[1]))
-            if offset == boundary and run[0] != "t":
-                boundary += size
-            offset += size
-        if 0 < boundary < end:
-            specs.append(_Spec(index, "quote", 0, boundary))
-    for match in re.finditer(r'“[^”]+”|"[^"\n]+"', text):
-        if match.start() or match.end() != end:
-            specs.append(_Spec(index, "quote", match.start(), match.end()))
-    # Do not admit a boundary through a marker or emit duplicate choices.
-    legal = []
-    for spec in dict.fromkeys(specs):
-        try:
-            _slice(element.runs, spec.start, spec.end)
-        except ContractError:
-            continue
-        legal.append(spec)
-    return legal
+def _proposals(element,index,quote_units=()):
+    """Only complete source units; punctuation prefixes are not display units."""
+    if element.kind!='p' or element.table_row or not element.text.strip():return []
+    specs=[_Spec(index,'heading',0,_length(element.runs))]
+    specs.extend(_Spec(index,'quote',*unit['source_range']) for unit in quote_units)
+    for spec in specs:_slice(element.runs,spec.start,spec.end)
+    return specs
 
 
 @dataclass(frozen=True)
@@ -125,6 +97,8 @@ class Prepared:
     source_page: object = None
     heading_source_json: str = ""
     heading_source_digest: str = ""
+    quote_source_json: str = ""
+    quote_source_digest: str = ""
 
     def candidates(self):
         rows = []
@@ -183,6 +157,21 @@ class Prepared:
                     raise ValueError('unsupported current source role')
             except (ValueError, KeyError, TypeError, AttributeError) as exc:
                 raise ContractError('current source heading evidence is required') from exc
+        quotes=[spec for spec in picked if spec.kind=='quote']
+        if quotes:
+            try:
+                geometry=json.loads(self.heading_source_json)
+                supplied=json.loads(self.quote_source_json)
+                if (_digest(geometry)!=self.heading_source_digest or
+                        _digest(supplied)!=self.quote_source_digest or
+                        supplied['version']!=quote_evidence.VERSION):raise ValueError('stale quote evidence')
+                proofs=quote_evidence.quote_evidence(book,self.page,geometry['raw_page'],
+                    geometry['layer'],geometry['source_rotation'],supplied['uncertain'])
+                if _digest(proofs)!=supplied['proofs_digest']:raise ValueError('quote source changed')
+                if any([spec.start,spec.end] not in [u['source_range'] for u in proofs[spec.element]['units']]
+                       for spec in quotes):raise ValueError('incomplete quote unit')
+            except (ValueError,KeyError,TypeError,AttributeError) as exc:
+                raise ContractError('current complete source quote evidence is required') from exc
         for left, right in zip(picked, picked[1:]):
             if left.element == right.element and left.end > right.start:
                 raise ContractError("overlapping selections")
@@ -248,10 +237,15 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
                 'reading_size': reading_size,
                 'proofs_digest': _digest(proofs)}
     geometry_digest = _digest(geometry)
+    quote_uncertain=bool(source_layer.get('uncertain_words') or source_layer.get('failed'))
+    quote_proofs=quote_evidence.quote_evidence(book,pno,raw,source_layer.get('layer'),doc[pno].rotation,quote_uncertain)
+    quote_binding={'version':quote_evidence.VERSION,'proofs_digest':_digest(quote_proofs),'uncertain':quote_uncertain}
+    quote_digest=_digest(quote_binding)
     context, omitted, specs, used = [], [], [], 0
     for index, element in enumerate(book.pages[pno]):
         record = {"id": "e%d" % index, **asdict(element)}
         record['heading_evidence'] = proofs[index]
+        record['quote_evidence'] = quote_proofs[index]
         if source_page is not None:
             from .build_epub import split_blocks
             mapping = json.loads(source_page.blocks_json)
@@ -263,7 +257,7 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
             continue
         used += size
         context.append(record)
-        for spec in (() if index in relational_regions else _proposals(element, index)):
+        for spec in (() if index in relational_regions else _proposals(element, index,quote_proofs[index]['units'])):
             if spec.kind == 'heading' and not proofs[index]['supported']:
                 continue
             if source_page is not None:
@@ -283,7 +277,7 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
         snapshot_id = _digest([snapshot_id, source_page.identity])
     if relational_regions:
         snapshot_id = _digest([snapshot_id, relational_regions])
-    snapshot_id = _digest([snapshot_id, geometry_digest])
+    snapshot_id = _digest([snapshot_id, geometry_digest,quote_digest])
     total = len(specs)
     random.Random(seed).shuffle(specs)
     specs = specs[:max_candidates]
@@ -305,6 +299,9 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
             group.append(record)
     coverage["omitted_inventory_records"] = omitted_inventory
     coverage["source_grid_elements"] = ["e%d" % i for i in relational_regions]
+    coverage['quote_evidence_version']=quote_evidence.VERSION
+    coverage['quote_supported_elements']=['e%d'%i for i,p in quote_proofs.items() if p['supported']]
+    coverage['quote_unsupported_elements']=['e%d'%i for i,p in quote_proofs.items() if not p['supported'] and book.pages[pno][i].kind=='p']
     coverage['heading_evidence_version'] = heading_evidence.VERSION
     coverage['heading_supported_elements'] = ['e%d' % i for i, proof in proofs.items()
         if proof['supported'] and i not in relational_regions and book.pages[pno][i].kind == 'p']
@@ -329,7 +326,7 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
             raise ContractError('enriched confidence context exceeds preparation bound')
     return Prepared(pno, revision, state_digest, pdf_digest, snapshot_id, tuple(specs),
                     json.dumps(state), raster, seed, json.dumps(coverage), source_page,
-                    json.dumps(geometry), geometry_digest)
+                    json.dumps(geometry), geometry_digest,json.dumps(quote_binding),quote_digest)
 
 
 def render_element(element, specs, render_runs):

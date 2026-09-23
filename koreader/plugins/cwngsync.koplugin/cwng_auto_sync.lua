@@ -154,6 +154,7 @@ function AutoSync:queueOpenBook(with_annotations, on_done, explicit)
         return
     end
     local queue = self:readPending()
+    entry.owner = self:accountOwner()
     Pending.record(queue, entry)
     self:writePending(queue)
     if NetworkMgr:isConnected() then
@@ -186,6 +187,7 @@ function AutoSync:noteStatusChange(doc_settings, summary)
         if not entry.document then return end
     end
     local queue = self:readPending()
+    entry.owner = self:accountOwner()
     Pending.record(queue, entry)
     self:writePending(queue)
     if NetworkMgr:isConnected() then self:flushPending() end
@@ -296,6 +298,11 @@ function AutoSync:flushPending(on_done)
     -- must not hold the queue forever.
     if shared.flushing and os.time() - (shared.flushing_since or 0) < 120 then return finish(true) end
     local queue = self:readPending()
+    local dropped = Pending.dropOtherAccounts(queue, self:accountOwner())
+    if dropped > 0 then
+        logger.info("CWNGSync: dropped", dropped, "unsent captures from a previous account")
+        self:writePending(queue)
+    end
     local documents = {}
     for document, entry in pairs(queue) do
         if type(entry) == "table" then documents[#documents + 1] = document end
@@ -383,7 +390,7 @@ function AutoSync:syncEverythingNow()
         local function afterQueue(ok, reason)
             if not ok and reason ~= "no book" and reason ~= "not connected" then
                 UIManager:show(InfoMessage:new{
-                    text = T(_("Could not send your reading to CWNG: %1"), reason or _("no response from server")),
+                    text = T(_("Could not send your reading to CWNG: %1"), require("CWNGSyncClient").plainReason(reason)),
                     timeout = 5,
                 })
             end

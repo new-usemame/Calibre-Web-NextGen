@@ -18,8 +18,9 @@ function Pending.record(queue, entry)
     local previous = queue[entry.document]
     entry.seq = ((previous and previous.seq) or 0) + 1
     -- A status or highlight change that has not reached the server yet must
-    -- survive a later capture that carries no change of its own.
-    if previous then
+    -- survive a later capture that carries no change of its own, from the
+    -- same account.
+    if previous and previous.owner == entry.owner then
         if entry.percentage == nil then
             entry.progress = previous.progress
             entry.percentage = previous.percentage
@@ -30,6 +31,20 @@ function Pending.record(queue, entry)
     end
     queue[entry.document] = entry
     return entry.seq
+end
+
+-- Remove what was captured under another account (another user or server):
+-- its book ids and positions belong there. A capture from before owners were
+-- recorded is taken to be the current account's. Returns how many were dropped.
+function Pending.dropOtherAccounts(queue, owner)
+    local dropped = 0
+    for document, entry in pairs(queue) do
+        if entry.owner ~= nil and entry.owner ~= owner then
+            queue[document] = nil
+            dropped = dropped + 1
+        end
+    end
+    return dropped
 end
 
 -- Drop the entry once the server has everything it carried, unless a newer

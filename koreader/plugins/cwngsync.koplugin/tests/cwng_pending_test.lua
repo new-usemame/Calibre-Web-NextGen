@@ -92,7 +92,21 @@ local function testOpeningABookWithoutReadingSendsNoPosition()
     assertEqual(queue.d1.status, "finished", "and the new status added")
 end
 
+local function testCapturesForAnotherAccountAreNeverSentToThisOne()
+    local queue = {}
+    Pending.record(queue, { document = "book:7", book_id = 7, status = "finished", owner = "http://a|ann" })
+    Pending.record(queue, { document = "d2", percentage = 0.5, status = "reading", owner = "http://a|ann" })
+    Pending.record(queue, { document = "d3", percentage = 0.1 }) -- queued before owners were recorded
+    Pending.record(queue, { document = "d2", percentage = 0.6, owner = "http://b|bob" })
+    assertEqual(queue.d2.status, nil, "nothing carries over from the other account's capture")
+    assertEqual(Pending.dropOtherAccounts(queue, "http://b|bob"), 1, "one capture belonged to ann")
+    assertEqual(queue["book:7"], nil, "ann's finished book 7 is not marked finished on bob's server")
+    assertEqual(queue.d2.percentage, 0.6, "bob's own capture stays")
+    assertEqual(queue.d3 ~= nil, true, "an older capture without an owner is this account's")
+end
+
 testMovedMeansAwayFromWhereTheBookOpened()
+testCapturesForAnotherAccountAreNeverSentToThisOne()
 testOpeningABookWithoutReadingSendsNoPosition()
 testLatestCaptureWinsAndALateDeliveryCannotDropIt()
 testUnsentStatusAndHighlightsSurviveALaterPositionOnlyCapture()

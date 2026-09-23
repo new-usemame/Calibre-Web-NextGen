@@ -91,6 +91,43 @@ local function stillPlaceholder(known, id, probe)
     return probe.placeholderId(known.path) == tonumber(id)
 end
 
+-- The library belongs to one account on one server (`owner`). Book ids and
+-- revisions mean nothing to another, so connecting elsewhere starts afresh:
+-- the old covers go, and downloaded books stay as the reader's own files, as
+-- "Disconnect this device" promises. Returns the actions that clear the disk,
+-- having already reset `state` in place, or nil when the owner is unchanged.
+-- A state without an owner was written before owners were recorded; it is
+-- taken to be the current account's.
+function Library.handover(state, owner, probe)
+    if state.owner == owner then return nil end
+    if state.owner == nil then
+        state.owner = owner
+        return nil
+    end
+    local actions = {}
+    for id, known in pairs(state.books) do
+        local op = "release"
+        if known.kind == "placeholder" then
+            local placeholder = stillPlaceholder(known, id, probe)
+            if placeholder then
+                op = "remove_placeholder"
+            elseif placeholder == nil then
+                op = "forget"
+            end
+        elseif not probe.attributes(known.path) then
+            op = "forget"
+        end
+        actions[#actions + 1] = { op = op, book_id = tonumber(id), path = known.path, leaving = true }
+    end
+    local collections = state.collections
+    for key in pairs(state) do state[key] = nil end
+    state.version = Library.STATE_VERSION
+    state.books = {}
+    state.owner = owner
+    state.collections = collections
+    return actions
+end
+
 -- probe:
 --   attributes(path) -> { size, modification } | nil
 --   digest(path)     -> KOReader partial MD5 | nil

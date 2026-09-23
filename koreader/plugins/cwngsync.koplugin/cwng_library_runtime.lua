@@ -95,6 +95,11 @@ function Runtime:getLibraryRoot()
     return root
 end
 
+-- Whose library and queued reading this device holds: one account on one server.
+function Runtime:accountOwner()
+    return tostring(self.settings.server) .. "|" .. tostring(self.settings.username)
+end
+
 function Runtime:newSyncClient()
     local CWNGSyncClient = require("CWNGSyncClient")
     return CWNGSyncClient:new{
@@ -463,6 +468,20 @@ function Runtime:syncLibrary(opts)
     shared.running = token
     local state = self:getLibraryState()
     local client = self:newSyncClient()
+    local leaving = Library.handover(state, self:accountOwner(), self:libraryProbe())
+    if leaving then
+        -- Another account's covers go before this one's arrive; its downloaded
+        -- books stay as the reader's own files.
+        local cleared = {}
+        for _, action in ipairs(leaving) do
+            local ok_call, ok = pcall(self.performLibraryAction, self, client, action)
+            Library.record(state, action, ok_call and ok)
+            if ok_call and ok then cleared[#cleared + 1] = action.path end
+        end
+        logger.info("CWNGSync: library handed over to a new account;", #leaving, "books of the previous one cleared")
+        self:saveLibraryState()
+        self:refreshLibraryViews(cleared)
+    end
     local books = {}
     local shelves = {}
     local pages = 0
@@ -591,7 +610,7 @@ function Runtime:openLibraryPlaceholder(file, open_real)
         else
             UIManager:show(InfoMessage:new{
                 text = T(_("Could not download %1.\n\n%2\n\nCheck that Wi-Fi is on and try again."),
-                    title, reason or _("no response from server")),
+                    title, require("CWNGSyncClient").plainReason(reason)),
             })
         end
     end)
@@ -667,7 +686,7 @@ function Runtime:rescueOpenedPlaceholder()
                 original(ReaderUI, file)
             else
                 UIManager:show(InfoMessage:new{
-                    text = T(_("Could not download %1.\n\n%2"), title, reason or ""),
+                    text = T(_("Could not download %1.\n\n%2"), title, require("CWNGSyncClient").plainReason(reason)),
                 })
             end
         end)

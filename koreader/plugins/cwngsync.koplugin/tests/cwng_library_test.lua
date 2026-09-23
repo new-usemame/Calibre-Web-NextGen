@@ -251,7 +251,36 @@ local function testStateOfAnotherVersionStartsOver()
     assertEqual(next(Library.loadState("garbage").books), nil, "garbage")
 end
 
+local function testAnotherAccountStartsAFreshLibraryAndKeepsDownloads()
+    local disk, state = newDisk(), Library.newState()
+    assertEqual(Library.handover(state, "http://a|ann", disk.probe), nil, "a new library takes its owner")
+    assertEqual(state.owner, "http://a|ann", "owner recorded")
+    local manifest = { book(1), book(2), book(3) }
+    syncTwice(disk, state, manifest)
+    local downloaded = ROOT .. "/Book 1 [1].epub"
+    disk.files[downloaded] = { bytes = "real-1", mtime = 200 }
+    perform(disk, state, Library.plan(manifest, state, ROOT, disk.probe))
+    disk.files[ROOT .. "/Book 3 [3].epub"] = nil -- deleted on the device
+    state.revision = "rev-a"
+    state.collections = { ["7"] = "Favorites" }
+    assertEqual(Library.handover(state, "http://a|ann", disk.probe), nil, "same account: nothing to do")
+
+    local actions = Library.handover(state, "http://b|bob", disk.probe)
+    assertEqual(ops(actions), "forget:3,release:1,remove_placeholder:2", "covers go, the downloaded book stays")
+    perform(disk, state, actions)
+    assertEqual(disk.files[downloaded] ~= nil, true, "the downloaded book is still on the device")
+    assertEqual(next(state.books), nil, "nothing of the old account is tracked")
+    assertEqual(state.revision, nil, "the old server's revision is never offered to the new one")
+    assertEqual(state.owner, "http://b|bob", "the library is the new account's")
+    assertEqual(state.collections["7"], "Favorites", "old shelf collections stay recorded, so the next sync removes them")
+
+    local other = book(1, { filename = "Other [1].epub", checksum = "md5:other" })
+    assertEqual(ops(Library.plan({ other }, state, ROOT, disk.probe)), "create_placeholder:1",
+        "id 1 on the new server is a different book: the old file is not renamed to it")
+end
+
 testEmptyDeviceGetsOnePlaceholderPerBookAndThenSettles()
+testAnotherAccountStartsAFreshLibraryAndKeepsDownloads()
 testMetadataRevisionRefreshesOnlyThatPlaceholder()
 testReadStatusIsAppliedOnceAndProgressOnlyForPlaceholders()
 testSentBookLandingOnThePlaceholderIsAdoptedNotOverwritten()

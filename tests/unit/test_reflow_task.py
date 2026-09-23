@@ -22,6 +22,7 @@ import pytest
 from cps.services.reflow import ledger as ledger_mod, model as model_mod
 from cps.services.worker import STAT_ENDED, STAT_FAIL, STAT_FINISH_SUCCESS
 from tests.fixtures import reflow_pdfs as F
+from tests.fixtures.forking import run_forked
 
 pytestmark = pytest.mark.unit
 
@@ -748,7 +749,6 @@ def test_failed_publication_preserves_previous_file_and_no_partial_format(rig,mo
 
 @pytest.mark.parametrize('existing',[False,True])
 def test_process_death_after_publication_restores_consistent_library(rig,monkeypatch,existing):
-    import multiprocessing
     target=rig.folder/'Book - Author.epub'
     if existing:
         target.write_bytes(b'previous private EPUB')
@@ -763,9 +763,7 @@ def test_process_death_after_publication_restores_consistent_library(rig,monkeyp
     def child():
         monkeypatch.setattr(rig.mod.os,'replace',die_after_publish)
         task.run(None)
-    process=multiprocessing.get_context('fork').Process(target=child)
-    process.start();process.join(30)
-    assert process.exitcode==86
+    assert run_forked(child,30)==86
     assert target.exists() and target.read_bytes()!=previous
     with rig.mod.publication.lock(os.path.join(rig.root,'publication-locks'),str(target)):
         assert rig.mod.recover_interrupted_jobs()==[]
@@ -779,7 +777,7 @@ def test_process_death_after_publication_restores_consistent_library(rig,monkeyp
 
 @pytest.mark.parametrize('crash_after_receipt',[False,True])
 def test_process_death_after_database_commit_retains_exact_new_file(rig,monkeypatch,crash_after_receipt):
-    import multiprocessing,json,hashlib
+    import json,hashlib
     marker=rig.folder/'format-state.json'
     target=rig.folder/'Book - Author.epub'
     target.write_bytes(b'old EPUB')
@@ -794,8 +792,7 @@ def test_process_death_after_database_commit_retains_exact_new_file(rig,monkeypa
     def committed(led):
         real_committed(led);os._exit(86)
     if crash_after_receipt:monkeypatch.setattr(rig.mod.publication,'committed',committed)
-    process=multiprocessing.get_context('fork').Process(target=task.run,args=(None,))
-    process.start();process.join(30);assert process.exitcode==86
+    assert run_forked(task.run,30,None)==86
     expected=hashlib.sha256(target.read_bytes()).hexdigest()
     ledpath=os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl')
     led=ledger_mod.Ledger(ledpath,5,task.job_id)
@@ -811,7 +808,6 @@ def test_process_death_after_database_commit_retains_exact_new_file(rig,monkeypa
 
 @pytest.mark.parametrize('changed',['target','metadata','source','backup','extra-staging'])
 def test_restart_preserves_later_user_changes_instead_of_rolling_them_back(rig,monkeypatch,changed):
-    import multiprocessing
     target=rig.folder/'Book - Author.epub';target.write_bytes(b'old EPUB')
     task=rig.mod.TaskReflowPdf(5,7,{'mode':'full','replace_existing_epub':True})
     real_replace=os.replace
@@ -820,8 +816,7 @@ def test_restart_preserves_later_user_changes_instead_of_rolling_them_back(rig,m
             real_replace(src,dst)
             if os.fspath(dst)==str(target):os._exit(86)
         monkeypatch.setattr(rig.mod.os,'replace',replace);task.run(None)
-    process=multiprocessing.get_context('fork').Process(target=child)
-    process.start();process.join(30);assert process.exitcode==86
+    assert run_forked(child,30)==86
     staging=next(rig.folder.glob('.reflow-*'))
     if changed=='target':target.write_bytes(b'later user EPUB')
     elif changed=='metadata':rig.local_db.session.existing=SimpleNamespace(name='other user format',uncompressed_size=123)
@@ -929,15 +924,13 @@ def test_a_library_reached_through_a_symlinked_root_is_converted_into(rig,monkey
 
 
 def _crash_after_publish(rig,monkeypatch,task,target):
-    import multiprocessing
     real_replace=os.replace
     def child():
         def replace(src,dst):
             real_replace(src,dst)
             if os.fspath(dst)==str(target):os._exit(86)
         monkeypatch.setattr(rig.mod.os,'replace',replace);task.run(None)
-    process=multiprocessing.get_context('fork').Process(target=child)
-    process.start();process.join(60);assert process.exitcode==86
+    assert run_forked(child,60)==86
 
 
 def test_conflict_evidence_leaves_the_book_folder_on_the_next_recovery_pass(rig,monkeypatch):
@@ -993,7 +986,6 @@ def test_a_staging_folder_orphaned_before_publication_is_removed_on_recovery(rig
     long book -- after the staging folder exists and before any journal entry
     names it. Nothing was published and nothing needs it, but nothing removed it
     either. Recovery now does. Breaks if such a folder survives recovery."""
-    import multiprocessing
     target=rig.folder/'Book - Author.epub';target.write_bytes(b'old EPUB')
     task=rig.mod.TaskReflowPdf(5,7,{'mode':'full','replace_existing_epub':True,'review_mode':'deterministic'})
     def child():
@@ -1001,8 +993,7 @@ def test_a_staging_folder_orphaned_before_publication_is_removed_on_recovery(rig
             with open(out_path+'.tmp','wb') as partial:partial.write(b'PK half an EPUB')
             os._exit(86)
         monkeypatch.setattr(rig.mod.build_epub,'build',die);task.run(None)
-    process=multiprocessing.get_context('fork').Process(target=child)
-    process.start();process.join(60);assert process.exitcode==86
+    assert run_forked(child,60)==86
     assert list(rig.folder.glob('.reflow-*'))
     assert rig.mod.recover_interrupted_jobs()==[task.job_id]
     assert not list(rig.folder.glob('.reflow-*'))

@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import pytest
 from cps.services.reflow import publication as p,ledger as l
+from tests.fixtures.forking import run_forked
 
 pytestmark=pytest.mark.unit
 
@@ -56,9 +57,7 @@ def test_a_separate_process_cannot_recover_while_publication_lock_is_owned(tmp_p
     def child():
         with p.lock(folder,target,blocking=False) as acquired:sender.send(acquired)
     with p.lock(folder,target):
-        process=multiprocessing.get_context('fork').Process(target=child)
-        process.start();process.join(5)
-        assert process.exitcode==0 and receiver.recv() is False
+        assert run_forked(child,5)==0 and receiver.recv() is False
     with p.lock(folder,target,blocking=False) as acquired:assert acquired
 
 

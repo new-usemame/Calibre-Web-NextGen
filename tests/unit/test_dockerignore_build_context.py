@@ -33,11 +33,12 @@ copy into ``/config`` on a fresh install — every new deployment would come up
 without an ``app.db``, and CI would stay green the whole time. So the runtime
 allowlist below is asserted as *not excluded*, path by path.
 
-The matcher models Docker's root-anchored, non-recursive semantics. Because a
-matcher that silently fails to understand a pattern would turn direction 2 into
-a false negative, ``test_no_pattern_forms_beyond_the_matcher`` fails loudly the
-moment ``.dockerignore`` grows a form this file does not model (``**``,
-negation), rather than quietly passing.
+The matcher models Docker's root-anchored semantics, including ``**`` (any
+number of directories, none included). Because a matcher that silently fails to
+understand a pattern would turn direction 2 into a false negative,
+``test_no_pattern_forms_beyond_the_matcher`` fails loudly the moment
+``.dockerignore`` grows a form this file does not model (negation), rather than
+quietly passing.
 """
 
 from __future__ import annotations
@@ -58,6 +59,10 @@ LOCAL_ONLY_ARTIFACTS = [
     ".venv/lib/python3.12/site-packages/flask/__init__.py",
     ".claude",
     ".claude/settings.local.json",
+    # Agent state inside the KOReader plugin folder, which the image zips whole
+    # into the plugin download (**/.claude).
+    "koreader/plugins/cwngsync.koplugin/.claude",
+    "koreader/plugins/cwngsync.koplugin/.claude/agent-memory/notes/MEMORY.md",
     ".coverage",
     "calibre-web.log",
 ]
@@ -97,22 +102,35 @@ def _patterns() -> list[str]:
     ]
 
 
+def _segments_match(pattern_parts: list[str], path_parts: list[str]) -> bool:
+    """Whether all of ``path_parts`` matches ``pattern_parts``, segment by segment.
+
+    A ``**`` segment spans any number of path segments, none included; any other
+    segment is a single-segment glob, so ``*`` never crosses a ``/``.
+    """
+    if not pattern_parts:
+        return not path_parts
+    head, rest = pattern_parts[0], pattern_parts[1:]
+    if head == "**":
+        return any(_segments_match(rest, path_parts[skip:])
+                   for skip in range(len(path_parts) + 1))
+    return (bool(path_parts) and fnmatch.fnmatchcase(path_parts[0], head)
+            and _segments_match(rest, path_parts[1:]))
+
+
 def _matches(pattern: str, path: str) -> bool:
     """Docker semantics: root-anchored, matches the path or any parent of it.
 
-    A pattern of N segments is compared against the first N segments of the
-    candidate path, so ``docs`` excludes ``docs/api.md`` (parent match) while
-    ``app.db`` does *not* touch ``empty_library/app.db`` (not root-anchored
-    there). Matching is case-sensitive, as it is in BuildKit on Linux.
+    The pattern must match the whole of the path or of one of its parents, so
+    ``docs`` excludes ``docs/api.md`` (parent match) while ``app.db`` does *not*
+    touch ``empty_library/app.db`` (not root-anchored there), and ``**/.claude``
+    excludes a ``.claude`` folder at any depth with everything in it. Matching
+    is case-sensitive, as it is in BuildKit on Linux.
     """
     pattern_parts = pattern.strip("/").split("/")
     path_parts = path.strip("/").split("/")
-    if len(pattern_parts) > len(path_parts):
-        return False
-    return all(
-        fnmatch.fnmatchcase(actual, expected)
-        for expected, actual in zip(pattern_parts, path_parts)
-    )
+    return any(_segments_match(pattern_parts, path_parts[:length])
+               for length in range(1, len(path_parts) + 1))
 
 
 def is_excluded(path: str) -> bool:
@@ -129,14 +147,16 @@ def test_dockerfile_still_copies_the_whole_context():
 def test_no_pattern_forms_beyond_the_matcher():
     """Guard against silent false negatives in the two tests below.
 
-    ``_matches`` models plain names, directories and single-segment globs. It
-    does not model ``**`` or ``!`` negation. If either appears, the allowlist
-    test could start passing for the wrong reason, so fail here instead.
+    ``_matches`` models plain names, directories, single-segment globs and
+    ``**`` as a whole segment. It does not model ``!`` negation or ``**`` inside
+    a segment (``a**b``). If either appears, the allowlist test could start
+    passing for the wrong reason, so fail here instead.
     """
     unsupported = [
         pattern
         for pattern in _patterns()
-        if pattern.startswith("!") or "**" in pattern
+        if pattern.startswith("!")
+        or any("**" in part and part != "**" for part in pattern.strip("/").split("/"))
     ]
     assert not unsupported, (
         f".dockerignore uses pattern forms this test cannot model: {unsupported}. "

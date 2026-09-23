@@ -325,4 +325,6 @@ def test_spa_gates_each_control_on_its_matching_capability():
     assert "{data.can_edit && (" in source
     assert "{data.can_duplicate && (" in source
     assert "{data.can_delete && (" in source
-    assert "data.can_kobo_sync && me?.features?.kobo_sync" in source
+    # The e-reader sync mark also reaches the KOReader library, so the control
+    # shows once either sync is on (frontend/src/lib/ereaderWording.ts).
+    assert "data.can_kobo_sync && shelfMarksReachDevices(me?.features)" in source

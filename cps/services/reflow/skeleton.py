@@ -584,6 +584,12 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
                                                       style)
         skel.regions.extend(artwork)
 
+    # Confidence is not a probability of correctness. Once OCR doubts a word,
+    # its paragraph is not a trustworthy transcription, including confident
+    # neighbors. Keep that source region as pixels rather than corrected prose.
+    kept_blocks, note_regions = _preserve_uncertain_ocr_regions(
+        raw, kept_blocks, note_regions, skel, cover, candidates)
+
     layout = _column_layout(kept_blocks, embedded, candidates, raw,
                             pixel_probe=pixel_probe)
     if isinstance(layout, _RowTable):
@@ -617,6 +623,11 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
         for blk, kept in kept_blocks:
             _classify_body(kept, blk, style, skel)
 
+    if layout is not None:
+        for region in skel.regions:
+            if region.reason == "ocr_uncertain_region":
+                region.band, region.column = layout.place(region.bbox)
+
     for img in embedded:
         band, column = layout.place(img.bbox) if layout else (0, 0)
         skel.regions.append(Region(kind="figure", bbox=img.bbox, image=img,
@@ -629,6 +640,52 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     skel.regions.extend(note_regions)
     skel.regions.sort(key=_region_order)
     return skel
+
+
+def _preserve_uncertain_ocr_regions(raw, kept_blocks, note_regions, skel, cover, candidates):
+    regions = []
+    for block in raw.text_blocks:
+        spans = [sp for ln in block.lines for sp in ln.spans]
+        if not spans or not all(sp.font == "ocr" for sp in spans):
+            continue
+        if cover is not None or any(sp.uncertain for sp in spans) or not any(c.isalnum() for c in block.text):
+            regions.append(block)
+    if not regions:
+        return kept_blocks, note_regions
+    owned = {id(ln) for block in regions for ln in block.lines}
+    kept_blocks = [(b, [ln for ln in lines if id(ln) not in owned])
+                   for b, lines in kept_blocks]
+    kept_blocks = [(b, lines) for b, lines in kept_blocks if lines]
+    # These are the same source-line objects after the note/furniture split.
+    # A guessed note label must not survive beside the faithful crop.
+    for collection in (skel.regions, note_regions, candidates):
+        for region in collection:
+            region.lines = [ln for ln in region.lines if id(ln) not in owned]
+            region.caption_lines = [ln for ln in region.caption_lines if id(ln) not in owned]
+        collection[:] = [r for r in collection if r.lines or r.kind == "figure"]
+    for block in regions:
+        skel.regions.append(Region(kind="artwork", lines=list(block.lines),
+            bbox=block.bbox, reason="ocr_uncertain_region"))
+        carriers = [r for r in skel.regions + candidates if r.kind == "figure"
+                    and r.bbox[0] <= block.bbox[0] and r.bbox[1] <= block.bbox[1]
+                    and r.bbox[2] >= block.bbox[2] and r.bbox[3] >= block.bbox[3]]
+        if carriers:
+            for region in carriers:
+                region.reason = "ocr_uncertain_region"
+        elif cover is None:
+            # OCR boxes may omit antialiased edges/descenders. Retain a small
+            # type-relative source margin, bounded by the actual page.
+            pad = max(1.0, min(6.0, median(ln.size for ln in block.lines) * 0.3))
+            box = (max(0.0, block.bbox[0] - pad), max(0.0, block.bbox[1] - pad),
+                   min(raw.width, block.bbox[2] + pad), min(raw.height, block.bbox[3] + pad))
+            skel.regions.append(Region(kind="figure", bbox=box,
+                reason="ocr_uncertain_region"))
+        else:
+            for region in skel.regions:
+                if region.kind == "figure" and region.image is cover:
+                    region.reason = "ocr_uncertain_region"
+    skel.reasons.append("ocr_uncertain_region")
+    return kept_blocks, note_regions
 
 
 def _region_order(region):

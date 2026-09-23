@@ -745,8 +745,11 @@ class TestPlateAndCaptionFidelity:
         book = assemble.assemble([skel], style, [raw])
         assert len(book.figures) == 1 and book.figures[0]['full_page']
         assert "noise" not in _whole_text(book)
-        assert "TITLE" in _whole_text(book) and "AUTHOR" in _whole_text(book)
-        assert 'noise' in ' '.join(item['text'] for item in book.artwork)
+        assert "TITLE" not in _whole_text(book) and "AUTHOR" not in _whole_text(book)
+        # The plate now owns all its OCR lettering; don't repeat recognized
+        # titles as additional chapters after the intact original cover.
+        lettering = ' '.join(item['text'] for item in book.artwork)
+        assert all(token in lettering for token in ['TITLE','AUTHOR','noise'])
         assert book.conservation.ok
         # Confident prose on the same background must not become a plate.
         for word in words: word.confidence = 96
@@ -1012,3 +1015,75 @@ def test_a_shared_composite_caption_is_not_assigned_to_one_panel():
     region=skeleton.Region(kind='figure',reason='scan_figure_band',bbox=(90,50,360,260),caption_lines=lines)
     skeleton._absorb_figure_content([], [region], skeleton.BookStyle(body_size=12))
     assert region.caption_lines==lines
+
+class TestUncertainOCRRegion:
+    def test_uncertain_paragraph_uses_pixels_including_confident_neighbors(self, tmp_path):
+        from cps.services.reflow import source
+        import types
+        doc = pymupdf.open()
+        page = doc.new_page(width=300, height=400)
+        page.insert_text((30, 100), 'Source words remain visible.', fontsize=12)
+        page.insert_text((30, 160), 'Reliable following paragraph.', fontsize=12)
+        words = [types.SimpleNamespace(text=text, confidence=confidence,
+                    bbox=(30+i*40, 88, 68+i*40, 103), block=1, paragraph=1,line=1)
+                 for i,(text,confidence) in enumerate([('misread',96),('uncertain',40),('neighbor',94)])]
+        words += [types.SimpleNamespace(text='Reliable following paragraph.',confidence=98,
+                    bbox=(30,148,190,163),block=2,paragraph=1,line=1)]
+        original = extract.RawPage(pno=0,width=300,height=400,blocks=[],
+            images=[extract.Image(bbox=(0,0,300,400),area_ratio=1.0)])
+        raw=source._page_from_ocr(types.SimpleNamespace(words=words,page_index=0,width=300,height=400),original)
+        style=skeleton.book_style([raw]);skel=skeleton.page_skeleton(raw,style)
+        book=assemble.assemble([skel],style,[raw])
+        try:
+            assert 'misread' not in _whole_text(book)
+            assert 'neighbor' not in _whole_text(book)
+            assert 'Reliable following paragraph.' in _whole_text(book)
+            assert book.conservation.ok
+            assert any('misread' in a['text'] for a in book.artwork)
+            output=tmp_path/'uncertain.epub';build_epub.build(book,str(output),doc=doc)
+            assert build_epub.validate(str(output)) == []
+            with zipfile.ZipFile(output) as z:
+                body=''.join(z.read(n).decode() for n in z.namelist() if re.fullmatch(r'OEBPS/ch\d+\.xhtml',n))
+                assert 'Original text region' in body
+                assert 'misread' not in body
+                assert any('fig_p0000' in n for n in z.namelist())
+        finally:doc.close()
+
+    @pytest.mark.parametrize('font,uncertain,expected', [('ocr',False,False),('ocr',True,True),('Times-Roman',True,False)])
+    def test_region_confidence_does_not_replace_native_or_confident_prose(self,font,uncertain,expected):
+        lines=[_line('A complete useful paragraph.',30,100,220,114,12)]
+        for span in lines[0].spans:span.font=font;span.uncertain=uncertain
+        raw=extract.RawPage(pno=0,width=300,height=400,blocks=[_block(0,lines)])
+        style=skeleton.book_style([raw]);skel=skeleton.page_skeleton(raw,style)
+        book=assemble.assemble([skel],style,[raw])
+        assert bool([f for f in book.figures if f['found']=='ocr_uncertain_region']) is expected
+        assert ('A complete useful paragraph.' in _whole_text(book)) is not expected
+        assert book.conservation.ok
+
+    def test_isolated_ocr_punctuation_is_source_pixels_without_a_score_cutoff(self):
+        line=_line('*',120,100,128,110,10)
+        line.spans[0].font='ocr'  # Even a confident recognition is not proof of a textual ornament.
+        raw=extract.RawPage(pno=0,width=300,height=400,blocks=[_block(0,[line])])
+        style=skeleton.book_style([raw]);book=assemble.assemble([skeleton.page_skeleton(raw,style)],style,[raw])
+        assert '*' not in _whole_text(book)
+        assert book.figures and book.artwork[0]['text']=='*'
+        assert book.conservation.ok
+
+    def test_uncertain_chart_lettering_stays_in_its_existing_source_figure(self):
+        doc=_doc(F.prose_page,lambda d:F.scan_chart_band_page(d,F.art_png(F.CHART_BAND_ART)))
+        try:
+            raws=extract.read_pages(doc)
+            for block in raws[1].text_blocks:
+                for line in block.lines:
+                    for span in line.spans:
+                        span.font='ocr'
+                        if span.text.strip()=='a':span.uncertain=True
+            style=skeleton.book_style(raws)
+            skels=[skeleton.page_skeleton(raw,style,pixel_probe=extract.ScanPixelProbe(doc,raw.pno,
+                mask=[ln.bbox for b in raw.text_blocks for ln in b.lines])) for raw in raws]
+            book=assemble.assemble(skels,style,raws)
+            figures=[f for f in book.figures if f['pno']==1]
+            assert len(figures)==1, figures
+            assert book.conservation.ok
+            assert any('a' in a['text'] for a in book.artwork)
+        finally:doc.close()

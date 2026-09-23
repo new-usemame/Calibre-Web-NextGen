@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.2"
+CONVERTER_VERSION = "1.3"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -156,7 +156,13 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                                'transcription uncertain; compare the original printed '
                                'caption.">%s (?)</span>' % caption)
                 index += 1
-            blocks.append(_figure_html(pno, figure_index, caption))
+            figures = [f for f in book.figures if f["pno"] == pno]
+            source_region = figure_index < len(figures) and figures[figure_index].get("found") == "ocr_uncertain_region"
+            if source_region:
+                caption = ('Original text region. OCR transcription is uncertain; '
+                           'read the source pixels. This image does not provide searchable text. '
+                           '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
+            blocks.append(_figure_html(pno, figure_index, caption, source_region=source_region))
             figure_index += 1
             continue
         if wrappers and element_index in wrappers:
@@ -301,11 +307,12 @@ def _aside_html(note, ref_ids, available, ambiguous=False, continuations=()):
             % (number, label, body, links))
 
 
-def _figure_html(pno, index, caption):
+def _figure_html(pno, index, caption, source_region=False):
     src = "images/fig_p%04d_%d.jpg" % (pno, index)
     # SPEC §3: a figure always carries a figcaption, empty when the page printed no
     # caption, so "no caption found" is stated rather than left to be inferred.
-    alt = "" if caption else "Original figure from PDF page %d" % (pno + 1)
+    alt = ("Original text region; OCR transcription uncertain" if source_region else
+           "" if caption else "Original figure from PDF page %d" % (pno + 1))
     return ('<figure><img src="%s" alt="%s"/><figcaption%s>%s</figcaption></figure>'
             % (src, alt, "" if caption else ' class="reflow-no-caption"', caption))
 
@@ -1210,7 +1217,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                                'are uncertain. %s.</p>' % link)
             if pno in recovered:
                 notice = ('<p class="source-evidence-notice reflow-uncertain">OCR readings are uncertain; '
-                          'highlighted words preserve the transcription. '
+                          'source images preserve affected text regions. '
                           '<a href="%s#page">View original page</a>.</p>' % href)
                 notices.append(notice)
                 html = notice + '\n' + html

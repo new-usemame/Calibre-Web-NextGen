@@ -11,7 +11,7 @@ from xml.dom import Node, minidom
 
 from . import annotate
 
-VERSION = 'reflow-enriched-source-3'
+VERSION = 'reflow-enriched-source-4'
 
 # A public content digest detects corruption, but cannot prove who rendered it.
 # Only the factory below issues authority for canonical bytes in this process.

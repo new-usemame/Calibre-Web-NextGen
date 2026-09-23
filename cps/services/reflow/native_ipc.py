@@ -200,6 +200,28 @@ class NativeDocument:
         self.operation_book = book
         return replace(result, source_page=source_page)
 
+    def capture_operation_audit(self, result, book_id):
+        from . import operation_audit, native_audit
+        plans = [p for p in getattr(result, 'operation_plans', ()) if p.selected]
+        if not plans: return [], {}
+        if self.operation_book is not result.book:
+            raise ValueError('native audit requires current prepared book')
+        operations = []
+        for plan in plans:
+            p = plan.prepared
+            plan.compile(result.book, self, source_page=p.source_page)
+            operations.append(dict(page=p.page, snapshot_id=p.snapshot_id,
+                source_identity=p.source_page.identity if p.source_page is not None else None,
+                selected=list(plan.selected)))
+        pages = {p['page'] for p in operations}
+        records = [{k:r[k] for k in ('page','stage','request_sha256','cached','attempt') if k in r}
+                   for r in getattr(result, 'stage_records', ()) if r['page'] in pages]
+        args = native_audit.request(dict(book_id=book_id, fingerprint=self.fingerprint,
+            operations=operations, stage_records=records), self.fingerprint, self.page_count)
+        expected, matching = operation_audit.capture(result, book_id)
+        reply = self.call('operation_audit', args)
+        return native_audit.validate_reply(reply, expected, matching, plans, result.book)
+
     def build(self, book, out_path, **arguments):
         report = arguments.pop('report_html', None)
         trace = arguments.pop('runtime_progress', None)

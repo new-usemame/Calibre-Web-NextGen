@@ -411,7 +411,7 @@ class TaskReflowPdf(CalibreTask):
         candidate=os.path.join(staging,'candidate.epub')
         publication_prepared=False
         try:
-            audit_rows,audit_matching=operation_audit.capture(result,self.book_id)
+            audit_rows,audit_matching=operation_audit.capture(result,self.book_id,document=document)
             operation_audit.record(ledger,'validated',operations=audit_rows)
             build_trace = runtime_diagnostics.BuildTrace(ledger)
             build_trace({"kind": "phase", "phase": "assembly_start"})

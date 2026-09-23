@@ -26,6 +26,7 @@ def serve(parent, cache_root, control):
     from . import pipeline, extract, structural_ops, build_epub, report, source_assessment
     faulthandler.enable(all_threads=True)
     root = Path.cwd(); doc = None; sequence = 0; fingerprint = None; operation_book = None
+    audit_pages = {}
     def stop(): return os.getppid() != parent
     def emit(row):
         control.write(json.dumps(dict(seq=sequence, **row), separators=(',', ':')) + '\n')
@@ -56,6 +57,7 @@ def serve(parent, cache_root, control):
                     if doc is None or extract.document_fingerprint(root / 'source.pdf') != fingerprint:
                         raise ValueError('source identity changed')
                     if op == 'prepare':
+                        audit_pages.clear(); operation_book = None
                         allowed = {'page_numbers', 'require_figure_caption', 'recovery_opts'}
                         if set(args) - allowed: raise ValueError('prepare fields')
                         opts = args.setdefault('recovery_opts', {})
@@ -68,7 +70,8 @@ def serve(parent, cache_root, control):
                         allowed = {'book', 'pno', 'revision', 'source_layer', 'seed', 'max_candidates', 'max_context_chars', 'raw_page', 'source_bound'}
                         if set(args) - allowed: raise ValueError('operation fields')
                         book = args.pop('book'); pno = args.pop('pno'); layer = args.pop('source_layer')
-                        if book is not None: operation_book = book
+                        if book is not None:
+                            operation_book = book; audit_pages.clear()
                         book = operation_book
                         if book is None: raise ValueError('missing native book context')
                         from .enriched_source import prepare_source_page
@@ -78,9 +81,39 @@ def serve(parent, cache_root, control):
                         value = structural_ops.prepare(book, doc, pno, source_layer=layer,
                                                        source_page=canonical, **args)
                         value = replace(value, source_page=None)
+                        if value.specs:
+                            # Store only child-minted prepared candidates, not
+                            # all-page rasters in RAM. Paths are child-generated.
+                            cache = root / ('audit-%d' % sequence)
+                            cache.mkdir(mode=0o700)
+                            ipc.write_owned(cache, 'response.json', dict(prepared=value, source=canonical))
+                            audit_pages[pno] = cache
+                        else: audit_pages.pop(pno, None)
                         # Factories use weak-key authority. Do not retain an equal
                         # prior canonical object across the next command's factory.
                         canonical = None
+                    elif op == 'operation_audit':
+                        from types import SimpleNamespace
+                        from . import native_audit, operation_audit
+                        native_audit.request(args, fingerprint, len(doc))
+                        if operation_book is None: raise ValueError('missing native audit book')
+                        plans = []
+                        for selected in args['operations']:
+                            pno = selected['page']
+                            if pno not in audit_pages: raise ValueError('unprepared native audit page')
+                            saved = codec.loads(ipc.read_owned(audit_pages[pno], 'response.json'))
+                            old = saved['source']
+                            canonical = sources(operation_book, {pno: old})[pno] if old is not None else None
+                            prepared = replace(saved['prepared'], source_page=canonical)
+                            if (prepared.snapshot_id != selected['snapshot_id'] or
+                                    (canonical.identity if canonical is not None else None) != selected['source_identity']):
+                                raise ValueError('stale native audit source snapshot')
+                            plans.append(prepared.accept(operation_book, doc, dict(protocol=structural_ops.PROTOCOL,
+                                snapshot_id=selected['snapshot_id'], select=selected['selected']), source_page=canonical))
+                        value = operation_audit.capture(SimpleNamespace(book=operation_book,
+                            operation_plans=plans, stage_records=args['stage_records']), args['book_id'], document=doc)
+                        native_audit.bounded(value)
+                        plans = []; canonical = prepared = saved = old = None
                     elif op == 'survey':
                         if args: raise ValueError('survey fields')
                         value = source_assessment.survey(doc)

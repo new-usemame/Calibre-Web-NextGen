@@ -28,6 +28,7 @@ import hashlib
 import json
 import os
 import threading
+import time
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -493,6 +494,77 @@ def build_manifest(user, *, cdb=None, session=None, read_column=None):
         unsupported=unsupported,
         paths=paths,
     )
+
+
+# ---------------------------------------------------------------------------
+# Syncs still reading pages
+# ---------------------------------------------------------------------------
+
+# A device reads a big library a page at a time, the pages one straight after
+# another. Each page after the first comes from the manifest its sync started
+# with instead of working the whole scope out again: one manifest per sync
+# rather than one per page, and pages that agree with each other. A sync is
+# known by its account and the revision its first page answered; one that goes
+# quiet for this long is forgotten and carries on from a new manifest.
+WALK_IDLE_SECONDS = 300
+_WALKS_MAX = 8
+
+
+def _clock():
+    return time.monotonic()
+
+
+class _Walks:
+    """Manifests of syncs still reading pages, keyed by (account id, revision)."""
+
+    def __init__(self, capacity=_WALKS_MAX, idle_seconds=WALK_IDLE_SECONDS):
+        self.capacity = capacity
+        self.idle_seconds = idle_seconds
+        self._items = OrderedDict()
+        self._lock = threading.Lock()
+
+    def remember(self, user_id, revision, manifest):
+        now = _clock()
+        with self._lock:
+            self._items[(user_id, revision)] = (manifest, now)
+            self._items.move_to_end((user_id, revision))
+            while self._items:
+                _manifest, used = next(iter(self._items.values()))
+                if len(self._items) <= self.capacity and now - used <= self.idle_seconds:
+                    break
+                self._items.popitem(last=False)
+
+    def recall(self, user_id, revision):
+        with self._lock:
+            found = self._items.get((user_id, revision))
+        if found is None or _clock() - found[1] > self.idle_seconds:
+            return None
+        return found[0]
+
+    def forget(self, user_id, revision):
+        with self._lock:
+            self._items.pop((user_id, revision), None)
+
+
+_WALKS = _Walks()
+
+
+def walk_manifest(user_id, revision):
+    """The manifest the sync of ``user_id`` at ``revision`` is reading, or None."""
+    return _WALKS.recall(user_id, revision)
+
+
+def continue_walk(user_id, revision, manifest, *, more):
+    """Keep ``manifest`` for the rest of this sync's pages, or let it go.
+
+    ``revision`` is the one the sync started with, which its cursors carry;
+    after a restart it can differ from ``manifest.revision``, and the rest of
+    the sync is then served from this one new manifest.
+    """
+    if more:
+        _WALKS.remember(user_id, revision, manifest)
+    else:
+        _WALKS.forget(user_id, revision)
 
 
 def describe_book(user, book_id, *, cdb=None, session=None, read_column=None):

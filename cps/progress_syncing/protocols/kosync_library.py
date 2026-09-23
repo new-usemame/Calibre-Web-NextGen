@@ -133,8 +133,14 @@ def get_library():
     except ValueError as error:
         return _error(str(error), 400, "invalid_request")
     _observe_device(user)
+    # The pages after the first come from the manifest this sync started with
+    # (see koreader_library's "Syncs still reading pages"); a sync the server
+    # no longer remembers carries on from the library as it is now.
+    manifest = (koreader_library.walk_manifest(user.id, cursor_revision)
+                if cursor_revision else None)
     try:
-        manifest = koreader_library.build_manifest(user)
+        if manifest is None:
+            manifest = koreader_library.build_manifest(user)
     except koreader_library.ScopeUnavailable as error:
         # Never serve a short list: the device would treat the missing books
         # as removed from its library (the #468 lesson, applied here).
@@ -156,6 +162,9 @@ def get_library():
     # between two pages is picked up by the next sync instead of hidden.
     revision = cursor_revision or manifest.revision
     books, more = koreader_library.page(manifest.entries, after=after, limit=limit)
+    koreader_library.continue_walk(user.id, revision, manifest, more=bool(more and books))
+    # File facts are read fresh for every page; the kept manifest stays as built.
+    books = [dict(book) for book in books]
     koreader_library.fill_file_facts(books, manifest.paths, _library_root())
     response = jsonify({
         "revision": revision,

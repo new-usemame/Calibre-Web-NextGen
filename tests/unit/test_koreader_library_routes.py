@@ -245,6 +245,122 @@ def test_paging_visits_every_book_once_under_the_starting_revision(world):
     assert _library(world, cursor="not-a-cursor").status_code == 400
 
 
+def _walk(world, user="reader", limit=2, pause=None):
+    """Every page of one sync, as the plugin reads them: book ids and revisions."""
+    seen, revisions, cursor = [], [], None
+    while True:
+        params = {"limit": limit}
+        if cursor:
+            params["cursor"] = cursor
+        body = _library(world, user, **params).get_json()
+        seen += [book["book_id"] for book in body["books"]]
+        revisions.append(body["revision"])
+        cursor = body["next_cursor"]
+        if cursor is None:
+            return seen, revisions
+        if pause:
+            pause()
+
+
+def test_a_device_reading_every_page_costs_one_manifest(world, monkeypatch):
+    """The plugin reads a big library a page (200 books) at a time. Working
+    the whole scope out again for every page made one sync of a 1,500-book
+    library cost eight manifests, each costing more as the library grows. The
+    pages after the first come from the manifest the sync started with."""
+    from cps import db
+    from cps.services import koreader_library
+    world.add_user("reader")
+    for book_id in range(1, 8):
+        world.add_book(book_id, "Book %d" % book_id)
+    builds = []
+    build = koreader_library.build_manifest
+    monkeypatch.setattr(koreader_library, "build_manifest",
+                        lambda user, **kwargs: builds.append(user.name) or build(user, **kwargs))
+
+    seen, revisions = _walk(world)
+    assert seen == [1, 2, 3, 4, 5, 6, 7]
+    assert len(revisions) == 4 and len(set(revisions)) == 1
+    assert builds == ["reader"]
+
+    # Starting a sync always looks at the library as it is now.
+    world.session.get(db.Books, 7).title = "Book seven, renamed"
+    world.session.commit()
+    builds.clear()
+    seen, renamed = _walk(world)
+    assert seen == [1, 2, 3, 4, 5, 6, 7]
+    assert len(set(renamed)) == 1 and renamed[0] != revisions[0]
+    assert builds == ["reader"]
+
+    # A server restarted in the middle of a sync, with the library changed
+    # meanwhile, finishes it from one new manifest, under the revision the
+    # sync started with (the next sync then sees the change).
+    started = _library(world, limit=2).get_json()
+    world.session.get(db.Books, 6).title = "Book six, renamed"
+    world.session.commit()
+    monkeypatch.setattr(koreader_library, "_WALKS", koreader_library._Walks())
+    builds.clear()
+    cursor, seen = started["next_cursor"], [1, 2]
+    while cursor:
+        body = _library(world, limit=2, cursor=cursor).get_json()
+        assert body["revision"] == started["revision"]
+        seen += [book["book_id"] for book in body["books"]]
+        cursor = body["next_cursor"]
+    assert seen == [1, 2, 3, 4, 5, 6, 7]
+    assert builds == ["reader"]
+    assert "unchanged" not in _library(world, if_revision=started["revision"]).get_json()
+
+    # A sync that pauses longer than a sync takes is still answered, from the
+    # library as it is when it carries on.
+    clock = [koreader_library._clock()]
+    monkeypatch.setattr(koreader_library, "_clock", lambda: clock[0])
+    builds.clear()
+
+    def wander_off():
+        clock[0] += 3600
+
+    assert _walk(world, pause=wander_off)[0] == [1, 2, 3, 4, 5, 6, 7]
+    assert builds == ["reader"] * 4
+
+
+def test_the_server_keeps_only_a_few_syncs_in_progress(world, monkeypatch):
+    """Each kept sync holds a whole manifest, so only the most recent few are
+    kept; one pushed out still finishes, from a manifest built for it."""
+    from cps.services import koreader_library
+    monkeypatch.setattr(koreader_library._WALKS, "capacity", 2)
+    names = ["first", "second", "third"]
+    for name in names:
+        world.add_user(name)
+    for book_id in range(1, 6):
+        world.add_book(book_id, "Book %d" % book_id)
+    builds = []
+    build = koreader_library.build_manifest
+    monkeypatch.setattr(koreader_library, "build_manifest",
+                        lambda user, **kwargs: builds.append(user.name) or build(user, **kwargs))
+
+    cursors = {name: _library(world, name, limit=2).get_json()["next_cursor"] for name in names}
+    builds.clear()
+    for name in reversed(names):
+        body = _library(world, name, limit=2, cursor=cursors[name]).get_json()
+        assert [book["book_id"] for book in body["books"]] == [3, 4]
+    assert builds == ["first"]
+
+
+def test_a_page_cursor_opens_only_its_own_readers_library(world):
+    """A cursor names the sync it continues; presented by another account it
+    must not hand over the manifest that account's sync never computed."""
+    world.add_user("reader")
+    world.add_user("guarded", denied_tags="secret")
+    for book_id in range(1, 6):
+        world.add_book(book_id, "Book %d" % book_id,
+                       tags=("secret",) if book_id >= 4 else ())
+    first = _library(world, "reader", limit=2).get_json()
+    assert first["next_cursor"]
+
+    borrowed = _library(world, "guarded", limit=2, cursor=first["next_cursor"]).get_json()
+    assert [book["book_id"] for book in borrowed["books"]] == [3]
+    assert borrowed["total"] == 3
+
+
 def _placeholder(world, book_id, user="reader"):
     return world.client.get(
         "/kosync/syncs/library/books/%d/placeholder" % book_id,

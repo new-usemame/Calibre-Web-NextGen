@@ -67,9 +67,11 @@ class LibraryWorld:
         self.monkeypatch = monkeypatch
         # Placeholders are cached in-process by book, revision and language;
         # each world starts with none, as a fresh server does.
-        from cps.services import koreader_placeholder
+        from cps.services import koreader_library, koreader_placeholder
         monkeypatch.setattr(koreader_placeholder, "_CACHE",
                             koreader_placeholder._RecentBytes(32 * 1024 * 1024))
+        # So are the manifests of syncs still reading pages.
+        monkeypatch.setattr(koreader_library, "_WALKS", koreader_library._Walks())
         self.engine = create_engine("sqlite://")
         event.listen(
             self.engine, "connect",

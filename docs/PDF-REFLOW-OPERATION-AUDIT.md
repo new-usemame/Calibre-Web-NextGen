@@ -14,7 +14,9 @@ The records distinguish three observations:
   hash, and actual stage request/attempt or cache references. This is not evidence
   that a wrapper reached an EPUB.
 * `emitted`: after the builder and EPUB validation, inspection of actual chapter
-  XHTML finds the role and text on the source page. Each row is `verified`,
+  XHTML finds the role and text after an explicit source-page marker in that
+  same chapter. A chapter prefix without a local marker remains unverified,
+  including a legitimate continuation whose source page is not explicit. Each row is `verified`,
   `not_found`, or `ambiguous`; verified rows include entry and element ordinal.
   Qualification badges remain present; comparison accounts only for the renderer's
   known qualification of an uncertain atomic source marker. The record binds the

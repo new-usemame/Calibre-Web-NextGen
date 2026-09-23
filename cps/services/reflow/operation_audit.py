@@ -56,10 +56,12 @@ def observe(path, rows, matching):
         opf=ET.fromstring(archive.read('OEBPS/content.opf'))
         ns='{http://www.idpf.org/2007/opf}'
         manifest={e.get('id'):e.get('href') for e in opf.findall(ns+'manifest/'+ns+'item')}
-        page=None
         for item in opf.findall(ns+'spine/'+ns+'itemref'):
             href=manifest[item.get('idref')]
             if not href.startswith('ch') or not href.endswith('.xhtml'):continue
+            # A chapter can begin with a continuation and no local marker.
+            # Do not invent source-page ownership from the preceding file.
+            page=None
             name='OEBPS/'+href
             root=ET.fromstring(archive.read(name))
             for ordinal,node in enumerate(root.iter()):

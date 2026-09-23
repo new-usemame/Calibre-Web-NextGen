@@ -125,12 +125,50 @@
 }
 .pairingUrlRow code { flex: 1; }
 .pairingUrlRow button { flex: 0 0 auto; }
-.pairingColumns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-5); margin-top: var(--sp-5); }
+/* Stock Kobo above KOReader: the KOReader panel holds two ways to connect side
+   by side, which a half-width column cannot. */
+.pairingColumns { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-5); margin-top: var(--sp-5); }
 .pairingColumns > div { min-width: 0; padding: var(--sp-4); background: var(--surface-2); border-radius: var(--r-md); }
 .pairingColumns ol { margin: var(--sp-2) 0; padding-left: var(--sp-5); color: var(--text-muted); line-height: var(--lh-relaxed); }
 .pairingColumns li + li { margin-top: var(--sp-2); }
 .pairingColumns a { color: var(--accent-text); text-decoration: underline; text-underline-offset: 3px; }
 .configLine { margin: var(--sp-3) 0; }
+.koreaderOptions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); margin-top: var(--sp-4); }
+.koreaderOption {
+  display: flex; flex-direction: column; gap: var(--sp-3); min-width: 0; padding: var(--sp-4);
+  border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-1);
+}
+.koreaderOption h4 { display: flex; align-items: center; gap: var(--sp-2); margin: 0; font-size: var(--fs-base); }
+.koreaderOption h4 svg { flex: 0 0 auto; color: var(--accent-text); }
+.koreaderOption p { margin: 0; line-height: var(--lh-base); }
+.koreaderOption > p:not([class]) { color: var(--text-muted); }
+.koreaderOption ol { margin: 0; }
+.addressInput, .codeInput {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0 var(--sp-3); color: var(--text);
+  background: var(--surface-3); border: 1px solid var(--border); border-radius: var(--r-md);
+}
+.addressInput:focus, .codeInput:focus { border-color: var(--accent); }
+.codeInput { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: var(--fs-md); letter-spacing: .12em; }
+.codeForm { display: grid; gap: var(--sp-2); }
+.codeForm .pairingLabel { margin: 0; }
+.koreaderAction { align-self: flex-start; }
+.koreaderDone {
+  display: flex; align-items: flex-start; gap: var(--sp-2); padding: var(--sp-3); color: var(--text);
+  background: var(--success-soft); border: 1px solid var(--success-border); border-radius: var(--r-md);
+}
+.koreaderDone svg { flex: 0 0 auto; margin-top: 3px; color: var(--success); }
+.pairRequest {
+  display: grid; gap: var(--sp-3); padding: var(--sp-4); border: 1px solid var(--accent);
+  border-radius: var(--r-md); background: var(--surface-2);
+}
+.pairRequestTitle { font-weight: var(--fw-bold); overflow-wrap: anywhere; }
+.pairRequestActions { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.pairRequestActions button { display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2); font-weight: var(--fw-medium); }
+.pairRequestActions button:disabled { opacity: .6; cursor: default; }
+.manualSetup { margin-top: var(--sp-4); }
+.manualSetup summary { display: flex; align-items: center; gap: var(--sp-2); min-height: 44px; cursor: pointer; color: var(--accent-text); font-weight: var(--fw-medium); }
+.manualSetup summary:hover { color: var(--accent-hover); }
+.manualSetup[open] summary { margin-bottom: var(--sp-2); }
 .deleteTokenButton {
   /* --danger is 4.15:1 on this card's --surface-2 in the dark palette, so it
      remains the non-text destructive cue while the small label uses AA text. */
@@ -170,7 +208,10 @@
   .dialogActions button { width: 100%; }
   .pagination { justify-content: space-between; }
   .pairing { padding: var(--sp-4); }
-  .pairingColumns { grid-template-columns: 1fr; }
+  .koreaderOptions { grid-template-columns: minmax(0, 1fr); }
+  .koreaderOption { padding: var(--sp-3); }
+  .koreaderAction { align-self: stretch; }
+  .pairRequestActions button { flex: 1 1 0; }
   .pairingUrlRow { flex-direction: column; }
   .pairingUrlRow button { width: 100%; }
   .deviceSeen, .deviceWaiting { grid-template-columns: auto minmax(0, 1fr); }

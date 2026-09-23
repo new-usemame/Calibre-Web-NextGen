@@ -63,6 +63,10 @@ export interface ServerFeatures {
   public_registration: boolean;
   anon_browse: boolean;
   kobo_sync: boolean;
+  /** The admin's KOReader sync switch. Pairing a KOReader by code and the
+   *  ready-made plugin download follow it. Absent on older servers → treat as
+   *  off, so the SPA never offers calls such a server does not have. */
+  koreader_sync?: boolean;
   /** #870 — the admin's "Sync Magic Shelves to Kobo" setting. A smart shelf's
    *  per-shelf mark is inert while this is off, so the SPA only offers the
    *  toggle when it can actually do something. Absent on older servers →
@@ -383,6 +387,16 @@ export interface KoboSyncToken {
   sync_url: string | null;
   server_url: string;
   is_localhost: boolean;
+}
+
+/** A KOReader device waiting for its pairing code to be answered. */
+export interface KoreaderPairRequest {
+  user_code: string;
+  device_name: string;
+  requested_at: string | null;
+  expires_at: string | null;
+  ip: string | null;
+  status: 'pending' | 'approved' | 'denied' | 'claimed';
 }
 
 export interface ProfileUpdate {
@@ -1016,6 +1030,40 @@ export function getMetadataProviders(): Promise<MetadataProvider[]> {
 /** Persist one provider toggle to current_user.view_settings["metadata"]. */
 export function setMetadataProviderActive(id: string, value: boolean): Promise<void> {
   return apiPost<void>(`/metadata/provider/${encodeURIComponent(id)}`, { id, value });
+}
+
+/** A file the server generates on POST (e.g. the ready-made KOReader plugin).
+ *  Same CSRF, mount-prefix and stale-token handling as apiPost; resolves to the
+ *  bytes and the filename the server named in Content-Disposition. */
+export async function apiPostDownload(
+  path: string,
+  body?: unknown,
+  options?: ApiRequestOptions,
+): Promise<{ blob: Blob; filename: string | null }> {
+  const doPost = async (csrf: string): Promise<Response> =>
+    classifiedFetch(path, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      body: body !== undefined ? JSON.stringify(body) : undefined,
+    }, options);
+
+  let csrf = await getCsrf(options);
+  let res = await doPost(csrf);
+  const isJson400 = res.status === 400
+    && (res.headers.get('content-type') || '').includes('application/json');
+  if (res.status === 400 && !isJson400) {
+    clearCsrf();
+    csrf = await getCsrf(options);
+    res = await doPost(csrf);
+  }
+  if (!res.ok) {
+    const parsed = await readApiError(res);
+    throw new ApiError(res.status, parsed.message, parsed.detail);
+  }
+  const disposition = res.headers.get('content-disposition') || '';
+  const named = /filename="([^"]+)"/i.exec(disposition);
+  return { blob: await res.blob(), filename: named ? named[1] : null };
 }
 
 /** Multipart POST (file upload). Mirrors apiPost's CSRF handling, but lets the

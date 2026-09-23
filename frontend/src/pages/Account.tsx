@@ -18,6 +18,7 @@ import { UI_BODY_FONTS, UI_DISPLAY_FONTS } from '../lib/fonts';
 import { THEMES, resolveTheme } from '../lib/themes';
 import { useT } from '../lib/i18n';
 import { authorityLabel, authorityTone, opaqueLabel } from '../lib/koboTwoWay';
+import { shelfMarkAudience } from '../lib/ereaderWording';
 import styles from './Account.module.css';
 import { useAnnouncer } from '../lib/a11y/announcer';
 
@@ -457,7 +458,9 @@ export function Account() {
         <div className={styles.field}>
           <label className={styles.toggle}>
             <input type="checkbox" checked={koboSync} onChange={(e) => setKoboSync(e.target.checked)} />
-            {t('Sync only selected shelves to Kobo')}
+            {shelfMarkAudience(me?.features) === 'ereader'
+              ? t('Sync only selected shelves to e-readers (Kobo and KOReader)')
+              : t('Sync only selected shelves to Kobo')}
           </label>
           <label className={styles.toggle}>
             <input type="checkbox" checked={opdsSync} onChange={(e) => setOpdsSync(e.target.checked)} />

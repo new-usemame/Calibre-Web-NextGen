@@ -20,6 +20,7 @@ import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { getShelfVisibilityAction } from '../lib/shelfVisibility';
+import { shelfMarkAudience, shelfMarksReachDevices } from '../lib/ereaderWording';
 import { SORT_OPTIONS } from '../lib/bookSortOptions';
 
 const SHELF_SORT_OPTIONS = [
@@ -222,9 +223,10 @@ export function Shelf({ id }: { id: string }) {
   // the shelf is one of ours — a public shelf someone else marked is not synced
   // to our device either way.
   const koboMarkInert = Boolean(
-    me?.features?.kobo_sync && data.kobo_sync && data.is_owner
+    shelfMarksReachDevices(me?.features) && data.kobo_sync && data.is_owner
     && me?.kobo_only_shelves_sync === false,
   );
+  const ereaderWording = shelfMarkAudience(me?.features) === 'ereader';
 
   const enableShelfOnlySync = () => {
     setActionError(null);
@@ -335,10 +337,12 @@ export function Shelf({ id }: { id: string }) {
                   {visibilityAction === 'make-private' ? t('Make private') : t('Make public')}
                 </button>
               )}
-              {me?.features?.kobo_sync && (
+              {shelfMarksReachDevices(me?.features) && (
                 <button className={data.kobo_sync ? styles.manageBtnActive : styles.manageBtn}
                   onClick={toggleKoboSync} disabled={updateShelf.isPending}>
-                  <Smartphone size={14} /> {data.kobo_sync ? t('Kobo sync on') : t('Enable Kobo sync')}
+                  <Smartphone size={14} /> {ereaderWording
+                    ? (data.kobo_sync ? t('E-reader sync on') : t('Enable e-reader sync'))
+                    : (data.kobo_sync ? t('Kobo sync on') : t('Enable Kobo sync'))}
                 </button>
               )}
               {sort === 'stored' && books.length > 1 && !hasMore && (
@@ -361,10 +365,14 @@ export function Shelf({ id }: { id: string }) {
             <Info size={18} className={styles.koboNoticeIcon} aria-hidden="true" />
             <div className={styles.koboNoticeBody}>
               <p className={styles.koboNoticeText}>
-                {t('Your Kobo is still set to sync your whole library, so marking this shelf does nothing on its own. Switch your account to shelf-only syncing to make it take effect.')}
+                {ereaderWording
+                  ? t('Your e-readers are still set to sync your whole library, so marking this shelf does nothing on its own. Switch your account to shelf-only syncing to make it take effect.')
+                  : t('Your Kobo is still set to sync your whole library, so marking this shelf does nothing on its own. Switch your account to shelf-only syncing to make it take effect.')}
               </p>
               <p className={styles.koboNoticeFine}>
-                {t('Books that are not on a Kobo-sync shelf are then removed from the device on its next sync. They stay in your library here.')}
+                {ereaderWording
+                  ? t('Books that are not on an e-reader sync shelf then leave the e-reader\'s library on its next sync. They stay in your library here.')
+                  : t('Books that are not on a Kobo-sync shelf are then removed from the device on its next sync. They stay in your library here.')}
               </p>
               <div className={styles.koboNoticeActions}>
                 <button

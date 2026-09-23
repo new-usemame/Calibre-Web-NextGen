@@ -258,7 +258,8 @@ export function Devices() {
           )}
         </>
       )}
-      <KoboPairing devices={devices} enabled={!!me?.features?.kobo_sync} />
+      <KoboPairing devices={devices} enabled={!!me?.features?.kobo_sync}
+        koreaderEnabled={!!me?.features?.koreader_sync} />
       {undoDevice && <div className={styles.toast} role="status">
         <span>{t('{name} removed.', { name: undoDevice.label })}</span>
         <button type="button" onClick={() => restore.mutate(undoDevice)}>{t('Undo')}</button>

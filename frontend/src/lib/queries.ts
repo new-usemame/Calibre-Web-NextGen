@@ -2,7 +2,7 @@ import type { ReaderBookmark } from "./readerResume";
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import {
-  apiGet, apiPost, apiPut, apiDelete, apiUpload, apiPostForm, ApiError,
+  apiGet, apiPost, apiPut, apiDelete, apiUpload, apiPostForm, apiPostDownload, ApiError,
   navigateToLogout, noteSessionIdentity,
   getMetadataProviders, setMetadataProviderActive,
 } from './api';
@@ -19,7 +19,7 @@ import type {
   NoticeInbox, KoboTwoWaySettings, KoboTwoWayBookState, KoboTwoWayUpdate,
   GlobalLibraryPage, LibraryModePayload, LibraryRemovalImpact, DeliveryDevice,
   DeviceDeliveryResult, MyLibraryIntroState,
-  KoboSyncToken,
+  KoboSyncToken, KoreaderPairRequest,
 } from './api';
 
 /** Entity kinds the catalog can be filtered by. Singular here; the browse-list
@@ -1433,6 +1433,44 @@ export function useDeleteKoboSyncToken() {
     onSuccess: () => qc.setQueryData<KoboSyncToken>(KOBO_SYNC_TOKEN_KEY, (old) => (
       old ? { ...old, configured: false, sync_url: null } : old
     )),
+  });
+}
+
+// ── KOReader: pairing by code and the ready-made plugin ──
+
+const koreaderPairPath = (code: string) =>
+  `/api/v1/devices/koreader/pair/${encodeURIComponent(code)}`;
+
+/** Who is behind a typed pairing code. A lookup, run when the reader submits. */
+export function useLookupKoreaderPair() {
+  return useMutation({
+    mutationFn: (code: string) => apiGet<KoreaderPairRequest>(koreaderPairPath(code)),
+  });
+}
+
+/** Approve or decline a waiting KOReader device. An approved device collects
+ *  its own app password on its next poll, then shows up as an e-reader, so
+ *  both lists are refreshed. */
+export function useAnswerKoreaderPair() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ code, approve }: { code: string; approve: boolean }) =>
+      apiPost<KoreaderPairRequest>(`${koreaderPairPath(code)}/${approve ? 'approve' : 'deny'}`),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['account'] });
+      void qc.invalidateQueries({ queryKey: ['annotation-devices'] });
+    },
+  });
+}
+
+/** The ready-made plugin: the plugin with this account's sign-in inside. */
+export function useKoreaderSetupBundle() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (server: string) => apiPostDownload(
+      '/api/v1/devices/koreader/setup-bundle', { server },
+    ),
+    onSuccess: () => { void qc.invalidateQueries({ queryKey: ['account'] }); },
   });
 }
 

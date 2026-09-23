@@ -11,6 +11,7 @@ walked through without sleeping.
 
 import hashlib
 import re
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 
@@ -280,15 +281,32 @@ def test_no_code_is_handed_out_when_there_is_no_website_to_approve_it(monkeypatc
 
 
 def test_the_short_pair_address_opens_the_e_readers_page(world):
-    plain = world.client.get("/pair")
+    alice = world.browser("alice")
+    plain = alice.get("/pair")
     assert plain.status_code == 302
     assert plain.headers["Location"].endswith("/app/account/devices?pair=1")
-    from_qr = world.client.get("/pair?code=k7m4-qx2p")
+    from_qr = alice.get("/pair?code=k7m4-qx2p")
     assert from_qr.headers["Location"].endswith("/app/account/devices?pair=1&code=K7M4QX2P")
-    junk = world.client.get('/pair?code="><script>')
+    junk = alice.get('/pair?code="><script>')
     assert junk.headers["Location"].endswith("/app/account/devices?pair=1")
-    mounted = world.client.get("/pair?code=K7M4QX2P", base_url="http://localhost/books")
+    mounted = alice.get("/pair?code=K7M4QX2P", base_url="http://localhost/books")
     assert mounted.headers["Location"].endswith("/books/app/account/devices?pair=1&code=K7M4QX2P")
+
+
+def test_a_signed_out_phone_signs_in_first_and_keeps_the_code(world):
+    # The phone that scans the QR code is often not signed in. The web app
+    # returns to ``next`` after signing in; landing on the e-readers page
+    # signed out would drop the code on the way through the sign-in.
+    for client in (world.client, world.browser()):
+        scanned = client.get("/pair?code=k7m4-qx2p")
+        assert scanned.status_code == 302
+        target = urlsplit(scanned.headers["Location"])
+        assert target.path == "/app/login"
+        assert parse_qs(target.query) == {"next": ["/app/account/devices?pair=1&code=K7M4QX2P"]}
+    mounted = world.client.get("/pair", base_url="http://localhost/books")
+    target = urlsplit(mounted.headers["Location"])
+    assert target.path == "/books/app/login"
+    assert parse_qs(target.query) == {"next": ["/books/app/account/devices?pair=1"]}
 
 
 def test_deleting_an_account_takes_its_app_passwords_and_pairings(world):

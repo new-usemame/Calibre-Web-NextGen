@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckCircle2, Copy, RefreshCw, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiUrl, ApiError } from '../lib/api';
@@ -12,6 +12,7 @@ import { relativeWhen } from '../lib/relativeTime';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { useT } from '../lib/i18n';
 import type { Device } from './DeviceInventory';
+import { KoreaderSetup } from './KoreaderSetup';
 import styles from '../pages/Devices.module.css';
 
 async function copyText(value: string): Promise<void> {
@@ -31,7 +32,15 @@ async function copyText(value: string): Promise<void> {
   if (!copied) throw new Error('copy failed');
 }
 
-export function KoboPairing({ devices, enabled }: { devices: Device[]; enabled: boolean }) {
+// After a code is approved the device signs in within a poll or two and then
+// fetches its library, which registers it here; look again a few times.
+const DEVICE_RECHECK_DELAYS_MS = [8_000, 20_000, 45_000];
+
+export function KoboPairing({ devices, enabled, koreaderEnabled }: {
+  devices: Device[];
+  enabled: boolean;
+  koreaderEnabled: boolean;
+}) {
   const t = useT();
   const announce = useAnnouncer();
   const queryClient = useQueryClient();
@@ -42,6 +51,7 @@ export function KoboPairing({ devices, enabled }: { devices: Device[]; enabled: 
   const deleteToken = useDeleteKoboSyncToken();
   const [copied, setCopied] = useState<'kobo' | 'koreader' | null>(null);
   const [copyError, setCopyError] = useState('');
+  const recheckTimers = useRef<number[]>([]);
   const seen = latestPairingDevice(devices);
   const mutationError = createToken.error ?? deleteToken.error;
   const configured = !!token.data?.configured && !!token.data.sync_url;
@@ -59,6 +69,17 @@ export function KoboPairing({ devices, enabled }: { devices: Device[]; enabled: 
     });
     return () => window.cancelAnimationFrame(frame);
   }, []);
+
+  useEffect(() => () => {
+    recheckTimers.current.forEach((timer) => window.clearTimeout(timer));
+  }, []);
+
+  const watchForApprovedDevice = () => {
+    recheckTimers.current.forEach((timer) => window.clearTimeout(timer));
+    recheckTimers.current = DEVICE_RECHECK_DELAYS_MS.map((delay) => window.setTimeout(() => {
+      void queryClient.refetchQueries({ queryKey: ['annotation-devices'], type: 'active' });
+    }, delay));
+  };
 
   const copy = async (kind: 'kobo' | 'koreader', value: string) => {
     setCopyError('');
@@ -170,25 +191,9 @@ export function KoboPairing({ devices, enabled }: { devices: Device[]; enabled: 
         </div>
 
         {visibility.showKoreader && (
-          <div>
-            <h3>{t('KOReader')}</h3>
-            <ol>
-              <li><a href={apiUrl('/kosync')}>{t('Install or update the NextGen Sync plugin.')}</a></li>
-              <li>{t('In KOReader, open NextGen Progress Sync and choose Set NextGen Server.')}</li>
-              <li>{t('Paste this server address (the plugin adds /kosync itself):')}</li>
-            </ol>
-            <div className={styles.pairingUrlRow}>
-              <code>{serverUrl}</code>
-              <button type="button" onClick={() => void copy('koreader', serverUrl)}>
-                <Copy size={16} aria-hidden="true" focusable={false} />
-                {copied === 'koreader' ? t('Copied') : t('Copy server address')}
-              </button>
-            </div>
-            <ol start={4}>
-              <li>{t('Choose Login and sign in with this NextGen account or one of its app passwords.')}</li>
-              <li>{t('Run a sync from the plugin.')}</li>
-            </ol>
-          </div>
+          <KoreaderSetup enabled={koreaderEnabled} serverUrl={serverUrl}
+            copied={copied === 'koreader'} onCopy={(value) => void copy('koreader', value)}
+            onApproved={watchForApprovedDevice} />
         )}
       </div>
 

@@ -169,7 +169,23 @@ end
 
 -- Book files in the library folder the library does not track (see
 -- Catalog.localEntries). Only those are looked at closely.
-local function untrackedFiles(root, tracked)
+-- Whether a file is one of the library's placeholders, by its own marker.
+-- Cached by size and date: a zip is opened once per file version.
+local placeholder_cache = {}
+local function isPlaceholderFile(plugin, path, attributes)
+    local key = path .. "|" .. tostring(attributes.size) .. "|" .. tostring(attributes.modification)
+    local cached = placeholder_cache[key]
+    if cached == nil then
+        cached = plugin.readPlaceholderId(path) ~= nil
+        placeholder_cache[key] = cached
+    end
+    return cached
+end
+
+-- Book files in the library folder that the library does not track: deliveries,
+-- books kept from another account, copies made over USB. A stray placeholder
+-- (say, one an interrupted sync left) is not a book the reader has.
+local function untrackedFiles(plugin, root, tracked)
     local files = {}
     local ok, iterator, dir = pcall(lfs.dir, root)
     if not ok then return files end
@@ -178,7 +194,7 @@ local function untrackedFiles(root, tracked)
         if not tracked[path] and name:sub(1, 1) ~= "." and not name:find("%.part$")
                 and DocumentRegistry:hasProvider(path) then
             local attributes = lfs.attributes(path)
-            if attributes and attributes.mode == "file" then
+            if attributes and attributes.mode == "file" and not isPlaceholderFile(plugin, path, attributes) then
                 files[#files + 1] = { name = name, path = path, mtime = attributes.modification }
             end
         end
@@ -207,12 +223,14 @@ function Home:loadCatalog()
     local present, tracked = {}, {}
     for _, entry in ipairs(all) do
         if entry.present then present[#present + 1] = entry end
-        tracked[entry.path] = true
     end
+    -- Only what the library tracks. A file at a book's name that the sync would
+    -- not take over (different bytes from the server's) is still the reader's
+    -- book, so it is listed as one.
     for _, known in pairs(state.books or {}) do
         if known.path then tracked[known.path] = true end
     end
-    for _, entry in ipairs(Catalog.localEntries(untrackedFiles(root, tracked), tracked, cachedMetadata)) do
+    for _, entry in ipairs(Catalog.localEntries(untrackedFiles(self.plugin, root, tracked), tracked, cachedMetadata)) do
         present[#present + 1] = entry
     end
     self.all_entries = present

@@ -83,10 +83,18 @@ class OCRResult:
 
 
 def _env():
-    # The recognizer does not need the application's provider keys or DB secrets.
-    environment = {name: os.environ[name] for name in
-                   ("PATH", "LANG", "LC_ALL", "TESSDATA_PREFIX", "TMPDIR")
-                   if name in os.environ}
+    # The recognizer does not need the application's provider keys or DB secrets:
+    # only the search path, the locale, Tesseract's data folder and a temporary
+    # folder pass through, each read by name so the environment gate
+    # (tests/unit/test_env_example_is_the_ssot.py) sees every one of them.
+    passed = {
+        "PATH": os.environ.get("PATH"),
+        "LANG": os.environ.get("LANG"),
+        "LC_ALL": os.environ.get("LC_ALL"),
+        "TESSDATA_PREFIX": os.environ.get("TESSDATA_PREFIX"),
+        "TMPDIR": os.environ.get("TMPDIR"),
+    }
+    environment = {name: value for name, value in passed.items() if value is not None}
     environment["OMP_THREAD_LIMIT"] = "1"
     return environment
 

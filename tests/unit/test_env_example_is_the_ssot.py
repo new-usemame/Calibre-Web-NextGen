@@ -61,9 +61,13 @@ SSOT_EXCEPTIONS = {
     "CALIBRE_CONFIG_DIRECTORY": "written by CWNG for Calibre child processes; Calibre owns and consumes it",
     "CI": "provided and interpreted by the CI and Playwright runtimes",
     "CONFIG_DIR": "Compose interpolation helper; CWNG reads the resulting CALIBRE_DBPATH instead",
+    "LANG": "provided by the operating system; Reflow passes it unchanged to its OCR and preparation processes",
+    "LC_ALL": "provided by the operating system; Reflow passes it unchanged to its OCR and preparation processes",
     "LISTEN_FDS": "provided by systemd's socket-activation protocol",
     "NODE_ENV": "provided and interpreted by the Node and Vite runtimes",
+    "PATH": "provided by the operating system; Reflow passes it unchanged to its OCR and preparation processes",
     "SECRET": "injected transiently by the operator's secret broker into measurement tools",
+    "TMPDIR": "provided by the operating system; Reflow passes it unchanged to its OCR and preparation processes",
 }
 
 EXAMPLE_ASSIGNMENT = re.compile(r"^\s*#?\s*([A-Z][A-Z0-9_]*)\s*=", re.MULTILINE)

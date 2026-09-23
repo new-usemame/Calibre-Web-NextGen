@@ -92,12 +92,22 @@ def _env():
 
 
 @lru_cache(maxsize=32)
-def _file_digest(path, size, modified_ns):
+def _file_digest(path, size, modified_ns, identity=None):
     digest = hashlib.sha256()
     with open(path, "rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+# Each supervised native worker owns one job. Cache only successful prerequisite
+# probes; receipt keys still use the same engine version and traineddata digest.
+_ENGINE_IDENTITIES = {}
+
+
+def _identity_stat(path):
+    stat = Path(path).stat()
+    return (stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
 
 
 def _engine(language):
@@ -110,6 +120,21 @@ def _engine(language):
     requested = language.split("+") if isinstance(language, str) else []
     if not requested or len(requested) > 4 or any(not LANGUAGE.fullmatch(x) for x in requested):
         raise OCRUnavailable("Choose one to four installed OCR languages.")
+    try:
+        executable_identity = _identity_stat(executable)
+    except OSError as exc:
+        raise OCRUnavailable("The local text recognition engine is unavailable.") from exc
+    key = (executable, executable_identity, language, os.getcwd(),
+           tuple(sorted(_env().items())))
+    cached = _ENGINE_IDENTITIES.get(key)
+    if cached is not None:
+        result, files = cached
+        try:
+            if all(_identity_stat(path) == stamp for path, stamp in files):
+                return result
+        except OSError:
+            pass
+        _ENGINE_IDENTITIES.pop(key, None)
     try:
         version = subprocess.run([executable, "--version"], capture_output=True,
                                  text=True, timeout=10, check=True, env=_env()).stdout.splitlines()[0]
@@ -126,15 +151,29 @@ def _engine(language):
     match = re.search(r'"([^"\n]+)"', lines[0] if lines else "")
     data_dir = Path(os.environ.get("TESSDATA_PREFIX") or (match.group(1) if match else ""))
     identities = []
+    files = []
     try:
         for name in sorted(set(requested + ["osd"])):
-            path = (data_dir / (name + ".traineddata")).resolve(strict=True)
-            stat = path.stat()
-            identities.append((name, _file_digest(str(path), stat.st_size, stat.st_mtime_ns)))
+            candidate = (data_dir / (name + ".traineddata")).absolute()
+            path = candidate.resolve(strict=True)
+            stamp = _identity_stat(path)
+            identities.append((name, _file_digest(str(path), stamp[2], stamp[3], stamp)))
+            if _identity_stat(path) != stamp:
+                raise OSError("OCR language data changed during verification")
+            files.append((str(candidate), stamp))
     except OSError as exc:
         raise OCRUnavailable("OCR language data could not be verified.") from exc
     identity = hashlib.sha256(json.dumps(identities).encode()).hexdigest()
-    return executable, version, identity
+    result = (executable, version, identity)
+    try:
+        if _identity_stat(executable) != executable_identity:
+            raise OSError("engine identity changed")
+    except OSError as exc:
+        raise OCRUnavailable("The local text recognition engine changed during verification.") from exc
+    if len(_ENGINE_IDENTITIES) >= 8:
+        _ENGINE_IDENTITIES.clear()
+    _ENGINE_IDENTITIES[key] = (result, tuple(files))
+    return result
 
 
 def _stopped(should_stop):

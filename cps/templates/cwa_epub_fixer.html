@@ -50,6 +50,7 @@
       <div class="progress-container" style="margin: 20px 0;">
         <div id="progress-bar" style="width: 0%; height: 25px; background-color: green; text-align: center; color: white;"></div>
       </div>
+      <p id="pollMessage" role="status" aria-live="polite" style="font-size: 11px; min-height: 1em;"></p>
       <div class="row">
         <div class="logging_window" style="padding-left: 15px;
                                           padding-right: 15px;
@@ -59,9 +60,9 @@
                                           max-height: calc(100vh - 40rem);
                                           overflow-y: scroll;">
           {# white-space: pre-wrap renders the log's own newlines, so the status is set
-             with textContent instead of innerHTML. The log carries book titles and
-             filenames straight out of the library, and anyone who can upload a book can
-             put HTML in a title. #}
+             with textContent instead of innerHTML. The log echoes text from inside the
+             library's books (EPUB metadata, archive member names, converter output),
+             and anyone who can upload a book controls that text. #}
           <p id="innerStatus" style="color: whitesmoke; font-size: small; white-space: pre-wrap;">No current or previous run to display. Press the Start button above to initiate a run.</p>
         </div>
       </div>
@@ -220,10 +221,14 @@
       // the rest of the run. Back off and keep trying instead.
       console.error("Error: ", e);
       pollFailures += 1;
+      document.getElementById("pollMessage").textContent = "{{ _('Lost contact with the server, retrying...') }}";
       timeout = setTimeout(getStatus, Math.min(30000, 1000 * Math.pow(2, pollFailures)));
       return;
     }
-    pollFailures = 0;
+    if (pollFailures > 0) {
+      pollFailures = 0;
+      document.getElementById("pollMessage").textContent = "";
+    }
 
     const status = get.status || "";
 

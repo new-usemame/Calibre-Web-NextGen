@@ -21,6 +21,7 @@ does not.
 from __future__ import annotations
 
 import inspect
+import io
 import json
 
 import flask
@@ -127,8 +128,53 @@ def test_the_tail_reader_never_exceeds_its_limit(cwaf, tmp_path):
     assert out.endswith("TAIL-MARKER")
 
 
-def test_the_tail_reader_tolerates_a_cut_through_a_multibyte_character(cwaf, tmp_path):
+def test_the_tail_reader_stays_bounded_while_the_writer_appends(cwaf, monkeypatch):
+    """The child appends to the log while the page polls it.
+
+    A read that runs to EOF is bounded by how fast the child writes, not by the cap:
+    here 500 KB lands between the seek and the read.
+    """
+    class GrowsWhileRead(io.BytesIO):
+        def read(self, n=-1):
+            pos = self.tell()
+            self.seek(0, io.SEEK_END)
+            self.write(b"Z" * 500_000)
+            self.seek(pos)
+            return super().read(n)
+
+    monkeypatch.setattr(cwaf, "open", lambda path, mode="r": GrowsWhileRead(b"X" * 10_000), raising=False)
+
+    assert len(cwaf._read_log_tail("run.log", limit=1000)) <= 1000
+
+
+def test_a_cut_through_the_last_progress_token_is_not_reported_as_progress(cwaf, tmp_path):
+    """The cut lands inside "12345/20000"; "45/20000" must not become the progress."""
+    progress_line = b"[convert-library]: (12345/20000) Converting Title.mobi to epub...\n"
+    cut_at = progress_line.index(b"45/20000")
+    limit = 400
+    filler = b"    ebook-convert output without any counters\n"
+    filler = filler * (limit // len(filler) + 1)
+    filler = filler[len(filler) - (limit - (len(progress_line) - cut_at)):]
+    log = tmp_path / "run.log"
+    log.write_bytes(b"[convert-library]: (12344/20000) Converting Earlier.mobi\n" + progress_line + filler)
+
+    tail = cwaf._read_log_tail(str(log), limit=limit)
+
+    assert not tail.startswith("45/20000")
+    assert cwaf.extract_progress(tail) != {"current": 45, "total": 20000}
+
+
+def test_a_cut_through_a_multibyte_character_starts_on_the_next_line(cwaf, tmp_path):
+    log = tmp_path / "run.log"
+    log.write_bytes("é".encode("utf-8") * 50 + b"\n" + "last line – é\n".encode("utf-8"))
+
+    tail = cwaf._read_log_tail(str(log), limit=len("last line – é\n".encode("utf-8")) + 5)
+
+    assert tail == "last line – é\n"
+
+
+def test_a_tail_without_any_newline_is_still_returned(cwaf, tmp_path):
     log = tmp_path / "run.log"
     log.write_bytes("é".encode("utf-8") * 50)
 
-    assert isinstance(cwaf._read_log_tail(str(log), limit=5), str)
+    assert cwaf._read_log_tail(str(log), limit=5)

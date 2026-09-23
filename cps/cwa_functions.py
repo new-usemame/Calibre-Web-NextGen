@@ -2020,7 +2020,8 @@ def _read_log_tail(log_path: str, limit: int = SERVICE_STATUS_TAIL_BYTES) -> str
         with open(log_path, 'rb') as f:
             f.seek(0, os.SEEK_END)
             size = f.tell()
-            f.seek(max(0, size - limit))
+            start = max(0, size - limit)
+            f.seek(start)
             # read(limit), not read(). The child appends to this file continuously, so a
             # bare read() keeps consuming whatever arrives after the seek and is bounded
             # by the child's output rate rather than by `limit` - which is the unbounded
@@ -2028,7 +2029,14 @@ def _read_log_tail(log_path: str, limit: int = SERVICE_STATUS_TAIL_BYTES) -> str
             chunk = f.read(limit)
     except FileNotFoundError:
         return ""
-    # A backwards seek can land mid-character; drop the partial one rather than raise.
+    if start > 0:
+        # The seek landed at an arbitrary byte, usually mid-line and possibly
+        # mid-character. Start at the next full line: a cut through the last "n/total"
+        # token would otherwise hand extract_progress() a smaller n, and the view would
+        # open on a replacement glyph. A tail with no newline at all is kept as it is.
+        newline = chunk.find(b'\n')
+        if newline != -1:
+            chunk = chunk[newline + 1:]
     return chunk.decode('utf-8', errors='replace')
 
 def _service_status(log_filename: str):

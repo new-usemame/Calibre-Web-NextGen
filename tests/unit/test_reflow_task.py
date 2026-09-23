@@ -193,6 +193,54 @@ def test_a_completed_job_keeps_a_text_free_recovery_census_for_crash_diagnosis(r
     assert all("cache" not in row and "text" not in row for row in record["pages"])
 
 
+def test_optional_trace_write_failure_keeps_actual_builder_validation_and_sample_output(rig, monkeypatch):
+    """A failed fsync for optional crash markers cannot fail a healthy EPUB.
+
+    This injects one failure only for the real task's build-trace append after
+    assembly starts.  Required job/audit/artifact writes still use the real
+    ledger; changing the task to catch all ledger errors makes the companion
+    critical-ledger test meaningless.
+    """
+    real_record = ledger_mod.Ledger.record
+    trace_attempts = []
+
+    def fail_one_trace(self, entry, durable=False):
+        if entry.get("kind") == "build_trace":
+            trace_attempts.append(dict(entry))
+            raise OSError("injected optional trace fsync failure")
+        return real_record(self, entry, durable=durable)
+
+    monkeypatch.setattr(ledger_mod.Ledger, "record", fail_one_trace)
+    task = _run(rig, mode="sample", sample_pages=2, cost_cap_usd=1.0)
+
+    assert task.stat == STAT_FINISH_SUCCESS, task.error
+    assert len(trace_attempts) == 1
+    assert rig.mod.build_epub.validate(task.results["path"]) == []
+    audit = ledger_mod.Ledger(os.path.join(rig.root, "jobs", "5", task.job_id + ".jsonl"),
+                              cap_usd=1.0)
+    degraded = audit.entries("runtime_diagnostics")
+    assert len(degraded) == 1
+    assert {key: value for key, value in degraded[0].items() if key != "ts"} == {
+        "kind": "runtime_diagnostics", "event": "build_trace_degraded",
+        "reason": "durable_trace_write_failed", "job": task.job_id}
+
+
+def test_required_audit_ledger_failure_still_fails_closed(rig, monkeypatch):
+    """Only build-trace append errors are optional; validated audit evidence is not."""
+    real_record = ledger_mod.Ledger.record
+
+    def fail_required_audit(self, entry, durable=False):
+        if entry.get("kind") == "operation_audit":
+            raise OSError("injected required audit failure")
+        return real_record(self, entry, durable=durable)
+
+    monkeypatch.setattr(ledger_mod.Ledger, "record", fail_required_audit)
+    task = _run(rig, mode="sample", sample_pages=2, cost_cap_usd=1.0)
+
+    assert task.stat == STAT_FAIL
+    assert not os.path.exists(rig.mod.sample_path(7, task.job_id))
+
+
 def test_a_cancelled_job_does_not_file_a_half_reviewed_conversion(rig):
     task = rig.mod.TaskReflowPdf(5, 7, {"mode": "full", "cost_cap_usd": 1.0})
     task.stat = STAT_ENDED          # what WorkerThread.end_task does

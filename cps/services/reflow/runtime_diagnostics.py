@@ -92,16 +92,34 @@ class BuildTrace(object):
         self.suppressed = 0
         self.last_crop = None
         self.last_crop_page = None
+        # The trace is optional crash evidence.  If its own durable append fails,
+        # normal conversion must keep its established validation/publication path;
+        # do not turn every later crop into another failed fsync attempt.
+        self.degraded = False
+        self.disabled = False
 
     def _record(self, event, reserve_finish=True, **facts):
         # Keep one slot for normal completion.  A fatal exit instead leaves the
         # most recent pre-crash checkpoint, which is the useful fact in that case.
         limit = self.max_markers - (1 if reserve_finish else 0)
-        if self.markers >= limit:
+        if self.disabled or self.markers >= limit:
             self.suppressed += 1
             return
-        self.ledger.record(dict(kind="build_trace", event=event, **facts), durable=True)
+        try:
+            self.ledger.record(dict(kind="build_trace", event=event, **facts), durable=True)
+        except OSError:
+            # Keep neither exception text nor a path: both are unhelpful to a
+            # reader of the job journal, and this is only optional telemetry.
+            self.degraded = True
+            self.disabled = True
+            self.suppressed += 1
+            return
         self.markers += 1
+
+    def degradation_record(self):
+        """A stable, text-free fact for the normal task path after a trace loss."""
+        return {"kind": "runtime_diagnostics", "event": "build_trace_degraded",
+                "reason": "durable_trace_write_failed"}
 
     def __call__(self, event):
         """Accept only builder-generated scalar event facts."""

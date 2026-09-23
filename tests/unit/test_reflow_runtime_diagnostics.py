@@ -78,6 +78,50 @@ def test_build_trace_is_bounded_but_keeps_completion_and_last_crop():
     assert sum(entry["event"] == "figure_crop" for entry in entries) < 40
 
 
+def test_build_trace_degrades_once_when_its_optional_durable_write_fails():
+    """A trace fsync failure is crash evidence loss, not a conversion failure.
+
+    The first trace append raises an I/O error.  Later phase/crop/finish events
+    must not retry it, while the public degraded fact has no exception/path text.
+    """
+    class BrokenTraceLedger(object):
+        def __init__(self):
+            self.calls = 0
+
+        def record(self, entry, durable=False):
+            self.calls += 1
+            raise OSError("private journal path unavailable")
+
+    ledger = BrokenTraceLedger()
+    trace = runtime_diagnostics.BuildTrace(ledger)
+    trace({"kind": "phase", "phase": "assembly_start"})
+    trace({"kind": "figure_crop", "page": 7, "ordinal": 1, "total": 2})
+    trace.finish()
+
+    assert trace.degraded and trace.disabled
+    assert ledger.calls == 1
+    assert trace.degradation_record() == {
+        "kind": "runtime_diagnostics", "event": "build_trace_degraded",
+        "reason": "durable_trace_write_failed"}
+
+
+def test_build_trace_does_not_suppress_cancellation_or_other_required_failures():
+    """Only OSError from the optional trace append is contained.
+
+    A cancellation-class exception must still escape to the task's established
+    cancellation handling; widening the catch to Exception makes this red.
+    """
+    from cps.services.reflow import build_epub
+
+    class CancelLedger(object):
+        def record(self, entry, durable=False):
+            raise build_epub.BuildCancelled("cancel requested")
+
+    with pytest.raises(build_epub.BuildCancelled):
+        runtime_diagnostics.BuildTrace(CancelLedger())(
+            {"kind": "phase", "phase": "assembly_start"})
+
+
 def test_service_exit_recorder_replaces_only_its_owned_record(tmp_path):
     """A service exit is retained as numeric supervisor evidence, atomically.
 

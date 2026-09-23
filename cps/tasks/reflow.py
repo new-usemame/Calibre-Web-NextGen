@@ -426,6 +426,14 @@ class TaskReflowPdf(CalibreTask):
                                              message="preserving original evidence %d/%d" % (done, total))),
                                      runtime_progress=build_trace)
             build_trace.finish()
+            if build_trace.degraded:
+                # A trace marker is optional incident evidence.  Its failure must
+                # not be allowed to alter the required audit/budget/publication
+                # ledger behavior below.  The record is deliberately text-free.
+                try:
+                    ledger.record(build_trace.degradation_record(), durable=True)
+                except OSError:
+                    log.warning("reflow: runtime trace degraded; status record unavailable")
             for warning in built.warnings:
                 # The reader is told the same thing in their own book, on the report
                 # page; this is the terser half, for whoever has to find out why.

@@ -34,26 +34,52 @@ words.  Future records must make both facts independently visible.
    only numeric supervisor values and never accepts a path from the environment or
    user input.
 
-## Explicit non-goals and containment boundary
+## Containment implementation (additive to the observability slice)
 
 No crash cause is asserted by this change.  A successful worker-thread replay
 does not clear the native-threading hypothesis, and it also does not exclude an
 external signal.
 
-PyMuPDF-facing work must ultimately run in a supervised process, not in the app
-worker thread.  The smallest sound boundary is a dedicated child that opens the
-PDF itself and receives only a schema-validated, filesystem-backed job manifest
-(source fingerprint, owned staging directory, and serializable conversion options).
-It must not receive a live document, page, cache object, or pickled application
-state.  The parent retains authentication, cost reservations, adoption, and final
-publication; it treats a child exit without a validated completion manifest as a
-normal failed conversion, retains any existing EPUB, reconciles reservations from
-the durable ledger, and removes only its owned staging/process artifacts.
+Application conversion now uses `NativeDocument`, a supervised fresh interpreter
+launched with `-I` and a fixed installed worker script. The worker opens its own
+private PDF snapshot. It never inherits a live PDF/page object, web bootstrap,
+provider client, ledger object, credential environment, or Python pickle.
 
-That boundary requires a substantial pure-manifest handoff across preparation,
-structural conversion, and build.  It is not implemented in this observability
-slice because a partial fork around live PyMuPDF objects would be less safe than
-the current design.  The next implementation must prove these behaviours:
+The fixed operation vocabulary is open, survey, prepare, operations, and build.
+Native extraction/recovery/assembly, per-page structural evidence/raster preparation,
+and final native glyph/figure/source rendering execute in that process. The API's
+page count and source survey also use it; quote preparation retains its existing
+fresh-exec worker. Offline callers with actual PDF documents remain compatible.
+
+The parent retains the existing structural orchestration and typed provider calls
+entirely, rather than delegating a provider RPC proxy. This smaller boundary leaves
+authentication, budgets, durable claims/reservations/reconciliation, typed request
+validation, source-authority factories, approval/adoption and publication unchanged.
+Only registered pure value types cross JSON; no dispatch instruction or secret does.
+Child-built candidates still pass the parent's original source fingerprint checks,
+EPUB validation, operation-emission audit and atomic publication transaction.
+
+The protocol has an exact version, explicit class registry, duplicate-key/unknown-
+field/nonfinite/depth/size rejection (256 MiB, depth 80), fixed manifest basenames,
+no-follow regular-file checks, sequence binding, and a separate bounded control FD.
+The source10 interface additions are explicitly round-tripped without alternate OCR
+substitution. A candidate path from a reply cannot choose the parent's read path.
+SourcePage authority is reissued from its pure provenance and checked identity in
+each process; wire data alone never receives an adoption seal.
+
+The child has its own process group. Cancellation is checked while waiting and
+before every progress acknowledgment; cleanup stops only that owned group and
+removes only the parent-created scratch directory. Native stderr is drained into
+a 64 KiB rolling tail independently from protocol traffic, with exit code/phase
+retained in the existing job ledger. Existing bounded build markers remain active.
+
+This is crash containment, not an OS sandbox: the worker runs under the service UID,
+and native memory exhaustion remains subject to the deployment's resource limits.
+It receives no arbitrary output path but has OS access appropriate to that UID.
+No historical cause is inferred from containment tests. Independent review and
+composed source-policy tests precede deployment and an actual-book retry.
+
+The implementation gates are:
 
 - forced child termination yields a failed job, no server exit, no newly published
   EPUB, and no released-or-forgotten reservation;
@@ -78,4 +104,3 @@ the current design.  The next implementation must prove these behaviours:
   it atomically replaces the fixed record with numeric values.  Invalid values
   must be rejected rather than written.  Removing validation or atomic replace
   makes this red.
-

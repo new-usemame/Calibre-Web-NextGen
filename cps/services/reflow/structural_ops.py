@@ -215,6 +215,11 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
         source_page.validate(book)
         if _digest(json.loads(source_page.provenance_json)) != _digest(source_layer):
             raise ContractError('current Recovery provenance differs')
+    from .native_ipc import NativeDocument
+    if isinstance(doc, NativeDocument):
+        return doc.prepare_operations(book, pno, revision, source_layer, seed=seed,
+            max_candidates=max_candidates, max_context_chars=max_context_chars,
+            source_page=source_page, raw_page=raw_page)
     source_layer = {k: copy.deepcopy(v) for k, v in source_layer.items()
                     if k in PROVENANCE_KEYS}
     if len(json.dumps(source_layer)) > 4096:

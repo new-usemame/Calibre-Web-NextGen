@@ -147,10 +147,23 @@ def test_a_book_whose_pages_do_not_open_is_not_filed_in_the_library(rig, monkeyp
     check is the thing that can notice, so the job has to ask it before it tells
     the library there is an EPUB. Injected here as a markup fault in the writer,
     because the point is the faults nobody has met yet."""
-    document = rig.mod.build_epub._document
-    monkeypatch.setattr(rig.mod.build_epub, "_document",
-                        lambda title, body, language="en":
-                        document(title, body + "<p>Hephaestio 9 & 29</p>", language))
+    # Inject at the actual process boundary: parent monkeypatches deliberately
+    # cannot change the fresh child's module globals.
+    from cps.services.reflow.native_ipc import NativeDocument
+    import zipfile
+    build = NativeDocument.build
+    def malformed(self, *args, **kwargs):
+        result = build(self, *args, **kwargs)
+        path = result.path
+        with zipfile.ZipFile(path) as archive:
+            entries = [(item, archive.read(item.filename)) for item in archive.infolist()]
+        with zipfile.ZipFile(path, 'w') as archive:
+            for item, data in entries:
+                if item.filename.endswith('ch001.xhtml'):
+                    data = data.replace(b'</body>', b'<p>Hephaestio 9 & 29</p></body>')
+                archive.writestr(item, data)
+        return result
+    monkeypatch.setattr(NativeDocument, 'build', malformed)
 
     task = _run(rig, mode="full", cost_cap_usd=1.0)
 
@@ -682,7 +695,6 @@ def test_a_book_that_never_ran_has_nothing_to_recover(rig):
 
 def test_cancel_during_original_evidence_stops_rendering_without_filing(rig, monkeypatch):
     from cps.services.reflow import assemble
-    from cps.services.reflow.source_display import SourceDisplay
     task = rig.mod.TaskReflowPdf(5, 7, {"mode": "full", "cost_cap_usd": 1.0})
     convert = task._convert
     def uncertain_pages(*args, **kwargs):
@@ -694,16 +706,15 @@ def test_cancel_during_original_evidence_stops_rendering_without_filing(rig, mon
         for pno in result.page_html:
             canonical=prepare_source_page(result.book,pno,{'layer':'native'})
             result.source_pages[pno]=canonical;result.page_html[pno]=canonical.html
-        monkeypatch.setattr(SourceDisplay, 'jpeg', cancel_after_first)
         return result
     monkeypatch.setattr(task, '_convert', uncertain_pages)
-    render = SourceDisplay.jpeg
     rendered = []
-    def cancel_after_first(*args, **kwargs):
-        rendered.append(args[0].pno)
-        pixels = render(*args, **kwargs)
-        task.stat = STAT_ENDED
-        return pixels
+    trace = rig.mod.runtime_diagnostics.BuildTrace.__call__
+    def cancel_after_first(self, event):
+        trace(self, event)
+        if event.get('kind') == 'evidence_page':
+            rendered.append(event['page']); task.stat = STAT_ENDED
+    monkeypatch.setattr(rig.mod.runtime_diagnostics.BuildTrace, '__call__', cancel_after_first)
     task.run(None)
     assert rendered == [0], 'cancellation must stop before another evidence raster'
     assert rig.local_db.session.commits == 0
@@ -1150,16 +1161,13 @@ def test_actual_free_task_files_builder_glyph_images_after_internal_validation(r
     """Exercise the actual task's builder/validator/publication seam, without AI."""
     from cps.services.reflow import extract
     import zipfile
-    read_page=extract.read_page
-    def unmapped_source(doc,pno):
-        raw=read_page(doc,pno)
-        if pno==1:
-            for block in raw.text_blocks:
-                for line in block.lines:
-                    for span in line.spans:
-                        if len(span.text.strip())>20:span.encoding_unresolved=True
-        return raw
-    monkeypatch.setattr(extract,'read_page',unmapped_source)
+    # Set the symbolic flag in the actual fixture PDF so the child sees the same
+    # mapping defect; no cross-process monkeypatch is part of the product contract.
+    path = rig.folder/'Book - Author.pdf'
+    with extract.pymupdf.open(path) as doc:
+        for font in doc[1].get_fonts():
+            doc.xref_set_key(font[0], 'FontDescriptor', '<< /Type /FontDescriptor /Flags 4 >>')
+        doc.saveIncr()
     task=_run(rig,mode='full',cost_cap_usd=0)
     assert task.stat==STAT_FINISH_SUCCESS,task.error
     target=str(rig.folder/'Book - Author.epub')

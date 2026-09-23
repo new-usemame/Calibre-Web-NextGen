@@ -1342,6 +1342,13 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     the list of things the build itself could not place -- neither is known until
     the split and the crops are done.
     """
+    from .native_ipc import NativeDocument
+    if isinstance(doc, NativeDocument):
+        return doc.build(book, out_path, page_html=page_html, metadata=metadata,
+            report_html=report_html, sidecar=sidecar, identifier=identifier,
+            figure_transform=figure_transform, should_stop=should_stop,
+            evidence_progress=evidence_progress, operation_plans=operation_plans,
+            source_pages=source_pages, runtime_progress=runtime_progress)
     metadata = dict(metadata or {})
     language = metadata.get("language") or "en"
     source_pages = dict(source_pages or {})

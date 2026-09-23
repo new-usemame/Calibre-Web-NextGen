@@ -237,7 +237,7 @@ class TaskReflowPdf(CalibreTask):
             admission.release(self.book_id, self)
 
     def _run(self, worker_thread):
-        import pymupdf
+        from ..services.reflow.native_ipc import NativeDocument
 
         local_db = db.CalibreDB(expire_on_commit=False, init=True)
         ledger = None
@@ -275,7 +275,9 @@ class TaskReflowPdf(CalibreTask):
             cache = pipeline.PageCache(reflow_dir("cache"))
             client = make_client(self.options.review_mode)
 
-            document = pymupdf.open(source)
+            document = NativeDocument(source, scratch_root=reflow_dir('native-scratch'),
+                cache_root=REFLOW_DIR, should_stop=lambda: self.cancelled,
+                progress=self._on_progress, ledger=ledger)
             try:
                 if document.page_count > max_pages():
                     return self._handleError(
@@ -393,6 +395,9 @@ class TaskReflowPdf(CalibreTask):
                 return report.about_page(_payload,
                                          show_cost=self.options.show_cost_in_report,
                                          links=links, losses=losses)
+            from ..services.reflow.native_ipc import NativeDocument
+            if isinstance(document, NativeDocument):
+                page = {'payload': payload, 'show_cost': self.options.show_cost_in_report}
         # The staging folder is named in the job's journal before it exists, so a
         # process that dies anywhere from here on -- mid-build is minutes on a long
         # book -- leaves nothing the next recovery pass cannot find and remove.

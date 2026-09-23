@@ -306,6 +306,11 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
         progress=None, should_stop=None, require_figure_caption=True,
         recovery_opts=None):
     """Convert one document. Returns what happened as well as what was produced."""
+    from .native_ipc import NativeDocument
+    if isinstance(doc, NativeDocument):
+        if client is not None: raise ValueError('native preparation cannot dispatch models')
+        return doc.prepare_result(page_numbers=page_numbers,
+            require_figure_caption=require_figure_caption, recovery_opts=recovery_opts)
     report = _reporter(progress)
     result = ReflowResult()
 

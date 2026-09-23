@@ -144,13 +144,9 @@ def _source_or_error(book_id):
 
 def _survey_uncached(path):
     """Bounded native text-layer assessment; no conversion or OCR."""
-    import pymupdf
-
-    document = pymupdf.open(path)
-    try:
-        return source_assessment.survey(document)
-    finally:
-        document.close()
+    from ..services.reflow.native_ipc import NativeDocument
+    with NativeDocument(path, scratch_root=os.path.join(REFLOW_DIR, 'native-scratch')) as document:
+        return document.call('survey', {})
 
 
 def _cache_key(path):
@@ -318,9 +314,9 @@ def _page_count_uncached(path):
 
     None when nothing can open it; whatever has to read it next refuses it.
     """
-    import pymupdf
+    from ..services.reflow.native_ipc import NativeDocument
     try:
-        with pymupdf.open(path) as document:
+        with NativeDocument(path, scratch_root=os.path.join(REFLOW_DIR, 'native-scratch')) as document:
             return document.page_count
     except Exception:                                              # noqa: BLE001
         return None

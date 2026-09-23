@@ -16781,9 +16781,17 @@ msgid "Source preparation stopped at its {minutes}-minute limit so that others c
 msgstr "De bronvoorbereiding is gestopt bij haar limiet van {minutes} minuten, zodat anderen aan de beurt komen. Al herkende pagina’s blijven bewaard: bereid opnieuw voor om verder te gaan."
 
 #: cps/spa_strings.py
-msgid "This sample is no longer kept: samples are removed {days} days after they are made. Make a new sample to see it again."
-msgstr "Dit voorproefje wordt niet meer bewaard: voorproefjes worden {days} dagen nadat ze zijn gemaakt verwijderd. Maak een nieuw voorproefje om het opnieuw te bekijken."
+msgid "Samples are removed {days} days after they are made. Make a new sample to see it again."
+msgstr "Voorproefjes worden {days} dagen nadat ze zijn gemaakt verwijderd. Maak een nieuw voorproefje om het opnieuw te bekijken."
 
 #: cps/tasks/reflow.py
 msgid "Settle interrupted conversions and remove expired Reflow files"
 msgstr "Onderbroken conversies afhandelen en verlopen Reflow-bestanden verwijderen"
+
+#: cps/spa_strings.py
+msgid "This sample is no longer kept"
+msgstr "Dit voorproefje wordt niet meer bewaard"
+
+#: cps/spa_strings.py
+msgid "Sample EPUB SHA-256: {hash}"
+msgstr "SHA-256 van de EPUB van het voorproefje: {hash}"

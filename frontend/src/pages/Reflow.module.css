@@ -115,6 +115,11 @@
   margin: 0 0 var(--sp-3); color: var(--danger);
   font-size: var(--fs-sm); line-height: var(--lh-base);
 }
+/* Why a sample's card has no download: sits between the title and the facts. */
+.expiredNote {
+  margin: 0 0 var(--sp-3); color: var(--text-muted);
+  font-size: var(--fs-sm); line-height: var(--lh-base); overflow-wrap: anywhere;
+}
 
 /* ---- consent ---- */
 .consent {

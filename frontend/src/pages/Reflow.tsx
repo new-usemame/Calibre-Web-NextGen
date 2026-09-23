@@ -534,14 +534,25 @@ function JobResult({ job, bookId, t, onConvertAll }: {
   const whole = job.status === 'done';
   const legacy = jobCounts(job);
   const scope = job.structural;
+  // The ledger still records a sample the daily housekeeping has removed; the
+  // card must not announce a file that is gone.
+  const expired = job.mode === 'sample' && !!job.sample_url && !!job.sample_expired;
 
   return (
     <section className={styles.card} aria-labelledby="reflow-result">
       <h2 className={styles.cardTitle} id="reflow-result">
-        {whole
-          ? (job.mode === 'sample' ? t('Your sample is ready') : t('The book was converted'))
-          : STATUS_LABEL(job.status, t)}
+        {expired
+          ? t('This sample is no longer kept')
+          : whole
+            ? (job.mode === 'sample' ? t('Your sample is ready') : t('The book was converted'))
+            : STATUS_LABEL(job.status, t)}
       </h2>
+      {expired && (
+        <p className={styles.expiredNote}>
+          {t('Samples are removed {days} days after they are made. Make a new sample to see it again.',
+            { days: job.sample_kept_days ?? 7 })}
+        </p>
+      )}
 
       {job.error && <p className={styles.error} role="alert">{job.error}</p>}
       {job.status === 'capped' && (
@@ -615,15 +626,10 @@ function JobResult({ job, bookId, t, onConvertAll }: {
             : t('This older job predates the current two-stage review. Its counts are historical and do not establish current review coverage.')}
       </p>
       {job.artifact && <p className={styles.note}>
-        {t('Filed EPUB SHA-256: {hash}', { hash: job.artifact.sha256 })}
+        {job.mode === 'sample'
+          ? t('Sample EPUB SHA-256: {hash}', { hash: job.artifact.sha256 })
+          : t('Filed EPUB SHA-256: {hash}', { hash: job.artifact.sha256 })}
       </p>}
-
-      {job.sample_url && job.sample_expired && (
-        <p className={styles.note}>
-          {t('This sample is no longer kept: samples are removed {days} days after they are made. Make a new sample to see it again.',
-            { days: job.sample_kept_days ?? 7 })}
-        </p>
-      )}
 
       <div className={styles.actions}>
         {job.sample_url && job.sample_ready && (

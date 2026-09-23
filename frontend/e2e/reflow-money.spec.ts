@@ -169,6 +169,38 @@ test('actual typed counts, microcharges, held costs and file identity stay separ
   assertNoPageErrors(errors);
 });
 
+test('a sample says how much of the book it read and, once its file is removed, that it is gone', async ({ page }) => {
+  // A free sample of a long scan reads only the front of the PDF, and the daily
+  // housekeeping removes a sample after its retention period; the ledger still
+  // records the artifact, so the card must not promise a file that is gone.
+  const expired: ReflowJob = { ...reviewed, job_id: '9'.repeat(32), status: 'done', spend_usd: 0, pending_usd: 0,
+    cap_usd: 0, calls: 0, reused: 0, gate: {}, sample_ready: false, sample_expired: true, sample_kept_days: 7,
+    structural: { ...reviewed.structural!, review_mode: 'deterministic', eligibility_measured: false,
+      source_context_pages: 61, source_pages: 3000, context: 'sample' } };
+  const { errors } = await stub(page, assessment(), [expired]);
+  const result = page.locator('section[aria-labelledby="reflow-result"]');
+  await expect(result.getByRole('heading', { level: 2 })).toHaveText('This sample is no longer kept');
+  await expect(result.getByText('Samples are removed 7 days after they are made. Make a new sample to see it again.', { exact: true })).toBeVisible();
+  await expect(result.getByRole('link', { name: 'Download the sample' })).toHaveCount(0);
+  await expect(result.getByText(`Sample EPUB SHA-256: ${'c'.repeat(64)}`, { exact: true })).toBeVisible();
+  await expect(result.getByRole('button', { name: 'Convert the whole book' })).toBeVisible();
+  await expect(result.getByText('Source pages prepared', { exact: true }).locator('xpath=following-sibling::dd[1]'))
+    .toHaveText('61 of 3000');
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(async (value) => {
+      document.documentElement.setAttribute('data-theme', value);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    }, theme);
+    await result.scrollIntoViewIfNeeded();
+    await assertNoHorizontalOverflow(page);
+    const findings = await new AxeBuilder({ page }).include('section[aria-labelledby="reflow-result"]')
+      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+    expect(findings.violations.filter((v) => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
+    await result.screenshot({ path: test.info().outputPath(`expired-sample-${theme}.jpg`), type: 'jpeg', quality: 75 });
+  }
+  assertNoPageErrors(errors);
+});
+
 test('invalid cap is associated with its field and a failed preparation buys nothing', async ({ page }) => {
   const { state, errors } = await stub(page); state.status = 'failed';
   await paidChoice(page).check(); await page.getByRole('button', { name: 'Prepare AI estimate', exact: true }).click();

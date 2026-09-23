@@ -665,6 +665,7 @@ def test_actual_task_prepares_full_source_for_sample_and_files_exact_hash(rig,mo
 
 
 def test_actual_task_quality_gate_prevents_both_typed_stages_with_configured_key(rig,monkeypatch):
+    monkeypatch.setattr(rig.mod.typed_model,'QUALITY_RELEASED',False)
     import requests
     monkeypatch.setattr(rig.mod.config,'resolved_openrouter_key',lambda:'inert-configured-key')
     def forbidden(*args,**kwargs):raise AssertionError('quality-gated task attempted network')
@@ -682,7 +683,6 @@ def test_actual_task_quality_gate_prevents_both_typed_stages_with_configured_key
 def test_actual_task_records_two_stage_decision_and_only_builds_approved_subset(rig,monkeypatch,decision):
     approve=decision=='approve'
     import json,zipfile
-    from cps.services.reflow.structural_pipeline import TwoStageClient
     from tests.unit.test_reflow_typed_transport import Session,reply
     doc=F.new_doc();page=doc.new_page(width=500,height=700)
     page.insert_text((80,100),'"Original displayed words remain exactly as printed."',fontsize=12)
@@ -703,7 +703,11 @@ def test_actual_task_records_two_stage_decision_and_only_builds_approved_subset(
             data=reply(json.dumps(response));data['model']=payload['model']
             return Session(data).post()
     session=Answering()
-    monkeypatch.setattr(rig.mod,'make_client',lambda tier:TwoStageClient('inert',enabled=True,session=session))
+    # Exercise the actual enabled product default and task factory. Only the
+    # HTTP boundary is inert; neither the release flag nor client is replaced.
+    monkeypatch.setattr(rig.mod.config,'resolved_openrouter_key',lambda:'inert-configured-key')
+    monkeypatch.setattr(model_mod.requests,'get',session.get)
+    monkeypatch.setattr(model_mod.requests,'post',session.post)
     task=_run(rig,mode='full',cost_cap_usd=1)
     assert task.stat==STAT_FINISH_SUCCESS,task.error
     assert len(session.calls)==2

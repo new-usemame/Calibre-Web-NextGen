@@ -33,7 +33,7 @@ def prepared_result(source):
 @pytest.mark.parametrize('approve',[True,False])
 def test_real_two_stage_pipeline_only_builds_verifier_decision_and_cache_replays_free(source,approve):
     from cps.services.reflow.structural_pipeline import run_structural,TwoStageClient
-    book,doc,tmp=source;session=WorkflowSession(approve);client=TwoStageClient('test',enabled=True,session=session)
+    book,doc,tmp=source;session=WorkflowSession(approve);client=TwoStageClient('test',session=session)
     ledger=Ledger(str(tmp/'job1'),cap_usd=1);cache=pipeline.PageCache(tmp/'cache')
     result=run_structural(doc,client=client,ledger=ledger,cache=cache,prepared_result=prepared_result(source))
     assert len(session.calls)==2 and ledger.spent()==pytest.approx(2*.000123456789)
@@ -63,7 +63,7 @@ def test_budget_can_stop_between_stages_without_publishing_proposal(source):
 
 def test_quality_gate_prevents_network_while_source_and_coverage_are_prepared(source):
     from cps.services.reflow.structural_pipeline import run_structural,TwoStageClient
-    _,doc,tmp=source;session=WorkflowSession();client=TwoStageClient('test',session=session)
+    _,doc,tmp=source;session=WorkflowSession();client=TwoStageClient('test',enabled=False,session=session)
     result=run_structural(doc,client=client,ledger=Ledger(str(tmp/'gate'),cap_usd=1),prepared_result=prepared_result(source))
     assert session.calls==[] and result.structural['eligible']==1
     assert result.structural['unreviewed']==1 and result.stopped=='quality_gate'

@@ -56,6 +56,7 @@ def test_current_source_identity_is_required_even_for_free_conversion(mod,monkey
 
 
 def test_optional_review_cannot_bypass_the_quality_gate(mod,monkeypatch,pdf_on_disk):
+    monkeypatch.setattr(mod.typed_model,'QUALITY_RELEASED',False)
     _wire(mod,monkeypatch,pdf_on_disk)
     body=consent(mod,pdf_on_disk);body.update(review_mode='source_verified',cost_cap_usd=1)
     response,added=_start(mod,body)

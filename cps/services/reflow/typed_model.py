@@ -11,8 +11,8 @@ from . import model
 ROUTE_VERSION = 'source-operations-flex-1'
 SOURCE_REVISION = 'source-operations-complete-quote-units-5'
 MAX_OUTPUT_TOKENS = 4096
-# Not publicly activated until independent semantic and application gates pass.
-QUALITY_RELEASED = False
+# Build availability still requires credentials, current consent and both spend limits.
+QUALITY_RELEASED = True
 STAGES = {
     'proposer': model.ModelSpec('openai/gpt-5.6-luna', .10, .60, label='Source proposal'),
     'verifier': model.ModelSpec('openai/gpt-5.6-terra', 1.0, 6.0, label='Source approval'),

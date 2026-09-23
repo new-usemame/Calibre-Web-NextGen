@@ -23,7 +23,6 @@ volume and hands back a download, so a user can look before they commit.
 import os
 import uuid
 import hashlib
-import tempfile
 import shutil
 import math
 
@@ -325,7 +324,16 @@ class TaskReflowPdf(CalibreTask):
                 return report.about_page(_payload,
                                          show_cost=self.options.show_cost_in_report,
                                          links=links, losses=losses)
-        staging=tempfile.mkdtemp(prefix='.reflow-'+self.job_id+'-',dir=os.path.dirname(target))
+        # The staging folder is named in the job's journal before it exists, so a
+        # process that dies anywhere from here on -- mid-build is minutes on a long
+        # book -- leaves nothing the next recovery pass cannot find and remove.
+        # Before, such a folder stayed hidden in the book's folder forever (N4).
+        full=self.options.mode=='full'
+        staging=os.path.join(os.path.dirname(target),'.reflow-%s-staging'%self.job_id)
+        staging_path=os.path.relpath(staging,config.get_book_path() if full else REFLOW_DIR)
+        ledger.record(dict(kind='staging',event='created',root='library' if full else 'reflow',
+                           path=staging_path),durable=True)
+        os.mkdir(staging,0o700)
         candidate=os.path.join(staging,'candidate.epub')
         publication_prepared=False
         try:
@@ -402,6 +410,9 @@ class TaskReflowPdf(CalibreTask):
             # its backup on an unhandled failure or conflicting later mutation.
             if not publication_prepared:
                 shutil.rmtree(staging,ignore_errors=True)
+            if not os.path.lexists(staging):
+                try:ledger.record(dict(kind='staging',event='removed',path=staging_path))
+                except OSError:pass                                   # pragma: no cover
 
     def _target_path(self, book, local_db):
         if self.options.mode == "sample":
@@ -498,7 +509,37 @@ def _format_state(local_db,book_id):
     return None if row is None else dict(name=row.name,size=int(row.uncompressed_size))
 
 
+#: What the jobs list says about a publication recovery could not settle: first
+#: with every file kept where it was, then -- on a later pass, if nothing has
+#: resolved it -- with that evidence moved out of the book's folder, exactly.
+REVIEW_IN_PLACE = "Publication recovery needs review; existing files were preserved."
+REVIEW_MOVED = ("Publication recovery needs review; the files it preserved were moved out of "
+                "the book's folder, unchanged, into Reflow's publication-conflicts folder.")
+
+
+def _conflicted_before(led):
+    """True once an earlier recovery pass recorded a conflict on this publication."""
+    events=led.entries('publication')
+    start=max((i for i,e in enumerate(events) if e.get('event')=='prepared'),default=-1)
+    return any(e.get('event')=='conflict' for e in events[start+1:])
+
+
 def _recover_publication(led):
+    """Settle one job's publication journal.
+
+    Returns True when there is nothing left to do, None when a live publication
+    holds the target's lock (try again on the next pass), or the error text the
+    job is filed with when a person has to look.
+
+    A conflict is recorded and every file is kept in place, as before. When the
+    same journal is still conflicted on a later pass -- the library did not
+    return to a state recovery can prove -- its staging evidence is copied out of
+    the book's folder, verified, closed in the journal and only then removed
+    (N4): a hidden ``.reflow-*`` folder holding two EPUBs no longer lives in the
+    library forever. Only a :class:`publication.PublicationConflict` is closed
+    this way; an I/O or database error is never proof of anything and keeps
+    being retried.
+    """
     record=publication.pending(led)
     if record is None:return True
     local_db=None
@@ -510,24 +551,65 @@ def _recover_publication(led):
             led._entries=ledger_mod.Ledger(led.path,led.cap_usd,led.job_id).entries()
             record=publication.pending(led)
             if record is None:return True
-            book_id=int(record['book_id'])
-            if str(book_id)!=os.path.basename(os.path.dirname(led.path)):
-                raise publication.PublicationConflict('publication ledger book identity differs')
-            local_db=db.CalibreDB(expire_on_commit=False,init=True)
-            book=local_db.get_book(book_id)
-            data=local_db.get_book_format(book_id,'PDF')
-            if book is None or data is None:raise publication.PublicationConflict('publication source book is unavailable')
-            source=os.path.join(config.get_book_path(),book.path,data.name+'.pdf')
-            publication.reconcile(led,config.get_book_path(),record,_format_state(local_db,book_id),book.path,source)
-            return True
+            book=None
+            try:
+                book_id=int(record['book_id'])
+                if str(book_id)!=os.path.basename(os.path.dirname(led.path)):
+                    raise publication.PublicationConflict('publication ledger book identity differs')
+                local_db=db.CalibreDB(expire_on_commit=False,init=True)
+                book=local_db.get_book(book_id)
+                data=local_db.get_book_format(book_id,'PDF')
+                if book is None or data is None:raise publication.PublicationConflict('publication source book is unavailable')
+                source=os.path.join(config.get_book_path(),book.path,data.name+'.pdf')
+                publication.reconcile(led,config.get_book_path(),record,_format_state(local_db,book_id),book.path,source)
+                return True
+            except publication.PublicationConflict as exc:
+                if not _conflicted_before(led):
+                    raise
+                evidence=publication.close_conflict(
+                    led,config.get_book_path(),record,
+                    os.path.join(REFLOW_DIR,'publication-conflicts',
+                                 os.path.basename(os.path.dirname(led.path)),led.job_id),
+                    str(exc),current_book_path=getattr(book,'path',None))
+                log.error('reflow publication conflict for job %s still stands (%s); its files '
+                          'were preserved in %s',led.job_id,exc,evidence or 'no staging folder remained')
+                return REVIEW_MOVED
     except (OSError,ValueError,KeyError,TypeError,SQLAlchemyError) as exc:
         reason=str(exc)
         if not any(e.get('event')=='conflict' and e.get('reason')==reason for e in led.entries('publication')):
             led.record(dict(kind='publication',event='conflict',reason=reason),durable=True)
         log.error('reflow publication recovery needs review for job %s: %s',led.job_id,reason)
-        return False
+        return REVIEW_IN_PLACE
     finally:
         if local_db is not None:local_db.session.close()
+
+
+def _remove_orphaned_staging(led):
+    """Remove every staging folder this job's journal created and nothing removed.
+
+    Called only for a job no live task owns and whose publication is settled, so
+    the folder holds nothing anyone needs: a partly built candidate, or a copy
+    of an EPUB that is still in place. Only a real folder named for this job,
+    inside its root and reached without symlinks, is ever removed. Returns the
+    number removed.
+    """
+    removed={e.get('path') for e in led.entries('staging') if e.get('event')=='removed'}
+    count=0
+    for entry in led.entries('staging'):
+        if entry.get('event')!='created' or entry.get('path') in removed:
+            continue
+        root=config.get_book_path() if entry.get('root')=='library' else REFLOW_DIR
+        if not root:
+            continue
+        path=publication.owned_staging(root,entry.get('path'),led.job_id)
+        if path is None:
+            continue
+        shutil.rmtree(path)
+        publication.sync(os.path.dirname(path))
+        led.record(dict(kind='staging',event='removed',path=entry['path'],recovered=True),durable=True)
+        removed.add(entry['path'])
+        count+=1
+    return count
 
 
 def recover_interrupted_jobs(worker=None):
@@ -583,12 +665,15 @@ def recover_interrupted_jobs(worker=None):
             settled=_recover_publication(led)
             if settled is None:
                 continue
-            if not settled:
-                error="Publication recovery needs review; existing files were preserved."
-                if led.job().get('error')!=error:
-                    led.record({"kind":"job","event":"finish","status":"failed","error":error})
+            if settled is not True:
+                if led.job().get('error')!=settled:
+                    led.record({"kind":"job","event":"finish","status":"failed","error":settled})
                     recovered.append(job_id)
                 continue
+            try:
+                _remove_orphaned_staging(led)
+            except (OSError,publication.PublicationConflict) as exc:
+                log.error('reflow: could not remove the staging folder of job %s: %s',job_id,exc)
             if led.job().get("status") != "running":
                 continue
             led.record({"kind": "job", "event": "finish",

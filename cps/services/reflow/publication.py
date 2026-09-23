@@ -6,10 +6,13 @@ Journal paths are relative to the current library. Every recovery mutation requi
 both the expected database state and exact file identities. A conflict preserves
 all evidence for the operator; it never guesses that a later file is ours.
 """
+import errno
 import fcntl
 import hashlib
+import json
 import os
 import shutil
+import time
 from contextlib import contextmanager
 
 
@@ -36,11 +39,23 @@ def sync(path):
 
 
 def relative(root,path):
-    root=os.path.realpath(root)
+    """``path`` as a library-relative path, or a conflict if it is not in the library.
+
+    The library root is followed once: a root configured as a symlink (``/books ->
+    /mnt/nas/books``, common on NAS installs) is resolved, and a path spelled
+    through it is re-anchored on the real root (N4 of the 7daffa5 retest -- every
+    full publication was refused there). Below the root nothing is followed: a
+    path whose own components are symlinks, or that leaves the real root, is
+    refused exactly as before.
+    """
+    anchor=os.path.abspath(root)
+    real_root=os.path.realpath(root)
     absolute=os.path.abspath(path)
-    if os.path.realpath(absolute)!=absolute or os.path.commonpath([root,absolute])!=root:
+    if absolute==anchor or absolute.startswith(anchor.rstrip(os.sep)+os.sep):
+        absolute=os.path.normpath(os.path.join(real_root,os.path.relpath(absolute,anchor)))
+    if os.path.realpath(absolute)!=absolute or os.path.commonpath([real_root,absolute])!=real_root:
         raise PublicationConflict('publication path escapes the current library or uses a symlink')
-    return os.path.relpath(absolute,root)
+    return os.path.relpath(absolute,real_root)
 
 
 def resolve(root,path):
@@ -65,11 +80,15 @@ def lock(directory,target,blocking=True):
         finally:fcntl.flock(handle,fcntl.LOCK_UN)
 
 
+#: Journal events after which there is nothing left for recovery to do.
+TERMINAL=('rolled_back','retained','conflict_closed')
+
+
 def pending(ledger):
     events=ledger.entries('publication')
     if not events:return None
     last=events[-1]
-    if last.get('event') in ('rolled_back','retained'):return None
+    if last.get('event') in TERMINAL:return None
     prepared=next((e for e in reversed(events) if e.get('event')=='prepared'),None)
     return prepared
 
@@ -80,6 +99,39 @@ def _owned_target(root,target,book_path,desired_format):
     name=desired_format.get('name') if isinstance(desired_format,dict) else None
     if not isinstance(name,str) or os.path.dirname(target)!=folder or os.path.basename(target)!=name+'.epub':
         raise PublicationConflict('publication target does not belong to the current book format')
+
+
+#: os.link failures that mean "this filesystem does not do hard links" (SMB,
+#: FUSE, rclone, vfat, some overlay mounts) rather than "something is wrong".
+_NO_HARD_LINKS=frozenset(code for code in (errno.EXDEV,errno.EPERM,errno.EMLINK,errno.ENOSYS,
+    getattr(errno,'ENOTSUP',None),getattr(errno,'EOPNOTSUPP',None)) if code is not None)
+
+
+def _keep_previous(target,backup,expected):
+    """Preserve the EPUB about to be replaced, as ``backup``, exactly.
+
+    A hard link costs nothing and cannot differ from the original. Where the
+    filesystem refuses one (N4), an exact copy does the same job: it is written
+    beside the backup name, synced, renamed into place, and then compared with
+    the identity the journal is about to record -- a copy that is not the file we
+    measured is a conflict before anything is published, never a bad backup.
+    Any other link failure is a real failure and propagates as before.
+    """
+    try:
+        os.link(target,backup);return
+    except OSError as exc:
+        if exc.errno not in _NO_HARD_LINKS:raise
+    partial=backup+'.partial'
+    try:
+        with open(target,'rb') as original,open(partial,'xb') as copy:
+            shutil.copyfileobj(original,copy,1024*1024)
+            copy.flush();os.fsync(copy.fileno())
+        os.replace(partial,backup)
+    finally:
+        if os.path.exists(partial):os.remove(partial)
+    if identity(backup)!=expected:
+        os.remove(backup)
+        raise PublicationConflict('the previous EPUB changed while it was being backed up')
 
 
 def prepare(ledger,root,book_id,book_path,source,target,staging,previous_format,desired_format,expected_source=None):
@@ -93,7 +145,7 @@ def prepare(ledger,root,book_id,book_path,source,target,staging,previous_format,
     if expected_source and source_identity['sha256']!=expected_source:
         raise PublicationConflict('publication source changed during conversion')
     if new is None:raise PublicationConflict('publication candidate is missing')
-    if old is not None:os.link(target,backup)
+    if old is not None:_keep_previous(target,backup,old)
     sync(candidate)
     if old is not None:sync(backup)
     sync(staging);sync(os.path.dirname(staging))
@@ -153,3 +205,83 @@ def reconcile(ledger,root,record,current_format,book_path,source):
     sync(os.path.dirname(target))
     ledger.record(dict(kind='publication',event=outcome),durable=True)
     return outcome
+
+
+def _copy_exact(source,destination):
+    """Copy one file so that ``destination`` is ``source`` byte for byte, or raise."""
+    want=identity(source)
+    if identity(destination)==want:return want    # a repeated pass after a crash
+    partial=destination+'.partial'
+    try:
+        with open(source,'rb') as original,open(partial,'wb') as copy:
+            shutil.copyfileobj(original,copy,1024*1024)
+            copy.flush();os.fsync(copy.fileno())
+        os.replace(partial,destination)
+    finally:
+        if os.path.exists(partial):os.remove(partial)
+    if identity(destination)!=want:
+        raise PublicationConflict('preserved publication evidence does not match its original')
+    return want
+
+
+def owned_staging(root,relative_path,job_id):
+    """The job's own staging folder under ``root``, or None if it is not there.
+
+    Only a real directory, directly named ``.reflow-<job_id>-...``, inside the
+    root and reached without symlinks, is ever returned -- anything else a
+    journal names is not ours to move or remove.
+    """
+    try:
+        path=resolve(root,relative_path)
+    except PublicationConflict:
+        return None
+    if not os.path.basename(path).startswith('.reflow-%s-'%job_id):
+        return None
+    if os.path.islink(path) or not os.path.isdir(path):
+        return None
+    return path
+
+
+def close_conflict(ledger,root,record,destination,reason,current_book_path=None):
+    """Take a conflicted publication's evidence out of the library, exactly.
+
+    A conflict means recovery could not prove which state is right, so it kept
+    every file -- inside the book's folder, where a hidden ``.reflow-*`` directory
+    holding two EPUBs then stayed forever (N4). When the conflict still stands on
+    a later recovery pass, the staging files are copied to ``destination`` (the
+    Reflow data folder), each copy verified against the original, with a manifest
+    naming the reason and the journal record; the journal is closed durably; and
+    only then is the staging folder removed from the library. Nothing is deleted
+    that has not first been preserved: ``previous.epub`` may be the only copy of
+    the EPUB the user had. Returns the evidence folder, or None when the staging
+    folder no longer exists.
+    """
+    staging=owned_staging(root,record.get('staging'),ledger.job_id)
+    if staging is None and current_book_path:
+        # The book was moved (retitled) after the crash; its folder moved too.
+        moved=os.path.join(current_book_path,os.path.basename(str(record.get('staging') or '')))
+        staging=owned_staging(root,moved,ledger.job_id)
+    evidence=None
+    if staging is not None:
+        os.makedirs(destination,exist_ok=True)
+        files={}
+        for name in sorted(os.listdir(staging)):
+            path=os.path.join(staging,name)
+            if os.path.islink(path) or not os.path.isfile(path):
+                raise PublicationConflict('publication staging contains unexpected entries')
+            files[name]=_copy_exact(path,os.path.join(destination,name))
+        manifest=dict(job_id=ledger.job_id,reason=reason,closed=time.time(),
+                      staging=relative(root,staging),record=record,files=files)
+        partial=os.path.join(destination,'manifest.json.partial')
+        with open(partial,'w',encoding='utf-8') as handle:
+            json.dump(manifest,handle,ensure_ascii=False,indent=1,sort_keys=True)
+            handle.flush();os.fsync(handle.fileno())
+        os.replace(partial,os.path.join(destination,'manifest.json'))
+        sync(destination)
+        evidence=destination
+    ledger.record(dict(kind='publication',event='conflict_closed',reason=reason,
+                       evidence=evidence),durable=True)
+    if staging is not None:
+        shutil.rmtree(staging)
+        sync(os.path.dirname(staging))
+    return evidence

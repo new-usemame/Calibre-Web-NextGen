@@ -817,3 +817,145 @@ def test_sample_source_change_during_build_never_publishes(rig,monkeypatch):
     task=_run(rig,mode='sample',review_mode='deterministic')
     assert task.stat==STAT_FAIL and 'source changed' in (task.error or '').lower()
     assert not os.path.isfile(rig.mod.sample_path(7,task.job_id))
+
+
+# ── publication on real-world libraries (N4, 7daffa5 retest) ─────────────────
+
+def test_a_replacement_is_filed_on_a_library_that_cannot_hard_link(rig,monkeypatch):
+    """An SMB/FUSE/rclone library refuses os.link; "replace the existing EPUB"
+    failed there every time. The whole conversion now files, and the previous
+    file was backed up by copy until the commit. Breaks with a link-only backup."""
+    import errno
+    target=rig.folder/'Book - Author.epub';target.write_bytes(b'previous user EPUB')
+    rig.formats['EPUB']=SimpleNamespace(name='Book - Author',format='EPUB')
+    rig.local_db.session.existing=SimpleNamespace(name='Book - Author',uncompressed_size=target.stat().st_size)
+    def refused(*_args,**_kwargs):raise OSError(errno.EXDEV,'Invalid cross-device link')
+    monkeypatch.setattr(rig.mod.publication.os,'link',refused)
+    task=_run(rig,mode='full',review_mode='deterministic',replace_existing_epub=True)
+    assert task.stat==STAT_FINISH_SUCCESS,task.error
+    assert target.read_bytes()[:2]==b'PK' and rig.local_db.session.commits==1
+    assert not list(rig.folder.glob('.reflow-*'))
+
+
+def test_a_library_reached_through_a_symlinked_root_is_converted_into(rig,monkeypatch):
+    """A library root configured as a symlink (/books -> /mnt/nas/books) had every
+    full conversion refused as 'escapes the library or uses a symlink'. It files
+    now, into the real folder, with a journal of library-relative paths."""
+    link=rig.folder.parent.parent.parent/'library-link'
+    link.symlink_to(rig.folder.parent.parent,target_is_directory=True)
+    monkeypatch.setattr(rig.mod.config,'get_book_path',lambda:str(link))
+    task=_run(rig,mode='full',review_mode='deterministic')
+    assert task.stat==STAT_FINISH_SUCCESS,task.error
+    assert (rig.folder/'Book - Author.epub').read_bytes()[:2]==b'PK'
+    ledger=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),0,task.job_id)
+    prepared=[e for e in ledger.entries('publication') if e.get('event')=='prepared'][-1]
+    assert prepared['target']=='Author/Book (5)/Book - Author.epub'
+
+
+def _crash_after_publish(rig,monkeypatch,task,target):
+    import multiprocessing
+    real_replace=os.replace
+    def child():
+        def replace(src,dst):
+            real_replace(src,dst)
+            if os.fspath(dst)==str(target):os._exit(86)
+        monkeypatch.setattr(rig.mod.os,'replace',replace);task.run(None)
+    process=multiprocessing.get_context('fork').Process(target=child)
+    process.start();process.join(60);assert process.exitcode==86
+
+
+def test_conflict_evidence_leaves_the_book_folder_on_the_next_recovery_pass(rig,monkeypatch):
+    """A publication journal whose files changed underneath it is a conflict: the
+    first recovery preserves everything in place for review. It used to stay in
+    the book's folder forever as a hidden .reflow-* directory holding two EPUBs.
+    The next pass moves that evidence -- byte for byte -- into the Reflow data
+    folder, closes the journal, and leaves the user's later file alone. Breaks if
+    the staging folder is left in the library after the second pass, or if any
+    preserved byte is lost."""
+    target=rig.folder/'Book - Author.epub';target.write_bytes(b'old EPUB')
+    task=rig.mod.TaskReflowPdf(5,7,{'mode':'full','replace_existing_epub':True,'review_mode':'deterministic'})
+    _crash_after_publish(rig,monkeypatch,task,target)
+    staging=next(rig.folder.glob('.reflow-*'))
+    kept={name:(staging/name).read_bytes() for name in os.listdir(staging)}
+    assert set(kept)=={'candidate.epub','previous.epub'} or set(kept)=={'previous.epub'}
+    target.write_bytes(b'later user EPUB')                      # the conflict
+
+    rig.mod.recover_interrupted_jobs()                           # pass 1: preserve in place
+    assert staging.is_dir() and target.read_bytes()==b'later user EPUB'
+    rig.mod.recover_interrupted_jobs()                           # pass 2: out of the library
+    assert not list(rig.folder.glob('.reflow-*'))
+    assert target.read_bytes()==b'later user EPUB'
+    evidence=os.path.join(rig.root,'publication-conflicts','5',task.job_id)
+    assert {name:open(os.path.join(evidence,name),'rb').read() for name in kept}==kept
+    led=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),0,task.job_id)
+    assert rig.mod.publication.pending(led) is None
+    before=led.entries()
+    rig.mod.recover_interrupted_jobs()                           # pass 3: nothing left to do
+    assert ledger_mod.Ledger(led.path,0,task.job_id).entries()==before
+    assert _ledger_rows(rig)[0]['status']=='failed'
+
+
+def test_a_conflict_that_resolves_is_cleaned_up_by_the_ordinary_recovery(rig,monkeypatch):
+    """The other way a conflict ends: the library returns to a state recovery can
+    prove (here the user restores the file Reflow published). The next pass then
+    reconciles normally and removes the staging folder itself."""
+    target=rig.folder/'Book - Author.epub';target.write_bytes(b'old EPUB')
+    task=rig.mod.TaskReflowPdf(5,7,{'mode':'full','replace_existing_epub':True,'review_mode':'deterministic'})
+    _crash_after_publish(rig,monkeypatch,task,target)
+    published=target.read_bytes();target.write_bytes(b'briefly changed')
+    rig.mod.recover_interrupted_jobs()
+    assert list(rig.folder.glob('.reflow-*'))
+    target.write_bytes(published)                                # resolved
+    rig.mod.recover_interrupted_jobs()
+    assert not list(rig.folder.glob('.reflow-*'))
+    assert target.read_bytes()==b'old EPUB'                      # rolled back: never committed
+    assert not os.path.exists(os.path.join(rig.root,'publication-conflicts','5',task.job_id))
+
+
+def test_a_staging_folder_orphaned_before_publication_is_removed_on_recovery(rig,monkeypatch):
+    """The process can die while the EPUB is still being built -- minutes, for a
+    long book -- after the staging folder exists and before any journal entry
+    names it. Nothing was published and nothing needs it, but nothing removed it
+    either. Recovery now does. Breaks if such a folder survives recovery."""
+    import multiprocessing
+    target=rig.folder/'Book - Author.epub';target.write_bytes(b'old EPUB')
+    task=rig.mod.TaskReflowPdf(5,7,{'mode':'full','replace_existing_epub':True,'review_mode':'deterministic'})
+    def child():
+        def die(book,out_path,**_kwargs):
+            with open(out_path+'.tmp','wb') as partial:partial.write(b'PK half an EPUB')
+            os._exit(86)
+        monkeypatch.setattr(rig.mod.build_epub,'build',die);task.run(None)
+    process=multiprocessing.get_context('fork').Process(target=child)
+    process.start();process.join(60);assert process.exitcode==86
+    assert list(rig.folder.glob('.reflow-*'))
+    assert rig.mod.recover_interrupted_jobs()==[task.job_id]
+    assert not list(rig.folder.glob('.reflow-*'))
+    assert target.read_bytes()==b'old EPUB'
+    assert _ledger_rows(rig)[0]['status']=='interrupted'
+
+
+@pytest.mark.parametrize('failure',['io','database'])
+def test_a_transient_failure_on_a_later_pass_never_moves_the_evidence(rig,monkeypatch,failure):
+    """Only a standing conflict is proof enough to take evidence out of the book's
+    folder. A NAS that drops out, or a database that is locked, on the later pass
+    says nothing about the files: they stay exactly where they are, the journal
+    stays open, and the next pass tries again. Breaks if a transient error is
+    treated as a standing conflict."""
+    import errno
+    from sqlalchemy.exc import OperationalError
+    target=rig.folder/'Book - Author.epub';target.write_bytes(b'old EPUB')
+    task=rig.mod.TaskReflowPdf(5,7,{'mode':'full','replace_existing_epub':True,'review_mode':'deterministic'})
+    _crash_after_publish(rig,monkeypatch,task,target)
+    target.write_bytes(b'later user EPUB')
+    rig.mod.recover_interrupted_jobs()                           # pass 1: a real conflict
+    staging=next(rig.folder.glob('.reflow-*'))
+    if failure=='io':
+        def unavailable(*_args,**_kwargs):raise OSError(errno.EIO,'Input/output error')
+        monkeypatch.setattr(rig.mod.publication,'reconcile',unavailable)
+    else:
+        def locked(_book_id):raise OperationalError('SELECT','{}',Exception('database is locked'))
+        monkeypatch.setattr(rig.local_db,'get_book',locked)
+    rig.mod.recover_interrupted_jobs()                           # pass 2: transient
+    assert staging.is_dir() and not os.path.exists(os.path.join(rig.root,'publication-conflicts'))
+    led=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),0,task.job_id)
+    assert rig.mod.publication.pending(led) is not None

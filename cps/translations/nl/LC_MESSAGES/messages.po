@@ -7462,6 +7462,18 @@ msgid "Remove rule"
 msgstr "Regel verwijderen"
 
 #: cps/spa_strings.py
+msgid "Add group"
+msgstr "Groep toevoegen"
+
+#: cps/spa_strings.py
+msgid "Remove group"
+msgstr "Groep verwijderen"
+
+#: cps/spa_strings.py
+msgid "Rule group"
+msgstr "Regelgroep"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Remove {name}?"
 msgstr "{name} verwijderen?"

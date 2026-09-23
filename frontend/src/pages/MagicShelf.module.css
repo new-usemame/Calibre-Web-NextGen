@@ -27,6 +27,12 @@
 .removeRule:hover:not(:disabled) { color: var(--danger); }
 .removeRule:disabled { opacity: 0.3; }
 .addRule { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--accent); font-size: var(--fs-sm); align-self: flex-start; padding: var(--sp-1) 0; }
+.addRow { display: flex; flex-wrap: wrap; gap: var(--sp-4); }
+/* A nested rule group (#2257), indented under a border rail. */
+.group { display: flex; flex-direction: column; gap: var(--sp-2); border-left: 2px solid var(--border); padding-left: var(--sp-3); }
+.groupHeader { display: flex; align-items: center; gap: var(--sp-2); color: var(--text-muted); font-size: var(--fs-sm); }
+.groupHeader select { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-1) var(--sp-2); color: var(--text); }
+.groupHeader .removeRule { margin-left: auto; }
 
 .preview { background: var(--accent-soft); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--sp-3); font-size: var(--fs-sm); color: var(--text); margin-bottom: var(--sp-3); }
 .sample { color: var(--text-muted); }
@@ -35,6 +41,7 @@
 
 @media (max-width: 600px) {
   .container { padding-inline: var(--sp-3); }
+  .group { padding-left: var(--sp-2); }
   .ruleRow {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;

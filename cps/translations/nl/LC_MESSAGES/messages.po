@@ -16759,3 +16759,23 @@ msgstr "Er komt momenteel een sleutel uit de omgeving (%(source)s); die geldt al
 #: cps/templates/config_edit.html
 msgid "Delete the saved key"
 msgstr "De opgeslagen sleutel verwijderen"
+
+#: cps/api/reflow.py
+msgid "You already have a source preparation running or waiting. Wait for it to finish, or stop it, before preparing another."
+msgstr "Je hebt al een bronvoorbereiding die loopt of wacht. Wacht tot die klaar is, of stop hem, voordat je een andere voorbereidt."
+
+#: cps/api/reflow.py
+msgid "Local source preparation is busy. Try again shortly."
+msgstr "De lokale bronvoorbereiding is bezet. Probeer het zo meteen opnieuw."
+
+#: cps/spa_strings.py
+msgid "Waiting for one earlier source preparation to finish."
+msgstr "Wacht tot één eerdere bronvoorbereiding klaar is."
+
+#: cps/spa_strings.py
+msgid "Waiting for {count} earlier source preparations to finish."
+msgstr "Wacht tot {count} eerdere bronvoorbereidingen klaar zijn."
+
+#: cps/spa_strings.py
+msgid "Source preparation stopped at its {minutes}-minute limit so that others can take a turn. Pages already recognized are kept: prepare again to continue."
+msgstr "De bronvoorbereiding is gestopt bij haar limiet van {minutes} minuten, zodat anderen aan de beurt komen. Al herkende pagina’s blijven bewaard: bereid opnieuw voor om verder te gaan."

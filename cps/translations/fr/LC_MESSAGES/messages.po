@@ -17273,3 +17273,23 @@ msgstr "Une clé provient actuellement de l’environnement (%(source)s) ; elle 
 #: cps/templates/config_edit.html
 msgid "Delete the saved key"
 msgstr "Supprimer la clé enregistrée"
+
+#: cps/api/reflow.py
+msgid "You already have a source preparation running or waiting. Wait for it to finish, or stop it, before preparing another."
+msgstr "Vous avez déjà une préparation du document source en cours ou en attente. Attendez qu’elle se termine, ou arrêtez-la, avant d’en préparer une autre."
+
+#: cps/api/reflow.py
+msgid "Local source preparation is busy. Try again shortly."
+msgstr "La préparation locale du document source est occupée. Réessayez dans quelques instants."
+
+#: cps/spa_strings.py
+msgid "Waiting for one earlier source preparation to finish."
+msgstr "En attente de la fin d’une préparation du document source lancée avant la vôtre."
+
+#: cps/spa_strings.py
+msgid "Waiting for {count} earlier source preparations to finish."
+msgstr "En attente de la fin de {count} préparations du document source lancées avant la vôtre."
+
+#: cps/spa_strings.py
+msgid "Source preparation stopped at its {minutes}-minute limit so that others can take a turn. Pages already recognized are kept: prepare again to continue."
+msgstr "La préparation du document source s’est arrêtée à sa limite de {minutes} minutes pour laisser leur tour aux autres. Les pages déjà reconnues sont conservées : relancez la préparation pour continuer."

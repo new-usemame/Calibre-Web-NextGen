@@ -937,3 +937,26 @@ def test_the_administrator_sees_the_conversion_limits(mod, monkeypatch, pdf_on_d
     with _ctx("/api/v1/admin/reflow"), patch.object(mod, "current_user", _user(admin=True)):
         body = _json(inspect.unwrap(mod.reflow_admin_config)())
     assert body["max_pages"] == 1500 and body["max_pdf_mb"] == 300
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("reason,status,code", [("owner_busy", 409, "preparation_owner_busy"),
+                                                ("queue_full", 503, "preparation_busy")])
+def test_a_preparation_that_cannot_join_the_line_says_why_in_the_readers_language(
+        mod, monkeypatch, pdf_on_disk, french, reason, status, code):
+    """N2(b): the line for the preparation slot turns a request away for only two
+    reasons -- this person already has one in flight, or the line is full -- and
+    each is its own answer, translated, rather than one untranslated 'busy'."""
+    _wire(mod, monkeypatch, pdf_on_disk)
+    def refused(*_args, **_kwargs):
+        raise mod.quote_preparation.PreparationBusy(reason)
+    monkeypatch.setattr(mod, "_start_preparation", refused)
+    with _ctx_in("fr", french, "/api/v1/books/5/reflow/estimate/prepare", "POST",
+                 {"source_recovery": "auto", "ocr_language": "eng"}), \
+            patch.object(mod, "current_user", _user()):
+        response = inspect.unwrap(mod.reflow_prepare_estimate)(5)
+    assert _status(response) == status
+    error = _json(response)["error"]
+    assert error["code"] == code
+    english = {"owner_busy": "You already", "queue_full": "Local source"}[reason]
+    assert error["message"] and not error["message"].startswith(english), error["message"]

@@ -8,7 +8,7 @@ import { apiGet, apiPost, apiDelete } from './api';
 
 import type { ReflowMode } from './reflowMoney.ts';
 import { preparationActive, type SourceAssessment, type ReviewMode, type ReviewPreparation, type SourceRecovery, type StructuralSummary } from './sourceReview.ts';
-export { selectedReview, preparationActive } from './sourceReview.ts';
+export { selectedReview, preparationActive, preparationNote } from './sourceReview.ts';
 export type { ReviewMode, ReviewQuote, ReviewPreparation, SourceAssessment } from './sourceReview.ts';
 
 // The shapes and the sums are one subject with the endpoints, and every caller

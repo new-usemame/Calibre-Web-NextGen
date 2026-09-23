@@ -7,7 +7,7 @@ import { useBook } from '../lib/queries';
 import {
   useReflowEstimate, useReflowJobs, useStartReflow, useCancelReflow,
   heldUsd, holdRequiringAcknowledgment, jobCounts, ledgerUsd,
-  selectedReview, preparationActive, usePrepareReflow, useReflowPreparation, useCancelPreparation, usd,
+  selectedReview, preparationActive, preparationNote, usePrepareReflow, useReflowPreparation, useCancelPreparation, usd,
   type ReflowJob, type ReflowMode, type ReviewMode,
 } from '../lib/reflow';
 import { Button } from '../components/Button';
@@ -85,6 +85,7 @@ export function Reflow({ id }: { id: string }) {
   const quote = preparationQ.data?.status === 'ready' && preparationQ.data.quote?.source_sha256 === est?.source_sha256
     ? preparationQ.data.quote : undefined;
   const paid = reviewMode === 'source_verified';
+  const note = preparationNote(preparationQ.data, prepare.isPending, !!preparationQ.error, !!quote);
   const selected = selectedReview(quote, mode, samplePages);
   const needed = selected.bound;
   const capNumber = Number(cap);
@@ -338,11 +339,15 @@ export function Reflow({ id }: { id: string }) {
             })}>{t('Stop preparation')}</Button>}
         </>}
         <p className={styles.note} role="status">
-          {paid && (preparing ? t('Preparing source context: {page} of {pages}', {
-            page: preparationQ.data?.progress.page ?? 0, pages: preparationQ.data?.progress.pages ?? est.pages })
-            : preparationQ.data?.status === 'cancelled' ? t('Source preparation stopped. No model request was sent.')
-              : preparationQ.data?.status === 'failed' || preparationQ.error ? t('Source estimate preparation failed. No model request was sent.')
-                : quote ? t('Source estimate ready. No credit has been reserved.') : '')}
+          {paid && (note.kind === 'queued'
+            ? (note.ahead === 1 ? t('Waiting for one earlier source preparation to finish.')
+              : t('Waiting for {count} earlier source preparations to finish.', { count: note.ahead }))
+            : note.kind === 'preparing' ? t('Preparing source context: {page} of {pages}', {
+              page: note.page, pages: note.pages ?? est.pages })
+              : note.kind === 'cancelled' ? t('Source preparation stopped. No model request was sent.')
+                : note.kind === 'timed_out' ? t('Source preparation stopped at its {minutes}-minute limit so that others can take a turn. Pages already recognized are kept: prepare again to continue.', { minutes: note.minutes })
+                  : note.kind === 'failed' ? t('Source estimate preparation failed. No model request was sent.')
+                    : note.kind === 'ready' ? t('Source estimate ready. No credit has been reserved.') : '')}
         </p>
         {paid && quote && <>
           <dl className={styles.facts}>

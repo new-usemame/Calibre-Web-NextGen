@@ -447,7 +447,13 @@ def reflow_prepare_estimate(book_id):
     try:
         job=_start_preparation(current_user.id,book_id,source,options,
             lambda path,opts,progress,stop:_quote_work(path,opts,progress,stop,cache_root))
-    except quote_preparation.PreparationBusy:return _err('preparation_busy','Local source preparation is busy. Try again shortly.',503)
+    except quote_preparation.PreparationBusy as busy:
+        # One preparation runs at a time and the rest wait in line (N2(b)); a
+        # request is only turned away for one of these two reasons.
+        if busy.reason=='owner_busy':
+            return _err('preparation_owner_busy',_('You already have a source preparation running or '
+                        'waiting. Wait for it to finish, or stop it, before preparing another.'),409)
+        return _err('preparation_busy',_('Local source preparation is busy. Try again shortly.'),503)
     return jsonify(job),200 if job['status']=='ready' else 202
 
 

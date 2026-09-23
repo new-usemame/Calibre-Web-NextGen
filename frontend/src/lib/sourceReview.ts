@@ -24,6 +24,10 @@ export interface ReviewPreparation {
   status: 'waiting' | 'preparing' | 'cancelling' | 'cancelled' | 'ready' | 'failed';
   progress: { stage?: string; page?: number; pages?: number };
   quote?: ReviewQuote; error?: string;
+  /** Preparations that run before this waiting one; the slot is shared, first come first served. */
+  ahead?: number;
+  /** The wall-clock limit one preparation runs under before it is stopped. */
+  timeout_minutes?: number;
 }
 export interface StructuralSummary {
   review_mode: ReviewMode; eligibility_measured: boolean; requested_models?: Record<string, number>;
@@ -37,6 +41,28 @@ export interface StructuralSummary {
 }
 export function preparationActive(status?: ReviewPreparation['status']): boolean {
   return status === 'waiting' || status === 'preparing' || status === 'cancelling';
+}
+export type PreparationNote =
+  | { kind: 'queued'; ahead: number }
+  | { kind: 'preparing'; page: number; pages?: number }
+  | { kind: 'cancelled' } | { kind: 'timed_out'; minutes: number } | { kind: 'failed' }
+  | { kind: 'ready' } | { kind: 'none' };
+/** What the preparation status line says: waiting in line for the shared slot,
+ *  preparing, or how it ended -- a preparation stopped at its time limit keeps the
+ *  pages it recognized and can continue, which a plain failure cannot promise. */
+export function preparationNote(prep: ReviewPreparation | undefined, pending: boolean,
+  failed: boolean, ready: boolean): PreparationNote {
+  if (prep?.status === 'waiting' && (prep.ahead ?? 0) > 0) return { kind: 'queued', ahead: prep.ahead ?? 0 };
+  if (pending || preparationActive(prep?.status)) {
+    return { kind: 'preparing', page: prep?.progress.page ?? 0, pages: prep?.progress.pages };
+  }
+  if (prep?.status === 'cancelled') return { kind: 'cancelled' };
+  if (prep?.status === 'failed' && prep.error === 'source_preparation_timeout') {
+    return { kind: 'timed_out', minutes: prep.timeout_minutes ?? 30 };
+  }
+  if (prep?.status === 'failed' || failed) return { kind: 'failed' };
+  if (ready) return { kind: 'ready' };
+  return { kind: 'none' };
 }
 export function selectedReview(quote: ReviewQuote | undefined, mode: ReflowMode, samplePages: number) {
   const start = mode === 'sample' ? (quote?.first_body_page ?? 0) : 0;

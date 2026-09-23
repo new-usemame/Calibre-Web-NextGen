@@ -1,8 +1,10 @@
 """Bounded local preparation jobs; no provider sessions or billing reservations."""
 import copy
 import hashlib
+import itertools
 import json
 import os
+import signal
 import threading
 import time
 import uuid
@@ -17,14 +19,45 @@ from . import extract,model,structural_quote,typed_model,prompts,ocr,build_epub,
 
 
 class PreparationBusy(Exception):
-    pass
+    """No room for this preparation now. ``reason`` is ``owner_busy`` (this person
+    already has one in flight) or ``queue_full`` (the line is full)."""
+    def __init__(self,reason='queue_full'):
+        super().__init__(reason);self.reason=reason
+
+
+class PreparationTimeout(Exception):
+    """A preparation ran past its wall-clock limit and was stopped."""
+
+
+#: The longest one preparation may hold the preparation slot (N2(b) of the
+#: 7daffa5 retest: the process had no wall-clock limit, so one huge PDF held the
+#: only slot for as long as it took). Recognised pages are cached as they finish,
+#: so a preparation stopped here continues from where it stopped when it is
+#: started again: a turn, not a loss.
+PREPARATION_TIMEOUT=30*60
+#: How long a stopped preparation gets to stop on its own -- OCR ends its own
+#: Tesseract -- before its whole process group is killed.
+STOP_GRACE=10.0
+#: How many preparations may wait for the slot behind the one that is running.
+MAX_WAITING=4
+ACTIVE=('waiting','preparing','cancelling')
+
+WORKER=Path(__file__).with_name('quote_worker.py')
 
 
 class PreparationStore:
-    def __init__(self,directory,workers=1):
+    """Preparations, one person at a time per slot, in the order they were asked for.
+
+    ``workers`` preparations run at once (one: each is a CPU-heavy process). The
+    rest wait in line, first come first served, and each is told how many are
+    ahead of it. One person has at most one preparation in flight, so nobody can
+    fill the line alone, and the line holds ``max_waiting``; past that a request is
+    refused as busy rather than queued behind hours of other people's work.
+    """
+    def __init__(self,directory,workers=1,max_waiting=MAX_WAITING):
         self.directory=Path(directory);self.directory.mkdir(parents=True,exist_ok=True)
         self.workers=workers;self.pool=ThreadPoolExecutor(max_workers=workers,thread_name_prefix='reflow-source-quote')
-        self.lock=threading.Lock();self.jobs={}
+        self.lock=threading.Lock();self.jobs={};self.max_waiting=max_waiting;self._order=itertools.count()
 
     def _key(self,source,options):
         fingerprint=extract.document_fingerprint(source)
@@ -48,9 +81,15 @@ class PreparationStore:
         actual=hashlib.sha256(json.dumps(data,sort_keys=True,ensure_ascii=False,separators=(',',':'),allow_nan=False).encode()).hexdigest()
         if identity!=actual:raise ValueError('prepared quote integrity changed')
 
-    @staticmethod
-    def _public(job):
+    def _ahead(self,job):
+        """How many preparations will run before this waiting one (lock held)."""
+        if job['status']!='waiting':return 0
+        return sum(1 for other in self.jobs.values()
+                   if other is not job and other['status'] in ACTIVE and other['order']<job['order'])
+
+    def _public(self,job):
         result={k:copy.deepcopy(job[k]) for k in ('preparation_id','status','progress')}
+        result['ahead']=self._ahead(job);result['timeout_minutes']=PREPARATION_TIMEOUT//60
         if job['status']=='ready':result['quote']=copy.deepcopy(job['quote'])
         if job.get('error'):result['error']=job['error']
         return result
@@ -69,13 +108,18 @@ class PreparationStore:
                 if job['owner']==owner and job['book_id']==book_id and job['key']==key and job['status'] in ('waiting','preparing','ready'):
                     job['touched']=now;return self._public(job)
             # Bound retained opaque handles independently of worker count.
-            terminal=sorted((j for j in self.jobs.values() if j['status'] not in ('waiting','preparing','cancelling')),key=lambda j:j['touched'])
+            terminal=sorted((j for j in self.jobs.values() if j['status'] not in ACTIVE),key=lambda j:j['touched'])
             for old in terminal[:max(0,len(self.jobs)-255)]:self.jobs.pop(old['preparation_id'],None)
-            active=sum(j['status'] in ('waiting','preparing','cancelling') for j in self.jobs.values())
-            if active>=self.workers:raise PreparationBusy('source preparation workers are busy')
+            if cached is None:
+                # A completed quote costs nothing and is never refused. New work
+                # waits its turn: one in flight per person, and a bounded line.
+                if any(j['owner']==owner and j['status'] in ACTIVE for j in self.jobs.values()):
+                    raise PreparationBusy('owner_busy')
+                active=sum(j['status'] in ACTIVE for j in self.jobs.values())
+                if active-self.workers>=self.max_waiting:raise PreparationBusy('queue_full')
             job=dict(preparation_id=uuid.uuid4().hex,owner=owner,book_id=book_id,key=key,source=source,
                      fingerprint=fingerprint,options=copy.deepcopy(options),status='waiting',progress={},
-                     stop=threading.Event(),touched=now)
+                     stop=threading.Event(),touched=now,order=next(self._order))
             if cached is not None:job.update(status='ready',quote=cached)
             self.jobs[job['preparation_id']]=job
             if job['status']!='ready':job['future']=self.pool.submit(self._run,job,work)
@@ -102,6 +146,8 @@ class PreparationStore:
             with self.lock:job.update(status='ready',quote=quote,touched=time.monotonic())
         except model.AttemptCancelled:
             with self.lock:job.update(status='cancelled',touched=time.monotonic())
+        except PreparationTimeout:
+            with self.lock:job.update(status='failed',error='source_preparation_timeout',touched=time.monotonic())
         except Exception:
             # No source paths, raw source text or another owner's identity in API errors.
             with self.lock:job.update(status='failed',error='source_preparation_failed',touched=time.monotonic())
@@ -152,7 +198,27 @@ def _child_environment(scratch):
     return environment
 
 
-def measure_isolated(source,options,progress,should_stop,cache_root):
+def _reap(process,control,grace):
+    """Stop the preparation process and everything it started; every wait is bounded.
+
+    The process leads its own session and process group (``start_new_session``),
+    so one ``killpg`` also reaches the Tesseract it runs. A running process is
+    first asked to stop through its control file and given ``grace`` seconds --
+    OCR then ends its own child and removes its scratch -- and the group is
+    signalled even after a normal exit, because a helper can outlive its parent.
+    """
+    if process.poll() is None:
+        try:control.touch(exist_ok=True)
+        except OSError:pass
+        try:process.wait(timeout=grace)
+        except subprocess.TimeoutExpired:pass
+    try:os.killpg(process.pid,signal.SIGKILL)
+    except (ProcessLookupError,PermissionError):pass
+    try:process.wait(timeout=grace)
+    except subprocess.TimeoutExpired:pass       # unkillable (in-kernel I/O): nothing more to do
+
+
+def measure_isolated(source,options,progress,should_stop,cache_root,timeout=None,grace=None):
     """One owned renderer process; only bounded progress and quote JSON cross back.
 
     The process has no client/session/key arguments, and no secrets in its
@@ -162,21 +228,35 @@ def measure_isolated(source,options,progress,should_stop,cache_root):
     ``PYTHONNOUSERSITE=1`` in its s6 run script). A cancellation file is polled
     by the existing extraction, Recovery and candidate loops, including OCR's
     child-process cancellation. No partial quote is made ready or billed.
+
+    It is bounded in time: past ``timeout`` seconds (``PREPARATION_TIMEOUT``) it
+    raises :class:`PreparationTimeout`, and a cancelled preparation that has not
+    stopped on its own within ``grace`` seconds is stopped. Either way the process
+    and everything it started are killed (``_reap``) and its scratch removed.
     """
+    timeout=PREPARATION_TIMEOUT if timeout is None else float(timeout)
+    grace=STOP_GRACE if grace is None else float(grace)
     scratch=Path(cache_root)/'quote-scratch';scratch.mkdir(parents=True,exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='prepare-',dir=scratch) as directory:
         root=Path(directory);control=root/'cancel';status=root/'progress.json';output=root/'quote.json'
         request=dict(source=str(source),options=options,cache_root=str(cache_root),
-                     control=str(control),progress=str(status),output=str(output))
+                     control=str(control),progress=str(status),output=str(output),parent=os.getpid())
         with open(root/'stderr.log','wb') as errors:
-            process=subprocess.Popen([sys.executable,'-I',str(Path(__file__).with_name('quote_worker.py'))],
+            process=subprocess.Popen([sys.executable,'-I',str(WORKER)],
                 stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=errors,
-                env=_child_environment(root),cwd=str(root))
+                env=_child_environment(root),cwd=str(root),start_new_session=True)
+            deadline=time.monotonic()+timeout;stopping=None
             try:
                 process.stdin.write(json.dumps(request).encode());process.stdin.close()
                 last=None
                 while process.poll() is None:
-                    if should_stop and should_stop():control.touch(exist_ok=True)
+                    now=time.monotonic()
+                    if should_stop and should_stop():
+                        control.touch(exist_ok=True)
+                        stopping=stopping or now+grace
+                        if now>=stopping:break
+                    if now>=deadline:
+                        raise PreparationTimeout('source preparation exceeded its time limit')
                     try:
                         event=json.loads(status.read_text())
                         if event!=last and progress:
@@ -188,9 +268,4 @@ def measure_isolated(source,options,progress,should_stop,cache_root):
                 if process.returncode!=0:raise ValueError('source preparation process failed')
                 return json.loads(output.read_text())
             finally:
-                if process.poll() is None:
-                    control.touch(exist_ok=True)
-                    # Exception cleanup owns this subprocess; normal cancellation
-                    # above waits for cooperative source/Recovery cleanup.
-                    try:process.wait(timeout=5)
-                    except subprocess.TimeoutExpired:process.terminate();process.wait()
+                _reap(process,control,grace)

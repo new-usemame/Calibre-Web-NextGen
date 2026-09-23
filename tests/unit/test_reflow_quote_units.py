@@ -124,3 +124,35 @@ def test_qualified_uncertain_terminal_marker_keeps_proven_source_unit(tmp_path):
     assert any(c['kind']=='quote' and c['element_id']=='e1' and c['source_range']==[start,end+2] for c in prepare(data).candidates())
     assert book.pages[0][1].runs[-1]==['sup','153',0,'uncertain']
     doc.close()
+
+
+def split_display(tmp_path):
+    data=fixture(tmp_path);book,doc,raw,*_=data
+    quote=book.pages[0][1];raw=raw.to_dict()
+    block=next(b for b in raw['blocks'] if len(b.get('lines',[]))==2 and b['lines'][0]['bbox'][1]>140 and b['lines'][0]['bbox'][1]<200)
+    parts=[]
+    for line in block['lines']:
+        part=copy.deepcopy(quote);part.bbox=line['bbox'];part.line_boxes=[line['bbox']]
+        part.runs=[['t',''.join(s['text'] for s in line['spans'])]]
+        part.punctuation_uncertain=True;parts.append(part)
+    book.elements[1:2]=parts;book.pages[0][1:2]=parts
+    at=raw['blocks'].index(block)
+    raw['blocks'][at:at+1]=[dict(block,lines=[line],bbox=line['bbox']) for line in block['lines']]
+    return book,doc,raw,0,len(parts[0].runs[0][1])
+
+
+@pytest.mark.parametrize('seam',['candidates','admission','builder'])
+def test_same_page_split_display_cannot_be_admitted_as_complete_quote(tmp_path,seam):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    data=split_display(tmp_path);book,doc,raw,start,end=data;p=prepare(data)
+    if seam=='candidates':
+        assert not any(c['kind']=='quote' and c['element_id'] in ('e1','e2') for c in p.candidates())
+    else:
+        forged=replace(p,specs=(ops._Spec(1,'quote',start,end),))
+        cid=forged.candidates()[0]['candidate_id'];target=tmp_path/'split.epub'
+        with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+            if seam=='admission':forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=p.snapshot_id,select=[cid]))
+            else:build_epub.build(book,str(target),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
+        assert not target.exists()
+    doc.close()

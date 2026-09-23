@@ -8,7 +8,7 @@ import re
 import statistics
 from . import extract,heading_evidence as geometry
 
-VERSION='source-quote-units-1'
+VERSION='source-quote-units-2'
 
 
 def _normal_positions(text):
@@ -85,6 +85,29 @@ def _italic(line):
         'italic' in s.get('font','').lower() or 'oblique' in s.get('font','').lower() for s in spans)
 
 
+def _same_page_continuation(elements,index,mapped,lines):
+    """Element and PDF-block boundaries can split one continuous display.
+
+    Adjacent same-column paragraphs at the same indent and ordinary line spacing
+    do not establish separate complete units, even if punctuation is uncertain
+    or the extraction engine created separate raw blocks. This adapter cannot
+    wrap across elements, so both fragments must abstain.
+    """
+    element=elements[index]
+    for neighbor_index in (index-1,index+1):
+        if not 0<=neighbor_index<len(elements):continue
+        neighbor=elements[neighbor_index]
+        if neighbor.kind!='p' or neighbor.table_row or neighbor.column!=element.column:continue
+        adjacent,_=geometry._map(neighbor,lines)
+        if not adjacent:continue
+        prior,following=(adjacent[-1],mapped[0]) if neighbor_index<index else (mapped[-1],adjacent[0])
+        a,b=prior['bbox'],following['bbox']
+        em=max(a[3]-a[1],b[3]-b[1])
+        if 0<b[1]-a[1]<=em*1.7 and abs(a[0]-b[0])<=em*.5:
+            return True
+    return False
+
+
 def quote_evidence(book,pno,raw_page,layer,source_rotation=0,uncertain=False):
     raw=raw_page.to_dict() if hasattr(raw_page,'to_dict') else raw_page
     lines=[line for block in (raw or {}).get('blocks',[]) if block.get('kind','text')=='text'
@@ -105,7 +128,7 @@ def quote_evidence(book,pno,raw_page,layer,source_rotation=0,uncertain=False):
         containing=[block for block in raw.get('blocks',[]) if any(line in mapped for line in block.get('lines',[]))]
         if any(any(line not in mapped for line in block.get('lines',[])) for block in containing):
             proof['reason']='incomplete_source_display_unit';continue
-        if geometry._continued(book,pno,index):
+        if geometry._continued(book,pno,index) or _same_page_continuation(elements,index,mapped,lines):
             proof['reason']='known_source_continuation';continue
         text=''.join(str(run[1]) for run in element.runs)
         end=len(text)

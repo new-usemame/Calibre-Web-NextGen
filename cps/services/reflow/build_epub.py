@@ -157,8 +157,14 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                                'caption.">%s (?)</span>' % caption)
                 index += 1
             figures = [f for f in book.figures if f["pno"] == pno]
-            source_region = figure_index < len(figures) and figures[figure_index].get("found") == "ocr_uncertain_region"
-            if source_region:
+            reason = figures[figure_index].get("found") if figure_index < len(figures) else ""
+            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict")
+            if reason == "native_outline_conflict":
+                caption = ('Native heading text conflicts with PDF navigation metadata. '
+                           'The original printed heading is shown as an image; no replacement '
+                           'transcription was inferred. '
+                           '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
+            elif source_region:
                 caption = ('Original text region. OCR transcription is uncertain; '
                            'read the source pixels. This image does not provide searchable text. '
                            '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
@@ -311,7 +317,7 @@ def _figure_html(pno, index, caption, source_region=False):
     src = "images/fig_p%04d_%d.jpg" % (pno, index)
     # SPEC §3: a figure always carries a figcaption, empty when the page printed no
     # caption, so "no caption found" is stated rather than left to be inferred.
-    alt = ("Original text region; OCR transcription uncertain" if source_region else
+    alt = ("Original source text region; see the source-image disclosure" if source_region else
            "" if caption else "Original figure from PDF page %d" % (pno + 1))
     return ('<figure><img src="%s" alt="%s"/><figcaption%s>%s</figcaption></figure>'
             % (src, alt, "" if caption else ' class="reflow-no-caption"', caption))
@@ -1407,13 +1413,25 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
             spine.append("reflow-about")
             entries.append((ABOUT_HREF, "About this conversion"))
 
+        # Use only literal, resolved internal PDF navigation. Its labels never
+        # replace body text, and destinations are our generated source-page anchors.
+        authored = extract.outline(doc) if doc is not None else []
+        from .skeleton import outline_is_useful
+        authored = [entry for entry in authored if entry['pno'] in page_homes] if outline_is_useful(authored) else []
         for chapter in chapters:
             documents[chapter.href] = _document(chapter.title,
                                                 "\n".join(chapter.blocks), language)
             manifest.append({"id": chapter.item_id, "href": chapter.href,
                              "type": "application/xhtml+xml"})
             spine.append(chapter.item_id)
-            entries.append((chapter.href, chapter.title))
+            if not authored:
+                entries.append((chapter.href, chapter.title))
+        if authored:
+            first = min(page_homes)
+            if first != authored[0]['pno']:
+                entries.append((page_homes[first] + '#pg_%04d' % first, 'Beginning'))
+            entries.extend((page_homes[entry['pno']] + '#pg_%04d' % entry['pno'], entry['title'])
+                           for entry in authored)
 
         # An ordinary spine item also works in readers which ignore EPUB page-list.
         # Keep this generated reference after the book, never inside its prose.

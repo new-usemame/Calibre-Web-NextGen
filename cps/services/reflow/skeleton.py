@@ -638,8 +638,36 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
         skel.regions.append(candidate)
 
     skel.regions.extend(note_regions)
+    _preserve_conflicting_outline_heading(raw, style, skel)
     skel.regions.sort(key=_region_order)
     return skel
+
+
+def _preserve_conflicting_outline_heading(raw, style, skel):
+    # Outline labels are independent, authored navigation, not body text. A
+    # disagreement cannot tell us which Unicode is right: preserve printed pixels.
+    if raw.is_page_scan:
+        return
+    labels = [entry for entry in style.outline if entry.get('internal') is True
+              and entry.get('pno') == raw.pno]
+    headings = [r for r in skel.regions if r.kind == 'heading' and r.display_group]
+    if len(labels) != 1 or len(headings) != 1:
+        return
+    heading = headings[0]
+    x0, y0, x1, y1 = heading.bbox
+    if not (0 <= x0 < x1 <= raw.width and 0 <= y0 < y1 <= raw.height
+            and y0 < raw.height * .5 and y1-y0 <= raw.height * .3
+            and (x1-x0)*(y1-y0) <= raw.width*raw.height*.35):
+        return
+    tokens = lambda text: re.findall(r'\w+', text.casefold())
+    label, reading = tokens(labels[0]['title']), tokens(heading.text)
+    if not label or any(reading[i:i+len(label)] == label for i in range(len(reading))):
+        return
+    heading.kind = 'artwork'
+    heading.reason = 'native_outline_conflict'
+    skel.regions.append(Region(kind='figure',bbox=heading.bbox,
+                               reason='native_outline_conflict'))
+    skel.reasons.append('native_outline_conflict')
 
 
 def _preserve_uncertain_ocr_regions(raw, kept_blocks, note_regions, skel, cover, candidates):

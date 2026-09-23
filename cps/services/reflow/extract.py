@@ -746,11 +746,24 @@ def document_fingerprint(source):
 def outline(doc):
     """The PDF's own bookmarks, when it has any: free, authored navigation."""
     try:
-        toc = doc.get_toc(simple=True) or []
+        toc = doc.get_toc(simple=False) or []
+        pages = len(doc)
     except Exception:
         return []
-    return [{"level": int(lvl), "title": (title or "").strip(), "pno": int(page) - 1}
-            for lvl, title, page in toc if (title or "").strip()]
+    entries = []
+    for row in toc:
+        if not isinstance(row, (list, tuple)) or len(row) != 4:
+            continue
+        level, title, page, destination = row
+        if (type(level) is not int or not 1 <= level <= 64 or
+                not isinstance(title, str) or not title.strip() or len(title) > 2048 or
+                type(page) is not int or not 1 <= page <= pages or
+                not isinstance(destination, dict) or type(destination.get('kind')) is not int or destination['kind'] != 1 or
+                type(destination.get('page')) is not int or destination['page'] != page - 1 or
+                destination.get('uri') or destination.get('file')):
+            continue
+        entries.append({'level': level, 'title': title.strip(), 'pno': page - 1, 'internal': True})
+    return entries
 
 
 def document_metadata(doc) -> Optional[dict]:

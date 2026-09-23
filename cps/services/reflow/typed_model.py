@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from . import model
 
 ROUTE_VERSION = 'source-operations-flex-1'
-SOURCE_REVISION = 'source-operations-enriched-heading-evidence-4'
+SOURCE_REVISION = 'source-operations-complete-quote-units-5'
 MAX_OUTPUT_TOKENS = 4096
 # Not publicly activated until independent semantic and application gates pass.
 QUALITY_RELEASED = False

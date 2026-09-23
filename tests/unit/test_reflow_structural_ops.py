@@ -20,27 +20,38 @@ X = '{http://www.w3.org/1999/xhtml}'
 @pytest.fixture
 def source(tmp_path):
     doc=pymupdf.open();page=doc.new_page(width=500,height=700)
-    body_width=pymupdf.get_text_length('Attribution: First source sentence. Following ordinary prose.',fontsize=12)
+    body_width=pymupdf.get_text_length('Attribution from an earlier printed edition:',fontsize=12,fontname='tiit')
     title_width=pymupdf.get_text_length('Learning the sky',fontsize=20)
-    page.insert_text((50+(body_width-title_width)/2,65),'Learning the sky',fontsize=20)
-    page.insert_text((50,105),'Attribution: First source sentence. Following ordinary prose.',fontsize=12)
+    page.insert_text((80+(body_width-title_width)/2,65),'Learning the sky',fontsize=20)
+    page.insert_text((80,105),'Attribution from an earlier printed edition:',fontsize=12,fontname='tiit')
+    x=80
+    for text,font in [('"First ','tiro'),('source','tiit'),(' sentence."','tiro')]:
+        page.insert_text((x,125),text,fontsize=12,fontname=font)
+        x+=pymupdf.get_text_length(text,fontname=font,fontsize=12)
+    page.insert_text((x,122),'7',fontsize=8,fontname='tiro')
+    page.insert_text((50,170),'Following ordinary prose establishes the wider printed body column.',fontsize=12)
     page.draw_circle((200,300),60)
     page.insert_text((130,385),'Figure 1. Original caption',fontsize=10)
     page.insert_text((50,610),'7 Uncertain original reference.',fontsize=10)
     path=tmp_path/'source.pdf';doc.save(path);doc.close();doc=pymupdf.open(path)
     elements=[assemble.Element(kind='p',pno=0,runs=[['t','Learning the sky']],bbox=(50,40,250,70)),
-        assemble.Element(kind='p',pno=0,runs=[['t','Attribution: “First '],['t','source','italic'],
-            ['t',' sentence.”'],['sup','7',0,'uncertain'],['t',' Following ordinary prose.']],bbox=(50,85,440,145)),
+        assemble.Element(kind='p',pno=0,runs=[['t','Attribution from an earlier printed edition: ','italic'],['t','"First '],['t','source','italic'],
+            ['t',' sentence."'],['sup','7',0,'uncertain']],bbox=(80,85,440,145)),
         assemble.Element(kind='h',pno=0,level=2,runs=[['t','Established heading']]),
         assemble.Element(kind='p',pno=0,runs=[['t','Immutable table row']],table_row=True),
         assemble.Element(kind='fig',pno=0,bbox=(135,235,265,365)),
         assemble.Element(kind='caption',pno=0,runs=[['t','Figure 1. Original caption','italic']],
-                         bbox=(130,370,320,390),caption_uncertain=True)]
+                         bbox=(130,370,320,390),caption_uncertain=True),
+        assemble.Element(kind='p',pno=0,runs=[['t','Following ordinary prose establishes the wider printed body column.']],bbox=(50,155,450,175))]
     book=assemble.Book(elements=elements,pages={0:elements},
         style=skeleton.BookStyle(body_size=12),
         notes=[assemble.Note(num=7,text='Uncertain original reference.',pno=0,uncertain=True,bbox=(50,590,350,620))],
         figures=[{'pno':0,'bbox':(135,235,265,365),'found':'source','needs_ink':False}])
-    title=extract.read_page(doc,0).text_blocks[0].lines[0]
+    raw=extract.read_page(doc,0)
+    title=raw.text_blocks[0].lines[0]
+    quote_lines=[l for b in raw.text_blocks for l in b.lines if 85<l.bbox[1]<140]
+    elements[1].line_boxes=[l.bbox for l in quote_lines]
+    elements[1].bbox=(min(l.bbox[0] for l in quote_lines),min(l.bbox[1] for l in quote_lines),max(l.bbox[2] for l in quote_lines),max(l.bbox[3] for l in quote_lines))
     elements[0].bbox=title.bbox;elements[0].line_boxes=[title.bbox]
     yield book,doc,tmp_path
     doc.close()
@@ -68,7 +79,7 @@ def texts(path):
         return bodies
 
 
-def test_uniform_choices_contain_real_pixels_and_wrong_but_legal_alternatives(source):
+def test_uniform_choices_contain_real_pixels_and_only_complete_source_units(source):
     p=prepared(source);view=p.model_view();c=view['candidates']
     assert len({tuple(sorted(x)) for x in c})==1
     assert not any(word in json.dumps(view) for word in ('abstention_controls','eligible','must not leak'))
@@ -76,16 +87,18 @@ def test_uniform_choices_contain_real_pixels_and_wrong_but_legal_alternatives(so
     assert data[:2]==b'\xff\xd8' and hashlib.sha256(data).hexdigest()==view['source_image']['sha256']
     assert choose(p,'e0','heading')
     assert not any(c['element_id']=='e1' and c['kind']=='heading' for c in p.candidates())
-    end=len('Attribution: “First source sentence.”7')
+    end=len('Attribution from an earlier printed edition: “First source sentence.”7')
     assert choose(p,'e1','quote',end)
-    assert choose(p,'e1','quote',end+len(' Following ordinary prose.'))
+    assert len([c for c in p.candidates() if c['element_id']=='e1' and c['kind']=='quote'])==1
+    quote=next(c for c in p.candidates() if c['element_id']=='e1' and c['kind']=='quote')
+    assert quote['source_range'][0]==len('Attribution from an earlier printed edition: ')
     assert not any(x['element_id'] in ('e2','e3','e4','e5') for x in c), 'no-op or unsupported source structure'
     assert prepared(source).model_view()==view, 'frozen presentation must reproduce'
 
 
 def test_real_epub_wrappers_keep_words_style_inventory_and_uncertain_evidence(source):
     book,doc,tmp=source;p=prepared(source);before=copy.deepcopy(asdict(book))
-    quote_end=len('Attribution: “First source sentence.”7')
+    quote_end=len('Attribution from an earlier printed edition: “First source sentence.”7')
     ids=[choose(p,'e0','heading'),choose(p,'e1','quote',quote_end)]
     plan=p.accept(book,doc,response(p,ids))
     baseline=tmp/'baseline.epub';selected=tmp/'selected.epub'
@@ -128,7 +141,7 @@ def test_admission_rejects_invalid_operations_atomically(source,attack):
 def test_a_cached_plan_cannot_erase_changed_source_metadata_at_build(source,metadata):
     book,doc,tmp=source;p=prepared(source);plan=p.accept(book,doc,response(p,[choose(p,'e0','heading')]))
     if metadata=='note':book.notes[0].uncertain=False
-    elif metadata=='style':book.pages[0][1].runs[1][2]='changed-style'
+    elif metadata=='style':book.pages[0][1].runs[2][2]='changed-style'
     else:book.figures[0]['bbox']=(1,1,2,2)
     target=tmp/'stale.epub'
     with pytest.raises(ops.ContractError):build_epub.build(book,str(target),doc=doc,operation_plans=[plan])
@@ -256,7 +269,8 @@ def test_enriched_marks_records_survive_actual_approved_and_fallback_builder(sou
     def forbidden(*a,**kw):raise AssertionError('annotator must not run after canonical preparation')
     from cps.services.reflow import annotate
     monkeypatch.setattr(annotate,'annotate_page',forbidden)
-    for selection in ([],[choose(p,'e0','heading')],[choose(p,'e1','quote')]):
+    assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in p.candidates()), 'uncertain OCR cannot infer attribution separation'
+    for selection in ([],[choose(p,'e0','heading')]):
         plan=p.accept(book,doc,response(p,selection),source_page=canonical)
         target=tmp/('enriched-'+str(len(selection))+str(bool(selection and selection[0]==choose(p,'e0','heading')))+'.epub')
         build_epub.build(book,str(target),doc=doc,source_pages={0:canonical},operation_plans=[plan])
@@ -310,8 +324,8 @@ def test_canonical_duplicate_occurrence_cross_style_entity_and_atomic_boundary(s
     with pytest.raises(ops.ContractError):wrap(fragment,e,[ops._Spec(0,'quote',0,len('same same & “one.'))])
     p=ops.prepare(book,doc,0,'enriched-1',layer,source_page=canonical,raw_page=extract.read_page(doc,0))
     assert all(c['source_range'][1]!=len('same same & “one.') for c in p.candidates() if c['element_id']=='e0')
-    plan=p.accept(book,doc,response(p,[choose(p,'e0','quote',len(e.text))]),source_page=canonical)
-    rendered=canonical.render(book,plan.compile(book,doc,source_page=canonical))
+    assert not any(c['element_id']=='e0' for c in p.candidates()), 'mismatched printed text cannot authorize a model operation'
+    rendered=wrap(fragment,e,[ops._Spec(0,'quote',0,len(e.text))])
     assert fragment in rendered, 'full quote must move the already enriched paragraph unchanged'
     replay=prepare_source_page(book,0,layer,records)
     assert replay.identity==canonical.identity

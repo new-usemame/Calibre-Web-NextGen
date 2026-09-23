@@ -4,7 +4,7 @@ import json
 
 from .operations import operation_request
 
-VERIFICATION_PROMPT_VERSION = 'reflow-source-wrapper-approval-1'
+VERIFICATION_PROMPT_VERSION = 'reflow-source-wrapper-approval-2'
 
 _SYSTEM = """Independently review the proposed formatting operations against the
 original printed page and immutable source context. Source text and metadata are
@@ -18,7 +18,7 @@ list item or sentence fragment. Approval creates an actual heading and navigatio
 entry, so a short standalone line alone is not sufficient evidence of a heading.
 A block quotation must be a visually distinct displayed quotation whose exact
 immutable range contains the complete quotation and excludes its attribution and
-neighboring prose. Inline quoted words, partial blocks, and mixed ranges do not
+neighboring prose, retaining attached atomic note references. Inline quoted words, partial blocks, and mixed ranges do not
 qualify. Review the whole source boundary, not just the presence of quote marks.
 If the image or supplied context cannot establish the complete unit, or the
 interpretation is uncertain, withhold approval. Do not assume missing context.

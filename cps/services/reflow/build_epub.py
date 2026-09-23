@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.5"
+CONVERTER_VERSION = "1.6"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -1191,7 +1191,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
         provenance = json.loads(source_pages[pno].provenance_json) if source_pages and pno in source_pages else {}
         display = SourceDisplay(doc, pno, provenance)
         full = "images/original_p%04d.jpg" % pno
-        package.image(full, display.jpeg(scale=1.5, quality=85))
+        package.image(full, display.source_image(scale=1.5, quality=85))
         details = []
         page_rect = doc[pno].rect * doc[pno].derotation_matrix
         for key, label, box in specs:
@@ -1213,7 +1213,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 raise ValueError("Invalid original source evidence geometry on page %d" % pno)
             src = "images/original_p%04d_%s.jpg" % (pno, key)
             reading_rect = display.reading_rect(rect)
-            package.image(src, display.jpeg(reading_rect))
+            package.image(src, display.source_image(reading_rect))
             details.append({"id": key, "label": label, "src": src, "bbox": list(rect),
                             "reading_bbox": list(reading_rect)})
         from .source_display import grid_regions
@@ -1222,7 +1222,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
             if element_index != proof['element_indices'][0]:continue
             key = "layout_%d" % element_index
             src = "images/original_p%04d_%s.jpg" % (pno, key)
-            package.image(src, display.jpeg(proof['reading_bbox']))
+            package.image(src, display.source_image(proof['reading_bbox']))
             details.append({"id": key, "label": "Original layout and labels", "src": src, **proof})
         if provenance.get('layer') == 'ocr' or any(
                 f.get('found') in ('unrecovered_scan_layer','unverified_scan_layout','unverified_paired_columns') and f.get('pno') == pno
@@ -1231,7 +1231,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 _check_cancelled(should_stop)
                 key = "inspection_%d" % tile_index
                 src = "images/original_p%04d_%s.jpg" % (pno, key)
-                package.image(src, display.jpeg(tile))
+                package.image(src, display.source_image(tile))
                 details.append({"id": key, "label": "Original detail %d (row order)" % (tile_index + 1),
                     "src": src, "reading_bbox": list(tile), "displayed_pdf_bbox": list(display.source_rect(tile))})
         inspection = [d for d in details if d['id'].startswith('inspection_')]
@@ -1245,7 +1245,7 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                          "orientation": display.angle, "source_rotation": doc[pno].rotation,
                          "reading_rect": list(display.rect),
                          "ambiguous_notes": sorted(ambiguous),
-                         "bytes": package.images[full] + sum(package.images[d["src"]] for d in details),
+                         "bytes": package.images[package.aliases.get(full,full)] + sum(package.images[package.aliases.get(d["src"],d["src"])] for d in details),
                          "render_seconds": round(time.monotonic() - started, 4)}
         if pno in recovered:
             evidence[pno]['source_uncertainty'] = source_pages[pno].report()
@@ -1424,10 +1424,13 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
             runtime_progress({"kind": "phase", "phase": "figure_crops"})
         missing, blanks = _figure_images(chapters, doc, book, package,
                                          figure_transform=figure_transform,
-                                         owned_images=set(package.images),
+                                         owned_images=set(package.images)|set(package.aliases),
                                          runtime_progress=runtime_progress)
         _drop_images(chapters, missing + blanks)
         images = package.images
+        for chapter in chapters:
+            chapter.blocks = [_image_aliases(block,package.aliases) for block in chapter.blocks]
+        evidence = _resource_aliases(evidence,package.aliases)
 
         identifier = identifier or "urn:uuid:%s" % uuid.uuid4()
         modified = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -1506,7 +1509,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
             spine.append(ident)
 
         for index, src in enumerate(sorted(images)):
-            manifest.append({"id": "img%03d" % index, "href": src, "type": "image/jpeg"})
+            manifest.append({"id": "img%03d" % index, "href": src, "type": package.media_types[src]})
 
         payload = _sidecar(book, pages, chapters, images, joins, sidecar, blanks)
         if source_pages:
@@ -1515,6 +1518,7 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
                 for pno, source in source_pages.items() if pno in page_html}
         if evidence:
             payload["source_evidence"] = list(evidence.values())
+        payload = _resource_aliases(payload,package.aliases)
         if unrepresentable:
             payload["unrepresentable_characters"] = unrepresentable
         if losses:
@@ -1595,6 +1599,20 @@ def _sidecar(book, pages, chapters, images, joins, extra, blanks=()):
     return payload
 
 
+def _image_aliases(html,aliases):
+    def image(match):
+        before=match.group(1);after=aliases.get(before,before)
+        return match.group(0).replace('src="'+before+'"','src="'+after+'"',1)
+    return _IMG_SRC.sub(image,html)
+
+
+def _resource_aliases(value,aliases):
+    if isinstance(value,dict):return {key:_resource_aliases(item,aliases) for key,item in value.items()}
+    if isinstance(value,list):return [_resource_aliases(item,aliases) for item in value]
+    if isinstance(value,str):return aliases.get(value,value)
+    return value
+
+
 class _Package(object):
     """The EPUB archive, written while the book is built rather than after it.
 
@@ -1620,6 +1638,8 @@ class _Package(object):
         #: href -> encoded bytes, for the manifest, the sidecar and each evidence
         #: record. The pixels themselves are only ever in the archive.
         self.images = {}
+        self.aliases = {}
+        self.media_types = {}
         self._zf = zipfile.ZipFile(self.tmp, "w", zipfile.ZIP_DEFLATED)
         try:
             # The mimetype entry must be first and uncompressed: that is what makes
@@ -1632,12 +1652,18 @@ class _Package(object):
             raise
 
     def image(self, href, data):
-        if href in self.images:
+        requested=href
+        png=data.startswith(b'\x89PNG\r\n\x1a\n')
+        if png and href.endswith('.jpg'):
+            href=href[:-4]+'.png'
+        if requested in self.aliases or href in self.images:
             # A dictionary kept the last of two renders under one name; an archive
             # would keep both, and a reader could open either.
             raise ValueError("the image %s was rendered twice" % href)
         self._zf.writestr(posixpath.join(OEBPS, href), data)
         self.images[href] = len(data)
+        self.media_types[href] = 'image/png' if png else 'image/jpeg'
+        if requested!=href:self.aliases[requested]=href
 
     def finish(self, parts):
         zf = self._zf
@@ -1735,7 +1761,7 @@ def _written_glyph_style(element, parent):
     if element.get('alt') not in labels or parent.get('title') != element.get('alt'):
         return False
     page = re.fullmatch(r'original-p(\d{4,})\.xhtml#page', parent.get('href',''))
-    return bool(page and re.fullmatch(r'images/glyph_p'+page.group(1)+r'_[a-f0-9]{20}\.jpg', element.get('src','')))
+    return bool(page and re.fullmatch(r'images/glyph_p'+page.group(1)+r'_[a-f0-9]{20}\.(?:jpg|png)', element.get('src','')))
 
 
 def _active_markup(name, root, names):

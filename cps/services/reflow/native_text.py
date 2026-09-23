@@ -343,11 +343,13 @@ def package_glyphs(book,page_html,doc,package,should_stop=None):
             else:
                 record=descriptor(note.pno,note.bbox,0,'note');records[image_name(record)]=record
     if records and doc is None:raise ValueError('Original PDF required for unmapped source glyphs')
-    for name,record in records.items():
+    display=None
+    for name,record in sorted(records.items(),key=lambda item:item[1]['page']):
         if should_stop and should_stop():
             from .build_epub import BuildCancelled
             raise BuildCancelled('Source glyph rendering cancelled')
-        display=SourceDisplay(doc,record['page'])
+        if display is None or display.pno!=record['page']:
+            display=SourceDisplay(doc,record['page'])
         rect=display.reading_rect(record['bbox'])
         if rect.is_empty:raise ValueError('Source glyph crop is outside page')
-        package.image(name,display.jpeg(rect,scale=6,quality=95))
+        package.image(name,display.source_image(rect,scale=6,quality=95))

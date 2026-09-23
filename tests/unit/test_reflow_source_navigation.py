@@ -19,6 +19,10 @@ class _Images(dict):
     given so a test can compare the pixels it was sent."""
 
     @property
+    def aliases(self):
+        return {}  # This byte-comparison sink deliberately keeps requested names.
+
+    @property
     def images(self):
         return {href: len(data) for href, data in self.items()}
 

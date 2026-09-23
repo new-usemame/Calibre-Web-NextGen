@@ -73,6 +73,75 @@ class SourceDisplay:
             if len(data)<=max_bytes:return data
         raise extract.RasterTooLarge('source display exceeds encoded-byte bound')
 
+    def _native_bitonal(self):
+        """Prove that one opaque native bitmap is the complete visible page."""
+        if hasattr(self, '_bitonal'):
+            return self._bitonal
+        self._bitonal = None
+        if self.angle or self.page.rotation:
+            return None
+        try:
+            from PIL import Image
+            images = self.page.get_image_info(xrefs=True)
+            if len(images) != 1:
+                return None
+            info = images[0]
+            width, height, xref = info['width'], info['height'], info['xref']
+            if not xref or info['bpc'] != 1 or info['colorspace'] != 1 or not (0 < width * height <= extract.MAX_RASTER_PIXELS):
+                return None
+            matrix = extract.pymupdf.Matrix(info['transform'])
+            if matrix.b or matrix.c or matrix.a <= 0 or matrix.d <= 0:
+                return None
+            if any(abs(a-b) > .001 for a,b in zip(info['bbox'], self.displayed)):
+                return None
+            sx, sy = width/self.displayed.width, height/self.displayed.height
+            if abs(sx-sy) > max(sx,sy)*1e-6:
+                return None
+            refs = [r for r in self.page.get_images(full=True) if r[0] == xref]
+            if len(refs) != 1 or refs[0][1] or self.doc.xref_get_key(xref, 'ImageMask')[1] == 'true':
+                return None
+            paint = self.page.get_bboxlog()
+            positions = [i for i,entry in enumerate(paint) if entry[0] == 'fill-image']
+            if len(positions) != 1 or any(entry[0] != 'ignore-text' for entry in paint[positions[0]+1:]):
+                return None
+            pix = extract.pymupdf.Pixmap(self.doc,xref)
+            if pix.n != 1 or pix.alpha or pix.width != width or pix.height != height:
+                return None
+            samples = pix.samples
+            image = Image.frombytes('L',(width,height),samples)
+            histogram = image.histogram()
+            if sum(histogram[1:255]):
+                return None
+            # Paint order alone cannot establish clipping/opacity. At the native
+            # resolution the complete rendered page must equal every source bit.
+            visible = self.page.get_pixmap(matrix=extract.pymupdf.Matrix(sx,sy),
+                alpha=False,colorspace=extract.pymupdf.csGRAY)
+            if (visible.width,visible.height)!=(width,height) or visible.samples != samples:
+                return None
+            self._bitonal = image.convert('1',dither=Image.Dither.NONE)
+        except (ValueError,RuntimeError,KeyError,TypeError,OverflowError):
+            return None
+        return self._bitonal
+
+    def source_image(self,rect=None,scale=3,quality=90,max_bytes=2*1024*1024):
+        """Lossless native pixels when proved; otherwise the existing renderer."""
+        import io
+        if not math.isfinite(scale) or scale <= 0:
+            raise ValueError('invalid source scale')
+        image = self._native_bitonal()
+        if image is not None:
+            reading = self.rect if rect is None else _rect(rect)&self.rect
+            if reading.is_empty:
+                raise ValueError('source region outside page')
+            sx,sy=image.width/self.rect.width,image.height/self.rect.height
+            box=(max(0,math.floor(reading.x0*sx)),max(0,math.floor(reading.y0*sy)),
+                 min(image.width,math.ceil(reading.x1*sx)),min(image.height,math.ceil(reading.y1*sy)))
+            crop=image.crop(box);stream=io.BytesIO();crop.save(stream,format='PNG',optimize=True)
+            data=stream.getvalue()
+            if len(data)<=max_bytes:
+                return data
+        return self.jpeg(rect,scale,quality,max_bytes)
+
     def query_document(self,isolate=False):
         """Existing pixel questions in reading coordinates, without a second renderer."""
         display=self

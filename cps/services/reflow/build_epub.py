@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.3"
+CONVERTER_VERSION = "1.4"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -92,6 +92,8 @@ span.reflow-uncertain { border-bottom: 1px dotted currentColor; }
 figure { margin: 1em 0; text-align: center; page-break-inside: avoid; }
 figcaption { font-size: 0.85em; text-align: center; }
 img { max-width: 100%; }
+.source-list { list-style: none; padding-left: 1.5em; }
+.source-list li { margin: 0.25em 0; }
 .source-pages { list-style: none; padding: 0; text-align: left; }
 .source-pages li { display: inline-block; width: 9em; }
 .source-pages a { display: block; padding: 0.35em 0.25em; }
@@ -180,11 +182,19 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                 index += 1
             figures = [f for f in book.figures if f["pno"] == pno]
             reason = figures[figure_index].get("found") if figure_index < len(figures) else ""
-            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout")
+            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns")
             if reason == "native_outline_conflict":
                 caption = ('Native heading text conflicts with PDF navigation metadata. '
                            'The original printed heading is shown as an image; no replacement '
                            'transcription was inferred. '
+                           '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
+            elif reason == "unverified_paired_columns":
+                caption = ('Original column relationships are preserved as a source image. '
+                           'The unverified scan transcript cannot establish a linear reading order. '
+                           '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
+            elif reason == "unrecovered_scan_layer":
+                caption = ('Original page image. The hidden text layer could not establish a '
+                           'reliable transcription; no searchable text is claimed. '
                            '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
             elif reason == "unverified_scan_layout":
                 caption = ('Unverified scan transcription cannot establish these symbols or their layout. '
@@ -213,7 +223,14 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
             continue
         if element_blocks is not None:
             element_blocks[element_index] = len(blocks)
-        if element.kind == "h":
+        if element.kind == "list":
+            from .assemble import plain_text
+            items=getattr(element,'list_items',[])
+            if not items or ' '.join(plain_text(r).strip() for r in items)!=element.text.strip():
+                raise ValueError('Source list items differ from source inventory')
+            blocks.append('<ol class="source-list">%s</ol>' % ''.join(
+                '<li>%s</li>' % _runs_html(r,available,ref_ids,ambiguous) for r in items))
+        elif element.kind == "h":
             level = min(6, max(1, int(element.level or 1)))
             if getattr(element,'display_lines',[]):
                 from .assemble import plain_text
@@ -845,12 +862,14 @@ def _nav(entries, language="en", page_homes=None):
 
 def _ncx(entries, identifier, title):
     points = []
+    target_order = {}
     for index, (href, label) in enumerate(entries, start=1):
+        order = target_order.setdefault(href, len(target_order) + 1)
         points.append(
             '  <navPoint id="nav%d" playOrder="%d">\n'
             "    <navLabel><text>%s</text></navLabel>\n"
             '    <content src="%s"/>\n'
-            "  </navPoint>" % (index, index, escape(label), href))
+            "  </navPoint>" % (index, order, escape(label), href))
     return (
         '<?xml version="1.0" encoding="utf-8"?>\n'
         '<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">\n'
@@ -1197,7 +1216,9 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
             src = "images/original_p%04d_%s.jpg" % (pno, key)
             package.image(src, display.jpeg(proof['reading_bbox']))
             details.append({"id": key, "label": "Original layout and labels", "src": src, **proof})
-        if provenance.get('layer') == 'ocr':
+        if provenance.get('layer') == 'ocr' or any(
+                f.get('found') in ('unrecovered_scan_layer','unverified_scan_layout','unverified_paired_columns') and f.get('pno') == pno
+                for f in book.figures):
             for tile_index, tile in enumerate(inspection_tiles(display.rect)):
                 _check_cancelled(should_stop)
                 key = "inspection_%d" % tile_index
@@ -1436,6 +1457,9 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
             if not authored:
                 entries.append((chapter.href, chapter.title))
         if authored:
+            # Navigation follows emitted reading order. Preserve every literal
+            # label and stable ties, including sections sharing one source page.
+            authored.sort(key=lambda entry: entry['pno'])
             first = min(page_homes)
             if first != authored[0]['pno']:
                 entries.append((page_homes[first] + '#pg_%04d' % first, 'Beginning'))
@@ -1731,6 +1755,47 @@ def _too_many(problems, found, kind):
         problems.append("and %d more %s" % (len(found) - _REPORT_LIMIT, kind))
 
 
+def _navigation_problems(documents):
+    """Bounded checks for the navigation contracts our builder actually uses."""
+    errors=[];opf=documents.get(OEBPS+'/content.opf')
+    if opf is None:return errors
+    ns='{http://www.idpf.org/2007/opf}'
+    items={node.get('id'):posixpath.normpath(posixpath.join(OEBPS,node.get('href','')))
+           for node in opf.iter(ns+'item')}
+    spine={items.get(node.get('idref')):i for i,node in enumerate(opf.iter(ns+'itemref'))}
+    anchors={name:{node.get('id'):i for i,node in enumerate(root.iter()) if node.get('id')}
+             for name,root in documents.items() if name.endswith('.xhtml')}
+    def target(name,href):
+        file,_,anchor=unquote(href).partition('#')
+        path=posixpath.normpath(posixpath.join(posixpath.dirname(name),file)) if file else name
+        return path,anchor
+    for name,root in documents.items():
+        if name.endswith('.ncx'):
+            seen={};namespace='{http://www.daisy.org/z3986/2005/ncx/}'
+            for point in root.iter(namespace+'navPoint'):
+                content=point.find(namespace+'content')
+                if content is None:continue
+                key=target(name,content.get('src',''));order=point.get('playOrder','')
+                if not order.isdecimal() or int(order)<1:
+                    errors.append('navigation %s has an invalid NCX playOrder' % name)
+                elif key in seen and seen[key]!=order:
+                    errors.append('navigation %s gives one target different NCX playOrder values' % name)
+                seen[key]=order
+        if not name.endswith('.xhtml'):continue
+        for nav in root.iter(_XHTML_NS+'nav'):
+            if 'toc' not in nav.get('{http://www.idpf.org/2007/ops}type','').split():continue
+            previous=None
+            for link in nav.iter(_XHTML_NS+'a'):
+                path,anchor=target(name,link.get('href',''))
+                if path not in spine or path not in anchors or (anchor and anchor not in anchors[path]):
+                    errors.append('navigation %s has an unresolved reading-order target' % name);continue
+                position=(spine[path],anchors[path].get(anchor,0))
+                if previous is not None and position<previous:
+                    errors.append('navigation %s goes backward in emitted reading order' % name)
+                previous=position
+    return errors
+
+
 def validate(path):
     """A readable zip with the parts a reader needs, and every part of it usable.
 
@@ -1768,7 +1833,7 @@ def validate(path):
             for required in ("META-INF/container.xml", "%s/content.opf" % OEBPS):
                 if required not in names:
                     problems.append("missing %s" % required)
-            declared, followed, active = {}, {}, []
+            declared, followed, active, documents = {}, {}, [], {}
             present = set(names)
             for name in names:
                 if not name.endswith((".xhtml", ".opf", ".ncx", ".xml")):
@@ -1778,6 +1843,7 @@ def validate(path):
                 except ElementTree.ParseError as exc:
                     problems.append("%s does not parse: %s" % (name, exc))
                     continue
+                documents[name]=root
                 if not name.endswith(".xhtml"):
                     continue
                 active.extend(_active_markup(name, root, present))
@@ -1803,6 +1869,7 @@ def validate(path):
                                        "that id" % (name, href))
             _too_many(problems, nowhere, "links that land on nothing")
             _too_many(problems, active, "markup the builder never writes")
+            _too_many(problems, _navigation_problems(documents), "invalid navigation contracts")
     except (zipfile.BadZipFile, IOError, OSError) as exc:
         problems.append("not a readable zip: %s" % exc)
     return problems

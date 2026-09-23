@@ -94,3 +94,44 @@ def test_outline_disagreement_cannot_turn_body_prose_into_a_page_image():
         assert 'ordinary paragraph' in ' '.join(e.text for e in book.elements)
         assert book.conservation.ok
     finally:doc.close()
+
+
+def test_authored_duplicate_destinations_share_ncx_order_and_nav_follows_spine(tmp_path):
+    from xml.etree import ElementTree as ET
+    with _document(duplicate=True) as doc:
+        doc.set_toc([[1,'SECOND',2],[1,'CHAPTER',1],[2,'Different destination label',1]])
+        book=assemble.deterministic_book(doc);path=tmp_path/'ordered.epub'
+        build_epub.build(book,str(path),doc=doc)
+        with zipfile.ZipFile(path) as z:
+            nav=ET.fromstring(z.read('OEBPS/nav.xhtml'))
+            toc=next(n for n in nav.iter('{http://www.w3.org/1999/xhtml}nav') if n.get('id')=='toc')
+            links=list(toc.iter('{http://www.w3.org/1999/xhtml}a'))
+            assert [n.text for n in links[:3]]==['CHAPTER','Different destination label','SECOND']
+            ncx=ET.fromstring(z.read('OEBPS/toc.ncx'));ns='{http://www.daisy.org/z3986/2005/ncx/}'
+            seen={}
+            for point in ncx.iter(ns+'navPoint'):
+                href=point.find(ns+'content').get('src');order=point.get('playOrder')
+                assert href not in seen or seen[href]==order
+                seen[href]=order
+            assert list(map(int,seen.values()))==list(range(1,len(seen)+1))
+
+
+@pytest.mark.parametrize('fault',['ncx_duplicate_order','backward_toc'])
+def test_internal_validator_refuses_semantically_invalid_navigation(tmp_path,fault):
+    from xml.etree import ElementTree as ET
+    with _document(duplicate=True) as doc:
+        book=assemble.deterministic_book(doc);path=tmp_path/'valid.epub';build_epub.build(book,str(path),doc=doc)
+    assert build_epub.validate(str(path))==[]
+    with zipfile.ZipFile(path) as z:parts={n:z.read(n) for n in z.namelist()}
+    if fault=='ncx_duplicate_order':
+        root=ET.fromstring(parts['OEBPS/toc.ncx']);ns='{http://www.daisy.org/z3986/2005/ncx/}'
+        points=list(root.iter(ns+'navPoint'));points[1].set('playOrder','9');parts['OEBPS/toc.ncx']=ET.tostring(root)
+    else:
+        root=ET.fromstring(parts['OEBPS/nav.xhtml']);ns='{http://www.w3.org/1999/xhtml}'
+        toc=next(n for n in root.iter(ns+'nav') if n.get('id')=='toc');links=list(toc.iter(ns+'a'))
+        links[0].set('href',links[2].get('href'));parts['OEBPS/nav.xhtml']=ET.tostring(root)
+    bad=tmp_path/'invalid.epub'
+    with zipfile.ZipFile(bad,'w') as z:
+        for n,b in parts.items():z.writestr(n,b)
+    errors=build_epub.validate(str(bad))
+    assert any('navigation' in error.lower() for error in errors),errors

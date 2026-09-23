@@ -183,6 +183,8 @@ def needs_recovery(raw):
         return ""
     if not raw.is_page_scan:
         return ""
+    if getattr(raw, "text_layer_invisible", False):
+        return "damaged_layer"
     tokens = len(raw.text.split())
     if tokens >= _SPARSE_TOKENS or looks_like_noise(raw.text):
         return "damaged_layer"

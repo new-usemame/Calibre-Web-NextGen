@@ -95,6 +95,7 @@ class Element(object):
     #: Caption has a broken extraction baseline; printed pixels are retained.
     caption_uncertain: bool = False
     punctuation_uncertain: bool = False
+    list_items: list = field(default_factory=list)
     display_lines: tuple = ()
     display_group: Optional[dict] = None
 
@@ -104,7 +105,8 @@ class Element(object):
 
     def to_dict(self):
         return {"kind": self.kind, "runs": self.runs, "pno": self.pno,
-                "level": self.level, "pages": self.pages or [self.pno]}
+                "level": self.level, "pages": self.pages or [self.pno],
+                **({"list_items": self.list_items} if getattr(self,"list_items",[]) else {})}
 
 
 @dataclass
@@ -203,7 +205,7 @@ class Book(object):
         return uncertain
 
     def needs_source_evidence(self, pno):
-        return any(f["pno"] == pno and f.get("found") in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout") for f in self.figures) or any(n.pno == pno and getattr(n,"glyph_fallback",False) for n in self.notes) or bool(self.ambiguous_note_numbers(pno)) or any(
+        return any(f["pno"] == pno and f.get("found") in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns") for f in self.figures) or any(n.pno == pno and getattr(n,"glyph_fallback",False) for n in self.notes) or bool(self.ambiguous_note_numbers(pno)) or any(
             any(r[0]=="glyph" for r in element.runs) or element.caption_uncertain or element.punctuation_uncertain or bool(getattr(element,"display_group",{}))
             for element in self.pages.get(pno, []))
 
@@ -1157,6 +1159,21 @@ def _page_elements(skel, repairs, reasons, vocab=None):
                                                 for sp in ln.spans),
                                             pages=[skel.pno]))
             continue
+        if region.kind == 'list':
+            items=[];all_runs=[]
+            for group in region.list_groups:
+                runs=[]
+                for line in group:
+                    part=_line_runs(line,skel.pno,page_notes,claimed,repairs,reasons,
+                                    preserve_style=not skel.is_scan)
+                    runs=part if not runs else stitch_runs(runs,part,vocab=vocab)
+                runs=tidy(runs);items.append(runs)
+                if all_runs:all_runs.append(['t',' '])
+                all_runs.extend(runs)
+            elements.append(Element(kind='list',runs=all_runs,list_items=items,pno=skel.pno,
+                bbox=region.bbox,pages=[skel.pno],band=region.band,column=region.column,
+                line_boxes=[line.bbox for line in region.lines]))
+            continue
         if region.kind not in ("heading", "body", "caption"):
             continue
         runs = []
@@ -1472,6 +1489,13 @@ def _heal_page_columns(skel, vocab):
             pending.append(region.bbox)
             held.extend(region.caption_lines if region.kind == "figure"
                         else region.lines)
+            continue
+        elif region.kind == "list":
+            # List items are independent source streams, never joined across
+            # their printed item boundaries, including beside preserved figures.
+            for group in region.list_groups:
+                counter.update(_WORD.findall(_heal_line_stream(
+                    [ln.text for ln in group], vocab)))
             continue
         elif region.kind == "note":
             counter.update(_WORD.findall(_heal_line_stream(

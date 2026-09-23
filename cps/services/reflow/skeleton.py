@@ -146,6 +146,7 @@ class Region(object):
     continued_from: Optional[tuple] = None
     initial_join: dict = field(default_factory=dict)
     display_group: dict = field(default_factory=dict)
+    list_groups: list = field(default_factory=list)
 
     @property
     def text(self):
@@ -511,6 +512,25 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     skel = PageSkeleton(pno=raw.pno, width=raw.width, height=raw.height,
                         is_scan=raw.is_page_scan)
 
+    if raw.is_page_scan and getattr(raw, "text_layer_invisible", False):
+        from .source import needs_recovery
+        if needs_recovery(raw):
+            # Recognition was disabled or could not establish a source layer.
+            # Preserve the complete page, not an invisible garbage transcript.
+            skel.regions.append(Region(kind='artwork',
+                lines=[ln for b in raw.text_blocks for ln in b.lines],
+                bbox=(0,0,raw.width,raw.height),reason='unrecovered_scan_layer'))
+            skel.regions.append(Region(kind='figure',bbox=(0,0,raw.width,raw.height),
+                reason='unrecovered_scan_layer'))
+            return skel
+
+    unverified_columns = _unverified_column_region(raw)
+    if unverified_columns == (0,0,raw.width,raw.height):
+        skel.regions.append(Region(kind='artwork',lines=[ln for b in raw.text_blocks for ln in b.lines],
+            bbox=unverified_columns,reason='unverified_scan_layout'))
+        skel.regions.append(Region(kind='figure',bbox=unverified_columns,reason='unverified_scan_layout'))
+        return skel
+
     if not raw.text_blocks:
         skel.reasons.append("no_text_layer" if raw.images else "empty_page")
         for img in raw.images:
@@ -529,6 +549,8 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     opening_lines=[ln for blk in body_blocks for ln in blk.lines]
     opening=opening_display_unit([ln.to_dict() for ln in opening_lines],style.body_size,raw.width,raw.height,scan=raw.is_page_scan)
     opening_owned={id(opening_lines[i]) for i in opening.get('indices',[])}
+    opening_owned.update(id(line) for block in body_blocks
+                         for group in _numbered_source_groups(block.lines) for line in group)
     kept_blocks = []
     for blk in body_blocks:
         kept = []
@@ -578,7 +600,29 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
         candidates = _vector_figures(raw)
     else:
         candidates = []
+    if unverified_columns:
+        # One owner for intersecting source regions; never repeat a figure below
+        # a new table crop or leave its final source row outside the crop.
+        box=unverified_columns
+        retained=[]
+        for candidate in candidates:
+            b=candidate.bbox
+            if b[0]<box[2] and box[0]<b[2] and b[1]<box[3] and box[1]<b[3]:
+                box=(min(box[0],b[0]),min(box[1],b[1]),max(box[2],b[2]),max(box[3],b[3]))
+            else:retained.append(candidate)
+        candidates=retained+[Region(kind='figure',bbox=box,reason='unverified_scan_layout')]
     artwork = []
+    if unverified_columns:
+        retained=[]
+        for block,lines in kept_blocks:
+            owned=[ln for ln in lines if box[0]<=ln.bbox[0] and ln.bbox[2]<=box[2]
+                   and box[1]<=ln.bbox[1] and ln.bbox[3]<=box[3]]
+            if owned:artwork.append(Region(kind='artwork',lines=owned,
+                bbox=_lines_bbox(owned,block.bbox),reason='unverified_scan_layout'))
+            other=[ln for ln in lines if ln not in owned]
+            if other:retained.append((block,other))
+        kept_blocks=retained
+        skel.regions.extend(artwork)
     if candidates:
         kept_blocks, artwork = _absorb_figure_content(kept_blocks, candidates,
                                                       style)
@@ -590,6 +634,13 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     kept_blocks, note_regions = _preserve_uncertain_ocr_regions(
         raw, kept_blocks, note_regions, skel, cover, candidates)
 
+    kept_blocks = _preserve_paired_scan_columns(raw, kept_blocks, skel, candidates)
+    if any(r.kind=='figure' and r.reason=='unverified_paired_columns'
+           and tuple(r.bbox)==(0,0,raw.width,raw.height) for r in skel.regions):
+        for region in note_regions:
+            region.kind='artwork';region.reason='unverified_paired_columns'
+            skel.regions.append(region)
+        note_regions=[]
     kept_blocks = _preserve_unverified_scan_layout(raw, kept_blocks, skel)
     kept_blocks = _preserve_tracked_native_lines(raw, kept_blocks, skel)
 
@@ -628,7 +679,7 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
 
     if layout is not None:
         for region in skel.regions:
-            if region.reason in ("ocr_uncertain_region", "native_spacing_uncertain", "unverified_scan_layout"):
+            if region.reason in ("ocr_uncertain_region", "native_spacing_uncertain", "unverified_scan_layout", "unverified_paired_columns"):
                 region.band, region.column = layout.place(region.bbox)
 
     for img in embedded:
@@ -641,6 +692,13 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
         skel.regions.append(candidate)
 
     skel.regions.extend(note_regions)
+    if getattr(raw,'text_layer_invisible',False):
+        # Invisible transcript fonts cannot preserve the printed display face.
+        for region in list(skel.regions):
+            if region.kind=='heading' and region.lines:
+                region.kind='artwork';region.reason='unverified_scan_layout'
+                skel.regions.append(Region(kind='figure',bbox=region.bbox,
+                    reason='unverified_scan_layout',band=region.band,column=region.column))
     _preserve_conflicting_outline_heading(raw, style, skel)
     skel.regions.sort(key=_region_order)
     return skel
@@ -671,6 +729,99 @@ def _preserve_conflicting_outline_heading(raw, style, skel):
     skel.regions.append(Region(kind='figure',bbox=heading.bbox,
                                reason='native_outline_conflict'))
     skel.reasons.append('native_outline_conflict')
+
+
+def _unverified_column_region(raw):
+    """Three sustained disjoint text columns in an unverified scan need layout.
+
+    Numeric cells retain their bounded region; prose around unrepresented artwork
+    or forms retains the complete page. Neither implies a recovered transcription.
+    Visible native text and confidence-bearing recognition are unaffected.
+    """
+    if not raw.is_page_scan or not (getattr(raw,'text_layer_invisible',False)
+            or getattr(raw,'text_layer_overpainted',False)):
+        return None
+    lines=[ln for block in raw.text_blocks for ln in block.lines if ln.stripped]
+    if not lines:return None
+    em=median(ln.size for ln in lines)
+    clusters=[]
+    for ln in sorted(lines,key=lambda ln:ln.x0):
+        if ln.bbox[2]-ln.x0 > raw.width*.42:continue
+        if clusters and abs(ln.x0-clusters[-1][0].x0)<=em*1.6:
+            clusters[-1].append(ln)
+        else:clusters.append([ln])
+    columns=[]
+    for group in clusters:
+        typical=median(ln.bbox[2]-ln.bbox[0] for ln in group)
+        group=[ln for ln in group if ln.bbox[2]-ln.bbox[0]<=typical*1.5+em]
+        if len(group)<6:continue
+        box=_lines_bbox(group,group[0].bbox)
+        if columns and box[0] < columns[-1][0][2]+em*.5:continue
+        columns.append((box,group))
+    for start in range(len(columns)-2):
+        group=columns[start:start+3]
+        overlap=min(box[3] for box,_ in group)-max(box[1] for box,_ in group)
+        if overlap < em*8:continue
+        top=max(box[1] for box,_ in group)
+        selected=[ln for _,ls in columns for ln in ls if ln.bbox[1]>=top-em*.5]
+        numeric=sum(ch.isdigit() for ln in selected for ch in ln.text)
+        letters=sum(ch.isalpha() for ln in selected for ch in ln.text)
+        if numeric > letters:
+            box=_lines_bbox(selected,selected[0].bbox)
+            return tuple(max(0,v-3) if i<2 else min(raw.width if i==2 else raw.height,v+3)
+                         for i,v in enumerate(box))
+        return (0,0,raw.width,raw.height)
+    return None
+
+
+def _preserve_paired_scan_columns(raw, kept_blocks, skel, candidates):
+    if not raw.is_page_scan or not getattr(raw,'text_layer_overpainted',False):return kept_blocks
+    boxes=[_lines_bbox(lines,block.bbox) for block,lines in kept_blocks]
+    em=median(line.size for _,lines in kept_blocks for line in lines) if kept_blocks else 0
+    if em<=0:return kept_blocks
+    pairs=[]
+    for i,left in enumerate(boxes):
+        for j,right in enumerate(boxes):
+            if (left[2]+.6*em < right[0] and abs(left[1]-right[1]) <= .3*em
+                    and left[3]-left[1]>=1.5*em and right[2]-right[0]>=3*em):
+                pairs.append((i,j))
+    for seed_left,seed_right in pairs:
+        left,right=boxes[seed_left],boxes[seed_right]
+        aligned=[(i,j) for i,j in pairs if abs(boxes[i][0]-left[0])<=em
+                 and abs(boxes[j][0]-right[0])<=em]
+        if len({i for i,_ in aligned})<3:continue
+        members={i for pair in aligned for i in pair}
+        top=min(boxes[i][1] for i in members);bottom=max(boxes[i][3] for i in members)
+        x0=min(boxes[i][0] for i in members);x1=max(boxes[i][2] for i in members)
+        # A two-column label row immediately above belongs to the same source
+        # region. It must itself contain separate source lines at both starts.
+        for index,(_,lines) in enumerate(kept_blocks):
+            if top-3*em<=boxes[index][1]<top and any(abs(ln.x0-left[0])<=em for ln in lines) and any(abs(ln.x0-right[0])<=em for ln in lines):
+                top=min(top,boxes[index][1])
+        absorbed_figure=False
+        for candidate in list(candidates):
+            b=candidate.bbox
+            if b[0]<x1 and x0<b[2] and b[1]<bottom and top<b[3]:
+                x0,top,x1,bottom=min(x0,b[0]),min(top,b[1]),max(x1,b[2]),max(bottom,b[3])
+                candidates.remove(candidate);absorbed_figure=True
+        if absorbed_figure:
+            # An unverified paired text layout shares its page with artwork.
+            # Preserve the complete designed region, including text the hidden
+            # layer may have misplaced above the inferred image boundary.
+            x0,top,x1,bottom=0,0,raw.width,raw.height
+            candidates.clear()
+        owned={id(line) for _,lines in kept_blocks for line in lines
+               if x0-em<=line.bbox[0] and line.bbox[2]<=x1+em
+               and top-.3*em<=line.bbox[1] and line.bbox[3]<=bottom+.3*em}
+        lines=[ln for _,group in kept_blocks for ln in group if id(ln) in owned]
+        if not lines:continue
+        box=(x0,top,x1,bottom);pad=min(4.0,.4*em)
+        crop=(max(0,box[0]-pad),max(0,box[1]-pad),min(raw.width,box[2]+pad),min(raw.height,box[3]+pad))
+        skel.regions.append(Region(kind='artwork',lines=lines,bbox=box,reason='unverified_paired_columns'))
+        skel.regions.append(Region(kind='figure',bbox=crop,reason='unverified_paired_columns'))
+        remaining=[(b,[ln for ln in ls if id(ln) not in owned]) for b,ls in kept_blocks]
+        return [(b,ls) for b,ls in remaining if ls]
+    return kept_blocks
 
 
 def _preserve_unverified_scan_layout(raw, kept_blocks, skel):
@@ -1227,8 +1378,30 @@ def _regroup_native_titles(kept_blocks, style, doc=None, pno=0):
     return out
 
 
+def _numbered_source_groups(lines):
+    starts=[]
+    for i,line in enumerate(lines):
+        marker=re.match(r'^([1-9][0-9]{0,2})[.)](?:\s|$)',line.stripped)
+        if marker:starts.append((i,int(marker.group(1)),line))
+    if len(starts)<2 or starts[0][0]!=0 or [n for _,n,_ in starts]!=list(range(1,len(starts)+1)):
+        return []
+    em=median(line.size for _,_,line in starts)
+    if em<=0 or max(line.x0 for _,_,line in starts)-min(line.x0 for _,_,line in starts)>.4*em:
+        return []
+    groups=[lines[a[0]:(starts[i+1][0] if i+1<len(starts) else len(lines))] for i,a in enumerate(starts)]
+    for group in groups:
+        if not re.sub(r'^[1-9][0-9]{0,2}[.)]\s*','',' '.join(line.stripped for line in group)).strip():return []
+        if any(line.x0 < group[0].x0-.3*em for line in group[1:]):return []
+    return groups
+
+
 def _classify_body(lines, blk, style, skel, band=0, column=0):
     """Split a block into headings and prose, honouring run-in sub-headings."""
+    groups=_numbered_source_groups(lines)
+    if groups:
+        skel.regions.append(Region(kind='list',lines=list(lines),list_groups=groups,
+            bbox=_lines_bbox(lines,blk.bbox),band=band,column=column,reason='numbered_source_list'))
+        return
     if lines and CAPTION_LINE.match(lines[0].stripped):
         skel.regions.append(Region(kind="caption",lines=list(lines),
             bbox=_lines_bbox(lines,blk.bbox),band=band,column=column))

@@ -247,6 +247,7 @@ class RawPage(object):
         default_factory=list)
     source_geometry: dict = field(default_factory=dict)
     text_layer_overpainted: bool = False
+    text_layer_invisible: bool = False
 
     @property
     def text_blocks(self):
@@ -271,7 +272,8 @@ class RawPage(object):
                 "drawing_rects": [[round(v, 2) for v in rect] for rect in self.drawing_rects],
                 "blocks": [b.to_dict() for b in self.blocks],
                 "images": [i.to_dict() for i in self.images],
-                "text_layer_overpainted": getattr(self, "text_layer_overpainted", False)}
+                "text_layer_overpainted": getattr(self, "text_layer_overpainted", False),
+                "text_layer_invisible": getattr(self, "text_layer_invisible", False)}
         if getattr(self,'source_geometry',{}):value['source_geometry'] = self.source_geometry
         return value
 
@@ -310,6 +312,7 @@ def read_page(doc, pno):
     except (AttributeError, RuntimeError):
         traces = []
     raw.text_layer_overpainted = text_layer_overpainted(page, traces)
+    raw.text_layer_invisible = bool(traces) and all(t.get("type") == 3 or t.get("opacity", 1) == 0 for t in traces)
     quote_fonts = _native_quote_variants(page, traces)
     for blk in payload.get("blocks", []):
         bbox = tuple(blk.get("bbox", (0, 0, 0, 0)))

@@ -107,6 +107,10 @@ test('an unavailable shared budget disables only paid review without exposing ot
   const { state, errors } = await stub(page, est);
   await expect(paidChoice(page)).toBeDisabled();
   await expect(page.getByText('AI review is unavailable because the shared 24-hour budget is exhausted. Source conversion remains available.', { exact: true })).toBeVisible();
+  await expect(paidChoice(page)).toHaveAttribute('aria-describedby', 'reflow-review-availability');
+  const findings = await new AxeBuilder({ page }).include('section[aria-labelledby="reflow-cost"]')
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
+  expect(findings.violations.filter((v) => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
   await page.getByRole('checkbox', { name: 'Create this source conversion without model requests or provider charges.' }).check();
   await page.getByRole('button', { name: 'Convert the sample', exact: true }).click();
   await expect.poll(() => state.starts.length).toBe(1);

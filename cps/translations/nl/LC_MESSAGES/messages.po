@@ -4849,6 +4849,31 @@ msgid "Active"
 msgstr "Actief"
 
 #: cps/spa_strings.py
+msgid ""
+"AI review is unavailable until an administrator sets a shared 24-hour "
+"budget. Source conversion remains available."
+msgstr ""
+"AI-controle is niet beschikbaar totdat een beheerder een gedeeld budget voor "
+"24 uur instelt. Bronconversie blijft beschikbaar."
+
+#: cps/spa_strings.py
+msgid ""
+"AI review is unavailable because the shared 24-hour budget is exhausted. "
+"Source conversion remains available."
+msgstr ""
+"AI-controle is niet beschikbaar omdat het gedeelde budget voor 24 uur is "
+"opgebruikt. Bronconversie blijft beschikbaar."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{amount} remains in the shared {hours}-hour AI review budget. It is checked "
+"again before every request."
+msgstr ""
+"Er resteert {amount} in het gedeelde budget voor AI-controle van {hours} "
+"uur. Het wordt vóór elk verzoek opnieuw gecontroleerd."
+
+#: cps/spa_strings.py
 msgid "Add identifier"
 msgstr "Identificatiecode toevoegen"
 
@@ -16738,6 +16763,14 @@ msgstr "Maximale uitgave per Reflow-conversie (USD)"
 #: cps/templates/config_edit.html
 msgid "A hard limit. No conversion may be started with a cost cap above this figure, and a running conversion stops when it reaches its cap."
 msgstr "Een harde limiet. Geen enkele conversie kan worden gestart met een kostenplafond boven dit bedrag, en een lopende conversie stopt wanneer ze haar plafond bereikt."
+
+#: cps/templates/config_edit.html
+msgid "Reflow shared AI review budget per 24 hours (USD)"
+msgstr "Gedeeld budget voor Reflow AI-controle per 24 uur (USD)"
+
+#: cps/templates/config_edit.html
+msgid "A shared rolling limit for all AI review on this server. Set a positive amount to allow paid review; zero disables paid review. Source conversion remains available."
+msgstr "Een gedeelde, voortschrijdende limiet voor alle AI-controle op deze server. Stel een positief bedrag in om betaalde controle toe te staan; nul schakelt betaalde controle uit. Bronconversie blijft beschikbaar."
 
 #: cps/templates/config_edit.html
 msgid "OpenRouter API Key (Reflow PDF to EPUB)"

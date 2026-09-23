@@ -4975,6 +4975,32 @@ msgid "Active"
 msgstr "Actif"
 
 #: cps/spa_strings.py
+msgid ""
+"AI review is unavailable until an administrator sets a shared 24-hour "
+"budget. Source conversion remains available."
+msgstr ""
+"La révision par IA n’est pas disponible tant qu’un administrateur n’a pas "
+"défini un budget partagé sur 24 heures. La conversion du document source "
+"reste disponible."
+
+#: cps/spa_strings.py
+msgid ""
+"AI review is unavailable because the shared 24-hour budget is exhausted. "
+"Source conversion remains available."
+msgstr ""
+"La révision par IA n’est pas disponible, car le budget partagé sur 24 heures "
+"est épuisé. La conversion du document source reste disponible."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{amount} remains in the shared {hours}-hour AI review budget. It is checked "
+"again before every request."
+msgstr ""
+"Il reste {amount} dans le budget partagé de révision par IA sur {hours} "
+"heures. Il est revérifié avant chaque requête."
+
+#: cps/spa_strings.py
 msgid "Add identifier"
 msgstr "Ajouter un identifiant"
 
@@ -17252,6 +17278,14 @@ msgstr "Dépense maximale par conversion Reflow (USD)"
 #: cps/templates/config_edit.html
 msgid "A hard limit. No conversion may be started with a cost cap above this figure, and a running conversion stops when it reaches its cap."
 msgstr "Une limite stricte. Aucune conversion ne peut être lancée avec un plafond de coût supérieur à ce montant, et une conversion en cours s’arrête lorsqu’elle atteint son plafond."
+
+#: cps/templates/config_edit.html
+msgid "Reflow shared AI review budget per 24 hours (USD)"
+msgstr "Budget partagé de révision par IA Reflow sur 24 heures (USD)"
+
+#: cps/templates/config_edit.html
+msgid "A shared rolling limit for all AI review on this server. Set a positive amount to allow paid review; zero disables paid review. Source conversion remains available."
+msgstr "Limite glissante partagée pour toutes les révisions par IA de ce serveur. Indiquez un montant positif pour autoriser la révision payante ; zéro désactive la révision payante. La conversion du document source reste disponible."
 
 #: cps/templates/config_edit.html
 msgid "OpenRouter API Key (Reflow PDF to EPUB)"

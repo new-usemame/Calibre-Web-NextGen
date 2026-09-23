@@ -176,9 +176,11 @@ def _invoke(args, directory, *, timeout, should_stop, watched=()):
         finally:
             # The direct child may already have exited while a helper remains.
             # This session belongs only to this invocation, including on success.
+            # macOS answers EPERM, not ESRCH, when every member of the group has
+            # exited and waits to be reaped: nothing is left to stop either way.
             try:
                 os.killpg(process.pid, signal.SIGKILL)
-            except ProcessLookupError:
+            except (ProcessLookupError, PermissionError):
                 pass
             process.wait()
     return status, stdout.read_text(errors="replace"), stderr.read_text(errors="replace")

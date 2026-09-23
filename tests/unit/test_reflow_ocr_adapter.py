@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Behavioral contracts for local recognition, source geometry and containment."""
+import errno
 import hashlib
 import json
 import os
@@ -111,6 +112,24 @@ def test_engine_timeout_cancellation_and_output_limits(tmp_path, monkeypatch):
     with pytest.raises(ocr.OCRCancelled):
         ocr._invoke([sys.executable, '-c', 'import time; time.sleep(10)'], tmp_path,
                     timeout=10, should_stop=lambda: next(calls))
+    monkeypatch.setattr(ocr, 'MAX_OUTPUT_BYTES', 1024)
+    with pytest.raises(ocr.OCRFailed, match='output limit'):
+        ocr._invoke([sys.executable, '-c', 'print("x" * 2048)'], tmp_path,
+                    timeout=10, should_stop=None)
+
+
+def test_a_recognizer_that_has_already_exited_is_not_a_failure_to_stop(tmp_path, monkeypatch):
+    """macOS refuses ``killpg`` (EPERM) for a process group whose members have all
+    exited and wait to be reaped -- the ordinary state of a recognizer that just
+    finished. That refusal is no reason to lose the page's answer, or to replace
+    the real error with a PermissionError (seen under load in the reflow suite)."""
+    def refused(pgid, sig):
+        raise PermissionError(errno.EPERM, 'Operation not permitted')
+
+    monkeypatch.setattr(ocr.os, 'killpg', refused)
+    status, output, _ = ocr._invoke([sys.executable, '-c', 'print("page")'], tmp_path,
+                                    timeout=10, should_stop=None)
+    assert (status, output.strip()) == (0, 'page')
     monkeypatch.setattr(ocr, 'MAX_OUTPUT_BYTES', 1024)
     with pytest.raises(ocr.OCRFailed, match='output limit'):
         ocr._invoke([sys.executable, '-c', 'print("x" * 2048)'], tmp_path,

@@ -1198,7 +1198,9 @@ def _page_elements(skel, repairs, reasons, vocab=None):
                 all_runs.extend(runs)
             elements.append(Element(kind='list',runs=all_runs,list_items=items,pno=skel.pno,
                 bbox=region.bbox,pages=[skel.pno],band=region.band,column=region.column,
-                line_boxes=[line.bbox for line in region.lines]))
+                line_boxes=[line.bbox for line in region.lines],
+                punctuation_uncertain=any(sp.punctuation_uncertain
+                    for line in region.lines for sp in line.spans)))
             continue
         if region.kind not in ("heading", "body", "caption"):
             continue

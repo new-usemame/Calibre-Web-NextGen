@@ -377,3 +377,30 @@ def test_continued_list_accepts_only_geometrically_separate_marker_and_text_on_o
     else:
         assert len(page.regions)==1 and len(a.list_groups)==3
         assert [l.text for l in a.list_groups[-1]]==['3.','Last item.']
+
+@pytest.mark.parametrize('uncertain',[True,False])
+def test_numbered_list_keeps_source_punctuation_qualification_and_passage_route(uncertain,tmp_path):
+    def line(text,y,flag=False):
+        span=extract.Span(text,10,'Times',0,(40,y,260,y+10),punctuation_uncertain=flag)
+        return extract.Line([span],span.bbox)
+    lines=[line('1. First item.',40),line('2. Qualified second item.',55,uncertain)]
+    region=skeleton.Region(kind='list',lines=lines,list_groups=[[ln] for ln in lines],bbox=(40,40,260,65))
+    page=skeleton.PageSkeleton(0,400,600,regions=[region])
+    book=assemble.assemble([page],skeleton.BookStyle(body_size=10))
+    element=next(e for e in book.pages[0] if e.kind=='list')
+    assert element.punctuation_uncertain is uncertain
+    assert [assemble.plain_text(r) for r in element.list_items]==[ln.text for ln in lines]
+    with pymupdf.open() as doc:
+        source=doc.new_page(width=400,height=600)
+        for ln in lines:source.insert_text((40,ln.bbox[3]),ln.text,fontsize=10)
+        path=tmp_path/'list.epub';build_epub.build(book,str(path),doc=doc,
+            page_html={0:build_epub.page_fragment(book,0,book.style)})
+        assert build_epub.validate(str(path))==[]
+        with zipfile.ZipFile(path) as archive:
+            bodies=''.join(archive.read(n).decode() for n in archive.namelist() if re.fullmatch(r'OEBPS/ch\d+\.xhtml',n))
+            assert ('Original punctuation may differ' in bodies) is uncertain
+            if uncertain:
+                match=re.search(r'original-p0000.xhtml#(text_\d+)',bodies)
+                assert match
+                original=archive.read('OEBPS/original-p0000.xhtml').decode()
+                assert 'id="'+match.group(1)+'"' in original

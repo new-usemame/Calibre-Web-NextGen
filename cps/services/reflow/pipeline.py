@@ -103,6 +103,9 @@ class ReflowResult(object):
     pending_usd: float = 0.0
     stopped: Optional[str] = None
     fingerprint: str = ""
+    #: The PDF's own page count, when the conversion read only part of it (a
+    #: sample's bounded context); None means every page was read.
+    pdf_pages: Optional[int] = None
 
     @property
     def pages(self):
@@ -189,9 +192,12 @@ MAX_CONSECUTIVE_REFUSALS = 3
 SURVEY_PAGES = 40
 
 
-def first_body_page(book):
-    """Where the book starts, as opposed to where the file starts."""
-    pages = sorted(book.pages)
+def first_body_page(book, before=None):
+    """Where the book starts, as opposed to where the file starts.
+
+    ``before`` limits the search to pages below it (a sample's search window).
+    """
+    pages = sorted(p for p in book.pages if before is None or p < before)
     if not pages:
         return 0
     for pno in pages:
@@ -214,10 +220,28 @@ def sample_pages(book, style, count):
     return pages[start:start + int(count)]
 
 
-def deterministic_window(doc, pages):
-    """The deterministic pass over the first *pages* pages, and nothing else."""
-    count = max(1, min(int(pages), doc.page_count))
-    return assemble.deterministic_book(doc, page_numbers=list(range(count)))
+#: However short the sample, the body is looked for at least this far in:
+#: title, copyright, dedication and contents pages rarely run longer.
+SAMPLE_SEARCH_PAGES = 12
+
+
+def sample_context(page_count, sample_count):
+    """The pages a sample is prepared from, as ``(search_end, context_end)``.
+
+    A sample is ``N`` pages from the first body page. Finding that page needs the
+    pages before it read and assembled, and a page's structure needs a neighbour
+    on each side; the rest of the book does not. A 20-page sample of a 3,000-page
+    scan used to read and recognise all 3,000 pages (N2 of the 7daffa5 retest).
+    The body is looked for in the first ``max(2N+1, 12)`` pages and the context
+    runs to the end of the latest sample that search allows, plus one page, so a
+    sample reads at most ``3N+1`` pages (``N+12`` for a very short one) whatever
+    the book's length. Front matter longer than the search starts the sample at
+    page one rather than shortening it. Both ends are exclusive.
+    """
+    count = max(1, int(sample_count))
+    total = max(0, int(page_count))
+    search = min(total, max(2 * count + 1, SAMPLE_SEARCH_PAGES))
+    return search, min(total, search + count)
 
 
 def survey_pages(page_count, sample=SURVEY_PAGES):

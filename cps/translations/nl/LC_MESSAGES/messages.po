@@ -16704,3 +16704,7 @@ msgstr "Optioneel. Bronconversie vereist geen providersleutel. Indien beschikbaa
 #: cps/spa_strings.py
 msgid "Models requested"
 msgstr "Aangeroepen modellen"
+
+#: cps/spa_strings.py
+msgid "The sample starts at the first body page and reads only the front of the book, so it stays quick however long the PDF is."
+msgstr "Het voorbeeld begint bij de eerste inhoudelijke pagina en leest alleen het begin van het boek, zodat het snel blijft, hoe lang de PDF ook is."

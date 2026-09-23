@@ -17218,3 +17218,7 @@ msgstr "Facultatif. La conversion du document source ne nécessite pas de clé f
 #: cps/spa_strings.py
 msgid "Models requested"
 msgstr "Modèles sollicités"
+
+#: cps/spa_strings.py
+msgid "The sample starts at the first body page and reads only the front of the book, so it stays quick however long the PDF is."
+msgstr "L’extrait commence à la première page du corps du livre et ne lit que le début du livre : il reste rapide, quelle que soit la longueur du PDF."

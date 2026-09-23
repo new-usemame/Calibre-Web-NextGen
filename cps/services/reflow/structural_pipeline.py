@@ -74,24 +74,38 @@ def _stage(client, stage, prepared, request, ledger, cache, pno, records, should
 
 def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
                    sample_count=None, progress=None, should_stop=None,
-                   recovery_opts=None, prepared_result=None, prepared_observer=None, measure_eligibility=True):
+                   recovery_opts=None, prepared_result=None, prepared_observer=None, measure_eligibility=True,
+                   sample_context=False):
     """Read full source context before selecting output/paid pages.
 
     ``prepared_result`` is an explicit local-rig reuse seam, never an API pickle
     input. It must match the current PDF and contain its complete Book context.
+
+    ``sample_context`` bounds a sample's source context to the front of the book
+    (:func:`pipeline.sample_context`) instead of the whole PDF. It is only for a
+    sample with no consent quote to honour: a prepared quote binds request
+    identities measured with the complete book's context, and a sample reviewed
+    against a different context would stop as stale before its first request.
     """
     if client is not None and client.enabled and client.configured:
         from .ledger import Ledger
         if not isinstance(cache, (pipeline.PageCache, OperationCache)) or not isinstance(ledger, Ledger):
             raise ops.ContractError('enabled structural dispatch requires a durable shared claim store and ledger')
+    bounded = bool(sample_context) and sample_count is not None
+    if bounded and prepared_observer is not None:
+        raise ops.ContractError('a consented review needs the complete source context')
+    search_end,context_end = (pipeline.sample_context(len(doc),sample_count) if bounded
+                              else (len(doc),len(doc)))
     result = prepared_result or pipeline.run(doc, client=None, progress=progress,
+                    page_numbers=list(range(context_end)) if bounded else None,
                     should_stop=should_stop, recovery_opts=recovery_opts)
-    if result.fingerprint != extract.document_fingerprint(doc) or set(result.book.pages) != set(range(len(doc))):
+    if result.fingerprint != extract.document_fingerprint(doc) or set(result.book.pages) != set(range(context_end)):
         raise ops.ContractError('complete current source context is required')
+    result.pdf_pages = len(doc)
     selected = sorted(set(page_numbers)) if page_numbers is not None else sorted(result.book.pages)
     if sample_count is not None:
-        start = pipeline.first_body_page(result.book)
-        selected = list(range(start,min(len(doc),start+int(sample_count))))
+        start = pipeline.first_body_page(result.book,before=search_end)
+        selected = list(range(start,min(context_end,start+int(sample_count))))
     if any(p not in result.book.pages for p in selected):raise ValueError('unknown output page')
     result.page_html={p:result.page_html[p] for p in selected}
     result.source_pages={};result.operation_plans=[];result.stage_records=[]
@@ -183,6 +197,8 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
     counts['cached_stages']=sum(r['cached'] for r in result.stage_records)
     counts['answered_stages']=len(result.stage_records)
     counts['source_context_pages']=len(result.book.pages)
+    counts['source_pages']=len(doc)
+    counts['context']='sample' if bounded else 'complete'
     attempts=[e for e in ledger.entries('reservation') if e.get('event')=='pending'] if ledger else []
     counts['attempted_stages']=len(attempts)
     counts['attempted_pages']=len({e['page_label'] for e in attempts})

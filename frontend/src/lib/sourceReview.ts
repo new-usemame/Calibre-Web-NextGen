@@ -28,6 +28,8 @@ export interface ReviewPreparation {
 export interface StructuralSummary {
   review_mode: ReviewMode; eligibility_measured: boolean; requested_models?: Record<string, number>;
   source_context_pages: number; total_pages: number;
+  /** The PDF's own page count, and whether a sample read only the front of it. */
+  source_pages?: number; context?: 'sample' | 'complete';
   eligible: number; limited: number; unsupported: number; no_choices: number; unreviewed: number;
   proposed_pages: number; proposed_operations: number; approved_pages: number; approved_operations: number;
   approved_heading: number; approved_quote: number; proposer_abstained: number; verifier_abstained: number;

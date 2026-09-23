@@ -392,7 +392,9 @@ export function Reflow({ id }: { id: string }) {
               onChange={(e) => setSamplePages(Math.max(1, Math.min(
                 est.sample_pages_max, Number.parseInt(e.target.value, 10) || 1)))} />
             <span className={styles.fieldHint}>
-              {t('The sample starts at the first body page and keeps the full source context for note and figure associations.')}
+              {paid
+                ? t('The sample starts at the first body page and keeps the full source context for note and figure associations.')
+                : t('The sample starts at the first body page and reads only the front of the book, so it stays quick however long the PDF is.')}
             </span>
           </label>
         )}
@@ -567,7 +569,9 @@ function JobResult({ job, bookId, t, onConvertAll }: {
         )}
         <Fact label={t('Job cap')} value={ledgerUsd(job.cap_usd)} />
         {scope ? <>
-          <Fact label={t('Source pages prepared')} value={String(scope.source_context_pages)} />
+          <Fact label={t('Source pages prepared')} value={scope.context === 'sample' && scope.source_pages
+            ? t('{done} of {total}', { done: scope.source_context_pages, total: scope.source_pages })
+            : String(scope.source_context_pages)} />
           <Fact label={t('Pages in this file')} value={String(scope.total_pages)} />
           {scope.eligibility_measured && <>
             <Fact label={t('Eligible pages')} value={String(scope.eligible)} />

@@ -170,7 +170,8 @@ def numbers(result, ledger=None, client=None):
     if hasattr(result,'structural'):
         payload['structural']=dict(result.structural)
         payload['statement']='Formatting operations preserve the chosen source words. Extraction and OCR can differ from the printed page; uncertainty disclosures and original evidence remain available.'
-        payload['structure']['scope']='full_source_book'
+        payload['structure']['scope']=('sample_context' if result.structural.get('context')=='sample'
+                                       else 'full_source_book')
         payload['rendered_structure']={'headings':len(re.findall(r'<h[1-6]\b',markup,re.I)),
             'blockquotes':len(_BLOCKQUOTE.findall(markup))}
         payload['model']['used']=bool(result.structural['attempted_stages'] or result.stage_records)
@@ -233,7 +234,8 @@ def _source(result):
                 "fonts": {}}
     fonts = sorted((assessment.fonts or {}).items(), key=lambda kv: -kv[1])
     return {
-        "pages": assessment.pages,
+        # The PDF's pages, not the pages a bounded sample read of it.
+        "pages": getattr(result, "pdf_pages", None) or assessment.pages,
         "verdict": assessment.verdict,
         "verdict_plain": assessment.describe(),
         "layer_is_trusted": assessment.layer_is_trusted,
@@ -386,7 +388,13 @@ def about_page(payload, show_cost=False, links=None, losses=()):
     if source.get("fonts"):
         out.append("<p>Type seen on the page: %s.</p>"
                    % escape(", ".join(sorted(source["fonts"]))))
-    if 'structural' in payload:
+    if 'structural' in payload and payload['structural'].get('context')=='sample':
+        out.append('<p>A sample reads only the front of the PDF: its first %d of %d pages, enough to find where '
+                   'the body starts and to give every sample page its neighbours. This file contains %s.</p>'
+                   % (payload['structural']['source_context_pages'],
+                      payload['structural'].get('source_pages',payload['source'].get('pages',0)),
+                      _count(payload['fidelity']['pages'],'one selected page','%d selected pages')))
+    elif 'structural' in payload:
         out.append('<p>Source preparation covers the complete PDF (%d pages). This file contains %d selected pages.</p>'
                    % (payload['structural']['source_context_pages'],payload['fidelity']['pages']))
     out.extend(_recovery_section(payload))
@@ -547,7 +555,9 @@ def _structure_section(payload):
         rows.append((_repaired_markers_label(structure), structure["markers_recovered"]))
     body = "".join("<tr><td>%s</td><td>%s</td></tr>" % (escape(label), value)
                    for label, value in rows)
-    return ["<h2>%s</h2>"%('Structure found in the full source PDF' if structure.get('scope')=='full_source_book' else 'What was recovered'),
+    heading={'full_source_book':'Structure found in the full source PDF',
+             'sample_context':'Structure found in the pages this sample read'}.get(structure.get('scope'),'What was recovered')
+    return ["<h2>%s</h2>"%heading,
             "<table><tbody>%s</tbody></table>" % body]
 
 

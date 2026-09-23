@@ -392,23 +392,62 @@ def test_a_sample_is_capped_however_many_pages_are_asked_for(rig):
         == rig.mod.SAMPLE_PAGES_DEFAULT
 
 
-def test_a_sample_starts_at_the_book_and_not_at_its_front_matter(rig):
-    import pymupdf
-
+def _long_book(rig, pages, front_matter=1):
+    """The rig's PDF replaced by title pages and then pages of prose."""
     doc = F.new_doc()
-    F.title_page(doc)
-    F.prose_page(doc)
-    F.prose_page(doc)
-    path = str(rig.folder / "sampled.pdf")
-    doc.save(path)
+    for _ in range(front_matter):
+        F.title_page(doc)
+    for _ in range(pages - front_matter):
+        F.prose_page(doc)
+    doc.save(str(rig.folder / "Book - Author.pdf"))
     doc.close()
 
-    task = rig.mod.TaskReflowPdf(5, 7, {"mode": "sample", "sample_pages": 2})
-    opened = pymupdf.open(path)
-    try:
-        assert task._sample_pages(opened) == [1, 2]
-    finally:
-        opened.close()
+
+def test_a_sample_starts_at_the_book_and_not_at_its_front_matter(rig):
+    """The sample the user downloads is body pages, not a title page. Run through
+    the conversion itself: the helper this used to call was never on the path."""
+    _long_book(rig, 6)
+    task = _run(rig, mode="sample", sample_pages=2, review_mode="deterministic")
+    assert task.stat == STAT_FINISH_SUCCESS, task.error
+    report = task.results["report"]
+    assert report["fidelity"]["pages"] == 2
+    assert [row["page"] for row in report["structural"]["pages"]] == [1, 2]
+
+
+def test_a_sample_of_a_long_book_reads_only_the_pages_it_needs(rig, monkeypatch):
+    """N2(a) of the 7daffa5 retest: a 20-page sample of a 3,000-page scan read and
+    recognised all 3,000 pages before it chose 20. A sample now reads the front
+    of the book only -- the pages the body is looked for in, the sample, and one
+    page past it -- whatever the book's length, and says so. Breaks if a sample
+    reads the whole book again."""
+    from cps.services.reflow import extract
+    _long_book(rig, 40)
+    read = []
+    real = extract.read_page
+    def counting(doc, pno):
+        read.append(pno)
+        return real(doc, pno)
+    monkeypatch.setattr(extract, "read_page", counting)
+    task = _run(rig, mode="sample", sample_pages=3, review_mode="deterministic")
+    assert task.stat == STAT_FINISH_SUCCESS, task.error
+    assert set(read) <= set(range(15)), sorted(set(read))
+    report = task.results["report"]
+    assert [row["page"] for row in report["structural"]["pages"]] == [1, 2, 3]
+    assert report["source"]["pages"] == 40
+    assert report["structural"]["source_context_pages"] == 15
+    assert report["structural"]["source_pages"] == 40
+    assert report["structure"]["scope"] == "sample_context"
+
+
+def test_a_sample_is_as_long_as_asked_when_the_front_matter_outruns_the_search(rig):
+    """A bounded search can miss a body that starts late. The sample is then the
+    pages it asked for from the start of the book -- never fewer pages because
+    the body was spotted in the context read past the search."""
+    _long_book(rig, 30, front_matter=13)
+    task = _run(rig, mode="sample", sample_pages=3, review_mode="deterministic")
+    assert task.stat == STAT_FINISH_SUCCESS, task.error
+    report = task.results["report"]
+    assert [row["page"] for row in report["structural"]["pages"]] == [0, 1, 2]
 
 
 # ── housekeeping ─────────────────────────────────────────────────────────────

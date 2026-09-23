@@ -284,27 +284,19 @@ class TaskReflowPdf(CalibreTask):
         from ..services.reflow.structural_quote import consent_observer
         quote=getattr(self.options,"consent_quote",None)
         observer=consent_observer(quote,document) if quote is not None else None
+        sample=self.options.mode=='sample'
+        # A sample reads the front of the book, not all of it (N2): only a paid
+        # sample keeps the complete context, because its consent quote was
+        # measured against it (see structural_pipeline.run_structural).
         result = structural_pipeline.run_structural(document,client=client,ledger=ledger,cache=cache,
-                            sample_count=self.options.sample_pages if self.options.mode=='sample' else None,
+                            sample_count=self.options.sample_pages if sample else None,
+                            sample_context=sample and observer is None,
                             progress=self._on_progress,should_stop=lambda:self.cancelled,
                             recovery_opts=recovery_opts,prepared_observer=observer,measure_eligibility=self.options.review_mode=="source_verified")
         result.structural["review_mode"]=self.options.review_mode
         # The task/report ledger records the same final user-facing scope.
         ledger.record({"kind":"structural_summary","summary":result.structural})
         return result
-
-    def _sample_pages(self, document):
-        """A sample of the body, not of the front matter.
-
-        Reading the whole book to find where the body starts would cost the user the
-        wait they are trying to avoid, so the first pass is over a short window and
-        the sample runs on from wherever that window says the book begins.
-        """
-        window = min(document.page_count, self.options.sample_pages * 3)
-        head = pipeline.deterministic_window(document, window)
-        start = pipeline.first_body_page(head)
-        return list(range(start, min(document.page_count,
-                                     start + self.options.sample_pages)))
 
     def _write_epub(self, document, result, ledger, client, book, local_db):
         payload = report.numbers(result, ledger=ledger, client=client)

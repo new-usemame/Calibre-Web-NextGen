@@ -133,7 +133,9 @@ def test_successful_chosen_recovery_geometry_is_used_after_empty_native_assessme
     result=pipeline.run(doc)
     assert not result.assessment.layer_is_trusted, 'original native page has no text'
     assert result.book.figures and all(f['bbox'][3]<page.rect.height*.8 for f in result.book.figures)
-    assert 'Figure 7.4' in result.page_html[0]
+    assert 'Figure 7.4' not in result.page_html[0]
+    assert 'original_p0000_caption_' in result.page_html[0]
+    assert any('Figure 7.4' in e.text for e in result.book.elements if e.kind=='caption')
     doc.close();master.close()
 
 

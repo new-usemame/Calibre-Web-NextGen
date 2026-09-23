@@ -203,7 +203,7 @@ class Book(object):
         return uncertain
 
     def needs_source_evidence(self, pno):
-        return any(f["pno"] == pno and f.get("found") in ("ocr_uncertain_region", "native_outline_conflict") for f in self.figures) or any(n.pno == pno and getattr(n,"glyph_fallback",False) for n in self.notes) or bool(self.ambiguous_note_numbers(pno)) or any(
+        return any(f["pno"] == pno and f.get("found") in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout") for f in self.figures) or any(n.pno == pno and getattr(n,"glyph_fallback",False) for n in self.notes) or bool(self.ambiguous_note_numbers(pno)) or any(
             any(r[0]=="glyph" for r in element.runs) or element.caption_uncertain or element.punctuation_uncertain or bool(getattr(element,"display_group",{}))
             for element in self.pages.get(pno, []))
 

@@ -590,6 +590,9 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     kept_blocks, note_regions = _preserve_uncertain_ocr_regions(
         raw, kept_blocks, note_regions, skel, cover, candidates)
 
+    kept_blocks = _preserve_unverified_scan_layout(raw, kept_blocks, skel)
+    kept_blocks = _preserve_tracked_native_lines(raw, kept_blocks, skel)
+
     layout = _column_layout(kept_blocks, embedded, candidates, raw,
                             pixel_probe=pixel_probe)
     if isinstance(layout, _RowTable):
@@ -625,7 +628,7 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
 
     if layout is not None:
         for region in skel.regions:
-            if region.reason == "ocr_uncertain_region":
+            if region.reason in ("ocr_uncertain_region", "native_spacing_uncertain", "unverified_scan_layout"):
                 region.band, region.column = layout.place(region.bbox)
 
     for img in embedded:
@@ -668,6 +671,61 @@ def _preserve_conflicting_outline_heading(raw, style, skel):
     skel.regions.append(Region(kind='figure',bbox=heading.bbox,
                                reason='native_outline_conflict'))
     skel.reasons.append('native_outline_conflict')
+
+
+def _preserve_unverified_scan_layout(raw, kept_blocks, skel):
+    if not raw.is_page_scan or not getattr(raw, 'text_layer_overpainted', False):
+        return kept_blocks
+    from .assess import looks_like_prose
+    # Ordinary continuous prose keeps its reflow. Sparse non-prose runs with
+    # repeated tiny labels do not prove symbols or their empty-cell relations.
+    # Preserve the complete run between prose boundaries, never guessed cells.
+    retained, group = [], []
+    def flush():
+        lines = [line for _, items in group for line in items]
+        small = [line for line in lines if 0 < len(line.stripped) <= 3]
+        if len(small) < 3 or len({round(line.bbox[1]/max(1,line.size)) for line in small}) < 3:
+            retained.extend(group); return
+        box = _lines_bbox(lines, lines[0].bbox)
+        x0,y0,x1,y1 = box
+        area = (x1-x0)*(y1-y0)
+        occupied = sum((ln.bbox[2]-ln.bbox[0])*(ln.bbox[3]-ln.bbox[1]) for ln in lines)
+        if (not (0 <= x0 < x1 <= raw.width and 0 <= y0 < y1 <= raw.height)
+                or y1-y0 < max(1,median(ln.size for ln in lines))*8
+                or area <= 0 or occupied/area > .25):
+            retained.extend(group); return
+        pad = max(2.0,min(6.0,median(ln.size for ln in lines)*.4))
+        crop = (max(0,x0-pad),max(0,y0-pad),min(raw.width,x1+pad),min(raw.height,y1+pad))
+        skel.regions.append(Region(kind='artwork',lines=lines,bbox=box,reason='unverified_scan_layout'))
+        skel.regions.append(Region(kind='figure',bbox=crop,reason='unverified_scan_layout'))
+    for block,lines in kept_blocks:
+        if (looks_like_prose(' '.join(line.text for line in lines))
+                or any(len(line.stripped.split()) >= 8 for line in lines)):
+            flush(); group=[]; retained.append((block,lines))
+        else:
+            group.append((block,lines))
+    flush()
+    return retained
+
+
+def _preserve_tracked_native_lines(raw, kept_blocks, skel):
+    retained = []
+    for block, lines in kept_blocks:
+        # Keep the complete paragraph/list block: removing just its first line
+        # can strand a list number or move the continuation before its source.
+        box = _lines_bbox(lines, block.bbox)
+        x0,y0,x1,y1 = box
+        if (not any(getattr(line, 'spacing_uncertain', False) for line in lines)
+                or not (0 <= x0 < x1 <= raw.width and 0 <= y0 < y1 <= raw.height)
+                or y1-y0 > raw.height*.3 or (x1-x0)*(y1-y0) > raw.width*raw.height*.35):
+            retained.append((block,lines))
+            continue
+        pad = max(1.0, min(4.0, median(line.size for line in lines)*.25))
+        crop = (max(0,x0-pad),max(0,y0-pad),min(raw.width,x1+pad),min(raw.height,y1+pad))
+        skel.regions.append(Region(kind='artwork',lines=list(lines),bbox=box,
+                                   reason='native_spacing_uncertain'))
+        skel.regions.append(Region(kind='figure',bbox=crop,reason='native_spacing_uncertain'))
+    return retained
 
 
 def _preserve_uncertain_ocr_regions(raw, kept_blocks, note_regions, skel, cover, candidates):

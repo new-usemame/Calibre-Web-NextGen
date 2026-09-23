@@ -334,7 +334,7 @@ def recover(doc, raw_pages, fingerprint, *, mode="auto",
             recovery.engine_unavailable = True
             for raw, reason in zip(raw_pages, wanted):
                 prov = PageRecovery(
-                    pno=raw.pno, reason=reason or "native_trusted",
+                    pno=raw.pno, reason=reason or ("native_unverified_scan_layer" if getattr(raw,"text_layer_overpainted",False) else "native_trusted"),
                     failed="engine or language data unavailable" if reason else "",
                     page_rect=(0.0, 0.0, raw.width, raw.height))
                 if reason:
@@ -346,7 +346,7 @@ def recover(doc, raw_pages, fingerprint, *, mode="auto",
             return recovery
 
     for raw, reason in zip(raw_pages, wanted):
-        prov = PageRecovery(pno=raw.pno, reason=reason or "native_trusted",
+        prov = PageRecovery(pno=raw.pno, reason=reason or ("native_unverified_scan_layer" if getattr(raw,"text_layer_overpainted",False) else "native_trusted"),
                             page_rect=(0.0, 0.0, raw.width, raw.height))
         if not reason:
             prov.layer = "native"

@@ -132,6 +132,29 @@ class BuildResult(object):
 
 # ------------------------------------------------------------------ one page
 
+def _caption_keys(elements):
+    """Stable source-crop identities shared by canonical markup and packaging."""
+    keys, counts, figure = {}, {}, -1
+    for index, element in enumerate(elements):
+        if element.kind == "fig":
+            figure += 1
+        elif element.kind == "caption":
+            ordinal = counts.get(figure, 0)
+            counts[figure] = ordinal + 1
+            if element.caption_uncertain:
+                base = "caption_%d" % figure if figure >= 0 else "caption_orphan"
+                keys[index] = base + ("_%d" % ordinal if ordinal else "")
+    return keys
+
+
+def _source_caption(pno, key):
+    return ('<span class="reflow-uncertain"><img src="images/original_p%04d_%s.jpg" alt="Original printed caption"/>'
+            '<br/>Caption transcription uncertain; the original printed caption '
+            'is shown as an image, without searchable text. '
+            '<a href="original-p%04d.xhtml#%s">Inspect original printed caption</a>.</span>'
+            % (pno, key, pno, key))
+
+
 def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
     """One page as it was printed: the unit the model edits and the gate measures."""
     elements = list(book.pages.get(pno) or [])
@@ -141,6 +164,7 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
     ref_ids = {}
     blocks = []
     figure_index = 0
+    caption_keys = _caption_keys(elements)
 
     index = 0
     while index < len(elements):
@@ -152,17 +176,23 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
             if index < len(elements) and elements[index].kind == "caption":
                 caption = _runs_html(elements[index].runs, available, ref_ids, ambiguous)
                 if elements[index].caption_uncertain:
-                    caption = ('<span class="reflow-uncertain" title="Caption '
-                               'transcription uncertain; compare the original printed '
-                               'caption.">%s (?)</span>' % caption)
+                    caption = _source_caption(pno, caption_keys[index])
                 index += 1
             figures = [f for f in book.figures if f["pno"] == pno]
             reason = figures[figure_index].get("found") if figure_index < len(figures) else ""
-            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict")
+            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout")
             if reason == "native_outline_conflict":
                 caption = ('Native heading text conflicts with PDF navigation metadata. '
                            'The original printed heading is shown as an image; no replacement '
                            'transcription was inferred. '
+                           '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
+            elif reason == "unverified_scan_layout":
+                caption = ('Unverified scan transcription cannot establish these symbols or their layout. '
+                           'The original region is shown as an image, without inferred or searchable text. '
+                           '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
+            elif reason == "native_spacing_uncertain":
+                caption = ('Character spacing is uncertain. The original printed text region is '
+                           'shown as an image, without inferred or searchable text. '
                            '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
             elif source_region:
                 caption = ('Original text region. OCR transcription is uncertain; '
@@ -211,7 +241,7 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                 blocks.append('<p class="source-evidence-notice">%s<a href="original-p%04d.xhtml#title_%d">View original title and layout</a>.</p>' % (copy,pno,element_index))
         elif element.kind == "caption":
             if element.caption_uncertain:
-                inner = '<span class="reflow-uncertain">%s (?)</span>' % inner
+                inner = _source_caption(pno, caption_keys[element_index])
             blocks.append('<p class="caption">%s</p>' % inner)
         else:
             blocks.append("<p>%s</p>" % inner)
@@ -1122,19 +1152,9 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 specs.append(("title_%d" % element_index, "Original title and neighboring layout", element.bbox))
             if element.punctuation_uncertain:
                 specs.append(("text_%d" % element_index, "Original punctuation and passage", element.bbox))
-        caption_keys, caption_counts = [], {}
-        figure_index = -1
-        for element in book.pages.get(pno, []):
-            if element.kind == "fig":
-                figure_index += 1
-            if element.kind == "caption":
-                ordinal = caption_counts.get(figure_index, 0)
-                caption_counts[figure_index] = ordinal + 1
-                base = "caption_%d" % figure_index if figure_index >= 0 else "caption_orphan"
-                key = base + ("_%d" % ordinal if ordinal else "") if element.caption_uncertain else None
-                caption_keys.append(key)
-                if key is not None:
-                    specs.append((key, "Original printed caption", element.bbox))
+        elements = book.pages.get(pno, [])
+        for element_index, key in _caption_keys(elements).items():
+            specs.append((key, "Original printed caption", elements[element_index].bbox))
         if not specs and pno not in recovered and pno not in scanned and not book.needs_source_evidence(pno):
             continue
         if doc is None:
@@ -1229,17 +1249,6 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 html = notice + '\n' + html
             if notices:
                 html = re.sub(r'(</h[1-6]>)', lambda m: m.group(0) + '\n' + '\n'.join(notices), html)
-        caption_links = iter(caption_keys)
-
-        def caption_link(match):
-            key = next(caption_links, None)
-            if key is None:
-                return match.group(0)
-            return ('%s%s<br/><a href="%s#%s">Original printed caption '
-                    '(transcription uncertain)</a>%s' % (
-                        match.group(1), match.group(2), href, key, match.group(3)))
-        html = re.sub(r'(<figcaption\b[^>]*>|<p class="caption">)(.*?)(</figcaption>|</p>)',
-                      caption_link, html, flags=re.S)
         if grids and source_pages and pno in source_pages:
             # Canonical marked atoms are retained exactly, after their original
             # layout. Do not infer cells or relabel a chart as a semantic table.

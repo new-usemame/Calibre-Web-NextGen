@@ -46,13 +46,23 @@ def test_conflicting_opening_heading_preserves_pixels_and_literal_outline_naviga
 
 
 @pytest.mark.parametrize('duplicate,title',[(False,'CHAPTER'),(True,'CHAPrER')])
-def test_matching_or_ambiguous_outline_does_not_reinterpret_body(duplicate,title):
+def test_matching_or_ambiguous_outline_does_not_reinterpret_body(duplicate,title,tmp_path):
     doc=_document(title,duplicate)
     try:
         book=assemble.deterministic_book(doc)
         assert title in ' '.join(e.text for e in book.elements)
         assert not any(f['found']=='native_outline_conflict' for f in book.figures)
         assert book.conservation.ok
+        if duplicate:
+            # Two authored sections may share one page. The ambiguity blocks
+            # body-heading inference, not their literal internal navigation.
+            path=tmp_path/'same-page-outline.epub'
+            build_epub.build(book,str(path),doc=doc)
+            assert build_epub.validate(str(path))==[]
+            with zipfile.ZipFile(path) as z:
+                nav=z.read('OEBPS/nav.xhtml').decode()
+                labels=re.findall(r'href="ch\d+\.xhtml#pg_0000">([^<]+)</a>',nav)
+                assert labels[:2]==['CHAPTER','Different destination label']
     finally:doc.close()
 
 

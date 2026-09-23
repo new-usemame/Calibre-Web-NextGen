@@ -544,7 +544,8 @@ class TestScanArtwork(object):
 
         fragment = build_epub.page_fragment(book, 1)
         assert "<figure>" in fragment
-        assert "Figure 7.4 - Sect as a Spectrum" in fragment
+        assert "Figure 7.4 - Sect as a Spectrum" not in fragment
+        assert "original_p0001_caption_0.jpg" in fragment
         assert "figcaption" in fragment
 
     def test_the_crop_is_the_chart_and_not_the_prose(self):
@@ -576,7 +577,8 @@ class TestScanArtwork(object):
                  if "fig_p0001" in name]
         assert names == ["fig_p0001_0.jpg"], names
         fragment = build_epub.page_fragment(book, 1)
-        assert "Chart 45 - John F. Kennedy Jr." in fragment
+        assert "Chart 45 - John F. Kennedy Jr." not in fragment
+        assert "original_p0001_caption_0.jpg" in fragment
         assert "figcaption" in fragment
         assert "The native was the son of U.S." in _whole_text(book)
         assert book.conservation.ok, book.conservation.to_dict()
@@ -791,9 +793,9 @@ class TestPlateAndCaptionFidelity:
         style = skeleton.book_style([raw])
         book = assemble.assemble([skel],style,[raw])
         html = build_epub.page_fragment(book,0)
-        assert html.index('ANCIENT') < html.index('modern')
-        assert 'reflow-uncertain' in html and 'printed caption' in html
-        assert '(?)' in html
+        assert 'ANCIENT' not in html and 'modern' not in html
+        assert 'original_p0000_caption_0.jpg' in html
+        assert 'transcription uncertain' in html
         assert book.conservation.ok
 
 
@@ -816,7 +818,7 @@ class TestPlateAndCaptionFidelity:
         assert [ln.text for _,ls in rest for ln in ls] == [right.text,bottom.text]
         assert candidate.bbox[3] <= number.bbox[1], 'caption must not distort the chart crop'
 
-    def test_scan_caption_has_source_evidence_and_keeps_source_italics(self):
+    def test_scan_caption_uses_source_pixels_without_unverified_primary_text(self, tmp_path):
         number = _line('Figure 3. Original caption.', 50, 330, 190, 338, 6)
         explanation = _line('Unverified symbols appear in this explanation.', 50, 345, 190, 353, 6.5)
         explanation.spans[0].flags = extract.FLAG_ITALIC
@@ -829,9 +831,19 @@ class TestPlateAndCaptionFidelity:
         caption=next(el for el in book.pages[0] if el.kind=='caption')
         assert caption.caption_uncertain, 'a native scan layer does not verify the printed glyphs'
         html=build_epub.page_fragment(book,0)
-        assert '<em>Unverified symbols appear in this explanation.</em>' in html
-        assert 'reflow-uncertain' in html and '(?)' in html
+        assert 'Unverified symbols' not in html and 'Figure 3.' not in html
+        assert 'original_p0000_caption_0.jpg' in html
+        assert 'original-p0000.xhtml#caption_0' in html
         assert book.conservation.ok
+        with pymupdf.open() as doc:
+            page=doc.new_page(width=500,height=700)
+            page.insert_text((50,338), 'Figure 3. Original caption.', fontsize=6)
+            output=_build(book,tmp_path,doc)
+        assert not build_epub.validate(output.path)
+        with zipfile.ZipFile(output.path) as z:
+            assert z.read('OEBPS/images/original_p0000_caption_0.jpg')
+            chapters=' '.join(z.read(n).decode() for n in z.namelist() if re.fullmatch(r'OEBPS/ch\d+\.xhtml',n))
+            assert 'Unverified symbols' not in chapters
 
 
 @pytest.mark.parametrize('side', ['right', 'left'])

@@ -126,6 +126,7 @@ class Line(object):
 
     spans: List[Span]
     bbox: Tuple[float, float, float, float]
+    spacing_uncertain: bool = False
 
     @property
     def text(self):
@@ -163,7 +164,8 @@ class Line(object):
 
     def to_dict(self):
         return {"bbox": [round(v, 2) for v in self.bbox],
-                "spans": [sp.to_dict() for sp in self.spans]}
+                "spans": [sp.to_dict() for sp in self.spans],
+                "spacing_uncertain": getattr(self, "spacing_uncertain", False)}
 
 
 @dataclass
@@ -244,6 +246,7 @@ class RawPage(object):
     drawing_rects: List[Tuple[float, float, float, float]] = field(
         default_factory=list)
     source_geometry: dict = field(default_factory=dict)
+    text_layer_overpainted: bool = False
 
     @property
     def text_blocks(self):
@@ -267,7 +270,8 @@ class RawPage(object):
                 "height": round(self.height, 2), "drawings": self.drawings,
                 "drawing_rects": [[round(v, 2) for v in rect] for rect in self.drawing_rects],
                 "blocks": [b.to_dict() for b in self.blocks],
-                "images": [i.to_dict() for i in self.images]}
+                "images": [i.to_dict() for i in self.images],
+                "text_layer_overpainted": getattr(self, "text_layer_overpainted", False)}
         if getattr(self,'source_geometry',{}):value['source_geometry'] = self.source_geometry
         return value
 
@@ -288,7 +292,7 @@ def read_page(doc, pno):
     parea = rect.get_area() or 1.0
     raw = RawPage(pno=pno, width=rect.width, height=rect.height)
 
-    from .native_text import unresolved_fonts, normalize_blocks, mark_unmapped_words
+    from .native_text import unresolved_fonts, normalize_blocks, mark_unmapped_words, synthetic_spacing_uncertain, text_layer_overpainted
     unknown_fonts = unresolved_fonts(page)
     payload = page.get_text("rawdict")
     for block in payload.get("blocks", []):
@@ -305,6 +309,7 @@ def read_page(doc, pno):
         traces = page.get_texttrace()
     except (AttributeError, RuntimeError):
         traces = []
+    raw.text_layer_overpainted = text_layer_overpainted(page, traces)
     quote_fonts = _native_quote_variants(page, traces)
     for blk in payload.get("blocks", []):
         bbox = tuple(blk.get("bbox", (0, 0, 0, 0)))
@@ -326,7 +331,8 @@ def read_page(doc, pno):
                      for sp in ln.get("spans", [])]
             spans = mark_unmapped_words(spans, traces)
             if any(sp.text.strip() for sp in spans):
-                lines.append(Line(spans=spans, bbox=tuple(ln.get("bbox", bbox))))
+                lines.append(Line(spans=spans, bbox=tuple(ln.get("bbox", bbox)),
+                    spacing_uncertain=synthetic_spacing_uncertain(ln.get("spans", []))))
         if lines:
             raw.blocks.append(Block(number=blk.get("number", 0), bbox=bbox, lines=lines))
 

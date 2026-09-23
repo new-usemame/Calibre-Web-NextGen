@@ -10,6 +10,63 @@ import re
 from dataclasses import replace
 
 
+def text_layer_overpainted(page, traces):
+    """A later unmasked page image prevents native font codes proving glyphs.
+
+    This is conservative paint-order provenance, not an OCR confidence score.
+    Transparent/masked images cannot establish it; text drawn after the image
+    stays native. No character identity is inferred from the covered layer.
+    """
+    if not traces:
+        return False
+    log = page.get_bboxlog()
+    images = [(i, box) for i,(kind,box) in enumerate(log) if kind == 'fill-image']
+    info = page.get_image_info()
+    if len(info) != len(images):
+        return False
+    carriers = [(seq,box) for (seq,box),record in zip(images,info)
+                if record.get('has-mask') is False]
+    return bool(carriers) and all(any(seq > trace.get('seqno', len(log))
+        and box[0] <= trace['bbox'][0] and box[1] <= trace['bbox'][1]
+        and box[2] >= trace['bbox'][2] and box[3] >= trace['bbox'][3]
+        for seq,box in carriers) for trace in traces)
+
+
+def synthetic_spacing_uncertain(spans):
+    """Repeated inserted spaces in short native glyph groups are not word proof.
+
+    Encoded whitespace and font/size/baseline changes end a group. We preserve
+    pixels, never remove spaces or infer a dictionary word. A conservative false
+    positive therefore changes presentation without inventing transcription.
+    """
+    groups, chars, previous = [], [], None
+    for span in spans:
+        size = span.get('size', 0)
+        origin = span.get('origin', (0, 0))
+        if previous is not None:
+            same = (span.get('font') == previous.get('font') and size > 0
+                    and abs(size-previous.get('size', 0)) <= .05*size
+                    and abs(origin[1]-previous.get('origin', (0,0))[1]) <= .15*size
+                    and -.15*size <= span['bbox'][0]-previous['bbox'][2] <= .6*size)
+            if not same:
+                groups.append(chars); chars = []
+        for char in span.get('chars', ()):
+            if char.get('c', '').isspace() and not char.get('synthetic', False):
+                groups.append(chars); chars = []
+            else:
+                chars.append(char)
+        previous = span
+    groups.append(chars)
+    for group in groups:
+        text = ''.join(c.get('c', '') for c in group)
+        inserted = sum(c.get('synthetic', False) and c.get('c', '').isspace() for c in group)
+        pieces = text.split()
+        if (inserted >= 3 and 4 <= sum(c.isalpha() for c in text) <= 80
+                and pieces and max(map(len, pieces)) <= 3):
+            return True
+    return False
+
+
 def unresolved_fonts(page):
     doc = page.parent
     result = set()

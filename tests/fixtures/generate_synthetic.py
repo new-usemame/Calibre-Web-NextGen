@@ -515,6 +515,147 @@ def create_noteref_epub(output_path: Path) -> None:
     print(f"  \u2713 Created ({size:,} bytes)")
 
 
+def create_nested_toc_epub(output_path: Path, *, ncx_only: bool = False,
+                           nav_outside_package: bool = False) -> None:
+    """
+    Build a book whose table of contents is three levels deep (#2253).
+
+    Part One holds Chapter One and Chapter Two; Chapter One holds Late Section,
+    which is a fragment (`ch1.xhtml#late-section`) placed several pages into
+    its chapter, so a reader that opens the chapter instead of the fragment
+    lands on the wrong page. Afterword is a second top-level entry.
+
+    `ncx_only=False` ships an EPUB 3 nav document; `ncx_only=True` ships the
+    same outline as an EPUB 2 NCX, the other TOC shape epub.js parses.
+
+    `nav_outside_package=True` puts the package in OEBPS/ and the nav document
+    at the root (manifest href `../nav.xhtml`, entries `OEBPS/ch1.xhtml`), the
+    layout of the converted Gutenberg books in the local-dev library, where
+    TOC hrefs are not relative to the package document the spine is keyed by.
+    """
+    print(f"Creating nested-TOC EPUB: {output_path.name}")
+
+    variant = 'ncx' if ncx_only else ('nav-outside' if nav_outside_package else 'nav')
+    pkg = 'OEBPS/' if nav_outside_package else ''
+    nav_href = '../nav.xhtml' if nav_outside_package else 'nav.xhtml'
+    filler = ''.join(
+        f'  <p>Filler paragraph {n} of chapter one. It exists only to push the late '
+        f'section several pages further into the chapter, so opening the chapter at '
+        f'its first page cannot also show the late section.</p>\n'
+        for n in range(1, 61)
+    )
+
+    def doc(title: str, body: str) -> str:
+        return (
+            '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE html>\n'
+            '<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en">\n'
+            f'<head><title>{title}</title></head>\n<body>\n{body}</body>\n</html>'
+        )
+
+    if ncx_only:
+        toc_item = '<item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>'
+        spine_open = '<spine toc="ncx">'
+        version, modified = '2.0', ''
+    else:
+        toc_item = f'<item id="nav" href="{nav_href}" media-type="application/xhtml+xml" properties="nav"/>'
+        spine_open = '<spine>'
+        version = '3.0'
+        modified = '<meta property="dcterms:modified">2025-01-01T00:00:00Z</meta>'
+
+    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as epub:
+        epub.writestr('mimetype', 'application/epub+zip',
+                      compress_type=zipfile.ZIP_STORED)
+
+        epub.writestr('META-INF/container.xml', '''<?xml version="1.0" encoding="UTF-8"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+  <rootfiles>
+    <rootfile full-path="PKGcontent.opf" media-type="application/oebps-package+xml"/>
+  </rootfiles>
+</container>'''.replace('PKG', pkg))
+
+        epub.writestr(f'{pkg}content.opf', f'''<?xml version="1.0" encoding="UTF-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="{version}" unique-identifier="bookid">
+  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+    <dc:identifier id="bookid">test-nested-toc-{variant}</dc:identifier>
+    <dc:title>Nested TOC Sample</dc:title>
+    <dc:creator>CWA Test Suite</dc:creator>
+    <dc:language>en</dc:language>
+    {modified}
+  </metadata>
+  <manifest>
+    {toc_item}
+    <item id="part1" href="part1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ch1" href="ch1.xhtml" media-type="application/xhtml+xml"/>
+    <item id="ch2" href="ch2.xhtml" media-type="application/xhtml+xml"/>
+    <item id="after" href="after.xhtml" media-type="application/xhtml+xml"/>
+  </manifest>
+  {spine_open}
+    <itemref idref="part1"/>
+    <itemref idref="ch1"/>
+    <itemref idref="ch2"/>
+    <itemref idref="after"/>
+  </spine>
+</package>''')
+
+        if ncx_only:
+            epub.writestr('toc.ncx', '''<?xml version="1.0" encoding="UTF-8"?>
+<ncx xmlns="http://www.daisy.org/z3986/2005/ncx/" version="2005-1">
+  <head><meta name="dtb:uid" content="test-nested-toc-ncx"/></head>
+  <docTitle><text>Nested TOC Sample</text></docTitle>
+  <navMap>
+    <navPoint id="np-part1" playOrder="1">
+      <navLabel><text>Part One</text></navLabel><content src="part1.xhtml"/>
+      <navPoint id="np-ch1" playOrder="2">
+        <navLabel><text>Chapter One</text></navLabel><content src="ch1.xhtml"/>
+        <navPoint id="np-late" playOrder="3">
+          <navLabel><text>Late Section</text></navLabel><content src="ch1.xhtml#late-section"/>
+        </navPoint>
+      </navPoint>
+      <navPoint id="np-ch2" playOrder="4">
+        <navLabel><text>Chapter Two</text></navLabel><content src="ch2.xhtml"/>
+      </navPoint>
+    </navPoint>
+    <navPoint id="np-after" playOrder="5">
+      <navLabel><text>Afterword</text></navLabel><content src="after.xhtml"/>
+    </navPoint>
+  </navMap>
+</ncx>''')
+        else:
+            epub.writestr('nav.xhtml', ('''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+<head><title>Contents</title></head>
+<body>
+  <nav epub:type="toc" id="toc">
+    <ol>
+      <li><a href="part1.xhtml">Part One</a>
+        <ol>
+          <li><a href="ch1.xhtml">Chapter One</a>
+            <ol>
+              <li><a href="ch1.xhtml#late-section">Late Section</a></li>
+            </ol>
+          </li>
+          <li><a href="ch2.xhtml">Chapter Two</a></li>
+        </ol>
+      </li>
+      <li><a href="after.xhtml">Afterword</a></li>
+    </ol>
+  </nav>
+</body>
+</html>''').replace('href="', f'href="{pkg}'))
+
+        epub.writestr(f'{pkg}part1.xhtml', doc('Part One', '  <h1>PART-ONE-OPENING</h1>\n'))
+        epub.writestr(f'{pkg}ch1.xhtml', doc('Chapter One', (
+            '  <h1 id="chapter-one">CHAPTER-ONE-OPENING</h1>\n' + filler +
+            '  <h2 id="late-section">LATE-SECTION-HEADING</h2>\n'
+            '  <p>The late section of chapter one.</p>\n')))
+        epub.writestr(f'{pkg}ch2.xhtml', doc('Chapter Two', '  <h1>CHAPTER-TWO-OPENING</h1>\n'))
+        epub.writestr(f'{pkg}after.xhtml', doc('Afterword', '  <h1>AFTERWORD-OPENING</h1>\n'))
+
+    size = output_path.stat().st_size
+    print(f"  ✓ Created ({size:,} bytes)")
+
+
 def main():
     """Main entry point."""
     print("=" * 70)
@@ -583,6 +724,17 @@ def main():
         # 11. In-book links: noteref markers, cross-document and external links
         path = output_dir / "test_noteref_links.epub"
         create_noteref_epub(path)
+        files_created.append(path)
+
+        # 12. Multi-level table of contents, EPUB 3 nav and EPUB 2 NCX (#2253)
+        path = output_dir / "test_nested_toc.epub"
+        create_nested_toc_epub(path)
+        files_created.append(path)
+        path = output_dir / "test_nested_toc_ncx.epub"
+        create_nested_toc_epub(path, ncx_only=True)
+        files_created.append(path)
+        path = output_dir / "test_nested_toc_nav_outside.epub"
+        create_nested_toc_epub(path, nav_outside_package=True)
         files_created.append(path)
 
     except Exception as e:

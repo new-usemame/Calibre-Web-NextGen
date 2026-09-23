@@ -419,6 +419,14 @@
 
 .tocItem:hover { background: var(--surface-2); color: var(--text); }
 
+/* #2253: a nested level is indented under its parent, with a rule down the
+ * side so a long run of sections still reads as belonging to one chapter. */
+.tocNested {
+  margin-left: var(--sp-3);
+  padding-left: var(--sp-2);
+  border-left: 1px solid var(--border);
+}
+
 /* Search shares the TOC drawer shell, then becomes a compact form + result
  * list. All content here is on the app surface, so use app tokens regardless of
  * the separately-selected reading-page theme. */

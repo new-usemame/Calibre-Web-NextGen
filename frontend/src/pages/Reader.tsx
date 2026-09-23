@@ -2,7 +2,7 @@ import {
   archiveMatchesFingerprint, chapterProgressCfi, resumeCfi, resumeForArchive,
   withResumeTimeout,
 } from "../lib/readerResume";
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Link } from 'wouter';
 import ePub from 'epubjs';
 import {
@@ -25,6 +25,7 @@ import {
   DEFAULT_HIT_CAP, MIN_QUERY_LENGTH, searchBook, type SearchHit,
 } from '../lib/reader/searchBook';
 import { chapterLabelForHref, splitSearchExcerpt } from '../lib/reader/searchUi';
+import { flattenToc, tocFromNavigation, type TocItem } from '../lib/reader/toc';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/safeStorage';
 import { getReaderContentUrl } from '../lib/readerTarget';
 import {
@@ -94,11 +95,6 @@ const HILITE_FILL: Record<string, string> = {
 const UNKNOWN_FILL = '#d0cbc2';
 
 type ReaderTheme = 'light' | 'sepia' | 'dark' | 'black';
-
-interface TocItem {
-  label: string;
-  href: string;
-}
 
 /** A saved highlight as the reader needs it: enough to list, jump to and edit. */
 interface AnnRow {
@@ -219,6 +215,28 @@ const FONT_FAMILY: Record<ReaderSettings['font'], string> = {
   default: '', Yahei: 'Microsoft YaHei, sans-serif', SimSun: 'SimSun, serif',
   KaiTi: 'KaiTi, serif', Arial: 'Arial, sans-serif',
 };
+
+/** The table of contents as nested lists, so every level is reachable and a
+ *  screen reader announces where each entry sits in the book's outline. */
+function TocList({ items, onPick, untitled, nested = false }: {
+  items: TocItem[];
+  onPick: (href: string) => void;
+  untitled: string;
+  nested?: boolean;
+}) {
+  return (
+    <ul role="list" className={nested ? styles.tocNested : undefined}>
+      {items.map((item, i) => (
+        <li key={`${item.href}-${i}`}>
+          <button className={styles.tocItem} onClick={() => onPick(item.href)}>{item.label || untitled}</button>
+          {item.subitems.length > 0 && (
+            <TocList items={item.subitems} onPick={onPick} untitled={untitled} nested />
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 function loadTheme(): ReaderTheme {
   const v = safeLocalStorageGet(LS_THEME);
@@ -355,6 +373,9 @@ export function Reader({ id }: { id: string }) {
   // #1303: true for a right-to-left book; swaps which screen side turns forward.
   const [rtl, setRtl] = useState(false);
   const [toc, setToc] = useState<TocItem[]>([]);
+  // Search results are named after the first entry, at any level, that points
+  // into their document; a section in its own file is otherwise a raw path.
+  const tocEntries = useMemo(() => flattenToc(toc), [toc]);
   const [tocOpen, setTocOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1526,7 +1547,12 @@ export function Reader({ id }: { id: string }) {
 
         epubBook.loaded.navigation.then((nav: any) => {
           if (!cancelled) {
-            setToc(nav.toc.map((t: any) => ({ label: (t.label || '').trim(), href: t.href })));
+            const packaging = (epubBook as any).packaging;
+            setToc(tocFromNavigation(
+              nav.toc,
+              packaging?.navPath || packaging?.ncxPath,
+              (epubBook as any).path?.directory,
+            ));
           }
         });
 
@@ -1736,14 +1762,29 @@ export function Reader({ id }: { id: string }) {
     // throw "No Section Found" when the toc href and spine href bases differ
     // (common when opening from an ArrayBuffer). spine.get() matches by href/id/
     // index and is robust; fall back to the raw href (sans fragment) if needed.
-    let target: string | number = href;
+    //
+    // A nested entry usually names a place inside its chapter (ch1.xhtml#s2),
+    // and the index alone opens the chapter's first page. So an href with a
+    // fragment is displayed as itself once the spine resolves it (epub.js runs
+    // the same lookup, then pages to the element), with the index as fallback.
+    let index: number | null = null;
     try {
       const section = epubBook?.spine?.get(href);
-      if (section && typeof section.index === 'number') target = section.index;
+      if (section && typeof section.index === 'number') index = section.index;
     } catch { /* fall through to href */ }
-    Promise.resolve(rendition.display(target)).catch(() => {
-      Promise.resolve(rendition.display(href.split('#')[0])).catch(() => {/* give up quietly */});
-    });
+    const target = index !== null && !href.includes('#') ? index : href;
+    Promise.resolve(rendition.display(target))
+      .then(async () => {
+        if (typeof target !== 'string') return;
+        // As with the initial target: a freshly rendered section is reflowed by
+        // the rendered hook's typography after display() measured the fragment,
+        // so place it again once that layout frame has run.
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        await rendition.display(target);
+      })
+      .catch(() => {
+        Promise.resolve(rendition.display(index ?? href.split('#')[0])).catch(() => {/* give up quietly */});
+      });
   };
 
   if (isLoading) {
@@ -1844,13 +1885,7 @@ export function Reader({ id }: { id: string }) {
             {toc.length === 0 ? (
               <p className={styles.tocEmpty}>{t('No contents found.')}</p>
             ) : (
-              <ul role="list">
-                {toc.map((tocItem, i) => (
-                  <li key={`${tocItem.href}-${i}`}>
-                    <button className={styles.tocItem} onClick={() => goToc(tocItem.href)}>{tocItem.label || t('Untitled')}</button>
-                  </li>
-                ))}
-              </ul>
+              <TocList items={toc} onPick={goToc} untitled={t('Untitled')} />
             )}
           </nav>
         </>
@@ -2001,7 +2036,7 @@ export function Reader({ id }: { id: string }) {
                   <li key={`${hit.cfi}-${index}`}>
                     <button className={styles.searchResult} onClick={() => goToSearchResult(hit.cfi)}>
                       <span className={styles.searchChapter}>
-                        {chapterLabelForHref(hit.href, toc)}
+                        {chapterLabelForHref(hit.href, tocEntries)}
                       </span>
                       <span className={styles.searchExcerpt}>
                         {splitSearchExcerpt(hit.excerpt, searchQuery).map((part, partIndex) =>

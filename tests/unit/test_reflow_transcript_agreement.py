@@ -157,3 +157,14 @@ def test_unavailable_optional_recognizer_fails_closed_for_hidden_source(monkeypa
     recovered=source.recover([], [raw], 'a'*64,mode='auto_if_available')
     assert recovered.engine_unavailable and recovered.failed==1
     assert recovered.pages[0].transcript_unverified and recovered.pages[0].text==raw.text
+
+
+@pytest.mark.parametrize('atom',['glyph','raised','sup'])
+def test_marker_repair_cannot_reach_across_an_immutable_source_atom(atom):
+    from cps.services.reflow import assemble
+    from cps.services.reflow.native_text import descriptor
+    run=[atom,"following.'",descriptor(0,(20,20,60,30),10,'Times',reason='transcript')] if atom=='glyph' else [atom,'7',0]
+    runs=[['t','A complete original word zodiacal ', 'italic'],run]
+    before=__import__('copy').deepcopy(runs);repairs=[]
+    assemble._strip_marker_prefix(runs,repairs,0,'36',136)
+    assert runs==before and repairs==[]

@@ -556,8 +556,15 @@ def _strip_marker_prefix(runs, repairs, pno, digits, number):
     want = str(number)[:-len(digits)] if str(number).endswith(digits) else ""
     if not want:
         return
-    index = next((k for k in range(len(runs) - 1, -1, -1)
-                  if runs[k][0] == "t" and runs[k][1].strip()), None)
+    index = None
+    for k in range(len(runs)-1,-1,-1):
+        # An intervening glyph/marker/raised atom is real source content.
+        # Its invisible logical text cannot license editing earlier prose.
+        if runs[k][0] != "t":
+            return
+        if runs[k][1].strip():
+            index=k
+            break
     if index is None:
         return
     text = runs[index][1]
@@ -566,7 +573,7 @@ def _strip_marker_prefix(runs, repairs, pno, digits, number):
         residue = tail[-width:]
         if len(residue) != width or glyph_number(residue) != want:
             continue
-        runs[index] = ["t", tail[:-width]]
+        runs[index] = ["t", tail[:-width], *runs[index][2:]]
         repairs.append(Repair("marker_prefix", pno,
                               "read %r before marker %s as the %s of note %d"
                               % (residue, digits, want, number), consumed=residue))

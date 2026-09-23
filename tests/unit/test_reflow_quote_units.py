@@ -452,3 +452,56 @@ def test_unmapped_native_glyph_unit_cannot_gain_structural_role(tmp_path, seam):
                 build_epub.build(book, str(tmp_path/'forged.epub'), doc=doc,
                     operation_plans=[ops.OperationPlan(forged, (cid,))])
     doc.close()
+
+
+def test_complete_quote_preserves_source_word_image_as_an_indivisible_atom(tmp_path):
+    from cps.services.reflow import enriched_source,build_epub
+    from cps.services.reflow.native_text import descriptor
+    from xml.etree import ElementTree as ET
+    from dataclasses import replace
+    data=fixture(tmp_path);book,doc,raw,start,end=data
+    element=book.pages[0][1];text=element.runs[0][1];a=text.index('complete');b=a+len('complete')
+    box=next(w[:4] for w in doc[0].get_text('words') if w[4]=='complete' and w[1]>140)
+    record=descriptor(0,box,11,'Times-Roman',reason='transcript')
+    element.runs=[['t',text[:a]],['glyph',text[a:b],record],['t',text[b:]]]
+    original=copy.deepcopy(element.runs)
+    source=enriched_source.prepare_source_page(book,0,{'layer':'native'},[])
+    prepared=ops.prepare(book,doc,0,'protected-atoms',{'layer':'native'},source_page=source,raw_page=raw)
+    choice=next(c for c in prepared.candidates() if c['kind']=='quote' and c['element_id']=='e1')
+    assert choice['source_range']==[start,end]
+    plan=prepared.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=prepared.snapshot_id,select=[choice['candidate_id']]),source_page=source)
+    target=tmp_path/'protected.epub';build_epub.build(book,str(target),doc=doc,source_pages={0:source},operation_plans=[plan])
+    assert element.runs==original and build_epub.validate(str(target))==[]
+    with zipfile.ZipFile(target) as archive:
+        blocks=[b for name in archive.namelist() if name.endswith('.xhtml') for b in ET.fromstring(archive.read(name)).iter('{http://www.w3.org/1999/xhtml}blockquote')]
+        assert len(blocks)==1 and len(list(blocks[0].iter('{http://www.w3.org/1999/xhtml}img')))==1
+    # Use the sealed canonical source block rather than a synthesized replacement.
+    fragment=build_epub.split_blocks(source.html)[1]
+    with pytest.raises(ops.ContractError,match='atom'):
+        enriched_source.wrap(fragment,element,[ops._Spec(1,'quote',a+1,end)])
+    forged=replace(prepared,specs=(ops._Spec(1,'quote',a+1,end),))
+    bad=forged.candidates()[0]['candidate_id']
+    with pytest.raises(ops.ContractError):forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=forged.snapshot_id,select=[bad]),source_page=source)
+    with pytest.raises(ops.ContractError):
+        build_epub.build(book,str(tmp_path/'cut.epub'),doc=doc,source_pages={0:source},operation_plans=[ops.OperationPlan(forged,(bad,))])
+    element.runs[1][2]['bbox'][0]+=1
+    with pytest.raises(ops.ContractError):prepared.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=prepared.snapshot_id,select=[choice['candidate_id']]),source_page=source)
+    doc.close()
+
+
+@pytest.mark.parametrize('kind,offered',[('closing_only',True),('inline',False)])
+def test_uncertain_terminal_image_cannot_be_used_as_a_textual_quote_boundary(tmp_path,kind,offered):
+    from cps.services.reflow import enriched_source
+    from cps.services.reflow.native_text import descriptor
+    data=fixture(tmp_path,kind);book,doc,raw,start,end=data
+    element=book.pages[0][1];text=element.runs[0][1]
+    # The complete final source word remains pixels, including the uncertain
+    # punctuation. It does not authorize a partial textual quotation.
+    cut=text.rstrip().rfind(' ')+1
+    record=descriptor(0,element.bbox,11,'Times-Roman',reason='transcript')
+    element.runs=[['t',text[:cut]],['glyph',text[cut:],record],*element.runs[1:]]
+    element.punctuation_uncertain=True
+    source=enriched_source.prepare_source_page(book,0,{'layer':'native'},[])
+    prepared=ops.prepare(book,doc,0,'protected-atoms',{'layer':'native'},source_page=source,raw_page=raw)
+    assert any(c['kind']=='quote' and c['source_range']==[start,end] for c in prepared.candidates()) is offered
+    doc.close()

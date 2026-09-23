@@ -11,7 +11,7 @@ from xml.dom import Node, minidom
 
 from . import annotate
 
-VERSION = 'reflow-enriched-source-6'
+VERSION = 'reflow-enriched-source-7'
 
 # A public content digest detects corruption, but cannot prove who rendered it.
 # Only the factory below issues authority for canonical bytes in this process.
@@ -156,7 +156,7 @@ def _tree(fragment, element):
     nodes = [n for n in root.documentElement.childNodes if n.nodeType == Node.ELEMENT_NODE]
     if len(nodes) != 1 or nodes[0].tagName != 'p':
         raise ContractError('wrapper requires one canonical paragraph')
-    marker_lengths = iter(len(str(r[1])) for r in element.runs if r[0] != 't')
+    atomic_runs = iter(r for r in element.runs if r[0] != 't')
     bounds, atoms, offset = {}, set(), 0
 
     def visit(node):
@@ -167,16 +167,27 @@ def _tree(fragment, element):
         elif node.nodeType == Node.ELEMENT_NODE:
             classes = node.getAttribute('class').split()
             marker = 'noteref' in classes or 'noteref-unresolved' in classes
-            if marker:
-                try: offset += next(marker_lengths)
-                except StopIteration as exc: raise ContractError('source marker mapping differs') from exc
+            glyph = 'source-glyph' in classes
+            raised = node.tagName == 'sup' and not marker
+            if marker or glyph or raised:
+                try: run = next(atomic_runs)
+                except StopIteration as exc: raise ContractError('source atom mapping differs') from exc
+                expected = ('sup','mark') if marker else ('glyph',) if glyph else ('raised',)
+                if run[0] not in expected:raise ContractError('source atom kind differs')
+                if glyph:
+                    from .native_text import glyph_html
+                    original=minidom.parseString(glyph_html(run[2])).documentElement
+                    if node.toxml()!=original.toxml():raise ContractError('source glyph binding differs')
+                elif raised and ''.join(n.data for n in node.childNodes if n.nodeType==Node.TEXT_NODE)!=str(run[1]):
+                    raise ContractError('raised source atom differs')
+                offset += len(str(run[1]))
                 atoms.add(id(node))
             else:
                 for child in node.childNodes: visit(child)
                 if annotate.CLASS in classes: atoms.add(id(node))
         bounds[id(node)] = (start, offset)
     node = nodes[0];visit(node)
-    if offset != _length(element.runs) or next(marker_lengths, None) is not None:
+    if offset != _length(element.runs) or next(atomic_runs, None) is not None:
         raise ContractError('canonical paragraph offsets differ from immutable runs')
     return node, bounds, atoms
 

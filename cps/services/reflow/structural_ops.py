@@ -267,7 +267,11 @@ def prepare(book, doc, pno, revision, source_layer, seed=0,
             continue
         used += size
         context.append(record)
-        for spec in (() if index in relational_regions or any(r[0]=="glyph" for r in element.runs) else _proposals(element, index,quote_proofs[index]['units'])):
+        protected_glyphs = any(r[0]=="glyph" for r in element.runs)
+        # Image words are immutable source atoms, and need their sealed rendered
+        # source binding before any structural wrapper may be offered.
+        blocked_glyphs = protected_glyphs and source_page is None
+        for spec in (() if index in relational_regions or blocked_glyphs else _proposals(element, index,quote_proofs[index]['units'])):
             if spec.kind == 'heading' and not proofs[index]['supported']:
                 continue
             if source_page is not None:

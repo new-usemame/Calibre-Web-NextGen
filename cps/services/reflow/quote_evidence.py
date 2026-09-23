@@ -8,7 +8,7 @@ import re
 import statistics
 from . import assemble,extract,note_evidence,heading_evidence as geometry
 
-VERSION='source-quote-units-7'
+VERSION='source-quote-units-8'
 
 
 def _normal_positions(text):
@@ -30,7 +30,7 @@ def _source_lines(element,lines):
     normal,positions=_normal_positions(text)
     atomic_suffix=[]
     for run in reversed(element.runs):
-        if run[0]=='t':break
+        if run[0] not in ('sup','mark'):break
         atomic_suffix.insert(0,run)
     atom_length=sum(len(str(run[1])) for run in atomic_suffix)
     uncertain_atom=bool(atomic_suffix) and all('uncertain' in run[2:] for run in atomic_suffix)
@@ -167,7 +167,7 @@ def quote_evidence(book,pno,raw_page,layer,source_rotation=0,uncertain=False):
     for index,element in enumerate(elements):
         proof={'version':VERSION,'supported':False,'reason':'missing_source_geometry','units':[]}
         result[index]=proof
-        if any(run[0]=="glyph" for run in element.runs):
+        if any(run[0]=="glyph" and (not isinstance(run[2],dict) or run[2].get("reason")!="transcript") for run in element.runs):
             proof["reason"]="unmapped_native_glyphs";continue
         if raw is None or raw.get('pno')!=pno or layer not in ('native','ocr') or source_rotation:
             continue
@@ -190,7 +190,7 @@ def quote_evidence(book,pno,raw_page,layer,source_rotation=0,uncertain=False):
         text=''.join(str(run[1]) for run in element.runs)
         end=len(text)
         for run in reversed(element.runs):
-            if run[0]=='t':break
+            if run[0] not in ('sup','mark'):break
             end-=len(str(run[1]))
         while end and text[end-1].isspace():end-=1
         start=len(text)-len(text.lstrip())
@@ -246,7 +246,19 @@ def quote_evidence(book,pno,raw_page,layer,source_rotation=0,uncertain=False):
         delimited=[]
         boundary_uncertain=element.punctuation_uncertain or uncertain
         proof['retained_uncertainty']=bool(boundary_uncertain)
-        if boundary_uncertain and any(mark in body for mark in ('\"','“','”')) and not body.startswith(('\"','“')):
+        # A terminal transcription-image word is preserved as a whole source
+        # atom. Its unreliable logical punctuation cannot establish an internal
+        # quotation split. Complete layout proof above still governs the unit.
+        cursor=0;terminal_image=None
+        for run in element.runs:
+            following=cursor+len(str(run[1]))
+            if run[0]=='glyph' and isinstance(run[2],dict) and run[2].get('reason')=='transcript' and following==end:
+                terminal_image=(cursor,following)
+            cursor=following
+        ambiguous_marks=[start+i for i,char in enumerate(body) if char in ('"','“','”')]
+        protected_terminal=bool(terminal_image and ambiguous_marks and
+            all(terminal_image[0]<=position<terminal_image[1] for position in ambiguous_marks))
+        if boundary_uncertain and ambiguous_marks and not body.startswith(('"','“')) and not protected_terminal:
             proof['reason']='uncertain_mixed_quote_boundary';continue
         for opening,closing in (() if boundary_uncertain else pairs):
             a=body.find(opening);b=body.rfind(closing)

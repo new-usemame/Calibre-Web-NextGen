@@ -1,15 +1,18 @@
-import { resumeCfi, resumeForArchive, withResumeTimeout } from "../lib/readerResume";
+import {
+  archiveMatchesFingerprint, chapterProgressCfi, resumeCfi, resumeForArchive,
+  withResumeTimeout,
+} from "../lib/readerResume";
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { Link } from 'wouter';
 import ePub from 'epubjs';
 import {
   ChevronLeft, ChevronRight, X, List, Sun, Moon, Coffee, Loader2, Trash2,
   SlidersHorizontal, StickyNote, Highlighter, MoonStar, Maximize, Minimize,
-  Search,
+  Search, MapPin,
 } from 'lucide-react';
 import {
   type ReaderSettings, isWorthResending, useBook, useBookmark, useReaderSettings,
-  useSaveBookmark, useSaveReaderSettings,
+  useReadingSources, useSaveBookmark, useSaveReaderSettings, type ReadingSource,
 } from '../lib/queries';
 import { apiPost, apiDelete, apiPatch, apiUrl, resourceUrl } from '../lib/api';
 import { Button } from '../components/Button';
@@ -232,18 +235,36 @@ function loadFont(): number {
   return v >= FONT_MIN && v <= FONT_MAX ? v : 100;
 }
 
+function readingSourceTime(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium', timeStyle: 'short',
+  }).format(date);
+}
+
+function readingSourcePercent(value: number): string {
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
+}
+
 export function Reader({ id }: { id: string }) {
   const t = useT();
   const announce = useAnnouncer();
+  const requestedSource = new URLSearchParams(window.location.search).get('source');
+  const [placesOpen, setPlacesOpen] = useState(false);
   const { data: book, isLoading, error } = useBook(id);
   const { data: savedBookmark, isFetched: isBookmarkFetched } = useBookmark(id, 'epub');
   const { data: settingsData, isFetched: isSettingsFetched } = useReaderSettings();
   const saveBookmark = useSaveBookmark(id);
   const saveSettings = useSaveReaderSettings();
+  const readingSources = useReadingSources(id, placesOpen);
 
   const viewerRef = useRef<HTMLDivElement>(null);
+  const placesTriggerRef = useRef<HTMLButtonElement>(null);
   const tocRef = useRef<HTMLElement>(null);
   const searchRef = useRef<HTMLElement>(null);
+  const placesRef = useRef<HTMLElement>(null);
   const searchFieldRef = useRef<HTMLInputElement>(null);
   const searchAbortRef = useRef<AbortController | null>(null);
   // The in-flight scan, so the next one can wait for it to finish touching the
@@ -276,6 +297,7 @@ export function Reader({ id }: { id: string }) {
   const [devices, setDevices] = useState<Record<string, { label?: string }>>({});
   const renditionRef = useRef<any>(null);
   const bookRef = useRef<any>(null);
+  const archiveRef = useRef<ArrayBuffer | null>(null);
 
   // Localized color names for highlight swatches + accessible labels.
   const colorLabel = (c: HiliteColor) =>
@@ -285,6 +307,8 @@ export function Reader({ id }: { id: string }) {
   const settingsPendingRef = useRef<Partial<ReaderSettings>>({});
   const lastCfiRef = useRef<string | null>(null);
   const lastPercentRef = useRef<number | null>(null);
+  const lastShareWithDevicesRef = useRef(true);
+  const sourceModeRef = useRef<'none' | 'preview' | 'browser'>('none');
   const saveRetries = useRef(0);
   // #1318 single-flight bookkeeping: one save in flight at a time, a coalesce
   // flag for relocations that happen during it, and a latch so a persistent
@@ -320,6 +344,13 @@ export function Reader({ id }: { id: string }) {
   const previewingRef = useRef(false);
 
   const [rendered, setRendered] = useState(false);
+
+  // A device-manager deep link can request the drawer before the loading view
+  // has mounted it. Open only after the reader exists so useFocusTrap can focus
+  // the close button instead of capturing a null ref and leaving focus on body.
+  useEffect(() => {
+    if (rendered && requestedSource) setPlacesOpen(true);
+  }, [rendered, requestedSource]);
   const [renderError, setRenderError] = useState<string | null>(null);
   // #1303: true for a right-to-left book; swaps which screen side turns forward.
   const [rtl, setRtl] = useState(false);
@@ -333,6 +364,8 @@ export function Reader({ id }: { id: string }) {
   const [searchComplete, setSearchComplete] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [annOpen, setAnnOpen] = useState(false);
+  const [openingSource, setOpeningSource] = useState<string | null>(null);
+  const [previewSource, setPreviewSource] = useState<ReadingSource | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   // Resolved once: whether this browser can do element fullscreen at all.
   const [canFullscreen] = useState(fullscreenSupported);
@@ -389,6 +422,78 @@ export function Reader({ id }: { id: string }) {
     ? getReaderContentUrl(id, epubFormat.format, epubFormat.content_url)
     : null;
 
+  const openReadingSource = useCallback(async (source: ReadingSource) => {
+    const archive = archiveRef.current;
+    const epubBook = bookRef.current;
+    const rendition = renditionRef.current;
+    if (!archive || !epubBook || !rendition) {
+      announce(t('The book is still opening. Try again in a moment.'), { assertive: true });
+      return;
+    }
+    setOpeningSource(source.id);
+    try {
+      const hint = source.resume;
+      let target: string | undefined;
+      if (hint.cfi) {
+        if (hint.epub_sha256) {
+          const validated = await resumeForArchive({
+            percentage: hint.percentage ?? 0,
+            synced_at: source.observed_at ?? '',
+            mode: 'automatic',
+            cfi: hint.cfi,
+            epub_sha256: hint.epub_sha256,
+          }, archive, async cfi => epubBook.getRange(cfi));
+          target = validated?.cfi;
+        } else if (await epubBook.getRange(hint.cfi)) {
+          // Browser CFIs are written against the EPUB currently served by this
+          // book id. Still resolve the range before trusting an old bookmark.
+          target = hint.cfi;
+        }
+      }
+      if (!target && hint.href && await archiveMatchesFingerprint(
+        archive, hint.epub_sha256,
+      )) {
+        target = hint.href;
+      }
+      if (!target && hint.chapter_href
+          && typeof hint.chapter_progression === 'number'
+          && await archiveMatchesFingerprint(archive, hint.epub_sha256)) {
+        if (!epubBook.locations.length()) {
+          await withResumeTimeout(() => epubBook.locations.generate(1600));
+        }
+        target = chapterProgressCfi(
+          epubBook, hint.chapter_href, hint.chapter_progression,
+        );
+      }
+      if (!target && typeof hint.percentage === 'number'
+          && Number.isFinite(hint.percentage)) {
+        if (!epubBook.locations.length()) {
+          await withResumeTimeout(() => epubBook.locations.generate(1600));
+        }
+        target = resumeCfi(epubBook.locations, {
+          percentage: hint.percentage,
+          synced_at: source.observed_at ?? '',
+          mode: 'automatic',
+        });
+      }
+      if (!target) throw new Error('No usable reading position');
+      previewingRef.current = true;
+      await rendition.display(target);
+      sourceModeRef.current = 'preview';
+      setRemoteResume(null);
+      setPreviewSource(source);
+      setPlacesOpen(false);
+      announce(t('Opened {source} at {percent}%.', {
+        source: source.label,
+        percent: Math.round(source.progress_percent ?? hint.percentage ?? 0),
+      }));
+    } catch {
+      announce(t('Could not open that reading position.'), { assertive: true });
+    } finally {
+      setOpeningSource(null);
+    }
+  }, [announce, t]);
+
   // C10: the TOC drawer and highlight popovers are overlays — trap focus while
   // open, restore on close, Escape closes (hooks run unconditionally every render).
   /*
@@ -417,6 +522,11 @@ export function Reader({ id }: { id: string }) {
   const closeActiveHl = useCallback(() => setActiveHl(null), []);
   const closeComposer = useCallback(() => setComposer(null), []);
   const closeAnnDrawer = useCallback(() => setAnnOpen(false), []);
+  const closePlaces = useCallback(() => {
+    setPlacesOpen(false);
+    // Deep links have no clicked trigger for the trap to remember.
+    requestAnimationFrame(() => placesTriggerRef.current?.focus());
+  }, []);
   const closeSearch = useCallback(() => {
     searchAbortRef.current?.abort();
     searchAbortRef.current = null;
@@ -430,6 +540,7 @@ export function Reader({ id }: { id: string }) {
   useFocusTrap(hlPopRef, { onClose: closeActiveHl, active: !!activeHl });
   useFocusTrap(notePopRef, { onClose: closeComposer, active: !!composer });
   useFocusTrap(annRef, { onClose: closeAnnDrawer, active: annOpen });
+  useFocusTrap(placesRef, { onClose: closePlaces, active: placesOpen });
   useFocusTrap(searchRef, { onClose: closeSearch, active: searchOpen });
 
   // Declared after the trap registration: the trap first establishes the
@@ -736,6 +847,7 @@ export function Reader({ id }: { id: string }) {
   const goToAnnotation = useCallback((row: AnnRow) => {
     if (!row.cfi_range) return;
     setAnnOpen(false);
+    setPreviewSource(null);
     // Set BEFORE display(): epub.js can report the relocation synchronously, so
     // arming the flag afterwards would arm it too late to suppress anything.
     previewingRef.current = true;
@@ -755,6 +867,7 @@ export function Reader({ id }: { id: string }) {
 
   const goToSearchResult = useCallback((cfi: string) => {
     closeSearch();
+    setPreviewSource(null);
     /*
      * A search hit is a preview, exactly like a highlight jump, and arms the
      * same flag -- see previewingRef.
@@ -918,8 +1031,15 @@ export function Reader({ id }: { id: string }) {
     // latest observed mutation and are dropped entirely if the reader unmounts
     // first, so the retry bookkeeping would silently stop happening.
     saveBookmark.mutateAsync(
-      pct != null ? { format: 'epub', bookmark: cfi, percentage: pct }
-                  : { format: 'epub', bookmark: cfi },
+      pct != null
+        ? {
+            format: 'epub', bookmark: cfi, percentage: pct,
+            share_with_devices: lastShareWithDevicesRef.current,
+          }
+        : {
+            format: 'epub', bookmark: cfi,
+            share_with_devices: lastShareWithDevicesRef.current,
+          },
     ).then(() => {
       saveRetries.current = 0;
       saveFailureAnnounced.current = false;
@@ -966,6 +1086,7 @@ export function Reader({ id }: { id: string }) {
         ? percentage
         : null;
       lastPercentRef.current = valid;
+      lastShareWithDevicesRef.current = sourceModeRef.current !== 'browser';
       // A fresh position supersedes any pending retry: the newest place is what
       // we want on the server, and it resets the attempt budget.
       saveRetries.current = 0;
@@ -1022,8 +1143,20 @@ export function Reader({ id }: { id: string }) {
   // A page turn is the reader moving themselves, so it ends any preview: from
   // here on the relocations are theirs and the position saves again. This is the
   // ONLY thing that clears the flag — see previewingRef's note.
-  const goPrev = useCallback(() => { setRemoteResume(null); previewingRef.current = false; return renditionRef.current?.prev(); }, []);
-  const goNext = useCallback(() => { setRemoteResume(null); previewingRef.current = false; return renditionRef.current?.next(); }, []);
+  const goPrev = useCallback(() => {
+    setRemoteResume(null);
+    setPreviewSource(null);
+    if (sourceModeRef.current === 'preview') sourceModeRef.current = 'browser';
+    previewingRef.current = false;
+    return renditionRef.current?.prev();
+  }, []);
+  const goNext = useCallback(() => {
+    setRemoteResume(null);
+    setPreviewSource(null);
+    if (sourceModeRef.current === 'preview') sourceModeRef.current = 'browser';
+    previewingRef.current = false;
+    return renditionRef.current?.next();
+  }, []);
 
   // Which way the page physically turns. In an RTL book the left of the screen
   // is forward, so the left zone advances and the right zone goes back. Labels
@@ -1177,6 +1310,8 @@ export function Reader({ id }: { id: string }) {
     // Following a link is the reader moving themselves, exactly like a page
     // turn, so it ends any preview and the position saves again.
     setRemoteResume(null);
+    setPreviewSource(null);
+    if (sourceModeRef.current === 'preview') sourceModeRef.current = 'browser';
     previewingRef.current = false;
     Promise.resolve(rendition.display(target)).catch(() => {
       Promise.resolve(rendition.display(documentOnly)).catch(() => {/* give up quietly */});
@@ -1279,6 +1414,7 @@ export function Reader({ id }: { id: string }) {
         if (!res.ok) throw new Error(t('Could not load the book file ({status})', { status: res.status }));
         const buf = await res.arrayBuffer();
         if (cancelled) return;
+        archiveRef.current = buf;
 
         const epubBook = ePub(buf as any);
         bookRef.current = epubBook;
@@ -1500,6 +1636,7 @@ export function Reader({ id }: { id: string }) {
 
     return () => {
       cancelled = true;
+      archiveRef.current = null;
       linkSyncTimers.current.forEach(clearTimeout); linkSyncTimers.current = [];
       linkAnchorsRef.current = new Map();
       setLinkHits([]);
@@ -1583,6 +1720,8 @@ export function Reader({ id }: { id: string }) {
     // Choosing a chapter is an explicit reading move, like a page turn.
     previewingRef.current = false;
     setRemoteResume(null);
+    setPreviewSource(null);
+    if (sourceModeRef.current === 'preview') sourceModeRef.current = 'browser';
     const rendition = renditionRef.current;
     const epubBook = bookRef.current;
     setTocOpen(false);
@@ -1656,8 +1795,15 @@ export function Reader({ id }: { id: string }) {
               <span className={styles.annCount} aria-hidden="true">{annList.length}</span>
             )}
           </button>
+          <button ref={placesTriggerRef} className={styles.iconBtn} onClick={() => {
+            setTocOpen(false); setAnnOpen(false); setSettingsOpen(false); closeSearch();
+            setPlacesOpen((open) => !open);
+          }} aria-label={t('Reading places')} aria-expanded={placesOpen}
+            aria-controls="reading-places-panel" title={t('Reading places')}>
+            <MapPin size={19} aria-hidden="true" focusable={false} />
+          </button>
           <button className={styles.iconBtn} onClick={() => {
-            setTocOpen(false); setAnnOpen(false); setSettingsOpen(false); setSearchOpen(true);
+            setTocOpen(false); setAnnOpen(false); setSettingsOpen(false); setPlacesOpen(false); setSearchOpen(true);
           }} aria-label={t('Search inside book')} aria-expanded={searchOpen} title={t('Search inside book')}>
             <Search size={19} aria-hidden="true" focusable={false} />
           </button>
@@ -1671,7 +1817,7 @@ export function Reader({ id }: { id: string }) {
                 : <Maximize size={19} aria-hidden="true" focusable={false} />}
             </button>
           )}
-          <button className={styles.iconBtn} onClick={() => { closeSearch(); setSettingsOpen((o) => !o); }}
+          <button className={styles.iconBtn} onClick={() => { closeSearch(); setPlacesOpen(false); setSettingsOpen((o) => !o); }}
             aria-label={t('Reading appearance')} aria-expanded={settingsOpen} title={t('Reading appearance')}>
             <SlidersHorizontal size={19} aria-hidden="true" focusable={false} />
           </button>
@@ -1704,7 +1850,100 @@ export function Reader({ id }: { id: string }) {
         </>
       )}
 
-      {remoteResume && (
+      {placesOpen && (
+        <>
+          <div className={styles.tocScrim} onClick={closePlaces} aria-hidden="true" />
+          <section ref={placesRef} id="reading-places-panel" className={styles.placesPanel}
+            role="dialog" aria-modal="true" aria-labelledby="reading-places-heading" tabIndex={-1}>
+            <div className={styles.panelHeading}>
+              <div>
+                <h2 id="reading-places-heading" className={styles.tocHeading}>{t('Reading places')}</h2>
+                <p className={styles.placesIntro}>
+                  {t('Preview a saved place in this reader. The device’s saved position will not change.')}
+                </p>
+              </div>
+              <button className={styles.iconBtn} onClick={closePlaces} aria-label={t('Close')}>
+                <X size={18} aria-hidden="true" focusable={false} />
+              </button>
+            </div>
+            {readingSources.isLoading ? (
+              <p className={styles.tocEmpty} role="status">{t('Loading reading places…')}</p>
+            ) : readingSources.error ? (
+              <p className={styles.placesError} role="alert">{t('Could not load reading places.')}</p>
+            ) : readingSources.data?.sources.length ? (
+              <ul className={styles.placesList} role="list">
+                {readingSources.data.sources.map((source) => {
+                  const sourceTime = readingSourceTime(source.observed_at);
+                  const selected = requestedSource === source.id;
+                  return (
+                    <li key={source.id} className={selected ? styles.placeSelected : styles.place}>
+                      <div className={styles.placeHeading}>
+                        <strong>{source.observation === 'resolved'
+                          ? t('Other saved position') : source.label}</strong>
+                        <span>{source.progress_percent == null
+                          ? t('Place saved')
+                          : t('{percent}% read', {
+                            percent: readingSourcePercent(source.progress_percent),
+                          })}</span>
+                      </div>
+                      <div className={styles.placeTags}>
+                        {source.observation !== 'resolved' && <span>{t('Last reported')}</span>}
+                        <span>{source.resume.exact ? t('Exact place') : t('Approximate')}</span>
+                        {source.provenance === 'unknown' && <span>{t('Source not recorded')}</span>}
+                        {source.edition?.match === 'different' && <span>{t('Different edition')}</span>}
+                      </div>
+                      {sourceTime && <small>{source.observation === 'resolved'
+                        ? t('Saved {time}', { time: sourceTime })
+                        : t('Last reported {time}', { time: sourceTime })}</small>}
+                      <button type="button" className={styles.placeOpen}
+                        disabled={openingSource !== null}
+                        onClick={() => void openReadingSource(source)}>
+                        {openingSource === source.id ? t('Opening…') : t('Preview this place')}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <p className={styles.tocEmpty}>{t('No saved reading places yet.')}</p>
+            )}
+            {readingSources.data?.integrations.storyteller.configured
+              && readingSources.data.integrations.storyteller.reachable === false && (
+                <p className={styles.placesError} role="status">
+                  {t('Storyteller is configured but could not be reached.')}
+                </p>
+              )}
+            <p className={styles.placesFootnote}>
+              {t('Device positions are read-only here. Continue reading to save a new Browser position.')}
+            </p>
+          </section>
+        </>
+      )}
+
+      {previewSource && (
+        <div className={styles.resumeNotice} role="status">
+          <span>{t('Previewing {source}. Its saved position will not change.', {
+            source: previewSource.label,
+          })}</span>
+          <button onClick={() => {
+            const rendition = renditionRef.current;
+            const epubBook = bookRef.current;
+            const location = rendition?.currentLocation() as any;
+            const cfi = location?.start?.cfi;
+            const exact = cfi && epubBook?.locations.length()
+              ? epubBook.locations.percentageFromCfi(cfi) * 100
+              : undefined;
+            sourceModeRef.current = 'browser';
+            previewingRef.current = false;
+            setPreviewSource(null);
+            if (cfi) persistCfi(cfi, exact);
+            announce(t('Reading from here. This is now your Browser position.'));
+          }}>{t('Read from here')}</button>
+          <button onClick={() => setPlacesOpen(true)}>{t('Choose another place')}</button>
+        </div>
+      )}
+
+      {remoteResume && !requestedSource && !previewSource && (
         <div className={styles.resumeNotice} role="status">
           <button onClick={() => {
             previewingRef.current = true;

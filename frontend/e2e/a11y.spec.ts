@@ -190,6 +190,16 @@ test('book cards are a single tab stop (no nested tabindex)', async ({ page }) =
 
 test('clickable announcement is a link with a sibling dismiss button', async ({ page }) => {
   await page.goto('/app');
+  // The My Library intro occupies the same status slot ahead of the Ko-fi
+  // banner in the queue; on a shared/long-lived server it may or may not still
+  // be standing. Dismiss it (idempotent) so the banner under test always shows.
+  const csrf = await page.request.get('/api/v1/auth/csrf');
+  if (csrf.ok()) {
+    const { csrf_token } = (await csrf.json()) as { csrf_token: string };
+    await page.request.post('/api/v1/account/my-library-intro/dismiss', {
+      headers: { 'X-CSRFToken': csrf_token },
+    }).catch(() => undefined);
+  }
   await page.evaluate(() => {
     localStorage.setItem('cwng_banner_dismissed:help-announcement-v1', '1');
     localStorage.removeItem('cwng_banner_dismissed:kofi-support-v1');

@@ -88,13 +88,15 @@ def coerce_percentage(raw) -> Optional[float]:
 
 
 def record_web_reader_progress(user, book_id: int, percentage: float,
-                               *, origin_device_id=None, cfi=None) -> bool:
-    """Advance the shared progress carrier from a web-reader position.
+                               *, origin_device_id=None, cfi=None,
+                               share_with_devices=True) -> bool:
+    """Record a Browser position and, by default, advance shared carriers.
 
-    Returns ``True`` when the carrier was advanced.  The caller is responsible
-    for committing the session — both bookmark routes already do. M1 carries
+    Returns ``True`` when the Browser journal was recorded without sharing or
+    when the shared carrier advanced. The caller is responsible for committing
+    the session — both bookmark routes already do. M1 carries
     ``origin_device_id`` through this write boundary; M3 adds the per-device
-    position row that can persist it without changing the resolved carrier.
+    position row that can persist it independently of the shared carrier.
 
     Skipped without a write when:
       * ``percentage`` is not a positive number.  A 0% sample is what the
@@ -166,6 +168,13 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
                 "book %s: %s", user_id, book_id, e,
             )
             return False
+
+    # A reader deliberately continuing from a device/source preview establishes
+    # a new Browser place without editing the source it inspected. Keep the
+    # attributed Browser journal above, but leave every shared device carrier
+    # alone. Normal web reading retains the existing cross-device behavior.
+    if share_with_devices is False:
+        return True
 
     # Imported lazily: the KOSync protocol module pulls in cps.kobo, and this
     # service is imported from cps.web / cps.api.reader at request time.

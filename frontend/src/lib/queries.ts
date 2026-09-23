@@ -1294,12 +1294,60 @@ export function useBookmark(bookId: string | number, format = 'epub') {
   });
 }
 
+export interface ReadingSource {
+  id: string;
+  label: string;
+  kind: string;
+  observation: 'last_reported' | 'resolved';
+  provenance?: 'unknown';
+  progress_percent: number | null;
+  chapter_progress_percent?: number | null;
+  observed_at: string | null;
+  received_at?: string | null;
+  locator_type?: string | null;
+  resume: {
+    percentage: number | null;
+    cfi?: string;
+    href?: string;
+    chapter_href?: string;
+    chapter_progression?: number;
+    epub_sha256?: string;
+    exact: boolean;
+  };
+  writeback: 'read_only';
+  rehydrate_needed?: boolean;
+  edition?: { match: 'sha256' | 'different' };
+}
+
+export interface ReadingSourcesPayload {
+  book_id: number;
+  sources: ReadingSource[];
+  integrations: {
+    storyteller: { configured: boolean; reachable: boolean | null };
+  };
+}
+
+export function useReadingSources(bookId: string | number, enabled = true) {
+  return useQuery<ReadingSourcesPayload>({
+    queryKey: ['reading-sources', String(bookId)],
+    queryFn: () => apiGet<ReadingSourcesPayload>(`/api/v1/books/${bookId}/reading-sources`),
+    staleTime: 30_000,
+    enabled,
+    retry: retryUnlessUnauthorized,
+  });
+}
+
 export function useSaveBookmark(bookId: string | number) {
   return useMutation({
     // `percentage` (#324) is the portable half of the position: the server hands
     // it to the shared Kobo/KOReader carrier so browser reading reaches the
     // user's devices. Omitted until epub.js has generated locations.
-    mutationFn: (vars: { format: string; bookmark: string; percentage?: number }) =>
+    mutationFn: (vars: {
+      format: string;
+      bookmark: string;
+      percentage?: number;
+      share_with_devices?: boolean;
+    }) =>
       apiPost(`/api/v1/books/${bookId}/bookmark`, vars, { webreaderDevice: true }),
     // #1318: deliberately NO react-query `retry` here. The route now answers
     // 5xx when the write did not land, which is worth re-sending — but a

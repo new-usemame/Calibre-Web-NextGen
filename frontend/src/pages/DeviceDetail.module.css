@@ -109,6 +109,16 @@
 .positionRow a { color: var(--text); font-weight: var(--fw-medium); min-height: 24px; }
 .positionRow a:hover { color: var(--accent-text); }
 .positionMeta { display: inline-flex; align-items: baseline; gap: var(--sp-2); flex: none; color: var(--text-muted); font-size: var(--fs-sm); }
+.positionActions {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+  margin-top: var(--sp-2); color: var(--text-muted); font-size: var(--fs-xs);
+}
+.positionActions a {
+  display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--sp-3);
+  border: 1px solid var(--accent); border-radius: var(--r-md);
+  color: var(--accent-text); background: var(--accent-soft); font-size: var(--fs-sm); font-weight: var(--fw-medium);
+}
+.positionActions a:hover { background: var(--surface-3); }
 /* rehydrate_needed, surfaced calmly: the position is queued for repair on the
    device's next sync — informational tint, not an alarm. */
 .repairPill {
@@ -136,5 +146,7 @@
   .summary dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-3) var(--sp-4); }
   .positionRow { flex-direction: column; gap: 2px; }
   .positionMeta { flex: initial; }
+  .positionActions { align-items: flex-start; flex-direction: column; }
+  .positionActions a { width: 100%; justify-content: center; }
   .pagination { justify-content: space-between; }
 }

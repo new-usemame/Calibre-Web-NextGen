@@ -775,8 +775,27 @@ def test_the_catalogue_shows_a_picture_of_every_arrangement_and_lettering():
     assert all(data[:2] == b"\xff\xd8" for data in thumbs.values())
     assert len(set(thumbs.values())) == len(thumbs)
 
-    sample = cg.font_sample(catalogue["fonts"][0]["id"])
-    assert sample.data[:2] == b"\xff\xd8"
+    # Lettering cards must show the typeface itself. Every sample receives the
+    # same glyphs, so a byte difference here is renderer/font output rather
+    # than a different name printed into the preview.
+    samples = {entry["id"]: cg.font_sample(entry["id"]).data for entry in catalogue["fonts"]}
+    assert all(data[:2] == b"\xff\xd8" for data in samples.values())
+    # Generic aliases may deliberately resolve to a named installed font (for
+    # example ``serif`` → Liberation Serif). What the picker promises is real
+    # rendering with visibly different font families, not a unique JPEG for
+    # aliases that resolve to the same face.
+    assert len({samples[font_id] for font_id in ("serif", "sans", "mono")}) == 3
+
+
+def test_changed_catalogue_artwork_invalidates_disk_and_browser_caches(monkeypatch):
+    from cps import cover_picker
+    from cps.services import cover_designer_cache
+
+    old_key = cover_designer_cache.cache_key("font", "serif", 266, 400, "pil")
+    monkeypatch.setattr(cover_designer_cache, "CACHE_VERSION", "next-render")
+
+    assert cover_designer_cache.cache_key("font", "serif", 266, 400, "pil") != old_key
+    assert cover_picker._font_sample_url("serif").endswith("?v=next-render")
 
 
 def test_a_catalogue_picture_is_drawn_once_and_then_read_from_disk():

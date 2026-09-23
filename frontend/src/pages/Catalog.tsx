@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Link, useSearch, useLocation } from 'wouter';
 import { ChevronLeft, SlidersHorizontal, ListChecks, Settings, RefreshCw, UploadCloud, LayoutGrid, List, Pencil, Check, X, Trash2, Merge } from 'lucide-react';
@@ -19,6 +19,7 @@ import { saveCatalog, loadCatalog } from '../lib/scrollCache';
 import { useNamedPreference } from '../lib/useNamedPreference';
 import { usePersistentChoice } from '../lib/usePersistentChoice';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
+import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { measureCatalogColumnCount } from '../lib/catalogGridMeasurement';
@@ -338,7 +339,10 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // #1054: let a user drop the per-card Read/edit row to calm the grid down.
   const [cardActionsHidden, setCardActionsHidden, cardActionsPreferenceSaving]
     = useCardActionsHidden({ onError: catalogPreferenceError });
+  const [readingTagsHidden, setReadingTagsHidden, readingTagsPreferenceSaving]
+    = useReadingTagsHidden({ onError: catalogPreferenceError });
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const settingsMenuRef = useRef<HTMLDivElement>(null);
   const [density, setDensity] = usePersistentChoice(
     'cwng:catalog-density-v1', ['comfortable', 'compact', 'dense'] as const, 'compact');
   const [rowsChoice, setRowsChoice] = usePersistentChoice(
@@ -481,6 +485,23 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
       document.removeEventListener('mousedown', onDoc);
       document.removeEventListener('keydown', onKey);
     };
+  }, [settingsOpen]);
+
+  // The toolbar can wrap to very different heights across desktop and mobile.
+  // Measure the space below the actual anchor so adding a preference never
+  // strands the last controls beyond the viewport; native focus then scrolls
+  // the menu itself to the selected option.
+  useLayoutEffect(() => {
+    if (!settingsOpen) return;
+    const constrainMenu = () => {
+      const menu = settingsMenuRef.current;
+      if (!menu) return;
+      const available = window.innerHeight - menu.getBoundingClientRect().top - 12;
+      menu.style.maxHeight = `${Math.max(160, available)}px`;
+    };
+    constrainMenu();
+    window.addEventListener('resize', constrainMenu);
+    return () => window.removeEventListener('resize', constrainMenu);
   }, [settingsOpen]);
 
   // The saved default view is part of the filter identity: turning it on/off (or
@@ -942,7 +963,8 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
               <Settings size={15} />
             </button>
             {settingsOpen && (
-              <div className={styles.settingsMenu} data-testid="catalog-view-settings-menu">
+              <div ref={settingsMenuRef} className={styles.settingsMenu}
+                data-testid="catalog-view-settings-menu">
                 <p className={styles.settingsHead}>{t('View settings')}</p>
                 <label className={styles.settingsItem}>
                   <input
@@ -979,11 +1001,23 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   />
                   <span>{t('Show Read now and edit buttons')}</span>
                 </label>
+                <label className={styles.settingsItem}>
+                  <input
+                    type="checkbox"
+                    data-testid="show-reading-tags"
+                    className={styles.settingsCheck}
+                    checked={!readingTagsHidden}
+                    disabled={readingTagsPreferenceSaving}
+                    onChange={(e) => setReadingTagsHidden(!e.target.checked)}
+                  />
+                  <span>{t('Show Reading tags')}</span>
+                </label>
                 <fieldset className={styles.densityField}>
                   <legend>{t('Book density')}</legend>
                   {DENSITY_OPTIONS.map((option) => (
                     <label key={option.value} className={styles.settingsItem}>
                       <input type="radio" name="book-density" value={option.value}
+                        className={styles.settingsCheck}
                         checked={density === option.value}
                         onChange={() => {
                           // Gate the new page size until ResizeObserver reports
@@ -1001,6 +1035,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   {(['1', '2', '3', '4', '5', '6'] as const).map((choice) => (
                     <label key={choice} className={styles.settingsItem}>
                       <input type="radio" name="catalog-rows" value={choice}
+                        className={styles.settingsCheck}
                         checked={rowsChoice === choice} onChange={() => setRowsChoice(choice)} />
                       <span>{choice}</span>
                     </label>
@@ -1030,6 +1065,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           onClose={() => setDiscoverHidden(true)}
           closeDisabled={discoverPreferenceSaving}
           hideActions={cardActionsHidden}
+          hideReadingTags={readingTagsHidden}
         />
       )}
 
@@ -1072,6 +1108,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   quickEdit={canEdit && !selecting}
                   canRead={!!me?.role?.viewer}
                   hideActions={cardActionsHidden}
+                  hideReadingTags={readingTagsHidden}
                   selectable={selecting}
                   selected={selected.has(book.id)}
                   onToggleSelect={(b) =>

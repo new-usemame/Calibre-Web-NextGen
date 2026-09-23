@@ -18,6 +18,7 @@ import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
+import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { getShelfVisibilityAction } from '../lib/shelfVisibility';
 import { SORT_OPTIONS } from '../lib/bookSortOptions';
 
@@ -45,6 +46,7 @@ function dedupAppend(prev: Book[], next: Book[]): Book[] {
 
 export function Shelf({ id }: { id: string }) {
   const [cardActionsHidden] = useCardActionsHidden();
+  const [readingTagsHidden] = useReadingTagsHidden();
   const t = useT();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
@@ -419,6 +421,7 @@ export function Shelf({ id }: { id: string }) {
                 removeLabel={t('Remove from shelf')}
                 canRead={!!me?.role?.viewer}
                 hideActions={cardActionsHidden}
+                hideReadingTags={readingTagsHidden}
               />
             ))}
           </div>

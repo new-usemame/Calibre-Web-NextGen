@@ -138,10 +138,11 @@ function AnnotationList({ payload, loading, error }: {
   );
 }
 
-function PositionList({ data, loading, error }: {
+function PositionList({ data, loading, error, publicId }: {
   data?: PositionsPayload;
   loading: boolean;
   error: unknown;
+  publicId: string;
 }) {
   const t = useT();
   if (loading) return <p role="status" className={styles.panelStatus}>{t('Loading reading positions…')}</p>;
@@ -169,6 +170,15 @@ function PositionList({ data, loading, error }: {
                   <span className={styles.repairPill}>{t('Position repair queued')}</span>
                 )}
               </span>
+            </div>
+            <div className={styles.positionActions}>
+              <small>{t('Last reported {time}', {
+                time: new Date(position.client_modified_at || position.server_modified_at)
+                  .toLocaleString(),
+              })}</small>
+              <Link href={`/read/${position.book_id}?source=${encodeURIComponent(`device:${publicId}`)}`}>
+                {t('Preview in reader')}
+              </Link>
             </div>
             {position.progress_percent != null && (
               <div className={styles.progressTrack} aria-hidden="true">
@@ -354,7 +364,7 @@ export function DeviceDetail({ publicId }: { publicId: string }) {
       </section>
       <section className={styles.positions} aria-labelledby="device-positions-heading">
         <h2 id="device-positions-heading">{t('Reading positions')}</h2>
-        <PositionList data={positions.data}
+        <PositionList data={positions.data} publicId={publicId}
           loading={positions.isLoading || stalePositionPage} error={positions.error} />
         {!stalePositionPage && (positions.data?.total ?? 0) > POSITION_PAGE_SIZE && (
           <nav className={styles.pagination} aria-label={t('Reading positions')}>

@@ -413,6 +413,8 @@
   border-radius: var(--r-md);
   box-shadow: var(--elev-2);
   padding: var(--sp-1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   z-index: var(--z-overlay, 50);
   animation: settingsIn var(--dur-fast) var(--ease-out);
 }

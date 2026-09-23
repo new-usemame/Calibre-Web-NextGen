@@ -339,10 +339,11 @@ test('long title, author and series tokens add no horizontal overflow', async ({
 });
 
 // #1828 — the mobile book page buried the description under ~two screens of
-// action chips, a heavy delete block and the attribute list. The redesign puts
-// the description directly under the title/author on narrow viewports, with
-// the action row, tags and metadata after it. Desktop keeps its historical
-// order (actions first, description last) — pinned by the second test.
+// action chips, a heavy delete block and the attribute list. The 2026-09-14
+// operator ruling then moved the (now four-control) action row to the TOP of
+// the page — directly under the back link, above the cover — on both
+// viewports. What remains of #1828's promise: the description still precedes
+// the attribute list on mobile (reading order inside the info column).
 //
 // The description and a publisher row are stubbed into the detail payload so
 // the assertions do not depend on what the seed library happens to carry.
@@ -358,7 +359,17 @@ async function stubDescription(page: Page, bookId: number) {
   });
 }
 
-test('mobile reading order: description precedes the action row and the attribute list (#1828)', async ({ page }) => {
+/** Fonts + cover art settle the layout before the sequential box reads (the
+ *  movers: an Arabic display-face title re-wrapping, and `aspect-ratio:
+ *  auto 2 / 3` reserving 2:3 only until the cover's natural ratio lands). */
+async function settleBookLayout(page: Page) {
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() =>
+    Promise.all(Array.from(document.images).map((img) =>
+      img.complete ? null : img.decode().catch(() => null))));
+}
+
+test('mobile: the action row leads above the cover; the description still precedes the attribute list (#1828)', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 667 });
   await page.goto('/app');
   const bookId = await firstBookId(page);
@@ -370,34 +381,28 @@ test('mobile reading order: description precedes the action row and the attribut
   await expect(description).toBeVisible({ timeout: 10_000 });
   const actions = page.getByTestId('book-actions');
   await expect(actions).toBeVisible();
+  const cover = page.locator('main [class*="coverWrap"]').first();
+  await expect(cover).toBeVisible();
   const metaList = page.locator('main dl');
   await expect(metaList).toContainText('Sentinel Publisher');
-  // The three boxes are read SEQUENTIALLY; late layout shifts between reads
-  // invert the comparison by tens of px. Two movers: a webfont swap re-wrapping
-  // the header (the seed's first book has an Arabic display-face title), and
-  // the cover image arriving — `aspect-ratio: auto 2 / 3` reserves 2:3 only
-  // until the natural ratio lands. Pin the settled layout first.
-  await page.evaluate(() => document.fonts.ready);
-  await page.evaluate(() =>
-    Promise.all(Array.from(document.images).map((img) =>
-      img.complete ? null : img.decode().catch(() => null))));
-  await expect(description).toBeVisible();
+  await settleBookLayout(page);
 
-  const descBox = (await description.boundingBox())!;
   const actionsBox = (await actions.boundingBox())!;
+  const coverBox = (await cover.boundingBox())!;
+  const descBox = (await description.boundingBox())!;
   const metaBox = (await metaList.boundingBox())!;
 
   expect(
-    descBox.y + descBox.height,
-    'the description must end above the action row on mobile, not follow it',
-  ).toBeLessThanOrEqual(actionsBox.y + 1);
-  expect(
     actionsBox.y + actionsBox.height,
-    'the action row must end above the attribute list on mobile',
+    'the action row must end above the cover on mobile — it leads the page',
+  ).toBeLessThanOrEqual(coverBox.y + 1);
+  expect(
+    descBox.y + descBox.height,
+    'the description must end above the attribute list on mobile (#1828)',
   ).toBeLessThanOrEqual(metaBox.y + 1);
 });
 
-test('desktop layout is unchanged: the action row still precedes the description (#1828)', async ({ page, isMobile }) => {
+test('desktop: the action row leads above the cover/title block; the description stays last in the column (#1828)', async ({ page, isMobile }) => {
   test.skip(isMobile === true, 'desktop layout assertion — the mobile project emulates a handset');
   await page.goto('/app');
   const bookId = await firstBookId(page);
@@ -409,18 +414,26 @@ test('desktop layout is unchanged: the action row still precedes the description
   await expect(description).toBeVisible({ timeout: 10_000 });
   const actions = page.getByTestId('book-actions');
   await expect(actions).toBeVisible();
-  // Same sequential-measurement race as the mobile half — settle fonts and
-  // cover art first (see the mobile test above for the movers).
-  await page.evaluate(() => document.fonts.ready);
-  await page.evaluate(() =>
-    Promise.all(Array.from(document.images).map((img) =>
-      img.complete ? null : img.decode().catch(() => null))));
-  await expect(description).toBeVisible();
+  const cover = page.locator('main [class*="coverWrap"]').first();
+  await expect(cover).toBeVisible();
+  const metaList = page.locator('main dl');
+  await expect(metaList).toContainText('Sentinel Publisher');
+  await settleBookLayout(page);
 
-  const descBox = (await description.boundingBox())!;
   const actionsBox = (await actions.boundingBox())!;
+  const coverBox = (await cover.boundingBox())!;
+  const descBox = (await description.boundingBox())!;
+  const metaBox = (await metaList.boundingBox())!;
   expect(
     actionsBox.y + actionsBox.height,
-    'desktop must keep the action row above the description',
+    'the action row must end above the cover/title block on desktop',
+  ).toBeLessThanOrEqual(coverBox.y + 1);
+  // On desktop the description lives in the info column beside the cover, so
+  // its height relative to the cover depends on how many attribute rows the
+  // book has (CI's first seed book has fewer than the dev rig's). What #1828
+  // pins is the column order: the description comes after the attribute list.
+  expect(
+    metaBox.y + metaBox.height,
+    'desktop keeps the description last in the info column, after the attribute list',
   ).toBeLessThanOrEqual(descBox.y + 1);
 });

@@ -22,6 +22,7 @@ _UNSET_PREFERENCES = {
     "discover_hidden": None,
     "show_hidden_books": None,
     "card_actions_hidden": None,
+    "reading_tags_hidden": None,
 }
 
 
@@ -52,11 +53,13 @@ def test_me_serializes_named_preference_and_unset_state():
             "discover_hidden": True,
             "show_hidden_books": False,
             "card_actions_hidden": True,
+            "reading_tags_hidden": False,
         },
     }))["preferences"] == {
         "discover_hidden": True,
         "show_hidden_books": False,
         "card_actions_hidden": True,
+        "reading_tags_hidden": False,
     }
 
 
@@ -143,6 +146,7 @@ def test_endpoint_updates_multiple_preferences_in_one_transaction():
         "discover_hidden": True,
         "show_hidden_books": True,
         "card_actions_hidden": False,
+        "reading_tags_hidden": True,
     }
     response, session = _call({"preferences": updates}, user)
 

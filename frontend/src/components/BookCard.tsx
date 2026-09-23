@@ -38,6 +38,9 @@ interface BookCardProps {
    *  off would keep tabbing through two invisible controls per card. Both
    *  actions remain on the book's own page, which the cover already links to. */
   hideActions?: boolean;
+  /** Hide the compact Reading / Read status badges while leaving book state,
+   * filters, progress and ordinary metadata tags untouched. */
+  hideReadingTags?: boolean;
   /** Global-library surfaces only. The Add action stays visible even when the
    * user hid ordinary card actions, because adding is this surface's purpose. */
   membership?: 'owned' | 'unowned';
@@ -65,6 +68,7 @@ function BookCardInner({
   showSeriesIndex = false,
   quickEdit = false,
   hideActions = false,
+  hideReadingTags = false,
   membership,
   onAddToLibrary,
   addPending = false,
@@ -106,13 +110,13 @@ function BookCardInner({
             the WCAG pass: it announces the badge once, rather than letting the
             icon and the adjacent text be read as two separate things. Keep it
             even now that the label is visible. */}
-        {book.in_progress ? (
+        {!hideReadingTags && book.in_progress ? (
           <span className={styles.readingBadge} role="img" aria-label={t('Reading')}
             data-testid="reading-badge">
             <BookOpen size={13} strokeWidth={2.5} aria-hidden="true" focusable={false} />
             {t('Reading')}
           </span>
-        ) : book.read ? (
+        ) : !hideReadingTags && book.read ? (
           <span className={styles.readBadge} role="img" aria-label={t('Read')}
             data-testid="read-badge">
             <Check size={13} strokeWidth={3} aria-hidden="true" focusable={false} />

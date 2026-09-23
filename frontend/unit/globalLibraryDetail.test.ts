@@ -18,11 +18,11 @@ test('non-member detail keeps global editing and hides member-only controls', ()
   const queries = source('../src/lib/queries.ts');
 
   assert.match(detail, /const inLibrary = !!book && \(!selectionMode \|\| book\.in_my_library !== false\)/);
-  // The membership action lives in the gear menu, labelled by the action it
-  // performs; only global-browsers can add a book they do not own.
+  // Membership removal is a direct personal action for owned books; only
+  // global-browsers can add a book they do not own.
   assert.match(detail, /if \(selectionMode\)/);
-  assert.match(detail, /label: t\('Remove from library'\)/);
-  assert.match(detail, /else if \(me\?\.role\?\.browse_global\)[\s\S]*label: t\('Add to library'\)/);
+  assert.match(detail, /selectionMode && inLibrary[\s\S]*onClick=\{removeMembership\}[\s\S]*data-testid="remove-from-my-library"/);
+  assert.match(detail, /!inLibrary && me\?\.role\?\.browse_global[\s\S]*id: 'add-to-library'[\s\S]*addToLibrary\.mutate/);
   assert.match(detail, /label: t\('Not in your library'\)/);
   assert.match(detail, /\{inLibrary && book\.in_progress && \(/);
   assert.match(detail, /\{inLibrary && \([\s\S]*<AddToShelf/);

@@ -71,6 +71,69 @@ async function warmCatalogueImages(page: Page, panel: ReturnType<typeof designer
 }
 
 test.describe('cover designer v2 (live backend, no fixtures)', () => {
+  test('real server font samples load as distinct, scrollable previews', async ({ page }) => {
+    test.setTimeout(FIRST_RENDER);
+    const id = await firstBookId(page);
+    test.skip(!id, 'seed has no books');
+    await page.setViewportSize({ width: 390, height: 844 });
+    // Candidate providers are deliberately out of scope for a font-preview
+    // proof and can make the test wait on an outside service.
+    await page.route('**/cover/candidates*', (route) =>
+      route.fulfill({ json: { candidates: [], providers: [], query: 'seed' } }));
+    await page.goto(`/app/book/${id}/cover`);
+    const panel = designerPanel(page);
+    await panel.locator(':scope > summary').first().click();
+
+    const lettering = panel.getByRole('radiogroup', { name: 'Lettering' });
+    const cards = lettering.getByRole('radio');
+    await expect(cards.first()).toBeVisible({ timeout: FIRST_RENDER });
+    const samples = lettering.locator('img[data-font-sample]');
+    await expect(samples.first()).toBeVisible({ timeout: FIRST_RENDER });
+    // The strip is intentionally lazy: a phone should load the cards in view,
+    // not download every installed font before it can be used. Two loaded
+    // samples are enough to prove real distinct rendering here; the focused
+    // Python regression checks every catalogue image byte-for-byte.
+    const loadedSamples = async () => samples.evaluateAll((imgs) => imgs
+      .filter((img): img is HTMLImageElement => img instanceof HTMLImageElement && img.complete && img.naturalWidth > 0)
+      .map((img) => ({ id: img.dataset.fontSample ?? '', src: img.currentSrc })));
+    await expect.poll(async () => (await loadedSamples()).length, { timeout: FIRST_RENDER }).toBeGreaterThanOrEqual(2);
+
+    // Fetch the bytes from the logged-in live server. Distinct checksums prove
+    // that the cards contain distinct server-rendered glyphs, rather than a
+    // visual CSS stack or a repeated placeholder JPEG.
+    const loaded = await loadedSamples();
+    for (const { src } of loaded) {
+      expect(new URL(src).searchParams.get('v')).toMatch(/^\d+$/);
+    }
+    const signatures = await page.evaluate(async (items: { id: string; src: string }[]) => Promise.all(items.map(async ({ id, src }) => {
+      const buffer = await fetch(src, { credentials: 'include' }).then((r) => r.arrayBuffer());
+      const bytes = new Uint8Array(buffer as ArrayBuffer);
+      let hash = 2166136261;
+      for (const byte of bytes) hash = Math.imul(hash ^ byte, 16777619);
+      return { id, signature: `${bytes.length}:${hash >>> 0}` };
+    })), loaded);
+    const signatureById = new Map(signatures.map(({ id, signature }) => [id, signature]));
+    // Generic names can intentionally resolve to their installed counterpart
+    // (for example `serif` → Liberation Serif). The useful promise is that
+    // different font families render different glyph pixels.
+    expect(new Set(['serif', 'sans', 'mono'].map((id) => signatureById.get(id))).size).toBe(3);
+
+    const geometry = await lettering.evaluate((el) => ({
+      clientWidth: el.clientWidth,
+      scrollWidth: el.scrollWidth,
+      overflowX: getComputedStyle(el).overflowX,
+      snap: getComputedStyle(el).scrollSnapType,
+    }));
+    expect(geometry.scrollWidth).toBeGreaterThan(geometry.clientWidth);
+    expect(geometry.overflowX).toBe('auto');
+    expect(geometry.snap).toContain('x');
+
+    await cards.first().focus();
+    await page.keyboard.press('End');
+    await expect(cards.last()).toBeFocused();
+    await expect.poll(() => lettering.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  });
+
   test('arrangements, custom colours, preset persistence, hide/restore, apply', async ({ page }) => {
     test.setTimeout(240_000);
     const id = await firstBookId(page);

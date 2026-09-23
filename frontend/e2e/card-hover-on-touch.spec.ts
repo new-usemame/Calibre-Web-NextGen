@@ -22,6 +22,8 @@ async function liftState(page: import('@playwright/test').Page) {
   });
 }
 
+const TRANSPARENT = /^(transparent|rgba\(0, 0, 0, 0\))$/;
+
 const RING_OFF = /^(transparent|rgba\(0, 0, 0, 0\))$/;
 
 test('the cover lift never follows the pointer on a touch device', async ({ page }) => {
@@ -60,4 +62,67 @@ test('the cover lift never follows the pointer on a touch device', async ({ page
     const focused = await liftState(page);
     expect(focused.transform, 'keyboard focus lifts the cover').not.toBe('none');
   }
+});
+
+test('a touch that becomes a scroll leaves no highlight on the card', async ({ page, browserName }) => {
+  test.skip(!isTouchProject(), 'touch-only regression; the fine-pointer lift is covered above');
+
+  await page.goto('/app');
+  const firstCard = page.locator('a[aria-label^="Open details for"]').first();
+  await expect(firstCard).toBeVisible();
+  const firstCover = firstCard.locator('div').first();
+
+  const sampleCover = () => firstCover.evaluate((node) => {
+    const s = getComputedStyle(node);
+    return { transform: s.transform, boxShadow: s.boxShadow, outline: s.outlineColor };
+  });
+  const resting = await sampleCover();
+  expect(resting.transform, 'a card at rest is not raised').toBe('none');
+
+  /* iOS Safari paints its default tap highlight — a grey box BEHIND the link —
+     on every touch that starts on a cover, including touches that turn into a
+     scroll and never open the book (operator, 2026-09-14: "the little highlight
+     that goes behind the tapped on but not necessarily opened book"). The card
+     opts out at its root so no touch can paint it; scoped to the card, not
+     global, per the operator's constraint. */
+  const tapHighlight = await firstCard.evaluate(
+    (node) => getComputedStyle(node).getPropertyValue('-webkit-tap-highlight-color'),
+  );
+  await test.info().attach('tap-highlight', { body: tapHighlight, contentType: 'text/plain' });
+  expect(tapHighlight, 'the card itself must be unable to paint a tap highlight').toMatch(TRANSPARENT);
+
+  if (browserName !== 'chromium') {
+    /* Playwright drives one-shot taps on WebKit; the press-and-drag gesture
+       below needs CDP. WebKit's guarantee is the property assertion above —
+       a transparent highlight cannot paint — plus the hover gate the previous
+       test measures on this same project. */
+    return;
+  }
+
+  /* A real gesture through the input pipeline, not dispatched DOM events: the
+     finger lands on the cover, drags the page into a scroll, lifts. This is
+     the operator's "scrolling and tapping around" path — the touch starts on
+     the card but must not open the book and must leave nothing behind. */
+  const box = (await firstCard.boundingBox())!;
+  const x = Math.round(box.x + box.width / 2);
+  const y = Math.round(box.y + box.height / 2);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y, id: 1 }] });
+  for (let step = 1; step <= 5; step++) {
+    await cdp.send('Input.dispatchTouchEvent', {
+      type: 'touchMove', touchPoints: [{ x, y: y - step * 24, id: 1 }],
+    });
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+
+  // The gesture became a scroll, not a tap: the catalog is still here…
+  await expect(page, 'a scroll starting on a card must not open the book').toHaveURL(/\/app\/?$/);
+  // …and within 300 ms the card computes exactly as it did at rest — no stuck
+  // lift, shadow or ring (the glitch was the highlight lingering under a cover
+  // the reader touched while scrolling and never opened).
+  await page.waitForTimeout(300);
+  const after = await sampleCover();
+  expect(after.transform, 'scroll-off leaves no lift').toBe(resting.transform);
+  expect(after.boxShadow, 'scroll-off leaves no shadow').toBe(resting.boxShadow);
+  expect(after.outline, 'scroll-off leaves no ring').toBe(resting.outline);
 });

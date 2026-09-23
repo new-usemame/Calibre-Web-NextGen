@@ -4749,6 +4749,10 @@ msgstr "套用所選"
 msgid "Applying…"
 msgstr "正在套用…"
 
+#: cps/spa_strings.py
+msgid "Approximate"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/duplicates.html cps/templates/kobo_reconcile.html
 msgid "Archive"
@@ -4969,10 +4973,6 @@ msgid "Certificate path"
 msgstr "憑證路徑"
 
 #: cps/spa_strings.py
-msgid "Change library cover"
-msgstr "變更書庫封面"
-
-#: cps/spa_strings.py
 msgid "Check again"
 msgstr "再次檢查"
 
@@ -4997,6 +4997,10 @@ msgstr "選擇要上傳的封面圖片"
 #: cps/spa_strings.py
 msgid "Choose an image…"
 msgstr "選擇圖片…"
+
+#: cps/spa_strings.py
+msgid "Choose another place"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Choose fields"
@@ -5176,6 +5180,10 @@ msgid "Could not load pairing details."
 msgstr "無法載入配對詳情。"
 
 #: cps/spa_strings.py
+msgid "Could not load reading places."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not load reading positions."
 msgstr "無法載入閱讀進度。"
 
@@ -5206,6 +5214,10 @@ msgstr "無法載入使用者。"
 #: cps/spa_strings.py
 msgid "Could not open that highlight."
 msgstr "無法開啟該標記。"
+
+#: cps/spa_strings.py
+msgid "Could not open that reading position."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not open that search result."
@@ -5305,6 +5317,13 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Cover size"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Cover sources and their API keys belong to this server, not to either cover "
+"choice. They help search for images; choosing one here saves it only in the "
+"scope selected above."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5542,6 +5561,12 @@ msgid "Device name"
 msgstr "裝置名稱"
 
 #: cps/spa_strings.py
+msgid ""
+"Device positions are read-only here. Continue reading to save a new Browser "
+"position."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Device renamed."
 msgstr "裝置已重新命名。"
 
@@ -5570,6 +5595,10 @@ msgstr "裝置"
 #: cps/spa_strings.py
 msgid "Devices appear here after their first sync."
 msgstr "裝置在首次同步後會顯示在這裡。"
+
+#: cps/spa_strings.py
+msgid "Different edition"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Disable standard password login"
@@ -5698,12 +5727,20 @@ msgid "Edit custom colours"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Edit my private cover"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Edit note"
 msgstr "編輯筆記"
 
 #: cps/spa_strings.py
 msgid "Edit public shelves"
 msgstr "編輯公開書架"
+
+#: cps/spa_strings.py
+msgid "Edit shared library cover"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
@@ -5765,6 +5802,10 @@ msgid "Every filled field will replace each book's existing values."
 msgstr "每個填入的欄位都會替換每本書的現有值。"
 
 #: cps/spa_strings.py
+msgid "Exact place"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Excluded"
 msgstr "已排除"
 
@@ -5795,14 +5836,6 @@ msgstr "無法載入書架。"
 #: cps/spa_strings.py
 msgid "Failed to load."
 msgstr "載入失敗。"
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Favorite"
-msgstr "最愛"
-
-#: cps/spa_strings.py
-msgid "Favorited"
-msgstr "已加至最愛"
 
 #: cps/spa_strings.py
 msgid "Fetch metadata from web"
@@ -6203,6 +6236,15 @@ msgid "Last modified"
 msgstr "上次修改"
 
 #: cps/spa_strings.py
+msgid "Last reported"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Last reported {time}"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Last seen {when}"
 msgstr "上次連線 {when}"
@@ -6226,10 +6268,6 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Lettering"
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "Library cover"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6269,6 +6307,10 @@ msgstr "正在載入新的探索精選。"
 #: cps/spa_strings.py
 msgid "Loading pairing details…"
 msgstr "正在載入配對詳情…"
+
+#: cps/spa_strings.py
+msgid "Loading reading places…"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Loading reading positions…"
@@ -6423,10 +6465,6 @@ msgid "Model"
 msgstr "型號"
 
 #: cps/spa_strings.py
-msgid "More actions"
-msgstr ""
-
-#: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "{name} 更多操作"
@@ -6464,11 +6502,11 @@ msgid "My account"
 msgstr "我的帳號"
 
 #: cps/spa_strings.py
-msgid "My own cover"
+msgid "My presets"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "My presets"
+msgid "My private cover"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6610,6 +6648,10 @@ msgstr "尚無來自此裝置的閱讀進度。"
 #: cps/spa_strings.py
 msgid "No registered devices."
 msgstr "無已註冊裝置。"
+
+#: cps/spa_strings.py
+msgid "No saved reading places yet."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "No shelves yet — create one below."
@@ -6787,6 +6829,15 @@ msgid "OpenLDAP server"
 msgstr "OpenLDAP 伺服器"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Opened {source} at {percent}%."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Opening…"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Opens a prefilled report on GitHub. Nothing is sent until you post it, and "
 "you can edit it first."
@@ -6821,6 +6872,10 @@ msgstr "已還原 {n} 筆資料的原始裝置歸屬。"
 #, python-brace-format
 msgid "Original device attribution restored for {ok} of {total}."
 msgstr "已還原 {total} 筆資料中 {ok} 筆的原始裝置歸屬。"
+
+#: cps/spa_strings.py
+msgid "Other saved position"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "PDF reader"
@@ -6877,12 +6932,6 @@ msgstr "發生問題後已暫停"
 msgid "People & devices"
 msgstr "使用者與裝置"
 
-#: cps/spa_strings.py cps/templates/cover_picker.html
-msgid ""
-"Pick a cover from any source we support, paste a URL, upload a file, or use "
-"the cover embedded in the book itself."
-msgstr ""
-
 #: cps/spa_strings.py
 msgid "Picked"
 msgstr "精選"
@@ -6899,6 +6948,10 @@ msgstr "釘選側邊欄"
 #: cps/spa_strings.py
 msgid "Pink"
 msgstr "粉紅色"
+
+#: cps/spa_strings.py
+msgid "Place saved"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Placeholders:"
@@ -6942,7 +6995,26 @@ msgid "Preview"
 msgstr "預覽"
 
 #: cps/spa_strings.py
+msgid ""
+"Preview a saved place in this reader. The device’s saved position will not "
+"change."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Preview in reader"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Preview of the designed cover"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Preview this place"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Previewing {source}. Its saved position will not change."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/layout.html
@@ -6991,6 +7063,10 @@ msgid "Rating (stars)"
 msgstr "評分 (星數)"
 
 #: cps/spa_strings.py
+msgid "Read from here"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Read status"
 msgstr "閱讀狀態"
 
@@ -7005,6 +7081,14 @@ msgstr "閱讀器設定已儲存。"
 #: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "閱讀外觀"
+
+#: cps/spa_strings.py
+msgid "Reading from here. This is now your Browser position."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reading places"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reading positions"
@@ -7061,10 +7145,6 @@ msgstr "移除裝置"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr "從最愛中移除"
-
-#: cps/spa_strings.py
-msgid "Remove from library"
-msgstr ""
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from shelf"
@@ -7266,6 +7346,11 @@ msgid "Save the file, safely eject the Kobo, then restart it."
 msgstr "儲存檔案，安全退出 Kobo，然後重新啟動它。"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Saved {time}"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Saved. Restart the server for the login changes to take effect."
 msgstr "已儲存。請重新啟動伺服器使登入變更生效。"
 
@@ -7437,9 +7522,18 @@ msgstr "請先設定 Kobo 同步，此選項才會啟用。"
 msgid "Setting up…"
 msgstr "正在設定…"
 
+#: cps/spa_strings.py cps/templates/layout.html cps/templates/read.html
+#: cps/templates/readcbr.html
+msgid "Settings"
+msgstr "設定"
+
 #: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "設定已儲存。"
+
+#: cps/spa_strings.py
+msgid "Shared cover"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Shelf name"
@@ -7456,6 +7550,10 @@ msgstr "顯示探索區段"
 #: cps/spa_strings.py
 msgid "Show Read now and edit buttons"
 msgstr "顯示「立即閱讀」和編輯按鈕"
+
+#: cps/spa_strings.py
+msgid "Show Reading tags"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Show Table view"
@@ -7494,6 +7592,14 @@ msgstr "顯示較少標籤"
 #: cps/spa_strings.py
 msgid "Show hidden books"
 msgstr "顯示隱藏的書籍"
+
+#: cps/spa_strings.py
+msgid "Show less"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Show more"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Show password"
@@ -7601,6 +7707,10 @@ msgid "Source details"
 msgstr "來源詳情"
 
 #: cps/spa_strings.py
+msgid "Source not recorded"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "Start My Library? It begins as everything you can see now, so nothing "
 "changes until you remove books yourself. Your e-reader keeps the same books "
@@ -7630,6 +7740,10 @@ msgstr "原廠 Kobo"
 #: cps/spa_strings.py
 msgid "Stock Kobo sync URL"
 msgstr "原廠 Kobo 同步 URL"
+
+#: cps/spa_strings.py
+msgid "Storyteller is configured but could not be reached."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
@@ -7726,6 +7840,10 @@ msgstr ""
 msgid "That URL is not a usable image."
 msgstr "該 URL 不是可用的圖片。"
 
+#: cps/spa_strings.py
+msgid "The book is still opening. Try again in a moment."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/modal_dialogs.html
 msgid ""
@@ -7741,19 +7859,6 @@ msgstr "全域書庫"
 msgid "The library cover is back for you."
 msgstr ""
 
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Every book, new arrivals included, is "
-"under Global Library in the menu."
-msgstr ""
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Your administrator manages what enters it."
-msgstr ""
-
 #: cps/spa_strings.py
 msgid "The preset change failed. Try again."
 msgstr ""
@@ -7766,6 +7871,35 @@ msgstr ""
 msgid ""
 "The server-wide option is also off, so nothing can sync yet. An "
 "administrator can enable it in the classic server settings."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: every book, new arrivals included, is under Global Library "
+"in the menu."
+msgstr ""
+"共享書庫中每本書只保留一份——「我的書庫」是你自己的藏書選擇。沒有任何書籍遺失:"
+"所有書籍,包括新到館藏,都在選單的「全域書庫」中。"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: your administrator manages what enters it."
+msgstr ""
+"共享書庫中每本書只保留一份——「我的書庫」是你自己的藏書選擇。沒有任何書籍遺失:"
+"你的管理員負責管理加入的內容。"
+
+#: cps/spa_strings.py
+msgid ""
+"This changes only your view of this book and copies delivered to your e-"
+"readers. The shared book cover and everyone else’s view stay unchanged."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This changes the cover stored with the book. Everyone who can access the "
+"book sees it."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7939,10 +8073,6 @@ msgstr "上傳書籍"
 #: cps/spa_strings.py
 msgid "Uploading is not available for your account on this server."
 msgstr "此伺服器上您的帳戶不支援上傳。"
-
-#: cps/spa_strings.py
-msgid "Use my own cover"
-msgstr "使用我的封面"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8128,13 +8258,6 @@ msgstr "你的書庫"
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
 msgstr "您的瀏覽器無法播放此音訊格式。"
-
-#: cps/spa_strings.py
-msgid ""
-"Your cover appears only to you and on books delivered to your e-readers. The "
-"library cover stays unchanged for everyone else, and administrators manage "
-"it."
-msgstr ""
 
 #: cps/spa_strings.py
 msgid "Your cover was updated."
@@ -11200,6 +11323,12 @@ msgid "Add Allowed/Denied custom column values"
 msgstr "添加顯示或隱藏書籍的自定義欄位值"
 
 #: cps/templates/cover_picker.html
+msgid ""
+"Pick a cover from any source we support, paste a URL, upload a file, or use "
+"the cover embedded in the book itself."
+msgstr ""
+
+#: cps/templates/cover_picker.html
 msgid "Use a URL"
 msgstr "使用 URL"
 
@@ -13065,6 +13194,10 @@ msgstr "回到首頁"
 msgid "Logout User"
 msgstr "登出賬號"
 
+#: cps/templates/image.html
+msgid "Favorite"
+msgstr "最愛"
+
 #: cps/templates/index.html
 msgid "Dismiss library introduction"
 msgstr "關閉書庫介紹"
@@ -13301,10 +13434,6 @@ msgstr "登出"
 #: cps/templates/layout.html
 msgid "Support Calibre-Web NextGen"
 msgstr "支援 Calibre-Web NextGen"
-
-#: cps/templates/layout.html cps/templates/read.html cps/templates/readcbr.html
-msgid "Settings"
-msgstr "設定"
 
 #: cps/templates/layout.html
 msgid "Refresh Library"
@@ -14671,6 +14800,15 @@ msgstr "同步所選書架到 Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "顯示已讀/未讀選擇"
+
+#~ msgid "Change library cover"
+#~ msgstr "變更書庫封面"
+
+#~ msgid "Favorited"
+#~ msgstr "已加至最愛"
+
+#~ msgid "Use my own cover"
+#~ msgstr "使用我的封面"
 
 #~ msgid "Change my cover"
 #~ msgstr "變更我的封面"

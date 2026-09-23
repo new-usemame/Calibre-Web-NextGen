@@ -5083,6 +5083,11 @@ msgstr "Appliquer la sélection"
 msgid "Applying…"
 msgstr "Application…"
 
+# Reading sources
+#: cps/spa_strings.py
+msgid "Approximate"
+msgstr "Approximatif"
+
 #: cps/spa_strings.py cps/templates/book_table.html
 #: cps/templates/duplicates.html cps/templates/kobo_reconcile.html
 msgid "Archive"
@@ -5308,10 +5313,6 @@ msgid "Certificate path"
 msgstr "Chemin du certificat"
 
 #: cps/spa_strings.py
-msgid "Change library cover"
-msgstr "Modifier la couverture de la bibliothèque"
-
-#: cps/spa_strings.py
 msgid "Check again"
 msgstr "Vérifier à nouveau"
 
@@ -5338,6 +5339,10 @@ msgstr "Choisir une image de couverture à téléverser"
 #: cps/spa_strings.py
 msgid "Choose an image…"
 msgstr "Choisir une image…"
+
+#: cps/spa_strings.py
+msgid "Choose another place"
+msgstr "Choisir une autre position"
 
 #: cps/spa_strings.py
 msgid "Choose fields"
@@ -5524,6 +5529,10 @@ msgid "Could not load pairing details."
 msgstr "Impossible de charger les informations d’association."
 
 #: cps/spa_strings.py
+msgid "Could not load reading places."
+msgstr "Impossible de charger les positions de lecture."
+
+#: cps/spa_strings.py
 msgid "Could not load reading positions."
 msgstr "Impossible de charger les positions de lecture."
 
@@ -5554,6 +5563,10 @@ msgstr "Impossible de charger les utilisateurs."
 #: cps/spa_strings.py
 msgid "Could not open that highlight."
 msgstr "Impossible d'ouvrir ce passage surligné."
+
+#: cps/spa_strings.py
+msgid "Could not open that reading position."
+msgstr "Impossible d’ouvrir cette position de lecture."
 
 #: cps/spa_strings.py
 msgid "Could not open that search result."
@@ -5654,6 +5667,17 @@ msgstr "Couverture à modifier"
 #: cps/spa_strings.py
 msgid "Cover size"
 msgstr "Taille de la couverture"
+
+#: cps/spa_strings.py
+msgid ""
+"Cover sources and their API keys belong to this server, not to either cover "
+"choice. They help search for images; choosing one here saves it only in the "
+"scope selected above."
+msgstr ""
+"Les sources de couvertures et leurs clés API appartiennent à ce serveur, et "
+"non à l’un ou l’autre choix de couverture. Elles servent à rechercher des "
+"images ; le choix effectué ici enregistre l’image uniquement dans la portée "
+"sélectionnée ci-dessus."
 
 #: cps/spa_strings.py
 msgid "Cover updated from the selected result."
@@ -5901,6 +5925,14 @@ msgid "Device name"
 msgstr "Nom de l'appareil"
 
 #: cps/spa_strings.py
+msgid ""
+"Device positions are read-only here. Continue reading to save a new Browser "
+"position."
+msgstr ""
+"Les positions des appareils sont en lecture seule ici. Continuez à lire pour "
+"enregistrer une nouvelle position dans le navigateur."
+
+#: cps/spa_strings.py
 msgid "Device renamed."
 msgstr "Appareil renommé."
 
@@ -5931,6 +5963,10 @@ msgstr "Appareils"
 #: cps/spa_strings.py
 msgid "Devices appear here after their first sync."
 msgstr "Les appareils apparaissent ici après leur première synchronisation."
+
+#: cps/spa_strings.py
+msgid "Different edition"
+msgstr "Édition différente"
 
 #: cps/spa_strings.py
 msgid "Disable standard password login"
@@ -6064,12 +6100,20 @@ msgid "Edit custom colours"
 msgstr "Modifier les couleurs personnalisées"
 
 #: cps/spa_strings.py
+msgid "Edit my private cover"
+msgstr "Modifier ma couverture privée"
+
+#: cps/spa_strings.py
 msgid "Edit note"
 msgstr "Modifier la note"
 
 #: cps/spa_strings.py
 msgid "Edit public shelves"
 msgstr "Modifier les étagères publiques"
+
+#: cps/spa_strings.py
+msgid "Edit shared library cover"
+msgstr "Modifier la couverture partagée de la bibliothèque"
 
 #: cps/spa_strings.py
 msgid "Edit smart shelf"
@@ -6134,6 +6178,10 @@ msgstr ""
 "Chaque champ renseigné remplacera les valeurs existantes de chaque livre."
 
 #: cps/spa_strings.py
+msgid "Exact place"
+msgstr "Position exacte"
+
+#: cps/spa_strings.py
 msgid "Excluded"
 msgstr "Exclu"
 
@@ -6164,14 +6212,6 @@ msgstr "Impossible de charger les étagères."
 #: cps/spa_strings.py
 msgid "Failed to load."
 msgstr "Le chargement a échoué."
-
-#: cps/spa_strings.py cps/templates/image.html
-msgid "Favorite"
-msgstr "Favori"
-
-#: cps/spa_strings.py
-msgid "Favorited"
-msgstr "Ajouté aux favoris"
 
 #: cps/spa_strings.py
 msgid "Fetch metadata from web"
@@ -6590,6 +6630,15 @@ msgid "Last modified"
 msgstr "Dernière modification"
 
 #: cps/spa_strings.py
+msgid "Last reported"
+msgstr "Dernier signalement"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Last reported {time}"
+msgstr "Dernier signalement : {time}"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Last seen {when}"
 msgstr "Vu pour la dernière fois {when}"
@@ -6614,10 +6663,6 @@ msgstr "Gauche"
 #: cps/spa_strings.py
 msgid "Lettering"
 msgstr "Typographie"
-
-#: cps/spa_strings.py
-msgid "Library cover"
-msgstr "Couverture de la bibliothèque"
 
 #: cps/spa_strings.py
 msgid "Library settings"
@@ -6656,6 +6701,10 @@ msgstr "Chargement d’une nouvelle sélection Découvrir."
 #: cps/spa_strings.py
 msgid "Loading pairing details…"
 msgstr "Chargement des informations d’association…"
+
+#: cps/spa_strings.py
+msgid "Loading reading places…"
+msgstr "Chargement des positions de lecture…"
 
 #: cps/spa_strings.py
 msgid "Loading reading positions…"
@@ -6810,10 +6859,6 @@ msgid "Model"
 msgstr "Modèle"
 
 #: cps/spa_strings.py
-msgid "More actions"
-msgstr "Plus d'actions"
-
-#: cps/spa_strings.py
 #, python-brace-format
 msgid "More actions for {name}"
 msgstr "Plus d'actions pour {name}"
@@ -6853,12 +6898,12 @@ msgid "My account"
 msgstr "Mon compte"
 
 #: cps/spa_strings.py
-msgid "My own cover"
-msgstr "Ma propre couverture"
-
-#: cps/spa_strings.py
 msgid "My presets"
 msgstr "Mes préréglages"
+
+#: cps/spa_strings.py
+msgid "My private cover"
+msgstr "Ma couverture privée"
 
 #: cps/spa_strings.py
 msgid "Name"
@@ -7008,6 +7053,10 @@ msgstr "Aucune position de lecture enregistrée par cet appareil."
 #: cps/spa_strings.py
 msgid "No registered devices."
 msgstr "Aucun appareil enregistré."
+
+#: cps/spa_strings.py
+msgid "No saved reading places yet."
+msgstr "Aucune position de lecture enregistrée pour le moment."
 
 #: cps/spa_strings.py
 msgid "No shelves yet — create one below."
@@ -7202,6 +7251,15 @@ msgid "OpenLDAP server"
 msgstr "Serveur OpenLDAP"
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Opened {source} at {percent}%."
+msgstr "{source} ouvert à {percent} %."
+
+#: cps/spa_strings.py
+msgid "Opening…"
+msgstr "Ouverture…"
+
+#: cps/spa_strings.py
 msgid ""
 "Opens a prefilled report on GitHub. Nothing is sent until you post it, and "
 "you can edit it first."
@@ -7242,6 +7300,10 @@ msgstr "Attribution à l'appareil d'origine rétablie pour {n}."
 #, python-brace-format
 msgid "Original device attribution restored for {ok} of {total}."
 msgstr "Attribution à l'appareil d'origine rétablie pour {ok} sur {total}."
+
+#: cps/spa_strings.py
+msgid "Other saved position"
+msgstr "Autre position enregistrée"
 
 #: cps/spa_strings.py
 msgid "PDF reader"
@@ -7300,15 +7362,6 @@ msgstr "En pause après un problème"
 msgid "People & devices"
 msgstr "Personnes et appareils"
 
-#: cps/spa_strings.py cps/templates/cover_picker.html
-msgid ""
-"Pick a cover from any source we support, paste a URL, upload a file, or use "
-"the cover embedded in the book itself."
-msgstr ""
-"Choisissez une couverture depuis n’importe quelle source prise en charge, "
-"collez une URL, téléversez un fichier, ou utilisez la couverture intégrée au "
-"livre."
-
 #: cps/spa_strings.py
 msgid "Picked"
 msgstr "Sélectionné"
@@ -7325,6 +7378,10 @@ msgstr "Épingler la barre latérale"
 #: cps/spa_strings.py
 msgid "Pink"
 msgstr "Rose"
+
+#: cps/spa_strings.py
+msgid "Place saved"
+msgstr "Position enregistrée"
 
 #: cps/spa_strings.py
 msgid "Placeholders:"
@@ -7368,8 +7425,29 @@ msgid "Preview"
 msgstr "Aperçu"
 
 #: cps/spa_strings.py
+msgid ""
+"Preview a saved place in this reader. The device’s saved position will not "
+"change."
+msgstr ""
+"Prévisualisez une position enregistrée dans ce lecteur. La position "
+"enregistrée de l’appareil ne changera pas."
+
+#: cps/spa_strings.py
+msgid "Preview in reader"
+msgstr "Prévisualiser dans le lecteur"
+
+#: cps/spa_strings.py
 msgid "Preview of the designed cover"
 msgstr "Aperçu de la couverture créée"
+
+#: cps/spa_strings.py
+msgid "Preview this place"
+msgstr "Prévisualiser cette position"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Previewing {source}. Its saved position will not change."
+msgstr "Aperçu de {source}. Sa position enregistrée ne changera pas."
 
 #: cps/spa_strings.py cps/templates/layout.html
 msgid "Previous"
@@ -7417,6 +7495,10 @@ msgid "Rating (stars)"
 msgstr "Note (étoiles)"
 
 #: cps/spa_strings.py
+msgid "Read from here"
+msgstr "Lire à partir d’ici"
+
+#: cps/spa_strings.py
 msgid "Read status"
 msgstr "Statut de lecture"
 
@@ -7431,6 +7513,15 @@ msgstr "Paramètres de lecture enregistrés."
 #: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "Apparence de lecture"
+
+#: cps/spa_strings.py
+msgid "Reading from here. This is now your Browser position."
+msgstr ""
+"Lecture à partir d’ici. C’est maintenant votre position dans le navigateur."
+
+#: cps/spa_strings.py
+msgid "Reading places"
+msgstr "Positions de lecture"
 
 #: cps/spa_strings.py
 msgid "Reading positions"
@@ -7490,10 +7581,6 @@ msgstr "Supprimer l'appareil"
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from favorites"
 msgstr "Retirer des favoris"
-
-#: cps/spa_strings.py
-msgid "Remove from library"
-msgstr "Retirer de la bibliothèque"
 
 #: cps/spa_strings.py cps/templates/detail.html
 msgid "Remove from shelf"
@@ -7705,6 +7792,11 @@ msgstr ""
 "redémarrez-la."
 
 #: cps/spa_strings.py
+#, python-brace-format
+msgid "Saved {time}"
+msgstr "Enregistré {time}"
+
+#: cps/spa_strings.py
 msgid "Saved. Restart the server for the login changes to take effect."
 msgstr ""
 "Sauvegardé. Redémarrez le serveur pour que les modifications de connexion "
@@ -7882,9 +7974,18 @@ msgstr ""
 msgid "Setting up…"
 msgstr "Configuration…"
 
+#: cps/spa_strings.py cps/templates/layout.html cps/templates/read.html
+#: cps/templates/readcbr.html
+msgid "Settings"
+msgstr "Paramètres"
+
 #: cps/spa_strings.py
 msgid "Settings saved."
 msgstr "Paramètres enregistrés."
+
+#: cps/spa_strings.py
+msgid "Shared cover"
+msgstr "Couverture partagée"
 
 #: cps/spa_strings.py
 msgid "Shelf name"
@@ -7901,6 +8002,10 @@ msgstr "Afficher la section Découvrir"
 #: cps/spa_strings.py
 msgid "Show Read now and edit buttons"
 msgstr "Afficher les boutons Lire et Modifier"
+
+#: cps/spa_strings.py
+msgid "Show Reading tags"
+msgstr "Afficher les étiquettes de lecture"
 
 #: cps/spa_strings.py
 msgid "Show Table view"
@@ -7939,6 +8044,14 @@ msgstr "Afficher moins d’étiquettes"
 #: cps/spa_strings.py
 msgid "Show hidden books"
 msgstr "Afficher les livres masqués"
+
+#: cps/spa_strings.py
+msgid "Show less"
+msgstr "Afficher moins"
+
+#: cps/spa_strings.py
+msgid "Show more"
+msgstr "Afficher plus"
 
 #: cps/spa_strings.py
 msgid "Show password"
@@ -8055,6 +8168,10 @@ msgid "Source details"
 msgstr "Détails de la source"
 
 #: cps/spa_strings.py
+msgid "Source not recorded"
+msgstr "Source non enregistrée"
+
+#: cps/spa_strings.py
 msgid ""
 "Start My Library? It begins as everything you can see now, so nothing "
 "changes until you remove books yourself. Your e-reader keeps the same books "
@@ -8087,6 +8204,10 @@ msgstr "Liseuse Kobo avec logiciel d’origine"
 #: cps/spa_strings.py
 msgid "Stock Kobo sync URL"
 msgstr "URL de synchronisation de la liseuse Kobo avec logiciel d’origine"
+
+#: cps/spa_strings.py
+msgid "Storyteller is configured but could not be reached."
+msgstr "Storyteller est configuré, mais reste inaccessible."
 
 #: cps/spa_strings.py cps/templates/config_edit.html
 #: cps/templates/cover_picker.html
@@ -8192,6 +8313,10 @@ msgstr "Modèles de texte"
 msgid "That URL is not a usable image."
 msgstr "Cette URL ne correspond pas à une image utilisable."
 
+#: cps/spa_strings.py
+msgid "The book is still opening. Try again in a moment."
+msgstr "Le livre est encore en cours d’ouverture. Réessayez dans un instant."
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/modal_dialogs.html
 msgid ""
@@ -8209,26 +8334,6 @@ msgstr "La bibliothèque globale"
 #: cps/spa_strings.py
 msgid "The library cover is back for you."
 msgstr "La couverture de la bibliothèque est rétablie pour vous."
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Every book, new arrivals included, is "
-"under Global Library in the menu."
-msgstr ""
-"La bibliothèque est partagée et ne contient chaque livre qu'une seule fois — "
-"ce que vous gardez, c'est Ma bibliothèque. Rien de ce que vous aviez n'a "
-"disparu. Chaque livre, nouveautés comprises, se trouve sous Bibliothèque "
-"globale dans le menu."
-
-#: cps/spa_strings.py cps/templates/index.html
-msgid ""
-"The library is shared and holds every book once — what you keep is My "
-"Library. Nothing you had is gone. Your administrator manages what enters it."
-msgstr ""
-"La bibliothèque est partagée et ne contient chaque livre qu'une seule fois — "
-"ce que vous gardez, c'est Ma bibliothèque. Rien de ce que vous aviez n'a "
-"disparu. Votre administrateur gère ce qui y entre."
 
 #: cps/spa_strings.py
 msgid "The preset change failed. Try again."
@@ -8248,6 +8353,42 @@ msgstr ""
 "L'option au niveau du serveur est également désactivée, donc rien ne peut "
 "encore se synchroniser. Un administrateur peut l'activer dans les paramètres "
 "classiques du serveur."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: every book, new arrivals included, is under Global Library "
+"in the menu."
+msgstr ""
+"La bibliothèque partagée ne contient chaque livre qu'une seule fois — Ma "
+"bibliothèque est votre propre sélection. Rien n'a disparu : chaque livre, "
+"nouveautés comprises, se trouve sous Bibliothèque globale dans le menu."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid ""
+"The shared library holds every book once — My Library is your own selection. "
+"Nothing is gone: your administrator manages what enters it."
+msgstr ""
+"La bibliothèque partagée ne contient chaque livre qu'une seule fois — Ma "
+"bibliothèque est votre propre sélection. Rien n'a disparu : votre "
+"administrateur gère ce qui y entre."
+
+#: cps/spa_strings.py
+msgid ""
+"This changes only your view of this book and copies delivered to your e-"
+"readers. The shared book cover and everyone else’s view stay unchanged."
+msgstr ""
+"Cela modifie uniquement votre affichage de ce livre et les copies envoyées à "
+"vos liseuses. La couverture partagée du livre et l’affichage des autres "
+"utilisateurs restent inchangés."
+
+#: cps/spa_strings.py
+msgid ""
+"This changes the cover stored with the book. Everyone who can access the "
+"book sees it."
+msgstr ""
+"Cela modifie la couverture enregistrée avec le livre. Toute personne ayant "
+"accès au livre la voit."
 
 #: cps/spa_strings.py
 msgid "This device will no longer sync."
@@ -8427,10 +8568,6 @@ msgstr "Téléverser des livres"
 msgid "Uploading is not available for your account on this server."
 msgstr ""
 "Le téléversement n'est pas disponible pour votre compte sur ce serveur."
-
-#: cps/spa_strings.py
-msgid "Use my own cover"
-msgstr "Utiliser ma propre couverture"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -8645,16 +8782,6 @@ msgstr "Votre bibliothèque"
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
 msgstr "Votre navigateur ne peut pas lire ce format audio."
-
-#: cps/spa_strings.py
-msgid ""
-"Your cover appears only to you and on books delivered to your e-readers. The "
-"library cover stays unchanged for everyone else, and administrators manage "
-"it."
-msgstr ""
-"Votre couverture n’apparaît que pour vous et sur les livres envoyés à vos "
-"liseuses. La couverture de la bibliothèque reste inchangée pour tous les "
-"autres utilisateurs et les administrateurs la gèrent."
 
 #: cps/spa_strings.py
 msgid "Your cover was updated."
@@ -11830,6 +11957,15 @@ msgid "Add Allowed/Denied custom column values"
 msgstr "Ajouter les valeurs de colonnes autorisées/refusées"
 
 #: cps/templates/cover_picker.html
+msgid ""
+"Pick a cover from any source we support, paste a URL, upload a file, or use "
+"the cover embedded in the book itself."
+msgstr ""
+"Choisissez une couverture depuis n’importe quelle source prise en charge, "
+"collez une URL, téléversez un fichier, ou utilisez la couverture intégrée au "
+"livre."
+
+#: cps/templates/cover_picker.html
 msgid "Use a URL"
 msgstr ""
 
@@ -13837,6 +13973,10 @@ msgstr "Retour à l’accueil"
 msgid "Logout User"
 msgstr "Déconnecter l’utilisateur"
 
+#: cps/templates/image.html
+msgid "Favorite"
+msgstr "Favori"
+
 #: cps/templates/index.html
 msgid "Dismiss library introduction"
 msgstr "Fermer la présentation de la bibliothèque"
@@ -14076,10 +14216,6 @@ msgstr "Déconnexion"
 #: cps/templates/layout.html
 msgid "Support Calibre-Web NextGen"
 msgstr ""
-
-#: cps/templates/layout.html cps/templates/read.html cps/templates/readcbr.html
-msgid "Settings"
-msgstr "Paramètres"
 
 #: cps/templates/layout.html
 msgid "Refresh Library"
@@ -15839,6 +15975,54 @@ msgstr "{pages} pages ne contiennent que des images. Elles sont lues depuis la p
 #, python-brace-format
 msgid "{pages} pages have a text layer that is not readable words. They are read off the printed page with local text recognition — a transcription of the source, never a rewrite."
 msgstr "{pages} pages ont une couche de texte qui ne contient pas de mots lisibles. Elles sont lues depuis la page imprimée avec une reconnaissance de texte locale — une transcription de la source, jamais une réécriture."
+#~ msgid "Change library cover"
+#~ msgstr "Modifier la couverture de la bibliothèque"
+
+#~ msgid "Favorited"
+#~ msgstr "Ajouté aux favoris"
+
+#~ msgid "Library cover"
+#~ msgstr "Couverture de la bibliothèque"
+
+#~ msgid "More actions"
+#~ msgstr "Plus d'actions"
+
+#~ msgid "My own cover"
+#~ msgstr "Ma propre couverture"
+
+#~ msgid "Remove from library"
+#~ msgstr "Retirer de la bibliothèque"
+
+#~ msgid ""
+#~ "The library is shared and holds every book once — what you keep is My "
+#~ "Library. Nothing you had is gone. Every book, new arrivals included, is "
+#~ "under Global Library in the menu."
+#~ msgstr ""
+#~ "La bibliothèque est partagée et ne contient chaque livre qu'une seule "
+#~ "fois — ce que vous gardez, c'est Ma bibliothèque. Rien de ce que vous "
+#~ "aviez n'a disparu. Chaque livre, nouveautés comprises, se trouve sous "
+#~ "Bibliothèque globale dans le menu."
+
+#~ msgid ""
+#~ "The library is shared and holds every book once — what you keep is My "
+#~ "Library. Nothing you had is gone. Your administrator manages what enters "
+#~ "it."
+#~ msgstr ""
+#~ "La bibliothèque est partagée et ne contient chaque livre qu'une seule "
+#~ "fois — ce que vous gardez, c'est Ma bibliothèque. Rien de ce que vous "
+#~ "aviez n'a disparu. Votre administrateur gère ce qui y entre."
+
+#~ msgid "Use my own cover"
+#~ msgstr "Utiliser ma propre couverture"
+
+#~ msgid ""
+#~ "Your cover appears only to you and on books delivered to your e-readers. "
+#~ "The library cover stays unchanged for everyone else, and administrators "
+#~ "manage it."
+#~ msgstr ""
+#~ "Votre couverture n’apparaît que pour vous et sur les livres envoyés à vos "
+#~ "liseuses. La couverture de la bibliothèque reste inchangée pour tous les "
+#~ "autres utilisateurs et les administrateurs la gèrent."
 
 #~ msgid "Change my cover"
 #~ msgstr "Modifier ma couverture"

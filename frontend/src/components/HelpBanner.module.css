@@ -34,6 +34,51 @@
   outline-offset: -3px;
 }
 
+/* Library-intro announcement: a title plus a full explanation scans better as
+   a left-aligned block than as centered lines, and the start edge lines up
+   with the TopBar / page gutter (--sp-5). The icon sits in a small chip so it
+   reads as part of the notice instead of floating at the screen edge. */
+.introSurface {
+  justify-content: flex-start;
+  align-items: flex-start;
+  text-align: left;
+  padding: var(--sp-2) 52px var(--sp-2) var(--sp-5);
+}
+
+.iconChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--r-md);
+  color: var(--hb-icon);
+  background: rgba(111, 216, 203, 0.14);
+  background: color-mix(in srgb, var(--hb-icon) 16%, transparent);
+}
+
+.introText {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.introTitle {
+  color: var(--hb-strong);
+  font-weight: var(--fw-semi);
+  font-size: var(--fs-base);
+  line-height: var(--lh-snug);
+}
+
+.introBody {
+  color: var(--hb-text);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-snug);
+  max-width: 88ch;
+}
+
 @keyframes hbSlideDown {
   from { opacity: 0; transform: translateY(-100%); }
   to   { opacity: 1; transform: translateY(0); }
@@ -196,6 +241,25 @@
   /* the icon is decorative; drop it on phones so the centered message keeps the
      most room and stays on one or two tidy lines */
   .iconWrap { display: none; }
+
+  .introSurface {
+    gap: var(--sp-2);
+    padding: var(--sp-2) 44px var(--sp-2) var(--sp-4);
+    font-size: var(--fs-sm);
+  }
+
+  .iconChip {
+    width: 26px;
+    height: 26px;
+  }
+
+  .introTitle {
+    font-size: var(--fs-sm);
+  }
+
+  .introBody {
+    font-size: var(--fs-xs);
+  }
 
   .supportBanner .bannerSurface {
     gap: var(--sp-2);

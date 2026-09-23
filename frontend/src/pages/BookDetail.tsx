@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, Fragment } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, Fragment } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
-import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
+import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
 import {
   useBook, useToggleRead, useToggleFavorite, useToggleArchived, useToggleHidden,
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
@@ -26,6 +26,7 @@ import { getPrimaryReadTarget } from '../lib/readerTarget';
 import { canDeleteBooks, canDownloadBooks, canReadBooks, canUploadBooks } from '../lib/permissions';
 import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
+import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { BookUserNotices } from '../components/UserNotices';
 import { backTarget } from '../lib/backLink';
 import { useAnnouncer } from '../lib/a11y/announcer';
@@ -304,8 +305,78 @@ function TagEditor({ bookId, tags, canEdit }:
   );
 }
 
+/** The long-form description: clamped to ~5 lines with a bottom fade when the
+ *  text actually overflows, with a quiet Show more/Show less toggle directly
+ *  under it. The HTML keeps the existing sanitised render path; the clamp is
+ *  just line-clamp on the container. Expansion is session-local state — it
+ *  never persists, and resets when the page switches books. */
+function DescriptionBlock({ html, bookId }: { html: string; bookId: number }) {
+  const t = useT();
+  const ref = useRef<HTMLDivElement>(null);
+  const [expanded, setExpanded] = useState(false);
+  const [clampable, setClampable] = useState(false);
+
+  useEffect(() => { setExpanded(false); }, [bookId]);
+
+  /* line-clamp truncates the box itself, so on a clamped element scrollHeight
+     === clientHeight and "does it overflow?" is unanswerable from the outside.
+     Measure with the clamp removed instead, inside one synchronous block — no
+     paint can intervene. Runs before first paint (layout effect) and on every
+     resize (a width change can re-wrap text across the five-line mark either
+     way, so the button appears and disappears honestly). */
+  const measure = useCallback(() => {
+    const el = ref.current;
+    if (!el) return;
+    const line = parseFloat(getComputedStyle(el).lineHeight);
+    if (!line || Number.isNaN(line)) return;
+    const wasClamped = el.classList.contains(styles.descriptionClamped);
+    if (wasClamped) el.classList.remove(styles.descriptionClamped);
+    const overflows = el.scrollHeight > line * 5 + 2;
+    if (wasClamped) el.classList.add(styles.descriptionClamped);
+    setClampable(overflows);
+  }, []);
+
+  useLayoutEffect(measure, [measure, html]);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measure]);
+
+  const clamped = clampable && !expanded;
+  return (
+    <div className={styles.descriptionBlock}>
+      <div
+        ref={ref}
+        className={clamped ? `${styles.description} ${styles.descriptionClamped}` : styles.description}
+        dir="auto"
+        data-testid="book-description"
+        // description_html is sanitized server-side in serialize_book_detail
+        // (cps/clean_html.clean_string — bleach/nh3 allowlist, same as the
+        // legacy templates), so it is safe to render here.
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{ __html: html }}
+      />
+      {clampable && (
+        <button
+          type="button"
+          className={styles.showMore}
+          aria-expanded={expanded}
+          data-testid="description-toggle"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? t('Show less') : t('Show more')}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function BookDetail() {
   const [cardActionsHidden] = useCardActionsHidden();
+  const [readingTagsHidden] = useReadingTagsHidden();
   const t = useT();
   const announce = useAnnouncer();
   const params = useParams<{ id: string }>();
@@ -437,7 +508,8 @@ export function BookDetail() {
   };
 
   /* The "More actions" gear menu — every book action that is not one of the
-     four visible controls (Read now, Favorite, Add to shelf, the gear itself).
+     visible controls (Read now, Edit cover, Add to shelf, favorite, personal
+     membership removal, and the gear itself).
      Labels name the ACTION performed (state-aware), per the cleanup brief:
      today's "In your library" state chip becomes "Remove from library". */
   const menuItems: MenuSectionDef['items'] = [];
@@ -497,16 +569,7 @@ export function BookDetail() {
     });
   }
   if (selectionMode) {
-    if (inLibrary) {
-      menuItems.push({
-        id: 'remove-from-library',
-        label: t('Remove from library'),
-        icon: <BookCheck size={15} />,
-        disabled: removalImpact.isPending || removeFromLibrary.isPending,
-        onSelect: removeMembership,
-        testId: 'menu-remove-from-library',
-      });
-    } else if (me?.role?.browse_global) {
+    if (!inLibrary && me?.role?.browse_global) {
       menuItems.push({
         id: 'add-to-library',
         label: t('Add to library'),
@@ -583,6 +646,117 @@ export function BookDetail() {
         {bookBackTarget.isOrigin ? t('← Back') : t('← Library')}
       </Link>
 
+      {/* The action row is deliberately ordered by the reader's next likely
+          step: read, edit the artwork, organise, then compact personal state.
+          The flexible group is the spacer before the gear, which pins Settings
+          to the far edge without letting it become an orphaned mobile row. */}
+      <div className={styles.actions} data-testid="book-actions">
+        <div className={styles.actionsGroup}>
+          {inLibrary && primaryReadTarget ? (
+            <Link href={primaryReadTarget} className={styles.actionPrimary}>
+              {t('Read now')}
+            </Link>
+          ) : null}
+
+          {!me?.role?.anonymous && (
+            <Link href={`/book/${book.id}/cover`} className={styles.actionSecondary}
+              data-testid="edit-cover-action">
+              <ImageIcon size={15} aria-hidden="true" focusable={false} />
+              {t('Edit cover')}
+            </Link>
+          )}
+
+          {inLibrary && (
+            <AddToShelf bookId={book.id} inLibrary={inLibrary} />
+          )}
+
+          {/* Favorite is compact because the star carries the familiar state;
+              the accessible name and title always say exactly what it does. */}
+          {inLibrary && <button
+            className={book.favorited ? styles.actionIconOn : styles.actionIcon}
+            onClick={() => toggleFavorite.mutate()}
+            disabled={toggleFavorite.isPending}
+            aria-label={book.favorited ? t('Remove from favorites') : t('Add to favorites')}
+            aria-pressed={book.favorited}
+            title={book.favorited ? t('Remove from favorites') : t('Add to favorites')}
+          >
+            <Star size={17} aria-hidden="true" focusable={false} fill={book.favorited ? 'currentColor' : 'none'} />
+          </button>}
+
+          {selectionMode && inLibrary && (
+            <button type="button" className={styles.actionIcon}
+              onClick={removeMembership}
+              disabled={removalImpact.isPending || removeFromLibrary.isPending}
+              aria-label={t('Remove from my library')}
+              title={t('Remove from my library')}
+              data-testid="remove-from-my-library">
+              <BookX size={17} aria-hidden="true" focusable={false} />
+            </button>
+          )}
+        </div>
+
+        {menuItems.length > 0 && (
+          <div className={styles.gearWrap}>
+            <Menu
+              label={t('Settings')}
+              title={t('Settings')}
+              icon={<Settings size={17} aria-hidden="true" focusable={false} />}
+              sections={menuSections}
+              triggerTestId="book-actions-menu"
+              menuTestId="book-actions-menu-list"
+            />
+          </div>
+        )}
+      </div>
+      <p className={reloadMessage ? styles.actionStatus : undefined} role="status">{reloadMessage}</p>
+
+      {/* The delete error surfaces beside the row regardless of viewport —
+          the destructive control itself lives in the gear menu. */}
+      {deleteError && <p className={styles.deleteErr} role="alert">{deleteError}</p>}
+
+      {/* Send-to-e-reader / send-to-device panels (opened from the menu),
+          directly under the row that opens them. */}
+      <div ref={sendPanelWrapRef} className={styles.sendPanelWrap}>
+        {sendOpen && (
+        <SendPanel
+          formats={book.formats.map((f) => f.format)}
+          pending={sendToEreader.isPending}
+          banner={sendBanner}
+          defaultEmail={savedEreader}
+          onSend={(format, convert, emails) => {
+            setSendBanner(null);
+            sendToEreader.mutate(
+              { format, convert, emails: emails || undefined },
+              {
+                onSuccess: (r) => { setSendBanner({ ok: true, text: r.message }); },
+                onError: (err) =>
+                  setSendBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Send failed.') }),
+              },
+            );
+          }}
+        />
+      )}
+
+      {deviceSendOpen && (
+        <DeviceSendPanel
+          devices={deliveryDevices.data?.devices ?? []}
+          pending={queueDeviceDelivery.isPending}
+          banner={deviceSendBanner}
+          onSend={(device) => {
+            setDeviceSendBanner(null);
+            queueDeviceDelivery.mutate(device, {
+              onSuccess: (result) => setDeviceSendBanner({ ok: true, text: result.message }),
+              onError: (err) => setDeviceSendBanner({
+                ok: false,
+                text: err instanceof ApiError
+                  ? err.message : t('Could not queue this book for the device.'),
+              }),
+            });
+          }}
+        />
+      )}
+      </div>
+
       <BookUserNotices bookId={book.id} />
 
       <div className={styles.layout}>
@@ -617,19 +791,6 @@ export function BookDetail() {
                 )}
                 <span className={styles.coverFallbackMark} aria-hidden="true">NextGen</span>
               </div>
-            )}
-            {/* "Edit cover" pill overlaid on the artwork — opens the cover
-                editor, where both the library cover and the reader's own
-                (private) cover are managed. Always visible on touch/coarse
-                pointers; hover/focus-revealed on fine pointers (see the CSS).
-                Guests get no control: the editor's sources answer 403/401 for
-                them, so the affordance would be a dead end. */}
-            {!me?.role?.anonymous && (
-              <Link href={`/book/${book.id}/cover`} className={styles.changeCover}
-                data-testid="edit-cover-pill">
-                <ImageIcon size={14} aria-hidden="true" focusable={false} />
-                {t('Edit cover')}
-              </Link>
             )}
           </div>
         </div>
@@ -703,104 +864,12 @@ export function BookDetail() {
           {/* Description — in the DOM directly under the title/author header,
               because on a phone that is where it belongs (#1828): the thing the
               page is about comes before the controls and the attribute list.
-              Desktop keeps its long-standing visual order (actions first,
-              description last) via `order` in the stylesheet, so this reorder
-              changes nothing there. */}
+              Desktop keeps its long-standing in-column order (description last)
+              via `order` in the stylesheet; the visible action row leads the
+              whole page above the layout grid on both viewports. */}
           {book.description_html && (
-            <div
-              className={styles.description}
-              dir="auto"
-              // description_html is sanitized server-side in serialize_book_detail
-              // (cps/clean_html.clean_string — bleach/nh3 allowlist, same as the
-              // legacy templates), so it is safe to render here.
-              // eslint-disable-next-line react/no-danger
-              dangerouslySetInnerHTML={{ __html: book.description_html }}
-            />
+            <DescriptionBlock html={book.description_html} bookId={book.id} />
           )}
-
-          {/* Actions — the four visible controls. Everything else lives in the
-              gear menu (built above) or in the Files section at the page foot. */}
-          <div className={styles.actions} data-testid="book-actions">
-            {inLibrary && primaryReadTarget ? (
-              <Link href={primaryReadTarget} className={styles.actionPrimary}>
-                {t('Read now')}
-              </Link>
-            ) : null}
-
-            {/* Star / favorite */}
-            {inLibrary && <button
-              className={book.favorited ? styles.readToggleActive : styles.readToggleGhost}
-              onClick={() => toggleFavorite.mutate()}
-              disabled={toggleFavorite.isPending}
-              aria-label={book.favorited ? t('Remove from favorites') : t('Add to favorites')}
-            >
-              <Star size={14} fill={book.favorited ? 'currentColor' : 'none'} />
-              {book.favorited ? t('Favorited') : t('Favorite')}
-            </button>}
-
-            {inLibrary && (
-              <AddToShelf bookId={book.id} inLibrary={inLibrary} />
-            )}
-
-            {menuItems.length > 0 && (
-              <Menu
-                label={t('More actions')}
-                title={t('More actions')}
-                icon={<Settings size={17} aria-hidden="true" focusable={false} />}
-                sections={menuSections}
-                triggerTestId="book-actions-menu"
-                menuTestId="book-actions-menu-list"
-              />
-            )}
-          </div>
-          <p className={reloadMessage ? styles.actionStatus : undefined} role="status">{reloadMessage}</p>
-
-          {/* The delete error surfaces beside the row regardless of viewport —
-              the destructive control itself lives in the gear menu. */}
-          {deleteError && <p className={styles.deleteErr} role="alert">{deleteError}</p>}
-
-          {/* Send-to-e-reader / send-to-device panels (opened from the menu) */}
-          <div ref={sendPanelWrapRef} className={styles.sendPanelWrap}>
-            {sendOpen && (
-            <SendPanel
-              formats={book.formats.map((f) => f.format)}
-              pending={sendToEreader.isPending}
-              banner={sendBanner}
-              defaultEmail={savedEreader}
-              onSend={(format, convert, emails) => {
-                setSendBanner(null);
-                sendToEreader.mutate(
-                  { format, convert, emails: emails || undefined },
-                  {
-                    onSuccess: (r) => { setSendBanner({ ok: true, text: r.message }); },
-                    onError: (err) =>
-                      setSendBanner({ ok: false, text: err instanceof ApiError ? err.message : t('Send failed.') }),
-                  },
-                );
-              }}
-            />
-          )}
-
-
-          {deviceSendOpen && (
-            <DeviceSendPanel
-              devices={deliveryDevices.data?.devices ?? []}
-              pending={queueDeviceDelivery.isPending}
-              banner={deviceSendBanner}
-              onSend={(device) => {
-                setDeviceSendBanner(null);
-                queueDeviceDelivery.mutate(device, {
-                  onSuccess: (result) => setDeviceSendBanner({ ok: true, text: result.message }),
-                  onError: (err) => setDeviceSendBanner({
-                    ok: false,
-                    text: err instanceof ApiError
-                      ? err.message : t('Could not queue this book for the device.'),
-                  }),
-                });
-              }}
-            />
-          )}
-          </div>
 
           {/* Tags — inline add/remove for editors (fork #572), read-only links
               otherwise. */}
@@ -952,6 +1021,7 @@ export function BookDetail() {
       {book.authors.length > 0 && (
         <MoreByAuthor
           hideActions={cardActionsHidden}
+          hideReadingTags={readingTagsHidden}
           canRead={canReadBooks(me)}
           key={book.id}
           authorId={book.authors[0].id}

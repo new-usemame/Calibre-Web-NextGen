@@ -22,7 +22,7 @@
 }
 .subtitle { color: var(--text-muted); font-size: var(--fs-base); margin: 0; max-width: 60ch; }
 
-/* ---- scope switch (Library cover | My own cover) ---- */
+/* ---- scope switch (shared cover | my private cover) ---- */
 .scopeSwitch {
   display: inline-flex;
   gap: 2px;
@@ -51,6 +51,11 @@
 .scope:focus-visible, .scopeOn:focus-visible {
   outline: 2px solid var(--accent-ring);
   outline-offset: 2px;
+}
+.scopeHelp { color: var(--text-faint); font-size: var(--fs-sm); line-height: var(--lh-snug); margin: var(--sp-2) 0 0; max-width: 66ch; }
+@media (max-width: 440px) {
+  .scopeSwitch { display: flex; width: 100%; }
+  .scope, .scopeOn { flex: 1 1 0; justify-content: center; padding-inline: var(--sp-2); }
 }
 
 /* Personal scope: drop the private cover and fall back to the library one. */

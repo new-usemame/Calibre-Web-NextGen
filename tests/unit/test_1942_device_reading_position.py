@@ -5,6 +5,7 @@
 from datetime import datetime, timezone
 import sys
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 from flask import Flask, g
@@ -126,6 +127,42 @@ def test_web_reader_records_its_exact_cfi_even_when_resolved_progress_is_lower(
     assert journal.device_id == browser.id
     assert journal.progress_percent == 20.0
     assert journal.cfi == "epubcfi(/6/8!/4/6:2)"
+
+
+def test_source_preview_continuation_records_only_the_browser_journal(
+        position_session, monkeypatch):
+    from cps.services import reading_position
+    import cps.progress_syncing.protocols.kosync  # noqa: F401
+    kosync = sys.modules["cps.progress_syncing.protocols.kosync"]
+
+    session, (kobo, browser) = position_session
+    shared = ub.KoboReadingState(user_id=USER_ID, book_id=BOOK_ID)
+    shared.current_bookmark = ub.KoboBookmark(progress_percent=80.0)
+    session.add(shared)
+    session.commit()
+    update = Mock()
+    kosync_write = Mock()
+    monkeypatch.setattr(kosync, "update_book_read_status", update)
+    monkeypatch.setattr(kosync, "record_percentage_only_progress", kosync_write)
+
+    assert reading_position.record_web_reader_progress(
+        SimpleNamespace(id=USER_ID),
+        BOOK_ID,
+        22.0,
+        origin_device_id=browser.id,
+        cfi="epubcfi(/6/8!/4/6:4)",
+        share_with_devices=False,
+    ) is True
+    session.commit()
+
+    rows = session.query(ub.DeviceReadingPosition).all()
+    assert [(row.device_id, row.progress_percent, row.cfi) for row in rows] == [
+        (browser.id, 22.0, "epubcfi(/6/8!/4/6:4)"),
+    ]
+    assert all(row.device_id != kobo.id for row in rows)
+    assert shared.current_bookmark.progress_percent == 80.0
+    update.assert_not_called()
+    kosync_write.assert_not_called()
 
 
 @pytest.fixture

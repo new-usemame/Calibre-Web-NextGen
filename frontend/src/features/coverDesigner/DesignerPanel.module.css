@@ -202,19 +202,33 @@
 }
 .popFoot { display: flex; justify-content: flex-end; }
 
-/* ---- lettering cards ---- */
-.fontRow { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
+/* ---- lettering cards ----
+   These are a carousel, not a wrapping grid. The previous 2:3 cover samples
+   were cropped around their empty middle to fit a wide card, so every font
+   looked like the same blank rectangle. The server samples are real renders
+   in each installed font; anchoring the crop at the title makes those glyphs
+   visible, while scroll-snap keeps a one-handed phone swipe deliberate. */
+.fontRow {
+  display: flex; gap: var(--sp-3); flex-wrap: nowrap; max-width: 100%;
+  overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin;
+  scroll-snap-type: x mandatory; scroll-padding-inline: 2px;
+  padding: var(--sp-1) 2px var(--sp-2);
+}
 .fontCard, .fontCardOn {
+  flex: 0 0 clamp(132px, 26%, 172px); scroll-snap-align: start;
   display: flex; flex-direction: column; align-items: center; gap: var(--sp-1);
-  padding: var(--sp-2); border-radius: var(--r-md); cursor: pointer; min-width: 96px;
+  padding: var(--sp-2); border-radius: var(--r-md); cursor: pointer; min-width: 0;
   background: var(--surface-3); border: 1px solid var(--border-strong); color: var(--text);
   transition: border-color var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 .fontSample, .fontSampleFallback {
-  height: 48px; min-width: 80px; max-width: 140px; border-radius: var(--r-sm);
+  width: 100%; height: auto; aspect-ratio: 5 / 3; border-radius: var(--r-sm);
   display: grid; place-items: center; object-fit: cover;
   background: var(--surface-1); color: var(--text); font-size: var(--fs-lg);
 }
+/* The top third is the server-rendered lettering. `center` hid it behind the
+   wide card's crop, which is why every option looked blank in the report. */
+.fontSample { object-position: center top; }
 .fontLabel { font-size: var(--fs-xs); color: var(--text-muted); }
 .fontCardOn { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
 .fontCardOn .fontLabel { color: var(--accent-hover); font-weight: var(--fw-semi); }
@@ -225,6 +239,11 @@
   outline: 2px solid var(--accent-ring); outline-offset: 2px;
 }
 .mixedNote { color: var(--text-faint); font-size: var(--fs-xs); margin: var(--sp-1) 0 0; }
+@media (max-width: 600px) {
+  /* One full choice plus a clear edge of the next card signals that the strip
+     swipes; it never leaks into the page's horizontal scroll. */
+  .fontCard, .fontCardOn { flex-basis: min(72vw, 204px); }
+}
 
 /* ---- advanced disclosure ---- */
 .advanced {

@@ -57,66 +57,6 @@
   display: block;
 }
 
-/* "Edit cover" affordance overlaid on the cover — opens the cover editor,
-   where both the library cover and the reader's own private cover live. On
-   touch/coarse pointers it is always visible (there is no hover to reveal it);
-   on fine pointers it fades in when the cover is hovered or when focus lands
-   inside the wrapper, so keyboard users get the same reveal before reaching
-   it. pointer-events track visibility so the hidden pill is never a mystery
-   click target over the artwork. */
-.changeCover {
-  position: absolute;
-  left: 50%;
-  bottom: var(--sp-3);
-  transform: translateX(-50%);
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  padding: var(--sp-2) var(--sp-3);
-  border-radius: var(--r-full);
-  background: rgba(20, 28, 36, .82);
-  -webkit-backdrop-filter: blur(6px);
-  backdrop-filter: blur(6px);
-  border: 1px solid var(--border-strong);
-  /* The chip is a fixed dark glass scrim (readable over any cover art), so its
-     text must be a fixed light — var(--text) is dark in Light/Sepia and fails
-     contrast on the scrim (1.4:1). The hover state flips to --on-accent/--accent. */
-  color: #f2efe9;
-  font-size: var(--fs-sm);
-  font-weight: var(--fw-medium);
-  text-decoration: none;
-  white-space: nowrap;
-  box-shadow: var(--elev-2);
-  opacity: .92;
-  transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), opacity var(--dur-fast) var(--ease);
-}
-.changeCover:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-ring); opacity: 1; }
-/* Hover rules live under (hover: hover): iOS keeps a synthetic :hover stuck on
-   the last tapped element, which would leave the accent state "on" after the
-   tap (#2230's class of bug). */
-@media (hover: hover) and (pointer: fine) {
-  .changeCover { opacity: 0; pointer-events: none; }
-  .coverWrap:hover .changeCover,
-  .coverWrap:focus-within .changeCover { opacity: .92; pointer-events: auto; }
-  .coverWrap:hover .changeCover:hover,
-  .changeCover:hover,
-  .changeCover:focus-visible {
-    background: var(--accent);
-    color: var(--on-accent);
-    border-color: var(--accent);
-    opacity: 1;
-    transform: translateX(-50%) translateY(-2px);
-  }
-}
-@media (hover: none) {
-  .changeCover:active {
-    background: var(--accent);
-    color: var(--on-accent);
-    border-color: var(--accent);
-  }
-}
-@media (prefers-reduced-motion: reduce) { .changeCover { transition: none; } }
-
 /* Coverless detail cover — a themed typographic cover (mirrors BookCover's
    card fallback, larger). Tokens only, so it adapts to every theme; never a
    dark logo on a light theme. */
@@ -298,6 +238,12 @@
   font-size: var(--fs-sm, 0.85rem);
 }
 .tagChipLink {
+  /* SC 2.5.8: the smallest hit targets in a chip row must clear 24px — the
+     chips are packed too close to use the spacing exception instead. */
+  display: inline-flex;
+  align-items: center;
+  min-width: 24px;
+  min-height: 24px;
   color: var(--text);
   text-decoration: none;
 }
@@ -308,8 +254,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: var(--r-full);
   border: none;
   background: transparent;
@@ -358,12 +304,33 @@
 }
 
 
-/* Actions row */
+/* Actions row — leads the page under the back link, above the cover/title
+   block (operator ruling 2026-09-14), spanning the container width. */
 .actions {
   display: flex;
   align-items: center;
   gap: var(--sp-3);
+  flex-wrap: nowrap;
+  margin-bottom: var(--sp-5);
+}
+
+/* The three buttons wrap beneath themselves at narrow widths… */
+.actionsGroup {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
   flex-wrap: wrap;
+  gap: var(--sp-3);
+}
+
+/* …while the gear stays pinned to the top-right of the FIRST row — never a
+   row of its own with an empty band under the buttons. */
+.gearWrap {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  margin-left: auto;
+  display: inline-flex;
 }
 
 /* The TopBar is sticky: focus/anchor scrolling must never park a row control
@@ -407,6 +374,49 @@
 
 .actionPrimary:active {
   background: var(--accent-press);
+}
+
+/* Secondary text action in the ordered book row. */
+.actionSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  height: 38px;
+  padding: var(--sp-2) var(--sp-4);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semi);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.actionSecondary:hover { background: var(--surface-2); }
+
+/* Icon-only personal controls retain a 38px target, a native tooltip, and a
+   full accessible name. `BookX` is deliberately not the trash/delete symbol:
+   it means remove this book from this reader's collection. */
+.actionIcon, .actionIconOn {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease);
+}
+.actionIcon:hover:not(:disabled) { background: var(--surface-2); border-color: var(--border-strong); }
+.actionIconOn { color: var(--accent-hover); border-color: var(--accent); background: var(--accent-soft); }
+.actionIcon:disabled, .actionIconOn:disabled { opacity: .5; cursor: not-allowed; }
+.actionIcon:focus-visible, .actionIconOn:focus-visible, .actionSecondary:focus-visible {
+  outline: 2px solid var(--accent-ring); outline-offset: 2px;
 }
 
 /* Read-toggle button variants */
@@ -557,12 +567,16 @@
 
 /* Description prose. Since #1828 this sits directly under the title/author
    header IN THE DOM — the correct reading order, and the mobile visual order.
-   Desktop keeps its historical arrangement (actions and metadata first,
-   description last) by ordering it after the other info-column items; the
-   mobile media query below resets that to 0 so the grid's auto-placement
-   follows the DOM. */
-.description {
+   Desktop keeps its historical in-column arrangement (metadata first,
+   description last) by ordering the block after the other info-column items;
+   the mobile media query below resets that to 0 so the grid's auto-placement
+   follows the DOM. (The visible action row leads the whole page above the
+   layout grid since the 2026-09-14 ruling, on both viewports.) */
+.descriptionBlock {
   order: 10;
+}
+
+.description {
   color: var(--text);
   line-height: var(--lh-base);
   max-width: 70ch;
@@ -577,6 +591,55 @@
   margin-bottom: 0;
 }
 
+/* Long descriptions clamp to five lines, with a gradient fade over the last
+   visible line. The fade ends at the page's own background token, so it reads
+   as the text dissolving in both light and dark themes. */
+.descriptionClamped {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+  position: relative;
+}
+
+.descriptionClamped::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1.7em;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+  pointer-events: none;
+}
+
+/* The clamp toggle — a quiet text button (accent colour, no border), directly
+   under the text, left-aligned. */
+.showMore {
+  display: inline-block;
+  margin-top: var(--sp-1);
+  padding: var(--sp-1) 0;
+  min-height: 32px;
+  background: none;
+  border: none;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  text-align: left;
+}
+
+.showMore:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+}
+
+.showMore:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+}
+
 /* Mobile adjustments */
 @media (max-width: 700px) {
   .container { padding: var(--sp-4) var(--sp-3); }
@@ -588,16 +651,19 @@
     font-size: var(--fs-xl);
   }
 
-  /* #1828 reading order: the description's desktop `order: 10` must not carry
-     into the grid, where every item keeps order 0 and auto-placement follows
-     the DOM — header beside the cover, then description, then everything else. */
-  .description { order: 0; }
+  /* #1828 reading order: the description block's desktop `order: 10` must not
+     carry into the grid, where every item keeps order 0 and auto-placement
+     follows the DOM — header beside the cover, then description, then the
+     rest. */
+  .descriptionBlock { order: 0; }
 
   /* #1828 chip compression: the action row keeps 34px chips with tighter gaps
      so the description stays near the first screen. 34px keeps the SC 2.5.8
      24px floor with margin; labels shrink one step. */
-  .actions { gap: var(--sp-2); }
+  .actions,
+  .actionsGroup { gap: var(--sp-2); }
   .actionPrimary,
+  .actionSecondary,
   .readToggleActive,
   .readToggleGhost {
     height: 34px;

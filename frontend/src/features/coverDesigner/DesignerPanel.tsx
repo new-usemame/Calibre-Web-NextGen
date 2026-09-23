@@ -776,7 +776,7 @@ function LetteringPicker({ catalogue, design, onChange }: {
               className={checked ? styles.fontCardOn : styles.fontCard}
               onClick={() => onChange(f.id)}
             >
-              <FontSample sampleUrl={f.sample_url} cssStack={f.css_stack} />
+              <FontSample fontId={f.id} sampleUrl={f.sample_url} cssStack={f.css_stack} />
               <span className={styles.fontLabel}>{t(f.label)}</span>
             </button>
           );
@@ -787,12 +787,13 @@ function LetteringPicker({ catalogue, design, onChange }: {
   );
 }
 
-function FontSample({ sampleUrl, cssStack }: { sampleUrl: string; cssStack: string }) {
+function FontSample({ fontId, sampleUrl, cssStack }: { fontId: string; sampleUrl: string; cssStack: string }) {
   const [failed, setFailed] = useState(!sampleUrl);
   useEffect(() => { setFailed(!sampleUrl); }, [sampleUrl]);
   if (failed) {
     return (
-      <span className={styles.fontSampleFallback} style={{ fontFamily: cssStack || undefined }} aria-hidden="true">
+      <span className={styles.fontSampleFallback} style={{ fontFamily: cssStack || undefined }}
+        data-font-fallback={fontId} aria-hidden="true">
         Aa
       </span>
     );
@@ -801,6 +802,7 @@ function FontSample({ sampleUrl, cssStack }: { sampleUrl: string; cssStack: stri
   return (
     <img
       src={sampleUrl} alt="" loading="lazy" className={styles.fontSample}
+      data-font-sample={fontId}
       onError={() => setFailed(true)} />
   );
 }

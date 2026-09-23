@@ -10,6 +10,7 @@ import { useAddToMyLibrary, useGlobalLibrary, useMe } from '../lib/queries';
 import { usePersistentBool } from '../lib/usePersistentBool';
 import { usePersistentChoice } from '../lib/usePersistentChoice';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
+import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useT } from '../lib/i18n';
 import catalogStyles from './Catalog.module.css';
 import styles from './GlobalLibrary.module.css';
@@ -35,6 +36,7 @@ export function GlobalLibrary() {
   const [density] = usePersistentChoice(
     'cwng:catalog-density-v1', ['comfortable', 'compact', 'dense'] as const, 'compact');
   const [cardActionsHidden] = useCardActionsHidden();
+  const [readingTagsHidden] = useReadingTagsHidden();
   const [page, setPage] = useState(1);
   const [books, setBooks] = useState<Book[]>([]);
   const filter = onlyMissing ? 'not_in_my_library' : 'all';
@@ -122,6 +124,7 @@ export function GlobalLibrary() {
                 detailsEnabled
                 canRead={owned && !!me?.role?.viewer}
                 hideActions={cardActionsHidden}
+                hideReadingTags={readingTagsHidden}
                 onAddToLibrary={owned ? undefined : addBook}
                 addPending={add.isPending && add.variables === book.id} />;
             })}

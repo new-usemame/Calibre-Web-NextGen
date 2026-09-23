@@ -2231,9 +2231,9 @@ end
 
 -- Phase 2: two-way highlight sync. Pull the book's annotations from the
 -- server, diff against what's on the device, write server-side highlights into
--- KoboReader.sqlite (so stock Nickel shows them), and push device-side
--- highlights up. Opt-in (sync_annotations) + Kobo-only (provider.available()).
--- Verified end-to-end on real hardware per the manual checklist.
+-- the open book (KOReader's own annotations; KoboReader.sqlite too for a Kobo
+-- kepub, so stock Nickel shows them), and push device-side highlights up.
+-- Opt-in (sync_annotations).
 -- The annotation_ids this device last pushed for the open document, kept in the
 -- book's own sidecar so it travels with the book and is scoped to it.
 --
@@ -2331,9 +2331,12 @@ function CWNGSync:syncAnnotations(interactive)
                 diff.send_to_server = localList
             end
 
+            -- Every device applies now: KOReader's own annotations off Kobo,
+            -- KoboReader.sqlite for a Kobo kepub. The deletions go too, so a
+            -- server highlight the user deleted here is not put back.
             local applied = 0
-            if volume_id and #diff.apply_to_device > 0 then
-                local ok_apply, n = pcall(provider.applyToDevice, diff.apply_to_device, volume_id)
+            if #diff.apply_to_device > 0 or #plan.deletions > 0 then
+                local ok_apply, n = pcall(provider.applyToDevice, diff.apply_to_device, volume_id, plan.deletions)
                 applied = (ok_apply and n) or 0
                 if applied > 0 then
                     self:refreshLibraryViews({ self:getCurrentDocumentFile() })

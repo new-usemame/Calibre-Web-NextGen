@@ -30,8 +30,8 @@ two pushes are byte-identical on the wire:
     the user deleted their last highlight   (#905, must delete)
     this device never had those highlights  (#920, must not delete)
 
-and the KOReader-native provider is push-only (``applyToDevice`` is a no-op off
-Kobo), so a second device could never receive the first device's highlights yet
+and the KOReader-native provider was then push-only (``applyToDevice`` was a
+no-op off Kobo), so a second device could never receive the first device's highlights yet
 still declared its empty set complete — silently destroying them, permanently,
 since ``apply_portable`` never un-hides a tombstone. Only the device can tell
 the two apart, because only it knows what it used to have, so the decision lives

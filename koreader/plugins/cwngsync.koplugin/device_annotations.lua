@@ -2,16 +2,16 @@
 Device-write provider seam (Phase 2, generic transport).
 
 Selects how annotations the server says belong on this device get written
-locally. Today there is one provider — KoboReader.sqlite (Kobo only), which
-puts highlights onto stock Nickel. A KOReader-native (`.sdr` sidecar) provider
-that works on every KOReader device is a future addition behind this same
-interface; nothing else in the plugin needs to change when it lands.
+locally. The KOReader-native provider works on every KOReader device through
+the open book's own annotations; it hands a Kobo kepub on to KoboReader.sqlite,
+which puts highlights onto stock Nickel.
 
 Provider interface:
     available()                       -> bool   (is this provider usable here?)
     readAll(volume_id)                -> list|nil (device's annotations, portable;
                                                   nil when they could not be read)
-    applyToDevice(portables, vol_id)  -> count   (write server annotations locally)
+    applyToDevice(portables, vol_id, deletions)
+                                      -> count   (write server annotations locally)
     backup()                          -> path|false
 
 `readAll` returning nil rather than {} is load-bearing, not a style choice. The

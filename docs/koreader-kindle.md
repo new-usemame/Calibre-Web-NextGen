@@ -82,8 +82,8 @@ send to the e-reader appear too, even if they aren't on those shelves.
 
 ## Sending a book from CWNG
 
-On the book's page in CWNG, open the menu, choose **Send to device**, pick the e-reader,
-and press **Send to device**. The book arrives the next time the e-reader wakes up, or
+On the book's page in CWNG, open the ⚙ menu, choose **Send to device**, pick the
+e-reader, and press **Send to device**. The book arrives the next time the e-reader wakes up, or
 straight away if you tap ☰ ▸ **Sync now**. The home says *New on this device* and shows
 the book first under **Recent**.
 
@@ -100,5 +100,7 @@ the book first under **Recent**.
 
 - **"Could not download"**: check that Wi-Fi is on, then tap the book again.
 - **A new book or shelf hasn't appeared**: tap ☰ ▸ **Sync now**.
+- **The e-reader restarted and shows its own home screen**: start KOReader the way you
+  usually do. The library home comes back with it.
 - **Connected to the wrong account**: choose **Tools ▸ CWNG library ▸ Disconnect this
   device**, then connect again.

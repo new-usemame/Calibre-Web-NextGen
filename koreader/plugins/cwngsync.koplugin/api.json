@@ -219,7 +219,7 @@
                 "device",
                 "device_id"
             ],
-            "expected_status" : [200, 400, 403, 429, 503]
+            "expected_status" : [200, 400, 403, 409, 429, 503]
         },
         "pair_poll" : {
             "path" : "/pair/poll",

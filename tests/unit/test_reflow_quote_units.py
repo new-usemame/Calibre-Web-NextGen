@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Complete printed quotation units bound structural choices."""
 import copy
+import re
+import zipfile
 import pymupdf
 import pytest
 from cps.services.reflow import assemble,extract,skeleton,structural_ops as ops
@@ -105,6 +107,25 @@ def test_truncated_source_paragraph_is_not_a_complete_display_unit(tmp_path):
     first=next(l for b in raw.text_blocks for l in b.lines if tuple(l.bbox)==tuple(quote.line_boxes[0]))
     quote.runs=[['t',first.text]];quote.line_boxes=[first.bbox];quote.bbox=first.bbox
     assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in prepare(data).candidates())
+    doc.close()
+
+
+def test_native_italic_complete_quote_stays_italic_after_admitted_wrapper(tmp_path):
+    from cps.services.reflow import build_epub
+    data=fixture(tmp_path,'all_italic_annotation');_,doc,raw,*_=data
+    style=skeleton.book_style([raw])
+    book=assemble.assemble([skeleton.page_skeleton(raw,style)],style,[raw])
+    prepared=ops.prepare(book,doc,0,'italic-native-test',{'layer':'native'},raw_page=raw)
+    choice=next(c['candidate_id'] for c in prepared.candidates() if c['kind']=='quote')
+    plan=prepared.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=prepared.snapshot_id,
+                                       select=[choice]))
+    target=tmp_path/'italic-quote.epub'
+    build_epub.build(book,str(target),doc=doc,operation_plans=[plan])
+    with zipfile.ZipFile(target) as archive:
+        chapters=''.join(archive.read(name).decode() for name in archive.namelist()
+                         if name.startswith('OEBPS/ch') and name.endswith('.xhtml'))
+    assert '<blockquote><p><em>A complete verse ends here.</em> <em>(A separate observation occupies</em> <em>two printed lines.)</em></p></blockquote>' in chapters
+    assert 'A complete verse ends here. (A separate observation occupies two printed lines.)' in re.sub(r'<[^>]+>','',chapters)
     doc.close()
 
 

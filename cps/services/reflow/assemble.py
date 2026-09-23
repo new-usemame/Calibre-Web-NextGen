@@ -1104,7 +1104,11 @@ def _page_elements(skel, repairs, reasons, vocab=None):
         display_group=getattr(region,'display_group',{})
         display_lines=[]
         for line_index,line in enumerate(region.lines):
-            line_runs = _line_runs(line, skel.pno, page_notes, claimed, repairs, reasons)
+            # Native PDF spans carry an observed italic flag. Preserve it through
+            # ordinary body assembly so an admitted wrapper cannot discard the
+            # source emphasis; scan-layer style is still not trusted here.
+            line_runs = _line_runs(line, skel.pno, page_notes, claimed, repairs, reasons,
+                                   preserve_style=not skel.is_scan)
             if display_group:
                 display_lines.append({'runs':tidy(line_runs),
                     'scale':display_group['relative_sizes'][line_index],

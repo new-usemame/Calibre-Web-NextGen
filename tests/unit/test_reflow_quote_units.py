@@ -16,7 +16,11 @@ def fixture(tmp_path,kind='multi'):
     elif kind=='short':lines=['"Stay."'];ys=[160]
     elif kind=='inline':lines=['Ordinary prose calls this "a name" inside its sentence.'];ys=[160]
     else:lines=['First complete sentence. The next sentence continues','across the printed block. The final sentence must stay.'];ys=[160,174]
-    for i,(y,text) in enumerate(zip(ys,lines)):page.insert_text((40 if kind=='inline' or (kind=='ordinary_indent' and i>0) else 70,y),text,fontsize=11,fontname='tiro')
+    if kind=='closing_only':lines[-1]+='\"'
+    if kind=='opening_only':lines[0]='\"'+lines[0]
+    for i,(y,text) in enumerate(zip(ys,lines)):
+        x=40 if kind=='inline' or (kind=='ordinary_indent' and i>0) else 95 if kind=='display_first_indent' and i==0 else 70
+        page.insert_text((x,y),text,fontsize=11,fontname='tiro')
     if kind=='note':page.insert_text((70+pymupdf.get_text_length(lines[-1],fontname='tiro',fontsize=11),ys[-1]-3),'7',fontsize=7,fontname='tiro')
     for y,text in [(240,'Ordinary source body resumes with the original column.'),(254,'The following text remains distinct from the display.')]:page.insert_text((40,y),text,fontsize=11,fontname='tiro')
     path=tmp_path/(kind+'.pdf');doc.save(path);doc.close();doc=pymupdf.open(path);raw=extract.read_page(doc,0)
@@ -156,3 +160,16 @@ def test_same_page_split_display_cannot_be_admitted_as_complete_quote(tmp_path,s
             else:build_epub.build(book,str(target),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
         assert not target.exists()
     doc.close()
+
+
+@pytest.mark.parametrize('kind',['closing_only','display_first_indent'])
+def test_complete_display_boundary_does_not_require_paired_quotes_or_uniform_first_indent(tmp_path,kind):
+    data=fixture(tmp_path,kind);p=prepare(data)
+    assert [c['source_range'] for c in p.candidates() if c['kind']=='quote' and c['element_id']=='e1']==[[data[3],data[4]]]
+    data[1].close()
+
+
+def test_opening_only_quote_does_not_prove_its_terminal_boundary(tmp_path):
+    data=fixture(tmp_path,'opening_only')
+    assert not any(c['kind']=='quote' and c['element_id']=='e1' for c in prepare(data).candidates())
+    data[1].close()

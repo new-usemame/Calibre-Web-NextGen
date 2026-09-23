@@ -8,7 +8,7 @@ import re
 import statistics
 from . import extract,heading_evidence as geometry
 
-VERSION='source-quote-units-2'
+VERSION='source-quote-units-3'
 
 
 def _normal_positions(text):
@@ -141,12 +141,12 @@ def quote_evidence(book,pno,raw_page,layer,source_rotation=0,uncertain=False):
         heights=[line['bbox'][3]-line['bbox'][1] for line in mapped]
         em=statistics.median(heights)
         left=min(line['bbox'][0] for line in mapped)
-        # A first-line indent in otherwise ordinary prose is not a display block.
+        # Every line must remain inset from the body column below. A display
+        # paragraph may additionally indent its first line; ordinary first-line
+        # indentation returns to the body column and fails that minimum inset.
         centers=[(line['bbox'][0]+line['bbox'][2])/2 for line in mapped]
         centered=(max(line['bbox'][0] for line in mapped)-left>em*.5 and
                   max(centers)-min(centers)<=em*.5)
-        if max(line['bbox'][0] for line in mapped)-left>em*.5 and not centered:
-            proof['reason']='inconsistent_display_indent';continue
         references=[other for other in elements if other is not element and other.kind=='p'
             and not other.table_row and other.column==element.column and geometry._valid(other.bbox)
             and other.bbox[0]+em*(.5 if centered else 1)<=left and other.bbox[2]>left+em
@@ -186,7 +186,8 @@ def quote_evidence(book,pno,raw_page,layer,source_rotation=0,uncertain=False):
                               or all(_italic(line) for line in mapped[first:last+1])))):
                 proof['reason']='mixed_or_inline_quotation';continue
             start,end=qstart,qend
-        elif not boundary_uncertain and any(mark in body for mark in ('"','“','”')):
+        elif (not boundary_uncertain and any(mark in body for mark in ('"','“','”'))
+              and not (body.endswith(('"','”')) and not body.startswith(('"','“')))):
             proof['reason']='unbalanced_quote_boundary';continue
         # Every retained range is a complete layout unit. A model must still
         # decide whether the display has quotation semantics rather than assume

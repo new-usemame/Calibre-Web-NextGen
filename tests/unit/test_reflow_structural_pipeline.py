@@ -141,3 +141,30 @@ def test_enabled_claim_store_also_requires_durable_billing_ledger(source):
                           prepared_result=prepared_result(source))
     assert result.structural['approved_operations']==1 and len(session.calls)==2
     assert len(list(cache.directory.glob('*/*.json')))==2
+
+
+def test_shared_exhaustion_between_stages_keeps_complete_source_and_truthful_reason(source):
+    from cps.services.reflow.structural_pipeline import run_structural,TwoStageClient
+    from cps.services.reflow.shared_budget import Store,SharedLedger
+    book,doc,tmp=source;session=WorkflowSession();client=TwoStageClient('test',enabled=True,session=session)
+    ledger=SharedLedger(tmp/'jobs/a/job.jsonl',1,job_id='a',store=Store(tmp,lambda:.01),book_id=1,user_id=1)
+    result=run_structural(doc,client=client,ledger=ledger,cache=pipeline.PageCache(tmp/'cache'),prepared_result=prepared_result(source))
+    assert len(session.calls)==1 and not result.operation_plans
+    assert result.stopped=='instance_budget_exhausted'
+    assert result.structural['unreviewed']==1 and result.structural['approved_operations']==0
+    assert set(result.page_html)==set(book.pages) and result.source_pages[0].html==result.page_html[0]
+
+
+def test_shared_settlement_failure_cannot_turn_billed_wire_into_unsent_cache_entry(source,monkeypatch):
+    from cps.services.reflow.structural_pipeline import run_structural,TwoStageClient
+    from cps.services.reflow.shared_budget import Store,SharedLedger,BudgetError
+    _,doc,tmp=source;store=Store(tmp,lambda:1);cache=pipeline.PageCache(tmp/'cache')
+    ledger=SharedLedger(tmp/'jobs/a/job.jsonl',1,job_id='a',store=store,book_id=1,user_id=1)
+    def failed_settlement(*args,**kwargs):raise BudgetError()
+    monkeypatch.setattr(store,'finish',failed_settlement)
+    first=WorkflowSession()
+    result=run_structural(doc,client=TwoStageClient('test',enabled=True,session=first),ledger=ledger,cache=cache,prepared_result=prepared_result(source))
+    assert len(first.calls)==1 and result.stopped=='instance_budget_unavailable'
+    second=WorkflowSession();other=SharedLedger(tmp/'jobs/b/job.jsonl',1,job_id='b',store=Store(tmp,lambda:1),book_id=2,user_id=2)
+    result=run_structural(doc,client=TwoStageClient('test',enabled=True,session=second),ledger=other,cache=cache,prepared_result=prepared_result(source))
+    assert not second.calls and result.stopped=='prior_request_pending'

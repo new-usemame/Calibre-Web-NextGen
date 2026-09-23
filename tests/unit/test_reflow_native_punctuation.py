@@ -4,16 +4,19 @@ import zipfile
 from xml.etree import ElementTree as ET
 import pymupdf
 import pytest
-from cps.services.reflow import assemble, build_epub, structural_ops
+from cps.services.reflow import assemble, build_epub, structural_ops, extract
 pytestmark = pytest.mark.unit
 
 
-def punctuation_pdf(path, kind):
+def punctuation_pdf(path, kind, display=False):
     doc=pymupdf.open();page=doc.new_page(width=500,height=700)
     font=page.insert_font(fontname='body',fontbuffer=pymupdf.Font('tiro').buffer)
     text='“Quoted original words.”' if kind!='straight' else '"Quoted original words."'
     if kind=='apostrophe_variants':text='‘Quoted original words.’'
-    page.insert_text((50,100),text,fontname='body',fontsize=12)
+    page.insert_text((80 if display else 50,100),text,fontname='body',fontsize=12)
+    if display:
+        page.insert_text((50,150),'Surrounding prose establishes the body column and a separate display.',
+                         fontname='body',fontsize=12)
     if kind in ('collapsed','apostrophe_variants'):
         cmap=int(doc.xref_get_key(font,'ToUnicode')[1].split()[0])
         stream=doc.xref_stream(cmap)
@@ -34,9 +37,9 @@ def test_only_collapsed_native_quote_forms_require_original_evidence(tmp_path,ki
 
 
 def test_native_punctuation_disclosure_links_to_original_passage_and_survives_wrappers(tmp_path):
-    with punctuation_pdf(tmp_path/'source.pdf','collapsed') as doc:
+    with punctuation_pdf(tmp_path/'source.pdf','collapsed',display=True) as doc:
         book=assemble.deterministic_book(doc)
-        prepared=structural_ops.prepare(book,doc,0,'test',{'layer':'native'},seed=1)
+        prepared=structural_ops.prepare(book,doc,0,'test',{'layer':'native'},seed=1,raw_page=extract.read_page(doc,0))
         choice=next(c['candidate_id'] for c in prepared.candidates() if c['kind']=='quote')
         plan=prepared.accept(book,doc,{'protocol':structural_ops.PROTOCOL,'snapshot_id':prepared.snapshot_id,'select':[choice]})
         target=tmp_path/'book.epub';build_epub.build(book,str(target),doc=doc,operation_plans=[plan])

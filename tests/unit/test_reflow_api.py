@@ -238,6 +238,7 @@ def _current_body(mod,body):
 def _paid(mod,monkeypatch):
     """An already measured server quote; transport/source measurement has its own seam tests."""
     monkeypatch.setattr(mod.typed_model,'QUALITY_RELEASED',True)
+    monkeypatch.setattr(mod.config,'config_reflow_instance_budget_usd',5.0,raising=False)
     quote={'source_context_pages':400,'first_body_page':4,
            'pages':[{'page_index0':p,'proposer_bound_usd':.01,'verifier_bound_usd':.05} for p in range(400)]}
     monkeypatch.setattr(mod,'_quote_store',lambda:SimpleNamespace(ready=lambda *args:quote))

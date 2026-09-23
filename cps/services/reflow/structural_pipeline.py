@@ -2,7 +2,7 @@
 from collections import Counter
 from dataclasses import asdict
 
-from . import pipeline, prompts, structural_ops as ops, model, extract
+from . import pipeline, prompts, structural_ops as ops, model, extract, shared_budget
 from .enriched_source import prepare_recovery_page, prepare_source_page
 from .operation_cache import OperationCache, PriorRequestPending
 from .typed_model import TypedStageClient, TypedStageRejected, QUALITY_RELEASED, SOURCE_REVISION, ROUTE_VERSION
@@ -53,6 +53,10 @@ def _stage(client, stage, prepared, request, ledger, cache, pno, records, should
             ledger.record({'kind':'typed_stage','page':pno,'stage':stage,'attempt':answer.attempt,
                            'request_sha256':wire.sha256,'status':'answered'})
         return answer.response
+    except shared_budget.BudgetError as exc:
+        if exc.before_dispatch and cache:cache.release_unsent(wire.sha256,token)
+        # After a response, failed settlement must retain its replay guard.
+        raise
     except (model.CapExceeded, model.AttemptCancelled):
         if cache:cache.release_unsent(wire.sha256,token)
         raise
@@ -173,6 +177,7 @@ def run_structural(doc, client=None, ledger=None, cache=None, page_numbers=None,
                     states[pno]={'status':'approved','operations':len(approved.selected)}
                 else:counts['verifier_abstained']+=1;states[pno]={'status':'verifier_abstained'}
             outcome.gate='PASS'
+        except shared_budget.BudgetError as exc:halted=exc.code
         except model.CapExceeded:halted='cost_cap'
         except model.AttemptCancelled:halted='cancelled'
         except model.UncertainBilling:halted='billing_uncertain'

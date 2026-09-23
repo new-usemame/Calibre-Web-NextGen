@@ -97,6 +97,10 @@ def sweep(root, active_jobs=(), now=None):
     for path, _size, _mtime in records:
         job_id = os.path.basename(path)[:-len(".jsonl")]
         try:
+            # A partial/malformed financial tail is evidence, not an empty job.
+            with open(path, encoding='utf-8') as stream:
+                if any(not isinstance(json.loads(line),dict) for line in stream if line.strip()):
+                    raise ValueError('malformed job record')
             led = ledger_mod.Ledger(path, cap_usd=0.0, job_id=job_id)
             reason, answers = _record_needs(led, active)
         except (OSError, ValueError, TypeError, AttributeError):

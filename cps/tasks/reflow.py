@@ -34,7 +34,7 @@ from cps.constants import REFLOW_DIR
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED, \
     STAT_STARTED, STAT_WAITING
 from cps.services.reflow import admission, build_epub, extract, ledger as ledger_mod, \
-    model, ocr, pipeline, publication, report, retention, structural_pipeline, typed_model
+    model, ocr, pipeline, publication, report, retention, structural_pipeline, typed_model, shared_budget
 
 log = logger.create()
 
@@ -51,7 +51,7 @@ SAMPLE_PAGES_MAX = 60
 #: and a jobs list that reports both endings with one word takes that reason away.
 #: ``billing_uncertain`` ends the same way but for a different cause: a dispatched
 #: request's billing could not be proven either way, and its bound stays held.
-STOP_STATUS = {"cost_cap": "capped", "model_errors": "incomplete", "model_rejections": "incomplete",
+STOP_STATUS = {"instance_budget_unavailable": "incomplete", "instance_budget_exhausted": "capped", "cost_cap": "capped", "model_errors": "incomplete", "model_rejections": "incomplete",
                "billing_uncertain": "billing_unknown", "prior_request_pending": "billing_unknown",
                "quality_gate": "limited", "not_configured": "limited", "estimate_stale": "limited", "source_changed": "incomplete", "billing_bound": "incomplete", "route_mismatch": "incomplete"}
 
@@ -106,6 +106,30 @@ class ReflowOptions(object):
 def config_default_tier():
     tier = getattr(config, "config_reflow_default_tier", None)
     return tier if tier in model.TIERS else model.DEFAULT_TIER
+
+
+def instance_budget_usd():
+    """Read committed admin state on every admission, including other processes."""
+    try:
+        session = getattr(config, '_session', None)
+        if session is not None:
+            from sqlalchemy import select
+            from cps.config_sql import _Settings
+            with session.get_bind().connect() as connection:
+                value = connection.execute(select(_Settings.config_reflow_instance_budget_usd)).scalar()
+        else:
+            value = getattr(config, 'config_reflow_instance_budget_usd', None)
+        return float(shared_budget.money(value))
+    except Exception:
+        return 0.0
+
+
+def instance_budget_store():
+    return shared_budget.Store(REFLOW_DIR, instance_budget_usd)
+
+
+def instance_budget_status():
+    return instance_budget_store().status()
 
 
 def hard_cap_usd():
@@ -242,10 +266,12 @@ class TaskReflowPdf(CalibreTask):
             if getattr(self.options,"source_sha256",None) and extract.document_fingerprint(source)!=self.options.source_sha256:
                 raise ValueError("Source changed after consent; prepare the current PDF again.")
             self.results["title"] = book.title
-            ledger = ledger_mod.Ledger(
+            ledger_class = shared_budget.SharedLedger if self.options.review_mode=='source_verified' else ledger_mod.Ledger
+            shared = dict(store=instance_budget_store(), book_id=self.book_id, user_id=self.user_id) if self.options.review_mode=='source_verified' else {}
+            ledger = ledger_class(
                 os.path.join(reflow_dir("jobs", str(self.book_id)),
                              "%s.jsonl" % self.job_id),
-                cap_usd=self.options.cost_cap_usd, job_id=self.job_id)
+                cap_usd=self.options.cost_cap_usd, job_id=self.job_id, **shared)
             cache = pipeline.PageCache(reflow_dir("cache"))
             client = make_client(self.options.review_mode)
 
@@ -493,7 +519,9 @@ class TaskReflowPdf(CalibreTask):
     def _summary(self, result):
         if hasattr(result,'structural'):
             counts=result.structural
-            return ("%d pages prepared · %d formatting changes approved · %d eligible pages not reviewed · $%.6f confirmed · up to $%.6f unresolved"
+            shared_stop = (str(shared_budget.BudgetError(result.stopped))+" "
+                if result.stopped in ('instance_budget_unavailable','instance_budget_exhausted') else '')
+            return shared_stop + ("%d pages prepared · %d formatting changes approved · %d eligible pages not reviewed · $%.6f confirmed · up to $%.6f unresolved"
                 % (result.pages,counts['approved_operations'],counts['unreviewed'],result.spend_usd,result.pending_usd))
         if result.stopped == "billing_uncertain":
             return ("stopped after %d of %d pages: a model answer was lost after "

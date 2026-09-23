@@ -73,7 +73,7 @@ def test_actual_epub_shows_original_grid_before_unchanged_marked_ocr_and_exclude
               assemble.Element('p',runs=[['t','Ordinary prose continues.']],pno=0,bbox=(20,260,260,280))]
     book=assemble.Book(elements=elements,pages={0:elements})
     source=prepare_source_page(book,0,{'layer':'ocr','orientation':0},[{'token':'Beta','confidence':40}])
-    prepared=ops.prepare(book,doc,0,'display-test',json.loads(source.provenance_json),source_page=source)
+    prepared=ops.prepare(book,doc,0,'display-test',json.loads(source.provenance_json),source_page=source,raw_page=extract.read_page(doc,0))
     assert 'e0' in json.loads(prepared.coverage_json)['source_grid_elements']
     assert all(c['element_id']!='e0' for c in prepared.candidates())
     target=tmp_path/'grid.epub'
@@ -116,16 +116,18 @@ def test_giant_source_and_grid_query_are_bounded_before_allocation(angle):
 def test_preexisting_grid_plan_is_rejected_at_final_builder_before_publication(tmp_path,monkeypatch):
     from cps.services.reflow import assemble,build_epub,structural_ops as ops,source_display
     from cps.services.reflow.enriched_source import prepare_source_page
-    doc=pymupdf.open();page=doc.new_page(width=240,height=240)
-    for y in range(30,211,30):page.draw_line((20,y),(220,y),width=.7)
-    for x in range(20,221,40):page.draw_line((x,30),(x,210),width=.7)
+    doc=pymupdf.open();page=doc.new_page(width=300,height=300)
+    for y in range(30,211,30):page.draw_line((20,y),(280,y),width=.7)
+    for x in range(20,281,40):page.draw_line((x,30),(x,210),width=.7)
+    for i,text in enumerate(['"Quoted cell content continues', 'across several source lines', 'inside the physical grid', 'and remains one complete', 'display unit whose cells', 'must never acquire a wrapper', 'that would hide their relation."']):
+        page.insert_text((60,60+i*15),text,fontsize=10)
+    page.insert_text((20,250),'Surrounding prose establishes the body column.',fontsize=10)
     doc.save(tmp_path/'source.pdf');doc.close();doc=pymupdf.open(tmp_path/'source.pdf')
-    e=assemble.Element('p',runs=[['t','Quoted "cell content" across source rows.']],bbox=(20,30,220,215))
-    book=assemble.Book(elements=[e],pages={0:[e]})
+    book=assemble.deterministic_book(doc)
     source=prepare_source_page(book,0,{'layer':'ocr','orientation':0})
     with monkeypatch.context() as patch:
         patch.setattr(source_display,'grid_regions',lambda *args:{})
-        previous=ops.prepare(book,doc,0,'pre-display-contract',json.loads(source.provenance_json),source_page=source)
+        previous=ops.prepare(book,doc,0,'pre-display-contract',json.loads(source.provenance_json),source_page=source,raw_page=extract.read_page(doc,0))
         choice=previous.candidates()[0]['candidate_id']
         plan=previous.accept(book,doc,{'protocol':ops.PROTOCOL,'snapshot_id':previous.snapshot_id,'select':[choice]},source_page=source)
     target=tmp_path/'rejected.epub'
@@ -164,7 +166,7 @@ def test_physical_grid_groups_keep_all_ocr_atoms_without_dropping_distinct_equal
     book=assemble.Book(elements=elements,pages={0:elements})
     source=prepare_source_page(book,0,{'layer':'ocr','orientation':0},
           [{'token':'Alpha','confidence':40},{'token':'Beta','confidence':40}])
-    prepared=ops.prepare(book,doc,0,'group-test',json.loads(source.provenance_json),source_page=source)
+    prepared=ops.prepare(book,doc,0,'group-test',json.loads(source.provenance_json),source_page=source,raw_page=extract.read_page(doc,0))
     assert prepared.candidates()==[]
     target=tmp_path/'groups.epub';result=build_epub.build(book,str(target),doc=doc,source_pages={0:source})
     with zipfile.ZipFile(target) as z:

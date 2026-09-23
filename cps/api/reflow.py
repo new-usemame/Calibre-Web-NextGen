@@ -414,6 +414,7 @@ def _estimate_payload(book, source):
         'source_sha256':fingerprint,'consent_contract':CONSENT_CONTRACT,
         'existing_epub':calibre_db.get_book_format(book.id,'EPUB') is not None,
         'configured':bool(config.resolved_openrouter_key()),'hard_cap_usd':tasks_reflow.hard_cap_usd(),
+        'instance_budget':parallel.run_blocking(tasks_reflow.instance_budget_status),
         'sample_pages_default':tasks_reflow.SAMPLE_PAGES_DEFAULT,'sample_pages_max':tasks_reflow.SAMPLE_PAGES_MAX,
         'sample_suggested':pages>tasks_reflow.SAMPLE_PAGES_DEFAULT,
         'sampled':int(quote.get('sampled') or 0),'cached':bool(quote.get('cached')),
@@ -570,6 +571,12 @@ def reflow_start(book_id):
                   if options.mode=='sample' else range(quote['source_context_pages']))
         needed=sum(p['proposer_bound_usd']+p['verifier_bound_usd'] for p in quote['pages'] if p['page_index0'] in selected)
         options.consent_quote=quote
+        shared=parallel.run_blocking(tasks_reflow.instance_budget_status)
+        if shared['status'] in ('disabled','unavailable'):
+            return _err('instance_budget_unavailable','Shared AI review budget is unavailable. An administrator must configure or repair it; source-only conversion remains available.',409)
+        first_bound=next((p['proposer_bound_usd'] for p in quote['pages'] if p['page_index0'] in selected and p['proposer_bound_usd']>0),0)
+        if shared['status']=='exhausted' or shared['remaining_usd']<first_bound:
+            return _err('instance_budget_exhausted','Shared AI review budget cannot fund the next request. Source-only conversion remains available.',409)
     options.source_sha256=fingerprint
     try:payload=_estimate_payload(book,source)
     except Exception:return _err('estimate_failed','This PDF could not be assessed.',422)
@@ -694,7 +701,7 @@ def reflow_jobs(book_id):
                        "progress": round(float(getattr(task, "progress", 0) or 0), 4),
                        "message": str(getattr(task, "message", "") or ""),
                        "cancellable": bool(getattr(task, "is_cancellable", False))})
-    return jsonify({"items": items, "active": active})
+    return jsonify({"items": items, "active": active,"instance_budget":parallel.run_blocking(tasks_reflow.instance_budget_status)})
 
 
 @api_v1.route("/books/<int:book_id>/reflow/jobs/<job_id>/sample.epub")

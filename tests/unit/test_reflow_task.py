@@ -80,7 +80,9 @@ def rig(tmp_path, monkeypatch):
     folder = library / "Author/Book (5)"
     folder.mkdir(parents=True)
     doc = F.new_doc()
-    F.chapter_opening_page(doc, "Serapio of Alexandria")
+    page=F.chapter_opening_page(doc, "Serapio of Alexandria")
+    page.insert_text((84,400),'"A separately displayed source quotation remains complete."',
+                     fontsize=12,fontname="tiro")
     F.prose_page(doc)
     F.prose_page(doc)
     doc.save(str(folder / "Book - Author.pdf"))
@@ -96,7 +98,8 @@ def rig(tmp_path, monkeypatch):
         get_book_path=lambda: str(library),
         resolved_openrouter_key=lambda: "",
         config_reflow_default_tier="standard",
-        config_reflow_hard_cap_usd=5.0))
+        config_reflow_hard_cap_usd=5.0,
+        config_reflow_instance_budget_usd=5.0))
     monkeypatch.setattr(mod.helper, "mark_book_format_materialised",
                         lambda *a, **kw: None)
     return SimpleNamespace(mod=mod, book=book, formats=formats, local_db=local_db,
@@ -228,7 +231,7 @@ def test_a_conversion_with_rejected_model_answers_does_not_say_it_finished(rig, 
     monkeypatch.setattr(rig.mod,'make_client',lambda tier:TwoStageClient('inert',enabled=True,session=session))
     task=_run(rig,mode='full',cost_cap_usd=1)
     assert task.stat==STAT_FINISH_SUCCESS,task.error
-    assert session.calls
+    assert session.calls, _ledger_rows(rig)
     assert os.path.isfile(str(rig.folder/'Book - Author.epub'))
     row=_ledger_rows(rig)[0]
     assert row['structural']['rejected']>0
@@ -682,7 +685,7 @@ def test_actual_task_records_two_stage_decision_and_only_builds_approved_subset(
     from cps.services.reflow.structural_pipeline import TwoStageClient
     from tests.unit.test_reflow_typed_transport import Session,reply
     doc=F.new_doc();page=doc.new_page(width=500,height=700)
-    page.insert_text((50,100),'"Original displayed words remain exactly as printed."',fontsize=12)
+    page.insert_text((80,100),'"Original displayed words remain exactly as printed."',fontsize=12)
     for y in (180,195,210):page.insert_text((50,y),'Ordinary body context supports the source display.',fontsize=12)
     doc.save(str(rig.folder/'Book - Author.pdf'));doc.close()
     class Answering:

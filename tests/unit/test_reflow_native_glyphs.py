@@ -97,14 +97,19 @@ def test_repeated_callout_ids_stay_unique_and_return_to_first():
     assert ids['1']==nodes[0].get('id')
 
 
-def test_glyph_package_links_to_packaged_original_page(tmp_path):
+@pytest.mark.parametrize("block_note", [False, True])
+def test_glyph_package_links_to_packaged_original_page(tmp_path, block_note):
     import pymupdf, zipfile
     from cps.services.reflow import skeleton
     doc=pymupdf.open();page=doc.new_page();page.insert_text((40,50),'Printed source')
     record=descriptor(0,(40,38,100,52),12,'LegacySymbols')
     element=assemble.Element('p',pno=0,bbox=(40,38,100,52),runs=[['glyph','X',record]])
     book=assemble.Book(elements=[element],pages={0:[element]},style=skeleton.BookStyle(body_size=12))
+    if block_note:
+        element.runs=[['t','Body'],['sup','1',0]]
+        book.notes=[assemble.Note(1,'Unmapped source note',0,marked=True,bbox=(40,38,100,52),glyph_fallback=True)]
     target=tmp_path/'glyph.epub';build_epub.build(book,str(target),doc=doc)
+    assert build_epub.validate(str(target)) == []
     with zipfile.ZipFile(target) as archive:
         assert 'OEBPS/original-p0000.xhtml' in archive.namelist()
         assert b'id="page"' in archive.read('OEBPS/original-p0000.xhtml')
@@ -167,3 +172,20 @@ def test_whitespace_between_unmapped_words_remains_real_spacing():
         char_boxes=tuple((i,i+1,i*5,0,(i+1)*5,10) for i in range(5)))
     result=mark_unmapped_words([span],[])
     assert [(s.text,s.encoding_unresolved) for s in result]==[('AB',True),(' ',False),('CD',True)]
+
+
+@pytest.mark.parametrize('attack', ['css_suffix','other_element','wrong_parent','wrong_image','wrong_page','missing_disclosure'])
+def test_glyph_style_exception_does_not_authorize_other_markup(attack):
+    from xml.etree import ElementTree as ET
+    from cps.services.reflow.native_text import glyph_html,image_name
+    record=descriptor(0,(0,0,10,10),10,'Legacy')
+    root=ET.fromstring('<html xmlns="http://www.w3.org/1999/xhtml"><body>'+glyph_html(record)+'</body></html>')
+    anchor=list(list(root)[0])[0];img=list(anchor)[0]
+    if attack=='css_suffix':img.set('style',img.get('style')+';position:fixed')
+    elif attack=='other_element':img.tag='{http://www.w3.org/1999/xhtml}span'
+    elif attack=='wrong_parent':anchor.set('class','ordinary-link')
+    elif attack=='wrong_image':img.set('src','images/ordinary.jpg')
+    elif attack=='wrong_page':anchor.set('href','original-p0001.xhtml#page')
+    else:img.set('alt','')
+    names={'OEBPS/'+image_name(record),'OEBPS/images/ordinary.jpg','OEBPS/original-p0000.xhtml','OEBPS/original-p0001.xhtml'}
+    assert build_epub._active_markup('OEBPS/ch001.xhtml',root,names)

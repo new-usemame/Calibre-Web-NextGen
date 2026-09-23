@@ -1075,3 +1075,26 @@ def test_a_transient_failure_on_a_later_pass_never_moves_the_evidence(rig,monkey
     assert staging.is_dir() and not os.path.exists(os.path.join(rig.root,'publication-conflicts'))
     led=ledger_mod.Ledger(os.path.join(rig.root,'jobs','5',task.job_id+'.jsonl'),0,task.job_id)
     assert rig.mod.publication.pending(led) is not None
+
+
+def test_actual_free_task_files_builder_glyph_images_after_internal_validation(rig,monkeypatch):
+    """Exercise the actual task's builder/validator/publication seam, without AI."""
+    from cps.services.reflow import extract
+    import zipfile
+    read_page=extract.read_page
+    def unmapped_source(doc,pno):
+        raw=read_page(doc,pno)
+        if pno==1:
+            for block in raw.text_blocks:
+                for line in block.lines:
+                    for span in line.spans:
+                        if len(span.text.strip())>20:span.encoding_unresolved=True
+        return raw
+    monkeypatch.setattr(extract,'read_page',unmapped_source)
+    task=_run(rig,mode='full',cost_cap_usd=0)
+    assert task.stat==STAT_FINISH_SUCCESS,task.error
+    target=str(rig.folder/'Book - Author.epub')
+    assert rig.mod.build_epub.validate(target)==[]
+    with zipfile.ZipFile(target) as archive:
+        assert any(b'class="source-glyph"' in archive.read(n) for n in archive.namelist() if n.endswith('.xhtml'))
+    assert rig.local_db.session.commits==1

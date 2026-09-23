@@ -1631,6 +1631,28 @@ _NEVER_WRITTEN_URLS = frozenset(("srcset", "poster", "background", "action",
                                  "formaction", "data", "http-equiv"))
 
 
+def _written_glyph_style(element, parent):
+    """Only the exact bounded image/link shape emitted by native_text.glyph_html.
+
+    This does not extend the external/model markup gate or authorize these CSS
+    values on arbitrary nodes. The normal URL/resource checks still apply.
+    """
+    if element.tag != _XHTML_NS+'img' or parent is None or parent.tag != _XHTML_NS+'a':
+        return False
+    if element.get('style') not in ('height:1em;width:auto;vertical-align:baseline',
+                                    'max-width:100%;height:auto'):
+        return False
+    if set(element.attrib) != {'src','alt','style'} or set(parent.attrib) != {'class','href','title'}:
+        return False
+    if parent.get('class') != 'source-glyph' or len(parent) != 1 or parent.text or len(element) or element.text or element.tail:
+        return False
+    label = 'Original source text; Unicode encoding unavailable. Open original page.'
+    if element.get('alt') != label or parent.get('title') != label:
+        return False
+    page = re.fullmatch(r'original-p(\d{4,})\.xhtml#page', parent.get('href',''))
+    return bool(page and re.fullmatch(r'images/glyph_p'+page.group(1)+r'_[a-f0-9]{20}\.jpg', element.get('src','')))
+
+
 def _active_markup(name, root, names):
     """The written bytes of one document, held to what the builder writes.
 
@@ -1642,6 +1664,7 @@ def _active_markup(name, root, names):
     """
     found = []
     here = posixpath.dirname(name)
+    parents = {child: parent for parent in root.iter() for child in parent}
     for element in root.iter():
         tag = element.tag if isinstance(element.tag, str) else ""
         local = tag[len(_XHTML_NS):] if tag.startswith(_XHTML_NS) else None
@@ -1653,7 +1676,7 @@ def _active_markup(name, root, names):
             value = value or ""
             if key.startswith("on") or key in _NEVER_WRITTEN_URLS:
                 found.append('%s gives <%s> the attribute "%s"' % (name, local, key))
-            elif key == "style" and not _WRITTEN_STYLE.match(value):
+            elif key == "style" and not (_WRITTEN_STYLE.match(value) or _written_glyph_style(element, parents.get(element))):
                 found.append('%s styles <%s> with "%s"' % (name, local, value[:80]))
             elif key in ("href", "src") and _LEAVES_THE_BOOK.match(value):
                 found.append('%s points <%s> outside the book: "%s"'

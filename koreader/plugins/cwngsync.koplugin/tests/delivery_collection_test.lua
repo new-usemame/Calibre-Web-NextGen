@@ -42,6 +42,7 @@ local function newHarness(options)
         claims = 0,
         installs = {},
         completions = {},
+        arrivals = {},
     }
     local pending = {
         network = {},
@@ -65,6 +66,7 @@ local function newHarness(options)
             return server ~= nil and server ~= ""
         end,
         InfoMessage = { new = function(_, value) return value end },
+        Home = { bookArrived = function(path) table.insert(calls.arrivals, path) end },
         logger = {
             dbg = function() end,
             info = function() end,
@@ -208,6 +210,7 @@ local function testOverlappingExternalTriggerIsRejectedButContinuationsRun()
         "the overlapping triggers must install one copy of the delivery")
     assertEqual(harness.calls.completions[delivery.id], 1,
         "the overlapping triggers must acknowledge the delivery once")
+    assertEqual(#harness.calls.arrivals, 1, "the home is told once that the book arrived")
 
     assertEqual(#harness.pending.ticks, 1,
         "a successful delivery schedules its pagination continuation")

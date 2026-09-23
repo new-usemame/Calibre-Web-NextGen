@@ -158,6 +158,7 @@ def test_toggle_disables():
 def test_toggle_warns_when_global_magic_shelf_sync_is_off():
     """Mirrors the classic edit route (#359): store the intent, say it's inert."""
     from cps.api import magicshelves as mod
+    from cps.services import ereader_scope
     shelf = _shelf(kobo_sync=False)
     sess_patch, _ = _patch_session(mod, shelf)
     with _ctx("/api/v1/magicshelf/3/kobo-sync", body={"kobo_sync": True}):
@@ -165,7 +166,11 @@ def test_toggle_warns_when_global_magic_shelf_sync_is_off():
              patch.object(mod, "current_user", SimpleNamespace(id=7, is_authenticated=True)), \
              patch.object(mod, "config", SimpleNamespace(config_kobo_sync=True,
                                                          config_kobo_sync_magic_shelves=False)), \
-             patch.object(mod, "_", lambda s: s):  # bare Flask app has no babel
+             patch.object(mod, "_", lambda s: s), \
+             patch.object(ereader_scope, "_", lambda s: s), \
+             patch.object(ereader_scope, "koreader_library_on", lambda: False):
+            # A bare Flask app has no babel; a Kobo-only server (the e-reader
+            # wording is covered in test_ereader_magic_shelf_wording.py).
             resp = inspect.unwrap(mod.set_magic_shelf_kobo_sync)(3)
     body = json.loads(resp.get_data())
     assert shelf.kobo_sync is True

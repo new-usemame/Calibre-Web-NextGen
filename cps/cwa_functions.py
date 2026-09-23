@@ -49,6 +49,7 @@ from .schedule import (
     resolve_hardcover_auto_fetch_schedule,
 )
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS, STAT_FAIL, STAT_ENDED, STAT_CANCELLED
+from .services import ereader_scope
 # TaskReconnectDatabase deliberately not imported here — the post-ingest
 # reconnect endpoint uses CalibreDB.refresh_for_new_data() instead, to avoid
 # the engine-disposal race in fork issue #192 (PR #199, v4.0.30).
@@ -1159,6 +1160,7 @@ def set_cwa_settings():
                                     hardcover_token_available=hardcover_token_available,
                                     next_duplicate_scan_run=next_scan_run,
                                     processed_books_dir=constants.processed_books_dir(),
+                                    koreader_sync=ereader_scope.koreader_library_on(),
                                     config=config)
 
 

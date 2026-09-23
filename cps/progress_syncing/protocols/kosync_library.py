@@ -362,5 +362,8 @@ def put_read_status():
         log.error("KOReader read status for book %s failed", book_id, exc_info=True)
         return _error("Read status could not be saved", 503, "unavailable")
     if problem:
-        return _error(problem, 500, "read_status_failed")
+        # The problem text can carry the database's own words (SQL, table
+        # names): the admin reads it in the log, the device gets a plain answer.
+        log.error("KOReader read status for book %s not saved: %s", book_id, problem)
+        return _error("Read status could not be saved", 500, "read_status_failed")
     return jsonify({"book_id": book_id, "read_status": status})

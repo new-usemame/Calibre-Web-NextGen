@@ -317,8 +317,10 @@ def authenticate_user() -> Optional[ub.User]:
     # its credentials with every request; when this check came last, each
     # request from a device paid the LDAP bind (a failed login on the
     # directory) and the account hash before its own password was looked at.
+    # Successful sign-ins log at DEBUG: a library sync is a burst of requests,
+    # each signed in. Refused ones stay at INFO (#312).
     if usermanagement._verify_app_password_digest(user, password):
-        log.info("KOReader auth: authenticated via app password: %s", username)
+        log.debug("KOReader auth: authenticated via app password: %s", username)
         return user
 
     # Check if LDAP authentication is enabled
@@ -326,7 +328,7 @@ def authenticate_user() -> Optional[ub.User]:
         # Try LDAP authentication
         login_result, error = services.ldap.bind_user(user.name, password)
         if login_result:
-            log.info(f"authenticate_user: Successfully authenticated user via LDAP: {user.name}")
+            log.debug("KOReader auth: authenticated via LDAP: %s", user.name)
             return user
 
         # Log LDAP failure but continue to local check (fallback)
@@ -337,14 +339,14 @@ def authenticate_user() -> Optional[ub.User]:
     # Verify password using constant-time comparison
     # Check if user has a local password set before attempting verification
     if user.password and check_password_hash(str(user.password), password):
-        log.info(f"User authenticated successfully: {username}")
+        log.debug("KOReader auth: authenticated: %s", username)
         return user
 
     # App passwords saved before digests existed cost a slow hash each, so
     # they come last; the first sign-in with one gives it its digest. This
     # login path is shared by KOReader progress, annotation and library sync.
     if usermanagement._verify_app_password_older(user, password):
-        log.info("KOReader auth: authenticated via app password: %s", username)
+        log.debug("KOReader auth: authenticated via app password: %s", username)
         return user
 
     # Fork issue #312: promoted from DEBUG. Invalid-password attempts

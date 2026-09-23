@@ -15791,6 +15791,18 @@ msgstr "à l’instant"
 msgid "{name} wants to connect to your account."
 msgstr "{name} souhaite se connecter à votre compte."
 
+# KOReader: the magic shelf sync setting names e-readers
+
+msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
+msgstr "Synchroniser les étagères magiques avec les liseuses (Kobo et KOReader)"
+
+msgid "When active, Magic Shelves marked for e-reader sync reach your Kobo as collections and your KOReader library as shelves. Kobo also needs Kobo Sync in Basic Configuration."
+msgstr "Lorsque cette option est activée, les étagères magiques marquées pour la synchronisation liseuse arrivent sur votre Kobo sous forme de collections et dans votre bibliothèque KOReader sous forme d’étagères. Pour Kobo, activez aussi Kobo Sync dans la configuration de base."
+
+msgid "E-reader sync for Magic Shelves is disabled globally — this shelf won't reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and KOReader)' is enabled in CWA Settings."
+msgstr "La synchronisation des étagères magiques avec les liseuses est désactivée pour tout le serveur — cette étagère n’atteindra pas vos liseuses tant que « Synchroniser les étagères magiques avec les liseuses (Kobo et KOReader) » n’est pas activé dans les paramètres CWA."
+
+
 
 #~ msgid "Change library cover"
 #~ msgstr "Modifier la couverture de la bibliothèque"

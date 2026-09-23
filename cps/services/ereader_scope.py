@@ -28,6 +28,8 @@ the real Kobo sync in every mode and fails if the two ever diverge.
 from dataclasses import dataclass
 from typing import FrozenSet, Optional
 
+from flask_babel import gettext as _
+
 from .. import constants, db, ub, user_library
 
 
@@ -69,8 +71,26 @@ def shelf_marks_enabled(config):
     """
     if getattr(config, "config_kobo_sync", False):
         return True
+    return koreader_library_on()
+
+
+def koreader_library_on():
+    """Whether KOReader sync, and with it the KOReader library, is switched on."""
     from ..progress_syncing.settings import is_koreader_sync_enabled
     return is_koreader_sync_enabled()
+
+
+def magic_shelves_off_warning():
+    """What a reader is told on marking a magic shelf while the admin's magic
+    shelf sync setting is off. That one setting also governs the KOReader
+    library, and is labelled for e-readers once KOReader sync is on."""
+    if koreader_library_on():
+        return _("E-reader sync for Magic Shelves is disabled globally — this shelf "
+                 "won't reach your e-readers until 'Sync Magic Shelves to e-readers "
+                 "(Kobo and KOReader)' is enabled in CWA Settings.")
+    return _("Kobo sync for Magic Shelves is disabled globally — "
+             "this shelf won't reach your Kobo until 'Sync Magic "
+             "Shelves to Kobo' is enabled in CWA Settings.")
 
 
 def personal_library(user):

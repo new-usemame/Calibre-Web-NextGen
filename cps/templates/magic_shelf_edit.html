@@ -433,7 +433,11 @@ div.help-panel > .panel-body {
                             Enable Kobo sync (shelf appears on Kobo devices)
                         </label>
                         {% if not kobo_magic_sync_enabled %}
+                        {% if koreader_sync %}
+                        <small class="form-text" style="color: #e2b93d;">Turn on “Sync Magic Shelves to e-readers (Kobo and KOReader)” in CWA Settings first — until then this checkbox has no effect and the shelf won't reach your e-readers.</small>
+                        {% else %}
                         <small class="form-text" style="color: #e2b93d;">Turn on “Sync Magic Shelves to Kobo” in CWA Settings first — until then this checkbox has no effect and the shelf won't reach your Kobo.</small>
+                        {% endif %}
                         {% else %}
                         <small class="form-text text-muted">Only works if Kobo integration is enabled</small>
                         {% endif %}

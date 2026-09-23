@@ -15441,6 +15441,18 @@ msgstr "zojuist"
 msgid "{name} wants to connect to your account."
 msgstr "{name} wil verbinding maken met je account."
 
+# KOReader: the magic shelf sync setting names e-readers
+
+msgid "Sync Magic Shelves to e-readers (Kobo and KOReader)"
+msgstr "Magische boekenplanken synchroniseren met e-readers (Kobo en KOReader)"
+
+msgid "When active, Magic Shelves marked for e-reader sync reach your Kobo as collections and your KOReader library as shelves. Kobo also needs Kobo Sync in Basic Configuration."
+msgstr "Als dit aan staat, komen magische boekenplanken die voor e-reader-synchronisatie zijn gemarkeerd als collecties op je Kobo en als boekenplanken in je KOReader-bibliotheek. Voor Kobo moet ook Kobo Sync aan staan in de basisconfiguratie."
+
+msgid "E-reader sync for Magic Shelves is disabled globally — this shelf won't reach your e-readers until 'Sync Magic Shelves to e-readers (Kobo and KOReader)' is enabled in CWA Settings."
+msgstr "E-reader-synchronisatie voor magische boekenplanken is voor de hele server uitgeschakeld — deze boekenplank bereikt je e-readers pas als ‘Magische boekenplanken synchroniseren met e-readers (Kobo en KOReader)’ is ingeschakeld in de CWA-instellingen."
+
+
 
 #~ msgid "Change library cover"
 #~ msgstr "Bibliotheekomslag wijzigen"

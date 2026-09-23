@@ -11,6 +11,7 @@ reader's library or rights is refused.
 
 import io
 import json
+import logging
 import zipfile
 from datetime import datetime
 from urllib.parse import quote
@@ -502,6 +503,57 @@ def test_read_status_from_the_device_is_what_the_website_then_shows(world):
     world.session.expire_all()
     assert world.read_row(reader, 1).read_status == ub.ReadBook.STATUS_UNREAD
     assert _books(world)[0][1]["progress"] is None
+
+
+def test_a_status_the_library_cannot_save_is_refused_without_its_database_error(
+        world, monkeypatch, caplog):
+    """The database's own words (table names, SQL, paths) go to the log for
+    the admin, not over the wire to whoever holds a device password."""
+    from cps import helper
+    world.add_user("reader")
+    world.add_book(1, "Stuck")
+    detail = ("Read status could not set: (sqlite3.OperationalError) disk I/O error "
+              "[SQL: UPDATE custom_column_5 SET value=?]")
+    monkeypatch.setattr(helper, "edit_book_read_status",
+                        lambda book_id, read_status=None: detail)
+
+    response = world.client.put(
+        "/kosync/syncs/read_status", headers=world.device_headers("reader"),
+        json={"book_id": 1, "status": "finished", "device": "Kindle", "device_id": "kindle-1"})
+
+    assert response.status_code == 500
+    body = response.get_json()
+    assert body == {"error": "read_status_failed", "message": "Read status could not be saved"}
+    assert any("disk I/O error" in record.getMessage() for record in caplog.records)
+
+
+def test_a_healthy_sync_is_quiet_in_the_log_and_a_refused_sign_in_is_not(world, caplog):
+    """A library sync is a burst of requests (manifest, a placeholder per
+    book, files); a line per request at INFO buried everything else. A wrong
+    password still shows at INFO, as #312 wants."""
+    from cps.services import app_passwords
+    reader = world.add_user("reader")
+    for book_id in (1, 2, 3):
+        world.add_book(book_id, "Book %d" % book_id)
+    _row, device_password = app_passwords.mint(reader.id, "Kindle", session=world.session)
+    world.session.commit()
+
+    caplog.set_level(logging.DEBUG)
+    for password in ("secret", device_password):
+        headers = world.device_headers("reader", password)
+        assert world.client.get("/kosync/syncs/library", headers=headers).status_code == 200
+        for book_id in (1, 2, 3):
+            assert world.client.get("/kosync/syncs/library/books/%d/placeholder" % book_id,
+                                    headers=headers).status_code == 200
+        assert world.client.get("/kosync/syncs/library/books/1/file",
+                                headers=headers).status_code == 200
+    assert [record.getMessage() for record in caplog.records
+            if record.levelno >= logging.INFO] == []
+
+    assert world.client.get("/kosync/users/auth",
+                            headers=world.basic("reader", "wrong")).status_code == 401
+    assert [record.getMessage() for record in caplog.records
+            if record.levelno == logging.INFO] == ["KOReader auth: Invalid password for user: reader"]
 
 
 def test_read_status_resolves_a_document_checksum_and_refuses_what_it_cannot(world):

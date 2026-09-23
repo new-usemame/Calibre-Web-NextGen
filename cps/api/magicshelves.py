@@ -191,7 +191,5 @@ def set_magic_shelf_kobo_sync(shelf_id):
     # Mirror of the classic edit route: intent is stored, but it stays inert
     # until an admin enables the magic-shelf half of Kobo sync (#359).
     if enabled and not config.config_kobo_sync_magic_shelves:
-        body["warning"] = _("Kobo sync for Magic Shelves is disabled globally — "
-                            "this shelf won't reach your Kobo until 'Sync Magic "
-                            "Shelves to Kobo' is enabled in CWA Settings.")
+        body["warning"] = ereader_scope.magic_shelves_off_warning()
     return jsonify(body)

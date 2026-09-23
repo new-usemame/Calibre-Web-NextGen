@@ -133,10 +133,30 @@ class PreparationStore:
         self.pool.shutdown(wait=True,cancel_futures=True)
 
 
+def _child_environment(scratch):
+    """What the preparation child may see of the web process: nothing secret.
+
+    The child parses an untrusted PDF and runs OCR. It needs a PATH (to find
+    Tesseract), the locale and the OCR data location -- the allowlist the OCR
+    adapter already uses (``ocr._env``) -- and nothing else: no provider key, no
+    database or mail secret. Its temporary files stay in the per-preparation
+    scratch directory, which is removed with it. ``PYTHONNOUSERSITE`` restates what
+    ``-I`` below already enforces; the service sets it for the parent too.
+    """
+    environment=ocr._env()
+    environment['TMPDIR']=str(scratch)
+    environment['PYTHONNOUSERSITE']='1'
+    return environment
+
+
 def measure_isolated(source,options,progress,should_stop,cache_root):
     """One owned renderer process; only bounded progress and quote JSON cross back.
 
-    The process has no client/session/key arguments. A cancellation file is polled
+    The process has no client/session/key arguments, and no secrets in its
+    environment (``_child_environment``). It runs in Python's isolated mode (``-I``:
+    no PYTHONPATH, no user site-packages, no script directory on sys.path), the
+    same import boundary the service itself starts with (``-P`` and
+    ``PYTHONNOUSERSITE=1`` in its s6 run script). A cancellation file is polled
     by the existing extraction, Recovery and candidate loops, including OCR's
     child-process cancellation. No partial quote is made ready or billed.
     """
@@ -146,8 +166,9 @@ def measure_isolated(source,options,progress,should_stop,cache_root):
         request=dict(source=str(source),options=options,cache_root=str(cache_root),
                      control=str(control),progress=str(status),output=str(output))
         with open(root/'stderr.log','wb') as errors:
-            process=subprocess.Popen([sys.executable,str(Path(__file__).with_name('quote_worker.py'))],
-                stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=errors)
+            process=subprocess.Popen([sys.executable,'-I',str(Path(__file__).with_name('quote_worker.py'))],
+                stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=errors,
+                env=_child_environment(root),cwd=str(root))
             try:
                 process.stdin.write(json.dumps(request).encode());process.stdin.close()
                 last=None

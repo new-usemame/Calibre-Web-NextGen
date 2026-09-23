@@ -107,3 +107,36 @@ def test_recovery_runtime_change_invalidates_ready_quote_without_reusing_old_con
         version[0]='engine-2'
         with pytest.raises(KeyError):store.ready(7,5,job['preparation_id'],str(source),options)
     finally:store.close()
+
+
+def test_the_preparation_process_inherits_no_secrets_and_no_injected_imports(tmp_path,monkeypatch):
+    """The preparation child reads an untrusted PDF. It needs no provider key or
+    database secret, and it must not import code from the web process's
+    environment: the service is started with ``-P`` and ``PYTHONNOUSERSITE=1``
+    precisely so /config and PYTHONPATH cannot place modules ahead of the app.
+    OCR already scrubs its environment (ocr._env); this child inherited
+    everything. Breaks if the child is started with the parent environment again,
+    or with a stripped one that drops the isolation flags (the sitecustomize
+    marker below is then imported)."""
+    import os,subprocess
+    from tests.fixtures import reflow_pdfs as F
+    from cps.services.reflow import quote_preparation
+    source=tmp_path/'source.pdf';doc=F.new_doc();F.chapter_opening_page(doc,'A complete source title');F.prose_page(doc)
+    doc.save(source);doc.close()
+    injected=tmp_path/'injected';injected.mkdir();marker=tmp_path/'imported-from-the-web-environment'
+    (injected/'sitecustomize.py').write_text('open(%r,"w").write("x")\n'%str(marker))
+    monkeypatch.setenv('PYTHONPATH',str(injected))
+    monkeypatch.setenv('OPENROUTER_API_KEY','sk-or-v1-NOT-FOR-THE-CHILD')
+    monkeypatch.setenv('CWNG_TEST_DB_PASSWORD','not-for-the-child')
+    started=[];real=subprocess.Popen
+    def spy(*args,**kwargs):
+        started.append(dict(os.environ) if kwargs.get('env') is None else dict(kwargs['env']))
+        return real(*args,**kwargs)
+    monkeypatch.setattr(quote_preparation.subprocess,'Popen',spy)
+    quote=quote_preparation.measure_isolated(source,{'source_recovery':'off','ocr_language':'eng'},None,None,tmp_path)
+    assert quote['source_context_pages']==2          # the stripped child still does the work
+    assert started,'no preparation process was started'
+    environment=started[0]
+    assert 'OPENROUTER_API_KEY' not in environment and 'CWNG_TEST_DB_PASSWORD' not in environment
+    assert not any('sk-or-' in value for value in environment.values())
+    assert not marker.exists(),'the child imported a module from the inherited PYTHONPATH'

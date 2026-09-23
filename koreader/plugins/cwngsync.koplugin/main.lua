@@ -27,6 +27,7 @@ local T = ffiUtil.template
 local _ = require("gettext")
 local bit = require("bit")
 local AutoSync = require("cwng_auto_sync")
+local Home = require("cwng_home")
 local LibraryRuntime = require("cwng_library_runtime")
 local Setup = require("cwng_setup")
 local SetupFlow = require("cwng_setup_flow")
@@ -121,6 +122,7 @@ function CWNGSync:init()
     self.ui.menu:registerToMainMenu(self)
     self:installOpenHook()
     self:installStatusHook()
+    self:installHomeButton()
     self:onDispatcherRegisterActions()
     self:registerEvents()
     if not self.ui.document then
@@ -136,7 +138,33 @@ function CWNGSync:onLibraryShown()
         if not self:bundlePending() then self:maybeWelcome() end
         return
     end
+    if self:homeEnabled() then self:showHome() end
     if NetworkMgr:isConnected() then self:onDeviceOnline() end
+end
+
+-- The CWNG home stands in for the file browser while the library is on,
+-- unless the reader turned it off (Advanced).
+function CWNGSync:homeEnabled()
+    return self:libraryEnabled() and self.settings.home_enabled ~= false
+end
+
+function CWNGSync:showHome()
+    if not self:libraryEnabled() or self:hasActiveDocument() then return false end
+    return Home.show(self) ~= nil
+end
+
+-- The file browser's home button brings the CWNG home back.
+function CWNGSync:installHomeButton()
+    local ok, FileManager = pcall(require, "apps/filemanager/filemanager")
+    if not ok or FileManager._cwngsync_original_onHome then return end
+    local original = FileManager.onHome
+    FileManager._cwngsync_original_onHome = original
+    FileManager.onHome = function(file_manager, ...)
+        local result = original(file_manager, ...)
+        local plugin = file_manager[CWNGSync.name]
+        if plugin and plugin.homeEnabled and plugin:homeEnabled() then plugin:showHome() end
+        return result
+    end
 end
 
 function CWNGSync:getSyncPeriod()
@@ -321,6 +349,8 @@ function CWNGSync:addToMainMenu(menu_items)
                     if self.settings.library_enabled then
                         self:applyReaderDefaults()
                         self:syncLibrary({ force = true, interactive = true })
+                    else
+                        Home.closeFor(self.ui)
                     end
                 end,
             },
@@ -388,6 +418,20 @@ end
 -- The manual controls from before the library existed, for troubleshooting.
 function CWNGSync:getAdvancedMenuItems()
     return {
+            {
+                text = _("Start on the library home"),
+                help_text = _([[Show your books by Reading, Recent, Shelves, Authors and Series instead of KOReader's file browser. The file browser is always one tap away (menu, Browse files).]]),
+                enabled_func = function() return self:libraryEnabled() end,
+                checked_func = function() return self.settings.home_enabled ~= false end,
+                callback = function()
+                    if self.settings.home_enabled == false then
+                        self.settings.home_enabled = nil
+                    else
+                        self.settings.home_enabled = false
+                        Home.closeFor(self.ui)
+                    end
+                end,
+            },
             {
                 text = _("Set NextGen Server"),
                 keep_menu_open = true,
@@ -1486,6 +1530,7 @@ function CWNGSync:refreshLibraryViews(changed_files)
         menu:updateItems(1, true)
     end
 
+    Home.refreshShown()
     refreshMenu(self.ui and self.ui.file_chooser, "file chooser")
     refreshMenu(self.ui and self.ui.booklist_menu, "book list menu")
     refreshMenu(self.ui and self.ui.menu, "menu")
@@ -2342,6 +2387,7 @@ function CWNGSync:syncAnnotations(interactive)
 end
 
 function CWNGSync:onCloseWidget()
+    Home.closeFor(self.ui)
     UIManager:unschedule(self.periodic_push_task)
     self.periodic_push_task = nil
     if self.online_retry_task then

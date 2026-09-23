@@ -53,6 +53,8 @@ local function testEntriesKnowWhatIsOnTheDevice()
     assertEqual(list[5].downloaded, false, "a cover is not a download")
     assertEqual(list[1].path, ROOT .. "/Guards [1].epub", "path from the library folder")
     assertEqual(list[6].title, "A Broken Compass", "a book with little metadata is still listed")
+    assertEqual(list[5].present, true, "a cover is on the device")
+    assertEqual(list[1].present, false, "a book the sync has not added yet is not")
 end
 
 local function testRecentlyAddedNewestFirst()
@@ -103,6 +105,20 @@ local function testSearchFindsEveryWordAnywhereAndRanksTitles()
     assertEqual(titles(accents), "Coraline", "matching goes through the fold")
 end
 
+local function testAccentsMatchTheirPlainLetters()
+    local fold = Catalog.makeFold()
+    assertEqual(fold("Brontë Æsop Ōtsuka Straße"), "bronte aesop otsuka strasse", "accents and ligatures fold")
+    local books = { { book_id = 1, title = "Jane Eyre", authors = { "Charlotte Brontë" }, filename = "a.epub" },
+                    { book_id = 2, title = "Émile", authors = { "Jean-Jacques Rousseau" }, filename = "b.epub" } }
+    local list = Catalog.entries(books, {}, ROOT)
+    assertEqual(titles(Catalog.search(list, "bronte", fold)), "Jane Eyre", "typed without the accent")
+    assertEqual(titles(Catalog.search(list, "émile", fold)), "Émile", "typed with it")
+    local calls = 0
+    local memo = Catalog.memoize(function(s) calls = calls + 1 return s end)
+    memo("x") memo("x") memo("y")
+    assertEqual(calls, 2, "each text folded once")
+end
+
 local function testDownloadedOnly()
     assertEqual(titles(Catalog.downloadedOnly(entries())), "Coraline", "only the real book")
 end
@@ -112,5 +128,6 @@ testRecentlyAddedNewestFirst()
 testContinueReadingPutsThisDeviceFirstAndDropsFinished()
 testGroupsAndTheirMembersInReadingOrder()
 testSearchFindsEveryWordAnywhereAndRanksTitles()
+testAccentsMatchTheirPlainLetters()
 testDownloadedOnly()
 print("cwng_catalog_test.lua: all tests passed")

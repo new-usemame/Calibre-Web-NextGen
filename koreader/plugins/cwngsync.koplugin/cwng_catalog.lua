@@ -15,6 +15,47 @@ local function defaultFold(text)
     return (text or ""):lower()
 end
 
+-- Letters with accents match and sort with their plain letter, so "Brontë"
+-- is found by typing "bronte". Latin-1 and Latin Extended-A, both cases.
+local ACCENTS = {
+    a = "àáâãäåāăąÀÁÂÃÄÅĀĂĄ", c = "çćĉċčÇĆĈĊČ", d = "ďđĎĐ", e = "èéêëēĕėęěÈÉÊËĒĔĖĘĚ",
+    g = "ĝğġģĜĞĠĢ", h = "ĥħĤĦ", i = "ìíîïĩīĭįıÌÍÎÏĨĪĬĮİ", j = "ĵĴ", k = "ķĶ", l = "ĺļľŀłĹĻĽĿŁ",
+    n = "ñńņňÑŃŅŇ", o = "òóôõöøōŏőÒÓÔÕÖØŌŎŐ", r = "ŕŗřŔŖŘ", s = "śŝşšŚŜŞŠ", t = "ţťŧŢŤŦ",
+    u = "ùúûüũūŭůűųÙÚÛÜŨŪŬŮŰŲ", w = "ŵŴ", y = "ýÿŷÝŸŶ", z = "źżžŹŻŽ",
+    ae = "æÆ", oe = "œŒ", ss = "ß",
+}
+local PLAIN = {}
+for plain, accented in pairs(ACCENTS) do
+    for char in accented:gmatch("[\xC3-\xC5][\x80-\xBF]") do PLAIN[char] = plain end
+end
+
+function Catalog.stripAccents(text)
+    return (text:gsub("[\xC3-\xC5][\x80-\xBF]", PLAIN))
+end
+
+-- The fold used for matching and sorting: `lower` lowercases (KOReader's
+-- Unicode-aware one on the device), then accents go.
+function Catalog.makeFold(lower)
+    lower = lower or string.lower
+    return function(text)
+        return Catalog.stripAccents(lower(text or ""))
+    end
+end
+
+-- Sorting a large library folds the same names over and over; remember them.
+function Catalog.memoize(fold)
+    local cache = {}
+    return function(text)
+        text = text or ""
+        local folded = cache[text]
+        if folded == nil then
+            folded = fold(text)
+            cache[text] = folded
+        end
+        return folded
+    end
+end
+
 local function join(root, name)
     return (root:gsub("/+$", "")) .. "/" .. name
 end
@@ -39,6 +80,9 @@ function Catalog.entries(books, known_books, root)
                 added = type(book.added) == "string" and book.added or "",
                 last_read = type(book.last_read) == "string" and book.last_read or "",
                 path = (known and known.path) or join(root, book.filename),
+                -- On the device as a cover or the real book (not yet, while
+                -- a sync is still adding it).
+                present = known ~= nil,
                 downloaded = known ~= nil and known.kind == "downloaded",
             }
         end

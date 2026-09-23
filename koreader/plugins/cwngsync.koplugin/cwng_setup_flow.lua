@@ -67,6 +67,7 @@ function SetupFlow:showLibrary()
     if root and chooser and chooser.changeToPath and util.directoryExists(root) then
         chooser:changeToPath(root)
     end
+    self:showHome()
 end
 
 -- Verify credentials with the server, then keep them and turn everything on.

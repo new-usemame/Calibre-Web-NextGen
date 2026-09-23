@@ -81,28 +81,56 @@ def test_filter_offers_nothing_to_a_user_who_may_not_read():
 # --- the click -------------------------------------------------------------
 
 HARNESS = r"""
+// Runs caliBlur's shipped cover click handler, and the real handleDirectReading()
+// it calls, against a stub link, event and window. The input is our own repo file.
 const src = require('fs').readFileSync(process.argv[2], 'utf8');
 const scenario = JSON.parse(process.argv[3]);
-const start = src.indexOf('function handleDirectReading(');
-const end = src.indexOf('function handleReadStatusToggle(', start);
-if (start < 0 || end < 0) throw new Error('handleDirectReading not found');
+
+function slice(from, to) {
+  const a = src.indexOf(from), b = src.indexOf(to, a);
+  if (a < 0 || b < 0) throw new Error('not found: ' + from);
+  return src.slice(a, b).trim();
+}
+function handler() {
+  const at = src.indexOf("on('click.directReading'");
+  const a = src.indexOf('function', at);
+  let depth = 0;
+  for (let i = src.indexOf('{', a); i < src.length; i++) {
+    if (src[i] === '{') depth++;
+    else if (src[i] === '}' && --depth === 0) return src.slice(a, i + 1);
+  }
+  throw new Error('click handler not found');
+}
+
 const attrs = scenario.attrs;
+const W = 150, H = 225, LEFT = 100, TOP = 200;
+const link = {};
 const $link = {
   // jQuery's .data() coerces "5" to 5; mirror that so both code shapes run.
   data: (k) => { const v = attrs['data-' + k]; return v !== undefined && /^\d+$/.test(v) ? Number(v) : v; },
   attr: (k) => attrs[k],
+  closest: () => $link, offset: () => ({ left: LEFT, top: TOP }),
+  outerWidth: () => W, outerHeight: () => H,
 };
-const opened = [];
+const $ = (x) => (x === link ? $link : { width: () => 1366 });
+const opened = [], actions = [];
 const window = { scriptRoot: scenario.scriptRoot || '', open: (url) => opened.push(url),
                  location: { href: 'about:grid' } };
-// Executes the shipped function verbatim; the input is our own repo file.
-const handleDirectReading = new Function('window', 'return (' + src.slice(start, end).trim() + ');')(window);
-const handled = handleDirectReading($link);
-process.stdout.write(JSON.stringify({ handled, opened, location: window.location.href }) + "\n");
+const other = (name) => () => actions.push(name);
+const make = new Function('$', 'window', 'handleReadStatusToggle', 'handleEditMetadata',
+  'handleSendToEReader',
+  'const handleDirectReading = (' + slice('function handleDirectReading(', 'function handleReadStatusToggle(') + ');' +
+  'return (' + handler() + ');');
+const onClick = make($, window, other('toggle'), other('edit'), other('send'));
+
+let prevented = false;
+// A click on the centre of the cover, where the read icon is drawn.
+onClick.call(link, { pageX: LEFT + W / 2, pageY: TOP + H / 2, preventDefault: () => { prevented = true; } });
+process.stdout.write(JSON.stringify({ prevented, opened, actions, location: window.location.href }) + "\n");
 """
 
 
-def _click(tmp_path, attrs, script_root=""):
+def _click_centre(tmp_path, attrs, script_root=""):
     harness = tmp_path / "harness.js"
     harness.write_text(HARNESS, encoding="utf-8")
     out = subprocess.run(
@@ -125,23 +153,26 @@ needs_node = pytest.mark.skipif(
 @needs_node
 @pytest.mark.parametrize("formats", ["mobi", "azw3", "mobi,azw3,fb2,html"])
 def test_read_on_an_unreadable_book_opens_no_reader_and_leaves_the_click_to_the_cover(tmp_path, formats):
-    result = _click(tmp_path, _link(7, formats, ""))
+    result = _click_centre(tmp_path, _link(7, formats, ""))
     assert result["opened"] == [], "a reader was opened for %s" % formats
-    # Not handled, so the caller does not preventDefault: the click does what the
-    # rest of the cover does (details modal, or the detail page).
-    assert result["handled"] is not True
-    assert result["location"] == "about:grid"
+    # The click is not cancelled, so it follows the cover's link to the detail
+    # page, like a click anywhere else on the cover. No other action fires.
+    assert result["prevented"] is False
+    assert result["actions"] == [] and result["location"] == "about:grid"
 
 
 @needs_node
-def test_read_on_a_cover_with_no_book_does_nothing(tmp_path):
-    # The global-library <span class="book-cover-link"> has no id, href or formats.
-    result = _click(tmp_path, {})
+def test_read_on_a_cover_with_no_book_id_opens_nothing(tmp_path):
+    # The global-library <span class="book-cover-link"> has no id or link.
+    result = _click_centre(tmp_path, {"data-book-read-formats": "epub"})
     assert result["opened"] == [] and result["location"] == "about:grid"
+    assert result["prevented"] is False
 
 
 @needs_node
 def test_read_opens_the_first_format_the_server_offers(tmp_path):
-    result = _click(tmp_path, _link(5, "pdf,mobi,epub", "epub,pdf"), script_root="/calibre")
-    assert result["handled"] is True
+    result = _click_centre(tmp_path, _link(5, "pdf,mobi,epub", "epub,pdf"), script_root="/calibre")
     assert result["opened"] == ["/calibre/read/5/epub"]
+    # Cancelled, so the grid page itself stays put while the reader opens in a tab.
+    assert result["prevented"] is True
+    assert result["actions"] == [] and result["location"] == "about:grid"

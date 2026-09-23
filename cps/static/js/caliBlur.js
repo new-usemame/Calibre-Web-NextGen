@@ -1066,8 +1066,8 @@ $(function() {
     }
     
     // Opens the reader and returns true, or returns false when the book has nothing
-    // the reader opens, so the click falls through to what the rest of the cover
-    // does (the details modal, or the detail page). The server renders the formats
+    // the reader opens, so the click is not cancelled and follows the cover's link to
+    // the detail page like the rest of the cover. The server renders the formats
     // (the reader_formats filter) in the order the detail page's "Read now" uses.
     // A MOBI or AZW3 only book used to open a reader tab that read_book() can only
     // answer with a 404 (#2249).

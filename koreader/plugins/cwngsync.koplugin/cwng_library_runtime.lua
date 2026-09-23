@@ -584,7 +584,10 @@ function Runtime:openLibraryPlaceholder(file, open_real)
         UIManager:close(message)
         if ok then
             open_real(file)
-            UIManager:scheduleIn(5, function() self:reportInventory(false, false) end)
+            -- With auto sync on, opening the book reports the inventory already.
+            if not self.settings.auto_sync then
+                UIManager:scheduleIn(5, function() self:reportInventory(false, false) end)
+            end
         else
             UIManager:show(InfoMessage:new{
                 text = T(_("Could not download %1.\n\n%2\n\nCheck that Wi-Fi is on and try again."),

@@ -172,6 +172,27 @@ def test_a_sample_is_a_look_and_not_a_filing(rig):
     assert not os.path.exists(str(rig.folder / "Book - Author.epub"))
 
 
+def test_a_completed_job_keeps_a_text_free_recovery_census_for_crash_diagnosis(rig):
+    """The compact job row cannot explain which source pages used OCR after the
+    Python service disappears.  The durable census keeps page/layer facts and a
+    digest, never OCR readings or cache locations.  Breaks if conversion only
+    writes the old aggregate recovery summary again.
+    """
+    task = _run(rig, mode="sample", sample_pages=2, cost_cap_usd=1.0)
+
+    audit = ledger_mod.Ledger(os.path.join(rig.root, "jobs", "5", task.job_id + ".jsonl"),
+                              cap_usd=1.0)
+    records = audit.entries("recovery_provenance")
+
+    assert len(records) == 1
+    record = records[0]
+    assert record["page_count"] == 3
+    assert record["options"] == {"mode": "auto", "language": "eng"}
+    assert len(record["digest"]) == 64
+    assert [row["page"] for row in record["pages"]] == [0, 1, 2]
+    assert all("cache" not in row and "text" not in row for row in record["pages"])
+
+
 def test_a_cancelled_job_does_not_file_a_half_reviewed_conversion(rig):
     task = rig.mod.TaskReflowPdf(5, 7, {"mode": "full", "cost_cap_usd": 1.0})
     task.stat = STAT_ENDED          # what WorkerThread.end_task does

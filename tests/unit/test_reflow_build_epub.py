@@ -87,6 +87,21 @@ def test_unprintable_source_characters_do_not_make_a_whole_chapter_unreadable(
     assert any("replacement character" in warning for warning in losses)
 
 
+def test_builder_announces_native_evidence_and_figure_boundaries(tmp_path):
+    """A crash after the durable staging marker used to leave no build boundary.
+
+    The builder now tells its caller which native-PDF phases began, independent of
+    whether this small prose fixture happens to contain a figure.  Removing a
+    callback at a phase boundary makes the durable runtime trace incomplete.
+    """
+    events = []
+    built = _build(_book(F.prose_page), tmp_path, runtime_progress=events.append)
+
+    assert build_epub.validate(built.path) == []
+    assert [event["phase"] for event in events if event["kind"] == "phase"] == [
+        "native_glyphs", "source_evidence", "figure_crops", "archive_finalize"]
+
+
 def test_a_hostile_cached_page_is_refused_at_the_packaging_boundary(tmp_path):
     """The final boundary. A page written to the cache before the adoption gate
     learned this check -- or planted there -- must not ship either: the builder

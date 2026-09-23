@@ -1,0 +1,9 @@
+#!/usr/bin/with-contenv bash
+# shellcheck shell=bash
+
+# s6 supplies the longrun's exit code and terminating signal as $1/$2.  Keep a
+# tiny stdlib-only record after the server is gone; this must not import Flask or
+# accept a user-selected destination during a crash path.
+exec cwa-as-abc /usr/bin/env -u PYTHONPATH PYTHONNOUSERSITE=1 \
+    python3 -P /app/calibre-web-automated/scripts/record_runtime_service_exit.py "$1" "$2"
+

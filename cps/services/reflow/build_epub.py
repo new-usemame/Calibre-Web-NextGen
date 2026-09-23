@@ -922,7 +922,8 @@ def _opf(metadata, manifest, spine, identifier, modified, nonlinear=()):
         "</package>\n" % (REFLOW_NS, "\n".join(meta_lines), items, refs))
 
 
-def _figure_images(chapters, doc, book, package, figure_transform=None, owned_images=()):
+def _figure_images(chapters, doc, book, package, figure_transform=None, owned_images=(),
+                   runtime_progress=None):
     """Crop each figure the fragments referred to; drop the ones we cannot make.
 
     Each crop goes into ``package`` as it is cut (:class:`_Package`); what comes
@@ -952,12 +953,15 @@ def _figure_images(chapters, doc, book, package, figure_transform=None, owned_im
         seen.append(figure)
 
     missing, blanks = [], []
-    for src in wanted:
+    for ordinal, src in enumerate(wanted, 1):
         match = re.match(r"images/fig_p(\d+)_(\d+)\.jpg$", src)
         if not match or doc is None:
             missing.append(src)
             continue
         pno, index = int(match.group(1)), int(match.group(2))
+        if runtime_progress is not None:
+            runtime_progress({"kind": "figure_crop", "page": pno,
+                              "ordinal": ordinal, "total": len(wanted)})
         page_figures = boxes.get(pno) or []
         if index >= len(page_figures):
             missing.append(src)
@@ -1139,7 +1143,8 @@ def _check_cancelled(should_stop):
 
 
 def _original_evidence(book, page_html, doc, package, figure_transform=None,
-                       should_stop=None, progress=None, source_pages=None):
+                       should_stop=None, progress=None, source_pages=None,
+                       runtime_progress=None):
     """Package original pixels, never a re-render of the extracted reading.
 
     Detail crops retain adjacent printed context; the full original page lets a
@@ -1158,6 +1163,9 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
         _check_cancelled(should_stop)
         if progress is not None:
             progress(index, len(wanted))
+        if runtime_progress is not None:
+            runtime_progress({"kind": "evidence_page", "page": pno,
+                              "ordinal": index + 1, "total": len(wanted)})
         specs = []
         ambiguous = book.ambiguous_note_numbers(pno)
         if ambiguous:
@@ -1326,7 +1334,8 @@ def _original_document(record, home, language):
 
 def build(book, out_path, page_html=None, metadata=None, doc=None,
           report_html=None, sidecar=None, identifier=None, figure_transform=None,
-          should_stop=None, evidence_progress=None, operation_plans=(), source_pages=None):
+          should_stop=None, evidence_progress=None, operation_plans=(), source_pages=None,
+          runtime_progress=None):
     """Write one EPUB 3 and say what went into it.
 
     ``report_html`` is called last, with the document each page marker landed in and
@@ -1391,17 +1400,25 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     package = _Package(out_path)
     try:
         from .native_text import package_glyphs
+        if runtime_progress is not None:
+            runtime_progress({"kind": "phase", "phase": "native_glyphs"})
         package_glyphs(book,page_html,doc,package,should_stop)
+        if runtime_progress is not None:
+            runtime_progress({"kind": "phase", "phase": "source_evidence"})
         evidence = _original_evidence(book, page_html, doc, package, figure_transform,
-                                      should_stop, evidence_progress, source_pages)
+                                      should_stop, evidence_progress, source_pages,
+                                      runtime_progress)
 
         pages = _page_blocks(page_html)
         joins = _join_page_turns(pages)
         chapters = _chapters(pages)
         dropped = _bind_links(chapters)
+        if runtime_progress is not None:
+            runtime_progress({"kind": "phase", "phase": "figure_crops"})
         missing, blanks = _figure_images(chapters, doc, book, package,
                                          figure_transform=figure_transform,
-                                         owned_images=set(package.images))
+                                         owned_images=set(package.images),
+                                         runtime_progress=runtime_progress)
         _drop_images(chapters, missing + blanks)
         images = package.images
 
@@ -1505,6 +1522,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
                             "its plain text" % (pno, reasons[0]))
 
         _check_cancelled(should_stop)
+        if runtime_progress is not None:
+            runtime_progress({"kind": "phase", "phase": "archive_finalize"})
         package.finish({
             "opf": _opf(metadata, manifest, spine, identifier, modified,
                         nonlinear={"original-p%04d" % pno for pno in evidence}),

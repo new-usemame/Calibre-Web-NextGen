@@ -34,7 +34,7 @@ from cps.constants import REFLOW_DIR
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED, \
     STAT_STARTED, STAT_WAITING
 from cps.services.reflow import admission, build_epub, extract, ledger as ledger_mod, \
-    model, ocr, pipeline, publication, report, retention, structural_pipeline, typed_model, shared_budget, operation_audit
+    model, ocr, pipeline, publication, report, retention, structural_pipeline, typed_model, shared_budget, operation_audit, runtime_diagnostics
 
 log = logger.create()
 
@@ -295,6 +295,12 @@ class TaskReflowPdf(CalibreTask):
                     summary = result.recovery.summary()
                     summary.pop("pages", None)
                     ledger.record(dict(kind="recovery", **summary))
+                    # The concise historic summary is kept for job-list consumers.
+                    # Incidents additionally need the complete, text-free census
+                    # and the exact recovery choices it represents.
+                    ledger.record(runtime_diagnostics.recovery_record(
+                        result.recovery, self.options.source_recovery,
+                        self.options.ocr_language), durable=True)
                 if self.cancelled:
                     # The pages already paid for stay in the cache, so restarting is
                     # cheap — but a conversion nobody waited for does not become the
@@ -402,6 +408,8 @@ class TaskReflowPdf(CalibreTask):
         try:
             audit_rows,audit_matching=operation_audit.capture(result,self.book_id)
             operation_audit.record(ledger,'validated',operations=audit_rows)
+            build_trace = runtime_diagnostics.BuildTrace(ledger)
+            build_trace({"kind": "phase", "phase": "assembly_start"})
             built = build_epub.build(result.book, candidate, page_html=result.page_html,
                                      metadata=_metadata(book), doc=document,
                                      report_html=page,
@@ -415,7 +423,9 @@ class TaskReflowPdf(CalibreTask):
                                      evidence_progress=lambda done, total: self._on_progress(
                                          pipeline.Progress("evidence", page=done, pages=total,
                                              spend_usd=result.spend_usd,
-                                             message="preserving original evidence %d/%d" % (done, total))))
+                                             message="preserving original evidence %d/%d" % (done, total))),
+                                     runtime_progress=build_trace)
+            build_trace.finish()
             for warning in built.warnings:
                 # The reader is told the same thing in their own book, on the report
                 # page; this is the terser half, for whoever has to find out why.

@@ -624,6 +624,8 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
         kept_blocks=retained
         skel.regions.extend(artwork)
     if candidates:
+        kept_blocks, connected_artwork = _complete_unverified_figure_tops(raw, kept_blocks, candidates, style)
+        skel.regions.extend(connected_artwork)
         kept_blocks, artwork = _absorb_figure_content(kept_blocks, candidates,
                                                       style)
         skel.regions.extend(artwork)
@@ -756,6 +758,32 @@ def _unverified_column_region(raw):
     lines=[ln for block in raw.text_blocks for ln in block.lines if ln.stripped]
     if not lines:return None
     em=median(ln.size for ln in lines)
+    # Some PDFs store each printed label and its right-aligned page number as
+    # separate lines. Preserve the connected row region, not only occasional
+    # rows whose text extraction happened to join both cells.
+    rows=[]
+    for line in sorted(lines,key=lambda ln:(ln.bbox[1]+ln.bbox[3])/2):
+        center=(line.bbox[1]+line.bbox[3])/2
+        if rows and abs(center-rows[-1][0])<=em*.4:
+            rows[-1][1].append(line)
+        else:rows.append((center,[line]))
+    runs=[];run=[]
+    for center,cells in rows:
+        cells=sorted(cells,key=lambda ln:ln.bbox[0])
+        last=cells[-1]
+        numeric=re.fullmatch(r'\s*\d{1,5}\s*',last.text)
+        labels=[ln for ln in cells[:-1] if any(ch.isalpha() for ch in ln.text)]
+        valid=(numeric and labels and last.bbox[0]-max(ln.bbox[2] for ln in labels)>=2*em)
+        if (not valid or (run and (center-run[-1][0]>3*em
+                or abs(last.bbox[2]-run[-1][1][-1].bbox[2])>em))):
+            if len(run)>=4:runs.append(run)
+            run=[]
+        if valid:run.append((center,cells))
+    if len(run)>=4:runs.append(run)
+    if runs:
+        selected=[ln for _,cells in max(runs,key=len) for ln in cells]
+        box=_lines_bbox(selected,selected[0].bbox)
+        return (max(0,box[0]-3),max(0,box[1]-3),min(raw.width,box[2]+3),min(raw.height,box[3]+3))
     tabular=[ln for ln in lines if '\t' in ln.text and re.search(r'\d+\s*$',ln.text)]
     if len(tabular)>=4:
         right=median(ln.bbox[2] for ln in tabular)
@@ -2352,6 +2380,57 @@ def _attach_caption(candidate, kept_blocks, style):
     candidate.bbox = (candidate.bbox[0], candidate.bbox[1], candidate.bbox[2],
                       max(candidate.bbox[3], max(ln.bbox[3] for ln in found)))
     return out
+
+
+def _complete_unverified_figure_tops(raw, kept_blocks, candidates, style):
+    """Keep connected scan diagram rows with an already measured figure.
+
+    An invisible/overpainted transcript can split one symbol diagram into several
+    blocks, with the measured figure beginning inside a later block. Extend only
+    through adjacent large-lettering blocks above that boundary, stopping at prose
+    or a different column. Pixels own the whole blocks; their unverified text is
+    never repeated as reading prose. Visible native text is outside this policy.
+    """
+    if not raw.is_page_scan or not (getattr(raw, 'text_layer_invisible', False)
+                                   or getattr(raw, 'text_layer_overpainted', False)):
+        return kept_blocks, []
+    from .assess import looks_like_prose
+    owned, artwork = set(), []
+    em = max(1.0, style.body_size)
+    ordered = sorted(kept_blocks, key=lambda item: _lines_bbox(item[1], item[0].bbox)[1], reverse=True)
+    for candidate in candidates:
+        if candidate.reason != 'scan_figure_band':
+            continue
+        box = candidate.bbox
+        claimed = []
+        for block, lines in ordered:
+            if any(id(line) in owned for line in lines):
+                continue
+            b = _lines_bbox(lines, block.bbox)
+            if b[1] >= box[1]:
+                continue
+            # Start with a block crossing the figure's top, then walk the same
+            # source column upward through short gaps. No growth sideways.
+            if b[3] < box[1] - 2*em or (not claimed and b[3] < box[1]):
+                break
+            if (b[0] < box[0] or b[2] > box[2]
+                    or looks_like_prose(' '.join(line.text for line in lines))
+                    or any(len(line.stripped.split()) >= 8 for line in lines)
+                    or not any(_chart_lettering(line, style) for line in lines)):
+                break
+            expanded = (box[0], max(0, b[1]-2), box[2], box[3])
+            if any(other is not candidate and _inside(b, other.bbox) for other in candidates):
+                break
+            box = expanded
+            claimed.extend(lines)
+        if claimed:
+            candidate.bbox = box
+            owned.update(id(line) for line in claimed)
+            artwork.append(Region(kind='artwork', lines=claimed,
+                bbox=_lines_bbox(claimed, box), reason='connected_scan_figure'))
+    retained = [(block, [line for line in lines if id(line) not in owned])
+                for block, lines in kept_blocks]
+    return [(block, lines) for block, lines in retained if lines], artwork
 
 
 def _absorb_figure_content(kept_blocks, candidates, style):

@@ -163,3 +163,77 @@ def test_source_tabular_contents_rows_do_not_flatten_an_unverified_scan(invisibl
     assert book.conservation.ok
     assert bool([f for f in book.figures if f['found']=='unverified_scan_layout']) is invisible
     assert any('The first source chapter' in e.text for e in book.elements) is not invisible
+
+@pytest.mark.parametrize('hidden',[True,False])
+def test_scan_figure_owns_connected_large_symbol_blocks_above_partial_crop(hidden,monkeypatch,tmp_path):
+    # A measured figure begins in the second symbol row. The source layer groups
+    # its header/first rows separately; those must not become junk prose above it.
+    def put(page,mode):
+        page.insert_text((80,95),'Day  Night',fontsize=18,render_mode=mode)
+        page.insert_text((80,125),'Q / X',fontsize=22,render_mode=mode)
+        page.insert_text((80,155),'0 VS 9',fontsize=22,render_mode=mode)
+        page.insert_text((80,185),'Y / Z',fontsize=22,render_mode=mode)
+        page.insert_textbox((50,240,350,550),('This ordinary source paragraph must remain outside the figure. It has complete sentences and readable words that establish a reliable prose region after the diagram. The paragraph continues in its normal reading order without changing its words or promoting a chart label into prose. ')*2,fontsize=10,render_mode=mode)
+    with pymupdf.open() as pixels:
+        p=pixels.new_page(width=400,height=600);put(p,0);png=p.get_pixmap().tobytes('png')
+    with pymupdf.open() as doc:
+        p=doc.new_page(width=400,height=600);p.insert_image(p.rect,stream=png);put(p,3 if hidden else 0)
+        raw=extract.read_page(doc,0);style=skeleton.book_style([raw]);style.body_size=10
+        monkeypatch.setattr(skeleton,'_scan_figures',lambda *a:[skeleton.Region(kind='figure',bbox=(65,140,250,205),reason='scan_figure_band')])
+        skel=skeleton.page_skeleton(raw,style)
+        book=assemble.assemble([skel],style,[raw])
+        assert book.conservation.ok
+        assert any('ordinary source paragraph' in e.text for e in book.elements)
+        figure=next(f for f in book.figures if f['found']=='scan_figure_band')
+        if hidden:
+            assert figure['bbox'][1] < 80
+            assert not any('Day' in e.text or 'Q / X' in e.text for e in book.elements)
+        else:
+            assert figure['bbox'][1]==140
+        path=tmp_path/'connected.epub';build_epub.build(book,str(path),doc=doc)
+        assert build_epub.validate(str(path))==[]
+
+@pytest.mark.parametrize('separate_numbers',[True,False])
+def test_scan_contents_separate_page_number_column_preserves_whole_row_region(separate_numbers,tmp_path):
+    def put(p,mode):
+        for section in range(3):
+            for row in range(5):
+                y=70+section*90+row*15
+                label=['Introductory observations','The deeper account','Related principles','Additional considerations','Closing observations'][row]
+                if separate_numbers:
+                    p.insert_text((50,y),label,fontsize=10,render_mode=mode)
+                    p.insert_text((320,y),str(100+section*10+row),fontsize=10,render_mode=mode)
+                else:
+                    p.insert_text((50,y),label+' refers to 123 incidents in ordinary prose.',fontsize=10,render_mode=mode)
+        p.insert_textbox((40,380,380,550),('This unrelated ordinary prose below the rows must remain selectable. It contains complete readable sentences and references to 12 events within the paragraph. ')*3,fontsize=10,render_mode=mode)
+    with pymupdf.open() as pixels:
+        p=pixels.new_page(width=420,height=600);put(p,0);png=p.get_pixmap().tobytes('png')
+    with pymupdf.open() as doc:
+        p=doc.new_page(width=420,height=600);p.insert_image(p.rect,stream=png);put(p,3)
+        book=assemble.deterministic_book(doc)
+        assert book.conservation.ok
+        assert any('unrelated ordinary prose' in e.text for e in book.elements)
+        regions=[f for f in book.figures if f['found']=='unverified_scan_layout']
+        if separate_numbers:
+            assert any(f['bbox'][1]<65 and f['bbox'][3]>305 for f in regions)
+            assert not any('Introductory observations' in e.text or 'Closing observations' in e.text for e in book.elements)
+        else:
+            assert not regions
+        path=tmp_path/'contents.epub';build_epub.build(book,str(path),doc=doc)
+        assert build_epub.validate(str(path))==[]
+
+@pytest.mark.parametrize('barrier',['prose','other_column','disconnected'])
+def test_connected_scan_figure_stops_at_source_boundaries(barrier):
+    from types import SimpleNamespace as NS
+    def line(text,box,size=20):return NS(text=text,stripped=text,bbox=box,size=size)
+    seed=line('X / Y',(110,90,220,115))
+    upper=line('Q / Z',(110,60,220,80))
+    if barrier=='prose':upper=line('An ordinary sentence with enough readable words must stay prose.',(110,60,220,80),10)
+    if barrier=='other_column':upper=line('Q / Z',(10,60,90,80))
+    if barrier=='disconnected':upper=line('Q / Z',(110,20,220,40))
+    blocks=[(NS(bbox=ln.bbox),[ln]) for ln in [upper,seed]]
+    figure=skeleton.Region(kind='figure',bbox=(100,100,250,200),reason='scan_figure_band')
+    kept,art=skeleton._complete_unverified_figure_tops(NS(is_page_scan=True,text_layer_invisible=True),blocks,[figure],NS(body_size=10))
+    assert figure.bbox==(100,88,250,200)
+    assert any(upper is ln for _,lines in kept for ln in lines)
+    assert [ln.text for region in art for ln in region.lines]==['X / Y']

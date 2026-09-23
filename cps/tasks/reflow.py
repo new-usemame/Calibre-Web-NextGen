@@ -331,7 +331,9 @@ class TaskReflowPdf(CalibreTask):
         try:
             built = build_epub.build(result.book, candidate, page_html=result.page_html,
                                      metadata=_metadata(book), doc=document,
-                                     report_html=page, sidecar=payload,
+                                     report_html=page,
+                                     sidecar=report.sidecar(
+                                         payload, show_cost=self.options.show_cost_in_report),
                                      source_pages=getattr(result,'source_pages',None),
                                      operation_plans=getattr(result,'operation_plans',None),
                                      figure_transform=(result.recovery.figure_rect

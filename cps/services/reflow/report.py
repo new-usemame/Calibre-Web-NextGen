@@ -348,6 +348,23 @@ def check_completion(payload, ledger):
 
 # -------------------------------------------------------------------- the page
 
+def sidecar(payload, show_cost=False):
+    """The JSON twin written into the EPUB, with the same cost choice as the page.
+
+    ``numbers()`` is one payload for the page, the sidecar and the ledger check
+    (G4), and G4 must keep seeing the real spend. What travels inside the book is
+    different: the about page leaves "What this cost" out unless the user chose to
+    show it, and a file anyone can be handed must not carry the figures the page
+    withheld. The spend block is replaced by an explicit ``{"shown": false}`` so a
+    reader of the JSON can tell a withheld figure from a missing one. The job's
+    ledger keeps every figure for its owner.
+    """
+    public = dict(payload)
+    if not show_cost:
+        public["spend"] = {"shown": False}
+    return public
+
+
 def about_page(payload, show_cost=False, links=None, losses=()):
     """The XHTML body of ``reflow-about.xhtml``, in plain language.
 

@@ -179,6 +179,34 @@ def test_a_cancelled_job_does_not_file_a_half_reviewed_conversion(rig):
     assert _ledger_rows(rig)[0]["status"] == "cancelled"
 
 
+def test_the_epubs_own_sidecar_keeps_the_cost_private_unless_the_user_shows_it(rig):
+    """``show_cost_in_report`` decides whether what a conversion cost travels
+    inside the book. The about page honoured it; the machine-readable twin in
+    META-INF/reflow.json carried the confirmed spend, the held amount, the cap,
+    the token counts and the per-model bill regardless -- readable by anyone the
+    file is shared with. Breaks if the sidecar is written from the unredacted
+    report payload again."""
+    from cps.services.reflow import build_epub
+
+    private = _run(rig, mode="sample", sample_pages=2, cost_cap_usd=0.75)
+    shown = _run(rig, mode="sample", sample_pages=2, cost_cap_usd=0.75,
+                 show_cost_in_report=True)
+    for task in (private, shown):
+        assert task.stat == STAT_FINISH_SUCCESS, task.error
+
+    hidden = build_epub.read_sidecar(rig.mod.sample_path(7, private.job_id))
+    public = build_epub.read_sidecar(rig.mod.sample_path(7, shown.job_id))
+    money = {"usd", "pending_usd", "cap_usd", "calls", "reused", "prompt_tokens",
+             "completion_tokens", "models", "unresolved_attempts"}
+    assert not money & set(hidden.get("spend") or {}), hidden.get("spend")
+    assert hidden["spend"] == {"shown": False}
+    # The job's own record is where the owner reads what was spent; it is untouched.
+    assert _ledger_rows(rig)[0]["cap_usd"] == pytest.approx(0.75)
+    # The same conversion with the cost shown carries every figure the page shows.
+    assert public["spend"]["cap_usd"] == pytest.approx(0.75)
+    assert money <= set(public["spend"])
+
+
 # ── the record ───────────────────────────────────────────────────────────────
 
 def test_the_job_says_what_it_was_and_how_it_ended(rig):

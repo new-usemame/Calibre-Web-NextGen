@@ -299,12 +299,21 @@ COPY --from=dependencies /usr/bin/lsof /usr/bin/lsof
 COPY --from=dependencies /opt/python /opt/python
 
 # Install only runtime apt packages (no Python — that came from PBS via the COPY above)
+# tesseract-ocr + eng + osd: Reflow's local source recovery reads picture-only and
+# damaged PDF pages with the Tesseract CLI (cps/services/reflow/ocr.py). English is
+# the bundled recognition language; osd is required for orientation detection.
+# Operator-approved 2026-09-22 (project rule 6); tesseract-ocr-all is NOT approved.
+# Without these packages the app still runs: recovery reports the engine missing
+# and conversions keep a facsimile of those pages.
 RUN \
   echo "**** install runtime packages ****" && \
   apt-get update && \
   apt-get install -y --no-install-recommends \
   imagemagick \
   ghostscript \
+  tesseract-ocr \
+  tesseract-ocr-eng \
+  tesseract-ocr-osd \
   libldap2 \
   libmagic1 \
   libsasl2-2 \

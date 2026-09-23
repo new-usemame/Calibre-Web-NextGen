@@ -44,19 +44,19 @@ def test_encoded_spaces_and_ordinary_inferred_word_spaces_remain_text():
         assert book.conservation.ok
 
 
-def _overpainted_document(overpaint=True):
+def _overpainted_document(overpaint=True,invisible=False):
     source=pymupdf.open();p=source.new_page(width=400,height=600)
-    p.insert_textbox((40,65,360,120),'Ordinary reliable surrounding prose is a complete sentence with the words that explain how the example is used.',fontsize=10)
+    p.insert_textbox((40,65,360,120),'Ordinary reliable surrounding prose is a complete sentence with the words that explain how the example is used. The next sentence is normal readable text that stays outside the sparse symbol region.',fontsize=10)
     for x,text in [(40,'Object'),(130,'Speed'),(220,'Direction')]:p.insert_text((x,160),text,fontsize=9)
     for y,label in [(210,'A'),(270,'B'),(330,'C')]:p.insert_text((40,y),label,fontsize=10)
     p.insert_text((130,210),'N/A',fontsize=9)
     png=p.get_pixmap().tobytes('png');source.close()
     doc=pymupdf.open();p=doc.new_page(width=400,height=600)
     if not overpaint:p.insert_image(p.rect,stream=png)
-    p.insert_textbox((40,65,360,120),'Ordinary reliable surrounding prose is a complete sentence with the words that explain how the example is used.',fontsize=10)
-    for x,text in [(40,'Object'),(130,'Speed'),(220,'Direction')]:p.insert_text((x,160),text,fontsize=9)
-    for y,label in [(210,'O'),(270,'2'),(330,'S')]:p.insert_text((40,y),label,fontsize=10)
-    p.insert_text((130,210),'n / a',fontsize=9)
+    p.insert_textbox((40,65,360,120),'Ordinary reliable surrounding prose is a complete sentence with the words that explain how the example is used. The next sentence is normal readable text that stays outside the sparse symbol region.',fontsize=10,render_mode=3 if invisible else 0)
+    for x,text in [(40,'Object'),(130,'Speed'),(220,'Direction')]:p.insert_text((x,160),text,fontsize=9,render_mode=3 if invisible else 0)
+    for y,label in [(210,'O'),(270,'2'),(330,'S')]:p.insert_text((40,y),label,fontsize=10,render_mode=3 if invisible else 0)
+    p.insert_text((130,210),'n / a',fontsize=9,render_mode=3 if invisible else 0)
     if overpaint:p.insert_image(p.rect,stream=png)
     return doc
 
@@ -79,3 +79,13 @@ def test_image_paint_order_quarantines_sparse_unverified_layout_only(overpaint,t
                 body=''.join(z.read(n).decode() for n in z.namelist() if re.fullmatch(r'OEBPS/ch\d+\.xhtml',n))
                 assert 'Unverified scan transcription' in body
                 assert 'n / a' not in body
+
+
+def test_invisible_scan_symbols_have_the_same_unverified_provenance_as_overpainted_text():
+    with _overpainted_document(False,True) as doc:
+        raw=extract.read_page(doc,0)
+        assert raw.text_layer_invisible and not raw.text_layer_overpainted
+        style=skeleton.book_style([raw]);book=assemble.assemble([skeleton.page_skeleton(raw,style)],style,[raw])
+        assert book.conservation.ok
+        assert any(f['found']=='unverified_scan_layout' for f in book.figures)
+        assert not any(e.text.strip() in ('O','2','S') for e in book.elements)

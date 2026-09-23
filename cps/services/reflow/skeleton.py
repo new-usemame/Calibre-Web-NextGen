@@ -844,7 +844,8 @@ def _preserve_paired_scan_columns(raw, kept_blocks, skel, candidates):
 
 
 def _preserve_unverified_scan_layout(raw, kept_blocks, skel):
-    if not raw.is_page_scan or not getattr(raw, 'text_layer_overpainted', False):
+    if not raw.is_page_scan or not (getattr(raw, 'text_layer_overpainted', False)
+                                   or getattr(raw, 'text_layer_invisible', False)):
         return kept_blocks
     from .assess import looks_like_prose
     # Ordinary continuous prose keeps its reflow. Sparse non-prose runs with

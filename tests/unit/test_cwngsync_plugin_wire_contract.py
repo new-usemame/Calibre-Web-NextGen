@@ -123,8 +123,10 @@ def test_the_parser_actually_finds_the_calls():
         "claim_deletion", "complete_deletion",
         "get_collections", "complete_collections",
         "pull_annotations", "push_annotations",
+        "get_library", "update_read_status", "pair_start", "pair_poll",
     }
     assert "annotations" in calls["push_annotations"]
+    assert calls["update_read_status"] >= {"document", "status"}
 
 
 def test_a_nested_table_is_parsed_by_depth_not_by_the_first_brace():

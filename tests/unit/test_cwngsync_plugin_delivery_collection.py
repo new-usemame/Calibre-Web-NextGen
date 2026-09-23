@@ -73,7 +73,8 @@ def test_collection_guard_remains_explicit_in_the_production_function():
 
 
 def test_manual_collection_is_available_without_an_open_book():
-    menu = _function("addToMainMenu")
+    # The manual controls moved under Tools > CWNG library > Advanced.
+    menu = _function("getAdvancedMenuItems")
 
     assert "Collect books queued for this device now" in menu
     assert "self:collectDeliveries(true, true)" in menu

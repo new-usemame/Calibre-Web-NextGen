@@ -26,6 +26,10 @@ local ffiUtil = require("ffi/util")
 local T = ffiUtil.template
 local _ = require("gettext")
 local bit = require("bit")
+local AutoSync = require("cwng_auto_sync")
+local LibraryRuntime = require("cwng_library_runtime")
+local Setup = require("cwng_setup")
+local SetupFlow = require("cwng_setup_flow")
 
 if G_reader_settings:hasNot("device_id") then
     G_reader_settings:saveSetting("device_id", random.uuid())
@@ -66,7 +70,8 @@ CWNGSync.default_settings = {
     server = nil,
     username = nil,
     password = nil,
-    -- Do *not* default to auto-sync, as wifi may not be on at all times, and the nagging enabling this may cause requires careful consideration.
+    -- Off until the device is connected through setup (which turns it on);
+    -- it never turns Wi-Fi on by itself, so there is nothing to nag about.
     auto_sync = false,
     pages_before_update = nil,
     sync_forward = SYNC_STRATEGY.PROMPT,
@@ -74,6 +79,9 @@ CWNGSync.default_settings = {
     -- Highlight sync writes into the device's KoboReader.sqlite — opt-in,
     -- default off until the user explicitly enables it (Kobo only).
     sync_annotations = false,
+    -- The CWNG library folder (covers of every book in scope, downloaded on
+    -- tap). Turned on by setup; an existing install keeps its folders.
+    library_enabled = false,
 }
 
 function CWNGSync:init()
@@ -100,8 +108,9 @@ function CWNGSync:init()
     self.periodic_push_task = function()
         self.periodic_push_scheduled = false
         self.page_update_counter = 0
-        -- We do *NOT* want to make sure networking is up here, as the nagging would be extremely annoying; we're leaving that to the network activity check...
-        self:updateProgress(false, false)
+        -- Position only; highlights go when the book is closed or the device
+        -- sleeps. Queued when offline, never a reason to turn Wi-Fi on.
+        self:queueOpenBook(false)
     end
 
     local migrated_settings = Migration.migrateSettings(G_reader_settings)
@@ -109,13 +118,25 @@ function CWNGSync:init()
         or G_reader_settings:readSetting("cwngsync", self.default_settings)
     self.device_id = G_reader_settings:readSetting("device_id")
 
-    -- Disable auto-sync if beforeWifiAction was reset to "prompt" behind our back...
-    if self.settings.auto_sync and Device:hasSeamlessWifiToggle() and G_reader_settings:readSetting("wifi_enable_action") ~= "turn_on" then
-        self.settings.auto_sync = false
-        logger.warn("CWNGSync: Automatic sync has been disabled because wifi_enable_action is *not* turn_on")
-    end
-
     self.ui.menu:registerToMainMenu(self)
+    self:installOpenHook()
+    self:installStatusHook()
+    self:onDispatcherRegisterActions()
+    self:registerEvents()
+    if not self.ui.document then
+        UIManager:nextTick(function() self:onLibraryShown() end)
+    end
+end
+
+-- The file browser is up: finish a ready-made setup, offer to connect, or
+-- bring the library up to date.
+function CWNGSync:onLibraryShown()
+    if self:importSetupBundle() then return end
+    if not self:isConfigured() then
+        if not self:bundlePending() then self:maybeWelcome() end
+        return
+    end
+    if NetworkMgr:isConnected() then self:onDeviceOnline() end
 end
 
 function CWNGSync:getSyncPeriod()
@@ -218,32 +239,153 @@ local function validateUser(user, pass)
 end
 
 function CWNGSync:onDispatcherRegisterActions()
+    Dispatcher:registerAction("cwngsync_sync_now", { category="none", event="CWNGSyncSyncNow", title=_("Sync with CWNG now"), general=true,})
     Dispatcher:registerAction("cwngsync_push_progress", { category="none", event="CWNGSyncPushProgress", title=_("Push progress from this device"), reader=true,})
     Dispatcher:registerAction("cwngsync_pull_progress", { category="none", event="CWNGSyncPullProgress", title=_("Pull progress from other devices"), reader=true, separator=true,})
 end
 
 function CWNGSync:onReaderReady()
-    if self.settings.auto_sync then
+    self:registerEvents()
+    self.last_page = self.ui:getCurrentPage()
+    -- A cloud book opened some way the open hook did not see.
+    if self:rescueOpenedPlaceholder() then return end
+    -- Only when already online: opening a book never asks for Wi-Fi.
+    if self.settings.auto_sync and self:isConfigured() and NetworkMgr:isConnected() then
         UIManager:nextTick(function()
-            self:getProgress(true, false)
-            self:syncDeviceCapabilities(false, false)
-            self:collectDeliveries(false, false)
+            self:flushPending(function()
+                self:getProgress(false, false)
+                if self.settings.sync_annotations then self:syncAnnotations(false) end
+                -- A book sent from the website while reading arrives now.
+                self:syncDeviceCapabilities(false, false)
+                self:collectDeliveries(false, false)
+            end)
         end)
     end
-    -- NOTE: Keep in mind that, on Android, turning on WiFi requires a focus switch, which will trip a Suspend/Resume pair.
-    --       NetworkMgr will attempt to hide the damage to avoid a useless pull -> push -> pull dance instead of the single pull requested.
-    --       Plus, if wifi_enable_action is set to prompt, that also avoids stacking three prompts on top of each other...
-    self:registerEvents()
-    self:onDispatcherRegisterActions()
+end
 
-    self.last_page = self.ui:getCurrentPage()
+function CWNGSync:onCWNGSyncSyncNow()
+    self:syncEverythingNow()
+    return true
+end
+
+local function hostOf(server)
+    return (server or ""):match("^https?://([^/]+)") or server or ""
 end
 
 function CWNGSync:addToMainMenu(menu_items)
     menu_items.cwng_progress_sync = {
-        text = _("NextGen Progress Sync"),
+        text = _("CWNG library"),
         sorting_hint = "tools",
         sub_item_table = {
+            {
+                text_func = function()
+                    if self:isConfigured() then
+                        return T(_("Connected: %1 at %2"), self.settings.username, hostOf(self.settings.server))
+                    end
+                    return _("Connect this device")
+                end,
+                keep_menu_open = true,
+                callback = function()
+                    if self:isConfigured() then
+                        UIManager:show(InfoMessage:new{
+                            text = T(_("This device reads the CWNG library of %1 at %2.\n\nTo use another account, choose Disconnect this device first."),
+                                self.settings.username, self.settings.server),
+                        })
+                    else
+                        self:showConnectChoices()
+                    end
+                end,
+            },
+            {
+                text = _("Sync now"),
+                enabled_func = function() return self:isConfigured() end,
+                callback = function() self:syncEverythingNow() end,
+            },
+            {
+                text = _("Show my library"),
+                enabled_func = function()
+                    return self:libraryEnabled() and not self:hasActiveDocument()
+                end,
+                callback = function() self:showLibrary() end,
+                separator = true,
+            },
+            {
+                text = _("Show my CWNG library on this device"),
+                help_text = _([[Every book in your CWNG library appears here with its cover, or only the books on the shelves you chose for e-readers on the website (the same choice your Kobo uses). Tap a book to download and open it.]]),
+                enabled_func = function() return self:isConfigured() end,
+                checked_func = function() return self.settings.library_enabled == true end,
+                callback = function()
+                    self.settings.library_enabled = not self.settings.library_enabled
+                    if self.settings.library_enabled then
+                        self:applyReaderDefaults()
+                        self:syncLibrary({ force = true, interactive = true })
+                    end
+                end,
+            },
+            {
+                text = _("Sync reading automatically"),
+                help_text = _([[Your position, read status and highlights are sent when you close a book or the device sleeps, and brought in whenever the device is online. Wi-Fi is never turned on for this; anything waiting goes the next time it is.]]),
+                checked_func = function() return self.settings.auto_sync end,
+                callback = function()
+                    self.settings.auto_sync = not self.settings.auto_sync
+                    self:registerEvents()
+                    if not(self:hasActiveDocument()) then
+                        return
+                    end
+                    if self.settings.auto_sync then
+                        -- Since we will update the progress when closing the document,
+                        -- pull the current progress now so as not to silently overwrite it.
+                        if NetworkMgr:isConnected() then self:getProgress(false, false) end
+                    else
+                        -- Since we won't update the progress when closing the document,
+                        -- send the current progress now so as not to lose it.
+                        self:queueOpenBook(true)
+                    end
+                end,
+            },
+            {
+                text = _("Include highlights and notes"),
+                checked_func = function() return self.settings.sync_annotations end,
+                callback = function()
+                    self.settings.sync_annotations = not self.settings.sync_annotations
+                end,
+                separator = true,
+            },
+            {
+                text = _("Advanced"),
+                sub_item_table = self:getAdvancedMenuItems(),
+            },
+            {
+                text = _("Disconnect this device"),
+                enabled_func = function() return self:isConfigured() end,
+                keep_menu_open = true,
+                callback = function(touchmenu_instance)
+                    UIManager:show(ConfirmBox:new{
+                        text = _("Disconnect this device from CWNG? Downloaded books stay on it; covers of books you have not downloaded stay until you connect again."),
+                        ok_text = _("Disconnect"),
+                        ok_callback = function()
+                            self:disconnect()
+                            if touchmenu_instance then touchmenu_instance:updateItems() end
+                        end,
+                    })
+                end,
+            },
+            {
+                text = T(_("Plugin version: %1"), self.version),
+                keep_menu_open = true,
+                callback = function()
+                    UIManager:show(InfoMessage:new{
+                        text = T(_("CWNG library plugin\nVersion: %1\n\nKeeps this device's library, reading position, read status and highlights in step with Calibre-Web NextGen."), self.version),
+                    })
+                end,
+            },
+        }
+    }
+end
+
+-- The manual controls from before the library existed, for troubleshooting.
+function CWNGSync:getAdvancedMenuItems()
+    return {
             {
                 text = _("Set NextGen Server"),
                 keep_menu_open = true,
@@ -278,39 +420,10 @@ function CWNGSync:addToMainMenu(menu_items)
                 separator = true,
             },
             {
-                text = _("Automatically keep documents in sync"),
-                checked_func = function() return self.settings.auto_sync end,
-                help_text = _([[This may lead to nagging about toggling WiFi on document close and suspend/resume, depending on the device's connectivity.]]),
-                callback = function()
-                    -- Actively recommend switching the before wifi action to "turn_on" instead of prompt, as prompt will just not be practical (or even plain usable) here.
-                    if Device:hasSeamlessWifiToggle() and G_reader_settings:readSetting("wifi_enable_action") ~= "turn_on" and not self.settings.auto_sync then
-                        UIManager:show(InfoMessage:new{ text = _("You will have to switch the 'Action when Wi-Fi is off' Network setting to 'turn on' to be able to enable this feature!") })
-                        return
-                    end
-
-                    self.settings.auto_sync = not self.settings.auto_sync
-                    self:registerEvents()
-                    if not(self:hasActiveDocument()) then
-                        return
-                    end
-                    if self.settings.auto_sync then
-                        -- Since we will update the progress when closing the document,
-                        -- pull the current progress now so as not to silently overwrite it.
-                        self:getProgress(true, true)
-                    else
-                        -- Since we won't update the progress when closing the document,
-                        -- push the current progress now so as not to lose it.
-                        self:updateProgress(true, true)
-                    end
-                end,
-            },
-            {
                 text_func = function()
                     return T(_("Periodically sync every # pages (%1)"), self:getSyncPeriod())
                 end,
                 enabled_func = function() return self.settings.auto_sync end,
-                -- This is the condition that allows enabling auto_disable_wifi in NetworkManager ;).
-                help_text = NetworkMgr:getNetworkInterfaceName() and _([[Unlike the automatic sync above, this will *not* attempt to setup a network connection, but instead relies on it being already up, and may trigger enough network activity to passively keep WiFi enabled!]]),
                 keep_menu_open = true,
                 callback = function(touchmenu_instance)
                     local SpinWidget = require("ui/widget/spinwidget")
@@ -415,7 +528,7 @@ If set to 0, updating progress based on page turns will be disabled.]]),
                     return self.settings.password ~= nil and self:hasActiveDocument()
                 end,
                 callback = function()
-                    self:updateProgress(true, true)
+                    self:pushNow()
                 end,
             },
             {
@@ -450,14 +563,6 @@ If set to 0, updating progress based on page turns will be disabled.]]),
                 separator = true,
             },
             {
-                text = _("Sync KOReader highlights"),
-                help_text = _([[Uploads highlights and notes from the open KOReader document to your NextGen library. On Kobo devices, existing server-to-Nickel highlight support remains available.]]),
-                checked_func = function() return self.settings.sync_annotations end,
-                callback = function()
-                    self.settings.sync_annotations = not self.settings.sync_annotations
-                end,
-            },
-            {
                 text = _("Sync highlights now") .. self:statusTextIfActionUnavailable(),
                 enabled_func = function()
                     return self.settings.sync_annotations and self.settings.password ~= nil and self:hasActiveDocument()
@@ -465,18 +570,7 @@ If set to 0, updating progress based on page turns will be disabled.]]),
                 callback = function()
                     self:syncAnnotations(true)
                 end,
-                separator = true,
             },
-            {
-                text = T(_("Plugin version: %1"), self.version),
-                keep_menu_open = true,
-                callback = function()
-                    UIManager:show(InfoMessage:new{
-                        text = T(_("NextGen Progress Sync Plugin\nVersion: %1\n\nThis plugin syncs your reading progress to Calibre-Web NextGen."), self.version),
-                    })
-                end,
-            },
-        }
     }
 end
 
@@ -507,8 +601,10 @@ function CWNGSync:setSyncBackward(strategy)
     self.settings.sync_backward = strategy
 end
 
-function CWNGSync:login(menu)
-    if NetworkMgr:willRerunWhenOnline(function() self:login(menu) end) then
+-- on_credentials(username, password), when given, receives the typed sign-in
+-- instead of the plain login (setup uses it to connect the whole device).
+function CWNGSync:login(menu, on_credentials)
+    if NetworkMgr:willRerunWhenOnline(function() self:login(menu, on_credentials) end) then
         return
     end
 
@@ -548,7 +644,11 @@ function CWNGSync:login(menu)
                         else
                             UIManager:close(dialog)
                             UIManager:scheduleIn(0.5, function()
-                                self:doLogin(username, password, menu)
+                                if on_credentials then
+                                    on_credentials(username, password)
+                                else
+                                    self:doLogin(username, password, menu)
+                                end
                             end)
                             UIManager:show(InfoMessage:new{
                                 text = _("Logging in. Please wait…"),
@@ -607,7 +707,6 @@ end
 
 function CWNGSync:logout(menu)
     self.settings.password = nil
-    self.settings.auto_sync = true
     if menu then
         menu:updateItems()
     end
@@ -882,22 +981,21 @@ function CWNGSync:getInventoryBooks()
     -- Inventory describes the device, so it must never inherit bulk pull's
     -- selected/current-view shortcut. Prefer KOReader's configured home (which
     -- can itself be an SD-card library), then use progressively weaker roots.
-    local function usableRoot(candidate)
-        return candidate and util.directoryExists(candidate) and candidate or nil
-    end
-    local root_path = usableRoot(G_reader_settings:readSetting("home_dir"))
-        or usableRoot(Device.home_dir)
-        or usableRoot(G_reader_settings:readSetting("lastdir"))
-        or usableRoot(self.ui and self.ui.file_chooser and self.ui.file_chooser.path)
+    local root_path = self:getDeliveryRootPath()
     if not root_path then
         return {}, nil
     end
 
+    local library = self:libraryEnabled()
     local document_registry_ok, DocumentRegistry = pcall(require, "document/documentregistry")
     local paths = {}
     local seen = {}
     util.findFiles(root_path, function(path)
         if seen[path] then
+            return
+        end
+        -- A cover waiting to be downloaded is not a book on this device.
+        if library and self:isLibraryPlaceholder(path) then
             return
         end
         if document_registry_ok and DocumentRegistry and DocumentRegistry.hasProvider then
@@ -998,6 +1096,13 @@ function CWNGSync:getDeliveryRootPath()
     local function usableRoot(candidate)
         return candidate and util.directoryExists(candidate) and candidate or nil
     end
+    -- With the library on, sent books land in it: that is where the reader
+    -- looks, and a sent book replaces its own cover there.
+    if self:libraryEnabled() then
+        local root = self:getLibraryRoot()
+        if root and not util.directoryExists(root) then util.makePath(root) end
+        if usableRoot(root) then return root end
+    end
     return usableRoot(G_reader_settings:readSetting("home_dir"))
         or usableRoot(Device.home_dir)
         or usableRoot(G_reader_settings:readSetting("lastdir"))
@@ -1032,6 +1137,12 @@ function CWNGSync:syncDeviceCapabilities(interactive, ensure_networking)
     }
 
     local function syncCollections()
+        -- The library builds shelves from its own manifest, cloud books
+        -- included; the inventory-only snapshot would duplicate them.
+        if self:libraryEnabled() then
+            self:retireSnapshotCollections()
+            return
+        end
         client:get_collections(
             self.settings.username, self.settings.password, Device.model, self.device_id,
             function(ok, snapshot, reason)
@@ -1707,7 +1818,7 @@ function CWNGSync:updateProgress(ensure_networking, interactive, on_suspend)
         Device.model,
         self.device_id,
         function(ok, body)
-            logger.dbg("CWNGSync: [Push] progress to", percentage * 100, "% =>", progress, "for", self.view.document.file)
+            logger.dbg("CWNGSync: [Push] progress to", percentage * 100, "% =>", progress, "for", current_file)
             logger.dbg("CWNGSync: ok:", ok, "body:", body)
             if interactive then
                 if ok then
@@ -1812,7 +1923,7 @@ function CWNGSync:getProgress(ensure_networking, interactive)
         self.settings.password,
         doc_digest,
         function(ok, body)
-            logger.dbg("CWNGSync: [Pull] progress for", self.view.document.file)
+            logger.dbg("CWNGSync: [Pull] progress for", current_file)
             logger.dbg("CWNGSync: ok:", ok, "body:", body)
 
             if not ok or not body then
@@ -1966,18 +2077,9 @@ end
 
 function CWNGSync:_onCloseDocument()
     logger.dbg("CWNGSync: onCloseDocument")
-    -- NOTE: Because everything is terrible, on Android, opening the system settings to enable WiFi means we lose focus,
-    --       and we handle those system focus events via... Suspend & Resume events, so we need to neuter those handlers early.
-    self.onResume = nil
-    self.onSuspend = nil
-    -- NOTE: Because we'll lose the document instance on return, we need to *block* until the connection is actually up here,
-    --       we cannot rely on willRerunWhenOnline, because if we're not currently online,
-    --       it *will* return early, and that means the actual callback *will* run *after* teardown of the document instance
-    --       (and quite likely ours, too).
-    NetworkMgr:goOnlineToRun(function()
-        -- Drop the inner willRerunWhenOnline ;).
-        self:updateProgress(false, false)
-    end)
+    -- The book is still open while this event runs: capture everything now.
+    -- Delivery happens now if online, else on the next connection.
+    self:queueOpenBook(true)
 end
 
 function CWNGSync:schedulePeriodicPush()
@@ -2005,42 +2107,59 @@ end
 
 function CWNGSync:_onResume()
     logger.dbg("CWNGSync: onResume")
-    -- If we have auto_restore_wifi enabled, skip this to prevent both the "Connecting..." UI to pop-up,
-    -- *and* a duplicate NetworkConnected event from firing...
-    if Device:hasWifiRestore() and NetworkMgr.wifi_was_on and G_reader_settings:isTrue("auto_restore_wifi") then
-        return
-    end
-
-    -- And if we don't, this *will* (attempt to) trigger a connection and as such a NetworkConnected event,
-    -- but only a single pull will happen, since getProgress debounces itself.
-    UIManager:scheduleIn(1, function()
-        self:getProgress(true, false)
-    end)
+    -- The device rejoins Wi-Fi by itself after waking; catch it when it does.
+    self:onlineSoon()
 end
 
 function CWNGSync:_onSuspend()
     logger.dbg("CWNGSync: onSuspend")
-    -- We request an extra flashing refresh on success, to deal with potential ghosting left by the NetworkMgr UI
-    self:updateProgress(true, false, true)
+    self:queueOpenBook(true)
 end
 
 function CWNGSync:_onNetworkConnected()
     logger.dbg("CWNGSync: onNetworkConnected")
     UIManager:scheduleIn(0.5, function()
-        -- Network is supposed to be on already, don't wrap this in willRerunWhenOnline
-        self:getProgress(false, false)
-        self:collectDeliveries(false, false)
+        if self:bundlePending() then
+            self:importSetupBundle()
+            return
+        end
+        self:onDeviceOnline()
     end)
 end
 
 function CWNGSync:_onNetworkDisconnecting()
     logger.dbg("CWNGSync: onNetworkDisconnecting")
-    -- Network is supposed to be on already, don't wrap this in willRerunWhenOnline
-    self:updateProgress(false, false)
+    -- Last chance while the connection is still up.
+    if self:hasCurrentDocument() then self:queueOpenBook(false) end
+end
+
+-- A push the reader asked for goes through the same queue as automatic ones,
+-- so an older queued position can never follow it to the server.
+function CWNGSync:pushNow()
+    if not self.settings.username or not self.settings.password then
+        promptLogin()
+        return
+    end
+    if not self:hasCurrentDocument() then
+        showNoBookMessage()
+        return
+    end
+    NetworkMgr:runWhenConnected(function()
+        self:queueOpenBook(false, function(ok)
+            if ok then
+                UIManager:show(InfoMessage:new{
+                    text = _("Progress has been pushed."),
+                    timeout = 3,
+                })
+            else
+                showSyncError()
+            end
+        end)
+    end)
 end
 
 function CWNGSync:onCWNGSyncPushProgress()
-    self:updateProgress(true, true)
+    self:pushNow()
 end
 
 function CWNGSync:onCWNGSyncPullProgress()
@@ -2048,21 +2167,16 @@ function CWNGSync:onCWNGSyncPullProgress()
 end
 
 function CWNGSync:registerEvents()
-    if self.settings.auto_sync then
-        self.onCloseDocument = self._onCloseDocument
-        self.onPageUpdate = self._onPageUpdate
-        self.onResume = self._onResume
-        self.onSuspend = self._onSuspend
-        self.onNetworkConnected = self._onNetworkConnected
-        self.onNetworkDisconnecting = self._onNetworkDisconnecting
-    else
-        self.onCloseDocument = nil
-        self.onPageUpdate = nil
-        self.onResume = nil
-        self.onSuspend = nil
-        self.onNetworkConnected = nil
-        self.onNetworkDisconnecting = nil
-    end
+    local configured = self:isConfigured()
+    local auto = configured and self.settings.auto_sync
+    local online = configured and (auto or self:libraryEnabled())
+    self.onCloseDocument = auto and self._onCloseDocument or nil
+    self.onPageUpdate = auto and self._onPageUpdate or nil
+    self.onSuspend = auto and self._onSuspend or nil
+    self.onNetworkDisconnecting = auto and self._onNetworkDisconnecting or nil
+    self.onResume = online and self._onResume or nil
+    -- Also finishes a ready-made setup that was waiting for Wi-Fi.
+    self.onNetworkConnected = self._onNetworkConnected
 end
 
 -- Phase 2: two-way highlight sync. Pull the book's annotations from the
@@ -2226,6 +2340,22 @@ end
 function CWNGSync:onCloseWidget()
     UIManager:unschedule(self.periodic_push_task)
     self.periodic_push_task = nil
+    if self.online_retry_task then
+        UIManager:unschedule(self.online_retry_task)
+        self.online_retry_task = nil
+    end
+end
+
+-- The library folder, setup and automatic sync live in their own files; their
+-- functions become plugin methods. A name defined twice is a load error, not a
+-- silent override.
+for _, mixin in ipairs({ LibraryRuntime, SetupFlow, AutoSync }) do
+    for key, value in pairs(mixin) do
+        if type(value) == "function" and key:sub(1, 1) ~= "_" then
+            assert(CWNGSync[key] == nil, "CWNGSync: duplicate method " .. key)
+            CWNGSync[key] = value
+        end
+    end
 end
 
 return CWNGSync

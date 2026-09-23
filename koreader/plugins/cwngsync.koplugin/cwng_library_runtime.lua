@@ -1,0 +1,630 @@
+--[[
+Runtime half of the CWNG library folder. library.lua decides what the folder
+must hold; this file talks to the server and the disk, and is mixed into the
+CWNGSync plugin class by main.lua.
+
+Two paths matter to the reader:
+  * syncLibrary   - fetches the manifest and brings the folder in line with it,
+                    one file per UI tick so the device stays responsive.
+  * the open hook - tapping a placeholder downloads the real book over it and
+                    opens that instead, from anywhere KOReader opens a book.
+]]
+
+local BookList = require("ui/widget/booklist")
+local DataStorage = require("datastorage")
+local Device = require("device")
+local DocSettings = require("docsettings")
+local InfoMessage = require("ui/widget/infomessage")
+local Json = require("json")
+local Library = require("cwng_library")
+local LuaSettings = require("luasettings")
+local NetworkMgr = require("ui/network/manager")
+local UIManager = require("ui/uimanager")
+local lfs = require("libs/libkoreader-lfs")
+local logger = require("logger")
+local util = require("util")
+local T = require("ffi/util").template
+local _ = require("gettext")
+
+local Runtime = {}
+
+local PLACEHOLDER_MAX_BYTES = 1024 * 1024
+-- Automatic syncs (network up, wake, file browser shown) are at most this
+-- often. A manual "Sync now" and the first sync after setup ignore it.
+local LIBRARY_SYNC_INTERVAL = 5 * 60
+local MAX_MANIFEST_PAGES = 200
+local PLACEHOLDER_TIMEOUTS = { 5, 20 }
+
+-- Shared by the file browser's and the reader's plugin instances: there is one
+-- library and one sync at a time, whichever instance started it.
+local shared = {
+    running = nil,
+    last_sync = nil,
+    state = nil,
+    store = nil,
+    plugin = nil,
+}
+Runtime._shared = shared
+
+local function store()
+    if not shared.store then
+        shared.store = LuaSettings:open(DataStorage:getSettingsDir() .. "/cwngsync_library.lua")
+    end
+    return shared.store
+end
+
+function Runtime:getLibraryState()
+    if not shared.state then
+        shared.state = Library.loadState(store():readSetting("state"))
+    end
+    return shared.state
+end
+
+function Runtime:saveLibraryState()
+    local file = store()
+    file:saveSetting("state", self:getLibraryState())
+    local ok, err = pcall(file.flush, file)
+    if not ok then logger.warn("CWNGSync: could not save library state", err) end
+end
+
+function Runtime:isConfigured()
+    local s = self.settings
+    return type(s) == "table" and type(s.server) == "string" and s.server ~= ""
+        and type(s.username) == "string" and s.username ~= ""
+        and type(s.password) == "string" and s.password ~= ""
+end
+
+-- On for a device connected through setup (code, ready-made plugin or first
+-- sign-in); an existing progress-sync install keeps its folders as they are
+-- until the reader turns the library on.
+function Runtime:libraryEnabled()
+    return self:isConfigured() and self.settings.library_enabled == true
+end
+
+-- The folder is fixed the first time it is needed, so later changes to
+-- KOReader's home folder (which setup points at this folder) cannot move it.
+function Runtime:getLibraryRoot()
+    local root = self.settings.library_root
+    if type(root) == "string" and root ~= "" then return root end
+    root = Library.defaultRoot({
+        isKindle = Device:isKindle(),
+        isKobo = Device:isKobo(),
+        home_dir = G_reader_settings:readSetting("home_dir") or Device.home_dir,
+    })
+    self.settings.library_root = root
+    return root
+end
+
+function Runtime:newSyncClient()
+    local CWNGSyncClient = require("CWNGSyncClient")
+    return CWNGSyncClient:new{
+        service_url = self.settings.server .. "/kosync",
+        service_spec = self.path .. "/api.json",
+    }
+end
+
+-- The book id written inside a placeholder by the server, or nil for any
+-- other file. Only small files are opened; a real book is never unzipped here.
+function Runtime.readPlaceholderId(path)
+    local attributes = lfs.attributes(path)
+    if not attributes or attributes.mode ~= "file" or attributes.size > PLACEHOLDER_MAX_BYTES then
+        return nil
+    end
+    local ok_require, Archiver = pcall(require, "ffi/archiver")
+    if not ok_require then return nil end
+    local arc = Archiver.Reader:new()
+    if not arc:open(path) then return nil end
+    local ok, content = pcall(arc.extractToMemory, arc, "META-INF/cwng-placeholder.json")
+    pcall(arc.close, arc)
+    if not ok or type(content) ~= "string" or content == "" then return nil end
+    local ok_json, data = pcall(Json.decode, content)
+    if ok_json and type(data) == "table" then return tonumber(data.book_id) end
+    return nil
+end
+
+local function openDocumentPath()
+    local ok, ReaderUI = pcall(require, "apps/reader/readerui")
+    local instance = ok and ReaderUI.instance
+    return instance and instance.document and instance.document.file or nil
+end
+
+function Runtime:libraryProbe()
+    return {
+        attributes = function(path)
+            local a = lfs.attributes(path)
+            if not a or a.mode ~= "file" then return nil end
+            return { size = a.size, modification = a.modification }
+        end,
+        digest = function(path) return self:getDocumentDigest(path) end,
+        placeholderId = Runtime.readPlaceholderId,
+        isOpen = function(path) return openDocumentPath() == path end,
+    }
+end
+
+-- True for a file this plugin put in the library as a not-yet-downloaded book.
+-- Inventory and bulk progress pull skip these: the device does not hold the
+-- book, only its cover.
+function Runtime:isLibraryPlaceholder(path)
+    local book_id, known = Library.placeholderAt(self:getLibraryState(), path)
+    if not book_id then return false end
+    local a = lfs.attributes(path)
+    return a ~= nil and a.size == known.size
+end
+
+local function isoToTime(value)
+    if type(value) ~= "string" then return nil end
+    local y, mo, d, h, mi, s = value:match("^(%d%d%d%d)-(%d%d)-(%d%d)[T ](%d%d):(%d%d):(%d%d)")
+    if not y then
+        y, mo, d = value:match("^(%d%d%d%d)-(%d%d)-(%d%d)")
+        h, mi, s = 12, 0, 0
+    end
+    if not y then return nil end
+    return os.time({ year = tonumber(y), month = tonumber(mo), day = tonumber(d),
+        hour = tonumber(h), min = tonumber(mi), sec = tonumber(s) })
+end
+Runtime._isoToTime = isoToTime
+
+local function fileInfo(path)
+    local a = lfs.attributes(path)
+    if not a then return nil end
+    return { size = a.size, mtime = a.modification }
+end
+
+-- Mirror the server's read status (and, for a cloud book, its progress) into
+-- the book's KOReader sidecar, so the cover grid shows "finished" or a
+-- progress bar. KOReader's own "on hold" is the reader's and is kept unless
+-- the book was finished somewhere.
+function Runtime:writeBookStatus(path, book, kind)
+    if openDocumentPath() == path then return false end
+    local ok, err = pcall(function()
+        local doc_settings = DocSettings:open(path)
+        local summary = doc_settings:readSetting("summary") or {}
+        if not (summary.status == "abandoned" and book.read_status ~= "finished") then
+            summary.status = Library.koreaderStatus(book.read_status)
+        end
+        doc_settings:saveSetting("summary", summary)
+        if kind == "placeholder" then
+            local progress = tonumber(book.progress)
+            if progress and progress > 0 then
+                doc_settings:saveSetting("percent_finished", progress)
+            else
+                doc_settings:delSetting("percent_finished")
+            end
+        end
+        doc_settings:flush()
+    end)
+    if not ok then
+        logger.warn("CWNGSync: could not write book status", path, err)
+        return false
+    end
+    BookList.resetBookInfoCache(path)
+    return true
+end
+
+function Runtime:fetchPlaceholder(client, book, path)
+    local temp = path .. ".cwngsync.part"
+    local ok, _length, _checksum, reason = client:download_file(
+        self.settings.username, self.settings.password, Device.model, self.device_id,
+        "/syncs/library/books/" .. book.book_id .. "/placeholder", temp, PLACEHOLDER_TIMEOUTS)
+    if not ok then
+        logger.warn("CWNGSync: placeholder download failed", book.book_id, reason)
+        return false
+    end
+    local a = lfs.attributes(temp)
+    if not a or a.size == 0 or a.size > PLACEHOLDER_MAX_BYTES
+            or Runtime.readPlaceholderId(temp) ~= book.book_id then
+        os.remove(temp)
+        logger.warn("CWNGSync: server returned something that is not this book's placeholder", book.book_id)
+        return false
+    end
+    -- The plan was made a moment ago; never let a placeholder land on a file
+    -- that has since become something else (a book sent to this device).
+    if lfs.attributes(path) and Runtime.readPlaceholderId(path) ~= book.book_id then
+        os.remove(temp)
+        return false
+    end
+    local renamed, rename_error = os.rename(temp, path)
+    if not renamed then
+        os.remove(temp)
+        logger.warn("CWNGSync: could not place placeholder", path, rename_error)
+        return false
+    end
+    -- "Last read" order: a never-opened cloud book sorts by when it joined the
+    -- library, behind everything that has been read or sent.
+    local when = isoToTime(book.added) or (os.time() - 365 * 24 * 3600)
+    pcall(lfs.touch, path, when, when)
+    BookList.resetBookInfoCache(path)
+    if book.read_status ~= "unread" or (tonumber(book.progress) or 0) > 0 then
+        self:writeBookStatus(path, book, "placeholder")
+    end
+    return true, fileInfo(path)
+end
+
+function Runtime:performLibraryAction(client, action)
+    local op = action.op
+    if op == "create_placeholder" or op == "refresh_placeholder" then
+        return self:fetchPlaceholder(client, action.book, action.path)
+    elseif op == "remove_placeholder" then
+        local removed = os.remove(action.path)
+        if removed then
+            pcall(DocSettings.updateLocation, action.path) -- the status sidecar we wrote
+            BookList.resetBookInfoCache(action.path)
+        end
+        return removed ~= nil
+    elseif op == "remove_download" then
+        local removed = os.remove(action.path)
+        if removed then
+            -- The sidecar stays on purpose: position, highlights and notes
+            -- come back if the book returns to this device.
+            BookList.resetBookInfoCache(action.path)
+            local ok_history, ReadHistory = pcall(require, "readhistory")
+            if ok_history then pcall(ReadHistory.fileDeleted, ReadHistory, action.path) end
+        end
+        return removed ~= nil
+    elseif op == "move_download" then
+        local moved = os.rename(action.from, action.path)
+        if not moved then return false end
+        pcall(DocSettings.updateLocation, action.from, action.path)
+        local ok_history, ReadHistory = pcall(require, "readhistory")
+        if ok_history then pcall(ReadHistory.updateItem, ReadHistory, action.from, action.path) end
+        local ok_collection, ReadCollection = pcall(require, "readcollection")
+        if ok_collection then pcall(ReadCollection.updateItem, ReadCollection, action.from, action.path) end
+        BookList.resetBookInfoCache(action.from)
+        return true, fileInfo(action.path)
+    elseif op == "adopt_download" then
+        local info = fileInfo(action.path)
+        if not info then return false end
+        info.checksum = self:getDocumentDigest(action.path)
+        return true, info
+    elseif op == "apply_status" then
+        local known = self:getLibraryState().books[tostring(action.book_id)]
+        return self:writeBookStatus(action.path, action.book, known and known.kind)
+    elseif op == "conflict" then
+        logger.warn("CWNGSync: library conflict for book", action.book_id, action.path, action.reason)
+        return false
+    elseif op == "release" or op == "forget" then
+        return true
+    end
+    return false
+end
+
+-- The user's shelves as KOReader collections, cloud books included, so a
+-- shelf chosen on the website is one tap away on the device.
+function Runtime:applyLibraryCollections(books, shelves)
+    local ok, ReadCollection = pcall(require, "readcollection")
+    if not ok or type(ReadCollection.coll) ~= "table" then return end
+    local state = self:getLibraryState()
+    local existing = {}
+    for name in pairs(ReadCollection.coll) do existing[name] = true end
+    local plan = Library.collectionPlan(books, shelves, self:getLibraryRoot(),
+        state.collections, existing)
+    local signature = {}
+    for _, collection in ipairs(plan.collections) do
+        signature[#signature + 1] = collection.name .. "=" .. table.concat(collection.files, "|")
+    end
+    signature = table.concat(signature, "\n")
+    if signature == state.collections_signature and #plan.remove == 0 then return end
+    local updated = {}
+    for _, name in ipairs(plan.remove) do
+        if ReadCollection.coll[name] then
+            ReadCollection:removeCollection(name)
+            updated[name] = true
+        end
+    end
+    for _, collection in ipairs(plan.collections) do
+        if ReadCollection.coll[collection.name] then
+            -- Same collection, fresh membership; its sort settings stay.
+            ReadCollection.coll[collection.name] = {}
+        else
+            ReadCollection:addCollection(collection.name)
+        end
+        for _, file in ipairs(collection.files) do
+            if lfs.attributes(file, "mode") == "file" then
+                ReadCollection:addItem(file, collection.name)
+            end
+        end
+        updated[collection.name] = true
+    end
+    if next(updated) then
+        local written, err = pcall(ReadCollection.write, ReadCollection, updated)
+        if not written then
+            logger.warn("CWNGSync: could not write shelf collections", err)
+            return
+        end
+    end
+    state.collections = plan.managed
+    state.collections_signature = signature
+end
+
+-- The per-account "[CWNG xxxx]" collections the older inventory-based shelf
+-- sync made are replaced by the library's own; drop them once.
+function Runtime:retireSnapshotCollections()
+    local snapshot_state = G_reader_settings:readSetting("cwngsync_collection_state")
+    if type(snapshot_state) ~= "table" or next(snapshot_state) == nil then return end
+    local ok, ReadCollection = pcall(require, "readcollection")
+    if not ok or type(ReadCollection.coll) ~= "table" then return end
+    local updated = {}
+    for _, scope in pairs(snapshot_state) do
+        for _, name in pairs(type(scope) == "table" and scope.names or {}) do
+            if ReadCollection.coll[name] then
+                ReadCollection:removeCollection(name)
+                updated[name] = true
+            end
+        end
+    end
+    if next(updated) then pcall(ReadCollection.write, ReadCollection, updated) end
+    G_reader_settings:delSetting("cwngsync_collection_state")
+end
+
+function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelves)
+    local state = self:getLibraryState()
+    local root = self:getLibraryRoot()
+    local actions = Library.plan(books, state, root, self:libraryProbe())
+    local client = self:newSyncClient()
+    local changed = {}
+    local adding = 0
+    for _, action in ipairs(actions) do
+        if action.op == "create_placeholder" then adding = adding + 1 end
+    end
+    if adding >= 5 and opts.interactive ~= false then
+        UIManager:show(InfoMessage:new{
+            text = T(_("Adding %1 books to your library…"), adding),
+            timeout = 3,
+        })
+    end
+
+    local index = 0
+    local succeeded, failed = 0, 0
+    local function step()
+        if shared.running ~= token then return end
+        index = index + 1
+        local action = actions[index]
+        if not action then
+            state.revision = revision
+            state.manifest = books
+            state.shelves = shelves
+            local ok_collections, collections_error = pcall(self.applyLibraryCollections, self, books, shelves)
+            if not ok_collections then
+                logger.warn("CWNGSync: shelf collections failed", collections_error)
+            end
+            self:saveLibraryState()
+            self:refreshLibraryViews(changed)
+            done(true, { actions = #actions, succeeded = succeeded, failed = failed })
+            return
+        end
+        local ok_call, ok, info = pcall(self.performLibraryAction, self, client, action)
+        ok = ok_call and ok
+        if not ok_call then logger.warn("CWNGSync: library action failed", action.op, ok) end
+        Library.record(state, action, ok, info)
+        if ok then
+            succeeded = succeeded + 1
+            if action.path then changed[#changed + 1] = action.path end
+            if action.from then changed[#changed + 1] = action.from end
+        elseif action.op ~= "conflict" then
+            failed = failed + 1
+        end
+        -- Show covers as they arrive rather than all at the end.
+        if #changed >= 18 then
+            self:saveLibraryState()
+            self:refreshLibraryViews(changed)
+            changed = {}
+        end
+        UIManager:nextTick(step)
+    end
+    step()
+end
+
+-- opts: interactive (show outcome, may bring Wi-Fi up), force (ignore the
+-- interval and the revision shortcut), on_done(ok, summary).
+function Runtime:syncLibrary(opts)
+    opts = opts or {}
+    if not self:libraryEnabled() then return end
+    if shared.running then return end
+    if not NetworkMgr:isConnected() then
+        if opts.interactive then
+            NetworkMgr:runWhenConnected(function() self:syncLibrary(opts) end)
+        end
+        return
+    end
+    local now = os.time()
+    if not opts.force and shared.last_sync and now - shared.last_sync < LIBRARY_SYNC_INTERVAL then
+        return
+    end
+    local root = self:getLibraryRoot()
+    if not root then return end
+    if not util.directoryExists(root) then util.makePath(root) end
+    if not util.directoryExists(root) then
+        logger.warn("CWNGSync: cannot create library folder", root)
+        return
+    end
+
+    local token = {}
+    shared.running = token
+    local state = self:getLibraryState()
+    local client = self:newSyncClient()
+    local books = {}
+    local shelves = {}
+    local pages = 0
+
+    local function done(ok, summary)
+        if shared.running ~= token then return end
+        shared.running = nil
+        if ok then shared.last_sync = os.time() end
+        if opts.interactive then
+            if ok then
+                UIManager:show(InfoMessage:new{ text = _("Your library is up to date."), timeout = 2 })
+            else
+                UIManager:show(InfoMessage:new{
+                    text = T(_("Could not update your library: %1"), summary or _("no response from server")),
+                    timeout = 5,
+                })
+            end
+        end
+        if opts.on_done then opts.on_done(ok, summary) end
+    end
+
+    local function fetch(cursor)
+        pages = pages + 1
+        local if_revision = (cursor == nil and not opts.force) and state.revision or nil
+        client:get_library(self.settings.username, self.settings.password, Device.model,
+            self.device_id, cursor, if_revision,
+            function(ok, body, reason)
+                if shared.running ~= token then return end
+                if not ok or type(body) ~= "table" then
+                    logger.warn("CWNGSync: library manifest failed", reason)
+                    done(false, reason)
+                    return
+                end
+                if body.unchanged then
+                    -- Nothing changed on the server; still reconcile the disk
+                    -- (a book deleted on the device comes back as a cover).
+                    self:applyLibraryManifest(state.manifest or {}, state.revision, token, opts, done,
+                        state.shelves)
+                    return
+                end
+                if type(body.shelves) == "table" then shelves = body.shelves end
+                for _, book in ipairs(body.books or {}) do books[#books + 1] = book end
+                if body.next_cursor and pages < MAX_MANIFEST_PAGES then
+                    fetch(body.next_cursor)
+                    return
+                end
+                self:applyLibraryManifest(books, body.revision, token, opts, done, shelves)
+            end)
+    end
+    fetch(nil)
+end
+
+-- Download the real book over its placeholder. Synchronous: the reader tapped
+-- this book and is waiting for it.
+function Runtime:downloadLibraryBook(book_id, path, title)
+    local client = self:newSyncClient()
+    local temp = path .. ".cwngsync.part"
+    local ok, length, checksum, reason = client:download_file(
+        self.settings.username, self.settings.password, Device.model, self.device_id,
+        "/syncs/library/books/" .. book_id .. "/file", temp)
+    if not ok then return false, reason end
+    local a = lfs.attributes(temp)
+    if not a or (length and a.size ~= length) then
+        os.remove(temp)
+        return false, _("the download was incomplete")
+    end
+    local digest = self:getDocumentDigest(temp)
+    if checksum and checksum ~= "" and digest ~= checksum then
+        os.remove(temp)
+        return false, _("the downloaded file was damaged")
+    end
+    local renamed, rename_error = os.rename(temp, path)
+    if not renamed then
+        os.remove(temp)
+        return false, rename_error
+    end
+    pcall(lfs.touch, path)
+    BookList.resetBookInfoCache(path)
+    self:refreshLibraryViews({ path })
+
+    local state = self:getLibraryState()
+    local book = { book_id = book_id }
+    for _, entry in ipairs(state.manifest or {}) do
+        if entry.book_id == book_id then book = entry break end
+    end
+    local info = fileInfo(path) or {}
+    info.checksum = digest
+    Library.record(state, { op = "download", book_id = book_id, path = path, book = book }, true, info)
+    self:saveLibraryState()
+    logger.info("CWNGSync: downloaded library book", book_id, title)
+    return true
+end
+
+local function manifestTitle(state, book_id, path)
+    for _, entry in ipairs(state.manifest or {}) do
+        if entry.book_id == book_id and type(entry.title) == "string" then return entry.title end
+    end
+    return (path:match("([^/]+)$") or path):gsub("%s*%[%d+%]%.%w+$", "")
+end
+
+-- Called in place of opening `file`. Returns true when `file` is a cloud book
+-- and this function took over (it opens the real book itself once it is here).
+function Runtime:openLibraryPlaceholder(file, open_real)
+    if not self:isConfigured() then return false end
+    local state = self:getLibraryState()
+    local book_id, known = Library.placeholderAt(state, file)
+    if not book_id then return false end
+    local a = lfs.attributes(file)
+    if not a or a.size ~= known.size then
+        -- Already replaced by the real book (sent, or downloaded elsewhere).
+        return false
+    end
+    local title = manifestTitle(state, book_id, file)
+    NetworkMgr:runWhenConnected(function()
+        local message = InfoMessage:new{ text = T(_("Downloading %1…"), title) }
+        UIManager:show(message)
+        UIManager:forceRePaint()
+        local ok, reason = self:downloadLibraryBook(book_id, file, title)
+        UIManager:close(message)
+        if ok then
+            open_real(file)
+            UIManager:scheduleIn(5, function() self:reportInventory(false, false) end)
+        else
+            UIManager:show(InfoMessage:new{
+                text = T(_("Could not download %1.\n\n%2\n\nCheck that Wi-Fi is on and try again."),
+                    title, reason or _("no response from server")),
+            })
+        end
+    end)
+    return true
+end
+
+-- Every way KOReader opens a book (file browser, history, collections, "open
+-- last book") goes through ReaderUI:showReader, so this one hook covers them.
+function Runtime:installOpenHook()
+    shared.plugin = self
+    local ok, ReaderUI = pcall(require, "apps/reader/readerui")
+    if not ok or ReaderUI._cwngsync_original_showReader then return end
+    local original = ReaderUI.showReader
+    ReaderUI._cwngsync_original_showReader = original
+    ReaderUI.showReader = function(reader_ui, file, ...)
+        local n = select("#", ...)
+        local args = { ... }
+        local plugin = shared.plugin
+        if plugin and type(file) == "string" then
+            local handled_ok, handled = pcall(plugin.openLibraryPlaceholder, plugin, file,
+                function(real_file) original(reader_ui, real_file, unpack(args, 1, n)) end)
+            if handled_ok and handled then return end
+            if not handled_ok then logger.warn("CWNGSync: open hook failed", handled) end
+        end
+        return original(reader_ui, file, unpack(args, 1, n))
+    end
+end
+
+-- A placeholder opened some way the hook did not see (its record lost): close
+-- it and fetch the real book, rather than showing the explanatory page.
+function Runtime:rescueOpenedPlaceholder()
+    local file = self.ui and self.ui.document and self.ui.document.file
+    if not file or not self:isConfigured() then return false end
+    local book_id = Runtime.readPlaceholderId(file)
+    if not book_id then return false end
+    local title = manifestTitle(self:getLibraryState(), book_id, file)
+    local ui = self.ui
+    UIManager:nextTick(function()
+        ui:onClose()
+        NetworkMgr:runWhenConnected(function()
+            local message = InfoMessage:new{ text = T(_("Downloading %1…"), title) }
+            UIManager:show(message)
+            UIManager:forceRePaint()
+            local ok, reason = self:downloadLibraryBook(book_id, file, title)
+            UIManager:close(message)
+            if ok then
+                local ReaderUI = require("apps/reader/readerui")
+                local original = ReaderUI._cwngsync_original_showReader or ReaderUI.showReader
+                original(ReaderUI, file)
+            else
+                UIManager:show(InfoMessage:new{
+                    text = T(_("Could not download %1.\n\n%2"), title, reason or ""),
+                })
+            end
+        end)
+    end)
+    return true
+end
+
+return Runtime

@@ -829,8 +829,11 @@ def _opf(metadata, manifest, spine, identifier, modified, nonlinear=()):
         "</package>\n" % (REFLOW_NS, "\n".join(meta_lines), items, refs))
 
 
-def _figure_images(chapters, doc, book, figure_transform=None, owned_images=()):
+def _figure_images(chapters, doc, book, package, figure_transform=None, owned_images=()):
     """Crop each figure the fragments referred to; drop the ones we cannot make.
+
+    Each crop goes into ``package`` as it is cut (:class:`_Package`); what comes
+    back is the two lists of figures the book does not get.
 
     Two drops are not the same event. A crop that *fails* is a loss: the page
     printed a figure and the book does not have it, so it is reported. A candidate
@@ -848,14 +851,14 @@ def _figure_images(chapters, doc, book, figure_transform=None, owned_images=()):
         wanted.extend(_IMG_SRC.findall("\n".join(chapter.blocks)))
     wanted = [src for src in dict.fromkeys(wanted) if src.startswith("images/") and src not in owned_images]
     if not wanted:
-        return {}, [], []
+        return [], []
 
     boxes = {}
     for index, figure in enumerate(book.figures):
         seen = boxes.setdefault(figure["pno"], [])
         seen.append(figure)
 
-    images, missing, blanks = {}, [], []
+    missing, blanks = [], []
     for src in wanted:
         match = re.match(r"images/fig_p(\d+)_(\d+)\.jpg$", src)
         if not match or doc is None:
@@ -895,12 +898,13 @@ def _figure_images(chapters, doc, book, figure_transform=None, owned_images=()):
         ink_doc=render_doc
         if figure.get('needs_ink') and geometry.get('space')=='reading':
             ink_doc=SourceDisplay(doc,pno,dict(geometry,layer='ocr')).query_document(isolate=True)
+        data = None
         try:
             if figure.get("needs_ink") and not extract.region_has_ink(
                     ink_doc, pno, bbox, mask=mask):
                 blanks.append(src)
                 continue
-            images[src] = extract.crop_jpeg(render_doc, pno, bbox)
+            data = extract.crop_jpeg(render_doc, pno, bbox)
         except Exception as exc:                                  # pragma: no cover
             log.warning("reflow: figure %s could not be cropped: %s", src, exc)
             if figure.get("needs_ink"):
@@ -908,14 +912,18 @@ def _figure_images(chapters, doc, book, figure_transform=None, owned_images=()):
                 # measured territory cannot be cut, the whole printed page is the
                 # honest remainder -- the reader loses nothing that was there.
                 try:
-                    images[src] = extract.crop_jpeg(render_doc, pno, _page_rect(render_doc, pno))
-                    continue
+                    data = extract.crop_jpeg(render_doc, pno, _page_rect(render_doc, pno))
                 except Exception:                                 # pragma: no cover
                     pass
-            missing.append(src)
+            if data is None:
+                missing.append(src)
         finally:
             if ink_doc is not render_doc:ink_doc.close()
-    return images, missing, blanks
+        if data is not None:
+            # Outside the crop's failure handling: a crop the archive cannot take
+            # is a failed build, never a figure reported lost from the source.
+            package.image(src, data)
+    return missing, blanks
 
 
 def _page_rect(doc, pno):
@@ -1037,16 +1045,18 @@ def _check_cancelled(should_stop):
         raise BuildCancelled("EPUB assembly was cancelled.")
 
 
-def _original_evidence(book, page_html, doc, figure_transform=None,
+def _original_evidence(book, page_html, doc, package, figure_transform=None,
                        should_stop=None, progress=None, source_pages=None):
     """Package original pixels, never a re-render of the extracted reading.
 
     Detail crops retain adjacent printed context; the full original page lets a
     reader resolve associations outside a crop. All rendering uses extract's
     existing pre-allocation and encoded-byte bounds. These links are generated
-    after the model markup boundary, not accepted from model output.
+    after the model markup boundary, not accepted from model output. Every image
+    goes into ``package`` as it is rendered (:class:`_Package`), so no more than
+    one of them is in memory at a time however long the book is.
     """
-    evidence, images = {}, {}
+    evidence = {}
     recovered = {pno for pno, source in (source_pages or {}).items() if source.report()['uncertain']}
     scanned = {pno for pno, source in (source_pages or {}).items()
                if json.loads(source.provenance_json).get('layer') == 'ocr'}
@@ -1090,7 +1100,7 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
         provenance = json.loads(source_pages[pno].provenance_json) if source_pages and pno in source_pages else {}
         display = SourceDisplay(doc, pno, provenance)
         full = "images/original_p%04d.jpg" % pno
-        images[full] = display.jpeg(scale=1.5, quality=85)
+        package.image(full, display.jpeg(scale=1.5, quality=85))
         details = []
         page_rect = doc[pno].rect * doc[pno].derotation_matrix
         for key, label, box in specs:
@@ -1112,7 +1122,7 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
                 raise ValueError("Invalid original source evidence geometry on page %d" % pno)
             src = "images/original_p%04d_%s.jpg" % (pno, key)
             reading_rect = display.reading_rect(rect)
-            images[src] = display.jpeg(reading_rect)
+            package.image(src, display.jpeg(reading_rect))
             details.append({"id": key, "label": label, "src": src, "bbox": list(rect),
                             "reading_bbox": list(reading_rect)})
         from .source_display import grid_regions
@@ -1121,14 +1131,14 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
             if element_index != proof['element_indices'][0]:continue
             key = "layout_%d" % element_index
             src = "images/original_p%04d_%s.jpg" % (pno, key)
-            images[src] = display.jpeg(proof['reading_bbox'])
+            package.image(src, display.jpeg(proof['reading_bbox']))
             details.append({"id": key, "label": "Original layout and labels", "src": src, **proof})
         if provenance.get('layer') == 'ocr':
             for tile_index, tile in enumerate(inspection_tiles(display.rect)):
                 _check_cancelled(should_stop)
                 key = "inspection_%d" % tile_index
                 src = "images/original_p%04d_%s.jpg" % (pno, key)
-                images[src] = display.jpeg(tile)
+                package.image(src, display.jpeg(tile))
                 details.append({"id": key, "label": "Original detail %d (row order)" % (tile_index + 1),
                     "src": src, "reading_bbox": list(tile), "displayed_pdf_bbox": list(display.source_rect(tile))})
         inspection = [d for d in details if d['id'].startswith('inspection_')]
@@ -1142,7 +1152,7 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
                          "orientation": display.angle, "source_rotation": doc[pno].rotation,
                          "reading_rect": list(display.rect),
                          "ambiguous_notes": sorted(ambiguous),
-                         "bytes": len(images[full]) + sum(len(images[d["src"]]) for d in details),
+                         "bytes": package.images[full] + sum(package.images[d["src"]] for d in details),
                          "render_seconds": round(time.monotonic() - started, 4)}
         if pno in recovered:
             evidence[pno]['source_uncertainty'] = source_pages[pno].report()
@@ -1205,7 +1215,7 @@ def _original_evidence(book, page_html, doc, figure_transform=None,
         if progress is not None:
             progress(index + 1, len(wanted))
     _check_cancelled(should_stop)
-    return evidence, images
+    return evidence
 
 
 def _original_document(record, home, language):
@@ -1301,118 +1311,126 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     generated_pages = {pno: _well_formed_text(html or "")
                        for pno, html in generated_pages.items()}
     page_html, refused = _refuse_unsafe_pages(page_html, book, source_pages, generated_pages)
-    evidence, original_images = _original_evidence(
-        book, page_html, doc, figure_transform, should_stop, evidence_progress, source_pages)
+    # From here the book is written while it is built: each image goes into the
+    # archive when it is rendered (_Package), and a build that stops for any reason
+    # -- a cancel, a bad page, a full disk -- removes its half-written archive.
+    package = _Package(out_path)
+    try:
+        evidence = _original_evidence(book, page_html, doc, package, figure_transform,
+                                      should_stop, evidence_progress, source_pages)
 
-    pages = _page_blocks(page_html)
-    joins = _join_page_turns(pages)
-    chapters = _chapters(pages)
-    dropped = _bind_links(chapters)
-    images, missing, blanks = _figure_images(chapters, doc, book,
-                                             figure_transform=figure_transform, owned_images=original_images)
-    _drop_images(chapters, missing + blanks)
-    images.update(original_images)
+        pages = _page_blocks(page_html)
+        joins = _join_page_turns(pages)
+        chapters = _chapters(pages)
+        dropped = _bind_links(chapters)
+        missing, blanks = _figure_images(chapters, doc, book, package,
+                                         figure_transform=figure_transform,
+                                         owned_images=set(package.images))
+        _drop_images(chapters, missing + blanks)
+        images = package.images
 
-    identifier = identifier or "urn:uuid:%s" % uuid.uuid4()
-    modified = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        identifier = identifier or "urn:uuid:%s" % uuid.uuid4()
+        modified = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-    entries = []
-    manifest = [
-        {"id": "nav", "href": "nav.xhtml", "type": "application/xhtml+xml",
-         "properties": "nav"},
-        {"id": "ncx", "href": "toc.ncx", "type": "application/x-dtbncx+xml"},
-        {"id": "css", "href": "style.css", "type": "text/css"},
-    ]
-    spine = []
-    documents = {}
-    page_homes = _page_homes(chapters)
+        entries = []
+        manifest = [
+            {"id": "nav", "href": "nav.xhtml", "type": "application/xhtml+xml",
+             "properties": "nav"},
+            {"id": "ncx", "href": "toc.ncx", "type": "application/x-dtbncx+xml"},
+            {"id": "css", "href": "style.css", "type": "text/css"},
+        ]
+        spine = []
+        documents = {}
+        page_homes = _page_homes(chapters)
 
-    losses = _losses(dropped, missing)
-    if refused:
-        losses.append(_count(
-            len(refused),
-            "One page's markup could not be trusted and the page is kept as its "
-            "plain text.",
-            "%d pages' markup could not be trusted and they are kept as their "
-            "plain text."))
-    if unrepresentable:
-        count = sum(item["count"] for item in unrepresentable)
-        losses.append(
-            "%d unprintable characters in the PDF text layer could not be represented "
-            "in an EPUB. Each is shown as the replacement character (\ufffd); the "
-            "surrounding text is kept. Consult the source PDF at those locations."
-            % count)
-    if callable(report_html):
-        report_html = report_html(page_homes, losses)
-    if report_html:
-        documents[ABOUT_HREF] = _document("About this conversion", report_html, language)
-        manifest.append({"id": "reflow-about", "href": ABOUT_HREF,
-                         "type": "application/xhtml+xml"})
-        spine.append("reflow-about")
-        entries.append((ABOUT_HREF, "About this conversion"))
+        losses = _losses(dropped, missing)
+        if refused:
+            losses.append(_count(
+                len(refused),
+                "One page's markup could not be trusted and the page is kept as its "
+                "plain text.",
+                "%d pages' markup could not be trusted and they are kept as their "
+                "plain text."))
+        if unrepresentable:
+            count = sum(item["count"] for item in unrepresentable)
+            losses.append(
+                "%d unprintable characters in the PDF text layer could not be represented "
+                "in an EPUB. Each is shown as the replacement character (\ufffd); the "
+                "surrounding text is kept. Consult the source PDF at those locations."
+                % count)
+        if callable(report_html):
+            report_html = report_html(page_homes, losses)
+        if report_html:
+            documents[ABOUT_HREF] = _document("About this conversion", report_html, language)
+            manifest.append({"id": "reflow-about", "href": ABOUT_HREF,
+                             "type": "application/xhtml+xml"})
+            spine.append("reflow-about")
+            entries.append((ABOUT_HREF, "About this conversion"))
 
-    for chapter in chapters:
-        documents[chapter.href] = _document(chapter.title,
-                                            "\n".join(chapter.blocks), language)
-        manifest.append({"id": chapter.item_id, "href": chapter.href,
-                         "type": "application/xhtml+xml"})
-        spine.append(chapter.item_id)
-        entries.append((chapter.href, chapter.title))
+        for chapter in chapters:
+            documents[chapter.href] = _document(chapter.title,
+                                                "\n".join(chapter.blocks), language)
+            manifest.append({"id": chapter.item_id, "href": chapter.href,
+                             "type": "application/xhtml+xml"})
+            spine.append(chapter.item_id)
+            entries.append((chapter.href, chapter.title))
 
-    # An ordinary spine item also works in readers which ignore EPUB page-list.
-    # Keep this generated reference after the book, never inside its prose.
-    if page_homes:
-        documents[SOURCE_INDEX_HREF] = _source_index(page_homes, language, evidence)
-        manifest.append({"id": "source-pages", "href": SOURCE_INDEX_HREF,
-                         "type": "application/xhtml+xml"})
-        spine.append("source-pages")
-        entries.append((SOURCE_INDEX_HREF, "Source PDF pages"))
+        # An ordinary spine item also works in readers which ignore EPUB page-list.
+        # Keep this generated reference after the book, never inside its prose.
+        if page_homes:
+            documents[SOURCE_INDEX_HREF] = _source_index(page_homes, language, evidence)
+            manifest.append({"id": "source-pages", "href": SOURCE_INDEX_HREF,
+                             "type": "application/xhtml+xml"})
+            spine.append("source-pages")
+            entries.append((SOURCE_INDEX_HREF, "Source PDF pages"))
 
-    for pno, record in sorted(evidence.items()):
-        ident = "original-p%04d" % pno
-        documents[record["href"]] = _original_document(record, page_homes[pno], language)
-        manifest.append({"id": ident, "href": record["href"], "type": "application/xhtml+xml"})
-        spine.append(ident)
+        for pno, record in sorted(evidence.items()):
+            ident = "original-p%04d" % pno
+            documents[record["href"]] = _original_document(record, page_homes[pno], language)
+            manifest.append({"id": ident, "href": record["href"], "type": "application/xhtml+xml"})
+            spine.append(ident)
 
-    for index, src in enumerate(sorted(images)):
-        manifest.append({"id": "img%03d" % index, "href": src, "type": "image/jpeg"})
+        for index, src in enumerate(sorted(images)):
+            manifest.append({"id": "img%03d" % index, "href": src, "type": "image/jpeg"})
 
-    payload = _sidecar(book, pages, chapters, images, joins, sidecar, blanks)
-    if source_pages:
-        payload['source_enrichment'] = {str(pno): dict(source.report(), identity=source.identity,
-            provenance=json.loads(source.provenance_json), raw_records=json.loads(source.records_json))
-            for pno, source in source_pages.items() if pno in page_html}
-    if evidence:
-        payload["source_evidence"] = list(evidence.values())
-    if unrepresentable:
-        payload["unrepresentable_characters"] = unrepresentable
-    if losses:
-        payload["unplaced"] = list(payload.get("unplaced") or []) + losses
-    warnings = []
-    if dropped:
-        warnings.append("%d note links had no target and were disarmed" % len(dropped))
-    if missing:
-        warnings.append("%d figure images could not be extracted" % len(missing))
-    for pno, reasons in refused:
-        warnings.append("page %d's markup was not trusted (%s); the page ships as "
-                        "its plain text" % (pno, reasons[0]))
+        payload = _sidecar(book, pages, chapters, images, joins, sidecar, blanks)
+        if source_pages:
+            payload['source_enrichment'] = {str(pno): dict(source.report(), identity=source.identity,
+                provenance=json.loads(source.provenance_json), raw_records=json.loads(source.records_json))
+                for pno, source in source_pages.items() if pno in page_html}
+        if evidence:
+            payload["source_evidence"] = list(evidence.values())
+        if unrepresentable:
+            payload["unrepresentable_characters"] = unrepresentable
+        if losses:
+            payload["unplaced"] = list(payload.get("unplaced") or []) + losses
+        warnings = []
+        if dropped:
+            warnings.append("%d note links had no target and were disarmed" % len(dropped))
+        if missing:
+            warnings.append("%d figure images could not be extracted" % len(missing))
+        for pno, reasons in refused:
+            warnings.append("page %d's markup was not trusted (%s); the page ships as "
+                            "its plain text" % (pno, reasons[0]))
 
-    _check_cancelled(should_stop)
-    _write_epub(out_path, {
-        "opf": _opf(metadata, manifest, spine, identifier, modified,
-                    nonlinear={"original-p%04d" % pno for pno in evidence}),
-        "nav": _nav(entries, language, page_homes),
-        "ncx": _ncx(entries, identifier, metadata.get("title") or ""),
-        "documents": documents,
-        "images": images,
-        "sidecar": payload,
-    })
+        _check_cancelled(should_stop)
+        package.finish({
+            "opf": _opf(metadata, manifest, spine, identifier, modified,
+                        nonlinear={"original-p%04d" % pno for pno in evidence}),
+            "nav": _nav(entries, language, page_homes),
+            "ncx": _ncx(entries, identifier, metadata.get("title") or ""),
+            "documents": documents,
+            "sidecar": payload,
+        })
 
-    return BuildResult(path=str(out_path), notes=payload["notes"],
-                       figures=payload["figures"], images=len(images),
-                       page_joins=joins, warnings=warnings, sidecar=payload,
-                       chapters=[{"href": c.href, "title": c.title,
-                                  "pages": list(c.pages)} for c in chapters])
+        return BuildResult(path=str(out_path), notes=payload["notes"],
+                           figures=payload["figures"], images=len(images),
+                           page_joins=joins, warnings=warnings, sidecar=payload,
+                           chapters=[{"href": c.href, "title": c.title,
+                                      "pages": list(c.pages)} for c in chapters])
+    except BaseException:
+        package.abandon()
+        raise
 
 
 def _sidecar(book, pages, chapters, images, joins, extra, blanks=()):
@@ -1460,17 +1478,52 @@ def _sidecar(book, pages, chapters, images, joins, extra, blanks=()):
     return payload
 
 
-def _write_epub(out_path, parts):
-    directory = os.path.dirname(str(out_path))
-    if directory and not os.path.isdir(directory):
-        os.makedirs(directory, exist_ok=True)
-    tmp = "%s.tmp" % out_path
-    with zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zf:
-        # The mimetype entry must be first and uncompressed: that is what makes the
-        # zip recognisable as an EPUB before anything inside it is read.
-        info = zipfile.ZipInfo("mimetype", date_time=time.localtime(time.time())[:6])
-        info.compress_type = zipfile.ZIP_STORED
-        zf.writestr(info, b"application/epub+zip")
+class _Package(object):
+    """The EPUB archive, written while the book is built rather than after it.
+
+    A scanned page carries about a megabyte and a half of original evidence -- the
+    whole printed page and the tiles a reader checks a reading against -- and the
+    builder used to hold every image of the book in one dictionary until the last
+    page was done: a long scan was gigabytes of JPEG in memory before the first
+    byte reached the disk. Each image now goes into the archive the moment it is
+    rendered, and only its size stays behind (``images``).
+
+    The archive is ``<out_path>.tmp`` until :meth:`finish` puts it in place; a build
+    that stops calls :meth:`abandon`, which removes it. Nothing is left beside the
+    target -- in a conversion, a staging folder that holds the candidate and
+    nothing else.
+    """
+
+    def __init__(self, out_path):
+        self.path = str(out_path)
+        self.tmp = "%s.tmp" % self.path
+        directory = os.path.dirname(self.path)
+        if directory and not os.path.isdir(directory):
+            os.makedirs(directory, exist_ok=True)
+        #: href -> encoded bytes, for the manifest, the sidecar and each evidence
+        #: record. The pixels themselves are only ever in the archive.
+        self.images = {}
+        self._zf = zipfile.ZipFile(self.tmp, "w", zipfile.ZIP_DEFLATED)
+        try:
+            # The mimetype entry must be first and uncompressed: that is what makes
+            # the zip recognisable as an EPUB before anything inside it is read.
+            info = zipfile.ZipInfo("mimetype", date_time=time.localtime(time.time())[:6])
+            info.compress_type = zipfile.ZIP_STORED
+            self._zf.writestr(info, b"application/epub+zip")
+        except BaseException:
+            self.abandon()
+            raise
+
+    def image(self, href, data):
+        if href in self.images:
+            # A dictionary kept the last of two renders under one name; an archive
+            # would keep both, and a reader could open either.
+            raise ValueError("the image %s was rendered twice" % href)
+        self._zf.writestr(posixpath.join(OEBPS, href), data)
+        self.images[href] = len(data)
+
+    def finish(self, parts):
+        zf = self._zf
         zf.writestr("META-INF/container.xml",
                     '<?xml version="1.0" encoding="utf-8"?>\n'
                     '<container version="1.0" '
@@ -1487,10 +1540,19 @@ def _write_epub(out_path, parts):
         zf.writestr("%s/style.css" % OEBPS, STYLESHEET)
         for href, text in parts["documents"].items():
             zf.writestr(posixpath.join(OEBPS, href), text)
-        for href, data in parts["images"].items():
-            zf.writestr(posixpath.join(OEBPS, href), data)
-    os.replace(tmp, str(out_path))
-    return str(out_path)
+        zf.close()
+        os.replace(self.tmp, self.path)
+        return self.path
+
+    def abandon(self):
+        try:
+            self._zf.close()
+        except Exception:                                         # pragma: no cover
+            pass        # a half-written archive is removed whatever state it is in
+        try:
+            os.unlink(self.tmp)
+        except FileNotFoundError:
+            pass
 
 
 # -------------------------------------------------------------------- validation

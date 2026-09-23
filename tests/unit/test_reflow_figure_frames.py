@@ -9,6 +9,18 @@ from cps.services.reflow.source_display import SourceDisplay
 pytestmark=pytest.mark.unit
 
 
+class _Images(dict):
+    """The builder's image sink (``build_epub._Package``), keeping the bytes it is
+    given so a test can compare the pixels it was sent."""
+
+    @property
+    def images(self):
+        return {href: len(data) for href, data in self.items()}
+
+    def image(self, href, data):
+        self[href] = data
+
+
 @pytest.mark.parametrize('rotation,orientation',[(0,0),(90,0),(0,90),(90,270)])
 def test_source_bound_ordinary_crop_uses_reading_frame(rotation,orientation):
     doc=pymupdf.open();page=doc.new_page(width=400,height=600)
@@ -25,7 +37,8 @@ def test_source_bound_ordinary_crop_uses_reading_frame(rotation,orientation):
     # explicit reading-space provenance must not be transformed twice.
     old=source.Recovery(provenance={0:source.PageRecovery(pno=0,layer='ocr',orientation=orientation,
         source_rotation=rotation,page_rect=tuple(page.rect),derotation=tuple(page.derotation_matrix))})
-    images,missing,blanks=build_epub._figure_images(chapters,doc,book,old.figure_rect)
+    images=_Images()
+    missing,blanks=build_epub._figure_images(chapters,doc,book,images,old.figure_rect)
     assert not missing and not blanks
     assert images['images/fig_p0000_0.jpg']==display.jpeg(box,scale=2,quality=85)
     doc.close()
@@ -97,7 +110,8 @@ def test_prose_footnote_is_not_figure_ink_but_its_printed_body_is_retained():
     figure={'pno':0,'bbox':(40,450,360,550),'needs_ink':True}
     book=assemble.Book(notes=[note],figures=[figure])
     chapter=build_epub.Chapter(index=1,title='test',blocks=['<figure><img src="images/fig_p0000_0.jpg"/></figure>'])
-    images,missing,blanks=build_epub._figure_images([chapter],doc,book)
+    images=_Images()
+    missing,blanks=build_epub._figure_images([chapter],doc,book,images)
     assert images=={} and missing==[] and blanks==['images/fig_p0000_0.jpg']
     assert book.notes==[note] and note.text.startswith('A real footnote')
     doc.close()

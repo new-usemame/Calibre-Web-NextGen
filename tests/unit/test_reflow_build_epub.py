@@ -15,15 +15,19 @@ printed with the same gate the model's answers go through.
 """
 
 import collections
+import errno
 import json
 import posixpath
+import random
 import re
+import tracemalloc
 import zipfile
 from xml.etree import ElementTree as ET
 
+import pymupdf
 import pytest
 
-from cps.services.reflow import annotate, assemble, build_epub, gate
+from cps.services.reflow import annotate, assemble, build_epub, gate, ocr, structural_pipeline
 from tests.fixtures import reflow_pdfs as F
 
 pytestmark = pytest.mark.unit
@@ -1375,3 +1379,163 @@ class TestADocumentWithNoHeadingOfItsOwn(object):
         labels = _nav_labels(_build(book, tmp_path).path)
 
         assert any("Serapio of Alexandria" in label for label in labels), labels
+
+
+# -------------------------------------------------- a long book, one page at a time
+
+_SCAN_WORDS = ("river bridge garden market window morning evening village harbour "
+               "mill lantern orchard meadow chapel quarry ferry").split()
+
+
+def _scanned_book(monkeypatch, pages):
+    """A scan of ``pages`` small printed pages, read by a stand-in for Tesseract.
+
+    The stand-in answers with the words each page was printed with, where they were
+    printed, so everything from the OCR answer on -- the recovered layer, the
+    canonical source pages, the original evidence -- is the real code, and the test
+    needs no OCR engine installed.
+    """
+    printed, scan, words = pymupdf.open(), pymupdf.open(), {}
+    for pno in range(pages):
+        pick = random.Random(pno).choice
+        page = printed.new_page(width=360, height=480)
+        for line in range(18):
+            page.insert_text((48, 70 + 20 * line),
+                             " ".join(pick(_SCAN_WORDS) for _ in range(6)), fontsize=11)
+        words[pno] = page.get_text("words")
+        pixels = page.get_pixmap(matrix=pymupdf.Matrix(2, 2), colorspace=pymupdf.csGRAY)
+        scan.new_page(width=360, height=480).insert_image(
+            pymupdf.Rect(0, 0, 360, 480), stream=pixels.tobytes("jpg"))
+    printed.close()
+
+    def recognize(page, *, source_sha256, language="eng", dpi=300, **_):
+        found = tuple(ocr.OCRWord(w[4], tuple(w[:4]), tuple(w[:4]), tuple(w[:4]), 96.0,
+                                  w[5], 0, w[6]) for w in words[page.number])
+        return ocr.OCRResult(source_sha256, page.number, "tesseract (stand-in)", language,
+                             "0" * 64, dpi, float(dpi), 0, 0, 20.0, page.rect.width,
+                             page.rect.height, found, ())
+
+    monkeypatch.setattr(ocr, "_engine", lambda language: (
+        "tesseract", "tesseract (stand-in)", "0" * 64))
+    monkeypatch.setattr(ocr, "recognize_page", recognize)
+    return scan, structural_pipeline.run_structural(scan, measure_eligibility=False)
+
+
+def _build_traced(book, path, **kwargs):
+    """Build, and say how much memory the build itself held at its busiest."""
+    tracemalloc.start()
+    try:
+        built = build_epub.build(book, str(path), **kwargs)
+        return built, tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+
+
+def test_a_long_scan_is_written_without_holding_its_original_pages_in_memory(
+        tmp_path, monkeypatch):
+    """Every page of a scan carries its original pixels into the book: the whole
+    printed page and the tiles a reader checks a reading against, about 400 KB here
+    and a megabyte and a half on a letter-size scan. The builder kept all of them
+    in one dictionary until the last page was done, so a 2,000-page scan asked for
+    gigabytes before the first byte reached the disk. Now the book it holds is
+    about one page of evidence, however long the scan is -- and nothing is given
+    up for it: every original is in the book, whole."""
+    scan, result = _scanned_book(monkeypatch, 12)
+    held = []
+    try:
+        built, peak = _build_traced(
+            result.book, tmp_path / "scan.epub", page_html=result.page_html, doc=scan,
+            source_pages=result.source_pages,
+            evidence_progress=lambda done, total: held.append(
+                tracemalloc.get_traced_memory()[0]))
+    finally:
+        scan.close()
+
+    evidence = built.sidecar["source_evidence"]
+    with zipfile.ZipFile(built.path) as zf:
+        assert zf.testzip() is None
+        written = {i.filename: i.file_size for i in zf.infolist()
+                   if i.filename.startswith("OEBPS/images/")}
+    assert len(evidence) == 12
+    assert len(written) == built.images == sum(1 + len(r["details"]) for r in evidence)
+    assert sum(record["bytes"] for record in evidence) == sum(written.values())
+    page = max(record["bytes"] for record in evidence)
+    # held[1] is the first page done, held[-1] the last: eleven pages later.
+    assert held[-1] - held[1] < page, (
+        "the builder kept %d KB more after eleven more pages of %d KB of originals"
+        % ((held[-1] - held[1]) // 1024, page // 1024))
+    assert peak < 3 * page, (peak // 1024, page // 1024, sum(written.values()) // 1024)
+
+
+def _plate_png(seed, width=640, height=800):
+    """A photograph as far as compression is concerned: grain in every pixel."""
+    grain = random.Random(seed).randbytes(width * height)
+    return pymupdf.Pixmap(pymupdf.csGRAY, width, height, grain, False).tobytes("png")
+
+
+def test_a_book_of_plates_is_written_without_holding_its_plates_in_memory(tmp_path):
+    """The figure crops took the same road into the same dictionary: a book of
+    photographs was held whole until its last plate was cut. One plate in flight
+    costs a few times its size (the JPEG, its compressed copy, the compressor), so
+    the bound is on the book: never half of its plates at once."""
+    doc = F.new_doc()
+    for index in range(16):
+        page = F.add_page(doc)
+        y = F.add_body_lines(page, F.PROSE_LINES[:2])
+        page.insert_image(pymupdf.Rect(F.LEFT, y + 16.0, F.LEFT + 320.0, y + 416.0),
+                          stream=_plate_png(index))
+    try:
+        book = assemble.deterministic_book(doc)
+        built, peak = _build_traced(book, tmp_path / "plates.epub",
+                                    page_html=_fragments(book), doc=doc)
+    finally:
+        doc.close()
+
+    with zipfile.ZipFile(built.path) as zf:
+        plates = [i.file_size for i in zf.infolist() if i.filename.startswith("OEBPS/images/")]
+    assert len(plates) == built.images == 16
+    assert peak < sum(plates) / 2, (peak // 1024, max(plates) // 1024, sum(plates) // 1024)
+
+
+def test_a_scan_cancelled_while_its_originals_are_written_leaves_nothing_behind(
+        tmp_path, monkeypatch):
+    """The book is now written while it is built, so a build that stops part of the
+    way -- a reader cancelling a long scan, most often -- has a half-written archive
+    on disk. It is removed: in a conversion the target's folder is a staging folder
+    that must hold the finished candidate and nothing else."""
+    scan, result = _scanned_book(monkeypatch, 3)
+    progress = []
+    try:
+        with pytest.raises(build_epub.BuildCancelled):
+            build_epub.build(result.book, str(tmp_path / "scan.epub"),
+                             page_html=result.page_html, doc=scan,
+                             source_pages=result.source_pages,
+                             evidence_progress=lambda done, total: progress.append(done),
+                             should_stop=lambda: len(progress) >= 2)
+    finally:
+        scan.close()
+    assert progress == [0, 1], "the build was meant to stop after one page was written"
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_disk_that_fills_while_a_plate_is_written_fails_the_build(tmp_path, monkeypatch):
+    """A crop that cannot be cut is a figure the reader is told is missing. A crop
+    that was cut and could not be written is not that -- the page printed nothing
+    wrong -- so it fails the build, and its half-written archive goes with it."""
+    doc = F.new_doc()
+    F.illustrated_page(doc, F.solid_png())
+    write = zipfile.ZipFile.writestr
+
+    def full_disk(self, name, data, *args, **kwargs):
+        if str(getattr(name, "filename", name)).startswith("OEBPS/images/fig_"):
+            raise OSError(errno.ENOSPC, "No space left on device")
+        return write(self, name, data, *args, **kwargs)
+
+    try:
+        book = assemble.deterministic_book(doc)
+        monkeypatch.setattr(zipfile.ZipFile, "writestr", full_disk)
+        with pytest.raises(OSError):
+            _build(book, tmp_path, doc=doc)
+    finally:
+        doc.close()
+    assert list(tmp_path.iterdir()) == []

@@ -14,6 +14,18 @@ XHTML = "{http://www.w3.org/1999/xhtml}"
 EPUB_TYPE = "{http://www.idpf.org/2007/ops}type"
 
 
+class _Images(dict):
+    """The builder's image sink (``build_epub._Package``), keeping the bytes it is
+    given so a test can compare the pixels it was sent."""
+
+    @property
+    def images(self):
+        return {href: len(data) for href, data in self.items()}
+
+    def image(self, href, data):
+        self[href] = data
+
+
 @pytest.mark.parametrize("selected", [(0, 1, 2), (0, 2)])
 def test_source_page_navigation_resolves_to_real_starts_without_renumbering(tmp_path, selected):
     with pymupdf.open() as doc:
@@ -131,7 +143,8 @@ def test_original_caption_details_are_unique_and_linked_per_caption(tmp_path):
                                    bbox=(40,380,250,410),caption_uncertain=True)]
         book=assemble.Book(elements=elements,pages={0:elements})
         fragments={0:build_epub.page_fragment(book,0)}
-        evidence,images=build_epub._original_evidence(book,fragments,doc)
+        images=_Images()
+        evidence=build_epub._original_evidence(book,fragments,doc,images)
         details=evidence[0]['details']
         assert len({d['id'] for d in details})==2
         assert len({d['src'] for d in details})==2
@@ -149,7 +162,7 @@ def test_original_evidence_rejects_empty_transformed_geometry_before_padding():
         book=assemble.Book(elements=[caption],pages={0:[caption]})
         with pytest.raises(ValueError,match='geometry'):
             build_epub._original_evidence(book,{0:build_epub.page_fragment(book,0)},doc,
-                                          figure_transform=lambda p,b:(0,0,0,0))
+                                          _Images(),figure_transform=lambda p,b:(0,0,0,0))
 
 
 def test_unmatched_notes_without_damaged_source_group_remain_unqualified():

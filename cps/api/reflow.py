@@ -55,7 +55,7 @@ from ..cw_login import current_user
 from ..services import parallel
 from ..services.reflow import (admission, build_epub, extract,
                                ledger as ledger_mod, model, ocr, pipeline, retention, structural_quote,
-                               typed_model, quote_preparation)
+                               typed_model, quote_preparation, source_assessment)
 from ..services.worker import STAT_STARTED, STAT_WAITING, WorkerThread
 from ..tasks import reflow as tasks_reflow
 from ..usermanagement import login_required_if_no_ano
@@ -143,12 +143,12 @@ def _source_or_error(book_id):
 # ── the estimate, measured once per PDF ──────────────────────────────────────
 
 def _survey_uncached(path):
-    """The deterministic pass over a spread of pages. Seconds, not milliseconds."""
+    """Bounded native text-layer assessment; no conversion or OCR."""
     import pymupdf
 
     document = pymupdf.open(path)
     try:
-        return pipeline.survey(document)
+        return source_assessment.survey(document)
     finally:
         document.close()
 
@@ -168,7 +168,7 @@ def _cache_key(path):
     """
     stat = os.stat(path)
     priced_by = "\0".join((os.path.abspath(path), build_epub.CONVERTER_VERSION,
-                           model.PRICE_TABLE_MEASURED))
+                           model.PRICE_TABLE_MEASURED, source_assessment.VERSION))
     digest = hashlib.sha1(priced_by.encode("utf-8")).hexdigest()[:16]
     return "%s-%d-%d" % (digest, stat.st_size, int(stat.st_mtime))
 
@@ -418,6 +418,7 @@ def _estimate_payload(book, source):
         'sample_pages_default':tasks_reflow.SAMPLE_PAGES_DEFAULT,'sample_pages_max':tasks_reflow.SAMPLE_PAGES_MAX,
         'sample_suggested':pages>tasks_reflow.SAMPLE_PAGES_DEFAULT,
         'sampled':int(quote.get('sampled') or 0),'cached':bool(quote.get('cached')),
+        'assessment_scope':quote.get('assessment_scope','sample'),
         'limits':{'max_pages':tasks_reflow.max_pages(),'max_pdf_mb':tasks_reflow.max_pdf_mb()},
         'review':{'quality_released':typed_model.QUALITY_RELEASED,'route_version':typed_model.ROUTE_VERSION,
             'source_revision':typed_model.SOURCE_REVISION,'provider':'openai/flex','service_tier':'flex',
@@ -425,7 +426,9 @@ def _estimate_payload(book, source):
             'max_output_tokens':typed_model.MAX_OUTPUT_TOKENS},
         'recovery':{'ocr_candidates':int(quote.get('ocr_candidates') or 0),
             'image_only':int(quote.get('ocr_image_only') or 0),'damaged':int(quote.get('ocr_damaged') or 0),
-            'estimated_seconds':int(quote.get('ocr_estimated_seconds') or 0),
+            'estimated_seconds':quote.get('ocr_estimated_seconds'),
+            'counts_estimated':bool(quote.get('counts_estimated',True)),
+            'sampled_pages':int(quote.get('sampled') or 0),
             'engine_available':bool(engine['available']),'engine_version':engine['version'],'engine_detail':engine['detail'],
             'language':'eng','dpi':300,'pdf_sha256':fingerprint[:16],
             'non_latin_share':float(quote.get('non_latin_share') or 0)},

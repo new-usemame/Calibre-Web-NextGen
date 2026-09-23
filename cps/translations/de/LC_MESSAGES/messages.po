@@ -4200,7 +4200,7 @@ msgstr "Gehe zum Upload"
 
 #: cps/spa_strings.py
 msgid "Open Tasks"
-msgstr "Offene Aufgaben"
+msgstr "Aufgaben öffnen"
 
 #: cps/spa_strings.py
 msgid "Open search"
@@ -6457,7 +6457,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Library settings"
-msgstr "Bibliothekeinstellungen"
+msgstr "Bibliothekseinstellungen"
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Line height"
@@ -6754,7 +6754,7 @@ msgstr "Neueste"
 
 #: cps/spa_strings.py
 msgid "Newest published"
-msgstr ""
+msgstr "Erscheinungsdatum (neueste zuerst)"
 
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
 #: cps/templates/feed.xml cps/templates/layout.html
@@ -6949,7 +6949,7 @@ msgstr "Älteste"
 
 #: cps/spa_strings.py
 msgid "Oldest published"
-msgstr "Älteste veröffentlicht"
+msgstr "Erscheinungsdatum (älteste zuerst)"
 
 #: cps/spa_strings.py
 msgid ""
@@ -7573,7 +7573,7 @@ msgstr "Suchbegriff"
 
 #: cps/spa_strings.py
 msgid "Search this book"
-msgstr "Dieses Buch suchen"
+msgstr "Dieses Buch durchsuchen"
 
 #: cps/spa_strings.py
 msgid "Search title, author…"
@@ -7806,7 +7806,7 @@ msgid ""
 msgstr ""
 "Die globale Bibliothek wieder anzeigen? Ihre Auswahl bleibt exakt so erhalten, "
 "wie Sie sie hinterlassen haben — Sie können jederzeit zurückwechseln und sie "
-"bleibt erhalten. Bei der nächsten Aktualisierung synchronisiert Ihr e-Reader "
+"bleibt erhalten. Bei der nächsten Aktualisierung synchronisiert Ihr E-Reader "
 "die globale Bibliothek."
 
 #: cps/spa_strings.py
@@ -7841,7 +7841,7 @@ msgstr "Seitenleiste angeheftet."
 
 #: cps/spa_strings.py
 msgid "Sidebar unpinned."
-msgstr "Seitenleiste gelöst."
+msgstr "Seitenleiste nicht mehr angeheftet."
 
 #: cps/spa_strings.py
 msgid "Sign in with a magic link"
@@ -8447,7 +8447,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Your Library"
-msgstr "Deine Bibliothek"
+msgstr "Ihre Bibliothek"
 
 #: cps/spa_strings.py
 msgid "Your browser cannot play this audio format."
@@ -8630,7 +8630,7 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} devices · {m} active"
-msgstr "{n} Geräte · {m} Aktiv"
+msgstr "{n} Geräte · {m} aktiv"
 
 #: cps/spa_strings.py
 #, python-brace-format

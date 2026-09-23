@@ -91,7 +91,8 @@ export function KoreaderSetup({ enabled, serverUrl, onCopy, copied, onApproved }
     if (!link.open) return undefined;
     const frame = window.requestAnimationFrame(() => {
       pairRef.current?.scrollIntoView({ block: 'start' });
-      codeRef.current?.focus();
+      // A lookup that already answered has moved focus to its card.
+      if (!requestRef.current) codeRef.current?.focus();
     });
     if (link.code) {
       setCode(displayUserCode(link.code));

@@ -5,15 +5,19 @@ import { assertNoHorizontalOverflow } from './utils';
 const syncUrl = 'https://books.example.test/kobo/0123456789abcdef0123456789abcdef';
 const serverUrl = 'https://books.example.test';
 
-async function enableKoboFeature(page: Page) {
+async function syncFeatures(page: Page, features: { kobo_sync: boolean; koreader_sync: boolean }) {
   await page.route('**/api/v1/auth/me', async (route) => {
     const response = await route.fetch();
     const me = await response.json();
     await route.fulfill({ response, json: {
       ...me,
-      features: { ...(me.features ?? {}), kobo_sync: true },
+      features: { ...(me.features ?? {}), ...features },
     } });
   });
+}
+
+async function enableKoboFeature(page: Page) {
+  await syncFeatures(page, { kobo_sync: true, koreader_sync: true });
 }
 
 test('user generates settings, copies them, and confirms the first device check-in', async ({ page, context }) => {
@@ -54,7 +58,8 @@ test('user generates settings, copies them, and confirms the first device check-
   await expect(pairing.getByText(`api_endpoint=${syncUrl}`, { exact: true })).toBeVisible();
   await expect(pairing.getByText(serverUrl, { exact: true })).toBeVisible();
   await expect(pairing).toContainText('.kobo/Kobo/Kobo eReader.conf');
-  await expect(pairing).toContainText('the plugin adds /kosync itself');
+  // The manual KOReader route stays one click away under the two easy ones.
+  await pairing.getByText('Set up by hand', { exact: true }).click();
   await expect(pairing.getByRole('link', { name: 'Install or update the NextGen Sync plugin.' }))
     .toHaveAttribute('href', '/kosync');
 
@@ -87,14 +92,7 @@ test('account links directly to the SPA pairing section', async ({ page }) => {
 });
 
 test('KOReader setup remains discoverable without stock Kobo sync or a token', async ({ page }) => {
-  await page.route('**/api/v1/auth/me', async (route) => {
-    const response = await route.fetch();
-    const me = await response.json();
-    await route.fulfill({ response, json: {
-      ...me,
-      features: { ...(me.features ?? {}), kobo_sync: false },
-    } });
-  });
+  await syncFeatures(page, { kobo_sync: false, koreader_sync: true });
   await page.route('**/api/v1/account/kobo-sync-token', (route) => route.fulfill({ json: {
     user_id: 1,
     configured: false,
@@ -111,10 +109,13 @@ test('KOReader setup remains discoverable without stock Kobo sync or a token', a
   await expect(pairing.getByRole('heading', {
     level: 3, name: 'KOReader', exact: true,
   })).toBeVisible();
-  await expect(pairing.getByRole('link', { name: 'Install or update the NextGen Sync plugin.' }))
-    .toHaveAttribute('href', '/kosync');
+  await expect(pairing.getByRole('button', { name: 'Download ready-made plugin' })).toBeVisible();
+  await expect(pairing.getByLabel('Code on the e-reader')).toBeVisible();
   await expect(pairing.getByText(serverUrl, { exact: true })).toBeVisible();
   await expect(pairing.getByRole('button', { name: 'Copy server address' })).toBeVisible();
+  await pairing.getByText('Set up by hand', { exact: true }).click();
+  await expect(pairing.getByRole('link', { name: 'Install or update the NextGen Sync plugin.' }))
+    .toHaveAttribute('href', '/kosync');
   await expect(pairing.getByRole('button', { name: 'Generate sync URL' })).toHaveCount(0);
   await expect(pairing.getByRole('status').filter({
     hasText: /^Kobo sync is not enabled on this server\.$/,

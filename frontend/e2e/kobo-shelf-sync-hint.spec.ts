@@ -13,8 +13,10 @@ import { test, expect, Page } from '@playwright/test';
  *   - not marked                    -> no notice (nothing was claimed)
  * and that the button actually flips the account setting.
  *
- * Skips itself when the instance has Kobo sync disabled server-side — the
- * "Enable Kobo sync" control does not exist then, and neither should the notice.
+ * Skips itself when the instance has neither Kobo nor KOReader sync on — the
+ * shelf's sync control does not exist then, and neither should the notice.
+ * (With KOReader sync on the control reads "Enable e-reader sync": the mark
+ * then reaches the KOReader library too.)
  *
  * "Sync only selected shelves" is an ACCOUNT-level flag shared by every browser
  * session of the same user, so these tests cannot run concurrently with each
@@ -47,10 +49,11 @@ test.describe('#866 Kobo shelf-sync hint', () => {
     const headers = { 'X-CSRFToken': await csrfToken(page) };
 
     const me = (await (await page.request.get('/api/v1/auth/me')).json()) as {
-      features?: { kobo_sync?: boolean };
+      features?: { kobo_sync?: boolean; koreader_sync?: boolean };
       kobo_only_shelves_sync?: boolean;
     };
-    test.skip(!me.features?.kobo_sync, 'Kobo sync is disabled on this instance');
+    test.skip(!me.features?.kobo_sync && !me.features?.koreader_sync,
+      'Neither Kobo nor KOReader sync is enabled on this instance');
     const restore = me.kobo_only_shelves_sync === true;
 
     const created = await page.request.post('/api/v1/shelves', {
@@ -69,7 +72,7 @@ test.describe('#866 Kobo shelf-sync hint', () => {
       await expect(page.getByText(NOTICE)).toHaveCount(0);
 
       // Mark it the way the reporter did, from the shelf page itself.
-      await page.getByRole('button', { name: /enable kobo sync/i }).click();
+      await page.getByRole('button', { name: /enable (kobo|e-reader) sync/i }).click();
       await expect(page.getByText(NOTICE)).toBeVisible();
 
       // One click fixes it, and the notice goes away without a reload.
@@ -97,10 +100,11 @@ test.describe('#866 Kobo shelf-sync hint', () => {
     const headers = { 'X-CSRFToken': await csrfToken(page) };
 
     const me = (await (await page.request.get('/api/v1/auth/me')).json()) as {
-      features?: { kobo_sync?: boolean };
+      features?: { kobo_sync?: boolean; koreader_sync?: boolean };
       kobo_only_shelves_sync?: boolean;
     };
-    test.skip(!me.features?.kobo_sync, 'Kobo sync is disabled on this instance');
+    test.skip(!me.features?.kobo_sync && !me.features?.koreader_sync,
+      'Neither Kobo nor KOReader sync is enabled on this instance');
     const restore = me.kobo_only_shelves_sync === true;
 
     const created = await page.request.post('/api/v1/shelves', {

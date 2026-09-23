@@ -3097,7 +3097,9 @@ def check_valid_domain(domain_text):
 
 
 def get_download_link(book_id, book_format, client):
-    book_format = book_format.split(".")[0]
+    # Route/DB format identifiers are case-insensitive; Calibre stores lowercase
+    # filename extensions. Keep delivery paths, MIME and format branches aligned.
+    book_format = book_format.split(".")[0].lower()
     # Try filtered view first to respect user restrictions.
     # allow_show_hidden=True: a user's own hidden book is still downloadable
     # through Send-to-eReader and OPDS — hidden hides from listings, not from

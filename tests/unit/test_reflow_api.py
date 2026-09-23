@@ -697,6 +697,40 @@ def test_a_restart_interrupted_job_is_shown_as_over_not_running(
     assert body["active"] == []
 
 
+@pytest.mark.unit
+def test_a_sample_the_housekeeping_removed_says_so_instead_of_just_losing_its_download(
+        mod, monkeypatch, pdf_on_disk):
+    """Samples are kept for a week, then the daily housekeeping removes them. A
+    row whose sample was made and is gone says so; a row whose sample is still
+    there offers it; a run that never made one is neither."""
+    _wire(mod, monkeypatch, pdf_on_disk)
+    from cps.services.reflow import ledger as ledger_mod
+
+    for job_id, made in (("e1b2c3d4e5f60006", True), ("e1b2c3d4e5f60007", True),
+                         ("e1b2c3d4e5f60008", False)):
+        led = ledger_mod.Ledger(os.path.join(mod.REFLOW_DIR, "jobs", "5", job_id + ".jsonl"),
+                                cap_usd=0.0, job_id=job_id)
+        led.record({"kind": "job", "event": "start", "mode": "sample", "user_id": 7})
+        if made:
+            led.record({"kind": "artifact", "sha256": "f" * 64, "bytes": 4})
+        led.record({"kind": "job", "event": "finish", "status": "done" if made else "failed"})
+    with open(mod.tasks_reflow.sample_path(7, "e1b2c3d4e5f60007"), "wb") as handle:
+        handle.write(b"PK\x03\x04")
+
+    with _ctx("/api/v1/books/5/reflow/jobs"):
+        with patch.object(mod, "current_user", _user(uid=7)):
+            with patch.object(mod.WorkerThread, "get_instance",
+                              staticmethod(lambda: SimpleNamespace(tasks=[]))):
+                rows = {row["job_id"]: row for row in
+                        _json(inspect.unwrap(mod.reflow_jobs)(5))["items"]}
+
+    gone, there, never = (rows[job] for job in (
+        "e1b2c3d4e5f60006", "e1b2c3d4e5f60007", "e1b2c3d4e5f60008"))
+    assert (gone["sample_ready"], gone["sample_expired"], gone["sample_kept_days"]) == (False, True, 7)
+    assert (there["sample_ready"], there["sample_expired"]) == (True, False)
+    assert (never["sample_ready"], never["sample_expired"]) == (False, False)
+
+
 # ── the report of the book that is in the library ────────────────────────────
 
 def _epub_with_sidecar(path, payload):

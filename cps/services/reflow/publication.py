@@ -69,15 +69,39 @@ def resolve(root,path):
 
 @contextmanager
 def lock(directory,target,blocking=True):
+    """One publisher per target, across processes: ``flock`` on a keyed file.
+
+    Retention removes lock files nobody has used for a month, holding each one
+    while it does (``retention._prune_locks``). A publisher that opened the file
+    just before it went would then hold a lock on a file nobody else can find,
+    and the next publisher would lock a new one beside it -- two publishers of
+    one EPUB. So a lock, once taken, is checked against the name: if the name no
+    longer leads to the file locked, it is let go and taken again. Taking a lock
+    refreshes the file's time, which is what retention ages it by.
+    """
     os.makedirs(directory,exist_ok=True)
     key=hashlib.sha256(os.path.realpath(target).encode()).hexdigest()
-    with open(os.path.join(directory,key+'.lock'),'a') as handle:
-        try:fcntl.flock(handle,fcntl.LOCK_EX|(0 if blocking else fcntl.LOCK_NB))
-        except BlockingIOError:
-            yield False
+    path=os.path.join(directory,key+'.lock')
+    while True:
+        with open(path,'a') as handle:
+            try:fcntl.flock(handle,fcntl.LOCK_EX|(0 if blocking else fcntl.LOCK_NB))
+            except BlockingIOError:
+                yield False
+                return
+            try:
+                named=os.stat(path)
+                held=os.fstat(handle.fileno())
+                current=(named.st_dev,named.st_ino)==(held.st_dev,held.st_ino)
+            except FileNotFoundError:
+                current=False
+            if not current:
+                fcntl.flock(handle,fcntl.LOCK_UN)
+                continue
+            try:os.utime(path)
+            except OSError:pass
+            try:yield True
+            finally:fcntl.flock(handle,fcntl.LOCK_UN)
             return
-        try:yield True
-        finally:fcntl.flock(handle,fcntl.LOCK_UN)
 
 
 #: Journal events after which there is nothing left for recovery to do.

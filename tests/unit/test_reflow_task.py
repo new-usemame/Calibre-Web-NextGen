@@ -472,19 +472,36 @@ def test_a_queued_conversion_over_the_limit_fails_before_reading_a_page(rig, mon
 
 # ── housekeeping ─────────────────────────────────────────────────────────────
 
-def test_a_sample_nobody_downloaded_does_not_live_forever(rig):
-    keep = rig.mod.sample_path(7, "aaaaaaaaaaaaaaaa")
-    drop = rig.mod.sample_path(7, "bbbbbbbbbbbbbbbb")
-    os.makedirs(os.path.dirname(keep), exist_ok=True)
-    for path in (keep, drop):
+def test_the_daily_maintenance_removes_a_sample_nobody_downloaded(rig, monkeypatch):
+    """A sample is a preview, not a library: a week after it was made it goes.
+    That rule existed (``cleanup_samples``) and nothing ever called it, so every
+    sample anyone made stayed on the config volume for good. The daily scheduled
+    maintenance now runs Reflow's housekeeping, which applies it -- and leaves
+    alone whatever belongs to a job the worker still holds."""
+    from cps import schedule
+    monkeypatch.setattr(schedule, "config", SimpleNamespace(
+        schedule_metadata_backup=False, schedule_generate_book_covers=False,
+        schedule_generate_series_covers=False))
+    fresh, expired, held = (rig.mod.sample_path(7, job) for job in (
+        "aaaaaaaaaaaaaaaa", "bbbbbbbbbbbbbbbb", "cccccccccccccccc"))
+    old = time.time() - 8 * 86400
+    for path in (fresh, expired, held):
         with open(path, "wb") as handle:
             handle.write(b"PK\x03\x04")
-    old = time.time() - 40 * 86400
-    os.utime(drop, (old, old))
+        if path != fresh:
+            os.utime(path, (old, old))
+    queued = rig.mod.TaskReflowPdf(5, 7, {"mode": "sample"})
+    queued.job_id = "cccccccccccccccc"
 
-    assert rig.mod.cleanup_samples(max_age_days=7) == 1
-    assert os.path.isfile(keep)
-    assert not os.path.exists(drop)
+    (make, hidden), = [(task, hidden) for task, name, hidden
+                       in schedule.get_scheduled_tasks(reconnect=False)
+                       if name == "reflow housekeeping"]
+    make().run(SimpleNamespace(tasks=[(1, "admin", None, queued, False)]))
+
+    assert hidden, "housekeeping is not a task anyone asked for"
+    assert os.path.isfile(fresh)
+    assert not os.path.exists(expired)
+    assert os.path.isfile(held), "the sample of a job the worker holds was removed"
 
 
 # ── a restart mid-conversion ─────────────────────────────────────────────────

@@ -65,6 +65,10 @@ export interface ReflowJob {
   error: string | null;
   sample_url: string | null;
   sample_ready?: boolean;
+  /** The sample was made and has since been removed (samples are kept for
+   *  ``sample_kept_days`` days). */
+  sample_expired?: boolean;
+  sample_kept_days?: number;
   structural?: StructuralSummary | null;
   artifact?: { sha256: string; bytes: number } | null;
 }

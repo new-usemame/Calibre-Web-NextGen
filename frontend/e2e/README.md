@@ -173,7 +173,7 @@ surfaces; reverse dependents cannot be discovered by that traversal and must be 
 prefixes. The whole `cps/api/` blueprint tree is therefore protected explicitly: its registration in
 `cps/main.py` points toward the handlers, opposite to the import direction walked by the classifier. The
 two-level cutoff only bounds each root's dependency fan-out—it is not what excludes reverse dependents.
-At this revision the derived set is 204 of 268 local Python modules (the closure correctly picks
+At this revision the derived set is 205 of 269 local Python modules (the closure correctly picks
 up `cps/services/device_delivery.py` through the book-action request path, and this branch's
 `cps/user_preferences.py` through the account API path). It also now picks up the cover picker and
 its services: `cps/api/actions.py` gained a personal-cover `kind: "generated"` that calls into
@@ -183,7 +183,7 @@ edge, and behind them the cover designer's own `cps/services/cover_design_preset
 `cps/services/cover_designer_cache.py`. That is the classifier working: a cover apply now runs from
 the same request tree as the rest of `cps/api/`. Reflow entered the same way: `cps/api/reflow.py`
 is a blueprint under `cps/api/`, so its whole service package (`cps/services/reflow/*`) and the worker
-`cps/tasks/reflow.py` are protected — twenty-nine modules that run a paid model against a user's book and
+`cps/tasks/reflow.py` are protected — thirty modules that run a paid model against a user's book and
 write a new format into the library, which is exactly the class of change the gate exists for.
 Measured at `origin/main`
 `e6298e0d560b`, the previous and expanded policies each fired on 26 of the latest 100 first-parent commits;

@@ -17293,3 +17293,11 @@ msgstr "En attente de la fin de {count} préparations du document source lancée
 #: cps/spa_strings.py
 msgid "Source preparation stopped at its {minutes}-minute limit so that others can take a turn. Pages already recognized are kept: prepare again to continue."
 msgstr "La préparation du document source s’est arrêtée à sa limite de {minutes} minutes pour laisser leur tour aux autres. Les pages déjà reconnues sont conservées : relancez la préparation pour continuer."
+
+#: cps/spa_strings.py
+msgid "This sample is no longer kept: samples are removed {days} days after they are made. Make a new sample to see it again."
+msgstr "Cet échantillon n’est plus conservé : les échantillons sont supprimés {days} jours après leur création. Créez un nouvel échantillon pour le revoir."
+
+#: cps/tasks/reflow.py
+msgid "Settle interrupted conversions and remove expired Reflow files"
+msgstr "Régler les conversions interrompues et supprimer les fichiers Reflow expirés"

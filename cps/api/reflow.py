@@ -54,7 +54,8 @@ from ..constants import REFLOW_DIR
 from ..cw_login import current_user
 from ..services import parallel
 from ..services.reflow import (admission, build_epub, extract,
-                               ledger as ledger_mod, model, ocr, pipeline, structural_quote, typed_model, quote_preparation)
+                               ledger as ledger_mod, model, ocr, pipeline, retention, structural_quote,
+                               typed_model, quote_preparation)
 from ..services.worker import STAT_STARTED, STAT_WAITING, WorkerThread
 from ..tasks import reflow as tasks_reflow
 from ..usermanagement import login_required_if_no_ano
@@ -669,6 +670,11 @@ def reflow_jobs(book_id):
                                   % (int(book_id), job_id))
             item["sample_ready"] = os.path.isfile(
                 tasks_reflow.sample_path(mine, job_id))
+            # A sample that was made and is gone was removed by the daily
+            # housekeeping (``retention``); the row says so instead of just
+            # losing its download.
+            item["sample_expired"] = bool(row.get("artifact")) and not item["sample_ready"]
+            item["sample_kept_days"] = int(retention.POLICIES["samples"].days)
         items.append(item)
 
     active = []

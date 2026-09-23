@@ -34,7 +34,7 @@ from cps.constants import REFLOW_DIR
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED, \
     STAT_STARTED, STAT_WAITING
 from cps.services.reflow import admission, build_epub, extract, ledger as ledger_mod, \
-    model, ocr, pipeline, publication, report, structural_pipeline, typed_model
+    model, ocr, pipeline, publication, report, retention, structural_pipeline, typed_model
 
 log = logger.create()
 
@@ -676,16 +676,7 @@ def recover_interrupted_jobs(worker=None):
     root = os.path.join(REFLOW_DIR, "jobs")
     if not os.path.isdir(root):
         return []
-    active_ids = set()
-    if worker is not None:
-        for __, __, __, task, __ in worker.tasks:
-            if not getattr(task, "is_reflow", False):
-                continue
-            if task.stat not in (STAT_WAITING, STAT_STARTED):
-                continue
-            job_id = getattr(task, "job_id", None)
-            if job_id:
-                active_ids.add(job_id)
+    active_ids = _active_job_ids(worker)
     recovered = []
     for book_id in sorted(os.listdir(root)):
         directory = os.path.join(root, book_id)
@@ -721,28 +712,52 @@ def recover_interrupted_jobs(worker=None):
     return recovered
 
 
-def cleanup_samples(max_age_days=7):
-    """A sample is a preview, not a library. Old ones go."""
-    root = os.path.join(REFLOW_DIR, "samples")
-    if not os.path.isdir(root):
-        return 0
-    import time
-
-    cutoff = time.time() - max_age_days * 86400
-    removed = 0
-    for directory, _dirs, files in os.walk(root):
-        for name in files:
-            path = os.path.join(directory, name)
-            try:
-                if os.path.getmtime(path) < cutoff:
-                    os.remove(path)
-                    removed += 1
-            except OSError:                                       # pragma: no cover
-                continue
-    return removed
+def _active_job_ids(worker):
+    """The Reflow jobs ``worker`` holds, waiting or running."""
+    ids = set()
+    for __, __, __, task, __ in (worker.tasks if worker is not None else ()):
+        if getattr(task, "is_reflow", False) and task.stat in (STAT_WAITING, STAT_STARTED) \
+                and getattr(task, "job_id", None):
+            ids.add(task.job_id)
+    return ids
 
 
-__all__ = ["TaskReflowPdf", "ReflowOptions", "sample_path", "cleanup_samples",
+class TaskReflowHousekeeping(CalibreTask):
+    """Reflow's daily housekeeping, with the other scheduled maintenance.
+
+    It settles the conversions no process finished -- the pass startup runs,
+    which a publication conflict needs a second time before its evidence can
+    leave the book's folder (N4) -- and then keeps the Reflow data folder
+    bounded (:func:`retention.sweep`). It runs on the worker thread, so no
+    conversion of this process runs beside it, and the jobs the worker holds are
+    passed on: nothing of theirs is touched.
+    """
+
+    def __init__(self, task_message=N_("Settle interrupted conversions and remove expired Reflow files")):
+        super(TaskReflowHousekeeping, self).__init__(task_message)
+
+    def run(self, worker_thread):
+        try:
+            recovered = recover_interrupted_jobs(worker_thread)
+            removed = retention.sweep(REFLOW_DIR, active_jobs=_active_job_ids(worker_thread))
+        except Exception as exc:
+            log.error("reflow housekeeping failed: %s", exc)
+            return self._handleError("Reflow housekeeping failed: %s" % exc)
+        if recovered or removed:
+            log.info("reflow housekeeping: settled %d conversion(s); removed %s",
+                     len(recovered), removed or "nothing")
+        self._handleSuccess()
+
+    @property
+    def name(self):
+        return "Reflow housekeeping"
+
+    @property
+    def is_cancellable(self):
+        return False
+
+
+__all__ = ["TaskReflowPdf", "TaskReflowHousekeeping", "ReflowOptions", "sample_path",
            "recover_interrupted_jobs", "hard_cap_usd", "config_default_tier",
            "max_pages", "max_pdf_mb", "pdf_size_mb", "MAX_PAGES_DEFAULT", "MAX_PDF_MB_DEFAULT",
            "make_client", "reflow_dir", "INTERRUPTED_STATUS",

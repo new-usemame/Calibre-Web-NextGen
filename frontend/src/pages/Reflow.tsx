@@ -618,6 +618,13 @@ function JobResult({ job, bookId, t, onConvertAll }: {
         {t('Filed EPUB SHA-256: {hash}', { hash: job.artifact.sha256 })}
       </p>}
 
+      {job.sample_url && job.sample_expired && (
+        <p className={styles.note}>
+          {t('This sample is no longer kept: samples are removed {days} days after they are made. Make a new sample to see it again.',
+            { days: job.sample_kept_days ?? 7 })}
+        </p>
+      )}
+
       <div className={styles.actions}>
         {job.sample_url && job.sample_ready && (
           <a className={styles.download} href={resourceUrl(job.sample_url)}>

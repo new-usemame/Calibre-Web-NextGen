@@ -588,10 +588,10 @@ Accepted true values are `true`, `1`, `yes`, and `on`; false values are `false`,
 
 ### KOReader sync
 
-CWA has built-in KOReader progress sync; no separate kosync server is needed.
+CWA has built-in KOReader sync; no separate kosync server is needed. With the plugin, a Kindle or any KOReader e-reader opens on your library: covers of every book (or of the shelves you choose for e-readers), downloaded when you open them, with reading position, read status and highlights synced automatically. **Setup and daily use: [docs/koreader-kindle.md](docs/koreader-kindle.md).**
 
-1. In KOReader, install the CWA plugin: visit `http://your-cwa:8083/kosync` for download and install instructions.
-2. Point the plugin at `http://your-cwa:8083` and log in with your CWA username and password.
+1. In CWA open **E-readers ▸ Pair a Kobo or KOReader** and either download the **ready-made plugin** (copy one folder over USB; nothing to type on the e-reader) or **pair with a code** shown on the e-reader.
+2. To install the plain plugin by hand instead, visit `http://your-cwa:8083/kosync`, then sign in from **Tools ▸ CWNG library ▸ Connect this device**.
 3. Read on any device. Progress syncs back to CWA, and from there to Kobo if Kobo sync is enabled.
 
 **Keeping the plugin updated.** KOReader's [Updates Manager](https://github.com/advokatb/updatesmanager.koplugin) and [appstore.koplugin](https://github.com/kaz-utashiro/appstore.koplugin) can both update the plugin in place. Point either at the plugin's own repository, [`new-usemame/cwngsync.koplugin`](https://github.com/new-usemame/cwngsync.koplugin/releases) — not at this one. The plugin publishes a release only when the plugin itself changes, and its version is the server version it last changed in, so it can legitimately sit behind your server version; that alone doesn't mean anything is wrong. With the plugin repository configured, a check that reports no new release means the plugin stream has nothing newer.

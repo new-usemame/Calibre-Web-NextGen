@@ -17,6 +17,7 @@ from . import api_v1
 from .books import _rows_to_items
 from .. import ub, config, db, calibre_db, logger, magic_shelf
 from ..cw_login import current_user
+from ..services import ereader_scope
 from ..custom_column_sort import (
     custom_sort_options,
     load_configured_columns,
@@ -158,8 +159,8 @@ def set_magic_shelf_kobo_sync(shelf_id):
         return _err("not_found", "Smart shelf not found", 404)
     if not magic_shelf.can_kobo_sync_magic_shelf(shelf, current_user):
         return _err("forbidden", "You are not allowed to edit this shelf", 403)
-    if not config.config_kobo_sync:
-        return _err("forbidden", "Kobo sync is not enabled on this server", 403)
+    if not ereader_scope.shelf_marks_enabled(config):
+        return _err("forbidden", "E-reader sync is not enabled on this server", 403)
 
     data = request.get_json(silent=True)
     # A JSON boolean, not Python truthiness: bool("false") is True, so coercing

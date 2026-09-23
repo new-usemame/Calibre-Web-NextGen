@@ -18,7 +18,7 @@ from . import calibre_db, config, constants, db, logger, ub, user_library
 from .render_template import render_title_template
 from .sort_orders import BOOK_SORT_ORDERS
 from .usermanagement import login_required_if_no_ano, user_login_required
-from .services import hardcover
+from .services import ereader_scope, hardcover
 from .services.worker import WorkerThread
 from .tasks.hardcover_sync import TaskHardcoverBulkSync
 log = logger.create()
@@ -757,7 +757,7 @@ def create_edit_shelf(shelf, page_title, page, shelf_id=False):
             flash(_("Sorry you are not allowed to create a public shelf"), category="error")
             return redirect(url_for('web.index'))
         is_public = 1 if to_save.get("is_public") == "on" else 0
-        if config.config_kobo_sync:
+        if ereader_scope.shelf_marks_enabled(config):
             shelf.kobo_sync = True if to_save.get("kobo_sync") else False
             if shelf.kobo_sync:
                 ub.session.query(ub.ShelfArchive).filter(ub.ShelfArchive.user_id == current_user.id).filter(
@@ -797,7 +797,7 @@ def create_edit_shelf(shelf, page_title, page, shelf_id=False):
                                  shelf=shelf,
                                  title=page_title,
                                  page=page,
-                                 kobo_sync_enabled=config.config_kobo_sync,
+                                 kobo_sync_enabled=ereader_scope.shelf_marks_enabled(config),
                                  sync_only_selected_shelves=sync_only_selected_shelves,
                                  sync_only_selected_opds_shelves=sync_only_selected_opds_shelves,
                                  opds_expose_checked=opds_expose_checked)

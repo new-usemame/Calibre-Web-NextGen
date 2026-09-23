@@ -19,6 +19,7 @@ from .serializers import serialize_shelf
 from .books import _rows_to_items
 from .. import calibre_db, config, db, ub, user_library
 from ..cw_login import current_user
+from ..services import ereader_scope
 from ..sort_orders import BOOK_SORT_ORDERS, RECENT_SORT, recent_sort_order, viewer_id
 from ..usermanagement import login_required_if_no_ano
 from ..shelf import (
@@ -185,7 +186,7 @@ def create_shelf_api():
         return _err("conflict", "A shelf with that name already exists", 409)
 
     shelf = ub.Shelf(name=name, is_public=is_public, user_id=int(current_user.id))
-    if data.get("kobo_sync") and config.config_kobo_sync:
+    if data.get("kobo_sync") and ereader_scope.shelf_marks_enabled(config):
         shelf.kobo_sync = True
     try:
         ub.session.add(shelf)
@@ -229,7 +230,7 @@ def update_shelf_api(shelf_id):
     if "is_public" in data:
         shelf.is_public = target_public
 
-    if "kobo_sync" in data and config.config_kobo_sync:
+    if "kobo_sync" in data and ereader_scope.shelf_marks_enabled(config):
         shelf.kobo_sync = bool(data["kobo_sync"])
         if shelf.kobo_sync:
             # Clear any pending tombstone so a re-enabled shelf re-syncs to Kobo.

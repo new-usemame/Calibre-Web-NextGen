@@ -59,6 +59,20 @@ def shelf_only(user):
     return bool(getattr(user, "kobo_only_shelves_sync", False))
 
 
+def shelf_marks_enabled(config):
+    """Whether marking a shelf for e-reader sync can reach a device here.
+
+    Kobo sync and the KOReader library both deliver the shelf-only scope, so
+    the per-shelf mark matters when either one is switched on. A server that
+    syncs only KOReader must still let its readers choose their shelves.
+    ``config`` is the app config the caller already holds.
+    """
+    if getattr(config, "config_kobo_sync", False):
+        return True
+    from ..progress_syncing.settings import is_koreader_sync_enabled
+    return is_koreader_sync_enabled()
+
+
 def personal_library(user):
     """My Library is on for this user (the #1939 personal mode)."""
     return (

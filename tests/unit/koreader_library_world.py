@@ -90,7 +90,7 @@ class LibraryWorld:
         monkeypatch.setattr(db.ub, "session", self.session)
         monkeypatch.setattr(cps, "calibre_db", cdb)
         monkeypatch.setattr(helper, "calibre_db", cdb)
-        monkeypatch.setattr(self.kosync, "is_koreader_sync_enabled", lambda: True)
+        self.sync_switch(True)
         for name, value in (
                 ("config_use_google_drive", False),
                 ("config_read_column", 0),
@@ -128,13 +128,9 @@ class LibraryWorld:
         from cps.api import api_v1
         from cps.cw_login import login_user
         from cps.spa import spa
-        import cps.api.auth as api_auth
-        import cps.api.koreader_devices as koreader_devices
         from cps.progress_syncing.protocols import kosync_pairing
 
         self.monkeypatch.setattr(config, "config_anonbrowse", 0, raising=False)
-        self.monkeypatch.setattr(koreader_devices, "is_koreader_sync_enabled", lambda: True)
-        self.monkeypatch.setattr(api_auth, "is_koreader_sync_enabled", lambda: True)
         self.monkeypatch.setattr(kosync_pairing.spa, "spa_available", lambda: spa_available)
         self.app.config.update(WTF_CSRF_ENABLED=False, RATELIMIT_ENABLED=rate_limits,
                                RATELIMIT_STORAGE_URI="memory://")
@@ -165,10 +161,11 @@ class LibraryWorld:
         return client
 
     def sync_switch(self, enabled):
-        """The admin's KOReader sync switch, as every KOReader route reads it."""
+        """The admin's KOReader sync switch (a cwa.db setting), everywhere it is read."""
         import cps.api.auth as api_auth
         import cps.api.koreader_devices as koreader_devices
-        for module in (self.kosync, koreader_devices, api_auth):
+        from cps.progress_syncing import settings
+        for module in (settings, self.kosync, koreader_devices, api_auth):
             self.monkeypatch.setattr(module, "is_koreader_sync_enabled", lambda: enabled)
 
     def freeze_pairing_clock(self, start=NOW):

@@ -360,3 +360,18 @@ def test_editorial_bracket_and_first_line_indent_do_not_hide_continuation(tmp_pa
             else:build_epub.build(book,str(tmp_path/'fragment.epub'),doc=doc,operation_plans=[ops.OperationPlan(forged,(cid,))])
     assert not assemble.continues('Counting onward leaves an equal','[number] in the next interval.'), 'prose joining remains conservative'
     doc.close()
+
+
+@pytest.mark.parametrize('seam',['admission','builder'])
+def test_old_quote_proof_cannot_survive_current_boundary_revision(tmp_path,monkeypatch,seam):
+    from cps.services.reflow import quote_evidence,build_epub
+    data=fixture(tmp_path);book,doc,raw,*_=data
+    current=quote_evidence.VERSION
+    monkeypatch.setattr(quote_evidence,'VERSION','previous-boundary-contract')
+    prepared=prepare(data);choice=next(c for c in prepared.candidates() if c['kind']=='quote')
+    monkeypatch.setattr(quote_evidence,'VERSION',current)
+    with pytest.raises(ops.ContractError,match='quote evidence'):
+        if seam=='admission':prepared.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=prepared.snapshot_id,select=[choice['candidate_id']]))
+        else:build_epub.build(book,str(tmp_path/'stale.epub'),doc=doc,operation_plans=[ops.OperationPlan(prepared,(choice['candidate_id'],))])
+    assert not (tmp_path/'stale.epub').exists()
+    doc.close()

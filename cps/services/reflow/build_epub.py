@@ -268,7 +268,7 @@ def _aside_html(note, ref_ids, available, ambiguous=False, continuations=()):
         origin = getattr(note, "continued_from", None)
         if origin is not None:
             return ('<aside class="footnote" epub:type="footnote" id="note_tail_p%d">'
-                    '<p><a href="#note_source_p%d_%d">Note %d, continued</a>: %s</p></aside>'
+                    '<p><a href="#fn_p%04d_%d">Note %d, continued</a>: %s</p></aside>'
                     % (note.pno, origin[0], origin[1], origin[1], body))
         return '<aside class="footnote" epub:type="footnote"><p>%s</p></aside>' % body
     number = str(note.num)
@@ -281,8 +281,8 @@ def _aside_html(note, ref_ids, available, ambiguous=False, continuations=()):
     links = ''.join(' <a href="#note_tail_p%d">Continued on PDF page %d</a>.'
                     % (n.pno, n.pno+1) for n in continuations)
     return ('<aside class="footnote" epub:type="footnote" id="fn_%s">'
-            '<p id="note_source_p%d_%s">%s %s%s</p></aside>'
-            % (number, note.pno, number, label, body, links))
+            '<p>%s %s%s</p></aside>'
+            % (number, label, body, links))
 
 
 def _figure_html(pno, index, caption):
@@ -568,7 +568,7 @@ def _scope_ids(html, pno):
     """Note numbers repeat from page to page; ids in one book may not."""
     prefix = "p%04d_" % pno
     html = re.sub(r'(\sid=")(fn_|fnref_)', r"\1\2%s" % prefix, html)
-    html = re.sub(r'(href="#)(fn_|fnref_)', r"\1\2%s" % prefix, html)
+    html = re.sub(r'(href="#)(fn_|fnref_)(?!p\d+_)', r"\1\2%s" % prefix, html)
     return html
 
 

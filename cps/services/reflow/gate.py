@@ -454,7 +454,7 @@ _HEADING_BLOCK = re.compile(r"<h([1-6])\b[^>]*>(.*?)</h\1\s*>", re.I | re.S)
 _HREF_FRAGMENT = re.compile(r"#[A-Za-z0-9._-]*\Z")
 #: The only image source there is: a figure this pipeline cropped out of the PDF.
 _FIGURE_SRC = re.compile(r"images/fig_p\d+_\d+\.jpg\Z")
-_NOTE_ID = re.compile(r"fn_\d+(_\d+)?\Z")
+_NOTE_ID = re.compile(r"(?:fn_\d+(_\d+)?|note_tail_p\d+)\Z")
 _NOTEREF_ID = re.compile(r"fnref_\d+(_\d+)?\Z")
 _SMALL_SPAN = re.compile(r"[1-9]\d{0,2}\Z")
 

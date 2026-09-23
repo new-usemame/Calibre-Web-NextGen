@@ -65,12 +65,16 @@ def test_emitted_continuation_links_resolve_and_keep_note_words(tmp_path):
     from cps.services.reflow import build_epub
     raw=pages();style=skeleton.BookStyle(body_size=10)
     book=assemble.assemble([skeleton.page_skeleton(p,style) for p in raw],style,raw)
+    from cps.services.reflow import gate
+    for pno in book.pages:
+        checked=gate.check_structure(build_epub.page_fragment(book,pno))
+        assert checked.ok, checked.reasons
     target=tmp_path/'notes.epub';build_epub.build(book,str(target))
     ns='{http://www.w3.org/1999/xhtml}'
     with zipfile.ZipFile(target) as z:
         roots={n:ET.fromstring(z.read(n)) for n in z.namelist() if n.endswith('.xhtml')}
     ids={(name,e.get('id')) for name,r in roots.items() for e in r.iter() if e.get('id')}
-    links=[(name,a.get('href')) for name,r in roots.items() for a in r.iter(ns+'a') if 'note_source_' in a.get('href','') or 'note_tail_' in a.get('href','')]
+    links=[(name,a.get('href')) for name,r in roots.items() for a in r.iter(ns+'a') if 'fn_p0000_1' in a.get('href','') or 'note_tail_' in a.get('href','')]
     assert len(links)==2
     import posixpath
     for name,href in links:
@@ -80,3 +84,25 @@ def test_emitted_continuation_links_resolve_and_keep_note_words(tmp_path):
     assert len(asides)==2
     assert sum('[number] in the following interval.' in ''.join(a.itertext()) for a in asides)==1
     assert all('[number]' not in ''.join(p.itertext()) for r in roots.values() for p in r.iter(ns+'blockquote'))
+
+
+def test_detached_raised_body_callout_binds_real_note_and_keeps_text_order():
+    raw=pages();body=raw[0].blocks[0]
+    target=body.lines[0];right=target.bbox[2]
+    body.lines.insert(1,line('1',right+1,target.bbox[1]+1,5))
+    style=skeleton.BookStyle(body_size=10)
+    book=assemble.assemble([skeleton.page_skeleton(p,style) for p in raw],style,raw)
+    assert book.notes[0].marked
+    element=next(e for e in book.pages[0] if 'Main body before' in e.text)
+    assert ['sup','1',0] in element.runs
+    assert book.conservation.ok
+
+
+def test_detached_digit_inside_unsplit_text_span_is_not_guessed_as_a_callout():
+    raw=pages();body=raw[0].blocks[0];target=body.lines[0]
+    body.lines.insert(1,line('1',target.bbox[0]+30,target.bbox[1]+1,5))
+    style=skeleton.BookStyle(body_size=10)
+    book=assemble.assemble([skeleton.page_skeleton(p,style) for p in raw],style,raw)
+    assert not book.notes[0].marked
+    assert not any(r[0]=='sup' for e in book.pages[0] for r in e.runs)
+    assert book.conservation.ok

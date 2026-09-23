@@ -24,6 +24,7 @@ States: pending -> approved -> claimed, or pending -> denied. A row past
 """
 
 import hashlib
+import ipaddress
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -120,6 +121,21 @@ def app_password_label(device_name):
     return app_passwords.clip_label("KOReader: %s" % device_name)
 
 
+def client_address(text):
+    """The address a device connected from, as a person knows it, or None.
+
+    A server listening on IPv6 and IPv4 at once sees an IPv4 device as
+    ``::ffff:192.168.1.23``; that is shown, and counted, as 192.168.1.23.
+    """
+    text = (text or "").strip()
+    try:
+        parsed = ipaddress.ip_address(text)
+    except ValueError:
+        return text[:64] or None
+    mapped = getattr(parsed, "ipv4_mapped", None)
+    return str(mapped or parsed)
+
+
 def _sweep(session, now):
     session.query(ub.KOReaderPairing).filter(
         ub.KOReaderPairing.expires_at <= now).delete(synchronize_session=False)
@@ -136,7 +152,7 @@ def start(device_name, *, address=None, now=None, session=None):
     name = clean_device_name(device_name)
     if not name:
         raise PairingError("invalid_request", 400, "The device name is missing.")
-    address = (address or "")[:64] or None
+    address = client_address(address)
     try:
         _sweep(session, now)
         waiting = session.query(func.count(ub.KOReaderPairing.id)).filter(

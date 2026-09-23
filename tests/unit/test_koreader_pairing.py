@@ -238,6 +238,23 @@ def test_waiting_codes_are_capped_per_address_even_with_the_limiter_off(world):
     assert start(world).status_code == 200
 
 
+def test_an_ipv4_device_is_shown_by_its_ipv4_address_on_a_dual_stack_server(world):
+    """A server listening on IPv6 and IPv4 at once sees an IPv4 device as
+    ``::ffff:192.168.1.23`` (the rig showed ``::ffff:172.17.0.1``). The
+    person approving knows the device as 192.168.1.23, and the per-address
+    cap counts both spellings as one address."""
+    body = start(world, address="::ffff:192.168.1.23").get_json()
+    shown = world.browser("alice").get("/api/v1/devices/koreader/pair/%s" % body["user_code"])
+    assert shown.get_json()["ip"] == "192.168.1.23"
+    for _ in range(4):
+        assert start(world, address="192.168.1.23").status_code == 200
+    assert start(world, address="::ffff:192.168.1.23").status_code == 429
+
+    other = start(world, address="2001:db8::17").get_json()
+    shown = world.browser("alice").get("/api/v1/devices/koreader/pair/%s" % other["user_code"])
+    assert shown.get_json()["ip"] == "2001:db8::17"
+
+
 def test_a_signed_out_visitor_or_guest_cannot_answer_a_code(world, monkeypatch):
     from cps import config
     body = start(world).get_json()

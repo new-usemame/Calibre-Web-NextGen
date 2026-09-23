@@ -107,6 +107,13 @@ VEC_MIN_PATHS = 25
 #: ... covering at least this much of the page, and at most this much.
 VEC_MIN_AREA = 0.04
 VEC_MAX_AREA = 0.75
+# A compact diagram can have only a few area-bearing paths (circles and
+# diagonals); its ticks and labels are thin paths whose boxes fail the filter
+# above. Require both a substantial core and nearby supporting strokes.
+VEC_COMPACT_MIN_PATHS = 6
+VEC_COMPACT_MIN_AREA = 0.02
+VEC_COMPACT_MIN_STROKES = 12
+VEC_COMPACT_REACH = 12.0
 
 FOLIO = re.compile(r"^(?:page\s*)?[\divxlcdmIVXLCDM]{1,8}[.)]?$")
 CAPTION_LINE = re.compile(r"^(?:fig(?:ure|\.)|table|chart|plate|map|diagram)\s*\d", re.I)
@@ -2402,9 +2409,10 @@ def _vector_figures(raw):
     enough paths to be a drawing rather than a rule, not so many the page is a
     dense table or a traced scan, and a cluster of believable area.
     """
-    rects = [r for r in raw.drawing_rects
+    all_rects = raw.drawing_rects
+    rects = [r for r in all_rects
              if (r[2] - r[0]) > 4 and (r[3] - r[1]) > 4]
-    if len(rects) < VEC_MIN_PATHS:
+    if len(rects) < VEC_COMPACT_MIN_PATHS:
         return []
     clusters = []
     for rect in rects:
@@ -2429,6 +2437,16 @@ def _vector_figures(raw):
         if count >= VEC_MIN_PATHS and VEC_MIN_AREA <= area <= VEC_MAX_AREA:
             out.append(Region(kind="figure", reason="vector_figure",
                               bbox=box))
+        elif count >= VEC_COMPACT_MIN_PATHS and VEC_COMPACT_MIN_AREA <= area <= VEC_MAX_AREA:
+            reach = VEC_COMPACT_REACH
+            nearby = [rect for rect in all_rects
+                      if rect[2] >= box[0] - reach and rect[0] <= box[2] + reach
+                      and rect[3] >= box[1] - reach and rect[1] <= box[3] + reach]
+            if len(nearby) >= VEC_COMPACT_MIN_STROKES:
+                extent = (min(r[0] for r in nearby), min(r[1] for r in nearby),
+                          max(r[2] for r in nearby), max(r[3] for r in nearby))
+                out.append(Region(kind="figure", reason="vector_figure",
+                                  bbox=extent))
     return out
 
 

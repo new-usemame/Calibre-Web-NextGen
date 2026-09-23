@@ -642,6 +642,54 @@ class TestScanArtwork(object):
         with zipfile.ZipFile(result.path) as zf:
             assert _ink_share(zf.read(names[0])) > 0.01
 
+    def test_compact_vector_circle_beside_prose_keeps_its_diagram(self, tmp_path):
+        """A circle built from a few large paths and thin marks stays visible.
+
+        The printed diagram is beside prose, not an embedded bitmap. Breaks if
+        figure discovery counts only paths wide and tall enough to be boxes.
+        """
+        doc = pymupdf.open()
+        page = doc.new_page(width=612, height=792)
+        page.insert_text((162, 322), 'The circle divides into equal sections.', fontsize=11)
+        page.insert_text((162, 345), 'The diagram explains the paragraph.', fontsize=11)
+        page.insert_text((162, 520), 'The next prose paragraph remains text.', fontsize=11)
+        center = pymupdf.Point(378, 432)
+        page.draw_circle(center, 61, color=(0, 0, 0), width=.5)
+        page.draw_circle(center, 31, color=(0, 0, 0), width=.5)
+        for dx, dy in ((61, 0), (0, 61), (53, 31), (53, -31), (31, 53), (31, -53)):
+            page.draw_line((center.x - dx, center.y - dy),
+                           (center.x + dx, center.y + dy), color=(0, 0, 0), width=.5)
+        for offset in range(-7, 8):
+            page.draw_line((center.x + offset * 4, 499),
+                           (center.x + offset * 4 + 2, 502), color=(0, 0, 0), width=.5)
+        try:
+            book = assemble.deterministic_book(doc)
+            figures = [f for f in book.figures if f['pno'] == 0]
+            assert len(figures) == 1, book.figures
+            assert any('diagram explains' in e.text for e in book.elements)
+            result = _build(book, tmp_path, doc)
+        finally:
+            doc.close()
+        names = _epub_images(result.path)
+        assert len(names) == 1, names
+        with zipfile.ZipFile(result.path) as zf:
+            assert _ink_share(zf.read(names[0])) > 0.01
+
+    def test_short_vector_rules_beside_prose_do_not_become_a_diagram(self):
+        """Dense small marks without a circle are page furniture, not artwork."""
+        doc = pymupdf.open()
+        page = doc.new_page(width=612, height=792)
+        page.insert_text((162, 322), 'An ordinary paragraph survives.', fontsize=11)
+        for offset in range(35):
+            y = 360 + offset * 4
+            page.draw_line((316, y), (319, y + 2), color=(0, 0, 0), width=.5)
+        try:
+            book = assemble.deterministic_book(doc)
+        finally:
+            doc.close()
+        assert not book.figures
+        assert any('ordinary paragraph' in e.text for e in book.elements)
+
     def test_a_lone_display_line_is_a_chapter_opening_not_a_figure(self, tmp_path):
         """Page 93's shape: 'CHAPTER 4' over white space is a chapter opening.
         The white space above a title is not figure territory, the display

@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.9"
+CONVERTER_VERSION = "1.10"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -67,6 +67,8 @@ _TOKEN = re.compile(r"<\s*(/?)\s*([A-Za-z][A-Za-z0-9]*)([^>]*?)(/?)\s*>", re.S)
 _SPLIT_HEADING = re.compile(r"^<h([%s])\b" % "".join(str(x) for x in SPLIT_LEVELS), re.I)
 _PARAGRAPH = re.compile(r"^<p[\s>]", re.I)
 _ASIDE = re.compile(r"^<aside[\s>]", re.I)
+_SOURCE_NOTICE = re.compile(r'^<p\b[^>]*\bclass="[^"]*\bsource-evidence-notice\b', re.I)
+_INLINE_PAGE_ID = re.compile(r'\bid="pg_(\d{4,})"')
 _TAG = re.compile(r"<[^>]+>")
 _HEADING_TEXT = re.compile(r"<h[1-6][^>]*>(.*?)</h[1-6]>", re.I | re.S)
 _TRAILING_HYPHEN = re.compile(
@@ -442,7 +444,7 @@ def _open_tag(block):
     return block[:block.find(">") + 1]
 
 
-def merge_paragraphs(left, right):
+def merge_paragraphs(left, right, page_marker=""):
     """Join two paragraphs the way the typesetter's page turn joined them."""
     head = _inner(right).lstrip()
     tail = _inner(left).rstrip()
@@ -454,7 +456,7 @@ def merge_paragraphs(left, right):
         glue = ""
     else:
         glue = " "
-    return "%s%s%s%s</p>" % (_open_tag(left), tail, glue, head)
+    return "%s%s%s%s%s</p>" % (_open_tag(left), tail, glue, page_marker, head)
 
 
 # --------------------------------------------------------------- the whole book
@@ -681,12 +683,26 @@ def _join_page_turns(pages):
         previous, current = pages[index - 1], pages[index]
         if not previous["body"] or not current["body"]:
             continue
-        tail, head = previous["body"][-1], current["body"][0]
+        # Source warnings belong to their printed page, but a warning emitted
+        # after the final glyph can sit between the halves of one sentence.
+        # Move only trailing notices, and only after continuation is proven.
+        tail_index = len(previous["body"]) - 1
+        while tail_index >= 0 and _SOURCE_NOTICE.match(previous["body"][tail_index]):
+            tail_index -= 1
+        if tail_index < 0:
+            continue
+        tail, head = previous["body"][tail_index], current["body"][0]
         if not (_is_paragraph(tail) and _is_paragraph(head)):
             continue
         if not assemble.continues(block_text(tail), block_text(head)):
             continue
-        previous["body"][-1] = merge_paragraphs(tail, current["body"].pop(0))
+        # A previous-page footnote follows that page's body in the spine. Keep
+        # its page marker after the note instead of moving the marker ahead of it.
+        marker = current["anchor"] if not previous["asides"] else ""
+        previous["body"][tail_index] = merge_paragraphs(
+            tail, current["body"].pop(0), marker)
+        if marker:
+            current["anchor"] = ""
         joined += 1
     return joined
 
@@ -718,6 +734,9 @@ def _chapters(pages):
             current.blocks.append(block)
             if page["pno"] not in current.pages:
                 current.pages.append(page["pno"])
+            for pno in (int(found) for found in _INLINE_PAGE_ID.findall(block)):
+                if pno not in current.pages:
+                    current.pages.append(pno)
         if pending and current is not None:
             current.blocks.append(pending)
             if page["pno"] not in current.pages:

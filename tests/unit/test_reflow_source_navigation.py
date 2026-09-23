@@ -81,6 +81,59 @@ def test_source_page_navigation_resolves_to_real_starts_without_renumbering(tmp_
         assert spine[-1].get("idref") == item.get("id"), "The index must not interrupt the book"
 
 
+def test_source_glyph_notice_does_not_split_a_sentence_at_a_page_turn():
+    """A page-end source warning remains available after its sentence finishes.
+
+    Breaks if the warning hides the preceding paragraph from page-turn joining,
+    or if moving it loses the actual source-page marker or original-page link.
+    """
+    notice = ('<p class="source-evidence-notice">Some glyphs need checking. '
+              '<a href="original-p0000.xhtml#page">Open original page</a>.</p>')
+    pages = build_epub._page_blocks({
+        0: '<p>The conjunction is not technically an aspect, but is treated</p>' + notice,
+        1: '<p>more or less as one, and is usually considered one of the aspects.</p>'
+           '<h2>A new section</h2><p>Another paragraph.</p>',
+    })
+    assert build_epub._join_page_turns(pages) == 1
+    chapters = build_epub._chapters(pages)
+    root = ET.fromstring('<body xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">%s</body>' %
+                         ''.join(block for chapter in chapters for block in chapter.blocks))
+    paragraphs = list(root.iter(XHTML + 'p'))
+    joined = next(p for p in paragraphs if 'The conjunction' in ''.join(p.itertext()))
+    assert 'treated more or less as one' in ''.join(joined.itertext())
+    notices = [p for p in paragraphs if 'Some glyphs need checking' in ''.join(p.itertext())]
+    assert len(notices) == 1
+    assert paragraphs.index(notices[0]) > paragraphs.index(joined)
+    assert joined.find('.//*[@id="pg_0001"]') is not None
+    assert root.find('.//*[@href="original-p0000.xhtml#page"]') is not None
+
+
+@pytest.mark.parametrize('first,second', [
+    ('A complete sentence.', 'Another paragraph starts here.'),
+    ('A heading follows', '<h2>New chapter</h2><p>new opening.</p>'),
+    ('An unfinished thought', '<figure><img src="images/diagram.jpg" alt="diagram"/></figure><p>new prose.</p>'),
+])
+def test_source_notice_cannot_force_unrelated_page_blocks_to_merge(first, second):
+    """Warnings are movable only when the two adjacent prose blocks continue."""
+    notice = '<p class="source-evidence-notice">Check source.</p>'
+    pages = build_epub._page_blocks({0: '<p>%s</p>%s' % (first, notice),
+                               1: second if second.startswith('<') else '<p>%s</p>' % second})
+    assert build_epub._join_page_turns(pages) == 0
+    assert pages[0]['body'][-1] == notice
+
+
+def test_page_turn_with_a_prior_note_keeps_its_marker_after_the_note():
+    """Joining prose cannot put the next PDF page ahead of an earlier note."""
+    pages = build_epub._page_blocks({
+        0: '<p>An unfinished thought</p><aside class="footnote" id="fn_1">1 Earlier note.</aside>',
+        1: '<p>continues here.</p>',
+    })
+    assert build_epub._join_page_turns(pages) == 1
+    assert 'continues here' in pages[0]['body'][0]
+    assert 'pg_0001' not in pages[0]['body'][0]
+    assert 'pg_0001' in pages[1]['anchor']
+
+
 def test_uncertain_notes_expose_original_pixels_and_only_disarm_ambiguous_links(tmp_path):
     from cps.services.reflow import extract
     with pymupdf.open() as doc:

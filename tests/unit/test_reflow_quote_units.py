@@ -15,7 +15,7 @@ def fixture(tmp_path,kind='multi'):
     if kind=='attribution':
         prefix='(from an earlier source) ';page.insert_text((70,160),prefix.strip(),fontsize=11,fontname='tiit')
         lines=['"First complete sentence. The next sentence continues','across the printed block and ends here."'];ys=[174,188]
-    elif kind in ('annotation','all_italic_annotation'):
+    elif kind in ('annotation','all_italic_annotation','mixed_native_styles'):
         lines=['A complete verse ends here.', '(A separate observation occupies', 'two printed lines.)'];ys=[160,174,188]
     elif kind=='inline_parenthetical':lines=['A complete verse (with its own aside) ends here.'];ys=[160]
     elif kind=='short':lines=['"Stay."'];ys=[160]
@@ -25,7 +25,10 @@ def fixture(tmp_path,kind='multi'):
     if kind=='opening_only':lines[0]='\"'+lines[0]
     for i,(y,text) in enumerate(zip(ys,lines)):
         x=40 if kind=='inline' or (kind=='ordinary_indent' and i>0) else 95 if kind=='display_first_indent' and i==0 else 70
-        page.insert_text((x,y),text,fontsize=11,fontname='tiit' if kind=='all_italic_annotation' or (kind=='annotation' and i>0) else 'tiro')
+        font = 'tiit' if kind=='all_italic_annotation' or (kind=='annotation' and i>0) else 'tiro'
+        if kind=='mixed_native_styles':
+            font=('tiit','tibo','tibi')[i]
+        page.insert_text((x,y),text,fontsize=11,fontname=font)
     if kind=='note':page.insert_text((70+pymupdf.get_text_length(lines[-1],fontname='tiro',fontsize=11),ys[-1]-3),'7',fontsize=7,fontname='tiro')
     for y,text in [(240,'Ordinary source body resumes with the original column.'),(254,'The following text remains distinct from the display.')]:page.insert_text((40,y),text,fontsize=11,fontname='tiro')
     path=tmp_path/(kind+'.pdf');doc.save(path);doc.close();doc=pymupdf.open(path);raw=extract.read_page(doc,0)
@@ -126,6 +129,32 @@ def test_native_italic_complete_quote_stays_italic_after_admitted_wrapper(tmp_pa
                          if name.startswith('OEBPS/ch') and name.endswith('.xhtml'))
     assert '<blockquote><p><em>A complete verse ends here.</em> <em>(A separate observation occupies</em> <em>two printed lines.)</em></p></blockquote>' in chapters
     assert 'A complete verse ends here. (A separate observation occupies two printed lines.)' in re.sub(r'<[^>]+>','',chapters)
+    doc.close()
+
+
+def test_native_mixed_inline_styles_survive_complete_quote_and_partial_forgery(tmp_path):
+    from dataclasses import replace
+    from cps.services.reflow import build_epub
+    data=fixture(tmp_path,'mixed_native_styles');_,doc,raw,*_=data
+    style=skeleton.book_style([raw])
+    book=assemble.assemble([skeleton.page_skeleton(raw,style)],style,[raw])
+    prepared=ops.prepare(book,doc,0,'mixed-native-style-test',{'layer':'native'},raw_page=raw)
+    choice=next(c for c in prepared.candidates() if c['kind']=='quote')
+    assert choice['source_range']==[0,len(assemble.plain_text(book.pages[0][1].runs))]
+    plan=prepared.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=prepared.snapshot_id,
+                                       select=[choice['candidate_id']]))
+    target=tmp_path/'mixed-native.epub';build_epub.build(book,str(target),doc=doc,operation_plans=[plan])
+    with zipfile.ZipFile(target) as archive:
+        chapters=''.join(archive.read(name).decode() for name in archive.namelist()
+                         if name.startswith('OEBPS/ch') and name.endswith('.xhtml'))
+    assert ('<blockquote><p><em>A complete verse ends here.</em> '
+            '<strong>(A separate observation occupies</strong> '
+            '<strong><em>two printed lines.)</em></strong></p></blockquote>') in chapters
+    assert 'A complete verse ends here. (A separate observation occupies two printed lines.)' in re.sub(r'<[^>]+>','',chapters)
+    forged=replace(prepared,specs=(ops._Spec(1,'quote',0,choice['source_range'][1]-1),))
+    with pytest.raises(ops.ContractError,match='complete source quote evidence'):
+        forged.accept(book,doc,dict(protocol=ops.PROTOCOL,snapshot_id=forged.snapshot_id,
+                                    select=[forged.candidates()[0]['candidate_id']]))
     doc.close()
 
 

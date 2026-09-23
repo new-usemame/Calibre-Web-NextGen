@@ -223,8 +223,14 @@ def _runs_html(runs, available, ref_ids, ambiguous=()):
     for run in runs:
         if run[0] == "t":
             text = escape(run[1])
-            parts.append("<em>%s</em>" % text
-                         if len(run) > 2 and run[2] == "italic" else text)
+            style = run[2] if len(run) > 2 else None
+            if style == "italic":
+                text = "<em>%s</em>" % text
+            elif style == "bold":
+                text = "<strong>%s</strong>" % text
+            elif style == "bolditalic":
+                text = "<strong><em>%s</em></strong>" % text
+            parts.append(text)
             continue
         number = str(run[1])
         # A marker established by a repair over a scan is an uncertain reading:

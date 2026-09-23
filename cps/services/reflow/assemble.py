@@ -502,7 +502,18 @@ def _line_runs(line, pno, page_notes, claimed, repairs, reasons, preserve_style=
                 runs.append(["mark", text.strip()])
                 index += 1
                 continue
-        runs.append(["t", text] + (["italic"] if preserve_style and span.italic else []))
+        # A native text span can carry independent italic and bold observations.
+        # The renderer keeps the compact, stable style vocabulary below; OCR/scan
+        # styling is deliberately never admitted through this path.
+        style = None
+        if preserve_style:
+            if span.italic and span.bold:
+                style = "bolditalic"
+            elif span.italic:
+                style = "italic"
+            elif span.bold:
+                style = "bold"
+        runs.append(["t", text] + ([style] if style else []))
         index += 1
     return runs
 

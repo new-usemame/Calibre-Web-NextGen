@@ -206,3 +206,17 @@ def test_pixel_owned_hyphen_stays_immutable_and_source_counter_keeps_physical_wo
     legacy=assemble.source_word_counter([raw],vocab={'knowledge'},protected_atoms=False)
     assert legacy['knowledge']==1 and expected['knowledge']==0
     assert expected['knowl']==expected['edge']==1
+
+
+def test_separate_text_hyphen_between_image_atoms_can_be_removed_without_touching_atoms():
+    from copy import deepcopy
+    from cps.services.reflow import assemble
+    from cps.services.reflow.native_text import descriptor
+    a=['glyph','significa',descriptor(0,(20,20,60,30),10,'Times',reason='transcript')]
+    b=['glyph','tions',descriptor(0,(20,40,45,50),10,'Times',reason='transcript')]
+    original=deepcopy([a,b])
+    result=assemble.stitch_runs([a,['t','\u00ad ']], [b],vocab={'significations'})
+    assert assemble.plain_text(result)=='significations'
+    assert [r for r in result if r[0]=='glyph']==original
+    retained=assemble.stitch_runs([a,['t','\u00ad ']], [b],vocab=set())
+    assert assemble.plain_text(retained)=='significa\u00adtions'

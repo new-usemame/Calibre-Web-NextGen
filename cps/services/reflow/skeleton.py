@@ -758,6 +758,7 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
                     reason='unverified_scan_layout',band=region.band,column=region.column))
     _preserve_conflicting_outline_heading(raw, style, skel)
     skel.regions.sort(key=_region_order)
+    _join_numbered_regions(skel)
     return skel
 
 
@@ -1483,6 +1484,67 @@ def _regroup_native_titles(kept_blocks, style, doc=None, pno=0):
         box=_lines_bbox(lines,lines[0].bbox)
         out.append((extract.Block(-1,box,lines),lines))
     return out
+
+
+def _join_numbered_regions(skel):
+    """Continue an already proven numbered list across PDF block boundaries.
+
+    Only adjacent same-column source lines qualify: the next sequential item,
+    or a hanging-indent continuation of a physically hyphenated last line.
+    Pictures, notes, unrelated prose and large vertical gaps remain barriers.
+    """
+    out = []
+    for region in skel.regions:
+        prior = out[-1] if out else None
+        if (prior is None or prior.kind != 'list' or region.kind != 'body'
+                or not prior.lines or not region.lines
+                or (prior.band, prior.column) != (region.band, region.column)):
+            out.append(region); continue
+        first, last = region.lines[0], prior.lines[-1]
+        em = median(line.size for line in prior.lines if line.size > 0)
+        marker_x = prior.list_groups[0][0].x0
+        gap = first.bbox[1] - last.bbox[3]
+        marker = re.match(r'^([1-9][0-9]{0,2})[.)](?:\s|$)', first.stripped)
+        next_item = bool(marker and int(marker.group(1)) == len(prior.list_groups) + 1
+                         and abs(first.x0 - marker_x) <= .4 * em)
+        continuation = (last.stripped.endswith(('-', '\u00ad', '‐', '‑'))
+                        and first.stripped[:1].islower()
+                        and marker_x + .5 * em <= first.x0 <= marker_x + 4 * em)
+        if not (-.2 * em <= gap <= 1.6 * em and (next_item or continuation)):
+            out.append(region); continue
+        # A PDF block can also contain a later independent paragraph. Validate
+        # every consumed line, and retain the unproved tail as its own region.
+        consumed = []
+        previous = last
+        expected = len(prior.list_groups) + 1
+        for line in region.lines:
+            distance = line.bbox[1] - previous.bbox[3]
+            item = re.match(r'^([1-9][0-9]{0,2})[.)](?:\s|$)', line.stripped)
+            aligned = (abs(line.x0 - marker_x) <= .4 * em and int(item.group(1)) == expected
+                       if item else marker_x + .5 * em <= line.x0 <= marker_x + 4 * em)
+            # Some PDFs put the numeral and its text in separate line records
+            # on the same physical baseline. Prove that pair geometrically.
+            marker_row = (re.fullmatch(r'[1-9][0-9]{0,2}[.)]', previous.stripped)
+                          and abs((previous.bbox[1] + previous.bbox[3]) / 2
+                                  - (line.bbox[1] + line.bbox[3]) / 2) <= .4 * em
+                          and previous.bbox[2] <= line.x0 + .1 * em)
+            if not (aligned and (marker_row or -.2 * em <= distance <= 1.6 * em)):
+                break
+            if item:
+                expected += 1
+            consumed.append(line); previous = line
+        combined = prior.lines + consumed
+        groups = _numbered_source_groups(combined)
+        if not consumed or not groups or len(groups) < len(prior.list_groups):
+            out.append(region); continue
+        prior.lines = combined; prior.list_groups = groups
+        prior.bbox = _lines_bbox(combined, prior.bbox)
+        remainder = region.lines[len(consumed):]
+        if remainder:
+            from dataclasses import replace
+            out.append(replace(region, lines=remainder,
+                               bbox=_lines_bbox(remainder, region.bbox)))
+    skel.regions = out
 
 
 def _numbered_source_groups(lines):

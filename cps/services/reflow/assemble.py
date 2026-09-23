@@ -344,6 +344,16 @@ def stitch_runs(prev, nxt, heal=True, vocab=None):
             if j >= 0 and prev[j][0] == "t":
                 prev[j][1] = prev[j][1].rstrip() + prev[k][1].strip()
                 del prev[j + 1:]
+            elif j >= 0 and prev[j][0] == "glyph":
+                # The printed atom ends before this separate editable hyphen.
+                # Remove only that text span when the ordinary source-word
+                # proof earns a wrap; neither neighboring image atom changes.
+                prefix = re.search(r"[\w'’]+$", prev[j][1].rstrip())
+                word = _first_word(nxt)
+                if (heal and prefix and word and word[:1].islower()
+                        and (vocab is None or (prefix.group(0) + word).lower() in vocab)):
+                    return prev[:j + 1] + nxt
+                return prev[:j + 1] + [["t", prev[k][1].strip()]] + nxt
     # An immutable printed wrap stays visible. Do not insert a synthetic gap,
     # search past this atom, or shave its source pixels to satisfy a word join.
     final = next((r for r in reversed(prev) if r[1].strip()), None)
@@ -1635,7 +1645,8 @@ def _heal_page(raw, vocab, protected_atoms=True):
     whole -- the three things ``continues`` and the stitcher ask together. Any
     other seam keeps its hyphen on both sides of the conservation comparison.
     """
-    parts = [_heal_source_lines(block.lines, vocab, protected_atoms=protected_atoms)
+    parts = [(_heal_source_lines(block.lines, vocab) if protected_atoms
+              else _heal_linebreaks(block.text, vocab))
              for block in raw.text_blocks]
     for index in range(len(parts) - 1):
         if (protected_atoms and raw.text_blocks[index].lines

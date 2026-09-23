@@ -321,3 +321,59 @@ def test_deep_margin_folio_sequence_is_furniture_but_body_digits_are_not(sequenc
         skel=skeleton.page_skeleton(raw,style)
         assert any(r.kind==('furniture' if sequence else 'body') and any(l.text==(str(raw.pno+1) if sequence else '42') for l in r.lines) for r in skel.regions)
         assert any(r.kind=='body' and any(l.text==str(20+raw.pno*3) for l in r.lines) for r in skel.regions)
+
+
+@pytest.mark.parametrize('barrier',[None,'column','gap','figure','unrelated'])
+def test_source_numbered_list_wraps_across_extraction_blocks_without_eating_other_regions(barrier):
+    def line(text,x,y):
+        return extract.Line([extract.Span(text,10,'Times',0,(x,y,250,y+10))],(x,y,250,y+10))
+    lines=[line('1. First item.',40,20),line('2. Second item.',40,33),line('3. A plan-',40,46)]
+    a=skeleton.Region(kind='list',lines=lines,list_groups=[[l] for l in lines],bbox=(40,20,250,56))
+    tail=[line('et in this item.',60,59),line('4. Final item.',40,72)]
+    b=skeleton.Region(kind='body',lines=tail,bbox=(40,59,250,82))
+    if barrier=='column':b.column=1
+    if barrier=='gap':b.lines=[line('et in this item.',60,99),line('4. Final item.',40,112)]
+    if barrier=='unrelated':b.lines=[line('Independent prose begins here.',40,59)]
+    regions=[a,b]
+    if barrier=='figure':regions.insert(1,skeleton.Region(kind='figure',bbox=(40,56,250,59)))
+    page=skeleton.PageSkeleton(0,400,600,regions=regions)
+    skeleton._join_numbered_regions(page)
+    if barrier is not None:
+        assert len(a.list_groups)==3 and b in page.regions
+    else:
+        assert len(page.regions)==1 and len(a.list_groups)==4
+        assert [l.text for l in a.list_groups[2]]==['3. A plan-','et in this item.']
+        assert a.list_groups[3][0].text=='4. Final item.'
+
+
+@pytest.mark.parametrize('tail_x,tail_y',[(40,85),(60,140)])
+def test_list_continuation_consumes_only_proved_prefix_of_a_mixed_pdf_block(tail_x,tail_y):
+    def line(text,x,y):
+        return extract.Line([extract.Span(text,10,'Times',0,(x,y,250,y+10))],(x,y,250,y+10))
+    head=[line('1. One.',40,20),line('2. A plan-',40,33)]
+    tail=[line('et completes the item.',60,46),line('3. Last item.',40,59),line('Independent prose remains outside.',tail_x,tail_y)]
+    a=skeleton.Region(kind='list',lines=head,list_groups=[[l] for l in head],bbox=(40,20,250,43))
+    b=skeleton.Region(kind='body',lines=tail,bbox=(40,46,250,tail_y+10))
+    page=skeleton.PageSkeleton(0,400,600,regions=[a,b])
+    before=[id(l) for r in page.regions for l in r.lines]
+    skeleton._join_numbered_regions(page)
+    assert len(page.regions)==2 and len(a.list_groups)==3
+    assert page.regions[1].text=='Independent prose remains outside.'
+    assert [id(l) for r in page.regions for l in r.lines]==before
+
+
+@pytest.mark.parametrize('overlap',[False,True])
+def test_continued_list_accepts_only_geometrically_separate_marker_and_text_on_one_row(overlap):
+    def line(text,x,y,width=180):
+        return extract.Line([extract.Span(text,10,'Times',0,(x,y,x+width,y+10))],(x,y,x+width,y+10))
+    head=[line('1. One.',40,20),line('2. A plan-',40,33)]
+    tail=[line('et completes the item.',60,46),line('3.',40,60,8),line('Last item.',45 if overlap else 60,59)]
+    a=skeleton.Region(kind='list',lines=head,list_groups=[[l] for l in head],bbox=(40,20,220,43))
+    b=skeleton.Region(kind='body',lines=tail,bbox=(40,46,240,70))
+    page=skeleton.PageSkeleton(0,400,600,regions=[a,b])
+    skeleton._join_numbered_regions(page)
+    if overlap:
+        assert len(page.regions)==2 and len(a.list_groups)==2
+    else:
+        assert len(page.regions)==1 and len(a.list_groups)==3
+        assert [l.text for l in a.list_groups[-1]]==['3.','Last item.']

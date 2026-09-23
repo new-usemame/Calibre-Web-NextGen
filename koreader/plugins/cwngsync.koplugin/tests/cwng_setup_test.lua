@@ -99,7 +99,8 @@ local function testReaderDefaultsMakeTheLibraryHome()
     assertEqual(defaults.home_dir, "/mnt/us/cwng-library", "home")
     assertEqual(defaults.lock_home_folder, true, "locked")
     assertEqual(defaults.start_with, "filemanager", "opens on it")
-    assertEqual(defaults.collate, "access", "last read first")
+    assertEqual(defaults.collate, "date", "most recent first, by the time the plugin controls")
+    assertEqual(defaults.reverse_collate, false, "newest at the top")
 end
 
 testTypedAddressesBecomeOneCanonicalForm()

@@ -281,6 +281,19 @@ local function testShelvesBecomeCollectionsWithoutTakingTheReadersOwn()
     assertEqual(#plan.collections[1].files, 2, "cloud and downloaded books alike")
     assertEqual(plan.collections[1].files[1], ROOT .. "/Book 1 [1].epub", "library paths")
     assertEqual(plan.collections[2].name, "To Read (CWNG)", "the reader's own collection is not taken over")
+    local steady = Library.collectionPlan(books, shelves, ROOT, plan.managed,
+        { Favorites = true, ["To Read"] = true, ["To Read (CWNG)"] = true })
+    assertEqual(steady.collections[1].name, "Favorites", "a collection this device made keeps its name")
+    assertEqual(steady.collections[2].name, "To Read (CWNG)", "suffixed one stays suffixed")
+    assertEqual(#steady.remove, 0, "nothing to remove when nothing changed")
+    local builtin = Library.collectionPlan(books, shelves, ROOT, {}, { favorites = true })
+    assertEqual(builtin.collections[1].name, "Favorites (CWNG)",
+        "KOReader's built-in favorites (shown as Favorites) is not doubled")
+    local upgraded = Library.collectionPlan(books, shelves, ROOT, { ["s-fav"] = "Favorites" },
+        { Favorites = true, favorites = true })
+    assertEqual(upgraded.collections[1].name, "Favorites (CWNG)",
+        "a device that already made 'Favorites' moves it off the built-in's name")
+    assertEqual(upgraded.remove[1], "Favorites", "and drops the old one")
 
     -- Next sync: the shelf was renamed and one shelf emptied.
     local again = Library.collectionPlan(

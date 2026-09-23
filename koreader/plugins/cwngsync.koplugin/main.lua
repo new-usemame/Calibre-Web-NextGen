@@ -249,6 +249,7 @@ function CWNGSync:onReaderReady()
     self.last_page = self.ui:getCurrentPage()
     -- A cloud book opened some way the open hook did not see.
     if self:rescueOpenedPlaceholder() then return end
+    self:markOpened(self:getCurrentDocumentFile())
     -- Only when already online: opening a book never asks for Wi-Fi.
     if self.settings.auto_sync and self:isConfigured() and NetworkMgr:isConnected() then
         UIManager:nextTick(function()

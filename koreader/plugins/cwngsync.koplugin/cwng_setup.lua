@@ -115,13 +115,18 @@ function Setup.applyPluginDefaults(settings)
 end
 
 -- KOReader settings that make the library the home screen: open on it, stay
--- in it, newest-read first.
+-- in it, most recent first. "Recent" is the modification time, which the
+-- plugin sets when a library book is opened or downloaded (and to the date
+-- added for a cover). Not KOReader's "last read date": that is the access
+-- time, and e-reader storage (Kindle's FUSE /mnt/us) updates it on every
+-- read, so indexing covers alone reshuffles the whole grid.
 function Setup.readerDefaults(library_root)
     return {
         home_dir = library_root,
         lock_home_folder = true,
         start_with = "filemanager",
-        collate = "access",
+        collate = "date",
+        reverse_collate = false,
     }
 end
 

@@ -114,7 +114,15 @@ function Runtime.readPlaceholderId(path)
     if not ok_require then return nil end
     local arc = Archiver.Reader:new()
     if not arc:open(path) then return nil end
-    local ok, content = pcall(arc.extractToMemory, arc, "META-INF/cwng-placeholder.json")
+    -- The reader only knows an entry once it has walked past it, so a lookup
+    -- by name before iterating finds nothing.
+    local ok, content = pcall(function()
+        for entry in arc:iterate() do
+            if entry.path == "META-INF/cwng-placeholder.json" then
+                return arc:extractToMemory(entry.path)
+            end
+        end
+    end)
     pcall(arc.close, arc)
     if not ok or type(content) ~= "string" or content == "" then return nil end
     local ok_json, data = pcall(Json.decode, content)
@@ -298,12 +306,27 @@ function Runtime:applyLibraryCollections(books, shelves)
     for name in pairs(ReadCollection.coll) do existing[name] = true end
     local plan = Library.collectionPlan(books, shelves, self:getLibraryRoot(),
         state.collections, existing)
+    -- Only files that exist can be collected (a cover that failed to arrive
+    -- is added on a later sync), and the signature covers exactly those, so a
+    -- sync that finally delivers them is not mistaken for "nothing changed".
     local signature = {}
     for _, collection in ipairs(plan.collections) do
-        signature[#signature + 1] = collection.name .. "=" .. table.concat(collection.files, "|")
+        local present = {}
+        for _, file in ipairs(collection.files) do
+            if lfs.attributes(file, "mode") == "file" then present[#present + 1] = file end
+        end
+        collection.files = present
+        signature[#signature + 1] = collection.name .. "=" .. table.concat(present, "|")
     end
     signature = table.concat(signature, "\n")
-    if signature == state.collections_signature and #plan.remove == 0 then return end
+    local in_place = signature == state.collections_signature and #plan.remove == 0
+    for _, collection in ipairs(plan.collections) do
+        local current = ReadCollection.coll[collection.name]
+        local count = 0
+        for _ in pairs(current or {}) do count = count + 1 end
+        if not current or count ~= #collection.files then in_place = false end
+    end
+    if in_place then return end
     local updated = {}
     for _, name in ipairs(plan.remove) do
         if ReadCollection.coll[name] then
@@ -319,9 +342,7 @@ function Runtime:applyLibraryCollections(books, shelves)
             ReadCollection:addCollection(collection.name)
         end
         for _, file in ipairs(collection.files) do
-            if lfs.attributes(file, "mode") == "file" then
-                ReadCollection:addItem(file, collection.name)
-            end
+            ReadCollection:addItem(file, collection.name)
         end
         updated[collection.name] = true
     end
@@ -593,6 +614,30 @@ function Runtime:installOpenHook()
             if not handled_ok then logger.warn("CWNGSync: open hook failed", handled) end
         end
         return original(reader_ui, file, unpack(args, 1, n))
+    end
+end
+
+-- The library sorts most recent first by modification time; opening a book
+-- is what makes it recent. (KOReader's own history only moves the access
+-- time, which the device's storage also moves on every read.)
+function Runtime:markOpened(file)
+    if type(file) ~= "string" or not self:libraryEnabled() then return end
+    local root = self:getLibraryRoot()
+    if not root or file:sub(1, #root + 1) ~= root .. "/" then return end
+    local now = os.time()
+    pcall(lfs.touch, file, now, now)
+    local known_id = nil
+    for id, known in pairs(self:getLibraryState().books or {}) do
+        if known.path == file then known_id = id break end
+    end
+    if known_id then
+        -- Keep the record in step, so the planner does not read the new time
+        -- as the file having been replaced.
+        local known = self:getLibraryState().books[known_id]
+        if known.kind ~= "placeholder" then
+            known.mtime = now
+            self:saveLibraryState()
+        end
     end
 end
 

@@ -311,9 +311,14 @@ end
 -- Returns { collections = { {id, name, files} }, remove = {name...}, managed }.
 function Library.collectionPlan(books, shelves, root, managed, existing_names)
     managed = managed or {}
-    existing_names = existing_names or {}
+    -- Compared without case: KOReader shows its built-in "favorites" as
+    -- "Favorites", so a shelf of that name would look like a duplicate.
     local ours = {}
     for _, name in pairs(managed) do ours[name] = true end
+    local existing = {}
+    for name in pairs(existing_names or {}) do
+        if not ours[name] then existing[name:lower()] = true end
+    end
     local members = {}
     for _, book in ipairs(books or {}) do
         if validBook(book) and type(book.shelves) == "table" then
@@ -331,16 +336,16 @@ function Library.collectionPlan(books, shelves, root, managed, existing_names)
         if id and members[id] then
             local base = type(shelf.name) == "string" and shelf.name ~= "" and shelf.name or "Shelf"
             local name = base
-            if (existing_names[name] and not ours[name]) or taken[name] then
+            if existing[name:lower()] or taken[name:lower()] then
                 name = base .. " (CWNG)"
             end
-            taken[name] = true
+            taken[name:lower()] = true
             plan.managed[id] = name
             table.insert(plan.collections, { id = id, name = name, files = members[id] })
         end
     end
     for id, name in pairs(managed) do
-        if plan.managed[id] ~= name and not taken[name] then
+        if plan.managed[id] ~= name and not taken[name:lower()] then
             table.insert(plan.remove, name)
         end
     end

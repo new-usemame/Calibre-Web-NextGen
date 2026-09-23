@@ -43,7 +43,7 @@ class TestLocaleResolverChain:
         # a logged-in user can still force a per-request language for an
         # OPDS client that lives outside their browser session.
         lang_param_pos = src.find("request.args.get('lang')")
-        user_locale_pos = src.find("current_user.locale")
+        user_locale_pos = src.find("user.locale")
         assert lang_param_pos != -1, "?lang= query-param branch missing"
         assert user_locale_pos != -1, "user.locale branch missing"
         assert lang_param_pos < user_locale_pos, (

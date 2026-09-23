@@ -37,10 +37,18 @@ def _coerce_locale(raw, available):
     return None
 
 
-def get_locale():
+def get_locale(user=None):
+    """The locale this request is served in.
+
+    ``user`` defaults to the request's own account, which is how Flask-Babel
+    calls it. The SPA's /me serializer passes the account it is describing, so
+    the New UI loads the same language the classic pages render (#2247).
+    """
     # If no request context (e.g. background thread), fall back to English
     if not has_request_context():
         return 'en'
+    if user is None:
+        user = current_user
 
     available = get_available_translations()
 
@@ -55,9 +63,9 @@ def get_locale():
         return coerced
 
     # if a user is logged in, use the locale from the user settings
-    if current_user is not None and hasattr(current_user, "locale"):
+    if user is not None and hasattr(user, "locale"):
         # if the account is the guest account bypass the config lang settings
-        if current_user.name != 'Guest':
+        if user.name != 'Guest':
             # F-011141: coerce the STORED value too, not just ?lang=. This is
             # the security boundary, deliberately placed on the read side:
             #   - it repairs rows written before validation existed;
@@ -67,7 +75,7 @@ def get_locale():
             #   - it survives a server dropping a translation it used to ship.
             # Write-time validation still exists, but for data hygiene; a
             # missed writer must not be able to break locale resolution.
-            stored = _coerce_locale(current_user.locale, available)
+            stored = _coerce_locale(user.locale, available)
             if stored:
                 return stored
             # An unusable stored locale falls through to negotiation rather
@@ -136,7 +144,7 @@ def sanitize_locale_for_write(raw):
     return _coerce_locale(raw, available)
 
 
-def effective_locale(raw):
+def effective_locale(raw, user=None):
     """The locale a caller will actually be served, for reporting back.
 
     Serializers hand this the stored value so a client form can only ever hold
@@ -146,7 +154,7 @@ def effective_locale(raw):
     look one up.
     """
     try:
-        return get_locale()
+        return get_locale(user)
     except Exception as e:
         log.debug('Locale resolution unavailable (%s); reporting stored value', e)
         return raw

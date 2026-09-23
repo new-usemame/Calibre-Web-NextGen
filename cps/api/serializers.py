@@ -7,6 +7,7 @@ from datetime import date, datetime
 from .. import constants, db
 from ..clean_html import clean_string
 from ..cover_version import COVER_VERSION_ARG, cover_version_token
+from ..cw_babel import effective_locale
 from ..ui_themes import theme_slug
 from ..user_preferences import serialize_named_preferences
 
@@ -79,7 +80,10 @@ def serialize_user(user):
     payload = {
         "id": user.id,
         "name": user.name,
-        "locale": user.locale,
+        # The locale this account is actually served, not the raw row: the
+        # Guest row stores 'en' but classic negotiates Accept-Language for it,
+        # so the raw value pinned every guest's New UI to English (#2247).
+        "locale": effective_locale(user.locale, user),
         "theme": theme_slug(user.theme),
         "ui_font_body": user.ui_font_body or "",
         "ui_font_display": user.ui_font_display or "",

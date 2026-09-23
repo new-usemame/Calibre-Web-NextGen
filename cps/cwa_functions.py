@@ -2033,9 +2033,10 @@ def _read_log_tail(log_path: str, limit: int = SERVICE_STATUS_TAIL_BYTES) -> str
         # The seek landed at an arbitrary byte, usually mid-line and possibly
         # mid-character. Start at the next full line: a cut through the last "n/total"
         # token would otherwise hand extract_progress() a smaller n, and the view would
-        # open on a replacement glyph. A tail with no newline at all is kept as it is.
+        # open on a replacement glyph. A tail whose only newline ends it (one line longer
+        # than the window) is kept as it is, rather than emptied.
         newline = chunk.find(b'\n')
-        if newline != -1:
+        if -1 < newline < len(chunk) - 1:
             chunk = chunk[newline + 1:]
     return chunk.decode('utf-8', errors='replace')
 

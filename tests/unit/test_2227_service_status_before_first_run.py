@@ -168,9 +168,17 @@ def test_a_cut_through_a_multibyte_character_starts_on_the_next_line(cwaf, tmp_p
     log = tmp_path / "run.log"
     log.write_bytes("é".encode("utf-8") * 50 + b"\n" + "last line – é\n".encode("utf-8"))
 
-    tail = cwaf._read_log_tail(str(log), limit=len("last line – é\n".encode("utf-8")) + 5)
+    # + 4 puts the seek on the second byte of the last "é" before the newline.
+    tail = cwaf._read_log_tail(str(log), limit=len("last line – é\n".encode("utf-8")) + 4)
 
     assert tail == "last line – é\n"
+
+
+def test_one_line_longer_than_the_window_is_not_emptied(cwaf, tmp_path):
+    log = tmp_path / "run.log"
+    log.write_bytes(b"first\n" + b"L" * 5000 + b"\n")
+
+    assert cwaf._read_log_tail(str(log), limit=1000) == "L" * 999 + "\n"
 
 
 def test_a_tail_without_any_newline_is_still_returned(cwaf, tmp_path):

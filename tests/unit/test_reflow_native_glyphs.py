@@ -109,3 +109,34 @@ def test_glyph_package_links_to_packaged_original_page(tmp_path):
         assert 'OEBPS/original-p0000.xhtml' in archive.namelist()
         assert b'id="page"' in archive.read('OEBPS/original-p0000.xhtml')
     doc.close()
+
+
+def test_invalid_unicode_trace_replaces_only_affected_word_with_source_pixels():
+    from cps.services.reflow.native_text import mark_unmapped_words
+    span=extract.Span('Reăase the text',10,'Mapped',0,(0,0,75,10),
+        char_boxes=tuple((i,i+1,i*5,0,(i+1)*5,10) for i in range(15)))
+    trace=[{'font':'Mapped','chars':[(0xfffd,103,(10,8),(10,1,15,9))]}]
+    spans=mark_unmapped_words([span],trace)
+    assert ''.join(s.text for s in spans)==span.text
+    assert [s.text for s in spans if s.encoding_unresolved]==['Reăase']
+    marker=extract.Span('Ą•',6,'Mapped',1,(0,0,10,6),char_boxes=((0,1,0,0,5,6),(1,2,5,0,10,6)))
+    result=mark_unmapped_words([marker],[{'font':'Mapped','chars':[(0xfffd,104,(0,5),(0,0,5,6)),(0x2022,103,(5,5),(5,0,10,6))]}])
+    assert len(result)==1 and result[0].encoding_unresolved and result[0].text=='Ą•'
+
+
+def test_valid_mapped_non_latin_word_stays_searchable_text():
+    from cps.services.reflow.native_text import mark_unmapped_words
+    span=extract.Span('Καί',10,'Mapped',0,(0,0,15,10),char_boxes=tuple((i,i+1,i*5,0,(i+1)*5,10) for i in range(3)))
+    trace=[{'font':'Mapped','chars':[(ord(c),i,(i*5,8),(i*5,0,(i+1)*5,10)) for i,c in enumerate(span.text)]}]
+    assert mark_unmapped_words([span],trace)==[span]
+    assert not span.encoding_unresolved
+
+
+def test_unmapped_raised_marker_preserves_position_without_guessing_digits():
+    marker=extract.Span('Ą•',6,'BrokenMapped',0,(50,8,60,14),encoding_unresolved=True)
+    body=extract.Span('word',12,'Times',0,(10,10,50,22))
+    line=extract.Line([body,marker],(10,8,60,22))
+    runs=assemble._line_runs(line,0,{},set(),[],[],preserve_style=True)
+    html=build_epub._runs_html(runs,set(),{})
+    assert '<sup><a class="source-glyph"' in html
+    assert 'Ą•' not in html and '>24<' not in html

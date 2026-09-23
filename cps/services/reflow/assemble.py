@@ -483,7 +483,8 @@ def _line_runs(line, pno, page_notes, claimed, repairs, reasons, preserve_style=
         text = texts[index]
         if preserve_style and getattr(span,"encoding_unresolved",False):
             from .native_text import descriptor
-            runs.append(["glyph",text,descriptor(pno,span.bbox,span.size,span.font)])
+            runs.append(["glyph",text,descriptor(pno,span.bbox,span.size,span.font,
+                raised=span.superscript or _is_raised(span,line))])
             reasons.append("unmapped_native_glyphs")
             index += 1
             continue

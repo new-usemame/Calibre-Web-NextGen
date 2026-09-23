@@ -27,9 +27,47 @@ def unresolved_fonts(page):
     return result
 
 
-def descriptor(pno, bbox, size, font=''):
+def mark_unmapped_words(spans, traces):
+    """Preserve printed words when MuPDF exposes an invalid Unicode mapping.
+
+    get_text may synthesize a plausible Latin character from a CID even though
+    the PDF's ToUnicode maps it to U+FFFD. Text trace retains that evidence. The
+    entire affected word/marker is untrusted, not an invented Unicode repair.
+    """
+    bad = [(trace.get('font', ''), char[3]) for trace in traces
+           if trace.get('type') != 3 and trace.get('opacity', 1) != 0
+           for char in trace.get('chars', ()) if char[0] == 0xfffd]
+    if not bad:
+        return spans
+    result = []
+    for span in spans:
+        points = [((box[0]+box[2])/2, (box[1]+box[3])/2)
+                  for font, box in bad if font == span.font
+                  and span.bbox[0] <= (box[0]+box[2])/2 <= span.bbox[2]
+                  and span.bbox[1] <= (box[1]+box[3])/2 <= span.bbox[3]]
+        if not points or span.encoding_unresolved:
+            result.append(span)
+            continue
+        if not span.char_boxes:
+            result.append(replace(span, encoding_unresolved=True))
+            continue
+        for token in re.finditer(r'\S+|\s+', span.text):
+            chars = [c for c in span.char_boxes if c[0] >= token.start() and c[1] <= token.end()]
+            if not chars:
+                result.append(replace(span, text=token.group(), encoding_unresolved=True))
+                continue
+            box = (min(c[2] for c in chars), min(c[3] for c in chars),
+                   max(c[4] for c in chars), max(c[5] for c in chars))
+            uncertain = any(box[0] <= x <= box[2] and box[1] <= y <= box[3] for x,y in points)
+            result.append(replace(span, text=token.group(), bbox=box,
+                encoding_unresolved=uncertain,
+                char_boxes=tuple((c[0]-token.start(), c[1]-token.start(), *c[2:]) for c in chars)))
+    return result
+
+
+def descriptor(pno, bbox, size, font='', raised=False):
     return {'page': pno, 'bbox': [round(v, 4) for v in bbox],
-            'size': round(size, 4), 'font': font}
+            'size': round(size, 4), 'font': font, 'raised': bool(raised)}
 
 
 def image_name(record):
@@ -153,9 +191,10 @@ def glyph_html(record, block=False):
     from html import escape
     style='max-width:100%;height:auto' if block else 'height:1em;width:auto;vertical-align:baseline'
     label='Original source text; Unicode encoding unavailable. Open original page.'
-    return ('<a class="source-glyph" href="original-p%04d.xhtml#page" title="%s">'
+    html = ('<a class="source-glyph" href="original-p%04d.xhtml#page" title="%s">'
             '<img src="%s" alt="%s" style="%s"/></a>' %
             (record['page'],escape(label,quote=True),image_name(record),escape(label,quote=True),style))
+    return '<sup>'+html+'</sup>' if record.get('raised') else html
 
 
 def package_glyphs(book,page_html,doc,package,should_stop=None):

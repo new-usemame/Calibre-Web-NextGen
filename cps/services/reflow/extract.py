@@ -288,7 +288,7 @@ def read_page(doc, pno):
     parea = rect.get_area() or 1.0
     raw = RawPage(pno=pno, width=rect.width, height=rect.height)
 
-    from .native_text import unresolved_fonts, normalize_blocks
+    from .native_text import unresolved_fonts, normalize_blocks, mark_unmapped_words
     unknown_fonts = unresolved_fonts(page)
     payload = page.get_text("rawdict")
     for block in payload.get("blocks", []):
@@ -301,7 +301,11 @@ def read_page(doc, pno):
                     offset += len(text)
                 span["text"] = "".join(c.get("c", "") for c in chars)
                 span["char_boxes"] = tuple(boxes)
-    quote_fonts = _native_quote_variants(page)
+    try:
+        traces = page.get_texttrace()
+    except (AttributeError, RuntimeError):
+        traces = []
+    quote_fonts = _native_quote_variants(page, traces)
     for blk in payload.get("blocks", []):
         bbox = tuple(blk.get("bbox", (0, 0, 0, 0)))
         if blk.get("type") == 1:
@@ -320,6 +324,7 @@ def read_page(doc, pno):
                           punctuation_uncertain=sp.get("font", "") in quote_fonts
                           and '"' in sp.get("text", ""))
                      for sp in ln.get("spans", [])]
+            spans = mark_unmapped_words(spans, traces)
             if any(sp.text.strip() for sp in spans):
                 lines.append(Line(spans=spans, bbox=tuple(ln.get("bbox", bbox))))
         if lines:
@@ -335,7 +340,7 @@ def read_page(doc, pno):
     return raw
 
 
-def _native_quote_variants(page):
+def _native_quote_variants(page, traces=None):
     """Fonts whose distinct printed double-quote glyphs collapse to ASCII.
 
     Glyph IDs are not alternate Unicode readings. This only signals that the
@@ -344,10 +349,11 @@ def _native_quote_variants(page):
     not trigger. Apostrophe variants alone are common and are not this signal.
     """
     glyphs = {}
-    try:
-        traces = page.get_texttrace()
-    except (AttributeError, RuntimeError):
-        return set()
+    if traces is None:
+        try:
+            traces = page.get_texttrace()
+        except (AttributeError, RuntimeError):
+            return set()
     for span in traces:
         if span.get("type") == 3 or span.get("opacity", 1) == 0:
             continue

@@ -139,6 +139,28 @@ local function testAccentsMatchTheirPlainLetters()
     assertEqual(calls, 2, "each text folded once")
 end
 
+local function testBooksSentOrCopiedToTheFolderAreListedToo()
+    local title, author = Catalog.parseFilename("Jane Eyre_ An Autobiography - Charlotte Brontë [11].epub")
+    assertEqual(title .. "|" .. author, "Jane Eyre_ An Autobiography|Charlotte Brontë", "server file name")
+    assertEqual((Catalog.parseFilename("notes.pdf")), "notes", "any other name is the title")
+    local files = {
+        { name = "Guards [1].epub", path = ROOT .. "/Guards [1].epub", mtime = 100 },
+        { name = "Emma - Jane Austen [77].epub", path = ROOT .. "/Emma - Jane Austen [77].epub", mtime = 1790000000 },
+        { name = "x.epub", path = ROOT .. "/x.epub", mtime = 50 },
+    }
+    local tracked = { [ROOT .. "/Guards [1].epub"] = true }
+    local list = Catalog.localEntries(files, tracked, function(path)
+        if path == ROOT .. "/x.epub" then return { title = "Persuasion", authors = { "Jane Austen" } } end
+    end)
+    assertEqual(#list, 2, "a book the library tracks is not listed twice")
+    assertEqual(list[1].title .. "/" .. list[1].authors[1], "Emma/Jane Austen", "from the file name")
+    assertEqual(list[2].title, "Persuasion", "KOReader's own metadata wins")
+    assertEqual(list[1].downloaded and list[1].present, true, "it is here and readable")
+    assertEqual(list[1].added, "2026-09-21T14:13:20Z", "added when the file arrived")
+    assertEqual(titles(Catalog.recentlyAdded(list)), "Emma|Persuasion", "a new arrival is first in Recent")
+    assertEqual(list[1].book_id ~= list[2].book_id and list[1].book_id < 0, true, "ids never clash with the server's")
+end
+
 local function testDownloadedOnly()
     assertEqual(titles(Catalog.downloadedOnly(entries())), "Coraline", "only the real book")
 end
@@ -150,5 +172,6 @@ testGroupsAndTheirMembersInReadingOrder()
 testAuthorsAreFiledBySurname()
 testSearchFindsEveryWordAnywhereAndRanksTitles()
 testAccentsMatchTheirPlainLetters()
+testBooksSentOrCopiedToTheFolderAreListedToo()
 testDownloadedOnly()
 print("cwng_catalog_test.lua: all tests passed")

@@ -17,6 +17,7 @@ local Button = require("ui/widget/button")
 local ButtonDialog = require("ui/widget/buttondialog")
 local Catalog = require("cwng_catalog")
 local Device = require("device")
+local DocumentRegistry = require("document/documentregistry")
 local Geom = require("ui/geometry")
 local HorizontalGroup = require("ui/widget/horizontalgroup")
 local InfoMessage = require("ui/widget/infomessage")
@@ -166,12 +167,53 @@ function Home:init()
     self:showTab(self:defaultTab())
 end
 
+-- Book files in the library folder the library does not track (see
+-- Catalog.localEntries). Only those are looked at closely.
+local function untrackedFiles(root, tracked)
+    local files = {}
+    local ok, iterator, dir = pcall(lfs.dir, root)
+    if not ok then return files end
+    for name in iterator, dir do
+        local path = root .. "/" .. name
+        if not tracked[path] and name:sub(1, 1) ~= "." and not name:find("%.part$")
+                and DocumentRegistry:hasProvider(path) then
+            local attributes = lfs.attributes(path)
+            if attributes and attributes.mode == "file" then
+                files[#files + 1] = { name = name, path = path, mtime = attributes.modification }
+            end
+        end
+    end
+    table.sort(files, function(a, b) return a.name < b.name end)
+    return files
+end
+
+local function cachedMetadata(path)
+    local modules = coverModules()
+    if not modules then return nil end
+    local ok, info = pcall(modules.BookInfoManager.getBookInfo, modules.BookInfoManager, path, false)
+    if not ok or type(info) ~= "table" or info.ignore_meta or type(info.title) ~= "string" then return nil end
+    local authors
+    if type(info.authors) == "string" and info.authors ~= "" then
+        authors = {}
+        for author in info.authors:gmatch("[^\n]+") do authors[#authors + 1] = author end
+    end
+    return { title = info.title, authors = authors }
+end
+
 function Home:loadCatalog()
     local state = self.plugin:getLibraryState()
-    local all = Catalog.entries(state.manifest or {}, state.books or {}, self.plugin:getLibraryRoot())
-    local present = {}
+    local root = self.plugin:getLibraryRoot()
+    local all = Catalog.entries(state.manifest or {}, state.books or {}, root)
+    local present, tracked = {}, {}
     for _, entry in ipairs(all) do
         if entry.present then present[#present + 1] = entry end
+        tracked[entry.path] = true
+    end
+    for _, known in pairs(state.books or {}) do
+        if known.path then tracked[known.path] = true end
+    end
+    for _, entry in ipairs(Catalog.localEntries(untrackedFiles(root, tracked), tracked, cachedMetadata)) do
+        present[#present + 1] = entry
     end
     self.all_entries = present
     self.shelves = state.shelves or {}
@@ -584,6 +626,19 @@ function Home.refreshShown()
         local ok, err = pcall(home.refresh, home)
         if not ok then logger.warn("CWNGSync: library home refresh failed", err) end
     end
+end
+
+-- A book sent from the website has just landed: say so, and show it first
+-- in Recent unless the reader is busy browsing something else.
+function Home.bookArrived(path)
+    local home = Home.current
+    if not home or type(path) ~= "string" then return end
+    local title = Catalog.parseFilename(path:match("([^/]+)$") or path)
+    local view = home.view
+    if #home.stack == 0 and view and not view.query and (view.tab == "reading" or view.tab == "recent") then
+        home:showTab("recent")
+    end
+    UIManager:show(InfoMessage:new{ text = T(_("New on this device: %1"), title), timeout = 4 })
 end
 
 function Home.closeFor(ui)

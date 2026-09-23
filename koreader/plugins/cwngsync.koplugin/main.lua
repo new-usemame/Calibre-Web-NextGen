@@ -1453,6 +1453,7 @@ function CWNGSync:collectDeliveries(
             end
 
             self:refreshLibraryViews({ installed.path })
+            Home.bookArrived(installed.path)
             client:complete_delivery(
                 self.settings.username,
                 self.settings.password,

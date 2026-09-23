@@ -123,6 +123,46 @@ function Catalog.entries(books, known_books, root)
     return out
 end
 
+-- Title and author from a library file name, "Title - Author [12].epub"
+-- (the server's naming for sent and downloaded books); anything else is all
+-- title.
+function Catalog.parseFilename(name)
+    local stem = (name or ""):gsub("%.[%w]+$", ""):gsub("%s*%[%d+%]$", "")
+    local title, author = stem:match("^(.-) %- ([^%-]+)$")
+    if title and title ~= "" then return title, author end
+    return stem, nil
+end
+
+-- Books in the library folder that the library does not track: sent from
+-- the website, released when they left the chosen shelves, or copied over
+-- USB. They are the reader's too, so the home lists them. `files` is
+-- { {name, path, mtime} }; `tracked` is a set of paths the manifest owns;
+-- `metadata(path)` returns KOReader's cached {title, authors} or nil.
+function Catalog.localEntries(files, tracked, metadata)
+    local out = {}
+    for i, file in ipairs(files or {}) do
+        if not tracked[file.path] then
+            local meta = metadata and metadata(file.path)
+            local title, author = Catalog.parseFilename(file.name)
+            local authors = meta and meta.authors or (author and { author } or {})
+            out[#out + 1] = {
+                book_id = -i,
+                title = meta and meta.title or title,
+                authors = authors,
+                author_sorts = authorSorts({}, authors),
+                shelves = {},
+                added = file.mtime and os.date("!%Y-%m-%dT%H:%M:%SZ", file.mtime) or "",
+                last_read = "",
+                path = file.path,
+                present = true,
+                downloaded = true,
+                local_file = true,
+            }
+        end
+    end
+    return out
+end
+
 local function byTitle(fold)
     return function(a, b)
         local ta, tb = fold(a.title), fold(b.title)

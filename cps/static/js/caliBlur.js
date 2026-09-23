@@ -1071,7 +1071,7 @@ $(function() {
         // The server renders the formats its reader opens, in the order the detail
         // page's "Read now" uses (the reader_formats filter). A book with none of
         // them, e.g. MOBI or AZW3 only, opens its detail page instead of a reader
-        // that can only answer "Selected book is unavailable" (#2249).
+        // tab that read_book() can only answer with a 404 (#2249).
         var readFormats = String($link.attr('data-book-read-formats') || '')
             .split(',').filter(function(f) { return f; });
 

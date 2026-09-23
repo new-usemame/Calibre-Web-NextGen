@@ -5,9 +5,10 @@
 
 `handleDirectReading()` in caliBlur.js kept its own format list, which offered
 html/mobi/azw3/fb2 and fell back to a book's first format. read_book() renders
-none of those, so a MOBI-only book's read icon redirected to the library with
-"Selected book is unavailable. File does not exist or is not accessible", while
-the same book's detail page correctly showed no Read button.
+none of those, so a MOBI-only book's read icon opened a tab that read_book()
+answers with a 404 (upstream CWA redirects to the library with "Selected book is
+unavailable" instead), while the same book's detail page correctly showed no
+Read button.
 
 The fix keeps one list, on the server: check_read_formats() orders the reader's
 formats by preference, the detail page opens reader_list[0], and the grid reads

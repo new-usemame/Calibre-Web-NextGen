@@ -3712,10 +3712,16 @@ def test_full_sync_clears_only_target_users_entitlement_ledger(
         row.device_id for row in
         sync_harness.session.query(ub.KoboDeviceDeletedEntitlement)
     } == {other_device.id}
+    # The reset leaves the target's Kobos audited, so no later upgrade audit
+    # can rewrite their emptied ledgers; the other account's marker is as it was.
     assert {
-        row.device_id for row in
+        row.device_id: row.classification_version for row in
         sync_harness.session.query(ub.KoboDeviceEntitlementSeed)
-    } == {other_device.id}
+    } == {
+        sync_harness.device.id: kobo.ENTITLEMENT_CLASSIFICATION_VERSION,
+        second_target_device.id: kobo.ENTITLEMENT_CLASSIFICATION_VERSION,
+        other_device.id: 0,
+    }
 
     replay = sync_harness.sync(first.headers[sync_harness.token_header])
     replay_envelopes = _entitlements(replay)

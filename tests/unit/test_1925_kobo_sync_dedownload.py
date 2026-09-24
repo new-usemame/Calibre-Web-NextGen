@@ -5533,3 +5533,92 @@ def test_v4_1_43_book_sent_but_never_stored_is_recovered_by_full_sync_or_resend(
     )
 
 
+def test_v4_1_43_upgrade_treats_a_retired_second_kobo_as_a_household(
+    sync_harness, monkeypatch,
+):
+    """Retiring a reader does not make the survivor's copied ledger its own.
+
+    v4.1.43's seed copied the household's union onto both readers.  Removing
+    a reader later is a soft delete (``Device.active`` False) and its history
+    stays mixed into the survivor's rows, so the survivor's ledger remains
+    untrusted and is reannounced exactly as for a two-Kobo household.  Fails
+    if the reader count skips retired readers.
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    books, token = _v4_1_43_install(sync_harness, count=30)
+    retired = ub.Device(
+        user_id=sync_harness.user.id,
+        kind="kobo",
+        display_name="Retired Household Kobo",
+        model="Kobo Libra Colour",
+        active=False,
+        created_by="auto",
+    )
+    sync_harness.session.add(retired)
+    sync_harness.session.flush()
+    sync_harness.session.add(ub.KoboDeviceEntitlementSeed(
+        device_id=retired.id, classification_version=0,
+    ))
+    sync_harness.session.add_all([
+        ub.KoboDeviceBookEntitlement(
+            device_id=retired.id,
+            book_id=book.id,
+            fingerprint=_v4_1_43_fingerprint(
+                _render_book_entitlement(sync_harness, book, device=retired),
+            ),
+            payload_schema_version=1,
+            change_basis=None,
+        )
+        for book in books
+    ])
+    sync_harness.session.commit()
+
+    response = sync_harness.sync(token)
+    assert sorted(_entitlement_ids(response, kind="NewEntitlement")) == sorted(
+        str(book.uuid) for book in books
+    ), (
+        "the survivor of a retired household kept the copied union ledger; "
+        f"announced {len(_entitlements(response))} of {len(books)} books"
+    )
+
+
+def test_v4_1_43_upgrade_does_not_count_web_reader_or_koreader_devices(
+    sync_harness, monkeypatch,
+):
+    """Only paired Kobos make a ledger a household's.
+
+    The device registry also records the browser reader and KOReader of the
+    same account (``Device.kind`` "webreader" and "koreader").  They never
+    received the v4.1.43 Kobo seed, so a one-Kobo account that also reads in
+    the browser is still one Kobo, and its upgrade stays silent.  Fails if
+    the reader count includes other kinds of device.
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    books, token = _v4_1_43_install(sync_harness, count=30)
+    sync_harness.session.add_all([
+        ub.Device(
+            user_id=sync_harness.user.id,
+            kind=kind,
+            display_name=name,
+            active=True,
+            created_by="auto",
+        )
+        for kind, name in (("webreader", "Browser"), ("koreader", "KOReader"))
+    ])
+    sync_harness.session.commit()
+
+    upgrade = sync_harness.sync(token)
+    following = sync_harness.sync(upgrade.headers[sync_harness.token_header])
+    announced = [len(_entitlements(upgrade)), len(_entitlements(following))]
+    assert announced == [0, 0], (
+        f"a one-Kobo account with a browser reader re-announced {announced} "
+        f"of {len(books)} held books"
+    )

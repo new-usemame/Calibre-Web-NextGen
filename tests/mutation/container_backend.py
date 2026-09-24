@@ -10,19 +10,30 @@ not hermeticity. The CLI runs trusted tests and mutation specifications.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 import io
 import json
 import os
 from pathlib import Path
+import signal
 import subprocess
+import sys
 import tarfile
 import tempfile
+import time
 import uuid
 
 
 LABEL = "org.cwng.mutation-phase"
-CREATE_TIMEOUT = 5
+# Proportionate to a loaded shared daemon: on 2026-09-24 creates took up to 48 s
+# and rm -f up to 23 s on the development Mac.
+CREATE_TIMEOUT = 120
+DOCKER_TIMEOUT = 120
+# Killing the create CLI does not cancel the request. Docker finished such
+# creates up to 43 s after the harness stopped waiting for them.
+SETTLE_TIMEOUT = 60
+SETTLE_INTERVAL = 1
 LIMITS = ("Outside containment: externally delegated work in databases, network "
           "services, shared ports, remote service managers, and daemons outside "
           "the container. Not hermetic. Execution provenance is UNVERIFIED.")
@@ -60,7 +71,7 @@ def present_observation(result: ContainerObservation) -> int:
 
 def _docker(*args, timeout=None, **kwargs):
     if timeout is None:
-        timeout = CREATE_TIMEOUT if args[0] == "create" else 30
+        timeout = CREATE_TIMEOUT if args[0] == "create" else DOCKER_TIMEOUT
     try:
         return subprocess.run(["docker", *args], capture_output=True, timeout=timeout, **kwargs)
     except FileNotFoundError as exc:
@@ -68,9 +79,9 @@ def _docker(*args, timeout=None, **kwargs):
     except subprocess.TimeoutExpired as exc:
         if args[0] == "create":
             raise ContainerError(
-                f"Docker could not create the phase container within {CREATE_TIMEOUT} seconds. "
-                "The scratch directory may not be shared. Use --scratch-dir /tmp "
-                "or share the directory in Docker Desktop.") from exc
+                f"Docker could not create the phase container within {timeout:g} seconds. "
+                "The Docker daemon may be overloaded, or the scratch directory may not be shared. "
+                "Use --scratch-dir /tmp or share the directory in Docker Desktop.") from exc
         raise ContainerError(f"Docker {args[0]} timed out. Check the Docker daemon and available resources, then retry.") from exc
     except OSError as exc:
         raise ContainerError("Cannot start Docker. Check the Docker installation and executable permissions.") from exc
@@ -81,6 +92,53 @@ def _checked(proc, message="Docker command failed. Check docker info and the sel
         # Keep host-specific paths out of CLI errors.
         raise ContainerError(message)
     return proc.stdout
+
+
+def _recovery(token):
+    return f"docker rm -f $(docker ps -aq --filter label={LABEL}={token})"
+
+
+def _owned(token, timeout=None):
+    """Full IDs of the containers carrying this phase's unique label."""
+    listed = _docker("ps", "-aq", "--no-trunc", "--filter", f"label={LABEL}={token}", timeout=timeout)
+    return _checked(listed, "Docker could not list the phase container. Restore Docker access "
+                    "and run: " + _recovery(token)).decode().split()
+
+
+def _settle(token):
+    """After a lost create reply, wait until Docker has created the container or the deadline passes."""
+    deadline = time.monotonic() + SETTLE_TIMEOUT
+    while True:
+        remaining = deadline - time.monotonic()
+        try:
+            found = _owned(token, timeout=max(SETTLE_INTERVAL, min(DOCKER_TIMEOUT, remaining)))
+        except ContainerError:
+            found = []  # A struggling daemon; keep asking until the deadline.
+        if found or remaining <= 0:
+            return found
+        time.sleep(SETTLE_INTERVAL)
+
+
+@contextmanager
+def _stop_on_sigterm():
+    """Unwind on SIGTERM so the in-flight phase container is removed.
+
+    Later SIGTERMs are ignored while that cleanup runs. SIGKILL cannot be
+    handled: a killed sweep leaves its labelled container behind.
+    """
+    def stop(signum, frame):
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        raise SystemExit(128 + signum)
+
+    try:
+        previous = signal.signal(signal.SIGTERM, stop)
+    except ValueError:  # Not the main thread; the caller owns signal handling.
+        yield
+        return
+    try:
+        yield
+    finally:
+        signal.signal(signal.SIGTERM, previous)
 
 
 class ContainerSweep:
@@ -119,7 +177,9 @@ class ContainerSweep:
             raise ValueError("phase output must be an empty disposable directory")
         token = uuid.uuid4().hex
         name = "cwng-mutation-" + token
-        cid = None
+        cid = error = None
+        # True while Docker may still be creating the container: its reply is lost.
+        pending = False
         try:
             args = ["create", "--pull=never", "--name", name, "--label", f"{LABEL}={token}",
                     "--network=none", "--cgroupns=private", "--cap-drop=ALL",
@@ -129,7 +189,15 @@ class ContainerSweep:
             for key, value in (environment or {}).items():
                 args.extend(["--env", f"{key}={value}"])
             args.extend(["--entrypoint", argv[0], self.image, *argv[1:]])
-            cid = _checked(_docker(*args), "Docker could not create the phase container. Check free resources and Docker access to --scratch-dir; try a shared directory such as /tmp.").decode().strip()
+            pending = True
+            try:
+                created = _docker(*args)
+            except ContainerError as exc:
+                # A CLI that never started created nothing; a timed-out one may have.
+                pending = isinstance(exc.__cause__, subprocess.TimeoutExpired)
+                raise
+            pending = False
+            cid = _checked(created, "Docker could not create the phase container. Check free resources and Docker access to --scratch-dir; try a shared directory such as /tmp.").decode().strip()
             _checked(_docker("cp", "-", cid + ":/work", input=self.archive))
             if files:
                 stream = io.BytesIO()
@@ -154,37 +222,55 @@ class ContainerSweep:
             _checked(logs)
             observation = ContainerObservation(code, logs.stdout.decode(errors="replace"),
                 logs.stderr.decode(errors="replace"), timed_out, cid, self.seed_sha)
-        except BaseException:
-            self.failed = True
+        except BaseException as exc:
+            self.failed, error = True, exc
             raise
         finally:
-            # Also recover a create whose CLI lost its reply. Never remove by a
-            # guessed name without checking our unique ownership label first.
-            inspected = _docker("container", "inspect", cid or name, timeout=5)
-            if inspected.returncode == 0:
-                info = json.loads(inspected.stdout)[0]
-                if info["Config"]["Labels"].get(LABEL) != token:
-                    self.failed = True
-                    raise RuntimeError("container ownership mismatch")
-                try:
-                    _checked(_docker("rm", "-f", info["Id"]),
-                        f"Docker could not remove the phase container. Restore Docker access and run: docker rm -f {info['Id']}")
-                    remaining = _checked(_docker("ps", "-aq", "--filter", f"label={LABEL}={token}"))
-                    if remaining.strip():
-                        raise RuntimeError("phase container remains after removal")
-                except BaseException:
-                    self.failed = True
-                    raise
-            elif cid:
-                self.failed = True
-                raise RuntimeError("cannot establish container removal")
+            self._remove(token, cid, pending, error)
         if timed_out:
             self.failed = True
         return observation
 
+    def _remove(self, token, cid, pending, error):
+        """Remove the container carrying this phase's label, including one created after a lost reply.
+
+        Only the daemon's label filter selects what is removed; never a guessed name.
+        """
+        try:
+            if cid is None and not pending:
+                # Docker answered the create with an error: normally nothing exists.
+                # Look once in case the answer was a broken connection.
+                try:
+                    found = _owned(token)
+                except ContainerError:
+                    return
+            else:
+                found = _settle(token) if pending else _owned(token)
+            if cid is not None and cid not in found:
+                raise RuntimeError("cannot establish container removal")
+            for each in found:
+                _checked(_docker("rm", "-f", each),
+                    f"Docker could not remove the phase container. Restore Docker access and run: docker rm -f {each}")
+            if found and _owned(token):
+                raise RuntimeError("phase container remains after removal")
+        except BaseException:
+            self.failed = True
+            raise
+        if pending and not found:
+            unconfirmed = ("Docker did not confirm whether it created the phase container; "
+                           "if one appears, remove it with: " + _recovery(token))
+            if isinstance(error, ContainerError):
+                raise ContainerError(f"{error} {unconfirmed}") from error
+            print(unconfirmed, file=sys.stderr, flush=True)
+
 
 def run_sweep(args, mutants, harness):
     """Collect, check a clean baseline, then test each replacement in fresh containers."""
+    with _stop_on_sigterm():
+        return _sweep(args, mutants, harness)
+
+
+def _sweep(args, mutants, harness):
     runtime_overlay = harness._load_sibling("pytest_runtime").runtime_overlay
 
     sweep = ContainerSweep(args.repo, args.seed, image=args.image)

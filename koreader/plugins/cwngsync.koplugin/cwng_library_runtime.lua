@@ -665,7 +665,11 @@ function Runtime:syncLibrary(opts)
 
     local function fetch(cursor)
         pages = pages + 1
-        local if_revision = (cursor == nil and not opts.force) and state.revision or nil
+        -- "Nothing changed" is only an answer for a device that still has the
+        -- list: KOReader's settings write fails without a word on a full
+        -- disk, and the records can outlive the list they were planned from.
+        local if_revision = (cursor == nil and not opts.force and type(state.manifest) == "table")
+            and state.revision or nil
         local function onPage(ok, body, reason)
                 if shared.running ~= token then return end
                 if not ok or type(body) ~= "table" then
@@ -674,9 +678,15 @@ function Runtime:syncLibrary(opts)
                     return
                 end
                 if body.unchanged then
+                    -- Applied as an empty list, it would remove every book.
+                    if if_revision == nil then
+                        logger.warn("CWNGSync: the server said nothing changed without being asked")
+                        done(false, _("the server's list of books did not arrive"))
+                        return
+                    end
                     -- Nothing changed on the server; still reconcile the disk
                     -- (a book deleted on the device comes back as a cover).
-                    self:applyLibraryManifest(state.manifest or {}, state.revision, token, opts, done,
+                    self:applyLibraryManifest(state.manifest, state.revision, token, opts, done,
                         state.shelves)
                     return
                 end

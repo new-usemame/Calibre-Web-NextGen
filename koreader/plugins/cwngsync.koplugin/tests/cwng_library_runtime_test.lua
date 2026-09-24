@@ -346,6 +346,68 @@ local function testTheBookListIsWrittenOncePerSyncNotWithEveryRecord()
     package.loaded["cwng_library_runtime"] = Runtime
 end
 
+local function testALibraryWhoseListWasNotSavedIsNotEmptied()
+    -- KOReader's settings write fails without a word (a full disk), so the
+    -- records can reach the disk while the book list does not. After a
+    -- restart the server's "nothing changed" must not be applied to a list
+    -- the device no longer has: that would remove every cover and download.
+    for path in pairs(settings_files) do settings_files[path] = nil end
+    local root = folder .. "/unsaved"
+    assert(os.execute("mkdir -p '" .. root .. "'"))
+    local cover, book = put("unsaved/Cover [1].epub", 1), put("unsaved/Book [2].epub")
+    local list = {
+        { book_id = 1, filename = "Cover [1].epub", rev = "a", read_status = "unread" },
+        { book_id = 2, filename = "Book [2].epub", rev = "b", read_status = "unread", checksum = "md5:book" },
+    }
+    local asked = {}
+    local client = { get_library = function(_, _, _, _, _, _, if_revision, callback)
+        asked[#asked + 1] = if_revision or "everything"
+        ticks[#ticks + 1] = function()
+            callback(true, if_revision == "r1" and { unchanged = true, revision = "r1" }
+                or { books = list, revision = "r1" })
+        end
+    end }
+    local function start()
+        package.loaded["cwng_library_runtime"] = nil
+        local restarted = require("cwng_library_runtime")
+        restarted.readPlaceholderId = Runtime.readPlaceholderId
+        local runtime = setmetatable({ device_id = "device",
+            settings = { server = "http://books", username = "reader", password = "secret" },
+        }, { __index = restarted })
+        function runtime:libraryEnabled() return true end
+        function runtime:getLibraryRoot() return root end
+        function runtime:newSyncClient() return client end
+        function runtime:refreshLibraryViews() end
+        function runtime:applyLibraryCollections() end
+        function runtime:getDocumentDigest(path) return path == book and "md5:book" or nil end
+        return runtime
+    end
+    local function run(runtime, opts)
+        local outcome = {}
+        opts.on_done = function(ok) outcome.ok = ok end
+        runtime:syncLibrary(opts)
+        while #ticks > 0 do table.remove(ticks, 1)() end
+        return outcome
+    end
+
+    local runtime = start()
+    local state = runtime:getLibraryState()
+    state.owner = runtime:accountOwner()
+    state.books["1"] = { kind = "placeholder", path = cover, size = 5, mtime = 0, rev = "a", status = "unread" }
+    state.books["2"] = { kind = "downloaded", path = book, checksum = "md5:book", rev = "b", status = "unread" }
+    assertEqual(run(runtime, { force = true }).ok, true, "the first sync finishes")
+    written("cwngsync_library_list.lua").written = {} -- the list never reached the disk
+
+    asked = {}
+    local outcome = run(start(), {})
+    assertEqual(outcome.ok, true, "the sync after the restart finishes")
+    assertEqual(exists(cover), true, "the cover is still there")
+    assertEqual(exists(book), true, "and so is the downloaded book")
+    assertEqual(asked[1], "everything", "the device asks for the whole list")
+    assertEqual(#(written("cwngsync_library_list.lua").written.manifest or {}), 2, "and saves it again")
+    package.loaded["cwng_library_runtime"] = Runtime
+end
+
 local function testAnErrorInASyncDoesNotStopLaterSyncs()
     local outcome = sync(pagesOf(1, 1), false, nil, nil, "apply")
     assertEqual(outcome.ok, false, "an error while reading the list ends the sync")
@@ -385,6 +447,12 @@ local function testAServerRepeatingItsCursorStopsAtOnce()
     assertEqual(#outcome.requests, 2, "the repeat must stop the sync, not run it to the page limit")
 end
 
+local function testNothingChangedIsNotAnAnswerToAWholeListRequest()
+    local outcome = sync(function() return { unchanged = true, revision = "r1" } end)
+    assertEqual(outcome.applied, nil, "an empty list must never be applied")
+    assertEqual(outcome.ok, false, "the sync must fail")
+end
+
 local function testTheSameAccountTypedAnotherWayKeepsItsLibrary()
     -- Retyping the server with a slash at the end, or the name with a
     -- capital, is not a new account: its downloads must not be handed over.
@@ -404,6 +472,7 @@ end
 testEveryPageOfABigLibraryReachesTheDevice()
 testAListThatDoesNotFinishIsNotApplied()
 testTheSameAccountTypedAnotherWayKeepsItsLibrary()
+testNothingChangedIsNotAnAnswerToAWholeListRequest()
 testAServerRepeatingItsCursorStopsAtOnce()
 testRemovingACoverKeepsTheReadersNotesButNotAStaleStatus()
 testAStepDoesNothingToABookChangedSinceThePlan()
@@ -413,6 +482,7 @@ testAFewFailedCoversDoNotStopTheRest()
 testBooksThatArrivedDuringTheSyncDoNotStopIt()
 testTheInventoryKnowsCoversFromBooks()
 testTheBookListIsWrittenOncePerSyncNotWithEveryRecord()
+testALibraryWhoseListWasNotSavedIsNotEmptied()
 testAnErrorInASyncDoesNotStopLaterSyncs()
 os.execute("rm -rf '" .. folder .. "'")
 

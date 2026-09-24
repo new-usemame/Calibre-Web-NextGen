@@ -8,3 +8,5 @@
 
 - **Selecting text opens highlight controls in Safari in both web readers.** A shared parent-side selection observer handles sandboxed books while keeping embedded book scripts disabled and avoiding duplicate controls in other browsers. Canceling and immediately selecting the same passage again also reopens the controls.
 - **Opening a saved highlight or synced reading position lands on the correct page immediately.** Font and spacing are applied before the destination is measured, and selected margins remain consistent when opening chapters or resizing the reader.
+- **Every saved highlight and book note has an Edit action in the reader drawer.** Editing works with keyboard and touch even when the passage cannot be located or Safari cannot forward clicks from the book. Removing a standalone note removes its empty row; removing a note attached to a highlight keeps the highlight.
+- Preserve the reading passage through font, margin, line-height and column changes; appearance sliders no longer turn book pages when used with arrow keys.

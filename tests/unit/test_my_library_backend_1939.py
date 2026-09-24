@@ -2120,8 +2120,14 @@ def test_user_and_global_book_delete_cleanup_membership_rows(app_session, monkey
     assert app_session.query(ub.User).filter_by(id=target.id).first() is None
 
 
-def test_public_shelf_is_viewers_membership_intersection(
+def test_public_shelf_books_reach_a_viewer_only_through_the_public_shelf_allowance(
         app_session, calibre_session, monkeypatch):
+    """A public shelf shares its books without granting membership.
+
+    Surfaces that opt in (the shelf page, a book's detail, cover, reader and
+    download) see every book on a public shelf, for as long as the shelf stays
+    public. Everything else keeps the viewer's own library.
+    """
     owner = _mode_user(app_session, "shelf-owner")
     viewer = _mode_user(app_session, "shelf-viewer")
     shelf = ub.Shelf(name="Public", user_id=owner.id, is_public=1)
@@ -2139,11 +2145,20 @@ def test_public_shelf_is_viewers_membership_intersection(
                       .filter_by(shelf=shelf.id).all()]
     monkeypatch.setattr(db.ub, "session", app_session)
     monkeypatch.setattr(db, "current_user", viewer)
-    visible = (calibre_session.query(db.Books)
-               .filter(db.Books.id.in_(shelf_book_ids))
-               .filter(_cdb(calibre_session).common_filters())
-               .order_by(db.Books.id).all())
-    assert [book.id for book in visible] == [2]
+    cdb = _cdb(calibre_session)
+
+    def visible(**allowance):
+        return [book.id for book in (
+            calibre_session.query(db.Books)
+            .filter(db.Books.id.in_(shelf_book_ids))
+            .filter(cdb.common_filters(**allowance))
+            .order_by(db.Books.id).all())]
+
+    assert visible() == [2]
+    assert visible(allow_public_shelf_books=True) == [1, 2]
+    shelf.is_public = 0
+    app_session.commit()
+    assert visible(allow_public_shelf_books=True) == [2]
 
 
 def test_all_user_facet_counts_are_membership_scoped(

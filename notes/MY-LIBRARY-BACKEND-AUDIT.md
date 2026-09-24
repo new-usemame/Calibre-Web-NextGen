@@ -31,20 +31,21 @@ creation: every account defaults to `monolibrary` until an explicit action.
 |---|---|---|
 | `kobo.py` library sync and `api/kobo_two_way.py` picker | Membership-aware | The device sync set and user picker are the account's library. Sync reconciliation intersects Kobo shelves with membership. |
 | `kobo.py` changed-reading-state hydration | Deliberately global | Device-trailing per-user state must remain resolvable after removal. |
-| `opds.py` feeds, stats, metadata, covers, and downloads | Membership-aware | OPDS is a user-facing catalog and already funnels through the OPDS common filter. |
-| `shelf.py` and `api/shelves.py` add, series-add, browse, reorder, and picker paths | Membership-aware | A visible shelf cannot introduce or reveal a book outside the viewer's set. Activity-log title hydration is deliberately global and non-authoritative. |
+| `opds.py` feeds, stats, metadata, covers, and downloads | Membership-aware, plus public shelves for a shelf feed, covers, and downloads | OPDS is a user-facing catalog and already funnels through the OPDS common filter. A public shelf's books reach its feed, covers, and downloads; selected-shelf exposure still applies. |
+| `shelf.py` and `api/shelves.py` add, series-add, browse, reorder, and picker paths | Membership-aware, except a public shelf's own listing and count | A public shelf lists every book on it (see "Public shelves" below). A single add checks the actor's reach; series, selection, and search adds take books from the actor's own view. Activity-log title hydration is deliberately global and non-authoritative. |
 | `api/info.py` book and author/tag/series counts | Membership-aware | Every visible count describes the caller's catalog; monolibrary retains the historical global payload. |
-| `web.py` listings, author/series/tag/publisher/language facets, searches, matching tags, details, and covers | Membership-aware | These are user-visible browse paths already using the common filter. |
+| `web.py` listings, author/series/tag/publisher/language facets, searches, matching tags, details, and covers | Membership-aware, plus public shelves for details, the reader, and downloads | These are user-visible browse paths already using the common filter. A book on a public shelf opens without membership. |
 | `api/browse.py` author/series/tag/publisher/language facets | Membership-aware | Each entity and its displayed book count are built from filtered Books, so opening a facet cannot produce a smaller set than its label promised. |
 | `magic_shelf.py` rule evaluation | Membership-aware | Rules select from the user's library. The raw page hydration is safe because its IDs come from the filtered rule query. |
-| `helper.py` e-mail/send-to-device, download, book/series covers | Membership-aware | These user-facing content paths must agree with listing visibility. The documented admin download fallback remains a deliberate curation-only bypass. |
+| `helper.py` e-mail/send-to-device, download, book/series covers | Membership-aware, plus public shelves for downloads and book covers | These user-facing content paths must agree with listing visibility. Sending stays membership-aware, and the book pages offer it only where it works. The documented admin download fallback remains a deliberate curation-only bypass. |
 | `helper.py` conversion, upload/rename, and edit helpers | Deliberately global | Role-gated metadata edits change the one global record and file. |
 | `progress_syncing/`, `services/annotation_sync/`, and `tasks/annotation_sync.py` | Deliberately global | Bookmarks, annotations, and progress survive membership removal and reconnect on re-add. |
 | `tasks/hardcover_sync.py` and `tasks/auto_hardcover_id.py` | Deliberately global | Hardcover metadata is archive-level; its user reading data is preserved independently. |
 | `admin.py`, `about.py`, `duplicates.py`, `duplicate_index.py`, and `tasks/duplicate_scan.py` | Deliberately global | Administration and library-health operations cover the archive. |
 | `editbooks.py` | Deliberately global and role-gated | A metadata or file edit affects the shared book. |
 | `tasks/thumbnail.py`, `tasks/metadata_backup.py`, `tasks/database.py`, `services/cover_preview_cleanup.py`, and `tasks/kepub_package_repair.py` | Deliberately global | Maintenance must process every global record and file. |
-| `api/books.py`, `search.py`, and `user_library.py` | Membership-aware except explicit global operations | Ordinary API/search queries use the common filter; seed/add validation use the named global bypass. |
+| `api/books.py`, `search.py`, and `user_library.py` | Membership-aware except explicit global operations | Ordinary API/search queries use the common filter; seed/add validation use the named global bypass. Book detail also accepts a book on a public shelf. |
+| `api/reader.py` reading places and `api/comic.py` pages | Membership-aware, plus public shelves | The browser reader opens a shared book, so its resources and the reader's own reading places follow. |
 
 Membership is a curation boundary, not a complete authorization boundary. The
 Kobo reading-state GET/PUT and DELETE paths keep `enforce_policy=False`, and
@@ -52,11 +53,33 @@ entitlement ownership plus annotation authority remain based on existence in
 the global Calibre library. This is required so a removed book's annotations
 and ownership survive and can resume when the membership row returns.
 
-Public shelf visibility does not grant membership. A viewer sees the
-intersection of the public shelf's links and that viewer's current library;
-therefore a public shelf may be partially populated or empty for different
-viewers. The shelf owner does not confer their personal membership on anyone
-else.
+## Public shelves
+
+A public shelf shares its books without granting membership. Every account
+that can see the shelf sees all of its books, and can open each one: the book
+page, its cover, the browser reader with the reader's own reading places, and
+web and OPDS downloads. These entry points pass
+`common_filters(allow_public_shelf_books=True)`, which adds the books on
+currently public shelves to the membership predicate; a shelf's own listing
+passes it while that shelf is public. Everything else keeps the viewer's own
+library: other listings, search, facets, counts, sending to an e-reader, and
+Kobo sync. The allowance is rebuilt on every request, so making the shelf
+private or taking a book off it revokes access on the next request.
+
+The allowance relaxes membership only. Language, allowed and denied tags, the
+restricted column, roles, and OPDS shelf exposure still apply, and Kobo native
+entitlements are not inherited. A viewer sees only its own reading state for a
+shared book. The shelf owner does not confer their membership, progress, or
+annotations on anyone else.
+
+Because a public shelf grants read access, putting a book on one is an access
+decision. The owner places books from its own view. An account that edits
+someone else's public shelf, or an ownerless one, may place only books it can
+open itself: its own library, or the global library when it may browse that.
+Without this, an administrator-managed account holding "edit public shelves"
+could share itself any book its content rules allow. The refusal reads the same
+for every book outside that account's library, so it reveals nothing about the
+global library.
 
 ## Mode-switch preservation contract
 

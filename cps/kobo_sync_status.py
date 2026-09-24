@@ -8,6 +8,7 @@
 from .cw_login import current_user
 from . import logger, ub
 from datetime import datetime, timedelta, timezone
+from sqlalchemy import func
 from sqlalchemy.sql.expression import and_, bindparam, true
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 # from sqlalchemy import exc
@@ -235,6 +236,81 @@ def get_unseeded_kobo_device_ids(user_id):
         ).all()
     }
     return sorted(device_ids - seeded)
+
+
+def get_kobo_device_ids_awaiting_history_seed(user_id, unseeded_device_ids):
+    """Return which unsealed Kobos wait for their own first sync to seed them.
+
+    Only an account with flat ``KoboSyncedBooks`` history has such Kobos: it
+    crossed onto the per-device ledger from a release before v4.1.43.  A Kobo
+    it had before its first seal, and that has no ledger rows, stays unsealed
+    until its own first sync, whose token says how far it walked the library.
+    A Kobo first seen after the account's first seal is new to the server and
+    is sealed without history, whatever cursor it presents: a token from
+    another server must not vouch for this one's history.  A Kobo that already
+    has ledger rows is sealed and audited as it is.  Retired Kobos count:
+    removal is a soft delete.
+    """
+    unseeded_device_ids = sorted({int(device_id) for device_id in unseeded_device_ids})
+    if not unseeded_device_ids:
+        return []
+    has_flat_history = ub.session.query(ub.KoboSyncedBooks.id).filter(
+        ub.KoboSyncedBooks.user_id == int(user_id),
+    ).first() is not None
+    if not has_flat_history:
+        return []
+    with_rows = {
+        row.device_id for row in ub.session.query(
+            ub.KoboDeviceBookEntitlement.device_id,
+        ).filter(
+            ub.KoboDeviceBookEntitlement.device_id.in_(unseeded_device_ids),
+        ).distinct().all()
+    }
+    unseeded_device_ids = [
+        device_id for device_id in unseeded_device_ids
+        if device_id not in with_rows
+    ]
+    if not unseeded_device_ids:
+        return []
+    first_sealed_at = ub.session.query(
+        func.min(ub.KoboDeviceEntitlementSeed.seeded_at),
+    ).join(
+        ub.Device,
+        ub.Device.id == ub.KoboDeviceEntitlementSeed.device_id,
+    ).filter(
+        ub.Device.user_id == int(user_id),
+        ub.Device.kind == "kobo",
+    ).scalar()
+    if first_sealed_at is None:
+        return unseeded_device_ids
+    first_sealed_at = _naive_utc(first_sealed_at)
+    return [
+        row.id for row in ub.session.query(
+            ub.Device.id, ub.Device.first_seen_at,
+        ).filter(ub.Device.id.in_(unseeded_device_ids)).all()
+        if _naive_utc(row.first_seen_at) < first_sealed_at
+    ]
+
+
+def count_user_kobo_devices(user_id):
+    """How many Kobos this account has paired, retired ones included.
+
+    More than one means the account's flat ``KoboSyncedBooks`` history is a
+    union no single Kobo can be assumed to hold.  Device removal is a soft
+    delete (``active = False``) and a retired Kobo's deliveries stay in that
+    history, so do not add an ``active`` filter here.
+    """
+    return ub.session.query(ub.Device.id).filter(
+        ub.Device.user_id == int(user_id),
+        ub.Device.kind == "kobo",
+    ).count()
+
+
+def _naive_utc(value):
+    """Put a stored clock on the naive-UTC basis SQLite returns."""
+    if value is not None and value.tzinfo is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
 
 
 def user_has_completed_entitlement_seed(user_id):

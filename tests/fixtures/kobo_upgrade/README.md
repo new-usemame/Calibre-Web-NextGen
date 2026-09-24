@@ -40,4 +40,7 @@ downloaded is announced New again instead of being starved. A book another
 reader of the account, or a browser, downloaded keeps its row on a reader
 that lacks it; that gap is documented in the tests and recovered by resend or
 Full Sync. The tagged tests therefore record the download the reader made
-(`downloaded=`) wherever they model a held book.
+(`downloaded=`) wherever they model a held book. An installation from before
+v4.1.43, with no per-device ledger at all, is seeded per reader at its own
+first sync, from the flat history its own sync token vouches for
+(`test_pre_ledger_*` in `test_1925_kobo_sync_dedownload.py`).

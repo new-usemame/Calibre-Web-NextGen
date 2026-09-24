@@ -471,17 +471,29 @@ def _reset_pending_page_for_non_cwng_token(page, requesting_device_id):
         return False
 
 
-def _seed_existing_device_entitlement_ledgers(user_id):
-    """Mark the conservative pre-ack upgrade boundary for known Kobos.
+# A ledger row seeded from an account's pre-ledger history.  No payload hashes
+# to it, so only its change basis can suppress a replay: the declared-shape
+# transition (#1953) re-fingerprints it on its next selection, and a later
+# change to the book delivers.
+FLAT_HISTORY_SEED_FINGERPRINT = "flat-history-seed"
 
-    ``KoboSyncedBooks`` is user-wide and proves only that this server once
-    emitted something for a book.  It cannot prove which physical device
-    received a response, so copying it into a device's confirmed ledger can
-    permanently starve that device.  Existing rows therefore remain
-    unconfirmed and drain through the normal bounded missing-ledger query.
 
-    The marker still distinguishes a pre-existing device from a device added
-    later, and all writes remain staged for HandleSyncRequest's checked commit.
+def _seed_existing_device_entitlement_ledgers(
+        user_id, requesting_device_id=None, sync_token=None,
+        only_kobo_shelves=False):
+    """Seal each of the account's Kobos once, at the ledger boundary.
+
+    A seal marks a Kobo as on the per-device ledger; the one-time audit runs
+    for sealed Kobos.  A Kobo first seen after the account's first seal is
+    sealed with no history and is sent the library New.
+
+    An account crossing from before v4.1.43 has only the user-wide
+    ``KoboSyncedBooks`` history, which does not say which Kobo received a
+    book.  Each Kobo the account already had stays unsealed until its own
+    first sync, whose token vouches for its share of that history
+    (``_seed_ledger_from_flat_history``).  Without that seed the recovery arm
+    announces every held book New (#1925).  Writes stay staged for
+    HandleSyncRequest's checked commit.
     """
     device_ids = kobo_sync_status.get_unseeded_kobo_device_ids(user_id)
     if not device_ids:
@@ -489,7 +501,34 @@ def _seed_existing_device_entitlement_ledgers(user_id):
 
     started = monotonic()
     try:
-        kobo_sync_status.mark_device_entitlement_ledgers_seeded(device_ids)
+        awaiting = set(
+            kobo_sync_status.get_kobo_device_ids_awaiting_history_seed(
+                user_id, device_ids,
+            )
+        )
+        seal = [device_id for device_id in device_ids
+                if device_id not in awaiting]
+        seeded_books = 0
+        requester_seeded = bool(
+            requesting_device_id and int(requesting_device_id) in awaiting
+        )
+        if requester_seeded:
+            awaiting.discard(int(requesting_device_id))
+            seeded_books = _seed_ledger_from_flat_history(
+                user_id, int(requesting_device_id), sync_token,
+                only_kobo_shelves,
+            )
+            seal.append(int(requesting_device_id))
+        kobo_sync_status.mark_device_entitlement_ledgers_seeded(seal)
+        if requester_seeded:
+            # Its rows were written under today's classifier just now; the
+            # one-time audit is for rows v4.1.43 wrote.  Its position
+            # sentinel would turn a book this seed left out -- changed since
+            # the cursor, or resent before this sync -- into Changed.
+            kobo_sync_status.mark_device_entitlement_classification(
+                [int(requesting_device_id)],
+                ENTITLEMENT_CLASSIFICATION_VERSION,
+            )
     except Exception:
         _rollback_after_sync_failure()
         log.exception(
@@ -498,16 +537,117 @@ def _seed_existing_device_entitlement_ledgers(user_id):
         )
         return False
 
-    elapsed_ms = round((monotonic() - started) * 1000, 1)
     log.debug(
-        "Kobo Sync ledger seed: user=%s devices=%d books=0 deleted=0 "
-        "unconfirmed_devices=%d elapsed_ms=%.1f",
+        "Kobo Sync ledger seed: user=%s sealed=%d awaiting=%d books=%d "
+        "elapsed_ms=%.1f",
         user_id,
-        len(device_ids),
-        len(device_ids),
-        elapsed_ms,
+        len(seal),
+        len(awaiting),
+        seeded_books,
+        round((monotonic() - started) * 1000, 1),
     )
     return True
+
+
+def _seed_ledger_from_flat_history(
+        user_id, device_id, sync_token, only_kobo_shelves):
+    """Seed one pre-ledger Kobo with the history its own cursor vouches for.
+
+    Before v4.1.43 each Kobo walked the library through its own sync token in
+    ``(last_modified, id)`` order, and ``KoboSyncedBooks`` recorded every
+    book any of the account's Kobos was offered.  A flat-history book this
+    Kobo's cursor has passed, unchanged and unarchived since, was offered to
+    it as it is now.  It is seeded when a record shows the account took
+    delivery of it (``_book_ids_with_delivery_evidence``); a book no Kobo
+    downloaded, such as a ChangedEntitlement an empty Kobo dropped (#1735), is
+    left to the recovery arm, which announces it New.
+
+    A request without a books cursor (a new or reset Kobo, a store token)
+    seeds nothing, and a book changed after the cursor is not seeded, so both
+    are sent New.  When the account has more than one Kobo its history is
+    their union, and in shelf-only mode a book is seeded only if it was on a
+    Kobo-sync shelf before this Kobo's cursor passed; a book that only a
+    magic shelf selects is then not seeded.  Returns the rows staged.
+    """
+    if sync_token is None:
+        return 0
+    cursor_lm = books_cursor_datetime(sync_token.books_last_modified)
+    if cursor_lm <= datetime.min:
+        return 0
+    flat_book_ids = sorted({
+        row.book_id for row in ub.session.query(
+            ub.KoboSyncedBooks.book_id,
+        ).filter(
+            ub.KoboSyncedBooks.user_id == int(user_id),
+        ).all()
+    })
+    delivered = _book_ids_with_delivery_evidence(
+        user_id, device_id, flat_book_ids,
+    )
+    candidates = [book_id for book_id in flat_book_ids if book_id in delivered]
+    shared_history = kobo_sync_status.count_user_kobo_devices(user_id) > 1
+
+    change_bases = {}
+    for offset in range(0, len(candidates), 250):
+        chunk = candidates[offset:offset + 250]
+        passed = {
+            row.id: row.last_modified
+            for row in calibre_db.session.query(
+                db.Books.id, db.Books.last_modified,
+            ).filter(
+                db.Books.id.in_(chunk),
+                ~books_keyset_after_cursor(
+                    sync_token.books_last_modified, sync_token.books_last_id,
+                ),
+            ).all()
+        }
+        archives = {
+            row.book_id: row for row in ub.session.query(
+                ub.ArchivedBook.book_id,
+                ub.ArchivedBook.is_archived,
+                ub.ArchivedBook.last_modified,
+            ).filter(
+                ub.ArchivedBook.user_id == int(user_id),
+                ub.ArchivedBook.book_id.in_(chunk),
+            ).all()
+        }
+        shelved_at = None
+        if shared_history and only_kobo_shelves:
+            shelved_at = dict(ub.session.query(
+                ub.BookShelf.book_id, func.min(ub.BookShelf.date_added),
+            ).join(
+                ub.Shelf, ub.Shelf.id == ub.BookShelf.shelf,
+            ).filter(
+                ub.Shelf.user_id == int(user_id),
+                ub.Shelf.kobo_sync.is_(True),
+                ub.BookShelf.book_id.in_(chunk),
+            ).group_by(ub.BookShelf.book_id).all())
+        for book_id, book_clock in passed.items():
+            archive = archives.get(book_id)
+            archive_clock = archive.last_modified if archive else None
+            if archive is not None and (
+                    archive.is_archived
+                    or (archive_clock is not None
+                        and books_cursor_datetime(archive_clock) > cursor_lm)):
+                continue
+            if shelved_at is not None:
+                if book_id not in shelved_at:
+                    continue
+                joined = shelved_at[book_id]
+                if (joined is not None
+                        and books_cursor_datetime(joined) > cursor_lm):
+                    continue
+            change_bases[book_id] = _book_entitlement_change_basis(
+                book_clock, archive_clock,
+            )
+
+    kobo_sync_status.stage_device_entitlement_fingerprints(
+        device_id,
+        {book_id: FLAT_HISTORY_SEED_FINGERPRINT for book_id in change_bases},
+        change_bases=change_bases,
+        payload_schema_version=0,
+    )
+    return len(change_bases)
 
 
 def _book_ids_with_delivery_evidence(user_id, device_id, book_ids):
@@ -1797,11 +1937,13 @@ def HandleSyncRequest():
             capture_session=capture_session,
         )
 
-    # Upgrade bridge: flat delivery markers are user-wide and therefore cannot
-    # prove receipt by any physical device. Mark the boundary but leave every
-    # uncertain book absent from the confirmed ledger so it is reannounced New.
+    # Upgrade bridge: seal this Kobo onto the per-device ledger.  A Kobo from
+    # before v4.1.43 is seeded from the account's flat history as far as its
+    # own token vouches for it; the rest is announced New.
     if (requesting_device_id
-            and not _seed_existing_device_entitlement_ledgers(current_user.id)):
+            and not _seed_existing_device_entitlement_ledgers(
+                current_user.id, requesting_device_id, sync_token,
+                current_user.kobo_only_shelves_sync)):
         return _abort_sync_with_observability(
             503,
             requesting_device_id,

@@ -46,7 +46,7 @@ from .gdriveutils import getFileFromEbooksFolder, do_gdrive_download
 from .helper import check_valid_domain, check_email, check_username, \
     get_book_cover, get_series_cover_thumbnail, get_download_link, send_mail, generate_random_password, \
     send_registration_mail, check_send_to_ereader, check_read_formats, tags_filters, reset_password, valid_email, \
-    edit_book_read_status, valid_password, get_kosync_progress_display
+    edit_book_read_status, valid_password, get_kosync_progress_display, get_sendable_book
 from .pagination import Pagination
 from .sort_orders import BOOK_SORT_ORDERS, book_sort_order, viewer_id
 from .custom_column_sort import (
@@ -4029,7 +4029,10 @@ def show_book(book_id):
 
         entry.ordered_authors = calibre_db.order_authors([entry])
 
-        entry.email_share_list = check_send_to_ereader(entry)
+        # Offer sending only where send_mail sends: a book reached through a
+        # public shelf opens here without membership, but it is not sent.
+        entry.email_share_list = (check_send_to_ereader(entry)
+                                  if get_sendable_book(book_id, current_user) else [])
         entry.reader_list = check_read_formats(entry)
 
         entry.audio_entries = []

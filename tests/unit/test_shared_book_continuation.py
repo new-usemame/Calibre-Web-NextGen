@@ -418,3 +418,50 @@ def test_public_shelf_reader_gets_its_own_reading_places(shared_books, monkeypat
     env.public.is_public = 0
     env.session.commit()
     assert env.client.get('/api/v1/books/1/reading-sources').status_code == 404
+
+
+def test_classic_book_page_offers_sending_only_where_sending_works(shared_books, monkeypatch):
+    """Found with F4. The classic book page opens a book shared through a public
+    shelf, and it offered "Send to eReader" there. Sending follows the reader's
+    own library, as the SPA's hidden send action does, so that button could
+    only answer "Book not found".
+    """
+    from cps import cwa_db_loader, helper, web
+    env = shared_books
+    env.viewer.kindle_mail = 'viewer@kindle.example'
+    env.session.commit()
+    pages, queued = [], []
+    monkeypatch.setattr(web, 'config', SimpleNamespace(
+        config_read_column=0, config_use_google_drive=False,
+        get_book_path=web.config.get_book_path, get_mail_server_configured=lambda: True))
+    monkeypatch.setattr(helper, 'config', SimpleNamespace(
+        config_unicode_filename=False, mail_size=10 ** 9, config_converterpath='',
+        get_mail_settings=lambda: {}))
+    monkeypatch.setattr(web, 'render_title_template',
+        lambda _template, **context: pages.append(context) or '')
+    monkeypatch.setattr(web, 'CWA_DB', lambda: SimpleNamespace(cwa_settings={}))
+    monkeypatch.setattr(web, 'get_kosync_progress_display', lambda *_: (None, None, None))
+    monkeypatch.setattr(env.cdb, 'get_cc_columns', lambda *a, **k: [])
+    monkeypatch.setattr(env.cdb, 'get_hierarchical_column_ids', lambda *a, **k: set())
+    monkeypatch.setattr(helper, 'get_email_body_text', lambda: '')
+    monkeypatch.setattr(helper, 'TaskEmail', lambda *args, **kwargs: args[2])
+    monkeypatch.setattr(helper.WorkerThread, 'add',
+        staticmethod(lambda _user, task, *a, **k: queued.append(task)))
+    monkeypatch.setattr(cwa_db_loader, 'load_cwa_db', lambda: SimpleNamespace(
+        CWA_DB=lambda: SimpleNamespace(log_activity=lambda **_: None)))
+    env.app.add_url_rule('/book/<int:book_id>', 'show_book', inspect.unwrap(web.show_book))
+    env.app.add_url_rule('/send/<int:book_id>/<book_format>/<int:convert>', 'send_to_ereader',
+        inspect.unwrap(web.send_to_ereader), methods=['POST'])
+
+    def offered_and_sent():
+        assert env.client.get('/book/1').status_code == 200
+        offered = [option['format'] for option in pages.pop()['entry'].email_share_list]
+        sent = env.client.post('/send/1/epub/0').json[0]['type'] == 'success'
+        return offered, sent
+
+    # Shared through the public shelf only: the page must not offer what fails.
+    assert offered_and_sent() == ([], False)
+    env.session.add(ub.UserLibraryBook(user_id=env.viewer.id, book_id=1))
+    env.session.commit()
+    assert offered_and_sent() == (['Epub', 'Pdf'], True)
+    assert queued == ['book.epub']

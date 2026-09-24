@@ -567,6 +567,19 @@ def check_read_formats(entry):
 # 1: If epub file is existing, it's directly send to eReader email,
 # 2: If mobi file is existing, it's converted and send to eReader email,
 # 3: If Pdf file is existing, it's directly send to eReader email
+def get_sendable_book(book_id, user=None):
+    """Return the book ``send_mail`` sends for ``user``, else ``None``.
+
+    Sending follows the account's own library view, including its own hidden
+    and archived books. A book reached only through a public shelf can be read
+    and downloaded without membership, but it is not sent, so the book pages
+    must not offer to send it.
+    """
+    return calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_hidden=True, user=user,
+    )
+
+
 def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id,
               subject=None, user=None):
     """Send email with attachments"""
@@ -576,10 +589,7 @@ def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id,
     filter_user = user if user is not None else (
         current_user if has_request_context() else None
     )
-    book = calibre_db.get_filtered_book(
-        book_id, allow_show_archived=True, allow_show_hidden=True,
-        user=filter_user,
-    )
+    book = get_sendable_book(book_id, filter_user)
     if not book:
         return _("Book not found")
 

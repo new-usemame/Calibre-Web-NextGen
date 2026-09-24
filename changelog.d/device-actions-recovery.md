@@ -1,0 +1,1 @@
+Device management now explains failed rename, removal, and undo requests and keeps the action available to retry. Canceling a removal returns keyboard focus to the device's action button, and the page uses one main landmark for screen readers.

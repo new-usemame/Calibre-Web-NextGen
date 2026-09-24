@@ -9,6 +9,7 @@ const builder = fileURLToPath(new URL('../../tests/fixtures/reader_archive.py', 
 const archive = (chapters: string[]) => execFileSync('python3', [builder], { input: JSON.stringify(chapters) });
 const webCfi = 'epubcfi(/6/2!/4/2[existing],/1:0,/1:20)';
 const foreignCfi = 'epubcfi(/6/4!/4/2[wrapper]/2[kobo.15.1],/1:15,/1:63)';
+const initialBookmark = 'epubcfi(/6/2!/4/2[existing]/1:0)';
 
 async function openFixture(page: Page, duplicate = false, nativeSpans = false) {
   const epub = archive([
@@ -36,7 +37,7 @@ async function openFixture(page: Page, duplicate = false, nativeSpans = false) {
   });
   await page.route(`**/api/v1/books/${id}/bookmark*`, async (route) => {
     if (route.request().method() !== 'GET') bookmarkWrites.push(route.request().postDataJSON());
-    await route.fulfill({ json: { bookmark: 'epubcfi(/6/2!/4/2[existing]/1:0)' } });
+    await route.fulfill({ json: { bookmark: initialBookmark } });
   });
   await page.route(`**/annotations/${id}/data.json`, (route) => route.fulfill({ json: {
     annotations: [
@@ -65,7 +66,6 @@ test('native highlight maps into the existing EPUB, preserving web highlights an
   await page.getByRole('button', { name: 'Highlights and notes', exact: true }).click();
   const jump = page.getByRole('button', { name: `${quote} kobo`, exact: true });
   await expect(jump).toBeEnabled();
-  const writesBeforeJump = fixture.bookmarkWrites.length;
   await jump.click();
   const mark = page.locator('[data-id="native"]');
   await expect(mark.locator('rect').first()).toBeAttached();
@@ -77,7 +77,13 @@ test('native highlight maps into the existing EPUB, preserving web highlights an
   await page.getByRole('button', { name: 'Green', exact: true }).click();
   await expect.poll(() => fixture.edits.length).toBe(1);
   expect(fixture.edits).toEqual([{ highlight_color: 'green' }]);
-  expect(fixture.bookmarkWrites.length).toBe(writesBeforeJump);
+  // Observe beyond the 800ms save debounce. A pending initial-position save
+  // may finish during preview; only saving the preview chapter is a regression.
+  await page.waitForTimeout(1000);
+  for (const write of fixture.bookmarkWrites) {
+    expect((write as { bookmark: string }).bookmark.split('!')[0])
+      .toBe(initialBookmark.split('!')[0]);
+  }
   expect(errors).toEqual([]);
 });
 

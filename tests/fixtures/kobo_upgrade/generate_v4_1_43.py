@@ -40,9 +40,9 @@ for scenario in ('emitted', 'seeded_only'):
     harness = sync_harness.__wrapped__(patch)
     h = next(harness)
     try:
-        # strftime renders Calibre's undefined year 101 as 0101 on macOS and
-        # 101 on Linux, and the stored fingerprint hashes it: pin a date that
-        # every platform renders alike.
+        # strftime renders Calibre's undefined year 101 as 0101 on macOS but
+        # 101 on Linux under CPython 3.13, and the stored fingerprint hashes
+        # it: pin a date that every platform renders alike.
         h.book.pubdate = datetime(2020, 2, 3, 4, 5, 6)
         h.session.commit()
         patch.setattr(kobo.config, 'config_kobo_suppress_replayed_entitlements', True)

@@ -13,11 +13,11 @@ The generator must run against the old checkout, not the candidate.
 The generator pins the fixture book's publication date to
 `2020-02-03T04:05:06` before the old handler emits its page. The harness
 default is Calibre's undefined year 101, which `strftime('%Y')` renders as
-`0101` on macOS and `101` on Linux, and v4.1.43's fingerprint hashes the
-whole payload, date included. A fixture frozen on one platform would store a
-fingerprint the other never computes. The generator also asserts that `cps`
-is imported from the tagged checkout, not from an editable install on
-`sys.path`.
+`0101` on macOS but as `101` on Linux under CPython 3.13 (3.14 pads it), and
+v4.1.43's fingerprint hashes the whole payload, date included. A fixture
+frozen on one platform would store a fingerprint the other never computes.
+The generator also asserts that `cps` is imported from the tagged checkout,
+not from an editable install on `sys.path`.
 
 - **emitted:** two paired readers, one retired. The old seed sees no flat
   history and stamps both readers empty. The first reader receives a real

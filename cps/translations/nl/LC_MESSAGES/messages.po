@@ -15664,6 +15664,56 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+# Devices and browsers: one Browser reading source per account
+
+msgid "1 annotation assigned to this source"
+msgstr "1 annotatie toegewezen aan deze bron"
+
+msgid "1 annotation from this source"
+msgstr "1 annotatie uit deze bron"
+
+msgid "All browsers and computers signed in to your account share one Browser reading source."
+msgstr "Alle browsers en computers waarop je bent aangemeld bij je account delen één leesbron Browser."
+
+msgid "Browser"
+msgstr "Browser"
+
+msgid "Browser reading source"
+msgstr "Leesbron van de browser"
+
+msgid "Could not load devices and browsers."
+msgstr "Apparaten en browsers konden niet worden geladen."
+
+msgid "Could not load removal details. Try again."
+msgstr "Kan de verwijderingsdetails niet laden. Probeer het opnieuw."
+
+msgid "Could not remove this source. Try again."
+msgstr "Kan deze bron niet verwijderen. Probeer het opnieuw."
+
+msgid "Could not rename this source. Try again."
+msgstr "Kan deze bron niet hernoemen. Probeer het opnieuw."
+
+msgid "Could not restore this source. Try again."
+msgstr "Kan deze bron niet herstellen. Probeer het opnieuw."
+
+msgid "Devices and browsers"
+msgstr "Apparaten en browsers"
+
+msgid "Devices appear after their first sync. Browser appears after saving reading progress or annotations."
+msgstr "Apparaten verschijnen na hun eerste synchronisatie. Browser verschijnt na het opslaan van leesvoortgang of annotaties."
+
+msgid "Loading devices and browsers…"
+msgstr "Apparaten en browsers laden…"
+
+msgid "Manage devices and browsers"
+msgstr "Apparaten en browsers beheren"
+
+msgid "No devices or browser reading data yet."
+msgstr "Nog geen apparaten of leesgegevens uit de browser."
+
+msgid "Reading data is kept. Browser reappears when you next save reading progress or annotations."
+msgstr "Leesgegevens blijven behouden. Browser verschijnt opnieuw wanneer je leesvoortgang of annotaties opslaat."
+
 #, python-brace-format
 #~ msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
 #~ msgstr ""

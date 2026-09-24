@@ -16016,6 +16016,56 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+# Devices and browsers: one Browser reading source per account
+
+msgid "1 annotation assigned to this source"
+msgstr "1 annotation attribuée à cette source"
+
+msgid "1 annotation from this source"
+msgstr "1 annotation provenant de cette source"
+
+msgid "All browsers and computers signed in to your account share one Browser reading source."
+msgstr "Tous les navigateurs et ordinateurs connectés à votre compte partagent une seule source de lecture Navigateur."
+
+msgid "Browser"
+msgstr "Navigateur"
+
+msgid "Browser reading source"
+msgstr "Source de lecture du navigateur"
+
+msgid "Could not load devices and browsers."
+msgstr "Impossible de charger les appareils et les navigateurs."
+
+msgid "Could not load removal details. Try again."
+msgstr "Impossible de charger les détails de suppression. Réessayez."
+
+msgid "Could not remove this source. Try again."
+msgstr "Impossible de supprimer cette source. Réessayez."
+
+msgid "Could not rename this source. Try again."
+msgstr "Impossible de renommer cette source. Réessayez."
+
+msgid "Could not restore this source. Try again."
+msgstr "Impossible de restaurer cette source. Réessayez."
+
+msgid "Devices and browsers"
+msgstr "Appareils et navigateurs"
+
+msgid "Devices appear after their first sync. Browser appears after saving reading progress or annotations."
+msgstr "Les appareils apparaissent après leur première synchronisation. Le navigateur apparaît après l’enregistrement de la progression de lecture ou d’annotations."
+
+msgid "Loading devices and browsers…"
+msgstr "Chargement des appareils et des navigateurs…"
+
+msgid "Manage devices and browsers"
+msgstr "Gérer les appareils et les navigateurs"
+
+msgid "No devices or browser reading data yet."
+msgstr "Aucun appareil ni donnée de lecture dans le navigateur pour le moment."
+
+msgid "Reading data is kept. Browser reappears when you next save reading progress or annotations."
+msgstr "Les données de lecture sont conservées. Le navigateur réapparaît au prochain enregistrement de la progression de lecture ou d’annotations."
+
 #, python-brace-format
 #~ msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
 #~ msgstr ""

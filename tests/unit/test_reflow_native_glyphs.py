@@ -28,6 +28,49 @@ def test_superscript_uses_pdf_character_gap_not_string_proportion():
     assert [s.text for s in result[0].lines[0].spans]==['1','st',' house']
 
 
+def test_native_stacked_fractions_follow_the_slash_and_keep_other_raised_marks():
+    def body(text, x, y):
+        boxes=tuple((i,i+1,x+i*5,y,x+(i+1)*5,y+9) for i in range(len(text)))
+        span=extract.Span(text,9,'Times',0,(x,y,x+len(text)*5,y+9),char_boxes=boxes)
+        return extract.Line([span],span.bbox)
+
+    # The numerator and denominator are separate PDF lines around a slash in
+    # the body line. A footnote marker sits beside ordinary prose on that line.
+    line=body('at   /   of the signs',100,100)
+    slash=next(c for c in line.spans[0].char_boxes if line.text[c[0]]=='/')
+    num=extract.Span('3',6,'Times',0,(slash[2]-3,98.3,slash[2],104.3))
+    den=extract.Span('4',6,'Times',0,(slash[4],104.6,slash[4]+3,110.6))
+    marker=extract.Span('2',6,'Times',0,(line.bbox[2],98.3,line.bbox[2]+3,104.3))
+    blocks=[extract.Block(0,(100,98,200,111),[line]+[extract.Line([s],s.bbox) for s in (num,den,marker)])]
+    result=normalize_blocks(blocks)
+    joined=' '.join(ln.text for b in result for ln in b.lines)
+    assert '3/4' in joined
+    assert '4 at' not in joined
+    assert joined.count('2')==1
+    runs=assemble._line_runs(result[0].lines[0],0,{2},set(),[],[],preserve_style=True)
+    assert ['sup','2',0] in runs
+
+
+def test_slash_without_both_measured_fraction_parts_keeps_source_order():
+    main=extract.Span('Chapter 2 / 4',9,'Times',0,(100,100,170,109),
+                      char_boxes=((10,11,150,100,154,109),))
+    raised=extract.Span('3',6,'Times',0,(147,98,150,104))
+    blocks=[extract.Block(0,(100,98,170,109),[extract.Line([main],main.bbox),extract.Line([raised],raised.bbox)])]
+    result=normalize_blocks(blocks)
+    assert not any('3/4' in line.text for block in result for line in block.lines)
+
+
+def test_native_inline_numeric_slash_does_not_recruit_unrelated_small_digits():
+    text='A 3/4 turn is ordinary inline text.'
+    span=extract.Span(text,9,'Times',0,(100,100,100+len(text)*5,109),
+                      char_boxes=tuple((i,i+1,100+i*5,100,105+i*5,109) for i in range(len(text))))
+    folio=extract.Span('4',6,'Times',0,(300,10,303,16))
+    blocks=[extract.Block(0,span.bbox,[extract.Line([span],span.bbox)]),
+            extract.Block(1,folio.bbox,[extract.Line([folio],folio.bbox)])]
+    result=normalize_blocks(blocks)
+    assert [line.text for block in result for line in block.lines]==[text,'4']
+
+
 def test_real_unicode_map_overrides_symbolic_font_name():
     class Doc:
         def xref_get_key(self,xref,key):return ('xref','9 0 R') if key=='ToUnicode' else ('int','4')

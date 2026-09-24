@@ -193,6 +193,74 @@ def image_name(record):
     return 'images/glyph_p%04d_%s.jpg' % (record['page'], digest)
 
 
+def _attach_stacked_fractions(blocks):
+    """Read a PDF's separately drawn numerator/slash/denominator as one token.
+
+    Both small digits must bracket the slash horizontally and vertically. A
+    lone raised digit remains available to the ordinary note/ordinal handling.
+    Ambiguous matches remain separate source atoms rather than guessed text.
+    """
+    from .extract import Line, Block
+    lines = [line for block in blocks for line in block.lines]
+    parts = [line for line in lines if len(line.spans) == 1
+             and re.fullmatch(r'\d{1,3}', line.stripped)]
+    replacements, consumed = {}, set()
+    for line in lines:
+        edits = {}
+        for span_index, span in enumerate(line.spans):
+            if '/' not in span.text or not span.char_boxes:
+                continue
+            for start, end, x0, y0, x1, y1 in span.char_boxes:
+                if span.text[start:end] != '/':
+                    continue
+                mid = (y0 + y1) / 2
+                nearby = [part for part in parts if part is not line
+                          and id(part) not in consumed
+                          and .5 <= part.size / line.size <= .8]
+                upper = [part for part in nearby
+                         if abs(part.bbox[2] - x0) <= line.size * .18
+                         and part.bbox[1] < y0 <= part.bbox[3]
+                         and part.bbox[3] <= mid + line.size * .06]
+                lower = [part for part in nearby
+                         if abs(part.bbox[0] - x1) <= line.size * .18
+                         and mid - line.size * .06 <= part.bbox[1] <= y1
+                         and part.bbox[3] > y1]
+                if len(upper) != 1 or len(lower) != 1 or upper[0] is lower[0]:
+                    continue
+                num, den = upper[0], lower[0]
+                if id(num) in consumed or id(den) in consumed:
+                    continue
+                edits.setdefault(span_index, []).append((start, end, num, den, (x0,y0,x1,y1)))
+                consumed.update((id(num), id(den)))
+        if not edits:
+            continue
+        changed=[]
+        for index, span in enumerate(line.spans):
+            if index not in edits:
+                changed.append(span)
+                continue
+            text=span.text
+            boxes=list(span.char_boxes)
+            for start,end,num,den,slash_box in sorted(edits[index],reverse=True):
+                text=text[:start]+num.stripped+'/'+den.stripped+text[end:]
+                added=len(num.stripped)+len(den.stripped)
+                boxes=[(a+(added if a>=end else 0),b+(added if a>=end else 0),*box)
+                       for a,b,*box in boxes if b<=start or a>=end]
+                left=tuple(num.bbox);right=tuple(den.bbox)
+                slash=(slash_box[0],slash_box[1],slash_box[2],slash_box[3])
+                new=[left]*len(num.stripped)+[slash]+[right]*len(den.stripped)
+                boxes.extend((start+j,start+j+1,*box) for j,box in enumerate(new))
+            changed.append(replace(span,text=text,char_boxes=tuple(sorted(boxes))))
+        replacements[id(line)]=Line(changed,line.bbox,
+                                    spacing_uncertain=line.spacing_uncertain,
+                                    transcription_uncertain=line.transcription_uncertain)
+    return [Block(block.number,block.bbox,
+                  [replacements.get(id(line),line) for line in block.lines if id(line) not in consumed],
+                  block.kind)
+            for block in blocks if block.kind != 'text' or
+            any(id(line) not in consumed for line in block.lines)]
+
+
 def normalize_blocks(blocks):
     """Attach detached raised spans at measured character boundaries, then initials.
 
@@ -200,6 +268,7 @@ def normalize_blocks(blocks):
     and dictionary guesses are never used. Ambiguous placements stay unchanged.
     """
     from .extract import Line, Block
+    blocks = _attach_stacked_fractions(blocks)
     lines = [ln for b in blocks for ln in b.lines]
     replacements, consumed, proposals = {}, set(), {}
     for marker in lines:

@@ -683,7 +683,9 @@ end
 --     every delete cycle died inside the plugin and no request went out (#920).
 -- Declaring one and not the other is not caught by review or by a server-side
 -- HTTP test; tests/unit/test_cwngsync_plugin_wire_contract.py pins both.
-function CWNGSyncClient:push_annotations(username, password, document, annotations, deleted, callback)
+-- `device` and `device_id` name the e-reader, so the website can say which one
+-- a highlight came from.
+function CWNGSyncClient:push_annotations(username, password, document, annotations, deleted, device, device_id, callback)
     self.client:reset_middlewares()
     self.client:enable("Format.JSON")
     self.client:enable("GinClient")
@@ -699,6 +701,8 @@ function CWNGSyncClient:push_annotations(username, password, document, annotatio
                 annotations = annotations,
                 deleted = (deleted and #deleted > 0) and deleted or nil,
                 delete_source = (deleted and #deleted > 0) and "koreader" or nil,
+                device = device,
+                device_id = device_id,
             })
         end)
         finish(callback, ok, res, "CWNGSyncClient:push_annotations")

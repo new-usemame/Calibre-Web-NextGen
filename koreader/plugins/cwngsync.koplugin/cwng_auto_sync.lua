@@ -270,6 +270,7 @@ function AutoSync:deliverPending(client, entry, done)
                 return continue()
             end
             client:push_annotations(s.username, s.password, entry.document, list, deletions,
+                Device.model, self.device_id,
                 function(sent, _body, reason)
                     if sent then
                         self:saveBookSetting(entry.file, ANNOTATION_WATERMARK_KEY,

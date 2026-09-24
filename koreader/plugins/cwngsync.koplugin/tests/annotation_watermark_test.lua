@@ -43,6 +43,7 @@ local function mainFunctions(names)
         "local ANNOTATION_WATERMARK_KEY = " .. string.format("%q", key),
         "local SyncLogic, UIManager, InfoMessage = ...",
         "local T = function(text) return text end",
+        "local Device = { model = 'Kindle' }",
         "local _ = function(text) return text end",
         "local function promptLogin() end",
         "local function showSyncError() end",
@@ -90,8 +91,8 @@ local function newHarness(push_succeeds, own_highlights)
     local pushes = {}
     local client = {
         pull_annotations = function(_, _, _, _, callback) callback(true, { annotations = server }) end,
-        push_annotations = function(_, _, _, _, list, deleted, callback)
-            pushes[#pushes + 1] = { list = list, deleted = deleted }
+        push_annotations = function(_, _, _, _, list, deleted, device, device_id, callback)
+            pushes[#pushes + 1] = { list = list, deleted = deleted, device = device, device_id = device_id }
             callback(push_succeeds, {}, push_succeeds and nil or "offline")
         end,
     }
@@ -99,6 +100,7 @@ local function newHarness(push_succeeds, own_highlights)
         ui = ui,
         settings = { sync_annotations = true, username = "reader", password = "app", server = "http://books" },
         path = ".",
+        device_id = "this-kindle",
         hasCurrentDocument = function() return true end,
         getDocumentDigest = function() return "digest" end,
         getCurrentDocumentFile = function() return "/books/book.epub" end,
@@ -175,8 +177,23 @@ local function testItStaysDeletedWhenTheReaderHasHighlightsOfTheirOwn()
     assertEqual(h.ui.annotation.annotations[1].text, "Mine here", "and it is theirs")
 end
 
+local function testTheServerIsToldWhichDeviceMadeAHighlight()
+    -- Without it the website can only say "koreader", not "Kindle".
+    local own = { page = "/body/DocFragment[5]/body/p[2]/text().0", pos0 = "/body/DocFragment[5]/body/p[2]/text().0",
+        pos1 = "/body/DocFragment[5]/body/p[2]/text().9", text = "Mine here", datetime = "2026-09-20 10:00:00",
+        drawer = "lighten", color = "yellow" }
+    local h = newHarness(true, { own })
+    h.open()
+    h.done()
+    local push = h.pushes[1]
+    assertEqual(push and #push.list, 1, "the reader's own highlight is pushed")
+    assertEqual(push.device_id, "this-kindle", "with this device's id")
+    assertEqual(push.device, "Kindle", "and its model")
+end
+
 testAServerHighlightDeletedHereBeforeAnyPushStaysDeleted()
 testADeletionSurvivesAPushThatFailed()
 testItStaysDeletedWhenTheReaderHasHighlightsOfTheirOwn()
+testTheServerIsToldWhichDeviceMadeAHighlight()
 
 print("annotation_watermark tests passed")

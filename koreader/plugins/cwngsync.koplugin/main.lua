@@ -2388,7 +2388,7 @@ function CWNGSync:syncAnnotations(interactive)
             local deleted = plan.deletions
             if #diff.send_to_server > 0 or #deleted > 0 then
                 client:push_annotations(self.settings.username, self.settings.password, digest,
-                    diff.send_to_server, deleted,
+                    diff.send_to_server, deleted, Device.model, self.device_id,
                     function(ok2, _body2, reason)
                         -- Only once the server has it: a failed push must leave
                         -- the deletion pending, not forget it.

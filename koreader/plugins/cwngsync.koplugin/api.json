@@ -163,13 +163,17 @@
             ],
             "optional_params" : [
                 "deleted",
-                "delete_source"
+                "delete_source",
+                "device",
+                "device_id"
             ],
             "payload" : [
                 "document",
                 "annotations",
                 "deleted",
-                "delete_source"
+                "delete_source",
+                "device",
+                "device_id"
             ],
             "expected_status" : [200, 400, 401, 503]
         },

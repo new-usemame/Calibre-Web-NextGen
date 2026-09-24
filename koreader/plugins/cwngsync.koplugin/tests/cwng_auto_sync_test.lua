@@ -52,7 +52,30 @@ local function testAChangeTheServerAsksToSendLaterIsKept()
     end
 end
 
+local function testAQueuedHighlightSaysWhichDeviceMadeIt()
+    local plugin = setmetatable({
+        settings = { username = "reader", password = "app" },
+        device_id = "this-kindle",
+        saveBookSetting = function() end,
+    }, { __index = AutoSync })
+    local pushed
+    local client = {
+        push_annotations = function(_, _, _, _, list, deleted, device, device_id, callback)
+            pushed = { count = #list, device = device, device_id = device_id }
+            callback(true, {}, nil)
+        end,
+    }
+    local delivered
+    plugin:deliverPending(client, { file = "/books/b.epub", document = "digest",
+        annotations = { list = { { text = "mine" } }, deletions = {} } }, function(ok) delivered = ok end)
+    assertEqual(delivered, true, "delivered")
+    assertEqual(pushed and pushed.count, 1, "the highlight is pushed")
+    assertEqual(pushed.device_id, "this-kindle", "with this device's id")
+    assertEqual(pushed.device, "Kindle", "and its model")
+end
+
 testAChangeTheServerWillNeverTakeIsLetGo()
 testAChangeTheServerAsksToSendLaterIsKept()
+testAQueuedHighlightSaysWhichDeviceMadeIt()
 
 print("cwng_auto_sync tests passed")

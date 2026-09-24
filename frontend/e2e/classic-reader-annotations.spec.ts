@@ -8,7 +8,7 @@ const builder = fileURLToPath(new URL('../../tests/fixtures/reader_archive.py', 
 const installation = '293e761d-9fc4-4d78-a2c7-6aaeb29edc77';
 const quote = 'Native reader passage for testing.';
 
-test('classic annotation tab, exact jump, selection save and reading progress use the same browser identity', async ({ page }) => {
+test('classic annotation navigation, selection and progress work without a browser installation identity', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript((installation) => {

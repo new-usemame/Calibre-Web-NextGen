@@ -530,7 +530,8 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
         self:refreshLibraryViews(changed)
         done(ok, summary)
     end
-    local function step()
+    local step
+    local function stepOnce()
         if shared.running ~= token then return end
         index = index + 1
         local action = actions[index]
@@ -578,6 +579,15 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
             changed = {}
         end
         UIManager:nextTick(step)
+    end
+    -- As with the list's callback: an error in a step ends the sync rather
+    -- than leaving it marked as running for good.
+    step = function()
+        local ran, err = pcall(stepOnce)
+        if not ran then
+            logger.warn("CWNGSync: library sync failed", err)
+            done(false, _("something went wrong while updating the library"))
+        end
     end
     step()
 end
@@ -655,9 +665,7 @@ function Runtime:syncLibrary(opts)
     local function fetch(cursor)
         pages = pages + 1
         local if_revision = (cursor == nil and not opts.force) and state.revision or nil
-        client:get_library(self.settings.username, self.settings.password, Device.model,
-            self.device_id, cursor, if_revision,
-            function(ok, body, reason)
+        local function onPage(ok, body, reason)
                 if shared.running ~= token then return end
                 if not ok or type(body) ~= "table" then
                     logger.warn("CWNGSync: library manifest failed", reason)
@@ -685,6 +693,18 @@ function Runtime:syncLibrary(opts)
                     return
                 end
                 self:applyLibraryManifest(books, body.revision, token, opts, done, shelves)
+            end
+        client:get_library(self.settings.username, self.settings.password, Device.model,
+            self.device_id, cursor, if_revision,
+            function(ok, body, reason)
+                -- An error in here would end the request's coroutine without a
+                -- word and leave this sync marked as running: the library would
+                -- not sync again until KOReader restarted. It ends the sync.
+                local ran, err = pcall(onPage, ok, body, reason)
+                if not ran then
+                    logger.warn("CWNGSync: library sync failed", err)
+                    done(false, _("something went wrong while updating the library"))
+                end
             end)
     end
     fetch(nil)

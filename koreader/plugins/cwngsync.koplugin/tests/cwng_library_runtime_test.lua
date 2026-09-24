@@ -103,7 +103,7 @@ end
 -- `answer(cursor)` is the server: the body for the page after `cursor`.
 -- With `real_apply`, the manifest is applied by the runtime itself, and
 -- `fetch(book)` answers each cover download.
-local function sync(answer, real_apply, fetch, root)
+local function sync(answer, real_apply, fetch, root, broken)
     local queue, requests = {}, {}
     local outcome = { applied = nil }
     local client = {
@@ -131,7 +131,7 @@ local function sync(answer, real_apply, fetch, root)
             function runtime:getLibraryState() return state end
             function runtime:saveLibraryState() end
         end
-        function runtime:refreshLibraryViews() end
+        function runtime:refreshLibraryViews() if broken == "views" then error("views broke") end end
         function runtime:applyLibraryCollections() end
         function runtime:libraryProbe()
             return { attributes = function() return nil end, isOpen = function() return false end,
@@ -145,6 +145,7 @@ local function sync(answer, real_apply, fetch, root)
         outcome.runtime = runtime
     else
         function runtime:applyLibraryManifest(books, _, _, _, done)
+            if broken == "apply" then error("plan broke") end
             outcome.applied = books
             done(true)
         end
@@ -345,6 +346,16 @@ local function testTheBookListIsWrittenOncePerSyncNotWithEveryRecord()
     package.loaded["cwng_library_runtime"] = Runtime
 end
 
+local function testAnErrorInASyncDoesNotStopLaterSyncs()
+    local outcome = sync(pagesOf(1, 1), false, nil, nil, "apply")
+    assertEqual(outcome.ok, false, "an error while reading the list ends the sync")
+    assertEqual(sync(pagesOf(1, 1)).ok, true, "and the next sync runs")
+
+    outcome = sync(manyNewBooks(40), true, function() return true, { size = 1, mtime = 1 } end, nil, "views")
+    assertEqual(outcome.ok, false, "an error in a step ends the sync")
+    assertEqual(sync(pagesOf(1, 1)).ok, true, "and the next sync runs")
+end
+
 local function testEveryPageOfABigLibraryReachesTheDevice()
     -- 250 pages is 50,000 books at the server's page size of 200.
     local outcome = sync(pagesOf(250, 2))
@@ -385,6 +396,7 @@ testAFewFailedCoversDoNotStopTheRest()
 testBooksThatArrivedDuringTheSyncDoNotStopIt()
 testTheInventoryKnowsCoversFromBooks()
 testTheBookListIsWrittenOncePerSyncNotWithEveryRecord()
+testAnErrorInASyncDoesNotStopLaterSyncs()
 os.execute("rm -rf '" .. folder .. "'")
 
 print("cwng_library_runtime tests passed")

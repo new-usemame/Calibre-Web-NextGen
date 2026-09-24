@@ -40,7 +40,7 @@ EXTRAS = {'ReflowResult': {'source_pages', 'operation_plans', 'stage_records',
 # Keep declared source10 additions when running a pre-source10 composition.
 FORWARD = {'Span': {'transcription_uncertain'}, 'Line': {'transcription_uncertain'},
            'RawPage': {'transcript_unverified'}, 'PageRecovery': {'verification'},
-           'BookStyle': {'folio_boxes'}}
+           'BookStyle': {'folio_boxes', 'local_running_boxes'}}
 
 
 def _certainty_fields(kind, data):
@@ -50,7 +50,7 @@ def _certainty_fields(kind, data):
         if key in ('transcription_uncertain', 'transcript_unverified'):
             if type(item) is not bool: raise ValueError('invalid source certainty flag')
         elif not isinstance(item, dict): raise ValueError('invalid source metadata')
-        elif key == 'folio_boxes':
+        elif key in ('folio_boxes', 'local_running_boxes'):
             if any(type(p) is not int or p < 0 or not isinstance(box, tuple)
                    or len(box) != 4 or any(type(n) not in (int, float) for n in box)
                    for p, box in item.items()):

@@ -20,7 +20,7 @@ chart labels actually are — stray single glyphs and columns of numbers.
 """
 
 import re
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field, replace
 from statistics import median
 from typing import List, Optional, Tuple
@@ -244,6 +244,7 @@ class BookStyle(object):
     page_count: int = 0
     outline: List[dict] = field(default_factory=list)
     folio_boxes: dict = field(default_factory=dict)
+    local_running_boxes: dict = field(default_factory=dict)
 
     @property
     def boiler_threshold(self):
@@ -352,6 +353,63 @@ def _sequence_folios(raw_pages, body_size):
     return proved
 
 
+_LEADING_PRINTED_FOLIO = re.compile(r'^([0-9]{1,5})\s+(.+)$')
+_TRAILING_PRINTED_FOLIO = re.compile(r'^(.+?)\s+([0-9]{1,5})$')
+
+
+def _local_running_folios(raw_pages, body_size):
+    """Prove a short alternating running head by its margin row and folio run.
+
+    Three consecutive observations at page stride one or two are required.
+    The label, folio/page offset, type size, and row geometry must all agree;
+    repeated words elsewhere on a page do not inherit furniture status.
+    """
+    if not body_size:
+        return {}
+    groups = defaultdict(list)
+    for raw in raw_pages:
+        lines = sorted((line for block in raw.text_blocks for line in block.lines
+                        if line.stripped), key=lambda line: (line.bbox[1], line.bbox[0]))
+        if len(lines) < 2:
+            continue
+        line, following = lines[0], lines[1]
+        if (line.bbox[3] > raw.height * HEADER_BAND or
+                line.size > body_size * .98 or
+                following.bbox[1] - line.bbox[3] < line.size * .8 or
+                len(line.stripped) > BAND_TEXT_MAX):
+            continue
+        match = _LEADING_PRINTED_FOLIO.fullmatch(line.stripped)
+        if match:
+            folio, label, edge = int(match[1]), match[2], 'left'
+        else:
+            match = _TRAILING_PRINTED_FOLIO.fullmatch(line.stripped)
+            if not match:
+                continue
+            label, folio, edge = match[1], int(match[2]), 'right'
+        label = ' '.join(label.split())
+        if (len(label.split()) < 2 or sum(ch.isalpha() for ch in label) < 12 or
+                CAPTION_LINE.match(label)):
+            continue
+        groups[(label.casefold(), edge, folio - raw.pno)].append((raw, line))
+    proved = {}
+    for rows in groups.values():
+        rows.sort(key=lambda pair: pair[0].pno)
+        for raw, line in rows:
+            peers = [(other, candidate) for other, candidate in rows
+                     if abs(candidate.bbox[1] / other.height - line.bbox[1] / raw.height) <= .006
+                     and abs(candidate.bbox[0] / other.width - line.bbox[0] / raw.width) <= .025
+                     and abs(candidate.size - line.size) <= body_size * .08
+                     and abs((candidate.bbox[2] - candidate.bbox[0]) / other.width -
+                             (line.bbox[2] - line.bbox[0]) / raw.width) <= .04]
+            pages = sorted(other.pno for other, _ in peers)
+            if any(raw.pno in pages[i:i+3] and
+                   pages[i+1] - pages[i] == pages[i+2] - pages[i+1] and
+                   pages[i+1] - pages[i] in (1, 2)
+                   for i in range(len(pages) - 2)):
+                proved[raw.pno] = line.bbox
+    return proved
+
+
 def book_style(raw_pages, outline=None):
     """Measure the book once: body size, heading ladder, repeated band strings.
 
@@ -388,7 +446,8 @@ def book_style(raw_pages, outline=None):
 
     return BookStyle(body_size=body_size, ladder=ladder, band_hits=dict(bands),
                      page_count=len(raw_pages), outline=list(outline or []),
-                     folio_boxes=_sequence_folios(raw_pages,body_size))
+                     folio_boxes=_sequence_folios(raw_pages,body_size),
+                     local_running_boxes=_local_running_folios(raw_pages,body_size))
 
 
 # ------------------------------------------------------------------ heading vetoes
@@ -1492,6 +1551,8 @@ _PROSE_SENTENCE = re.compile(r"[A-Z\u201c\u2018\"']\S*[.!?](?:\s|$)")
 def _furniture_reason(line, raw, style, top_y=None):
     if getattr(style,"folio_boxes",{}).get(raw.pno) == line.bbox:
         return "folio_sequence"
+    if getattr(style,"local_running_boxes",{}).get(raw.pno) == line.bbox:
+        return "local_running_folio"
     y0, y1 = line.bbox[1], line.bbox[3]
     in_head = y1 <= raw.height * HEADER_BAND
     in_foot = y0 >= raw.height * FOOTER_BAND

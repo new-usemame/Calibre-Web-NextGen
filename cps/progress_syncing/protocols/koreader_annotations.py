@@ -159,7 +159,7 @@ def apply_push(annotations, *, user, book, session, commit,
     from ...services.annotation_portable import apply_portable
     from ...services import annotation_sync
 
-    summary = {"created": 0, "updated": 0, "deleted": 0, "skipped": 0}
+    summary = {"created": 0, "updated": 0, "deleted": 0, "unchanged": 0, "skipped": 0}
     if not isinstance(annotations, list):
         return summary
     for payload in annotations:
@@ -172,7 +172,7 @@ def apply_push(annotations, *, user, book, session, commit,
             deletable_sources=_DELETABLE_SOURCES,
         )
         summary[action] = summary.get(action, 0) + 1
-        if row is None or action == "skipped":
+        if row is None or action in ("skipped", "unchanged"):
             continue
         try:
             if action == "deleted":
@@ -510,10 +510,10 @@ def push_annotations():
     summary["matched"] = True
     log.info(
         "KOReader annotation push: user=%s book=%s document=%s "
-        "created=%s updated=%s deleted=%s skipped=%s (pushed=%s named_deletes=%s)",
+        "created=%s updated=%s deleted=%s unchanged=%s skipped=%s (pushed=%s named_deletes=%s)",
         user.id, book_id, _loggable(document),
         summary.get("created", 0), summary.get("updated", 0),
-        summary.get("deleted", 0), summary.get("skipped", 0),
+        summary.get("deleted", 0), summary.get("unchanged", 0), summary.get("skipped", 0),
         len(annotations), len(deleted_ids),
     )
     if summary.get("skipped"):

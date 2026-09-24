@@ -213,7 +213,7 @@ def test_apply_duplicate_is_suppressed(session):
     }
     _, first = apply_portable(payload, user_id=9, book=_book(), session=session, commit=session.commit)
     _, second = apply_portable(payload, user_id=9, book=_book(), session=session, commit=session.commit)
-    assert (first, second) == ("created", "skipped")
+    assert (first, second) == ("created", "unchanged")
     assert session.query(ub.Annotation).count() == 1
 
 

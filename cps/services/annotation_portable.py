@@ -121,7 +121,10 @@ def apply_portable(payload, *, user_id, book, session, commit,
     ``device_origin_id`` is recorded so the next pull won't echo the row back to
     the device. ``hidden: true`` soft-deletes.
 
-    Returns ``(row, action)`` where action ∈ {created, updated, deleted, skipped}.
+    Returns ``(row, action)`` where action ∈ {created, updated, deleted,
+    unchanged, skipped}. ``unchanged`` is a row sent again exactly as stored,
+    which a device retrying its complete set does on every sync; ``skipped``
+    is a change the server did not store.
     """
     from cps import ub
 
@@ -264,7 +267,10 @@ def apply_portable(payload, *, user_id, book, session, commit,
         row.device_origin_id, bool(row.hidden),
     )
     if not created and before == after:
-        return row, "skipped"
+        # A hide this sender may not make changed nothing because it was
+        # refused, not because it was already so.
+        refused = hidden_requested and not hidden_permitted
+        return row, "skipped" if refused else "unchanged"
 
     row.last_synced = _now()
     try:

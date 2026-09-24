@@ -869,13 +869,18 @@ def read_selected_books():
     vals = request.get_json().get('selections')
     markAsRead = request.get_json().get('markAsRead')
     if vals:
+        marked_read = []
         try:
             for book_id in vals:
-                helper.edit_book_read_status(book_id, markAsRead)
+                if (helper.edit_book_read_status(book_id, markAsRead, sync_hardcover=False) == ""
+                        and markAsRead):
+                    marked_read.append(book_id)
 
         except (OperationalError, IntegrityError, StaleDataError) as e:
             calibre_db.session.rollback()
             log.error_or_exception("Database error: {}".format(e))
+        # One Hardcover task for the selection, not one per book (#2289).
+        helper.queue_hardcover_mark_read(marked_read)
 
         return json.dumps({'success': True})
     return ""

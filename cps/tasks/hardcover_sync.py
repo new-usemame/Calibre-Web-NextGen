@@ -87,11 +87,7 @@ class TaskHardcoverBulkSync(CalibreTask):
                     if not identifiers:
                         self.skipped_no_identifiers += 1
                         continue
-                    if client.get_user_book(identifiers):
-                        self.already_synced += 1
-                    else:
-                        client.add_book(identifiers)
-                        self.synced += 1
+                    self._sync_book(client, identifiers)
                 except Exception as ex:
                     # One bad book must not strand the rest of the batch.
                     self.errors += 1
@@ -101,10 +97,7 @@ class TaskHardcoverBulkSync(CalibreTask):
                 if position + 1 < total and INTER_BOOK_DELAY:
                     time.sleep(INTER_BOOK_DELAY)
 
-            summary = ("Hardcover sync for shelf '{}': {} added, {} already synced, "
-                       "{} without Hardcover identifiers, {} errors").format(
-                self.shelf_name, self.synced, self.already_synced,
-                self.skipped_no_identifiers, self.errors)
+            summary = self._summary()
             self.log.info(summary)
             if self.errors and not (self.synced or self.already_synced):
                 self._handleError(summary)
@@ -113,6 +106,19 @@ class TaskHardcoverBulkSync(CalibreTask):
                 self._handleSuccess()
         finally:
             calibre_db.session.close()
+
+    def _sync_book(self, client, identifiers):
+        if client.get_user_book(identifiers):
+            self.already_synced += 1
+        else:
+            client.add_book(identifiers)
+            self.synced += 1
+
+    def _summary(self):
+        return ("Hardcover sync for shelf '{}': {} added, {} already synced, "
+                "{} without Hardcover identifiers, {} errors").format(
+            self.shelf_name, self.synced, self.already_synced,
+            self.skipped_no_identifiers, self.errors)
 
     @property
     def name(self):
@@ -125,3 +131,34 @@ class TaskHardcoverBulkSync(CalibreTask):
     @property
     def is_cancellable(self):
         return True
+
+
+class TaskHardcoverMarkRead(TaskHardcoverBulkSync):
+    """Mirror a manual "mark as read" to the user's Hardcover library (#2289).
+
+    Marking a book read in the web UI, the new UI, bulk edit or the KOReader
+    library plugin used to reach Kobo and KOReader but never Hardcover, so a
+    user with Hardcover sync on saw nothing there. Marking unread deliberately
+    sends nothing: it would have to guess what to delete from their Hardcover
+    history. Same worker, identifier skip and per-book tolerance as the shelf
+    sync; only the per-book action differs.
+    """
+
+    def __init__(self, token, book_ids,
+                 task_message=N_('Marking books read on Hardcover')):
+        super(TaskHardcoverMarkRead, self).__init__(
+            token, book_ids, None, task_message=task_message)
+
+    def _sync_book(self, client, identifiers):
+        if client.mark_book_read(identifiers):
+            self.synced += 1
+        else:
+            self.errors += 1
+
+    def _summary(self):
+        return ("Hardcover mark-read: {} marked read, "
+                "{} without Hardcover identifiers, {} errors").format(
+            self.synced, self.skipped_no_identifiers, self.errors)
+
+    def __str__(self):
+        return "Hardcover mark-read ({} books)".format(len(self.book_ids))

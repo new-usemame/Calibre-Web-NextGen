@@ -485,7 +485,7 @@
                 </li>
               {% endif %}
               {% for element in sidebar %}
-                {% if element['cc_id'] is defined or (current_user.check_visibility(element['visibility']) and element['public']) %}
+                {% if current_user.check_visibility(element['visibility']) and element['public'] %}
                     <li id="nav_{{element['id']}}" {% if page == element['page'] %}class="active"{% endif %} style="{% if element['id'] == 'duplicates' %}position: relative;{% endif %}">
                       <a href="{% if element['href'] %}{{ element['href'] }}{% else %}{{url_for(element['link'], data=element['page'], sort_param='stored')}}{% endif %}">
                         <span class="glyphicon {{element['glyph']}}"></span> {{_(element['text'])}}

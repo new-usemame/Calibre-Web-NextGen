@@ -267,8 +267,9 @@ def get_custom_column_sidebar_entries():
         from . import calibre_db, db
         if not db.cc_classes:
             return entries
+        hierarchical = calibre_db.get_hierarchical_column_ids()
         for col in calibre_db.get_cc_columns(config):
-            if col.datatype not in ('text', 'enumeration'):
+            if col.datatype not in ('text', 'enumeration') or col.id not in hierarchical:
                 continue
             prop = 'show_cc_%d' % col.id
             if current_user.get_view_property('cc_sidebar', prop) is False:
@@ -301,8 +302,9 @@ def get_custom_column_visibility_options():
         from . import calibre_db, db
         if not db.cc_classes:
             return options
+        hierarchical = calibre_db.get_hierarchical_column_ids()
         for col in calibre_db.get_cc_columns(config):
-            if col.datatype not in ('text', 'enumeration'):
+            if col.datatype not in ('text', 'enumeration') or col.id not in hierarchical:
                 continue
             options.append({
                 'id': col.id,

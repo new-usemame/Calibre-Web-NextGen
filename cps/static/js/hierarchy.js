@@ -46,10 +46,16 @@
             }
         });
 
-        $tree.on('toggle', 'details.hierarchy-details', function () {
-            state[$(this).data('path')] = this.open;
+        // 'toggle' does not bubble, so a delegated jQuery handler never fires;
+        // a capture-phase listener on the container sees every <details>.
+        $tree[0].addEventListener('toggle', function (event) {
+            var details = event.target;
+            if (!details.matches || !details.matches('details.hierarchy-details')) {
+                return;
+            }
+            state[$(details).data('path')] = details.open;
             saveState();
-        });
+        }, true);
 
         $('#hierarchy-expand-all').on('click', function (e) {
             e.preventDefault();

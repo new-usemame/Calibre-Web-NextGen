@@ -2295,19 +2295,17 @@ class CalibreDB:
 
         return cc
 
-    def hierarchical_cc_filter(self, col_id, path):
+    def hierarchical_cc_filter(self, col_id, node):
         """SQLAlchemy filter matching a hierarchy node and all of its descendants.
 
-        Matches:      Computers            (exact leaf)
-                      Computers.DB         (descendant)
-                      Computers.DB.Oracle  (deeper descendant)
-        Does NOT match: ComputersX         (prefix collision guard via trailing '.')
+        Matches the exact stored spellings the tree counted under ``node``
+        (see hierarchy.subtree_values), so ``Computers..DB`` or
+        ``Fiction . Mystery`` list the same books the tree counts, a
+        different-case ``computers.DB`` stays under its own node, and
+        ``ComputersX`` never matches ``Computers``.
         """
         cc = cc_classes[col_id]
-        return or_(
-            cc.value == path,
-            cc.value.like(hierarchy.like_pattern(path), escape=hierarchy.ESCAPE_CHAR)
-        )
+        return cc.value.in_(hierarchy.subtree_values(node))
 
     def get_hierarchical_column_ids(self, ttl=300):
         """Return the set of custom column ids that behave as hierarchies.
@@ -2323,7 +2321,17 @@ class CalibreDB:
         if cached is not None and now - cached[0] < ttl:
             return cached[1]
         ids = set()
-        for cid, cc in cc_classes.items():
+        try:
+            # Only tag-like columns hold dotted paths; int/float/bool/datetime/
+            # rating values are not strings and can never form a hierarchy.
+            text_ids = {row.id for row in self.session.query(CustomColumns.id).filter(
+                CustomColumns.datatype.in_(('text', 'enumeration')))}
+        except OperationalError:
+            return set()
+        for cid in text_ids:
+            cc = cc_classes.get(cid)
+            if cc is None:
+                continue
             try:
                 values = [r[0] for r in self.session.query(cc.value).distinct()]
             except OperationalError:
@@ -2333,21 +2341,11 @@ class CalibreDB:
         self.__class__._hier_cache = (now, ids)
         return ids
 
-    def hierarchical_cc_search_filter(self, col_id, term):
-        """Calibre-style search semantics for hierarchical columns: a term
-        matches the exact value or any of its descendants ('Computers'
-        matches 'Computers' and 'Computers.DB'), case-insensitively.
-        Non-hierarchical columns keep the fuzzy substring behaviour."""
-        cc = cc_classes[col_id]
-        pattern = func.lower(hierarchy.like_pattern(term))
-        return or_(
-            func.lower(cc.value) == func.lower(term),
-            func.lower(cc.value).like(pattern, escape=hierarchy.ESCAPE_CHAR)
-        )
-
-    def get_hierarchical_tree(self, col_id, apply_common_filters=True):
+    def get_hierarchical_tree(self, col_id, apply_common_filters=True, book_filter=None):
         """Return the nested tree (list of root nodes) for custom column `col_id`,
-        honouring user visibility filters. See cps/hierarchy.py for the node shape.
+        honouring user visibility filters (``book_filter`` replaces the default
+        ``common_filters()``, e.g. OPDS's shelf restriction). See
+        cps/hierarchy.py for the node shape.
         """
         cc = cc_classes.get(col_id)
         if cc is None:
@@ -2357,14 +2355,16 @@ class CalibreDB:
             .select_from(Books)
             .join(rel)
             .distinct())
-        if apply_common_filters:
+        if book_filter is not None:
+            q = q.filter(book_filter)
+        elif apply_common_filters:
             q = q.filter(self.common_filters())
         try:
             rows = q.all()
         except OperationalError:
             log.error("Failed to read custom column %s for hierarchy tree", col_id)
             return []
-        return hierarchy.parse_tag_hierarchy([r[1] for r in rows])
+        return hierarchy.parse_tag_hierarchy([(r[0], r[1]) for r in rows])
 
     # read search results from calibre-database and return it (function is used for feed and simple search
     def get_search_results(self, term, config, offset=None, order=None, limit=None, *join,

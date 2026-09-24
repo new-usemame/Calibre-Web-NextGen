@@ -735,7 +735,9 @@ def render_books_list(data, sort_param, book_id, page):
             col_id = int(data[3:])
         except ValueError:
             abort(404)
-        return render_cc_category(page, col_id, book_id or '', order)
+        # books_list defaults book_id to the integer 1 when no node is named
+        path = book_id if isinstance(book_id, str) else ''
+        return render_cc_category(page, col_id, path, order)
     elif data == "language":
         return render_language_books(page, book_id, order)
     elif data == "archived":
@@ -2489,30 +2491,33 @@ def cc_category_list(column_id, category_path):
     /custom_column/5/Computers           -> books under 'Computers' (+ descendants)
     /custom_column/5/Computers/DB        -> books under 'Computers.DB'
     """
-    if column_id not in db.cc_classes:
-        abort(404)
-    col = calibre_db.session.query(db.CustomColumns).filter(
-        db.CustomColumns.id == column_id).first()
-    if not col or col.datatype not in ('text', 'enumeration'):
-        abort(404)
     order = get_sort_function(request.args.get('sort_param', 'stored'), 'cc_%d' % column_id)
     return render_cc_category(request.args.get('page', 1), column_id,
                               category_path, order)
 
 
+def browsable_cc_column(col_id):
+    """The tag-like custom column ``col_id`` if this library lets it be
+    browsed: it exists, is text/enumeration, and is not hidden by the admin."""
+    for col in calibre_db.get_cc_columns(config):
+        if col.id == col_id and col.datatype in ('text', 'enumeration'):
+            return col
+    return None
+
+
 def render_cc_category(page, col_id, path, order):
     """Render either the tree overview (no path) or the filtered book list
     for one node of a hierarchical custom column."""
-    if col_id not in db.cc_classes:
+    # Custom columns are part of the Categories section, and a column the
+    # admin hid (config_columns_to_ignore) is not browsable by URL either.
+    if not current_user.check_visibility(constants.SIDEBAR_CATEGORY):
         abort(404)
-    col = calibre_db.session.query(db.CustomColumns).filter(
-        db.CustomColumns.id == col_id).first()
-    if not col or col.datatype not in ('text', 'enumeration'):
+    col = browsable_cc_column(col_id)
+    if col is None:
         abort(404)
 
-    # Flask's <path:...> converter captures slashes; our separator is '.'
-    path = (path or '').replace('/', hierarchy.SEPARATOR)
-    path = hierarchy.join_path([path])
+    # '/' is part of a value ("Sci-Fi/Fantasy"), never a separator.
+    path = hierarchy.join_path([path or ''])
 
     try:
         page = int(page)
@@ -2528,7 +2533,7 @@ def render_cc_category(page, col_id, path, order):
         entries, random, pagination = calibre_db.fill_indexpage(
             page, 0,
             db.Books,
-            cc_rel.any(calibre_db.hierarchical_cc_filter(col_id, path)),
+            cc_rel.any(calibre_db.hierarchical_cc_filter(col_id, node)),
             # The FULL shared ORDER BY, tiebreaker included (#1331). Slicing
             # order[0][0] out of it dropped Books.id and made paging inside a
             # node plan-dependent; series context is already inside the
@@ -2544,7 +2549,8 @@ def render_cc_category(page, col_id, path, order):
             'index.html', random=random, entries=entries, pagination=pagination,
             id=path,
             title=_("%(column)s: %(name)s", column=col.name, name=path),
-            page="category", order=order[1],
+            # Sort and paging links route back through books_list's cc_ branch
+            page="cc_%d" % col_id, order=order[1],
             breadcrumbs=[[ (col.name, '') ] + hierarchy.breadcrumb_trail(path)],
             subcategories=node['children'], col_id=col_id)
 
@@ -3346,7 +3352,7 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
             for option in get_custom_column_visibility_options():
                 key = 'show_cc_%d' % option['id']
                 current_user.set_view_property('cc_sidebar', key,
-                                               to_save.get(key) == 'on')
+                                               to_save.get(key) == 'on', commit=False)
         except Exception:
             log.error("Could not save custom column sidebar visibility", exc_info=True)
         # A stored locale is returned verbatim by get_locale() on every later
@@ -4122,6 +4128,7 @@ def show_book(book_id):
                                      original_filename=(original_filename_row.filename
                                                         if original_filename_row else None),
                                      cc=cc,
+                                     hierarchical_cc_ids=calibre_db.get_hierarchical_column_ids(),
                                      is_xhr=request.headers.get('X-Requested-With') == 'XMLHttpRequest',
                                      title=entry.title,
                                      books_shelfs=book_in_shelves,

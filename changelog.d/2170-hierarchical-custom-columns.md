@@ -1,18 +1,8 @@
-## Overview
+### Added
 
-Calibre supports subgroups via custom columns. ref: https://manual.calibre-ebook.com/sub_groups.html
-This PR adds support for browsing Calibre custom columns containing hierarchical values using Calibre's `.` separator convention.
-
-The change introduces:
-
-- Generic hierarchical custom-column detection
-- Hierarchy parsing and tree construction
-- Detection of actual hierarchical value sets rather than assuming every dotted value is hierarchical
-- Hierarchical descendant filtering
-- Hierarchical search semantics
-- Tree-based browsing in the web UI
-- Breadcrumb navigation
-- Per-user sidebar visibility for custom columns
-- OPDS navigation for hierarchical custom columns
-- Expand/collapse state persistence in the browser
-- Support for arbitrary text/enumeration custom columns
+- **Custom columns that use Calibre's dotted sub-groups can be browsed as a tree in the classic UI
+  and over OPDS.** A value like `Computers.DB.Oracle` now shows under Computers › DB › Oracle, and
+  opening a level lists its books together with everything filed beneath it. Each such column
+  gets its own sidebar entry, which you can switch off per column on your profile page, and appears
+  in the OPDS catalog root. Columns whose values merely contain a dot (Dewey `778.3`) stay flat.
+  Contributed by @Rol3333.

@@ -50,11 +50,15 @@ def parse_tag_hierarchy(values):
         {'name': 'DB', 'path': 'Computers.DB', 'count': 1,
          'total_count': 2, 'children': [...]}
 
-    ``count`` counts direct hits on the exact value, ``total_count``
-    aggregates the counts of the whole subtree (including the node itself).
+    ``values`` holds plain strings or ``(book_id, value)`` pairs. ``count``
+    counts direct hits on the exact value, ``total_count`` the distinct books
+    in the whole subtree (a book filed under both ``X.Y`` and ``X.Y.Z`` counts
+    once for ``X``). ``raw_values`` keeps the stored spellings that normalise
+    to the node, so a lookup can match exactly what the tree counted.
     """
     roots = {}
-    for value in values:
+    for index, item in enumerate(values):
+        book, value = item if isinstance(item, tuple) else (('anon', index), item)
         if not value:
             continue
         parts = split_path(value)
@@ -64,9 +68,12 @@ def parse_tag_hierarchy(values):
             path = part if i == 0 else path + SEPARATOR + part
             node = node_map.setdefault(part, {'name': part, 'path': path,
                                               'id': None, 'count': 0,
-                                              'children': {}})
+                                              'children': {}, 'books': set(),
+                                              'raw_values': set()})
             if i == len(parts) - 1:
                 node['count'] += 1          # direct hits only
+                node['books'].add(book)
+                node['raw_values'].add(value)
             node_map = node['children']
     return _finalize(list(roots.values()))
 
@@ -76,9 +83,20 @@ def _finalize(nodes):
     nodes.sort(key=lambda n: n['name'].lower())
     for node in nodes:
         node['children'] = _finalize(list(node['children'].values()))
-        node['total_count'] = node['count'] + sum(c['total_count']
-                                                  for c in node['children'])
+        for child in node['children']:
+            node['books'] |= child['books']
+        node['total_count'] = len(node['books'])
     return nodes
+
+
+def subtree_values(node):
+    """Every stored value counted under ``node``, descendants included."""
+    found, stack = set(), [node]
+    while stack:
+        current = stack.pop()
+        found |= current['raw_values']
+        stack.extend(current['children'])
+    return sorted(found)
 
 
 def get_node_by_path(tree, path):
@@ -134,5 +152,13 @@ def is_hierarchical_value_set(values):
     on dot-containing but flat value sets (Dewey '778.3', LCC 'QA76.76.C68').
     """
     vset = {v.strip() for v in values if v}
-    return any(any(other.startswith(v + SEPARATOR) for other in vset)
-               for v in vset)
+    # A value has a descendant exactly when some value's text up to one of its
+    # separators is itself a stored value. One pass over each value instead of
+    # comparing every pair keeps a column with thousands of values cheap.
+    for other in vset:
+        start = other.find(SEPARATOR)
+        while start != -1:
+            if other[:start] in vset:
+                return True
+            start = other.find(SEPARATOR, start + 1)
+    return False

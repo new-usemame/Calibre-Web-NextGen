@@ -83,9 +83,15 @@ def _now():
 # ---------------------------------------------------------------------------
 
 
-def build_pull_payload(user_id: int, book_id: int, session) -> dict:
+def build_pull_payload(user_id: int, book_id: int, session, *,
+                       book=None, book_format=None) -> dict:
     """Portable annotations for one user + book, INCLUDING hidden rows so the
-    device can mirror deletions locally."""
+    device can mirror deletions locally.
+
+    ``book``/``book_format`` identify the file the device holds (the format its
+    checksum matched); with them, highlights anchored only by a CFI also carry
+    the XPointers KOReader needs to place them (see ``_add_device_xpointers``).
+    """
     from ...services.annotation_portable import to_portable
     rows = (
         session.query(ub.Annotation)
@@ -94,7 +100,47 @@ def build_pull_payload(user_id: int, book_id: int, session) -> dict:
         .all()
     )
     annotations = [to_portable(r) for r in rows]
+    if book is not None and book_format:
+        _add_device_xpointers(rows, annotations, book, book_format)
     return {"annotations": annotations, "annotation_count": len(annotations)}
+
+
+def _add_device_xpointers(rows, annotations, book, book_format) -> None:
+    """Put crengine XPointers on pulled highlights that only have a CFI (#324).
+
+    A highlight made in the web reader (or a Kobo one with a computed CFI) is
+    stored as a CFI, which KOReader cannot place. The device applies any pulled
+    highlight carrying ``start_xpointer``/``end_xpointer``, so derive them here
+    per request -- they belong to the device's file, not to the row, and a
+    replaced book simply derives again. ``position_type`` and ``cfi_range`` are
+    left as stored.
+
+    Only a CFI expressed against the very file the device holds is converted
+    (the web reader's CFIs are EPUB coordinates, a Kobo row's may be KEPUB), and
+    ``derive_xpointers`` refuses unless the result frames the row's
+    ``highlighted_text`` -- a near miss is dropped here, not drawn on the wrong
+    words.
+    """
+    from ...annotations import _book_format_path, _cfi_source_path
+    from ...services.koreader_xpointer import derive_xpointers
+
+    device_path = _book_format_path(book, book_format)
+    if not device_path:
+        return
+    for row, wire in zip(rows, annotations):
+        if (row.hidden or not row.cfi_range or not row.highlighted_text
+                or wire.get("start_xpointer") or wire.get("end_xpointer")):
+            continue
+        try:
+            if _cfi_source_path(row, book) != device_path:
+                continue
+            pair = derive_xpointers(device_path, row.cfi_range, row.highlighted_text)
+        except Exception:  # pragma: no cover - a derived anchor is optional
+            log.warning("KOReader pull: could not derive XPointers for %s",
+                        row.annotation_id, exc_info=True)
+            continue
+        if pair:
+            wire["start_xpointer"], wire["end_xpointer"] = pair
 
 
 def apply_push(annotations, *, user, book, session, commit,
@@ -283,7 +329,7 @@ def pull_annotations(document: str):
     if not is_valid_key_field(document):
         return _reject(user, document, ERROR_DOCUMENT_FIELD_MISSING, "Invalid document field")
 
-    book_id, _fmt, _title, _path, _ver = get_book_by_checksum(document)
+    book_id, book_format, _title, _path, _ver = get_book_by_checksum(document)
     if not book_id:
         # Unknown book: empty set, not an error (the device may have a book the
         # server doesn't know yet). Logged because from the device's side this
@@ -313,7 +359,14 @@ def pull_annotations(document: str):
             "book_known": False,
         })
 
-    payload = build_pull_payload(user.id, book_id, ub.session)
+    from ... import calibre_db
+    try:
+        book = calibre_db.get_book(book_id)
+    except Exception:  # pragma: no cover - XPointer derivation is optional
+        log.warning("KOReader annotation pull: book %s lookup failed", book_id, exc_info=True)
+        book = None
+    payload = build_pull_payload(user.id, book_id, ub.session,
+                                 book=book, book_format=book_format)
     payload["document"] = document
     payload["calibre_book_id"] = book_id
     # See the unmatched branch above: present-and-true is what lets a client

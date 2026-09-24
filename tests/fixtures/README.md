@@ -50,6 +50,22 @@ python generate_synthetic.py
 
 This creates minimal valid and intentionally corrupted files for edge case testing.
 
+## KOReader positions (`koreader_xpointer/`)
+
+Ground truth for the CFI <-> KOReader XPointer converter (`cps/services/koreader_xpointer.py`, #324),
+taken from KOReader itself rather than written by hand:
+
+- `metamorphosis-221.epub`, `alice-222.epub` - the Project Gutenberg EPUBs of *Metamorphosis* and
+  *Alice's Adventures in Wonderland* (public domain), exactly as a CWNG library served them.
+- `<book>.pages.json` - the XPointer KOReader 2026.07.1 recorded at the top of every page of each book
+  on a Kindle, with the text that page starts with, read through KOReader's HTTP inspector plugin.
+- `probe.epub` - a small synthetic book built by `engine/make_probe.py` to hit each crengine
+  text-node rule (whitespace-only nodes, inline vs block siblings, hidden elements, entities).
+- `engine-words.json` - word ranges reported by KOReader's own crengine for the three books above, from
+  `engine/probe.lua` run inside the KOReader linux-arm64 release by `engine/run-probe.sh`.
+- `rig-web-rows.json`, `rig-engine-check.json` - two highlights as stored by a test server (one made on
+  the Kindle, one in the web reader) and crengine's text for each.
+
 ## File Size Considerations
 
 - Total fixture size: ~5-10 MB

@@ -2015,36 +2015,76 @@ def _resolve_book_or_404(book_id: int):
     return book
 
 
+def _book_format_path(book, book_format) -> Optional[str]:
+    """On-disk file of one EPUB-family format (``EPUB``/``KEPUB``) of a book,
+    mirroring ``cps/web.py``'s serve_book lookup; ``None`` when absent."""
+    from . import config
+
+    wanted = (book_format or "").upper()
+    if wanted not in ("EPUB", "KEPUB"):
+        return None
+    for fmt in getattr(book, "data", None) or []:
+        if (fmt.format or "").upper() != wanted:
+            continue
+        path = os.path.join(config.get_book_path(), book.path, fmt.name + "." + wanted.lower())
+        if os.path.isfile(path):
+            return path
+    return None
+
+
 def _resolve_epub_path(book) -> Optional[str]:
-    """Find the on-disk EPUB file for a book — mirrors the lookup
-    pattern in ``cps/web.py``'s serve_book. Returns ``None`` if no
+    """Find the on-disk EPUB file for a book. Returns ``None`` if no
     EPUB/KEPUB format exists or the file is missing on disk.
 
     Prefers KEPUB: Kobo highlights anchor on KoboSpan ids, which only
     exist in the kepub. A plain EPUB has no KoboSpans, so computing a
     CFI against it would never resolve the anchor."""
-    from . import config
+    return _book_format_path(book, "KEPUB") or _book_format_path(book, "EPUB")
 
-    def _disk_path(fmt):
-        ext = (fmt.format or "").upper()
-        if ext not in ("EPUB", "KEPUB"):
-            return None
-        path = os.path.join(config.get_book_path(), book.path, fmt.name + "." + ext.lower())
-        return path if os.path.isfile(path) else None
 
-    data = book.data or []
-    # KEPUB first (carries KoboSpans), then any EPUB as a fallback.
-    for fmt in data:
-        if (fmt.format or "").upper() == "KEPUB":
-            p = _disk_path(fmt)
-            if p:
-                return p
-    for fmt in data:
-        if (fmt.format or "").upper() == "EPUB":
-            p = _disk_path(fmt)
-            if p:
-                return p
-    return None
+def _has_native_kobo_anchor(row) -> bool:
+    """True when the row's CFI is derived server-side from a Kobo anchor."""
+    from .services.kobo_position import _extract_kobospan_id, KOBO_SELECTOR_SENTINEL
+    if (_extract_kobospan_id(row.start_container_path or "")
+            and _extract_kobospan_id(row.end_container_path or "")):
+        return True
+    start_child = getattr(row, "start_container_child_index", None)
+    end_child = getattr(row, "end_container_child_index", None)
+    return (start_child is not None and end_child is not None
+            and start_child != KOBO_SELECTOR_SENTINEL
+            and end_child != KOBO_SELECTOR_SENTINEL)
+
+
+def _cfi_source_path(row, book) -> Optional[str]:
+    """The file a row's ``cfi_range`` is expressed against.
+
+    A Kobo-anchored row's CFI is computed here from the KEPUB when there is
+    one; every other CFI comes from the web reader, which renders the EPUB.
+    """
+    if _has_native_kobo_anchor(row):
+        return _resolve_epub_path(book)
+    return _book_format_path(book, "EPUB")
+
+
+def _compute_koreader_cfi(row, book) -> Optional[str]:
+    """Web-reader CFI for a KOReader highlight (crengine XPointers, #324).
+
+    Resolved against the EPUB the web reader renders, and only when the
+    passage between the two points is the row's highlighted text: XPointers
+    taken from a KEPUB or an older copy of the book give ``None``.
+    """
+    if not row.start_xpointer or not row.end_xpointer:
+        return None
+    epub_path = _book_format_path(book, "EPUB")
+    if not epub_path:
+        return None
+    from .services.koreader_xpointer import derive_cfi_range
+    try:
+        return derive_cfi_range(epub_path, row.start_xpointer, row.end_xpointer,
+                                row.highlighted_text)
+    except Exception as e:
+        log.warning("annotations: xpointer->cfi failed for %s: %s", row.annotation_id, e)
+        return None
 
 
 def _compute_annotation_cfi(row, book) -> Optional[str]:
@@ -2118,19 +2158,17 @@ def _resolve_annotation_anchor(row, book):
         return None, "ok" if row.pdf_page is not None and row.pdf_quad_json else "unresolved"
     if position_type == "comic_page":
         return None, "ok" if row.comic_page is not None else "unresolved"
+    if position_type == "koreader_xpointer":
+        # A KOReader highlight's native anchor is its XPointer pair. Like a
+        # KoboSpan anchor it is re-resolved on every read, so a replaced EPUB
+        # cannot keep serving a CFI that frames other words.
+        current_cfi = _compute_koreader_cfi(row, book)
+        if current_cfi:
+            _persist_cfi_range(row, current_cfi)
+            return current_cfi, "ok"
+        return row.cfi_range, "unresolved"
 
-    from .services.kobo_position import _extract_kobospan_id, KOBO_SELECTOR_SENTINEL
-    has_selector = bool(
-        _extract_kobospan_id(row.start_container_path or "")
-        and _extract_kobospan_id(row.end_container_path or "")
-    )
-    start_child = getattr(row, "start_container_child_index", None)
-    end_child = getattr(row, "end_container_child_index", None)
-    has_child_anchor = (
-        start_child is not None and end_child is not None
-        and start_child != KOBO_SELECTOR_SENTINEL and end_child != KOBO_SELECTOR_SENTINEL
-    )
-    if has_selector or has_child_anchor:
+    if _has_native_kobo_anchor(row):
         current_cfi = _compute_annotation_cfi(row, book)
         if current_cfi:
             _persist_cfi_range(row, current_cfi)

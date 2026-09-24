@@ -71,10 +71,15 @@ function Setup.pairingOutcome(ok, body, reason, fallback_server)
         if status == "approved" then
             if type(body.username) == "string" and body.username ~= ""
                     and type(body.password) == "string" and body.password ~= "" then
+                -- The address this device reached the server at, not the one
+                -- the server reports for itself: behind a proxy that does not
+                -- pass on its scheme and host, that is an inside address, or
+                -- plain http where the device used https, and the app
+                -- password would go out in the clear from then on.
                 return {
                     state = "approved",
                     credentials = {
-                        server = Setup.normalizeServer(body.server) or fallback_server,
+                        server = fallback_server or Setup.normalizeServer(body.server),
                         username = body.username,
                         password = body.password,
                     },

@@ -53,16 +53,21 @@ local function testReadyMadeBundleNeedsServerAndCredentials()
 end
 
 local function testPairingOutcomes()
+    -- Behind a proxy that does not pass on its scheme and host, the server
+    -- calls itself by an inside, plain-http address.
     local approved = Setup.pairingOutcome(true,
-        { status = "approved", server = "http://srv:8083/", username = "reader", password = "app" },
-        nil, "http://fallback")
+        { status = "approved", server = "http://cwng:8083/", username = "reader", password = "app" },
+        nil, "https://books.example.com")
     assertEqual(approved.state, "approved", "approved")
-    assertEqual(approved.credentials.server, "http://srv:8083", "server from approval")
+    assertEqual(approved.credentials.server, "https://books.example.com", "the address the device reached is kept")
     assertEqual(approved.credentials.password, "app", "password handed over")
 
     local no_server = Setup.pairingOutcome(true,
         { status = "approved", username = "reader", password = "app" }, nil, "http://typed")
-    assertEqual(no_server.credentials.server, "http://typed", "falls back to the address it asked")
+    assertEqual(no_server.credentials.server, "http://typed", "the address it asked")
+    local only_reported = Setup.pairingOutcome(true,
+        { status = "approved", server = "http://srv:8083/", username = "reader", password = "app" })
+    assertEqual(only_reported.credentials.server, "http://srv:8083", "the server's own, when nothing else is known")
 
     assertEqual(Setup.pairingOutcome(true, { status = "approved", username = "reader" }).state,
         "error", "approval without a password is not a connection")

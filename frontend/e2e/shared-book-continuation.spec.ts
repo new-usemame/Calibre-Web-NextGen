@@ -46,12 +46,15 @@ test('a public shelf offers reading and downloads without adding personal member
     const response = await page.request.get((await download.getAttribute('href'))!);
     expect(response.ok()).toBeTruthy();
     expect((await response.body()).length).toBeGreaterThan(0);
-    // Reading through a public shelf never offers membership changes.
+    // Reading through a public shelf never offers membership changes, nor a
+    // private cover: the server keeps one only for the reader's own books.
     await expect(page.getByTestId('remove-from-my-library')).toHaveCount(0);
+    await expect(page.getByTestId('edit-cover-action')).toHaveCount(0);
     await page.getByTestId('book-actions-menu').click();
     const menu = page.getByTestId('book-actions-menu-list');
     await expect(menu).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: 'Add to library', exact: true })).toHaveCount(0);
+    await expect(menu.getByRole('menuitem', { name: 'Edit cover…', exact: true })).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
     await page.getByRole('link', { name: 'Read now', exact: true }).click();
@@ -73,21 +76,39 @@ test('a public shelf offers reading and downloads without adding personal member
     const detail = await (await page.request.get(`/api/v1/books/${selected.id}`)).json();
     expect(detail.in_my_library).toBe(false);
     expect(detail.accessible_via_public_shelf).toBe(true);
-    // The classic book page opens the shared book as well, but offers Send to
-    // eReader only for books in the reader's own library, which is where
-    // sending looks; for the shared book the button could only fail.
+    // The reader's own book keeps its cover editor.
+    await page.goto(`/app/book/${member.id}`);
+    await expect(page.getByTestId('edit-cover-action')).toBeVisible();
+    // The classic book page opens the shared book as well, but keeps sending
+    // and the library's own controls for the reader's library, as the new UI
+    // does: sending looks there, and the book is not theirs to mark or remove.
     expect((await page.request.post('/api/v1/account/profile', {
       headers: await csrf(page), data: { kindle_mail: 'shared-reader@example.com' },
     })).ok()).toBeTruthy();
+    // A private shelf of the reader's own gives the page a shelf to offer.
+    const ownShelf = await page.request.post('/api/v1/shelves', {
+      headers: await csrf(page), data: { name: `Own shelf ${secondaryUser.username}`, is_public: false },
+    });
+    expect(ownShelf.ok()).toBeTruthy();
     const origin = new URL(page.url()).origin;
     await page.context().addCookies([{ name: 'cwng_prefer_spa', value: '0', url: origin }]);
+    const libraryControls = ['#sendToEReaderBtn', '#toggle-read-btn', '#toggle-favorite-btn',
+      '#toggle-archive-btn', '#remove-from-my-library-btn', '#toggle-hide-btn', '#addShelfMenu',
+      '#add-shelf-pill'];
     await page.goto(`/book/${selected.id}`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#title')).toHaveText(selected.title);
-    await expect(page.locator('#sendToEReaderBtn')).toHaveCount(0);
+    for (const control of libraryControls) {
+      await expect(page.locator(control), control).toHaveCount(0);
+    }
     await page.goto(`/book/${member.id}`, { waitUntil: 'domcontentloaded' });
     await expect(page.locator('#title')).toHaveText(member.title);
-    await expect(page.locator('#sendToEReaderBtn')).toBeAttached();
+    for (const control of libraryControls) {
+      await expect(page.locator(control), control).toBeAttached();
+    }
     await page.context().clearCookies({ name: 'cwng_prefer_spa' });
+    expect((await page.request.post(`/api/v1/shelves/${(await ownShelf.json()).id}/delete`, {
+      headers: await csrf(page),
+    })).ok()).toBeTruthy();
     expect((await admin.request.post(`/api/v1/admin/users/${secondaryUser.id}`, {
       headers, data: { roles: { viewer: false, download: false } },
     })).ok()).toBeTruthy();

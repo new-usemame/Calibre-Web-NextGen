@@ -2,9 +2,12 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Account-wide browser attribution and preservation of pre-upgrade sources.
 
-Old device rows remain as aliases, retaining their original public IDs and
-transport telemetry. Only the canonical row participates in source selection.
-The created_by markers are internal; neither is accepted from a client.
+Old device rows remain as aliases, retaining their original public IDs,
+transport telemetry and observations. An account with one old row keeps it as
+its Browser; an account with several gains a new Browser row, so merging never
+overwrites an old row's own observations. Only the canonical row participates
+in source selection. The created_by markers are internal; neither is accepted
+from a client.
 """
 
 import re
@@ -37,6 +40,24 @@ def _rows(conn, table, ids, order="id"):
     ).bindparams(bindparam("ids", expanding=True)), {"ids": ids}).mappings().all()
 
 
+def _new_account_browser(conn, like):
+    """Insert an account Browser that copies ``like``'s descriptive columns.
+
+    Only the new row receives merged observations, so every original row,
+    ``like`` included, keeps its own history untouched as an alias.
+    """
+    columns = [c for c in like if c not in ("id", "public_id", "created_by")]
+    conn.execute(text(
+        f"INSERT INTO device (public_id, created_by, {', '.join(columns)}) "
+        f"VALUES (:public_id, :created_by, {', '.join(':' + c for c in columns)})"
+    ), {**{c: like[c] for c in columns},
+        "public_id": str(uuid.uuid4()), "created_by": ACCOUNT_BROWSER})
+    return conn.execute(text(
+        "SELECT * FROM device WHERE user_id=:user AND kind='webreader' "
+        "AND created_by=:created_by"
+    ), {"user": like["user_id"], "created_by": ACCOUNT_BROWSER}).mappings().one()
+
+
 def _copy_latest(conn, table, key, clock, ids, canonical_id, *, combine_latch=False):
     """Copy whole latest observations; retain alias rows as historical evidence."""
     winners = {}
@@ -64,7 +85,8 @@ def migrate_account_browser_source(engine):
 
 Run after the annotation/device schema migrations. A completed account is
 skipped on subsequent boots, so historical alias telemetry cannot overwrite
-new reading activity. No device rows or annotation content are deleted.
+new reading activity. No device rows or annotation content are deleted, and
+no pre-upgrade source's own observations are overwritten.
 """
     with engine.begin() as conn:
         # Acquire SQLite's writer reservation before choosing canonical rows.
@@ -108,16 +130,24 @@ new reading activity. No device rows or annotation content are deleted.
                     "SELECT * FROM device WHERE user_id=:user AND kind='webreader' "
                     "AND created_by='account-browser'"
                 ), {"user": user_id}).mappings().all()
-            canonical = devices[0]
-            canonical_id = canonical["id"]
+            preferred = devices[0]
             ids = [d["id"] for d in devices]
-            aliases = ids[1:]
+            canonical = preferred
+            if preferred["created_by"] != ACCOUNT_BROWSER and len(devices) > 1:
+                # Merging into one of several sources would replace that
+                # source's own older observations with newer ones from the
+                # others (a laptop's 80% by a phone's later 10%) and keep them
+                # nowhere. A new Browser receives the merge instead, so every
+                # original, the oldest included, keeps its rows as an alias.
+                canonical = _new_account_browser(conn, preferred)
+            canonical_id = canonical["id"]
+            aliases = [i for i in ids if i != canonical_id]
             conn.execute(text(
                 "UPDATE annotation SET origin_device_id=:canonical WHERE user_id=:user "
                 "AND source='webreader' AND origin_device_id IS NULL"
             ), {"canonical": canonical_id, "user": user_id})
-            label = canonical["display_name"]
-            if canonical["created_by"] == "auto" and re.fullmatch(r"Web reader(?: \d+)?", label or ""):
+            label = preferred["display_name"]
+            if preferred["created_by"] == "auto" and re.fullmatch(r"Web reader(?: \d+)?", label or ""):
                 label = "Browser"
             conn.execute(text(
                 "UPDATE device SET created_by='account-browser', display_name=:label, "

@@ -30,6 +30,22 @@ def _snapshot(conn, table):
     return [dict(r) for r in conn.execute(text(f"SELECT * FROM {table} ORDER BY id")).mappings()]
 
 
+OBSERVATIONS = ("device_reading_position", "annotation_device_state", "device_retired_assignment")
+
+
+def _observations(conn, device_ids):
+    """Every row a source owns in the tables the merge writes."""
+    return {table: [dict(r) for r in conn.execute(text(
+        f"SELECT * FROM {table} WHERE device_id IN ({', '.join(map(str, device_ids))}) ORDER BY id"
+    )).mappings()] for table in OBSERVATIONS}
+
+
+def _browser(session, user_id):
+    from cps import ub
+    return session.query(ub.Device).filter_by(
+        user_id=user_id, kind="webreader", created_by="account-browser").one()
+
+
 def test_populated_upgrade_preserves_content_positions_aliases_and_routing(db, monkeypatch):
     from cps import ub, annotations
     from cps.services.browser_source import migrate_account_browser_source
@@ -41,7 +57,7 @@ def test_populated_upgrade_preserves_content_positions_aliases_and_routing(db, m
     kobo = ub.Device(user_id=7, kind="kobo", display_name="Clara")
     other = ub.Device(user_id=8, kind="webreader", display_name="Custom source", active=False)
     session.add_all(browsers + [kobo, other]); session.flush()
-    canonical, alias, retired = browsers
+    oldest, alias, retired = browsers
     rows = [ub.Annotation(
         user_id=7, book_id=10 + i, annotation_id=f"kept-{i}",
         source="webreader", highlighted_text=f"passage {i}", note_text=f"note {i}",
@@ -72,13 +88,19 @@ def test_populated_upgrade_preserves_content_positions_aliases_and_routing(db, m
         before = _snapshot(conn, "annotation")
         bookmark = _snapshot(conn, "bookmark")
         hardware = dict(conn.execute(text("SELECT * FROM device WHERE id=:id"), {"id": kobo.id}).mappings().one())
+        originals = _observations(conn, [d.id for d in browsers])
     migrate_account_browser_source(engine)
     session.expire_all()
-    assert session.query(ub.Device).filter_by(kind="webreader", active=True).count() == 1
+    canonical = _browser(session, 7)
+    assert session.query(ub.Device).filter_by(kind="webreader", active=True).all() == [canonical]
     assert canonical.display_name == "Browser"
+    assert [(d.active, d.created_by) for d in browsers] == [(False, "browser-alias")] * 3
     assert other.display_name == "Custom source" and not other.active
     assert session.query(ub.Device).filter_by(user_id=9).count() == 0
-    assert session.query(ub.Device).count() == 5  # aliases retained, not deleted
+    assert session.query(ub.Device).count() == 6  # a new Browser; every original kept as an alias
+    with engine.connect() as conn:
+        # Each original keeps its own observations, the oldest's 80% included.
+        assert _observations(conn, [d.id for d in browsers]) == originals
     position = session.query(ub.DeviceReadingPosition).filter_by(device_id=canonical.id, book_id=10).one()
     assert (position.progress_percent, position.cfi, position.location_value) == (20, "position-2", "location-2")
     assert position.client_modified_at == now + timedelta(hours=2)
@@ -91,7 +113,7 @@ def test_populated_upgrade_preserves_content_positions_aliases_and_routing(db, m
         assert conn.execute(text("PRAGMA foreign_key_check")).all() == []
     for original, current in zip(before, after):
         for col in ("origin_device_id", "assigned_device_id", "last_editor_device_id"):
-            if original[col] in {alias.id, retired.id}:
+            if original[col] in {oldest.id, alias.id, retired.id}:
                 original[col] = canonical.id
         assert current == original  # includes every content field, clock, revision
     assert annotations._owned_device(old_public, 7, session).id == canonical.id
@@ -99,7 +121,7 @@ def test_populated_upgrade_preserves_content_positions_aliases_and_routing(db, m
     assert resolve_owned_device_best_effort(user_id=7, public_id=old_public) == canonical.id
     assert resolve_owned_device_best_effort(user_id=8, public_id=old_public) is None
     public_ids, choices = annotations._annotation_device_payload(7, session, include_assignable=True)
-    assert alias.id not in public_ids and old_public not in choices
+    assert {oldest.id, alias.id}.isdisjoint(public_ids) and old_public not in choices
     assert [v["type"] for v in choices.values()].count("webreader") == 1
     # An old restore request must not steal an assignment made to the Clara.
     monkeypatch.setattr(annotations, "_device_visibility_scopes", lambda *a: {7: frozenset((10, 11, 12))})
@@ -204,3 +226,93 @@ def test_first_browser_source_is_not_committed_before_its_outer_transaction(db):
     session.rollback()
     with engine.connect() as observer:
         assert observer.execute(text("SELECT COUNT(*) FROM device")).scalar() == 0
+
+
+def test_an_older_further_position_survives_a_later_lower_report(db):
+    """The laptop read to 80%, then the phone reported 10%: both stay stored."""
+    from cps import ub
+    from cps.services.browser_source import migrate_account_browser_source
+    engine, session = db
+    laptop, phone = (ub.Device(user_id=7, kind="webreader", display_name=name, created_by="auto")
+                     for name in ("Web reader", "Web reader 2"))
+    session.add_all([laptop, phone]); session.flush()
+    noon = datetime(2026, 9, 20, 12)
+    for device, percent, cfi, at in ((laptop, 80.0, "epubcfi(/6/40!/4/2:4)", noon),
+                                     (phone, 10.0, "epubcfi(/6/8!/4/2:4)", noon + timedelta(hours=1))):
+        session.add(ub.DeviceReadingPosition(device_id=device.id, book_id=5, progress_percent=percent,
+                                             cfi=cfi, client_modified_at=at, server_modified_at=at))
+    session.commit()
+    migrate_account_browser_source(engine)
+    migrate_account_browser_source(engine)
+    session.expire_all()
+    positions = {(p.device_id, p.progress_percent, p.cfi)
+                 for p in session.query(ub.DeviceReadingPosition).filter_by(book_id=5)}
+    browser = _browser(session, 7)
+    assert positions == {
+        (laptop.id, 80.0, "epubcfi(/6/40!/4/2:4)"),
+        (phone.id, 10.0, "epubcfi(/6/8!/4/2:4)"),
+        (browser.id, 10.0, "epubcfi(/6/8!/4/2:4)"),  # the Browser shows the latest report
+    }
+
+
+def test_a_browser_that_already_exists_stays_the_one_source(db):
+    """A Browser written before the migration (a newer id) absorbs older sources."""
+    from cps import ub
+    from cps.services.browser_source import migrate_account_browser_source
+    from cps.services.device_registry import upsert_webreader_device
+    engine, session = db
+    legacy = ub.Device(user_id=7, kind="webreader", display_name="Web reader", created_by="auto")
+    session.add(legacy); session.flush()
+    browser = upsert_webreader_device(session, user_id=7)
+    assert browser.id > legacy.id
+    session.add(ub.DeviceReadingPosition(device_id=legacy.id, book_id=5, cfi="legacy",
+                                         server_modified_at=datetime(2026, 9, 1)))
+    session.commit()
+    migrate_account_browser_source(engine)
+    session.expire_all()
+    assert _browser(session, 7).id == browser.id
+    assert (legacy.active, legacy.created_by) == (False, "browser-alias")
+    assert session.query(ub.DeviceReadingPosition).filter_by(device_id=browser.id).one().cfi == "legacy"
+
+
+def test_the_browser_is_active_when_any_folded_source_is(db):
+    """A removed Browser returns when a source that saw later activity folds in."""
+    from cps import ub
+    from cps.services.browser_source import migrate_account_browser_source
+    engine, session = db
+    for user_id, legacy_active in ((7, True), (8, False)):
+        session.add(ub.Device(user_id=user_id, kind="webreader", display_name="Browser",
+                              active=False, created_by="account-browser"))
+        session.add(ub.Device(user_id=user_id, kind="webreader", display_name="Web reader",
+                              active=legacy_active, created_by="auto"))
+    session.commit()
+    migrate_account_browser_source(engine)
+    session.expire_all()
+    assert (_browser(session, 7).active, _browser(session, 8).active) == (True, False)
+
+
+def test_assignments_retired_on_any_old_source_are_restorable_on_the_browser(db, monkeypatch):
+    """Undo after the upgrade brings back what removing each old browser cleared."""
+    from cps import ub, annotations
+    from cps.services.browser_source import migrate_account_browser_source
+    engine, session = db
+    browsers = [ub.Device(user_id=7, kind="webreader", display_name=f"Web reader {i}",
+                          active=False, created_by="auto") for i in (1, 2)]
+    session.add_all(browsers); session.flush()
+    notes = [ub.Annotation(user_id=7, book_id=10, annotation_id=f"retired-{i}", source="webreader",
+                           note_text=f"note {i}", origin_device_id=device.id)
+             for i, device in enumerate(browsers)]
+    session.add_all(notes); session.flush()
+    session.add_all([ub.DeviceRetiredAssignment(device_id=device.id, annotation_id=note.id)
+                     for device, note in zip(browsers, notes)])
+    session.commit()
+    migrate_account_browser_source(engine)
+    session.expire_all()
+    browser = _browser(session, 7)
+    assert not browser.active  # every old source had been removed
+    monkeypatch.setattr(annotations, "_device_visibility_scopes", lambda *a: {7: frozenset((10,))})
+    _, restored, conflicts = annotations.restore_annotation_device(
+        browser.public_id, user_id=7, session=session, commit=session.commit,
+    )
+    assert (restored, conflicts) == (2, 0)
+    assert {note.assigned_device_id for note in notes} == {browser.id}

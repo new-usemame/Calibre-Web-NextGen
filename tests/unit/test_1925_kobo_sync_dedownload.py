@@ -5586,16 +5586,18 @@ def test_v4_1_43_upgrade_treats_a_retired_second_kobo_as_a_household(
     )
 
 
-def test_v4_1_43_upgrade_does_not_count_web_reader_or_koreader_devices(
+def test_v4_1_43_upgrade_counts_only_this_accounts_kobos(
     sync_harness, monkeypatch,
 ):
-    """Only paired Kobos make a ledger a household's.
+    """Only the account's own paired Kobos make its ledger a household's.
 
-    The device registry also records the browser reader and KOReader of the
-    same account (``Device.kind`` "webreader" and "koreader").  They never
-    received the v4.1.43 Kobo seed, so a one-Kobo account that also reads in
-    the browser is still one Kobo, and its upgrade stays silent.  Fails if
-    the reader count includes other kinds of device.
+    The device registry also records the account's browser reader and
+    KOReader (``Device.kind`` "webreader" and "koreader"), and every other
+    account's devices.  None of them received this account's v4.1.43 seed, so
+    a one-Kobo account that also reads in the browser, on a server where
+    another account has a Kobo too, is still one Kobo, and its upgrade stays
+    silent.  Fails if the reader count includes other kinds of device or
+    other accounts' Kobos.
     """
     from cps import kobo, ub
 
@@ -5605,13 +5607,19 @@ def test_v4_1_43_upgrade_does_not_count_web_reader_or_koreader_devices(
     books, token = _v4_1_43_install(sync_harness, count=30)
     sync_harness.session.add_all([
         ub.Device(
-            user_id=sync_harness.user.id,
+            user_id=user_id,
             kind=kind,
             display_name=name,
+            model=model,
             active=True,
             created_by="auto",
         )
-        for kind, name in (("webreader", "Browser"), ("koreader", "KOReader"))
+        for user_id, kind, name, model in (
+            (sync_harness.user.id, "webreader", "Browser", None),
+            (sync_harness.user.id, "koreader", "KOReader", None),
+            (sync_harness.user.id + 1, "kobo", "Another Account's Kobo",
+             "Kobo Libra Colour"),
+        )
     ])
     sync_harness.session.commit()
 
@@ -5619,6 +5627,7 @@ def test_v4_1_43_upgrade_does_not_count_web_reader_or_koreader_devices(
     following = sync_harness.sync(upgrade.headers[sync_harness.token_header])
     announced = [len(_entitlements(upgrade)), len(_entitlements(following))]
     assert announced == [0, 0], (
-        f"a one-Kobo account with a browser reader re-announced {announced} "
+        "a one-Kobo account sharing the device registry with a browser "
+        f"reader, KOReader and another account's Kobo re-announced {announced} "
         f"of {len(books)} held books"
     )

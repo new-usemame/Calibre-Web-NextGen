@@ -206,9 +206,11 @@ def _attach_stacked_fractions(blocks):
              and re.fullmatch(r'\d{1,3}', line.stripped)
              and not (line.spans[0].encoding_unresolved or
                       line.spans[0].transcription_uncertain)]
-    replacements, consumed = {}, set()
+    # Discover every plausible owner before changing any line. Otherwise the
+    # first slash hides shared digits from later slashes and extraction order
+    # silently decides which prose receives the fraction.
+    proposals, owners = [], {}
     for line in lines:
-        edits = {}
         for span_index, span in enumerate(line.spans):
             if ('/' not in span.text or not span.char_boxes or
                     span.encoding_unresolved or span.transcription_uncertain):
@@ -218,7 +220,6 @@ def _attach_stacked_fractions(blocks):
                     continue
                 mid = (y0 + y1) / 2
                 nearby = [part for part in parts if part is not line
-                          and id(part) not in consumed
                           and .5 <= part.size / line.size <= .8]
                 upper = [part for part in nearby
                          if abs(part.bbox[2] - x0) <= line.size * .18
@@ -228,13 +229,23 @@ def _attach_stacked_fractions(blocks):
                          if abs(part.bbox[0] - x1) <= line.size * .18
                          and mid - line.size * .06 <= part.bbox[1] <= y1
                          and part.bbox[3] > y1]
-                if len(upper) != 1 or len(lower) != 1 or upper[0] is lower[0]:
-                    continue
-                num, den = upper[0], lower[0]
-                if id(num) in consumed or id(den) in consumed:
-                    continue
-                edits.setdefault(span_index, []).append((start, end, num, den, (x0,y0,x1,y1)))
-                consumed.update((id(num), id(den)))
+                proposal = len(proposals)
+                proposals.append((line, span_index, start, end, (x0,y0,x1,y1), upper, lower))
+                for part in upper + lower:
+                    owners.setdefault(id(part), set()).add(proposal)
+    edits_by_line, consumed = {}, set()
+    for proposal, (line, span_index, start, end, box, upper, lower) in enumerate(proposals):
+        if len(upper) != 1 or len(lower) != 1 or upper[0] is lower[0]:
+            continue
+        num, den = upper[0], lower[0]
+        if owners[id(num)] != {proposal} or owners[id(den)] != {proposal}:
+            continue
+        edits_by_line.setdefault(id(line), {}).setdefault(span_index, []).append(
+            (start, end, num, den, box))
+        consumed.update((id(num), id(den)))
+    replacements = {}
+    for line in lines:
+        edits = edits_by_line.get(id(line), {})
         if not edits:
             continue
         changed=[]

@@ -83,6 +83,68 @@ def test_unmapped_native_digit_is_not_guessed_into_a_fraction():
     assert sorted(line.text for block in result for line in block.lines)==['3','4','a / b']
 
 
+@pytest.mark.parametrize('reverse', [False, True])
+@pytest.mark.parametrize('shared', ['both', 'numerator', 'denominator'])
+def test_competing_native_slashes_keep_all_ambiguous_source_atoms(reverse, shared):
+    def prose(text, y):
+        span=extract.Span(text,9,'Times',0,(100,y,125,y+9),
+                          char_boxes=((2,3,110,y,114,y+9),))
+        return extract.Line([span],span.bbox)
+    first,second=prose('a / b',100),prose('c / d',100.5)
+    upper=extract.Span('3',6,'Times',0,(107,98.5,110,104.5))
+    lower=extract.Span('4',6,'Times',0,(114,105,117,111))
+    # The private extra pair fits only one slash when just one half is shared.
+    local_upper=extract.Span('2',6,'Times',0,(107,97.8,110,100.2))
+    local_lower=extract.Span('5',6,'Times',0,(114,105.7,117,109.2))
+    digits=[upper,lower]
+    if shared=='numerator':digits.append(local_lower)
+    if shared=='denominator':digits.append(local_upper)
+    lines=([second,first] if reverse else [first,second]) + [extract.Line([s],s.bbox) for s in digits]
+    result=normalize_blocks([extract.Block(0,(100,97,125,112),lines)])
+    resulting=[line for block in result for line in block.lines]
+    found=[line.text for line in resulting]
+    assert set(found[:2])=={'a / b','c / d'}
+    assert not any('/' in text and any(d in text for d in ('2','3','4','5')) for text in found[:2])
+    assert sorted(found[2:])==sorted(s.text for s in digits)
+    assert sorted((line.text,line.bbox) for line in resulting)==sorted(
+        (line.text,line.bbox) for line in lines)
+
+
+def test_competing_slashes_do_not_suppress_unrelated_fraction():
+    def line(text,y,x):
+        span=extract.Span(text,9,'Times',0,(x,y,x+25,y+9),
+                          char_boxes=((2,3,x+10,y,x+14,y+9),))
+        return extract.Line([span],span.bbox)
+    prose=[line('a / b',100,100),line('c / d',100.5,100),line('e / f',140,200)]
+    digits=[extract.Span('3',6,'Times',0,(107,98.5,110,104.5)),
+            extract.Span('4',6,'Times',0,(114,105,117,111)),
+            extract.Span('1',6,'Times',0,(207,138,210,144)),
+            extract.Span('2',6,'Times',0,(214,144.5,217,150.5))]
+    result=normalize_blocks([extract.Block(0,(100,98,225,151),prose+
+                 [extract.Line([s],s.bbox) for s in digits])])
+    found=[line.text for block in result for line in block.lines]
+    assert found[:3]==['a / b','c / d','e 1/2 f']
+    assert found[3:]==['3','4']
+
+
+def test_separated_native_fractions_in_one_line_keep_character_boundaries():
+    text='a / b / c'
+    boxes=tuple((i,i+1,100+5*i,100,105+5*i,109) for i in range(len(text)))
+    main=extract.Span(text,9,'Times',0,(100,100,145,109),char_boxes=boxes)
+    digits=[]
+    for x,numerator,denominator in ((110,'3','4'),(130,'1','2')):
+        for value,bbox in ((numerator,(x-3,98,x,104)),
+                           (denominator,(x+5,104.5,x+8,110.5))):
+            span=extract.Span(value,6,'Times',0,bbox)
+            digits.append(extract.Line([span],bbox))
+    result=normalize_blocks([extract.Block(0,(100,98,145,112),
+               [extract.Line([main],main.bbox)]+digits)])
+    found=[line.text for block in result for line in block.lines]
+    assert found==['a 3/4 b 1/2 c']
+    final=result[0].lines[0].spans[0]
+    assert [(a,b) for a,b,*_ in final.char_boxes]==[(i,i+1) for i in range(len(final.text))]
+
+
 def test_real_unicode_map_overrides_symbolic_font_name():
     class Doc:
         def xref_get_key(self,xref,key):return ('xref','9 0 R') if key=='ToUnicode' else ('int','4')

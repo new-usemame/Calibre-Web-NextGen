@@ -42,6 +42,8 @@ local PLACEHOLDER_TIMEOUTS = { 5, 20 }
 -- the sync stops rather than waiting out every remaining book's timeouts.
 local DOWNLOADING_OPS = { create_placeholder = true, refresh_placeholder = true }
 local STOP_AFTER_FAILED_DOWNLOADS = 3
+-- A proxy answers these for a server that is down or out of reach.
+local GATEWAY_ERRORS = { [502] = true, [503] = true, [504] = true }
 local SAVE_EVERY_SECONDS = 30
 
 -- Shared by the file browser's and the reader's plugin instances: there is one
@@ -273,12 +275,13 @@ end
 
 function Runtime:fetchPlaceholder(client, book, path)
     local temp = path .. ".cwngsync.part"
-    local ok, _length, _checksum, reason = client:download_file(
+    local ok, _length, _checksum, reason, status = client:download_file(
         self.settings.username, self.settings.password, Device.model, self.device_id,
         "/syncs/library/books/" .. book.book_id .. "/placeholder", temp, PLACEHOLDER_TIMEOUTS)
     if not ok then
         logger.warn("CWNGSync: placeholder download failed", book.book_id, reason)
-        return false
+        -- A book the server refuses is that book's; no answer is the server's.
+        return false, nil, (status == nil or GATEWAY_ERRORS[status]) and "unanswered" or nil
     end
     local a = lfs.attributes(temp)
     if not a or a.size == 0 or a.size > PLACEHOLDER_MAX_BYTES
@@ -558,7 +561,7 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
             failed = failed + 1
         end
         if downloads and why ~= "changed" then
-            failed_downloads_in_a_row = ok and 0 or failed_downloads_in_a_row + 1
+            failed_downloads_in_a_row = why == "unanswered" and failed_downloads_in_a_row + 1 or 0
             if failed_downloads_in_a_row >= STOP_AFTER_FAILED_DOWNLOADS then
                 -- Each attempt holds the screen for its timeouts: a server that
                 -- stopped answering must not cost that for every book left.

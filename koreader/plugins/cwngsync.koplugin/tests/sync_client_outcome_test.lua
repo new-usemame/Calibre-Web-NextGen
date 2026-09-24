@@ -136,6 +136,32 @@ local function testNoSyncFailureIsWrittenAtDbg()
     assertTruthy(text:find("logger.warn(", 1, true), "failures are logged at warn")
 end
 
+local function testADownloadSaysWhetherTheServerAnswered()
+    -- A book the server refuses must not look like a server that is gone:
+    -- the library stops a sync only for the second.
+    local answer
+    package.loaded["socket.http"] = { request = function() return answer() end }
+    package.loaded["socket"] = { skip = function(n, ...) return select(n + 1, ...) end }
+    package.loaded["ltn12"] = { sink = { file = function(handle) return handle end } }
+    package.loaded["mime"] = { b64 = function(text) return text end }
+    local path = os.tmpname()
+    local function download()
+        local ok, _, _, reason, status = CWNGSyncClient.download_file({ service_url = "http://books" },
+            "reader", "secret", "Kindle", "device", "/syncs/library/books/7/placeholder", path, { 1, 1 })
+        return ok, reason, status
+    end
+    answer = function() return 1, 404, {}, "HTTP/1.1 404 NOT FOUND" end
+    local ok, reason, status = download()
+    assertEqual(ok, false, "a refusal is a failure")
+    assertEqual(status, 404, "that carries the server's status")
+    answer = function() return nil, "timeout" end
+    ok, reason, status = download()
+    assertEqual(ok, false, "no answer is a failure")
+    assertEqual(status, nil, "that carries no status")
+    assertTruthy(reason, "but still a reason")
+    os.remove(path)
+end
+
 local function testFailuresReadAsPlainWordsOnScreen()
     local plain = CWNGSyncClient.plainReason
     assertEqual(plain("common/Spore/Protocols.lua:85: timeout"), "the server took too long to answer",
@@ -152,6 +178,7 @@ local function testFailuresReadAsPlainWordsOnScreen()
 end
 
 testDescribeFailureNamesEveryShape()
+testADownloadSaysWhetherTheServerAnswered()
 testNoSyncFailureIsWrittenAtDbg()
 testRaisedCallReportsAReasonAndWarns()
 testNon200ReportsItsStatus()

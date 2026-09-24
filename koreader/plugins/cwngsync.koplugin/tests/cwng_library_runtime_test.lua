@@ -102,7 +102,9 @@ end
 
 -- `answer(cursor)` is the server: the body for the page after `cursor`.
 -- With `real_apply`, the manifest is applied by the runtime itself, and
--- `fetch(book)` answers each cover download.
+-- `fetch(book)` answers each cover download; a table `{ download = f }`
+-- instead answers the runtime's own download as the client would,
+-- `f(book_id, temp)`.
 local function sync(answer, real_apply, fetch, root, broken)
     local queue, requests = {}, {}
     local outcome = { applied = nil }
@@ -137,9 +139,16 @@ local function sync(answer, real_apply, fetch, root, broken)
             return { attributes = function() return nil end, isOpen = function() return false end,
                 digest = function() return nil end, placeholderId = function() return nil end }
         end
-        function runtime:fetchPlaceholder(_, book)
-            outcome.fetched = outcome.fetched + 1
-            return fetch(book)
+        if type(fetch) == "table" then
+            function client:download_file(_, _, _, _, url_path, temp)
+                outcome.fetched = outcome.fetched + 1
+                return fetch.download(tonumber(url_path:match("/books/(%d+)/")), temp)
+            end
+        else
+            function runtime:fetchPlaceholder(_, book)
+                outcome.fetched = outcome.fetched + 1
+                return fetch(book)
+            end
         end
         outcome.state = state
         outcome.runtime = runtime
@@ -258,10 +267,32 @@ local function manyNewBooks(count)
 end
 
 local function testASyncStopsWhenTheServerStopsAnswering()
-    local outcome = sync(manyNewBooks(2000), true, function() return false end)
+    local outcome = sync(manyNewBooks(2000), true, { download = function() return false, nil, nil, "timeout" end })
     assertEqual(outcome.fetched, 3, "three downloads fail in a row, then the sync stops")
     assertEqual(outcome.ok, false, "and says it did not finish")
     assertEqual(shown[#shown]:find("up to date", 1, true), nil, "it never says the library is up to date")
+    -- A proxy in front of a server that is down answers for it.
+    outcome = sync(manyNewBooks(2000), true, { download = function() return false, nil, nil, "HTTP 502", 502 end })
+    assertEqual(outcome.fetched, 3, "a gateway error is the server not answering")
+end
+
+local function testBooksTheServerRefusesDoNotStopTheRest()
+    -- A book with no format this e-reader opens is refused on every sync. The
+    -- server is answering: the books after it must still arrive.
+    local root = folder .. "/refused"
+    assert(os.execute("mkdir -p '" .. root .. "'"))
+    local outcome = sync(manyNewBooks(20), true, { download = function(book_id, temp)
+        if book_id <= 5 then return false, nil, nil, "HTTP 404", 404 end
+        local f = assert(io.open(temp, "wb"))
+        f:write("cover")
+        f:close()
+        placeholders[temp] = book_id
+        return true
+    end }, root)
+    assertEqual(outcome.fetched, 20, "every book is tried")
+    assertEqual(outcome.ok, true, "the sync finishes")
+    assertEqual(outcome.state.books["20"] ~= nil, true, "the books after the refused ones arrive")
+    assert(shown[#shown]:find("except 5 books", 1, true), "and it says which did not: " .. tostring(shown[#shown]))
 end
 
 local function testASyncStopsWhenTheNetworkGoesAway()
@@ -477,6 +508,7 @@ testAServerRepeatingItsCursorStopsAtOnce()
 testRemovingACoverKeepsTheReadersNotesButNotAStaleStatus()
 testAStepDoesNothingToABookChangedSinceThePlan()
 testASyncStopsWhenTheServerStopsAnswering()
+testBooksTheServerRefusesDoNotStopTheRest()
 testASyncStopsWhenTheNetworkGoesAway()
 testAFewFailedCoversDoNotStopTheRest()
 testBooksThatArrivedDuringTheSyncDoNotStopIt()

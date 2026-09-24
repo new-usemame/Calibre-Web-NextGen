@@ -592,7 +592,8 @@ end
 -- Stream one library file (a placeholder or the real book) to `local_path`.
 -- Synchronous on purpose: callers either run it between UI ticks one file at a
 -- time, or while the reader is waiting for the book it just tapped. Returns
--- ok, content_length, checksum, reason.
+-- ok, content_length, checksum, reason, and the HTTP status when the server
+-- answered with an error.
 function CWNGSyncClient:download_file(
         username, password, device, device_id, url_path, local_path, timeouts)
     local http = require("socket.http")
@@ -630,7 +631,7 @@ function CWNGSyncClient:download_file(
     end
     if code ~= 200 then
         os.remove(local_path)
-        return false, nil, nil, status or ("HTTP " .. tostring(code))
+        return false, nil, nil, status or ("HTTP " .. tostring(code)), tonumber(code)
     end
     return true,
         tonumber(responseHeader(headers, "content-length")),

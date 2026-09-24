@@ -1032,7 +1032,7 @@ function CWNGSync:getInventoryBooks()
         return {}, nil
     end
 
-    local library = self:libraryEnabled()
+    local isPlaceholder = self:libraryEnabled() and self:libraryPlaceholderTest()
     local document_registry_ok, DocumentRegistry = pcall(require, "document/documentregistry")
     local paths = {}
     local seen = {}
@@ -1041,7 +1041,7 @@ function CWNGSync:getInventoryBooks()
             return
         end
         -- A cover waiting to be downloaded is not a book on this device.
-        if library and self:isLibraryPlaceholder(path) then
+        if isPlaceholder and isPlaceholder(path) then
             return
         end
         if document_registry_ok and DocumentRegistry and DocumentRegistry.hasProvider then

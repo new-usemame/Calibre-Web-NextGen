@@ -171,6 +171,17 @@ function Runtime:isLibraryPlaceholder(path)
     return a ~= nil and a.size == known.size
 end
 
+-- isLibraryPlaceholder for a walk over many files: the records are indexed
+-- once, when the walk starts.
+function Runtime:libraryPlaceholderTest()
+    local index = Library.placeholderIndex(self:getLibraryState())
+    return function(path)
+        local known = index[path]
+        if not known then return false end
+        return lfs.attributes(path, "size") == known.size
+    end
+end
+
 local function isoToTime(value)
     if type(value) ~= "string" then return nil end
     local y, mo, d, h, mi, s = value:match("^(%d%d%d%d)-(%d%d)-(%d%d)[T ](%d%d):(%d%d):(%d%d)")

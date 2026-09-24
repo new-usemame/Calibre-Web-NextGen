@@ -268,6 +268,26 @@ local function testBooksThatArrivedDuringTheSyncDoNotStopIt()
     assertEqual(outcome.ok, true, "and the sync finishes")
 end
 
+local function testTheInventoryKnowsCoversFromBooks()
+    local cover = put("Cover [21].epub", 21)
+    local book = put("Book [22].epub")
+    local swapped = put("Swapped [23].epub")
+    local untracked = put("Untracked.epub")
+    local state = { books = {
+        ["21"] = { kind = "placeholder", path = cover, size = 5 },       -- "cover" is 5 bytes
+        ["22"] = { kind = "downloaded", path = book, size = 8 },
+        ["23"] = { kind = "placeholder", path = swapped, size = 5 },     -- replaced: 8 bytes now
+    } }
+    local runtime = setmetatable({}, { __index = Runtime })
+    function runtime:getLibraryState() return state end
+    local isPlaceholder = runtime:libraryPlaceholderTest()
+    for _, path in ipairs({ cover, book, swapped, untracked }) do
+        assertEqual(isPlaceholder(path), runtime:isLibraryPlaceholder(path), "same answer as one by one for " .. path)
+    end
+    assertEqual(isPlaceholder(cover), true, "a cover is not a book on the device")
+    assertEqual(isPlaceholder(swapped), false, "a cover replaced by a file is")
+end
+
 local function testEveryPageOfABigLibraryReachesTheDevice()
     -- 250 pages is 50,000 books at the server's page size of 200.
     local outcome = sync(pagesOf(250, 2))
@@ -306,6 +326,7 @@ testASyncStopsWhenTheServerStopsAnswering()
 testASyncStopsWhenTheNetworkGoesAway()
 testAFewFailedCoversDoNotStopTheRest()
 testBooksThatArrivedDuringTheSyncDoNotStopIt()
+testTheInventoryKnowsCoversFromBooks()
 os.execute("rm -rf '" .. folder .. "'")
 
 print("cwng_library_runtime tests passed")

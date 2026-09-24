@@ -384,6 +384,16 @@ function Library.isManagedPlaceholder(state, path)
     return Library.placeholderAt(state, path) ~= nil
 end
 
+-- placeholderAt for many paths at once: path -> record of each cover. One
+-- pass over the records instead of one per file, for a folder of thousands.
+function Library.placeholderIndex(state)
+    local index = {}
+    for _, known in pairs(state.books or {}) do
+        if known.kind == "placeholder" and known.path then index[known.path] = known end
+    end
+    return index
+end
+
 -- Shelves become KOReader collections holding every book on the shelf, cloud
 -- or downloaded, under the shelf's own name. `managed` maps shelf id -> the
 -- collection name this device created for it last time; a name already used

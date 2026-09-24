@@ -277,18 +277,19 @@ def test_background_marker_save_does_not_persist_a_requests_unsaved_setting(app_
     assert row["title_regex"] == stored_regex
 
 
-def test_config_save_off_the_serving_thread_is_refused(app_db):
-    """``ConfigSQL.save()`` refuses to run on a thread that does not serve requests.
+@pytest.mark.parametrize("operation", ["save", "load"])
+def test_config_session_access_off_the_serving_thread_is_refused(app_db, operation):
+    """``ConfigSQL.save()``/``load()`` refuse to run on a thread that does not serve requests.
 
-    It commits the requests' session, so from any other thread it is the race
-    this file is about; a future task that calls it must fail loudly in tests,
-    not intermittently in production.  Breaks if the guard is removed: the
-    save then commits the setting from the worker thread.
+    Both use the requests' session, so from any other thread they are the race
+    this file is about; a future task that calls one must fail loudly in
+    tests, not intermittently in production.  Breaks if the guard is removed:
+    ``save`` then commits the setting from the worker thread.
     """
     stored_regex = _settings_row(app_db.path)["title_regex"]
     app_db.config.config_title_regex = "saved-from-a-worker"
 
-    thread, outcome = _in_worker(app_db.config.save)
+    thread, outcome = _in_worker(getattr(app_db.config, operation))
     _finish(thread)
 
     assert isinstance(outcome.get("error"), RuntimeError), outcome

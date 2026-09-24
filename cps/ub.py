@@ -1142,8 +1142,8 @@ class KoboDeviceEntitlementSeed(Base):
     # Version 0 rows were written by the shipped v4.1.43 seed, which copied
     # the user-wide flat history onto every Kobo it marked: sound for a single
     # paired reader, a household union for two or more.  The audit therefore
-    # keeps a single reader's rows, stamping the change basis they can vouch
-    # for, and clears a household's.
+    # keeps a single reader's book rows, stamping the change basis they can
+    # vouch for, clears a household's, and clears every seeded tombstone.
     classification_version = Column(
         Integer, nullable=False, default=0, server_default="0",
     )

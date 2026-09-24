@@ -4713,6 +4713,17 @@ def _entitlement_ids(response, *, kind=None):
     return ids
 
 
+def _removal_ids(response):
+    """The UUIDs a response told the reader to remove."""
+    return [
+        item[kind]["BookEntitlement"]["Id"]
+        for item in response.get_json()
+        for kind in ("NewEntitlement", "ChangedEntitlement")
+        if kind in item
+        and item[kind].get("BookEntitlement", {}).get("IsRemoved") is True
+    ]
+
+
 @pytest.mark.xfail(
     strict=True,
     reason=(
@@ -5362,5 +5373,85 @@ def test_v4_1_43_row_older_than_its_books_last_change_is_still_delivered(
     assert entitlement["BookEntitlement"]["Id"] == str(target.uuid)
     assert entitlement["BookEntitlement"]["IsRemoved"] is False
     assert entitlement["BookMetadata"]["Title"] == target.title
+
+
+@pytest.mark.parametrize("kobos", (1, 2))
+def test_v4_1_43_upgrade_delivers_a_removal_its_seed_marked_acknowledged(
+    sync_harness, monkeypatch, kobos,
+):
+    """A hard delete the reader never heard about must still reach it once.
+
+    v4.1.43's seed wrote every tombstone of the user into every Kobo's
+    deleted-book ledger as if acknowledged, so a removal an offline reader
+    never received was suppressed and its archive cursor moved past it: the
+    deleted book stays on the reader with no server-side way to dislodge it.
+    The upgrade clears those rows for a single Kobo as for a household, so
+    the removal goes out exactly once.  The price is resending removals a
+    reader already applied, as main always did; that this is harmless
+    (Nickel has nothing left to remove) is ASSUMED, not observed on hardware.
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    books, _token = _v4_1_43_install(sync_harness, count=3)
+    devices = [sync_harness.device]
+    if kobos == 2:
+        second = ub.Device(
+            user_id=sync_harness.user.id,
+            kind="kobo",
+            display_name="Second Household Kobo",
+            model="Kobo Libra Colour",
+            active=True,
+            created_by="auto",
+        )
+        sync_harness.session.add(second)
+        sync_harness.session.flush()
+        sync_harness.session.add(ub.KoboDeviceEntitlementSeed(
+            device_id=second.id, classification_version=0,
+        ))
+        devices.append(second)
+
+    orphan = "00000000-0000-0000-0009-000000000002"
+    deleted_at = max(book.last_modified for book in books) + timedelta(hours=1)
+    sync_harness.session.add(ub.KoboDeletedBook(
+        user_id=sync_harness.user.id, book_uuid=orphan, deleted_at=deleted_at,
+    ))
+    seeded_fingerprint = _v4_1_43_fingerprint({
+        "BookEntitlement": kobo.create_deleted_book_entitlement(
+            orphan, deleted_at,
+        ),
+        "BookMetadata": kobo.create_deleted_book_metadata(orphan),
+    })
+    sync_harness.session.add_all([
+        ub.KoboDeviceDeletedEntitlement(
+            device_id=device.id,
+            book_uuid=orphan,
+            fingerprint=seeded_fingerprint,
+            payload_schema_version=1,
+            change_basis=None,
+        )
+        for device in devices
+    ])
+    sync_harness.session.commit()
+
+    # v4.1.43 suppressed the removal and moved the archive cursor past it.
+    token = kobo.SyncToken.SyncToken(
+        books_last_modified=max(book.last_modified for book in books),
+        books_last_created=max(book.timestamp for book in books),
+        books_last_id=max(book.id for book in books),
+        archive_last_modified=deleted_at + timedelta(minutes=1),
+    ).build_sync_token()
+    removed = []
+    for _sync in range(3):
+        response = sync_harness.sync(token)
+        removed += _removal_ids(response)
+        token = response.headers[sync_harness.token_header]
+
+    assert removed == [orphan], (
+        f"{kobos} Kobo(s): a removal the reader never received was delivered "
+        f"{removed.count(orphan)} times across three syncs"
+    )
 
 

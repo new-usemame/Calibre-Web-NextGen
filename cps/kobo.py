@@ -601,6 +601,11 @@ def _migrate_device_entitlement_classification(user_id):
     declared-shape transition then suppresses it and re-fingerprints it on the
     next selection.  Rows describing a later edit keep no basis and deliver.
 
+    The deleted-book ledger is cleared in both branches.  The v4.1.43 seed
+    wrote every tombstone into every device's deleted ledger as delivered, so
+    those rows prove nothing; clearing them lets the deletion recovery arm
+    offer each removal once.
+
     Deliberately accepted, and unchanged from v4.1.43: a legacy
     ``ChangedEntitlement`` that an empty Kobo dropped (#1735) still wrote a
     flat marker, so a kept row can name a book the device never stored.  That
@@ -649,11 +654,11 @@ def _migrate_device_entitlement_classification(user_id):
                 ).filter(
                     ub.KoboDeviceBookEntitlement.device_id == int(device_id),
                 ).delete(synchronize_session=False)
-                removed += ub.session.query(
-                    ub.KoboDeviceDeletedEntitlement,
-                ).filter(
-                    ub.KoboDeviceDeletedEntitlement.device_id == int(device_id),
-                ).delete(synchronize_session=False)
+            removed += ub.session.query(
+                ub.KoboDeviceDeletedEntitlement,
+            ).filter(
+                ub.KoboDeviceDeletedEntitlement.device_id == int(device_id),
+            ).delete(synchronize_session=False)
             proven_book_ids = {
                 row.book_id for row in ub.session.query(
                     ub.DeviceReadingPosition.book_id,
@@ -1744,8 +1749,8 @@ def HandleSyncRequest():
             capture_session=capture_session,
         )
     # Audit legacy-classifier rows once, before the recovery arm below reads
-    # them: a single Kobo keeps its ledger, and a household's union copy is
-    # cleared.
+    # them: a single Kobo keeps its ledger, a household's union copy is
+    # cleared, and seeded tombstones are cleared for both.
     if (requesting_device_id
             and not _migrate_device_entitlement_classification(current_user.id)):
         return _abort_sync_with_observability(

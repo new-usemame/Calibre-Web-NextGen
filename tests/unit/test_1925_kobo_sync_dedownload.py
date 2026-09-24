@@ -5408,6 +5408,44 @@ def test_v4_1_43_upgrade_resends_no_held_book(
     )
 
 
+@pytest.mark.parametrize("topology", (
+    "single",
+    "single_sealed_with_copy",
+    "household_sealed_together",
+    "household_paired_separately",
+    "retired_household_kobo",
+))
+def test_v4_1_43_kobo_whose_first_sync_has_no_token_resends_no_held_book(
+    sync_harness, monkeypatch, topology,
+):
+    """A v4.1.43 Kobo that comes back without a token still holds its books.
+
+    A Kobo can make its first sync after the upgrade with no token, as after
+    a USB eject (#2131), and that sync selects the whole library.  Unlike a
+    Kobo from before v4.1.43, which then has no cursor to vouch for its
+    history, a v4.1.43 Kobo brings its ledger across the upgrade: the audit
+    keeps and stamps the rows its downloads vouch for whatever the request
+    carries.  Fails if the audit or the stamping depends on the cursor.
+    """
+    from cps import kobo
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    _books, kobos = _v4_1_43_account(sync_harness, topology, count=120)
+
+    announced = {
+        device.id: _brief(
+            _sync_session(sync_harness, None, device, raw_device_id)[1],
+        )
+        for device, raw_device_id, _token in kobos
+    }
+
+    assert announced == {device.id: {} for device, _raw, _token in kobos}, (
+        f"{topology}: {announced}"
+    )
+
+
 @pytest.mark.parametrize("kobos", (1, 2))
 def test_v4_1_43_book_no_kobo_downloaded_is_announced_new_once(
     sync_harness, monkeypatch, kobos,

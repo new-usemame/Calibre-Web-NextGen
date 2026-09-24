@@ -27,6 +27,11 @@ runpy.run_path('tests/unit/conftest.py')
 from tests.unit.test_1925_kobo_sync_dedownload import sync_harness, _entitlements
 from cps import kobo, ub, config_sql
 
+# An editable install on sys.path would generate with the candidate's code.
+for module in (kobo, ub, config_sql):
+    assert Path(module.__file__).resolve().parent.parent == Path.cwd().resolve(), module.__file__
+print(f'Generating with actual tagged modules from {Path.cwd()} at {actual}')
+
 output = Path(sys.argv[1])
 for scenario in ('emitted', 'seeded_only'):
     target = output / scenario
@@ -35,6 +40,11 @@ for scenario in ('emitted', 'seeded_only'):
     harness = sync_harness.__wrapped__(patch)
     h = next(harness)
     try:
+        # strftime renders Calibre's undefined year 101 as 0101 on macOS and
+        # 101 on Linux, and the stored fingerprint hashes it: pin a date that
+        # every platform renders alike.
+        h.book.pubdate = datetime(2020, 2, 3, 4, 5, 6)
+        h.session.commit()
         patch.setattr(kobo.config, 'config_kobo_suppress_replayed_entitlements', True)
         patch.setattr(kobo.config, 'config_kobo_cover_padding_enabled', False, raising=False)
         config_sql._Settings.__table__.create(h.session.bind, checkfirst=True)

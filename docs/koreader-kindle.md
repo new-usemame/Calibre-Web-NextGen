@@ -73,8 +73,9 @@ send to the e-reader appear too, even if they aren't on those shelves.
   highlights are sent to CWNG. There's nothing to press.
 - **Open a book** and it picks up where you left off on another device or in the web
   reader.
-- **Highlights and notes made on another KOReader e-reader** appear in the book when you
-  open it. Delete one here and it stays deleted.
+- **Highlights and notes made in CWNG's web reader or on another KOReader e-reader**
+  appear in the book when you open it, and the ones you make here appear in the web
+  reader. Delete one here and it stays deleted.
 - **No Wi-Fi?** Nothing is lost. It's sent the next time the e-reader is online. The
   plugin never turns Wi-Fi on by itself for this.
 - **Opening a book and closing it without turning a page sends nothing**, so glancing at

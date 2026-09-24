@@ -176,7 +176,7 @@ def test_direct_epub_download_embeds_current_users_personal_cover(tmp_path, monk
     monkeypatch.setattr(
         user_cover,
         "override_for_user",
-        lambda user_id, book_id: override,
+        lambda user_id, book_id, session=None: override,
     )
     monkeypatch.setattr(helper.config, "get_book_path", lambda: str(library))
     monkeypatch.setattr(helper.config, "config_use_google_drive", False, raising=False)

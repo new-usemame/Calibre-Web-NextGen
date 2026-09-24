@@ -35,7 +35,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from .. import db, logger, ub
-from . import device_delivery, ereader_scope
+from . import device_delivery, ereader_scope, koreader_placeholder
 
 log = logger.create()
 
@@ -390,12 +390,17 @@ def file_facts(path):
 # ---------------------------------------------------------------------------
 
 def book_rev(row, authors, series, fmt_row):
-    """What a placeholder shows, plus which file stands behind it."""
+    """What a placeholder shows, plus which file stands behind it.
+
+    Includes the placeholder layout, so a new look reaches devices that
+    already hold placeholders: they replace one only when its rev changes.
+    """
     return _digest([
         row.title, authors, series,
         row.series_index if series else None,
         bool(row.has_cover), iso_z(row.last_modified) if row.last_modified else None,
         fmt_row.format.upper(), fmt_row.name, fmt_row.uncompressed_size,
+        koreader_placeholder.LAYOUT,
     ], 16)
 
 

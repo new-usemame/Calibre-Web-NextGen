@@ -517,6 +517,107 @@ def test_a_cover_too_big_to_decode_safely_gets_the_plain_cover(world):
     assert own.getpixel((60, 60)) == pytest.approx((40, 40, 40), abs=12)
 
 
+def _badge_is_visible(cover):
+    """The cloud badge's dark disc and white cloud are both in the corner."""
+    width, height = cover.size
+    corner = cover.crop((width * 2 // 3, height * 2 // 3, width, height))
+    colours = [colour for _count, colour in corner.getcolors(corner.width * corner.height)]
+    return (any(max(colour) < 60 for colour in colours)
+            and any(min(colour) > 245 for colour in colours))
+
+
+def test_a_cover_too_small_to_show_gets_the_plain_cover_with_its_badge(world):
+    """A real library holds a 2x2 cover.jpg. Its placeholder cover stayed 2x2,
+    the badge landed outside it, and the grid showed a black tile nobody
+    could tell from a downloaded book. A cover too small to show gets the
+    plain cover: title, authors and badge; a small real one is kept."""
+    world.add_user("reader")
+    world.add_book(1, "Le Petit Prince", cover_image=_image_bytes((2, 2), "JPEG", shade=10))
+    world.add_book(2, "Small But Real", cover_image=_image_bytes((150, 225), "JPEG"))
+
+    plain = _placeholder_cover(world, 1)
+    assert plain.size == (400, 600)
+    assert plain.getpixel((200, 60)) == pytest.approx((236, 232, 224), abs=12)
+    assert _badge_is_visible(plain)
+
+    small = _placeholder_cover(world, 2)
+    assert small.size == (150, 225)
+    assert small.getpixel((20, 20)) == pytest.approx((40, 40, 40), abs=12)
+    assert _badge_is_visible(small)
+
+
+PAPER = (236, 232, 224)
+
+
+def test_plain_covers_spell_accented_greek_and_cyrillic_titles(world):
+    """Pillow's own face has ASCII only, so é, ž or any Russian letter came out
+    as the same empty box, and every three-letter Russian title got the same
+    cover. Plain covers are lettered in the Liberation Sans the app ships."""
+    world.add_user("reader")
+    titles = ["Мир", "Дом", "Résumé", "Rèsumè", "Ωμέγα", "Άλφα"]
+    for book_id, title in enumerate(titles, start=1):
+        world.add_book(book_id, title, cover=False, authors=("Лев Толстой",))
+    title_area = (0, 90, 400, 360)
+    covers = {title: _placeholder_cover(world, book_id).crop(title_area).tobytes()
+              for book_id, title in enumerate(titles, start=1)}
+    assert covers["Мир"] != covers["Дом"]
+    assert covers["Résumé"] != covers["Rèsumè"]
+    assert covers["Ωμέγα"] != covers["Άλφα"]
+
+
+def test_a_title_no_server_font_can_spell_is_left_off_not_boxed(world):
+    """No font the server has draws Arabic or Chinese: a plain cover leaves
+    such a title and author off rather than printing rows of boxes, and keeps
+    its badge. (The device's own list still shows the title.)"""
+    world.add_user("reader")
+    world.add_book(1, "الأمير الصغير", cover=False, authors=("أنطوان دو سانت إكزوبيري",))
+    world.add_book(2, "三体", cover=False, authors=("刘慈欣",))
+    for book_id in (1, 2):
+        cover = _placeholder_cover(world, book_id)
+        inside_the_frame = cover.crop((26, 26, 374, 490))
+        for low, high in inside_the_frame.getextrema():
+            assert high - low < 30, book_id
+        assert _badge_is_visible(cover)
+
+
+def test_the_first_page_of_a_placeholder_is_its_cover(world):
+    """KOReader draws the first page to thumbnail a PDF, a comic and most
+    formats other than EPUB, and a placeholder keeps its book's file name: a
+    PDF's placeholder showed its explanation page in the grid, not its cover.
+    Reading order starts with the badged cover; the explanation follows."""
+    world.add_user("reader")
+    world.add_book(1, "Paper Only", formats=("PDF",))
+    archive = zipfile.ZipFile(io.BytesIO(_placeholder(world, 1).get_data()))
+    opf = etree.fromstring(archive.read("OEBPS/content.opf"))
+    hrefs = {item.get("id"): item.get("href")
+             for item in opf.xpath("//opf:manifest/opf:item", namespaces=OPF_NS)}
+    spine = [hrefs[ref.get("idref")]
+             for ref in opf.xpath("//opf:spine/opf:itemref", namespaces=OPF_NS)]
+    assert len(spine) == 2 and spine[1] == "placeholder.xhtml"
+
+    first = etree.fromstring(archive.read("OEBPS/" + spine[0]))
+    shown = first.xpath("//*[local-name()='body']//*[local-name()='img']/@src")
+    assert shown == ["cover.jpg"]
+    assert "".join(first.xpath("//*[local-name()='body']//text()")).strip() == ""
+    # The same badged image the grid shows for an EPUB.
+    [cover_item] = opf.xpath("//opf:manifest/opf:item[@properties='cover-image']/@href",
+                             namespaces=OPF_NS)
+    assert cover_item == "cover.jpg"
+
+
+def test_a_new_placeholder_look_reaches_devices_that_already_hold_one(world, monkeypatch):
+    """A device replaces a placeholder only when its book's rev changes, so a
+    change to how placeholders look must change every rev once."""
+    from cps.services import koreader_placeholder
+    world.add_user("reader")
+    world.add_book(1, "Kept")
+    before = _books(world)[0][1]["rev"]
+    monkeypatch.setattr(koreader_placeholder, "LAYOUT", koreader_placeholder.LAYOUT + 1)
+    after = _books(world)[0][1]
+    assert after["rev"] != before
+    assert _placeholder(world, 1).headers["X-CWNG-Placeholder-Rev"] == after["rev"]
+
+
 def test_a_placeholder_is_built_once_per_revision(world, monkeypatch):
     """A second device, a device that lost its copy, or a client that never
     sends If-None-Match asks again for the same placeholder: the bytes built

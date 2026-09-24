@@ -5,8 +5,11 @@
 The KOReader library shows every book in the user's e-reader scope as a cover
 in KOReader's own grid. A book that has not been downloaded is this file: the
 cover (with a small cloud badge so it reads as "in the cloud"), the metadata
-KOReader lists and sorts by, and one page explaining that opening the book
-downloads it. The plugin recognises it by ``META-INF/cwng-placeholder.json``.
+KOReader lists and sorts by, and two pages: the cover, then a page explaining
+that opening the book downloads it. The cover comes first because KOReader
+draws the first page to thumbnail most formats other than EPUB, and a
+placeholder keeps its book's file name (``.pdf``, ``.cbz``...). The plugin
+recognises a placeholder by ``META-INF/cwng-placeholder.json``.
 
 The bytes depend only on their inputs (fixed zip timestamps), so an unchanged
 book always yields an identical placeholder, and :func:`cached` keeps recent
@@ -15,6 +18,7 @@ ones so the same placeholder is not built twice.
 
 import io
 import json
+import os
 import threading
 import zipfile
 from collections import OrderedDict
@@ -38,6 +42,14 @@ COVER_QUALITY = 75
 # at sizes no cover needs: a 12000x12000 PNG named cover.jpg took 1.7 s and
 # 760 MB of memory for one placeholder. Such a book gets the plain cover.
 MAX_DECODED_PIXELS = 4096 * 4096
+# A stored cover shorter than this on either side is not a cover anyone can
+# see on a device (a real library holds a 2x2 one, which left no room for the
+# badge): such a book gets the plain cover, with its title and authors.
+MIN_COVER_SIDE = 120
+# How placeholders look. A device replaces a placeholder only when its book's
+# ``rev`` changes, and ``rev`` includes this: bump it whenever a change here
+# alters the bytes of existing placeholders, so devices fetch them again.
+LAYOUT = 2
 _ZIP_TIME = (1980, 1, 1, 0, 0, 0)
 
 _CONTAINER = """<?xml version="1.0" encoding="UTF-8"?>
@@ -65,14 +77,50 @@ def _load_cover(cover_path):
     except (OSError, ValueError, Image.DecompressionBombError):
         return None
     image.thumbnail(COVER_MAX, Image.LANCZOS)
+    if min(image.size) < MIN_COVER_SIDE:
+        log.debug("KOReader placeholder: %s is %dx%d, too small to show; using a "
+                  "plain cover", cover_path, image.width, image.height)
+        return None
     return image
 
 
-def _font(size):
+# Plain covers are lettered in the Liberation Sans the app ships (for PDF.js):
+# it has accented Latin, Greek and Cyrillic, where Pillow's own face has ASCII
+# only and drew "é" or any Russian letter as the same empty box.
+_LETTERING_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                              "static", "standard_fonts")
+# A code point no font draws: what a missing letter looks like in a face.
+_NO_SUCH_LETTER = "\U0010FFFD"
+# Text that would come out as more boxes than this share of its letters is
+# left off the cover (no font here draws Arabic, Hebrew or Chinese).
+_MOST_BOXES = 0.2
+
+
+def _font(size, bold=False):
+    name = "LiberationSans-Bold.ttf" if bold else "LiberationSans-Regular.ttf"
+    try:
+        return ImageFont.truetype(os.path.join(_LETTERING_DIR, name), size)
+    except (OSError, ValueError):  # a trimmed install without the fonts
+        pass
     try:
         return ImageFont.load_default(size=size)
     except (TypeError, OSError, ValueError):  # Pillow built without FreeType
         return ImageFont.load_default()
+
+
+def _shape(font, text):
+    mask = font.getmask(text)
+    return mask.size, bytes(mask)
+
+
+def _legible(font, text):
+    """Whether ``font`` draws most of ``text`` as letters rather than boxes."""
+    letters = [ch for ch in text or "" if not ch.isspace()]
+    if not letters:
+        return False
+    missing = _shape(font, _NO_SUCH_LETTER)
+    boxes = sum(1 for ch in letters if _shape(font, ch) == missing)
+    return boxes <= len(letters) * _MOST_BOXES
 
 
 def _wrap(draw, text, font, width, max_lines):
@@ -99,25 +147,32 @@ def _wrap(draw, text, font, width, max_lines):
 
 
 def _text_cover(title, authors):
-    """A plain typographic cover for a book without one."""
+    """A plain typographic cover for a book without one.
+
+    Text the lettering cannot draw is left off rather than printed as boxes;
+    the device lists the title in its own fonts anyway.
+    """
     width, height = COVER_MAX
     image = Image.new("RGB", (width, height), (236, 232, 224))
     draw = ImageDraw.Draw(image)
     margin = 32
     draw.rectangle((margin // 2, margin // 2, width - margin // 2, height - margin // 2),
                    outline=(90, 84, 76), width=3)
-    title_font = _font(38)
+    title_font = _font(38, bold=True)
     y = 110
-    for line in _wrap(draw, title or "", title_font, width - 2 * margin, 6):
-        line_width = draw.textlength(line, font=title_font)
-        draw.text(((width - line_width) / 2, y), line, fill=(40, 36, 32), font=title_font)
-        y += 48
+    if _legible(title_font, title):
+        for line in _wrap(draw, title, title_font, width - 2 * margin, 6):
+            line_width = draw.textlength(line, font=title_font)
+            draw.text(((width - line_width) / 2, y), line, fill=(40, 36, 32), font=title_font)
+            y += 48
     author_font = _font(26)
     y = max(y + 36, 380)
-    for line in _wrap(draw, ", ".join(authors or ()), author_font, width - 2 * margin, 3):
-        line_width = draw.textlength(line, font=author_font)
-        draw.text(((width - line_width) / 2, y), line, fill=(70, 64, 58), font=author_font)
-        y += 34
+    byline = ", ".join(authors or ())
+    if _legible(author_font, byline):
+        for line in _wrap(draw, byline, author_font, width - 2 * margin, 3):
+            line_width = draw.textlength(line, font=author_font)
+            draw.text(((width - line_width) / 2, y), line, fill=(70, 64, 58), font=author_font)
+            y += 34
     return image
 
 
@@ -183,13 +238,18 @@ def _opf(*, book_id, title, authors, series, series_index, language, modified):
   </metadata>
   <manifest>
     <item id="cover-image" href="cover.jpg" media-type="image/jpeg" properties="cover-image"/>
+    <item id="cover" href="cover.xhtml" media-type="application/xhtml+xml"/>
     <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
     <item id="ncx" href="toc.ncx" media-type="application/x-dtbncx+xml"/>
     <item id="page" href="placeholder.xhtml" media-type="application/xhtml+xml"/>
   </manifest>
   <spine toc="ncx">
+    <itemref idref="cover"/>
     <itemref idref="page"/>
   </spine>
+  <guide>
+    <reference type="cover" title="Cover" href="cover.xhtml"/>
+  </guide>
 </package>
 """ % {
         "id": book_id, "title": escape(title or ""), "creators": creators,
@@ -205,6 +265,10 @@ def _nav(title, language):
 <head><title>%(title)s</title></head>
 <body>
   <nav epub:type="toc" id="toc"><ol><li><a href="placeholder.xhtml">%(title)s</a></li></ol></nav>
+  <nav epub:type="landmarks" id="landmarks" hidden="hidden"><ol>
+    <li><a epub:type="cover" href="cover.xhtml">Cover</a></li>
+    <li><a epub:type="bodymatter" href="placeholder.xhtml">%(title)s</a></li>
+  </ol></nav>
 </body>
 </html>
 """ % {"lang": quoteattr(language), "title": escape(title or "")}
@@ -223,6 +287,24 @@ def _ncx(book_id, title):
   </navMap>
 </ncx>
 """ % {"id": book_id, "title": escape(title or "")}
+
+
+def _cover_page(title, language):
+    """The first page: the badged cover, as large as the page allows.
+
+    MuPDF, which draws KOReader's thumbnail of a PDF or comic from its first
+    page, shrinks an image taller than the page to fit it.
+    """
+    return """<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang=%(lang)s lang=%(lang)s>
+<head>
+  <title>%(title)s</title>
+  <style>body{margin:0;padding:0;text-align:center}img{width:100%%}</style>
+</head>
+<body epub:type="cover"><img src="cover.jpg" alt=%(alt)s/></body>
+</html>
+""" % {"lang": quoteattr(language), "title": escape(title or ""), "alt": quoteattr(title or "")}
 
 
 def _page(*, title, authors, language, heading, lines):
@@ -264,6 +346,8 @@ def build(*, book_id, rev, title, authors, series, series_index, cover_path,
             modified=modified).encode("utf-8"), zipfile.ZIP_DEFLATED),
         ("OEBPS/nav.xhtml", _nav(title, language).encode("utf-8"), zipfile.ZIP_DEFLATED),
         ("OEBPS/toc.ncx", _ncx(book_id, title).encode("utf-8"), zipfile.ZIP_DEFLATED),
+        ("OEBPS/cover.xhtml", _cover_page(title, language).encode("utf-8"),
+         zipfile.ZIP_DEFLATED),
         ("OEBPS/placeholder.xhtml", _page(
             title=title, authors=authors, language=language, heading=heading,
             lines=lines).encode("utf-8"), zipfile.ZIP_DEFLATED),

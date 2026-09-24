@@ -15600,6 +15600,51 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+# Reader: native highlights and browser reading sources
+
+msgid "All annotations"
+msgstr "Alle annotaties"
+
+msgid "Browser reading sources"
+msgstr "Leesbronnen in de browser"
+
+msgid "Browsers appear after saving reading progress or annotations. Different browsers or profiles can appear separately."
+msgstr "Browsers verschijnen na het opslaan van leesvoortgang of annotaties. Verschillende browsers of profielen kunnen afzonderlijk verschijnen."
+
+msgid "Inventory not reported"
+msgstr "Inventaris niet gemeld"
+
+msgid "Location unavailable"
+msgstr "Locatie niet beschikbaar"
+
+msgid "Reading data is kept. Future browser saves can appear under an unidentified browser source."
+msgstr "Leesgegevens blijven bewaard. Toekomstige opslagacties in de browser kunnen onder een niet-geïdentificeerde browserbron verschijnen."
+
+msgid "This device has not reported its inventory yet."
+msgstr "Dit apparaat heeft zijn inventaris nog niet gemeld."
+
+msgid "Unidentified browser source"
+msgstr "Niet-geïdentificeerde browserbron"
+
+msgid "Warning: the saved highlight could not be located in the current book. Its text is preserved."
+msgstr "Waarschuwing: de opgeslagen markering kon niet worden gevonden in het huidige boek. De tekst blijft bewaard."
+
+#, python-brace-format
+msgid "{n} annotations assigned to this source"
+msgstr "{n} annotaties toegewezen aan deze bron"
+
+#, python-brace-format
+msgid "{n} annotations assigned to this source will become Unknown device."
+msgstr "{n} annotaties die aan deze bron zijn toegewezen, krijgen de aanduiding Onbekend apparaat."
+
+#, python-brace-format
+msgid "{n} annotations from this source"
+msgstr "{n} annotaties uit deze bron"
+
+#, python-brace-format
+msgid "{n} annotations were made on this source. They are not deleted. Their origin history is kept."
+msgstr "{n} annotaties zijn op deze bron gemaakt. Ze worden niet verwijderd. Hun oorspronkelijke herkomst blijft bewaard."
+
 #~ msgid ""
 #~ "Choose Login and sign in with this NextGen account or one of its app "
 #~ "passwords."

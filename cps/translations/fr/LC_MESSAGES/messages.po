@@ -15950,6 +15950,51 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+# Reader: native highlights and browser reading sources
+
+msgid "All annotations"
+msgstr "Toutes les annotations"
+
+msgid "Browser reading sources"
+msgstr "Sources de lecture dans le navigateur"
+
+msgid "Browsers appear after saving reading progress or annotations. Different browsers or profiles can appear separately."
+msgstr "Les navigateurs apparaissent après l’enregistrement de la progression de lecture ou d’annotations. Chaque navigateur ou profil peut apparaître séparément."
+
+msgid "Inventory not reported"
+msgstr "Inventaire non communiqué"
+
+msgid "Location unavailable"
+msgstr "Emplacement indisponible"
+
+msgid "Reading data is kept. Future browser saves can appear under an unidentified browser source."
+msgstr "Les données de lecture sont conservées. Les prochains enregistrements du navigateur peuvent apparaître sous une source de navigateur non identifiée."
+
+msgid "This device has not reported its inventory yet."
+msgstr "Cet appareil n’a pas encore communiqué son inventaire."
+
+msgid "Unidentified browser source"
+msgstr "Source de navigateur non identifiée"
+
+msgid "Warning: the saved highlight could not be located in the current book. Its text is preserved."
+msgstr "Avertissement : l’annotation enregistrée n’a pas pu être localisée dans le livre actuel. Son texte est conservé."
+
+#, python-brace-format
+msgid "{n} annotations assigned to this source"
+msgstr "{n} annotations attribuées à cette source"
+
+#, python-brace-format
+msgid "{n} annotations assigned to this source will become Unknown device."
+msgstr "{n} annotations attribuées à cette source seront associées à Appareil inconnu."
+
+#, python-brace-format
+msgid "{n} annotations from this source"
+msgstr "{n} annotations provenant de cette source"
+
+#, python-brace-format
+msgid "{n} annotations were made on this source. They are not deleted. Their origin history is kept."
+msgstr "{n} annotations ont été créées sur cette source. Elles ne sont pas supprimées. Leur historique d’origine est conservé."
+
 #~ msgid ""
 #~ "Choose Login and sign in with this NextGen account or one of its app "
 #~ "passwords."

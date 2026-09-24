@@ -253,6 +253,7 @@ class RawPage(object):
     text_layer_overpainted: bool = False
     text_layer_invisible: bool = False
     transcript_unverified: bool = False
+    source_links: list = field(default_factory=list)
 
     @property
     def text_blocks(self):
@@ -281,7 +282,86 @@ class RawPage(object):
                 "text_layer_invisible": getattr(self, "text_layer_invisible", False),
                 "transcript_unverified": getattr(self, "transcript_unverified", False)}
         if getattr(self,'source_geometry',{}):value['source_geometry'] = self.source_geometry
+        if self.source_links:value['source_links'] = self.source_links
         return value
+
+
+def _source_links(page, payload, page_count):
+    """Keep literal PDF GoTo records and a uniquely owned source glyph.
+
+    Rectangle overlap alone is insufficient: tall link rectangles often cross
+    both the preceding and following note labels. A character centre must be
+    inside the rectangle, and the owned characters must form one contiguous run
+    on one source line. Unsupported actions are recorded but never followed.
+    """
+    records = []
+    for ordinal, link in enumerate(page.get_links()):
+        xref = link.get('xref')
+        rect = link.get('from')
+        missing_xref = type(xref) is not int or xref <= 0
+        if missing_xref and link.get('kind') != pymupdf.LINK_GOTO:
+            continue
+        try:
+            box = tuple(float(v) for v in rect)
+        except (TypeError, ValueError, OverflowError):
+            box = ()
+        kind = link.get('kind', -1)
+        valid_box = (len(box) == 4 and all(math.isfinite(v) for v in box)
+                     and box[2] > box[0] and box[3] > box[1])
+        record = {'pno': page.number, 'xref': xref if not missing_xref else 0,
+                  'rect': box if valid_box else None,
+                  'kind': kind if type(kind) is int else -1,
+                  'status': 'unsupported_action'}
+        if missing_xref:
+            record['annotation_index'] = ordinal
+        if record['kind'] != pymupdf.LINK_GOTO:
+            records.append(record)
+            continue
+        if not valid_box:
+            record['status'] = 'invalid_source_rectangle'
+            records.append(record)
+            continue
+        target = link.get('page')
+        point = link.get('to')
+        try:
+            destination = tuple(float(v) for v in point)
+        except (TypeError, ValueError, OverflowError):
+            destination = ()
+        if (type(target) is not int or not 0 <= target < page_count or
+                len(destination) != 2 or not all(math.isfinite(v) for v in destination) or
+                not 0 <= destination[0] <= page.parent[target].rect.width or
+                not 0 <= destination[1] <= page.parent[target].rect.height):
+            record['status'] = 'invalid_destination'
+            records.append(record)
+            continue
+        record.update(dest_page=target, dest_point=destination,
+                      view='XYZ', status='ambiguous_source')
+        if missing_xref:
+            record['status'] = 'missing_xref'
+            records.append(record)
+            continue
+        owners = []
+        for block in payload.get('blocks', []):
+            for line in block.get('lines', []):
+                chars = [char for sp in line.get('spans', [])
+                         for char in sp.get('chars', [])]
+                selected = [(i, char) for i, char in enumerate(chars)
+                            if box[0] <= (char['bbox'][0] + char['bbox'][2]) / 2 <= box[2]
+                            and box[1] <= (char['bbox'][1] + char['bbox'][3]) / 2 <= box[3]
+                            and char.get('c', '').strip()]
+                if selected:
+                    owners.append((line, selected))
+        if len(owners) == 1:
+            line, selected = owners[0]
+            label = ''.join(char['c'] for _, char in selected)
+            line_text = ''.join(char.get('c', '') for sp in line.get('spans', [])
+                                for char in sp.get('chars', []))
+            if (label and line_text.count(label) == 1 and
+                    selected[-1][0]-selected[0][0]+1 == len(selected)):
+                record.update(status='source_owned', label=label,
+                              line_text=line_text, line_box=tuple(line['bbox']))
+        records.append(record)
+    return records
 
 
 def open_document(source):
@@ -303,6 +383,7 @@ def read_page(doc, pno, *, keep_char_boxes=False):
     from .native_text import unresolved_fonts, normalize_blocks, mark_unmapped_words, synthetic_spacing_uncertain, text_layer_overpainted
     unknown_fonts = unresolved_fonts(page)
     payload = page.get_text("rawdict")
+    raw.source_links = _source_links(page, payload, len(doc))
     for block in payload.get("blocks", []):
         for line in block.get("lines", []):
             for span in line.get("spans", []):

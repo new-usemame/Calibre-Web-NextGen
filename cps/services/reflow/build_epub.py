@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.18"
+CONVERTER_VERSION = "1.20"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -174,6 +174,9 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
     blocks = []
     figure_index = 0
     caption_keys = _caption_keys(elements)
+    navigation = [link for link in book.source_navigation
+                  if link['status'] == 'resolved' and
+                  (link['pno'] == pno or link['dest_page'] == pno)]
 
     index = 0
     while index < len(elements):
@@ -183,7 +186,9 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
         if element.kind == "fig":
             caption = ""
             if index < len(elements) and elements[index].kind == "caption":
-                caption = _runs_html(elements[index].runs, available, ref_ids, ambiguous)
+                caption = _nav_runs_html(elements[index].runs,
+                    _source_nav_marks(navigation,pno,index,None),
+                    available, ref_ids, ambiguous)
                 if elements[index].caption_uncertain:
                     caption = _source_caption(pno, caption_keys[index])
                 index += 1
@@ -229,7 +234,8 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
             if element.punctuation_uncertain:
                 blocks.append(_punctuation_notice(pno, element_index))
             continue
-        inner = _runs_html(element.runs, available, ref_ids, ambiguous)
+        marks = _source_nav_marks(navigation, pno, element_index, None)
+        inner = _nav_runs_html(element.runs, marks, available, ref_ids, ambiguous)
         if not inner.strip():
             continue
         if element_blocks is not None:
@@ -240,7 +246,9 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
             if not items or ' '.join(plain_text(r).strip() for r in items)!=element.text.strip():
                 raise ValueError('Source list items differ from source inventory')
             blocks.append('<ol class="source-list">%s</ol>' % ''.join(
-                '<li>%s</li>' % _runs_html(r,available,ref_ids,ambiguous) for r in items))
+                '<li>%s</li>' % _nav_runs_html(r,
+                    _source_nav_marks(navigation,pno,element_index,ii),
+                    available,ref_ids,ambiguous) for ii,r in enumerate(items)))
         elif element.kind == "h":
             level = min(6, max(1, int(element.level or 1)))
             if getattr(element,'display_lines',[]):
@@ -281,7 +289,57 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
             [n for n in book.notes if getattr(n, "continued_from", None) == (pno, note.num)]))
     if any(r[0]=="glyph" for el in elements for r in el.runs) or any(getattr(n,"glyph_fallback",False) for n in notes):
         blocks.append('<p class="source-evidence-notice">Some source words or glyphs are shown as original images because their text encoding or transcription is uncertain. <a href="original-p%04d.xhtml#page">Open original page</a>.</p>' % pno)
+    if any(link['pno'] == pno and link['kind'] == 1 and link['status'] != 'resolved'
+           for link in book.source_navigation):
+        blocks.append('<p class="source-evidence-notice">An internal PDF link could not be placed unambiguously. '
+                      '<a href="original-p%04d.xhtml#page">Open original page</a>.</p>' % pno)
     return "\n".join(blocks)
+
+
+def _source_nav_marks(navigation, pno, element_index, item_index):
+    marks=[]
+    for link in navigation:
+        if link['pno'] == pno and link['source_element'] == element_index \
+                and link['source_item'] == item_index:
+            marks.append((link['source_offset'], 'open', link['id']))
+            marks.append((link['source_offset']+link['source_extent'], 'close', link['id']))
+        if link['dest_page'] == pno and link['dest_element'] == element_index \
+                and link['dest_item'] == item_index:
+            marks.append((link['dest_offset'], 'anchor', link['id']))
+    return marks
+
+
+def _nav_runs_html(runs, marks, available, ref_ids, ambiguous):
+    if not marks:
+        return _runs_html(runs, available, ref_ids, ambiguous)
+    events={}
+    for offset, kind, ident in marks:
+        events.setdefault(offset, []).append((kind, ident))
+    output=[];position=0
+    def emit(offset):
+        for kind, ident in sorted(events.get(offset, []),
+                                  key=lambda row: {'close':0,'anchor':1,'open':2}[row[0]]):
+            if kind == 'close':output.append('</a>')
+            elif kind == 'anchor':output.append('<span id="%s"></span>' % ident)
+            else:output.append('<a href="#%s">' % ident)
+    emit(0)
+    for run in runs:
+        size=(len(run[1]) if run[0] in ('t','raised','glyph')
+              else len('[%s]' % run[1]))
+        if run[0] != 't' or not size:
+            output.append(_runs_html([run],available,ref_ids,ambiguous))
+            position+=size;emit(position)
+            continue
+        run_start=position
+        starts=[run_start]+sorted(p for p in events if run_start<p<run_start+size)+[run_start+size]
+        for a,b in zip(starts,starts[1:]):
+            part=list(run);part[1]=run[1][a-run_start:b-run_start]
+            output.append(_runs_html([part],available,ref_ids,ambiguous))
+            position=b;emit(position)
+    if any(offset>position for offset in events):
+        raise ValueError('PDF navigation offset beyond source text: %r, length %d, %r' %
+                         (marks,position,assemble.plain_text(runs)[:100]))
+    return ''.join(output)
 
 
 def _punctuation_notice(pno, index):
@@ -1421,10 +1479,12 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
     current_page_html = dict(page_html) if operation_plans else {}
     # Source evidence also governs direct builder callers. Do this before XML
     # character filtering, so no raw source character is reintroduced afterward.
-    page_html = {pno: canonical(pno) if book.needs_source_evidence(pno) or pno in source_pages else html
+    page_html = {pno: canonical(pno) if book.needs_source_evidence(pno) or
+                 book.has_source_navigation(pno) or pno in source_pages else html
                  for pno, html in page_html.items()}
     generated_pages={pno:html for pno,html in page_html.items()
-                     if book.needs_source_evidence(pno) or pno in source_pages}
+                     if book.needs_source_evidence(pno) or book.has_source_navigation(pno)
+                     or pno in source_pages}
     # Inactive opt-in seam: only source-bound wrapper plans are admitted here.
     # Recheck cached plans before producing any output or rendering evidence.
     seen_pages = set()
@@ -1634,6 +1694,8 @@ def _sidecar(book, pages, chapters, images, joins, extra, blanks=()):
                                  if figure.get("found") not in (None, "embedded")),
         "figures_blank_dropped": len(blanks),
         "images_embedded": len(images),
+        "source_document_sha256": book.source_fingerprint,
+        "source_navigation": book.source_navigation,
         "artwork_words": artwork_words,
         # What conservation means here, exactly: every alphabetic word of the PDF
         # text layer is accounted for in the reading flow (body, headings,

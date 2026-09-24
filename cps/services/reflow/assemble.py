@@ -96,6 +96,7 @@ class Element(object):
     caption_uncertain: bool = False
     punctuation_uncertain: bool = False
     list_items: list = field(default_factory=list)
+    list_item_boxes: list = field(default_factory=list)
     display_lines: tuple = ()
     display_group: Optional[dict] = None
 
@@ -174,6 +175,8 @@ class Book(object):
     pages: dict = field(default_factory=dict)         # pno -> [Element] as printed
     body_boxes: dict = field(default_factory=dict)    # pno -> the page minus its furniture
     title_pages: dict = field(default_factory=dict)   # source page -> printed title label
+    source_navigation: list = field(default_factory=list)
+    source_fingerprint: str = ""
     figures: List[dict] = field(default_factory=list)
     #: Lettering the text layer read off a figure, kept with the figure instead of
     #: the prose: pno, text, bbox. Counted into conservation so the words are
@@ -189,6 +192,11 @@ class Book(object):
 
     def page_reasons(self, pno):
         return list(self.reasons.get(pno, []))
+
+    def has_source_navigation(self, pno):
+        return any(link['status'] == 'resolved' and
+                   (link['pno'] == pno or link['dest_page'] == pno)
+                   for link in self.source_navigation)
 
     def ambiguous_note_numbers(self, pno):
         notes = [note for note in self.notes if note.pno == pno and note.num is not None]
@@ -208,7 +216,8 @@ class Book(object):
         return uncertain
 
     def needs_source_evidence(self, pno):
-        return any(f["pno"] == pno and f.get("found") in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark") for f in self.figures) or any(n.pno == pno and getattr(n,"glyph_fallback",False) for n in self.notes) or bool(self.ambiguous_note_numbers(pno)) or any(
+        return any(link['pno'] == pno and link['kind'] == 1 and link['status'] != 'resolved'
+                   for link in self.source_navigation) or any(f["pno"] == pno and f.get("found") in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark") for f in self.figures) or any(n.pno == pno and getattr(n,"glyph_fallback",False) for n in self.notes) or bool(self.ambiguous_note_numbers(pno)) or any(
             any(r[0]=="glyph" for r in element.runs) or element.caption_uncertain or element.punctuation_uncertain or bool(getattr(element,"display_group",{}))
             for element in self.pages.get(pno, []))
 
@@ -1053,6 +1062,8 @@ def _copy_element(element):
                    caption_uncertain=element.caption_uncertain,
                    punctuation_uncertain=element.punctuation_uncertain,
                    line_boxes=list(element.line_boxes),
+                   list_items=deepcopy(element.list_items),
+                   list_item_boxes=deepcopy(element.list_item_boxes),
                    display_lines=deepcopy(element.display_lines),
                    display_group=deepcopy(element.display_group))
 
@@ -1187,7 +1198,7 @@ def _page_elements(skel, repairs, reasons, vocab=None):
                                             pages=[skel.pno]))
             continue
         if region.kind == 'list':
-            items=[];all_runs=[]
+            items=[];all_runs=[];item_boxes=[]
             for group in region.list_groups:
                 runs=[]
                 for line in group:
@@ -1195,9 +1206,11 @@ def _page_elements(skel, repairs, reasons, vocab=None):
                                     preserve_style=not skel.is_scan)
                     runs=part if not runs else stitch_runs(runs,part,vocab=vocab)
                 runs=tidy(runs);items.append(runs)
+                item_boxes.append([tuple(line.bbox) for line in group])
                 if all_runs:all_runs.append(['t',' '])
                 all_runs.extend(runs)
-            elements.append(Element(kind='list',runs=all_runs,list_items=items,pno=skel.pno,
+            elements.append(Element(kind='list',runs=all_runs,list_items=items,
+                list_item_boxes=item_boxes,pno=skel.pno,
                 bbox=region.bbox,pages=[skel.pno],band=region.band,column=region.column,
                 line_boxes=[line.bbox for line in region.lines],
                 punctuation_uncertain=any(sp.punctuation_uncertain
@@ -1287,6 +1300,128 @@ def _region_caption_box(region):
         return region.bbox
     return (min(b[0] for b in boxes), min(b[1] for b in boxes),
             max(b[2] for b in boxes), max(b[3] for b in boxes))
+
+
+def _source_label_offset(text, line_text, label):
+    """Locate the owned glyph using its own line, even when digits repeat."""
+    if line_text.count(label) != 1:return None
+    at = line_text.index(label)
+    before = line_text[:at]
+    after = line_text[at+len(label):]
+    if before:
+        context = before[-min(24,len(before)):]
+        if text.count(context) == 1:
+            return text.index(context)+len(context)
+    if after:
+        context = after[:min(24,len(after))]
+        if text.count(context) == 1:
+            return text.index(context)-len(label)
+    if text.count(label) == 1:return text.index(label)
+    return None
+
+
+def _bind_source_navigation(book, raw_pages):
+    """Map literal PDF positions to the page's final source elements.
+
+    Fail closed on competing homes. A destination point is a viewport location,
+    not a semantic reference to a nearby superscript.
+    """
+    raw_by_page = {raw.pno: raw for raw in raw_pages}
+    for raw in raw_pages:
+        for source in raw.source_links:
+            record = dict(source)
+            record['id'] = ('pdfgoto_p%04d_x%d' % (raw.pno, source['xref'])
+                            if source['xref'] else
+                            'pdfgoto_p%04d_i%d' % (raw.pno, source['annotation_index']))
+            if record['status'] != 'source_owned':
+                book.source_navigation.append(record)
+                continue
+            label = record['label']
+            line_box = record['line_box']
+            owners = []
+            for ei, element in enumerate(book.pages.get(raw.pno, [])):
+                if element.kind == 'list':
+                    for ii, (runs, boxes) in enumerate(zip(element.list_items,
+                                                             element.list_item_boxes)):
+                        if any(abs(box[1]-line_box[1]) < 1.5 and
+                               abs(box[3]-line_box[3]) < 1.5 for box in boxes):
+                            text = plain_text(runs)
+                            offset=_source_label_offset(text,record['line_text'],label)
+                            if offset is not None:owners.append((ei, ii, offset))
+                elif any(abs(box[1]-line_box[1]) < 1.5 and
+                         abs(box[3]-line_box[3]) < 1.5 for box in element.line_boxes):
+                    offset=_source_label_offset(element.text,record['line_text'],label)
+                    if offset is not None:owners.append((ei, None, offset))
+            if len(owners) != 1:
+                record['status'] = 'ambiguous_owner'
+                book.source_navigation.append(record)
+                continue
+            record['source_element'], record['source_item'], record['source_offset'] = owners[0]
+            owner_text = (plain_text(book.pages[raw.pno][owners[0][0]].list_items[owners[0][1]])
+                          if owners[0][1] is not None else book.pages[raw.pno][owners[0][0]].text)
+            token = '[%s]' % label
+            if owner_text.startswith(token, record['source_offset']):
+                record['source_extent'] = len(token)
+            elif owner_text[record['source_offset']-1:record['source_offset']+len(label)+1] == token:
+                record['source_offset'] -= 1
+                record['source_extent'] = len(token)
+            else:
+                record['source_extent'] = len(label)
+            target_page = raw_by_page.get(record['dest_page'])
+            if target_page is None:
+                record['status'] = 'destination_unavailable'
+                book.source_navigation.append(record)
+                continue
+            x, y = record['dest_point']
+            candidates = []
+            for block in target_page.text_blocks:
+                for line in block.lines:
+                    box = line.bbox
+                    gap = max(box[1]-y, y-box[3], 0)
+                    if gap <= 10 and box[0]-12 <= x <= box[2]+12:
+                        direction = 0 if box[1] <= y <= box[3] else (1 if y < box[1] else 2)
+                        candidates.append((direction, gap, line))
+            if not candidates:
+                record['status'] = 'destination_unmapped'
+                book.source_navigation.append(record)
+                continue
+            candidates.sort(key=lambda item:(item[0], item[1]))
+            if len(candidates)>1 and candidates[0][:2] == candidates[1][:2]:
+                record['status'] = 'ambiguous_destination'
+                book.source_navigation.append(record)
+                continue
+            line = candidates[0][2]
+            homes=[]
+            for ei, element in enumerate(book.pages.get(record['dest_page'], [])):
+                if element.kind == 'list':
+                    for ii, boxes in enumerate(element.list_item_boxes):
+                        if any(abs(box[1]-line.bbox[1])<1.5 and
+                               abs(box[3]-line.bbox[3])<1.5 for box in boxes):
+                            homes.append((ei, ii, 0))
+                    continue
+                if element.kind not in ('p','h','caption'):continue
+                if any(abs(box[1]-line.bbox[1])<1.5 and
+                       abs(box[3]-line.bbox[3])<1.5 for box in element.line_boxes):
+                    phrase = line.stripped
+                    offset = element.text.find(phrase)
+                    if offset < 0:
+                        offset = element.text.find(phrase[:min(20,len(phrase))])
+                    if offset >= 0:
+                        homes.append((ei, None, offset))
+            if len(homes) != 1:
+                record['status'] = 'destination_unmapped'
+                book.source_navigation.append(record)
+                continue
+            record['dest_element'], record['dest_item'], record['dest_offset'] = homes[0]
+            source_element = book.pages[raw.pno][record['source_element']]
+            dest_element = book.pages[record['dest_page']][record['dest_element']]
+            if (source_element.display_lines or dest_element.display_lines or
+                    source_element.caption_uncertain or dest_element.caption_uncertain):
+                record['status'] = 'presentation_unmapped'
+                book.source_navigation.append(record)
+                continue
+            record['status'] = 'resolved'
+            book.source_navigation.append(record)
 
 
 def assemble(skeletons, style, raw_pages=None):
@@ -1389,6 +1524,7 @@ def assemble(skeletons, style, raw_pages=None):
             book.reasons[skel.pno] = sorted(set(page_reasons))
 
     if raw_pages is not None:
+        _bind_source_navigation(book, raw_pages)
         book.source_words = source_word_counter(raw_pages, vocab=vocab,
                                                 skeletons=skeletons)
         book.conservation = check_conservation(book.source_words, book.elements,
@@ -1443,7 +1579,9 @@ def deterministic_book(doc, page_numbers=None):
                 doc, raw.pno,
                 mask=[ln.bbox for blk in raw.text_blocks for ln in blk.lines]))
         for raw in raw_pages]
-    return assemble(skeletons, style, raw_pages)
+    book = assemble(skeletons, style, raw_pages)
+    book.source_fingerprint = extract.document_fingerprint(doc)
+    return book
 
 
 # ---------------------------------------------------------------- the invariant

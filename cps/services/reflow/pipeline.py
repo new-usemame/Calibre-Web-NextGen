@@ -371,6 +371,7 @@ def run(doc, client=None, ledger=None, cache=None, page_numbers=None,
 
     report(Progress(stage="assemble", message="putting the text back together"))
     book = assemble.assemble(skeletons, style, raw_pages)
+    book.source_fingerprint = result.fingerprint
     result.book = book
 
     report(Progress(stage="route", message="deciding which pages need a model"))

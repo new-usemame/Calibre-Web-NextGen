@@ -59,6 +59,15 @@ test('a public shelf offers reading and downloads without adding personal member
     // actual page turn and require readable content from the next section.
     await page.getByRole('button', { name: 'Next page', exact: true }).click();
     await expect(page.frameLocator('iframe').first().locator('body')).not.toBeEmpty();
+    // The reader's own reading places load for a shared book too (#2284
+    // review F4); without membership the panel used to show only an error.
+    await page.getByRole('button', { name: 'Reading places', exact: true }).click();
+    const places = page.getByRole('dialog', { name: 'Reading places', exact: true });
+    await expect(places.getByText('No saved reading places yet.', { exact: true })
+      .or(places.getByRole('list'))).toBeVisible();
+    await expect(places.getByRole('alert')).toHaveCount(0);
+    await places.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(places).toHaveCount(0);
     const detail = await (await page.request.get(`/api/v1/books/${selected.id}`)).json();
     expect(detail.in_my_library).toBe(false);
     expect(detail.accessible_via_public_shelf).toBe(true);

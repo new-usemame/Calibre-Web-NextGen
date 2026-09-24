@@ -32,7 +32,10 @@ local PLACEHOLDER_MAX_BYTES = 1024 * 1024
 -- Automatic syncs (network up, wake, file browser shown) are at most this
 -- often. A manual "Sync now" and the first sync after setup ignore it.
 local LIBRARY_SYNC_INTERVAL = 5 * 60
-local MAX_MANIFEST_PAGES = 200
+-- Only a guard against a server that never stops paging: a list cut short is
+-- never applied, since every book past the cut would look as if it had left the
+-- library. 5000 pages is a million books at the server's page size.
+local MAX_MANIFEST_PAGES = 5000
 local PLACEHOLDER_TIMEOUTS = { 5, 20 }
 
 -- Shared by the file browser's and the reader's plugin instances: there is one
@@ -485,6 +488,7 @@ function Runtime:syncLibrary(opts)
     local books = {}
     local shelves = {}
     local pages = 0
+    local cursors_seen = {}
 
     local function done(ok, summary)
         if shared.running ~= token then return end
@@ -524,7 +528,14 @@ function Runtime:syncLibrary(opts)
                 end
                 if type(body.shelves) == "table" then shelves = body.shelves end
                 for _, book in ipairs(body.books or {}) do books[#books + 1] = book end
-                if body.next_cursor and pages < MAX_MANIFEST_PAGES then
+                if body.next_cursor then
+                    local cursor_key = tostring(body.next_cursor)
+                    if cursors_seen[cursor_key] or pages >= MAX_MANIFEST_PAGES then
+                        logger.warn("CWNGSync: library manifest did not finish after", pages, "pages")
+                        done(false, _("the server's list of books did not finish"))
+                        return
+                    end
+                    cursors_seen[cursor_key] = true
                     fetch(body.next_cursor)
                     return
                 end

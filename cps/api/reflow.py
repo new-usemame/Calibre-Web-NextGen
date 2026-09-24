@@ -315,9 +315,12 @@ def _page_count_uncached(path):
     None when nothing can open it; whatever has to read it next refuses it.
     """
     from ..services.reflow.native_ipc import NativeDocument
+    from ..services.reflow.native_resources import ResourceUnavailable, ResourceStopped
     try:
         with NativeDocument(path, scratch_root=os.path.join(REFLOW_DIR, 'native-scratch')) as document:
             return document.page_count
+    except (ResourceUnavailable, ResourceStopped):
+        raise  # resource refusal is not an unreadable PDF or a cached page count
     except Exception:                                              # noqa: BLE001
         return None
 
@@ -347,13 +350,25 @@ def _over_limit(source):
             size=format_decimal(tasks_reflow.pdf_size_mb(size), format="#,##0.0"),
             limit=format_decimal(limit_mb)), 422)
     limit_pages = tasks_reflow.max_pages()
-    pages = _page_count(source)
+    from ..services.reflow.native_resources import ResourceUnavailable, ResourceStopped
+    try:
+        pages = _page_count(source)
+    except (ResourceUnavailable, ResourceStopped) as exc:
+        return _resource_refusal(exc)
     if pages is not None and pages > limit_pages:
         return _err("pdf_too_many_pages", _(
             "This PDF has %(pages)s pages. Reflow converts PDFs of up to %(limit)s pages; "
             "an administrator can change this limit.",
             pages=format_decimal(pages), limit=format_decimal(limit_pages)), 422)
     return None
+
+
+def _resource_refusal(exc):
+    from ..services.reflow.native_resources import ResourceBusy
+    if isinstance(exc, ResourceBusy):
+        return _err('native_capacity_busy', 'Native work is already active. Retry after it completes.', 409)
+    return _err('native_capacity_unavailable',
+                'Native capacity is busy, insufficient or unmeasurable. Retry after active work completes or an administrator restores capacity.', 503)
 
 
 CONSENT_CONTRACT='source-review-1'
@@ -481,11 +496,14 @@ def reflow_estimate(book_id):
     _book, source, failure = _source_or_error(book_id)
     if failure:
         return failure
+    from ..services.reflow.native_resources import ResourceUnavailable, ResourceStopped
     try:
         refused = _over_limit(source)
         if refused:
             return refused
         return jsonify(_estimate_payload(_book, source))
+    except (ResourceUnavailable, ResourceStopped) as exc:
+        return _resource_refusal(exc)
     except Exception as exc:                                      # noqa: BLE001
         log.error_or_exception("reflow: could not estimate book %s: %s" % (book_id, exc))
         return _err("estimate_failed",

@@ -16,6 +16,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from . import extract,model,structural_quote,typed_model,prompts,ocr,build_epub,enriched_source,heading_units
+from .native_resources import Lease, ResourceUnavailable, ResourceStopped
 
 
 class PreparationBusy(Exception):
@@ -144,6 +145,10 @@ class PreparationStore:
             finally:
                 if temporary.exists():temporary.unlink()
             with self.lock:job.update(status='ready',quote=quote,touched=time.monotonic())
+        except ResourceStopped:
+            with self.lock:job.update(status='cancelled',error='native_capacity_stopped',touched=time.monotonic())
+        except ResourceUnavailable:
+            with self.lock:job.update(status='failed',error='native_capacity_unavailable',touched=time.monotonic())
         except model.AttemptCancelled:
             with self.lock:job.update(status='cancelled',touched=time.monotonic())
         except PreparationTimeout:
@@ -237,19 +242,22 @@ def measure_isolated(source,options,progress,should_stop,cache_root,timeout=None
     timeout=PREPARATION_TIMEOUT if timeout is None else float(timeout)
     grace=STOP_GRACE if grace is None else float(grace)
     scratch=Path(cache_root)/'quote-scratch';scratch.mkdir(parents=True,exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix='prepare-',dir=scratch) as directory:
+    with Lease(cache_root, should_stop) as resources, tempfile.TemporaryDirectory(prefix='prepare-',dir=scratch) as directory:
         root=Path(directory);control=root/'cancel';status=root/'progress.json';output=root/'quote.json'
         request=dict(source=str(source),options=options,cache_root=str(cache_root),
                      control=str(control),progress=str(status),output=str(output),parent=os.getpid())
         with open(root/'stderr.log','wb') as errors:
+            resources.before_launch()
             process=subprocess.Popen([sys.executable,'-I',str(WORKER)],
                 stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=errors,
-                env=_child_environment(root),cwd=str(root),start_new_session=True)
+                env=_child_environment(root),cwd=str(root),start_new_session=True,
+                pass_fds=(resources.fd,))
             deadline=time.monotonic()+timeout;stopping=None
             try:
                 process.stdin.write(json.dumps(request).encode());process.stdin.close()
                 last=None
                 while process.poll() is None:
+                    resources.check()
                     now=time.monotonic()
                     if should_stop and should_stop():
                         control.touch(exist_ok=True)
@@ -263,6 +271,7 @@ def measure_isolated(source,options,progress,should_stop,cache_root,timeout=None
                             progress(SimpleNamespace(**event));last=event
                     except (OSError,ValueError,TypeError):pass
                     time.sleep(.1)
+                resources.check(force=True)
                 if control.exists() or (should_stop and should_stop()):
                     raise model.AttemptCancelled('local source preparation cancelled')
                 if process.returncode!=0:raise ValueError('source preparation process failed')

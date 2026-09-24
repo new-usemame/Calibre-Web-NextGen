@@ -12,6 +12,7 @@ import tempfile
 import threading
 
 from . import native_codec as codec
+from .native_resources import Lease
 
 WORKER = Path(__file__).with_name('native_worker.py')
 MAX_CONTROL = 4096
@@ -68,10 +69,12 @@ class NativeDocument:
         self.seq = 0
         self.last_phase = 'open'
         self.operation_book = None
+        self.resource_lease = None
         os.makedirs(scratch_root, mode=0o700, exist_ok=True)
         self.root = tempfile.mkdtemp(prefix='native-', dir=scratch_root)
         self.selector = selectors.DefaultSelector()
         try:
+            self.resource_lease = Lease(cache_root or Path(scratch_root).parent, should_stop)
             shutil.copyfile(source, Path(self.root) / 'source.pdf')
             self.fingerprint = extract.document_fingerprint(Path(self.root) / 'source.pdf')
             if extract.document_fingerprint(source) != self.fingerprint:
@@ -82,12 +85,13 @@ class NativeDocument:
             read_fd, write_fd = os.pipe()
             self.control = os.fdopen(read_fd, 'rb', buffering=0)
             try:
+                self.resource_lease.before_launch()
                 self.process = subprocess.Popen(
                     [sys.executable, '-I', str(WORKER), str(os.getpid()),
                      os.path.realpath(cache_root) if cache_root else '', str(write_fd)],
                     cwd=self.root, env=environment, stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True,
-                    pass_fds=(write_fd,))
+                    pass_fds=(write_fd, self.resource_lease.fd))
             finally: os.close(write_fd)
             # Drain separately from the control pipe: native warnings cannot
             # block the worker or grow an unbounded diagnostic file. No native
@@ -112,9 +116,15 @@ class NativeDocument:
             self.error_tail = (self.error_tail + data)[-65536:]
 
     def _cancel(self):
+        self.check_resources()
         if self.should_stop and self.should_stop():
             from .model import AttemptCancelled
             raise AttemptCancelled('Native PDF work was cancelled')
+
+    def check_resources(self, force=False):
+        if self.resource_lease is not None:
+            return self.resource_lease.check(force=force)
+        return False
 
     def _line(self):
         while b'\n' not in self.buffer:
@@ -263,6 +273,13 @@ class NativeDocument:
     def close(self):
         if self.closed: return
         self.closed = True
+        try:
+            self._close_process()
+        finally:
+            if self.resource_lease is not None:
+                self.resource_lease.close()
+
+    def _close_process(self):
         process = self.process
         if process:
             try: process.stdin.close()

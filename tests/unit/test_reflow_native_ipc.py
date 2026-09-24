@@ -153,7 +153,7 @@ def test_child_environment_excludes_secrets_and_uses_installed_script(rig, monke
         assert 'OPENROUTER_API_KEY' not in kw['env'] and 'PYTHONPATH' not in kw['env']
 
 
-@pytest.mark.parametrize('stop_kind', ['death', 'cancel'])
+@pytest.mark.parametrize('stop_kind', ['death', 'cancel', 'capacity'])
 def test_parent_typed_billing_survives_native_death_without_paid_replay(rig, monkeypatch, stop_kind):
     """Real task + native child + typed provider/ledger/cache; only HTTP is fake.
     Crash after paid adoption, then retry: neither charge nor approved decision
@@ -192,6 +192,10 @@ def test_parent_typed_billing_survives_native_death_without_paid_replay(rig, mon
             assert len(calls) == 2
             assert self.ledger.pending_usd() == 0
             if stop_kind == 'death': os.kill(self.process.pid, signal.SIGKILL)
+            elif stop_kind == 'capacity':
+                from cps.services.reflow import native_resources
+                monkeypatch.setattr(native_resources, 'measure', lambda root: (0, 8 * 1024**3))
+                self.resource_lease.next_check = 0
             else: failed.stat = STAT_ENDED
         return real(self, operation, args, **kwargs)
     monkeypatch.setattr(ipc.NativeDocument, 'call', die)
@@ -207,6 +211,9 @@ def test_parent_typed_billing_survives_native_death_without_paid_replay(rig, mon
     assert len(exits) == 1
     assert exits[0]['exit_code'] == (-signal.SIGKILL if stop_kind == 'death' else 0)
     monkeypatch.setattr(ipc.NativeDocument, 'call', real)
+    if stop_kind == 'capacity':
+        from cps.services.reflow import native_resources
+        monkeypatch.setattr(native_resources, 'measure', lambda root: (8 * 1024**3, 8 * 1024**3))
     success = _run(rig, mode='full', cost_cap_usd=1, replace_existing_epub=True)
     assert success.stat == STAT_FINISH_SUCCESS, success.error
     assert len(calls) == 2, 'durably answered requests must be cache hits on retry'

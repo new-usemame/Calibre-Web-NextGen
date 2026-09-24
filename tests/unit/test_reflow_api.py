@@ -334,6 +334,13 @@ def test_two_simultaneous_starts_admit_exactly_one_conversion(
     import threading
 
     _wire(mod, monkeypatch, pdf_on_disk)
+    # This test targets book reserve-through-enqueue, not native preflight.
+    # Both callers have an already measured page count. The independent shared
+    # native-gate test covers simultaneous capacity admission across launchers.
+    monkeypatch.setattr(mod, '_page_count', lambda path: 400)
+    # Do not race two patch contexts restoring the same module attribute while
+    # the other thread still needs it. Each request retains its own Flask context.
+    monkeypatch.setattr(mod, 'current_user', _user())
     worker = SimpleNamespace(tasks=[])
     queued = []
     barrier = threading.Barrier(2)
@@ -355,8 +362,7 @@ def test_two_simultaneous_starts_admit_exactly_one_conversion(
         with _ctx("/api/v1/books/5/reflow", method="POST",
                   body=_current_body(mod,{"mode": "full", "model_tier": "standard", "consent": True,
                         "cost_cap_usd": 1.0})):
-            with patch.object(mod, "current_user", _user()):
-                outcomes.append(_status(inspect.unwrap(mod.reflow_start)(5)))
+            outcomes.append(_status(inspect.unwrap(mod.reflow_start)(5)))
 
     threads = [threading.Thread(target=start) for _ in range(2)]
     for thread in threads:

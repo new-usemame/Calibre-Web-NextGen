@@ -303,7 +303,7 @@ class TaskReflowPdf(CalibreTask):
                     ledger.record(runtime_diagnostics.recovery_record(
                         result.recovery, self.options.source_recovery,
                         self.options.ocr_language), durable=True)
-                if self.cancelled:
+                if self._native_stop(document):
                     # The pages already paid for stay in the cache, so restarting is
                     # cheap — but a conversion nobody waited for does not become the
                     # book. Cancel means cancel, not "file whatever was ready".
@@ -326,15 +326,18 @@ class TaskReflowPdf(CalibreTask):
             ledger.record({"kind": "job", "event": "finish",
                            "status": STOP_STATUS.get(result.stopped, "done")})
             self._handleSuccess()
-        except (ocr.OCRCancelled, build_epub.BuildCancelled, model.AttemptCancelled):
+        except (ocr.OCRCancelled, build_epub.BuildCancelled, model.AttemptCancelled) as exc:
             # The user stopped the recognition stage: nothing was filed, the
             # original is untouched, and the identity cache keeps what was
             # already recognized, so a resume spends nothing twice.
             if ledger is not None:
                 ledger.record({"kind": "job", "event": "finish",
-                               "status": "cancelled"})
+                               "status": "cancelled", "reason": str(exc)[:200]})
             self.message = ("cancelled during source recovery or EPUB assembly; the original is "
                             "unchanged and compatible recovery may resume")
+            from ..services.reflow.native_resources import ResourceStopped
+            if isinstance(exc, ResourceStopped):
+                self.message = str(exc)
             return self._finish_cancelled()
         except Exception as exc:                                  # noqa: BLE001
             log.error_or_exception(exc)
@@ -353,6 +356,14 @@ class TaskReflowPdf(CalibreTask):
 
     # ------------------------------------------------------------------ stages
 
+    def _native_stop(self, document):
+        # Fake/direct documents remain supported by the existing test and local
+        # pipeline interfaces. Actual Task documents always expose this guard.
+        check = getattr(document, 'check_resources', None)
+        if check:
+            check(force=True)
+        return self.cancelled
+
     def _convert(self, document, client, ledger, cache):
         recovery_opts = {
             "mode": self.options.source_recovery,
@@ -370,7 +381,7 @@ class TaskReflowPdf(CalibreTask):
         result = structural_pipeline.run_structural(document,client=client,ledger=ledger,cache=cache,
                             sample_count=self.options.sample_pages if sample else None,
                             sample_context=sample and observer is None,
-                            progress=self._on_progress,should_stop=lambda:self.cancelled,
+                            progress=self._on_progress,should_stop=lambda:self._native_stop(document),
                             recovery_opts=recovery_opts,prepared_observer=observer,measure_eligibility=self.options.review_mode=="source_verified")
         result.structural["review_mode"]=self.options.review_mode
         # The task/report ledger records the same final user-facing scope.
@@ -424,7 +435,7 @@ class TaskReflowPdf(CalibreTask):
                                      operation_plans=getattr(result,'operation_plans',None),
                                      figure_transform=(result.recovery.figure_rect
                                                        if result.recovery else None),
-                                     should_stop=lambda: self.cancelled,
+                                     should_stop=lambda: self._native_stop(document),
                                      evidence_progress=lambda done, total: self._on_progress(
                                          pipeline.Progress("evidence", page=done, pages=total,
                                              spend_usd=result.spend_usd,
@@ -463,7 +474,7 @@ class TaskReflowPdf(CalibreTask):
                 for chunk in iter(lambda:handle.read(1024*1024),b''):digest.update(chunk)
             artifact={'sha256':digest.hexdigest(),'bytes':os.path.getsize(built.path)}
             operation_audit.record(ledger,'emitted',operations=operation_audit.observe(built.path,audit_rows,audit_matching),**artifact)
-            if self.cancelled:
+            if self._native_stop(document):
                 raise build_epub.BuildCancelled('cancelled before publication')
             if extract.document_fingerprint(self._pdf_path(local_db,book))!=result.fingerprint:
                 raise ValueError("Source changed during conversion; no EPUB was published.")

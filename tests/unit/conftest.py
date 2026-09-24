@@ -143,3 +143,14 @@ def _preload_cps_services() -> None:
 _preload_real_constants()
 _preload_real_cps_package()
 _preload_cps_services()
+# Reflow unit tests must not depend on the runner's incidental VM capacity.
+import pytest
+
+# Keep real lease/integration logic enabled; resource-specific tests override
+# this injected meter to exercise low/unknown capacity and cgroup fixtures.
+@pytest.fixture(autouse=True)
+def reflow_unit_capacity(request, monkeypatch):
+    if request.node.path.name.startswith('test_reflow'):
+        from cps.services.reflow import native_resources
+        monkeypatch.setenv('REFLOW_NATIVE_CAPACITY_MODE', 'checked')
+        monkeypatch.setattr(native_resources, 'measure', lambda root: (8 * 1024**3, 8 * 1024**3))

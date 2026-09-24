@@ -89,6 +89,81 @@ It receives no arbitrary output path but has OS access appropriate to that UID.
 No historical cause is inferred from containment tests. Independent review and
 composed source-policy tests precede deployment and an actual-book retry.
 
+## Shared native capacity profile (post-564 resource incident)
+
+The 540-page cached Book564 run peaked at 1.908 GiB **aggregate app memory**;
+earlier global OOM killed both child and parent. Its later successful run used
+three >=2 GiB available-memory readings and a 512 MiB stop guard. These are
+observations, not a universal bound or a safe 2 GiB container-size claim. The
+separate SIGBUS cause is still unknown. Parent s6 now enables Python fatal stacks
+on stderr and disables core dumps; the existing finish hook retains exit facts.
+No stack locals, credentials or process memory dumps are collected. Configure
+bounded platform log retention; this instrumentation is not a SIGBUS fix.
+
+`native_resources.Lease` now gates BOTH native launchers (`NativeDocument`, used
+by conversion/page count/survey, and `quote_preparation.measure_isolated`). One
+heavy work item per Reflow state root may be live, across service processes. The
+permanent `native-resource.lock` uses nonblocking flock; busy fails immediately,
+not an unbounded wait. Do not unlink/replace it, use separate state roots for the
+same resource budget, or put it on storage without reliable cross-process flock.
+The child inherits its open descriptor, so owner-process death does not release
+the slot while that child still lives. Unkillable/orphaned work can retain the
+slot: explicit operator diagnosis is safer than guessing a PID is stale. Normal
+cleanup reaps only the owned process group before closing the parent descriptor.
+This is cooperative service-instance admission, not distributed host arbitration.
+
+Configuration is trusted deployment environment, not request data:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `REFLOW_NATIVE_CAPACITY_MODE` | `checked` | `checked` or explicit `serialize-only` |
+| `REFLOW_NATIVE_ADMIT_MIB` | 2048 | Free headroom required before launch |
+| `REFLOW_NATIVE_RESERVE_MIB` | 512 | Stop below this free headroom |
+| `REFLOW_NATIVE_SCRATCH_ADMIT_MIB` | 2048 | Free Reflow scratch-volume space before launch |
+| `REFLOW_NATIVE_SCRATCH_RESERVE_MIB` | 256 | Stop below this scratch-volume reserve |
+
+Numeric values must be positive integers, with each reserve below its admission
+threshold. Checked mode takes three readings 100 ms apart, then checks again
+after snapshot copying immediately before launch. It polls reserve during native
+waits at most every 500 ms and forces fresh readings at parent pipeline/provider
+stop and pre-publication checkpoints. Failure latches for that work item; no
+automatic retry, cap change, unknown-hold release or partial publication follows.
+No standing monitoring thread/service is created. A request already posted to a
+provider is not undone: its existing billing/unknown-outcome semantics still apply.
+
+On Linux checked mode reads MemAvailable and applicable visible cgroup-v2
+memory.max/current values, including visible ancestors, and uses the minimum
+headroom. It does not count swap or treat MemAvailable as a container limit.
+Missing/malformed data, v1/hybrid memory controllers and non-Linux meters are
+unsupported and **fail closed**. Namespace-hidden ancestor limits cannot be
+discovered: expose the effective envelope or reserve it externally. Explicit
+`serialize-only` retains the shared slot but skips RAM AND scratch measurements;
+it is suitable only for a separately capacity-managed deployment/development
+runner, never evidence that memory protection was tested. Unit tests inject
+ample measurements while retaining real checked admission and flock; targeted
+tests replace them with low/unknown signals and synthetic proc/cgroup files.
+
+Budget parent/web activity, native work, provider JSON, caches and foreign
+services separately. Scratch thresholds are floors, not a space reservation:
+allow for PDF snapshot, IPC graph, source rasters, candidate EPUB and publication
+backup, and provision the library volume separately if mounted elsewhere. The
+observed 14.66 MB PDF produced a 296.42 MB EPUB; compressed input size is no RAM
+or output-size predictor. A container limit caps the whole service, not just the
+child, and does not reserve memory for the parent. Sampling cannot reliably beat
+every sudden allocation/OOM or prevent unrelated workloads consuming capacity.
+
+Refused conversion tasks remain failed/owned until normal task finalization;
+preparations report `native_capacity_unavailable` (or cancelled with
+`native_capacity_stopped`); estimate/page-count busy conflicts are HTTP409 and
+low/unknown capacity is HTTP503, not
+a bad-PDF diagnosis. There is no queued promise to auto-retry when space returns.
+Root/deployment owner must validate the final composed image/profile on a normal
+representative workload, with bounded resource/exit evidence and original-file/
+financial checks. Independent review and actual reader gates are still separate.
+
+Kernel contracts: [cgroup v2 hierarchy and memory controller](https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html)
+and [flock open-file-description lifetime](https://man7.org/linux/man-pages/man2/flock.2.html).
+
 The implementation gates are:
 
 - forced child termination yields a failed job, no server exit, no newly published

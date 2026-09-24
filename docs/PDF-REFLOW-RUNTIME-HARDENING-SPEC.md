@@ -117,6 +117,10 @@ not an operator capacity setting. A malformed inherited descriptor fails OCR
 before launch. Executables that deliberately detach or discard descriptors are
 outside this cooperative contract; this is not an OS sandbox.
 This is cooperative service-instance admission, not distributed host arbitration.
+Every lease now also verifies actual independent-process exclusion on its exact
+held inode, including serialize-only. An ineffective or unknown storage lock
+refuses work; success is not cached across leases. See the bounded probe contract
+and observed Docker shared-bind limitation in `PDF-REFLOW-NATIVE-RESOURCE-SPEC.md`.
 
 Configuration is trusted deployment environment, not request data:
 

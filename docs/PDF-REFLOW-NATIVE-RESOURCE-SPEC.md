@@ -52,3 +52,29 @@ as a non-root interface, like `memory.max/current`. A subtree mountpoint
 does not become a hierarchy root because it says `domain`. Namespace-hidden
 ancestors still require external deployment capacity accounting. Unknown data
 remains fail-closed in checked mode; serialize-only remains explicit.
+
+## Coordination storage capability
+
+A successful flock call alone is not proof of exclusion. After capacity samples,
+each held lease launches one fixed inert isolated-Python probe, without the lease
+FD or inherited environment. It independently opens the existing lock (no create,
+no symlink following), verifies the expected device/inode, and tries EX|NB.
+Only EAGAIN/EWOULDBLOCK is evidence of exclusion; acquisition, other errors,
+identity mismatch, abnormal exit and timeout refuse admission. The normal probe
+deadline is two seconds, cancellation is polled at most 50 ms apart, and owned
+probe kill/reap has a one-second wait. Kernel-uninterruptible I/O cannot be given
+a userspace timing guarantee; failure never authorizes heavy work.
+
+The check applies in serialize-only too. No persistent marker/pass cache exists;
+every new lease probes again. Path identity is rechecked before launch and at
+active reserve checkpoints. Never replace/unlink the permanent lock inode or
+split one instance's launchers across independent state roots. Existing inherited
+worker/OCR lease ownership remains unchanged.
+
+Installed Linux campaign probes observed ineffective flock on the X8 Docker
+shared fakeowner bind, while owned tmpfs and new native ext4 named volumes
+excluded correctly. Unsupported shared storage must refuse, not claim safety.
+Validated native named volumes are the campaign's private deployment profile,
+not a universal guarantee for every Docker volume. This guard tests native-work
+coordination only, not SQLite locking, durability or financial-store correctness.
+It does not establish any cause for historical SIGBUS.

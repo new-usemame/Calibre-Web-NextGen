@@ -6,11 +6,8 @@
 
 """An empty password never reaches an LDAP bind.
 
-A bind with a user's name and an empty password is an unauthenticated bind,
-and many directories (Active Directory by default) report it as a success
-without checking any credential. The directory below behaves that way: it
-accepts every bind for a user it knows, so only the sign-in code's own check
-stands between an empty password and a signed-in account.
+The stand-in directory accepts every bind for a user it knows, so these tests
+observe the sign-in code's own check rather than the directory's.
 """
 
 from unittest.mock import MagicMock, patch

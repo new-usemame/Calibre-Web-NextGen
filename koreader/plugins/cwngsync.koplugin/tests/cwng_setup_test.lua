@@ -28,10 +28,25 @@ local function testTypedAddressesBecomeOneCanonicalForm()
     assertEqual(Setup.normalizeServer("  https://books.example.org/ "), "https://books.example.org", "slash + spaces")
     assertEqual(Setup.normalizeServer("http://192.168.1.20:8083/kosync"), "http://192.168.1.20:8083", "old /kosync suffix")
     assertEqual(Setup.normalizeServer("https://example.org/cwng/"), "https://example.org/cwng", "subpath kept")
+    assertEqual(Setup.normalizeServer("Http://Books.Example.org/CWNG"), "http://books.example.org/CWNG",
+        "scheme and host in lower case, path as typed")
     assertEqual(Setup.normalizeServer("ftp://example.org"), nil, "other schemes refused")
     assertEqual(Setup.normalizeServer("http://"), nil, "no host")
     assertEqual(Setup.normalizeServer("my server"), nil, "spaces")
     assertEqual(Setup.normalizeServer(nil), nil, "nothing typed")
+end
+
+local function testOneAccountHoweverItIsTyped()
+    local key = Setup.accountKey("http://books.example.org:8083", "reader")
+    assertEqual(Setup.accountKey("http://books.example.org:8083/", "reader"), key, "trailing slash")
+    assertEqual(Setup.accountKey("books.example.org:8083/kosync", "reader"), key, "typed bare, old suffix")
+    assertEqual(Setup.accountKey("HTTP://Books.Example.org:8083", "Reader"), key, "capitals in host and name")
+    assertEqual(Setup.accountKey("http://books.example.org:8083/cwng", "reader") ~= key, true,
+        "another path is another server")
+    assertEqual(Setup.accountKey("http://books.example.org:8083/CWNG", "reader")
+        ~= Setup.accountKey("http://books.example.org:8083/cwng", "reader"), true, "a path keeps its case")
+    assertEqual(Setup.accountKey("http://books.example.org:8083", "other") ~= key, true, "another user")
+    assertEqual(Setup.accountKey("https://books.example.org:8083", "reader") ~= key, true, "another scheme")
 end
 
 local function testReadyMadeBundleNeedsServerAndCredentials()
@@ -109,6 +124,7 @@ local function testReaderDefaultsMakeTheLibraryHome()
 end
 
 testTypedAddressesBecomeOneCanonicalForm()
+testOneAccountHoweverItIsTyped()
 testReadyMadeBundleNeedsServerAndCredentials()
 testPairingOutcomes()
 testVerifyLinkCarriesTheCode()

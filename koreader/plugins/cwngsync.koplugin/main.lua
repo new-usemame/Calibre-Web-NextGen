@@ -636,7 +636,20 @@ end
 
 function CWNGSync:setServer(server)
     logger.dbg("CWNGSync: Setting server to:", server)
-    self.settings.server = server ~= "" and server or nil
+    if server == "" then
+        self.settings.server = nil
+        return
+    end
+    -- Stored the way setup stores it, so the same server typed with a slash
+    -- at the end is still the same server.
+    local normalized = Setup.normalizeServer(server)
+    if not normalized then
+        UIManager:show(InfoMessage:new{
+            text = T(_("%1 is not a server address. Type it like books.example.com or http://192.168.1.20:8083."), server),
+        })
+        return
+    end
+    self.settings.server = normalized
 end
 
 function CWNGSync:setSyncForward(strategy)

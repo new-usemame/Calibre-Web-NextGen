@@ -385,8 +385,25 @@ local function testAServerRepeatingItsCursorStopsAtOnce()
     assertEqual(#outcome.requests, 2, "the repeat must stop the sync, not run it to the page limit")
 end
 
+local function testTheSameAccountTypedAnotherWayKeepsItsLibrary()
+    -- Retyping the server with a slash at the end, or the name with a
+    -- capital, is not a new account: its downloads must not be handed over.
+    local function owner(server, username)
+        return setmetatable({ settings = { server = server, username = username } },
+            { __index = Runtime }):accountOwner()
+    end
+    local state = { owner = owner("http://books.example.org:8083", "reader"), books = { ["1"] = { path = "/b.epub" } } }
+    local Library = require("cwng_library")
+    local probe = { attributes = function() return { mode = "file" } end }
+    assertEqual(Library.handover(state, owner("http://books.example.org:8083/", "Reader"), probe), nil,
+        "the same account must keep its library")
+    assertEqual(state.books["1"] ~= nil, true, "and its books")
+    assertEqual(owner("http://books.example.org:8083", "other") ~= state.owner, true, "another reader is another account")
+end
+
 testEveryPageOfABigLibraryReachesTheDevice()
 testAListThatDoesNotFinishIsNotApplied()
+testTheSameAccountTypedAnotherWayKeepsItsLibrary()
 testAServerRepeatingItsCursorStopsAtOnce()
 testRemovingACoverKeepsTheReadersNotesButNotAStaleStatus()
 testAStepDoesNothingToABookChangedSinceThePlan()

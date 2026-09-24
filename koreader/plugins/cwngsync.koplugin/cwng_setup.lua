@@ -36,6 +36,8 @@ function Setup.normalizeServer(input)
     if type(input) ~= "string" then return nil end
     local value = trim(input)
     if value == "" or value:find("%s") then return nil end
+    -- The scheme and host name are the same in any case; a path is not.
+    value = value:gsub("^[%a][%w+.-]*://[^/?#]*", string.lower)
     if not value:match("^https?://") then
         if value:match("^%a[%w+.-]*://") then return nil end
         value = "http://" .. value
@@ -44,6 +46,15 @@ function Setup.normalizeServer(input)
     local host = value:match("^https?://([^/?#]+)")
     if not host or host == "" or host:match("^:") then return nil end
     return value
+end
+
+-- Which account a server address and username name. The library and the queued
+-- reading belong to one account, and a change of account hands them over, so
+-- the same account typed another way must give the same key: a trailing slash,
+-- a capital in the host, or a username in other case (the server matches
+-- usernames without case).
+function Setup.accountKey(server, username)
+    return (Setup.normalizeServer(server) or tostring(server)) .. "|" .. tostring(username):lower()
 end
 
 -- setup.json, as written by the website's "ready-made plugin" download.

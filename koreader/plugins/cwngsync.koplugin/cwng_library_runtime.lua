@@ -17,6 +17,7 @@ local DocSettings = require("docsettings")
 local InfoMessage = require("ui/widget/infomessage")
 local Json = require("json")
 local Library = require("cwng_library")
+local Setup = require("cwng_setup")
 local LuaSettings = require("luasettings")
 local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
@@ -142,7 +143,7 @@ end
 
 -- Whose library and queued reading this device holds: one account on one server.
 function Runtime:accountOwner()
-    return tostring(self.settings.server) .. "|" .. tostring(self.settings.username)
+    return Setup.accountKey(self.settings.server, self.settings.username)
 end
 
 function Runtime:newSyncClient()

@@ -36,7 +36,7 @@ for scenario in ('emitted', 'seeded_only'):
     h = next(harness)
     try:
         patch.setattr(kobo.config, 'config_kobo_suppress_replayed_entitlements', True)
-        patch.setattr(kobo.config, 'config_kobo_cover_padding_enabled', False)
+        patch.setattr(kobo.config, 'config_kobo_cover_padding_enabled', False, raising=False)
         config_sql._Settings.__table__.create(h.session.bind, checkfirst=True)
         h.session.add(ub.User(id=h.user.id, name='Upgrade Reader',
                              email='upgrade@example.org', password='', role=16))

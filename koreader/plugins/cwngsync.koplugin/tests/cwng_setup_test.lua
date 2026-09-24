@@ -26,7 +26,7 @@ end
 local function testTypedAddressesBecomeOneCanonicalForm()
     assertEqual(Setup.normalizeServer("books.example.org"), "http://books.example.org", "bare host")
     assertEqual(Setup.normalizeServer("  https://books.example.org/ "), "https://books.example.org", "slash + spaces")
-    assertEqual(Setup.normalizeServer("http://10.0.30.36:8083/kosync"), "http://10.0.30.36:8083", "old /kosync suffix")
+    assertEqual(Setup.normalizeServer("http://192.168.1.20:8083/kosync"), "http://192.168.1.20:8083", "old /kosync suffix")
     assertEqual(Setup.normalizeServer("https://example.org/cwng/"), "https://example.org/cwng", "subpath kept")
     assertEqual(Setup.normalizeServer("ftp://example.org"), nil, "other schemes refused")
     assertEqual(Setup.normalizeServer("http://"), nil, "no host")
@@ -36,15 +36,15 @@ end
 
 local function testReadyMadeBundleNeedsServerAndCredentials()
     local config = Setup.parseBundle(
-        '{"server": "http://10.0.30.36:8083/", "username": "maggie", "password": "tok"}', decode)
-    assertEqual(config and config.server, "http://10.0.30.36:8083", "server normalized")
-    assertEqual(config.username, "maggie", "username")
+        '{"server": "http://192.168.1.20:8083/", "username": "reader", "password": "tok"}', decode)
+    assertEqual(config and config.server, "http://192.168.1.20:8083", "server normalized")
+    assertEqual(config.username, "reader", "username")
     assertEqual(config.password, "tok", "password")
 
     local missing, why = Setup.parseBundle('{"server": "http://x"}', decode)
     assertEqual(missing, nil, "a bundle without credentials is refused")
     assertEqual(why, "setup file has no sign-in details", "and says why")
-    assertEqual((Setup.parseBundle('{"server": "http://x", "username": "maggie"}', decode)), nil,
+    assertEqual((Setup.parseBundle('{"server": "http://x", "username": "reader"}', decode)), nil,
         "a username without its password is refused")
     assertEqual((Setup.parseBundle("not json", decode)), nil, "garbage refused")
     assertEqual((Setup.parseBundle("", decode)), nil, "empty refused")
@@ -54,17 +54,17 @@ end
 
 local function testPairingOutcomes()
     local approved = Setup.pairingOutcome(true,
-        { status = "approved", server = "http://srv:8083/", username = "maggie", password = "app" },
+        { status = "approved", server = "http://srv:8083/", username = "reader", password = "app" },
         nil, "http://fallback")
     assertEqual(approved.state, "approved", "approved")
     assertEqual(approved.credentials.server, "http://srv:8083", "server from approval")
     assertEqual(approved.credentials.password, "app", "password handed over")
 
     local no_server = Setup.pairingOutcome(true,
-        { status = "approved", username = "maggie", password = "app" }, nil, "http://typed")
+        { status = "approved", username = "reader", password = "app" }, nil, "http://typed")
     assertEqual(no_server.credentials.server, "http://typed", "falls back to the address it asked")
 
-    assertEqual(Setup.pairingOutcome(true, { status = "approved", username = "maggie" }).state,
+    assertEqual(Setup.pairingOutcome(true, { status = "approved", username = "reader" }).state,
         "error", "approval without a password is not a connection")
     assertEqual(Setup.pairingOutcome(true, { status = "pending" }).state, "pending", "pending")
     assertEqual(Setup.pairingOutcome(false, { status = "denied" }, "HTTP 403").state, "denied", "denied")

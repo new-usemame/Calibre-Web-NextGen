@@ -294,6 +294,15 @@ export default defineConfig({
       dependencies: ['setup'],
     })),
 
+    // Only WebKit let the narrowed Account selects widen the page; Chromium
+    // clipped them. The spec sets its own phone widths.
+    {
+      name: 'account-form-webkit-mobile',
+      testMatch: /account-form-phone-layout\.spec\.ts/,
+      use: { ...devices['iPhone 13'], storageState: STORAGE },
+      dependencies: ['setup'],
+    },
+
     // 8. Sub-path reverse proxy (opt-in: set E2E_SUBPATH_URL to the nginx rig).
     //    Guards Class 1 subpath breakage (v4.1.1 reader 404, #571 white page).
     ...(SUBPATH_URL

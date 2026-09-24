@@ -78,10 +78,14 @@ test.beforeEach(async ({ page }) => {
 
 test.afterEach(async ({ page }) => {
   // Reader appearance is per user and server-side; hand the next spec back the account it had.
+  // Put back only what these tests change. The GET answers with every default filled in, so
+  // saving the whole answer stores choices the account never made: reflow among them, which
+  // puts the classic reader's sidebar beside the page and covers its tabs on a phone.
   if (!savedReader) return;
+  const { theme, fontSize, lineHeight } = savedReader;
   await page.request.post('/api/v1/reader/settings', {
     headers: { 'X-CSRFToken': await csrfToken(page), 'Content-Type': 'application/json' },
-    data: savedReader,
+    data: { theme, fontSize, lineHeight },
   });
 });
 

@@ -22,6 +22,7 @@ from flask import request, redirect, send_from_directory, send_file, make_respon
 from flask import session as flask_session
 from flask_babel import gettext as _
 from flask_babel import get_locale
+from markupsafe import escape
 from .cw_login import login_user, logout_user, current_user
 from flask_limiter import RateLimitExceeded
 from flask_limiter.util import get_remote_address
@@ -2548,7 +2549,9 @@ def render_cc_category(page, col_id, path, order):
         return render_title_template(
             'index.html', random=random, entries=entries, pagination=pagination,
             id=path,
-            title=_("%(column)s: %(name)s", column=col.name, name=path),
+            # layout.html and index.html print title with |safe; a stored value
+            # is text an edit-role user chose, so it is escaped here
+            title=_("%(column)s: %(name)s", column=escape(col.name), name=escape(path)),
             # Sort and paging links route back through books_list's cc_ branch
             page="cc_%d" % col_id, order=order[1],
             breadcrumbs=[[ (col.name, '') ] + hierarchy.breadcrumb_trail(path)],

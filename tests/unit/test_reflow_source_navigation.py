@@ -134,6 +134,41 @@ def test_page_turn_with_a_prior_note_keeps_its_marker_after_the_note():
     assert 'pg_0001' in pages[1]['anchor']
 
 
+def test_completed_index_entry_does_not_absorb_next_page_entry():
+    """Dot leaders and terminal page references identify separate index rows."""
+    pages = build_epub._page_blocks({
+        0: '<h2>Index</h2><p>alpha . . . . . . 7 beta . . . . . . 9, 42</p>',
+        1: '<p>gamma . . . . . . 2 delta . . . . . . 17</p>',
+    })
+    assert build_epub._join_page_turns(pages) == 0
+    assert len(pages[1]['body']) == 1
+    chapters = build_epub._chapters(pages)
+    root = ET.fromstring('<body xmlns="http://www.w3.org/1999/xhtml" '
+                         'xmlns:epub="http://www.idpf.org/2007/ops">%s</body>' %
+                         ''.join(block for chapter in chapters for block in chapter.blocks))
+    paragraphs = list(root.iter(XHTML + 'p'))
+    assert len(paragraphs) == 2
+    marker = root.find('.//*[@id="pg_0001"]')
+    assert marker is not None and list(root).index(marker) < list(root).index(paragraphs[1])
+
+
+@pytest.mark.parametrize('before,after', [
+    ('Among the 12 houses, the source places this example in house 3',
+     'because the chart uses a different starting sign.'),
+    ('The measured series . . . . . . 3',
+     'continues with a further observation in the next passage.'),
+])
+def test_numeric_prose_still_joins_across_page_turn(before, after):
+    """A number at the page edge alone is not an index-entry boundary."""
+    pages = build_epub._page_blocks({
+        0: '<p>%s</p>' % before,
+        1: '<p>%s</p>' % after,
+    })
+    assert build_epub._join_page_turns(pages) == 1
+    assert before + ' <span epub:type="pagebreak"' in pages[0]['body'][0]
+    assert not pages[1]['body']
+
+
 @pytest.mark.parametrize('details', [
     [],
     [{'id': 'notes', 'label': 'Printed note context',

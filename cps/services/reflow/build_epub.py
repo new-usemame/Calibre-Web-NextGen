@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.12"
+CONVERTER_VERSION = "1.13"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -73,6 +73,11 @@ _TAG = re.compile(r"<[^>]+>")
 _HEADING_TEXT = re.compile(r"<h[1-6][^>]*>(.*?)</h[1-6]>", re.I | re.S)
 _TRAILING_HYPHEN = re.compile(
     r"(\w)[" + assemble.HYPHENS + r"](\s*(?:</[A-Za-z0-9]+>\s*)*)$")
+# Index entries end in page references after long dot leaders. A page turn can
+# start another lowercase entry even though the preceding text has no sentence
+# punctuation; that is a new row, not a continuation of prose.
+_INDEX_LEADER_REF = re.compile(r"(?:\s*\.\s*){4,}\s*(?:[ivxlcdm]+\s*,\s*)?\d{1,4}\b", re.I)
+_INDEX_END_REF = re.compile(r"(?:\d{1,4}|[ivxlcdm]+)\s*$", re.I)
 _ID = re.compile(r'\sid="([^"]+)"')
 _HREF = re.compile(r'href="#([^"]+)"')
 _IMG_SRC = re.compile(r'<img\b[^>]*\bsrc="([^"]+)"[^>]*/?>', re.I)
@@ -676,6 +681,16 @@ def _page_blocks(page_html):
     return pages
 
 
+def _completed_index_entry_boundary(tail, head):
+    """A completed leader/reference row followed by a new indexed term."""
+    left, right = block_text(tail), block_text(head)
+    if not _INDEX_END_REF.search(left) or not _INDEX_LEADER_REF.search(left):
+        return False
+    first = _INDEX_LEADER_REF.search(right)
+    return bool(first and first.start() <= 100
+                and re.search(r"[A-Za-z]", right[:first.start()]))
+
+
 def _join_page_turns(pages):
     """DIAGNOSIS B on the markup: the sentence, not the page, is the unit."""
     joined = 0
@@ -693,6 +708,8 @@ def _join_page_turns(pages):
             continue
         tail, head = previous["body"][tail_index], current["body"][0]
         if not (_is_paragraph(tail) and _is_paragraph(head)):
+            continue
+        if _completed_index_entry_boundary(tail, head):
             continue
         if not assemble.continues(block_text(tail), block_text(head)):
             continue

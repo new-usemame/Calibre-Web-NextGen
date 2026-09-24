@@ -71,6 +71,18 @@ def test_native_inline_numeric_slash_does_not_recruit_unrelated_small_digits():
     assert [line.text for block in result for line in block.lines]==[text,'4']
 
 
+def test_unmapped_native_digit_is_not_guessed_into_a_fraction():
+    body=extract.Span('a / b',9,'Times',0,(100,100,125,109),
+                      char_boxes=((2,3,110,100,114,109),))
+    numerator=extract.Span('3',6,'Unmapped',0,(107,98,110,104),encoding_unresolved=True)
+    denominator=extract.Span('4',6,'Times',0,(114,104.5,117,110.5))
+    blocks=[extract.Block(0,(100,98,125,111),
+            [extract.Line([s],s.bbox) for s in (body,numerator,denominator)])]
+    result=normalize_blocks(blocks)
+    assert not any('3/4' in line.text for block in result for line in block.lines)
+    assert sorted(line.text for block in result for line in block.lines)==['3','4','a / b']
+
+
 def test_real_unicode_map_overrides_symbolic_font_name():
     class Doc:
         def xref_get_key(self,xref,key):return ('xref','9 0 R') if key=='ToUnicode' else ('int','4')

@@ -203,12 +203,15 @@ def _attach_stacked_fractions(blocks):
     from .extract import Line, Block
     lines = [line for block in blocks for line in block.lines]
     parts = [line for line in lines if len(line.spans) == 1
-             and re.fullmatch(r'\d{1,3}', line.stripped)]
+             and re.fullmatch(r'\d{1,3}', line.stripped)
+             and not (line.spans[0].encoding_unresolved or
+                      line.spans[0].transcription_uncertain)]
     replacements, consumed = {}, set()
     for line in lines:
         edits = {}
         for span_index, span in enumerate(line.spans):
-            if '/' not in span.text or not span.char_boxes:
+            if ('/' not in span.text or not span.char_boxes or
+                    span.encoding_unresolved or span.transcription_uncertain):
                 continue
             for start, end, x0, y0, x1, y1 in span.char_boxes:
                 if span.text[start:end] != '/':

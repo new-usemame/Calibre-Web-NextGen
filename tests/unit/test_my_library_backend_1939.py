@@ -608,16 +608,16 @@ def test_admin_api_switches_named_mode_for_target_user(app_session, monkeypatch)
         assert response.get_json()["library_mode"] == "personal_library"
 
 
-def test_policy_funnel_is_wired_to_web_opds_shelf_and_kobo():
-    from cps import kobo, opds, shelf
+def test_policy_funnel_is_wired_to_web_opds_and_kobo():
+    # Shelf adds are covered by behaviour in test_shelf_membership_server_side.py
+    # and test_shared_book_continuation.py.
+    from cps import kobo, opds
 
     web_source = pyinspect.getsource(db.CalibreDB.fill_indexpage_with_archived_books)
     opds_source = pyinspect.getsource(opds.get_opds_restricted_common_filter)
-    shelf_source = pyinspect.getsource(shelf.add_book_to_shelf)
     kobo_source = pyinspect.getsource(kobo.HandleSyncRequest)
     assert "self.common_filters(" in web_source
     assert "calibre_db.common_filters(" in opds_source
-    assert "calibre_db.common_filters()" in shelf_source
     assert "calibre_db.common_filters(allow_show_archived=True)" in kobo_source
 
 

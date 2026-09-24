@@ -258,3 +258,130 @@ def test_detail_personal_state_requires_membership_or_current_sharing(shared_boo
     # Hiding the DTO is not destructive; re-adding/sharing recovers stored state.
     assert env.session.query(ub.ReadBook).one().read_status == ub.ReadBook.STATUS_FINISHED
     assert env.session.query(ub.KoboBookmark).one().progress_percent == 75
+
+
+def _allow_public_shelf_edits(env, monkeypatch):
+    """Give the viewer "edit public shelves" and mount both single-add transports.
+
+    Both register before the first request, as Flask requires.
+    """
+    from cps import shelf as shelf_module
+    from cps.api import shelves
+    monkeypatch.setattr(shelf_module, 'queue_hardcover_sync', lambda *a, **k: None)
+    monkeypatch.setattr(shelf_module, '_log_shelf_activity', lambda *a, **k: None)
+    env.viewer.role |= constants.ROLE_EDIT_SHELFS
+    env.session.commit()
+    env.app.add_url_rule('/api/v1/shelves/<int:shelf_id>/books/<int:book_id>', 'api_shelf_add',
+        inspect.unwrap(shelves.add_book_to_shelf_api), methods=['POST'])
+    env.app.add_url_rule('/shelf/add/<int:shelf_id>/<int:book_id>', 'classic_shelf_add',
+        inspect.unwrap(shelf_module.add_to_shelf), methods=['POST'])
+
+
+def _add_to_shelf(env, transport, shelf_id, book_id):
+    if transport == 'api':
+        return env.client.post('/api/v1/shelves/%s/books/%s' % (shelf_id, book_id))
+    return env.client.post('/shelf/add/%s/%s' % (shelf_id, book_id),
+                           headers={'X-Requested-With': 'XMLHttpRequest'})
+
+
+def _shelved(env, book_id):
+    return env.session.query(ub.BookShelf).filter_by(shelf=env.public.id, book_id=book_id).count()
+
+
+@pytest.mark.parametrize('shelf_owner', ['another_account', 'nobody'])
+@pytest.mark.parametrize('transport', ['api', 'classic'])
+def test_managed_editor_cannot_share_itself_a_book_through_a_public_shelf(
+        shared_books, monkeypatch, transport, shelf_owner):
+    """#2284 review F2. The viewer's library is managed (personal, no global
+    browse), and it may edit public shelves. A public shelf lets every account
+    read its books. Placing book 3, which is outside the viewer's library, on
+    another account's public shelf would therefore let the viewer read and
+    download a book that nobody gave it.
+    """
+    from cps import shelf as shelf_module
+    env = shared_books
+    _allow_public_shelf_edits(env, monkeypatch)
+    if shelf_owner == 'nobody':
+        env.public.user_id = None
+        env.session.commit()
+    assert env.client.get('/download/3/epub').status_code == 404
+
+    added = _add_to_shelf(env, transport, env.public.id, 3)
+
+    # (add, on the shelf, download, detail): the head this was found on answered
+    # (200 or 204, 1, 200, 200).
+    assert (added.status_code, _shelved(env, 3),
+            env.client.get('/download/3/epub').status_code,
+            env.client.get('/api/v1/books/3').status_code) == (403, 0, 404, 404), added.data
+    if transport == 'api':
+        assert added.json['error'] == {
+            'code': 'library_membership_rejected',
+            'message': shelf_module.SHELF_MANAGED_MEMBERSHIP_REFUSAL,
+        }
+    assert env.session.query(ub.UserLibraryBook).count() == 0
+
+
+@pytest.mark.parametrize('reach', ['own_library', 'global_library'])
+def test_editor_still_shares_a_book_it_can_open(shared_books, monkeypatch, reach):
+    """The F2 limit is the editor's own reach, not a ban on sharing."""
+    env = shared_books
+    _allow_public_shelf_edits(env, monkeypatch)
+    if reach == 'own_library':
+        env.session.add(ub.UserLibraryBook(user_id=env.viewer.id, book_id=3))
+    else:
+        env.viewer.role |= constants.ROLE_BROWSE_GLOBAL
+    env.session.commit()
+
+    added = _add_to_shelf(env, 'api', env.public.id, 3)
+
+    assert added.status_code == 200, added.data
+    assert _shelved(env, 3) == 1
+
+
+@pytest.mark.parametrize('library', ['monolibrary', 'personal_with_global_browse'])
+def test_unmanaged_editor_still_hears_not_found_for_a_book_it_cannot_see(
+        shared_books, monkeypatch, library):
+    """Only a managed library gets the "ask an administrator" refusal. An editor
+    whose own rules hide the book keeps the plain not-found answer.
+    """
+    env = shared_books
+    _allow_public_shelf_edits(env, monkeypatch)
+    if library == 'monolibrary':
+        env.viewer.has_own_library = False
+    else:
+        env.viewer.role |= constants.ROLE_BROWSE_GLOBAL
+    env.viewer.denied_tags = 'tag-3'
+    env.session.commit()
+
+    added = _add_to_shelf(env, 'api', env.public.id, 3)
+
+    assert added.status_code == 404, added.data
+    assert added.json['error']['code'] == 'not_found'
+    assert _shelved(env, 3) == 0
+
+
+def test_refused_add_never_puts_the_book_in_the_shelf_owners_library(shared_books, monkeypatch):
+    """A shelf add first gives a personal-library owner who can browse the
+    global library the book it is receiving. For an add that will be refused,
+    that grant must not happen at all. A grant committed and then reverted is
+    still visible to the owner's Kobo sync in between.
+    """
+    from sqlalchemy import text
+    from cps import user_library
+    env = shared_books
+    _allow_public_shelf_edits(env, monkeypatch)
+    monkeypatch.setattr(user_library, 'calibre_db', env.cdb)
+    env.owner.has_own_library = True
+    env.owner.user_library_seeded = True
+    env.owner.role = (env.owner.role or 0) | constants.ROLE_BROWSE_GLOBAL
+    env.session.execute(text('CREATE TABLE membership_writes (user_id INTEGER, book_id INTEGER)'))
+    env.session.execute(text(
+        'CREATE TRIGGER record_membership_write AFTER INSERT ON user_library_book '
+        'BEGIN INSERT INTO membership_writes VALUES (new.user_id, new.book_id); END'))
+    env.session.commit()
+
+    added = _add_to_shelf(env, 'api', env.public.id, 3)
+
+    assert added.status_code == 403, added.data
+    assert env.session.execute(text('SELECT user_id, book_id FROM membership_writes')).all() == []
+    assert _shelved(env, 3) == 0

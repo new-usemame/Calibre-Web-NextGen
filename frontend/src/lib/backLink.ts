@@ -23,8 +23,8 @@ const LIST_ORIGIN_PATTERNS = [
   SPA_ROUTES.rated,
   SPA_ROUTES.favorites,
   SPA_ROUTES.archived,
-  // AdvancedSearch keeps criteria only in component state, not the URL, so returning
-  // to /search restores an empty form rather than the previous result set.
+  // AdvancedSearch keeps its submitted criteria in the query string (#2211), so the
+  // recorded origin returns to the same search, not an empty form.
   SPA_ROUTES.search,
   SPA_ROUTES.table,
   SPA_ROUTES.duplicates,

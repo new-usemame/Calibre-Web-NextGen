@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useId } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useLocation, useSearch } from 'wouter';
 import { Search as SearchIcon, RotateCcw } from 'lucide-react';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import { useSearchOptions, useAdvancedSearch, useMe } from '../lib/queries';
@@ -9,6 +10,8 @@ import { Button } from '../components/Button';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { apiPost, type Book, type AdvancedSearchParams, type Me } from '../lib/api';
+import { advancedSearchFromQuery, advancedSearchToQuery } from '../lib/advancedSearchUrl';
+import { SPA_ROUTES } from '../lib/routes';
 import { useT } from '../lib/i18n';
 import styles from './AdvancedSearch.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
@@ -45,13 +48,34 @@ const EMPTY: FormState = {
 
 const RATINGS = ['', '1', '2', '3', '4', '5'];
 
-function dedupAppend(prev: Book[], next: Book[]): Book[] {
-  const seen = new Set(prev.map((b) => b.id));
-  const fresh = next.filter((b) => !seen.has(b.id));
-  return fresh.length ? [...prev, ...fresh] : prev;
+/** Loaded pages in page order, each book once. A page is stored by its number
+ *  and REPLACED when it is fetched again, so a refetch that no longer returns a
+ *  book (it was edited out of the criteria) drops it instead of appending the
+ *  fresh page onto the stale one. */
+function mergePages(pages: Map<number, Book[]>): Book[] {
+  const seen = new Set<number>();
+  const merged: Book[] = [];
+  for (const n of [...pages.keys()].sort((a, b) => a - b)) {
+    for (const book of pages.get(n) ?? []) {
+      if (seen.has(book.id)) continue;
+      seen.add(book.id);
+      merged.push(book);
+    }
+  }
+  return merged;
 }
 
-export function AdvancedSearch({ defaultFilter }: { defaultFilter?: AdvancedSearchParams } = {}) {
+/** The raw query string. wouter's useSearch() is unescaped, which turns an
+ *  encoded `&`, `=` or `+` inside a value into a separator; parse this instead. */
+function currentQuery(): string {
+  return window.location.search.replace(/^\?/, '');
+}
+
+function formFrom(params: AdvancedSearchParams | null): FormState {
+  return params ? { ...EMPTY, ...params } as FormState : EMPTY;
+}
+
+export function AdvancedSearch() {
   const [cardActionsHidden] = useCardActionsHidden();
   const [readingTagsHidden] = useReadingTagsHidden();
   const t = useT();
@@ -59,14 +83,20 @@ export function AdvancedSearch({ defaultFilter }: { defaultFilter?: AdvancedSear
   const me = useMe().data;
   const canEdit = !!me?.role?.edit;  // quick-edit pencil on results (#572)
   const { data: options } = useSearchOptions();
-  const initial = defaultFilter ? { ...EMPTY, ...defaultFilter } as FormState : EMPTY;
-  const [form, setForm] = useState<FormState>(initial);
-  const [submitted, setSubmitted] = useState<AdvancedSearchParams | null>(defaultFilter ?? null);
+  const [, navigate] = useLocation();
+  const urlSearch = useSearch();  // change signal only; see currentQuery()
+  // The submitted query lives in the URL (#2211), so opening a result and
+  // coming back, or reloading to pick up edits, re-runs the same search.
+  const [fromUrl] = useState(() => advancedSearchFromQuery(currentQuery()));
+  const [form, setForm] = useState<FormState>(() => formFrom(fromUrl));
+  const [submitted, setSubmitted] = useState<AdvancedSearchParams | null>(fromUrl);
   const [defaultSaving, setDefaultSaving] = useState(false);
   const [defaultStatus, setDefaultStatus] = useState('');
   const [page, setPage] = useState(1);
   const [results, setResults] = useState<Book[]>([]);
   const accKeyRef = useRef<string>('');
+  const pagesRef = useRef<Map<number, Book[]>>(new Map());
+  const writtenQueryRef = useRef(currentQuery());
 
   const { data, isFetching, isPlaceholderData, error } = useAdvancedSearch(submitted, page);
 
@@ -77,28 +107,57 @@ export function AdvancedSearch({ defaultFilter }: { defaultFilter?: AdvancedSear
     if (!data || isPlaceholderData) return;
     const key = JSON.stringify(submitted);
     if (key !== accKeyRef.current) {
-      setResults(data.items);
+      pagesRef.current = new Map();
       accKeyRef.current = key;
-    } else {
-      setResults((prev) => dedupAppend(prev, data.items));
     }
-  }, [data, isPlaceholderData, submitted]);
+    pagesRef.current.set(page, data.items);
+    setResults(mergePages(pagesRef.current));
+  }, [data, isPlaceholderData, submitted, page]);
+
+  const clearResults = () => {
+    setPage(1);
+    setResults([]);
+    accKeyRef.current = '';
+    pagesRef.current = new Map();
+  };
+
+  const writeUrl = (query: string) => {
+    writtenQueryRef.current = query;
+    navigate(query ? `${SPA_ROUTES.search}?${query}` : SPA_ROUTES.search, { replace: true });
+  };
+
+  // The URL changed under us (a nav link to a bare /search, a typed URL):
+  // follow it rather than keep showing a query the address bar no longer names.
+  useEffect(() => {
+    const query = currentQuery();
+    if (query === writtenQueryRef.current) return;
+    writtenQueryRef.current = query;
+    const params = advancedSearchFromQuery(query);
+    setForm(formFrom(params));
+    clearResults();
+    setSubmitted(params);
+  }, [urlSearch]);
 
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((f) => ({ ...f, [key]: value }));
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setPage(1);
-    setResults([]);
-    accKeyRef.current = '';
-    setSubmitted({ ...form });
+    // Searching again with the same criteria must ask the server again: the
+    // library may have been edited since (another tab, another user), and under
+    // an unchanged key react-query would answer from its cached pages (#2211).
+    qc.removeQueries({ queryKey: ['adv-search'] });
+    clearResults();
+    const next = { ...form };
+    setSubmitted(next);
+    writeUrl(advancedSearchToQuery(next));
   };
 
   const onReset = () => {
     setForm(EMPTY);
+    clearResults();
     setSubmitted(null);
-    setResults([]);
+    writeUrl('');
   };
 
   const persistDefault = async (value: AdvancedSearchParams | null) => {

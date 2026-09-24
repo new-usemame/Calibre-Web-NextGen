@@ -98,7 +98,11 @@ def adv_search_custom_columns(cc, term, q):
         else:
             custom_query = term.get('custom_column_' + str(c.id))
             if c.datatype == 'bool':
-                if custom_query != "Any":
+                # Absent means unconstrained, like "Any". The classic form always
+                # posts a value, but the New UI's JSON search never sends custom
+                # columns, and treating the missing value as a filter restricted
+                # every search to books with the flag unset (#2211).
+                if custom_query not in (None, "Any"):
                     if custom_query == "":
                         q = q.filter(~getattr(db.Books, 'custom_column_' + str(c.id)).
                                      any(db.cc_classes[c.id].value >= 0))
@@ -312,7 +316,7 @@ def build_adv_search_query(term):
                 search_term.extend(["{} <= {}".format(c.name,column_high)])
                 cc_present = True
         elif c.datatype == "bool":
-            if term.get('custom_column_' + str(c.id)) != "Any":
+            if term.get('custom_column_' + str(c.id)) not in (None, "Any"):
                 search_term.extend([("{}: {}".format(c.name, term.get('custom_column_' + str(c.id))))])
                 cc_present = True
         elif term.get('custom_column_' + str(c.id)):

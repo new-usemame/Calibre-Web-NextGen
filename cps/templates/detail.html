@@ -809,7 +809,17 @@
                                             </ul>
                                         </div>
                                         {% endif %}
-                                        {% if books_shelfs %}
+                                        {# Offer removal only from shelves this reader may edit, by
+                                           the rule the server enforces (check_shelf_edit_permissions)
+                                           and the shelf pills below use. books_shelfs holds every
+                                           shelf with the book, other readers' private ones too. #}
+                                        {% set removable = namespace(shelves=[]) %}
+                                        {% for shelf in g.shelves_access %}
+                                            {% if shelf.id in books_shelfs and ((not shelf.is_public and shelf.user_id == current_user.id) or (shelf.is_public and current_user.role_edit_shelfs())) %}
+                                                {% set removable.shelves = removable.shelves + [shelf] %}
+                                            {% endif %}
+                                        {% endfor %}
+                                        {% if removable.shelves %}
                                         <div class="btn-group" role="group" aria-label="Remove from shelves">
                                             <button id="removeShelfMenu" type="button" class="btn btn-default dropdown-toggle action-icon-btn"
                                                     data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
@@ -817,16 +827,14 @@
                                                 <span class="glyphicon glyphicon-remove"></span>
                                             </button>
                                             <ul id="remove-from-shelves" class="dropdown-menu" aria-labelledby="removeShelfMenu">
-                                                {% for shelf in g.shelves_access %}
-                                                    {% if shelf.id in books_shelfs %}
-                                                        <li>
-                                                            <a data-href="{{ url_for('shelf.remove_from_shelf', book_id=entry.id, shelf_id=shelf.id) }}"
-                                                               data-add-href="{{ url_for('shelf.add_to_shelf', book_id=entry.id, shelf_id=shelf.id) }}"
-                                                               data-shelf-action="remove">
-                                                                {{ shelf.name }}{% if shelf.is_public == 1 %} {{ _('(Public)') }}{% endif %}
-                                                            </a>
-                                                        </li>
-                                                    {% endif %}
+                                                {% for shelf in removable.shelves %}
+                                                    <li>
+                                                        <a data-href="{{ url_for('shelf.remove_from_shelf', book_id=entry.id, shelf_id=shelf.id) }}"
+                                                           data-add-href="{{ url_for('shelf.add_to_shelf', book_id=entry.id, shelf_id=shelf.id) }}"
+                                                           data-shelf-action="remove">
+                                                            {{ shelf.name }}{% if shelf.is_public == 1 %} {{ _('(Public)') }}{% endif %}
+                                                        </a>
+                                                    </li>
                                                 {% endfor %}
                                             </ul>
                                         </div>

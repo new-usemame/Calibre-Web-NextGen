@@ -5,3 +5,5 @@
 - **Browser reading sources are clearly separated from physical e-readers.** Source totals and assigned annotation totals are labeled separately, historical untyped annotations remain accessible, and an unidentified browser source is identified explicitly. A device that has never reported its inventory no longer looks like a device that reported zero books.
 
 - **The classic web reader opens its Annotations tab and jumps to the selected passage on the first click.** Both web interfaces reuse the same browser identity for highlights and reading progress, preventing an extra unidentified source merely from switching interfaces.
+
+- **Selecting text opens highlight controls in Safari in both web readers.** A shared parent-side selection observer handles sandboxed books while keeping embedded book scripts disabled and avoiding duplicate controls in other browsers.

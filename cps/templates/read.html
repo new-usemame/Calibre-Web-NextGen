@@ -345,6 +345,10 @@
       <script src="{{ url_for('static', filename='js/reading/epub.js') }}"></script>
       <script src="{{ url_for('static', filename='js/reading/device-identity.js') }}"></script>
       <script src="{{ url_for('static', filename='js/reading/epub-progress.js') }}"></script>
+      <script type="module">
+        import { observeReaderSelections } from "{{ url_for('static', filename='js/reading/selection-observer.js') }}";
+        window.observeReaderSelections = observeReaderSelections;
+      </script>
       <script src="{{ url_for('static', filename='js/reading/annotations.js') }}"></script>
     </body>
 </html>

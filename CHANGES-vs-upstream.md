@@ -68,6 +68,7 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 ### Bug fixes
 
+- **Safari text selection opens highlight controls in both web readers.** Shared focused-frame selection observation preserves the script-disabled book sandbox and native-event deduplication. Desktop mouse and mobile DOM-selection browser contracts cover creation and embedded-script isolation. | SHA `TBD` | release `TBD`.
 - **Kobo re-downloads are harmless.** An on-demand EPUB→KEPUB materialisation no longer advances `books.last_modified` (helper SSOT) and `DownloadUrls[].Size` leaves the entitlement fingerprint (payload schema v2), so the device is not told the book changed; each Kobo download is ledgered per device and the next annotations GET from that device is served from the server's own rows, re-anchored by text against the current KEPUB when the chapter names changed. New table `kobo_device_book_download`, auto-created. | SHA `TBD` | release `TBD`.
 
 - **Clearing a note now agrees in the classic and new readers.** Explicit web-reader clears store an empty string; omitted notes and existing NULLs stay unknown. Kobo column rendering treats either empty representation as no note. No migration. | SHA `TBD` | release `TBD`.

@@ -1,3 +1,4 @@
+import { observeReaderSelections } from '../../../cps/static/js/reading/selection-observer.js';
 import {
   archiveMatchesFingerprint, chapterProgressCfi, resumeCfi, resumeForArchive,
   withResumeTimeout,
@@ -1464,6 +1465,7 @@ export function Reader({ id }: { id: string }) {
   useEffect(() => {
     if (!epubFormat || !epubContentUrl || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !settingsHydrated) return;
     let cancelled = false;
+    let stopSelectionObserver: (() => void) | undefined;
     setRendered(false);
     setRenderError(null);
     // Clear rather than carry: wouter reuses this component across an :id
@@ -1699,6 +1701,7 @@ export function Reader({ id }: { id: string }) {
           })
           .catch(() => { /* highlights are best-effort */ });
 
+        stopSelectionObserver = observeReaderSelections(rendition);
         // Capture a text selection → offer a highlight-color popover.
         rendition.on('selected', (cfiRange: string, contents: any) => {
           let text = '';
@@ -1715,6 +1718,7 @@ export function Reader({ id }: { id: string }) {
 
     return () => {
       cancelled = true;
+      stopSelectionObserver?.();
       archiveRef.current = null;
       linkSyncTimers.current.forEach(clearTimeout); linkSyncTimers.current = [];
       linkAnchorsRef.current = new Map();

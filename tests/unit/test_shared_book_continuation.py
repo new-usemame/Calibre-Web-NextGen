@@ -420,11 +420,14 @@ def test_public_shelf_reader_gets_its_own_reading_places(shared_books, monkeypat
     assert env.client.get('/api/v1/books/1/reading-sources').status_code == 404
 
 
-def test_classic_book_page_offers_sending_only_where_sending_works(shared_books, monkeypatch):
+def test_classic_book_page_offers_only_what_shared_access_allows(shared_books, monkeypatch):
     """Found with F4. The classic book page opens a book shared through a public
     shelf, and it offered "Send to eReader" there. Sending follows the reader's
     own library, as the SPA's hidden send action does, so that button could
-    only answer "Book not found".
+    only answer "Book not found". The page also offered the library's own
+    controls (shelves, favorite, read and archive state, hiding, and "In your
+    library" with its removal) for a book that is not in the reader's library.
+    The new UI keeps those to library books, and so does the classic page now.
     """
     from cps import cwa_db_loader, helper, web
     env = shared_books
@@ -455,13 +458,17 @@ def test_classic_book_page_offers_sending_only_where_sending_works(shared_books,
 
     def offered_and_sent():
         assert env.client.get('/book/1').status_code == 200
-        offered = [option['format'] for option in pages.pop()['entry'].email_share_list]
+        page = pages.pop()
+        offered = [option['format'] for option in page['entry'].email_share_list]
         sent = env.client.post('/send/1/epub/0').json[0]['type'] == 'success'
-        return offered, sent
+        return offered, sent, page['in_my_library']
 
-    # Shared through the public shelf only: the page must not offer what fails.
-    assert offered_and_sent() == ([], False)
+    # Shared through the public shelf only: the page must not offer what fails,
+    # nor present the book as the reader's own, whatever else the reader owns.
+    env.session.add(ub.UserLibraryBook(user_id=env.viewer.id, book_id=3))
+    env.session.commit()
+    assert offered_and_sent() == ([], False, False)
     env.session.add(ub.UserLibraryBook(user_id=env.viewer.id, book_id=1))
     env.session.commit()
-    assert offered_and_sent() == (['Epub', 'Pdf'], True)
+    assert offered_and_sent() == (['Epub', 'Pdf'], True, True)
     assert queued == ['book.epub']

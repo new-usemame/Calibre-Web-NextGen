@@ -676,7 +676,7 @@
                                         {% endif %}
                                     {% endif %}
                                     {% endif %}
-                                    {% if not current_user.is_anonymous %}
+                                    {% if not current_user.is_anonymous and in_my_library %}
                                         {# Read-status icon uses the glyphicon-check / glyphicon-unchecked matched
                                            pair. The checkbox glyph shows current STATE while the accessible label
                                            names the action the click will perform:
@@ -769,7 +769,7 @@
                                        able to strand users' already-hidden books by disabling the
                                        feature mid-flight). Placed at the END of the action row, well
                                        away from frequently-clicked Read Status (#319 #3 ask). #}
-                                    {% if not current_user.is_anonymous and (g.user_hide_enabled or is_hidden) %}
+                                    {% if not current_user.is_anonymous and in_my_library and (g.user_hide_enabled or is_hidden) %}
                                         <button type="button" class="btn btn-default action-icon-btn" id="toggle-hide-btn"
                                                 data-book-id="{{ entry.id }}"
                                                 title="{{ is_hidden and _('Unhide from your library') or _('Hide from your library') }}"
@@ -786,7 +786,7 @@
                                                 {% set shelf_state.has_available = true %}
                                             {% endif %}
                                         {% endfor %}
-                                        {% if shelf_state.has_available %}
+                                        {% if shelf_state.has_available and in_my_library %}
                                         <div class="btn-group" role="group" aria-label="Add to shelves">
                                             <button id="addShelfMenu" type="button" class="btn btn-primary dropdown-toggle action-icon-btn"
                                                     data-toggle="dropdown" aria-haspopup="true" aria-expanded="false"
@@ -1024,7 +1024,7 @@
                                             </a>
                                         {% endif %}
                                     {% endfor %}
-                                    {% if shelf_state.has_available %}
+                                    {% if shelf_state.has_available and in_my_library %}
                                         <button type="button" class="meta-pill shelf-add" id="add-shelf-pill" data-label="{{ _('Add to shelf') }}">
                                             + {{ _('Add to shelf') }}
                                         </button>

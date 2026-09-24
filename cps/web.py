@@ -4034,6 +4034,10 @@ def show_book(book_id):
         entry.email_share_list = (check_send_to_ereader(entry)
                                   if get_sendable_book(book_id, current_user) else [])
         entry.reader_list = check_read_formats(entry)
+        # Such a book is not in the reader's library either, so the page keeps
+        # the library's own controls (shelves, favorite, read and archive
+        # state, hiding, removal) for books that are, as the new UI does.
+        in_my_library = user_library.contains_book(current_user, book_id)
 
         entry.audio_entries = []
         for media_format in entry.data:
@@ -4099,6 +4103,7 @@ def show_book(book_id):
                                      kosync_progress_created_at=kosync_progress_created_at,
                                      is_hidden=is_hidden,
                                      is_favorited=is_favorited,
+                                     in_my_library=in_my_library,
                                      other_users_with_kindle=other_users_with_kindle,
                                      page="book")
     else:

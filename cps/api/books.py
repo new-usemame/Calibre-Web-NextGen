@@ -516,16 +516,7 @@ def book_detail(book_id):
         db.public_shelf_book_filter(ub.session, calibre_db.session),
     ).first() is not None
 
-    personal_library = (
-        user_library.mode_for_user(current_user)
-        == constants.LIBRARY_MODE_PERSONAL
-    )
-    in_my_library = not personal_library
-    if personal_library and current_user.is_authenticated and not current_user.is_anonymous:
-        in_my_library = ub.session.query(ub.UserLibraryBook.id).filter(
-            ub.UserLibraryBook.user_id == int(current_user.id),
-            ub.UserLibraryBook.book_id == int(book_id),
-        ).first() is not None
+    in_my_library = user_library.contains_book(current_user, book_id)
 
     # Enrich language objects with display name so serialize_book_detail stays pure
     for lang in getattr(book, "languages", None) or []:

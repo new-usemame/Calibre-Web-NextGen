@@ -109,6 +109,24 @@ def membership_count(user_id, session=None):
             .filter(ub.UserLibraryBook.user_id == int(user_id)).count())
 
 
+def contains_book(user, book_id, session=None):
+    """Whether ``book_id`` is in ``user``'s own library.
+
+    A monolibrary account holds the whole library. A personal-library account
+    holds only its own rows, so a book it reaches through a public shelf is
+    not contained, and neither is any book for a guest session.
+    """
+    if mode_for_user(user) != constants.LIBRARY_MODE_PERSONAL:
+        return True
+    if (not getattr(user, "is_authenticated", False)
+            or getattr(user, "is_anonymous", False)):
+        return False
+    return (_session(session).query(ub.UserLibraryBook.id)
+            .filter(ub.UserLibraryBook.user_id == int(user.id),
+                    ub.UserLibraryBook.book_id == int(book_id))
+            .first() is not None)
+
+
 def prepare_user_library_seed(user, *, chunk_size=SEED_CHUNK_SIZE,
                               app_session=None, cdb=None):
     """Idempotently insert every currently visible book in bounded chunks.

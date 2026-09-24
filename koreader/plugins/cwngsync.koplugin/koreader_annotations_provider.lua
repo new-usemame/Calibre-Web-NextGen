@@ -221,7 +221,7 @@ local function applyNative(portables, deletions)
         if item.pos0 and item.pos1 then by_range[tostring(item.pos0) .. "|" .. tostring(item.pos1)] = true end
     end
 
-    local changed = 0
+    local changed, drawn = 0, {}
     for _, portable in ipairs(portables or {}) do
         local id = portable.annotation_id
         local item = id and by_id[id]
@@ -279,16 +279,20 @@ local function applyNative(portables, deletions)
                 }))
                 by_id[id] = new_item
                 by_range[pos0 .. "|" .. pos1] = true
+                drawn[#drawn + 1] = id
                 changed = changed + 1
             end
         end
     end
     if changed > 0 then UIManager:setDirty(ui.dialog, "ui") end
-    return changed
+    return changed, drawn
 end
 
 -- `deletions` are the ids the user deleted on this device since the last
--- push, as SyncLogic.planLocalContribution named them.
+-- push, as SyncLogic.planLocalContribution named them. Returns how many
+-- highlights changed and, when drawn natively, the ids of the ones drawn new:
+-- the caller counts those as known to both sides, so deleting one here is
+-- noticed like deleting any other.
 function Provider.applyToDevice(portables, volume_id, deletions)
     -- A CW-synced kepub on a Kobo carries a VolumeID; its highlights also
     -- belong in KoboReader.sqlite, so stock Nickel shows them (the shipped

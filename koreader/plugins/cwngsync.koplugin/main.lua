@@ -2260,6 +2260,25 @@ function CWNGSync:saveAnnotationWatermark(localList)
     doc_settings:saveSetting(ANNOTATION_WATERMARK_KEY, SyncLogic.annotationIds(localList))
 end
 
+-- Highlights just drawn from the server are known to both sides from that
+-- moment. Without them in the watermark, one deleted here before the next
+-- push would never be named as deleted, and the next open would draw it again.
+function CWNGSync:addToAnnotationWatermark(ids)
+    if type(ids) ~= "table" or #ids == 0 then return end
+    local doc_settings = self.ui and self.ui.doc_settings
+    if not (doc_settings and doc_settings.saveSetting) then return end
+    local merged, seen = {}, {}
+    for _, list in ipairs({ self:readAnnotationWatermark(), ids }) do
+        for _, id in ipairs(list) do
+            if not seen[id] then
+                seen[id] = true
+                merged[#merged + 1] = id
+            end
+        end
+    end
+    doc_settings:saveSetting(ANNOTATION_WATERMARK_KEY, merged)
+end
+
 function CWNGSync:syncAnnotations(interactive)
     if not self.settings.sync_annotations then
         if interactive then
@@ -2336,10 +2355,12 @@ function CWNGSync:syncAnnotations(interactive)
             -- Every device applies now: KOReader's own annotations off Kobo,
             -- KoboReader.sqlite for a Kobo kepub. The deletions go too, so a
             -- server highlight the user deleted here is not put back.
-            local applied = 0
+            local applied, drawn = 0, nil
             if #diff.apply_to_device > 0 or #plan.deletions > 0 then
-                local ok_apply, n = pcall(provider.applyToDevice, diff.apply_to_device, volume_id, plan.deletions)
+                local ok_apply, n, ids = pcall(provider.applyToDevice, diff.apply_to_device, volume_id, plan.deletions)
                 applied = (ok_apply and n) or 0
+                drawn = ok_apply and ids or nil
+                self:addToAnnotationWatermark(drawn)
                 if applied > 0 then
                     self:refreshLibraryViews({ self:getCurrentDocumentFile() })
                 end
@@ -2360,6 +2381,7 @@ function CWNGSync:syncAnnotations(interactive)
                         -- the deletion pending, not forget it.
                         if ok2 and plan.may_save_watermark then
                             self:saveAnnotationWatermark(localList)
+                            self:addToAnnotationWatermark(drawn)
                         end
                         if interactive then
                             if ok2 then

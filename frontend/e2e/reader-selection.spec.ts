@@ -79,11 +79,16 @@ for (const classic of [false, true]) {
             // dragging selected text itself invokes Chromium's drag-and-drop.
             await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...start, button: 'left', buttons: 1, clickCount: 1 });
             await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...start, button: 'left', buttons: 0, clickCount: 1 });
+            expect(await frame.evaluate(() => window.getSelection()?.isCollapsed)).toBe(true);
             await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...start, button: 'left', buttons: 1, clickCount: 1 });
             await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...end, button: 'left', buttons: 1 });
             await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...end, button: 'left', buttons: 0, clickCount: 1 });
           } finally { await cdp.detach(); }
         } else {
+          // Linux WebKit can drag retained selected text without selecting it
+          // anew. Establish a collapsed selection before the immediate drag.
+          await page.mouse.click(start.x, start.y);
+          expect(await frame.evaluate(() => window.getSelection()?.isCollapsed)).toBe(true);
           await page.mouse.move(start.x, start.y);
           await page.mouse.down();
           await page.mouse.move(end.x, end.y, { steps: 12 });

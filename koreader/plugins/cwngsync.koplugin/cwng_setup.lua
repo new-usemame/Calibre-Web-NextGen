@@ -48,6 +48,16 @@ function Setup.normalizeServer(input)
     return value
 end
 
+-- Typed without a scheme, an address is tried as http first: a CWNG server's
+-- own port. This is the https address to try when that fails, since a server
+-- behind a proxy that speaks only https refuses http, and browsers hide the
+-- https:// the reader used. Nil when the reader typed a scheme.
+function Setup.secureAlternative(input)
+    if type(input) ~= "string" or trim(input):match("^%a[%w+.-]*://") then return nil end
+    local server = Setup.normalizeServer(input)
+    return server and ("https://" .. server:sub(#"http://" + 1)) or nil
+end
+
 -- Which account a server address and username name. The library and the queued
 -- reading belong to one account, and a change of account hands them over, so
 -- the same account typed another way must give the same key: a trailing slash,

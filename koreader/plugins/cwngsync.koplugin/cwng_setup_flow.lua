@@ -185,17 +185,23 @@ function SetupFlow:showConnectChoices()
                 text = _("Sign in with username and password"),
                 callback = function()
                     UIManager:close(dialog)
-                    self:askServer(function(server)
+                    self:askServer(function(server, secure)
                         self:login(nil, function(username, password)
-                            self:connectWith({ server = server, username = username, password = password },
-                                "sign-in", function(ok, why)
-                                    if ok then return end
-                                    UIManager:show(InfoMessage:new{
-                                        text = why == "rejected"
-                                            and _("That username or password was not accepted. Try again from Tools ▸ CWNG library ▸ Connect this device.")
-                                            or T(_("Could not reach %1. Check the address and that this device is on Wi-Fi."), hostOf(server)),
-                                    })
-                                end)
+                            local function signIn(address, fallback)
+                                self:connectWith({ server = address, username = username, password = password },
+                                    "sign-in", function(ok, why)
+                                        if ok then return end
+                                        if why == "unreachable" and fallback then
+                                            return signIn(fallback)
+                                        end
+                                        UIManager:show(InfoMessage:new{
+                                            text = why == "rejected"
+                                                and _("That username or password was not accepted. Try again from Tools ▸ CWNG library ▸ Connect this device.")
+                                                or T(_("Could not reach %1. Check the address and that this device is on Wi-Fi."), hostOf(server)),
+                                        })
+                                    end)
+                            end
+                            signIn(server, secure)
                         end)
                     end)
                 end,
@@ -222,8 +228,9 @@ function SetupFlow:askServer(continue)
     dialog = InputDialog:new{
         title = _("Your CWNG address"),
         description = _("The address you open CWNG at in a browser, for example books.example.com or 192.168.1.20:8083."),
-        -- A known address is offered, not assumed: it may be the one that just failed.
-        input = self.settings.server or "",
+        -- A known address is offered, not assumed: it may be the one that just
+        -- failed. Without the http:// guessed for it, so https is tried again.
+        input = (self.settings.server or ""):gsub("^http://", ""),
         input_hint = "books.example.com",
         buttons = {{
             {
@@ -235,7 +242,8 @@ function SetupFlow:askServer(continue)
                 text = _("Continue"),
                 is_enter_default = true,
                 callback = function()
-                    local server = Setup.normalizeServer(dialog:getInputText())
+                    local typed = dialog:getInputText()
+                    local server = Setup.normalizeServer(typed)
                     if not server then
                         UIManager:show(InfoMessage:new{
                             text = _("That doesn't look like a web address. Type it the way you would in a browser."),
@@ -245,7 +253,7 @@ function SetupFlow:askServer(continue)
                     end
                     UIManager:close(dialog)
                     self.settings.server = server
-                    continue(server)
+                    continue(server, Setup.secureAlternative(typed))
                 end,
             },
         }},
@@ -265,11 +273,12 @@ end
 function SetupFlow:startPairing()
     if session.pairing then return end
     NetworkMgr:runWhenConnected(function()
-        self:askServer(function(server) self:requestPairing(server) end)
+        self:askServer(function(server, secure) self:requestPairing(server, secure) end)
     end)
 end
 
-function SetupFlow:requestPairing(server)
+-- `secure`: the https address to try if `server`, guessed as http, fails.
+function SetupFlow:requestPairing(server, secure)
     local client = newClient(self, server)
     local pairing = { server = server }
     session.pairing = pairing
@@ -286,6 +295,9 @@ function SetupFlow:requestPairing(server)
             elseif status == 404 or status == 405 then
                 text = T(_("%1 did not accept a pairing request. If that is your CWNG address, it may be too old to pair by code: choose Sign in with username and password instead."),
                     hostOf(server))
+            elseif secure then
+                logger.info("CWNGSync: pairing over http failed, trying https:", hostOf(server), reason)
+                return self:requestPairing(secure)
             else
                 text = T(_("Could not start pairing with %1: %2\n\nCheck the address, and that KOReader sync is switched on in CWNG's settings."),
                     hostOf(server), CWNGSyncClient.plainReason(reason))

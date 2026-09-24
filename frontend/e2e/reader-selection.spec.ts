@@ -50,49 +50,66 @@ for (const classic of [false, true]) {
     const { frame, writes } = await openReader(page, classic);
     const element = await frame.frameElement();
     expect(await element.getAttribute('sandbox')).not.toContain('allow-scripts');
-    if (isMobile) {
-      // WebKit's mobile profile has no OS selection handles. Preserve real
-      // iframe focus and DOM selection; the parent observer must discover it.
-      await frame.evaluate(() => {
-        window.focus(); const node = document.getElementById('kobo.1.1')!.firstChild!;
-        const range = document.createRange(); range.setStart(node, 0); range.setEnd(node, 6);
-        const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
-        document.dispatchEvent(new Event('selectionchange', { bubbles: true }));
-      });
-    } else {
-      const frameBox = (await element.boundingBox())!;
-      const textBox = await frame.evaluate(() => {
-        const node = document.getElementById('kobo.1.1')!.firstChild!;
-        const range = document.createRange(); range.setStart(node, 0); range.setEnd(node, 6);
-        const box = range.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width, height: box.height };
-      });
-      const start = { x: frameBox.x + textBox.x + 1, y: frameBox.y + textBox.y + textBox.height / 2 };
-      const end = { x: frameBox.x + textBox.x + textBox.width - 1, y: start.y };
-      if (browserName === 'chromium') {
-        // Playwright's drag interception injects timer-based listeners into
-        // the script-disabled frame. Send trusted browser input directly.
-        const cdp = await page.context().newCDPSession(page);
-        try {
-          await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...start, buttons: 0 });
-          await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...start, button: 'left', buttons: 1, clickCount: 1 });
-          await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...end, button: 'left', buttons: 1 });
-          await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...end, button: 'left', buttons: 0, clickCount: 1 });
-        } finally { await cdp.detach(); }
+    const selectPassage = async () => {
+      if (isMobile) {
+        // WebKit's mobile profile has no OS selection handles. Preserve real
+        // iframe focus and DOM selection; the parent observer must discover it.
+        await frame.evaluate(() => {
+          window.focus(); const node = document.getElementById('kobo.1.1')!.firstChild!;
+          const range = document.createRange(); range.setStart(node, 0); range.setEnd(node, 6);
+          const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);
+          document.dispatchEvent(new Event('selectionchange', { bubbles: true }));
+        });
       } else {
-        await page.mouse.move(start.x, start.y);
-        await page.mouse.down();
-        await page.mouse.move(end.x, end.y, { steps: 12 });
-        await page.mouse.up();
+        const frameBox = (await element.boundingBox())!;
+        const textBox = await frame.evaluate(() => {
+          const node = document.getElementById('kobo.1.1')!.firstChild!;
+          const range = document.createRange(); range.setStart(node, 0); range.setEnd(node, 6);
+          const box = range.getBoundingClientRect(); return { x: box.x, y: box.y, width: box.width, height: box.height };
+        });
+        const start = { x: frameBox.x + textBox.x + 1, y: frameBox.y + textBox.y + textBox.height / 2 };
+        const end = { x: frameBox.x + textBox.x + textBox.width - 1, y: start.y };
+        if (browserName === 'chromium') {
+          // Playwright's drag interception injects timer-based listeners into
+          // the script-disabled frame. Send trusted browser input directly.
+          const cdp = await page.context().newCDPSession(page);
+          try {
+            await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...start, buttons: 0 });
+            // Collapse any retained selection before starting a new text drag;
+            // dragging selected text itself invokes Chromium's drag-and-drop.
+            await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...start, button: 'left', buttons: 1, clickCount: 1 });
+            await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...start, button: 'left', buttons: 0, clickCount: 1 });
+            await cdp.send('Input.dispatchMouseEvent', { type: 'mousePressed', ...start, button: 'left', buttons: 1, clickCount: 1 });
+            await cdp.send('Input.dispatchMouseEvent', { type: 'mouseMoved', ...end, button: 'left', buttons: 1 });
+            await cdp.send('Input.dispatchMouseEvent', { type: 'mouseReleased', ...end, button: 'left', buttons: 0, clickCount: 1 });
+          } finally { await cdp.detach(); }
+        } else {
+          await page.mouse.move(start.x, start.y);
+          await page.mouse.down();
+          await page.mouse.move(end.x, end.y, { steps: 12 });
+          await page.mouse.up();
+        }
       }
-    }
+    };
+    await selectPassage();
     const selected = await frame.evaluate(() => window.getSelection()?.toString());
     expect(selected).toBe('Select');
     if (classic) {
       await expect(page.locator('.cwa-ann-save')).toBeVisible();
+      await page.locator('.cwa-ann-cancel').click();
+      await expect(page.locator('.cwa-ann-save')).toHaveCount(0);
+      await selectPassage();
+      expect(await frame.evaluate(()=>window.getSelection()?.toString())).toBe('Select');
+      await expect(page.locator('.cwa-ann-save'), 'Same-passage reselection after Cancel must reopen creation').toBeVisible();
       await page.locator('.cwa-ann-save').click();
     } else {
       const dialog = page.getByRole('dialog', { name: 'Highlight color', exact: true });
       await expect(dialog).toBeVisible();
+      await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+      await expect(dialog).toHaveCount(0);
+      await selectPassage();
+      expect(await frame.evaluate(()=>window.getSelection()?.toString())).toBe('Select');
+      await expect(dialog, 'Same-passage reselection after Cancel must reopen creation').toBeVisible();
       await dialog.getByRole('button', { name: 'Yellow', exact: true }).click();
     }
     await expect.poll(() => writes.length).toBe(1);

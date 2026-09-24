@@ -78,3 +78,16 @@ test('blocked frame events still deliver settled selections once and observer li
   assert.equal(h.timers.size, 0); assert.equal(h.listeners.size, 0);
   assert.equal(h.emitted.length, 2);
 });
+
+test('a new selection of the same passage is actionable even when collapse occurred between polls', () => {
+  const h = harness();
+  h.select(); h.advance(600);
+  assert.equal(h.emitted.length, 1);
+  h.host.document.activeElement = null; h.advance(900);
+  h.host.document.activeElement = h.contents.document.defaultView.frameElement;
+  // A quick second gesture replaces the selection before the next poll.
+  h.collapse(); h.select(); h.advance(1500);
+  assert.equal(h.emitted.length, 2);
+  h.advance(2100); assert.equal(h.emitted.length, 2, 'unchanged selection stays delivered');
+  h.stop();
+});

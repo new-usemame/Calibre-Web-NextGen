@@ -37,13 +37,21 @@ test('a public shelf offers reading and downloads without adding personal member
     await page.goto(`/app/shelf/${shelf.id}`);
     await page.getByRole('link', { name: `Open details for ${selected.title}`, exact: true }).click();
     await expect(page.getByRole('link', { name: 'Read now', exact: true })).toBeVisible();
-    const download = page.locator('a[download]').filter({ hasText: 'EPUB' }).first();
+    // Downloads live in the book page's Files section, one row per format.
+    const download = page.getByTestId('book-files').getByRole('listitem')
+      .filter({ hasText: 'EPUB' }).locator('a[download]');
     await expect(download).toBeVisible();
     const response = await page.request.get((await download.getAttribute('href'))!);
     expect(response.ok()).toBeTruthy();
     expect((await response.body()).length).toBeGreaterThan(0);
-    await expect(page.getByRole('button', { name: 'Remove from my library', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Add to my library', exact: true })).toHaveCount(0);
+    // Reading through a public shelf never offers membership changes.
+    await expect(page.getByTestId('remove-from-my-library')).toHaveCount(0);
+    await page.getByTestId('book-actions-menu').click();
+    const menu = page.getByTestId('book-actions-menu-list');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: 'Add to library', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
     await page.getByRole('link', { name: 'Read now', exact: true }).click();
     await expect(page).toHaveURL(/\/read\//);
     await expect(page.locator('iframe').first()).toBeVisible();

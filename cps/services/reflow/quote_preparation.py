@@ -248,9 +248,11 @@ def measure_isolated(source,options,progress,should_stop,cache_root,timeout=None
                      control=str(control),progress=str(status),output=str(output),parent=os.getpid())
         with open(root/'stderr.log','wb') as errors:
             resources.before_launch()
+            environment = _child_environment(root)
+            environment['REFLOW_NATIVE_LEASE_FD'] = str(resources.fd)
             process=subprocess.Popen([sys.executable,'-I',str(WORKER)],
                 stdin=subprocess.PIPE,stdout=subprocess.DEVNULL,stderr=errors,
-                env=_child_environment(root),cwd=str(root),start_new_session=True,
+                env=environment,cwd=str(root),start_new_session=True,
                 pass_fds=(resources.fd,))
             deadline=time.monotonic()+timeout;stopping=None
             try:

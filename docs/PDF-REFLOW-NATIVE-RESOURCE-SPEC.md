@@ -30,3 +30,23 @@ low reserve stops only owned work; Task prior EPUB and financial evidence surviv
 success still emits validated EPUB. Use injected readings and tiny real subprocess
 fixtures, existing Task tests, focused mutation red/green and one final Reflow suite.
 Root owns independent review and actual deployment validation after composition.
+
+## Descendant ownership and visible hierarchy correction
+
+Both native-document and quote launchers pass a private inherited lease FD and
+its descriptor number in their allowlisted child environment. Supervised OCR
+passes that same open file description to its executable and stays in the
+worker's process group. The supervisor's existing final group cleanup therefore
+reaches OCR even after abrupt worker death; the lease remains busy until all
+descriptor holders exit. OCR cancellation locally kills/reaps its direct child;
+the supervisor owns group-wide cleanup (including helpers). Standalone OCR,
+without this launch contract, retains its separate session and group cleanup.
+This is cooperative trusted-executable process containment, not a sandbox for
+executables that deliberately detach or close inherited ownership descriptors.
+
+Cgroup measurement walks all applicable visible mounts, not merely the most
+specific subtree view. A missing controller pair is accepted only at a mount
+whose hierarchy root is `/`, with the root-domain marker; a subtree mountpoint
+does not become a hierarchy root because it says `domain`. Namespace-hidden
+ancestors still require external deployment capacity accounting. Unknown data
+remains fail-closed in checked mode; serialize-only remains explicit.

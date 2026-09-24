@@ -188,11 +188,27 @@ def _invoke(args, directory, *, timeout, should_stop, watched=()):
     directory = Path(directory).resolve()
     stdout, stderr = directory / "stdout", directory / "stderr"
     started = time.monotonic()
+    # Only the supervised launchers set this in their allowlisted environment.
+    # OCR stays in that owned worker group, and shares its lock description so
+    # worker death cannot admit another job while recognition is still alive.
+    # Standalone OCR retains its independently owned session and group cleanup.
+    lease = os.environ.get('REFLOW_NATIVE_LEASE_FD')
+    inherited = ()
+    if lease is not None:
+        try:
+            fd = int(lease)
+            if fd < 3:
+                raise ValueError()
+            os.fstat(fd)
+            inherited = (fd,)
+        except (ValueError, OSError):
+            raise OCRUnavailable('Invalid supervised OCR resource ownership.') from None
     with stdout.open("wb") as out, stderr.open("wb") as err:
         environment = _env()
         environment["TMPDIR"] = str(directory)
         process = subprocess.Popen(args, stdout=out, stderr=err, env=environment,
-                                   cwd=directory, start_new_session=True)
+                                   cwd=directory, start_new_session=not inherited,
+                                   pass_fds=inherited)
         try:
             while True:
                 _stopped(should_stop)
@@ -213,12 +229,18 @@ def _invoke(args, directory, *, timeout, should_stop, watched=()):
                     *[(path, MAX_OUTPUT_BYTES) for path in watched]]):
                 raise OCRFailed("Text recognition exceeded its output limit.")
         finally:
-            # The direct child may already have exited while a helper remains.
-            # This session belongs only to this invocation, including on success.
+            # In supervised mode the group includes this Python worker: only
+            # the parent supervisor may kill that group. Local OCR failure kills
+            # and reaps its direct child; final supervisor cleanup covers helpers.
+            # Standalone mode owns the entire invocation group, even on success.
             # macOS answers EPERM, not ESRCH, when every member of the group has
             # exited and waits to be reaped: nothing is left to stop either way.
             try:
-                os.killpg(process.pid, signal.SIGKILL)
+                if inherited:
+                    if process.poll() is None:
+                        process.kill()
+                else:
+                    os.killpg(process.pid, signal.SIGKILL)
             except (ProcessLookupError, PermissionError):
                 pass
             process.wait()

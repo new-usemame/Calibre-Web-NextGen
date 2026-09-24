@@ -110,6 +110,12 @@ The child inherits its open descriptor, so owner-process death does not release
 the slot while that child still lives. Unkillable/orphaned work can retain the
 slot: explicit operator diagnosis is safer than guessing a PID is stale. Normal
 cleanup reaps only the owned process group before closing the parent descriptor.
+Supervised OCR stays in that group and explicitly inherits the same lease FD;
+standalone OCR still owns a separate invocation group. The launch-only
+`REFLOW_NATIVE_LEASE_FD` environment entry is internal descriptor transport,
+not an operator capacity setting. A malformed inherited descriptor fails OCR
+before launch. Executables that deliberately detach or discard descriptors are
+outside this cooperative contract; this is not an OS sandbox.
 This is cooperative service-instance admission, not distributed host arbitration.
 
 Configuration is trusted deployment environment, not request data:
@@ -134,6 +140,9 @@ provider is not undone: its existing billing/unknown-outcome semantics still app
 On Linux checked mode reads MemAvailable and applicable visible cgroup-v2
 memory.max/current values, including visible ancestors, and uses the minimum
 headroom. It does not count swap or treat MemAvailable as a container limit.
+All applicable mount views are walked: adding a subtree view cannot conceal a
+limiting ancestor visible through a full mount. Missing controller files at a
+non-root mount remain unknown even when `cgroup.type` says `domain`.
 Missing/malformed data, v1/hybrid memory controllers and non-Linux meters are
 unsupported and **fail closed**. Namespace-hidden ancestor limits cannot be
 discovered: expose the effective envelope or reserve it externally. Explicit

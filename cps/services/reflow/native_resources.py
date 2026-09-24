@@ -70,30 +70,33 @@ def linux_headroom(proc=Path('/proc')):
                 relative = PurePosixPath(unified[0]).relative_to(root)
             except ValueError:
                 continue
-            mounts.append((len(root), Path(mount), relative))
+            mounts.append((PurePosixPath(root), Path(mount), relative))
     if not mounts:
         raise ValueError('cgroup mount unavailable')
-    _, mount, relative = max(mounts, key=lambda entry: entry[0])
-    current = mount / relative
-    while True:
-        maximum, usage = current / 'memory.max', current / 'memory.current'
-        # The true v2 root has no memory controller limit files. Non-root or
-        # partially readable/missing files are unknown, not "unlimited".
-        if current == mount and not maximum.exists() and not usage.exists():
-            if _read(current / 'cgroup.type') != 'domain':
-                raise ValueError('unknown root controller')
-        else:
-            limit, used = _read(maximum), int(_read(usage))
-            if used < 0:
-                raise ValueError('invalid cgroup usage')
-            if limit != 'max':
-                cap = int(limit)
-                if cap < 0:
-                    raise ValueError('invalid cgroup limit')
-                available = min(available, max(0, cap - used))
-        if current == mount:
-            break
-        current = current.parent
+    # A second subtree mount must never hide an ancestor visible through another
+    # mount. Inspect every applicable view; missing data in any view is unknown.
+    for hierarchy_root, mount, relative in mounts:
+        current = mount / relative
+        while True:
+            maximum, usage = current / 'memory.max', current / 'memory.current'
+            # A mountpoint is not necessarily the hierarchy root. Namespace-
+            # hidden ancestors remain a deployment limitation, not free memory.
+            if (hierarchy_root == PurePosixPath('/') and current == mount
+                    and not maximum.exists() and not usage.exists()):
+                if _read(current / 'cgroup.type') != 'domain':
+                    raise ValueError('unknown root controller')
+            else:
+                limit, used = _read(maximum), int(_read(usage))
+                if used < 0:
+                    raise ValueError('invalid cgroup usage')
+                if limit != 'max':
+                    cap = int(limit)
+                    if cap < 0:
+                        raise ValueError('invalid cgroup limit')
+                    available = min(available, max(0, cap - used))
+            if current == mount:
+                break
+            current = current.parent
     if available < 0:
         raise ValueError('invalid host capacity')
     return available

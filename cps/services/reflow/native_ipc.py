@@ -81,6 +81,7 @@ class NativeDocument:
                 raise ValueError('Source changed while preparing native worker')
             environment = ocr._env()
             environment.update(TMPDIR=self.root, PYTHONNOUSERSITE='1', PYTHONFAULTHANDLER='1')
+            environment['REFLOW_NATIVE_LEASE_FD'] = str(self.resource_lease.fd)
             # Fixed installed script and -I exclude cwd, user site and PYTHONPATH.
             read_fd, write_fd = os.pipe()
             self.control = os.fdopen(read_fd, 'rb', buffering=0)

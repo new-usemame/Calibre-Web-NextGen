@@ -16,3 +16,7 @@
 
 - **Signing in with an app password no longer gets slower as more app passwords
   exist.**
+- **A book with a long title in Russian, Chinese or another non-Latin script
+  can be sent to an e-reader.** Its file name was cut to 180 letters, which in
+  those scripts is more than the 255 bytes an e-reader's file system allows, so
+  the device could not save it.

@@ -20,7 +20,7 @@ import pytest
 from lxml import etree
 from PIL import Image
 
-from cps import ub
+from cps import db, ub
 from cps.progress_syncing.checksums.koreader import calculate_koreader_partial_md5
 from cps.services import ereader_scope
 from tests.unit.koreader_library_world import LibraryWorld
@@ -95,6 +95,29 @@ def test_manifest_lists_the_ereader_scope_as_verifiable_files(world):
     assert books[2]["filename"] == "Paper Only - Ann Author [2].pdf"
     assert books[2]["series"] is None and books[2]["series_index"] is None
 
+
+
+def test_a_long_title_in_any_script_makes_a_file_name_a_device_can_create(world):
+    """File names were cut at 180 characters. A Russian or Chinese title is
+    two or three bytes a letter, so its name passed the 255-byte limit of
+    e-reader file systems and the book never appeared. Cut by bytes, on a
+    letter boundary, a name always fits and is still the start of the title."""
+    world.add_user("reader")
+    russian = "Война и мир, том первый и второй, с примечаниями переводчика " * 4
+    chinese = "三体问题地球往事三部曲之一黑暗森林死神永生" * 8
+    for book_id, title in ((1, russian), (2, chinese)):
+        # The test machine cannot hold a file under such a name either, so
+        # the book is stored short and only its recorded name is long.
+        world.add_book(book_id, "Short %d" % book_id)
+        world.session.query(db.Data).filter(db.Data.book == book_id).one().name = title
+    world.session.commit()
+    books, _body = _books(world)
+    for book_id, title in ((1, russian), (2, chinese)):
+        name = books[book_id]["filename"]
+        assert len(name.encode("utf-8")) <= 255, name
+        stem = name.rsplit(f" [{book_id}]", 1)[0]
+        assert len(stem) > 40 and title.startswith(stem), name
+        assert name.endswith(f"[{book_id}].epub")
 
 def test_manifest_carries_the_readers_status_position_and_shelves(world):
     reader = _standard_library(world)

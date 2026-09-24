@@ -73,8 +73,10 @@ def _delivery_filename(book_id: int, data) -> str:
     if not stem:
         stem = "Book"
     # Leave room for the stable id and extension while keeping the DB and FAT
-    # filename safely below their common 255-byte/component ceilings.
-    stem = stem[:180]
+    # filename safely below their common 255-byte/component ceilings. Bytes,
+    # not characters: a Cyrillic or Chinese title is two or three bytes a
+    # letter, and cut at 180 letters it made a name no e-reader could create.
+    stem = stem.encode("utf-8")[:180].decode("utf-8", "ignore").rstrip(" .") or "Book"
     return f"{stem} [{book_id}].{str(data.format).lower()}"
 
 

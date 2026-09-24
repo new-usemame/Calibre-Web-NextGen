@@ -273,13 +273,47 @@ def test_kobo_removes_exactly_what_left_the_ereader_scope(
     assert removed & visible == visible - scope_holds
 
 
-@pytest.mark.parametrize("my_library", [False, True],
-                         ids=["shelves", "shelves-and-my-library"])
-def test_unreadable_magic_shelf_never_removes_books(world, my_library):
-    w = world(shelves=True, my_library=my_library, magic_reliable=False)
+# A magic shelf whose rule failed to evaluate. The ids it did read are still
+# delivered, and the scope is still the reliable one minus nothing: "unreliable"
+# means neither "allow everything" nor "allow nothing". It only suspends what
+# a short list would wrongly remove, on both protocols. With shelf-only sync
+# off, magic shelves do not choose the books, so nothing is suspended.
+EXPECTED_REMOVED_UNRELIABLE = {
+    (False, False): set(),
+    (False, True): {4},
+    (True, False): set(),
+    (True, True): set(),
+}
 
-    assert w.full_device_removals() == set()
-    scope = ereader_scope.membership(
-        w.user, magic_shelf_book_ids=set(MAGIC_SHELF),
-        magic_shelf_membership_reliable=False)
-    assert scope.reliable is False
+
+@pytest.mark.parametrize("shelves,my_library", MODES)
+def test_unreadable_magic_shelf_suspends_only_removals(world, shelves, my_library):
+    # Each world wires the Kobo module to itself: one sync per world.
+    fresh = world(shelves=shelves, my_library=my_library, magic_reliable=False)
+    assert fresh.fresh_device_holds() == EXPECTED_HELD[(shelves, my_library)]
+
+    full = world(shelves=shelves, my_library=my_library, magic_reliable=False)
+    assert full.full_device_removals() == EXPECTED_REMOVED_UNRELIABLE[(shelves, my_library)]
+
+
+@pytest.mark.parametrize("shelves,my_library", MODES)
+def test_unreadable_magic_shelf_is_the_same_scope_for_koreader(world, shelves, my_library):
+    from cps.services import koreader_library
+
+    w = world(shelves=shelves, my_library=my_library, magic_reliable=False)
+    scope = ereader_scope.membership(w.user, session=w.session)
+
+    if shelves:
+        expected = KOBO_SHELF | MAGIC_SHELF
+        if my_library:
+            expected &= MY_LIBRARY
+        assert scope.book_ids == expected
+        assert scope.reliable is False
+        # Never a short list: the device keeps what it has until it reads.
+        with pytest.raises(koreader_library.ScopeUnavailable):
+            koreader_library.build_manifest(w.user, cdb=w.cdb, session=w.session,
+                                            read_column=0)
+    else:
+        assert scope.reliable is True
+        assert (w.ereader_scope_holds() & KOBO_READABLE
+                == EXPECTED_HELD[(shelves, my_library)])

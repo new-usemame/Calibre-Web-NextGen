@@ -4536,6 +4536,183 @@ def _seed_legacy_install(sync_harness, count=218, stagger=True, record_flat=True
     return delivered
 
 
+def _v4_1_43_fingerprint(entitlement):
+    """The entitlement hash v4.1.43 shipped (``cps/kobo.py`` at tag v4.1.43).
+
+    It hashes the whole payload, ``DownloadUrls[].Size`` included.  Today's
+    schema-2 fingerprint hashes a projection without Size, so a v4.1.43 row
+    never equals the current fingerprint of a book that has a download.
+    """
+    return hashlib.sha256(json.dumps(
+        entitlement, sort_keys=True, separators=(",", ":"), ensure_ascii=False,
+    ).encode("utf-8")).hexdigest()
+
+
+def _render_book_entitlement(sync_harness, book, *, device=None, archived=None):
+    """Render ``book``'s base entitlement as the sync handler does for ``device``."""
+    from cps import kobo, ub
+
+    device = device or sync_harness.device
+    if archived is None:
+        archived = bool(sync_harness.session.query(
+            ub.ArchivedBook.is_archived,
+        ).filter_by(
+            user_id=sync_harness.user.id, book_id=book.id,
+        ).scalar())
+    with sync_harness.app.test_request_context(
+            "/v1/library/sync",
+            headers={"x-kobo-devicemodel": device.model or "Kobo Clara BW"}):
+        g.annotation_origin_device_id = device.id
+        return {
+            "BookEntitlement": kobo.create_book_entitlement(
+                book, archived=archived,
+            ),
+            "BookMetadata": kobo.get_metadata(book),
+        }
+
+
+def _rewrite_ledger_as_v4_1_43(sync_harness, *, device=None):
+    """Give acknowledged ledger rows the shape a real v4.1.43 app.db holds.
+
+    v4.1.43 stored ``(device_id, book_id, fingerprint, updated_at)`` and wrote
+    the row when it SENT an entitlement, New and Changed alike.  Its
+    fingerprint hashed ``DownloadUrls[].Size``; ``payload_schema_version`` and
+    ``change_basis`` only arrive with the upgrade's ALTER TABLE, as
+    ``DEFAULT 1`` and NULL.  Each row written here by current code is rehashed
+    with the v4.1.43 formula over the very payload it describes (checked), and
+    ``updated_at`` keeps the clock the row was written at.  Deleted-book rows
+    get the same shape.  Returns how many book rows now differ from today's
+    fingerprint of the same payload.
+    """
+    from cps import db, kobo, ub
+
+    device = device or sync_harness.device
+    session = sync_harness.session
+    differing = 0
+    for row in session.query(ub.KoboDeviceBookEntitlement).filter_by(
+            device_id=device.id).all():
+        payload = _render_book_entitlement(
+            sync_harness, session.get(db.Books, row.book_id), device=device,
+        )
+        current = kobo._entitlement_fingerprint(payload)
+        assert current == row.fingerprint, (
+            f"fixture premise: the row for book {row.book_id} must describe "
+            "the payload it is rewritten from"
+        )
+        row.fingerprint = _v4_1_43_fingerprint(payload)
+        differing += row.fingerprint != current
+        row.payload_schema_version = 1
+        row.change_basis = None
+    for row in session.query(ub.KoboDeviceDeletedEntitlement).filter_by(
+            device_id=device.id).all():
+        tombstone = session.query(ub.KoboDeletedBook).filter_by(
+            user_id=sync_harness.user.id, book_uuid=row.book_uuid,
+        ).one()
+        row.fingerprint = _v4_1_43_fingerprint({
+            "BookEntitlement": kobo.create_deleted_book_entitlement(
+                row.book_uuid, tombstone.deleted_at,
+            ),
+            "BookMetadata": kobo.create_deleted_book_metadata(row.book_uuid),
+        })
+        row.payload_schema_version = 1
+        row.change_basis = None
+    session.commit()
+    return differing
+
+
+def _mark_v4_1_43_upgrade(sync_harness):
+    """The upgrade's ALTER TABLE: every existing seed marker reads version 0."""
+    from cps import ub
+
+    for seed in sync_harness.session.query(ub.KoboDeviceEntitlementSeed).all():
+        seed.classification_version = 0
+    sync_harness.session.commit()
+
+
+def _deliver_as_v4_1_43(sync_harness, books):
+    """Deliver ``books`` for real, then age the ledger into v4.1.43's shape.
+
+    Every book goes out through acknowledged syncs, so every row names a book
+    that was sent.  The ledger then takes v4.1.43's row shape and the seed
+    marker the upgrade's version 0.  Returns the reader's own settled token.
+    """
+    from cps import kobo, ub
+
+    token = kobo.SyncToken.SyncToken().build_sync_token()
+    for _page in range(len(books) // kobo.SYNC_ITEM_LIMIT + 2):
+        response = sync_harness.sync(token)
+        token = response.headers[sync_harness.token_header]
+        if not _entitlements(response):
+            break
+    assert sync_harness.session.query(
+        ub.KoboDeviceBookEntitlement,
+    ).count() == len(books)
+    assert _rewrite_ledger_as_v4_1_43(sync_harness) == len(books), (
+        "fixture premise: no v4.1.43 row may equal today's fingerprint"
+    )
+    _mark_v4_1_43_upgrade(sync_harness)
+    return token
+
+
+def _v4_1_43_install(sync_harness, *, count):
+    """A one-Kobo v4.1.43 install whose reader holds ``count`` books.
+
+    Returns the books and the reader's own settled token.
+    """
+    books = _seed_legacy_install(sync_harness, count=count, record_flat=False)
+    return books, _deliver_as_v4_1_43(sync_harness, books)
+
+
+def _legacy_paged_library(sync_harness):
+    """#1735's shape: a full first page, then one book called Changed.
+
+    Last-modified ascends while date-added descends, so under v4.1.43's
+    creation-time watermark the first ``SYNC_ITEM_LIMIT`` books were New and
+    the last one was announced as ChangedEntitlement to a reader that did not
+    have it.  Returns every book and that last one.
+    """
+    from cps import db, kobo
+
+    total = kobo.SYNC_ITEM_LIMIT + 1
+    base = sync_harness.book.last_modified
+    books = [sync_harness.book]
+    sync_harness.book.timestamp = base + timedelta(seconds=total)
+    for offset in range(1, total):
+        book = db.Books(
+            f"Legacy Paged Book {offset + 1}",
+            f"Legacy Paged Book {offset + 1}",
+            "Author",
+            base + timedelta(seconds=total - offset),   # date added
+            db.Books.DEFAULT_PUBDATE,
+            "1.0",
+            base + timedelta(seconds=offset),           # last modified
+            f"legacy-paged-book-{offset + 1}",
+            0,
+            [],
+            [],
+        )
+        sync_harness.session.add(book)
+        sync_harness.session.flush()
+        book.uuid = f"00000000-0000-0000-0008-{offset + 1:012d}"
+        sync_harness.session.add(db.Data(
+            book.id, "EPUB", 8_000_000 + offset,
+            f"legacy-paged-book-{offset + 1}",
+        ))
+        books.append(book)
+    sync_harness.session.commit()
+    return books, books[-1]
+
+
+def _entitlement_ids(response, *, kind=None):
+    """The book ids a response announced, optionally of one envelope kind."""
+    ids = []
+    for item in _entitlements(response):
+        for envelope_kind in ("NewEntitlement", "ChangedEntitlement"):
+            if envelope_kind in item and kind in (None, envelope_kind):
+                ids.append(item[envelope_kind]["BookEntitlement"]["Id"])
+    return ids
+
+
 @pytest.mark.xfail(
     strict=True,
     reason=(
@@ -4766,48 +4943,29 @@ def test_a_book_the_device_never_received_survives_one_library_deletion(
 
 
 def test_v4_1_43_install_upgrading_is_not_told_its_whole_library_is_new(
-    sync_harness, monkeypatch, caplog,
+    sync_harness, monkeypatch,
 ):
     """The shipped v4.1.43 -> next-release upgrade must be silent.
 
-    v4.1.43 (tag bdead55920) ships ``_seed_existing_device_entitlement_ledgers``
-    in its SEEDING form and has no ``ENTITLEMENT_CLASSIFICATION_VERSION``
-    column, so every existing install has a full per-device ledger whose
-    ``classification_version`` reads 0.  Here that ledger is built by real
-    acknowledged deliveries, so the device provably holds all 218 books and
-    every fingerprint is genuine.  Flipping the stamp to 0 is the whole
-    upgrade.  Nickel re-downloads any book announced New (#1925).
+    v4.1.43 (tag bdead55920) seeded and kept a per-device ledger but wrote no
+    classification stamp, so after the upgrade's ALTER TABLE every existing
+    install reads ``classification_version`` 0 and holds ledger rows in
+    v4.1.43's shape: fingerprints that hash ``DownloadUrls[].Size`` (today's do
+    not), ``payload_schema_version`` 1 and ``change_basis`` NULL.  Here the
+    reader received all 218 books through real acknowledged syncs, and the
+    ledger was then rewritten into exactly that shape (``_v4_1_43_install``).
+    The reader presents its own settled token.  Nickel re-downloads a held
+    book it is told about again (#1925), so the upgrade sync and the pages
+    after it must carry nothing.  Syncs that reselect the held books are
+    ``test_v4_1_43_held_books_stay_silent_when_a_sync_reselects_them``.
     """
-    from cps import kobo, ub
+    from cps import kobo
 
     monkeypatch.setattr(
         kobo.config, "config_kobo_suppress_replayed_entitlements", True,
     )
-    delivered = _seed_legacy_install(sync_harness, record_flat=False)
+    _books, token = _v4_1_43_install(sync_harness, count=218)
 
-    # Drain the library for real: these are acknowledged deliveries.
-    token = kobo.SyncToken.SyncToken().build_sync_token()
-    drained = []
-    for _page in range(4):
-        response = sync_harness.sync(token)
-        drained.append(len(_entitlements(response)))
-        token = response.headers[sync_harness.token_header]
-    assert drained == [100, 100, 18, 0], drained
-    assert sync_harness.session.query(
-        ub.KoboDeviceBookEntitlement,
-    ).count() == 218
-
-    # This is the entire v4.1.43 -> main upgrade: the classification stamp
-    # that release never wrote now reads 0.
-    seed = sync_harness.session.get(
-        ub.KoboDeviceEntitlementSeed, sync_harness.device.id,
-    )
-    assert seed is not None
-    seed.classification_version = 0
-    sync_harness.session.commit()
-
-    caplog.clear()
-    caplog.set_level(logging.DEBUG, logger="cps.kobo")
     upgrade_pages = []
     for _page in range(4):
         response = sync_harness.sync(token)
@@ -4831,35 +4989,41 @@ def test_v4_1_43_install_with_a_second_kobo_is_still_reannounced(
     that copy provably over-claims for at least one of them, so the audit must
     still clear the rows and reannounce rather than suppress against another
     device's history.  Same fixture and same upgrade as the single-Kobo case
-    above; only the household size differs.
+    above; only the household size differs: the second reader sits in the
+    same v4.1.43 seed batch with its own copy of the rows.
     """
     from cps import kobo, ub
 
     monkeypatch.setattr(
         kobo.config, "config_kobo_suppress_replayed_entitlements", True,
     )
-    _seed_legacy_install(sync_harness, record_flat=False)
+    books, token = _v4_1_43_install(sync_harness, count=218)
 
-    token = kobo.SyncToken.SyncToken().build_sync_token()
-    for _page in range(4):
-        response = sync_harness.sync(token)
-        token = response.headers[sync_harness.token_header]
-    assert sync_harness.session.query(
-        ub.KoboDeviceBookEntitlement,
-    ).count() == 218
-
-    sync_harness.session.add(ub.Device(
+    second = ub.Device(
         user_id=sync_harness.user.id,
         kind="kobo",
         display_name="Second Household Kobo",
         model="Kobo Libra Colour",
         active=True,
         created_by="auto",
-    ))
-    seed = sync_harness.session.get(
-        ub.KoboDeviceEntitlementSeed, sync_harness.device.id,
     )
-    seed.classification_version = 0
+    sync_harness.session.add(second)
+    sync_harness.session.flush()
+    sync_harness.session.add(ub.KoboDeviceEntitlementSeed(
+        device_id=second.id, classification_version=0,
+    ))
+    sync_harness.session.add_all([
+        ub.KoboDeviceBookEntitlement(
+            device_id=second.id,
+            book_id=book.id,
+            fingerprint=_v4_1_43_fingerprint(
+                _render_book_entitlement(sync_harness, book, device=second),
+            ),
+            payload_schema_version=1,
+            change_basis=None,
+        )
+        for book in books
+    ])
     sync_harness.session.commit()
 
     upgrade_pages = []
@@ -4979,3 +5143,224 @@ def test_v4_1_43_upgrade_still_delivers_a_book_the_ledger_never_recorded(
         items[0]["NewEntitlement"]["BookEntitlement"]["Id"]
         == str(never_arrived.uuid)
     )
+
+def _rebuild_magic_shelf_cache(monkeypatch, books, rebuilt_at):
+    """A magic-shelf cache rebuild: every member is selected again (#359)."""
+    from cps import kobo
+
+    member_ids = {book.id for book in books}
+    monkeypatch.setattr(
+        kobo, "get_magic_shelf_book_ids_for_kobo",
+        lambda _user_id: (set(member_ids), True),
+    )
+    monkeypatch.setattr(
+        kobo, "get_magic_shelf_membership_added_at",
+        lambda _user_id: rebuilt_at,
+    )
+
+
+@pytest.mark.parametrize("reselection", (
+    "stale_cursor_on_the_upgrade_sync",
+    "tokenless_sync_after_the_upgrade",
+    "magic_shelf_rebuild_after_the_upgrade",
+))
+def test_v4_1_43_held_books_stay_silent_when_a_sync_reselects_them(
+    sync_harness, monkeypatch, reselection,
+):
+    """A kept v4.1.43 ledger must suppress, not merely go unconsulted.
+
+    A v4.1.43 row hashes ``DownloadUrls[].Size`` and has no change basis, so
+    on its own it never matches a current payload: the first sync that
+    selects a held book again would announce it ChangedEntitlement, and
+    Nickel de-downloads a held book on Changed (#1925).  Three ordinary
+    things select a whole library again -- a valid token whose cursor trails
+    the reader's ledger, a request with no token at all (USB eject, #2131),
+    and a magic-shelf cache rebuild, which happens every 30 minutes (#359).
+    Each must announce nothing, and each row must come out re-fingerprinted
+    at the current schema so the next reselection is an exact-bytes match.
+    One held book was restored from the archive long before v4.1.43 sent it,
+    so its change basis carries an archive clock too.  Fails if the upgrade
+    keeps v4.1.43 rows without proving them current (they fail open as
+    Changed) or clears them (they come back New).
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    books = _seed_legacy_install(sync_harness, count=218, record_flat=False)
+    restored = books[5]
+    archive_clocks = {
+        restored.id: min(book.last_modified for book in books)
+        - timedelta(days=7),
+    }
+    sync_harness.session.add(ub.ArchivedBook(
+        user_id=sync_harness.user.id,
+        book_id=restored.id,
+        is_archived=False,
+        last_modified=archive_clocks[restored.id],
+    ))
+    sync_harness.session.commit()
+    settled_token = _deliver_as_v4_1_43(sync_harness, books)
+
+    if reselection == "stale_cursor_on_the_upgrade_sync":
+        reselecting = sync_harness.sync(
+            kobo.SyncToken.SyncToken().build_sync_token(),
+        )
+    else:
+        upgrade = sync_harness.sync(settled_token)
+        assert _entitlements(upgrade) == []
+        if reselection == "tokenless_sync_after_the_upgrade":
+            reselecting = sync_harness.sync(None)
+        else:
+            _rebuild_magic_shelf_cache(
+                monkeypatch, books,
+                max(book.last_modified for book in books) + timedelta(days=1),
+            )
+            reselecting = sync_harness.sync(
+                upgrade.headers[sync_harness.token_header],
+            )
+    following = sync_harness.sync(
+        reselecting.headers[sync_harness.token_header],
+    )
+
+    announced = [
+        len(_entitlements(response)) for response in (reselecting, following)
+    ]
+    assert announced == [0, 0], (
+        f"{reselection}: a reader holding all {len(books)} books was told "
+        f"about {announced} of them again, which de-downloads each one"
+    )
+
+    sync_harness.session.expire_all()
+    rows = {
+        row.book_id: row for row in sync_harness.session.query(
+            ub.KoboDeviceBookEntitlement,
+        ).filter_by(device_id=sync_harness.device.id).all()
+    }
+    assert set(rows) == {book.id for book in books}
+    not_current = [
+        book.id for book in books
+        if (
+            rows[book.id].payload_schema_version,
+            rows[book.id].change_basis,
+            rows[book.id].fingerprint,
+        ) != (
+            kobo.ENTITLEMENT_PAYLOAD_SCHEMA_VERSION,
+            kobo._book_entitlement_change_basis(
+                book.last_modified, archive_clocks.get(book.id),
+            ),
+            kobo._entitlement_fingerprint(
+                _render_book_entitlement(sync_harness, book),
+            ),
+        )
+    ]
+    assert not_current == [], (
+        f"{len(not_current)} reselected rows were not re-fingerprinted at the "
+        f"current schema, e.g. book ids {not_current[:5]}"
+    )
+
+
+def test_v4_1_43_book_edited_after_the_upgrade_is_still_delivered_as_changed(
+    sync_harness, monkeypatch,
+):
+    """Keeping the ledger must not swallow a real edit.
+
+    The upgrade vouches for a kept row only while its book is unchanged.  An
+    edit after the upgrade moves the book's change basis, so the row no longer
+    qualifies for the silent re-fingerprint, and the edit reaches the reader
+    once, as ChangedEntitlement, with no other book.  Fails if kept rows are
+    trusted whatever the book's clock says.
+    """
+    from cps import kobo
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    books, token = _v4_1_43_install(sync_harness, count=30)
+    upgrade = sync_harness.sync(token)
+    assert _entitlements(upgrade) == []
+
+    edited = books[7]
+    edited.title = f"{edited.title} (revised)"
+    edited.last_modified = (
+        max(book.last_modified for book in books) + timedelta(hours=1)
+    )
+    sync_harness.session.commit()
+
+    changed = sync_harness.sync(upgrade.headers[sync_harness.token_header])
+    envelopes = _entitlements(changed)
+    assert _entitlement_ids(changed, kind="ChangedEntitlement") == [
+        str(edited.uuid),
+    ], envelopes
+    assert len(envelopes) == 1, envelopes
+    assert (
+        envelopes[0]["ChangedEntitlement"]["BookMetadata"]["Title"]
+        == edited.title
+    )
+    assert _entitlements(sync_harness.sync(
+        changed.headers[sync_harness.token_header],
+    )) == []
+
+
+@pytest.mark.parametrize("moved_clock", ("book_edited", "unarchived"))
+def test_v4_1_43_row_older_than_its_books_last_change_is_still_delivered(
+    sync_harness, monkeypatch, moved_clock,
+):
+    """A kept row vouches only for the payload it was written for.
+
+    v4.1.43 wrote the row when it sent the book.  If the book changed after
+    that and before the upgrade, the reader holds the older version and
+    v4.1.43 would have sent the change at its next sync.  The upgrade must
+    not stamp such a row as current: it stays unproven, and the change goes
+    out once as ChangedEntitlement when the book is next selected, while the
+    held books around it stay silent.  Both clocks in the change basis count:
+    an edit moves ``Books.last_modified``; un-archiving through the book
+    editor moves only ``ArchivedBook.last_modified`` and leaves the row, which
+    still describes the archived payload.  Fails if the audit stamps a row
+    without comparing the book's clocks with the row's.
+    """
+    from cps import kobo, ub
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    books, token = _v4_1_43_install(sync_harness, count=30)
+    target = books[3]
+    row = sync_harness.session.query(ub.KoboDeviceBookEntitlement).filter_by(
+        device_id=sync_harness.device.id, book_id=target.id,
+    ).one()
+    written_at = datetime(2026, 8, 29, 9, 0, 0)
+    changed_at = written_at + timedelta(days=1)
+    row.updated_at = written_at
+    if moved_clock == "book_edited":
+        target.title = f"{target.title} (revised)"
+        target.last_modified = changed_at
+    else:
+        # v4.1.43 last sent this book while it was archived; the editor's
+        # un-archive (editbooks ``is_archived`` = False) leaves ledger rows.
+        row.fingerprint = _v4_1_43_fingerprint(
+            _render_book_entitlement(sync_harness, target, archived=True),
+        )
+        sync_harness.session.add(ub.ArchivedBook(
+            user_id=sync_harness.user.id,
+            book_id=target.id,
+            is_archived=False,
+            last_modified=changed_at,
+        ))
+    sync_harness.session.commit()
+
+    upgrade = sync_harness.sync(token)
+    reselected = sync_harness.sync(None)
+
+    announced = _entitlements(upgrade) + _entitlements(reselected)
+    assert [sorted(item) for item in announced] == [["ChangedEntitlement"]], (
+        f"{moved_clock}: expected exactly one ChangedEntitlement for the "
+        f"changed book, got {announced}"
+    )
+    entitlement = announced[0]["ChangedEntitlement"]
+    assert entitlement["BookEntitlement"]["Id"] == str(target.uuid)
+    assert entitlement["BookEntitlement"]["IsRemoved"] is False
+    assert entitlement["BookMetadata"]["Title"] == target.title
+
+

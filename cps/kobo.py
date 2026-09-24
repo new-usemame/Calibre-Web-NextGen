@@ -510,6 +510,70 @@ def _seed_existing_device_entitlement_ledgers(user_id):
     return True
 
 
+def _proven_legacy_change_bases(user_id, rows):
+    """Return the change basis each kept legacy ledger row can vouch for.
+
+    ``rows`` are the kept rows' ``(book_id, updated_at)``; the stamp itself
+    only fills a missing basis.  Rows before #1953 hash
+    ``DownloadUrls[].Size`` (payload schema 1), so no current fingerprint can
+    ever equal them; without a basis every one would fail open as
+    ``ChangedEntitlement`` the next time its book is selected.
+
+    A row vouches for the book's current basis only when neither clock the
+    basis encodes has moved since the row was written.  v4.1.43 wrote a row
+    in the same request that rendered the payload, and that payload carries
+    ``LastModified``, so a later book edit, or a later archive toggle, is a
+    change the device has not been told about; such a row keeps no basis and
+    still delivers.  A book no longer in the library gets nothing.  The basis
+    is built exactly as the sync loop builds it, so the declared-shape
+    transition (#1953) suppresses these rows and re-fingerprints them the next
+    time they are selected.
+    """
+    written_at = {
+        int(book_id): books_cursor_datetime(updated_at)
+        for book_id, updated_at in rows
+    }
+    book_ids = sorted(written_at)
+    book_clocks = {}
+    archive_clocks = {}
+    for offset in range(0, len(book_ids), 250):
+        chunk = book_ids[offset:offset + 250]
+        book_clocks.update({
+            row.id: row.last_modified
+            for row in calibre_db.session.query(
+                db.Books.id, db.Books.last_modified,
+            ).filter(db.Books.id.in_(chunk)).all()
+        })
+        archive_clocks.update({
+            row.book_id: row.last_modified
+            for row in ub.session.query(
+                ub.ArchivedBook.book_id, ub.ArchivedBook.last_modified,
+            ).filter(
+                ub.ArchivedBook.user_id == int(user_id),
+                ub.ArchivedBook.book_id.in_(chunk),
+            ).all()
+        })
+
+    bases = {}
+    for book_id in book_ids:
+        book_clock = book_clocks.get(book_id)
+        if book_clock is None:
+            continue
+        if books_cursor_datetime(book_clock) > written_at[book_id]:
+            continue
+        # No archive row, or a legacy row whose clock was never set: the
+        # sync loop encodes both as ``archive=none``.  Every archive toggle
+        # sets the clock, so an unset one has not moved since the send.
+        archive_clock = archive_clocks.get(book_id)
+        if (archive_clock is not None
+                and books_cursor_datetime(archive_clock) > written_at[book_id]):
+            continue
+        bases[book_id] = _book_entitlement_change_basis(
+            book_clock, archive_clock,
+        )
+    return bases
+
+
 def _migrate_device_entitlement_classification(user_id):
     """Stamp the one-time v0 audit, keeping a device-scoped ledger intact.
 
@@ -527,6 +591,15 @@ def _migrate_device_entitlement_classification(user_id):
     provably over-claims for at least one of them and stays untrusted.  With a
     single paired Kobo the user-wide history is that device's history, and the
     rows stand.
+
+    Kept rows are not enough on their own.  A v4.1.43 row carries payload
+    schema 1 and no change basis, so it can never suppress a replay: the next
+    tokenless sync, stale token or magic-shelf rebuild would announce every
+    held book as Changed, which also de-downloads it.  Each kept row whose
+    book and archive clocks have not moved since it was written is stamped
+    with the book's current basis (``_proven_legacy_change_bases``); the
+    declared-shape transition then suppresses it and re-fingerprints it on the
+    next selection.  Rows describing a later edit keep no basis and deliver.
 
     Deliberately accepted, and unchanged from v4.1.43: a legacy
     ``ChangedEntitlement`` that an empty Kobo dropped (#1735) still wrote a
@@ -554,18 +627,22 @@ def _migrate_device_entitlement_classification(user_id):
         )
         removed = 0
         preserved = 0
+        stamped = 0
         device_proven = 0
         for device_id in device_ids:
             ledger_book_ids = set()
             if ledger_is_device_scoped:
-                ledger_book_ids = {
-                    row.book_id for row in ub.session.query(
-                        ub.KoboDeviceBookEntitlement.book_id,
-                    ).filter(
-                        ub.KoboDeviceBookEntitlement.device_id == int(device_id),
-                    ).all()
-                }
+                kept_rows = ub.session.query(
+                    ub.KoboDeviceBookEntitlement.book_id,
+                    ub.KoboDeviceBookEntitlement.updated_at,
+                ).filter(
+                    ub.KoboDeviceBookEntitlement.device_id == int(device_id),
+                ).all()
+                ledger_book_ids = {row.book_id for row in kept_rows}
                 preserved += len(ledger_book_ids)
+                stamped += kobo_sync_status.stamp_device_entitlement_change_bases(
+                    device_id, _proven_legacy_change_bases(user_id, kept_rows),
+                )
             else:
                 removed += ub.session.query(
                     ub.KoboDeviceBookEntitlement,
@@ -609,12 +686,14 @@ def _migrate_device_entitlement_classification(user_id):
 
     log.debug(
         "Kobo Sync classification migration: user=%s devices=%d "
-        "device_proven=%d rearmed=%d preserved=%d elapsed_ms=%.1f",
+        "device_proven=%d rearmed=%d preserved=%d stamped=%d "
+        "elapsed_ms=%.1f",
         user_id,
         len(device_ids),
         device_proven,
         removed,
         preserved,
+        stamped,
         round((monotonic() - started) * 1000, 1),
     )
     return True
@@ -1664,8 +1743,9 @@ def HandleSyncRequest():
             response_mode="ledger_seed_failed",
             capture_session=capture_session,
         )
-    # Pre-ack rows prove only a committed server emission. Clear them once
-    # before they can hide an uncertain book from the recovery arm below.
+    # Audit legacy-classifier rows once, before the recovery arm below reads
+    # them: a single Kobo keeps its ledger, and a household's union copy is
+    # cleared.
     if (requesting_device_id
             and not _migrate_device_entitlement_classification(current_user.id)):
         return _abort_sync_with_observability(

@@ -8,7 +8,7 @@
 from .cw_login import current_user
 from . import logger, ub
 from datetime import datetime, timedelta, timezone
-from sqlalchemy.sql.expression import and_, true
+from sqlalchemy.sql.expression import and_, bindparam, true
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 # from sqlalchemy import exc
 
@@ -131,6 +131,35 @@ def stage_device_entitlement_fingerprints(
             },
         )
         ub.session.execute(statement)
+
+
+def stamp_device_entitlement_change_bases(device_id, change_bases):
+    """Stage a proven change basis onto rows that carry none.
+
+    Only ``change_basis`` is written.  The fingerprint and
+    ``payload_schema_version`` stay as they were, so the declared-shape
+    transition re-fingerprints each row the next time its book is selected,
+    and ``updated_at`` keeps the clock the row was written at.  A row that
+    already has a basis is never overwritten.  Returns the number of bases
+    offered; the writes stay in the caller's transaction.
+    """
+    if not device_id or not change_bases:
+        return 0
+    table = ub.KoboDeviceBookEntitlement.__table__
+    statement = table.update().where(
+        table.c.device_id == int(device_id),
+        table.c.book_id == bindparam("stamp_book_id"),
+        table.c.change_basis.is_(None),
+    ).values(change_basis=bindparam("stamp_change_basis"))
+    items = list(change_bases.items())
+    for offset in range(0, len(items), _LEDGER_UPSERT_BATCH_SIZE):
+        ub.session.execute(statement, [
+            {"stamp_book_id": int(book_id), "stamp_change_basis": basis}
+            for book_id, basis in items[
+                offset:offset + _LEDGER_UPSERT_BATCH_SIZE
+            ]
+        ])
+    return len(items)
 
 
 def get_device_deleted_entitlement_fingerprints(

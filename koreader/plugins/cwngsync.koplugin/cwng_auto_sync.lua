@@ -53,9 +53,13 @@ end
 -- A 4xx other than an auth failure will not change on retry (the server does
 -- not know this book, or refused the value): give up on that part rather than
 -- queue it forever. Anything else is transient.
+-- A refusal that sending again will not change, so the queued change is let
+-- go. Sign-in failures are not (a new password fixes them), and neither are
+-- "too slow", "too early" or "too many requests": those ask to try later.
+local RETRY_LATER = { [401] = true, [403] = true, [408] = true, [425] = true, [429] = true }
 local function isFinalRefusal(reason)
     local code = tonumber(tostring(reason or ""):match("^HTTP (%d+)$"))
-    return code ~= nil and code >= 400 and code < 500 and code ~= 401 and code ~= 403
+    return code ~= nil and code >= 400 and code < 500 and not RETRY_LATER[code]
 end
 
 function AutoSync:readPending()

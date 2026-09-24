@@ -175,9 +175,14 @@ function Library.plan(manifest_books, state, root, probe)
         -- A filename change (retitled book, new format) moves the entry.
         if known and known.path ~= path then
             if known.kind == "downloaded" and not probe.attributes(known.path) then
-                if known.checksum and probe.attributes(path) and probe.digest(path) == known.checksum then
+                local here = probe.attributes(path)
+                -- A kept file has no checksum; a rename keeps its size and time.
+                if here and (known.checksum and probe.digest(path) == known.checksum
+                        or not known.checksum and known.size ~= nil
+                            and here.size == known.size and here.modification == known.mtime) then
                     -- Already moved, by a sync that stopped before saving it.
-                    add("adopt_download", id, { path = path, book = book, from = known.path })
+                    add("adopt_download", id, { path = path, book = book, from = known.path,
+                        keep = not known.checksum })
                     goto continue
                 end
                 -- The reader deleted it here: nothing to move. Treated as not
@@ -201,7 +206,8 @@ function Library.plan(manifest_books, state, root, probe)
             else
                 local placeholder = stillPlaceholder(known, id, probe)
                 if placeholder then
-                    add("remove_placeholder", id, { path = known.path })
+                    -- Notes kept from a download read here follow the book.
+                    add("remove_placeholder", id, { path = known.path, to = path })
                 elseif placeholder == false then
                     add("release", id, { path = known.path })
                 end

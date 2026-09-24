@@ -228,6 +228,21 @@ local function testRemovingACoverKeepsTheReadersNotesButNotAStaleStatus()
         true, "a cover with notes is removed too")
     assertEqual(exists(noted), false, "the cover file is gone")
     assertEqual(sidecars_deleted[noted], nil, "the reader's notes and position stay")
+
+    -- A retitled book's cover: the notes go to its new name.
+    local old_name, new_name = put("Old Title [6].epub", 6), folder .. "/New Title [6].epub"
+    sidecars[old_name] = { data = { annotations = { { text = "mine" } } } }
+    assertEqual(runtime:performLibraryAction(nil, { op = "remove_placeholder", book_id = 6, path = old_name,
+        to = new_name }), true, "a retitled cover is removed")
+    assertEqual(sidecars[new_name] and sidecars[new_name].data.annotations[1].text, "mine",
+        "its notes are under the new name")
+    assertEqual(sidecars[old_name], nil, "and no longer under the old one")
+
+    local taken, occupied = put("Taken [7].epub", 7), folder .. "/Occupied [7].epub"
+    sidecars[taken] = { data = { annotations = { { text = "these" } } } }
+    sidecars[occupied] = { data = { annotations = { { text = "those" } } } }
+    runtime:performLibraryAction(nil, { op = "remove_placeholder", book_id = 7, path = taken, to = occupied })
+    assertEqual(sidecars[occupied].data.annotations[1].text, "those", "notes already there are never replaced")
 end
 
 local function testAStepDoesNothingToABookChangedSinceThePlan()

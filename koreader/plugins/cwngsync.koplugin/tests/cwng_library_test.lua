@@ -207,6 +207,11 @@ local function testRenamedBookMovesItsFileAndKeepsItsPlace()
     local actions = Library.plan(renamed, state, ROOT, disk.probe)
     assertEqual(ops(actions), "create_placeholder:1,move_download:2,remove_placeholder:1",
         "placeholder recreated under the new name; downloaded book moved")
+    for _, a in ipairs(actions) do
+        if a.op == "remove_placeholder" then
+            assertEqual(a.to, ROOT .. "/New 1 [1].epub", "the old cover's notes are for the new name")
+        end
+    end
     perform(disk, state, actions)
     assertEqual(disk.files[ROOT .. "/New 2 [2].epub"].bytes, "real-2", "downloaded bytes moved intact")
     assertEqual(#Library.plan(renamed, state, ROOT, disk.probe), 0, "and it settles")
@@ -316,6 +321,36 @@ local function testADownloadDeletedHereThenRetitledComesBackAsACover()
     assertEqual(#Library.plan({ retitled }, state, ROOT, disk.probe), 0, "and the library settles")
 end
 
+local function testAKeptBookWhoseMoveWasNotSavedStaysTheReaders()
+    -- With no checksum from the server, a file that replaced a cover is kept
+    -- as the reader's. Retitled, it moves; when KOReader stops before the move
+    -- is saved, its size and time (a rename keeps both) still identify it.
+    local disk, state = newDisk(), Library.newState()
+    local b = book(1)
+    b.checksum = nil
+    syncTwice(disk, state, { b })
+    local old_path, new_path = ROOT .. "/Book 1 [1].epub", ROOT .. "/New Title [1].epub"
+    disk.files[old_path] = { bytes = "the reader's own edition", mtime = 300 }
+    perform(disk, state, Library.plan({ b }, state, ROOT, disk.probe))
+    local retitled = book(1, { filename = "New Title [1].epub" })
+    retitled.checksum = nil
+
+    local moved = disk.files[old_path]
+    disk.files[old_path] = nil
+    disk.files[new_path] = { bytes = "someone else's edition!!", mtime = 301 }
+    assertEqual(#moved.bytes, #disk.files[new_path].bytes, "set-up: the same size")
+    local planned = ops(Library.plan({ retitled }, state, ROOT, disk.probe))
+    assertEqual(planned:find("adopt_download", 1, true), nil, "a different file of the same size is not it")
+
+    disk.files[new_path] = moved
+    local actions = Library.plan({ retitled }, state, ROOT, disk.probe)
+    assertEqual(ops(actions), "adopt_download:1", "the moved file is recognised")
+    perform(disk, state, actions)
+    assertEqual(state.books["1"].path, new_path, "recorded at its new name")
+    assertEqual(state.books["1"].checksum, nil, "and still the reader's: no sync deletes it")
+    assertEqual(#Library.plan({ retitled }, state, ROOT, disk.probe), 0, "and the library settles")
+end
+
 local function testAMoveWhoseRecordWasLostIsRecognised()
     local disk, state = newDisk(), Library.newState()
     local old_path = downloaded(disk, state, book(1))
@@ -422,4 +457,5 @@ testABookSentOntoItsCoverIsTheBookAtOnce()
 testAFileCopiedOverACoverIsNeverDeletedWhenTheServerHasNoChecksum()
 testADownloadDeletedHereThenRetitledComesBackAsACover()
 testAMoveWhoseRecordWasLostIsRecognised()
+testAKeptBookWhoseMoveWasNotSavedStaysTheReaders()
 print("cwng_library_test.lua: all tests passed")

@@ -374,7 +374,12 @@ function Runtime:performLibraryAction(client, action)
         local keep_sidecar = not sidecarIsOnlyStatus(action.path)
         local removed = os.remove(action.path)
         if removed then
-            if not keep_sidecar then pcall(DocSettings.updateLocation, action.path) end
+            if not keep_sidecar then
+                pcall(DocSettings.updateLocation, action.path)
+            elseif action.to and not DocSettings:hasSidecarFile(action.to) then
+                -- A retitled book: its notes wait under the name it comes back as.
+                pcall(DocSettings.updateLocation, action.path, action.to)
+            end
             BookList.resetBookInfoCache(action.path)
         end
         return removed ~= nil

@@ -5290,16 +5290,17 @@ def clean_database(_session):
 
 
 # Save downloaded books per user in calibre-web's own database
-def update_download(book_id, user_id):
-    check = session.query(Downloads).filter(Downloads.user_id == user_id).filter(Downloads.book_id == book_id).first()
+def update_download(book_id, user_id, _session=None):
+    s = _session if _session else session
+    check = s.query(Downloads).filter(Downloads.user_id == user_id).filter(Downloads.book_id == book_id).first()
 
     if not check:
         new_download = Downloads(user_id=user_id, book_id=book_id)
-        session.add(new_download)
+        s.add(new_download)
         try:
-            session.commit()
+            s.commit()
         except exc.OperationalError:
-            session.rollback()
+            s.rollback()
 
 
 # Delete non existing downloaded books in calibre-web's own database
@@ -5470,6 +5471,21 @@ def init_db_thread():
     Session = scoped_session(sessionmaker())
     Session.configure(bind=engine)
     return Session()
+
+
+def owned_session():
+    """Return a new Session on app.db's engine for code off the serving thread.
+
+    ``session`` belongs to the web requests: every request greenlet shares that
+    one object on the thread that serves HTTP, and a SQLAlchemy Session is not
+    thread-safe.  WorkerThread and scheduler code that reads or writes app.db
+    through it can fail a request mid-query ("This session is in 'prepared'
+    state") or commit a request's unfinished changes.  The caller owns the
+    returned Session and closes it (it is a context manager).  It shares the
+    engine, whose pool is thread-safe, instead of building one per call as
+    ``init_db_thread()`` does.
+    """
+    return sessionmaker(bind=session.get_bind())()
 
 
 def init_db(app_db_path):

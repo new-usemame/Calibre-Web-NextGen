@@ -309,14 +309,17 @@ def _encode_for_member(jpeg_path: str, extension: str) -> bytes | None:
         return output.getvalue()
 
 
-def materialize_delivery_copy(user_id, book_id, source_path: str, book_format: str):
+def materialize_delivery_copy(user_id, book_id, source_path: str, book_format: str,
+                              *, session=None):
     """Return a private EPUB/KEPUB copy with this user's cover embedded.
 
     The shared library archive is opened read-only.  Replacing exactly the
     manifest-declared cover image preserves KEPUB KoboSpan anchors and every
-    other package member byte-for-byte.
+    other package member byte-for-byte.  A caller off the serving thread (the
+    e-mail task) passes a ``session`` of its own; ``ub.session`` belongs to
+    the web requests.
     """
-    row = override_for_user(user_id, book_id)
+    row = override_for_user(user_id, book_id, session=session)
     if row is None or (book_format or "").lower() not in ("epub", "kepub"):
         return None
     try:

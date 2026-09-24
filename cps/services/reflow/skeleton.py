@@ -536,6 +536,33 @@ def heading_ish(line, style):
 
 # ----------------------------------------------------------------------- the skeleton
 
+def _embedded_source_mark(image, raw, kept_blocks):
+    """Keep a wide, shallow raster in a sparse centered title composition.
+
+    The PDF has pixels here but no Unicode atoms. Size alone previously dropped
+    printed imprints. Sparse page structure and interior placement separate this
+    source mark from narrow running furniture and small images in dense prose.
+    Its words remain pixels; no transcription is inferred from the image.
+    """
+    if raw.is_page_scan or image.full_page or getattr(image, 'page_background', False):
+        return False
+    if not (image.width >= max(extract.MIN_FIG_PX, raw.width * .24)
+            and 8 <= image.height < extract.MIN_FIG_PX
+            and image.width >= image.height * 6):
+        return False
+    x0, y0, x1, y1 = image.bbox
+    if not (abs((x0 + x1) / 2 - raw.width / 2) <= raw.width * .15
+            and raw.height * .12 <= (y0 + y1) / 2 <= raw.height * .8):
+        return False
+    lines = [line for _, group in kept_blocks for line in group]
+    if not 2 <= len(lines) <= 8:
+        return False
+    above = [line for line in lines if line.bbox[3] < y0
+             and abs((line.bbox[0] + line.bbox[2]) / 2 - raw.width / 2)
+             <= raw.width * .18]
+    return len(above) >= 2
+
+
 def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     """Classify one page's regions, recording a reason for every uncertain call.
 
@@ -623,8 +650,10 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
         if kept:
             kept_blocks.append((blk, kept))
 
-    embedded = [img for img in raw.images if img.substantial and not img.full_page
-                and not getattr(img,'page_background',False)]
+    source_marks = {id(img) for img in raw.images
+                    if _embedded_source_mark(img, raw, kept_blocks)}
+    embedded = [img for img in raw.images if (img.substantial or id(img) in source_marks)
+                and not img.full_page and not getattr(img,'page_background',False)]
 
     # A full-bleed cover or plate is the page itself with a little text over
     # it: one figure, nothing left to slice. Evidence is the pixels and the
@@ -772,7 +801,9 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     for img in embedded:
         band, column = layout.place(img.bbox) if layout else (0, 0)
         skel.regions.append(Region(kind="figure", bbox=img.bbox, image=img,
-                                   band=band, column=column))
+                                   band=band, column=column,
+                                   reason="embedded_source_mark" if id(img) in source_marks else "",
+                                   needs_ink=id(img) in source_marks))
     for candidate in candidates:
         if layout is not None:
             candidate.band, candidate.column = layout.place(candidate.bbox)

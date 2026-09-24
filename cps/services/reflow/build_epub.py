@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.15"
+CONVERTER_VERSION = "1.16"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -189,7 +189,7 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                 index += 1
             figures = [f for f in book.figures if f["pno"] == pno]
             reason = figures[figure_index].get("found") if figure_index < len(figures) else ""
-            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns")
+            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark")
             if reason == "native_outline_conflict":
                 caption = ('Native heading text conflicts with PDF navigation metadata. '
                            'The original printed heading is shown as an image; no replacement '
@@ -210,6 +210,10 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
             elif reason == "native_spacing_uncertain":
                 caption = ('Character spacing is uncertain. The original printed text region is '
                            'shown as an image, without inferred or searchable text. '
+                           '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
+            elif reason == "embedded_source_mark":
+                caption = ('Printed source lettering is preserved as an image, '
+                           'without inferred or searchable text. '
                            '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
             elif source_region:
                 caption = ('Original text region. OCR transcription is uncertain; '
@@ -1218,6 +1222,11 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
         elements = book.pages.get(pno, [])
         for element_index, key in _caption_keys(elements).items():
             specs.append((key, "Original printed caption", elements[element_index].bbox))
+        for figure_index, figure in enumerate(f for f in book.figures if f['pno'] == pno):
+            if figure.get('found') == 'embedded_source_mark':
+                specs.append(('source_mark_%d' % figure_index,
+                              'Original printed lettering and neighboring layout',
+                              figure['bbox']))
         if not specs and pno not in recovered and pno not in scanned and not book.needs_source_evidence(pno):
             continue
         if doc is None:

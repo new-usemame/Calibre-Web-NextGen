@@ -63,8 +63,12 @@ web and OPDS downloads. These entry points pass
 currently public shelves to the membership predicate; a shelf's own listing
 passes it while that shelf is public. Everything else keeps the viewer's own
 library: other listings, search, facets, counts, sending to an e-reader, and
-Kobo sync. The allowance is rebuilt on every request, so making the shelf
-private or taking a book off it revokes access on the next request.
+Kobo sync. The book pages, classic and new, draw the same line: for a shared
+book they offer reading and downloads, and keep the library's own controls
+(shelves, favorite, read and archive state, hiding, removal) and the private
+cover for books in the viewer's library. The allowance is rebuilt on every
+request, so making the shelf private or taking a book off it revokes access on
+the next request.
 
 The allowance relaxes membership only. Language, allowed and denied tags, the
 restricted column, roles, and OPDS shelf exposure still apply, and Kobo native

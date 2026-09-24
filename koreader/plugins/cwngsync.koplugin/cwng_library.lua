@@ -174,7 +174,17 @@ function Library.plan(manifest_books, state, root, probe)
 
         -- A filename change (retitled book, new format) moves the entry.
         if known and known.path ~= path then
-            if known.kind == "downloaded" then
+            if known.kind == "downloaded" and not probe.attributes(known.path) then
+                if known.checksum and probe.attributes(path) and probe.digest(path) == known.checksum then
+                    -- Already moved, by a sync that stopped before saving it.
+                    add("adopt_download", id, { path = path, book = book, from = known.path })
+                    goto continue
+                end
+                -- The reader deleted it here: nothing to move. Treated as not
+                -- known, the book comes back as a cover under its new name.
+                add("forget", id, { path = known.path })
+                known = nil
+            elseif known.kind == "downloaded" then
                 if probe.attributes(path) then
                     add("conflict", id, { path = path, book = book,
                         reason = "a different file already uses the new name" })
@@ -188,14 +198,15 @@ function Library.plan(manifest_books, state, root, probe)
                     add("apply_status", id, { path = path, book = book })
                 end
                 goto continue
+            else
+                local placeholder = stillPlaceholder(known, id, probe)
+                if placeholder then
+                    add("remove_placeholder", id, { path = known.path })
+                elseif placeholder == false then
+                    add("release", id, { path = known.path })
+                end
+                known = nil
             end
-            local placeholder = stillPlaceholder(known, id, probe)
-            if placeholder then
-                add("remove_placeholder", id, { path = known.path })
-            elseif placeholder == false then
-                add("release", id, { path = known.path })
-            end
-            known = nil
         end
 
         if not known then
@@ -223,9 +234,13 @@ function Library.plan(manifest_books, state, root, probe)
                 -- this device, landing on the same name. Keep it only if it is
                 -- the book; a checksum the server does not know is still the
                 -- reader's file, so it is left alone rather than overwritten.
+                -- Without a checksum from the server nobody can tell, so it is
+                -- listed as the book but kept as the reader's: no sync deletes it.
                 if probe.placeholderId(path) == book.book_id then
                     add("refresh_placeholder", id, { path = path, book = book })
-                elseif not book.checksum or probe.digest(path) == book.checksum then
+                elseif not book.checksum then
+                    add("adopt_download", id, { path = path, book = book, keep = true })
+                elseif probe.digest(path) == book.checksum then
                     add("adopt_download", id, { path = path, book = book })
                 else
                     add("conflict", id, { path = path, book = book,
@@ -298,13 +313,15 @@ function Library.record(state, action, ok, info)
             progress = book.progress,
         }
     elseif op == "adopt_download" or op == "download" then
+        -- `checksum` is what makes a downloaded book the library's to remove
+        -- again; a kept file has none, so leaving the library releases it.
         state.books[id] = {
             kind = "downloaded",
             path = action.path,
             rev = book.rev,
             size = info.size,
             mtime = info.mtime,
-            checksum = info.checksum or book.checksum,
+            checksum = not action.keep and (info.checksum or book.checksum) or nil,
             status = book.read_status,
         }
     elseif op == "move_download" then

@@ -279,6 +279,58 @@ local function testAnotherAccountStartsAFreshLibraryAndKeepsDownloads()
         "id 1 on the new server is a different book: the old file is not renamed to it")
 end
 
+-- A book downloaded here, as the library records it after a download.
+local function downloaded(disk, state, b)
+    syncTwice(disk, state, { b })
+    local path = ROOT .. "/" .. b.filename
+    disk.files[path] = { bytes = "real-" .. b.book_id, mtime = 200 }
+    perform(disk, state, Library.plan({ b }, state, ROOT, disk.probe))
+    assertEqual(state.books[tostring(b.book_id)].kind, "downloaded", "set-up: the book is downloaded")
+    return path
+end
+
+local function testAFileCopiedOverACoverIsNeverDeletedWhenTheServerHasNoChecksum()
+    local disk, state = newDisk(), Library.newState()
+    local b = book(1)
+    b.checksum = nil
+    syncTwice(disk, state, { b })
+    local path = ROOT .. "/Book 1 [1].epub"
+    disk.files[path] = { bytes = "the reader's own edition", mtime = 300 }
+    perform(disk, state, Library.plan({ b }, state, ROOT, disk.probe))
+    assertEqual(state.books["1"].kind, "downloaded", "it is listed as the book")
+    local leaving = Library.plan({}, state, ROOT, disk.probe)
+    assertEqual(ops(leaving), "release:1", "leaving the library lets go of it")
+    perform(disk, state, leaving)
+    assert(disk.files[path], "the reader's file is still there")
+end
+
+local function testADownloadDeletedHereThenRetitledComesBackAsACover()
+    local disk, state = newDisk(), Library.newState()
+    local old_path = downloaded(disk, state, book(1))
+    disk.files[old_path] = nil
+    local retitled = book(1, { filename = "New Title [1].epub" })
+    local actions = Library.plan({ retitled }, state, ROOT, disk.probe)
+    assertEqual(ops(actions), "create_placeholder:1,forget:1", "nothing to move: it comes back as a cover")
+    perform(disk, state, actions)
+    assertEqual(state.books["1"].path, ROOT .. "/New Title [1].epub", "under its new name")
+    assertEqual(#Library.plan({ retitled }, state, ROOT, disk.probe), 0, "and the library settles")
+end
+
+local function testAMoveWhoseRecordWasLostIsRecognised()
+    local disk, state = newDisk(), Library.newState()
+    local old_path = downloaded(disk, state, book(1))
+    local new_path = ROOT .. "/New Title [1].epub"
+    -- The move happened, but KOReader stopped before the state was saved.
+    disk.files[new_path], disk.files[old_path] = disk.files[old_path], nil
+    local retitled = book(1, { filename = "New Title [1].epub" })
+    local actions = Library.plan({ retitled }, state, ROOT, disk.probe)
+    assertEqual(ops(actions), "adopt_download:1", "the moved book is recognised by its bytes")
+    assertEqual(actions[1].from, old_path, "with where its sidecar may still be")
+    perform(disk, state, actions)
+    assertEqual(state.books["1"].path, new_path, "recorded at its new name")
+    assertEqual(#Library.plan({ retitled }, state, ROOT, disk.probe), 0, "and the library settles")
+end
+
 testEmptyDeviceGetsOnePlaceholderPerBookAndThenSettles()
 testAnotherAccountStartsAFreshLibraryAndKeepsDownloads()
 testMetadataRevisionRefreshesOnlyThatPlaceholder()
@@ -367,4 +419,7 @@ end
 testStateOfAnotherVersionStartsOver()
 testShelvesBecomeCollectionsWithoutTakingTheReadersOwn()
 testABookSentOntoItsCoverIsTheBookAtOnce()
+testAFileCopiedOverACoverIsNeverDeletedWhenTheServerHasNoChecksum()
+testADownloadDeletedHereThenRetitledComesBackAsACover()
+testAMoveWhoseRecordWasLostIsRecognised()
 print("cwng_library_test.lua: all tests passed")

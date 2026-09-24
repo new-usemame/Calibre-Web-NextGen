@@ -256,14 +256,68 @@ function Runtime:fetchPlaceholder(client, book, path)
     return true, fileInfo(path)
 end
 
+-- What a cover's sidecar holds when a sync is the only thing that wrote it:
+-- writeBookStatus's status and progress, and the path KOReader adds itself.
+local STATUS_ONLY_KEYS = { doc_path = true, summary = true, percent_finished = true }
+local STATUS_ONLY_SUMMARY = { status = true, modified = true }
+
+-- Whether removing a cover may take its sidecar with it. Only when the sidecar
+-- holds nothing but the status a sync wrote (left behind, it would put a stale
+-- "finished" on the book if it came back). A position, highlights, notes or a
+-- custom cover are the reader's: they may be the book's from when it was
+-- downloaded here, and they stay.
+local function sidecarIsOnlyStatus(path)
+    local ok, only = pcall(function()
+        if not DocSettings:hasSidecarFile(path) then return false end
+        if DocSettings:findCustomCoverFile(path) or DocSettings:findCustomMetadataFile(path) then return false end
+        for key, value in pairs(DocSettings:open(path).data or {}) do
+            if not STATUS_ONLY_KEYS[key] then return false end
+            if key == "summary" then
+                if type(value) ~= "table" then return false end
+                for field in pairs(value) do
+                    if not STATUS_ONLY_SUMMARY[field] then return false end
+                end
+            end
+        end
+        return true
+    end)
+    return ok and only == true
+end
+
+-- A step runs up to minutes after the plan that chose it, one per tick, and
+-- the reader may have opened, downloaded or replaced the book in between. Each
+-- step that touches a file checks again that it is still the file the plan
+-- saw; if not, it does nothing and the next sync decides afresh.
+local function stillAsPlanned(self, action)
+    local op = action.op
+    local open = openDocumentPath()
+    if op == "create_placeholder" then
+        return lfs.attributes(action.path, "mode") == nil
+    elseif op == "refresh_placeholder" or op == "remove_placeholder" then
+        return open ~= action.path and Runtime.readPlaceholderId(action.path) == action.book_id
+    elseif op == "remove_download" then
+        return open ~= action.path
+            and (action.checksum == nil or self:getDocumentDigest(action.path) == action.checksum)
+    elseif op == "move_download" then
+        return open ~= action.from and lfs.attributes(action.path, "mode") == nil
+    end
+    return true
+end
+
 function Runtime:performLibraryAction(client, action)
     local op = action.op
+    if not stillAsPlanned(self, action) then
+        logger.info("CWNGSync: library step skipped, the book changed since the sync planned it:",
+            op, action.book_id)
+        return false
+    end
     if op == "create_placeholder" or op == "refresh_placeholder" then
         return self:fetchPlaceholder(client, action.book, action.path)
     elseif op == "remove_placeholder" then
+        local keep_sidecar = not sidecarIsOnlyStatus(action.path)
         local removed = os.remove(action.path)
         if removed then
-            pcall(DocSettings.updateLocation, action.path) -- the status sidecar we wrote
+            if not keep_sidecar then pcall(DocSettings.updateLocation, action.path) end
             BookList.resetBookInfoCache(action.path)
         end
         return removed ~= nil
@@ -291,6 +345,10 @@ function Runtime:performLibraryAction(client, action)
         local info = fileInfo(action.path)
         if not info then return false end
         info.checksum = self:getDocumentDigest(action.path)
+        if action.from and not DocSettings:hasSidecarFile(action.path) then
+            -- A move whose record was lost may have lost its sidecar move too.
+            pcall(DocSettings.updateLocation, action.from, action.path)
+        end
         return true, info
     elseif op == "apply_status" then
         local known = self:getLibraryState().books[tostring(action.book_id)]

@@ -24,6 +24,7 @@ either form passes.
 """
 
 import os
+import shlex
 import subprocess
 import time
 from pathlib import Path
@@ -148,7 +149,7 @@ def test_healthcheck_https_sqlite_preflight_has_a_real_wall_clock_bound(tmp_path
 
     helper = tmp_path / "cwa-healthcheck"
     helper.write_text(
-        HEALTHCHECK_HELPER.read_text().replace("/config/app.db", str(app_db))
+        HEALTHCHECK_HELPER.read_text().replace("/config/app.db", shlex.quote(str(app_db)))
     )
     helper.chmod(0o755)
 

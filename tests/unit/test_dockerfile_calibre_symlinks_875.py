@@ -35,6 +35,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import shlex
 import subprocess
 from pathlib import Path
 
@@ -121,8 +122,8 @@ def _run_shipped_command(command: str, tmp_path: Path) -> Path:
     nested.write_text("#!/bin/sh\nexit 0\n")
     nested.chmod(0o755)
 
-    localized = command.replace("/opt/calibre", str(calibre_dir)).replace(
-        "/usr/bin", str(usr_bin)
+    localized = command.replace("/opt/calibre", shlex.quote(str(calibre_dir))).replace(
+        "/usr/bin", shlex.quote(str(usr_bin))
     )
     result = subprocess.run(
         ["/bin/sh", "-c", localized],
@@ -188,8 +189,8 @@ def test_linking_is_idempotent(link_command: str, tmp_path: Path) -> None:
     first = sorted(p.name for p in usr_bin.iterdir())
 
     calibre_dir = tmp_path / "opt" / "calibre"
-    localized = link_command.replace("/opt/calibre", str(calibre_dir)).replace(
-        "/usr/bin", str(usr_bin)
+    localized = link_command.replace("/opt/calibre", shlex.quote(str(calibre_dir))).replace(
+        "/usr/bin", shlex.quote(str(usr_bin))
     )
     second_run = subprocess.run(
         ["/bin/sh", "-c", localized], capture_output=True, text=True, cwd=tmp_path

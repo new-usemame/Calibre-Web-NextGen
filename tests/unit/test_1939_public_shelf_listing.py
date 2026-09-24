@@ -2,9 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Public-shelf listing exception for personal-library users (issue #1939)."""
 
-import ast
 from datetime import datetime, timezone
-from pathlib import Path
 from types import SimpleNamespace
 
 import flask
@@ -16,7 +14,6 @@ from cps import db, ub
 
 
 pytestmark = pytest.mark.unit
-REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _book(book_id, title):
@@ -303,78 +300,7 @@ def test_opds_public_shelf_feed_lists_out_of_membership_book(
     assert [entry.Books.id for entry in feed_entries] == [2]
 
 
-class _PublicShelfOptInVisitor(ast.NodeVisitor):
-    def __init__(self, module):
-        self.module = module
-        self.function = None
-        self.calls = []
-
-    def visit_FunctionDef(self, node):
-        previous = self.function
-        self.function = node.name
-        self.generic_visit(node)
-        self.function = previous
-
-    visit_AsyncFunctionDef = visit_FunctionDef
-
-    def visit_Call(self, node):
-        for keyword in node.keywords:
-            if keyword.arg == "allow_public_shelf_books":
-                self.calls.append(
-                    (self.module, self.function, node.lineno, keyword.value)
-                )
-        self.generic_visit(node)
-
-
-def _public_shelf_keyword_calls():
-    calls = []
-    for path in (REPO_ROOT / "cps").rglob("*.py"):
-        module = path.relative_to(REPO_ROOT).as_posix()
-        visitor = _PublicShelfOptInVisitor(module)
-        visitor.visit(ast.parse(path.read_text(), filename=str(path)))
-        calls.extend(visitor.calls)
-    return calls
-
-
-def _is_public_shelf_predicate(node):
-    return (
-        isinstance(node, ast.Call)
-        and isinstance(node.func, ast.Name)
-        and node.func.id == "bool"
-        and len(node.args) == 1
-        and not node.keywords
-        and isinstance(node.args[0], ast.Attribute)
-        and node.args[0].attr == "is_public"
-        and isinstance(node.args[0].value, ast.Name)
-        and node.args[0].value.id == "shelf"
-    )
-
-
-def test_only_public_shelf_listing_paths_opt_in():
-    calls = _public_shelf_keyword_calls()
-    forwarding_calls = [
-        call for call in calls
-        if isinstance(call[3], ast.Name)
-        and call[3].id == "allow_public_shelf_books"
-    ]
-    opt_in_calls = [call for call in calls if call not in forwarding_calls]
-
-    # db.py only carries the caller's decision through the canonical filter.
-    # Every actual opt-in must be one of these read-listing surfaces, and every
-    # one must derive the exception from the selected shelf's persisted policy.
-    assert {(module, function) for module, function, _line, _value in forwarding_calls} == {
-        ("cps/db.py", "fill_indexpage_with_archived_books"),
-    }
-    assert {(module, function) for module, function, _line, _value in opt_in_calls} == {
-        ("cps/shelf.py", "render_show_shelf"),
-        ("cps/shelf.py", "_shelf_book_count"),
-        ("cps/api/shelves.py", "shelf_detail"),
-        ("cps/opds.py", "feed_shelf"),
-    }
-    assert all(_is_public_shelf_predicate(value) for *_caller, value in opt_in_calls)
-    assert {module for module, *_rest in opt_in_calls} == {
-        "cps/shelf.py",
-        "cps/api/shelves.py",
-        "cps/opds.py",
-    }
-    assert "cps/kobo.py" not in {module for module, *_rest in opt_in_calls}
+# The former AST allowlist here asserted that only listing routes could opt in.
+# Shared-shelf continuation intentionally authorizes detail/read/download now.
+# Real SQL and route isolation coverage above and in
+# test_shared_book_continuation.py exercises that policy directly.

@@ -46,7 +46,9 @@ executables that deliberately detach or close inherited ownership descriptors.
 
 Cgroup measurement walks all applicable visible mounts, not merely the most
 specific subtree view. A missing controller pair is accepted only at a mount
-whose hierarchy root is `/`, with the root-domain marker; a subtree mountpoint
+whose hierarchy root is `/`, with readable `cgroup.controllers` advertising
+memory. The true root need not have `cgroup.type`: the kernel documents that
+as a non-root interface, like `memory.max/current`. A subtree mountpoint
 does not become a hierarchy root because it says `domain`. Namespace-hidden
 ancestors still require external deployment capacity accounting. Unknown data
 remains fail-closed in checked mode; serialize-only remains explicit.

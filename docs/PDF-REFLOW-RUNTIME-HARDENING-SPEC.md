@@ -143,6 +143,10 @@ headroom. It does not count swap or treat MemAvailable as a container limit.
 All applicable mount views are walked: adding a subtree view cannot conceal a
 limiting ancestor visible through a full mount. Missing controller files at a
 non-root mount remain unknown even when `cgroup.type` says `domain`.
+At a proven cgroup2 mount hierarchy root `/`, absence of both memory limit/usage
+files is legitimate; readable `cgroup.controllers` must advertise memory.
+`cgroup.type` is a non-root interface and is not required at the actual root.
+Partial pairs, unreadable metadata and missing non-root pairs still fail closed.
 Missing/malformed data, v1/hybrid memory controllers and non-Linux meters are
 unsupported and **fail closed**. Namespace-hidden ancestor limits cannot be
 discovered: expose the effective envelope or reserve it externally. Explicit

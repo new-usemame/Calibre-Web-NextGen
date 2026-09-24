@@ -83,7 +83,10 @@ def linux_headroom(proc=Path('/proc')):
             # hidden ancestors remain a deployment limitation, not free memory.
             if (hierarchy_root == PurePosixPath('/') and current == mount
                     and not maximum.exists() and not usage.exists()):
-                if _read(current / 'cgroup.type') != 'domain':
+                # cgroup.type, like memory.max/current, is a non-root ABI.
+                # Require readable controller availability, not a domain marker
+                # (which also exists on non-root subtree mountpoints).
+                if 'memory' not in _read(current / 'cgroup.controllers').split():
                     raise ValueError('unknown root controller')
             else:
                 limit, used = _read(maximum), int(_read(usage))

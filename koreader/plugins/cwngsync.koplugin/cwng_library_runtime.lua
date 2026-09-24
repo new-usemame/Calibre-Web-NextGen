@@ -37,6 +37,10 @@ local LIBRARY_SYNC_INTERVAL = 5 * 60
 -- library. 5000 pages is a million books at the server's page size.
 local MAX_MANIFEST_PAGES = 5000
 local PLACEHOLDER_TIMEOUTS = { 5, 20 }
+-- Steps that download from the server, and how many may fail in a row before
+-- the sync stops rather than waiting out every remaining book's timeouts.
+local DOWNLOADING_OPS = { create_placeholder = true, refresh_placeholder = true }
+local STOP_AFTER_FAILED_DOWNLOADS = 3
 
 -- Shared by the file browser's and the reader's plugin instances: there is one
 -- library and one sync at a time, whichever instance started it.
@@ -309,7 +313,7 @@ function Runtime:performLibraryAction(client, action)
     if not stillAsPlanned(self, action) then
         logger.info("CWNGSync: library step skipped, the book changed since the sync planned it:",
             op, action.book_id)
-        return false
+        return false, nil, "changed"
     end
     if op == "create_placeholder" or op == "refresh_placeholder" then
         return self:fetchPlaceholder(client, action.book, action.path)
@@ -461,25 +465,36 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
     end
 
     local index = 0
-    local succeeded, failed = 0, 0
+    local succeeded, failed, failed_downloads_in_a_row = 0, 0, 0
+    -- The list is recorded as applied either way: the next sync plans against
+    -- it again, so whatever did not happen now happens then.
+    local function finish(ok, summary)
+        state.revision = revision
+        state.manifest = books
+        state.shelves = shelves
+        local ok_collections, collections_error = pcall(self.applyLibraryCollections, self, books, shelves)
+        if not ok_collections then
+            logger.warn("CWNGSync: shelf collections failed", collections_error)
+        end
+        self:saveLibraryState()
+        self:refreshLibraryViews(changed)
+        done(ok, summary)
+    end
     local function step()
         if shared.running ~= token then return end
         index = index + 1
         local action = actions[index]
         if not action then
-            state.revision = revision
-            state.manifest = books
-            state.shelves = shelves
-            local ok_collections, collections_error = pcall(self.applyLibraryCollections, self, books, shelves)
-            if not ok_collections then
-                logger.warn("CWNGSync: shelf collections failed", collections_error)
-            end
-            self:saveLibraryState()
-            self:refreshLibraryViews(changed)
-            done(true, { actions = #actions, succeeded = succeeded, failed = failed })
+            finish(true, { actions = #actions, succeeded = succeeded, failed = failed })
             return
         end
-        local ok_call, ok, info = pcall(self.performLibraryAction, self, client, action)
+        local downloads = DOWNLOADING_OPS[action.op]
+        if downloads and not NetworkMgr:isConnected() then
+            logger.warn("CWNGSync: library sync stopped, the network went away after", index - 1, "steps")
+            finish(false, _("the network went away; the rest comes on the next sync"))
+            return
+        end
+        local ok_call, ok, info, why = pcall(self.performLibraryAction, self, client, action)
         ok = ok_call and ok
         if not ok_call then logger.warn("CWNGSync: library action failed", action.op, ok) end
         Library.record(state, action, ok, info)
@@ -489,6 +504,17 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
             if action.from then changed[#changed + 1] = action.from end
         elseif action.op ~= "conflict" then
             failed = failed + 1
+        end
+        if downloads and why ~= "changed" then
+            failed_downloads_in_a_row = ok and 0 or failed_downloads_in_a_row + 1
+            if failed_downloads_in_a_row >= STOP_AFTER_FAILED_DOWNLOADS then
+                -- Each attempt holds the screen for its timeouts: a server that
+                -- stopped answering must not cost that for every book left.
+                logger.warn("CWNGSync: library sync stopped after", failed_downloads_in_a_row,
+                    "downloads failed in a row")
+                finish(false, _("the server stopped answering; the rest comes on the next sync"))
+                return
+            end
         end
         -- Show covers as they arrive rather than all at the end.
         if #changed >= 18 then
@@ -553,7 +579,13 @@ function Runtime:syncLibrary(opts)
         shared.running = nil
         if ok then shared.last_sync = os.time() end
         if opts.interactive then
-            if ok then
+            if ok and type(summary) == "table" and (summary.failed or 0) > 0 then
+                UIManager:show(InfoMessage:new{
+                    text = T(_("Your library is updated, except %1 books. They are tried again on the next sync."),
+                        summary.failed),
+                    timeout = 4,
+                })
+            elseif ok then
                 UIManager:show(InfoMessage:new{ text = _("Your library is up to date."), timeout = 2 })
             else
                 UIManager:show(InfoMessage:new{

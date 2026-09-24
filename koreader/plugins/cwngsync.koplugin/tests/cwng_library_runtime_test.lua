@@ -46,8 +46,13 @@ stub("apps/reader/readerui", reader)
 stub("ui/widget/infomessage", { new = function(_, fields) return fields end })
 stub("json", {})
 stub("luasettings", {})
-stub("ui/network/manager", { isConnected = function() return true end })
-stub("ui/uimanager", { show = function() end })
+local network = { up = true }
+stub("ui/network/manager", { isConnected = function() return network.up end })
+local ticks, shown = {}, {}
+stub("ui/uimanager", {
+    show = function(_, widget) shown[#shown + 1] = widget.text end,
+    nextTick = function(_, f) ticks[#ticks + 1] = f end,
+})
 stub("libs/libkoreader-lfs", { attributes = function(path, field)
     local f = io.open(path, "rb")
     if not f then return nil end
@@ -59,7 +64,10 @@ stub("libs/libkoreader-lfs", { attributes = function(path, field)
 end })
 stub("logger", { warn = function() end, info = function() end, dbg = function() end })
 stub("util", { directoryExists = function() return true end, makePath = function() end })
-stub("ffi/util", { template = function(text) return text end })
+stub("ffi/util", { template = function(text, ...)
+    local args = { ... }
+    return (text:gsub("%%(%d)", function(n) return tostring(args[tonumber(n)]) end))
+end })
 stub("gettext", function(text) return text end)
 
 local Runtime = require("cwng_library_runtime")
@@ -72,7 +80,9 @@ local function assertEqual(actual, expected, message)
 end
 
 -- `answer(cursor)` is the server: the body for the page after `cursor`.
-local function sync(answer)
+-- With `real_apply`, the manifest is applied by the runtime itself, and
+-- `fetch(book)` answers each cover download.
+local function sync(answer, real_apply, fetch, root)
     local queue, requests = {}, {}
     local outcome = { applied = nil }
     local client = {
@@ -86,20 +96,41 @@ local function sync(answer)
         device_id = "device",
     }, { __index = Runtime })
     function runtime:libraryEnabled() return true end
-    function runtime:getLibraryRoot() return "/mnt/us/cwng-library" end
+    function runtime:getLibraryRoot() return root or "/mnt/us/cwng-library" end
     function runtime:getLibraryState() return { books = {} } end
     function runtime:newSyncClient() return client end
     function runtime:accountOwner() return "reader@server" end
     function runtime:libraryProbe() return {} end
-    function runtime:applyLibraryManifest(books, _, _, _, done)
-        outcome.applied = books
-        done(true)
+    if real_apply then
+        local state = { books = {} }
+        outcome.fetched = 0
+        function runtime:getLibraryState() return state end
+        function runtime:saveLibraryState() end
+        function runtime:refreshLibraryViews() end
+        function runtime:applyLibraryCollections() end
+        function runtime:libraryProbe()
+            return { attributes = function() return nil end, isOpen = function() return false end,
+                digest = function() return nil end, placeholderId = function() return nil end }
+        end
+        function runtime:fetchPlaceholder(_, book)
+            outcome.fetched = outcome.fetched + 1
+            return fetch(book)
+        end
+        outcome.state = state
+    else
+        function runtime:applyLibraryManifest(books, _, _, _, done)
+            outcome.applied = books
+            done(true)
+        end
     end
     runtime:syncLibrary({
         force = true,
+        interactive = real_apply,
         on_done = function(ok, summary) outcome.ok, outcome.summary = ok, summary end,
     })
-    while #queue > 0 do table.remove(queue, 1)() end
+    while #queue > 0 or #ticks > 0 do
+        if #queue > 0 then table.remove(queue, 1)() else table.remove(ticks, 1)() end
+    end
     outcome.requests = requests
     return outcome
 end
@@ -189,6 +220,54 @@ local function testAStepDoesNothingToABookChangedSinceThePlan()
     assert(exists(became_book), "the downloaded book is still there")
 end
 
+local function manyNewBooks(count)
+    return function()
+        local books = {}
+        for id = 1, count do
+            books[id] = { book_id = id, filename = "Book [" .. id .. "].epub", rev = "r1", read_status = "unread" }
+        end
+        return { books = books, revision = "r1" }
+    end
+end
+
+local function testASyncStopsWhenTheServerStopsAnswering()
+    local outcome = sync(manyNewBooks(2000), true, function() return false end)
+    assertEqual(outcome.fetched, 3, "three downloads fail in a row, then the sync stops")
+    assertEqual(outcome.ok, false, "and says it did not finish")
+    assertEqual(shown[#shown]:find("up to date", 1, true), nil, "it never says the library is up to date")
+end
+
+local function testASyncStopsWhenTheNetworkGoesAway()
+    local outcome = sync(manyNewBooks(2000), true, function(book)
+        if book.book_id == 10 then network.up = false end
+        return true, { size = 1, mtime = 1 }
+    end)
+    network.up = true
+    assertEqual(outcome.fetched, 10, "nothing is attempted after the network went away")
+    assertEqual(outcome.ok, false, "and the sync says it did not finish")
+    assertEqual(outcome.state.books["10"] ~= nil, true, "what did arrive is recorded")
+end
+
+local function testAFewFailedCoversDoNotStopTheRest()
+    local outcome = sync(manyNewBooks(50), true, function(book)
+        return book.book_id % 10 ~= 0, { size = 1, mtime = 1 }
+    end)
+    assertEqual(outcome.fetched, 50, "every cover is tried")
+    assertEqual(outcome.ok, true, "the sync finishes")
+    assert(shown[#shown]:find("except 5 books", 1, true), "and says which did not arrive: " .. tostring(shown[#shown]))
+end
+
+local function testBooksThatArrivedDuringTheSyncDoNotStopIt()
+    -- Planned as new covers, but by the time their turn comes the books are
+    -- there (sent or downloaded meanwhile): skipped, not failures.
+    local root = folder .. "/arrived"
+    assert(os.execute("mkdir -p '" .. root .. "'"))
+    for id = 1, 3 do put("arrived/Book [" .. id .. "].epub") end
+    local outcome = sync(manyNewBooks(10), true, function() return true, { size = 1, mtime = 1 } end, root)
+    assertEqual(outcome.fetched, 7, "every other cover still arrives")
+    assertEqual(outcome.ok, true, "and the sync finishes")
+end
+
 local function testEveryPageOfABigLibraryReachesTheDevice()
     -- 250 pages is 50,000 books at the server's page size of 200.
     local outcome = sync(pagesOf(250, 2))
@@ -223,6 +302,10 @@ testAListThatDoesNotFinishIsNotApplied()
 testAServerRepeatingItsCursorStopsAtOnce()
 testRemovingACoverKeepsTheReadersNotesButNotAStaleStatus()
 testAStepDoesNothingToABookChangedSinceThePlan()
+testASyncStopsWhenTheServerStopsAnswering()
+testASyncStopsWhenTheNetworkGoesAway()
+testAFewFailedCoversDoNotStopTheRest()
+testBooksThatArrivedDuringTheSyncDoNotStopIt()
 os.execute("rm -rf '" .. folder .. "'")
 
 print("cwng_library_runtime tests passed")

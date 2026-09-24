@@ -1382,7 +1382,7 @@ export function useSaveBookmark(bookId: string | number) {
       percentage?: number;
       share_with_devices?: boolean;
     }) =>
-      apiPost(`/api/v1/books/${bookId}/bookmark`, vars, { webreaderDevice: true }),
+      apiPost(`/api/v1/books/${bookId}/bookmark`, vars),
     // #1318: deliberately NO react-query `retry` here. The route now answers
     // 5xx when the write did not land, which is worth re-sending — but a
     // built-in retry re-sends the SAME variables, and the reader fires a save

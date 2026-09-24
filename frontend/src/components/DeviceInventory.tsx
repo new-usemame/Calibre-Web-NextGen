@@ -28,7 +28,7 @@ export interface Device {
   last_seen: string | null;
   annotation_count: number;
   origin_annotation_count?: number | null;
-  browser_identity?: 'identified' | 'unidentified' | null;
+  browser_identity?: 'account' | null;
   highlights?: number;
   notes?: number;
   dogears?: number;

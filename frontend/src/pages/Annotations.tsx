@@ -101,7 +101,7 @@ export function Annotations({ id }: { id: string }) {
   const activeDevices = registry?.devices ?? [];
   const overrideOf = (row: Annotation) => assignmentOverride(row, assignments);
   const assignmentOf = (row: Annotation) => effectiveDevice(row, overrideOf(row));
-  const deviceLabel = (deviceId: string | null) => annotationDeviceLabel(deviceId, devices, t('Unknown device'), t('Deleted device'));
+  const deviceLabel = (deviceId: string | null) => annotationDeviceLabel(deviceId, devices, t('Unknown device'), t('Deleted device'), t('Browser'));
   const counts = useMemo(() => {
     const result = new Map<string, number>();
     annotations.forEach((row) => {
@@ -113,7 +113,7 @@ export function Annotations({ id }: { id: string }) {
   const filters = useMemo(() => [
     { id: 'all', label: t('All'), count: annotations.length },
     { id: 'unknown', label: t('Unknown device'), count: counts.get('unknown') || 0 },
-    ...Object.entries(devices).map(([deviceId, device]) => ({ id: deviceId, label: device.label, count: counts.get(deviceId) || 0 })),
+    ...Object.entries(devices).map(([deviceId, device]) => ({ id: deviceId, label: device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label, count: counts.get(deviceId) || 0 })),
   ].filter((item) => item.id === 'all' || item.count > 0), [annotations.length, counts, devices, t]);
   const filtered = annotations.filter((row) => filter === 'all' || (filter === 'unknown' ? !assignmentOf(row) : assignmentOf(row) === filter));
   const entries = useMemo<Entry[]>(() => {
@@ -280,7 +280,7 @@ export function Annotations({ id }: { id: string }) {
         <select aria-label={t('Assign selected to device')} disabled={!selected.size || busy} defaultValue=""
           onChange={(event) => { const value = event.target.value; if (value !== '') void applyBulk(value === 'unknown' ? null : value); event.currentTarget.value = ''; }}>
           <option value="" disabled>{t('Assign to device')}</option><option value="unknown">{t('Use original devices')}</option>
-          {activeDevices.map((device) => <option key={device.public_id} value={device.public_id}>{device.label}</option>)}
+          {activeDevices.map((device) => <option key={device.public_id} value={device.public_id}>{device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label}</option>)}
         </select>
         {progress && <span>{t('{done} of {total}', { done: progress.done, total: progress.total })}</span>}
       </BulkSelectionBar>}
@@ -330,7 +330,7 @@ export function Annotations({ id }: { id: string }) {
                     onClick={(event) => event.stopPropagation()} onChange={(event) => void setOneAssignment(row, event.target.value === 'unknown' ? null : event.target.value)}>
                     <option value="unknown">{row.origin_device_id ? t('Use original device: {name}', { name: deviceLabel(row.origin_device_id) }) : t('Unknown device')}</option>
                     {current && !activeDevices.some((device) => device.public_id === current) && overrideOf(row) !== null && <option value={current} disabled>{deviceLabel(current)}</option>}
-                    {activeDevices.map((device) => <option key={device.public_id} value={device.public_id}>{device.label} — {device.model}</option>)}</select>}
+                    {activeDevices.map((device) => <option key={device.public_id} value={device.public_id}>{device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label} — {device.model}</option>)}</select>}
                   {row.chapter_progress != null && <><span aria-hidden="true">·</span><span>{Math.round(row.chapter_progress * 100)}%</span></>}
                   {row.anchor_status === 'unresolved' && <><span aria-hidden="true">·</span><span className={styles.anchorWarning}
                     title={t("Warning: the saved highlight could not be located in the current book. Its text is preserved.")} aria-label={t("Warning: the saved highlight could not be located in the current book. Its text is preserved.")}><AlertTriangle size={13} aria-hidden="true" focusable={false} />{t('Location unavailable')}</span></>}

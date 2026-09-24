@@ -56,12 +56,12 @@ function RemoveDialog({ device, counts, onCancel, onRemove }: {
     <div className={styles.scrim}>
       <div ref={dialogRef} className={styles.dialog} role="alertdialog" aria-modal="true"
         aria-labelledby={`${descriptionId}-title`} aria-describedby={descriptionId}>
-        <h2 id={`${descriptionId}-title`}>{t('Remove {name}?', { name: device.label })}</h2>
+        <h2 id={`${descriptionId}-title`}>{t('Remove {name}?', { name: device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label })}</h2>
         <div id={descriptionId}>
           {counts.origin_count > 0 && <p>{t('{n} annotations were made on this source. They are not deleted. Their origin history is kept.', { n: counts.origin_count })}</p>}
           {counts.assigned_count > 0 && <p>{t('{n} annotations assigned to this source will become Unknown device.', { n: counts.assigned_count })}</p>}
           <p>{device.type === 'webreader'
-            ? t('Reading data is kept. Future browser saves can appear under an unidentified browser source.')
+            ? t('Reading data is kept. Browser reappears when you next save reading progress or annotations.')
             : t('This device will no longer sync.')}</p>
         </div>
         <div className={styles.dialogActions}>
@@ -131,7 +131,7 @@ export function Devices() {
     mutationFn: (device: Device) => apiDelete(`/api/annotations/devices/${device.public_id}`),
     onSuccess: (_result, device) => {
       setRemoving(null); setUndoDevice(device); refresh();
-      announce(t('{name} removed.', { name: device.label }));
+      announce(t('{name} removed.', { name: device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label }));
       invokerRef.current?.focus();
     },
   });
@@ -151,11 +151,11 @@ export function Devices() {
   return (
     <main className={styles.container}>
       <Link href="/account" className={styles.back}><ChevronLeft size={16} aria-hidden="true" focusable={false} /> {t('Account')}</Link>
-      <div className={styles.heading}><Smartphone aria-hidden="true" focusable={false} /><h1>{t('E-readers')}</h1></div>
-      {error ? <EmptyState message={t('Could not load e-readers.')} /> : devices.length === 0 ? (
+      <div className={styles.heading}><Smartphone aria-hidden="true" focusable={false} /><h1>{t('Devices and browsers')}</h1></div>
+      {error ? <EmptyState message={t('Could not load devices and browsers.')} /> : devices.length === 0 ? (
         <section className={styles.empty}>
-          <h2>{t('No e-readers yet.')}</h2>
-          <p>{t('Devices appear here after their first sync.')}</p>
+          <h2>{t('No devices or browser reading data yet.')}</h2>
+          <p>{t('Devices appear after their first sync. Browser appears after saving reading progress or annotations.')}</p>
           <a href="#kobo-pairing">{t('Pair an e-reader')}</a>
         </section>
       ) : (
@@ -167,10 +167,10 @@ export function Devices() {
           {['ereaders', 'browsers'].map((group) => {
             const grouped = devices.filter(device => (device.type === 'webreader') === (group === 'browsers'));
             if (!grouped.length) return null;
-            return <section key={group} id={group === 'browsers' ? 'browser-reading-sources' : undefined} aria-label={group === 'browsers' ? t('Browser reading sources') : t('E-readers')}>
+            return <section key={group} id={group === 'browsers' ? 'browser-reading-sources' : undefined} aria-label={group === 'browsers' ? t('Browser reading source') : t('E-readers')}>
               {group === 'browsers' && <>
-                <h2>{t('Browser reading sources')}</h2>
-                <p>{t('Browsers appear after saving reading progress or annotations. Different browsers or profiles can appear separately.')}</p>
+                <h2>{t('Browser reading source')}</h2>
+                <p>{t('All browsers and computers signed in to your account share one Browser reading source.')}</p>
               </>}
           <ul className={styles.list} role="list">
             {grouped.map((device) => (
@@ -184,9 +184,9 @@ export function Devices() {
                     <button type="submit" disabled={!label.trim() || rename.isPending}>{t('Save')}</button>
                     <button type="button" onClick={() => setEditing(null)}>{t('Cancel')}</button>
                   </form>
-                ) : <h2><Link href={`/account/devices/${device.public_id}`}>{device.label}</Link></h2>}
+                ) : <h2><Link href={`/account/devices/${device.public_id}`}>{device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label}</Link></h2>}
                 <p className={styles.deviceMeta}>{[device.model, device.firmware && `FW ${device.firmware}`].filter(Boolean).join(' · ')}</p>
-                {device.browser_identity === 'unidentified' && <p className={styles.deviceMeta}>{t('Unidentified browser source')}</p>}
+
                 <p className={styles.deviceStats}>
                   {device.origin_annotation_count != null && <><span>{t('{n} annotations from this source', { n: device.origin_annotation_count })}</span> · </>}
                   <span>{t('{n} annotations assigned to this source', { n: device.annotation_count })}</span> · {t('Last seen {when}', { when: relativeWhen(device.last_seen) })}
@@ -222,9 +222,9 @@ export function Devices() {
                 )}
               </div>
               <div className={styles.cardActions}>
-                <button type="button" aria-label={t('Rename {name}', { name: device.label })}
+                <button type="button" aria-label={t('Rename {name}', { name: device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label })}
                   onClick={() => { setEditing(device.public_id); setLabel(device.label); }}><Pencil size={17} aria-hidden="true" focusable={false} /></button>
-                <button type="button" aria-label={t('More actions for {name}', { name: device.label })}
+                <button type="button" aria-label={t('More actions for {name}', { name: device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label })}
                   aria-expanded={menu === device.public_id}
                   className={menu === device.public_id ? styles.menuTriggerOpen : undefined}
                   onClick={(event) => {
@@ -252,7 +252,7 @@ export function Devices() {
             </section>;
           })}
           {(data?.total ?? 0) > DEVICE_PAGE_SIZE && (
-            <nav className={styles.pagination} aria-label={t('E-readers')}>
+            <nav className={styles.pagination} aria-label={t('Devices and browsers')}>
               <button
                 type="button"
                 disabled={deviceOffset === 0}

@@ -45,7 +45,28 @@ stub("docsettings", {
 stub("apps/reader/readerui", reader)
 stub("ui/widget/infomessage", { new = function(_, fields) return fields end })
 stub("json", {})
-stub("luasettings", {})
+-- KOReader's settings files: each flush keeps a copy of what it wrote, and a
+-- restart reads only those copies.
+local settings_files = {}
+local function copy(value)
+    if type(value) ~= "table" then return value end
+    local out = {}
+    for k, v in pairs(value) do out[k] = copy(v) end
+    return out
+end
+stub("luasettings", { open = function(_, path)
+    local file = settings_files[path] or { written = {}, flushes = 0 }
+    settings_files[path] = file
+    local data = copy(file.written)
+    return {
+        readSetting = function(_, key) return data[key] end,
+        saveSetting = function(_, key, value) data[key] = value end,
+        flush = function()
+            file.flushes = file.flushes + 1
+            file.written = copy(data)
+        end,
+    }
+end })
 local network = { up = true }
 stub("ui/network/manager", { isConnected = function() return network.up end })
 local ticks, shown = {}, {}
@@ -97,15 +118,19 @@ local function sync(answer, real_apply, fetch, root)
     }, { __index = Runtime })
     function runtime:libraryEnabled() return true end
     function runtime:getLibraryRoot() return root or "/mnt/us/cwng-library" end
-    function runtime:getLibraryState() return { books = {} } end
+    if real_apply ~= "persist" then
+        function runtime:getLibraryState() return { books = {} } end
+    end
     function runtime:newSyncClient() return client end
     function runtime:accountOwner() return "reader@server" end
     function runtime:libraryProbe() return {} end
     if real_apply then
         local state = { books = {} }
         outcome.fetched = 0
-        function runtime:getLibraryState() return state end
-        function runtime:saveLibraryState() end
+        if real_apply ~= "persist" then
+            function runtime:getLibraryState() return state end
+            function runtime:saveLibraryState() end
+        end
         function runtime:refreshLibraryViews() end
         function runtime:applyLibraryCollections() end
         function runtime:libraryProbe()
@@ -117,6 +142,7 @@ local function sync(answer, real_apply, fetch, root)
             return fetch(book)
         end
         outcome.state = state
+        outcome.runtime = runtime
     else
         function runtime:applyLibraryManifest(books, _, _, _, done)
             outcome.applied = books
@@ -288,6 +314,37 @@ local function testTheInventoryKnowsCoversFromBooks()
     assertEqual(isPlaceholder(swapped), false, "a cover replaced by a file is")
 end
 
+local function written(name)
+    for path, file in pairs(settings_files) do
+        if path:sub(-#name) == name then return file end
+    end
+end
+
+local function testTheBookListIsWrittenOncePerSyncNotWithEveryRecord()
+    local outcome = sync(manyNewBooks(60), "persist", function() return true, { size = 1, mtime = 1 } end)
+    assertEqual(outcome.ok, true, "the sync finishes")
+    for _ = 1, 5 do outcome.runtime:saveLibraryState() end -- five books opened
+    local list, records = written("cwngsync_library_list.lua"), written("cwngsync_library.lua")
+    assertEqual(list.flushes, 1, "the book list is written once")
+    assertEqual(#list.written.manifest, 60, "with every book")
+    assertEqual(records.written.state.manifest, nil, "the records are written without it")
+    assertEqual(outcome.runtime:getLibraryState().manifest ~= nil, true, "and it stays in memory")
+
+    -- KOReader restarts: a fresh runtime reads only what was written.
+    package.loaded["cwng_library_runtime"] = nil
+    local restarted = setmetatable({}, { __index = require("cwng_library_runtime") })
+    local state = restarted:getLibraryState()
+    assertEqual(#state.manifest, 60, "the book list comes back")
+    assertEqual(state.books["60"] ~= nil, true, "with the records")
+
+    -- A list from another revision than the records is not trusted.
+    list.written.revision = "some other revision"
+    package.loaded["cwng_library_runtime"] = nil
+    restarted = setmetatable({}, { __index = require("cwng_library_runtime") })
+    assertEqual(restarted:getLibraryState().manifest, nil, "a list that does not match the records is ignored")
+    package.loaded["cwng_library_runtime"] = Runtime
+end
+
 local function testEveryPageOfABigLibraryReachesTheDevice()
     -- 250 pages is 50,000 books at the server's page size of 200.
     local outcome = sync(pagesOf(250, 2))
@@ -327,6 +384,7 @@ testASyncStopsWhenTheNetworkGoesAway()
 testAFewFailedCoversDoNotStopTheRest()
 testBooksThatArrivedDuringTheSyncDoNotStopIt()
 testTheInventoryKnowsCoversFromBooks()
+testTheBookListIsWrittenOncePerSyncNotWithEveryRecord()
 os.execute("rm -rf '" .. folder .. "'")
 
 print("cwng_library_runtime tests passed")

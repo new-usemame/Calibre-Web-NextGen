@@ -41,6 +41,7 @@ local PLACEHOLDER_TIMEOUTS = { 5, 20 }
 -- the sync stops rather than waiting out every remaining book's timeouts.
 local DOWNLOADING_OPS = { create_placeholder = true, refresh_placeholder = true }
 local STOP_AFTER_FAILED_DOWNLOADS = 3
+local SAVE_EVERY_SECONDS = 30
 
 -- Shared by the file browser's and the reader's plugin instances: there is one
 -- library and one sync at a time, whichever instance started it.
@@ -60,18 +61,55 @@ local function store()
     return shared.store
 end
 
+-- The server's list of books is most of the state's size (thousands of
+-- entries) and changes once per sync, while the per-book records change with
+-- every step and every book opened. So it lives in a file of its own, written
+-- only when a sync brings a new list.
+local function manifestStore()
+    if not shared.manifest_store then
+        shared.manifest_store = LuaSettings:open(DataStorage:getSettingsDir() .. "/cwngsync_library_list.lua")
+    end
+    return shared.manifest_store
+end
+
 function Runtime:getLibraryState()
     if not shared.state then
-        shared.state = Library.loadState(store():readSetting("state"))
+        local state = Library.loadState(store():readSetting("state"))
+        if state.manifest == nil then
+            local list = manifestStore()
+            if list:readSetting("revision") == state.revision then
+                state.manifest = list:readSetting("manifest")
+                state.shelves = list:readSetting("shelves")
+                shared.saved_manifest = state.manifest
+            end
+        end
+        shared.state = state
     end
     return shared.state
 end
 
-function Runtime:saveLibraryState()
-    local file = store()
-    file:saveSetting("state", self:getLibraryState())
+local function flush(file, what)
     local ok, err = pcall(file.flush, file)
-    if not ok then logger.warn("CWNGSync: could not save library state", err) end
+    if not ok then logger.warn("CWNGSync: could not save library", what, err) end
+end
+
+function Runtime:saveLibraryState()
+    local state = self:getLibraryState()
+    local manifest, shelves = state.manifest, state.shelves
+    if manifest ~= nil and manifest ~= shared.saved_manifest then
+        local list = manifestStore()
+        list:saveSetting("revision", state.revision)
+        list:saveSetting("manifest", manifest)
+        list:saveSetting("shelves", shelves)
+        flush(list, "list")
+        shared.saved_manifest = manifest
+    end
+    -- The records alone; the list is put back once they are written.
+    state.manifest, state.shelves = nil, nil
+    local file = store()
+    file:saveSetting("state", state)
+    flush(file, "state")
+    state.manifest, state.shelves = manifest, shelves
 end
 
 function Runtime:isConfigured()
@@ -477,6 +515,7 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
 
     local index = 0
     local succeeded, failed, failed_downloads_in_a_row = 0, 0, 0
+    local last_saved = os.time()
     -- The list is recorded as applied either way: the next sync plans against
     -- it again, so whatever did not happen now happens then.
     local function finish(ok, summary)
@@ -527,9 +566,14 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
                 return
             end
         end
-        -- Show covers as they arrive rather than all at the end.
+        -- Show covers as they arrive rather than all at the end. The records
+        -- are saved at most every half minute meanwhile: a record lost to a
+        -- crash only costs fetching that cover again.
         if #changed >= 18 then
-            self:saveLibraryState()
+            if os.time() - (last_saved or 0) >= SAVE_EVERY_SECONDS then
+                self:saveLibraryState()
+                last_saved = os.time()
+            end
             self:refreshLibraryViews(changed)
             changed = {}
         end
@@ -776,12 +820,12 @@ function Runtime:markOpened(file)
         if known.path == file then known_id = id break end
     end
     if known_id then
-        -- Keep the record in step, so the planner does not read the new time
-        -- as the file having been replaced.
+        -- Keep the record in step. Only a cover's time is ever compared with
+        -- the file's, so this rides along with the next save instead of
+        -- writing every record of the library each time a book is opened.
         local known = self:getLibraryState().books[known_id]
         if known.kind ~= "placeholder" then
             known.mtime = now
-            self:saveLibraryState()
         end
     end
 end

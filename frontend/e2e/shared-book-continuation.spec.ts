@@ -14,16 +14,18 @@ test('a public shelf offers reading and downloads without adding personal member
     headers, data: { roles: { browse_global: false }, library_mode: 'personal_library' },
   })).ok()).toBeTruthy();
   const catalog = await (await page.request.get('/api/v1/books?sort=new&per_page=200')).json();
-  let book: { id: number; title: string } | undefined;
+  const readable: { id: number; title: string }[] = [];
   for (const candidate of catalog.items) {
     const detail = await (await page.request.get(`/api/v1/books/${candidate.id}`)).json();
     if (detail.formats.some((format: { format: string }) => format.format === 'EPUB')) {
-      book = candidate;
-      break;
+      readable.push(candidate);
+      if (readable.length === 2) break;
     }
   }
-  expect(book, 'fixture needs a readable EPUB').toBeTruthy();
-  const selected = book!;
+  expect(readable.length, 'fixture needs two readable EPUBs').toBe(2);
+  // `selected` leaves the reader's library and comes back through the shelf;
+  // `member` stays in it as the control.
+  const [selected, member] = readable;
   expect((await page.request.delete(`/api/v1/books/${selected.id}/my-library`, {
     headers: await csrf(page),
   })).ok()).toBeTruthy();
@@ -71,6 +73,21 @@ test('a public shelf offers reading and downloads without adding personal member
     const detail = await (await page.request.get(`/api/v1/books/${selected.id}`)).json();
     expect(detail.in_my_library).toBe(false);
     expect(detail.accessible_via_public_shelf).toBe(true);
+    // The classic book page opens the shared book as well, but offers Send to
+    // eReader only for books in the reader's own library, which is where
+    // sending looks; for the shared book the button could only fail.
+    expect((await page.request.post('/api/v1/account/profile', {
+      headers: await csrf(page), data: { kindle_mail: 'shared-reader@example.com' },
+    })).ok()).toBeTruthy();
+    const origin = new URL(page.url()).origin;
+    await page.context().addCookies([{ name: 'cwng_prefer_spa', value: '0', url: origin }]);
+    await page.goto(`/book/${selected.id}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#title')).toHaveText(selected.title);
+    await expect(page.locator('#sendToEReaderBtn')).toHaveCount(0);
+    await page.goto(`/book/${member.id}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#title')).toHaveText(member.title);
+    await expect(page.locator('#sendToEReaderBtn')).toBeAttached();
+    await page.context().clearCookies({ name: 'cwng_prefer_spa' });
     expect((await admin.request.post(`/api/v1/admin/users/${secondaryUser.id}`, {
       headers, data: { roles: { viewer: false, download: false } },
     })).ok()).toBeTruthy();

@@ -255,15 +255,15 @@ test('device inventory renders one bounded window and reports the true total', a
 
 test('account summary makes the e-reader manager discoverable', async ({ page }) => {
   await page.route('**/api/annotations/devices?*', route => route.fulfill({ json: {
-    devices: [device, { ...device, public_id: 'browser-1', label: 'Browser', type: 'webreader',
-      origin_annotation_count: 7, annotation_count: 0 }], total: 2, limit: 100, offset: 0,
+    devices: [{ ...device, annotation_count: 1 }, { ...device, public_id: 'browser-1', label: 'Browser', type: 'webreader',
+      origin_annotation_count: 1, annotation_count: 0 }], total: 2, limit: 100, offset: 0,
   } }));
   await page.goto('/app/account');
   const card = page.getByRole('region', { name: 'Devices and browsers' });
   const physical = card.getByRole('listitem').filter({ hasText: 'Libra Colour' });
-  await expect(physical).toContainText('312 annotations assigned to this source');
+  await expect(physical).toContainText('1 annotation assigned to this source');
   const browser = card.getByRole('listitem').filter({ hasText: 'Browser' });
-  await expect(browser).toContainText('7 annotations from this source');
+  await expect(browser).toContainText('1 annotation from this source');
   await expect(card.getByRole('link')).toHaveCount(2);
   await card.getByRole('link', { name: 'Manage devices and browsers' }).click();
   await expect(page).toHaveURL(/\/app\/account\/devices$/);

@@ -578,9 +578,9 @@ def _migrate_device_entitlement_classification(user_id):
     """Stamp the one-time v0 audit, keeping a device-scoped ledger intact.
 
     A pre-#2025 install already carries per-device rows written by the shipped
-    v4.1.43 seed and by its own acknowledged deliveries.  Deleting them costs
-    the entire library: the cursor-independent recovery arm below reselects
-    every book, and against an empty ledger every one of them classifies as
+    v4.1.43 seed and by its own deliveries.  Deleting them costs the entire
+    library: the cursor-independent recovery arm below reselects every book,
+    and against an empty ledger every one of them classifies as
     ``NewEntitlement``, which Nickel treats as "not downloaded" (#1925).  That
     is a whole-library re-download with reading position lost, once, on every
     existing Kobo -- far larger than the ambiguity the delete was clearing.
@@ -606,12 +606,18 @@ def _migrate_device_entitlement_classification(user_id):
     those rows prove nothing; clearing them lets the deletion recovery arm
     offer each removal once.
 
-    Deliberately accepted, and unchanged from v4.1.43: a legacy
-    ``ChangedEntitlement`` that an empty Kobo dropped (#1735) still wrote a
-    flat marker, so a kept row can name a book the device never stored.  That
-    gap already ships in v4.1.43, is not created here, and stays recoverable
-    through Full Sync and per-book resend.  Deleting every row instead turns a
-    bounded, recoverable gap into a certain, unrecoverable one for everybody.
+    Known gap, unchanged from v4.1.43 and not created here: v4.1.43 wrote a
+    row when it *sent* a book, New or Changed alike, not when the device
+    stored it.  A legacy ``ChangedEntitlement`` that an empty Kobo dropped
+    (#1735), or a response that never reached the device, leaves a row for a
+    book the device lacks, and a kept row keeps that book silent.  No server
+    record separates those books from held ones: v4.1.43 records no
+    per-device receipt, and a book's ``Downloads`` rows are deleted for every
+    user whenever a hot or downloaded-books listing meets it and its viewer
+    cannot see it, so a missing one proves nothing.  Full Sync and per-book
+    resend both deliver such a book again.  Deleting every row instead turns
+    that bounded, recoverable gap into a certain whole-library re-download
+    for everybody.
 
     A device-authored reading-position observation is the narrow durable proof
     that the physical Kobo possessed a book.  Proven books that have no ledger

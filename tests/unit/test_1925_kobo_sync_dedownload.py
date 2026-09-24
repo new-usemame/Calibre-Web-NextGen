@@ -5110,50 +5110,56 @@ def test_v4_1_43_upgrade_keeps_a_held_row_over_the_position_sentinel(
     assert after == before
 
 
-def test_v4_1_43_upgrade_still_delivers_a_book_the_ledger_never_recorded(
+def test_v4_1_43_upgrade_still_delivers_a_book_v4_1_43_never_sent(
     sync_harness, monkeypatch,
 ):
     """Keeping the ledger must not suppress a book that is not in it.
 
-    The live under-delivery reports (#1735, #2201) are libraries where only
-    part of the collection ever reached the reader.  Those books have no
-    ledger row, so the cursor-independent recovery arm must still announce
-    them New across the upgrade -- keeping the rows for the delivered books
-    may not cost the undelivered ones their repair.
+    v4.1.43 could leave a book behind its reader's cursor without ever
+    sending it: its "only sync selected shelves" mode folded a newer shelf
+    date into the cursor after the first page and then went silent (#2201).
+    v4.1.43 wrote ledger rows only for books it sent, so such a book has no
+    row, and the cursor-independent recovery arm must announce it New across
+    the upgrade -- keeping the rows for held books may not cost it its repair.
+
+    This covers books v4.1.43 never SENT.  A book it sent that the reader
+    never stored has a row exactly like a held book's and is NOT recovered by
+    the upgrade; that gap and its recovery are
+    ``test_v4_1_43_book_sent_but_never_stored_is_recovered_by_full_sync_or_resend``.
     """
-    from cps import kobo, ub
+    from cps import db, kobo
 
     monkeypatch.setattr(
         kobo.config, "config_kobo_suppress_replayed_entitlements", True,
     )
-    delivered = _seed_legacy_install(sync_harness, count=3, record_flat=False)
+    books, token = _v4_1_43_install(sync_harness, count=3)
 
-    token = kobo.SyncToken.SyncToken().build_sync_token()
-    for _page in range(2):
-        response = sync_harness.sync(token)
-        token = response.headers[sync_harness.token_header]
-    assert sync_harness.session.query(
-        ub.KoboDeviceBookEntitlement,
-    ).count() == 3
-
-    # This book never physically arrived, so the ledger has no row for it.
-    never_arrived = delivered[-1]
-    sync_harness.session.query(ub.KoboDeviceBookEntitlement).filter_by(
-        device_id=sync_harness.device.id, book_id=never_arrived.id,
-    ).delete(synchronize_session=False)
-    seed = sync_harness.session.get(
-        ub.KoboDeviceEntitlementSeed, sync_harness.device.id,
+    # A book whose clock is already behind the reader's cursor, with no flat
+    # marker and no ledger row: v4.1.43's cursor never selected it.
+    behind = min(book.last_modified for book in books) - timedelta(days=1)
+    never_sent = db.Books(
+        "Never Sent", "Never Sent", "Author", behind, db.Books.DEFAULT_PUBDATE,
+        "1.0", behind, "never-sent", 0, [], [],
     )
-    seed.classification_version = 0
+    sync_harness.session.add(never_sent)
+    sync_harness.session.flush()
+    never_sent.uuid = "00000000-0000-0000-0003-999999999999"
+    sync_harness.session.add(db.Data(
+        never_sent.id, "EPUB", 3_999_999, "never-sent",
+    ))
     sync_harness.session.commit()
 
     response = sync_harness.sync(token)
-    items = _entitlements(response)
-    assert [sorted(item) for item in items] == [["NewEntitlement"]], items
-    assert (
-        items[0]["NewEntitlement"]["BookEntitlement"]["Id"]
-        == str(never_arrived.uuid)
+    assert _entitlement_ids(response) == [str(never_sent.uuid)], (
+        _entitlements(response)
     )
+    assert _entitlement_ids(response, kind="NewEntitlement") == [
+        str(never_sent.uuid),
+    ]
+    assert _entitlements(sync_harness.sync(
+        response.headers[sync_harness.token_header],
+    )) == []
+
 
 def _rebuild_magic_shelf_cache(monkeypatch, books, rebuilt_at):
     """A magic-shelf cache rebuild: every member is selected again (#359)."""
@@ -5452,6 +5458,78 @@ def test_v4_1_43_upgrade_delivers_a_removal_its_seed_marked_acknowledged(
     assert removed == [orphan], (
         f"{kobos} Kobo(s): a removal the reader never received was delivered "
         f"{removed.count(orphan)} times across three syncs"
+    )
+
+
+@pytest.mark.parametrize("recovery", ("full_sync", "per_book_resend"))
+def test_v4_1_43_book_sent_but_never_stored_is_recovered_by_full_sync_or_resend(
+    sync_harness, monkeypatch, recovery,
+):
+    """The documented gap, and the recovery that reaches it.
+
+    v4.1.43 wrote a ledger row when it SENT an entitlement, New and Changed
+    alike.  Its creation-time classifier announced page two of a large first
+    sync as ChangedEntitlement, which a reader that does not hold the book
+    ignores (#1735, the "stops at 100 books" reports), so that book carries a
+    row exactly like a held one; so does a book whose response never reached
+    the reader.  Nothing the server stores separates them from held books
+    (``_migrate_device_entitlement_classification`` says why), so the upgrade
+    keeps the row and stays silent even when the library is selected again --
+    asserted first, so a change that starts guessing shows up here.  The
+    recovery the product offers must still reach the book: Full Sync
+    announces the library New, and a per-book resend announces exactly that
+    book New.
+    """
+    from cps import admin, kobo
+
+    monkeypatch.setattr(
+        kobo.config, "config_kobo_suppress_replayed_entitlements", True,
+    )
+    monkeypatch.setattr(admin, "calibre_db", sync_harness.calibre_db)
+    monkeypatch.setattr(admin, "_", lambda value: value)
+    books, never_stored = _legacy_paged_library(sync_harness)
+    # Premise: v4.1.43's classifier announced this book Changed, not New.
+    assert never_stored.id not in _legacy_classification_replay(
+        books, kobo.SYNC_ITEM_LIMIT,
+    )
+    token = _deliver_as_v4_1_43(sync_harness, books)
+
+    upgrade = sync_harness.sync(token)
+    reselected = sync_harness.sync(None)
+    assert _entitlements(upgrade) + _entitlements(reselected) == [], (
+        "kept v4.1.43 rows were announced again after the upgrade (Changed: "
+        "the audit did not vouch for them; New: it cleared them). If the gap "
+        "was closed on purpose, rewrite this test and the documented gap"
+    )
+    token = reselected.headers[sync_harness.token_header]
+
+    if recovery == "full_sync":
+        with sync_harness.app.test_request_context(
+                f"/ajax/fullsync/{sync_harness.user.id}", method="POST"):
+            assert admin.do_full_kobo_sync(
+                sync_harness.user.id,
+            ).status_code == 200
+        expected = sorted(str(book.uuid) for book in books)
+    else:
+        with sync_harness.app.test_request_context(
+                f"/ajax/kobo_resend/{sync_harness.user.id}/{never_stored.id}",
+                method="POST"):
+            assert admin.do_kobo_resend(
+                sync_harness.user.id, never_stored.id,
+            ).status_code == 200
+        expected = [str(never_stored.uuid)]
+
+    new_ids, changed_ids = [], []
+    for _page in range(4):
+        response = sync_harness.sync(token)
+        new_ids += _entitlement_ids(response, kind="NewEntitlement")
+        changed_ids += _entitlement_ids(response, kind="ChangedEntitlement")
+        token = response.headers[sync_harness.token_header]
+    assert changed_ids == []
+    assert sorted(new_ids) == expected, (
+        f"{recovery}: announced {len(new_ids)} books New; the book the reader "
+        f"never stored was {'' if str(never_stored.uuid) in new_ids else 'not '}"
+        "among them"
     )
 
 

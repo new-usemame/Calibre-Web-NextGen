@@ -24,7 +24,9 @@ import { ApiError, resourceUrl, resourceSrcSet } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
 import { hasRecipients, toggleRecipients } from '../lib/sendRecipients';
-import { canDeleteBooks, canDownloadBooks, canReadBooks, canUploadBooks } from '../lib/permissions';
+import {
+  canDeleteBooks, canDownloadBooks, canEditBookCover, canReadBooks, canUploadBooks,
+} from '../lib/permissions';
 import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
@@ -413,6 +415,9 @@ export function BookDetail() {
   // reader's own notes and progress, without personal membership. Membership
   // actions (shelves, favorites, archive, removal) still require inLibrary.
   const canAccessBook = inLibrary || book?.accessible_via_public_shelf === true;
+  // The cover editor needs the library cover (editors) or a private cover the
+  // server keeps for this book; a public shelf alone grants neither.
+  const canEditCover = canEditBookCover(me, inLibrary);
   const toggleRead = useToggleRead(id);
   const toggleFavorite = useToggleFavorite(id);
   const toggleArchived = useToggleArchived(id);
@@ -639,7 +644,7 @@ export function BookDetail() {
       to: `/book/${book.id}/edit`,
     });
   }
-  if (!me?.role?.anonymous) {
+  if (canEditCover) {
     menuItems.push({
       id: 'edit-cover',
       label: t('Edit cover…'),
@@ -686,7 +691,7 @@ export function BookDetail() {
             </Link>
           ) : null}
 
-          {!me?.role?.anonymous && (
+          {canEditCover && (
             <Link href={`/book/${book.id}/cover`} className={styles.actionSecondary}
               data-testid="edit-cover-action">
               <ImageIcon size={15} aria-hidden="true" focusable={false} />

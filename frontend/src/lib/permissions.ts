@@ -47,3 +47,18 @@ export function canDownloadBooks(me: Me | undefined | null): boolean {
 export function canDeleteBooks(me: Me | undefined | null): boolean {
   return !!me?.role?.delete_books && !!me?.role?.edit;
 }
+
+/**
+ * May this user open the cover editor for a book?
+ *
+ * Editors change the library cover of any book they can see
+ * (`cps/cover_picker.py::_load_book`). Everyone else edits a private cover,
+ * which the server keeps for a book in their library or, with Global Library
+ * access, any book they may browse (`cps/api/actions.py::_personal_cover_book`).
+ * A book reached only through a public shelf is neither, so the editor could
+ * only fail there. Guests have no private cover.
+ */
+export function canEditBookCover(me: Me | undefined | null, inLibrary: boolean): boolean {
+  if (!me || me.role?.anonymous) return false;
+  return inLibrary || !!(me.role?.edit || me.role?.admin || me.role?.browse_global);
+}

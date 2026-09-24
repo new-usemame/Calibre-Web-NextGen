@@ -18,22 +18,6 @@
   {% endfor %}
 {% endmacro %}
 
-{% macro render_tree_nodes(nodes, col_id, current_path='', depth=0) %}
-  {% for node in nodes %}
-    <li class="hierarchy-node depth-{{ depth }}{% if current_path.startswith(node.path) %} expanded{% else %} collapsed{% endif %}" data-path="{{ node.path }}">
-      <a href="{{ url_for('web.cc_category_list', column_id=col_id, category_path=node.path) }}">
-        <span class="hierarchy-toggle glyphicon glyphicon-triangle-right" aria-hidden="true"></span>
-        {{ node.name }} <span class="badge badge-sm">{{ node.total_count }}</span>
-      </a>
-      {% if node.children %}
-        <ul class="hierarchy-children list-unstyled">
-          {{ render_tree_nodes(node.children, col_id, current_path, depth + 1) }}
-        </ul>
-      {% endif %}
-    </li>
-  {% endfor %}
-{% endmacro %}
-
 {% macro render_details_tree(nodes, col_id, current_path='') %}
   {% for node in nodes %}
     <details class="hierarchy-details" data-path="{{ node.path }}"

@@ -2571,14 +2571,8 @@ class Category:
     count = None
     rating = None
 
-    def __init__(self, name, cat_id, rating=None, path=None, children=None):
+    def __init__(self, name, cat_id, rating=None):
         self.name = name
-        self.sort = name
         self.id = cat_id
         self.rating = rating
         self.count = 1
-        # Hierarchical custom column support: full dotted path and nested
-        # child nodes (list of Category instances). Flat categories keep
-        # the previous behaviour (path == name, no children).
-        self.path = path or name
-        self.children = children or []

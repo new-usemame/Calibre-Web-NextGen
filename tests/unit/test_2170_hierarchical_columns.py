@@ -151,3 +151,25 @@ def test_every_node_lists_exactly_the_books_the_tree_counts(monkeypatch):
     finally:
         session.close()
         engine.dispose()
+
+
+def test_the_tree_page_shows_every_level_with_its_distinct_book_count():
+    """The column overview renders get_hierarchical_tree's nodes as they are:
+    every level shows its distinct-book count, and value text is escaped."""
+    import os
+    import re
+    from jinja2 import Environment, FileSystemLoader
+
+    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), os.pardir, os.pardir)
+    env = Environment(loader=FileSystemLoader(root), autoescape=True)
+    env.globals["url_for"] = lambda endpoint, **kw: "/%s/%s" % (kw.get("column_id"), kw.get("category_path"))
+    template = env.from_string(
+        "{% from 'cps/templates/macros/hierarchy.html' import render_details_tree %}"
+        "{{ render_details_tree(tree, 10) }}")
+    tree = hierarchy.parse_tag_hierarchy(
+        [(1, "Computers"), (2, "Computers.DB"), (2, "Computers.DB.SQL"), (3, "Fiction.<b>")])
+    html = template.render(tree=tree)
+    counts = dict(re.findall(r'data-path="([^"]+)".*?badge badge-sm">(\d+)<', html, re.S))
+    assert counts == {"Computers": "2", "Computers.DB": "1", "Computers.DB.SQL": "1",
+                      "Fiction": "1", "Fiction.&lt;b&gt;": "1"}
+    assert "<b>" not in html

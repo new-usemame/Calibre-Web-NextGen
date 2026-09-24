@@ -139,11 +139,6 @@ def like_pattern(path):
     return escape_like(join_path(split_path(path))) + '.' + '%'
 
 
-def has_hierarchy_separator(value):
-    """True when a single stored value looks hierarchical (contains a dot)."""
-    return bool(value) and SEPARATOR in value
-
-
 def is_hierarchical_value_set(values):
     """True when a column's value set behaves as a hierarchy.
 

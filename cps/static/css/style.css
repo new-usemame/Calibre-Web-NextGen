@@ -820,24 +820,6 @@ select.cwa-settings-select {
 }
 
 /* ---- Hierarchical custom columns -------------------------------------- */
-.hierarchy-tree ul.hierarchy-children {
-  padding-left: 1.4em;
-}
-
-.hierarchy-node > a .hierarchy-toggle {
-  display: inline-block;
-  margin-right: .4em;
-  transition: transform .15s ease;
-}
-
-.hierarchy-node.expanded > a .hierarchy-toggle {
-  transform: rotate(90deg);
-}
-
-.hierarchy-node.collapsed > ul.hierarchy-children {
-  display: none;
-}
-
 .hierarchy-details {
   padding-left: 1.2em;
 }
@@ -846,8 +828,7 @@ select.cwa-settings-select {
   cursor: pointer;
 }
 
-.hierarchy-details > summary .badge,
-.hierarchy-node .badge {
+.hierarchy-details > summary .badge {
   font-size: .7em;
   margin-left: .4em;
 }

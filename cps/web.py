@@ -2554,18 +2554,10 @@ def render_cc_category(page, col_id, path, order):
             breadcrumbs=[[ (col.name, '') ] + hierarchy.breadcrumb_trail(path)],
             subcategories=node['children'], col_id=col_id)
 
-    # Root behaviour: show top-level nodes with aggregated child counts
-    tree = calibre_db.get_hierarchical_tree(col_id)
-    entries = []
-    for n in tree:
-        cat = db.Category(n['name'], n['path'], path=n['path'])
-        cat.count = n['total_count']
-        cat.children = n['children']
-        entries.append(cat)
+    # Root behaviour: the whole tree, each level with its distinct-book count
     return render_title_template(
-        'cc_list.html', entries=entries, folder='web.books_list',
-        charlist=list(), title=col.name, page="cclist",
-        data='cc_%d' % col_id, order=1, col_id=col_id, hierarchical=True)
+        'cc_list.html', entries=calibre_db.get_hierarchical_tree(col_id),
+        title=col.name, page="cclist", col_id=col_id)
 
 
 # ################################### Download/Send ##################################################################

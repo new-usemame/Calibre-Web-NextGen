@@ -64,6 +64,9 @@ test('classic annotation tab, exact jump, selection save and reading progress us
   }
   expect(frame).not.toBe(page.mainFrame());
   const selected = await frame.evaluate(() => {
+    // Match a user entering the reading frame after activating the sidebar.
+    // WebKit ignores background-frame selections when focus stays in the sidebar.
+    window.focus();
     const node = document.getElementById('kobo.15.1')!.firstChild!;
     const range = document.createRange(); range.setStart(node, 0); range.setEnd(node, 6);
     const selection = window.getSelection()!; selection.removeAllRanges(); selection.addRange(range);

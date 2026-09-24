@@ -15,7 +15,7 @@ import logging
 
 import pytest
 
-from tests.unit.test_1925_kobo_sync_dedownload import sync_harness
+from tests.unit.test_1925_kobo_sync_dedownload import sync_harness, _record_downloads
 
 
 pytestmark = pytest.mark.unit
@@ -112,6 +112,8 @@ def _establish_acknowledged_ledgers(sync_harness, monkeypatch):
         "ChangedEntitlement": 1,
         "IsRemoved": 1,
     }
+    # The reader downloads each book it was sent New.
+    _record_downloads(sync_harness, initial)
 
     old_clock = datetime(2026, 8, 29, 2, 19, 2)
     book_rows = sync_harness.session.query(

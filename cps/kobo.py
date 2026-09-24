@@ -510,6 +510,53 @@ def _seed_existing_device_entitlement_ledgers(user_id):
     return True
 
 
+def _book_ids_with_delivery_evidence(user_id, device_id, book_ids):
+    """Return which of ``book_ids`` a record shows reached the account.
+
+    A Kobo stores a book by downloading it, and every download, from a Kobo
+    or from anywhere else, records a ``Downloads`` row for the account.  Only
+    a Kobo reports reading statistics, and only for a book it holds; a
+    device-authored position proves this Kobo held the book.  None of them
+    is written for a book whose response was lost, or for a
+    ChangedEntitlement a Kobo without the book dropped (#1735).
+
+    ``Downloads`` rows can also vanish: the hot and downloaded-books listings
+    delete every account's rows for a book their viewer cannot see.  Such a
+    book counts as delivered only through the other two records.
+    """
+    book_ids = sorted({int(book_id) for book_id in book_ids})
+    delivered = set()
+    for offset in range(0, len(book_ids), 250):
+        chunk = book_ids[offset:offset + 250]
+        delivered.update(row.book_id for row in ub.session.query(
+            ub.Downloads.book_id,
+        ).filter(
+            ub.Downloads.user_id == int(user_id),
+            ub.Downloads.book_id.in_(chunk),
+        ).all())
+        delivered.update(row.book_id for row in ub.session.query(
+            ub.KoboReadingState.book_id,
+        ).join(
+            ub.KoboStatistics,
+            ub.KoboStatistics.kobo_reading_state_id == ub.KoboReadingState.id,
+        ).filter(
+            ub.KoboReadingState.user_id == int(user_id),
+            ub.KoboReadingState.book_id.in_(chunk),
+            or_(
+                ub.KoboStatistics.spent_reading_minutes.isnot(None),
+                ub.KoboStatistics.remaining_time_minutes.isnot(None),
+            ),
+        ).all())
+        delivered.update(row.book_id for row in ub.session.query(
+            ub.DeviceReadingPosition.book_id,
+        ).filter(
+            ub.DeviceReadingPosition.device_id == int(device_id),
+            ub.DeviceReadingPosition.book_id.in_(chunk),
+            ub.DeviceReadingPosition.client_modified_at.isnot(None),
+        ).all())
+    return delivered
+
+
 def _proven_legacy_change_bases(user_id, rows):
     """Return the change basis each kept legacy ledger row can vouch for.
 
@@ -575,7 +622,7 @@ def _proven_legacy_change_bases(user_id, rows):
 
 
 def _migrate_device_entitlement_classification(user_id):
-    """Stamp the one-time v0 audit, keeping a device-scoped ledger intact.
+    """Stamp the one-time v0 audit, keeping each Kobo's own ledger.
 
     A pre-#2025 install already carries per-device rows written by the shipped
     v4.1.43 seed and by its own deliveries.  Deleting them costs the entire
@@ -583,14 +630,20 @@ def _migrate_device_entitlement_classification(user_id):
     and against an empty ledger every one of them classifies as
     ``NewEntitlement``, which Nickel treats as "not downloaded" (#1925).  That
     is a whole-library re-download with reading position lost, once, on every
-    existing Kobo -- far larger than the ambiguity the delete was clearing.
+    existing Kobo.
 
-    The rows are kept only while they can describe one device.  That seed
-    copied the user-wide ``KoboSyncedBooks`` history onto *every* Kobo left
-    unseeded at the upgrade boundary, so with a second paired Kobo the copy
-    provably over-claims for at least one of them and stays untrusted.  With a
-    single paired Kobo the user-wide history is that device's history, and the
-    rows stand.
+    v4.1.43 wrote a row when it *sent* a book, New and Changed alike, not when
+    the Kobo stored it, and its boundary seed copied the account's flat
+    history onto every Kobo it sealed.  A row is kept when a record shows the
+    account took delivery of its book (``_book_ids_with_delivery_evidence``).
+    A row for a book no Kobo of the account downloaded -- a response that
+    never arrived, a ChangedEntitlement an empty Kobo dropped (#1735) -- is
+    cleared, so the recovery arm announces that book New.  Two limits follow
+    from records being per account, not per Kobo.  A book one Kobo of a
+    household never received stays silent there when another of the
+    account's Kobos, or a browser, downloaded it; Full Sync and per-book
+    resend reach it.  A held book whose download rows a listing deleted, and
+    whose reading its Kobo never reported, is announced once more.
 
     Kept rows are not enough on their own.  A v4.1.43 row carries payload
     schema 1 and no change basis, so it can never suppress a replay: the next
@@ -601,23 +654,11 @@ def _migrate_device_entitlement_classification(user_id):
     declared-shape transition then suppresses it and re-fingerprints it on the
     next selection.  Rows describing a later edit keep no basis and deliver.
 
-    The deleted-book ledger is cleared in both branches.  The v4.1.43 seed
-    wrote every tombstone into every device's deleted ledger as delivered, so
-    those rows prove nothing; clearing them lets the deletion recovery arm
-    offer each removal once.
-
-    Known gap, unchanged from v4.1.43 and not created here: v4.1.43 wrote a
-    row when it *sent* a book, New or Changed alike, not when the device
-    stored it.  A legacy ``ChangedEntitlement`` that an empty Kobo dropped
-    (#1735), or a response that never reached the device, leaves a row for a
-    book the device lacks, and a kept row keeps that book silent.  No server
-    record separates those books from held ones: v4.1.43 records no
-    per-device receipt, and a book's ``Downloads`` rows are deleted for every
-    user whenever a hot or downloaded-books listing meets it and its viewer
-    cannot see it, so a missing one proves nothing.  Full Sync and per-book
-    resend both deliver such a book again.  Deleting every row instead turns
-    that bounded, recoverable gap into a certain whole-library re-download
-    for everybody.
+    The deleted-book ledger is cleared for every device.  The v4.1.43 seed
+    wrote every tombstone into every device's deleted ledger as delivered,
+    and its own removals were recorded when sent, not when applied, so none
+    of those rows proves the reader removed the book; clearing them lets the
+    deletion recovery arm offer each removal once.
 
     A device-authored reading-position observation is the narrow durable proof
     that the physical Kobo possessed a book.  Proven books that have no ledger
@@ -633,34 +674,47 @@ def _migrate_device_entitlement_classification(user_id):
 
     started = monotonic()
     try:
-        ledger_is_device_scoped = (
-            kobo_sync_status.count_user_kobo_devices(user_id) == 1
-        )
-        removed = 0
+        unproven = 0
+        tombstones = 0
         preserved = 0
         stamped = 0
         device_proven = 0
         for device_id in device_ids:
-            ledger_book_ids = set()
-            if ledger_is_device_scoped:
-                kept_rows = ub.session.query(
+            legacy_book_ids = [
+                row.book_id for row in ub.session.query(
                     ub.KoboDeviceBookEntitlement.book_id,
-                    ub.KoboDeviceBookEntitlement.updated_at,
                 ).filter(
                     ub.KoboDeviceBookEntitlement.device_id == int(device_id),
+                    ub.KoboDeviceBookEntitlement.change_basis.is_(None),
                 ).all()
-                ledger_book_ids = {row.book_id for row in kept_rows}
-                preserved += len(ledger_book_ids)
-                stamped += kobo_sync_status.stamp_device_entitlement_change_bases(
-                    device_id, _proven_legacy_change_bases(user_id, kept_rows),
+            ]
+            undelivered = sorted(
+                set(legacy_book_ids) - _book_ids_with_delivery_evidence(
+                    user_id, device_id, legacy_book_ids,
                 )
-            else:
-                removed += ub.session.query(
+            )
+            for offset in range(0, len(undelivered), 250):
+                unproven += ub.session.query(
                     ub.KoboDeviceBookEntitlement,
                 ).filter(
                     ub.KoboDeviceBookEntitlement.device_id == int(device_id),
+                    ub.KoboDeviceBookEntitlement.book_id.in_(
+                        undelivered[offset:offset + 250],
+                    ),
+                    ub.KoboDeviceBookEntitlement.change_basis.is_(None),
                 ).delete(synchronize_session=False)
-            removed += ub.session.query(
+            kept_rows = ub.session.query(
+                ub.KoboDeviceBookEntitlement.book_id,
+                ub.KoboDeviceBookEntitlement.updated_at,
+            ).filter(
+                ub.KoboDeviceBookEntitlement.device_id == int(device_id),
+            ).all()
+            ledger_book_ids = {row.book_id for row in kept_rows}
+            preserved += len(ledger_book_ids)
+            stamped += kobo_sync_status.stamp_device_entitlement_change_bases(
+                device_id, _proven_legacy_change_bases(user_id, kept_rows),
+            )
+            tombstones += ub.session.query(
                 ub.KoboDeviceDeletedEntitlement,
             ).filter(
                 ub.KoboDeviceDeletedEntitlement.device_id == int(device_id),
@@ -697,12 +751,13 @@ def _migrate_device_entitlement_classification(user_id):
 
     log.debug(
         "Kobo Sync classification migration: user=%s devices=%d "
-        "device_proven=%d rearmed=%d preserved=%d stamped=%d "
-        "elapsed_ms=%.1f",
+        "device_proven=%d unproven=%d tombstones=%d preserved=%d "
+        "stamped=%d elapsed_ms=%.1f",
         user_id,
         len(device_ids),
         device_proven,
-        removed,
+        unproven,
+        tombstones,
         preserved,
         stamped,
         round((monotonic() - started) * 1000, 1),
@@ -1755,8 +1810,8 @@ def HandleSyncRequest():
             capture_session=capture_session,
         )
     # Audit legacy-classifier rows once, before the recovery arm below reads
-    # them: a single Kobo keeps its ledger, a household's union copy is
-    # cleared, and seeded tombstones are cleared for both.
+    # them: each Kobo keeps the rows whose books the account took delivery of,
+    # and every recorded tombstone is cleared.
     if (requesting_device_id
             and not _migrate_device_entitlement_classification(current_user.id)):
         return _abort_sync_with_observability(

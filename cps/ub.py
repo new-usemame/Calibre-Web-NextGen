@@ -1140,10 +1140,10 @@ class KoboDeviceEntitlementSeed(Base):
     )
     # Version 1 means the one-time pre-#2025 audit has run for this device.
     # Version 0 rows were written by the shipped v4.1.43 seed, which copied
-    # the user-wide flat history onto every Kobo it marked: sound for a single
-    # paired reader, a household union for two or more.  The audit therefore
-    # keeps a single reader's book rows, stamping the change basis they can
-    # vouch for, clears a household's, and clears every seeded tombstone.
+    # the user-wide flat history onto every Kobo it sealed, and by v4.1.43's
+    # deliveries, recorded when sent.  The audit keeps the rows whose books
+    # the account took delivery of, stamps the change basis each kept row can
+    # vouch for, and clears every recorded tombstone.
     classification_version = Column(
         Integer, nullable=False, default=0, server_default="0",
     )

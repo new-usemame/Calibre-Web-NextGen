@@ -162,12 +162,15 @@ def get_reading_sources(book_id):
         return guard
     # Match the authorized reader/book-detail surface: hidden and archived are
     # listing states, while a curator may deep-link into the global catalogue.
+    # A book on a public shelf opens in the reader without membership, so its
+    # reader gets its own places here too; every row below is that user's own.
     # common_filters() still enforces language/content/role restrictions.
     book = calibre_db.get_filtered_book(
         book_id,
         allow_show_archived=True,
         allow_show_hidden=True,
         allow_show_global=_can_browse_global(),
+        allow_public_shelf_books=True,
     )
     if book is None:
         return _err("not_found", "Book not found", 404)

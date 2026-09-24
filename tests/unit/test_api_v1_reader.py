@@ -229,6 +229,7 @@ def test_reading_sources_matches_hidden_archived_global_detail_visibility():
         allow_show_archived=True,
         allow_show_hidden=True,
         allow_show_global=True,
+        allow_public_shelf_books=True,
     )
 
 

@@ -385,3 +385,36 @@ def test_refused_add_never_puts_the_book_in_the_shelf_owners_library(shared_book
     assert added.status_code == 403, added.data
     assert env.session.execute(text('SELECT user_id, book_id FROM membership_writes')).all() == []
     assert _shelved(env, 3) == 0
+
+
+def test_public_shelf_reader_gets_its_own_reading_places(shared_books, monkeypatch):
+    """#2284 review F4. The reader opened through a public shelf asks for this
+    book's reading places. It gets its own saved places, as a member would, and
+    nothing for books that no public shelf shares with it.
+    """
+    from cps import web
+    from cps.api import reader
+    env = shared_books
+    monkeypatch.setattr(reader, 'calibre_db', env.cdb)
+    monkeypatch.setattr(reader, 'config', web.config)
+    env.app.add_url_rule('/api/v1/books/<int:book_id>/reading-sources', 'reading_sources',
+        inspect.unwrap(reader.get_reading_sources))
+    for user, percent in ((env.viewer, 40.0), (env.owner, 90.0)):
+        device = ub.Device(user_id=user.id, kind='webreader', display_name='Browser')
+        env.session.add(device)
+        env.session.flush()
+        env.session.add(ub.DeviceReadingPosition(
+            device_id=device.id, book_id=1, progress_percent=percent,
+            server_modified_at=datetime(2026, 9, 1)))
+    env.session.commit()
+
+    places = env.client.get('/api/v1/books/1/reading-sources')
+
+    assert places.status_code == 200, places.data
+    # Only the reader's own place; the shelf owner's reading stays private.
+    assert [source['progress_percent'] for source in places.json['sources']] == [40.0]
+    assert env.client.get('/api/v1/books/2/reading-sources').status_code == 404
+    assert env.client.get('/api/v1/books/3/reading-sources').status_code == 404
+    env.public.is_public = 0
+    env.session.commit()
+    assert env.client.get('/api/v1/books/1/reading-sources').status_code == 404

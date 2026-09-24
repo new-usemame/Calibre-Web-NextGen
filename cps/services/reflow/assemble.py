@@ -173,6 +173,7 @@ class Book(object):
     furniture: List[str] = field(default_factory=list)
     pages: dict = field(default_factory=dict)         # pno -> [Element] as printed
     body_boxes: dict = field(default_factory=dict)    # pno -> the page minus its furniture
+    title_pages: dict = field(default_factory=dict)   # source page -> printed title label
     figures: List[dict] = field(default_factory=list)
     #: Lettering the text layer read off a figure, kept with the figure instead of
     #: the prose: pno, text, bbox. Counted into conservation so the words are
@@ -1323,6 +1324,10 @@ def assemble(skeletons, style, raw_pages=None):
         # copies.
         elements = _join_within_page(elements, vocab)
         book.pages[skel.pno] = elements
+        if skel.title_unit:
+            first = next((el for el in elements if el.kind in ('p', 'h') and el.text.strip()), None)
+            if first is not None:
+                book.title_pages[skel.pno] = first.text
         book.body_boxes[skel.pno] = skel.body_box()
         elements = [_copy_element(el) for el in elements]
 

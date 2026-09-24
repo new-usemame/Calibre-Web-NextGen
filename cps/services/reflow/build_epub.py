@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.16"
+CONVERTER_VERSION = "1.17"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -695,11 +695,13 @@ def _completed_index_entry_boundary(tail, head):
                 and re.search(r"[A-Za-z]", right[:first.start()]))
 
 
-def _join_page_turns(pages):
+def _join_page_turns(pages, title_pages=()):
     """DIAGNOSIS B on the markup: the sentence, not the page, is the unit."""
     joined = 0
     for index in range(1, len(pages)):
         previous, current = pages[index - 1], pages[index]
+        if previous['pno'] in title_pages or current['pno'] in title_pages:
+            continue
         if not previous["body"] or not current["body"]:
             continue
         # Source warnings belong to their printed page, but a warning emitted
@@ -728,7 +730,8 @@ def _join_page_turns(pages):
     return joined
 
 
-def _chapters(pages):
+def _chapters(pages, title_pages=None):
+    title_pages = title_pages or {}
     chapters = []
     current = None
 
@@ -738,16 +741,19 @@ def _chapters(pages):
         return chapter
 
     for page in pages:
+        title_page = page['pno'] in title_pages
+        if title_page:
+            current = start(title_pages[page['pno']])
         # The page marker waits for the block it belongs to, so a page that opens a
         # chapter puts its marker in the new document and not the previous one.
         pending = page["anchor"]
         for block in page["body"] + page["asides"]:
             heading = _SPLIT_HEADING.match(block)
-            if heading:
+            if heading and not title_page:
                 current = start(block_text(block))
             elif current is None:
                 current = start("")
-            elif len(current.blocks) >= MAX_BLOCKS_PER_DOC:
+            elif len(current.blocks) >= MAX_BLOCKS_PER_DOC and not title_page:
                 current = start("", continued=True)
             if pending:
                 current.blocks.append(pending)
@@ -762,6 +768,8 @@ def _chapters(pages):
             current.blocks.append(pending)
             if page["pno"] not in current.pages:
                 current.pages.append(page["pno"])
+        if title_page:
+            current = None
     _name_the_untitled(chapters)
     return chapters
 
@@ -1467,8 +1475,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
                                       runtime_progress)
 
         pages = _page_blocks(page_html)
-        joins = _join_page_turns(pages)
-        chapters = _chapters(pages)
+        joins = _join_page_turns(pages, book.title_pages)
+        chapters = _chapters(pages, book.title_pages)
         dropped = _bind_links(chapters)
         if runtime_progress is not None:
             runtime_progress({"kind": "phase", "phase": "figure_crops"})

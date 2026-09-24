@@ -168,6 +168,7 @@ class PageSkeleton(object):
     regions: List[Region] = field(default_factory=list)
     reasons: List[str] = field(default_factory=list)
     is_scan: bool = False
+    title_unit: bool = False
 
     def body_box(self):
         """The part of the printed page whose words were kept.
@@ -820,7 +821,47 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     _preserve_conflicting_outline_heading(raw, style, skel)
     skel.regions.sort(key=_region_order)
     _join_numbered_regions(skel)
+    skel.title_unit = _sparse_title_unit(raw, skel, style)
     return skel
+
+
+def _sparse_title_unit(raw, skel, style):
+    """Recognize an early, centered bibliographic composition from printed boxes.
+
+    This marks a source-page boundary for the chapter builder; it does not join,
+    demote, or transcribe any of the page's elements. A prose opening or two
+    equally prominent sections must keep their ordinary chapter structure.
+    """
+    if raw.is_page_scan or raw.pno > 6 or 'columns_reordered' in skel.reasons:
+        return False
+    if any(r.kind not in ('body', 'heading', 'figure', 'furniture') or
+           (r.kind == 'figure' and r.reason not in ('embedded', 'embedded_source_mark')) or
+           r.list_groups for r in skel.regions):
+        return False
+    lines = sorted((ln for region in skel.regions
+                    if region.kind in ('body', 'heading') for ln in region.lines),
+                   key=lambda ln: (ln.bbox[1], ln.bbox[0]))
+    if not 4 <= len(lines) <= 12:
+        return False
+    if (lines[0].bbox[1] > raw.height * .30 or
+            not raw.height * .35 <= lines[-1].bbox[3] <= raw.height * .9):
+        return False
+    for line in lines:
+        x0, _, x1, _ = line.bbox
+        if (abs((x0 + x1) / 2 - raw.width / 2) > raw.width * .10 or
+                x1 - x0 > raw.width * .75 or
+                len(line.stripped) > 65 or len(line.stripped.split()) > 8):
+            return False
+    sizes = [line.size for line in lines]
+    if (min(sizes) <= 0 or max(sizes) < max(18, style.body_size * 1.2) or
+            min(sizes) > max(sizes) * .8):
+        return False
+    gaps = [b.bbox[1] - a.bbox[3] for a, b in zip(lines, lines[1:])]
+    separation = max(range(len(gaps)), key=gaps.__getitem__)
+    if (gaps[separation] < max(32, 1.5 * median(sizes)) or
+            max(sizes[separation + 1:]) > max(sizes[:separation + 1]) * .85):
+        return False
+    return True
 
 
 def _preserve_conflicting_outline_heading(raw, style, skel):

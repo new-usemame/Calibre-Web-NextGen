@@ -20,15 +20,13 @@
 
 Values such as ``Computers.DB.Oracle`` stored in tag-like custom columns are
 converted into nested tree dictionaries so they can be rendered as collapsible
-trees and filtered with prefix matching (a parent node matches itself plus all
-of its descendants).
+trees, and a node matches itself plus all of its descendants.
 
 This module intentionally has no Flask/SQLAlchemy dependencies so it stays
 unit-testable in isolation.
 """
 
 SEPARATOR = '.'
-ESCAPE_CHAR = '\\'
 
 
 def split_path(path):
@@ -125,18 +123,6 @@ def breadcrumb_trail(path):
         acc.append(part)
         trail.append((part, SEPARATOR.join(acc)))
     return trail
-
-
-def escape_like(text):
-    """Escape SQL LIKE wildcards so user-supplied paths match literally."""
-    return (text.replace(ESCAPE_CHAR, ESCAPE_CHAR * 2)
-                .replace('%', ESCAPE_CHAR + '%')
-                .replace('_', ESCAPE_CHAR + '_'))
-
-
-def like_pattern(path):
-    """Build the escaped LIKE pattern matching a node and all descendants."""
-    return escape_like(join_path(split_path(path))) + '.' + '%'
 
 
 def is_hierarchical_value_set(values):

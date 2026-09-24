@@ -135,26 +135,3 @@ class TestIsHierarchicalValueSet(unittest.TestCase):
         # 'ComputersX' does not make 'Computers' a hierarchy root
         self.assertFalse(hierarchy.is_hierarchical_value_set(
             ['Computers', 'ComputersX']))
-
-
-class TestLikeEscaping(unittest.TestCase):
-
-    def test_escape_like_wildcards(self):
-        self.assertEqual(hierarchy.escape_like('100%'), r'100\%')
-        self.assertEqual(hierarchy.escape_like('a_b'), r'a\_b')
-        self.assertEqual(hierarchy.escape_like(r'a\b'), r'a\\b')
-
-    def test_like_pattern_guards_prefix_collisions(self):
-        # '.' is not a LIKE wildcard, so no escaping required; the trailing
-        # dot guards against 'ComputersX' matching prefix 'Computers'.
-        pattern = hierarchy.like_pattern('Computers')
-        self.assertEqual(pattern, 'Computers.%')
-        self.assertNotEqual(pattern, 'ComputersX%')
-
-    def test_like_pattern_escapes_wildcards_in_path(self):
-        # A node literally named '100%' must not match '1000...'
-        self.assertEqual(hierarchy.like_pattern('100%'), r'100\%.%')
-
-
-if __name__ == '__main__':
-    unittest.main()

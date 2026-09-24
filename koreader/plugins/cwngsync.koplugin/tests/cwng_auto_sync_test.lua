@@ -74,8 +74,53 @@ local function testAQueuedHighlightSaysWhichDeviceMadeIt()
     assertEqual(pushed.device, "Kindle", "and its model")
 end
 
+-- A book open on page 42, as the reader left it last time.
+local function openBook(highlights)
+    local provider = { push_all_local = true, readAll = function() return highlights end }
+    package.loaded["device_annotations"] = { getProvider = function() return provider end }
+    local plugin = setmetatable({
+        settings = { username = "reader", password = "app", sync_annotations = true },
+        ui = { doc_settings = { readSetting = function() return nil end } },
+        hasCurrentDocument = function() return true end,
+        getDocumentDigest = function() return "digest" end,
+        getCurrentDocumentFile = function() return "/books/b.epub" end,
+        getLastProgress = function() return "page42" end,
+        getLastPercent = function() return 0.36 end,
+        readAnnotationWatermark = function() return {} end,
+    }, { __index = AutoSync })
+    plugin:recordOpenedPosition()
+    plugin:recordOpenedAnnotations()
+    return plugin
+end
+
+local function testAHighlightMadeWithoutTurningAPageIsSent()
+    local highlights = { { annotation_id = "old", highlighted_text = "there before" } }
+    local plugin = openBook(highlights)
+    highlights[2] = { annotation_id = "new", highlighted_text = "broom" }
+    local entry = plugin:captureOpenBook(true)
+    assertEqual(entry ~= nil, true, "closing the book owes the server the new highlight")
+    assertEqual(entry.annotations and #entry.annotations.list, 2, "the book's highlights are sent")
+    assertEqual(entry.percentage, nil, "but not the position, which did not move")
+end
+
+local function testANoteWrittenWithoutTurningAPageIsSent()
+    local highlights = { { annotation_id = "old", highlighted_text = "there before" } }
+    local plugin = openBook(highlights)
+    highlights[1] = { annotation_id = "old", highlighted_text = "there before", note_text = "why?" }
+    local entry = plugin:captureOpenBook(true)
+    assertEqual(entry and entry.annotations and #entry.annotations.list, 1, "the edited note is sent")
+end
+
+local function testABookOnlyGlancedAtSendsNothing()
+    local plugin = openBook({ { annotation_id = "old", highlighted_text = "there before" } })
+    assertEqual(plugin:captureOpenBook(true), nil, "opening and closing a book says nothing")
+end
+
 testAChangeTheServerWillNeverTakeIsLetGo()
 testAChangeTheServerAsksToSendLaterIsKept()
 testAQueuedHighlightSaysWhichDeviceMadeIt()
+testAHighlightMadeWithoutTurningAPageIsSent()
+testANoteWrittenWithoutTurningAPageIsSent()
+testABookOnlyGlancedAtSendsNothing()
 
 print("cwng_auto_sync tests passed")

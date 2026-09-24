@@ -113,21 +113,35 @@ function AutoSync:captureOpenBook(with_annotations, explicit)
         status = Pending.statusToSend(summary.status,
             doc_settings and doc_settings:readSetting(PUSHED_STATUS_KEY)),
     }
-    entry = Pending.trimUnmoved(entry, explicit or Pending.movedSince(self.opened_progress, progress))
-    if not entry then return nil end
+    local moved = explicit or Pending.movedSince(self.opened_progress, progress)
     if with_annotations and self.settings.sync_annotations then
         local DeviceAnnotations = require("device_annotations")
         local provider = DeviceAnnotations.getProvider(self.ui, digest)
         if provider and provider.push_all_local then
             local plan = SyncLogic.planLocalContribution(provider, nil, self:readAnnotationWatermark())
             -- Unreadable is not "no highlights": leave the last snapshot queued.
-            if plan.known then
+            -- A highlight made without turning a page counts: the position
+            -- stays behind, the highlight does not.
+            if plan.known and (moved or #plan.deletions > 0
+                    or Pending.annotationsFingerprint(plan.list) ~= self.opened_annotations) then
                 entry.annotations = { list = plan.list, deletions = plan.deletions }
             end
         end
     end
-    if entry.percentage == nil and entry.status == nil and entry.annotations == nil then return nil end
-    return entry
+    return Pending.trimUnmoved(entry, moved)
+end
+
+-- The book's highlights as they are now, as the point a later capture is
+-- compared with. Called when the book is ready and after the server's
+-- highlights are drawn in it.
+function AutoSync:recordOpenedAnnotations()
+    self.opened_annotations = nil
+    local digest = self:hasCurrentDocument() and self:getDocumentDigest()
+    if not digest then return end
+    local ok, provider = pcall(require("device_annotations").getProvider, self.ui, digest)
+    if not (ok and provider and provider.push_all_local) then return end
+    local list, known = SyncLogic.resolveLocalSet(provider)
+    if known then self.opened_annotations = Pending.annotationsFingerprint(list) end
 end
 
 -- Where the book stands now, as the point a later capture is compared with

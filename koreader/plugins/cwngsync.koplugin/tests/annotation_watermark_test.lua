@@ -105,6 +105,7 @@ local function newHarness(push_succeeds, own_highlights)
         getDocumentDigest = function() return "digest" end,
         getCurrentDocumentFile = function() return "/books/book.epub" end,
         refreshLibraryViews = function() end,
+        recordOpenedAnnotations = function() end,
     }, { __index = CWNGSync })
     local real_require = require
     require = function(name)

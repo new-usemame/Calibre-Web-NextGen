@@ -80,6 +80,19 @@ function Pending.trimUnmoved(entry, moved)
     return entry
 end
 
+-- Which highlights a book has and what each says: compared with the same taken
+-- when the book opened, it tells whether the reader highlighted, noted or
+-- deleted anything, turning a page or not.
+function Pending.annotationsFingerprint(list)
+    local parts = {}
+    for _, a in ipairs(list or {}) do
+        parts[#parts + 1] = table.concat({ tostring(a.annotation_id), tostring(a.highlighted_text),
+            tostring(a.note_text), tostring(a.color) }, "\0")
+    end
+    table.sort(parts)
+    return table.concat(parts, "\n")
+end
+
 -- Whether a queued position should still be sent, given what the server holds
 -- now. A position another device recorded after this one was captured is
 -- newer reading, and sending the old one late would overwrite it.

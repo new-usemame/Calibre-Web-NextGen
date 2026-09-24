@@ -276,6 +276,7 @@ function CWNGSync:onReaderReady()
     self:registerEvents()
     self.last_page = self.ui:getCurrentPage()
     self:recordOpenedPosition()
+    self:recordOpenedAnnotations()
     -- A cloud book opened some way the open hook did not see.
     if self:rescueOpenedPlaceholder() then return end
     self:markOpened(self:getCurrentDocumentFile())
@@ -2375,6 +2376,7 @@ function CWNGSync:syncAnnotations(interactive)
                 drawn = ok_apply and ids or nil
                 self:addToAnnotationWatermark(drawn)
                 if applied > 0 then
+                    self:recordOpenedAnnotations()
                     self:refreshLibraryViews({ self:getCurrentDocumentFile() })
                 end
             end

@@ -245,6 +245,26 @@ function TocList({ items, onPick, untitled, nested = false }: {
   );
 }
 
+function applyDocumentTheme(doc: Document, theme: ReaderTheme) {
+  const bg = THEMES[theme].body.background.replace(' !important', '');
+  const fg = THEMES[theme].body.color.replace(' !important', '');
+  doc.documentElement.style.setProperty('background', bg, 'important');
+  if (doc.body) {
+    doc.body.style.setProperty('background', bg, 'important');
+    doc.body.style.setProperty('color', fg, 'important');
+  }
+}
+
+function applyDocumentTypography(doc: Document, settings: {
+  fontPct: number; fontFamily: ReaderSettings['font']; margin: number; lineHeight: number;
+}) {
+  if (!doc.body) return;
+  doc.body.style.setProperty('font-size', `${settings.fontPct}%`);
+  doc.body.style.setProperty('font-family',
+    settings.fontFamily === 'default' ? 'initial' : FONT_FAMILY[settings.fontFamily], 'important');
+  doc.body.style.setProperty('line-height', String(settings.lineHeight / 100), 'important');
+}
+
 function loadTheme(): ReaderTheme {
   const v = safeLocalStorageGet(LS_THEME);
   if (v === 'light' || v === 'sepia' || v === 'dark' || v === 'black') return v;
@@ -411,6 +431,12 @@ export function Reader({ id }: { id: string }) {
   const [fontFamily, setFontFamily] = useState<ReaderSettings['font']>('default');
   const [margin, setMargin] = useState(16);
   const [lineHeight, setLineHeight] = useState(150);
+  // The rendition's render hook is registered once per book, yet it styles
+  // every section rendered after that. It reads the reader's current choices
+  // through this ref: a closure kept the values from when the book opened and
+  // put them back at the next chapter (#2254).
+  const appearanceRef = useRef({ theme, fontPct, fontFamily, margin, lineHeight });
+  appearanceRef.current = { theme, fontPct, fontFamily, margin, lineHeight };
   /*
    * One column or two, persisted per user (#325).
    *
@@ -1166,8 +1192,6 @@ export function Reader({ id }: { id: string }) {
     // …and force it onto the currently-rendered iframe with inline styles, which
     // win unconditionally. epub.js can skip re-applying a theme it considers
     // already current (notably the initial 'dark'), leaving the prior background.
-    const bg = THEMES[t].body.background.replace(' !important', '');
-    const fg = THEMES[t].body.color.replace(' !important', '');
     // epub.js injects several equal-specificity `!important` body rules per theme;
     // the LAST one appended wins, so a previously-selected light/sepia rule beats
     // dark on re-select. An `!important` INLINE style sits above every stylesheet
@@ -1175,11 +1199,7 @@ export function Reader({ id }: { id: string }) {
     try {
       (rendition.getContents?.() || []).forEach((c: any) => {
         if (!c?.document) return;
-        c.document.documentElement.style.setProperty('background', bg, 'important');
-        if (c.document.body) {
-          c.document.body.style.setProperty('background', bg, 'important');
-          c.document.body.style.setProperty('color', fg, 'important');
-        }
+        applyDocumentTheme(c.document, t);
       });
     } catch { /* same-origin blob content; guard regardless */ }
   }, []);
@@ -1187,23 +1207,22 @@ export function Reader({ id }: { id: string }) {
   const applyTypography = useCallback(() => {
     const rendition = renditionRef.current;
     if (!rendition) return;
+    // The paginator owns page padding and reapplies it after resize. Give it
+    // the requested gutter so its column geometry and visible margins agree.
+    if (rendition.manager && rendition.manager.settings.gap !== margin * 2) {
+      rendition.manager.settings.gap = margin * 2;
+      rendition.manager.updateLayout();
+    }
     rendition.themes.fontSize(`${fontPct}%`);
     if (fontFamily === 'default') rendition.themes.font('initial');
     else rendition.themes.font(FONT_FAMILY[fontFamily]);
     try {
       (rendition.getContents?.() || []).forEach((c: any) => {
         if (!c?.document?.body) return;
-        c.document.body.style.setProperty('padding-inline', `${margin}px`, 'important');
-        c.document.body.style.setProperty('line-height', String(lineHeight / 100), 'important');
+        applyDocumentTypography(c.document, { fontPct, fontFamily, margin, lineHeight });
       });
     } catch { /* same-origin blob content; guard regardless */ }
   }, [fontPct, fontFamily, margin, lineHeight]);
-  // The rendition's 'rendered' listener is attached once per book, yet it
-  // re-applies the appearance to every section rendered after that. It reads
-  // the reader's current choices through this ref: a closure kept the values
-  // from when the book opened and put them back at the next chapter (#2254).
-  const appearanceRef = useRef({ theme, applyTypography });
-  appearanceRef.current = { theme, applyTypography };
 
   // A page turn is the reader moving themselves, so it ends any preview: from
   // here on the relocations are theirs and the position saves again. This is the
@@ -1484,12 +1503,15 @@ export function Reader({ id }: { id: string }) {
 
         const epubBook = ePub(buf as any);
         bookRef.current = epubBook;
-        const rendition = epubBook.renderTo(viewerRef.current!, {
+        // epub.js forwards gap to its manager, but omits it from RenditionOptions.
+        const renditionOptions = {
           width: '100%',
           height: '100%',
           flow: 'paginated',
+          gap: appearanceRef.current.margin * 2,
           spread: spread === 'nonespread' ? 'none' : 'auto',
-        });
+        };
+        const rendition = epubBook.renderTo(viewerRef.current!, renditionOptions);
         renditionRef.current = rendition;
 
         /*
@@ -1526,8 +1548,22 @@ export function Reader({ id }: { id: string }) {
         });
 
         Object.entries(THEMES).forEach(([name, t]) => rendition.themes.register(name, t));
-        rendition.themes.select(theme);
-        rendition.themes.fontSize(`${fontPct}%`);
+        const initialAppearance = appearanceRef.current;
+        rendition.themes.select(initialAppearance.theme);
+        rendition.themes.fontSize(`${initialAppearance.fontPct}%`);
+        rendition.themes.font(initialAppearance.fontFamily === 'default'
+          ? 'initial' : FONT_FAMILY[initialAppearance.fontFamily]);
+
+        // This synchronous hook runs before the manager measures a display()
+        // target. Late `rendered` styling reflowed a newly loaded chapter after
+        // that measurement, leaving first-click jumps on the previous spread.
+        rendition.hooks.render.register((view: any) => {
+          if (!view.contents?.document) return;
+          const appearance = appearanceRef.current;
+          applyDocumentTheme(view.contents.document, appearance.theme);
+          applyDocumentTypography(view.contents.document, appearance);
+          view.expand();
+        });
 
         // C10 (SC 4.1.2): epub.js renders each section into an <iframe> with no
         // title — screen readers announce "frame" with no name. Title them as
@@ -1536,10 +1572,6 @@ export function Reader({ id }: { id: string }) {
           viewerRef.current?.querySelectorAll('iframe').forEach((f) => {
             f.setAttribute('title', t('Book content'));
           });
-          applyTheme(appearanceRef.current.theme);
-          appearanceRef.current.applyTypography();
-          // Typography reflows the page, so the link targets are measured after it.
-          scheduleLinkSync();
         });
 
         setRemoteResume(null);
@@ -1571,14 +1603,6 @@ export function Reader({ id }: { id: string }) {
         }
         await rendition.display(initialTarget);
         if (cancelled) return;
-        if (!savedCfiRef.current && initialTarget && resume?.mode === 'automatic') {
-          // The rendered hook applies typography, which can reflow the target
-          // out of the initial spread. Place it again after that layout frame.
-          await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-          if (cancelled) return;
-          await rendition.display(initialTarget);
-        }
-        if (cancelled) return;
         // display() resolves only after the package document is parsed, so the
         // spine's page-progression-direction is readable by here.
         setRtl(isRtlBook(epubBook));
@@ -1605,10 +1629,7 @@ export function Reader({ id }: { id: string }) {
               const cfi = resumeCfi(epubBook.locations, resume);
               if (cfi) {
                 await rendition.display(cfi);
-                // As with the initial target, typography may reflow this spread.
-                await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-                if (cancelled || readerMoved || !previewingRef.current) return;
-                await rendition.display(cfi);
+                if (cancelled) return;
               }
             }
             if (!readerMoved && savedCfiRef.current && resume?.mode === 'offer') {
@@ -1818,24 +1839,17 @@ export function Reader({ id }: { id: string }) {
     // and the index alone opens the chapter's first page. So an href with a
     // fragment is displayed as itself once the spine resolves it (epub.js runs
     // the same lookup, then pages to the element), with the index as fallback.
+    // The render hook styles a new section before epub.js measures the
+    // fragment, so one display lands on it.
     let index: number | null = null;
     try {
       const section = epubBook?.spine?.get(href);
       if (section && typeof section.index === 'number') index = section.index;
     } catch { /* fall through to href */ }
     const target = index !== null && !href.includes('#') ? index : href;
-    Promise.resolve(rendition.display(target))
-      .then(async () => {
-        if (typeof target !== 'string') return;
-        // As with the initial target: a freshly rendered section is reflowed by
-        // the rendered hook's typography after display() measured the fragment,
-        // so place it again once that layout frame has run.
-        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-        await rendition.display(target);
-      })
-      .catch(() => {
-        Promise.resolve(rendition.display(index ?? href.split('#')[0])).catch(() => {/* give up quietly */});
-      });
+    Promise.resolve(rendition.display(target)).catch(() => {
+      Promise.resolve(rendition.display(index ?? href.split('#')[0])).catch(() => {/* give up quietly */});
+    });
   };
 
   if (isLoading) {

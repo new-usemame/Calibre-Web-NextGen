@@ -11,10 +11,13 @@ const webCfi = 'epubcfi(/6/2!/4/2[existing],/1:0,/1:20)';
 const foreignCfi = 'epubcfi(/6/4!/4/2[wrapper]/2[kobo.15.1],/1:15,/1:63)';
 const initialBookmark = 'epubcfi(/6/2!/4/2[existing]/1:0)';
 
-async function openFixture(page: Page, duplicate = false, nativeSpans = false) {
+async function openFixture(page: Page, duplicate = false, nativeSpans = false, longChapter = false) {
+  const precedingText = longChapter ? Array.from({ length: 40 }, (_, i) =>
+    `<p>Paragraph ${i}: The reader continues across the page through a quiet landscape, with another sentence to fill this passage.</p>`,
+  ).join('') : '';
   const epub = archive([
     '<p id="existing">Existing web passage remains.</p>' + (nativeSpans ? `<p><span id="kobo.15.1">${quote}</span></p>` : duplicate ? `<p>${quote}</p>` : ''),
-    nativeSpans ? `<p><span id="kobo.15.1">${quote}</span></p>` : `<p>😀 Before: a native <em>passage spans</em> nodes. After.</p>`,
+    precedingText + (nativeSpans ? `<p><span id="kobo.15.1">${quote}</span></p>` : `<p>😀 Before: a native <em>passage spans</em> nodes. After.</p>`),
   ]);
   const list = await (await page.request.get('/api/v1/books?per_page=1')).json();
   const id = list.items[0].id;
@@ -62,18 +65,26 @@ async function openFixture(page: Page, duplicate = false, nativeSpans = false) {
 test('native highlight maps into the existing EPUB, preserving web highlights and preview bookmarks', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  const fixture = await openFixture(page);
+  await page.route('**/api/v1/reader/settings', route => route.fulfill({ json: {
+    reader: { theme: 'lightTheme', font: 'Arial', fontSize: 130, margin: 48,
+      lineHeight: 150, spread: 'nonespread', reflow: false },
+  } }));
+  const fixture = await openFixture(page, false, false, true);
   await page.getByRole('button', { name: 'Highlights and notes', exact: true }).click();
   const jump = page.getByRole('button', { name: `${quote} kobo`, exact: true });
   await expect(jump).toBeEnabled();
   await jump.click();
   const mark = page.locator('[data-id="native"]');
-  await expect(mark.locator('rect').first()).toBeAttached();
+  await expect(mark.locator('rect').first()).toBeInViewport();
   expect(await mark.getAttribute('data-epubcfi')).not.toBe(foreignCfi);
   expect(fixture.bytesRequested).toEqual([`/show/${fixture.id}/epub`]);
   // An actual click on the mapped overlay must update the original annotation,
   // never send the display-only EPUB CFI back as its Kobo source position.
-  await mark.dispatchEvent('click');
+  // epub.js makes SVG marks pointer-transparent and forwards iframe clicks.
+  // Use trusted input at the visible mark, as a person would click the text.
+  const bounds = await mark.locator('rect').first().boundingBox();
+  expect(bounds).not.toBeNull();
+  await page.mouse.click(bounds!.x + bounds!.width / 2, bounds!.y + bounds!.height / 2);
   await page.getByRole('button', { name: 'Green', exact: true }).click();
   await expect.poll(() => fixture.edits.length).toBe(1);
   expect(fixture.edits).toEqual([{ highlight_color: 'green' }]);
@@ -195,4 +206,43 @@ test('native mapping proves exact uniqueness with real DOM ranges and refuses in
   expect(results.nativeWithUnreadableSibling).toEqual([['native', JSON.stringify({ text: 'same quote', start: 0, end: 10, section: 1 })]]);
   expect(results.nativeUnicode).toEqual([['native', JSON.stringify({ text: quote, start: 11, end: 20, section: 1 })]]);
   expect(results.chapterWithBang).toEqual([['native', JSON.stringify({ text: 'same quote', start: 0, end: 10, section: 0 })]]);
+});
+
+test('changed appearance reaches a new chapter and live margins preserve the visible passage', async ({ page }) => {
+  let settings = { theme: 'lightTheme', font: 'Arial', fontSize: 130, margin: 48,
+    lineHeight: 150, spread: 'nonespread', reflow: false };
+  await page.route('**/api/v1/reader/settings', route => {
+    if (route.request().method() === 'POST') settings = { ...settings, ...route.request().postDataJSON() };
+    return route.fulfill({ json: { reader: settings } });
+  });
+  await openFixture(page, false, false, true);
+  await page.getByRole('button', { name: 'Reading appearance', exact: true }).click();
+  const appearance = page.getByRole('dialog', { name: 'Reading appearance', exact: true });
+  await appearance.getByRole('button', { name: 'Dark', exact: true }).click();
+  await appearance.getByLabel('Font size').fill('150');
+  await appearance.getByLabel('Page margins').fill('64');
+  await appearance.getByLabel('Line height').fill('190');
+  await expect(appearance.getByLabel('Page margins')).toHaveValue('64');
+  await appearance.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Highlights and notes', exact: true }).click();
+  const jump = page.getByRole('button', { name: `${quote} kobo`, exact: true });
+  await expect(jump).toBeEnabled();
+  await jump.click();
+  const rect = page.locator('[data-id="native"] rect').first();
+  await expect(rect).toBeInViewport();
+  const body = page.frameLocator('iframe[title="Book content"]').locator('body');
+  await expect(body).toContainText('Paragraph 0:');
+  const observed = await body.evaluate(element => {
+    const style = getComputedStyle(element);
+    return { fontSize: style.fontSize, padding: style.paddingInlineStart,
+      lineHeight: style.lineHeight, background: style.backgroundColor };
+  });
+  expect(observed).toEqual({ fontSize: '24px', padding: '64px',
+    lineHeight: '45.6px', background: 'rgb(21, 17, 12)' });
+  // The passage must remain visible through live reflow without another jump.
+  await page.getByRole('button', { name: 'Reading appearance', exact: true }).click();
+  await appearance.getByLabel('Page margins').fill('16');
+  await appearance.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(body).toHaveCSS('padding-inline-start', '16px');
+  await expect(rect).toBeInViewport();
 });

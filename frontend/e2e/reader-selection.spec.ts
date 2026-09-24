@@ -49,8 +49,8 @@ for (const classic of [false, true]) {
   test(`${classic ? 'classic' : 'SPA'} new text selection creates a highlight without enabling book scripts`, async ({ page, isMobile, browserName }) => {
     const { frame, writes } = await openReader(page, classic);
     const element = await frame.frameElement();
-    // The iframe contents exist before the rendered hook applies page margins.
-    // Wait for its accessible rendered title before measuring mouse coordinates.
+    // Wait for the accessible rendered title: the iframe can exist before
+    // typography and page layout are ready for measuring mouse coordinates.
     if (!classic) await expect(page.locator('iframe[title="Book content"]')).toBeVisible();
     await expect(frame.locator('[id="kobo.1.1"]')).toBeVisible();
     expect(await element.getAttribute('sandbox')).not.toContain('allow-scripts');

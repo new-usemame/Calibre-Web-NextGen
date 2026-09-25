@@ -1137,7 +1137,7 @@ class TestUncertainOCRRegion:
             assert build_epub.validate(str(output)) == []
             with zipfile.ZipFile(output) as z:
                 body=''.join(z.read(n).decode() for n in z.namelist() if re.fullmatch(r'OEBPS/ch\d+\.xhtml',n))
-                assert 'Original text region' in body
+                assert 'Source image' in body
                 assert 'misread' not in body
                 assert any('fig_p0000' in n for n in z.namelist())
         finally:doc.close()

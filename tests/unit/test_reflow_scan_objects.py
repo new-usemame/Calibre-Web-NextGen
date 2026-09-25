@@ -491,7 +491,7 @@ def test_uncertain_caption_stays_with_primary_chart_and_disclosure():
     html = build_epub.page_fragment(book, 0)
     assert html.count('original_p0000_caption_0.jpg') == 1
     assert html.index('fig_p0000_0') < html.index('original_p0000_caption_0.jpg')
-    assert 'Original text region' in html and 'Inspect original printed caption' in html
+    assert 'OCR uncertain' in html and 'Inspect original printed caption' in html
 
 
 def test_complete_figure_crop_does_not_repeat_its_printed_caption():

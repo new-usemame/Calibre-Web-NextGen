@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.28"
+CONVERTER_VERSION = "1.29"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -244,9 +244,9 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                            'aligned source rows in this image. It is not searchable text. '
                            '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
             elif source_region:
-                caption = ('Original text region. OCR transcription is uncertain; '
-                           'read the source pixels. This image does not provide searchable text. '
-                           '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
+                caption = ('Source image · <a href="source-pages.xhtml#source-images">'
+                           'OCR uncertain</a> · <a href="original-p%04d.xhtml#page">'
+                           'View larger</a>' % pno)
             if source_caption and source_region:
                 caption = source_caption + ' ' + caption
             blocks.append(_figure_html(pno, figure_index, caption, source_region=source_region))
@@ -982,7 +982,13 @@ def _source_page_items(page_homes):
 def _source_index(page_homes, language, evidence=None):
     originals = ""
     if evidence:
-        originals = ('<h2>Original printed evidence</h2><p>These original images '
+        originals = ('<section id="source-images"><h2>Reading source text images</h2>'
+                     '<p>Some text is shown as original printed pixels because OCR '
+                     'cannot verify its wording or layout. Text inside these images '
+                     'is not searchable and does not grow with reader font settings. '
+                     'Use View larger beneath an image to open the original page and '
+                     'enlarged details, then use its Return link to resume reading.</p></section>'
+                     '<h2>Original printed evidence</h2><p>These original images '
                      'help check uncertain transcriptions and note associations.</p><ol>%s</ol>'
                      % "".join('<li><a href="original-p%04d.xhtml">Original PDF page %d</a></li>'
                                % (pno, pno + 1) for pno in sorted(evidence)))

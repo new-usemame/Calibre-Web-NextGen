@@ -614,6 +614,37 @@ def test_the_about_page_can_be_declined(tmp_path):
         assert not [n for n in zf.namelist() if "reflow-about" in n], zf.namelist()
 
 
+def test_repeated_uncertain_source_images_have_short_local_help_and_one_explanation():
+    figures = [assemble.Element(kind="fig", pno=0) for _ in range(3)]
+    figures.append(assemble.Element(kind="fig", pno=0))
+    book = assemble.Book(elements=figures, pages={0: figures}, figures=[
+        {"pno": 0, "found": reason, "bbox": (20, 20+i*60, 220, 70+i*60)}
+        for i, reason in enumerate(["ocr_uncertain_region"]*3 +
+                                   ["uncertain_aligned_scan_list"])])
+    fragment = build_epub.page_fragment(book, 0)
+    root = ET.fromstring("<root>" + fragment + "</root>")
+    captions = list(root.iter("figcaption"))
+    assert len(captions) == 4
+    for caption in captions[:3]:
+        label = " ".join("".join(caption.itertext()).split())
+        assert len(label) < 85, label
+        assert "uncertain" in label.lower()
+        assert any(a.get("href") == "original-p0000.xhtml#page"
+                   for a in caption.iter("a"))
+        assert any(a.get("href") == "source-pages.xhtml#source-images"
+                   for a in caption.iter("a"))
+    assert "Complete printed list" in "".join(captions[3].itertext())
+    index = ET.fromstring(build_epub._source_index({0: "ch001.xhtml"}, "en", {0: {}}))
+    help_sections = [node for node in index.iter(XHTML + "section")
+                     if node.get("id") == "source-images"]
+    assert len(help_sections) == 1
+    help_text = " ".join("".join(help_sections[0].itertext()).lower().split())
+    assert all(term in help_text for term in ("ocr", "searchable", "font", "detail"))
+    plain_index = build_epub._source_index({0: "ch001.xhtml"}, "en")
+    assert 'id="source-images"' not in plain_index
+
+
+
 @pytest.mark.parametrize("builder", [
     F.defect_c_page, F.broken_note_number_page, F.ambiguous_note_number_page,
     F.merged_note_number_page, F.hyphenated_note_page, F.typographers_page,

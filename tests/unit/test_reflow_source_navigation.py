@@ -2,10 +2,12 @@
 """A reader can navigate to actual PDF page starts, including sampled gaps."""
 
 import zipfile
+import io
 from xml.etree import ElementTree as ET
 
 import pymupdf
 import pytest
+from PIL import Image
 
 from cps.services.reflow import assemble, build_epub
 
@@ -224,6 +226,10 @@ def test_uncertain_notes_expose_original_pixels_and_only_disarm_ambiguous_links(
         result=build_epub.build(book,str(target),doc=doc,
                                page_html={0:'<p>Unqualified replacement rendering.</p>'})
         original=extract.render_page_jpeg(doc,0,scale=1.5,quality=85)
+        from cps.services.reflow.source_display import SourceDisplay
+        rendered=SourceDisplay(doc,0).pixmap(scale=1.5)
+        rendered_size=(rendered.width,rendered.height)
+        rendered_samples=rendered.samples
     assert build_epub.validate(str(target)) == []
     with zipfile.ZipFile(target) as z:
         chapter=ET.fromstring(z.read('OEBPS/'+result.chapters[0]['href']))
@@ -236,7 +242,13 @@ def test_uncertain_notes_expose_original_pixels_and_only_disarm_ambiguous_links(
         original_doc=ET.fromstring(z.read('OEBPS/original-p0000.xhtml'))
         images=list(original_doc.iter(XHTML+'img'))
         assert len(images)>=2, 'full page plus readable note-context detail are required'
-        assert z.read('OEBPS/'+images[0].get('src'))==original
+        encoded=z.read('OEBPS/'+images[0].get('src'))
+        if encoded.startswith(b'\x89PNG'):
+            with Image.open(io.BytesIO(encoded)) as image:
+                assert image.size==rendered_size
+                assert image.convert('RGB').tobytes()==rendered_samples
+        else:
+            assert encoded==original
         assert any('notes' in img.get('alt','').lower() for img in images)
         assert any(a.get('href','').endswith('#pg_0000') for a in original_doc.iter(XHTML+'a'))
         index=ET.fromstring(z.read('OEBPS/source-pages.xhtml'))

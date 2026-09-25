@@ -920,7 +920,9 @@ class TestPlateAndCaptionFidelity:
             output=_build(book,tmp_path,doc)
         assert not build_epub.validate(output.path)
         with zipfile.ZipFile(output.path) as z:
-            assert z.read('OEBPS/images/original_p0000_caption_0.jpg')
+            assert any(z.read(n) for n in z.namelist()
+                       if n.startswith('OEBPS/images/original_p0000_caption_0.')
+                       and n.endswith(('.jpg','.png')))
             chapters=' '.join(z.read(n).decode() for n in z.namelist() if re.fullmatch(r'OEBPS/ch\d+\.xhtml',n))
             assert 'Unverified symbols' not in chapters
 

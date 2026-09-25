@@ -242,7 +242,8 @@ def test_grouped_heading_final_epub_keeps_uncertain_atom_complete_nav_and_origin
         original=z.read('OEBPS/original-p0000.xhtml').decode()
         assert '#title_0' in chapters and 'id="title_0"' in original
         assert 'Return' in original
-        assert any('original_p0000_title_0.jpg' in n for n in z.namelist())
+        assert any('original_p0000_title_0.' in n and n.endswith(('.jpg','.png'))
+                   for n in z.namelist())
     assert json.loads(canonical.records_json)==records
     doc.close()
 

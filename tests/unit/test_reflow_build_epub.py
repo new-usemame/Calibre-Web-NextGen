@@ -1456,6 +1456,9 @@ def test_a_long_scan_is_written_without_holding_its_original_pages_in_memory(
     about one page of evidence, however long the scan is -- and nothing is given
     up for it: every original is in the book, whole."""
     scan, result = _scanned_book(monkeypatch, 12)
+    # PNG can be much smaller than the RGB pixels held while it is encoded.
+    # Bound the in-flight raster rather than multiplying compressed output.
+    rendered_page = int(scan[0].rect.width * 3 * scan[0].rect.height * 3 * 3)
     held = []
     try:
         built, peak = _build_traced(
@@ -1479,7 +1482,8 @@ def test_a_long_scan_is_written_without_holding_its_original_pages_in_memory(
     assert held[-1] - held[1] < page, (
         "the builder kept %d KB more after eleven more pages of %d KB of originals"
         % ((held[-1] - held[1]) // 1024, page // 1024))
-    assert peak < 3 * page, (peak // 1024, page // 1024, sum(written.values()) // 1024)
+    assert peak < max(3 * page, 2 * rendered_page), (
+        peak // 1024, rendered_page // 1024, sum(written.values()) // 1024)
 
 
 def _plate_png(seed, width=640, height=800):

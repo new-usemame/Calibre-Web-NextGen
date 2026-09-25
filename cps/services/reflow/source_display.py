@@ -2,11 +2,14 @@
 import math
 import hashlib
 import json
+import zlib
 from . import extract, ocr
 
 VERSION = 'source-display-1'
 MAX_INSPECTION_TILES = 64
 GRID_QUERY_PIXELS = 1_000_000
+MAX_LOSSLESS_CANDIDATE_PIXELS = 3_000_000
+MIN_PACKAGED_SAVING = 1024
 
 
 def _rect(value):
@@ -123,7 +126,35 @@ class SourceDisplay:
             return None
         return self._bitonal
 
-    def source_image(self,rect=None,scale=3,quality=90,max_bytes=2*1024*1024):
+    @staticmethod
+    def _lossless_candidate(pix, jpeg, max_bytes):
+        """Choose exact rendered samples only for a material packaged saving."""
+        if pix.width*pix.height > MAX_LOSSLESS_CANDIDATE_PIXELS:
+            return jpeg
+        from PIL import Image
+        import io
+        samples = pix.samples
+        size = (pix.width, pix.height)
+        if samples[0::3] == samples[1::3] == samples[2::3]:
+            image = Image.frombytes('L', size, samples[0::3])
+        else:
+            image = Image.frombytes('RGB', size, samples)
+        stream = io.BytesIO()
+        image.save(stream, format='PNG', optimize=True)
+        png = stream.getvalue()
+        if len(png) > max_bytes:
+            return jpeg
+        with Image.open(io.BytesIO(png)) as decoded:
+            if decoded.size != size or decoded.convert('RGB').tobytes() != samples:
+                raise ValueError('lossless source evidence changed rendered pixels')
+        jpeg_zip = len(zlib.compress(jpeg, 6))
+        png_zip = len(zlib.compress(png, 6))
+        if jpeg_zip-png_zip >= MIN_PACKAGED_SAVING and png_zip*50 <= jpeg_zip*49:
+            return png
+        return jpeg
+
+    def source_image(self,rect=None,scale=3,quality=90,max_bytes=2*1024*1024,
+                     lossless_candidate=False):
         """Lossless native pixels when proved; otherwise the existing renderer."""
         import io
         if not math.isfinite(scale) or scale <= 0:
@@ -140,7 +171,16 @@ class SourceDisplay:
             data=stream.getvalue()
             if len(data)<=max_bytes:
                 return data
-        return self.jpeg(rect,scale,quality,max_bytes)
+        if not lossless_candidate:
+            return self.jpeg(rect,scale,quality,max_bytes)
+        # This branch serves packaged source evidence only. The JPEG/OCR path
+        # keeps its existing scale ladder and exact input bytes.
+        for requested in extract._scale_ladder(scale):
+            pix = self.pixmap(rect, requested)
+            jpeg = pix.tobytes('jpg', jpg_quality=quality)
+            if len(jpeg) <= max_bytes:
+                return self._lossless_candidate(pix, jpeg, max_bytes)
+        raise extract.RasterTooLarge('source display exceeds encoded-byte bound')
 
     def query_document(self,isolate=False):
         """Existing pixel questions in reading coordinates, without a second renderer."""

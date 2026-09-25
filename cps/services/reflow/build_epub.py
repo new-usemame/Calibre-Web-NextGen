@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.21"
+CONVERTER_VERSION = "1.22"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -1302,7 +1302,8 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
         provenance = json.loads(source_pages[pno].provenance_json) if source_pages and pno in source_pages else {}
         display = SourceDisplay(doc, pno, provenance)
         full = "images/original_p%04d.jpg" % pno
-        package.image(full, display.source_image(scale=1.5, quality=85))
+        package.image(full, display.source_image(scale=1.5, quality=85,
+                                                 lossless_candidate=True))
         details = []
         page_rect = doc[pno].rect * doc[pno].derotation_matrix
         for key, label, box in specs:
@@ -1324,7 +1325,8 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 raise ValueError("Invalid original source evidence geometry on page %d" % pno)
             src = "images/original_p%04d_%s.jpg" % (pno, key)
             reading_rect = display.reading_rect(rect)
-            package.image(src, display.source_image(reading_rect))
+            package.image(src, display.source_image(reading_rect,
+                                                     lossless_candidate=True))
             details.append({"id": key, "label": label, "src": src, "bbox": list(rect),
                             "reading_bbox": list(reading_rect)})
         from .source_display import grid_regions
@@ -1333,7 +1335,8 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
             if element_index != proof['element_indices'][0]:continue
             key = "layout_%d" % element_index
             src = "images/original_p%04d_%s.jpg" % (pno, key)
-            package.image(src, display.source_image(proof['reading_bbox']))
+            package.image(src, display.source_image(proof['reading_bbox'],
+                                                     lossless_candidate=True))
             details.append({"id": key, "label": "Original layout and labels", "src": src, **proof})
         if provenance.get('layer') == 'ocr' or any(
                 f.get('found') in ('unrecovered_scan_layer','unverified_scan_layout','unverified_paired_columns') and f.get('pno') == pno
@@ -1342,7 +1345,8 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 _check_cancelled(should_stop)
                 key = "inspection_%d" % tile_index
                 src = "images/original_p%04d_%s.jpg" % (pno, key)
-                package.image(src, display.source_image(tile))
+                package.image(src, display.source_image(tile,
+                                                         lossless_candidate=True))
                 details.append({"id": key, "label": "Original detail %d (row order)" % (tile_index + 1),
                     "src": src, "reading_bbox": list(tile), "displayed_pdf_bbox": list(display.source_rect(tile))})
         inspection = [d for d in details if d['id'].startswith('inspection_')]

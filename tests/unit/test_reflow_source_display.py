@@ -1,5 +1,6 @@
 """Original-source orientation and inspection preserve physical relationships."""
 import json
+import re
 import pymupdf
 import pytest
 from cps.services.reflow import extract
@@ -81,14 +82,24 @@ def test_actual_epub_shows_original_grid_before_unchanged_marked_ocr_and_exclude
     assert build_epub.validate(str(target))==[]
     with zipfile.ZipFile(target) as z:
         chapter=z.read('OEBPS/'+result.chapters[0]['href']).decode()
-        assert 'original_p0000_layout_0.jpg' in chapter
-        assert chapter.index('original_p0000_layout_0.jpg')<chapter.index('Alpha')
+        layout = re.search(r'original_p0000_layout_0\.(?:png|jpg)',chapter)
+        assert layout
+        assert chapter.index(layout.group())<chapter.index('Alpha')
         assert 'OCR transcription. Read the original above for the layout and labels.' in chapter
         assert source.html.split('\n')[0] in chapter
         original=z.read('OEBPS/original-p0000.xhtml').decode()
         assert 'inspection_0' in original and 'Return to reflowed PDF page' in original
+        side=json.loads(z.read('META-INF/reflow.json'))
+        evidence=side['source_evidence'][0]
+        opf=z.read('OEBPS/content.opf').decode()
+        for detail in evidence['details']:
+            src=detail['src']
+            assert 'OEBPS/'+src in z.namelist()
+            assert src.removeprefix('images/') in original
+            mime='image/png' if src.endswith('.png') else 'image/jpeg'
+            assert mime in opf
         for name in z.namelist():
-            if 'inspection_' in name and name.endswith('.jpg'):
+            if 'inspection_' in name and name.endswith(('.jpg','.png')):
                 pix=pymupdf.Pixmap(z.read(name));assert pix.width>=600
     doc.close()
 
@@ -170,7 +181,7 @@ def test_physical_grid_groups_keep_all_ocr_atoms_without_dropping_distinct_equal
     assert prepared.candidates()==[]
     target=tmp_path/'groups.epub';result=build_epub.build(book,str(target),doc=doc,source_pages={0:source})
     with zipfile.ZipFile(target) as z:
-        layouts=[n for n in z.namelist() if '_layout_' in n and n.endswith('.jpg')]
+        layouts=[n for n in z.namelist() if '_layout_' in n and n.endswith(('.jpg','.png'))]
         assert len(layouts)==(1 if shared else 2)
         chapter=z.read('OEBPS/'+result.chapters[0]['href']).decode()
         assert chapter.index('_layout_')<chapter.index('Alpha')<chapter.index('Beta')

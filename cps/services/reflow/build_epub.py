@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.31"
+CONVERTER_VERSION = "1.32"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -874,8 +874,14 @@ def _source_contents_pages(pages, doc):
             continue
         if not blocks or blocks[0][1].casefold() != title.casefold():
             continue
-        rows = [(box, text) for box, text in blocks[1:]
-                if box[1] > blocks[0][0][3] and text]
+        # The qualification suppresses *all* later emitted headings on this
+        # page. Therefore every other substantive native block must belong to
+        # the numbered list. A block beside or overlapping the title may be a
+        # separate section; filtering it out here would silently absorb that
+        # section into Contents.
+        rows = blocks[1:]
+        if any(box[1] <= blocks[0][0][3] for box, _ in rows):
+            continue
         numbered = [box for box, text in rows if _CONTENTS_REF.search(text)
                     and re.search(r'[A-Za-z]', text)]
         # A real chapter can begin below a printed contents list on the same

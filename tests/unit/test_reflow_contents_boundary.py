@@ -158,3 +158,52 @@ def test_real_chapter_after_numbered_contents_rows_keeps_its_boundary():
     assert any('<h2>Actual section</h2>' in c.blocks for c in chapters)
     assert not any('<h1>Contents</h1>' in c.blocks and
                    '<h2>Actual section</h2>' in c.blocks for c in chapters)
+
+
+@pytest.mark.parametrize("top", [95, 175, 190])
+def test_side_column_beside_contents_keeps_its_real_section_boundary(top):
+    """A substantive block outside the list cannot license page-wide heading suppression."""
+    doc, _, page_html = _source_book()
+    try:
+        text = ('Actual section\nThis is a real chapter.\nIt occupies a separate\n'
+                'column beside Contents.\nIts text continues down\nthe printed page.')
+        assert doc[1].insert_textbox((20, top, 180, top + 175), text, fontsize=11) > 0
+        page_html[1] += ('<h2>Actual section</h2><p>This is a real chapter. '
+                         'It occupies a separate column beside Contents. '
+                         'Its text continues down the printed page.</p>')
+        pages = build_epub._page_blocks(page_html)
+        identified = build_epub._source_contents_pages(pages, doc)
+        chapters = build_epub._chapters(pages, contents_pages=identified)
+    finally:
+        doc.close()
+    assert identified == set()
+    assert not any('<h1>Contents</h1>' in c.blocks and
+                   '<h2>Actual section</h2>' in c.blocks for c in chapters)
+    assert any('<h2>Actual section</h2>' in c.blocks for c in chapters)
+
+
+def test_side_column_emits_a_separate_chapter_in_the_epub(tmp_path):
+    doc, book, page_html = _source_book()
+    try:
+        text = ('Actual section\nThis is a real chapter.\nIt occupies a separate\n'
+                'column beside Contents.\nIts text continues down\nthe printed page.')
+        assert doc[1].insert_textbox((20, 175, 180, 350), text, fontsize=11) > 0
+        page_html[1] += ('<h2>Actual section</h2><p>This is a real chapter. '
+                         'It occupies a separate column beside Contents. '
+                         'Its text continues down the printed page.</p>')
+        built = build_epub.build(book, str(tmp_path / "mixed.epub"),
+                                page_html=page_html, doc=doc)
+    finally:
+        doc.close()
+    assert build_epub.validate(built.path) == []
+    with zipfile.ZipFile(built.path) as archive:
+        bodies = [_body(archive, name) for name in sorted(
+            n.split('/')[-1] for n in archive.namelist()
+            if re.fullmatch(r'OEBPS/ch\d+\.xhtml', n))]
+        contents_home = next(i for i, body in enumerate(bodies)
+                             if any(e.get('id') == 'pg_0001' for e in body))
+        section_home = next(i for i, body in enumerate(bodies)
+                            if 'Actual section' in ' '.join(body.itertext()))
+        assert contents_home != section_home
+        assert 'Contents' in ' '.join(bodies[contents_home].itertext())
+        assert 'This is a real chapter.' in ' '.join(bodies[section_home].itertext())

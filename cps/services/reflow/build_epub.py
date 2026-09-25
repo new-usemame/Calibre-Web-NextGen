@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.30"
+CONVERTER_VERSION = "1.31"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -68,6 +68,7 @@ _SPLIT_HEADING = re.compile(r"^<h([%s])\b" % "".join(str(x) for x in SPLIT_LEVEL
 _PARAGRAPH = re.compile(r"^<p[\s>]", re.I)
 _ASIDE = re.compile(r"^<aside[\s>]", re.I)
 _SOURCE_NOTICE = re.compile(r'^<p\b[^>]*\bclass="[^"]*\bsource-evidence-notice\b', re.I)
+_LEADING_NOTICE = re.compile(r'^<(?:p|div)\b[^>]*\bclass="[^"]*\bsource-evidence-notice\b', re.I)
 _INLINE_PAGE_ID = re.compile(r'\bid="pg_(\d{4,})"')
 _TAG = re.compile(r"<[^>]+>")
 _HEADING_TEXT = re.compile(r"<h[1-6][^>]*>(.*?)</h[1-6]>", re.I | re.S)
@@ -836,10 +837,64 @@ def _opening_folio_before_heading(blocks):
     return bool(re.fullmatch(r'\s*\d{1,4}[ \t]{8,}[A-Za-z][^.!?]{0,60}\s*', text))
 
 
-def _chapters(pages, title_pages=None):
+_CONTENTS_TITLE = re.compile(r"^(?:table of )?contents$", re.I)
+_CONTENTS_REF = re.compile(r"\b(?:\d{1,4}|[ivxlcdm]{1,8})\s*$", re.I)
+
+
+def _source_contents_pages(pages, doc):
+    """Find a printed contents *list*, not prose that happens to say Contents.
+
+    The PDF must itself navigate to this page. Its native text must have the
+    matching heading followed by several numbered rows at one measured right
+    edge; the emitted page must open with that heading too. This only changes
+    chapter boundaries, never source words or the page's evidence images.
+    """
+    if doc is None:
+        return set()
+    from .skeleton import outline_is_useful
+    outline = extract.outline(doc)
+    if not outline_is_useful(outline):
+        return set()
+    candidates = {entry['pno']: entry['title'] for entry in outline
+                  if _CONTENTS_TITLE.fullmatch(entry['title'].strip())}
+    found = set()
+    for page in pages:
+        pno = page['pno']
+        title = candidates.get(pno)
+        if title is None:
+            continue
+        first = next((b for b in page['body'] if not _LEADING_NOTICE.match(b)), '')
+        if not _SPLIT_HEADING.match(first) or block_text(first).strip().casefold() != title.casefold():
+            continue
+        try:
+            source = doc[pno]
+            blocks = [(b[:4], ' '.join(b[4].split())) for b in source.get_text('blocks')
+                      if len(b) > 6 and b[6] == 0 and b[4].strip()]
+        except (IndexError, ValueError, TypeError):
+            continue
+        if not blocks or blocks[0][1].casefold() != title.casefold():
+            continue
+        rows = [(box, text) for box, text in blocks[1:]
+                if box[1] > blocks[0][0][3] and text]
+        numbered = [box for box, text in rows if _CONTENTS_REF.search(text)
+                    and re.search(r'[A-Za-z]', text)]
+        # A real chapter can begin below a printed contents list on the same
+        # page. If any following text block is not a numbered row, leave the
+        # normal heading boundaries intact rather than absorbing that chapter.
+        if (len(numbered) < 3 or len(numbered) != len(rows)
+                or max(box[2] for box in numbered) - min(box[2] for box in numbered)
+                   > source.rect.width * .08):
+            continue
+        found.add(pno)
+    return found
+
+
+def _chapters(pages, title_pages=None, contents_pages=()):
     title_pages = title_pages or {}
+    contents_pages = set(contents_pages)
     chapters = []
     current = None
+    after_contents = False
 
     def start(title, continued=False):
         chapter = Chapter(index=len(chapters) + 1, title=title, continued=continued)
@@ -847,19 +902,38 @@ def _chapters(pages, title_pages=None):
         return chapter
 
     for page in pages:
+        if after_contents:
+            # The following page is no longer part of the printed list. Even a
+            # blank page needs a real home for its source-page marker.
+            current = start("") if not page['body'] and not page['asides'] else None
+        after_contents = page['pno'] in contents_pages
         title_page = page['pno'] in title_pages
         if title_page:
             current = start(title_pages[page['pno']])
+        body = list(page['body'])
+        leading = []
+        while body and _LEADING_NOTICE.match(body[0]):
+            leading.append(body.pop(0))
         opening_heading = None
-        if not title_page and _opening_folio_before_heading(page['body']):
-            opening_heading = page['body'][1]
+        if not title_page and _opening_folio_before_heading(body):
+            opening_heading = body[1]
             current = start(block_text(opening_heading))
         # The page marker waits for the block it belongs to, so a page that opens a
         # chapter puts its marker in the new document and not the previous one.
         pending = page["anchor"]
-        for block in page["body"] + page["asides"]:
+        first_heading = body[0] if body and _SPLIT_HEADING.match(body[0]) else None
+        if first_heading is not None and not title_page and first_heading is not opening_heading:
+            current = start(block_text(first_heading))
+        if first_heading is not None:
+            # Generated warnings can precede a source heading. Put the page
+            # marker and heading together, then the warnings, in that chapter.
+            body = [body.pop(0)] + leading + body
+            leading = []
+        first_block = first_heading
+        for block in leading + body + page["asides"]:
             heading = _SPLIT_HEADING.match(block)
-            if heading and not title_page and block is not opening_heading:
+            if (heading and not title_page and block is not opening_heading
+                    and block is not first_block and page['pno'] not in contents_pages):
                 current = start(block_text(block))
             elif current is None:
                 current = start("")
@@ -1645,7 +1719,8 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
 
         pages = _page_blocks(page_html)
         joins = _join_page_turns(pages, book.title_pages)
-        chapters = _chapters(pages, book.title_pages)
+        contents_pages = _source_contents_pages(pages, doc)
+        chapters = _chapters(pages, book.title_pages, contents_pages)
         dropped = _bind_links(chapters)
         if runtime_progress is not None:
             runtime_progress({"kind": "phase", "phase": "figure_crops"})

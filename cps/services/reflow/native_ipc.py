@@ -321,6 +321,40 @@ class NativeDocument:
         except OSError:
             return 'unknown'
 
+    def _read_shutdown_phases(self):
+        """Read only the finite post-command diagnostic tail, never wait on it."""
+        if self.control is None:
+            return [], None
+        try:
+            os.set_blocking(self.control.fileno(), False)
+            raw = getattr(self, 'buffer', b'')
+            while len(raw) <= 4096:
+                try:
+                    part = os.read(self.control.fileno(), 4097 - len(raw))
+                except BlockingIOError:
+                    break
+                if not part:
+                    break
+                raw += part
+            if len(raw) > 4096:
+                raise ValueError('oversized shutdown diagnostics')
+            rows = []
+            phases = {'stdin_eof', 'parent_gone', 'command_loop_error',
+                      'document_close_started', 'document_closed', 'runtime_returning'}
+            for line in raw.splitlines():
+                row = json.loads(line)
+                if (not isinstance(row, dict) or set(row) != {'seq', 'shutdown_phase', 'monotonic_ns', 'cpu_ns'}
+                        or row['seq'] != self.seq or row['shutdown_phase'] not in phases
+                        or any(type(row[k]) is not int or row[k] < 0 for k in ('seq', 'monotonic_ns', 'cpu_ns'))):
+                    raise ValueError('invalid shutdown diagnostics')
+                rows.append(dict(phase=row['shutdown_phase'], seq=row['seq'],
+                                 monotonic_ns=row['monotonic_ns'], cpu_ns=row['cpu_ns']))
+            if len(rows) > 4:
+                raise ValueError('too many shutdown diagnostics')
+            return rows, None
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            return [], type(exc).__name__
+
     def _close_process(self):
         process = self.process
         evidence = None
@@ -330,7 +364,8 @@ class NativeDocument:
                 completed_phase=self.last_completed_phase,
                 completed_sequence=self.last_completed_sequence, sequence=self.seq,
                 pid=process.pid, pgid=process.pid, entry_exit_code=process.poll(),
-                eof='not_requested', wait='not_started', signals=[])
+                eof='not_requested', wait='not_started', signals=[],
+                close_entry_monotonic_ns=time.monotonic_ns())
         try:
             if process:
                 def kill_group(reason):
@@ -351,6 +386,7 @@ class NativeDocument:
                 try:
                     process.stdin.close()
                     evidence['eof'] = 'closed'
+                    evidence['eof_closed_monotonic_ns'] = time.monotonic_ns()
                 except OSError:
                     evidence['eof'] = 'error'
                 try:
@@ -365,6 +401,9 @@ class NativeDocument:
                 kill_group('descendant_cleanup')
                 if self.drain:
                     self.drain.join(timeout=2)
+                phases, diagnostic_error = self._read_shutdown_phases()
+                evidence['child_shutdown_phases'] = phases
+                evidence['child_shutdown_diagnostic_error'] = diagnostic_error
                 try:
                     self._exit_record(process)
                 except OSError:

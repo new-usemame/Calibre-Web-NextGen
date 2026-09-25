@@ -708,6 +708,69 @@ def _sparse_scan_spread_panels(raw):
     return panels
 
 
+def _uncertain_scan_key_panel(raw):
+    """Keep a scanned symbol key's printed relationships in one source crop.
+
+    Recognition often groups a column of symbols into a few tall, uncertain
+    lines while reading the adjacent labels as many independent short lines.
+    Reflowing either column separately destroys the row associations. This
+    requires both geometries and refuses pages with prose in the same panel.
+    """
+    if not raw.is_page_scan:
+        return None
+    lines = [ln for block in raw.text_blocks for ln in block.lines if ln.stripped]
+    if len(lines) < 12:
+        return None
+    strips = [ln for ln in lines if (ln.bbox[2]-ln.bbox[0] <= raw.width*.035
+              and ln.bbox[3]-ln.bbox[1] >= raw.height*.05
+              and all(sp.font == 'ocr' and sp.uncertain for sp in ln.spans))]
+    if len(strips) < 2:
+        return None
+    groups = []
+    for strip in sorted(strips, key=lambda ln: ln.bbox[0]):
+        group = next((group for group in groups
+                      if abs(group[0].bbox[0]-strip.bbox[0]) <= raw.width*.025), None)
+        if group is None:
+            groups.append([strip])
+        else:
+            group.append(strip)
+    matches = []
+    for group in groups:
+        left = min(ln.bbox[0] for ln in group)
+        right = max(ln.bbox[2] for ln in group)
+        top = min(ln.bbox[1] for ln in group)
+        bottom = max(ln.bbox[3] for ln in group)
+        if bottom-top < raw.height*.35:
+            continue
+        adjacent = [ln for ln in lines if ln not in group
+                    and right < ln.bbox[0] <= right+raw.width*.11
+                    and top-8 <= (ln.bbox[1]+ln.bbox[3])/2 <= bottom+8
+                    and ln.bbox[3]-ln.bbox[1] < raw.height*.045]
+        if len(adjacent) < 9:
+            continue
+        starts = [ln.bbox[0] for ln in adjacent]
+        aligned = [ln for ln in adjacent
+                   if abs(ln.bbox[0]-median(starts)) <= raw.width*.025
+                   and len(ln.stripped.split()) <= 5]
+        if len(aligned) < 9 or len(aligned) < len(adjacent)*.7:
+            continue
+        panel = [ln for ln in lines if ln.bbox[0] >= left-raw.width*.025
+                 and ln.bbox[1] >= top-raw.height*.12
+                 and ln.bbox[3] <= bottom+raw.height*.04]
+        if (len(panel) < len(lines)*.75 or
+                any(len(ln.stripped.split()) > 12 or
+                    ln.bbox[2]-ln.bbox[0] > raw.width*.5 for ln in panel)):
+            continue
+        # A second independent text area makes panel ownership uncertain.
+        if any(ln not in panel for ln in lines):
+            continue
+        box = _lines_bbox(panel, panel[0].bbox)
+        pad = max(8.0, min(15.0, raw.width*.02))
+        matches.append(((max(0,box[0]-pad), max(0,box[1]-pad),
+                         min(raw.width,box[2]+pad), min(raw.height,box[3]+pad)), panel))
+    return matches[0] if len(matches) == 1 else None
+
+
 def _complete_captioned_scan_top(raw, skel, pixel_probe):
     """Recover source ink immediately above an OCR-bounded chart and caption.
 
@@ -779,6 +842,16 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
             # proves ink before either is emitted as a figure.
             skel.regions.append(Region(kind="figure", bbox=img.bbox, image=img,
                                        needs_ink=True))
+        return skel
+
+    key_panel = _uncertain_scan_key_panel(raw)
+    if key_panel:
+        box, lines = key_panel
+        skel.regions.append(Region(kind='artwork', lines=lines, bbox=box,
+                                   reason='uncertain_scan_key_panel'))
+        skel.regions.append(Region(kind='figure', bbox=box,
+                                   reason='uncertain_scan_key_panel'))
+        skel.reasons.append('uncertain_scan_key_panel')
         return skel
 
     panels = _sparse_scan_spread_panels(raw)

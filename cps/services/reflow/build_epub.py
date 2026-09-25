@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.24"
+CONVERTER_VERSION = "1.25"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -204,7 +204,7 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                         figure_box[0] <= caption_box[0] and figure_box[1] <= caption_box[1]
                         and figure_box[2] >= caption_box[2] and figure_box[3] >= caption_box[3]):
                     source_caption = ''
-            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel")
+            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel", "uncertain_scan_key_panel")
             if reason == "native_outline_conflict":
                 caption = ('Native heading text conflicts with PDF navigation metadata. '
                            'The original printed heading is shown as an image; no replacement '
@@ -238,6 +238,11 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                 caption = ('Complete printed panel. OCR cannot establish every printed cell '
                            'or its reading order; use these source pixels. '
                            '<a href="original-p%04d.xhtml#page">Open original spread and enlarged details</a>.' % pno)
+            elif reason == "uncertain_scan_key_panel":
+                caption = ('Complete printed symbol key. OCR cannot verify the symbols or their '
+                           'associations with the adjacent labels; read the aligned source rows '
+                           'in this image. This image does not provide searchable text. '
+                           '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
             elif source_region:
                 caption = ('Original text region. OCR transcription is uncertain; '
                            'read the source pixels. This image does not provide searchable text. '

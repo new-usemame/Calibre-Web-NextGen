@@ -22,9 +22,11 @@
     same account, or a browser, downloaded, the update does not send it
     again. Use **Resend one book to this Kobo** on the account page, or
     **Force full kobo sync**.
-  - A book is also sent again once if its download record is gone and no Kobo
-    ever reported reading it. The **Hot** and **Downloaded** lists delete the
-    download records of a book their viewer cannot see.
+  - A book is also sent again once if its download records are gone and no
+    Kobo ever reported reading it. Until this release, opening **Hot Books**
+    deleted every account's download records of the books its viewer could
+    not see; the server cannot tell those books from ones a Kobo never
+    received, so it sends them rather than risk one never arriving.
   - Three more cases apply only to a server updating from a release older
     than v4.1.43, which kept no delivery record per Kobo. A Kobo whose first
     sync after the update carries no sync position, for example after a

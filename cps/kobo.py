@@ -660,9 +660,12 @@ def _book_ids_with_delivery_evidence(user_id, device_id, book_ids):
     is written for a book whose response was lost, or for a
     ChangedEntitlement a Kobo without the book dropped (#1735).
 
-    ``Downloads`` rows can also vanish: the hot and downloaded-books listings
-    delete every account's rows for a book their viewer cannot see.  Such a
-    book counts as delivered only through the other two records.
+    ``Downloads`` rows can also be missing for a delivered book: before
+    #2207 the Hot Books lists deleted every account's rows for a book their
+    viewer could not see.  Nothing else the server stored separates such a
+    book from one no Kobo received, not even rows on several accounts' Kobos
+    (#1735 left those too), so it counts as delivered only through the other
+    two records.
     """
     book_ids = sorted({int(book_id) for book_id in book_ids})
     delivered = set()
@@ -782,8 +785,9 @@ def _migrate_device_entitlement_classification(user_id):
     from records being per account, not per Kobo.  A book one Kobo of a
     household never received stays silent there when another of the
     account's Kobos, or a browser, downloaded it; Full Sync and per-book
-    resend reach it.  A held book whose download rows a listing deleted, and
-    whose reading its Kobo never reported, is announced once more.
+    resend reach it.  A held book whose download rows a Hot Books list
+    deleted before #2207, and whose reading its Kobo never reported, is
+    announced once more.
 
     Kept rows are not enough on their own.  A v4.1.43 row carries payload
     schema 1 and no change basis, so it can never suppress a replay: the next

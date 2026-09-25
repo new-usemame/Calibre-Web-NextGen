@@ -1,8 +1,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Run from clean v4.1.43 (bdead55920) to freeze its actual sync state.
 
-PYTHONPATH=. python /path/to/this/generate_v4_1_43.py OUTPUT_DIRECTORY
+PYTHONPATH=. python /path/to/this/generate_v4_1_43.py OUTPUT_DIRECTORY [SCENARIO ...]
 Uses the tagged handler, models and test transport; no current code is loaded.
+Name scenarios to regenerate only those; the others keep their frozen bytes.
 The fixture account is synthetic. Clocks remain exactly as recorded by the old
 writer so its seed/emission ordering is preserved rather than invented.
 """
@@ -32,8 +33,57 @@ for module in (kobo, ub, config_sql):
     assert Path(module.__file__).resolve().parent.parent == Path.cwd().resolve(), module.__file__
 print(f'Generating with actual tagged modules from {Path.cwd()} at {actual}')
 
+
+def two_accounts(h, scenario):
+    """One Kobo on each of two accounts, and no download record on either.
+
+    ``emitted_two_accounts``: v4.1.43 sends the book New to both.
+    ``seeded_two_accounts``: both accounts' flat history lists the book, as
+    v4.1.42 left each book after the first hundred it announced Changed to an
+    empty Kobo (#1735); the seed copies it onto both Kobos.
+    ``seeded_changed_two_accounts``: then an edit sends both a Changed, which
+    rewrites both rows after the seed.  The server records the same requests
+    whether a Kobo kept the book or dropped it.
+    """
+    h.session.add(ub.User(id=18, name='Other Reader', email='other@example.org',
+                          password='', role=16))
+    other = ub.Device(user_id=18, kind='kobo', display_name='Other Account Kobo',
+                      model='Kobo Clara BW', active=True, created_by='auto')
+    h.session.add(other)
+    h.session.commit()
+    kobos = {h.user.id: (h.device.id, 'a' * 64), 18: (other.id, 'c' * 64)}
+    token = None
+    if scenario != 'emitted_two_accounts':
+        h.session.add_all([ub.KoboSyncedBooks(user_id=user_id, book_id=h.book.id,
+                                              book_uuid=str(h.book.uuid)) for user_id in kobos])
+        h.session.commit()
+        token = kobo.SyncToken.SyncToken(
+            books_last_modified=datetime(2030, 1, 1), books_last_created=datetime(2030, 1, 1),
+            archive_last_modified=datetime(2030, 1, 1)).build_sync_token()
+    first_user, tokens = h.user.id, {}
+    for user_id, (device_id, raw) in kobos.items():
+        h.user.id = user_id
+        first = h.sync(token, internal_device_id=device_id, raw_device_id=raw)
+        assert len(_entitlements(first)) == (1 if scenario == 'emitted_two_accounts' else 0)
+        stable = h.sync(first.headers[h.token_header], internal_device_id=device_id, raw_device_id=raw)
+        assert _entitlements(stable) == []
+        tokens[user_id] = stable.headers[h.token_header]
+    if scenario == 'seeded_changed_two_accounts':
+        h.book.last_modified = datetime(2031, 1, 1)
+        h.session.commit()
+        for user_id, (device_id, raw) in kobos.items():
+            h.user.id = user_id
+            changed = h.sync(tokens[user_id], internal_device_id=device_id, raw_device_id=raw)
+            assert [sorted(item) for item in _entitlements(changed)] == [['ChangedEntitlement']]
+            tokens[user_id] = changed.headers[h.token_header]
+    h.user.id = first_user
+    return {'token': tokens[first_user], 'other_user_id': 18, 'other_device_id': other.id,
+            'other_token': tokens[18]}
+
+
 output = Path(sys.argv[1])
-for scenario in ('emitted', 'seeded_only'):
+for scenario in sys.argv[2:] or ('emitted', 'seeded_only', 'emitted_two_accounts',
+                                 'seeded_two_accounts', 'seeded_changed_two_accounts'):
     target = output / scenario
     target.mkdir(parents=True, exist_ok=True)
     patch = pytest.MonkeyPatch()
@@ -55,7 +105,11 @@ for scenario in ('emitted', 'seeded_only'):
         h.session.add(second)
         h.session.commit()
         token = None
-        if scenario == 'seeded_only':
+        extra = {}
+        if scenario.endswith('two_accounts'):
+            extra = two_accounts(h, scenario)
+            token = extra.pop('token')
+        elif scenario == 'seeded_only':
             h.session.add(ub.KoboSyncedBooks(user_id=h.user.id, book_id=h.book.id,
                                            book_uuid=str(h.book.uuid)))
             h.session.add(ub.KoboDeletedBook(user_id=h.user.id,
@@ -64,12 +118,13 @@ for scenario in ('emitted', 'seeded_only'):
             token = kobo.SyncToken.SyncToken(
                 books_last_modified=datetime(2030, 1, 1), books_last_created=datetime(2030, 1, 1),
                 archive_last_modified=datetime(2030, 1, 1)).build_sync_token()
-        first = h.sync(token)
-        assert len(_entitlements(first)) == (1 if scenario == 'emitted' else 0)
-        token = first.headers[h.token_header]
-        stable = h.sync(token)
-        token = stable.headers[h.token_header]
-        assert _entitlements(stable) == []
+        if scenario in ('emitted', 'seeded_only'):
+            first = h.sync(token)
+            assert len(_entitlements(first)) == (1 if scenario == 'emitted' else 0)
+            token = first.headers[h.token_header]
+            stable = h.sync(token)
+            token = stable.headers[h.token_header]
+            assert _entitlements(stable) == []
         if scenario == 'seeded_only':
             # Unlike the initial copied tombstone, this deletion is emitted to
             # the first reader after its durable seed marker already exists.
@@ -94,7 +149,7 @@ for scenario in ('emitted', 'seeded_only'):
         (target / 'state.json').write_text(json.dumps({
             'source_tag': 'v4.1.43', 'source_commit': 'bdead55920', 'scenario': scenario,
             'device_id': h.device.id, 'second_device_id': second.id,
-            'book_id': h.book.id, 'user_id': h.user.id, 'token': token,
+            'book_id': h.book.id, 'user_id': h.user.id, 'token': token, **extra,
         }, indent=2)+'\n')
     finally:
         harness.close()

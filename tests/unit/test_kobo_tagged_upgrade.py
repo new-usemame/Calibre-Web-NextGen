@@ -130,6 +130,41 @@ def test_tagged_seed_copy_is_kept_only_with_delivery_evidence_and_never_swallows
                 }
 
 
+@pytest.mark.parametrize('scenario', [
+    'emitted_two_accounts',          # v4.1.43 sent it New to both Kobos
+    'seeded_two_accounts',           # the seed copied both accounts' flat history
+    'seeded_changed_two_accounts',   # the same, then an edit sent both a Changed
+])
+def test_tagged_rows_on_two_accounts_with_no_download_record_announce_new_once(
+        sync_harness, monkeypatch, scenario):
+    """The server holds the same records whether these Kobos have the book.
+
+    Each database has a v4.1.43 row for the book on a Kobo of each of two
+    accounts, one fingerprint, and no download record or reading report on
+    either account.  The Kobos have the book if they downloaded it and a Hot
+    Books list then deleted every account's download records, as it did
+    before this release for a book its viewer could not see.  They lack it if
+    the reply never reached them, or if v4.1.42 announced it as changed, which
+    an empty Kobo ignores (#1735).  Timestamps do not separate the two: an
+    edit rewrites a seeded row after the seed, as an emission writes one.
+    Keeping such rows would leave a Kobo without the book for good, so each
+    Kobo is sent it New, once.
+    """
+    h = sync_harness
+    state = _restore_tagged_database(h, scenario)
+    monkeypatch.setattr(kobo.config, 'config_kobo_suppress_replayed_entitlements', True)
+    for user_id, device_id, token, raw_device_id in (
+            (state['user_id'], state['device_id'], state['token'], 'a' * 64),
+            (state['other_user_id'], state['other_device_id'], state['other_token'], 'c' * 64)):
+        monkeypatch.setattr(h.user, 'id', user_id)
+        announced = []
+        for _sync in range(3):
+            response = h.sync(token, internal_device_id=device_id, raw_device_id=raw_device_id)
+            announced += [sorted(item)[0] for item in _entitlements(response)]
+            token = response.headers[h.token_header]
+        assert announced == ['NewEntitlement'], (user_id, announced)
+
+
 def test_failed_upgrade_classification_rolls_back_ledger_pruning(sync_harness, monkeypatch):
     """Failure after pruning must retain the recoverable pre-migration state."""
     from cps import kobo_sync_status

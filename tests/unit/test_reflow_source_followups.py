@@ -184,14 +184,26 @@ def test_scan_figure_owns_connected_large_symbol_blocks_above_partial_crop(hidde
         book=assemble.assemble([skel],style,[raw])
         assert book.conservation.ok
         assert any('ordinary source paragraph' in e.text for e in book.elements)
-        figure=next(f for f in book.figures if f['found']=='scan_figure_band')
+        assert len(book.figures)==1
+        figure=book.figures[0]
         if hidden:
             assert figure['bbox'][1] < 80
             assert not any('Day' in e.text or 'Q / X' in e.text for e in book.elements)
         else:
             assert figure['bbox'][1]==140
+            assert figure['found']=='unverified_scan_layout'
+            assert figure['needs_ink'] is False
+            body=' '.join(e.text for e in book.elements if e.kind=='p')
+            assert all(label in body for label in ('Day', 'Q / X', '0 VS 9'))
+            assert 'Y / Z' not in body
+            assert any('Y / Z' in item['text'] for item in book.artwork)
         path=tmp_path/'connected.epub';build_epub.build(book,str(path),doc=doc)
         assert build_epub.validate(str(path))==[]
+        with zipfile.ZipFile(path) as package:
+            image=package.read('OEBPS/images/fig_p0000_0.jpg')
+            chapter=package.read('OEBPS/ch001.xhtml').decode()
+            assert 'images/fig_p0000_0.jpg' in chapter
+            assert image==extract.crop_jpeg(doc,0,figure['bbox'])
 
 @pytest.mark.parametrize('separate_numbers',[True,False])
 def test_scan_contents_separate_page_number_column_preserves_whole_row_region(separate_numbers,tmp_path):

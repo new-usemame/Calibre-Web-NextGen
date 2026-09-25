@@ -56,6 +56,30 @@ local function validBook(book)
         and validName(book.filename)
 end
 
+-- Where another account's books go when this device connects to a new one:
+-- beside the library folder, named after the account they came from (`owner`
+-- is Setup.accountKey's "server|username"). Characters a FAT card refuses are
+-- replaced.
+function Library.asideFolder(root, owner)
+    local name = tostring(owner or ""):match("|(.*)$") or ""
+    name = name:gsub('[%c\\/:*?"<>|]', "_"):gsub("^[%s.]+", ""):gsub("[%s.]+$", "")
+    if name == "" then name = "earlier account" end
+    return (root:gsub("/+$", "")) .. " - " .. name
+end
+
+-- `name` in `folder`, or "name (2).ext" and so on when that is taken.
+function Library.freeName(folder, name, exists)
+    local path = join(folder, name)
+    if not exists(path) then return path end
+    local stem, ext = name:match("^(.-)(%.[^.]*)$")
+    if not stem or stem == "" then stem, ext = name, "" end
+    for n = 2, 999 do
+        path = join(folder, string.format("%s (%d)%s", stem, n, ext))
+        if not exists(path) then return path end
+    end
+    return nil
+end
+
 -- Where the library lives when the user has not chosen a folder. Outside the
 -- Kindle's `documents/` (the stock side indexes that and is left alone), and a
 -- dot-folder on Kobo so Nickel does not list the placeholders as books.
@@ -93,8 +117,9 @@ end
 
 -- The library belongs to one account on one server (`owner`). Book ids and
 -- revisions mean nothing to another, so connecting elsewhere starts afresh:
--- the old covers go, and downloaded books stay as the reader's own files, as
--- "Disconnect this device" promises. Returns the actions that clear the disk,
+-- the old covers go, and downloaded books stay on the device, as "Disconnect
+-- this device" promises (the runtime then moves them out of the library
+-- folder, to Library.asideFolder). Returns the actions that clear the disk,
 -- having already reset `state` in place, or nil when the owner is unchanged.
 -- A state without an owner was written before owners were recorded; it is
 -- taken to be the current account's.

@@ -123,6 +123,9 @@ local function testAnAddressTypedWithoutHttpsFindsAnHttpsOnlyServer()
         "http is tried first, then https")
     assert(pairingShown(), "the code is shown")
     assertEqual(pairingShown().code, "ABCD-1234", "the https server's code")
+    -- A browser adds http:// to an address typed without one, and this server
+    -- refuses http: the address to type must say https.
+    assertEqual(pairingShown().address, "https://10.0.30.36:8083/pair", "the address to open says https")
     pairingShown().on_cancel() -- one pairing at a time
 end
 
@@ -133,6 +136,7 @@ local function testAPlainHttpServerIsAskedOnce()
     press(dialogs[#dialogs], "Continue")
     assertEqual(table.concat(asked, ", "), "pair http://192.168.1.20:8083", "one request when http answers")
     assert(pairingShown(), "the code is shown")
+    assertEqual(pairingShown().address, "192.168.1.20:8083/pair", "plain http needs no scheme to type")
     pairingShown().on_cancel() -- one pairing at a time
 end
 

@@ -104,4 +104,6 @@ the book first under **Recent**.
 - **The e-reader restarted and shows its own home screen**: start KOReader the way you
   usually do. The library home comes back with it.
 - **Connected to the wrong account**: choose **Tools ▸ CWNG library ▸ Disconnect this
-  device**, then connect again.
+  device**, then connect again. Books you downloaded under the other account move to a
+  folder of their own, named after that account, so they don't appear on the new home;
+  ☰ ▸ **Browse files** shows them.

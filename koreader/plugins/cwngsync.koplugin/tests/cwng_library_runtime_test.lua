@@ -75,6 +75,12 @@ stub("ui/uimanager", {
     nextTick = function(_, f) ticks[#ticks + 1] = f end,
 })
 stub("libs/libkoreader-lfs", { attributes = function(path, field)
+    local d = io.open(path .. "/.", "rb")
+    if d then
+        d:close()
+        if field then return field == "mode" and "directory" or nil end
+        return { mode = "directory" }
+    end
     local f = io.open(path, "rb")
     if not f then return nil end
     local size = f:seek("end")
@@ -82,9 +88,27 @@ stub("libs/libkoreader-lfs", { attributes = function(path, field)
     local attributes = { mode = "file", size = size, modification = 0 }
     if field then return attributes[field] end
     return attributes
+end, dir = function(path)
+    local names = {}
+    local listing = assert(io.popen("ls -a '" .. path .. "'"))
+    for name in listing:lines() do names[#names + 1] = name end
+    listing:close()
+    local i = 0
+    return function() i = i + 1; return names[i] end
 end })
 stub("logger", { warn = function() end, info = function() end, dbg = function() end })
-stub("util", { directoryExists = function() return true end, makePath = function() end })
+-- Folders are only made for real where a test asks (the other tests use paths
+-- like /mnt/us that must look present without existing).
+local real_folders = false
+stub("util", {
+    directoryExists = function(path)
+        if not real_folders then return true end
+        local d = io.open(path .. "/.", "rb")
+        if d then d:close() end
+        return d ~= nil
+    end,
+    makePath = function(path) if real_folders then os.execute("mkdir -p '" .. path .. "'") end end,
+})
 stub("ffi/util", { template = function(text, ...)
     local args = { ... }
     return (text:gsub("%%(%d)", function(n) return tostring(args[tonumber(n)]) end))
@@ -515,7 +539,93 @@ local function testTheSameAccountTypedAnotherWayKeepsItsLibrary()
     assertEqual(owner("http://books.example.org:8083", "other") ~= state.owner, true, "another reader is another account")
 end
 
+local function testAnotherAccountsBooksLeaveTheLibraryFolder()
+    -- A device moved to another account (a parent's Kindle handed to a
+    -- child's account) must not show the first account's books on the new
+    -- home, and their names, which carry the other server's ids, must not
+    -- block the new account's. They stay on the device with their notes.
+    real_folders = true
+    local root = folder .. "/handover"
+    local aside = root .. " - ann"
+    os.execute("mkdir -p '" .. root .. "' '" .. aside .. "'")
+    local function file(path, text)
+        local f = assert(io.open(path, "wb"))
+        f:write(text or "the book")
+        f:close()
+        return path
+    end
+    local kept = file(root .. "/Kept [3].epub")
+    local sent = file(root .. "/Sent [9].epub")
+    local cover = file(root .. "/Cover [5].epub", "cover")
+    placeholders[cover] = 5
+    -- A cover an interrupted sync left behind, unknown to the library.
+    local stray = file(root .. "/Stray [7].epub", "cover")
+    placeholders[stray] = 7
+    local reading = file(root .. "/Open [4].epub")
+    reader.instance = { document = { file = reading } }
+    local earlier = file(aside .. "/Sent [9].epub", "set aside before")
+    sidecars[kept] = { data = { percent_finished = 0.4 } }
+    local state = { owner = "http://old.example:8083|ann", books = {
+        ["3"] = { kind = "download", path = kept },
+        ["5"] = { kind = "placeholder", path = cover, size = #"cover" },
+    } }
+    local queue = {}
+    local client = { get_library = function(_, _, _, _, _, _, _, callback)
+        queue[#queue + 1] = function() callback(true, { books = {}, revision = "r1" }) end
+    end }
+    local runtime = setmetatable({ settings = { username = "kid", password = "secret" }, device_id = "device" },
+        { __index = Runtime })
+    function runtime:libraryEnabled() return true end
+    function runtime:getLibraryRoot() return root end
+    function runtime:getLibraryState() return state end
+    function runtime:saveLibraryState() end
+    function runtime:accountOwner() return "https://new.example|kid" end
+    function runtime:newSyncClient() return client end
+    function runtime:refreshLibraryViews() end
+    function runtime:applyLibraryCollections() end
+    function runtime:libraryProbe()
+        return { attributes = function(path)
+                local a = io.open(path, "rb")
+                if not a then return nil end
+                local size = a:seek("end")
+                a:close()
+                return { size = size, modification = 0 }
+            end, isOpen = function() return false end, digest = function() return nil end,
+            placeholderId = Runtime.readPlaceholderId }
+    end
+    shown = {}
+    runtime:syncLibrary({ force = true, on_done = function() end })
+    while #queue > 0 or #ticks > 0 do
+        if #queue > 0 then table.remove(queue, 1)() else table.remove(ticks, 1)() end
+    end
+    real_folders = false
+    reader.instance = nil
+    local function present(path)
+        local f = io.open(path, "rb")
+        if f then f:close() end
+        return f ~= nil
+    end
+    assertEqual(present(kept) or present(sent), false, "the previous account's books must leave the library folder")
+    assertEqual(present(aside .. "/Kept [3].epub"), true, "a downloaded book must stay on the device")
+    assertEqual(sidecars[aside .. "/Kept [3].epub"] ~= nil, true, "with its position and notes")
+    assertEqual(present(aside .. "/Sent [9] (2).epub"), true, "a book sent to the device must stay too, beside a namesake")
+    local f = io.open(earlier, "rb")
+    assertEqual(f:read("*a"), "set aside before", "a book set aside earlier must not be overwritten")
+    f:close()
+    assertEqual(present(reading), true, "the book open on screen must stay where KOReader will save it")
+    assertEqual(present(cover), false, "the previous account's covers must go")
+    assertEqual(present(aside .. "/Cover [5].epub"), false, "and not be carried along")
+    assertEqual(present(aside .. "/Stray [7].epub"), false,
+        "a stray cover must not be set aside: opening it there would fetch the new server's book 7")
+    local told = false
+    for _, text in ipairs(shown) do
+        if type(text) == "string" and text:find("handover - ann", 1, true) then told = true end
+    end
+    assertEqual(told, true, "the reader must be told where the books went")
+end
+
 testEveryPageOfABigLibraryReachesTheDevice()
+testAnotherAccountsBooksLeaveTheLibraryFolder()
 testAListThatDoesNotFinishIsNotApplied()
 testTheSameAccountTypedAnotherWayKeepsItsLibrary()
 testNothingChangedIsNotAnAnswerToAWholeListRequest()

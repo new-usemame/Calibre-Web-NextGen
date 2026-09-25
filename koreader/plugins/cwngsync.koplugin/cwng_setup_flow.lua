@@ -309,8 +309,10 @@ function SetupFlow:requestPairing(server, secure)
         local interval = math.max(3, tonumber(body.interval) or 5)
         local link = type(body.verify_url_complete) == "string" and body.verify_url_complete:match("^https?://")
             and body.verify_url_complete or Setup.verifyLink(body.verify_url, server, body.user_code)
-        local address = type(body.verify_url) == "string" and body.verify_url:match("^https?://(.+)$")
-            or (hostOf(server) .. "/pair")
+        -- What to type in a browser. It adds http:// to an address typed
+        -- without one, so only that is left out: an https-only server refuses it.
+        local address = (type(body.verify_url) == "string" and body.verify_url:match("^https?://")
+            and body.verify_url or (server .. "/pair")):gsub("^http://", "")
         pairing.screen = PairingScreen:new{
             link = link,
             code = body.user_code,

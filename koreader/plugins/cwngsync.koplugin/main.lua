@@ -316,13 +316,16 @@ function CWNGSync:addToMainMenu(menu_items)
                     return _("Connect this device")
                 end,
                 keep_menu_open = true,
-                callback = function()
+                callback = function(touchmenu_instance)
                     if self:isConfigured() then
                         UIManager:show(InfoMessage:new{
                             text = T(_("This device reads the CWNG library of %1 at %2.\n\nTo use another account, choose Disconnect this device first."),
                                 self.settings.username, self.settings.server),
                         })
                     else
+                        -- Connecting ends on the library home; this menu,
+                        -- still saying "Connect", must not stay on top of it.
+                        if touchmenu_instance then touchmenu_instance:closeMenu() end
                         self:showConnectChoices()
                     end
                 end,

@@ -183,7 +183,8 @@ local function isPlaceholderFile(plugin, path, attributes)
 end
 
 -- Book files in the library folder that the library does not track: deliveries,
--- books kept from another account, copies made over USB. A stray placeholder
+-- books that left the chosen shelves, copies made over USB. (Another account's
+-- books are moved out of the folder when the account changes.) A stray placeholder
 -- (say, one an interrupted sync left) is not a book the reader has.
 local function untrackedFiles(plugin, root, tracked)
     local files = {}

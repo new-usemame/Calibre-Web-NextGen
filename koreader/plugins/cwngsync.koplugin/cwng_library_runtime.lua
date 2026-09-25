@@ -424,6 +424,45 @@ function Runtime:performLibraryAction(client, action)
     return false
 end
 
+-- The home lists every book in the library folder, so on a new account the
+-- previous one's books would show up in it, and their names (which carry the
+-- other server's book ids) could collide with the new account's. They leave
+-- the folder, sidecars, history and collections following, for one named
+-- after the account they came from. A stray cover is not a book and stays, as
+-- does a book open right now (move_download refuses it: KOReader would write
+-- its sidecar back here).
+-- Returns that folder and the paths that were moved.
+function Runtime:setAsideBooksOf(previous_owner, client)
+    local root = self:getLibraryRoot()
+    local aside = Library.asideFolder(root, previous_owner)
+    local moved = {}
+    local ok, iterator, dir = pcall(lfs.dir, root)
+    if not ok then return aside, moved end
+    local names = {}
+    for name in iterator, dir do names[#names + 1] = name end
+    table.sort(names)
+    local exists = function(path) return lfs.attributes(path, "mode") ~= nil end
+    for _, name in ipairs(names) do
+        local path = Library.join(root, name)
+        if name:sub(1, 1) ~= "." and not name:find("%.part$")
+                and lfs.attributes(path, "mode") == "file" and not Runtime.readPlaceholderId(path) then
+            if not util.directoryExists(aside) then util.makePath(aside) end
+            local target = Library.freeName(aside, name, exists)
+            local ok_call, done = false, false
+            if target then
+                ok_call, done = pcall(self.performLibraryAction, self, client,
+                    { op = "move_download", from = path, path = target })
+            end
+            if ok_call and done then
+                moved[#moved + 1] = path
+            else
+                logger.warn("CWNGSync: could not set aside", path)
+            end
+        end
+    end
+    return aside, moved
+end
+
 -- The user's shelves as KOReader collections, cloud books included, so a
 -- shelf chosen on the website is one tap away on the device.
 function Runtime:applyLibraryCollections(books, shelves)
@@ -629,19 +668,29 @@ function Runtime:syncLibrary(opts)
     shared.running = token
     local state = self:getLibraryState()
     local client = self:newSyncClient()
+    local previous_owner = state.owner
     local leaving = Library.handover(state, self:accountOwner(), self:libraryProbe())
     if leaving then
         -- Another account's covers go before this one's arrive; its downloaded
-        -- books stay as the reader's own files.
+        -- books stay on the device, set aside in a folder of their own.
         local cleared = {}
         for _, action in ipairs(leaving) do
             local ok_call, ok = pcall(self.performLibraryAction, self, client, action)
             Library.record(state, action, ok_call and ok)
             if ok_call and ok then cleared[#cleared + 1] = action.path end
         end
-        logger.info("CWNGSync: library handed over to a new account;", #leaving, "books of the previous one cleared")
+        local aside, moved = self:setAsideBooksOf(previous_owner, client)
+        for _, path in ipairs(moved) do cleared[#cleared + 1] = path end
+        logger.info("CWNGSync: library handed over to a new account;", #leaving, "books of the previous one cleared,",
+            #moved, "files set aside")
         self:saveLibraryState()
         self:refreshLibraryViews(cleared)
+        if #moved > 0 then
+            UIManager:show(InfoMessage:new{
+                text = T(_("Books from the account this device used before are now in the folder “%1”. Menu ▸ Browse files shows them."),
+                    aside:match("[^/]+$")),
+            })
+        end
     end
     local books = {}
     local shelves = {}

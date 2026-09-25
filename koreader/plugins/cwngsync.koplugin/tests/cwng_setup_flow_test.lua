@@ -22,6 +22,8 @@ local typed = ""
 -- The fake server: which base URLs answer, which refuse the password, and
 -- what each request asked.
 local answering, refusing, asked, failing = {}, {}, {}, {}
+-- The pairing poll's answers, in order, and the tasks and delays scheduled.
+local polls, scheduled = {}, {}
 
 stub("ui/widget/buttondialog", { new = function(_, fields) dialogs[#dialogs + 1] = fields; return fields end })
 stub("ui/widget/inputdialog", { new = function(_, fields)
@@ -35,7 +37,7 @@ stub("cwng_pairing_screen", { new = function(_, fields) fields.pairing_screen = 
 stub("ui/uimanager", {
     show = function(_, widget) shown[#shown + 1] = widget end,
     close = function() end,
-    scheduleIn = function() end,
+    scheduleIn = function(_, delay, task) scheduled[#scheduled + 1] = { delay = delay, task = task } end,
     unschedule = function() end,
 })
 stub("ui/network/manager", { runWhenConnected = function(_, f) f() end })
@@ -60,6 +62,10 @@ stub("CWNGSyncClient", {
             else
                 callback(false, nil, failing[base(self)] or "HTTP 400")
             end
+        end
+        function o:pair_poll(_, callback)
+            local answer = table.remove(polls, 1) or { false, nil, "timeout" }
+            callback(answer[1], answer[2], answer[3])
         end
         function o:authorize()
             asked[#asked + 1] = "sign in " .. base(self)
@@ -157,7 +163,62 @@ local function testAnHttpsServerThatFailsSaysWhy()
     assert(text:find("certificate", 1, true), "the https failure is shown: " .. text)
 end
 
+-- Runs the scheduled polls with a clock that moves by each delay, until
+-- nothing is scheduled. Returns the delays, in order.
+local function runPolls()
+    local clock, real_time = os.time(), os.time
+    local delays = {}
+    os.time = function() return clock end -- luacheck: ignore
+    while #scheduled > 0 do
+        local next_task = table.remove(scheduled, 1)
+        delays[#delays + 1] = next_task.delay
+        clock = clock + next_task.delay
+        next_task.task()
+    end
+    os.time = real_time -- luacheck: ignore
+    return delays
+end
+
+local function testASlowServerIsWaitedOutWhileTheCodeLives()
+    -- Seen on a Kindle: a loaded server answered a dozen polls too slowly, the
+    -- device gave up with "Lost contact", and the approval arrived for nobody.
+    reset({ "http://10.0.20.139:18086" })
+    scheduled = {}
+    polls = {}
+    for _ = 1, 30 do polls[#polls + 1] = { false, nil, "timeout" } end
+    polls[#polls + 1] = { false, { status = "slow_down", interval = 10 }, "HTTP 429" }
+    polls[#polls + 1] = { true, { status = "approved", username = "reader", password = "app" } }
+    local plugin = newPlugin()
+    local connected
+    function plugin:connectWith(credentials) connected = credentials end
+    typed = "10.0.20.139:18086"
+    plugin:startPairing()
+    press(dialogs[#dialogs], "Continue")
+    local delays = runPolls()
+    assertEqual(connected and connected.username, "reader", "the approval must still be collected")
+    assertEqual(delays[#delays], 10, "and a server asking to slow down is polled less often")
+end
+
+local function testAServerThatNeverAnswersIsReportedWhenTheCodeRunsOut()
+    reset({ "http://10.0.20.139:18086" })
+    scheduled = {}
+    polls = {}
+    local plugin = newPlugin()
+    function plugin:connectWith() error("nothing was approved") end
+    typed = "10.0.20.139:18086"
+    plugin:startPairing()
+    press(dialogs[#dialogs], "Continue")
+    local delays = runPolls()
+    local waited = 0
+    for _, delay in ipairs(delays) do waited = waited + delay end
+    assert(waited >= 600, "polling must last as long as the code, not " .. waited .. " s")
+    local text = tostring(shown[#shown] and shown[#shown].text)
+    assert(text:find("Lost contact", 1, true), "the reader is told the server went quiet: " .. text)
+end
+
 local function testAPlainHttpServerIsAskedOnce()
+testASlowServerIsWaitedOutWhileTheCodeLives()
+testAServerThatNeverAnswersIsReportedWhenTheCodeRunsOut()
     reset({ "http://192.168.1.20:8083" })
     typed = "192.168.1.20:8083"
     newPlugin():startPairing()

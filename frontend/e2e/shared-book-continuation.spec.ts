@@ -54,6 +54,7 @@ test('a public shelf offers reading and downloads without adding personal member
     const menu = page.getByTestId('book-actions-menu-list');
     await expect(menu).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: 'Add to library', exact: true })).toHaveCount(0);
+    await expect(menu.getByRole('menuitem', { name: 'Not in your library', exact: true })).toBeVisible();
     await expect(menu.getByRole('menuitem', { name: 'Edit cover…', exact: true })).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
@@ -79,6 +80,14 @@ test('a public shelf offers reading and downloads without adding personal member
     // The reader's own book keeps its cover editor.
     await page.goto(`/app/book/${member.id}`);
     await expect(page.getByTestId('edit-cover-action')).toBeVisible();
+    // Nor does its menu call it missing: removal is the visible button.
+    await expect(page.getByTestId('remove-from-my-library')).toBeVisible();
+    await page.getByTestId('book-actions-menu').click();
+    const memberMenu = page.getByTestId('book-actions-menu-list');
+    await expect(memberMenu.getByRole('menuitem', { name: /^Mark as (?:un)?read$/ })).toBeVisible();
+    await expect(memberMenu.getByRole('menuitem', { name: 'Not in your library', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(memberMenu).toHaveCount(0);
     // The classic book page opens the shared book as well, but keeps sending
     // and the library's own controls for the reader's library, as the new UI
     // does: sending looks there, and the book is not theirs to mark or remove.

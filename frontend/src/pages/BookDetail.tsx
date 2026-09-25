@@ -614,8 +614,10 @@ export function BookDetail() {
         }),
         testId: 'menu-add-to-library',
       });
-    } else {
-      // Not toggleable for this user: show the current state, disabled.
+    } else if (!inLibrary) {
+      // Not addable by this user: show the current state, disabled. A book
+      // already in the library needs no entry here; its removal is the
+      // visible "Remove from my library" button.
       menuItems.push({ id: 'not-in-library', label: t('Not in your library'), icon: <BookPlus size={15} />, disabled: true });
     }
   }

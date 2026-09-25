@@ -7090,6 +7090,10 @@ msgstr ""
 msgid "Other saved position"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Other users' eReaders:"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr ""
@@ -13146,10 +13150,6 @@ msgstr "Alamat E-mail untuk Kirim ke E-Reader"
 #, fuzzy
 msgid "Select All"
 msgstr "Buat Rak"
-
-#: cps/templates/detail.html
-msgid "Other users' eReaders:"
-msgstr ""
 
 #: cps/templates/detail.html
 msgid "Additional email addresses:"

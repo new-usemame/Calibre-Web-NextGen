@@ -148,12 +148,16 @@ jobs:
           touch /config/cwa.db
       
       - name: Run smoke and unit tests
-        timeout-minutes: 10  # Last-resort kill; --timeout below is the real gate.
+        # Last-resort kill; --timeout below is the real gate. 15, not 10: by
+        # 2026-09-24 a healthy run of this step took 8.4-8.7 min on main, and a
+        # PR whose tests had all passed was killed at the 10-min wall. Still
+        # inside the job's 25-min cap with the installs that precede it.
+        timeout-minutes: 15
         env:
           PYTHONPATH: ${{ github.workspace }}:${{ github.workspace }}/scripts
         run: |
           # --timeout=120 + --timeout-method=thread converts hung tests into named
-          # test failures instead of opaque step-level 10-min step timeouts. Without
+          # test failures instead of opaque step-level timeouts. Without
           # this, a stuck test on one xdist worker only manifests as a step timeout
           # with no indication of which test or worker stalled.
           #
@@ -170,7 +174,7 @@ jobs:
           # notes/fix-udf-gil-deadlock-DESIGN.md). faulthandler's watchdog
           # writes every thread's stack WITHOUT needing the GIL, so a freeze
           # that starves pytest-timeout still produces named stacks in the
-          # log instead of a silent 10-minute step wall. 90 < the 120s
+          # log instead of a silent step-timeout wall. 90 < the 120s
           # pytest-timeout on purpose: a hung test logs stacks first, then
           # pytest-timeout attempts the interrupt.
           pytest -m "smoke or unit" \

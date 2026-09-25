@@ -7315,6 +7315,10 @@ msgstr ""
 msgid "Other saved position"
 msgstr "Andere opgeslagen positie"
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Other users' eReaders:"
+msgstr "eReaders van andere gebruikers:"
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr "PDF-lezer"
@@ -13505,10 +13509,6 @@ msgstr "Kies e-mailadressen:"
 #, fuzzy
 msgid "Select All"
 msgstr "Boekenplank maken"
-
-#: cps/templates/detail.html
-msgid "Other users' eReaders:"
-msgstr ""
 
 #: cps/templates/detail.html
 #, fuzzy

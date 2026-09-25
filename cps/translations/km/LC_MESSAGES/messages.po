@@ -7036,6 +7036,10 @@ msgstr ""
 msgid "Other saved position"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Other users' eReaders:"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr ""
@@ -13062,10 +13066,6 @@ msgstr "ឧបករណ៍ Kindle"
 #, fuzzy
 msgid "Select All"
 msgstr "បង្កើតធ្នើ"
-
-#: cps/templates/detail.html
-msgid "Other users' eReaders:"
-msgstr ""
 
 #: cps/templates/detail.html
 msgid "Additional email addresses:"

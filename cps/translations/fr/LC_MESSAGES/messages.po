@@ -7459,6 +7459,10 @@ msgstr "Attribution à l'appareil d'origine rétablie pour {ok} sur {total}."
 msgid "Other saved position"
 msgstr "Autre position enregistrée"
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Other users' eReaders:"
+msgstr "eReaders des autres utilisateurs :"
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr "Lecteur PDF"
@@ -13819,10 +13823,6 @@ msgstr "Choisissez les adresses e-mail :"
 #: cps/templates/detail.html
 msgid "Select All"
 msgstr "Sélectionner tout"
-
-#: cps/templates/detail.html
-msgid "Other users' eReaders:"
-msgstr ""
 
 #: cps/templates/detail.html
 msgid "Additional email addresses:"

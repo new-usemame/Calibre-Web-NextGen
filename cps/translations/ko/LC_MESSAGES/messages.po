@@ -7027,6 +7027,10 @@ msgstr ""
 msgid "Other saved position"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Other users' eReaders:"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr ""
@@ -13060,10 +13064,6 @@ msgstr "이메일 주소 선택:"
 #: cps/templates/detail.html
 msgid "Select All"
 msgstr "모두 선택"
-
-#: cps/templates/detail.html
-msgid "Other users' eReaders:"
-msgstr ""
 
 #: cps/templates/detail.html
 #, fuzzy

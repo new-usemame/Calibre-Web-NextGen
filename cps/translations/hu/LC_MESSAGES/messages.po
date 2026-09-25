@@ -7122,6 +7122,10 @@ msgstr ""
 msgid "Other saved position"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Other users' eReaders:"
+msgstr "Más felhasználók e-olvasói:"
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr ""
@@ -13299,10 +13303,6 @@ msgstr "Válasszon e-mail címeket:"
 #: cps/templates/detail.html
 msgid "Select All"
 msgstr "Mind kiválasztása"
-
-#: cps/templates/detail.html
-msgid "Other users' eReaders:"
-msgstr "Más felhasználók e-olvasói:"
 
 #: cps/templates/detail.html
 msgid "Additional email addresses:"

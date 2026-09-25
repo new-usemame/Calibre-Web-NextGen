@@ -7043,6 +7043,10 @@ msgstr ""
 msgid "Other saved position"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Other users' eReaders:"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr ""
@@ -13171,10 +13175,6 @@ msgstr "选择邮箱地址:"
 #, fuzzy
 msgid "Select All"
 msgstr "创建书架"
-
-#: cps/templates/detail.html
-msgid "Other users' eReaders:"
-msgstr ""
 
 #: cps/templates/detail.html
 #, fuzzy

@@ -7193,6 +7193,10 @@ msgstr ""
 msgid "Other saved position"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Other users' eReaders:"
+msgstr "E-Reader anderer Benutzer:"
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr "PDF Reader"
@@ -13335,10 +13339,6 @@ msgstr "Wähle die E-Mail-Adressen:"
 #: cps/templates/detail.html
 msgid "Select All"
 msgstr "Wähle alle"
-
-#: cps/templates/detail.html
-msgid "Other users' eReaders:"
-msgstr "E-Reader anderer Benutzer:"
 
 #: cps/templates/detail.html
 msgid "Additional email addresses:"

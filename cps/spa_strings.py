@@ -1221,6 +1221,7 @@ _("Organize your library, your way. Checkout books from the Global Library to br
 _("Original device attribution restored for {n}.")
 _("Original device attribution restored for {ok} of {total}.")
 _("Other saved position")
+_("Other users' eReaders:")
 _("PDF reader")
 _("Page margins")
 _("Page theme")

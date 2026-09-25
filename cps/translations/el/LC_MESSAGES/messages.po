@@ -7107,6 +7107,10 @@ msgstr ""
 msgid "Other saved position"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Other users' eReaders:"
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr ""
@@ -13189,10 +13193,6 @@ msgstr "Διεύθυνση E-mail Αποστολής στο Kindle"
 #, fuzzy
 msgid "Select All"
 msgstr "Δημιούργησε ένα Ράφι"
-
-#: cps/templates/detail.html
-msgid "Other users' eReaders:"
-msgstr ""
 
 #: cps/templates/detail.html
 msgid "Additional email addresses:"

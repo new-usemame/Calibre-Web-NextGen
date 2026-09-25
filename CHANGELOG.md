@@ -89,11 +89,6 @@ is for things you can see or feel when running the app.
   stay visible and reachable on phones. Addresses iroQuai’s feedback on fork
   issue #1939.
 
-- **Each browser is now listed as its own web-reader device.** New highlights
-  and notes persist their private browser origin instead of collapsing every
-  browser into one shared web-reader. Position requests carry the same
-  request-scoped identity for the per-device position store planned in M3.
-
 - **Owned Kobo annotations can become safely server-authoritative without a
   manual database edit.** CWNG captures the complete upstream annotation set
   per active Kobo, preserves its exact pages, and keeps unsafe or oversized
@@ -135,6 +130,12 @@ is for things you can see or feel when running the app.
   device messages in more places, with 1,298 translations contributed by @hug0-l
   in PR #2187. This update also translates the latest original-device actions and
   corrects a Simplified Chinese character and placeholders in draft translations.
+
+- **More of the interface translated into German, Italian, Spanish and Swedish.**
+  German translations contributed by @tbnobody in #2246 (wording follow-up in
+  #2274), Italian by @luke-70it in #2096 and #2159, Spanish for My Library,
+  device management and the admin menu by @HaruIjima-kun in #2109, and Swedish
+  device attribution strings by @yeager in #2212.
 
 - **Choose where to resume when a book has several saved reading places.** The
   web reader shows each named browser, Kobo, and configured Storyteller source

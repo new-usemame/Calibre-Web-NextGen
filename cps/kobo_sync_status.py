@@ -478,7 +478,12 @@ def change_archived_books(book_id, state=None, message=None, session=None, commi
     if not archived_book:
         archived_book = ub.ArchivedBook(user_id=current_user.id, book_id=book_id)
 
-    archived_book.is_archived = state if state else not archived_book.is_archived
+    # None toggles (the single-book buttons); True and False set the state, so
+    # "unarchive" never archives a selected book that was not archived.
+    if state is None:
+        archived_book.is_archived = not archived_book.is_archived
+    else:
+        archived_book.is_archived = bool(state)
     archived_book.last_modified = datetime.now(timezone.utc)        # toDo. Check utc timestamp
 
     s.merge(archived_book)

@@ -623,6 +623,124 @@ def _embedded_source_mark(image, raw, kept_blocks):
     return len(above) >= 2
 
 
+_ORDINAL_ROW = re.compile(r'^\s*\d{1,3}(?:st|nd|rd|th)(?=\s|[:.])', re.I)
+
+
+def _uncertain_aligned_scan_list(raw, kept_blocks):
+    """Own an OCR list as one image when its measured labels disagree.
+
+    This recognizes the physical row object, not any particular word or book.
+    A fully legible numbered list stays text; a few plausible OCR labels do
+    not license filling in the others from a sequence.
+    """
+    if not raw.is_page_scan or raw.source_geometry.get('space') != 'reading':
+        return None
+    lines = [line for _, group in kept_blocks for line in group
+             if line.stripped and len(line.stripped.split()) <= 4
+             and line.bbox[2]-line.bbox[0] < raw.width*.24]
+    best = []
+    for seed in lines:
+        aligned = sorted((line for line in lines
+                          if abs(line.bbox[0]-seed.bbox[0]) <= 3),
+                         key=lambda line: line.bbox[1])
+        group = []
+        for line in aligned:
+            if group and line.bbox[1]-group[-1].bbox[1] > raw.height*.04:
+                if len(group) > len(best): best = group
+                group = []
+            group.append(line)
+        if len(group) > len(best): best = group
+    if len(best) < 10:
+        return None
+    numbered = sum(bool(_ORDINAL_ROW.match(line.stripped)) for line in best)
+    if numbered < len(best)*.5 or numbered == len(best):
+        return None
+    box = _lines_bbox(best, best[0].bbox)
+    pad = max(4.0, min(8.0, raw.height*.012))
+    return ((max(0,box[0]-pad), max(0,box[1]-pad),
+             min(raw.width,box[2]+pad),min(raw.height,box[3]+pad)), best)
+
+
+def _sparse_scan_spread_panels(raw):
+    """Split a proven two-up scan with independent sparse printed panels.
+
+    The OCR may entirely omit a narrow page-number column. Each crop therefore
+    reaches its panel's outer paper edge; its text is counted once as artwork.
+    Paired cross-gutter rows and full-width headings veto the split.
+    """
+    if (not raw.is_page_scan or raw.source_geometry.get('space') != 'reading'
+            or raw.width < raw.height*1.2):
+        return None
+    lines = [line for block in raw.text_blocks for line in block.lines if line.stripped]
+    if len(lines) < 16:
+        return None
+    intervals = sorted((line.bbox[0], line.bbox[2]) for line in lines)
+    merged = []
+    for left, right in intervals:
+        if merged and left <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], right))
+        else:
+            merged.append((left,right))
+    gaps = [(b[0]-a[1], (a[1]+b[0])/2) for a,b in zip(merged,merged[1:])
+            if raw.width*.3 < (a[1]+b[0])/2 < raw.width*.7]
+    if not gaps:
+        return None
+    gap, split = max(gaps)
+    if gap < raw.width*.07:
+        return None
+    left = [line for line in lines if line.bbox[2] < split]
+    right = [line for line in lines if line.bbox[0] > split]
+    if len(left)+len(right) != len(lines) or min(len(left),len(right)) < 6:
+        return None
+    short = lambda group: sum(len(line.stripped.split()) <= 5 for line in group)
+    if max(short(left),short(right)) < 12 or max(short(left)/len(left),short(right)/len(right)) < .7:
+        return None
+    paired = sum(any(abs((line.bbox[1]+line.bbox[3])-
+                         (peer.bbox[1]+peer.bbox[3])) < raw.height*.016
+                     for peer in right) for line in left)
+    if paired >= min(len(left),len(right))*.6:
+        return None
+    panels = []
+    for x0,x1,group in ((0,split,left),(split,raw.width,right)):
+        top = max(0,min(line.bbox[1] for line in group)-12)
+        bottom = min(raw.height,max(line.bbox[3] for line in group)+12)
+        panels.append(((x0,top,x1,bottom),group))
+    return panels
+
+
+def _complete_captioned_scan_top(raw, skel, pixel_probe):
+    """Recover source ink immediately above an OCR-bounded chart and caption.
+
+    OCR geometry can begin at the first label below a chart's upper rim. A
+    neighboring printed caption and a tall crop identify the object; the
+    preceding figure and a short source-ink query bound any extension.
+    """
+    if not raw.is_page_scan or pixel_probe is None:
+        return
+    captions = [line for block in raw.text_blocks for line in block.lines
+                if _squashed_caption(line.stripped)]
+    figures = [r for r in skel.regions if r.kind == 'figure']
+    for figure in figures:
+        x0,y0,x1,y1 = figure.bbox
+        if y1-y0 < raw.height*.2 or not any(
+                0 <= caption.bbox[1]-y1 <= 6 and
+                x0 <= (caption.bbox[0]+caption.bbox[2])/2 <= x1
+                for caption in captions):
+            continue
+        previous = max((r.bbox[3] for r in figures if r is not figure
+                        and r.bbox[3] <= y0 and r.bbox[0] < x1
+                        and x0 < r.bbox[2]), default=0)
+        top = max(previous+2, y0-min(18,raw.height*.035))
+        if top >= y0-3:
+            continue
+        try:
+            ink = pixel_probe.ink_bounds((x0,top,x1,y0+2))
+        except (ValueError,RuntimeError,AttributeError):
+            continue
+        if ink and ink[1] < y0-2:
+            figure.bbox = (x0,max(top,ink[1]-2),x1,y1)
+
+
 def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
     """Classify one page's regions, recording a reason for every uncertain call.
 
@@ -661,6 +779,17 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
             # proves ink before either is emitted as a figure.
             skel.regions.append(Region(kind="figure", bbox=img.bbox, image=img,
                                        needs_ink=True))
+        return skel
+
+    panels = _sparse_scan_spread_panels(raw)
+    if panels:
+        for panel_index, (box, lines) in enumerate(panels):
+            skel.regions.append(Region(kind='artwork', lines=lines, bbox=box,
+                                       reason='sparse_scan_spread_panel', band=panel_index))
+            skel.regions.append(Region(kind='figure', bbox=box,
+                                       reason='sparse_scan_spread_panel', band=panel_index))
+        skel.reasons.append('sparse_scan_spread_panel')
+        skel.regions.sort(key=_region_order)
         return skel
 
     # A sequence-proven margin folio belongs to furniture before a note zone
@@ -709,6 +838,19 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
                 kept.append(ln)
         if kept:
             kept_blocks.append((blk, kept))
+
+    aligned = _uncertain_aligned_scan_list(raw, kept_blocks)
+    if aligned:
+        box, lines = aligned
+        owned = {id(line) for line in lines}
+        kept_blocks = [(blk, [line for line in group if id(line) not in owned])
+                       for blk, group in kept_blocks]
+        kept_blocks = [(blk, group) for blk, group in kept_blocks if group]
+        skel.regions.append(Region(kind='artwork', lines=lines, bbox=box,
+                                   reason='uncertain_aligned_scan_list'))
+        skel.regions.append(Region(kind='figure', bbox=box,
+                                   reason='uncertain_aligned_scan_list'))
+        skel.reasons.append('uncertain_aligned_scan_list')
 
     source_marks = {id(img) for img in raw.images
                     if _embedded_source_mark(img, raw, kept_blocks)}
@@ -878,6 +1020,7 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
                 skel.regions.append(Region(kind='figure',bbox=region.bbox,
                     reason='unverified_scan_layout',band=region.band,column=region.column))
     _preserve_conflicting_outline_heading(raw, style, skel)
+    _complete_captioned_scan_top(raw, skel, pixel_probe)
     skel.regions.sort(key=_region_order)
     _join_numbered_regions(skel)
     skel.title_unit = _sparse_title_unit(raw, skel, style)
@@ -1145,14 +1288,22 @@ def _preserve_tracked_native_lines(raw, kept_blocks, skel):
 
 def _preserve_uncertain_ocr_regions(raw, kept_blocks, note_regions, skel, cover, candidates):
     regions = []
+    claimed = {id(line) for region in skel.regions
+               if region.reason == 'uncertain_aligned_scan_list'
+               for line in region.lines}
     for block in raw.text_blocks:
-        spans = [sp for ln in block.lines for sp in ln.spans]
-        if any(getattr(ln,"transcription_uncertain",False) for ln in block.lines):
-            regions.append(block);continue
+        lines = [line for line in block.lines if id(line) not in claimed]
+        if not lines:
+            continue
+        spans = [sp for ln in lines for sp in ln.spans]
+        if any(getattr(ln,"transcription_uncertain",False) for ln in lines):
+            regions.append(replace(block, lines=lines,
+                                   bbox=_lines_bbox(lines,block.bbox)));continue
         if not spans or not all(sp.font == "ocr" for sp in spans):
             continue
-        if cover is not None or any(sp.uncertain for sp in spans) or not any(c.isalnum() for c in block.text):
-            regions.append(block)
+        if cover is not None or any(sp.uncertain for sp in spans) or not any(c.isalnum() for c in ''.join(ln.text for ln in lines)):
+            regions.append(replace(block, lines=lines,
+                                   bbox=_lines_bbox(lines,block.bbox)))
     if not regions:
         return kept_blocks, note_regions
     owned = {id(ln) for block in regions for ln in block.lines}

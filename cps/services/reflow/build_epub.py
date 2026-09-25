@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.22"
+CONVERTER_VERSION = "1.23"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -185,16 +185,26 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
         index += 1
         if element.kind == "fig":
             caption = ""
+            source_caption = ""
             if index < len(elements) and elements[index].kind == "caption":
                 caption = _nav_runs_html(elements[index].runs,
                     _source_nav_marks(navigation,pno,index,None),
                     available, ref_ids, ambiguous)
                 if elements[index].caption_uncertain:
                     caption = _source_caption(pno, caption_keys[index])
+                    source_caption = caption
                 index += 1
             figures = [f for f in book.figures if f["pno"] == pno]
             reason = figures[figure_index].get("found") if figure_index < len(figures) else ""
-            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark")
+            if source_caption and reason in ('sparse_scan_spread_panel',
+                    'unrecovered_scan_layer', 'unverified_paired_columns'):
+                caption_box = elements[index-1].bbox
+                figure_box = element.bbox
+                if (figure_box and caption_box and
+                        figure_box[0] <= caption_box[0] and figure_box[1] <= caption_box[1]
+                        and figure_box[2] >= caption_box[2] and figure_box[3] >= caption_box[3]):
+                    source_caption = ''
+            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel")
             if reason == "native_outline_conflict":
                 caption = ('Native heading text conflicts with PDF navigation metadata. '
                            'The original printed heading is shown as an image; no replacement '
@@ -220,10 +230,20 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                 caption = ('Printed source lettering is preserved as an image, '
                            'without inferred or searchable text. '
                            '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
+            elif reason == "uncertain_aligned_scan_list":
+                caption = ('Complete printed list. Some OCR labels disagree with the source; '
+                           'the label and value rows are preserved together as pixels. '
+                           '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
+            elif reason == "sparse_scan_spread_panel":
+                caption = ('Complete printed panel. OCR cannot establish every printed cell '
+                           'or its reading order; use these source pixels. '
+                           '<a href="original-p%04d.xhtml#page">Open original spread and enlarged details</a>.' % pno)
             elif source_region:
                 caption = ('Original text region. OCR transcription is uncertain; '
                            'read the source pixels. This image does not provide searchable text. '
                            '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
+            if source_caption and source_region:
+                caption = source_caption + ' ' + caption
             blocks.append(_figure_html(pno, figure_index, caption, source_region=source_region))
             figure_index += 1
             continue

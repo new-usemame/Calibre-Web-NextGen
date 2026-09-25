@@ -13508,7 +13508,7 @@ msgstr "Boekenplank maken"
 
 #: cps/templates/detail.html
 msgid "Other users' eReaders:"
-msgstr ""
+msgstr "eReaders van andere gebruikers:"
 
 #: cps/templates/detail.html
 #, fuzzy

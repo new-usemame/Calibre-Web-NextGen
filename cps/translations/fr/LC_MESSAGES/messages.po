@@ -13822,7 +13822,7 @@ msgstr "Sélectionner tout"
 
 #: cps/templates/detail.html
 msgid "Other users' eReaders:"
-msgstr ""
+msgstr "eReaders des autres utilisateurs :"
 
 #: cps/templates/detail.html
 msgid "Additional email addresses:"

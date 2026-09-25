@@ -849,38 +849,10 @@ def render_hot_books(page, order):
                      .order_by(func.random())
                      .limit(config.config_random_books).all())
 
-        off = int(config.config_books_per_page) * (page - 1)
-
-        # Get total count for pagination
-        total_hot_books = ub.session.query(func.count(ub.Downloads.book_id.distinct())).scalar()
-
-        # Get the book_ids for the current page
-        hot_book_ids_query = (ub.session.query(ub.Downloads.book_id)
-                              .group_by(ub.Downloads.book_id)
-                              .order_by(*order[0])
-                              .offset(off)
-                              .limit(config.config_books_per_page))
-
-        hot_book_ids = [item[0] for item in hot_book_ids_query]
-
-        entries = []
-        if hot_book_ids:
-            query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
-            # Fetch all book details in one query
-            book_details = query.filter(calibre_db.common_filters()).filter(db.Books.id.in_(hot_book_ids)).all()
-
-            # Create a dictionary for quick lookups
-            book_map = {book.Books.id: book for book in book_details}
-
-            # Reorder the entries to match the "hotness" order
-            for book_id in hot_book_ids:
-                if book_id in book_map:
-                    entries.append(book_map[book_id])
-                else:
-                    # This book might have been deleted from calibre but still in downloads table
-                    ub.delete_download(book_id)
-
-        pagination = Pagination(page, config.config_books_per_page, total_hot_books)
+        per_page = int(config.config_books_per_page)
+        entries, total_hot_books = helper.hot_books_page(
+            calibre_db.common_filters(), order[0], per_page * (page - 1), per_page)
+        pagination = Pagination(page, per_page, total_hot_books)
         return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
                                      title=_("Hot Books (Most Downloaded)"), page="hot", order=order[1])
     else:
@@ -904,10 +876,6 @@ def render_downloaded_books(page, order, user_id):
                                                             db.Books.id == db.books_series_link.c.book,
                                                             db.Series,
                                                             ub.Downloads, db.Books.id == ub.Downloads.book_id)
-        for book in entries:
-            if not (calibre_db.session.query(db.Books).filter(calibre_db.common_filters())
-                    .filter(db.Books.id == book.Books.id).first()):
-                ub.delete_download(book.Books.id)
         return render_title_template('index.html',
                                      random=random,
                                      entries=entries,

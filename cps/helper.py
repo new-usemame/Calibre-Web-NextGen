@@ -734,6 +734,49 @@ def get_sorted_author(value):
 SQLITE_IN_CHUNK_SIZE = 900
 
 
+def hot_books_page(visibility_filter, order, offset, limit):
+    """One page of the downloaded books the viewer can see, and their count.
+
+    Returns ``(entries, total)``: read-status rows (``generate_linked_query``)
+    in ``order``, and how many books the viewer can page through.  Filtering
+    before paging keeps pages full and the count true.
+
+    Download records are each account's own history, and the Kobo upgrade
+    audit reads them as proof that an account took delivery of a book, so a
+    book the viewer cannot see keeps every account's records.  Only the
+    records of a book the library deleted go: an id below the library's
+    highest one that no book answers to.  A higher id is not a deletion; the
+    library may be an older copy.
+    """
+    ranked = [row[0] for row in ub.session.query(ub.Downloads.book_id)
+              .group_by(ub.Downloads.book_id).order_by(*order)]
+    highest = calibre_db.session.query(func.max(db.Books.id)).scalar() or 0
+    visible = []
+    for start in range(0, len(ranked), SQLITE_IN_CHUNK_SIZE):
+        chunk = ranked[start:start + SQLITE_IN_CHUNK_SIZE]
+        present, shown = _present_and_visible_book_ids(chunk, visibility_filter)
+        visible.extend(book_id for book_id in chunk if book_id in shown)
+        for book_id in chunk:
+            if book_id not in present and book_id < highest:
+                ub.delete_download(book_id)
+    page_ids = visible[offset:offset + limit]
+    entries = []
+    if page_ids:
+        rows = (calibre_db.generate_linked_query(config.config_read_column, db.Books)
+                .filter(visibility_filter).filter(db.Books.id.in_(page_ids)).all())
+        by_id = {row.Books.id: row for row in rows}
+        entries = [by_id[book_id] for book_id in page_ids if book_id in by_id]
+    return entries, len(visible)
+
+
+def _present_and_visible_book_ids(book_ids, visibility_filter):
+    present = {row[0] for row in calibre_db.session.query(db.Books.id)
+               .filter(db.Books.id.in_(book_ids))}
+    visible = {row[0] for row in calibre_db.session.query(db.Books.id)
+               .filter(visibility_filter).filter(db.Books.id.in_(book_ids))}
+    return present, visible
+
+
 def book_in_progress_ids(book_read_statuses, read_column_configured, user):
     """Return the sync-driven "currently reading" ids from a batch of books.
 

@@ -49,12 +49,13 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.32"
+CONVERTER_VERSION = "1.33"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
 ABOUT_HREF = "reflow-about.xhtml"
 SOURCE_INDEX_HREF = "source-pages.xhtml"
+SOURCE_CHECKS_HREF = "source-checks.xhtml"
 
 #: Chapters split on the ladder's top two levels, per SPEC §3.
 SPLIT_LEVELS = (1, 2)
@@ -246,7 +247,7 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                            'aligned source rows in this image. It is not searchable text. '
                            '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
             elif source_region:
-                caption = ('Source image · <a href="source-pages.xhtml#source-images">'
+                caption = ('Source image · <a href="source-checks.xhtml">'
                            'OCR uncertain</a> · <a href="original-p%04d.xhtml#page">'
                            'View larger</a>' % pno)
             if source_caption and source_region:
@@ -379,9 +380,9 @@ def _punctuation_notice(pno, index):
 def _source_check_notice(label, source_href, source_label, uncertain=False):
     classes = 'source-evidence-notice' + (' reflow-uncertain' if uncertain else '')
     return ('<p class="%s source-evidence-compact">'
-            '<a href="source-pages.xhtml#source-checks">%s</a> · '
+            '<a href="%s">%s</a> · '
             '<a href="%s">%s</a></p>' %
-            (classes, label, source_href, source_label))
+            (classes, SOURCE_CHECKS_HREF, label, source_href, source_label))
 
 
 def _runs_html(runs, available, ref_ids, ambiguous=()):
@@ -1069,25 +1070,33 @@ def _source_page_items(page_homes):
         for pno, href in sorted(page_homes.items()))
 
 
+def _source_checks(language, evidence=None):
+    """A short, file-level help target for reader links at every font size."""
+    images = (('<section><h2>Reading source text images</h2>'
+               '<p>Some text is shown as original printed pixels because OCR '
+               'cannot verify its wording or layout. Text inside these images '
+               'is not searchable and does not grow with reader font settings. '
+               'Use View larger beneath an image to open the original page and '
+               'enlarged details, then use its Return link to resume reading.</p></section>')
+              if evidence else '')
+    return _document("Source checks", (
+        '<h1>Source checks in the reading text</h1>'
+        '<p>Punctuation uncertain means the printed punctuation may differ '
+        'from the transcription; the linked original passage shows it.</p>'
+        '<p>Words/glyphs uncertain means source lettering is retained as '
+        'original images because its encoding or transcription is unclear.</p>'
+        '<p>OCR uncertain means a recognized reading may be wrong; source '
+        'images retain the affected pixels.</p>'
+        '<p>PDF link unresolved means an authored internal destination could '
+        'not be placed unambiguously.</p>'
+        '<p>Each local link opens the original page or passage for checking.</p>'
+    ) + images, language)
+
+
 def _source_index(page_homes, language, evidence=None):
     originals = ""
     if evidence:
-        originals = ('<section id="source-images"><h2>Reading source text images</h2>'
-                     '<p>Some text is shown as original printed pixels because OCR '
-                     'cannot verify its wording or layout. Text inside these images '
-                     'is not searchable and does not grow with reader font settings. '
-                     'Use View larger beneath an image to open the original page and '
-                     'enlarged details, then use its Return link to resume reading.</p></section>'
-                     '<section id="source-checks"><h2>Source checks in the reading text</h2>'
-                     '<p>Punctuation uncertain means the printed punctuation may differ '
-                     'from the transcription; the linked original passage shows it. '
-                     'Words/glyphs uncertain means source lettering is retained as '
-                     'original images because its encoding or transcription is unclear. '
-                     'OCR uncertain means a recognized reading may be wrong; source '
-                     'images retain the affected pixels. PDF link unresolved means an '
-                     'authored internal destination could not be placed unambiguously. '
-                     'Each local link opens the original page or passage for checking.</p></section>'
-                     '<h2>Original printed evidence</h2><p>These original images '
+        originals = ('<h2>Original printed evidence</h2><p>These original images '
                      'help check uncertain transcriptions and note associations.</p><ol>%s</ol>'
                      % "".join('<li><a href="original-p%04d.xhtml">Original PDF page %d</a></li>'
                                % (pno, pno + 1) for pno in sorted(evidence)))
@@ -1804,6 +1813,11 @@ def build(book, out_path, page_html=None, metadata=None, doc=None,
         # An ordinary spine item also works in readers which ignore EPUB page-list.
         # Keep this generated reference after the book, never inside its prose.
         if page_homes:
+            documents[SOURCE_CHECKS_HREF] = _source_checks(language, evidence)
+            manifest.append({"id": "source-checks", "href": SOURCE_CHECKS_HREF,
+                             "type": "application/xhtml+xml"})
+            spine.append("source-checks")
+            entries.append((SOURCE_CHECKS_HREF, "Source checks"))
             documents[SOURCE_INDEX_HREF] = _source_index(page_homes, language, evidence)
             manifest.append({"id": "source-pages", "href": SOURCE_INDEX_HREF,
                              "type": "application/xhtml+xml"})

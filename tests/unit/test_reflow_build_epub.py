@@ -296,7 +296,7 @@ def _content_names(zf):
     """The documents that carry the book's text: not the machine navigation."""
     return [n for n in _xhtml_names(zf)
             if posixpath.basename(n) not in ("nav.xhtml", "reflow-about.xhtml",
-                                            "source-pages.xhtml")]
+                                            "source-pages.xhtml", "source-checks.xhtml")]
 
 
 _BODY = re.compile(r"<body[^>]*>(.*)</body>", re.S)
@@ -631,17 +631,17 @@ def test_repeated_uncertain_source_images_have_short_local_help_and_one_explanat
         assert "uncertain" in label.lower()
         assert any(a.get("href") == "original-p0000.xhtml#page"
                    for a in caption.iter("a"))
-        assert any(a.get("href") == "source-pages.xhtml#source-images"
+        assert any(a.get("href") == "source-checks.xhtml"
                    for a in caption.iter("a"))
     assert "Complete printed list" in "".join(captions[3].itertext())
-    index = ET.fromstring(build_epub._source_index({0: "ch001.xhtml"}, "en", {0: {}}))
-    help_sections = [node for node in index.iter(XHTML + "section")
-                     if node.get("id") == "source-images"]
-    assert len(help_sections) == 1
-    help_text = " ".join("".join(help_sections[0].itertext()).lower().split())
+    help_page = ET.fromstring(build_epub._source_checks("en", {0: {}}))
+    help_text = " ".join("".join(help_page.itertext()).lower().split())
     assert all(term in help_text for term in ("ocr", "searchable", "font", "detail"))
+    index = ET.fromstring(build_epub._source_index({0: "ch001.xhtml"}, "en", {0: {}}))
+    assert "Reading source text images" not in "".join(index.itertext())
     plain_index = build_epub._source_index({0: "ch001.xhtml"}, "en")
     assert 'id="source-images"' not in plain_index
+    assert 'Reading source text images' not in build_epub._source_checks("en")
 
 
 def test_repeated_punctuation_checks_preserve_paragraphs_and_distinct_source_routes():
@@ -666,7 +666,7 @@ def test_repeated_punctuation_checks_preserve_paragraphs_and_distinct_source_rou
         assert 'punctuation uncertain' in label.lower()
         assert 'source-evidence-compact' in notice.get('class', '')
         assert {link.get('href') for link in notice.iter('a')} == {
-            'source-pages.xhtml#source-checks',
+            'source-checks.xhtml',
             'original-p0000.xhtml#text_%d' % i}
     plain = assemble.Book(elements=[elements[-1]], pages={0: [elements[-1]]})
     assert build_epub.page_fragment(plain, 0) == '<p>Ordinary unflagged prose.</p>'
@@ -687,15 +687,15 @@ def test_other_generic_source_checks_keep_distinct_meanings_and_original_routes(
     for notice in notices:
         assert len("".join(notice.itertext())) < 80
         assert {a.get('href') for a in notice.iter('a')} == {
-            'source-pages.xhtml#source-checks', 'original-p0000.xhtml#page'}
-    index = ET.fromstring(build_epub._source_index({0: 'ch001.xhtml'}, 'en', {0: {}}))
-    help_sections = [node for node in index.iter(XHTML+'section')
-                     if node.get('id') == 'source-checks']
-    assert len(help_sections) == 1
-    explanation = ' '.join(''.join(help_sections[0].itertext()).lower().split())
+            'source-checks.xhtml', 'original-p0000.xhtml#page'}
+    help_page = ET.fromstring(build_epub._source_checks('en'))
+    explanation = ' '.join(''.join(help_page.itertext()).lower().split())
     assert all(term in explanation for term in (
         'punctuation may differ', 'encoding or transcription',
         'recognized reading may be wrong', 'destination could not be placed'))
+    body = help_page.find(XHTML + 'body')
+    assert [child.tag for child in list(body)[:5]] == [XHTML + 'h1'] + [XHTML + 'p'] * 4
+    assert 'source-checks' not in build_epub._source_index({0: 'ch001.xhtml'}, 'en', {0: {}})
 
 
 

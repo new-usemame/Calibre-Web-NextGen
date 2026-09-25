@@ -48,16 +48,21 @@ def test_native_punctuation_disclosure_links_to_original_passage_and_survives_wr
             chapters=''.join(z.read(n).decode() for n in z.namelist() if re.fullmatch(r'OEBPS/ch\d+\.xhtml',n))
             assert 'Punctuation uncertain' in chapters
             assert 'original-p0000.xhtml#text_0' in chapters
-            assert 'source-pages.xhtml#source-checks' in chapters
+            assert 'href="source-checks.xhtml"' in chapters
             assert '<p class="source-evidence-notice reflow-uncertain source-evidence-compact">' in chapters
             original=ET.fromstring(z.read('OEBPS/original-p0000.xhtml'))
             assert any(e.get('id')=='text_0' for e in original.iter())
             assert 'Return to reflowed PDF page 1' in ''.join(original.itertext())
-            help_page=ET.fromstring(z.read('OEBPS/source-pages.xhtml'))
-            sections=[e for e in help_page.iter() if e.get('id')=='source-checks']
-            assert len(sections)==1
-            help_text=' '.join(''.join(sections[0].itertext()).lower().split())
+            help_page=ET.fromstring(z.read('OEBPS/source-checks.xhtml'))
+            help_text=' '.join(''.join(help_page.itertext()).lower().split())
             assert 'punctuation' in help_text and 'original passage' in help_text
+            assert not any(e.get('id')=='source-checks' for e in
+                           ET.fromstring(z.read('OEBPS/source-pages.xhtml')).iter())
+            opf=z.read('OEBPS/content.opf').decode()
+            assert 'href="source-checks.xhtml"' in opf
+            assert 'idref="source-checks"' in opf
+            nav=z.read('OEBPS/nav.xhtml').decode()
+            assert 'href="source-checks.xhtml"' in nav
         book.pages[0][0].punctuation_uncertain=False
         with pytest.raises(structural_ops.ContractError):
             build_epub.build(book,str(tmp_path/'stale.epub'),doc=doc,operation_plans=[plan])

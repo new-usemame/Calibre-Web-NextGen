@@ -2994,41 +2994,6 @@ def _absorb_figure_content(kept_blocks, candidates, style, raw=None, pixel_probe
     owners = {id(line):unique_lettering_owner(line)
               for _,group in kept_blocks for line in group
               if _chart_lettering(line,style) and not _squashed_caption(line.stripped)}
-    preserved_areas = {}
-
-    def removed_area_is_preserved(removed, other):
-        """Prove every discarded source pixel blank or owned by another figure.
-
-        A text line alone is not a pixel copy. Four disjoint rectangles cover
-        the removed area outside the other figure's source-image territory,
-        including the strip below a short neighbor and both side strips.
-        """
-        if pixel_probe is None or not hasattr(pixel_probe, 'source_has_ink'):
-            return False
-        x0,y0,x1,y1 = removed
-        owned = other.bbox if isinstance(other, Region) else None
-        if owned is None:
-            pieces = [removed]
-        else:
-            a,b,c,d = max(x0,owned[0]),max(y0,owned[1]),min(x1,owned[2]),min(y1,owned[3])
-            if a >= c or b >= d:
-                pieces = [removed]
-            else:
-                pieces = [(x0,y0,x1,b), (x0,d,x1,y1),
-                          (x0,b,a,d), (c,b,x1,d)]
-        try:
-            if any(pixel_probe.source_has_ink(box) for box in pieces
-                   if box[2] > box[0] and box[3] > box[1]):
-                return False
-        except (ValueError,RuntimeError,AttributeError,extract.RasterTooLarge):
-            return False
-        if owned is not None and a < c and b < d:
-            prior = preserved_areas.get(id(other))
-            preserved_areas[id(other)] = ((min(a,prior[0]),min(b,prior[1]),
-                                          max(c,prior[2]),max(d,prior[3]))
-                                         if prior else (a,b,c,d))
-        return True
-
     for candidate in candidates:
         image_box = candidate.bbox
         kept_blocks = _attach_caption(candidate, kept_blocks, style)
@@ -3075,34 +3040,18 @@ def _absorb_figure_content(kept_blocks, candidates, style, raw=None, pixel_probe
             if raw is not None:
                 candidate.bbox = (max(0,candidate.bbox[0]),max(0,candidate.bbox[1]),
                                   min(raw.width,candidate.bbox[2]),min(raw.height,candidate.bbox[3]))
-            # A widened header can cross a later independent caption/figure
-            # near its lower corner. Trim the empty tail only after checking
-            # unmasked source pixels; the neighbor retains the actual text.
-            if candidate.bbox[0] < x0:
-                neighboring = [other for other in candidates if other is not candidate]
-                neighboring.extend(ln for _,group in kept_blocks for ln in group)
-                for other in sorted(neighboring,key=lambda item:item.bbox[1]):
-                    box = other.bbox
-                    if not (candidate.bbox[0] < box[2]
-                            and box[0] < x0 and box[1] < candidate.bbox[3]):
-                        continue
-                    end = max(ln.bbox[3] for ln in candidate.lines)
-                    if box[1] <= end+4 or box[1]-2 <= end:
-                        continue
-                    cut = box[1]-2
-                    removed = (candidate.bbox[0],cut,candidate.bbox[2],candidate.bbox[3])
-                    if removed_area_is_preserved(removed, other):
-                        candidate.bbox = (candidate.bbox[0],candidate.bbox[1],
-                                          candidate.bbox[2],cut)
-                    else:
-                        candidate.reason = 'unverified_scan_layout'
-
-    for candidate in candidates:
-        owned = preserved_areas.get(id(candidate))
-        if owned:
-            box = candidate.bbox
-            candidate.bbox = (min(box[0],owned[0]),min(box[1],owned[1]),
-                              max(box[2],owned[2]),max(box[3],owned[3]))
+            # Keep the complete expanded source crop. A nearby prose box may
+            # contain artwork absent from its transcript, and a neighboring
+            # figure may later be omitted after prose masks are applied. Neither
+            # is proof that source pixels can be trimmed here.
+            neighboring = [other.bbox for other in candidates if other is not candidate]
+            neighboring.extend(ln.bbox for _,group in kept_blocks for ln in group)
+            if any(_overlap_share(box,candidate.bbox)>0 for box in neighboring):
+                candidate.reason = 'unverified_scan_layout'
+                # This source image is the preservation owner. Retained prose
+                # may mask all of its ink during blank-figure admission; do not
+                # drop the crop on that unrelated heuristic.
+                candidate.needs_ink = False
 
     artwork = []
     for candidate in candidates:

@@ -1,7 +1,10 @@
 """Source object ownership for damaged scan transcripts."""
 import pytest
 import pymupdf
+import zipfile
+import io
 from types import SimpleNamespace
+from PIL import Image
 
 from cps.services.reflow import assemble, build_epub, extract, skeleton
 
@@ -42,36 +45,30 @@ def test_weak_overlap_prose_and_neighbor_figure_keep_independent_ownership():
         SimpleNamespace(body_size=11), raw=scan([title, prose, weak]),
         pixel_probe=BlankTail())
     assert _contains(main.bbox, title.bbox)
-    assert main.bbox[3] < neighbor.bbox[1]
+    assert main.bbox[3] >= 193.68
+    assert main.reason == 'unverified_scan_layout'
     assert prose in [ln for _, lines in rest for ln in lines]
     assert weak in [ln for _, lines in rest for ln in lines]
     assert not neighbor.lines
 
 
-def test_adjacent_source_line_proves_blank_tail_before_trimming():
+@pytest.mark.parametrize('answer', [False, True, None])
+def test_adjacent_source_line_keeps_complete_source_region(answer):
     title = _large_line('A source heading', (519, 125, 722, 149))
     following = line('Independent quotation', 448, 180, 104)
     candidate = skeleton.Region('figure', bbox=(546, 44, 796, 194),
                                 reason='scan_figure_side')
     blocks = [(extract.Block(i,item.bbox,[item]),[item])
               for i,item in enumerate((title,following))]
-    class Proof:
-        def source_has_ink(self, rect): return False
+    class Probe:
+        def source_has_ink(self, rect): return answer
+    probe = Probe() if answer is not None else None
     rest,_ = skeleton._absorb_figure_content(blocks,[candidate],
-        SimpleNamespace(body_size=11),raw=scan([title,following]),pixel_probe=Proof())
-    assert _contains(candidate.bbox,title.bbox) and candidate.bbox[3]<following.bbox[1]
+        SimpleNamespace(body_size=11),raw=scan([title,following]),pixel_probe=probe)
+    assert _contains(candidate.bbox,title.bbox) and candidate.bbox[3]==194
     assert following in [ln for _,lines in rest for ln in lines]
-    candidate.bbox=(546,44,796,194)
-    class Ink:
-        def source_has_ink(self, rect): return True
-    skeleton._absorb_figure_content(blocks,[candidate],SimpleNamespace(body_size=11),
-                                    raw=scan([title,following]),pixel_probe=Ink())
     assert candidate.reason=='unverified_scan_layout'
-    assert _contains(candidate.bbox,title.bbox)
-    candidate.reason='scan_figure_side';candidate.bbox=(546,44,796,194)
-    skeleton._absorb_figure_content(blocks,[candidate],SimpleNamespace(body_size=11),
-                                    raw=scan([title,following]))
-    assert candidate.reason=='unverified_scan_layout'
+    assert candidate.needs_ink is False
 
 
 def test_removed_figure_area_below_narrow_neighbor_keeps_printed_ink(tmp_path):
@@ -92,6 +89,80 @@ def test_removed_figure_area_below_narrow_neighbor_keeps_printed_ink(tmp_path):
             SimpleNamespace(body_size=11), raw=raw, pixel_probe=probe)
     assert candidate.bbox[3] >= 216
     assert candidate.reason == 'unverified_scan_layout'
+
+
+@pytest.mark.parametrize('kind', ['gray_rule', 'gray_symbol', 'color_rule'])
+def test_faint_encoded_source_marks_survive_full_primary_crop(tmp_path, kind):
+    title = _large_line('A complete title', (80, 100, 250, 124))
+    quote = line('Separate quotation', 40, 180, 100)
+    main = skeleton.Region('figure', bbox=(100, 40, 300, 220),
+                           reason='scan_figure_side')
+    raw = scan([title, quote], width=400, height=300)
+    raw.source_geometry = {}
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=400, height=300)
+        if kind == 'gray_rule':
+            page.draw_line((110, 207), (190, 207), color=(.65, .65, .65), width=.45)
+        elif kind == 'gray_symbol':
+            page.insert_text((110, 213), 'X', fontsize=12, color=(.85, .85, .85))
+        else:
+            page.draw_line((110, 207), (190, 207), color=(.35, .8, .85), width=.45)
+        rest, art = skeleton._absorb_figure_content(
+            [(block, block.lines) for block in raw.blocks], [main],
+            SimpleNamespace(body_size=11), raw=raw,
+            pixel_probe=extract.ScanPixelProbe(doc, 0))
+        assert main.bbox[3] == 220
+        regions = [main] + art + [skeleton.Region('body', lines=group, bbox=block.bbox)
+                                  for block, group in rest]
+        skel = skeleton.PageSkeleton(0, 400, 300, regions=regions)
+        book = assemble.assemble([skel], skeleton.book_style([raw]), [raw])
+        target = tmp_path / ('faint-' + kind + '.epub')
+        build_epub.build(book, target, doc=doc)
+        sample = extract.crop_jpeg(doc, 0, (100, 194, 200, 220))
+    assert min(Image.open(io.BytesIO(sample)).convert('L').getdata()) < 240
+    assert build_epub.validate(str(target)) == []
+    with zipfile.ZipFile(target) as z:
+        encoded = z.read('OEBPS/images/fig_p0000_0.jpg')
+        assert 'images/fig_p0000_0.jpg' in z.read('OEBPS/ch001.xhtml').decode()
+    assert min(Image.open(io.BytesIO(encoded)).convert('L').getdata()) < 240
+
+
+@pytest.mark.parametrize('retain_prose_mask', [False, True])
+def test_full_primary_source_image_survives_peer_masking_in_real_epub(
+        tmp_path, retain_prose_mask):
+    title = _large_line('A complete title', (80, 100, 250, 124))
+    quote = line('Separate quotation', 40, 180, 100)
+    raw = scan([title, quote], width=400, height=300)
+    raw.source_geometry = {}
+    main = skeleton.Region('figure', bbox=(100, 40, 300, 220),
+                           reason='scan_figure_side', needs_ink=True)
+    peer = skeleton.Region('figure', bbox=(90, 180, 140, 189),
+                           reason='scan_figure_side', needs_ink=True)
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=400, height=300)
+        page.draw_rect((105, 181, 130, 188), fill=(0, 0, 0), color=None)
+        rest, art = skeleton._absorb_figure_content(
+            [(block, block.lines) for block in raw.blocks], [main, peer],
+            SimpleNamespace(body_size=11), raw=raw,
+            pixel_probe=extract.ScanPixelProbe(doc, 0))
+        regions = [main, peer] + art
+        if retain_prose_mask:
+            regions += [skeleton.Region('body', lines=group, bbox=block.bbox)
+                        for block, group in rest]
+        skel = skeleton.PageSkeleton(0, 400, 300, regions=regions)
+        book = assemble.assemble([skel], skeleton.book_style([raw]), [raw])
+        target = tmp_path / 'source-preservation.epub'
+        build_epub.build(book, target, doc=doc)
+        expected = extract.crop_jpeg(doc, 0, main.bbox)
+    assert main.bbox[3] == 220 and main.needs_ink is False
+    assert build_epub.validate(str(target)) == []
+    with zipfile.ZipFile(target) as z:
+        primary = z.read('OEBPS/images/fig_p0000_0.jpg')
+        assert primary == expected
+        chapter = z.read('OEBPS/ch001.xhtml').decode()
+        assert 'images/fig_p0000_0.jpg' in chapter
+        assert 'Unverified scan transcription' in chapter
+        assert min(Image.open(io.BytesIO(primary)).convert('L').getdata()) < 100
 
 
 @pytest.mark.parametrize('mark,color', [
@@ -120,7 +191,7 @@ def test_removed_area_ink_outside_independent_source_owner_blocks_trim(mark, col
     assert main.reason == 'unverified_scan_layout'
 
 
-def test_neighbor_source_image_preserves_its_own_ink_and_allows_blank_trim():
+def test_neighbor_source_image_does_not_authorize_trimming_main_crop():
     title = _large_line('A complete title', (80, 100, 250, 124))
     main = skeleton.Region('figure', bbox=(100, 40, 300, 220),
                            reason='scan_figure_side')
@@ -134,9 +205,10 @@ def test_neighbor_source_image_preserves_its_own_ink_and_allows_blank_trim():
         skeleton._absorb_figure_content(
             [(raw.blocks[0], [title])], [main, neighbor],
             SimpleNamespace(body_size=11), raw=raw, pixel_probe=probe)
-    assert main.bbox[3] == 178
+    assert main.bbox[3] == 220
     assert neighbor.bbox[0] <= 105 and neighbor.bbox[3] >= 188
-    assert main.reason == 'scan_figure_side'
+    assert main.reason == 'unverified_scan_layout'
+    assert main.needs_ink is False
 
 
 @pytest.mark.parametrize('probe', [None, object()])

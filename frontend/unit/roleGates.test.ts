@@ -4,7 +4,7 @@ import test from 'node:test';
 
 import type { Me } from '../src/lib/api.ts';
 import {
-  canDeleteBooks, canDownloadBooks, canEditBookCover, canReadBooks,
+  canDeleteBooks, canDownloadBooks, canEditBookCover, canEditShelf, canReadBooks,
 } from '../src/lib/permissions.ts';
 import { getPrimaryReadTarget, getReaderContentUrl } from '../src/lib/readerTarget.ts';
 
@@ -82,4 +82,24 @@ test('the cover editor is offered only where some cover can be saved', () => {
   for (const [name, me, inLibrary, expected] of probes) {
     assert.equal(canEditBookCover(me, inLibrary), expected, name);
   }
+});
+
+test('a shelf is offered for adding or removing exactly where the server allows the change', () => {
+  // cps/shelf.py::check_shelf_edit_permissions: a private shelf by its owner
+  // only, a public shelf only with "Edit public shelves", its owner included.
+  const shelves: [string, { is_public: boolean; is_owner: boolean }][] = [
+    ['own private shelf', { is_public: false, is_owner: true }],
+    ["another reader's private shelf", { is_public: false, is_owner: false }],
+    ['own public shelf', { is_public: true, is_owner: true }],
+    ["another reader's public shelf", { is_public: true, is_owner: false }],
+  ];
+  const offered = (me: Me | undefined) =>
+    shelves.filter(([, shelf]) => canEditShelf(me, shelf)).map(([name]) => name);
+
+  assert.deepEqual(offered(account({ edit_shelfs: true })),
+    ['own private shelf', 'own public shelf', "another reader's public shelf"]);
+  // The role taken away after the reader made a shelf public: the server
+  // refuses that shelf to its owner as well.
+  assert.deepEqual(offered(account({ edit_shelfs: false })), ['own private shelf']);
+  assert.deepEqual(offered(undefined), ['own private shelf']);
 });

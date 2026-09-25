@@ -6,6 +6,7 @@ import {
   useAddToMyLibrary,
 } from '../lib/queries';
 import { useT } from '../lib/i18n';
+import { canEditShelf } from '../lib/permissions';
 import { Spinner } from './Spinner';
 import styles from './AddToShelf.module.css';
 import { useAnnouncer } from '../lib/a11y/announcer';
@@ -48,10 +49,7 @@ export function AddToShelf({ bookId, inLibrary = true }: { bookId: number; inLib
     };
   }, [open]);
 
-  const canEditPublic = !!me?.role?.edit_shelfs;
-  const editable = (shelvesData?.items ?? []).filter(
-    (s) => s.is_owner || (s.is_public && canEditPublic),
-  );
+  const editable = (shelvesData?.items ?? []).filter((s) => canEditShelf(me, s));
   const onShelf = new Set(membership?.shelf_ids ?? []);
 
   const ensureLibraryMembership = async () => {

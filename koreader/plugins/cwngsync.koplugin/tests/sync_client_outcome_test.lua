@@ -171,7 +171,11 @@ local function testFailuresReadAsPlainWordsOnScreen()
     assertEqual(plain("405 not expected"), "the server answered with error 405", "lua-Spore's unexpected status")
     assertEqual(plain("HTTP 503"), "the server answered with error 503", "a status the spec allows")
     assertEqual(plain(nil), "no response from server", "nothing to go on")
+    assertEqual(plain("common/Spore/Protocols.lua:85: wantread"), "that address does not answer over https",
+        "https sent to a plain http port, as seen on a Kindle")
     assertEqual(plain("checksum mismatch"), "checksum mismatch", "anything else is shown as it is")
+    assertEqual(plain("common/Spore/Protocols.lua:85: closed"), "closed",
+        "without the place in KOReader's code it was raised")
     assertEqual(CWNGSyncClient.statusOf("405 not expected"), 405, "status from lua-Spore's shape")
     assertEqual(CWNGSyncClient.statusOf("HTTP 409"), 409, "status from finish()'s shape")
     assertEqual(CWNGSyncClient.statusOf("common/Spore/Protocols.lua:85: timeout"), nil, "no status")

@@ -21,7 +21,7 @@ local shown, dialogs = {}, {}
 local typed = ""
 -- The fake server: which base URLs answer, which refuse the password, and
 -- what each request asked.
-local answering, refusing, asked = {}, {}, {}
+local answering, refusing, asked, failing = {}, {}, {}, {}
 
 stub("ui/widget/buttondialog", { new = function(_, fields) dialogs[#dialogs + 1] = fields; return fields end })
 stub("ui/widget/inputdialog", { new = function(_, fields)
@@ -58,7 +58,7 @@ stub("CWNGSyncClient", {
             if answering[base(self)] then
                 callback(true, { device_code = "dc", user_code = "ABCD-1234", verify_url = base(self) .. "/pair" })
             else
-                callback(false, nil, "HTTP 400")
+                callback(false, nil, failing[base(self)] or "HTTP 400")
             end
         end
         function o:authorize()
@@ -71,6 +71,7 @@ stub("CWNGSyncClient", {
     end,
     statusOf = function(reason) return tonumber(tostring(reason):match("(%d%d%d)")) end,
     plainReason = function(reason) return tostring(reason) end,
+    notHttps = function(reason) return tostring(reason):find("wantread", 1, true) ~= nil end,
 })
 G_reader_settings = { saveSetting = function() end } -- luacheck: ignore
 
@@ -94,7 +95,7 @@ local function newPlugin()
 end
 
 local function reset(servers)
-    shown, dialogs, asked, answering, refusing = {}, {}, {}, {}, {}
+    shown, dialogs, asked, answering, refusing, failing = {}, {}, {}, {}, {}, {}
     for _, server in ipairs(servers) do answering[server] = true end
 end
 
@@ -127,6 +128,33 @@ local function testAnAddressTypedWithoutHttpsFindsAnHttpsOnlyServer()
     -- refuses http: the address to type must say https.
     assertEqual(pairingShown().address, "https://10.0.30.36:8083/pair", "the address to open says https")
     pairingShown().on_cancel() -- one pairing at a time
+end
+
+local function testAPlainHttpServerThatFailsSaysWhy()
+    -- Seen on a Kindle: a slow http server timed out, the https attempt then
+    -- met a port that speaks no TLS, and the reader was told "wantread".
+    reset({})
+    failing["http://10.0.20.139:18086"] = "timeout"
+    failing["https://10.0.20.139:18086"] = "wantread"
+    typed = "10.0.20.139:18086"
+    newPlugin():startPairing()
+    press(dialogs[#dialogs], "Continue")
+    assertEqual(#asked, 2, "http, then https")
+    local text = tostring(shown[#shown] and shown[#shown].text)
+    assert(text:find("timeout", 1, true), "the http failure is the one shown: " .. text)
+    assert(not text:find("wantread", 1, true), "not the https attempt's: " .. text)
+end
+
+local function testAnHttpsServerThatFailsSaysWhy()
+    -- Behind an https-only proxy the https failure is the informative one.
+    reset({})
+    failing["http://books.example.com"] = "HTTP 400"
+    failing["https://books.example.com"] = "certificate verify failed"
+    typed = "books.example.com"
+    newPlugin():startPairing()
+    press(dialogs[#dialogs], "Continue")
+    local text = tostring(shown[#shown] and shown[#shown].text)
+    assert(text:find("certificate", 1, true), "the https failure is shown: " .. text)
 end
 
 local function testAPlainHttpServerIsAskedOnce()
@@ -191,6 +219,8 @@ end
 
 testAnAddressTypedWithoutHttpsFindsAnHttpsOnlyServer()
 testAPlainHttpServerIsAskedOnce()
+testAPlainHttpServerThatFailsSaysWhy()
+testAnHttpsServerThatFailsSaysWhy()
 testAnAddressTypedWithASchemeIsTakenAtItsWord()
 testAFailedAddressIsOfferedAgainWithoutTheGuessedScheme()
 testSigningInFindsAnHttpsOnlyServerToo()

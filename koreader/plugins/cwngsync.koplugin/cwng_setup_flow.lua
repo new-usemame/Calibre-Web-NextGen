@@ -278,7 +278,8 @@ function SetupFlow:startPairing()
 end
 
 -- `secure`: the https address to try if `server`, guessed as http, fails.
-function SetupFlow:requestPairing(server, secure)
+-- `http_failure`: why that http attempt failed, when this is the https one.
+function SetupFlow:requestPairing(server, secure, http_failure)
     local client = newClient(self, server)
     local pairing = { server = server }
     session.pairing = pairing
@@ -297,8 +298,11 @@ function SetupFlow:requestPairing(server, secure)
                     hostOf(server))
             elseif secure then
                 logger.info("CWNGSync: pairing over http failed, trying https:", hostOf(server), reason)
-                return self:requestPairing(secure)
+                return self:requestPairing(secure, nil, reason)
             else
+                -- A plain http server answers https with garbage; then the
+                -- http attempt's failure is the one that says what is wrong.
+                if http_failure and CWNGSyncClient.notHttps(reason) then reason = http_failure end
                 text = T(_("Could not start pairing with %1: %2\n\nCheck the address, and that KOReader sync is switched on in CWNG's settings."),
                     hostOf(server), CWNGSyncClient.plainReason(reason))
             end

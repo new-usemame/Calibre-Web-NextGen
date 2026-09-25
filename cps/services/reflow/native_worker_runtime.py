@@ -21,6 +21,33 @@ def sources(book, supplied):
     return result
 
 
+def _shutdown_document(doc, control, sequence, reason):
+    """Bounded, text-free close phases; slow exits get one stderr stack dump.
+
+    These frames follow the final command reply. They are diagnostic only and
+    cannot make a failed shutdown successful. The watchdog ends with this fresh
+    interpreter, including if Python finalization stalls after this returns.
+    """
+    import time
+    def phase(name):
+        try:
+            control.write(json.dumps({'seq': sequence, 'shutdown_phase': name,
+                'monotonic_ns': time.monotonic_ns(), 'cpu_ns': time.process_time_ns()}) + '\n')
+            control.flush()
+        except (OSError, ValueError):
+            pass  # Lost diagnostic channel must not prevent native cleanup.
+    phase(reason)
+    try:
+        faulthandler.dump_traceback_later(1.0, repeat=False, file=sys.stderr)
+    except (OSError, ValueError, RuntimeError):
+        pass
+    phase('document_close_started')
+    if doc is not None:
+        doc.close()
+    phase('document_closed')
+    phase('runtime_returning')
+
+
 def serve(parent, cache_root, control):
     import pymupdf
     from . import pipeline, extract, structural_ops, build_epub, report, source_assessment
@@ -37,9 +64,12 @@ def serve(parent, cache_root, control):
     def progress(event):
         emit({'progress': {'stage': str(event.stage)[:48], 'page': int(event.page),
                            'pages': int(event.pages)}})
+    end_reason = 'command_loop_error'
     try:
         for line in sys.stdin:
-            if stop(): break
+            if stop():
+                end_reason = 'parent_gone'
+                break
             if len(line) > 32 or int(line) != sequence + 1: raise ValueError('native sequence')
             sequence += 1
             request = codec.loads(ipc.read_owned(root, 'request.json'))
@@ -154,6 +184,8 @@ def serve(parent, cache_root, control):
             # its reply. Only the explicitly bound operation Book stays live.
             value = reply = None
             emit({'ready': True})
+        else:
+            end_reason = 'stdin_eof'
     finally:
-        if doc is not None: doc.close()
+        _shutdown_document(doc, control, sequence, end_reason)
     return 0

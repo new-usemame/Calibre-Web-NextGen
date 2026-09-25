@@ -94,6 +94,11 @@ def test_actual_epub_shows_original_grid_before_unchanged_marked_ocr_and_exclude
         evidence=side['source_evidence'][0]
         original_root=ET.fromstring(original)
         ns='{http://www.w3.org/1999/xhtml}'
+        children=list(original_root.find(ns+'body'))
+        nav=next(node for node in children if node.tag==ns+'nav')
+        full=next(node for node in children if any(
+            image.get('src')==evidence['full'] for image in node.iter(ns+'img')))
+        assert children[0].get('id')=='page' and children.index(nav)<children.index(full)
         ids=[node.get('id') for node in original_root.iter() if node.get('id')]
         assert len(ids)==len(set(ids))
         inspection=[detail for detail in evidence['details'] if detail['id'].startswith('inspection_')]

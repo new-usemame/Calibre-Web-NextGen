@@ -1619,13 +1619,14 @@ def _original_document(record, home, language):
     body = ('<h1 id="page">Original PDF page %d</h1>%s<p>These are original printed pixels. '
             'Extracted labels and glyphs may be wrong; no note identity is inferred '
             'from the transcription. The details below preserve printed context.</p>'
-            '<section class="source-evidence"><h2>Complete original page</h2>'
-            '<img src="%s" alt="Complete original PDF page %d"/></section>'
-            % (pno + 1, back, record["full"], pno + 1))
+            % (pno + 1, back))
     if record["details"]:
         body += '<nav aria-label="Original source details"><h2>Inspect original details</h2><ol>'
         body += ''.join('<li><a href="#%s">%s</a></li>' % (d['id'], escape(d['label'])) for d in record['details'])
         body += '</ol></nav>'
+    body += ('<section class="source-evidence"><h2>Complete original page</h2>'
+             '<img src="%s" alt="Complete original PDF page %d"/></section>'
+             % (record["full"], pno + 1))
     if record.get('source_uncertainty'):
         report = record['source_uncertainty']
         body += '<section class="source-evidence"><h2>OCR readings to check</h2><p>These tokens are retained as extracted. Some could not be highlighted in the reflowed text.</p><ul>'

@@ -277,6 +277,28 @@ def test_inspection_links_land_on_visible_heading_with_complete_detail_and_retur
     assert next(node for node in root.iter() if node.get('id') == 'notes').tag == XHTML + 'section'
 
 
+def test_original_detail_navigation_precedes_full_page_image_and_preserves_entry():
+    details = [
+        {'id': 'inspection_0', 'label': 'First tile', 'src': 'images/tile0.png'},
+        {'id': 'inspection_1', 'label': 'Second tile', 'src': 'images/tile1.png'},
+    ]
+    root = ET.fromstring(build_epub._original_document(
+        {'page': 15, 'full': 'images/page.png', 'details': details}, 'ch015.xhtml', 'en'))
+    body = root.find(XHTML + 'body')
+    children = list(body)
+    nav = next(node for node in children if node.tag == XHTML + 'nav')
+    full = next(node for node in children if any(
+        img.get('src') == 'images/page.png' for img in node.iter(XHTML + 'img')))
+    first_return = next(node for node in children if any(
+        link.get('href') == 'ch015.xhtml#pg_0015' for link in node.iter(XHTML + 'a')))
+    assert children[0].get('id') == 'page'
+    assert children.index(first_return) < children.index(nav) < children.index(full)
+    assert [link.get('href') for link in nav.iter(XHTML + 'a')] == [
+        '#inspection_0', '#inspection_1']
+    assert [img.get('src') for img in body.iter(XHTML + 'img')] == [
+        'images/page.png', 'images/tile0.png', 'images/tile1.png']
+
+
 def test_uncertain_notes_expose_original_pixels_and_only_disarm_ambiguous_links(tmp_path):
     from cps.services.reflow import extract
     with pymupdf.open() as doc:

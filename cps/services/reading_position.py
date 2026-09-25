@@ -36,10 +36,12 @@ unresolvable position.  Instead the row is written with an explicit
 percentage-only sentinel and served as ``position_kind: "percentage"``, which
 the plugin acts on with ``GotoPercent`` — an event both of KOReader's engines
 implement (``ReaderRolling:onGotoPercent``, ``ReaderPaging:onGotoPercent``).
-That lands the reader near where the browser stopped rather than exactly there;
-an exact hand-off still needs CFI <-> xpointer canonicalization, tracked on
-#324.  Clients that have not advertised percentage support never receive these
-rows, so this cannot mis-seek an older plugin.
+The row itself always stays percentage-only; when the requesting device holds
+the very EPUB the web reader renders, the kosync GET serves the browser's CFI
+converted to that file's XPointer instead (``koreader_position``), and in the
+other direction ``read_resume_position`` adds the CFI of a KOReader XPointer.
+Clients that have not advertised percentage support never receive these rows,
+so this cannot mis-seek an older plugin.
 
 Conflict policy: **furthest wins**, matching the rule KOSync already applies
 across devices (``kosync.py:1106``).  Opening a book in the browser therefore
@@ -55,7 +57,7 @@ finished-book guard below stays clearable on a custom-read-column install too
 """
 
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from .. import logger, ub
@@ -178,7 +180,8 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
 
     # Imported lazily: the KOSync protocol module pulls in cps.kobo, and this
     # service is imported from cps.web / cps.api.reader at request time.
-    from ..progress_syncing.protocols.kosync import (read_status_for_percentage,
+    from ..progress_syncing.protocols.kosync import (WEB_READER_DEVICE,
+                                                     read_status_for_percentage,
                                                      record_percentage_only_progress,
                                                      update_book_read_status)
 
@@ -247,7 +250,7 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
                 )
                 return False
             kosync_outcome = record_percentage_only_progress(
-                user_id, book_id, percentage, device="Web reader",
+                user_id, book_id, percentage, device=WEB_READER_DEVICE,
                 _return_outcome=True,
             )
             if not kosync_outcome.accepted:
@@ -266,6 +269,52 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
     log.debug("Web reader advanced progress for user %s book %s to %.2f%%",
               user_id, book_id, percentage)
     return True
+
+
+# A KOReader push stamps the shared row, then advances the bookmark a moment
+# later in the same request; this bounds that gap, not a device's clock.
+_SAME_REPORT_SLACK = timedelta(seconds=60)
+_MAX_KOREADER_DIGESTS = 3
+
+
+def _koreader_report(connection, user_id, book_id, bookmark_percent, bookmark_clock, utc):
+    """``(xpointer, digests)`` when the resume position IS a KOReader report.
+
+    The resume offers the shared Kobo bookmark. A KOReader push writes it
+    through ``update_book_read_status`` with the percentage it also stores,
+    beside its XPointer, on the book-id-keyed ``kosync_progress`` row. So the
+    bookmark is that push when that row holds an XPointer at exactly the
+    bookmark's percentage and was stamped no earlier than the bookmark
+    (``_SAME_REPORT_SLACK`` covers the gap between the two writes of one
+    push). Every other writer of the bookmark -- the web reader, a Kobo --
+    either replaces the row with the percentage-only sentinel or leaves it
+    older than the bookmark. The bookmark's own location fields are then
+    stale (a KOReader push does not write them), so they must not be used.
+
+    ``digests`` are the files that XPointer was reported from, from the
+    per-device journal (``koreader_position.journal_report``), newest first;
+    none (a push from before the journal) means no exact place, not the
+    bookmark's stale location.
+    """
+    from .koreader_position import KOREADER_LOCATION_TYPE, is_xpointer
+    row = connection.execute(
+        "SELECT progress, percentage, timestamp FROM kosync_progress "
+        "WHERE user_id=? AND document=?", (user_id, str(book_id)),
+    ).fetchone()
+    if (not row or not is_xpointer(row[0]) or row[1] is None or row[2] is None
+            or row[1] != bookmark_percent):
+        return None
+    if utc(row[2]) < bookmark_clock - _SAME_REPORT_SLACK:
+        return None
+    digests = [digest for (digest,) in connection.execute(
+        "SELECT p.location_source FROM device_reading_position p "
+        "JOIN device d ON d.id=p.device_id "
+        "WHERE d.user_id=? AND d.kind='koreader' AND p.book_id=? "
+        "AND p.location_type=? AND p.location_value=? AND p.location_source IS NOT NULL "
+        "ORDER BY p.server_modified_at DESC LIMIT ?",
+        (user_id, book_id, KOREADER_LOCATION_TYPE, row[0], _MAX_KOREADER_DIGESTS),
+    )]
+    return row[0], digests
 
 
 def read_resume_position(engine, user_id, book_id, fmt="epub"):
@@ -327,14 +376,30 @@ def read_resume_position(engine, user_id, book_id, fmt="epub"):
                 "ON s.id=b.kobo_reading_state_id WHERE s.user_id=? AND s.book_id=? LIMIT 1",
                 (user_id, book_id),
             ).fetchone()
+            try:
+                koreader = _koreader_report(connection, user_id, book_id, remote[0],
+                                            synced_at, utc)
+            except sqlite3.Error:
+                # An app database without these tables keeps the Kobo path.
+                log.debug("Could not read KOReader position for book %s", book_id,
+                          exc_info=True)
+                koreader = None
             # Release the read snapshot before any optional EPUB work.
             connection.close()
             connection = None
-            if location and location[1] == "KoboSpan" and location[0] and location[2]:
-                from .kobo_resume import exact_resume
+            from .kobo_resume import exact_resume
+            exact = None
+            if koreader is not None:
+                from .koreader_position import KOREADER_LOCATION_TYPE
+                xpointer, digests = koreader
+                for digest in digests:
+                    exact = exact_resume(book_id, digest, KOREADER_LOCATION_TYPE, xpointer)
+                    if exact:
+                        break
+            elif location and location[1] == "KoboSpan" and location[0] and location[2]:
                 exact = exact_resume(book_id, *location)
-                if exact:
-                    result["resume"].update(exact)
+            if exact:
+                result["resume"].update(exact)
         except Exception:
             log.debug("Could not load exact reader resume for book %s", book_id, exc_info=True)
     except Exception:

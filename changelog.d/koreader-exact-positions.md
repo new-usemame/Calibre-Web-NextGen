@@ -1,0 +1,5 @@
+### Fixed
+
+- **Switching between KOReader and the web reader opens the same page, not just the same percentage.** When your e-reader holds the same EPUB file the web reader shows, the web reader now opens at the exact place you stopped on the Kindle or other KOReader device, and KOReader opens at the exact place you stopped in the browser. Before, each hand-off went by percentage and could land several pages away. When the device holds a different copy of the book, the hand-off stays a percentage, as before. Which position wins is unchanged: the furthest one.
+- **Highlights convert between KOReader and the web reader in many more books.** Chapters whose HTML head leaves tags such as `<meta charset="utf-8">` unclosed, common in calibre-converted and retail EPUBs, no longer stop their highlights from appearing on the other reader.
+- **The web reader's reading sources list your KOReader e-readers.** A Kindle or other KOReader device shows where it last was in each book, and can be opened at that exact place when it holds the same file.

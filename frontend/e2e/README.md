@@ -173,11 +173,12 @@ surfaces; reverse dependents cannot be discovered by that traversal and must be 
 prefixes. The whole `cps/api/` blueprint tree is therefore protected explicitly: its registration in
 `cps/main.py` points toward the handlers, opposite to the import direction walked by the classifier. The
 two-level cutoff only bounds each root's dependency fan-out—it is not what excludes reverse dependents.
-At this revision the derived set is 186 of 246 local Python modules (the closure correctly picks
+At this revision the derived set is 187 of 247 local Python modules (the closure correctly picks
 up `cps/services/device_delivery.py` through the book-action request path,
 `cps/user_preferences.py` through the account API path, and the custom-column hierarchy helper
 `cps/hierarchy.py` through `cps/db.py`). The highlight position converter
-`cps/services/koreader_xpointer.py` entered through the annotation routes that call it. The KOReader
+`cps/services/koreader_xpointer.py` entered through the annotation routes that call it. Its position hand-off `cps/services/koreader_position.py` entered through the
+/kosync progress routes. The KOReader
 library and pairing modules entered the same way: `cps/api/koreader_devices.py`, the `/kosync` library
 and pairing routes, and the services under them (`app_passwords`, `ereader_scope`, `koreader_bundle`,
 `koreader_library`, `koreader_pairing`), and the placeholder builder

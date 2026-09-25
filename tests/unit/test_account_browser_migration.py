@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """Upgrade real browser histories without changing content or shared progress."""
 
+from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from threading import Barrier
@@ -281,6 +282,70 @@ def test_a_browser_that_already_exists_stays_the_one_source(db):
     assert _browser(session, 7).id == browser.id
     assert (legacy.active, legacy.created_by) == (False, "browser-alias")
     assert session.query(ub.DeviceReadingPosition).filter_by(device_id=browser.id).one().cfi == "legacy"
+
+
+def _contents(conn, table):
+    """Every stored observation's content, whichever source holds it."""
+    return Counter(tuple(sorted((c, str(v)) for c, v in row.items() if c not in ("id", "device_id")))
+                   for row in _snapshot(conn, table))
+
+
+def test_an_existing_browser_keeps_what_later_sources_replace(db):
+    """After a downgrade wrote new sources, the Browser takes their newer reports
+    and its own older ones move to an alias instead of disappearing."""
+    from cps import ub
+    from cps.services.browser_source import migrate_account_browser_source
+    engine, session = db
+    noon = datetime(2026, 9, 20, 12)
+    browsers = {u: ub.Device(user_id=u, kind="webreader", display_name="Browser",
+                             created_by="account-browser") for u in (7, 8)}
+    legacy = {u: ub.Device(user_id=u, kind="webreader", display_name="Web reader 5",
+                           created_by="auto") for u in (7, 8)}
+    session.add_all([*browsers.values(), *legacy.values()]); session.flush()
+    note = ub.Annotation(user_id=7, book_id=5, annotation_id="note", source="webreader",
+                         note_text="note", origin_device_id=browsers[7].id)
+    session.add(note); session.flush()
+    # Reader 7's Browser read to 90%; the older build then saved 10%. Reader
+    # 8's Browser saved last, so its merge replaces nothing.
+    for user, browser_at, legacy_at in ((7, noon, noon + timedelta(hours=1)),
+                                        (8, noon + timedelta(hours=1), noon)):
+        session.add(ub.DeviceReadingPosition(device_id=browsers[user].id, book_id=5, progress_percent=90.0,
+                                             cfi="further", server_modified_at=browser_at))
+        session.add(ub.DeviceReadingPosition(device_id=legacy[user].id, book_id=5, progress_percent=10.0,
+                                             cfi="later", server_modified_at=legacy_at))
+    session.add(ub.AnnotationDeviceState(device_id=browsers[7].id, annotation_id=note.id,
+                                         desired=True, updated_at=noon))
+    session.add(ub.AnnotationDeviceState(device_id=legacy[7].id, annotation_id=note.id,
+                                         desired=False, updated_at=noon + timedelta(hours=1)))
+    session.commit()
+    with engine.connect() as conn:
+        before = {t: _contents(conn, t) for t in OBSERVATIONS}
+    migrate_account_browser_source(engine)
+    session.expire_all()
+
+    def position(device_id):
+        p = session.query(ub.DeviceReadingPosition).filter_by(device_id=device_id, book_id=5).one()
+        return p.progress_percent, p.cfi
+
+    assert (_browser(session, 7).id, _browser(session, 8).id) == (browsers[7].id, browsers[8].id)
+    assert position(browsers[7].id) == (10.0, "later")  # the latest report, as a save would
+    assert position(browsers[8].id) == (90.0, "further")
+    kept = session.query(ub.Device).filter(
+        ub.Device.user_id == 7, ub.Device.id.notin_([browsers[7].id, legacy[7].id])).one()
+    assert (kept.kind, kept.created_by, kept.active) == ("webreader", "browser-alias", False)
+    assert position(kept.id) == (90.0, "further")
+    state = session.query(ub.AnnotationDeviceState).filter_by(device_id=kept.id).one()
+    assert (state.updated_at, state.desired) == (noon, True)
+    assert session.query(ub.Device).filter_by(user_id=8).count() == 2  # nothing to keep
+    with engine.connect() as conn:
+        after = {t: _contents(conn, t) for t in OBSERVATIONS}
+        # No observation's content is gone; the merge only adds copies.
+        assert all(not before[t] - after[t] for t in OBSERVATIONS)
+        tables = ("device",) + OBSERVATIONS
+        state = {t: _snapshot(conn, t) for t in tables}
+    migrate_account_browser_source(engine)
+    with engine.connect() as conn:
+        assert {t: _snapshot(conn, t) for t in tables} == state
 
 
 def test_the_browser_is_active_when_any_folded_source_is(db):

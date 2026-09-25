@@ -5,9 +5,11 @@
 Old device rows remain as aliases, retaining their original public IDs,
 transport telemetry and observations. An account with one old row keeps it as
 its Browser; an account with several gains a new Browser row, so merging never
-overwrites an old row's own observations. Only the canonical row participates
-in source selection. The created_by markers are internal; neither is accepted
-from a client.
+overwrites an old row's own observations. An existing Browser takes later
+sources' newer reports, as a save would, and any of its own observations they
+replace move to a new alias first: the merge discards no observation. Only the
+canonical row participates in source selection. The created_by markers are
+internal; neither is accepted from a client.
 """
 
 import re
@@ -40,32 +42,43 @@ def _rows(conn, table, ids, order="id"):
     ).bindparams(bindparam("ids", expanding=True)), {"ids": ids}).mappings().all()
 
 
-def _new_account_browser(conn, like):
-    """Insert an account Browser that copies ``like``'s descriptive columns.
+def _new_browser_row(conn, like, created_by, **values):
+    """Insert a browser row that copies ``like``'s descriptive columns.
 
-    Only the new row receives merged observations, so every original row,
-    ``like`` included, keeps its own history untouched as an alias.
+    ``values`` replace copied columns. Returns the new row.
     """
-    columns = [c for c in like if c not in ("id", "public_id", "created_by")]
+    row = {c: like[c] for c in like if c not in ("id", "public_id", "created_by")}
+    row.update(values, public_id=str(uuid.uuid4()), created_by=created_by)
     conn.execute(text(
-        f"INSERT INTO device (public_id, created_by, {', '.join(columns)}) "
-        f"VALUES (:public_id, :created_by, {', '.join(':' + c for c in columns)})"
-    ), {**{c: like[c] for c in columns},
-        "public_id": str(uuid.uuid4()), "created_by": ACCOUNT_BROWSER})
-    return conn.execute(text(
-        "SELECT * FROM device WHERE user_id=:user AND kind='webreader' "
-        "AND created_by=:created_by"
-    ), {"user": like["user_id"], "created_by": ACCOUNT_BROWSER}).mappings().one()
+        f"INSERT INTO device ({', '.join(row)}) VALUES ({', '.join(':' + c for c in row)})"
+    ), row)
+    return conn.execute(text("SELECT * FROM device WHERE public_id=:public_id"),
+                        {"public_id": row["public_id"]}).mappings().one()
+
+
+def _insert(conn, table, row):
+    row = {c: v for c, v in row.items() if c != "id"}
+    conn.execute(text(
+        f"INSERT INTO {table} ({', '.join(row)}) VALUES ({', '.join(':' + c for c in row)})"
+    ), row)
 
 
 def _copy_latest(conn, table, key, clock, ids, canonical_id, *, combine_latch=False):
-    """Copy whole latest observations; retain alias rows as historical evidence."""
+    """Copy whole latest observations onto the canonical row.
+
+    Alias rows stay as they are. Returns the canonical row's own observations
+    that a later report replaced, for the caller to keep.
+    """
     winners = {}
     latches = {}
+    own = {}
     for row in _rows(conn, table, ids, f"{clock}, id"):
         winners[row[key]] = dict(row)
+        if row["device_id"] == canonical_id:
+            own[row[key]] = dict(row)
         if combine_latch:
             latches[row[key]] = latches.get(row[key], False) or bool(row["rehydrate_needed"])
+    replaced = [row for identity, row in own.items() if winners[identity]["id"] != row["id"]]
     for identity, row in winners.items():
         row.pop("id")
         row["device_id"] = canonical_id
@@ -78,6 +91,7 @@ def _copy_latest(conn, table, key, clock, ids, canonical_id, *, combine_latch=Fa
             f"VALUES ({', '.join(':' + c for c in columns)}) "
             f"ON CONFLICT(device_id, {key}) DO UPDATE SET {updates}"
         ), row)
+    return replaced
 
 
 def migrate_account_browser_source(engine):
@@ -85,8 +99,8 @@ def migrate_account_browser_source(engine):
 
 Run after the annotation/device schema migrations. A completed account is
 skipped on subsequent boots, so historical alias telemetry cannot overwrite
-new reading activity. No device rows or annotation content are deleted, and
-no pre-upgrade source's own observations are overwritten.
+new reading activity. No device row, annotation content or observation is
+deleted: every observation the merge replaces stays on an alias.
 """
     with engine.begin() as conn:
         # Acquire SQLite's writer reservation before choosing canonical rows.
@@ -139,7 +153,7 @@ no pre-upgrade source's own observations are overwritten.
                 # others (a laptop's 80% by a phone's later 10%) and keep them
                 # nowhere. A new Browser receives the merge instead, so every
                 # original, the oldest included, keeps its rows as an alias.
-                canonical = _new_account_browser(conn, preferred)
+                canonical = _new_browser_row(conn, preferred, ACCOUNT_BROWSER)
             canonical_id = canonical["id"]
             aliases = [i for i in ids if i != canonical_id]
             conn.execute(text(
@@ -169,10 +183,23 @@ no pre-upgrade source's own observations are overwritten.
                 ).bindparams(bindparam("aliases", expanding=True)), {
                     "canonical": canonical_id, "user": user_id, "aliases": aliases,
                 })
-            _copy_latest(conn, "device_reading_position", "book_id", "server_modified_at",
-                         ids, canonical_id, combine_latch=True)
-            _copy_latest(conn, "annotation_device_state", "annotation_id", "updated_at",
-                         ids, canonical_id)
+            replaced = {
+                "device_reading_position": _copy_latest(
+                    conn, "device_reading_position", "book_id", "server_modified_at",
+                    ids, canonical_id, combine_latch=True),
+                "annotation_device_state": _copy_latest(
+                    conn, "annotation_device_state", "annotation_id", "updated_at",
+                    ids, canonical_id),
+            }
+            if any(replaced.values()):
+                # Only a Browser that already existed has rows of its own to
+                # lose (after a downgrade wrote new sources, say). It takes the
+                # newer reports, as a save would; what they replace moves to a
+                # new alias, as the other sources' rows stay on theirs.
+                kept = _new_browser_row(conn, canonical, BROWSER_ALIAS, active=False)["id"]
+                for table, rows in replaced.items():
+                    for row in rows:
+                        _insert(conn, table, dict(row, device_id=kept))
             # A browser has no hardware delivery state. Keep the original
             # telemetry, but canonical routing intent follows the assignment.
             # Qualified: a bare annotation_id resolves to annotation's own

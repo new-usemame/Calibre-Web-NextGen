@@ -5,7 +5,7 @@ import zipfile
 
 import pymupdf
 import pytest
-from PIL import Image
+from PIL import Image, ImageChops
 
 from cps.services.reflow import assemble, build_epub, extract, skeleton
 
@@ -78,6 +78,9 @@ def test_key_primary_package_retains_complete_source_pixels(mark, color, probe_k
     with pymupdf.open() as doc:
         page = doc.new_page(width=raw.width, height=raw.height)
         page.insert_image(page.rect, stream=pixels)
+        rendered = page.get_pixmap(matrix=pymupdf.Matrix(2, 2), alpha=False,
+                                   colorspace=pymupdf.csRGB)
+        source = Image.frombytes('RGB', (rendered.width, rendered.height), rendered.samples)
         if probe_kind == 'real':
             probe = extract.ScanPixelProbe(doc, 0)
         else:
@@ -95,12 +98,52 @@ def test_key_primary_package_retains_complete_source_pixels(mark, color, probe_k
         assert build_epub.validate(target) == []
         with zipfile.ZipFile(target) as package:
             primary = package.read('OEBPS/images/fig_p0000_0.jpg')
-            assert primary == extract.crop_jpeg(doc, 0, (0, 0, raw.width, raw.height))
+            extent = ImageChops.difference(source, Image.new('RGB', source.size, 'white')).getbbox()
+            assert extent is not None
+            left, right = max(0, extent[0]-8), min(source.width, extent[2]+8)
+            if source.width-(right-left) < source.width*.10:
+                left, right = 0, source.width
+            if left:
+                assert ImageChops.difference(source.crop((0, 0, left, source.height)),
+                    Image.new('RGB', (left, source.height), 'white')).getbbox() is None
+            if right < source.width:
+                assert ImageChops.difference(source.crop((right, 0, source.width, source.height)),
+                    Image.new('RGB', (source.width-right, source.height), 'white')).getbbox() is None
             with Image.open(io.BytesIO(primary)) as image:
-                assert image.size == (raw.width*2, raw.height*2)
-                x = round((mark[0]+mark[2]))
+                assert image.size == (right-left, source.height)
+                x = round((mark[0]+mark[2]))-left
                 y = round((mark[1]+mark[3]))
                 assert min(image.convert('RGB').getpixel((x, y))) < 230
             chapter = package.read('OEBPS/ch001.xhtml').decode()
-            assert chapter.count('Complete original page containing a printed symbol key.') == 1
+            assert chapter.count('Printed symbol key retained from the original page.') == 1
             assert 'original-p0000.xhtml#page' in chapter
+
+
+def test_key_trim_unknown_source_background_retains_full_page(tmp_path):
+    raw = _key_page()
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=raw.width, height=raw.height)
+        page.draw_rect(page.rect, color=None, fill=(.98, .97, .96))
+        book = assemble.assemble([skeleton.page_skeleton(raw, skeleton.book_style([raw]))],
+                                 skeleton.book_style([raw]), [raw])
+        target = tmp_path/'tinted.epub'
+        build_epub.build(book, target, doc=doc)
+        with zipfile.ZipFile(target) as package, Image.open(io.BytesIO(
+                package.read('OEBPS/images/fig_p0000_0.jpg'))) as image:
+            assert image.size == (raw.width*2, raw.height*2)
+
+
+def test_key_trim_error_retains_full_page(monkeypatch, tmp_path):
+    raw = _key_page()
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=raw.width, height=raw.height)
+        page.draw_rect((48, 94, 80, 104), color=None, fill=(0, 0, 0))
+        book = assemble.assemble([skeleton.page_skeleton(raw, skeleton.book_style([raw]))],
+                                 skeleton.book_style([raw]), [raw])
+        monkeypatch.setattr(build_epub, '_scan_key_white_margin_jpeg',
+                            lambda *args: (_ for _ in ()).throw(RuntimeError('unavailable')))
+        target = tmp_path/'unavailable.epub'
+        build_epub.build(book, target, doc=doc)
+        with zipfile.ZipFile(target) as package:
+            assert package.read('OEBPS/images/fig_p0000_0.jpg') == extract.crop_jpeg(
+                doc, 0, (0, 0, raw.width, raw.height))

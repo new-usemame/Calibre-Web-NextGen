@@ -12,7 +12,7 @@ import operator
 import sys
 import string
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from datetime import time as datetime_time
 from functools import wraps
 from urllib.parse import urlparse

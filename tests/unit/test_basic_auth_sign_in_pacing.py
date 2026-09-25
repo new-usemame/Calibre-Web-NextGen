@@ -135,3 +135,20 @@ def test_a_broken_limiter_store_does_not_lock_clients_out(login_type):
         for p in reversed(patches):
             p.stop()
     assert statuses == [200, 401, 200]
+
+
+def test_a_sign_in_succeeds_when_its_pace_cannot_be_cleared():
+    app, patches = _catalogue(constants.LOGIN_LDAP, existing_user=True)
+    limiter = patches[0].new
+    patches.append(patch.object(limiter.limiter.storage, "clear",
+                                side_effect=ConnectionError("store down")))
+    for p in patches:
+        p.start()
+    try:
+        client = app.test_client()
+        statuses = [client.get("/catalogue", auth=("alice", pw)).status_code
+                    for pw in ["wrong", "right"]]
+    finally:
+        for p in reversed(patches):
+            p.stop()
+    assert statuses == [401, 200]

@@ -179,6 +179,13 @@ export interface BookFormat {
 }
 
 /** An active physical reader registered through Kobo or KOReader sync. */
+/** Another user's eReader an admin can email a book to (fork #276, #2296). */
+export interface OtherEreader {
+  id: number;
+  name: string;
+  emails: string[];
+}
+
 export interface DeliveryDevice {
   public_id: string;
   label: string;

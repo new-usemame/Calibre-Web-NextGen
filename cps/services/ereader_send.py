@@ -43,3 +43,25 @@ def send_includes_own_address(own_kindle_mail: str | None, selected_emails: str 
     if not own:
         return False
     return bool(own & _split_addresses(selected_emails))
+
+
+def other_users_with_ereader(sender_id: int):
+    """Every user other than the sender who has an eReader address, by name.
+
+    These are the recipients fork #276 lets an admin choose from. The addresses
+    are other people's contact details, so callers must only use this for an
+    admin sender.
+    """
+    from .. import ub
+
+    return (ub.session.query(ub.User)
+            .filter(ub.User.id != int(sender_id),
+                    ub.User.kindle_mail.isnot(None),
+                    ub.User.kindle_mail != "")
+            .order_by(ub.User.name)
+            .all())
+
+
+def ereader_addresses(kindle_mail: str | None) -> list[str]:
+    """A user's configured eReader addresses, trimmed, in their saved order."""
+    return [part.strip() for part in (kindle_mail or "").split(",") if part.strip()]

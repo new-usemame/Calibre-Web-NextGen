@@ -1067,7 +1067,9 @@ def get_progress(document: str):
             "percentage": percentage_decimal,
             "device": progress_record.device,
             "device_id": progress_record.device_id,
-            "timestamp": int(progress_record.timestamp.timestamp())
+            # Stored as naive UTC: read as local time, a server with TZ set
+            # would serve every position hours in the future.
+            "timestamp": int(_aware_datetime(progress_record.timestamp).timestamp())
         }
 
         response_data = {**response_data, **response_updates}

@@ -112,3 +112,26 @@ def test_a_successful_sign_in_resets_the_pace(login_type):
     wrong = ["wrong"] * (ATTEMPTS_PER_MINUTE - 1)
     statuses = _statuses(login_type, wrong + ["right"] + wrong + ["right"] * 5)
     assert statuses == [401, 401, 200, 401, 401] + [200] * 5
+
+
+@pytest.mark.parametrize("login_type", [constants.LOGIN_STANDARD, constants.LOGIN_LDAP],
+                         ids=["local", "directory"])
+def test_a_broken_limiter_store_does_not_lock_clients_out(login_type):
+    # An external store (Redis, Memcached) can be down; sign-in still decides
+    # on the password alone, as the API sign-in does.
+    app, patches = _catalogue(login_type, existing_user=True)
+    limiter = patches[0].new
+    patches += [
+        patch.object(limiter, "check", side_effect=ConnectionError("store down")),
+        patch.object(limiter.limiter.storage, "clear", side_effect=ConnectionError("store down")),
+    ]
+    for p in patches:
+        p.start()
+    try:
+        client = app.test_client()
+        statuses = [client.get("/catalogue", auth=("alice", pw)).status_code
+                    for pw in ["right", "wrong", "right"]]
+    finally:
+        for p in reversed(patches):
+            p.stop()
+    assert statuses == [200, 401, 200]

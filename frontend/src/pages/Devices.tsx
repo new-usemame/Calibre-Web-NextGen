@@ -8,7 +8,7 @@ import { clampOffset } from '../lib/pagination';
 import { parseApiTimestamp, relativeWhen } from '../lib/relativeTime';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { useFocusTrap } from '../lib/a11y/useFocusTrap';
-import { useT } from '../lib/i18n';
+import { useT, type TFunction } from '../lib/i18n';
 import { SpinnerCentered } from '../components/Spinner';
 import { DeviceInventory, type Device } from '../components/DeviceInventory';
 import { KoboPairing } from '../components/KoboPairing';
@@ -31,6 +31,11 @@ function isDeviceStale(lastSeen: string | null): boolean {
   return timestamp !== null && Date.now() - timestamp > 30 * 86400000;
 }
 
+/** The account Browser is stored as "Browser"; show it in the reader's language. */
+function sourceName(device: Device, t: TFunction): string {
+  return device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label;
+}
+
 function RemoveDialog({ device, counts, onCancel, onRemove, pending, error }: {
   device: Device; counts: Counts; onCancel: () => void; onRemove: () => void;
   pending: boolean; error: boolean;
@@ -43,7 +48,7 @@ function RemoveDialog({ device, counts, onCancel, onRemove, pending, error }: {
     <div className={styles.scrim}>
       <div ref={dialogRef} className={styles.dialog} role="alertdialog" aria-modal="true" tabIndex={-1}
         aria-labelledby={`${descriptionId}-title`} aria-describedby={descriptionId}>
-        <h2 id={`${descriptionId}-title`}>{t('Remove {name}?', { name: device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label })}</h2>
+        <h2 id={`${descriptionId}-title`}>{t('Remove {name}?', { name: sourceName(device, t) })}</h2>
         <div id={descriptionId}>
           {counts.origin_count > 0 && <p>{t('{n} annotations were made on this source. They are not deleted. Their origin history is kept.', { n: counts.origin_count })}</p>}
           {counts.assigned_count > 0 && <p>{t('{n} annotations assigned to this source will become Unknown device.', { n: counts.assigned_count })}</p>}
@@ -125,7 +130,7 @@ export function Devices() {
     mutationFn: (device: Device) => apiDelete(`/api/annotations/devices/${device.public_id}`),
     onSuccess: (_result, device) => {
       setRemoving(null); restore.reset(); setUndoDevice(device); refresh();
-      announce(t('{name} removed.', { name: device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label }));
+      announce(t('{name} removed.', { name: sourceName(device, t) }));
     },
   });
   const restore = useMutation({
@@ -174,8 +179,7 @@ export function Devices() {
   const devices = data?.devices ?? [];
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / DEVICE_PAGE_SIZE));
   const currentPage = Math.floor(deviceOffset / DEVICE_PAGE_SIZE) + 1;
-  const displayName = (device: Device) =>
-    device.type === 'webreader' && device.label === 'Browser' ? t('Browser') : device.label;
+  const displayName = (device: Device) => sourceName(device, t);
   return (
     <div className={styles.container}>
       <Link href="/account" className={styles.back}><ChevronLeft size={16} aria-hidden="true" focusable={false} /> {t('Account')}</Link>
@@ -340,7 +344,7 @@ export function Devices() {
       {!isLoading && !staleDevicePage && <KoboPairing devices={devices} enabled={!!me?.features?.kobo_sync}
         koreaderEnabled={!!me?.features?.koreader_sync} />}
       {undoDevice && <div className={styles.toast}>
-        <span>{t('{name} removed.', { name: undoDevice.label })}</span>
+        <span>{t('{name} removed.', { name: displayName(undoDevice) })}</span>
         <button ref={undoRef} type="button" disabled={restore.isPending || remove.isPending || preflightPending} onClick={() => restore.mutate(undoDevice)}>{t('Undo')}</button>
         <span role="alert" className={styles.undoError}>{restore.isError ? t('Could not restore this source. Try again.') : ''}</span>
       </div>}

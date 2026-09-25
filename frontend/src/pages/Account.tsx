@@ -237,7 +237,11 @@ export function Account() {
         {devices.isLoading ? (
           <p className={styles.muted} role="status">{t('Loading devices and browsers…')}</p>
         ) : devices.isError ? (
-          <p className={styles.muted} role="alert">{t('Could not load devices and browsers.')}</p>
+          <>
+            <p className={styles.muted} role="alert">{t('Could not load devices and browsers.')}</p>
+            <button type="button" className={styles.retryButton} disabled={devices.isFetching}
+              onClick={() => void devices.refetch()}>{t('Try again')}</button>
+          </>
         ) : devices.data?.devices.length ? (
           <ul className={styles.sourceList} role="list">
             {devices.data!.devices.map((device) => (

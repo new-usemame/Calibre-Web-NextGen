@@ -102,6 +102,25 @@
 }
 .pairLink:hover { color: var(--accent-hover); }
 
+/* Retry after a failed device summary load: a quiet action, like pairing. */
+.retryButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0 0 var(--sp-2);
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--accent-text);
+  font-weight: var(--fw-medium);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.retryButton:hover:not(:disabled) { color: var(--accent-hover); }
+.retryButton:disabled { opacity: .6; cursor: default; }
+
 /* Identity */
 .identity {
   display: flex;

@@ -213,6 +213,26 @@ test('device manager renames and removes only through counted confirmation, then
   expect(calls.restored()).toBe(1);
 });
 
+test('removing the Browser names it in the reader\'s language, in the dialog and the Undo notice', async ({ page }) => {
+  await page.route('**/api/v1/auth/me', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...(await response.json()), locale: 'fr' } });
+  });
+  const calls = await stubDevices(page, { ...device, type: 'webreader', label: 'Browser', model: 'CWNG web reader' });
+  await page.goto('/app/account/devices');
+  await page.getByRole('button', { name: "Plus d'actions pour Navigateur" }).click();
+  await page.getByRole('button', { name: "Supprimer l'appareil" }).click();
+  const dialog = page.getByRole('alertdialog', { name: 'Supprimer Navigateur ?' });
+  await dialog.getByRole('button', { name: "Supprimer l'appareil" }).click();
+  await expect(dialog).toHaveCount(0);
+  // The notice is the Undo button's container; the announcer repeats its text.
+  const undo = page.getByRole('button', { name: 'Annuler', exact: true });
+  await expect(undo.locator('xpath=..')).toHaveText(/^Navigateur supprimé\.\s*Annuler$/);
+  await undo.click();
+  await expect(page.getByRole('link', { name: 'Navigateur', exact: true })).toBeVisible();
+  expect(calls.restored()).toBe(1);
+});
+
 test('failed device changes explain the failure and retain a working retry', async ({ page }) => {
   await stubDevices(page);
   // Fail each wire operation once; the original handlers provide the retry.
@@ -423,6 +443,21 @@ test('account summary makes the e-reader manager discoverable', async ({ page })
   await expect(page).toHaveURL(/\/app\/account\/devices$/);
   await expect(page.getByRole('heading', { name: 'Devices and browsers', exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Browser', exact: true })).toBeVisible();
+});
+
+test('account summary can retry a failed device list', async ({ page }) => {
+  let available = false;
+  await page.route('**/api/annotations/devices?*', route => available
+    ? route.fulfill({ json: { devices: [device], total: 1, limit: 100, offset: 0 } })
+    : route.fulfill({ status: 503, json: { error: 'unavailable' } }));
+  await page.goto('/app/account');
+  const card = page.getByRole('region', { name: 'Devices and browsers' });
+  await expect(card.getByRole('alert')).toHaveText('Could not load devices and browsers.', { timeout: 15000 });
+  available = true;
+  await card.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect(card.getByRole('listitem').filter({ hasText: 'Libra Colour' })).toBeVisible();
+  await expect(card.getByRole('alert')).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Try again', exact: true })).toHaveCount(0);
 });
 
 test('device manager owns pairing instead of sending users to the classic account page', async ({ page }) => {

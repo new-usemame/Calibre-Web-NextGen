@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.25"
+CONVERTER_VERSION = "1.26"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -239,9 +239,9 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                            'or its reading order; use these source pixels. '
                            '<a href="original-p%04d.xhtml#page">Open original spread and enlarged details</a>.' % pno)
             elif reason == "uncertain_scan_key_panel":
-                caption = ('Complete printed symbol key. OCR cannot verify the symbols or their '
-                           'associations with the adjacent labels; read the aligned source rows '
-                           'in this image. This image does not provide searchable text. '
+                caption = ('Complete original page containing a printed symbol key. OCR cannot '
+                           'verify the symbols or their associations with adjacent labels; read '
+                           'the aligned source rows in this image. It is not searchable text. '
                            '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
             elif source_region:
                 caption = ('Original text region. OCR transcription is uncertain; '

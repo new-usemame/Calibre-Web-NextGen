@@ -713,8 +713,10 @@ def _uncertain_scan_key_panel(raw):
 
     Recognition often groups a column of symbols into a few tall, uncertain
     lines while reading the adjacent labels as many independent short lines.
-    Reflowing either column separately destroys the row associations. This
-    requires both geometries and refuses pages with prose in the same panel.
+    Reflowing either column separately destroys the row associations. OCR
+    bounds cannot establish how far an unreadable mark extends, so the source
+    owner is the complete page even when all recognized lines form one panel.
+    This requires both geometries and refuses pages with independent prose.
     """
     if not raw.is_page_scan:
         return None
@@ -764,10 +766,7 @@ def _uncertain_scan_key_panel(raw):
         # A second independent text area makes panel ownership uncertain.
         if any(ln not in panel for ln in lines):
             continue
-        box = _lines_bbox(panel, panel[0].bbox)
-        pad = max(8.0, min(15.0, raw.width*.02))
-        matches.append(((max(0,box[0]-pad), max(0,box[1]-pad),
-                         min(raw.width,box[2]+pad), min(raw.height,box[3]+pad)), panel))
+        matches.append(((0, 0, raw.width, raw.height), panel))
     return matches[0] if len(matches) == 1 else None
 
 

@@ -142,3 +142,89 @@ def test_shutdown_diagnostics_refuse_unbounded_or_mismatched_frames(tmp_path):
             rows,error=d._read_shutdown_phases()
             assert rows==[] and error
         finally:d.control.close()
+
+
+def closing_resource_lease(d, tmp_path, monkeypatch):
+    from cps.services.reflow import native_resources as resources
+    with monkeypatch.context() as admission:
+        admission.setenv('REFLOW_NATIVE_CAPACITY_MODE', 'serialize-only')
+        lease = resources.Lease(tmp_path/'lease')
+    lease.mode = 'checked'
+    d.resource_lease = lease
+    released = []
+    close = lease.close
+
+    def release_after_cleanup():
+        # Resource-stop must not unwind out of close before owned work is reaped.
+        assert d.process.poll() is not None
+        assert d.shutdown_evidence['direct_child_reaped']
+        assert d.shutdown_evidence['group_state'] == 'absent'
+        assert d.shutdown_evidence['stderr_drain_complete']
+        released.append(True)
+        close()
+
+    monkeypatch.setattr(lease, 'close', release_after_cleanup)
+    return resources, lease, released
+
+
+@pytest.mark.parametrize('capacity', ['adequate', 'low', 'unknown', 'measurement_error'])
+def test_close_keeps_real_lease_reserve_checkpoint_until_owned_cleanup(
+        tmp_path, monkeypatch, capacity):
+    import time
+    d = inert_closing_child(tmp_path, 'document_finishes')
+    resources, lease, released = closing_resource_lease(d, tmp_path, monkeypatch)
+    samples = []
+    start = time.monotonic()
+
+    def measure(_):
+        samples.append(time.monotonic())
+        # Exercise the extended wait, not just a pre-close admission sample.
+        if time.monotonic() - start > 2.1:
+            if capacity == 'measurement_error': raise OSError('fixture measurement')
+            if capacity != 'adequate':
+                return (None if capacity == 'unknown' else 0), 8*1024**3
+        return 8*1024**3, 8*1024**3
+
+    monkeypatch.setattr(resources, 'measure', measure)
+    try:
+        d.close()
+        assert len(samples) >= 5
+        assert released == [True] and lease.fd is None
+        assert 'document_close_grace' in d.shutdown_evidence
+        if capacity == 'adequate':
+            d.require_clean_shutdown()
+            assert d.shutdown_evidence['exit_code'] == 0
+        else:
+            with pytest.raises(ipc.ChildExited): d.require_clean_shutdown()
+            assert any(s['reason'] == 'resource_stop' for s in d.shutdown_evidence['signals'])
+            assert d.shutdown_evidence['resource_stop_error'] == (
+                'OSError' if capacity == 'measurement_error' else 'ResourceStopped')
+            assert d.shutdown_evidence['wait'] == 'reaped_after_signal_request'
+    finally:
+        if d.process.poll() is None: d.process.kill(); d.process.wait()
+        if lease.fd is not None: os.close(lease.fd); lease.fd = None
+
+
+def test_resource_stop_stays_failure_when_child_exits_before_signal(tmp_path, monkeypatch):
+    d = inert_closing_child(tmp_path, 'document_finishes')
+    resources, lease, released = closing_resource_lease(d, tmp_path, monkeypatch)
+    samples = []
+
+    def measure(_):
+        samples.append(True)
+        # Force the actual exit race between the wait-loop poll and stop result.
+        d.process.wait(timeout=5)
+        return 0, 8*1024**3
+
+    monkeypatch.setattr(resources, 'measure', measure)
+    try:
+        d.close()
+        assert samples and released == [True] and lease.fd is None
+        e = d.shutdown_evidence
+        assert e['exit_code'] == 0 and e['stderr_drain_complete']
+        assert any(s['reason'] == 'resource_stop' and s['result'] == 'absent'
+                   for s in e['signals'])
+        with pytest.raises(ipc.ChildExited): d.require_clean_shutdown()
+    finally:
+        if d.process.poll() is None: d.process.kill(); d.process.wait()
+        if lease.fd is not None: os.close(lease.fd); lease.fd = None

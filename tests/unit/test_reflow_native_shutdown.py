@@ -26,7 +26,8 @@ def document(tmp_path, delay=0, script=None):
     Path(d.root).mkdir(); d.error_tail=b''; d.last_phase='build'; d.seq=4
     d.last_completed_phase='build'; d.last_completed_sequence=4
     d.ledger=SimpleNamespace(record=lambda value, **kw: rows.append(dict(value)))
-    d.resource_lease=SimpleNamespace(close=lambda: releases.append(list(rows)))
+    d.resource_lease=SimpleNamespace(check=lambda **kw: False,
+                                    close=lambda: releases.append(list(rows)))
     if script is not None: d.descendant_pid = int(p.stdout.readline())
     d.stderr_drain_state='pending'; d.stderr_drain_error=None
     d.drain=threading.Thread(target=d._drain_errors, daemon=True); d.drain.start()

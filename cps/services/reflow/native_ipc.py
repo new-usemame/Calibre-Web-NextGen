@@ -13,7 +13,8 @@ import threading
 import time
 
 from . import native_codec as codec
-from .native_resources import Lease
+from .model import AttemptCancelled
+from .native_resources import Lease, ResourceStopped
 
 WORKER = Path(__file__).with_name('native_worker.py')
 MAX_CONTROL = 4096
@@ -312,7 +313,7 @@ class NativeDocument:
                 or evidence.get('group_state') != 'absent'
                 or not evidence.get('stderr_drain_complete')
                 or evidence.get('cleanup_error') or evidence.get('record_error')
-                or any(item['reason'] in ('eof_timeout', 'document_close_timeout', 'cancelled')
+                or any(item['reason'] in ('eof_timeout', 'document_close_timeout', 'cancelled', 'resource_stop')
                        for item in evidence['signals'])):
             raise ChildExited('Native runtime cleanup failed or could not be verified')
 
@@ -411,6 +412,18 @@ class NativeDocument:
                         if cancelled:
                             termination_reason = 'cancelled'
                             break
+                    try:
+                        self.check_resources()
+                    except BaseException as exc:
+                        # Keep the lease checkpoint active during native close.
+                        # A stop (including an unknown measurement) must reach
+                        # owned-child cleanup before close() releases the lease.
+                        if isinstance(exc, AttemptCancelled) and not isinstance(exc, ResourceStopped):
+                            termination_reason = 'cancelled'
+                        else:
+                            termination_reason = 'resource_stop'
+                            evidence['resource_stop_error'] = type(exc).__name__
+                        break
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
                         termination_reason = ('document_close_timeout' if grace_granted

@@ -76,6 +76,12 @@ taken from KOReader itself rather than written by hand:
   probe, then `engine/browser_requests.py <epub> <words.json> <n>` (from the repo root) and
   `FRONTEND_DIR=<frontend> node engine/browser_cfis.mjs <epub> <requests.json>`; keep rows whose `text`
   equals crengine's word (all did).
+- `alice-pg11.kepub.epub` - what CWNG serves a Kobo for `alice-pg11.epub`: `kepubify` v4.0.4 (the release the
+  Dockerfile pins), then `normalize_kepub_package(path, split_chapters=True)`, which splits the Gutenberg chapter
+  files into pieces with new names.
+- `alice-pg11.kobo-spans.json` - every 3rd Kobo span of that KEPUB where crengine itself reports a word starting
+  at the XPointer `kepub_alignment` gives the span, with that word (`engine/kobo_spans.py`, from the full
+  `run-probe.sh … words` output for `alice-pg11.epub`).
 - `rig-web-rows.json`, `rig-engine-check.json` - two highlights as stored by a test server (one made on
   the Kindle, one in the web reader) and crengine's text for each.
 

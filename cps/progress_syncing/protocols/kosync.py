@@ -828,20 +828,23 @@ def record_percentage_only_progress(user_id, book_id, percentage: float,
     return outcome if _return_outcome else True
 
 
-def _web_reader_xpointer(user_id, book_id, progress_record, document):
-    """XPointer of the web reader's position in the requesting device's file.
+def _exact_xpointer(user_id, book_id, progress_record, document):
+    """XPointer of a web reader's or Kobo's position in the requesting device's file.
 
     Best-effort: any failure leaves the row served as a percentage.
     """
     try:
-        from ...services.koreader_position import web_position_for_device
-        return web_position_for_device(
-            user_id=user_id, book_id=book_id, record=progress_record, document=document,
-        )
+        from ...services.koreader_position import (kobo_position_for_device,
+                                                   web_position_for_device)
+        for place in (web_position_for_device, kobo_position_for_device):
+            xpointer = place(user_id=user_id, book_id=book_id,
+                             record=progress_record, document=document)
+            if xpointer:
+                return xpointer
     except Exception:
-        log.warning("Could not place the web reader position exactly for book %s",
-                    book_id, exc_info=True)
-        return None
+        log.warning("Could not place the %s position exactly for book %s",
+                    getattr(progress_record, "device", None), book_id, exc_info=True)
+    return None
 
 
 def _journal_koreader_report(user_id, internal_device_id, book_id, document,
@@ -1053,9 +1056,10 @@ def get_progress(document: str):
         # so no client can mistake it for an xpointer.
         progress_value = None if percentage_only else progress_record.progress
         if percentage_only and book_id:
-            # The web reader's own place, when it can be expressed exactly in
-            # the very file this device holds (#324); otherwise the percentage.
-            exact = _web_reader_xpointer(user.id, book_id, progress_record, document)
+            # The web reader's or Kobo's own place, when it can be expressed
+            # exactly in the very file this device holds (#324); otherwise the
+            # percentage.
+            exact = _exact_xpointer(user.id, book_id, progress_record, document)
             if exact:
                 progress_value, percentage_only = exact, False
 

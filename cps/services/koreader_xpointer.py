@@ -69,6 +69,7 @@ from __future__ import annotations
 
 import os
 import posixpath
+from bisect import bisect_right
 import re
 import zipfile
 from dataclasses import dataclass
@@ -291,6 +292,87 @@ def _text_between(start: "_Pos", end: "_Pos") -> Optional[str]:
             + end.text.value[:end.offset])
 
 
+# --- Text anchors: a place named by the book's text, not its tree ------------
+#
+# Another file made from this EPUB (a KEPUB: kepubify wraps each sentence in a
+# span, and CWNG may split a chapter file into pieces) shares its text but not
+# its tree or its file names. A place crosses over as the number of
+# non-whitespace characters before it in its chapter's <body>; the caller must
+# first check that both books hold exactly the same non-whitespace characters
+# (``spine_solid_texts``), or the count means nothing.
+
+
+def spine_solid_texts(epub_path) -> Optional[tuple]:
+    """``(member, text)`` for every spine item in reading order, or None.
+
+    ``text`` is every non-whitespace character of the item's <body>, in
+    order. A spine item that cannot be read as an XHTML document makes the
+    whole book None: its text is unknown. (Chapters refused for conversion
+    still count: their text is known even where positions in them are not.)
+    """
+    def run(book):
+        out = []
+        for item in book.items:
+            chapter = _parsed_chapter(book, item)
+            if chapter is None:
+                return None
+            out.append((item.member, _solid(chapter).text))
+        return tuple(out)
+    return _resolve(epub_path, run)
+
+
+def xpointer_at_solid_index(epub_path, member: str, index: int,
+                            expected: str) -> Optional[str]:
+    """XPointer of the ``index``-th non-whitespace character of ``member``.
+
+    ``expected`` is the chapter's non-whitespace text as the caller aligned it
+    (``spine_solid_texts``); a chapter that no longer reads so gives None.
+    """
+    def run(book):
+        found = _item_and_chapter(book, member)
+        if found is None or isinstance(index, bool) or not isinstance(index, int):
+            return None
+        item, chapter = found
+        solid = _solid(chapter)
+        if solid.text != expected or not 0 <= index < len(solid.text):
+            return None
+        k = bisect_right(solid.starts, index) - 1
+        parent, ordinal, value = solid.nodes[k]
+        need = index - solid.starts[k]
+        for raw, char in enumerate(value):
+            if char not in _XML_SPACE:
+                if not need:
+                    break
+                need -= 1
+        return _xpointer_string(book, item, _Pos(parent, _Text(parent, ordinal, value),
+                                                 raw, chapter))
+    return _resolve(epub_path, run)
+
+
+def solid_index_of_xpointer(epub_path, xpointer: str) -> Optional[tuple[str, int]]:
+    """``(member, index)`` of the character a crengine XPointer points at.
+
+    ``index`` counts the non-whitespace characters before it in the chapter's
+    body, so a point on whitespace counts as the character that follows it.
+    An element position, or a point after the chapter's last character, is
+    None.
+    """
+    def run(book):
+        point = _point_from_xpointer(book, xpointer)
+        if point is None:
+            return None
+        _book, item, pos = point
+        if pos.text is None:
+            return None
+        solid = _solid(pos.chapter)
+        k = solid.position.get((pos.text.parent, pos.text.ordinal))
+        if k is None:
+            return None  # a whitespace-only node
+        index = solid.starts[k] + len(pos.text.value[:pos.offset].translate(_NO_SPACE))
+        return (item.member, index) if index < len(solid.text) else None
+    return _resolve(epub_path, run)
+
+
 # ---------------------------------------------------------------------------
 # Book loading
 # ---------------------------------------------------------------------------
@@ -402,6 +484,7 @@ class _Chapter:
     # The browser's own tree, when its HTML parser builds a different one
     # (see ``_browser_view``); None when the XML tree is the browser's tree.
     browser: Optional["_BrowserView"] = None
+    solid: Optional["_Solid"] = None    # see ``_solid``
 
     def text_order(self) -> dict:
         """(parent, ordinal) -> document-order index of every DOM text node."""
@@ -423,6 +506,15 @@ class _Chapter:
 
 
 def _chapter(book: _Book, item: _SpineItem) -> Optional[_Chapter]:
+    """The chapter of ``item`` if positions in it can be converted."""
+    cached = _parsed_chapter(book, item)
+    if cached is None or cached.refusal:
+        return None
+    return cached
+
+
+def _parsed_chapter(book: _Book, item: _SpineItem) -> Optional[_Chapter]:
+    """The parsed chapter of ``item``, refused or not; None if unreadable."""
     if item.member is None:
         return None
     # A chapter that cannot be read is remembered as None too, so a book with
@@ -437,9 +529,41 @@ def _chapter(book: _Book, item: _SpineItem) -> Optional[_Chapter]:
                       book.path, exc_info=True)
             cached = None
         book.chapters[item.member] = cached
-    if cached is None or cached.refusal:
-        return None
     return cached
+
+
+def _item_and_chapter(book: _Book, member: str):
+    """The one trusted spine item reading ``member``, and its chapter."""
+    items = [i for i in book.items if i.member == member]
+    if len(items) != 1 or not items[0].fragment_trusted:
+        return None
+    chapter = _chapter(book, items[0])
+    return None if chapter is None else (items[0], chapter)
+
+
+_NO_SPACE = {ord(c): None for c in _XML_SPACE}
+
+
+@dataclass(frozen=True)
+class _Solid:
+    text: str          # every non-whitespace character of the body, in order
+    starts: list       # index in ``text`` of each node's first one
+    nodes: list        # (parent, ordinal, value) of each such text node
+    position: dict     # (parent, ordinal) -> its place in ``nodes``
+
+
+def _solid(chapter: "_Chapter") -> _Solid:
+    if chapter.solid is None:
+        parts, starts, nodes, position, count = [], [], [], {}, 0
+        for parent, ordinal, value in _solid_texts(chapter.body):
+            packed = value.translate(_NO_SPACE)
+            position[(parent, ordinal)] = len(nodes)
+            starts.append(count)
+            nodes.append((parent, ordinal, value))
+            parts.append(packed)
+            count += len(packed)
+        chapter.solid = _Solid("".join(parts), starts, nodes, position)
+    return chapter.solid
 
 
 def _load_chapter(path: str, member: str) -> Optional[_Chapter]:

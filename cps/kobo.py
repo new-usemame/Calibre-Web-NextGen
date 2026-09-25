@@ -3841,12 +3841,14 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage):
     nothing to fetch and carried on from where *it* last was. Same shape as
     #1366, where the web reader was the missing producer.
 
-    What transfers is the percentage, not the position. A Kobo reports a
+    What is stored is the percentage, not the position. A Kobo reports a
     ``KoboSpan`` addressing the kepub *that device holds*, which KOReader's
-    engine cannot resolve, so the row is stored percentage-only and served as
-    ``position_kind: "percentage"``. Clients that have not advertised support
-    for that are served nothing, exactly as before (see
-    ``record_percentage_only_progress``).
+    engine cannot resolve, so the row is stored percentage-only. When it is
+    served, the span is converted to the requesting device's own file where
+    that is provably exact (``koreader_position.kobo_position_for_device``);
+    otherwise it goes out as ``position_kind: "percentage"``. Clients that
+    have not advertised support for that are served nothing, exactly as
+    before (see ``record_percentage_only_progress``).
 
     Best-effort, and deliberately so: a Kobo's own sync is the required write
     here, and it must not fail because the KOReader carrier could not be
@@ -3860,6 +3862,7 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage):
     # Imported lazily: ``kosync`` imports this module for
     # ``push_reading_state_to_hardcover``, so a module-level import is a cycle.
     from .progress_syncing.protocols.kosync import record_percentage_only_progress
+    from .services.koreader_position import KOBO_DEVICE
 
     try:
         # A SAVEPOINT only contains what is flushed after it, so the Kobo's own
@@ -3868,7 +3871,7 @@ def share_kobo_progress_with_koreader(user_id, book_id, percentage):
         # web reader path documents).
         ub.session_flush()
         with ub.begin_contained_nested(ub.session):
-            record_percentage_only_progress(user_id, book_id, percentage, device="Kobo")
+            record_percentage_only_progress(user_id, book_id, percentage, device=KOBO_DEVICE)
     except Exception as e:
         log.warning("Could not share Kobo progress with KOReader for user %s book %s: %s",
                     user_id, book_id, e)

@@ -563,6 +563,10 @@ class ScanPixelProbe(object):
     def has_ink(self, rect):
         return region_has_ink(self._doc, self._pno, rect, mask=self._mask)
 
+    def source_has_ink(self, rect):
+        """Inspect actual source pixels, including text masked for art detection."""
+        return region_has_ink(self._doc, self._pno, rect, mask=())
+
     def ink_bounds(self, rect):
         """Conservative PDF-space extent of source artwork in a bounded clip.
 

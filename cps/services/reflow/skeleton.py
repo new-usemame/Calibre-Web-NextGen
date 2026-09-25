@@ -931,7 +931,7 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
         kept_blocks, connected_artwork = _complete_unverified_figure_tops(raw, kept_blocks, candidates, style)
         skel.regions.extend(connected_artwork)
         kept_blocks, artwork = _absorb_figure_content(kept_blocks, candidates,
-                                                      style)
+                                                      style, raw=raw, pixel_probe=pixel_probe)
         skel.regions.extend(artwork)
 
     # Preserve source-established columns before uncertain prose becomes images;
@@ -2363,14 +2363,18 @@ def _chart_lettering(line, style):
 
 def _inside(bbox, rect, share=FIG_LINE_OVERLAP):
     """True when ``bbox`` sits at least ``share`` inside ``rect``."""
+    return _overlap_share(bbox,rect) >= share
+
+
+def _overlap_share(bbox, rect):
     x0 = max(bbox[0], rect[0])
     y0 = max(bbox[1], rect[1])
     x1 = min(bbox[2], rect[2])
     y1 = min(bbox[3], rect[3])
     if x1 <= x0 or y1 <= y0:
-        return False
+        return 0.0
     area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-    return area > 0 and (x1 - x0) * (y1 - y0) / area >= share
+    return (x1 - x0) * (y1 - y0) / area if area > 0 else 0.0
 
 
 def _prose_rows(kept_blocks, raw, style):
@@ -2961,7 +2965,7 @@ def _complete_unverified_figure_tops(raw, kept_blocks, candidates, style):
     return [(block, lines) for block, lines in retained if lines], artwork
 
 
-def _absorb_figure_content(kept_blocks, candidates, style):
+def _absorb_figure_content(kept_blocks, candidates, style, raw=None, pixel_probe=None):
     """Move lettering and captions inside figure territory out of the prose.
 
     The text layer reads a chart's labels as words; left in place they print as
@@ -2973,6 +2977,23 @@ def _absorb_figure_content(kept_blocks, candidates, style):
     is visible nowhere -- an absorbed line whose blank territory is dropped at
     build time would be gone from the reader's book.
     """
+    def unique_lettering_owner(line):
+        shares = sorted(((_overlap_share(line.bbox, item.bbox), index)
+                         for index,item in enumerate(candidates)), reverse=True)
+        if not shares or shares[0][0] < FIG_LINE_OVERLAP:
+            return None
+        if len(shares)>1 and shares[0][0]-shares[1][0] < .05:
+            if raw is not None and raw.is_page_scan and all(
+                    span.font=='ocr' for span in line.spans):
+                # A later source-region pass will show the competing label as
+                # pixels instead of attributing its OCR text to either figure.
+                line.transcription_uncertain=True
+            return None
+        return candidates[shares[0][1]]
+
+    owners = {id(line):unique_lettering_owner(line)
+              for _,group in kept_blocks for line in group
+              if _chart_lettering(line,style) and not _squashed_caption(line.stripped)}
     for candidate in candidates:
         image_box = candidate.bbox
         kept_blocks = _attach_caption(candidate, kept_blocks, style)
@@ -2985,7 +3006,7 @@ def _absorb_figure_content(kept_blocks, candidates, style):
             for ln in inside:
                 if _squashed_caption(ln.stripped):
                     captions.append(ln)
-                elif _chart_lettering(ln, style):
+                elif _chart_lettering(ln, style) and owners.get(id(ln)) is candidate:
                     candidate.lines.append(ln)
                 else:
                     outside.append(ln)
@@ -3005,6 +3026,50 @@ def _absorb_figure_content(kept_blocks, candidates, style):
                               min(candidate.bbox[1], min(l.bbox[1] for l in captions)),
                               max(candidate.bbox[2], max(l.bbox[2] for l in captions)),
                               max(candidate.bbox[3], max(l.bbox[3] for l in captions)) + 2)
+
+        if candidate.lines:
+            # Partial geometric overlap is enough to assign chart lettering,
+            # but not enough to show every printed glyph. Complete only the
+            # lines this figure actually owns; prose and neighboring figures
+            # do not authorize a wider crop.
+            x0,y0,x1,y1 = candidate.bbox
+            candidate.bbox = (min(x0, min(ln.bbox[0] for ln in candidate.lines)-2),
+                              min(y0, min(ln.bbox[1] for ln in candidate.lines)-2),
+                              max(x1, max(ln.bbox[2] for ln in candidate.lines)+2),
+                              max(y1, max(ln.bbox[3] for ln in candidate.lines)+2))
+            if raw is not None:
+                candidate.bbox = (max(0,candidate.bbox[0]),max(0,candidate.bbox[1]),
+                                  min(raw.width,candidate.bbox[2]),min(raw.height,candidate.bbox[3]))
+            # A widened header can cross a later independent caption/figure
+            # near its lower corner. Trim the empty tail only after checking
+            # unmasked source pixels; the neighbor retains the actual text.
+            if candidate.bbox[0] < x0:
+                neighboring = [other.bbox for other in candidates if other is not candidate]
+                neighboring.extend(ln.bbox for _,group in kept_blocks for ln in group)
+                for other in sorted(neighboring,key=lambda box:box[1]):
+                    if not (candidate.bbox[0] < other[2]
+                            and other[0] < x0 and other[1] < candidate.bbox[3]):
+                        continue
+                    end = max(ln.bbox[3] for ln in candidate.lines)
+                    if other[1] <= end+4 or other[1]-2 <= end:
+                        continue
+                    gap = (candidate.bbox[0],end+3,candidate.bbox[2],other[1]-2)
+                    tail = (max(x0,other[2])+2,other[1],
+                            candidate.bbox[2],candidate.bbox[3])
+                    try:
+                        blank = (pixel_probe is not None
+                            and hasattr(pixel_probe,'source_has_ink')
+                            and gap[2]>gap[0] and gap[3]>gap[1]
+                            and not pixel_probe.source_has_ink(gap)
+                            and (tail[2]<=tail[0] or tail[3]<=tail[1]
+                                 or not pixel_probe.source_has_ink(tail)))
+                    except (ValueError,RuntimeError,AttributeError):
+                        blank = False
+                    if blank:
+                        candidate.bbox = (candidate.bbox[0],candidate.bbox[1],
+                                          candidate.bbox[2],other[1]-2)
+                    else:
+                        candidate.reason = 'unverified_scan_layout'
 
 
     artwork = []

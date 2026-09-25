@@ -1,7 +1,110 @@
 """Source object ownership for damaged scan transcripts."""
 import pytest
+from types import SimpleNamespace
 
 from cps.services.reflow import assemble, build_epub, extract, skeleton
+
+
+def _large_line(text, box):
+    return extract.Line([extract.Span(text, 24, 'ocr', 0, box, box[3])], box)
+
+
+def _contains(outer, inner):
+    return all((outer[0] <= inner[0], outer[1] <= inner[1],
+                outer[2] >= inner[2], outer[3] >= inner[3]))
+
+
+def test_absorbed_partial_heading_stays_wholly_in_its_primary_crop():
+    title = _large_line('A source heading', (519.36, 125.04, 722.16, 149.28))
+    candidate = skeleton.Region('figure', bbox=(546.48, 44.64, 796.48, 193.68),
+                                reason='scan_figure_side')
+    block = extract.Block(0, title.bbox, [title])
+    rest, art = skeleton._absorb_figure_content([(block, [title])], [candidate],
+                                                SimpleNamespace(body_size=11))
+    assert not rest and any(title in region.lines for region in art)
+    assert _contains(candidate.bbox, title.bbox)
+
+
+def test_weak_overlap_prose_and_neighbor_figure_keep_independent_ownership():
+    title = _large_line('A source heading', (519.36, 125.04, 722.16, 149.28))
+    prose = line('Ordinary adjacent words remain prose.', 448, 182, 105)
+    weak = _large_line('Detached heading', (515, 205, 700, 226))
+    main = skeleton.Region('figure', bbox=(546.48, 44.64, 796.48, 193.68),
+                           reason='scan_figure_side')
+    neighbor = skeleton.Region('figure', bbox=(448.95, 176.07, 550.89, 195.45),
+                               reason='scan_figure_side')
+    blocks = [(extract.Block(i, item.bbox, [item]), [item])
+              for i, item in enumerate((title, prose, weak))]
+    class BlankTail:
+        def source_has_ink(self, rect): return False
+    rest, art = skeleton._absorb_figure_content(blocks, [main, neighbor],
+        SimpleNamespace(body_size=11), raw=scan([title, prose, weak]),
+        pixel_probe=BlankTail())
+    assert _contains(main.bbox, title.bbox)
+    assert main.bbox[3] < neighbor.bbox[1]
+    assert prose in [ln for _, lines in rest for ln in lines]
+    assert weak in [ln for _, lines in rest for ln in lines]
+    assert not neighbor.lines
+
+
+def test_adjacent_source_line_proves_blank_tail_before_trimming():
+    title = _large_line('A source heading', (519, 125, 722, 149))
+    following = line('Independent quotation', 448, 180, 104)
+    candidate = skeleton.Region('figure', bbox=(546, 44, 796, 194),
+                                reason='scan_figure_side')
+    blocks = [(extract.Block(i,item.bbox,[item]),[item])
+              for i,item in enumerate((title,following))]
+    class Proof:
+        def source_has_ink(self, rect): return False
+    rest,_ = skeleton._absorb_figure_content(blocks,[candidate],
+        SimpleNamespace(body_size=11),raw=scan([title,following]),pixel_probe=Proof())
+    assert _contains(candidate.bbox,title.bbox) and candidate.bbox[3]<following.bbox[1]
+    assert following in [ln for _,lines in rest for ln in lines]
+    candidate.bbox=(546,44,796,194)
+    class Ink:
+        def source_has_ink(self, rect): return True
+    skeleton._absorb_figure_content(blocks,[candidate],SimpleNamespace(body_size=11),
+                                    raw=scan([title,following]),pixel_probe=Ink())
+    assert candidate.reason=='unverified_scan_layout'
+    assert _contains(candidate.bbox,title.bbox)
+    candidate.reason='scan_figure_side';candidate.bbox=(546,44,796,194)
+    skeleton._absorb_figure_content(blocks,[candidate],SimpleNamespace(body_size=11),
+                                    raw=scan([title,following]))
+    assert candidate.reason=='unverified_scan_layout'
+
+
+def test_fully_contained_lettering_needs_no_crop_growth():
+    title = _large_line('Contained title',(560,100,700,124))
+    candidate = skeleton.Region('figure',bbox=(546,44,796,194))
+    skeleton._absorb_figure_content([(extract.Block(0,title.bbox,[title]),[title])],
+                                    [candidate],SimpleNamespace(body_size=11))
+    assert candidate.bbox==(546,44,796,194)
+
+
+def test_competing_figure_ownership_uses_geometry_and_rejects_a_tie():
+    title=_large_line('Shared printed label',(100,100,200,120))
+    partial=skeleton.Region('figure',bbox=(115,90,210,140))
+    whole=skeleton.Region('figure',bbox=(90,90,210,140))
+    block=extract.Block(0,title.bbox,[title])
+    rest,art=skeleton._absorb_figure_content([(block,[title])],[partial,whole],
+                                              SimpleNamespace(body_size=11))
+    assert not rest and len(art)==1 and _contains(whole.bbox,title.bbox)
+    assert partial.bbox==(115,90,210,140)
+    first=skeleton.Region('figure',bbox=(90,90,210,140))
+    second=skeleton.Region('figure',bbox=(90,90,210,140))
+    rest,art=skeleton._absorb_figure_content([(block,[title])],[first,second],
+                                              SimpleNamespace(body_size=11),raw=scan([title]))
+    assert title in [ln for _,lines in rest for ln in lines] and not art
+    assert title.transcription_uncertain
+
+
+def test_expanded_crop_stays_within_upright_page_bounds():
+    title=_large_line('Edge title',(795,40,845,60))
+    candidate=skeleton.Region('figure',bbox=(800,30,840,100))
+    raw=scan([title],width=840,height=595)
+    skeleton._absorb_figure_content([(raw.blocks[0],[title])],[candidate],
+                                    SimpleNamespace(body_size=11),raw=raw)
+    assert candidate.bbox[2]==840 and candidate.bbox[0]<=title.bbox[0]
 
 
 def line(text, x, y, width=95):

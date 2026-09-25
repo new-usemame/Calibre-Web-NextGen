@@ -20,8 +20,9 @@
   - The server records that an account downloaded a book, not which Kobo
     downloaded it. If one Kobo is missing a book that another Kobo on the
     same account, or a browser, downloaded, the update does not send it
-    again. Use **Resend one book to this Kobo** on the account page, or
-    **Force full kobo sync**.
+    again. Use **Resend one book to this Kobo** on the account page, which
+    sends that book again to every Kobo on the account, or **Force full kobo
+    sync**, which sends each of them its whole library again.
   - A book is also sent again once if its download records are gone and no
     Kobo ever reported reading it. Until this release, opening **Hot Books**
     deleted every account's download records of the books its viewer could

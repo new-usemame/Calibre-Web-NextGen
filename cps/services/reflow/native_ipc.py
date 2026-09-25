@@ -17,6 +17,10 @@ from .native_resources import Lease
 
 WORKER = Path(__file__).with_name('native_worker.py')
 MAX_CONTROL = 4096
+SHUTDOWN_EOF_SECONDS = 2
+# A completed build may release hundreds of native page/image objects at close.
+# Grant this bounded interval only after the child reports entering doc.close().
+BUILD_DOCUMENT_CLOSE_GRACE_SECONDS = 30
 
 
 class ChildExited(RuntimeError):
@@ -308,7 +312,8 @@ class NativeDocument:
                 or evidence.get('group_state') != 'absent'
                 or not evidence.get('stderr_drain_complete')
                 or evidence.get('cleanup_error') or evidence.get('record_error')
-                or any(item['reason'] == 'eof_timeout' for item in evidence['signals'])):
+                or any(item['reason'] in ('eof_timeout', 'document_close_timeout', 'cancelled')
+                       for item in evidence['signals'])):
             raise ChildExited('Native runtime cleanup failed or could not be verified')
 
     @staticmethod
@@ -338,6 +343,11 @@ class NativeDocument:
                 raw += part
             if len(raw) > 4096:
                 raise ValueError('oversized shutdown diagnostics')
+            # Retain frames while the parent observes a running close. The final
+            # read after reap must include those already consumed for the grace.
+            self.buffer = raw
+            if raw and not raw.endswith(b'\n'):
+                raise ValueError('partial shutdown diagnostics')
             rows = []
             phases = {'stdin_eof', 'parent_gone', 'command_loop_error',
                       'document_close_started', 'document_closed', 'runtime_returning'}
@@ -389,13 +399,51 @@ class NativeDocument:
                     evidence['eof_closed_monotonic_ns'] = time.monotonic_ns()
                 except OSError:
                     evidence['eof'] = 'error'
-                try:
-                    process.wait(timeout=2)
+                deadline = time.monotonic() + SHUTDOWN_EOF_SECONDS
+                grace_granted = False
+                close_finished = False
+                termination_reason = None
+                while process.poll() is None:
+                    stop = getattr(self, 'should_stop', None)
+                    if stop:
+                        try: cancelled = bool(stop())
+                        except Exception: cancelled = True
+                        if cancelled:
+                            termination_reason = 'cancelled'
+                            break
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        termination_reason = ('document_close_timeout' if grace_granted
+                                              and not close_finished else 'eof_timeout')
+                        break
+                    try:
+                        process.wait(timeout=min(.1, remaining))
+                    except subprocess.TimeoutExpired:
+                        if (self.last_phase == 'build'
+                                and self.last_completed_phase == 'build'
+                                and self.last_completed_sequence == self.seq):
+                            observed, error = self._read_shutdown_phases()
+                            if not error:
+                                names = [row['phase'] for row in observed]
+                                if ('document_close_started' in names and not grace_granted
+                                        and 'document_closed' not in names):
+                                    grace_granted = True
+                                    deadline = time.monotonic() + BUILD_DOCUMENT_CLOSE_GRACE_SECONDS
+                                    evidence['document_close_grace'] = dict(
+                                        trigger='document_close_started',
+                                        allowed_seconds=BUILD_DOCUMENT_CLOSE_GRACE_SECONDS,
+                                        granted_elapsed_seconds=time.monotonic() - started)
+                                if grace_granted and 'document_closed' in names and not close_finished:
+                                    close_finished = True
+                                    deadline = min(deadline, time.monotonic() + SHUTDOWN_EOF_SECONDS)
+                                    evidence['document_close_grace']['finished_elapsed_seconds'] = time.monotonic() - started
+                if termination_reason is None:
+                    process.wait()
                     evidence['wait'] = 'reaped'
-                except subprocess.TimeoutExpired:
-                    evidence['wait'] = 'timeout'
-                    kill_group('eof_timeout')
-                    process.wait(timeout=2)
+                else:
+                    evidence['wait'] = 'timeout' if termination_reason != 'cancelled' else 'cancelled'
+                    kill_group(termination_reason)
+                    process.wait(timeout=SHUTDOWN_EOF_SECONDS)
                     evidence['wait'] = 'reaped_after_signal_request'
                 # Tesseract can outlive the Python parent. Reap only this owned group.
                 kill_group('descendant_cleanup')

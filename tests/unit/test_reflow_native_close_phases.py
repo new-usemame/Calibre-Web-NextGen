@@ -45,6 +45,8 @@ if mode=='atexit': atexit.register(slow_atexit)
 class Document:
  def close(self):
   if mode=='document': time.sleep(5)
+  if mode=='document_finishes': time.sleep(3)
+  if mode=='document_failure': raise RuntimeError('close failed')
 control=os.fdopen(int(sys.argv[2]),'w',buffering=1)
 print('ready',flush=True)
 sys.stdin.read()
@@ -65,8 +67,26 @@ control.close()
     return d
 
 
+def test_completed_build_waits_for_a_slow_but_finite_document_close(tmp_path):
+    d = inert_closing_child(tmp_path, 'document_finishes')
+    try:
+        d.close()
+        d.require_clean_shutdown()
+        evidence = d.shutdown_evidence
+        assert evidence['exit_code'] == 0
+        assert evidence['wait'] == 'reaped'
+        assert [row['phase'] for row in evidence['child_shutdown_phases']] == [
+            'stdin_eof', 'document_close_started', 'document_closed', 'runtime_returning']
+        assert evidence['document_close_grace']['trigger'] == 'document_close_started'
+        assert not any(row['reason'].endswith('timeout') for row in evidence['signals'])
+    finally:
+        if d.process.poll() is None: d.process.kill(); d.process.wait()
+
+
 @pytest.mark.parametrize('mode,last_phase,frame',[('document','document_close_started',b'in close'),('atexit','runtime_returning',b'in slow_atexit')])
-def test_slow_exit_stacks_distinguish_document_from_interpreter_cleanup(tmp_path,mode,last_phase,frame):
+def test_slow_exit_stacks_distinguish_document_from_interpreter_cleanup(tmp_path,mode,last_phase,frame,monkeypatch):
+    if mode == 'document':
+        monkeypatch.setattr(ipc, 'BUILD_DOCUMENT_CLOSE_GRACE_SECONDS', 1.2)
     d=inert_closing_child(tmp_path,mode)
     try:
         d.close()
@@ -77,9 +97,40 @@ def test_slow_exit_stacks_distinguish_document_from_interpreter_cleanup(tmp_path
         assert d.error_tail.count(b'Timeout (')==1
         assert frame in d.error_tail
         assert e['stderr_drain_complete'] and e['group_state']=='absent'
-        assert any(s['reason']=='eof_timeout' for s in e['signals'])
+        reason = 'document_close_timeout' if mode == 'document' else 'eof_timeout'
+        assert any(s['reason']==reason for s in e['signals'])
     finally:
         if d.process.poll() is None:d.process.kill();d.process.wait()
+
+
+def test_failed_document_close_is_not_accepted_as_cleanup(tmp_path):
+    d = inert_closing_child(tmp_path, 'document_failure')
+    d.close()
+    with pytest.raises(ipc.ChildExited): d.require_clean_shutdown()
+    assert d.shutdown_evidence['exit_code'] != 0
+    assert d.shutdown_evidence['child_shutdown_phases'][-1]['phase'] == 'document_close_started'
+    assert d.shutdown_evidence['direct_child_reaped']
+
+
+def test_uncompleted_build_does_not_receive_document_close_grace(tmp_path):
+    d = inert_closing_child(tmp_path, 'document_finishes')
+    d.last_completed_phase = 'prepare'
+    d.close()
+    with pytest.raises(ipc.ChildExited): d.require_clean_shutdown()
+    assert 'document_close_grace' not in d.shutdown_evidence
+    assert any(s['reason'] == 'eof_timeout' for s in d.shutdown_evidence['signals'])
+
+
+def test_cancellation_reaps_a_slow_close_without_using_grace_deadline(tmp_path):
+    import time
+    d = inert_closing_child(tmp_path, 'document')
+    start = time.monotonic()
+    d.should_stop = lambda: time.monotonic() - start > .35
+    d.close()
+    with pytest.raises(ipc.ChildExited): d.require_clean_shutdown()
+    assert time.monotonic() - start < 2
+    assert any(s['reason'] == 'cancelled' for s in d.shutdown_evidence['signals'])
+    assert d.shutdown_evidence['direct_child_reaped']
 
 
 def test_shutdown_diagnostics_refuse_unbounded_or_mismatched_frames(tmp_path):

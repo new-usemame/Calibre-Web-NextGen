@@ -1,0 +1,19 @@
+{
+  "area": "spa",
+  "body": "The annotation API resolves native Kobo positions against the KEPUB while the SPA opens the original EPUB. A valid exported CFI therefore need not describe the rendered file. The reader now verifies native chapter/span/offset coordinates in its actual archive first, then conservatively reanchors a globally unique exact quote when KoboSpans are absent. Display CFIs are session-local; native source positions, export CFIs and existing EPUB bookmarks remain unchanged. Missing or ambiguous mappings retain readable text without an unsafe jump. Overlay reconciliation preserves independent annotation records at the same CFI, including editing the drawer-selected record and repainting a survivor after deletion. Behavioral coverage includes real epub.js rendering, direct repeated-quote anchors, UTF-16/cross-node ranges, URI boundaries, incomplete scans, overlapping annotations and bookmark previews. Fixed in the candidate for #2208; public release remains pending.",
+  "created": "2026-09-09",
+  "id": "F-eab3f8",
+  "refs": [
+    "#2208"
+  ],
+  "resolution": {
+    "commit": "",
+    "date": "2026-09-09",
+    "note": "Implemented and independently verified in the #2208 candidate; not yet released.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "The SPA interprets native KEPUB annotation locations inside a different EPUB"
+}

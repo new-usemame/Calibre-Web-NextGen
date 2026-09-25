@@ -30,13 +30,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC = readFileSync(path.join(HERE, '../../src/pages/NativeReader.tsx'), 'utf8');
 const CSS = readFileSync(path.join(HERE, '../../src/pages/NativeReader.module.css'), 'utf8');
-const PLAYWRIGHT = readFileSync(path.join(HERE, '../../playwright.config.ts'), 'utf8');
 const WORKFLOW = readFileSync(path.join(HERE, '../../../.github/workflows/tests.yml'), 'utf8');
 
 test('the reader shell still relies on an inner scroll container', () => {
@@ -66,10 +66,18 @@ test('focus on the scroll container is visible, not clipped by the fixed shell',
   assert.match(rule[0], /outline-offset:\s*-/, 'focus ring is not inset, so it clips at the shell edge');
 });
 
-test('the behavioral regression stays routed through WebKit in CI', () => {
-  assert.match(PLAYWRIGHT, /name:\s*'webkit-reader'/, 'the focused WebKit project is missing');
-  assert.match(PLAYWRIGHT, /testMatch:\s*WEBKIT_READER_SPEC/, 'the reader spec is not scoped to WebKit');
-  assert.match(PLAYWRIGHT, /devices\['Desktop Safari'\]/, 'the reader project is not using WebKit');
+test('the behavioral regression stays routed through WebKit in CI', async () => {
+  const { default: config } = await import('../../playwright.config.ts');
+  const reader = config.projects?.find(project => project.name === 'webkit-reader');
+  assert.equal(reader?.use?.browserName ?? reader?.use?.defaultBrowserType, 'webkit', 'reader project must run WebKit');
+  const listed = JSON.parse(execFileSync(process.execPath, [
+    path.join(HERE, '../../node_modules/@playwright/test/cli.js'), 'test',
+    'native-reader-keyboard-scroll.spec.ts', '--list', '--reporter=json',
+  ], { cwd: path.join(HERE, '../..'), encoding: 'utf8' }));
+  const suite = listed.suites.find(suite => suite.file === 'native-reader-keyboard-scroll.spec.ts');
+  assert.ok(suite, 'the actual runner must discover the keyboard regression');
+  const projects = new Set(suite.specs.flatMap(spec => spec.tests.map(test => test.projectName)));
+  assert.deepEqual([...projects], ['webkit-reader'], 'keyboard regression must select the WebKit lane');
   assert.match(
     WORKFLOW,
     /playwright install --with-deps chromium webkit/,

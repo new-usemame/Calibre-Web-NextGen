@@ -201,6 +201,12 @@ def _ensure_legacy_webreader_device(session, ub, *, user_id, seen_at=None):
         device.active = True
         device.last_seen_at = now
         session.flush()
+    elif (device.last_seen_at is None
+          or now - device.last_seen_at.replace(tzinfo=now.tzinfo) >= LAST_SEEN_WRITE_INTERVAL):
+        # Headerless reading writes use the same coarse monotonic heartbeat as
+        # identified browsers, rather than leaving an active source stale forever.
+        device.last_seen_at = now
+        session.flush()
     return device
 
 

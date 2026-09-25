@@ -4709,6 +4709,10 @@ msgid "Alignment"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "All annotations"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "All books"
 msgstr "所有書籍"
 
@@ -4948,6 +4952,16 @@ msgstr ""
 msgid ""
 "Books that are not on an e-reader sync shelf then leave the e-reader's "
 "library on its next sync. They stay in your library here."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Browser reading sources"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Browsers appear after saving reading progress or annotations. Different "
+"browsers or profiles can appear separately."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6240,6 +6254,10 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Inventory not reported"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Issuer / base URL"
 msgstr "發行者 / 基礎 URL"
 
@@ -6413,6 +6431,10 @@ msgstr "正在載入閱讀進度…"
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Loading…"
 msgstr "載入中..."
+
+#: cps/spa_strings.py
+msgid "Location unavailable"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Lock cover"
@@ -6783,10 +6805,6 @@ msgid "Not configured"
 msgstr "未設定"
 
 #: cps/spa_strings.py
-msgid "Not in current file"
-msgstr "不在目前檔案中"
-
-#: cps/spa_strings.py
 msgid "Not matched to this library"
 msgstr "未匹配此書庫"
 
@@ -6988,6 +7006,10 @@ msgstr "已還原 {total} 筆資料中 {ok} 筆的原始裝置歸屬。"
 #: cps/spa_strings.py
 msgid "Other saved position"
 msgstr ""
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Other users' eReaders:"
+msgstr "其他使用者的電子閱讀器："
 
 #: cps/spa_strings.py
 msgid "PDF reader"
@@ -7197,6 +7219,12 @@ msgstr "閱讀器設定已儲存。"
 #: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "閱讀外觀"
+
+#: cps/spa_strings.py
+msgid ""
+"Reading data is kept. Future browser saves can appear under an unidentified "
+"browser source."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reading from here. This is now your Browser position."
@@ -8043,6 +8071,10 @@ msgid "This code has already been approved or declined."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "This device has not reported its inventory yet."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This device will no longer sync."
 msgstr "此裝置將不再同步。"
 
@@ -8070,12 +8102,6 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
-msgid ""
-"This request came from a different network than the one you are using. If "
-"you did not just ask for a code on your own e-reader, choose Deny."
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "This magic link can’t be checked. Generate a new one to try again."
 msgstr "無法驗證此魔術連結。請產生新的連結再試一次。"
 
@@ -8091,6 +8117,12 @@ msgstr "此頁面不存在。"
 msgid ""
 "This page ran into an error and could not be displayed. Your library is fine "
 "— reloading usually fixes it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This request came from a different network than the one you are using. If "
+"you did not just ask for a code on your own e-reader, choose Deny."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8182,6 +8214,10 @@ msgstr "正在復原…"
 #: cps/spa_strings.py
 msgid "Unhide"
 msgstr "取消隱藏"
+
+#: cps/spa_strings.py
+msgid "Unidentified browser source"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unknown color"
@@ -8352,8 +8388,10 @@ msgid "Waiting for you to authorise…"
 msgstr "正在等待您的授權…"
 
 #: cps/spa_strings.py
-msgid "Warning: this highlight can’t be shown in the book"
-msgstr "警告：此標記無法在書中顯示"
+msgid ""
+"Warning: the saved highlight could not be located in the current book. Its "
+"text is preserved."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -8623,6 +8661,28 @@ msgstr "{name}，{n} 個標記和筆記"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} annotations assigned to this source"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} annotations assigned to this source will become Unknown device."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} annotations from this source"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} annotations were made on this source. They are not deleted. Their origin "
+"history is kept."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} assigned to {name}."
 msgstr "{n} 個已指派到 {name}。"
 
@@ -8650,19 +8710,6 @@ msgstr "找到 {n} 個"
 #, python-brace-format
 msgid "{n} highlights and notes"
 msgstr "{n} 個標記和筆記"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"{n} highlights and notes assigned to this device will become Unknown device."
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"{n} highlights and notes were made on this device. They are not deleted. "
-"Their origin history is kept."
-msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9322,6 +9369,10 @@ msgstr "正在同步書架新增至 Hardcover"
 #: cps/tasks/hardcover_sync.py
 msgid "Hardcover Sync"
 msgstr "Hardcover 同步"
+
+#: cps/tasks/hardcover_sync.py
+msgid "Marking books read on Hardcover"
+msgstr ""
 
 #: cps/tasks/kepub_backfill.py
 msgid "Convert Kobo books missing KEPUB"
@@ -12969,10 +13020,6 @@ msgid "Select All"
 msgstr "選擇全部"
 
 #: cps/templates/detail.html
-msgid "Other users' eReaders:"
-msgstr "其他使用者的電子閱讀器："
-
-#: cps/templates/detail.html
 msgid "Additional email addresses:"
 msgstr "額外電子郵件位址："
 
@@ -15058,6 +15105,12 @@ msgstr "同步所選書架到 Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "顯示已讀/未讀選擇"
+
+#~ msgid "Not in current file"
+#~ msgstr "不在目前檔案中"
+
+#~ msgid "Warning: this highlight can’t be shown in the book"
+#~ msgstr "警告：此標記無法在書中顯示"
 
 #~ msgid ""
 #~ "In KOReader, open NextGen Progress Sync and choose Set NextGen Server."

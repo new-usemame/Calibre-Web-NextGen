@@ -6,7 +6,7 @@ import {
   useSendToEreader, useMe, useAccount, useUpdateMetadata, useDeleteBook, useReloadMetadata,
   useBookShelves, useShelves, useKoboTwoWayAnnotations, selectKoboTwoWayBook,
   useAddToMyLibrary, useMyLibraryRemovalImpact, useRemoveFromMyLibrary,
-  useActiveDeliveryDevices, useQueueDeviceDelivery,
+  useActiveDeliveryDevices, useQueueDeviceDelivery, useOtherEreaders,
   useDeleteFormat, useConvertFormat, useAddFormat,
 } from '../lib/queries';
 import { authorityLabel, opaqueLabel } from '../lib/koboTwoWay';
@@ -19,10 +19,11 @@ import { MoreByAuthor } from '../components/MoreByAuthor';
 import { AUTHOR_SEPARATOR } from '../lib/authors';
 import { SpinnerCentered, Spinner } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
-import type { CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice } from '../lib/api';
+import type { CustomColumn, CustomColumnValue, EntityRef, DeliveryDevice, OtherEreader } from '../lib/api';
 import { ApiError, resourceUrl, resourceSrcSet } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
+import { hasRecipients, toggleRecipients } from '../lib/sendRecipients';
 import { canDeleteBooks, canDownloadBooks, canReadBooks, canUploadBooks } from '../lib/permissions';
 import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
@@ -88,6 +89,8 @@ interface SendPanelProps {
   banner: { ok: boolean; text: string } | null;
   /** User's saved e-reader address, used to prefill the recipient field (#715). */
   defaultEmail: string;
+  /** Other users' eReaders an admin can add to the recipients (#2296). */
+  otherEreaders: OtherEreader[];
   onSend: (format: string, convert: boolean, emails: string) => void;
 }
 
@@ -96,7 +99,7 @@ interface SendPanelProps {
  *  saved e-reader address (#715 — previously the field was blank with only a
  *  "blank = your e-reader email" hint, so users thought the address was lost).
  *  Empty recipient still falls back to the saved address server-side. */
-function SendPanel({ formats, pending, banner, defaultEmail, onSend }: SendPanelProps) {
+function SendPanel({ formats, pending, banner, defaultEmail, otherEreaders, onSend }: SendPanelProps) {
   const t = useT();
   const [format, setFormat] = useState(formats[0] ?? '');
   const [convert, setConvert] = useState(false);
@@ -130,6 +133,26 @@ function SendPanel({ formats, pending, banner, defaultEmail, onSend }: SendPanel
           )}
         </label>
       </div>
+      {/* Admin-only (the server lists nobody for anyone else): tick another
+          user's eReader to add it to the recipients above (#2296, fork #276). */}
+      {otherEreaders.length > 0 && (
+        <fieldset className={styles.sendOthers} data-testid="send-other-ereaders">
+          <legend>{t("Other users' eReaders:")}</legend>
+          {otherEreaders.map((other) => (
+            <label key={other.id} className={styles.sendConvert}>
+              <input
+                type="checkbox"
+                checked={hasRecipients(emails, other.emails)}
+                onChange={(e) => {
+                  dirty.current = true;
+                  setEmails(toggleRecipients(emails, other.emails, e.target.checked));
+                }}
+              />
+              {other.name} <span className={styles.sendHint}>({other.emails.join(', ')})</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
       <div className={styles.sendActions}>
         <label className={styles.sendConvert}>
           <input type="checkbox" checked={convert} onChange={(e) => setConvert(e.target.checked)} />
@@ -413,6 +436,7 @@ export function BookDetail() {
   const canSend = inLibrary && !!me?.features?.mail_configured && !!me?.role?.download;
   const savedEreader = useAccount({ enabled: canSend }).data?.kindle_mail ?? '';
   const [sendOpen, setSendOpen] = useState(false);
+  const otherEreaders = useOtherEreaders(canSend && sendOpen && !!me?.role?.admin).data?.others ?? [];
   const [sendBanner, setSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
   const [deviceSendOpen, setDeviceSendOpen] = useState(false);
   const [deviceSendBanner, setDeviceSendBanner] = useState<{ ok: boolean; text: string } | null>(null);
@@ -723,6 +747,7 @@ export function BookDetail() {
           pending={sendToEreader.isPending}
           banner={sendBanner}
           defaultEmail={savedEreader}
+          otherEreaders={otherEreaders}
           onSend={(format, convert, emails) => {
             setSendBanner(null);
             sendToEreader.mutate(

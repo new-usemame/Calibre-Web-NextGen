@@ -5011,6 +5011,10 @@ msgid "Alignment"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "All annotations"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "All books"
 msgstr "Tutti i libri"
 
@@ -5253,6 +5257,16 @@ msgstr ""
 msgid ""
 "Books that are not on an e-reader sync shelf then leave the e-reader's "
 "library on its next sync. They stay in your library here."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Browser reading sources"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Browsers appear after saving reading progress or annotations. Different "
+"browsers or profiles can appear separately."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6579,6 +6593,10 @@ msgstr ""
 "quali vogliono!"
 
 #: cps/spa_strings.py
+msgid "Inventory not reported"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Issuer / base URL"
 msgstr "Issuer / URL di base"
 
@@ -6754,6 +6772,10 @@ msgstr "Caricamento progressi di lettura in corso…"
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Loading…"
 msgstr "Caricamento in corso…"
+
+#: cps/spa_strings.py
+msgid "Location unavailable"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Lock cover"
@@ -7137,10 +7159,6 @@ msgid "Not configured"
 msgstr "Non configurato"
 
 #: cps/spa_strings.py
-msgid "Not in current file"
-msgstr "Non trovato nel file corrente"
-
-#: cps/spa_strings.py
 msgid "Not matched to this library"
 msgstr "Nessuna corrispondenza trovata in questa biblioteca"
 
@@ -7365,6 +7383,10 @@ msgstr ""
 msgid "Other saved position"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Other users' eReaders:"
+msgstr "EReader di altri utenti:"
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr "Lettore PDF"
@@ -7575,6 +7597,12 @@ msgstr "Impostazioni del lettore salvate."
 #: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "Aspetto della lettura"
+
+#: cps/spa_strings.py
+msgid ""
+"Reading data is kept. Future browser saves can appear under an unidentified "
+"browser source."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reading from here. This is now your Browser position."
@@ -8466,6 +8494,10 @@ msgid "This code has already been approved or declined."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "This device has not reported its inventory yet."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This device will no longer sync."
 msgstr "Questo dispositivo non verrà più sincronizzato."
 
@@ -8493,12 +8525,6 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
-msgid ""
-"This request came from a different network than the one you are using. If "
-"you did not just ask for a code on your own e-reader, choose Deny."
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "This magic link can’t be checked. Generate a new one to try again."
 msgstr ""
 "Impossibile verificare questo magic-link. Generane uno nuovo e riprova."
@@ -8519,6 +8545,12 @@ msgstr ""
 "Si è verificato un errore in questa pagina e non è stato possibile "
 "visualizzarla. Nessun problema per la tua biblioteca: in genere basta "
 "ricaricare per risolvere."
+
+#: cps/spa_strings.py
+msgid ""
+"This request came from a different network than the one you are using. If "
+"you did not just ask for a code on your own e-reader, choose Deny."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "This shelf is empty. Add books from any book's page."
@@ -8613,6 +8645,10 @@ msgstr "Annullamento in corso…"
 #: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Rendi visibile"
+
+#: cps/spa_strings.py
+msgid "Unidentified browser source"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unknown color"
@@ -8787,8 +8823,10 @@ msgid "Waiting for you to authorise…"
 msgstr "In attesa di autorizzazione…"
 
 #: cps/spa_strings.py
-msgid "Warning: this highlight can’t be shown in the book"
-msgstr "Attenzione: non è possibile mostrare questa evidenziazione nel libro"
+msgid ""
+"Warning: the saved highlight could not be located in the current book. Its "
+"text is preserved."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -9082,6 +9120,28 @@ msgstr "{name}, {n} evidenziazioni e note"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} annotations assigned to this source"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} annotations assigned to this source will become Unknown device."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} annotations from this source"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} annotations were made on this source. They are not deleted. Their origin "
+"history is kept."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} assigned to {name}."
 msgstr "{n} assegnato/i a {name}."
 
@@ -9109,23 +9169,6 @@ msgstr "{n} trovato/i"
 #, python-brace-format
 msgid "{n} highlights and notes"
 msgstr "{n} evidenziazioni e note"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"{n} highlights and notes assigned to this device will become Unknown device."
-msgstr ""
-"{n} evidenziazioni e note assegnate a questo dispositivo verranno impostate "
-"su \"Dispositivo sconosciuto\"."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"{n} highlights and notes were made on this device. They are not deleted. "
-"Their origin history is kept."
-msgstr ""
-"{n} evidenziazioni e note sono state create su questo dispositivo. Non "
-"verranno eliminate e la loro cronologia di origine sarà conservata."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9790,6 +9833,10 @@ msgstr ""
 #: cps/tasks/hardcover_sync.py
 msgid "Hardcover Sync"
 msgstr "Sincronizzazione con Hardcover"
+
+#: cps/tasks/hardcover_sync.py
+msgid "Marking books read on Hardcover"
+msgstr ""
 
 #: cps/tasks/kepub_backfill.py
 msgid "Convert Kobo books missing KEPUB"
@@ -13866,10 +13913,6 @@ msgid "Select All"
 msgstr "Seleziona tutto"
 
 #: cps/templates/detail.html
-msgid "Other users' eReaders:"
-msgstr "EReader di altri utenti:"
-
-#: cps/templates/detail.html
 msgid "Additional email addresses:"
 msgstr "Ulteriori indirizzi email:"
 
@@ -16075,6 +16118,29 @@ msgstr "Sincronizza gli scaffali selezionati con OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Mostra sezione Libri letti e Libri da leggere"
+
+#~ msgid "Not in current file"
+#~ msgstr "Non trovato nel file corrente"
+
+#~ msgid "Warning: this highlight can’t be shown in the book"
+#~ msgstr ""
+#~ "Attenzione: non è possibile mostrare questa evidenziazione nel libro"
+
+#, python-brace-format
+#~ msgid ""
+#~ "{n} highlights and notes assigned to this device will become Unknown "
+#~ "device."
+#~ msgstr ""
+#~ "{n} evidenziazioni e note assegnate a questo dispositivo verranno "
+#~ "impostate su \"Dispositivo sconosciuto\"."
+
+#, python-brace-format
+#~ msgid ""
+#~ "{n} highlights and notes were made on this device. They are not deleted. "
+#~ "Their origin history is kept."
+#~ msgstr ""
+#~ "{n} evidenziazioni e note sono state create su questo dispositivo. Non "
+#~ "verranno eliminate e la loro cronologia di origine sarà conservata."
 
 #~ msgid ""
 #~ "Choose Login and sign in with this NextGen account or one of its app "

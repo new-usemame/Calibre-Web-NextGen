@@ -452,7 +452,7 @@ test.describe('reader highlights & notes drawer (#325)', () => {
     await expect(rows).toHaveCount(preExisting.length + 1);
 
     // Jumping closes the drawer and moves the book.
-    await rows.last().locator('button').click();
+    await rows.last().getByRole('button', { name: new RegExp(NOTE) }).click();
     await expect(drawer(page)).toBeHidden();
 
     // Survives a reload — the drawer is populated from the server, not memory.
@@ -653,23 +653,36 @@ test.describe('reader column count (#325)', () => {
         const doc = frame?.contentDocument;
         if (!doc) return null;
         const el = doc.querySelector('body') || doc.documentElement;
-        return doc.defaultView!.getComputedStyle(el).columnWidth;
+        return {
+          column: parseFloat(doc.defaultView!.getComputedStyle(el).columnWidth),
+          viewport: document.querySelector('.epub-container')!.clientWidth,
+        };
       });
 
       await page.getByRole('button', { name: 'Reading appearance' }).click();
       await expect(page.getByRole('button', { name: 'Two columns' })).toBeVisible();
 
       await page.getByRole('button', { name: 'Two columns' }).click();
-      await expect.poll(layout).not.toBe(null);
-      const twoUp = await layout();
+      let twoUp = 0;
+      await expect.poll(async () => {
+        const measured = await layout();
+        if (!measured || !(measured.column > 0)
+          || measured.column >= measured.viewport * 0.7) return false;
+        twoUp = measured.column;
+        return true;
+      }, { message: 'Two columns must actually fit beside each other' }).toBe(true);
 
       await page.getByRole('button', { name: 'One column' }).click();
-      // Poll rather than sleep: epub.js re-lays-out asynchronously.
-      await expect.poll(layout, { timeout: 15_000 }).not.toBe(twoUp);
-      const oneUp = await layout();
-
-      expect(oneUp, 'one column should be wider than a two-up column')
-        .not.toBe(twoUp);
+      // A temporarily absent frame is not a changed layout. Capture the same
+      // measurement that proves the one-column layout has finished applying.
+      let oneUp = 0;
+      await expect.poll(async () => {
+        const measured = await layout();
+        if (!measured || measured.column <= twoUp * 1.5
+          || measured.column < measured.viewport * 0.8) return false;
+        oneUp = measured.column;
+        return true;
+      }, { timeout: 15_000, message: 'One column must occupy the reader width' }).toBe(true);
 
       // The preference is persisted server-side, so it must come back.
       await waitForSavedSetting(page, 'spread', 'nonespread');
@@ -679,7 +692,7 @@ test.describe('reader column count (#325)', () => {
       await expect(page.getByRole('button', { name: 'One column' }))
         .toHaveAttribute('aria-pressed', 'true');
       // ...and be APPLIED, not merely remembered by the button.
-      await expect.poll(layout, { timeout: 15_000 }).toBe(oneUp);
+      await expect.poll(async () => (await layout())?.column, { timeout: 15_000 }).toBe(oneUp);
     });
 });
 
@@ -747,9 +760,8 @@ test.describe('reader black page theme (#325)', () => {
  * a note that never had one — and nothing in the row let a reader tell which
  * they were looking at. A deliberate state reported as a failure.
  *
- * Created through the API because the reader has no UI for making one yet; the
- * backend landed first on purpose. That is also why this is worth a test: the
- * rows can already exist before anything in the reader can produce them.
+ * Created through the API to verify that existing standalone notes render
+ * correctly independently of the reader's creation flow, covered separately.
  */
 test.describe('reader drawer: standalone notes (#325)', () => {
   test.describe.configure({ mode: 'serial' });
@@ -781,7 +793,7 @@ test.describe('reader drawer: standalone notes (#325)', () => {
     // It must NOT claim a lost position or a missing quote — those describe a
     // damaged highlight, which this is not.
     await expect(row).not.toContainText('(no text captured)');
-    const jump = row.getByRole('button');
+    const jump = row.getByRole('button', { name: new RegExp(NOTE) });
     await expect(jump).toBeDisabled();
     await expect(jump).toHaveAttribute('title', 'A note about the book, not tied to a passage');
 

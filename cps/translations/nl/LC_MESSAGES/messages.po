@@ -4919,6 +4919,11 @@ msgstr "Geavanceerd zoeken"
 msgid "Alignment"
 msgstr "Uitlijning"
 
+# Reader: native highlights and browser reading sources
+#: cps/spa_strings.py
+msgid "All annotations"
+msgstr "Alle annotaties"
+
 #: cps/spa_strings.py
 msgid "All books"
 msgstr "Alle boeken"
@@ -5172,6 +5177,18 @@ msgstr ""
 "Boeken die niet op een met e-readers gesynchroniseerde boekenplank staan, "
 "verdwijnen dan bij de volgende synchronisatie uit de bibliotheek van de e-"
 "reader. Ze blijven wel in je bibliotheek hier."
+
+#: cps/spa_strings.py
+msgid "Browser reading sources"
+msgstr "Leesbronnen in de browser"
+
+#: cps/spa_strings.py
+msgid ""
+"Browsers appear after saving reading progress or annotations. Different "
+"browsers or profiles can appear separately."
+msgstr ""
+"Browsers verschijnen na het opslaan van leesvoortgang of annotaties. "
+"Verschillende browsers of profielen kunnen afzonderlijk verschijnen."
 
 #: cps/spa_strings.py
 msgid "Built-in"
@@ -6510,6 +6527,10 @@ msgstr ""
 "welke ze willen!"
 
 #: cps/spa_strings.py
+msgid "Inventory not reported"
+msgstr "Inventaris niet gemeld"
+
+#: cps/spa_strings.py
 msgid "Issuer / base URL"
 msgstr "Issuer / basis-URL"
 
@@ -6685,6 +6706,10 @@ msgstr "Leesposities laden…"
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Loading…"
 msgstr "Bezig met laden…"
+
+#: cps/spa_strings.py
+msgid "Location unavailable"
+msgstr "Locatie niet beschikbaar"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Lock cover"
@@ -7064,10 +7089,6 @@ msgid "Not configured"
 msgstr "Niet geconfigureerd"
 
 #: cps/spa_strings.py
-msgid "Not in current file"
-msgstr "Niet in het huidige bestand"
-
-#: cps/spa_strings.py
 msgid "Not matched to this library"
 msgstr "Niet gekoppeld aan deze bibliotheek"
 
@@ -7294,6 +7315,10 @@ msgstr ""
 msgid "Other saved position"
 msgstr "Andere opgeslagen positie"
 
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Other users' eReaders:"
+msgstr "eReaders van andere gebruikers:"
+
 #: cps/spa_strings.py
 msgid "PDF reader"
 msgstr "PDF-lezer"
@@ -7504,6 +7529,14 @@ msgstr "Lezerinstellingen opgeslagen."
 #: cps/spa_strings.py
 msgid "Reading appearance"
 msgstr "Leesweergave"
+
+#: cps/spa_strings.py
+msgid ""
+"Reading data is kept. Future browser saves can appear under an unidentified "
+"browser source."
+msgstr ""
+"Leesgegevens blijven bewaard. Toekomstige opslagacties in de browser kunnen "
+"onder een niet-geïdentificeerde browserbron verschijnen."
 
 #: cps/spa_strings.py
 msgid "Reading from here. This is now your Browser position."
@@ -8401,6 +8434,10 @@ msgid "This code has already been approved or declined."
 msgstr "Deze code is al goedgekeurd of geweigerd."
 
 #: cps/spa_strings.py
+msgid "This device has not reported its inventory yet."
+msgstr "Dit apparaat heeft zijn inventaris nog niet gemeld."
+
+#: cps/spa_strings.py
 msgid "This device will no longer sync."
 msgstr "Dit apparaat wordt niet meer gesynchroniseerd."
 
@@ -8431,15 +8468,6 @@ msgstr ""
 "http://192.168.1.20:8083."
 
 #: cps/spa_strings.py
-msgid ""
-"This request came from a different network than the one you are using. If "
-"you did not just ask for a code on your own e-reader, choose Deny."
-msgstr ""
-"Dit verzoek kwam van een ander netwerk dan het netwerk dat je nu gebruikt. "
-"Heb je niet net zelf een code aangevraagd op je eigen e-reader, kies dan "
-"‘Weigeren’."
-
-#: cps/spa_strings.py
 msgid "This magic link can’t be checked. Generate a new one to try again."
 msgstr ""
 "Deze magic link kan niet worden gecontroleerd. Genereer een nieuwe om het "
@@ -8461,6 +8489,15 @@ msgid ""
 msgstr ""
 "Deze pagina liep tegen een fout aan en kon niet worden weergegeven. Jouw "
 "bibliotheek is in orde — herladen lost het meestal op."
+
+#: cps/spa_strings.py
+msgid ""
+"This request came from a different network than the one you are using. If "
+"you did not just ask for a code on your own e-reader, choose Deny."
+msgstr ""
+"Dit verzoek kwam van een ander netwerk dan het netwerk dat je nu gebruikt. "
+"Heb je niet net zelf een code aangevraagd op je eigen e-reader, kies dan "
+"‘Weigeren’."
 
 #: cps/spa_strings.py
 msgid "This shelf is empty. Add books from any book's page."
@@ -8558,6 +8595,10 @@ msgstr "Ongedaan maken…"
 #: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Zichtbaar maken"
+
+#: cps/spa_strings.py
+msgid "Unidentified browser source"
+msgstr "Niet-geïdentificeerde browserbron"
 
 #: cps/spa_strings.py
 msgid "Unknown color"
@@ -8732,8 +8773,12 @@ msgid "Waiting for you to authorise…"
 msgstr "Wachten tot je autoriseert…"
 
 #: cps/spa_strings.py
-msgid "Warning: this highlight can’t be shown in the book"
-msgstr "Waarschuwing: deze markering kan niet in het boek worden weergegeven"
+msgid ""
+"Warning: the saved highlight could not be located in the current book. Its "
+"text is preserved."
+msgstr ""
+"Waarschuwing: de opgeslagen markering kon niet worden gevonden in het "
+"huidige boek. De tekst blijft bewaard."
 
 #: cps/spa_strings.py
 msgid ""
@@ -9034,6 +9079,32 @@ msgstr "{name}, {n} markeringen en notities"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} annotations assigned to this source"
+msgstr "{n} annotaties toegewezen aan deze bron"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} annotations assigned to this source will become Unknown device."
+msgstr ""
+"{n} annotaties die aan deze bron zijn toegewezen, krijgen de aanduiding "
+"Onbekend apparaat."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} annotations from this source"
+msgstr "{n} annotaties uit deze bron"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} annotations were made on this source. They are not deleted. Their origin "
+"history is kept."
+msgstr ""
+"{n} annotaties zijn op deze bron gemaakt. Ze worden niet verwijderd. Hun "
+"oorspronkelijke herkomst blijft bewaard."
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} assigned to {name}."
 msgstr "{n} toegewezen aan {name}."
 
@@ -9061,23 +9132,6 @@ msgstr "{n} gevonden"
 #, python-brace-format
 msgid "{n} highlights and notes"
 msgstr "{n} markeringen en notities"
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"{n} highlights and notes assigned to this device will become Unknown device."
-msgstr ""
-"{n} markeringen en notities die aan dit apparaat zijn toegewezen, worden "
-"Onbekend apparaat."
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"{n} highlights and notes were made on this device. They are not deleted. "
-"Their origin history is kept."
-msgstr ""
-"{n} markeringen en notities zijn op dit apparaat gemaakt. Ze worden niet "
-"verwijderd. Hun herkomstgeschiedenis blijft bewaard."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -9756,6 +9810,10 @@ msgstr ""
 #, fuzzy
 msgid "Hardcover Sync"
 msgstr "Zet Hardcover-sync aan"
+
+#: cps/tasks/hardcover_sync.py
+msgid "Marking books read on Hardcover"
+msgstr ""
 
 #: cps/tasks/kepub_backfill.py
 msgid "Convert Kobo books missing KEPUB"
@@ -13457,10 +13515,6 @@ msgid "Select All"
 msgstr "Boekenplank maken"
 
 #: cps/templates/detail.html
-msgid "Other users' eReaders:"
-msgstr ""
-
-#: cps/templates/detail.html
 #, fuzzy
 msgid "Additional email addresses:"
 msgstr "Kies e-mailadressen:"
@@ -15599,6 +15653,29 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#~ msgid "Not in current file"
+#~ msgstr "Niet in het huidige bestand"
+
+#~ msgid "Warning: this highlight can’t be shown in the book"
+#~ msgstr ""
+#~ "Waarschuwing: deze markering kan niet in het boek worden weergegeven"
+
+#, python-brace-format
+#~ msgid ""
+#~ "{n} highlights and notes assigned to this device will become Unknown "
+#~ "device."
+#~ msgstr ""
+#~ "{n} markeringen en notities die aan dit apparaat zijn toegewezen, worden "
+#~ "Onbekend apparaat."
+
+#, python-brace-format
+#~ msgid ""
+#~ "{n} highlights and notes were made on this device. They are not deleted. "
+#~ "Their origin history is kept."
+#~ msgstr ""
+#~ "{n} markeringen en notities zijn op dit apparaat gemaakt. Ze worden niet "
+#~ "verwijderd. Hun herkomstgeschiedenis blijft bewaard."
 
 #~ msgid ""
 #~ "Choose Login and sign in with this NextGen account or one of its app "

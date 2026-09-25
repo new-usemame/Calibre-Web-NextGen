@@ -11,7 +11,7 @@ import { replaceCachedIdentity } from './identityCache';
 import { settleByBatch, settleById, type BulkFailureDetail } from './bulkResults';
 import { createEntityListQueryOptions } from './entityListQueryOptions';
 import { dismissNoticeIdsInBatches } from './noticeDismissal';
-import type { MetadataProvider, MetaSearchResponse } from './api';
+import type { MetadataProvider, MetaSearchResponse, OtherEreader } from './api';
 import type {
   Me, Book, BooksPage, BookDetail, EntityList, Shelf, ShelfDetail,
   SearchOptions, AdvancedSearchParams, AdvSearchResult, Account, ProfileUpdate,
@@ -535,6 +535,17 @@ export function useSendToEreader(id: string | number) {
   return useMutation({
     mutationFn: (v: { format: string; convert?: boolean; emails?: string }) =>
       apiPost<{ ok: boolean; message: string }>(`/api/v1/books/${id}/send`, v),
+  });
+}
+
+/** Other users' eReaders the send panel can offer. The server only lists them
+ *  for an admin; everyone else gets an empty list (#2296). */
+export function useOtherEreaders(enabled: boolean) {
+  return useQuery<{ others: OtherEreader[] }>({
+    queryKey: ['send-recipients'],
+    queryFn: () => apiGet<{ others: OtherEreader[] }>('/api/v1/send-recipients'),
+    enabled,
+    staleTime: 60000,
   });
 }
 

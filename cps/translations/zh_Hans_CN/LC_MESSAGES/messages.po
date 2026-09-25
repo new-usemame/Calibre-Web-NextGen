@@ -4745,6 +4745,10 @@ msgid "Alignment"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "All annotations"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "All books"
 msgstr ""
 
@@ -4984,6 +4988,16 @@ msgstr ""
 msgid ""
 "Books that are not on an e-reader sync shelf then leave the e-reader's "
 "library on its next sync. They stay in your library here."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Browser reading sources"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Browsers appear after saving reading progress or annotations. Different "
+"browsers or profiles can appear separately."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6276,6 +6290,10 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Inventory not reported"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Issuer / base URL"
 msgstr ""
 
@@ -6448,6 +6466,10 @@ msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "Loading…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Location unavailable"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
@@ -6819,10 +6841,6 @@ msgid "Not configured"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Not in current file"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Not matched to this library"
 msgstr ""
 
@@ -7023,6 +7041,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Other saved position"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/detail.html
+msgid "Other users' eReaders:"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7232,6 +7254,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reading appearance"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Reading data is kept. Future browser saves can appear under an unidentified "
+"browser source."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8075,6 +8103,10 @@ msgid "This code has already been approved or declined."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "This device has not reported its inventory yet."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "This device will no longer sync."
 msgstr ""
 
@@ -8102,12 +8134,6 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
-msgid ""
-"This request came from a different network than the one you are using. If "
-"you did not just ask for a code on your own e-reader, choose Deny."
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "This magic link can’t be checked. Generate a new one to try again."
 msgstr ""
 
@@ -8123,6 +8149,12 @@ msgstr ""
 msgid ""
 "This page ran into an error and could not be displayed. Your library is fine "
 "— reloading usually fixes it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This request came from a different network than the one you are using. If "
+"you did not just ask for a code on your own e-reader, choose Deny."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8213,6 +8245,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unhide"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Unidentified browser source"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8384,7 +8420,9 @@ msgid "Waiting for you to authorise…"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Warning: this highlight can’t be shown in the book"
+msgid ""
+"Warning: the saved highlight could not be located in the current book. Its "
+"text is preserved."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8655,6 +8693,28 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "{n} annotations assigned to this source"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} annotations assigned to this source will become Unknown device."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} annotations from this source"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid ""
+"{n} annotations were made on this source. They are not deleted. Their origin "
+"history is kept."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "{n} assigned to {name}."
 msgstr ""
 
@@ -8681,19 +8741,6 @@ msgstr ""
 #: cps/spa_strings.py
 #, python-brace-format
 msgid "{n} highlights and notes"
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"{n} highlights and notes assigned to this device will become Unknown device."
-msgstr ""
-
-#: cps/spa_strings.py
-#, python-brace-format
-msgid ""
-"{n} highlights and notes were made on this device. They are not deleted. "
-"Their origin history is kept."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9359,6 +9406,10 @@ msgstr ""
 #, fuzzy
 msgid "Hardcover Sync"
 msgstr "启用 Kobo 同步"
+
+#: cps/tasks/hardcover_sync.py
+msgid "Marking books read on Hardcover"
+msgstr ""
 
 #: cps/tasks/kepub_backfill.py
 msgid "Convert Kobo books missing KEPUB"
@@ -13128,10 +13179,6 @@ msgstr "选择邮箱地址:"
 #, fuzzy
 msgid "Select All"
 msgstr "创建书架"
-
-#: cps/templates/detail.html
-msgid "Other users' eReaders:"
-msgstr ""
 
 #: cps/templates/detail.html
 #, fuzzy

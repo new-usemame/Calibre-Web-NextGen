@@ -58,9 +58,11 @@ function RemoveDialog({ device, counts, onCancel, onRemove }: {
         aria-labelledby={`${descriptionId}-title`} aria-describedby={descriptionId}>
         <h2 id={`${descriptionId}-title`}>{t('Remove {name}?', { name: device.label })}</h2>
         <div id={descriptionId}>
-          {counts.origin_count > 0 && <p>{t('{n} highlights and notes were made on this device. They are not deleted. Their origin history is kept.', { n: counts.origin_count })}</p>}
-          {counts.assigned_count > 0 && <p>{t('{n} highlights and notes assigned to this device will become Unknown device.', { n: counts.assigned_count })}</p>}
-          <p>{t('This device will no longer sync.')}</p>
+          {counts.origin_count > 0 && <p>{t('{n} annotations were made on this source. They are not deleted. Their origin history is kept.', { n: counts.origin_count })}</p>}
+          {counts.assigned_count > 0 && <p>{t('{n} annotations assigned to this source will become Unknown device.', { n: counts.assigned_count })}</p>}
+          <p>{device.type === 'webreader'
+            ? t('Reading data is kept. Future browser saves can appear under an unidentified browser source.')
+            : t('This device will no longer sync.')}</p>
         </div>
         <div className={styles.dialogActions}>
           <button ref={cancelRef} type="button" className={styles.button} onClick={onCancel}>{t('Cancel')}</button>
@@ -162,8 +164,16 @@ export function Devices() {
             page: Math.floor(deviceOffset / DEVICE_PAGE_SIZE) + 1,
             pages: Math.max(1, Math.ceil((data?.total ?? 0) / DEVICE_PAGE_SIZE)),
           })}</p>
+          {['ereaders', 'browsers'].map((group) => {
+            const grouped = devices.filter(device => (device.type === 'webreader') === (group === 'browsers'));
+            if (!grouped.length) return null;
+            return <section key={group} id={group === 'browsers' ? 'browser-reading-sources' : undefined} aria-label={group === 'browsers' ? t('Browser reading sources') : t('E-readers')}>
+              {group === 'browsers' && <>
+                <h2>{t('Browser reading sources')}</h2>
+                <p>{t('Browsers appear after saving reading progress or annotations. Different browsers or profiles can appear separately.')}</p>
+              </>}
           <ul className={styles.list} role="list">
-            {devices.map((device) => (
+            {grouped.map((device) => (
             <li key={device.public_id} className={styles.card}>
               <div className={styles.cardMain}>
                 {editing === device.public_id ? (
@@ -176,10 +186,15 @@ export function Devices() {
                   </form>
                 ) : <h2><Link href={`/account/devices/${device.public_id}`}>{device.label}</Link></h2>}
                 <p className={styles.deviceMeta}>{[device.model, device.firmware && `FW ${device.firmware}`].filter(Boolean).join(' · ')}</p>
-                <p className={styles.deviceStats}>{t('{n} highlights and notes', { n: device.annotation_count })} · {t('Last seen {when}', { when: relativeWhen(device.last_seen) })}
+                {device.browser_identity === 'unidentified' && <p className={styles.deviceMeta}>{t('Unidentified browser source')}</p>}
+                <p className={styles.deviceStats}>
+                  {device.origin_annotation_count != null && <><span>{t('{n} annotations from this source', { n: device.origin_annotation_count })}</span> · </>}
+                  <span>{t('{n} annotations assigned to this source', { n: device.annotation_count })}</span> · {t('Last seen {when}', { when: relativeWhen(device.last_seen) })}
                   {isDeviceStale(device.last_seen) && <> <span className={styles.stalePill}>{t('Not seen lately')}</span></>}</p>
-                <p className={styles.deviceMeta}>{t('{n} books in latest inventory', { n: device.inventory_count })}</p>
-                {device.storage_free !== null && device.storage_total !== null && (
+                {device.type !== 'webreader' && <p className={styles.deviceMeta}>{device.inventory_observed
+                  ? t('{n} books in latest inventory', { n: device.inventory_count })
+                  : t('Inventory not reported')}</p>}
+                {device.type !== 'webreader' && device.storage_free != null && device.storage_total != null && (
                   <p className={styles.storage}>
                     <span>{t('{free} free of {total}', {
                       free: formatStorage(device.storage_free), total: formatStorage(device.storage_total),
@@ -193,14 +208,14 @@ export function Devices() {
                     </span>
                   </p>
                 )}
-                <button type="button" className={styles.inventoryToggle}
+                {device.type !== 'webreader' && <button type="button" className={styles.inventoryToggle}
                   aria-expanded={expandedInventory === device.public_id}
                   aria-controls={`device-inventory-${device.public_id}`}
                   onClick={() => setExpandedInventory(
                     expandedInventory === device.public_id ? null : device.public_id)}>
                   {expandedInventory === device.public_id ? t('Hide device library') : t('View device library')}
-                </button>
-                {expandedInventory === device.public_id && (
+                </button>}
+                {device.type !== 'webreader' && expandedInventory === device.public_id && (
                   <div id={`device-inventory-${device.public_id}`} className={styles.inventory}>
                     <DeviceInventory device={device} />
                   </div>
@@ -234,6 +249,8 @@ export function Devices() {
             </li>
             ))}
           </ul>
+            </section>;
+          })}
           {(data?.total ?? 0) > DEVICE_PAGE_SIZE && (
             <nav className={styles.pagination} aria-label={t('E-readers')}>
               <button

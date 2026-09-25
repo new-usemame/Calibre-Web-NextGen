@@ -12,7 +12,8 @@ function tone(count: number, kind: Tone): Tone | undefined {
 
 export function DeviceSummary({ device }: { device: Device }) {
   const t = useT();
-  const authority = device.authority;
+  const isBrowser = device.type === 'webreader';
+  const authority = isBrowser ? undefined : device.authority;
   const tracked = authority
     ? authority.authoritative + authority.seeding + authority.unseeded
       + authority.quarantined + authority.disabled
@@ -25,12 +26,12 @@ export function DeviceSummary({ device }: { device: Device }) {
         <div data-num=""><dt>{t('Highlights')}</dt><dd>{device.highlights ?? 0}</dd></div>
         <div data-num=""><dt>{t('Notes')}</dt><dd>{device.notes ?? 0}</dd></div>
         <div data-num=""><dt>{t('Dog-ears')}</dt><dd>{device.dogears ?? 0}</dd></div>
-        <div data-num="" data-tone={tone(device.seeded_books ?? 0, 'ok')}>
+        {!isBrowser && <><div data-num="" data-tone={tone(device.seeded_books ?? 0, 'ok')}>
           <dt>{t('Seeded books')}</dt><dd>{device.seeded_books ?? 0}</dd>
         </div>
         <div data-num="" data-tone={tone(device.unseeded_books ?? 0, 'muted')}>
           <dt>{t('Unseeded books')}</dt><dd>{device.unseeded_books ?? 0}</dd>
-        </div>
+        </div></>}
         {authority && (
           <>
             <div data-num="" data-tone={tone(authority.authoritative, 'ok')}>

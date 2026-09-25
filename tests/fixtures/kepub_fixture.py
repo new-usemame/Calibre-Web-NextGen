@@ -150,7 +150,7 @@ def build_synthetic_kepub(dest: Path, book_uuid: str = "00000000-0000-0000-0000-
     for i, fname in enumerate(chapters.keys(), 1):
         idref = f"ch{i}"
         manifest_lines.append(
-            f'    <item id="{idref}" href="OEBPS/{fname}" media-type="application/xhtml+xml"/>'
+            f'    <item id="{idref}" href="{fname}" media-type="application/xhtml+xml"/>'
         )
         spine_lines.append(f'    <itemref idref="{idref}"/>')
 
@@ -180,9 +180,8 @@ def build_minimal_epub(dest: Path) -> Path:
         manifest_items='    <item id="ch1" href="ch1.html" media-type="application/xhtml+xml"/>',
         spine_items='    <itemref idref="ch1"/>',
     )
-    # Note: container.xml points at OEBPS/content.opf but the items
-    # have no OEBPS/ prefix in their hrefs. parse_spine returns them
-    # bare and _resolve_spine_index has to handle that.
+    # Manifest hrefs resolve relative to OEBPS/content.opf. Native Kobo
+    # positions may still use the shorter bare chapter name.
     dest.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(dest, "w", zipfile.ZIP_DEFLATED) as zf:
         zf.writestr("META-INF/container.xml", CONTAINER_XML)

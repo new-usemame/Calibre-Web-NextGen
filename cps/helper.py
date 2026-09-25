@@ -1035,7 +1035,40 @@ def set_custom_read_column_value(book_id, value, source="read-status"):
     return False
 
 
-def edit_book_read_status(book_id, read_status=None):
+def queue_hardcover_mark_read(book_ids):
+    """Queue the background Hardcover "mark as read" for books the current user
+    just marked read (#2289). Same gate as the Kobo and KOReader progress push:
+    the server-wide Hardcover switch, the user's own token, and the per-book
+    reading-progress blacklist. The token is captured here because the worker
+    thread has no request context. Never raises: Hardcover is best-effort and
+    must not fail the read-status change that already committed."""
+    try:
+        from .services import hardcover
+        if not (book_ids and config.hardcover_sync_enabled() and bool(hardcover)):
+            return
+        token = getattr(current_user, "hardcover_token", None)
+        if not token:
+            log.info("User %s has no Hardcover token, not marking books read on Hardcover",
+                     current_user.name)
+            return
+        blocked = {row.book_id for row in ub.session.query(ub.HardcoverBookBlacklist).filter(
+            ub.HardcoverBookBlacklist.book_id.in_(book_ids),
+            ub.HardcoverBookBlacklist.blacklist_reading_progress.is_(True))}
+        wanted = [book_id for book_id in book_ids if book_id not in blocked]
+        if not wanted:
+            return
+        from .tasks.hardcover_sync import TaskHardcoverMarkRead
+        WorkerThread.add(current_user.name, TaskHardcoverMarkRead(token, wanted))
+    except Exception as ex:
+        log.warning("Could not queue Hardcover mark-read for books %s: %s", book_ids, ex)
+
+
+def edit_book_read_status(book_id, read_status=None, sync_hardcover=True):
+    """Set or toggle the current user's read status for one book.
+
+    ``sync_hardcover=False`` lets a bulk caller queue one Hardcover task for the
+    whole selection instead of one per book (see ``queue_hardcover_mark_read``).
+    """
     if not config.config_read_column:
         book = ub.session.query(ub.ReadBook).filter(and_(ub.ReadBook.user_id == int(current_user.id),
                                                          ub.ReadBook.book_id == book_id)).first()
@@ -1116,6 +1149,8 @@ def edit_book_read_status(book_id, read_status=None):
         # keeps owning the position rows and its own accounting.
         mirror_read_status_to_readbook(ub.session, current_user.id, book_id, not now_unread)
         ub.session_commit("Read status updated for book {}".format(book_id))
+    if sync_hardcover and not now_unread:
+        queue_hardcover_mark_read([book_id])
     return ""
 
 

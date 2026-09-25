@@ -6,6 +6,7 @@ import hashlib
 import json
 import re
 import zipfile
+from collections import Counter
 from dataclasses import asdict
 from xml.etree import ElementTree as ET
 
@@ -74,9 +75,67 @@ def response(p, ids):
 
 def texts(path):
     with zipfile.ZipFile(path) as z:
-        bodies=[ET.fromstring(z.read(n)).find(X+'body') for n in sorted(z.namelist())
-                if re.fullmatch(r'OEBPS/ch\d+\.xhtml',n)]
-        return bodies
+        opf=ET.fromstring(z.read('OEBPS/content.opf'))
+        ns='{http://www.idpf.org/2007/opf}'
+        manifest={item.get('id'):item.get('href') for item in opf.find(ns+'manifest')}
+        names=[manifest[item.get('idref')] for item in opf.find(ns+'spine')]
+        return [ET.fromstring(z.read('OEBPS/'+name)).find(X+'body') for name in names
+                if re.fullmatch(r'ch\d+\.xhtml',name)]
+
+
+def generated_notice(node):
+    return (node.tag in (X+'p',X+'div')
+            and 'source-evidence-notice' in node.get('class','').split())
+
+
+def source_and_notices(roots):
+    # The emitter identifies generated disclosure blocks structurally. Account
+    # their exact text/links separately; never discard them from the contract.
+    notices=[]
+    def source_text(node):
+        if generated_notice(node):
+            notices.append((''.join(node.itertext()),tuple(a.get('href') for a in node.iter(X+'a'))))
+            return ''
+        return (node.text or '')+''.join(source_text(child)+(child.tail or '') for child in node)
+    words=re.findall(r'\w+',' '.join(source_text(root) for root in roots))
+    return words,Counter(notices)
+
+
+def assert_source_and_notices_preserved(before,after):
+    old_words,old_notices=source_and_notices(before)
+    new_words,new_notices=source_and_notices(after)
+    assert new_words==old_words,'meaningful source token sequence changed'
+    assert new_notices==old_notices,'generated notice text/link inventory changed'
+
+
+def assert_opening_notice_placement(roots,heading):
+    blocks=[n for n in roots[0] if n.get('role')!='doc-pagebreak']
+    title,notice=(blocks[0],blocks[1]) if heading else (blocks[1],blocks[0])
+    assert title.tag==X+('h2' if heading else 'p')
+    assert ''.join(title.itertext())=='Learning the sky'
+    assert generated_notice(notice)
+    assert [a.get('href') for a in notice.iter(X+'a')]==['original-p0000.xhtml#notes']
+
+
+@pytest.mark.parametrize('damage',['changed_source','dropped_source','reordered_source',
+    'altered_notice','missing_notice','retargeted_notice','source_disguised_as_notice',
+    'notice_class_prefix_source'])
+def test_preservation_contract_detects_source_and_notice_corruption(damage):
+    body=ET.fromstring('<body xmlns="http://www.w3.org/1999/xhtml">'
+        '<p>Alpha source.</p><div class="source-evidence-notice"><p>Generated warning '
+        '<a href="original.xhtml#notes">Source notes</a>.</p></div>'
+        '<p>Beta source.</p></body>')
+    changed=copy.deepcopy(body)
+    if damage=='changed_source':changed[0].text='Altered source.'
+    elif damage=='dropped_source':changed.remove(changed[0])
+    elif damage=='reordered_source':
+        moved=changed[-1];changed.remove(moved);changed.insert(0,moved)
+    elif damage=='altered_notice':changed[1][0].text='Different warning '
+    elif damage=='missing_notice':changed.remove(changed[1])
+    elif damage=='retargeted_notice':changed[1][0][0].set('href','wrong.xhtml')
+    elif damage=='source_disguised_as_notice':changed[0].set('class','source-evidence-notice')
+    else:changed[0].set('class','source-evidence-notice-extra');changed[0].text='Changed source.'
+    with pytest.raises(AssertionError):assert_source_and_notices_preserved([body],[changed])
 
 
 def test_uniform_choices_contain_real_pixels_and_only_complete_source_units(source):
@@ -115,11 +174,13 @@ def test_real_epub_wrappers_keep_words_style_inventory_and_uncertain_evidence(so
     notes=[n for r in roots for n in r.iter(X+'aside')]
     assert any('original-p0000.xhtml#notes'==a.get('href') for n in notes for a in n.iter(X+'a'))
     assert any('original-p0000.xhtml#caption_0'==a.get('href') for r in roots for a in r.iter(X+'a'))
-    words=lambda rs:re.findall(r'\w+', ' '.join(''.join(r.itertext()) for r in rs))
-    assert words(roots)==words(texts(baseline)), 'meaningful token sequence changed'
+    baseline_roots=texts(baseline)
+    assert_source_and_notices_preserved(baseline_roots,roots)
+    assert_opening_notice_placement(baseline_roots,heading=False)
+    assert_opening_notice_placement(roots,heading=True)
     with zipfile.ZipFile(baseline) as a,zipfile.ZipFile(selected) as b:
-        assert {n:a.read(n) for n in a.namelist() if n.endswith('.jpg')}=={
-            n:b.read(n) for n in b.namelist() if n.endswith('.jpg')}
+        assert {n:a.read(n) for n in a.namelist() if n.startswith('OEBPS/images/')}=={
+            n:b.read(n) for n in b.namelist() if n.startswith('OEBPS/images/')}
 
 
 @pytest.mark.parametrize('attack',['unknown','stale','duplicate','overlap','prose','retarget_note','remove_evidence'])
@@ -199,12 +260,14 @@ def test_verifier_approved_subset_is_the_only_rendered_source_and_nav_change(sou
     assert any('original-p0000.xhtml#notes' == a.get('href') for r in roots for a in r.iter(X+'a'))
     baseline = tmp / 'verification-baseline.epub'
     build_epub.build(book, str(baseline), doc=doc)
-    words = lambda rs: re.findall(r'\w+', ' '.join(''.join(r.itertext()) for r in rs))
-    assert words(roots) == words(texts(baseline))
+    baseline_roots=texts(baseline)
+    assert_source_and_notices_preserved(baseline_roots,roots)
+    assert_opening_notice_placement(baseline_roots,heading=False)
+    assert_opening_notice_placement(roots,heading=bool(approved))
     assert any(e.text == 'source' for r in roots for e in r.iter(X+'em'))
     with zipfile.ZipFile(baseline) as a, zipfile.ZipFile(target) as b:
-        assert {n:a.read(n) for n in a.namelist() if n.endswith('.jpg')} == {
-            n:b.read(n) for n in b.namelist() if n.endswith('.jpg')}
+        assert {n:a.read(n) for n in a.namelist() if n.startswith('OEBPS/images/')} == {
+            n:b.read(n) for n in b.namelist() if n.startswith('OEBPS/images/')}
 
 
 @pytest.mark.parametrize('attack', ['malformed', 'duplicate', 'unknown', 'unproposed',

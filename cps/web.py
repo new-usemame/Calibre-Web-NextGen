@@ -37,7 +37,8 @@ from . import constants, logger, isoLanguages, services, helper, spa, oauth_auto
 from . import db, ub, config, app, user_library
 from . import calibre_db, kobo_sync_status, hierarchy
 from .services.ereader_send import (
-    ereader_addresses, other_users_with_ereader, send_includes_own_address,
+    ereader_addresses, other_users_with_ereader, record_email_activity,
+    send_includes_own_address,
 )
 from .services import app_passwords, ereader_scope, reading_position
 from .search import render_search_results, render_adv_search_results
@@ -2793,22 +2794,7 @@ def send_to_ereader(book_id, book_format, convert):
                        current_user.name, current_user.kindle_mail_subject)
     if result is None:
         ub.update_download(book_id, int(current_user.id))
-        # Track email/send activity
-        try:
-            from cps.cwa_db_loader import load_cwa_db
-            CWA_DB = load_cwa_db().CWA_DB
-            book = calibre_db.get_book(book_id)
-            cwa_db = CWA_DB()
-            cwa_db.log_activity(
-                user_id=int(current_user.id),
-                user_name=current_user.name,
-                event_type='EMAIL',
-                item_id=book_id,
-                item_title=book.title if book else 'Unknown',
-                extra_data=book_format.upper()
-            )
-        except Exception as e:
-            log.debug(f"Failed to log email activity: {e}")
+        record_email_activity(current_user, book_id, book_format)
         response = [{'type': "success", 'message': _("Success! Book queued for sending to %(eReadermail)s",
                                                    eReadermail=current_user.kindle_mail)}]
     else:
@@ -2865,22 +2851,7 @@ def send_to_selected_ereaders(book_id):
         # themselves, so it must not pollute their download history.
         if send_includes_own_address(current_user.kindle_mail, selected_emails):
             ub.update_download(book_id, int(current_user.id))
-        # Track email/send activity
-        try:
-            from cps.cwa_db_loader import load_cwa_db
-            CWA_DB = load_cwa_db().CWA_DB
-            book = calibre_db.get_book(book_id)
-            cwa_db = CWA_DB()
-            cwa_db.log_activity(
-                user_id=int(current_user.id),
-                user_name=current_user.name,
-                event_type='EMAIL',
-                item_id=book_id,
-                item_title=book.title if book else 'Unknown',
-                extra_data=book_format.upper()
-            )
-        except Exception as e:
-            log.debug(f"Failed to log email activity: {e}")
+        record_email_activity(current_user, book_id, book_format)
         response = [{'type': "success", 'message': _("Success! Book queued for sending to the selected address(es)!")}]
     else:
         response = [{'type': "danger", 'message': _("Oops! There was an error sending book: %(res)s", res=result)}]

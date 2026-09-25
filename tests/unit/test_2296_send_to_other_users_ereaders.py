@@ -100,3 +100,47 @@ def test_a_send_that_includes_your_own_ereader_is_still_your_download(world):
     assert len(sent) == 2
     assert _downloads(world, "admin") == [7]
     assert _downloads(world, "carol") == [7]
+
+
+def test_guests_get_no_addresses_when_anonymous_browsing_is_on(world):
+    from cps import config
+
+    world.monkeypatch.setattr(config, "config_anonbrowse", 1, raising=False)
+
+    response = world.browser().get("/api/v1/send-recipients")
+
+    assert response.status_code == 401
+    assert b"@" not in response.get_data()
+
+
+def test_the_list_is_never_cached_for_another_user(world):
+    from cps import protect_user_specific_catalog_responses
+
+    world.app.after_request(protect_user_specific_catalog_responses)
+
+    response = world.browser("admin").get("/api/v1/send-recipients")
+
+    assert "private" in response.headers.get("Cache-Control", "")
+
+
+def test_a_relayed_send_still_leaves_an_email_record(world):
+    """With no download row for a relay, the activity record is the one trace
+    of who sent what, and the classic route has always written it."""
+    import types
+    from cps import cwa_db_loader
+
+    logged = []
+
+    class FakeCwaDb:
+        def log_activity(self, **entry):
+            logged.append(entry)
+
+    world.monkeypatch.setattr(cwa_db_loader, "load_cwa_db",
+                              lambda: types.SimpleNamespace(CWA_DB=FakeCwaDb))
+    _mail(world, [])
+
+    world.browser("admin").post(
+        "/api/v1/books/7/send", json={"format": "epub", "emails": "bob@kindle.com"})
+
+    assert [(e["user_name"], e["event_type"], e["item_id"], e["item_title"], e["extra_data"])
+            for e in logged] == [("admin", "EMAIL", 7, "Dune", "EPUB")]

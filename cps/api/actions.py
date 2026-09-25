@@ -19,7 +19,8 @@ from ..kobo_sync_status import change_archived_books, remove_synced_book
 from ..cover_picker import designer_state
 from ..services import cover_extract, cover_url_validator, device_delivery, user_cover
 from ..services.ereader_send import (
-    ereader_addresses, other_users_with_ereader, send_includes_own_address,
+    ereader_addresses, other_users_with_ereader, record_email_activity,
+    send_includes_own_address,
 )
 
 BATCH_MEMBERSHIP_LIMIT = 200
@@ -485,6 +486,7 @@ def send_book_to_ereader(book_id):
     if result is None:
         if send_includes_own_address(current_user.kindle_mail, recipients):
             ub.update_download(book_id, int(current_user.id))
+        record_email_activity(current_user, book_id, book_format)
         return jsonify({"ok": True, "message": "Book queued for sending to %s" % recipients})
     return _err("send_failed", "There was an error sending the book: %s" % result, 502)
 
@@ -502,6 +504,7 @@ def list_send_recipients():
     guard = _require_real_user()
     if guard:
         return guard
+    user_library.mark_response_user_specific()
     others = []
     if current_user.role_admin():
         for user in other_users_with_ereader(current_user.id):

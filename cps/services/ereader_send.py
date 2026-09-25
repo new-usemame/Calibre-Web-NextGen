@@ -65,3 +65,29 @@ def other_users_with_ereader(sender_id: int):
 def ereader_addresses(kindle_mail: str | None) -> list[str]:
     """A user's configured eReader addresses, trimmed, in their saved order."""
     return [part.strip() for part in (kindle_mail or "").split(",") if part.strip()]
+
+
+def record_email_activity(sender, book_id: int, book_format: str) -> None:
+    """Add an emailed book to the activity log, as every send route does.
+
+    For a book relayed to someone else this is the only lasting record of the
+    send, since it is not the sender's download. Best effort: the send is
+    already queued, so a failure here is logged and never fails the request.
+    """
+    try:
+        from .. import calibre_db
+        from ..cwa_db_loader import load_cwa_db
+
+        book = calibre_db.get_book(book_id)
+        load_cwa_db().CWA_DB().log_activity(
+            user_id=int(sender.id),
+            user_name=sender.name,
+            event_type="EMAIL",
+            item_id=book_id,
+            item_title=book.title if book else "Unknown",
+            extra_data=book_format.upper(),
+        )
+    except Exception as e:
+        from .. import logger
+
+        logger.create().debug("Failed to log email activity: %s", e)

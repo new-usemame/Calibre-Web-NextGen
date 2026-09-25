@@ -209,7 +209,22 @@ def test_parent_typed_billing_survives_native_death_without_paid_replay(rig, mon
     assert [e['event'] for e in audit.entries('operation_audit')] == ['validated']
     exits = audit.entries('native_worker')
     assert len(exits) == 1
-    assert exits[0]['exit_code'] == (-signal.SIGKILL if stop_kind == 'death' else 0)
+    assert exits[0]['exit_code'] == -signal.SIGKILL
+    if stop_kind != 'death':
+        shutdown = audit.entries('native_shutdown')
+        assert len(shutdown) == 1
+        stopped = shutdown[0]
+        reason = 'cancelled' if stop_kind == 'cancel' else 'resource_stop'
+        assert stopped['signals'][0]['reason'] == reason
+        assert stopped['signals'][0]['signal'] == 'SIGKILL'
+        assert stopped['signals'][0]['result'] == 'sent'
+        assert stopped['wait'] == 'reaped_after_signal_request'
+        assert stopped['direct_child_reaped'] and stopped['group_state'] == 'absent'
+        assert stopped['stderr_drain_complete']
+        assert stopped['stderr_drain_state'] == 'eof'
+        assert stopped['stderr_drain_error'] is None
+        if stop_kind == 'capacity':
+            assert stopped['resource_stop_error'] == 'ResourceStopped'
     monkeypatch.setattr(ipc.NativeDocument, 'call', real)
     if stop_kind == 'capacity':
         from cps.services.reflow import native_resources

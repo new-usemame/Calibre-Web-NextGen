@@ -266,7 +266,7 @@ def upsert_webreader_device(session, *, user_id, installation_id=None, secret_ke
     now = seen_at or datetime.now(timezone.utc)
     if device is None:
         try:
-            with session.begin_nested():
+            with ub.begin_contained_nested(session):
                 device = ub.Device(
                     user_id=user_id, kind="webreader", display_name="Browser",
                     model="CWNG web reader", platform="web",

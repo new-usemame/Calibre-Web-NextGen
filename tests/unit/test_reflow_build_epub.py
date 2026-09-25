@@ -644,6 +644,60 @@ def test_repeated_uncertain_source_images_have_short_local_help_and_one_explanat
     assert 'id="source-images"' not in plain_index
 
 
+def test_repeated_punctuation_checks_preserve_paragraphs_and_distinct_source_routes():
+    source = ["First author's sentence.", "Second author's sentence.",
+              "Third author's sentence."]
+    elements = [assemble.Element(kind="p", pno=0, runs=[["t", text]],
+                                 punctuation_uncertain=True)
+                for text in source]
+    elements.append(assemble.Element(kind="p", pno=0,
+                                     runs=[["t", "Ordinary unflagged prose."]]))
+    book = assemble.Book(elements=elements, pages={0: elements})
+    root = ET.fromstring('<root xmlns:epub="http://www.idpf.org/2007/ops">' +
+                         build_epub.page_fragment(book, 0) + '</root>')
+    paragraphs = [node for node in root if node.tag == 'p']
+    assert [paragraphs[i * 2].text for i in range(3)] == source
+    assert paragraphs[-1].text == "Ordinary unflagged prose."
+    notices = [node for node in paragraphs if 'source-evidence-notice' in node.get('class', '')]
+    assert len(notices) == 3
+    for i, notice in enumerate(notices):
+        label = ' '.join(''.join(notice.itertext()).split())
+        assert len(label) < 80
+        assert 'punctuation uncertain' in label.lower()
+        assert 'source-evidence-compact' in notice.get('class', '')
+        assert {link.get('href') for link in notice.iter('a')} == {
+            'source-pages.xhtml#source-checks',
+            'original-p0000.xhtml#text_%d' % i}
+    plain = assemble.Book(elements=[elements[-1]], pages={0: [elements[-1]]})
+    assert build_epub.page_fragment(plain, 0) == '<p>Ordinary unflagged prose.</p>'
+
+
+def test_other_generic_source_checks_keep_distinct_meanings_and_original_routes():
+    prose = assemble.Element(kind="p", pno=0, runs=[["t", "The author's words."]])
+    note = assemble.Note(num=None, text="", pno=0, glyph_fallback=True)
+    unresolved = {"pno": 0, "kind": 1, "status": "ambiguous"}
+    book = assemble.Book(elements=[prose], pages={0: [prose]}, notes=[note],
+                         source_navigation=[unresolved])
+    root = ET.fromstring('<root xmlns:epub="http://www.idpf.org/2007/ops">' +
+                         build_epub.page_fragment(book, 0) + '</root>')
+    notices = [node for node in root if node.tag == 'p'
+               and 'source-evidence-notice' in node.get('class', '')]
+    assert [" ".join("".join(node.itertext()).split()).split(' · ')[0]
+            for node in notices] == ['Words/glyphs uncertain', 'PDF link unresolved']
+    for notice in notices:
+        assert len("".join(notice.itertext())) < 80
+        assert {a.get('href') for a in notice.iter('a')} == {
+            'source-pages.xhtml#source-checks', 'original-p0000.xhtml#page'}
+    index = ET.fromstring(build_epub._source_index({0: 'ch001.xhtml'}, 'en', {0: {}}))
+    help_sections = [node for node in index.iter(XHTML+'section')
+                     if node.get('id') == 'source-checks']
+    assert len(help_sections) == 1
+    explanation = ' '.join(''.join(help_sections[0].itertext()).lower().split())
+    assert all(term in explanation for term in (
+        'punctuation may differ', 'encoding or transcription',
+        'recognized reading may be wrong', 'destination could not be placed'))
+
+
 
 @pytest.mark.parametrize("builder", [
     F.defect_c_page, F.broken_note_number_page, F.ambiguous_note_number_page,

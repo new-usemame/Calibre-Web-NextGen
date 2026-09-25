@@ -46,11 +46,18 @@ def test_native_punctuation_disclosure_links_to_original_passage_and_survives_wr
         assert build_epub.validate(str(target))==[]
         with zipfile.ZipFile(target) as z:
             chapters=''.join(z.read(n).decode() for n in z.namelist() if re.fullmatch(r'OEBPS/ch\d+\.xhtml',n))
-            assert 'Original punctuation may differ' in chapters
+            assert 'Punctuation uncertain' in chapters
             assert 'original-p0000.xhtml#text_0' in chapters
+            assert 'source-pages.xhtml#source-checks' in chapters
+            assert '<p class="source-evidence-notice reflow-uncertain source-evidence-compact">' in chapters
             original=ET.fromstring(z.read('OEBPS/original-p0000.xhtml'))
             assert any(e.get('id')=='text_0' for e in original.iter())
             assert 'Return to reflowed PDF page 1' in ''.join(original.itertext())
+            help_page=ET.fromstring(z.read('OEBPS/source-pages.xhtml'))
+            sections=[e for e in help_page.iter() if e.get('id')=='source-checks']
+            assert len(sections)==1
+            help_text=' '.join(''.join(sections[0].itertext()).lower().split())
+            assert 'punctuation' in help_text and 'original passage' in help_text
         book.pages[0][0].punctuation_uncertain=False
         with pytest.raises(structural_ops.ContractError):
             build_epub.build(book,str(tmp_path/'stale.epub'),doc=doc,operation_plans=[plan])

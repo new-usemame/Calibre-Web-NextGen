@@ -410,7 +410,7 @@ def test_numbered_list_keeps_source_punctuation_qualification_and_passage_route(
         assert build_epub.validate(str(path))==[]
         with zipfile.ZipFile(path) as archive:
             bodies=''.join(archive.read(n).decode() for n in archive.namelist() if re.fullmatch(r'OEBPS/ch\d+\.xhtml',n))
-            assert ('Original punctuation may differ' in bodies) is uncertain
+            assert ('Punctuation uncertain' in bodies) is uncertain
             if uncertain:
                 match=re.search(r'original-p0000.xhtml#(text_\d+)',bodies)
                 assert match

@@ -283,7 +283,7 @@ def test_enriched_marks_records_survive_actual_approved_and_fallback_builder(sou
         if selection and selection[0]==choose(p,'e0','heading'):
             chapter=next(r for r in roots if any('Learning the sky' in ''.join(h.itertext()) for h in r.iter(X+'h2')))
             assert 'Some note labels or associations' in ''.join(chapter.itertext())
-            assert 'OCR readings are uncertain' in ''.join(chapter.itertext())
+            assert 'OCR uncertain' in ''.join(chapter.itertext())
     fallback=tmp/'enriched-fallback.epub'
     build_epub.build(book,str(fallback),doc=doc,source_pages={0:canonical},page_html={0:'<script>bad</script>'})
     assert any('source'==''.join(e.itertext()) for r in texts(fallback) for e in r.iter(X+'span'))

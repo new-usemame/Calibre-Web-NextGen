@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.29"
+CONVERTER_VERSION = "1.30"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -96,6 +96,7 @@ sup.noteref-unresolved { color: inherit; }
    likelier one is in the title, and every one of them is listed on the about
    page, because an e-reader has no hover. */
 span.reflow-uncertain { border-bottom: 1px dotted currentColor; }
+p.source-evidence-compact { text-indent: 0; margin: 0.35em 0; border-left: 0.12em solid currentColor; padding-left: 0.45em; }
 figure { margin: 1em 0; text-align: center; page-break-inside: avoid; }
 figcaption { font-size: 0.85em; text-align: center; }
 img { max-width: 100%; }
@@ -313,11 +314,12 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
         blocks.append(_aside_html(note, ref_ids, available, str(note.num) in ambiguous,
             [n for n in book.notes if getattr(n, "continued_from", None) == (pno, note.num)]))
     if any(r[0]=="glyph" for el in elements for r in el.runs) or any(getattr(n,"glyph_fallback",False) for n in notes):
-        blocks.append('<p class="source-evidence-notice">Some source words or glyphs are shown as original images because their text encoding or transcription is uncertain. <a href="original-p%04d.xhtml#page">Open original page</a>.</p>' % pno)
+        blocks.append(_source_check_notice('Words/glyphs uncertain',
+            'original-p%04d.xhtml#page' % pno, 'View original page'))
     if any(link['pno'] == pno and link['kind'] == 1 and link['status'] != 'resolved'
            for link in book.source_navigation):
-        blocks.append('<p class="source-evidence-notice">An internal PDF link could not be placed unambiguously. '
-                      '<a href="original-p%04d.xhtml#page">Open original page</a>.</p>' % pno)
+        blocks.append(_source_check_notice('PDF link unresolved',
+            'original-p%04d.xhtml#page' % pno, 'View original page'))
     return "\n".join(blocks)
 
 
@@ -368,9 +370,17 @@ def _nav_runs_html(runs, marks, available, ref_ids, ambiguous):
 
 
 def _punctuation_notice(pno, index):
-    return ('<p class="source-evidence-notice reflow-uncertain">Original punctuation '
-            'may differ from this transcription. <a href="original-p%04d.xhtml#text_%d">'
-            'View original passage</a>.</p>' % (pno, index))
+    return _source_check_notice('Punctuation uncertain',
+        'original-p%04d.xhtml#text_%d' % (pno, index),
+        'View original passage', uncertain=True)
+
+
+def _source_check_notice(label, source_href, source_label, uncertain=False):
+    classes = 'source-evidence-notice' + (' reflow-uncertain' if uncertain else '')
+    return ('<p class="%s source-evidence-compact">'
+            '<a href="source-pages.xhtml#source-checks">%s</a> · '
+            '<a href="%s">%s</a></p>' %
+            (classes, label, source_href, source_label))
 
 
 def _runs_html(runs, available, ref_ids, ambiguous=()):
@@ -988,6 +998,15 @@ def _source_index(page_homes, language, evidence=None):
                      'is not searchable and does not grow with reader font settings. '
                      'Use View larger beneath an image to open the original page and '
                      'enlarged details, then use its Return link to resume reading.</p></section>'
+                     '<section id="source-checks"><h2>Source checks in the reading text</h2>'
+                     '<p>Punctuation uncertain means the printed punctuation may differ '
+                     'from the transcription; the linked original passage shows it. '
+                     'Words/glyphs uncertain means source lettering is retained as '
+                     'original images because its encoding or transcription is unclear. '
+                     'OCR uncertain means a recognized reading may be wrong; source '
+                     'images retain the affected pixels. PDF link unresolved means an '
+                     'authored internal destination could not be placed unambiguously. '
+                     'Each local link opens the original page or passage for checking.</p></section>'
                      '<h2>Original printed evidence</h2><p>These original images '
                      'help check uncertain transcriptions and note associations.</p><ol>%s</ol>'
                      % "".join('<li><a href="original-p%04d.xhtml">Original PDF page %d</a></li>'
@@ -1473,9 +1492,8 @@ def _original_evidence(book, page_html, doc, package, figure_transform=None,
                 notices.append('<p class="source-evidence-notice">Some note labels or associations '
                                'are uncertain. %s.</p>' % link)
             if pno in recovered:
-                notice = ('<p class="source-evidence-notice reflow-uncertain">OCR readings are uncertain; '
-                          'source images preserve affected text regions. '
-                          '<a href="%s#page">View original page</a>.</p>' % href)
+                notice = _source_check_notice('OCR uncertain',
+                    '%s#page' % href, 'View original page', uncertain=True)
                 notices.append(notice)
                 html = notice + '\n' + html
             if notices:

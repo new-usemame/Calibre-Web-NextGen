@@ -633,6 +633,11 @@ _("All three text blocks")
 _("Unused by this arrangement")
 
 
+# #2115 — custom-column display controls in the SPA catalog.
+_("Custom display name")
+_("Custom fields on book cards")
+_("Display name for {name}")
+
 # ==== BEGIN AUTOGEN (scripts/extract_spa_strings.py --write) ====
 # Auto-anchored SPA-only msgids — every t('literal') and static label
 # property in frontend/src that

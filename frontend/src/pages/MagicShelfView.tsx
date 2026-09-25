@@ -16,6 +16,7 @@ import { ApiError } from '../lib/api';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
+import { selectedCustomColumns } from '../lib/customColumnDisplay';
 import { shelfMarkAudience, shelfMarksReachDevices } from '../lib/ereaderWording';
 import {
   canonicalMagicShelfSortAdoption,
@@ -89,6 +90,7 @@ export function MagicShelfView({ id }: { id: string }) {
   const updateProfile = useUpdateProfile();
   const [actionError, setActionError] = useState<string | null>(null);
   const [koboWarning, setKoboWarning] = useState<string | null>(null);
+  const customColumns = selectedCustomColumns(data?.custom_column_definitions, me);
 
   // Route reuse: reset paging when the shelf id changes (#612).
   useEffect(() => {
@@ -307,7 +309,7 @@ export function MagicShelfView({ id }: { id: string }) {
               <BookCard key={b.id} book={b}
                 selectable={selecting} selectionDisabled={bulkBusy} selected={selected.has(b.id)} onToggleSelect={toggleSelect}
                 hideActions={cardActionsHidden} hideReadingTags={readingTagsHidden}
-                canRead={!!me?.role?.viewer}
+                canRead={!!me?.role?.viewer} customColumnDefinitions={customColumns}
                 style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }} />
             ))}
           </div>

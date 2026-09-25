@@ -15654,6 +15654,19 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
 
+#: cps/spa_strings.py
+msgid "Custom display name"
+msgstr "Aangepaste weergavenaam"
+
+#: cps/spa_strings.py
+msgid "Custom fields on book cards"
+msgstr "Aangepaste velden op boekkaarten"
+
+#: cps/spa_strings.py
+msgid "Display name for {name}"
+msgstr "Weergavenaam voor {name}"
+
+
 #~ msgid "Not in current file"
 #~ msgstr "Niet in het huidige bestand"
 

@@ -16005,6 +16005,19 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
 
+#: cps/spa_strings.py
+msgid "Custom display name"
+msgstr "Nom d’affichage personnalisé"
+
+#: cps/spa_strings.py
+msgid "Custom fields on book cards"
+msgstr "Champs personnalisés sur les fiches de livres"
+
+#: cps/spa_strings.py
+msgid "Display name for {name}"
+msgstr "Nom d’affichage pour {name}"
+
+
 #~ msgid "Not in current file"
 #~ msgstr "Absent du fichier actuel"
 

@@ -1,5 +1,6 @@
 """Source object ownership for damaged scan transcripts."""
 import pytest
+import pymupdf
 from types import SimpleNamespace
 
 from cps.services.reflow import assemble, build_epub, extract, skeleton
@@ -71,6 +72,144 @@ def test_adjacent_source_line_proves_blank_tail_before_trimming():
     skeleton._absorb_figure_content(blocks,[candidate],SimpleNamespace(body_size=11),
                                     raw=scan([title,following]))
     assert candidate.reason=='unverified_scan_layout'
+
+
+def test_removed_figure_area_below_narrow_neighbor_keeps_printed_ink(tmp_path):
+    """The independent finite-PDF counterexample: the old probes missed this strip."""
+    title = _large_line('A complete title', (80, 100, 250, 124))
+    following = line('Separate quotation', 40, 180, 100)
+    candidate = skeleton.Region('figure', bbox=(100, 40, 300, 220),
+                                reason='scan_figure_side')
+    raw = scan([title, following], width=400, height=300)
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=400, height=300)
+        page.draw_rect((110, 202, 135, 216), fill=(0, 0, 0), color=None)
+        doc.save(tmp_path / 'printed-ink.pdf')
+        probe = extract.ScanPixelProbe(doc, 0)
+        assert probe.source_has_ink((100, 194, 140, 220))
+        skeleton._absorb_figure_content(
+            [(block, block.lines) for block in raw.blocks], [candidate],
+            SimpleNamespace(body_size=11), raw=raw, pixel_probe=probe)
+    assert candidate.bbox[3] >= 216
+    assert candidate.reason == 'unverified_scan_layout'
+
+
+@pytest.mark.parametrize('mark,color', [
+    ((110, 202, 135, 216), (0, 0, 0)),     # below the neighbor
+    ((80, 182, 89, 188), (0, 0, 0)),       # left strip
+    ((160, 182, 190, 190), (0, 0, 0)),     # right strip
+    ((150, 178, 180, 180), (0, 0, 0)),     # cut boundary
+    ((110, 202, 135, 216), (.5, .5, .5)), # gray source mark
+])
+def test_removed_area_ink_outside_independent_source_owner_blocks_trim(mark, color):
+    title = _large_line('A complete title', (80, 100, 250, 124))
+    main = skeleton.Region('figure', bbox=(100, 40, 300, 220),
+                           reason='scan_figure_side')
+    neighbor = skeleton.Region('figure', bbox=(90, 180, 140, 189),
+                               reason='ocr_uncertain_region')
+    raw = scan([title], width=400, height=300)
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=400, height=300)
+        page.draw_rect(mark, fill=color, color=None)
+        probe = extract.ScanPixelProbe(doc, 0)
+        assert probe.source_has_ink(mark)
+        skeleton._absorb_figure_content(
+            [(raw.blocks[0], [title])], [main, neighbor],
+            SimpleNamespace(body_size=11), raw=raw, pixel_probe=probe)
+    assert main.bbox[3] >= 220
+    assert main.reason == 'unverified_scan_layout'
+
+
+def test_neighbor_source_image_preserves_its_own_ink_and_allows_blank_trim():
+    title = _large_line('A complete title', (80, 100, 250, 124))
+    main = skeleton.Region('figure', bbox=(100, 40, 300, 220),
+                           reason='scan_figure_side')
+    neighbor = skeleton.Region('figure', bbox=(90, 180, 140, 189),
+                               reason='ocr_uncertain_region')
+    raw = scan([title], width=400, height=300)
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=400, height=300)
+        page.draw_rect((105, 181, 130, 188), fill=(0, 0, 0), color=None)
+        probe = extract.ScanPixelProbe(doc, 0)
+        skeleton._absorb_figure_content(
+            [(raw.blocks[0], [title])], [main, neighbor],
+            SimpleNamespace(body_size=11), raw=raw, pixel_probe=probe)
+    assert main.bbox[3] == 178
+    assert neighbor.bbox[0] <= 105 and neighbor.bbox[3] >= 188
+    assert main.reason == 'scan_figure_side'
+
+
+@pytest.mark.parametrize('probe', [None, object()])
+def test_missing_removed_area_probe_keeps_complete_source_crop(probe):
+    title = _large_line('A complete title', (80, 100, 250, 124))
+    following = line('Separate quotation', 40, 180, 100)
+    main = skeleton.Region('figure', bbox=(100, 40, 300, 220),
+                           reason='scan_figure_side')
+    raw = scan([title, following], width=400, height=300)
+    skeleton._absorb_figure_content(
+        [(block, block.lines) for block in raw.blocks], [main],
+        SimpleNamespace(body_size=11), raw=raw, pixel_probe=probe)
+    assert main.bbox[3] == 220 and main.reason == 'unverified_scan_layout'
+
+
+@pytest.mark.parametrize('error', [RuntimeError, extract.RasterTooLarge])
+def test_removed_area_probe_error_keeps_complete_source_crop(error):
+    class BrokenProbe:
+        def source_has_ink(self, rect): raise error('render unavailable')
+    title = _large_line('A complete title', (80, 100, 250, 124))
+    following = line('Separate quotation', 40, 180, 100)
+    main = skeleton.Region('figure', bbox=(100, 40, 300, 220),
+                           reason='scan_figure_side')
+    raw = scan([title, following], width=400, height=300)
+    skeleton._absorb_figure_content(
+        [(block, block.lines) for block in raw.blocks], [main],
+        SimpleNamespace(body_size=11), raw=raw, pixel_probe=BrokenProbe())
+    assert main.bbox[3] == 220 and main.reason == 'unverified_scan_layout'
+
+
+def test_removed_area_proof_uses_rotated_reading_coordinates():
+    from cps.services.reflow import ocr
+    from cps.services.reflow.source_display import SourceDisplay
+    title = _large_line('A complete title', (80, 100, 250, 124))
+    following = line('Separate quotation', 40, 180, 100)
+    main = skeleton.Region('figure', bbox=(100, 40, 300, 220),
+                           reason='scan_figure_side')
+    raw = scan([title, following], width=400, height=300)
+    raw.source_geometry['orientation'] = 90
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=300, height=400)
+        source_box = ocr._source_box((110, 202, 135, 216), 300, 400, 90)
+        page.draw_rect(source_box, fill=(0, 0, 0), color=None)
+        display = SourceDisplay(doc, 0, {'layer': 'ocr', 'orientation': 90,
+                                         'source_rotation': 0,
+                                         'page_rect': (0, 0, 300, 400)})
+        with display.query_document(isolate=True) as reading:
+            probe = extract.ScanPixelProbe(reading, 0)
+            assert probe.source_has_ink((110, 202, 135, 216))
+            skeleton._absorb_figure_content(
+                [(block, block.lines) for block in raw.blocks], [main],
+                SimpleNamespace(body_size=11), raw=raw, pixel_probe=probe)
+    assert main.bbox[3] == 220 and main.reason == 'unverified_scan_layout'
+
+
+@pytest.mark.parametrize('reverse', [False, True])
+def test_competing_source_image_owners_never_justify_removing_unowned_ink(reverse):
+    title = _large_line('A complete title', (80, 100, 250, 124))
+    main = skeleton.Region('figure', bbox=(100, 40, 300, 220),
+                           reason='scan_figure_side')
+    neighbors = [skeleton.Region('figure', bbox=(90, 180, 135, 189)),
+                 skeleton.Region('figure', bbox=(92, 180, 140, 190))]
+    if reverse:
+        neighbors.reverse()
+    raw = scan([title], width=400, height=300)
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=400, height=300)
+        page.draw_rect((160, 202, 190, 216), fill=(0, 0, 0), color=None)
+        skeleton._absorb_figure_content(
+            [(raw.blocks[0], [title])], [main] + neighbors,
+            SimpleNamespace(body_size=11), raw=raw,
+            pixel_probe=extract.ScanPixelProbe(doc, 0))
+    assert main.bbox[3] == 220 and main.reason == 'unverified_scan_layout'
 
 
 def test_fully_contained_lettering_needs_no_crop_growth():

@@ -4353,6 +4353,14 @@ msgid "Open search"
 msgstr "Ouvrir la recherche"
 
 #: cps/spa_strings.py
+msgid "Browse the Global Library"
+msgstr "Parcourir la bibliothèque globale"
+
+#: cps/spa_strings.py
+msgid "Open device administration"
+msgstr "Ouvrir l’administration des appareils"
+
+#: cps/spa_strings.py
 msgid "Editions"
 msgstr "Éditions"
 

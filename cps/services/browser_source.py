@@ -175,9 +175,11 @@ no pre-upgrade source's own observations are overwritten.
                          ids, canonical_id)
             # A browser has no hardware delivery state. Keep the original
             # telemetry, but canonical routing intent follows the assignment.
+            # Qualified: a bare annotation_id resolves to annotation's own
+            # string column, which never equals an id.
             conn.execute(text(
                 "UPDATE annotation_device_state SET desired=EXISTS "
-                "(SELECT 1 FROM annotation a WHERE a.id=annotation_id "
+                "(SELECT 1 FROM annotation a WHERE a.id=annotation_device_state.annotation_id "
                 "AND a.user_id=:user AND a.assigned_device_id=:canonical) "
                 "WHERE device_id=:canonical"
             ), {"user": user_id, "canonical": canonical_id})

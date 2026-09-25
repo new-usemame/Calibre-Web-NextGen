@@ -81,6 +81,9 @@ def test_populated_upgrade_preserves_content_positions_aliases_and_routing(db, m
         ))
         session.add(ub.DeviceRetiredAssignment(device_id=device.id, annotation_id=rows[2].id))
     session.add(ub.DeviceReadingPosition(device_id=alias.id, book_id=11, cfi="unique-book"))
+    # Routing intent for a note now assigned to the Clara, left on an old browser.
+    session.add(ub.AnnotationDeviceState(device_id=alias.id, annotation_id=rows[2].id,
+                                         desired=True, updated_at=now))
     session.add(ub.Bookmark(user_id=7, book_id=10, format="epub", bookmark_key="shared-bookmark", updated_at=now))
     session.commit()
     old_public = alias.public_id
@@ -106,6 +109,11 @@ def test_populated_upgrade_preserves_content_positions_aliases_and_routing(db, m
     assert position.client_modified_at == now + timedelta(hours=2)
     assert position.rehydrate_needed is True
     assert session.query(ub.DeviceReadingPosition).filter_by(device_id=canonical.id, book_id=11).one().cfi == "unique-book"
+    # The Browser takes each annotation's latest device state, and wants
+    # delivered only what is assigned to it.
+    states = {s.annotation_id: (s.updated_at, s.desired)
+              for s in session.query(ub.AnnotationDeviceState).filter_by(device_id=canonical.id)}
+    assert states == {rows[0].id: (now + timedelta(hours=2), True), rows[2].id: (now, False)}
     with engine.connect() as conn:
         after = _snapshot(conn, "annotation")
         assert _snapshot(conn, "bookmark") == bookmark

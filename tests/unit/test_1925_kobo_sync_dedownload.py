@@ -3754,7 +3754,6 @@ def test_admin_resend_clears_target_users_entitlement_ledger(
     other_device = _seed_other_user_ledger(sync_harness)
     monkeypatch.setattr(admin, "calibre_db", sync_harness.calibre_db)
     monkeypatch.setattr(admin, "_", lambda value: value)
-    before = sync_harness.book.last_modified
 
     with sync_harness.app.test_request_context(
         f"/ajax/kobo_resend/{sync_harness.user.id}/{sync_harness.book.id}",
@@ -3768,7 +3767,6 @@ def test_admin_resend_clears_target_users_entitlement_ledger(
     assert sync_harness.session.query(
         ub.KoboDevicePendingSyncPage,
     ).filter_by(device_id=sync_harness.device.id).count() == 0
-    assert sync_harness.book.last_modified > before
     rows = sync_harness.session.query(ub.KoboDeviceBookEntitlement).all()
     assert [(row.device_id, row.book_id) for row in rows] == [
         (other_device.id, sync_harness.book.id),
@@ -3785,6 +3783,46 @@ def test_admin_resend_clears_target_users_entitlement_ledger(
         row.device_id
         for row in sync_harness.session.query(ub.KoboDeviceBookEntitlement)
     } == {sync_harness.device.id, other_device.id}
+
+
+def test_resend_reaches_only_the_requesting_accounts_kobos(
+    sync_harness, monkeypatch,
+):
+    """Resend is one account's request: another account's Kobo that holds the
+    book must hear nothing.  It used to bump the book's ``last_modified``, a
+    library-wide clock, so every other account's Kobo holding the book got it
+    as Changed (#2207's gate: five other-account Kobos).  The cleared ledger
+    row is what reselects the book, whatever the reader's cursor."""
+    from cps import admin, kobo, ub
+
+    h = sync_harness
+    monkeypatch.setattr(kobo.config, "config_kobo_suppress_replayed_entitlements", True)
+    monkeypatch.setattr(admin, "calibre_db", h.calibre_db)
+    monkeypatch.setattr(admin, "_", lambda value: value)
+    other = ub.Device(user_id=18, kind="kobo", display_name="Other Account Kobo",
+                      model="Kobo Libra Colour", active=True, created_by="auto")
+    h.session.add(other)
+    h.session.commit()
+
+    def sync_as(user_id, token, device_id):
+        monkeypatch.setattr(h.user, "id", user_id)
+        return h.sync(token, internal_device_id=device_id,
+                      raw_device_id=("a" if user_id == 17 else "c") * 64)
+
+    def kinds(response):
+        return [sorted(item) for item in _entitlements(response)]
+
+    mine = sync_as(17, None, h.device.id)
+    theirs = sync_as(18, None, other.id)
+    assert kinds(mine) == kinds(theirs) == [["NewEntitlement"]]
+
+    monkeypatch.setattr(h.user, "id", 17)
+    with h.app.test_request_context(f"/ajax/kobo_resend/17/{h.book.id}", method="POST"):
+        assert admin.do_kobo_resend(17, h.book.id).status_code == 200
+
+    assert kinds(sync_as(18, theirs.headers[h.token_header], other.id)) == []
+    assert kinds(sync_as(18, None, other.id)) == []
+    assert kinds(sync_as(17, mine.headers[h.token_header], h.device.id)) == [["NewEntitlement"]]
 
 
 def test_self_resend_clears_only_callers_entitlement_ledger(

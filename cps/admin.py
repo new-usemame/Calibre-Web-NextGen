@@ -1495,11 +1495,13 @@ def ajax_kobo_resend(userid, bookid):
 
 def do_kobo_resend(userid, bookid):
     # Re-deliver one book to the user's Kobos on the next sync.  Clearing its
-    # ledger rows makes it New (the sync classifies by the device's ledger),
-    # and bumping Books.last_modified selects it wherever a device's cursor
-    # sits.  Run the one-time upgrade audit first: run later, it would give a
-    # book with a saved reading position a sentinel row and announce it
-    # Changed, which a reader that no longer holds the book can drop.
+    # ledger rows is enough: the sync's recovery arm reselects a book missing
+    # from a Kobo's ledger wherever the cursor sits, and classifies it New.
+    # Never touch Books.last_modified: that clock is the library's, and every
+    # other account's Kobo holding the book would get it as Changed.  Run the
+    # one-time upgrade audit first: run later, it would give a book with a
+    # saved reading position a sentinel row and announce it Changed, which a
+    # reader that no longer holds the book can drop.
     from .kobo import (_migrate_device_entitlement_classification,
                        _seed_existing_device_entitlement_ledgers)
     book = calibre_db.session.query(db.Books).filter(db.Books.id == bookid).first()
@@ -1527,15 +1529,12 @@ def do_kobo_resend(userid, bookid):
         ub.KoboSyncedBooks.user_id == userid,
         ub.KoboSyncedBooks.book_id == bookid,
     ).delete()
-    book.last_modified = datetime.now(timezone.utc)
-    calibre_db.session.commit()
     if deleted or ledger_deleted:
         message = _("Cleared sync state for book {0} (user {1}); the device "
                     "will re-receive the book on next sync").format(bookid, userid)
     else:
-        message = _("Book {0} was not in the sync record for user {1}; "
-                    "last_modified bumped so the device will receive on next "
-                    "sync").format(bookid, userid)
+        message = _("Book {0} was not in the sync record for user {1}; the "
+                    "device will receive it on next sync").format(bookid, userid)
     ub.session_commit(message)
     return Response(json.dumps([{"type": "success", "message": message}]),
                     mimetype='application/json')

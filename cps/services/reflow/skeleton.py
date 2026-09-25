@@ -661,6 +661,38 @@ def _uncertain_aligned_scan_list(raw, kept_blocks):
              min(raw.width,box[2]+pad),min(raw.height,box[3]+pad)), best)
 
 
+def _coalesce_nested_scan_list_figures(raw, skel):
+    """A list already inside a source crop has one primary image owner.
+
+    The measured list keeps its artwork lines for source accounting. A wider
+    scan figure can also be inferred from the prose gap around that list; when
+    it contains the list's crop, emitting both repeats the same printed rows.
+    Keep that wider source region, including any immediately printed heading.
+    """
+    if not raw.is_page_scan:
+        return
+    figures = [region for region in skel.regions if region.kind == 'figure']
+    for narrow in figures:
+        if narrow.reason != 'uncertain_aligned_scan_list':
+            continue
+        x0, y0, x1, y1 = narrow.bbox
+        carriers = [region for region in figures if region is not narrow
+                    and region.reason in ('ocr_uncertain_region', 'scan_figure_band')
+                    and region.bbox[2]-region.bbox[0] < raw.width*.75
+                    and region.bbox[0] <= x0+1 and region.bbox[1] <= y0+1
+                    and region.bbox[2] >= x1-1 and region.bbox[3] >= y1-1
+                    and (region.bbox[2]-region.bbox[0]) *
+                        (region.bbox[3]-region.bbox[1]) >
+                        1.5 * (x1-x0) * (y1-y0)]
+        if len(carriers) != 1:
+            continue
+        carrier = carriers[0]
+        a, b, c, d = carrier.bbox
+        carrier.bbox = (min(a,x0), min(b,y0), max(c,x1), max(d,y1))
+        carrier.reason = 'uncertain_aligned_scan_list'
+        skel.regions.remove(narrow)
+
+
 def _sparse_scan_spread_panels(raw):
     """Split a proven two-up scan with independent sparse printed panels.
 
@@ -706,6 +738,68 @@ def _sparse_scan_spread_panels(raw):
         bottom = min(raw.height,max(line.bbox[3] for line in group)+12)
         panels.append(((x0,top,x1,bottom),group))
     return panels
+
+
+def _uncertain_scan_key_panel(raw):
+    """Keep a scanned symbol key's printed relationships in one source crop.
+
+    Recognition often groups a column of symbols into a few tall, uncertain
+    lines while reading the adjacent labels as many independent short lines.
+    Reflowing either column separately destroys the row associations. OCR
+    bounds cannot establish how far an unreadable mark extends, so the source
+    owner is the complete page even when all recognized lines form one panel.
+    This requires both geometries and refuses pages with independent prose.
+    """
+    if not raw.is_page_scan:
+        return None
+    lines = [ln for block in raw.text_blocks for ln in block.lines if ln.stripped]
+    if len(lines) < 12:
+        return None
+    strips = [ln for ln in lines if (ln.bbox[2]-ln.bbox[0] <= raw.width*.035
+              and ln.bbox[3]-ln.bbox[1] >= raw.height*.05
+              and all(sp.font == 'ocr' and sp.uncertain for sp in ln.spans))]
+    if len(strips) < 2:
+        return None
+    groups = []
+    for strip in sorted(strips, key=lambda ln: ln.bbox[0]):
+        group = next((group for group in groups
+                      if abs(group[0].bbox[0]-strip.bbox[0]) <= raw.width*.025), None)
+        if group is None:
+            groups.append([strip])
+        else:
+            group.append(strip)
+    matches = []
+    for group in groups:
+        left = min(ln.bbox[0] for ln in group)
+        right = max(ln.bbox[2] for ln in group)
+        top = min(ln.bbox[1] for ln in group)
+        bottom = max(ln.bbox[3] for ln in group)
+        if bottom-top < raw.height*.35:
+            continue
+        adjacent = [ln for ln in lines if ln not in group
+                    and right < ln.bbox[0] <= right+raw.width*.11
+                    and top-8 <= (ln.bbox[1]+ln.bbox[3])/2 <= bottom+8
+                    and ln.bbox[3]-ln.bbox[1] < raw.height*.045]
+        if len(adjacent) < 9:
+            continue
+        starts = [ln.bbox[0] for ln in adjacent]
+        aligned = [ln for ln in adjacent
+                   if abs(ln.bbox[0]-median(starts)) <= raw.width*.025
+                   and len(ln.stripped.split()) <= 5]
+        if len(aligned) < 9 or len(aligned) < len(adjacent)*.7:
+            continue
+        panel = [ln for ln in lines if ln.bbox[0] >= left-raw.width*.025
+                 and ln.bbox[1] >= top-raw.height*.12
+                 and ln.bbox[3] <= bottom+raw.height*.04]
+        if (len(panel) < len(lines)*.75 or
+                any(len(ln.stripped.split()) > 12 or
+                    ln.bbox[2]-ln.bbox[0] > raw.width*.5 for ln in panel)):
+            continue
+        # A second independent text area makes panel ownership uncertain.
+        if any(ln not in panel for ln in lines):
+            continue
+        matches.append(((0, 0, raw.width, raw.height), panel))
+    return matches[0] if len(matches) == 1 else None
 
 
 def _complete_captioned_scan_top(raw, skel, pixel_probe):
@@ -779,6 +873,16 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
             # proves ink before either is emitted as a figure.
             skel.regions.append(Region(kind="figure", bbox=img.bbox, image=img,
                                        needs_ink=True))
+        return skel
+
+    key_panel = _uncertain_scan_key_panel(raw)
+    if key_panel:
+        box, lines = key_panel
+        skel.regions.append(Region(kind='artwork', lines=lines, bbox=box,
+                                   reason='uncertain_scan_key_panel'))
+        skel.regions.append(Region(kind='figure', bbox=box,
+                                   reason='uncertain_scan_key_panel'))
+        skel.reasons.append('uncertain_scan_key_panel')
         return skel
 
     panels = _sparse_scan_spread_panels(raw)
@@ -1021,6 +1125,7 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
                     reason='unverified_scan_layout',band=region.band,column=region.column))
     _preserve_conflicting_outline_heading(raw, style, skel)
     _complete_captioned_scan_top(raw, skel, pixel_probe)
+    _coalesce_nested_scan_list_figures(raw, skel)
     skel.regions.sort(key=_region_order)
     _join_numbered_regions(skel)
     skel.title_unit = _sparse_title_unit(raw, skel, style)

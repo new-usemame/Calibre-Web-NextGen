@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.24"
+CONVERTER_VERSION = "1.28"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -204,7 +204,7 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                         figure_box[0] <= caption_box[0] and figure_box[1] <= caption_box[1]
                         and figure_box[2] >= caption_box[2] and figure_box[3] >= caption_box[3]):
                     source_caption = ''
-            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel")
+            source_region = reason in ("ocr_uncertain_region", "native_outline_conflict", "native_spacing_uncertain", "unverified_scan_layout", "unrecovered_scan_layer", "unverified_paired_columns", "embedded_source_mark", "uncertain_aligned_scan_list", "sparse_scan_spread_panel", "uncertain_scan_key_panel")
             if reason == "native_outline_conflict":
                 caption = ('Native heading text conflicts with PDF navigation metadata. '
                            'The original printed heading is shown as an image; no replacement '
@@ -238,6 +238,11 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                 caption = ('Complete printed panel. OCR cannot establish every printed cell '
                            'or its reading order; use these source pixels. '
                            '<a href="original-p%04d.xhtml#page">Open original spread and enlarged details</a>.' % pno)
+            elif reason == "uncertain_scan_key_panel":
+                caption = ('Printed symbol key retained from the original page. OCR cannot verify '
+                           'the symbols or their associations with adjacent labels; read the '
+                           'aligned source rows in this image. It is not searchable text. '
+                           '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
             elif source_region:
                 caption = ('Original text region. OCR transcription is uncertain; '
                            'read the source pixels. This image does not provide searchable text. '
@@ -1065,6 +1070,38 @@ def _opf(metadata, manifest, spine, identifier, modified, nonlinear=()):
         "</package>\n" % (REFLOW_NS, "\n".join(meta_lines), items, refs))
 
 
+def _scan_key_white_margin_jpeg(doc, pno, bbox):
+    """Remove only side columns proved pure white in the emitted source raster.
+
+    The source-owned figure remains the full page. A symbol OCR did not bound
+    can be anywhere on it; the same pixmap supplies the proof and the JPEG, so
+    cached OCR geometry and a separate approximate ink query have no authority
+    to cut it. Unknown colors or a failed render keep the complete page.
+    """
+    from PIL import Image, ImageChops
+    clip = extract.pymupdf.Rect(*bbox)
+    scale = extract._bounded_scale(clip, 2.0)
+    pix = doc[pno].get_pixmap(matrix=extract.pymupdf.Matrix(scale, scale),
+                              clip=clip, alpha=False, colorspace=extract.pymupdf.csRGB)
+    if pix.n != 3 or pix.width < 2 or pix.height < 2:
+        return pix.tobytes('jpg', jpg_quality=85)
+    image = Image.frombytes('RGB', (pix.width, pix.height), pix.samples)
+    extent = ImageChops.difference(image, Image.new('RGB', image.size, 'white')).getbbox()
+    if extent is None:
+        return pix.tobytes('jpg', jpg_quality=85)
+    # Eight source pixels of the independently proved white columns protect the
+    # printed edge from JPEG boundary ringing. Never trim rows or nonwhite ink.
+    left = max(0, extent[0]-8)
+    right = min(pix.width, extent[2]+8)
+    if pix.width-(right-left) < pix.width*.10:
+        return pix.tobytes('jpg', jpg_quality=85)
+    cropped = extract.pymupdf.Pixmap(pix, pix.width, pix.height,
+        extract.pymupdf.IRect(pix.x+left, pix.y, pix.x+right, pix.y+pix.height))
+    if cropped.samples != image.crop((left, 0, right, pix.height)).tobytes():
+        raise ValueError('source side crop changed rendered pixels')
+    return cropped.tobytes('jpg', jpg_quality=85)
+
+
 def _figure_images(chapters, doc, book, package, figure_transform=None, owned_images=(),
                    runtime_progress=None):
     """Crop each figure the fragments referred to; drop the ones we cannot make.
@@ -1144,7 +1181,14 @@ def _figure_images(chapters, doc, book, package, figure_transform=None, owned_im
                     ink_doc, pno, bbox, mask=mask):
                 blanks.append(src)
                 continue
-            data = extract.crop_jpeg(render_doc, pno, bbox)
+            if figure.get('found') == 'uncertain_scan_key_panel':
+                try:
+                    data = _scan_key_white_margin_jpeg(render_doc, pno, bbox)
+                except Exception:
+                    # A failed trim proof cannot suppress the key's primary image.
+                    data = extract.crop_jpeg(render_doc, pno, bbox)
+            else:
+                data = extract.crop_jpeg(render_doc, pno, bbox)
         except Exception as exc:                                  # pragma: no cover
             log.warning("reflow: figure %s could not be cropped: %s", src, exc)
             if figure.get("needs_ink"):

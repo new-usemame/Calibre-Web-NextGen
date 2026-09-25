@@ -1,3 +1,0 @@
-### Fixed
-
-- **Imported books whose title sort is just their title now file under the right letter.** Many EPUBs carry a "title sort" that repeats the title word for word, and the import kept it as it was, so "The Donkey" sorted under T while "The Barn Door", which carried no title sort at all, sorted under B. When an imported book's title sort is identical to its title and your title-sorting rule would change it, the import now applies the rule. A title sort that differs from the title (a deliberate "Tolkien 01", say) is still kept exactly as the file has it. Books already in your library keep their stored title sort. Reported by @bcsteeve (#2219).

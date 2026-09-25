@@ -1,3 +1,0 @@
-### Fixed
-
-- **Picking up a book on your KOReader device after reading it on a Kobo opens at the sentence where you stopped.** Until now the hand-off went by percentage, which in a long book can be several pages away. The server now finds the Kobo's sentence in the EPUB your KOReader device holds, matching it through the book's text because the Kobo's copy is a converted KEPUB with its own file layout. This happens only when the server can prove the match: the Kobo downloaded the library's current KEPUB, the position is the Kobo's latest report, and your KOReader device holds the library's EPUB. Otherwise the hand-off stays a percentage, as before. Which position wins is unchanged: the furthest one.

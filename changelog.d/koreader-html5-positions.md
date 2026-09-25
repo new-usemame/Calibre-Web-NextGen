@@ -1,0 +1,3 @@
+### Fixed
+
+- **Highlights and exact positions now carry between KOReader and the web reader in Project Gutenberg books.** Gutenberg EPUBs, and other books whose chapters are `.html` files with tags written like `<a id="…"/>` or `<div/>`, are read differently by the browser than by KOReader. Until now the server refused to convert positions in those chapters, so highlights did not cross over and hand-offs fell back to a percentage. The server now works out the browser's reading of each such chapter as well, and converts a position when every piece of text lines up between the two readings. If anything is moved or hidden, for example text a table pushes out of place, that chapter keeps falling back as before. This adds the `html5lib` package (MIT license) as a dependency.

@@ -1320,6 +1320,40 @@ def _source_label_offset(text, line_text, label):
     return None
 
 
+def _line_owned_offset(text, phrase, target_box, owned_boxes, source_lines):
+    """Locate a destination by both rendered text and its original line.
+
+    Repeated text alone cannot identify a PDF viewport. Only align repeated
+    occurrences when every occurrence has a corresponding owned source line.
+    """
+    if not phrase:
+        return None
+    positions = [m.start() for m in re.finditer(re.escape(phrase), text)]
+    if len(positions) == 1:
+        return positions[0]
+    if not positions:
+        prefix = phrase[:min(20, len(phrase))]
+        positions = [m.start() for m in re.finditer(re.escape(prefix), text)]
+        if len(positions) == 1:
+            return positions[0]
+        return None
+    matching = []
+    for box in owned_boxes:
+        lines = [line for line in source_lines
+                 if abs(line.bbox[1]-box[1]) < 1.5 and
+                    abs(line.bbox[3]-box[3]) < 1.5]
+        if len(lines) != 1:
+            return None
+        if lines[0].stripped == phrase:
+            matching.append(box)
+    if len(matching) != len(positions):
+        return None
+    for ordinal, box in enumerate(matching):
+        if abs(box[1]-target_box[1]) < 1.5 and abs(box[3]-target_box[3]) < 1.5:
+            return positions[ordinal]
+    return None
+
+
 def _bind_source_navigation(book, raw_pages):
     """Map literal PDF positions to the page's final source elements.
 
@@ -1391,6 +1425,8 @@ def _bind_source_navigation(book, raw_pages):
                 book.source_navigation.append(record)
                 continue
             line = candidates[0][2]
+            source_lines = [source_line for block in target_page.text_blocks
+                            for source_line in block.lines]
             homes=[]
             for ei, element in enumerate(book.pages.get(record['dest_page'], [])):
                 if element.kind == 'list':
@@ -1402,11 +1438,10 @@ def _bind_source_navigation(book, raw_pages):
                 if element.kind not in ('p','h','caption'):continue
                 if any(abs(box[1]-line.bbox[1])<1.5 and
                        abs(box[3]-line.bbox[3])<1.5 for box in element.line_boxes):
-                    phrase = line.stripped
-                    offset = element.text.find(phrase)
-                    if offset < 0:
-                        offset = element.text.find(phrase[:min(20,len(phrase))])
-                    if offset >= 0:
+                    offset = _line_owned_offset(element.text, line.stripped,
+                                                line.bbox, element.line_boxes,
+                                                source_lines)
+                    if offset is not None:
                         homes.append((ei, None, offset))
             if len(homes) != 1:
                 record['status'] = 'destination_unmapped'
@@ -1422,6 +1457,18 @@ def _bind_source_navigation(book, raw_pages):
                 continue
             record['status'] = 'resolved'
             book.source_navigation.append(record)
+
+    # A source glyph cannot express two different destinations. Keep each PDF
+    # annotation and its geometry, but route the affected page to source evidence.
+    resolved = [link for link in book.source_navigation if link['status'] == 'resolved']
+    for i, left in enumerate(resolved):
+        for right in resolved[i+1:]:
+            if (left['pno'] == right['pno'] and
+                    left['source_element'] == right['source_element'] and
+                    left['source_item'] == right['source_item'] and
+                    left['source_offset'] < right['source_offset']+right['source_extent'] and
+                    right['source_offset'] < left['source_offset']+left['source_extent']):
+                left['status'] = right['status'] = 'ambiguous_source_overlap'
 
 
 def assemble(skeletons, style, raw_pages=None):

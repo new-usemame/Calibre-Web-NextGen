@@ -350,14 +350,21 @@ def _source_links(page, payload, page_count):
                             and box[1] <= (char['bbox'][1] + char['bbox'][3]) / 2 <= box[3]
                             and char.get('c', '').strip()]
                 if selected:
-                    owners.append((line, selected))
+                    owners.append((line, chars, selected))
         if len(owners) == 1:
-            line, selected = owners[0]
-            label = ''.join(char['c'] for _, char in selected)
+            line, chars, selected = owners[0]
+            first, last = selected[0][0], selected[-1][0]
+            # Spaces inside a uniquely owned label are part of its source run.
+            # A nonspace character outside the rectangle still makes it disjoint.
+            interval = chars[first:last+1]
+            selected_indexes = {i for i, _ in selected}
+            contiguous = all((char.get('c', '').isspace() or
+                              first+j in selected_indexes)
+                             for j, char in enumerate(interval))
+            label = ''.join(char.get('c', '') for char in interval)
             line_text = ''.join(char.get('c', '') for sp in line.get('spans', [])
                                 for char in sp.get('chars', []))
-            if (label and line_text.count(label) == 1 and
-                    selected[-1][0]-selected[0][0]+1 == len(selected)):
+            if label and contiguous and line_text.count(label) == 1:
                 record.update(status='source_owned', label=label,
                               line_text=line_text, line_box=tuple(line['bbox']))
         records.append(record)

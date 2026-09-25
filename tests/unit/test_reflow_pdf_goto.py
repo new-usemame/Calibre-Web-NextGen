@@ -162,3 +162,56 @@ def test_figure_attached_caption_keeps_its_authored_link_and_destination():
     target=build_epub.page_fragment(book,1)
     assert '<a href="#pdfgoto_p0000_x4">25</a>' in source
     assert 'id="pdfgoto_p0000_x4"' in target
+
+
+def test_repeated_destination_phrase_uses_third_source_line():
+    with pymupdf.open() as doc:
+        for _ in range(2):doc.new_page(width=450,height=650)
+        for y, text in ((100,'Repeated destination phrase'),
+                        (114,'middle unique context continues'),
+                        (128,'Repeated destination phrase')):
+            doc[0].insert_text((50,y),text,fontsize=11)
+        doc[1].insert_text((50,100),'1. Return.',fontsize=11)
+        doc[1].insert_link({'kind':pymupdf.LINK_GOTO,
+            'from':pymupdf.Rect(50,88,56,103),'page':0,
+            'to':pymupdf.Point(80,123)})
+        book=assemble.deterministic_book(doc)
+        link=book.source_navigation[0]
+        assert link['status']=='resolved'
+        html=build_epub.page_fragment(book,0)
+        assert html.index('middle unique context') < html.index('id="%s"' % link['id'])
+
+
+def test_competing_destinations_on_one_glyph_keep_source_evidence_without_nested_links():
+    with pymupdf.open() as doc:
+        for _ in range(3):doc.new_page(width=450,height=650)
+        for pno in (0,1):
+            doc[pno].insert_text((50,100),'Destination %s' % pno,fontsize=11)
+        doc[2].insert_text((50,100),'1. Return.',fontsize=11)
+        for pno in (0,1):
+            doc[2].insert_link({'kind':pymupdf.LINK_GOTO,
+                'from':pymupdf.Rect(50,88,56,103),'page':pno,
+                'to':pymupdf.Point(80,93)})
+        book=assemble.deterministic_book(doc)
+        assert [r['status'] for r in book.source_navigation] == [
+            'ambiguous_source_overlap','ambiguous_source_overlap']
+        assert all(r['rect'] and r['dest_point'] for r in book.source_navigation)
+        html=build_epub.page_fragment(book,2)
+        assert '<a href="#pdfgoto_' not in html
+        assert 'original-p0002.xhtml#page' in html
+
+
+def test_unique_multiword_source_label_preserves_internal_space():
+    with pymupdf.open() as doc:
+        for _ in range(2):doc.new_page(width=450,height=650)
+        doc[0].insert_text((50,100),'Read this chapter',fontsize=11)
+        doc[1].insert_text((50,100),'Destination.',fontsize=11)
+        doc[0].insert_link({'kind':pymupdf.LINK_GOTO,
+            'from':pymupdf.Rect(49,87,150,104),'page':1,
+            'to':pymupdf.Point(60,95)})
+        raw=extract.read_page(doc,0)
+        assert raw.source_links[0]['status']=='source_owned'
+        assert raw.source_links[0]['label']=='Read this chapter'
+        book=assemble.deterministic_book(doc)
+        assert book.source_navigation[0]['status']=='resolved'
+        assert '<a href="#pdfgoto_' in build_epub.page_fragment(book,0)

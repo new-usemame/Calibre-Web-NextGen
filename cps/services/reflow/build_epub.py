@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.20"
+CONVERTER_VERSION = "1.21"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"

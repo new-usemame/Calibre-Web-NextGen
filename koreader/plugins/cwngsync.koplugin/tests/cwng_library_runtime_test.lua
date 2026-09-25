@@ -564,6 +564,7 @@ local function testAnotherAccountsBooksLeaveTheLibraryFolder()
     local reading = file(root .. "/Open [4].epub")
     reader.instance = { document = { file = reading } }
     local earlier = file(aside .. "/Sent [9].epub", "set aside before")
+    file(aside .. "/.cwng-account", "http://old.example:8083|ann")
     sidecars[kept] = { data = { percent_finished = 0.4 } }
     local state = { owner = "http://old.example:8083|ann", books = {
         ["3"] = { kind = "download", path = kept },
@@ -624,8 +625,95 @@ local function testAnotherAccountsBooksLeaveTheLibraryFolder()
     assertEqual(told, true, "the reader must be told where the books went")
 end
 
+local function testBooksComeBackWithTheirAccount()
+    -- Connected to the wrong account by mistake and back again: the books of
+    -- the right one return to the home with their notes, including the ones
+    -- sent to the device, which no sync would bring back.
+    real_folders = true
+    local root = folder .. "/return"
+    local mine = root .. " - ann (2)"
+    local namesake = root .. " - ann"
+    os.execute("mkdir -p '" .. root .. "' '" .. mine .. "' '" .. namesake .. "'")
+    local function file(path, text)
+        local f = assert(io.open(path, "wb"))
+        f:write(text or "the book")
+        f:close()
+        return path
+    end
+    local function read(path)
+        local f = io.open(path, "rb")
+        if not f then return nil end
+        local text = f:read("*a")
+        f:close()
+        return text
+    end
+    -- An "ann" on another server set her books aside here first.
+    file(namesake .. "/.cwng-account", "https://other.example|ann")
+    file(namesake .. "/Other [3].epub", "the other server's book 3")
+    file(mine .. "/.cwng-account", "http://old.example:8083|ann")
+    file(mine .. "/Kept [3].epub", "ann's book 3")
+    file(mine .. "/Sent [9].epub", "sent to ann")
+    sidecars[mine .. "/Kept [3].epub"] = { data = { percent_finished = 0.4 } }
+    local kids = file(root .. "/Kid [1].epub", "kid's book")
+    local state = { owner = "https://new.example|kid", books = {} }
+    local queue = {}
+    local client = { get_library = function(_, _, _, _, _, _, _, callback)
+        queue[#queue + 1] = function() callback(true, { books = {}, revision = "r1" }) end
+    end }
+    local runtime = setmetatable({ settings = { username = "ann", password = "secret" }, device_id = "device" },
+        { __index = Runtime })
+    function runtime:libraryEnabled() return true end
+    function runtime:getLibraryRoot() return root end
+    function runtime:getLibraryState() return state end
+    function runtime:saveLibraryState() end
+    function runtime:accountOwner() return "http://old.example:8083|ann" end
+    function runtime:newSyncClient() return client end
+    function runtime:refreshLibraryViews() end
+    function runtime:applyLibraryCollections() end
+    function runtime:libraryProbe()
+        return { attributes = function(path) return read(path) and { size = #read(path), modification = 0 } end,
+            isOpen = function() return false end, digest = function() return nil end,
+            placeholderId = Runtime.readPlaceholderId }
+    end
+    shown = {}
+    runtime:syncLibrary({ force = true, on_done = function() end })
+    while #queue > 0 or #ticks > 0 do
+        if #queue > 0 then table.remove(queue, 1)() else table.remove(ticks, 1)() end
+    end
+    assertEqual(read(root .. "/Kept [3].epub"), "ann's book 3", "her downloaded book must be back in the library")
+    assertEqual(sidecars[root .. "/Kept [3].epub"] ~= nil, true, "with its position and notes")
+    assertEqual(read(root .. "/Sent [9].epub"), "sent to ann", "and the book sent to her device")
+    assertEqual(read(root .. "/Other [3].epub"), nil,
+        "a namesake's books must stay away: their names carry another server's ids")
+    assertEqual(read(namesake .. "/Other [3].epub"), "the other server's book 3", "and stay where they were")
+    assertEqual(read(mine .. "/.cwng-account"), nil, "her emptied folder must go")
+    assertEqual(read(kids), nil, "the account she left must not stay on her home")
+    local kid_folder = root .. " - kid"
+    assertEqual(read(kid_folder .. "/Kid [1].epub"), "kid's book", "its books wait in a folder of their own")
+    assertEqual(read(kid_folder .. "/.cwng-account"), "https://new.example|kid", "marked as that account's")
+    local told = false
+    for _, text in ipairs(shown) do
+        if type(text) == "string" and text:find("are back in the library", 1, true) then told = true end
+    end
+    assertEqual(told, true, "the reader must be told the books are back")
+
+    -- A book that cannot come back, because the name is taken, keeps its
+    -- folder, so it is not lost.
+    local busy = file(root .. "/Busy [5].epub", "the current account's book 5")
+    os.execute("mkdir -p '" .. mine .. "'")
+    file(mine .. "/.cwng-account", "http://old.example:8083|ann")
+    file(mine .. "/Busy [5].epub", "ann's book 5")
+    local returned = runtime:bringBackBooksOf("http://old.example:8083|ann", client)
+    real_folders = false
+    assertEqual(#returned, 0, "nothing may overwrite a book of the library")
+    assertEqual(read(busy), "the current account's book 5", "the library's book is untouched")
+    assertEqual(read(mine .. "/Busy [5].epub"), "ann's book 5", "and hers stays set aside")
+    assertEqual(read(mine .. "/.cwng-account"), "http://old.example:8083|ann", "in a folder still marked hers")
+end
+
 testEveryPageOfABigLibraryReachesTheDevice()
 testAnotherAccountsBooksLeaveTheLibraryFolder()
+testBooksComeBackWithTheirAccount()
 testAListThatDoesNotFinishIsNotApplied()
 testTheSameAccountTypedAnotherWayKeepsItsLibrary()
 testNothingChangedIsNotAnAnswerToAWholeListRequest()

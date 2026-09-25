@@ -424,6 +424,58 @@ function Runtime:performLibraryAction(client, action)
     return false
 end
 
+-- The books of a folder, by name: files only, no dotfiles, no unfinished
+-- downloads.
+local function booksIn(folder)
+    local names = {}
+    local ok, iterator, dir = pcall(lfs.dir, folder)
+    if not ok then return names end
+    for name in iterator, dir do
+        if name:sub(1, 1) ~= "." and not name:find("%.part$")
+                and lfs.attributes(Library.join(folder, name), "mode") == "file" then
+            names[#names + 1] = name
+        end
+    end
+    table.sort(names)
+    return names
+end
+
+local ASIDE_MARK = ".cwng-account"
+
+local function asideOwner(folder)
+    local f = io.open(Library.join(folder, ASIDE_MARK), "rb")
+    if not f then return nil end
+    local owner = f:read("*a")
+    f:close()
+    return owner
+end
+
+-- The folder that holds, or will hold, `owner`'s books while the device uses
+-- another account. It is named after the account's username; a mark inside
+-- records the whole account, server included, so a namesake on another server
+-- never gets these books back (their names carry this server's book ids). A
+-- folder of that name belonging to someone else leaves this one a numbered
+-- name. With `create`, a missing folder is made; without, nil when there is
+-- none.
+function Runtime:asideFolderOf(owner, create)
+    local base = Library.asideFolder(self:getLibraryRoot(), owner)
+    for n = 1, 9 do
+        local folder = n == 1 and base or string.format("%s (%d)", base, n)
+        if not util.directoryExists(folder) then
+            if not create then return nil end
+            util.makePath(folder)
+            local f = io.open(Library.join(folder, ASIDE_MARK), "wb")
+            if not f then return nil end
+            f:write(owner)
+            f:close()
+            return folder
+        elseif asideOwner(folder) == owner then
+            return folder
+        end
+    end
+    return nil
+end
+
 -- The home lists every book in the library folder, so on a new account the
 -- previous one's books would show up in it, and their names (which carry the
 -- other server's book ids) could collide with the new account's. They leave
@@ -434,20 +486,14 @@ end
 -- Returns that folder and the paths that were moved.
 function Runtime:setAsideBooksOf(previous_owner, client)
     local root = self:getLibraryRoot()
-    local aside = Library.asideFolder(root, previous_owner)
+    local aside
     local moved = {}
-    local ok, iterator, dir = pcall(lfs.dir, root)
-    if not ok then return aside, moved end
-    local names = {}
-    for name in iterator, dir do names[#names + 1] = name end
-    table.sort(names)
     local exists = function(path) return lfs.attributes(path, "mode") ~= nil end
-    for _, name in ipairs(names) do
+    for _, name in ipairs(booksIn(root)) do
         local path = Library.join(root, name)
-        if name:sub(1, 1) ~= "." and not name:find("%.part$")
-                and lfs.attributes(path, "mode") == "file" and not Runtime.readPlaceholderId(path) then
-            if not util.directoryExists(aside) then util.makePath(aside) end
-            local target = Library.freeName(aside, name, exists)
+        if not Runtime.readPlaceholderId(path) then
+            aside = aside or self:asideFolderOf(previous_owner, true)
+            local target = aside and Library.freeName(aside, name, exists)
             local ok_call, done = false, false
             if target then
                 ok_call, done = pcall(self.performLibraryAction, self, client,
@@ -461,6 +507,34 @@ function Runtime:setAsideBooksOf(previous_owner, client)
         end
     end
     return aside, moved
+end
+
+-- The device is back on an account whose books were set aside: they return
+-- to the library folder, where the sync that follows recognises each one
+-- still matching the server's file as downloaded, and a sent book is on the
+-- home again. A name the new home already uses keeps its book in the folder,
+-- which goes once it is empty.
+-- Returns the paths the books returned to.
+function Runtime:bringBackBooksOf(owner, client)
+    local returned = {}
+    local aside = self:asideFolderOf(owner, false)
+    if not aside then return returned end
+    local root = self:getLibraryRoot()
+    for _, name in ipairs(booksIn(aside)) do
+        local target = Library.join(root, name)
+        local ok_call, done = pcall(self.performLibraryAction, self, client,
+            { op = "move_download", from = Library.join(aside, name), path = target })
+        if ok_call and done then
+            returned[#returned + 1] = target
+        else
+            logger.warn("CWNGSync: could not bring back", name)
+        end
+    end
+    if #booksIn(aside) == 0 then
+        os.remove(Library.join(aside, ASIDE_MARK))
+        os.remove(aside)
+    end
+    return returned
 end
 
 -- The user's shelves as KOReader collections, cloud books included, so a
@@ -681,15 +755,22 @@ function Runtime:syncLibrary(opts)
         end
         local aside, moved = self:setAsideBooksOf(previous_owner, client)
         for _, path in ipairs(moved) do cleared[#cleared + 1] = path end
+        local returned = self:bringBackBooksOf(state.owner, client)
+        for _, path in ipairs(returned) do cleared[#cleared + 1] = path end
         logger.info("CWNGSync: library handed over to a new account;", #leaving, "books of the previous one cleared,",
-            #moved, "files set aside")
+            #moved, "files set aside,", #returned, "brought back")
         self:saveLibraryState()
         self:refreshLibraryViews(cleared)
+        local told = {}
         if #moved > 0 then
-            UIManager:show(InfoMessage:new{
-                text = T(_("Books from the account this device used before are now in the folder “%1”. Menu ▸ Browse files shows them."),
-                    aside:match("[^/]+$")),
-            })
+            told[#told + 1] = T(_("Books from the account this device used before are now in the folder “%1”. Menu ▸ Browse files shows them."),
+                aside:match("[^/]+$"))
+        end
+        if #returned > 0 then
+            told[#told + 1] = _("The books this account had on the device before are back in the library.")
+        end
+        if #told > 0 then
+            UIManager:show(InfoMessage:new{ text = table.concat(told, "\n\n") })
         end
     end
     local books = {}

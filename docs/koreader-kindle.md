@@ -106,4 +106,5 @@ the book first under **Recent**.
 - **Connected to the wrong account**: choose **Tools ▸ CWNG library ▸ Disconnect this
   device**, then connect again. Books you downloaded under the other account move to a
   folder of their own, named after that account, so they don't appear on the new home;
-  ☰ ▸ **Browse files** shows them.
+  ☰ ▸ **Browse files** shows them. Connect that account again and they're back on its
+  home, with your place and notes.

@@ -278,6 +278,7 @@ class TaskReflowPdf(CalibreTask):
             document = NativeDocument(source, scratch_root=reflow_dir('native-scratch'),
                 cache_root=REFLOW_DIR, should_stop=lambda: self.cancelled,
                 progress=self._on_progress, ledger=ledger)
+            published = False
             try:
                 if document.page_count > max_pages():
                     return self._handleError(
@@ -317,8 +318,18 @@ class TaskReflowPdf(CalibreTask):
                     return self._finish_cancelled()
                 built = self._write_epub(document, result, ledger, client, book,
                                          local_db)
+                published = True
             finally:
-                document.close()
+                try:
+                    document.close()
+                    if published: document.require_clean_shutdown()
+                except Exception as exc:
+                    if published:
+                        # Publication is already committed. Keep its artifact and
+                        # receipt visible; never turn cleanup failure into a retry.
+                        self.results.update(built)
+                        raise RuntimeError('Published artifact retained; runtime cleanup failed') from exc
+                    raise
 
             self.results.update(built)
             self.results["spend_usd"] = result.spend_usd

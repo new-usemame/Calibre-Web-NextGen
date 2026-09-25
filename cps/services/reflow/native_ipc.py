@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 
 from . import native_codec as codec
 from .native_resources import Lease
@@ -68,6 +69,9 @@ class NativeDocument:
         self.closed = False
         self.seq = 0
         self.last_phase = 'open'
+        self.last_completed_phase = None
+        self.last_completed_sequence = None
+        self.shutdown_evidence = None
         self.operation_book = None
         self.resource_lease = None
         os.makedirs(scratch_root, mode=0o700, exist_ok=True)
@@ -185,6 +189,8 @@ class NativeDocument:
                              'BuildCancelled': build_epub.BuildCancelled,
                              'AttemptCancelled': model.AttemptCancelled}.get(reply['value'], ValueError)
                     raise error('Native PDF %s failed: %s' % (operation, str(reply['value'])[:120]))
+                self.last_completed_phase = operation
+                self.last_completed_sequence = self.seq
                 return reply['value']
         except (BrokenPipeError, EOFError) as exc:
             raise ChildExited('Native PDF worker disconnected during ' + operation) from exc
@@ -280,29 +286,99 @@ class NativeDocument:
             if self.resource_lease is not None:
                 self.resource_lease.close()
 
+    def require_clean_shutdown(self):
+        evidence = self.shutdown_evidence
+        if (not evidence or evidence.get('exit_code') != 0
+                or evidence.get('entry_exit_code') is not None
+                or evidence.get('eof') != 'closed'
+                or evidence.get('completed_phase') != evidence.get('phase')
+                or evidence.get('completed_sequence') != evidence.get('sequence')
+                or not evidence.get('direct_child_reaped')
+                or evidence.get('group_state') != 'absent'
+                or not evidence.get('stderr_drain_complete')
+                or evidence.get('cleanup_error') or evidence.get('record_error')
+                or any(item['reason'] == 'eof_timeout' for item in evidence['signals'])):
+            raise ChildExited('Native runtime cleanup failed or could not be verified')
+
+    @staticmethod
+    def _group_state(pid):
+        try:
+            os.killpg(pid, 0)
+            return 'present'
+        except ProcessLookupError:
+            return 'absent'
+        except OSError:
+            return 'unknown'
+
     def _close_process(self):
         process = self.process
+        evidence = None
+        started = time.monotonic()
         if process:
-            try: process.stdin.close()
-            except OSError: pass
-            try: process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL); process.wait(timeout=2)
-            # Tesseract can outlive the Python parent. Reap only this owned group.
-            try: os.killpg(process.pid, signal.SIGKILL)
-            except (ProcessLookupError, PermissionError): pass
-            if self.drain:
-                self.drain.join(timeout=2)
-            try:
-                self._exit_record(process)
-            except OSError:
-                # Lifecycle diagnostics are optional; accounting and task-final
-                # ledger writes remain the caller's existing critical boundary.
-                pass
-        if self.control: self.control.close()
-        self.selector.close()
-        if process and self.drain and not self.drain.is_alive(): process.stdout.close()
-        shutil.rmtree(self.root)
+            evidence = dict(kind='native_shutdown', event='shutdown', phase=self.last_phase,
+                completed_phase=self.last_completed_phase,
+                completed_sequence=self.last_completed_sequence, sequence=self.seq,
+                pid=process.pid, pgid=process.pid, entry_exit_code=process.poll(),
+                eof='not_requested', wait='not_started', signals=[])
+        try:
+            if process:
+                def kill_group(reason):
+                    request = dict(signal='SIGKILL', reason=reason, result='requested',
+                        elapsed_seconds=time.monotonic() - started,
+                        group_state_before=self._group_state(process.pid))
+                    evidence['signals'].append(request)
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                        request['result'] = 'sent'
+                    except ProcessLookupError:
+                        request['result'] = 'absent'
+                    except PermissionError:
+                        request['result'] = 'permission_denied'
+                    except OSError:
+                        request['result'] = 'error'
+                        raise
+                try:
+                    process.stdin.close()
+                    evidence['eof'] = 'closed'
+                except OSError:
+                    evidence['eof'] = 'error'
+                try:
+                    process.wait(timeout=2)
+                    evidence['wait'] = 'reaped'
+                except subprocess.TimeoutExpired:
+                    evidence['wait'] = 'timeout'
+                    kill_group('eof_timeout')
+                    process.wait(timeout=2)
+                    evidence['wait'] = 'reaped_after_signal_request'
+                # Tesseract can outlive the Python parent. Reap only this owned group.
+                kill_group('descendant_cleanup')
+                if self.drain:
+                    self.drain.join(timeout=2)
+                try:
+                    self._exit_record(process)
+                except OSError:
+                    pass
+            if self.control: self.control.close()
+            self.selector.close()
+            if process and self.drain and not self.drain.is_alive(): process.stdout.close()
+            shutil.rmtree(self.root)
+        except BaseException as exc:
+            if evidence is not None: evidence['cleanup_error'] = type(exc).__name__
+            raise
+        finally:
+            if evidence is not None:
+                evidence.update(elapsed_seconds=time.monotonic() - started,
+                    exit_code=process.poll(),
+                    direct_child_reaped=process.returncode is not None,
+                    group_state=self._group_state(process.pid),
+                    stderr_drain_complete=self.drain is None or not self.drain.is_alive())
+                # This is evidence, not an inferred success category. A sent signal
+                # does not prove causation; present/unknown groups are not reaped.
+                # Emit before close() releases the parent's inherited lease handle.
+                self.shutdown_evidence = evidence
+                if self.ledger:
+                    try: self.ledger.record(evidence, durable=True)
+                    except OSError as exc: evidence['record_error'] = type(exc).__name__
 
     def _exit_record(self, process):
         if self.ledger is not None:

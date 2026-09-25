@@ -661,6 +661,38 @@ def _uncertain_aligned_scan_list(raw, kept_blocks):
              min(raw.width,box[2]+pad),min(raw.height,box[3]+pad)), best)
 
 
+def _coalesce_nested_scan_list_figures(raw, skel):
+    """A list already inside a source crop has one primary image owner.
+
+    The measured list keeps its artwork lines for source accounting. A wider
+    scan figure can also be inferred from the prose gap around that list; when
+    it contains the list's crop, emitting both repeats the same printed rows.
+    Keep that wider source region, including any immediately printed heading.
+    """
+    if not raw.is_page_scan:
+        return
+    figures = [region for region in skel.regions if region.kind == 'figure']
+    for narrow in figures:
+        if narrow.reason != 'uncertain_aligned_scan_list':
+            continue
+        x0, y0, x1, y1 = narrow.bbox
+        carriers = [region for region in figures if region is not narrow
+                    and region.reason in ('ocr_uncertain_region', 'scan_figure_band')
+                    and region.bbox[2]-region.bbox[0] < raw.width*.75
+                    and region.bbox[0] <= x0+1 and region.bbox[1] <= y0+1
+                    and region.bbox[2] >= x1-1 and region.bbox[3] >= y1-1
+                    and (region.bbox[2]-region.bbox[0]) *
+                        (region.bbox[3]-region.bbox[1]) >
+                        1.5 * (x1-x0) * (y1-y0)]
+        if len(carriers) != 1:
+            continue
+        carrier = carriers[0]
+        a, b, c, d = carrier.bbox
+        carrier.bbox = (min(a,x0), min(b,y0), max(c,x1), max(d,y1))
+        carrier.reason = 'uncertain_aligned_scan_list'
+        skel.regions.remove(narrow)
+
+
 def _sparse_scan_spread_panels(raw):
     """Split a proven two-up scan with independent sparse printed panels.
 
@@ -1093,6 +1125,7 @@ def page_skeleton(raw, style, layer_trusted=True, pixel_probe=None):
                     reason='unverified_scan_layout',band=region.band,column=region.column))
     _preserve_conflicting_outline_heading(raw, style, skel)
     _complete_captioned_scan_top(raw, skel, pixel_probe)
+    _coalesce_nested_scan_list_figures(raw, skel)
     skel.regions.sort(key=_region_order)
     _join_numbered_regions(skel)
     skel.title_unit = _sparse_title_unit(raw, skel, style)

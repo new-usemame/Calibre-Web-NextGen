@@ -355,6 +355,85 @@ def test_accurate_mixed_list_fallback_does_not_claim_source_disagreement():
     assert 'label and value rows are preserved together as pixels' in html
 
 
+def test_nested_scan_list_and_heading_have_one_primary_source_figure(monkeypatch, tmp_path):
+    heading = line('An introduction to the printed list:', 59, 108, 238)
+    rows = [line(f'{i}th: item', 185, 126 + i * 12, 75) for i in range(12)]
+    rows[0].spans[0].text = 'ist: item'
+    rows[4].spans[0].text = 'sth: item'
+    prose = line('Ordinary prose continues below this complete source list.', 48, 290, 336)
+    raw = scan([heading] + rows + [prose])
+    broad_box = (44, 105, 447, 274)
+    monkeypatch.setattr(skeleton, '_scan_figures', lambda *args:
+        [skeleton.Region('figure', bbox=broad_box, reason='scan_figure_band')])
+    style = skeleton.book_style([raw])
+    skel = skeleton.page_skeleton(raw, style)
+    figures = [region for region in skel.regions if region.kind == 'figure']
+    assert len(figures) == 1
+    assert figures[0].reason == 'uncertain_aligned_scan_list'
+    assert figures[0].bbox[0] == broad_box[0]
+    assert figures[0].bbox[1] <= heading.bbox[1]
+    assert figures[0].bbox[3] >= rows[-1].bbox[3]
+    assert len([line for region in skel.regions if region.kind == 'artwork'
+                for line in region.lines if line in rows]) == 12
+    book = assemble.assemble([skel], style, [raw])
+    assert book.conservation.ok
+    assert len(book.figures) == 1
+    with pymupdf.open() as printed:
+        page = printed.new_page(width=raw.width, height=raw.height)
+        page.insert_text((59, 117), heading.text, fontsize=9)
+        for i, row in enumerate(rows):
+            page.insert_text((185, 135+i*12), row.text, fontsize=9)
+        raster = page.get_pixmap().tobytes('png')
+    with pymupdf.open() as doc:
+        page = doc.new_page(width=raw.width, height=raw.height)
+        page.insert_image(page.rect, stream=raster)
+        target = tmp_path/'one-list.epub'
+        build_epub.build(book, target, doc=doc)
+        assert build_epub.validate(target) == []
+        with zipfile.ZipFile(target) as package:
+            html = package.read('OEBPS/ch001.xhtml').decode()
+            assert html.count('Complete printed list.') == 1
+            assert 'images/fig_p0000_0.jpg' in html
+            assert 'images/fig_p0000_1.jpg' not in html
+            assert package.read('OEBPS/images/fig_p0000_0.jpg') == extract.crop_jpeg(
+                doc, 0, book.figures[0]['bbox'])
+
+
+@pytest.mark.parametrize('carrier', [
+    (0, 0, 840, 595),        # an intentional full-page view may coexist with detail
+    (30, 20, 120, 100),      # an adjacent source object owns different ink
+    (180, 120, 265, 280),   # no substantially wider heading-and-list object
+    (44, 105, 220, 274),    # partial overlap may carry different source marks
+    (300, 105, 447, 274),   # a separate column is a separate source object
+])
+def test_scan_list_crop_remains_when_other_figure_does_not_own_it(carrier):
+    rows = [line(f'{i}th: item', 185, 120+i*12, 75) for i in range(12)]
+    raw = scan(rows)
+    inner = skeleton.Region('figure', bbox=(178, 116, 267, 262),
+                            reason='uncertain_aligned_scan_list')
+    other = skeleton.Region('figure', bbox=carrier, reason='ocr_uncertain_region')
+    skel = skeleton.PageSkeleton(0, raw.width, raw.height, [inner, other], is_scan=True)
+    skeleton._coalesce_nested_scan_list_figures(raw, skel)
+    assert [region for region in skel.regions if region.kind == 'figure'] == [inner, other]
+
+
+def test_two_measured_lists_keep_separate_source_owners():
+    raw = scan([line(f'{i}th: item', 185, 120+i*12, 75) for i in range(12)])
+    first = skeleton.Region('figure', bbox=(178, 116, 267, 262),
+                            reason='uncertain_aligned_scan_list')
+    second = skeleton.Region('figure', bbox=(480, 116, 569, 262),
+                             reason='uncertain_aligned_scan_list')
+    heading = skeleton.Region('figure', bbox=(44, 105, 447, 274),
+                              reason='ocr_uncertain_region')
+    skel = skeleton.PageSkeleton(0, raw.width, raw.height,
+                                 [first, second, heading], is_scan=True)
+    skeleton._coalesce_nested_scan_list_figures(raw, skel)
+    assert first not in skel.regions
+    assert second in skel.regions
+    assert heading.bbox == (44, 105, 447, 274)
+    assert heading.reason == 'uncertain_aligned_scan_list'
+
+
 @pytest.mark.parametrize('change', ['reliable', 'letters', 'separate', 'prose'])
 def test_aligned_list_does_not_claim_unproved_objects(change):
     rows = [line(f'{i}th: item', 185, 120 + i * 12, 75) for i in range(1, 13)]

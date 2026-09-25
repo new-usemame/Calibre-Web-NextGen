@@ -130,7 +130,7 @@ def test_rejected_directory_provisioning_never_creates_or_authenticates_account(
         assert '_user_id' not in cookie
 
 
-@pytest.mark.parametrize('setting', ['auto_create_disabled', 'standard_login_disabled', 'standard_mode'])
+@pytest.mark.parametrize('setting', ['auto_create_disabled', 'stale_standard_login_switch', 'standard_mode'])
 def test_directory_login_respects_instance_switches(ldap_login, monkeypatch, setting):
     h = ldap_login
     if setting == 'auto_create_disabled':
@@ -141,11 +141,15 @@ def test_directory_login_respects_instance_switches(ldap_login, monkeypatch, set
         assert h.session.query(ub.User).count() == 0
         h.existing()
         assert h.login().status_code == 200  # the switch only disables creation
-    elif setting == 'standard_login_disabled':
+    elif setting == 'stale_standard_login_switch':
+        # "Disable Standard Login" applies only while OAuth is the login type and
+        # a provider can replace the form (ConfigSQL.standard_login_disabled,
+        # discussion #2272). Left set under LDAP, it must not lock directory
+        # accounts out: the directory is asked and the account is provisioned.
         monkeypatch.setattr(config, 'config_disable_standard_login', True)
-        assert h.login().status_code == 403
-        h.directory.bind_user.assert_not_called()
-        assert h.session.query(ub.User).count() == 0
+        assert h.login().status_code == 200
+        h.directory.bind_user.assert_called_once()
+        assert h.session.query(ub.User).count() == 1
     else:
         monkeypatch.setattr(config, 'config_login_type', constants.LOGIN_STANDARD)
         h.existing()

@@ -185,6 +185,8 @@ def verify_password(username, password):
         if _verify_app_password_digest(user, password):
             [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
             return user
+        # Directory and local passwords are paced alike; a sign-in clears it.
+        limiter.check()
         if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
             login_result, error = services.ldap.bind_user(user.name, password)
             if login_result:
@@ -193,7 +195,6 @@ def verify_password(username, password):
             if error is not None:
                 log.error(error)
         else:
-            limiter.check()
             if check_password_hash(str(user.password), password):
                 [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
                 return user
@@ -205,6 +206,7 @@ def verify_password(username, password):
     
     # Handle new LDAP users (auto-creation for OPDS/API access)
     elif config.config_login_type == constants.LOGIN_LDAP and services.ldap and getattr(config, 'config_ldap_auto_create_users', True):
+        limiter.check()
         try:
             # Try LDAP authentication for new user
             login_result, error = services.ldap.bind_user(username, password)

@@ -65,6 +65,8 @@ class NativeDocument:
         self.process = None
         self.drain = None
         self.error_tail = b''
+        self.stderr_drain_state = 'not_started'
+        self.stderr_drain_error = None
         self.control = None
         self.closed = False
         self.seq = 0
@@ -101,6 +103,7 @@ class NativeDocument:
             # Drain separately from the control pipe: native warnings cannot
             # block the worker or grow an unbounded diagnostic file. No native
             # library work happens on this plain byte-reader thread.
+            self.stderr_drain_state = 'pending'
             self.drain = threading.Thread(target=self._drain_errors, daemon=True)
             self.drain.start()
             self.selector.register(self.control, selectors.EVENT_READ)
@@ -115,10 +118,18 @@ class NativeDocument:
     def __exit__(self, *args): self.close()
 
     def _drain_errors(self):
-        while True:
-            data = self.process.stdout.read(8192)
-            if not data: return
-            self.error_tail = (self.error_tail + data)[-65536:]
+        try:
+            while True:
+                data = self.process.stdout.read(8192)
+                if not data:
+                    self.stderr_drain_state = 'eof'
+                    return
+                self.error_tail = (self.error_tail + data)[-65536:]
+        except Exception as exc:
+            # Thread termination is not proof of EOF. Keep only a type name,
+            # never arbitrary exception text from a native diagnostic stream.
+            self.stderr_drain_error = type(exc).__name__
+            self.stderr_drain_state = 'error'
 
     def _cancel(self):
         self.check_resources()
@@ -371,7 +382,10 @@ class NativeDocument:
                     exit_code=process.poll(),
                     direct_child_reaped=process.returncode is not None,
                     group_state=self._group_state(process.pid),
-                    stderr_drain_complete=self.drain is None or not self.drain.is_alive())
+                    stderr_drain_state=self.stderr_drain_state,
+                    stderr_drain_error=self.stderr_drain_error,
+                    stderr_drain_complete=(self.stderr_drain_state == 'eof'
+                        and self.drain is not None and not self.drain.is_alive()))
                 # This is evidence, not an inferred success category. A sent signal
                 # does not prove causation; present/unknown groups are not reaped.
                 # Emit before close() releases the parent's inherited lease handle.

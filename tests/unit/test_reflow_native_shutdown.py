@@ -5,6 +5,7 @@ import selectors
 import signal
 import subprocess
 import sys
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -26,6 +27,9 @@ def document(tmp_path, delay=0, script=None):
     d.last_completed_phase='build'; d.last_completed_sequence=4
     d.ledger=SimpleNamespace(record=lambda value, **kw: rows.append(dict(value)))
     d.resource_lease=SimpleNamespace(close=lambda: releases.append(list(rows)))
+    if script is not None: d.descendant_pid = int(p.stdout.readline())
+    d.stderr_drain_state='pending'; d.stderr_drain_error=None
+    d.drain=threading.Thread(target=d._drain_errors, daemon=True); d.drain.start()
     return d, rows, releases
 
 
@@ -95,7 +99,7 @@ else:
     sys.stdin.read()
 """
     d, rows, _ = document(tmp_path, script=script)
-    child = int(d.process.stdout.readline())
+    child = d.descendant_pid
     try:
         d.close()
         result = next(x for x in rows if x['event']=='shutdown')
@@ -154,3 +158,43 @@ def test_shutdown_journal_failure_cannot_satisfy_success_gate(tmp_path):
     assert d.shutdown_evidence['exit_code']==0
     assert d.shutdown_evidence['record_error']=='OSError'
     with pytest.raises(ipc.ChildExited): d.require_clean_shutdown()
+
+
+def test_stopped_drain_on_read_error_fails_task_and_retains_publication(rig, monkeypatch):
+    original = ipc.NativeDocument._drain_errors
+    def broken_stream(self):
+        stream = self.process.stdout
+        class BrokenRead:
+            def read(self, size): raise OSError('injected stderr read error')
+            def close(self): return stream.close()
+        self.process.stdout = BrokenRead()
+        original(self)
+    monkeypatch.setattr(ipc.NativeDocument, '_drain_errors', broken_stream)
+    task = _run(rig, mode='full')
+    assert task.stat == STAT_FAIL
+    assert task.error == 'Published artifact retained; runtime cleanup failed'
+    assert Path(task.results['path']).is_file() and task.results['sha256']
+    assert _ledger_rows(rig)[0]['status']=='failed'
+    import json
+    rows=[json.loads(line) for path in Path(rig.root).glob('jobs/*/*.jsonl') for line in path.read_text().splitlines()]
+    shutdown=next(x for x in rows if x.get('kind')=='native_shutdown')
+    assert shutdown['stderr_drain_state']=='error'
+    assert shutdown['stderr_drain_error']=='OSError'
+    assert not shutdown['stderr_drain_complete']
+    assert any(x.get('kind')=='publication' and x.get('event')=='committed' for x in rows)
+
+
+def test_pending_alive_drain_cannot_satisfy_shutdown_gate(tmp_path):
+    d, rows, _ = document(tmp_path)
+    d.process.stdin.close(); d.process.wait(); d.drain.join(timeout=2)
+    release = threading.Event()
+    d.stderr_drain_state='pending'
+    d.drain=threading.Thread(target=release.wait, daemon=True); d.drain.start()
+    try:
+        d.close()
+        assert d.shutdown_evidence['stderr_drain_state']=='pending'
+        assert not d.shutdown_evidence['stderr_drain_complete']
+        assert d.drain.is_alive()
+        with pytest.raises(ipc.ChildExited): d.require_clean_shutdown()
+    finally:
+        release.set(); d.drain.join(timeout=2)

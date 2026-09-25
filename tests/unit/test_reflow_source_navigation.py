@@ -136,6 +136,47 @@ def test_page_turn_with_a_prior_note_keeps_its_marker_after_the_note():
     assert 'pg_0001' in pages[1]['anchor']
 
 
+def test_page_opening_folio_and_heading_share_new_chapter_with_page_marker():
+    pages = build_epub._page_blocks({
+        126: '<h1>Notes</h1><p>Earlier table note remains in this unit.</p>',
+        127: '<p>116                                           The Houses</p>'
+             '<h1>Angularity and Whole Sign Houses</h1><p>New source prose.</p>',
+    })
+    chapters = build_epub._chapters(pages)
+    assert len(chapters) == 2
+    assert 'Earlier table note' in ''.join(chapters[0].blocks)
+    assert 'pg_0127' not in ''.join(chapters[0].blocks)
+    new = ''.join(chapters[1].blocks)
+    assert new.index('pg_0127') < new.index('116') < new.index('Angularity')
+    assert build_epub._page_homes(chapters)[127] == chapters[1].href
+
+
+@pytest.mark.parametrize('opening', [
+    '<p>116 The Houses</p>',
+    '<p>116                                           4.23</p>',
+    '<p>116                                           A genuine sentence ends here.</p>',
+])
+def test_unproved_page_opening_does_not_move_to_following_chapter(opening):
+    pages = build_epub._page_blocks({
+        0: '<h1>Earlier section</h1><p>Earlier text.</p>',
+        1: opening + '<h1>Next section</h1><p>Next text.</p>',
+    })
+    chapters = build_epub._chapters(pages)
+    assert len(chapters) == 2
+    assert 'pg_0001' in ''.join(chapters[0].blocks)
+    assert opening in ''.join(chapters[0].blocks)
+
+
+def test_page_opening_heading_without_folio_keeps_marker_with_new_chapter():
+    pages = build_epub._page_blocks({
+        0: '<h1>Prior</h1><p>Prior text.</p>',
+        1: '<h1>Next</h1><p>Next text.</p>',
+    })
+    chapters = build_epub._chapters(pages)
+    assert 'pg_0001' not in ''.join(chapters[0].blocks)
+    assert 'pg_0001' in ''.join(chapters[1].blocks)
+
+
 def test_completed_index_entry_does_not_absorb_next_page_entry():
     """Dot leaders and terminal page references identify separate index rows."""
     pages = build_epub._page_blocks({

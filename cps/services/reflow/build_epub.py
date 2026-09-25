@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.23"
+CONVERTER_VERSION = "1.24"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -231,7 +231,7 @@ def page_fragment(book, pno, style=None, wrappers=None, element_blocks=None):
                            'without inferred or searchable text. '
                            '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
             elif reason == "uncertain_aligned_scan_list":
-                caption = ('Complete printed list. Some OCR labels disagree with the source; '
+                caption = ('Complete printed list. The OCR labels and row boundaries are unverified; '
                            'the label and value rows are preserved together as pixels. '
                            '<a href="original-p%04d.xhtml#page">Open original page and enlarged details</a>.' % pno)
             elif reason == "sparse_scan_spread_panel":
@@ -808,6 +808,19 @@ def _join_page_turns(pages, title_pages=()):
     return joined
 
 
+def _opening_folio_before_heading(blocks):
+    """A detached numbered running line can precede a page's first heading.
+
+    Preserve the printed line, including its spacing, but put it and the page
+    marker in the heading's chapter. A plain numbered paragraph or table value
+    does not supply the large source-layout gap and short text-only label.
+    """
+    if len(blocks) < 2 or not _is_paragraph(blocks[0]) or not _SPLIT_HEADING.match(blocks[1]):
+        return False
+    text = _TAG.sub('', _inner(blocks[0]))
+    return bool(re.fullmatch(r'\s*\d{1,4}[ \t]{8,}[A-Za-z][^.!?]{0,60}\s*', text))
+
+
 def _chapters(pages, title_pages=None):
     title_pages = title_pages or {}
     chapters = []
@@ -822,12 +835,16 @@ def _chapters(pages, title_pages=None):
         title_page = page['pno'] in title_pages
         if title_page:
             current = start(title_pages[page['pno']])
+        opening_heading = None
+        if not title_page and _opening_folio_before_heading(page['body']):
+            opening_heading = page['body'][1]
+            current = start(block_text(opening_heading))
         # The page marker waits for the block it belongs to, so a page that opens a
         # chapter puts its marker in the new document and not the previous one.
         pending = page["anchor"]
         for block in page["body"] + page["asides"]:
             heading = _SPLIT_HEADING.match(block)
-            if heading and not title_page:
+            if heading and not title_page and block is not opening_heading:
                 current = start(block_text(block))
             elif current is None:
                 current = start("")

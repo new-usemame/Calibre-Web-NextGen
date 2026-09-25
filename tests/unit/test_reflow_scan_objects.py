@@ -132,6 +132,18 @@ def test_damaged_aligned_list_owns_entire_measured_row_object():
     assert got[0][1] < rows[0].bbox[1] and got[0][3] > rows[-1].bbox[3]
 
 
+def test_accurate_mixed_list_fallback_does_not_claim_source_disagreement():
+    labels = [f'{i}th: item' for i in range(1, 11)] + ['A: alternate', 'B: reserve']
+    raw = scan([line(text, 185, 120 + i * 12, 100)
+                for i, text in enumerate(labels)])
+    style = skeleton.book_style([raw])
+    book = assemble.assemble([skeleton.page_skeleton(raw, style)], style, [raw])
+    html = build_epub.page_fragment(book, 0)
+    assert 'Complete printed list' in html
+    assert 'Some OCR labels disagree with the source' not in html
+    assert 'label and value rows are preserved together as pixels' in html
+
+
 @pytest.mark.parametrize('change', ['reliable', 'letters', 'separate', 'prose'])
 def test_aligned_list_does_not_claim_unproved_objects(change):
     rows = [line(f'{i}th: item', 185, 120 + i * 12, 75) for i in range(1, 13)]

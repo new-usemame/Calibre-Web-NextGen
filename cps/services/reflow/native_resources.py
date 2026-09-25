@@ -12,10 +12,13 @@ import shutil
 import stat
 import sys
 import time
+from subprocess import Popen, DEVNULL, TimeoutExpired
 
 from .model import AttemptCancelled
 
 MIB = 1024 * 1024
+LOCK_PROBE = Path(__file__).with_name('native_lock_probe.py')
+PROBE_TIMEOUT = 2.0
 
 
 class ResourceUnavailable(RuntimeError):
@@ -83,7 +86,10 @@ def linux_headroom(proc=Path('/proc')):
             # hidden ancestors remain a deployment limitation, not free memory.
             if (hierarchy_root == PurePosixPath('/') and current == mount
                     and not maximum.exists() and not usage.exists()):
-                if _read(current / 'cgroup.type') != 'domain':
+                # cgroup.type, like memory.max/current, is a non-root ABI.
+                # Require readable controller availability, not a domain marker
+                # (which also exists on non-root subtree mountpoints).
+                if 'memory' not in _read(current / 'cgroup.controllers').split():
                     raise ValueError('unknown root controller')
             else:
                 limit, used = _read(maximum), int(_read(usage))
@@ -147,6 +153,8 @@ class Lease:
                               os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600)
             if not stat.S_ISREG(os.fstat(self.fd).st_mode):
                 raise ResourceUnavailable('Native resource lock must be a regular file')
+            info = os.fstat(self.fd)
+            self.identity = (info.st_dev, info.st_ino)
             try:
                 fcntl.flock(self.fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
@@ -156,6 +164,7 @@ class Lease:
                 self._capacity(self.admit, self.disk_admit, ResourceUnavailable)
                 if sample < 2 and self.mode == 'checked':
                     time.sleep(.1)
+            self._verify_exclusion()
         except BaseException:
             self.close()
             raise
@@ -163,6 +172,50 @@ class Lease:
     def _cancel(self):
         if self.should_stop and self.should_stop():
             raise AttemptCancelled('Native resource admission cancelled')
+
+    def _check_identity(self, error=ResourceUnavailable):
+        try:
+            info = os.stat(self.root / 'native-resource.lock', follow_symlinks=False)
+            if not stat.S_ISREG(info.st_mode) or (info.st_dev, info.st_ino) != self.identity:
+                raise ValueError()
+        except (OSError, ValueError):
+            raise error('Native coordination lock identity changed; refusing work') from None
+
+    def _verify_exclusion(self):
+        # No persistent pass cache: test this exact held inode for every lease,
+        # including serialize-only. Independent open, deliberately no pass_fds.
+        self._cancel()
+        self._check_identity()
+        try:
+            process = Popen([sys.executable, '-I', str(LOCK_PROBE),
+                             str((self.root / 'native-resource.lock').absolute()),
+                             *map(str, self.identity)], stdin=DEVNULL, stdout=DEVNULL,
+                            stderr=DEVNULL, env={}, close_fds=True)
+        except OSError:
+            raise ResourceUnavailable('Native storage exclusion probe could not start') from None
+        deadline = time.monotonic() + PROBE_TIMEOUT
+        try:
+            while process.poll() is None:
+                self._cancel()
+                if time.monotonic() >= deadline:
+                    raise ResourceUnavailable('Native storage exclusion probe timed out')
+                try:
+                    process.wait(timeout=.05)
+                except TimeoutExpired:
+                    pass
+            self._cancel()
+            if process.returncode == 42:
+                raise ResourceUnavailable('Native storage exclusion is ineffective; independent lock acquired')
+            if process.returncode != 0:
+                raise ResourceUnavailable('Native storage exclusion is unverified; probe failed')
+            self._check_identity()
+        finally:
+            if process.poll() is None:
+                process.kill()  # fixed inert program, no descendants; only ours
+            try:
+                process.wait(timeout=1)
+            except TimeoutExpired:
+                raise ResourceUnavailable('Native storage exclusion probe could not be reaped') from None
 
     def _capacity(self, memory_floor, disk_floor, error):
         if self.mode == 'serialize-only':
@@ -179,6 +232,7 @@ class Lease:
             raise ResourceStopped(self.reason)
         if force or time.monotonic() >= self.next_check:
             try:
+                self._check_identity(ResourceStopped)
                 self._capacity(self.reserve, self.disk_reserve, ResourceStopped)
             except ResourceStopped as exc:
                 self.reason = str(exc)
@@ -189,6 +243,7 @@ class Lease:
     def before_launch(self):
         # Source snapshot copying may take time after the initial samples.
         self._cancel()
+        self._check_identity()
         self._capacity(self.admit, self.disk_admit, ResourceUnavailable)
 
     def close(self):

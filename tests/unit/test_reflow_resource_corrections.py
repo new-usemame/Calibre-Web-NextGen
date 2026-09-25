@@ -65,6 +65,7 @@ def test_missing_controller_files_require_hierarchy_root(tmp_path, root, valid):
     escaped = str(mount).replace(' ', r'\040')
     (proc / 'self/mountinfo').write_text(f'1 0 0:1 {root} {escaped} rw - cgroup2 cgroup rw\n')
     (mount / 'cgroup.type').write_text('domain')
+    (mount / 'cgroup.controllers').write_text('cpu memory')
     if valid:
         assert resources.linux_headroom(proc) == 8 * 1024**3
     else:

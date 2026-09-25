@@ -130,7 +130,8 @@ def test_rejected_directory_provisioning_never_creates_or_authenticates_account(
         assert '_user_id' not in cookie
 
 
-@pytest.mark.parametrize('setting', ['auto_create_disabled', 'standard_login_disabled', 'standard_mode'])
+@pytest.mark.parametrize('setting', ['auto_create_disabled', 'standard_login_withheld',
+                                     'standard_login_flag_without_sso', 'standard_mode'])
 def test_directory_login_respects_instance_switches(ldap_login, monkeypatch, setting):
     h = ldap_login
     if setting == 'auto_create_disabled':
@@ -141,11 +142,18 @@ def test_directory_login_respects_instance_switches(ldap_login, monkeypatch, set
         assert h.session.query(ub.User).count() == 0
         h.existing()
         assert h.login().status_code == 200  # the switch only disables creation
-    elif setting == 'standard_login_disabled':
-        monkeypatch.setattr(config, 'config_disable_standard_login', True)
+    elif setting == 'standard_login_withheld':
+        # While SSO replaces it (config.standard_login_disabled(), #2303),
+        # the password login never reaches the directory.
+        monkeypatch.setattr(config, 'standard_login_disabled', lambda: True)
         assert h.login().status_code == 403
         h.directory.bind_user.assert_not_called()
         assert h.session.query(ub.User).count() == 0
+    elif setting == 'standard_login_flag_without_sso':
+        # The flag left on under LDAP must not lock the directory out (#2272).
+        monkeypatch.setattr(config, 'config_disable_standard_login', True)
+        assert h.login().status_code == 200
+        h.directory.bind_user.assert_called_once()
     else:
         monkeypatch.setattr(config, 'config_login_type', constants.LOGIN_STANDARD)
         h.existing()

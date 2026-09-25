@@ -3040,37 +3040,18 @@ def _absorb_figure_content(kept_blocks, candidates, style, raw=None, pixel_probe
             if raw is not None:
                 candidate.bbox = (max(0,candidate.bbox[0]),max(0,candidate.bbox[1]),
                                   min(raw.width,candidate.bbox[2]),min(raw.height,candidate.bbox[3]))
-            # A widened header can cross a later independent caption/figure
-            # near its lower corner. Trim the empty tail only after checking
-            # unmasked source pixels; the neighbor retains the actual text.
-            if candidate.bbox[0] < x0:
-                neighboring = [other.bbox for other in candidates if other is not candidate]
-                neighboring.extend(ln.bbox for _,group in kept_blocks for ln in group)
-                for other in sorted(neighboring,key=lambda box:box[1]):
-                    if not (candidate.bbox[0] < other[2]
-                            and other[0] < x0 and other[1] < candidate.bbox[3]):
-                        continue
-                    end = max(ln.bbox[3] for ln in candidate.lines)
-                    if other[1] <= end+4 or other[1]-2 <= end:
-                        continue
-                    gap = (candidate.bbox[0],end+3,candidate.bbox[2],other[1]-2)
-                    tail = (max(x0,other[2])+2,other[1],
-                            candidate.bbox[2],candidate.bbox[3])
-                    try:
-                        blank = (pixel_probe is not None
-                            and hasattr(pixel_probe,'source_has_ink')
-                            and gap[2]>gap[0] and gap[3]>gap[1]
-                            and not pixel_probe.source_has_ink(gap)
-                            and (tail[2]<=tail[0] or tail[3]<=tail[1]
-                                 or not pixel_probe.source_has_ink(tail)))
-                    except (ValueError,RuntimeError,AttributeError):
-                        blank = False
-                    if blank:
-                        candidate.bbox = (candidate.bbox[0],candidate.bbox[1],
-                                          candidate.bbox[2],other[1]-2)
-                    else:
-                        candidate.reason = 'unverified_scan_layout'
-
+            # Keep the complete expanded source crop. A nearby prose box may
+            # contain artwork absent from its transcript, and a neighboring
+            # figure may later be omitted after prose masks are applied. Neither
+            # is proof that source pixels can be trimmed here.
+            neighboring = [other.bbox for other in candidates if other is not candidate]
+            neighboring.extend(ln.bbox for _,group in kept_blocks for ln in group)
+            if any(_overlap_share(box,candidate.bbox)>0 for box in neighboring):
+                candidate.reason = 'unverified_scan_layout'
+                # This source image is the preservation owner. Retained prose
+                # may mask all of its ink during blank-figure admission; do not
+                # drop the crop on that unrelated heuristic.
+                candidate.needs_ink = False
 
     artwork = []
     for candidate in candidates:

@@ -198,6 +198,105 @@ def test_admission_requires_all_three_samples_and_checked_is_default(tmp_path, m
         pass
 
 
+def test_exclusion_probe_reports_bounded_child_phases_and_parent_reap(tmp_path, monkeypatch):
+    monkeypatch.setenv('REFLOW_NATIVE_CAPACITY_MODE', 'serialize-only')
+    records = []
+    monkeypatch.setattr(resources.log, 'info', lambda message, *args: records.append(message % args))
+    with resources.Lease(tmp_path):
+        pass
+    assert len(records) == 1
+    assert 'outcome=passed' in records[0]
+    assert 'child_phases=' in records[0] and '1:' in records[0]
+    assert 'pid=' in records[0] and 'reaped_ms=' in records[0]
+    assert str(tmp_path) not in records[0]
+
+
+@pytest.mark.parametrize('script,expected_phase', [
+    ('import time; time.sleep(5)', 'none'),
+    ('import os,time; os.write(2, f"1:{time.monotonic_ns()}\\n".encode()); time.sleep(5)', '1:'),
+])
+def test_exclusion_timeout_distinguishes_pre_phase_and_child_stage(tmp_path, monkeypatch, script, expected_phase):
+    monkeypatch.setenv('REFLOW_NATIVE_CAPACITY_MODE', 'serialize-only')
+    # Leave room for interpreter startup on a loaded test host; both fixture
+    # delays are five seconds. Production's two-second deadline is untouched.
+    monkeypatch.setattr(resources, 'PROBE_TIMEOUT', .8)
+    probe = tmp_path / 'delayed_probe.py'; probe.write_text(script)
+    monkeypatch.setattr(resources, 'LOCK_PROBE', probe)
+    warnings, launched = [], []
+    monkeypatch.setattr(resources.log, 'warning', lambda message, *args: warnings.append(message % args))
+    original = resources.Popen
+    def launch(*args, **kwargs):
+        child = original(*args, **kwargs)
+        launched.append(child)
+        return child
+    monkeypatch.setattr(resources, 'Popen', launch)
+    with pytest.raises(resources.ResourceUnavailable, match='timed out'):
+        resources.Lease(tmp_path)
+    assert launched and launched[0].poll() is not None
+    assert len(warnings) == 1 and 'outcome=timeout' in warnings[0]
+    assert f'child_phases={expected_phase}' in warnings[0]
+
+
+def test_probe_logging_failure_cannot_mask_valid_exclusion(tmp_path, monkeypatch):
+    monkeypatch.setenv('REFLOW_NATIVE_CAPACITY_MODE', 'serialize-only')
+    def broken(*args):
+        raise OSError('inert logging error')
+    monkeypatch.setattr(resources.log, 'info', broken)
+    with resources.Lease(tmp_path):
+        pass
+
+
+def test_probe_drains_oversized_child_stderr_without_logging_it(tmp_path, monkeypatch):
+    monkeypatch.setenv('REFLOW_NATIVE_CAPACITY_MODE', 'serialize-only')
+    probe = tmp_path / 'noisy_probe.py'
+    probe.write_text('import os; os.write(2, b"private" * 20000); raise SystemExit(3)')
+    monkeypatch.setattr(resources, 'LOCK_PROBE', probe)
+    warnings = []
+    monkeypatch.setattr(resources.log, 'warning', lambda message, *args: warnings.append(message % args))
+    with pytest.raises(resources.ResourceUnavailable, match='probe failed'):
+        resources.Lease(tmp_path)
+    assert len(warnings) == 1 and 'outcome=failed' in warnings[0]
+    assert 'private' not in warnings[0] and 'child_phases=none' in warnings[0]
+
+
+def test_probe_warning_sink_failure_preserves_timeout_and_reaps(tmp_path, monkeypatch):
+    monkeypatch.setenv('REFLOW_NATIVE_CAPACITY_MODE', 'serialize-only')
+    monkeypatch.setattr(resources, 'PROBE_TIMEOUT', .12)
+    probe = tmp_path / 'delayed_probe.py'; probe.write_text('import time; time.sleep(5)')
+    monkeypatch.setattr(resources, 'LOCK_PROBE', probe)
+    launched = []
+    original = resources.Popen
+    def launch(*args, **kwargs):
+        child = original(*args, **kwargs); launched.append(child); return child
+    monkeypatch.setattr(resources, 'Popen', launch)
+    monkeypatch.setattr(resources.log, 'warning', lambda *args: (_ for _ in ()).throw(OSError('inert sink')))
+    with pytest.raises(resources.ResourceUnavailable, match='timed out'):
+        resources.Lease(tmp_path)
+    assert launched and launched[0].poll() is not None
+
+
+def test_probe_spawn_failure_keeps_original_refusal_and_scalar_evidence(tmp_path, monkeypatch):
+    monkeypatch.setenv('REFLOW_NATIVE_CAPACITY_MODE', 'serialize-only')
+    warnings = []
+    monkeypatch.setattr(resources.log, 'warning', lambda message, *args: warnings.append(message % args))
+    def refused(*args, **kwargs):
+        raise OSError('private path and detail')
+    monkeypatch.setattr(resources, 'Popen', refused)
+    with pytest.raises(resources.ResourceUnavailable, match='could not start'):
+        resources.Lease(tmp_path)
+    assert len(warnings) == 1 and 'outcome=spawn_failed' in warnings[0]
+    assert 'private' not in warnings[0]
+
+
+def test_probe_capture_setup_failure_keeps_valid_exclusion(tmp_path, monkeypatch):
+    monkeypatch.setenv('REFLOW_NATIVE_CAPACITY_MODE', 'serialize-only')
+    def unavailable(*args):
+        raise OSError('inert telemetry failure')
+    monkeypatch.setattr(resources.os, 'set_blocking', unavailable)
+    with resources.Lease(tmp_path):
+        pass
+
+
 def test_estimate_resource_refusal_is_503_not_bad_pdf(rig, monkeypatch):
     from cps.api import reflow as api
     from tests.unit.test_reflow_api import _ctx, _status, _json

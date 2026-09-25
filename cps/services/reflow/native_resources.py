@@ -5,6 +5,7 @@ description is inherited by the owned child until it exits. Measurements are
 admission/stop signals, never a promise that the kernel cannot OOM-kill the parent.
 """
 import fcntl
+import logging
 import os
 from pathlib import Path, PurePosixPath
 import re
@@ -12,13 +13,53 @@ import shutil
 import stat
 import sys
 import time
-from subprocess import Popen, DEVNULL, TimeoutExpired
+from subprocess import Popen, DEVNULL, PIPE, TimeoutExpired
 
 from .model import AttemptCancelled
 
 MIB = 1024 * 1024
 LOCK_PROBE = Path(__file__).with_name('native_lock_probe.py')
 PROBE_TIMEOUT = 2.0
+_PROBE_CAPTURE_LIMIT = 512
+log = logging.getLogger(__name__)
+
+
+def _probe_phases(data):
+    # Never log arbitrary child stderr, including an interpreter traceback.
+    phases = []
+    for line in data.splitlines()[:12]:
+        parts = line.split(b':', 1)
+        if (len(parts) == 2 and len(parts[0]) == 1 and parts[0] in b'123456789'
+                and 1 <= len(parts[1]) <= 20 and parts[1].isdigit()):
+            phases.append(line.decode('ascii'))
+    return ','.join(phases) or 'none'
+
+
+def _probe_report(outcome, process, start_ns, spawned_ns, phases):
+    # Optional, scalar-only evidence. No diagnostic sink may change admission.
+    try:
+        report = log.info if outcome == 'passed' else log.warning
+        report('Native storage probe outcome=%s pid=%d spawn_ms=%d deadline_ms=%d '
+               'reaped_ms=%d exit=%s child_phases=%s', outcome, process.pid,
+               (spawned_ns - start_ns) // 1_000_000, int(PROBE_TIMEOUT * 1000),
+               ((time.monotonic_ns() - start_ns) // 1_000_000
+                if process.returncode is not None else -1),
+               process.returncode, _probe_phases(phases))
+    except Exception:
+        pass
+
+
+def _drain_probe(process, captured):
+    # A fixed retention limit is safe only if the pipe is still drained.
+    try:
+        while True:
+            chunk = os.read(process.stderr.fileno(), 4096)
+            if not chunk:
+                break
+            if len(captured) < _PROBE_CAPTURE_LIMIT:
+                captured.extend(chunk[:_PROBE_CAPTURE_LIMIT - len(captured)])
+    except Exception:
+        pass
 
 
 class ResourceUnavailable(RuntimeError):
@@ -186,36 +227,72 @@ class Lease:
         # including serialize-only. Independent open, deliberately no pass_fds.
         self._cancel()
         self._check_identity()
+        start_ns = time.monotonic_ns()
         try:
             process = Popen([sys.executable, '-I', str(LOCK_PROBE),
                              str((self.root / 'native-resource.lock').absolute()),
                              *map(str, self.identity)], stdin=DEVNULL, stdout=DEVNULL,
-                            stderr=DEVNULL, env={}, close_fds=True)
+                            stderr=PIPE, env={}, close_fds=True)
         except OSError:
+            try:
+                log.warning('Native storage probe outcome=spawn_failed pid=-1 spawn_ms=%d '
+                            'deadline_ms=%d reaped_ms=-1 exit=none child_phases=none',
+                            (time.monotonic_ns() - start_ns) // 1_000_000,
+                            int(PROBE_TIMEOUT * 1000))
+            except Exception:
+                pass
             raise ResourceUnavailable('Native storage exclusion probe could not start') from None
+        spawned_ns = time.monotonic_ns()
+        captured = bytearray()
+        outcome = 'interrupted'
+        try:
+            os.set_blocking(process.stderr.fileno(), False)
+        except OSError:
+            # Closing the optional observation channel cannot stop the child:
+            # it handles a failed marker write and still tests flock.
+            try:
+                process.stderr.close()
+            except OSError:
+                pass
         deadline = time.monotonic() + PROBE_TIMEOUT
         try:
             while process.poll() is None:
+                _drain_probe(process, captured)
                 self._cancel()
                 if time.monotonic() >= deadline:
+                    outcome = 'timeout'
                     raise ResourceUnavailable('Native storage exclusion probe timed out')
                 try:
                     process.wait(timeout=.05)
                 except TimeoutExpired:
                     pass
+            _drain_probe(process, captured)
             self._cancel()
             if process.returncode == 42:
+                outcome = 'ineffective'
                 raise ResourceUnavailable('Native storage exclusion is ineffective; independent lock acquired')
             if process.returncode != 0:
+                outcome = 'failed'
                 raise ResourceUnavailable('Native storage exclusion is unverified; probe failed')
             self._check_identity()
+            outcome = 'passed'
         finally:
-            if process.poll() is None:
-                process.kill()  # fixed inert program, no descendants; only ours
             try:
-                process.wait(timeout=1)
-            except TimeoutExpired:
-                raise ResourceUnavailable('Native storage exclusion probe could not be reaped') from None
+                if process.poll() is None:
+                    process.kill()  # fixed inert program, no descendants; only ours
+                try:
+                    process.wait(timeout=1)
+                except TimeoutExpired:
+                    outcome = 'reap_failed'
+                    raise ResourceUnavailable('Native storage exclusion probe could not be reaped') from None
+            finally:
+                _drain_probe(process, captured)
+                if process.stderr:
+                    try:
+                        process.stderr.close()
+                    except OSError:
+                        pass
+                _probe_report(outcome, process, start_ns, spawned_ns, captured)
 
     def _capacity(self, memory_floor, disk_floor, error):
         if self.mode == 'serialize-only':

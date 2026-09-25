@@ -61,8 +61,13 @@ taken from KOReader itself rather than written by hand:
   on a Kindle, with the text that page starts with, read through KOReader's HTTP inspector plugin.
 - `probe.epub` - a small synthetic book built by `engine/make_probe.py` to hit each crengine
   text-node rule (whitespace-only nodes, inline vs block siblings, hidden elements, entities).
-- `engine-words.json` - word ranges reported by KOReader's own crengine for the three books above, from
-  `engine/probe.lua` run inside the KOReader linux-arm64 release by `engine/run-probe.sh`.
+- `head-voids.epub` - a synthetic book built by `engine/make_head_voids.py`: `.html` chapters whose `<head>`
+  leaves `<meta>`/`<link>` open, their self-closed twin, and three chapters that must stay refused (an open
+  void in the body, a head still malformed once closed, the open head in an `.xhtml` member). Text from
+  *Alice's Adventures in Wonderland* (public domain).
+- `engine-words.json` - word ranges reported by KOReader's own crengine for the four books above, from
+  `engine/probe.lua` run inside the KOReader linux-arm64 release by `engine/run-probe.sh` (`head-voids`: every
+  word, KOReader v2026.07.1, 2026-09-25).
 - `rig-web-rows.json`, `rig-engine-check.json` - two highlights as stored by a test server (one made on
   the Kindle, one in the web reader) and crengine's text for each.
 

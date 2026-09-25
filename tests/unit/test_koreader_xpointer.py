@@ -206,6 +206,78 @@ def test_positions_crengine_does_not_have_are_refused_not_moved():
         "/body/DocFragment[1]/body/div/h2/text()[1].0")
 
 
+def _head_voids_engine_words():
+    """crengine's words of ``head-voids.epub``, by DocFragment (spine order in
+    ``engine/make_head_voids.py``: 1 open.html, 2 closed.html, 3 bodyvoid.html,
+    4 badhead.html, 5 open.xhtml)."""
+    by_fragment = {}
+    for word in _json("engine-words.json")["head-voids"]["words"]:
+        number = int(re.match(r"/body/DocFragment\[(\d+)\]", word["s"]).group(1))
+        by_fragment.setdefault(number, []).append(word)
+    return by_fragment
+
+
+def test_html_chapter_with_open_head_voids_converts_like_its_self_closed_twin():
+    # <meta charset="utf-8"> and <link ...> left open in an .html chapter's
+    # head: the browser's HTML parser treats them as void and crengine is
+    # lenient, so both readers see the tree of the self-closed twin.
+    epub = FIXTURES / "head-voids.epub"
+    oracle = _EpubJs(epub)
+    words = _head_voids_engine_words()
+    twins = {(w["s"], w["e"]) for w in words[2]}
+    converted = 0
+    for word in words[1]:
+        twin_s, twin_e = (word[k].replace("DocFragment[1]", "DocFragment[2]") for k in "se")
+        # crengine itself reads the two files as the same tree.
+        assert (twin_s, twin_e) in twins, word
+        cfi = kx.xpointers_to_cfi_range(epub, word["s"], word["e"])
+        twin_cfi = kx.xpointers_to_cfi_range(epub, twin_s, twin_e)
+        if "/body/p[3]/" in word["s"]:
+            # The verse is white-space: pre-wrap by the stylesheet the open
+            # <link> names: the repaired head still brings its CSS along.
+            assert cfi is None and twin_cfi is None, word
+            continue
+        assert twin_cfi is not None, word
+        assert cfi == twin_cfi.replace("epubcfi(/6/4!", "epubcfi(/6/2!", 1), word
+        framed = re.sub(r"\s+", " ", oracle.range_text(twin_cfi))
+        assert framed == word["t"], (word, framed)
+        assert kx.cfi_range_to_xpointers(epub, cfi) == (word["s"], word["e"]), word
+        point = kx.xpointer_to_cfi(epub, word["s"])
+        assert point is not None and kx.cfi_to_xpointer(epub, point) == word["s"], word
+        converted += 1
+    assert converted > 60
+
+
+def test_open_voids_are_repaired_only_in_the_head_of_an_html_chapter():
+    epub = FIXTURES / "head-voids.epub"
+    words = _head_voids_engine_words()
+    # 3: an open <br> in the BODY (crengine even puts the following text
+    #    inside it); 4: a head still malformed once its voids are closed;
+    # 5: an .xhtml member, which the browser parses as XML and cannot render.
+    for number in (3, 4, 5):
+        assert words[number]
+        for word in words[number]:
+            assert kx.xpointers_to_cfi_range(epub, word["s"], word["e"]) is None, word
+            assert kx.xpointer_to_cfi(epub, word["s"]) is None, word
+    for cfi in ("epubcfi(/6/6!/4/2/1:0)", "epubcfi(/6/8!/4/2/1:0)",
+                "epubcfi(/6/10!/4/4/1:0)"):
+        assert kx.cfi_to_xpointer(epub, cfi) is None, cfi
+    # The same body in the .html twins does convert.
+    assert kx.cfi_to_xpointer(epub, "epubcfi(/6/2!/4/4/1:0)") == (
+        "/body/DocFragment[1]/body/p[1]/text().0")
+
+
+def test_an_unreadable_chapter_is_parsed_once_not_on_every_request(tmp_path, monkeypatch):
+    epub = tmp_path / "copy.epub"  # a fresh path: nothing of it is cached yet
+    shutil.copy(FIXTURES / "head-voids.epub", epub)
+    loads = []
+    real = kx._load_chapter
+    monkeypatch.setattr(kx, "_load_chapter", lambda *a: loads.append(a) or real(*a))
+    for _ in range(3):
+        assert kx.cfi_to_xpointer(epub, "epubcfi(/6/8!/4/2/1:0)") is None
+    assert len(loads) == 1
+
+
 def test_rig_highlights_convert_both_ways_only_when_they_frame_their_text():
     epub = FIXTURES / "metamorphosis-221.epub"
     shudder, alth = _json("rig-web-rows.json")

@@ -40,6 +40,12 @@ crengine (``lvtinydom.cpp`` / ``lvxml.cpp`` / ``epubfmt.cpp``)
   * a text node longer than 8192 source characters is split into several;
     a comment is not a node, but the text either side of it stays two nodes.
 
+Chapters are parsed as strict XML. The one leniency: in an ``.html`` member
+(which the browser parses with its HTML parser) void elements left open in
+``<head>`` -- ``<meta charset="utf-8">``, ``<link ...>`` -- are self-closed and
+the file parsed again, since both engines treat them as void. The body must
+still parse strictly, and the refusals below judge the file as written.
+
 Anything outside the modelled subset (pre-formatted text, CSS that may change
 an element's display/float/white-space where it matters, markup the browser's
 HTML parser would restructure, split text nodes, ...) returns ``None``: an
@@ -398,9 +404,17 @@ class _Chapter:
 def _chapter(book: _Book, item: _SpineItem) -> Optional[_Chapter]:
     if item.member is None:
         return None
-    cached = book.chapters.get(item.member)
-    if cached is None:
-        cached = _load_chapter(book.path, item.member)
+    # A chapter that cannot be read is remembered as None too, so a book with
+    # an unreadable chapter is not re-read and re-parsed on every request.
+    if item.member in book.chapters:
+        cached = book.chapters[item.member]
+    else:
+        try:
+            cached = _load_chapter(book.path, item.member)
+        except (etree.XMLSyntaxError, UnicodeDecodeError, KeyError):
+            log.debug("koreader_xpointer: cannot parse %s in %s", item.member,
+                      book.path, exc_info=True)
+            cached = None
         book.chapters[item.member] = cached
     if cached is None or cached.refusal:
         return None
@@ -414,13 +428,54 @@ def _load_chapter(path: str, member: str) -> Optional[_Chapter]:
             return None
         raw = archive.read(member)
         text = raw.decode("utf-8-sig", errors="strict")
-        root = _xml(_numeric_named_entities(text).encode("utf-8"))
+        source = _numeric_named_entities(text)
+        try:
+            root = _xml(source.encode("utf-8"))
+        except etree.XMLSyntaxError:
+            repaired = _close_head_voids(source, member)
+            if repaired is None:
+                raise
+            root = _xml(repaired.encode("utf-8"))
         body = root.find(f"{{{_XHTML_NS}}}body")
         if body is None or etree.QName(root).localname != "html":
             return None
+        # Refusals judge the file as written, not the repaired copy.
         refusal = _chapter_refusal(text, root, member)
         css = _chapter_css(archive, member, root)
     return _Chapter(body, refusal, tuple(_css_rules(css)), {}, _split_texts(text))
+
+
+# A start tag of a void element the head may carry, not already self-closed.
+# Quoted attribute values may contain '>' or '/'.
+_OPEN_HEAD_VOID = re.compile(
+    r"<(meta|link|base)(\s(?:[^<>\"']|\"[^\"]*\"|'[^']*')*?)?(?<!/)>")
+_HEAD = re.compile(r"(<head(?:\s[^<>]*)?>)(.*?)(</head\s*>)", re.S)
+
+
+def _close_head_voids(text: str, member: str) -> Optional[str]:
+    """``text`` with the void elements of its ``<head>`` self-closed, or None.
+
+    HTML-style ``<meta charset="utf-8">`` / ``<link ...>`` in a chapter's head
+    is ordinary in calibre-converted and retail books. The browser parses an
+    ``.html`` member with its HTML parser, where these elements are void, and
+    crengine is lenient, so both readers build the tree the self-closed file
+    would have. Only the head is repaired: positions live in the body, which
+    must still parse strictly. An ``.xhtml`` member is not repaired, because
+    the browser parses it as XML, fails, and renders no body at all (epub.js
+    chooses the parser from the member's extension, case-sensitively).
+    """
+    if posixpath.splitext(member)[1] not in (".html", ".htm"):
+        return None
+    match = _HEAD.search(text)
+    if match is None:
+        return None
+
+    def close(tag):
+        return f"<{tag.group(1)}{tag.group(2) or ''}/>"
+    head = _OPEN_HEAD_VOID.sub(close, match.group(2))
+    if head == match.group(2):
+        return None
+    return text[:match.start(2)] + head + text[match.end(2):]
 
 
 def _split_texts(text: str) -> frozenset:

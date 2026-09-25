@@ -40,7 +40,7 @@ def test_auth_config_exposes_custom_instance_name():
         cfg.config_public_reg = False
         cfg.config_register_email = False
         cfg.get_mail_server_configured.return_value = False
-        cfg.config_disable_standard_login = False
+        cfg.standard_login_disabled.return_value = False
         cfg.config_remote_login = False
         resp = app.test_client().get("/api/v1/auth/config")
     assert resp.status_code == 200
@@ -57,7 +57,7 @@ def test_auth_config_instance_name_falls_back_when_blank():
             cfg.config_public_reg = False
             cfg.config_register_email = False
             cfg.get_mail_server_configured.return_value = False
-            cfg.config_disable_standard_login = False
+            cfg.standard_login_disabled.return_value = False
             cfg.config_remote_login = False
             resp = app.test_client().get("/api/v1/auth/config")
         assert resp.get_json()["instance_name"] == "Calibre-Web NextGen"
@@ -96,7 +96,7 @@ def test_login_payload_includes_instance_name():
          patch("cps.api.auth.check_password_hash", return_value=True), \
          patch.object(cps.api.auth, "config") as cfg, \
          patch("cps.api.auth.login_user"):
-        cfg.config_disable_standard_login = False
+        cfg.standard_login_disabled.return_value = False
         cfg.config_calibre_web_title = "Alice's Library"
         cfg.config_user_hide_enabled = False
         cfg.get_mail_server_configured.return_value = False

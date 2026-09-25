@@ -12,7 +12,7 @@
   <form method="POST" role="form" style="background: none;">
     <input type="hidden" name="next" value="{{next_url}}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    {% if not config.config_disable_standard_login %}
+    {% if not config.standard_login_disabled() %}
     <div class="form-group">
       <label for="username" style="color: var(--color-primary)">{{_('Username')}}</label>
       <input type="text" class="form-control" id="username" name="username" autocapitalize="off"
@@ -95,7 +95,7 @@
       if generic_login_button %}{{ generic_login_button }}{% else %}{{_('Log in with SSO')}}{% endif %}</a>
     {% endif %}
     {% endif %}
-    {% if config.config_disable_standard_login %}
+    {% if config.standard_login_disabled() %}
     <div class="alert alert-info alert-dismissible" style="margin-top: 15px;">
       <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span
           aria-hidden="true">&times;</span></button>

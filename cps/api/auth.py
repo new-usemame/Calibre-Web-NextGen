@@ -278,8 +278,8 @@ def auth_login():
     if rate_limit_error is not None:
         return rate_limit_error
 
-    # I2: Honour config_disable_standard_login.
-    if config.config_disable_standard_login:
+    # I2: Honour "Disable Standard Login" while SSO can replace it.
+    if config.standard_login_disabled():
         return jsonify({"error": {"code": "standard_login_disabled",
                                   "message": "Standard login is disabled"}}), 403
 
@@ -372,7 +372,7 @@ def auth_config():
         "public_registration": bool(getattr(config, "config_public_reg", False)),
         "register_email": bool(getattr(config, "config_register_email", False)),
         "mail_configured": mail_ok,
-        "standard_login_disabled": bool(getattr(config, "config_disable_standard_login", False)),
+        "standard_login_disabled": config.standard_login_disabled(),
         "oauth_providers": _oauth_providers(),
         "remote_login": remote_login,
         "remote_login_url": remote_login_url,

@@ -458,6 +458,24 @@ class ConfigSQL(object):
     def get_mail_settings(self):
         return {k: v for k, v in self.__dict__.items() if k.startswith('mail_')}
 
+    def standard_login_disabled(self):
+        """Whether the username/password login is actually withheld.
+
+        "Disable Standard Login" only takes effect while OAuth is the login type
+        and a provider is registered to sign in with instead. The flag survives
+        a switch back to standard or LDAP login and every provider being turned
+        off; honouring it then hides the only way in (discussion #2272).
+        """
+        if not self.config_disable_standard_login:
+            return False
+        if self.config_login_type != constants.LOGIN_OAUTH:
+            return False
+        try:
+            from .oauth_bb import oauth_check
+        except ImportError:
+            return False
+        return bool(oauth_check)
+
     def get_mail_server_configured(self):
         return bool((self.mail_server != constants.DEFAULT_MAIL_SERVER and self.mail_server_type == 0)
                     or (self.mail_gmail_token != {} and self.mail_server_type == 1))

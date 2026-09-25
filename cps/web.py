@@ -3088,7 +3088,7 @@ def login():
 @limiter.limit("40/day", key_func=lambda: strip_whitespaces(request.form.get('username', "")).lower())
 @limiter.limit("3/minute", key_func=lambda: strip_whitespaces(request.form.get('username', "")).lower())
 def login_post():
-    if config.config_disable_standard_login:
+    if config.standard_login_disabled():
         flash(_("Standard login is disabled."), category="error")
         return render_login()
 

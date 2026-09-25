@@ -1,6 +1,7 @@
 """Original-source orientation and inspection preserve physical relationships."""
 import json
 import re
+from xml.etree import ElementTree as ET
 import pymupdf
 import pytest
 from cps.services.reflow import extract
@@ -91,6 +92,18 @@ def test_actual_epub_shows_original_grid_before_unchanged_marked_ocr_and_exclude
         assert 'inspection_0' in original and 'Return to reflowed PDF page' in original
         side=json.loads(z.read('META-INF/reflow.json'))
         evidence=side['source_evidence'][0]
+        original_root=ET.fromstring(original)
+        ns='{http://www.w3.org/1999/xhtml}'
+        ids=[node.get('id') for node in original_root.iter() if node.get('id')]
+        assert len(ids)==len(set(ids))
+        inspection=[detail for detail in evidence['details'] if detail['id'].startswith('inspection_')]
+        assert inspection
+        for detail in inspection:
+            target=next(node for node in original_root.iter() if node.get('id')==detail['id'])
+            assert target.tag==ns+'h2' and target.text==detail['label']
+            assert any(node.get('href')=='#'+detail['id'] for node in original_root.iter(ns+'a'))
+            owner=next(section for section in original_root.iter(ns+'section') if target in list(section))
+            assert [node.get('src') for node in owner.iter(ns+'img')]==[detail['src']]
         opf=z.read('OEBPS/content.opf').decode()
         for detail in evidence['details']:
             src=detail['src']

@@ -245,6 +245,36 @@ def test_original_page_fragment_has_return_at_entry_and_after_final_image(detail
     assert nodes.index(returns[-1]) > nodes.index(images[-1]), 'image end has no return'
     assert {el.get('id') for el in nodes if el.get('id')} >= {'page'} | {d['id'] for d in details}
     assert {img.get('src') for img in images} == {record['full']} | {d['src'] for d in details}
+    if not details:
+        assert not any(node.get('aria-label') == 'Original source details' for node in body.iter())
+        assert {el.get('id') for el in nodes if el.get('id')} == {'page'}
+
+
+def test_inspection_links_land_on_visible_heading_with_complete_detail_and_returns():
+    details = [
+        {'id': 'notes', 'label': 'Printed note context', 'src': 'images/note.png'},
+        {'id': 'inspection_0', 'label': 'First original tile', 'src': 'images/tile0.png'},
+        {'id': 'inspection_1', 'label': 'Next original tile', 'src': 'images/tile1.png'},
+    ]
+    root = ET.fromstring(build_epub._original_document(
+        {'page': 15, 'full': 'images/page.png', 'details': details}, 'ch015.xhtml', 'en'))
+    ids = [node.get('id') for node in root.iter() if node.get('id')]
+    assert len(ids) == len(set(ids))
+    links = [node for node in root.iter(XHTML + 'a')
+             if node.get('href', '').startswith('#inspection_')]
+    assert [node.get('href') for node in links] == ['#inspection_0', '#inspection_1']
+    assert [node.text for node in links] == [details[1]['label'], details[2]['label']]
+    for link, detail in zip(links, details[1:]):
+        target = next(node for node in root.iter() if node.get('id') == link.get('href')[1:])
+        assert target.tag == XHTML + 'h2' and target.text == detail['label']
+        section = next(node for node in root.iter(XHTML + 'section') if target in list(node))
+        assert [node.get('src') for node in section.iter(XHTML + 'img')] == [detail['src']]
+        returns = [node for node in section.iter(XHTML + 'a')
+                   if node.get('href') == 'ch015.xhtml#pg_0015']
+        assert len(returns) == 2
+        nodes = list(section.iter())
+        assert nodes.index(returns[0]) < nodes.index(next(section.iter(XHTML + 'img'))) < nodes.index(returns[1])
+    assert next(node for node in root.iter() if node.get('id') == 'notes').tag == XHTML + 'section'
 
 
 def test_uncertain_notes_expose_original_pixels_and_only_disarm_ambiguous_links(tmp_path):

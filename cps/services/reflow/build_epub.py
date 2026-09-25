@@ -49,7 +49,7 @@ from . import assemble, extract, gate
 log = logging.getLogger(__name__)
 
 CONVERTER = "Reflow"
-CONVERTER_VERSION = "1.33"
+CONVERTER_VERSION = "1.34"
 REFLOW_NS = "https://calibre-web-nextgen.org/ns/reflow#"
 SIDECAR_PATH = "META-INF/reflow.json"
 OEBPS = "OEBPS"
@@ -1639,8 +1639,10 @@ def _original_document(record, home, language):
         links = '<p>Inspect overlapping original details: ' + ' · '.join(
             '<a href="#%s">%s</a>' % (key, escape(next(d['label'] for d in record['details'] if d['id'] == key)))
             for key in detail.get('inspection_ids', [])) + '</p>' if detail.get('inspection_ids') else ''
-        body += ('<section class="source-evidence" id="%s"><h2>%s</h2>%s<img src="%s" alt="%s"/>%s</section>'
-                 % (detail["id"], escape(detail["label"]), back, detail["src"],
+        anchor = ' id="%s"' % detail['id']
+        section_id, heading_id = ('', anchor) if detail['id'].startswith('inspection_') else (anchor, '')
+        body += ('<section class="source-evidence"%s><h2%s>%s</h2>%s<img src="%s" alt="%s"/>%s</section>'
+                 % (section_id, heading_id, escape(detail["label"]), back, detail["src"],
                     escape(detail["label"]), links + back))
     body += back
     return _document("Original PDF page %d" % (pno + 1), body, language)

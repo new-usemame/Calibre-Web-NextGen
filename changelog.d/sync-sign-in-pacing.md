@@ -1,9 +1,12 @@
 ### Fixed
 
-- **KOReader sync slows down repeated wrong passwords, without ever slowing you down.**
-  Sign-ins to KOReader progress, annotation and library sync now pace wrong
-  passwords the way the rest of the app does. The pacing is kept per device
-  address, so a Kindle still using a revoked app password slows only itself,
-  and your other devices keep signing in straight away. OPDS catalogue sign-ins
-  are paced the same way now, so one misconfigured reader app can no longer
-  keep your account's other OPDS apps waiting.
+- **KOReader sync and OPDS sign-ins now slow down password guessing without
+  locking out your devices.** A device or app that keeps sending *different*
+  wrong passwords for an account is refused for a minute after three. A device
+  stuck on an old or revoked password is sending the same wrong password each
+  time, so it gets "wrong password", never a lockout. Your other devices, and a
+  right password on the same home network, keep signing in straight away.
+  Devices that sign in with an app password are never slowed. Before, KOReader
+  sync did not slow wrong passwords at all. OPDS paced every sign-in to an
+  account together, so one misconfigured reader app could keep the account's
+  other OPDS apps waiting.

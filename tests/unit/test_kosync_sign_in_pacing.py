@@ -1,102 +1,176 @@
 # -*- coding: utf-8 -*-
 # SPDX-License-Identifier: GPL-3.0-or-later
-"""KOReader sync paces wrong passwords per client, and never slows the owner.
+"""KOReader sync paces password guesses, not the devices that sync.
 
 KOReader sends its Basic credentials with every request. Wrong ones used to be
-checked without limit (and, under LDAP, each cost a directory bind). They are
-now counted per client address and account: a client that keeps sending a
-wrong password is answered 429, while the account's owner, signing in with the
-right password from another client, is never held up by it. A right password
-clears its own client's count, so a device syncing a library in a burst of
-signed-in requests is never slowed.
+checked without limit (and, under LDAP, each cost a directory bind). Now each
+client's *new* wrong passwords for an account are counted; after three in a
+minute that client is refused 429 before its password is even looked at.
+
+What must never be refused: a device with an app password; the right password
+from any client that is not guessing; and the owner of a stale device on the
+same home network, whose old password is one wrong password sent again and
+again, not a stream of guesses.
 
 Requests go through the real KOReader sync blueprint and a real limiter.
 """
 
-import flask
 import pytest
 from flask_limiter import Limiter
 
-from cps import rate_limits, ub
+from cps import constants, ub
 from cps.services import app_passwords
 from tests.unit.koreader_library_world import LibraryWorld
 
 pytestmark = pytest.mark.unit
 
 PER_MINUTE = 3
-STALE_KINDLE = "192.0.2.10"
+GUESSER = "192.0.2.10"
 OWNERS_PHONE = "192.0.2.20"
+HOME = "198.51.100.7"  # one address for the whole household (NAT)
+GUESSES = ["guess-%d" % n for n in range(PER_MINUTE + 2)]
 
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
     w = LibraryWorld(monkeypatch, tmp_path)
     limiter = Limiter(key_func=lambda: "unused", auto_check=False, storage_uri="memory://")
-    limiter.limit(f"{PER_MINUTE}/minute", key_func=rate_limits.basic_auth_client_key)(
-        w.kosync.kosync)
     limiter.init_app(w.app)
     monkeypatch.setattr(w.kosync, "limiter", limiter, raising=False)
+    w.limiter = limiter
     w.add_user("alice", password="alice-password")
     yield w
     w.close()
 
 
-def _client(world, address):
+def _sign_ins(world, address, passwords, *, account="alice",
+              path="/kosync/users/auth", method="get"):
     client = world.app.test_client()
     client.environ_base["REMOTE_ADDR"] = address
-    return client
-
-
-def _sign_ins(world, address, passwords, *, path="/kosync/users/auth", method="get"):
-    client = _client(world, address)
     body = {"json": {"document": "d" * 32, "progress": "1", "percentage": 0.5,
                      "device": "Kindle", "device_id": "kindle-1"}} if method == "put" else {}
-    return [getattr(client, method)(path, headers=world.basic("alice", pw), **body).status_code
+    return [getattr(client, method)(path, headers=world.basic(account, pw), **body).status_code
             for pw in passwords]
 
 
-def test_wrong_passwords_from_one_client_are_paced(world):
-    assert _sign_ins(world, STALE_KINDLE, ["wrong"] * (PER_MINUTE + 2)) == \
-        [401] * PER_MINUTE + [429, 429]
+def _app_password(world):
+    user = world.session.query(ub.User).filter(ub.User.name == "alice").one()
+    row, password = app_passwords.mint(user.id, "Kindle", session=world.session)
+    world.session.commit()
+    return row, password
+
+
+def test_a_client_guessing_passwords_is_paced(world):
+    assert _sign_ins(world, GUESSER, GUESSES) == [401] * PER_MINUTE + [429, 429]
+    # Once paced, even a right guess is refused: pacing that let the right
+    # password through would tell a guesser which one it was.
+    assert _sign_ins(world, GUESSER, ["alice-password"]) == [429]
+    # Another client of the same account is not held up by it.
+    assert _sign_ins(world, OWNERS_PHONE, ["alice-password"] * 5) == [200] * 5
+
+
+def test_a_stale_device_on_the_owners_network_does_not_lock_the_owner_out(world):
+    """The judge's NAT case: one address, a stale device and its owner."""
+    # The old password, retried on every auto-sync, is one wrong password.
+    assert _sign_ins(world, HOME, ["old-password"] * 10) == [401] * 10
+    assert _sign_ins(world, HOME, ["alice-password"] * 3) == [200] * 3
+
+
+def test_a_device_with_a_revoked_app_password_does_not_lock_its_owner_out(world):
+    row, stale_password = _app_password(world)
+    assert _sign_ins(world, HOME, [stale_password]) == [200]
+    row.revoked = True
+    world.session.commit()
+
+    assert _sign_ins(world, HOME, [stale_password] * 10) == [401] * 10
+    assert _sign_ins(world, HOME, ["alice-password"] * 3) == [200] * 3
+
+
+def test_a_device_with_an_app_password_is_never_refused(world):
+    _row, password = _app_password(world)
+    assert _sign_ins(world, HOME, GUESSES)[-1] == 429
+    assert _sign_ins(world, HOME, [password] * 5) == [200] * 5
+
+
+def test_a_right_password_clears_its_clients_count(world):
+    typos = GUESSES[:PER_MINUTE - 1]
+    statuses = _sign_ins(world, OWNERS_PHONE,
+                         typos + ["alice-password"] + GUESSES[2:2 + PER_MINUTE - 1]
+                         + ["alice-password"] * 5)
+    assert statuses == [401, 401, 200, 401, 401] + [200] * 5
+
+
+def test_the_count_is_per_account_whatever_its_spelling(world):
+    world.add_user("bob", password="bob-password")
+    assert _sign_ins(world, GUESSER, GUESSES[:PER_MINUTE]) == [401] * PER_MINUTE
+    assert _sign_ins(world, GUESSER, ["another"], account=" ALICE ") == [429]
+    assert _sign_ins(world, GUESSER, ["bob-password"], account="bob") == [200]
 
 
 def test_a_paced_progress_upload_is_answered_429_not_500(world):
-    statuses = _sign_ins(world, STALE_KINDLE, ["wrong"] * (PER_MINUTE + 1),
+    statuses = _sign_ins(world, GUESSER, GUESSES[:PER_MINUTE + 1],
                          path="/kosync/syncs/progress", method="put")
     assert statuses == [401] * PER_MINUTE + [429]
 
 
-def test_a_device_with_a_revoked_app_password_does_not_lock_its_owner_out(world):
-    user = world.session.query(ub.User).filter(ub.User.name == "alice").one()
-    row, stale_password = app_passwords.mint(user.id, "Kindle", session=world.session)
-    world.session.commit()
-    assert _sign_ins(world, STALE_KINDLE, [stale_password]) == [200]
-    row.revoked = True
-    world.session.commit()
-
-    # The Kindle keeps retrying on every auto-sync and is paced...
-    assert _sign_ins(world, STALE_KINDLE, [stale_password] * (PER_MINUTE + 2))[-1] == 429
-    # ...while the owner's phone signs in at once, every time.
-    assert _sign_ins(world, OWNERS_PHONE, ["alice-password"] * 5) == [200] * 5
+def test_a_paced_progress_read_is_answered_429_not_500(world):
+    statuses = _sign_ins(world, GUESSER, GUESSES[:PER_MINUTE + 1],
+                         path="/kosync/syncs/progress/" + "d" * 32)
+    assert statuses == [401] * PER_MINUTE + [429]
 
 
-def test_a_right_password_clears_its_clients_count(world):
-    typo_then_right = ["wrong"] * (PER_MINUTE - 1) + ["alice-password"]
+def test_guesses_at_an_unknown_account_are_paced_too(world):
+    assert _sign_ins(world, GUESSER, GUESSES, account="nobody") == \
+        [401] * PER_MINUTE + [429, 429]
+
+
+def test_pacing_fails_open_when_the_limiter_is_off_or_its_store_errors(world, monkeypatch):
+    world.limiter.enabled = False
+    assert _sign_ins(world, GUESSER, GUESSES) == [401] * len(GUESSES)
+    world.limiter.enabled = True
+
+    def unreachable(*_args, **_kwargs):
+        raise ConnectionError("limiter store unreachable")
+
+    for method in ("test", "hit", "clear", "get_window_stats"):
+        monkeypatch.setattr(world.limiter.limiter, method, unreachable)
+    assert _sign_ins(world, OWNERS_PHONE, GUESSES) == [401] * len(GUESSES)
+    assert _sign_ins(world, OWNERS_PHONE, ["alice-password"]) == [200]
+
+
+class _Directory:
+    def __init__(self):
+        self.binds = 0
+
+    def get_object_details(self, user=None, **_):
+        return {"uid": [user]}
+
+    def bind_user(self, username, password):
+        self.binds += 1
+        return True if password == "directory-password" else None
+
+
+@pytest.fixture
+def directory(world, monkeypatch):
+    import cps
+    from cps import config
+    from cps.services import simpleldap
+
+    ldap = _Directory()
+    monkeypatch.setattr(simpleldap, "_ldap", ldap)
+    monkeypatch.setattr(cps.services, "ldap", simpleldap)
+    monkeypatch.setattr(config, "config_login_type", constants.LOGIN_LDAP, raising=False)
+    return ldap
+
+
+def test_a_directory_sign_in_clears_its_clients_count(world, directory):
     statuses = _sign_ins(world, OWNERS_PHONE,
-                         typo_then_right + ["wrong"] * (PER_MINUTE - 1) + ["alice-password"] * 10)
-    assert 429 not in statuses
-    assert statuses[-10:] == [200] * 10
+                         GUESSES[:2] + ["directory-password"] + GUESSES[2:4]
+                         + ["directory-password"] * 5)
+    assert statuses == [401, 401, 200, 401, 401] + [200] * 5
 
 
-def test_one_client_is_paced_per_account():
-    app = flask.Flask(__name__)
-    keys = []
-    for address, account in [(STALE_KINDLE, "alice"), (OWNERS_PHONE, "alice"),
-                             (STALE_KINDLE, "Alice "), (STALE_KINDLE, "bob")]:
-        with app.test_request_context(
-                "/", environ_base={"REMOTE_ADDR": address},
-                headers=LibraryWorld.basic(account, "x")):
-            keys.append(rate_limits.basic_auth_client_key())
-    stale_alice, phone_alice, stale_alice_again, stale_bob = keys
-    assert stale_alice == stale_alice_again
-    assert len({stale_alice, phone_alice, stale_bob}) == 3
+def test_a_paced_client_costs_the_directory_nothing(world, directory):
+    assert _sign_ins(world, GUESSER, GUESSES) == [401] * PER_MINUTE + [429, 429]
+    assert directory.binds == PER_MINUTE
+

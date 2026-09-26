@@ -159,6 +159,53 @@ def create_authenticated_user(username, email=None, auth_source="unknown"):
         return None
 
 
+def _verify_slower_credentials(user, username, password):
+    """The account's directory or local password, then pre-digest app passwords.
+
+    With no account yet, a directory sign-in may create one (OPDS/API access).
+    """
+    if user:
+        if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
+            login_result, error = services.ldap.bind_user(user.name, password)
+            if login_result:
+                return user
+            if error is not None:
+                log.error(error)
+        else:
+            if check_password_hash(str(user.password), password):
+                return user
+        # App passwords saved before digests existed cost a slow hash each,
+        # so they come after the account password; each is slow only once.
+        if _verify_app_password_older(user, password):
+            return user
+        return None
+
+    # Handle new LDAP users (auto-creation for OPDS/API access)
+    if config.config_login_type == constants.LOGIN_LDAP and services.ldap and getattr(config, 'config_ldap_auto_create_users', True):
+        try:
+            # Try LDAP authentication for new user
+            login_result, error = services.ldap.bind_user(username, password)
+            if login_result:
+                # Authentication successful, get user details and create account
+                ldap_user_details = services.ldap.get_object_details(username)
+                if ldap_user_details:
+                    from . import admin
+                    create_result, error_msg = admin.ldap_import_create_user(username, ldap_user_details)
+                    if create_result:
+                        # Get the newly created user
+                        user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).first()
+                        if user:
+                            log.info("LDAP auto-created user for OPDS/API: '%s'", username)
+                            return user
+
+                log.warning("LDAP authentication succeeded but user creation failed for '%s'", username)
+            elif error:
+                log.debug("LDAP authentication failed for new user '%s': %s", username, error)
+        except Exception as ex:
+            log.error("LDAP auto-creation error for OPDS user '%s': %s", username, ex)
+    return None
+
+
 @auth.verify_password
 def verify_password(username, password):
     # Issue #121: OPDS clients (Readest, etc.) commonly issue an
@@ -183,53 +230,20 @@ def verify_password(username, password):
         # passwords first — see fork issue #95. This is the digest lookup:
         # no slow hash, and an app password never reaches LDAP as a bind.
         if _verify_app_password_digest(user, password):
-            rate_limits.clear_current_limits(limiter)
             return user
-        # Directory and local passwords are paced alike; a sign-in clears it.
-        rate_limits.pace(limiter)
-        if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
-            login_result, error = services.ldap.bind_user(user.name, password)
-            if login_result:
-                rate_limits.clear_current_limits(limiter)
-                return user
-            if error is not None:
-                log.error(error)
-        else:
-            if check_password_hash(str(user.password), password):
-                rate_limits.clear_current_limits(limiter)
-                return user
-        # App passwords saved before digests existed cost a slow hash each,
-        # so they come after the account password; each is slow only once.
-        if _verify_app_password_older(user, password):
-            rate_limits.clear_current_limits(limiter)
-            return user
-    
-    # Handle new LDAP users (auto-creation for OPDS/API access)
-    elif config.config_login_type == constants.LOGIN_LDAP and services.ldap and getattr(config, 'config_ldap_auto_create_users', True):
-        rate_limits.pace(limiter)
-        try:
-            # Try LDAP authentication for new user
-            login_result, error = services.ldap.bind_user(username, password)
-            if login_result:
-                # Authentication successful, get user details and create account
-                ldap_user_details = services.ldap.get_object_details(username)
-                if ldap_user_details:
-                    from . import admin
-                    create_result, error_msg = admin.ldap_import_create_user(username, ldap_user_details)
-                    if create_result:
-                        # Get the newly created user
-                        user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).first()
-                        if user:
-                            log.info("LDAP auto-created user for OPDS/API: '%s'", username)
-                            rate_limits.clear_current_limits(limiter)
-                            return user
-                
-                log.warning("LDAP authentication succeeded but user creation failed for '%s'", username)
-            elif error:
-                log.debug("LDAP authentication failed for new user '%s': %s", username, error)
-        except Exception as ex:
-            log.error("LDAP auto-creation error for OPDS user '%s': %s", username, ex)
-    
+
+    # Every slower check is a password guess. This client's new wrong
+    # passwords for this account are counted, and too many are refused with
+    # 429 before their password is looked at (rate_limits.BasicAuthPacing).
+    # A right password clears the count.
+    pacing = rate_limits.BasicAuthPacing(limiter, "opds")
+    pacing.refuse_if_paced(username)
+    user = _verify_slower_credentials(user, username, password)
+    if user:
+        pacing.succeeded(username)
+        return user
+    pacing.failed(username, password)
+
     # Issue #121: only warn when a non-empty username actually failed to
     # authenticate. The empty-username probe case is filtered out at the
     # top of this function, so reaching here means real credentials were

@@ -25,7 +25,7 @@ Security:
     - All API endpoints use HTTP Basic Authentication
     - Document identifiers validated to prevent injection attacks
     - Session management via SQLAlchemy with proper isolation
-    - Rate limiting should be applied at reverse proxy level
+    - Wrong passwords are paced per client and account (authenticate_user)
 
 Integration:
     - Syncs with Calibre library via BookFormatChecksum table
@@ -308,37 +308,54 @@ def authenticate_user() -> Optional[ub.User]:
         log.error(f"Database error during user lookup: {e}")
         return None
 
-    if not user:
-        # Fork issue #312: promoted from DEBUG so kosync auth failures
-        # are visible in default-INFO logs. Includes the username so a
-        # typo or stale device config is identifiable from one line.
-        log.info("KOReader auth: User not found: %s", username)
-        return None
-
     # App passwords first (fork issues #586, #95), found by their digest: one
     # indexed lookup, no slow hash, and never an LDAP bind. KOReader sends
     # its credentials with every request; when this check came last, each
     # request from a device paid the LDAP bind (a failed login on the
     # directory) and the account hash before its own password was looked at.
+    # An app password is a random token, so it is let in before the pacing
+    # below: a device using one is never refused for another's guesses.
     # Successful sign-ins log at DEBUG: a library sync is a burst of requests,
     # each signed in. Refused ones stay at INFO (#312).
-    if usermanagement._verify_app_password_digest(user, password):
+    if user and usermanagement._verify_app_password_digest(user, password):
         log.debug("KOReader auth: authenticated via app password: %s", username)
-        rate_limits.clear_current_limits(limiter)
         return user
 
-    # Every slower check is a password guess: count it, and let a sign-in
-    # clear the count. Too many raise RateLimitExceeded, answered 429.
-    rate_limits.pace(limiter)
+    # Every slower check is a password guess. This client's new wrong
+    # passwords for this account are counted, and too many are refused with
+    # 429 before their password is looked at (rate_limits.BasicAuthPacing).
+    pacing = rate_limits.BasicAuthPacing(limiter, "kosync")
+    pacing.refuse_if_paced(username)
 
+    if not user:
+        # Fork issue #312: promoted from DEBUG so kosync auth failures
+        # are visible in default-INFO logs. Includes the username so a
+        # typo or stale device config is identifiable from one line.
+        log.info("KOReader auth: User not found: %s", username)
+        pacing.failed(username, password)
+        return None
+
+    if _verify_slower_credentials(user, username, password):
+        pacing.succeeded(username)
+        return user
+
+    # Fork issue #312: promoted from DEBUG. Invalid-password attempts
+    # for a real user are exactly the signal needed to diagnose stale
+    # device-side credentials after a password change.
+    log.info("KOReader auth: Invalid password for user: %s", username)
+    pacing.failed(username, password)
+    return None
+
+
+def _verify_slower_credentials(user, username, password) -> bool:
+    """The directory, the account password, then pre-digest app passwords."""
     # Check if LDAP authentication is enabled
     if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
         # Try LDAP authentication
         login_result, error = services.ldap.bind_user(user.name, password)
         if login_result:
             log.debug("KOReader auth: authenticated via LDAP: %s", user.name)
-            rate_limits.clear_current_limits(limiter)
-            return user
+            return True
 
         # Log LDAP failure but continue to local check (fallback)
         # We use debug level here because failure is expected if the user is using a local password
@@ -349,22 +366,15 @@ def authenticate_user() -> Optional[ub.User]:
     # Check if user has a local password set before attempting verification
     if user.password and check_password_hash(str(user.password), password):
         log.debug("KOReader auth: authenticated: %s", username)
-        rate_limits.clear_current_limits(limiter)
-        return user
+        return True
 
     # App passwords saved before digests existed cost a slow hash each, so
     # they come last; the first sign-in with one gives it its digest. This
     # login path is shared by KOReader progress, annotation and library sync.
     if usermanagement._verify_app_password_older(user, password):
         log.debug("KOReader auth: authenticated via app password: %s", username)
-        rate_limits.clear_current_limits(limiter)
-        return user
-
-    # Fork issue #312: promoted from DEBUG. Invalid-password attempts
-    # for a real user are exactly the signal needed to diagnose stale
-    # device-side credentials after a password change.
-    log.info("KOReader auth: Invalid password for user: %s", username)
-    return None
+        return True
+    return False
 
 
 def create_sync_response(data: Dict[str, Any], status_code: int = 200) -> tuple:
@@ -966,10 +976,8 @@ def auth_user():
     Returns:
         200: {"authorized": "OK"} if authentication succeeds
         401: {"error": 2001, "message": "Unauthorized"} if authentication fails
-
-    Note:
-        Rate limiting should be applied at reverse proxy level to prevent
-        brute force attacks (suggested: 10 requests per minute per IP).
+        429: too many different wrong passwords from this client for this
+             account in the last minute (see authenticate_user)
     """
     blocked = _require_kosync_enabled()
     if blocked:

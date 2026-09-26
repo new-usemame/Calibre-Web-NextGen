@@ -89,6 +89,9 @@ RELAYED = [
     ("127.0.0.1", {"Forwarded": "for=127.0.0.1, for=198.51.100.1"}),
     # RFC 7239 parameter names are case-insensitive.
     ("127.0.0.1", {"Forwarded": "For=198.51.100.1"}),
+    # A proxy that hides who its client is has still relayed someone.
+    ("127.0.0.1", {"Forwarded": "for=_hidden"}),
+    ("127.0.0.1", {"X-Forwarded-For": "unknown"}),
 ]
 
 

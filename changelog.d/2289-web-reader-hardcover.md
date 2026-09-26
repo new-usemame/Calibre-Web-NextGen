@@ -1,0 +1,3 @@
+### Fixed
+
+- **Reading in the web reader now updates your progress on Hardcover.** Before, only a Kobo or KOReader reached Hardcover; reading in the browser moved your place on your devices but not there. With Hardcover sync on and your own API key set, your place goes to Hardcover in the background as you read, with the same limits as your devices: a book needs a `hardcover-id`, page progress needs an edition, and a place behind one your devices already reported isn't sent. Also, a book you finish at 99% or more (where CWNG already counts it as finished) is now marked Read on Hardcover. Before, it stayed on "Currently Reading". Thanks to @ashtakom (#2289).

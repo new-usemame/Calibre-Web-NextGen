@@ -40,7 +40,7 @@ local CWNGSync = WidgetContainer:extend{
     name = "cwngsync",
     settings_key = "cwngsync",
     title = _("Login to NextGen Server"),
-    version = "4.1.43",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
+    version = "4.1.44",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
 
     push_timestamp = nil,
     pull_timestamp = nil,
@@ -316,13 +316,16 @@ function CWNGSync:addToMainMenu(menu_items)
                     return _("Connect this device")
                 end,
                 keep_menu_open = true,
-                callback = function()
+                callback = function(touchmenu_instance)
                     if self:isConfigured() then
                         UIManager:show(InfoMessage:new{
                             text = T(_("This device reads the CWNG library of %1 at %2.\n\nTo use another account, choose Disconnect this device first."),
                                 self.settings.username, self.settings.server),
                         })
                     else
+                        -- Connecting ends on the library home; this menu,
+                        -- still saying "Connect", must not stay on top of it.
+                        if touchmenu_instance then touchmenu_instance:closeMenu() end
                         self:showConnectChoices()
                     end
                 end,

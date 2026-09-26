@@ -354,11 +354,9 @@ msgstr ""
 #: cps/admin.py
 #, python-brace-format
 msgid ""
-"Book {0} was not in the sync record for user {1}; last_modified bumped so "
-"the device will receive on next sync"
+"Book {0} was not in the sync record for user {1}; the device will receive it "
+"on next sync"
 msgstr ""
-"Bok {0} fanns inte i synkroniseringsposten för användare {1}. last_modified "
-"har uppdaterats så att enheten tar emot boken vid nästa synkronisering."
 
 #: cps/admin.py cps/templates/kobo_reconcile.html
 #, python-format
@@ -4271,6 +4269,14 @@ msgid "Open search"
 msgstr "Öppna sökningen"
 
 #: cps/spa_strings.py
+msgid "Browse the Global Library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Open device administration"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Editions"
 msgstr "Utgåvor"
 
@@ -4834,6 +4840,14 @@ msgid "(replace cover)"
 msgstr "(ersätt omslag)"
 
 #: cps/spa_strings.py
+msgid "1 annotation assigned to this source"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "1 annotation from this source"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "1 selected."
 msgstr "1 vald."
 
@@ -4956,6 +4970,12 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "All books"
 msgstr "Alla böcker"
+
+#: cps/spa_strings.py
+msgid ""
+"All browsers and computers signed in to your account share one Browser "
+"reading source."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "All shelves"
@@ -5200,13 +5220,11 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Browser reading sources"
+msgid "Browser"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid ""
-"Browsers appear after saving reading progress or annotations. Different "
-"browsers or profiles can appear separately."
+msgid "Browser reading source"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5473,12 +5491,12 @@ msgid "Could not load device annotations."
 msgstr "Kunde inte läsa in enhetsanteckningar."
 
 #: cps/spa_strings.py
-msgid "Could not load duplicates."
-msgstr "Kunde inte läsa in dubbletter."
+msgid "Could not load devices and browsers."
+msgstr ""
 
 #: cps/spa_strings.py
-msgid "Could not load e-readers."
-msgstr "Kunde inte läsa in e-boksläsare."
+msgid "Could not load duplicates."
+msgstr "Kunde inte läsa in dubbletter."
 
 #: cps/spa_strings.py
 msgid "Could not load highlights and notes."
@@ -5495,6 +5513,10 @@ msgstr "Det gick inte att läsa in läsplatser."
 #: cps/spa_strings.py
 msgid "Could not load reading positions."
 msgstr "Kunde inte läsa in läspositioner."
+
+#: cps/spa_strings.py
+msgid "Could not load removal details. Try again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load stats."
@@ -5545,8 +5567,16 @@ msgid "Could not reload metadata"
 msgstr "Kunde inte läsa in metadata på nytt"
 
 #: cps/spa_strings.py
+msgid "Could not remove this source. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not rename shelf."
 msgstr "Kunde inte byta namn på hyllan."
+
+#: cps/spa_strings.py
+msgid "Could not rename this source. Try again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not request deletion from this device."
@@ -5555,6 +5585,10 @@ msgstr "Kunde inte begära borttagning från den här enheten."
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "Kunde inte återställa lösenordet."
+
+#: cps/spa_strings.py
+msgid "Could not restore this source. Try again."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/shelf_reorder.html
 msgid "Could not save order."
@@ -5918,8 +5952,14 @@ msgid "Devices"
 msgstr "Enheter"
 
 #: cps/spa_strings.py
-msgid "Devices appear here after their first sync."
-msgstr "Enheter visas här efter den första synkroniseringen."
+msgid "Devices and browsers"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Devices appear after their first sync. Browser appears after saving reading "
+"progress or annotations."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Different edition"
@@ -6690,6 +6730,10 @@ msgid "Loading device library…"
 msgstr "Läser in enhetsbibliotek…"
 
 #: cps/spa_strings.py
+msgid "Loading devices and browsers…"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Loading new Discover picks."
 msgstr "Läser in nya val i Upptäck."
 
@@ -6774,8 +6818,8 @@ msgid "Manage admin role from OAuth group"
 msgstr "Hantera administratörsroll från OAuth-grupp"
 
 #: cps/spa_strings.py
-msgid "Manage e-readers"
-msgstr "Hantera e-boksläsare"
+msgid "Manage devices and browsers"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Manage presets"
@@ -6887,10 +6931,10 @@ msgstr "Mitt bibliotek är nu aktiverat för {accounts} konton."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
+msgid ""
+"My Library setup is incomplete for {accounts} account(s). You can retry or "
+"undo."
 msgstr ""
-"Mitt bibliotek är aktiverat för {accounts} konton; {errors} konton "
-"misslyckades."
 
 #: cps/spa_strings.py
 msgid "My account"
@@ -7002,6 +7046,10 @@ msgid "No contents found."
 msgstr "Inget innehåll hittades."
 
 #: cps/spa_strings.py
+msgid "No devices or browser reading data yet."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No duplicate groups found."
 msgstr "Inga dubblettgrupper hittades."
 
@@ -7010,10 +7058,6 @@ msgid ""
 "No e-reader is waiting with this code. Check it, or get a new code on the e-"
 "reader."
 msgstr ""
-
-#: cps/spa_strings.py
-msgid "No e-readers yet."
-msgstr "Inga e-boksläsare ännu."
 
 #: cps/spa_strings.py
 msgid "No excluded tags"
@@ -7525,8 +7569,8 @@ msgstr "Läsutseende"
 
 #: cps/spa_strings.py
 msgid ""
-"Reading data is kept. Future browser saves can appear under an unidentified "
-"browser source."
+"Reading data is kept. Browser reappears when you next save reading progress "
+"or annotations."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7722,6 +7766,12 @@ msgstr "Fortsätt vid {percent} från en annan enhet"
 #: cps/spa_strings.py
 msgid "Retry"
 msgstr "Försök igen"
+
+#: cps/spa_strings.py
+msgid ""
+"Retry finishes the remaining accounts without changing completed selections. "
+"Undo restores the settings from before setup began."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reverse-proxy header login"
@@ -8563,10 +8613,6 @@ msgstr "Ångrar…"
 #: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Visa igen"
-
-#: cps/spa_strings.py
-msgid "Unidentified browser source"
-msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unknown color"
@@ -9739,6 +9785,14 @@ msgstr "Synkroniserar tillägg till hyllor med Hardcover"
 #: cps/tasks/hardcover_sync.py
 msgid "Hardcover Sync"
 msgstr "Hardcover-synkronisering"
+
+#: cps/tasks/hardcover_sync.py
+msgid "Marking books read on Hardcover"
+msgstr ""
+
+#: cps/tasks/hardcover_sync.py
+msgid "Syncing reading progress to Hardcover"
+msgstr ""
 
 #: cps/tasks/kepub_backfill.py
 msgid "Convert Kobo books missing KEPUB"
@@ -15892,6 +15946,33 @@ msgstr "Exponera valda hyllor via OPDS"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Visa avsnittet Läst/oläst"
+
+#, python-brace-format
+#~ msgid ""
+#~ "Book {0} was not in the sync record for user {1}; last_modified bumped so "
+#~ "the device will receive on next sync"
+#~ msgstr ""
+#~ "Bok {0} fanns inte i synkroniseringsposten för användare {1}. "
+#~ "last_modified har uppdaterats så att enheten tar emot boken vid nästa "
+#~ "synkronisering."
+
+#~ msgid "Could not load e-readers."
+#~ msgstr "Kunde inte läsa in e-boksläsare."
+
+#~ msgid "Devices appear here after their first sync."
+#~ msgstr "Enheter visas här efter den första synkroniseringen."
+
+#~ msgid "Manage e-readers"
+#~ msgstr "Hantera e-boksläsare"
+
+#~ msgid "No e-readers yet."
+#~ msgstr "Inga e-boksläsare ännu."
+
+#, python-brace-format
+#~ msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
+#~ msgstr ""
+#~ "Mitt bibliotek är aktiverat för {accounts} konton; {errors} konton "
+#~ "misslyckades."
 
 #~ msgid "Not in current file"
 #~ msgstr "Inte i aktuell fil"

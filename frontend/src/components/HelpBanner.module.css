@@ -2,6 +2,9 @@
    it reads as a distinct, friendly notice. Sits directly under the top bar. */
 .banner {
   position: relative;
+  /* Clips the dismiss button's enlarged target (.close::before) to the strip,
+     so it can never take a click meant for the page below. */
+  overflow: hidden;
   background: linear-gradient(90deg, var(--hb-bg-start) 0%, var(--hb-bg-mid) 60%, var(--hb-bg-end) 100%);
   border-bottom: 1px solid var(--hb-edge);
   box-shadow: inset 3px 0 0 var(--hb-icon);
@@ -216,15 +219,16 @@
    elementFromPoint rather than computed from this inset, because a pseudo-element
    expander is only real if it actually receives the click.
 
-   MEASURED, not claimed: 43x44 at 390px, and 43x40 at 1440px — where the top 4px
-   fall under the 56px sticky top bar, which wins the hit test. Both clear the
-   24x24 SC 2.5.8 AA floor and both improve on the bare 28x28.
+   MEASURED, not claimed (Chromium and WebKit): 44.5x44.5 at 390px, and 44.5x36
+   at 1440px. Both clear the 24x24 SC 2.5.8 AA floor.
 
-   The desktop height is bounded by the layout, not by this rule: the banner is
-   only 37px tall there, so a full 44px of vertical target cannot fit without
-   reaching either into the top bar (which steals the hit, as above) or below the
-   banner into page content (which would steal hits FROM that content — a worse
-   defect than the 4px). Do not "fix" the 40 by growing this inset. */
+   The desktop height is bounded by the layout, not by this rule: a one-line
+   notice is only 37px tall there, so a full 44px of vertical target cannot fit
+   without reaching into the top bar or below the strip into page content, where
+   it would steal hits FROM that content. .banner's overflow clip keeps it inside
+   the strip. Before that clip, the expander hit-tested 2.5px below a one-line
+   notice at 1280 and 1440px. The focus ring (2px + 2px offset) still fits inside
+   the clip. Do not grow this inset. */
 .close::before {
   content: '';
   position: absolute;

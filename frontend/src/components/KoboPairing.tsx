@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, Copy, RefreshCw, Trash2 } from 'lucide-react';
+import { Cable, CheckCircle2, Copy, RefreshCw, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiUrl, ApiError } from '../lib/api';
 import {
@@ -115,7 +115,9 @@ export function KoboPairing({ devices, enabled, koreaderEnabled }: {
 
   return (
     <section id="kobo-pairing" className={styles.pairing} aria-labelledby="kobo-pairing-title">
-      <h2 id="kobo-pairing-title">{t('Pair a Kobo or KOReader')}</h2>
+      <h2 id="kobo-pairing-title" className={styles.pairingTitle}>
+        <Cable size={18} aria-hidden="true" focusable={false} /> {t('Pair a Kobo or KOReader')}
+      </h2>
       <p className={styles.pairingIntro}>
         {t('Connect this account to an e-reader, then sync once to confirm it reached your library.')}
       </p>

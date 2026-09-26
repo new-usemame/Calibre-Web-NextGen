@@ -4,7 +4,7 @@ import test from 'node:test';
 
 import type { Me } from '../src/lib/api.ts';
 import {
-  canDeleteBooks, canDownloadBooks, canReadBooks,
+  canDeleteBooks, canDownloadBooks, canEditBookCover, canEditShelf, canReadBooks,
 } from '../src/lib/permissions.ts';
 import { getPrimaryReadTarget, getReaderContentUrl } from '../src/lib/readerTarget.ts';
 
@@ -42,11 +42,8 @@ test('reader CTA and content route use viewer independently of download', () => 
   assert.equal(canDownloadBooks(probes[1].me), false);
   assert.equal(getReaderContentUrl(197, 'EPUB'), '/show/197/epub');
 
-  const detail = source('../src/pages/BookDetail.tsx');
-  const card = source('../src/components/BookCard.tsx');
-  assert.match(detail, /getPrimaryReadTarget\([\s\S]*?canReadBooks\(me\),\s*\)/);
-  assert.match(detail, /inLibrary && primaryReadTarget \? \(/);
-  assert.match(card, /getPrimaryReadTarget\(book\.id, book\.formats, canRead\)/);
+  // Rendered shared-resource controls and denied roles are covered by the
+  // real browser flow in shared-book-continuation.spec.ts.
 });
 
 test('all destructive book CTAs require delete-books and edit together', () => {
@@ -67,4 +64,42 @@ test('all destructive book CTAs require delete-books and edit together', () => {
   assert.match(detail, /const canDelete = canDeleteBooks\(me\);[\s\S]*\{canDelete && \(/);
   assert.match(edit, /\{canDeleteBooks\(me\) && \(/);
   assert.match(bulk, /const canDelete = canDeleteBooks\(me\)/);
+});
+
+test('the cover editor is offered only where some cover can be saved', () => {
+  // [account, in the reader's library, may open the editor]
+  const probes: [string, Me | undefined, boolean, boolean][] = [
+    ['reader, own book', account({ viewer: true }), true, true],
+    // A public shelf alone: the private cover route answers 404 and the
+    // library cover needs the edit role, so the editor could only fail.
+    ['reader, book shared by a public shelf', account({ viewer: true }), false, false],
+    ['Global Library reader, book outside the library', account({ viewer: true, browse_global: true }), false, true],
+    ['editor, book outside the library', account({ edit: true }), false, true],
+    ['admin, book outside the library', account({ admin: true }), false, true],
+    ['guest', account({ anonymous: true, viewer: true }), true, false],
+    ['account still loading', undefined, true, false],
+  ];
+  for (const [name, me, inLibrary, expected] of probes) {
+    assert.equal(canEditBookCover(me, inLibrary), expected, name);
+  }
+});
+
+test('a shelf is offered for adding or removing exactly where the server allows the change', () => {
+  // cps/shelf.py::check_shelf_edit_permissions: a private shelf by its owner
+  // only, a public shelf only with "Edit public shelves", its owner included.
+  const shelves: [string, { is_public: boolean; is_owner: boolean }][] = [
+    ['own private shelf', { is_public: false, is_owner: true }],
+    ["another reader's private shelf", { is_public: false, is_owner: false }],
+    ['own public shelf', { is_public: true, is_owner: true }],
+    ["another reader's public shelf", { is_public: true, is_owner: false }],
+  ];
+  const offered = (me: Me | undefined) =>
+    shelves.filter(([, shelf]) => canEditShelf(me, shelf)).map(([name]) => name);
+
+  assert.deepEqual(offered(account({ edit_shelfs: true })),
+    ['own private shelf', 'own public shelf', "another reader's public shelf"]);
+  // The role taken away after the reader made a shelf public: the server
+  // refuses that shelf to its owner as well.
+  assert.deepEqual(offered(account({ edit_shelfs: false })), ['own private shelf']);
+  assert.deepEqual(offered(undefined), ['own private shelf']);
 });

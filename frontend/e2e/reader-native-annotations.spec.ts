@@ -193,12 +193,23 @@ test('native mapping proves exact uniqueness with real DOM ranges and refuses in
       chapterWithBang: await resolve(['<p><span id="s">same quote</span></p>', '<p><span id="s">same quote</span></p>'], 'same quote', false, undefined,
         { content_id: 'fixture!!OPS/part!!one/chapter.xhtml', start_kobospan: 's', end_kobospan: 's', start_offset: 0, end_offset: 10 },
         ['/OPS/part!!one/chapter.xhtml', '/OPS/other.xhtml']),
+      // The EPUB changed after the Kobo highlight was made: the saved span still
+      // exists and its offsets still fit, but it now holds other text.
+      rewritten: await resolve(['<p><span id="s">The revised edition says otherwise.</span></p>'], 'The original sentence.', false, undefined,
+        { content_id: 'fixture!!OPS/part0/chapter.xhtml', start_kobospan: 's', end_kobospan: 's', start_offset: 0, end_offset: 22 }),
+      moved: await resolve(['<p><span id="s">A new preface paragraph here.</span></p>', '<p>The original sentence.</p>'], 'The original sentence.', false, undefined,
+        { content_id: 'fixture!!OPS/part0/chapter.xhtml', start_kobospan: 's', end_kobospan: 's', start_offset: 0, end_offset: 22 }),
+      movedTwice: await resolve(['<p><span id="s">A new preface paragraph here.</span></p>', '<p>The original sentence.</p><p>The original sentence.</p>'], 'The original sentence.', false, undefined,
+        { content_id: 'fixture!!OPS/part0/chapter.xhtml', start_kobospan: 's', end_kobospan: 's', start_offset: 0, end_offset: 22 }),
     };
   }, { javascript });
   expect(results.exact).toEqual([['native', JSON.stringify({ text: quote, start: 11, end: 7, section: 0 })]]);
-  for (const key of ['duplicate', 'overlap', 'caseMismatch', 'unreadable', 'aborted', 'ambiguousNativeChapter', 'duplicateSpanIds', 'phantomEncodedMember'] as const) {
+  // A changed span is never painted: its new text would get the old highlight.
+  // Only the saved quote, found exactly once, can still place it.
+  for (const key of ['duplicate', 'overlap', 'caseMismatch', 'unreadable', 'aborted', 'ambiguousNativeChapter', 'duplicateSpanIds', 'phantomEncodedMember', 'rewritten', 'movedTwice'] as const) {
     expect(results[key], key).toEqual([]);
   }
+  expect(results.moved).toEqual([['native', JSON.stringify({ text: 'The original sentence.', start: 0, end: 22, section: 1 })]]);
   expect(results.nonreading).toHaveLength(1);
   expect(results.mixed).toEqual([['native', JSON.stringify({ text: 'unique quote', start: 0, end: 12, section: 0 })]]);
   expect(results.nativeWithUnreadableSibling).toEqual([['native', JSON.stringify({ text: 'same quote', start: 0, end: 10, section: 1 })]]);

@@ -1,0 +1,3691 @@
+{
+"source": "Project Gutenberg ebook #11, .epub.noimages as downloaded 2026-09-25 (ebookmaker 2 output)",
+"engine": "KOReader v2026.07.1 crengine via engine/run-probe.sh (words)",
+"browser": "epub.js 0.3.93 contents.cfiFromRange in Chromium via engine/browser_cfis.mjs",
+"words": [
+{
+"s": "/body/DocFragment[2]/body/div[1]/h2/text().0",
+"e": "/body/DocFragment[2]/body/div[1]/h2/text().3",
+"t": "The",
+"cfi": "epubcfi(/6/4!/4/2[pg-header]/2[pg-header-heading],/1:0,/1:3)"
+},
+{
+"s": "/body/DocFragment[2]/body/div[1]/div[1]/text()[1].198",
+"e": "/body/DocFragment[2]/body/div[1]/div[1]/text()[1].203",
+"t": "under",
+"cfi": "epubcfi(/6/4!/4/2[pg-header]/4,/1:198,/1:203)"
+},
+{
+"s": "/body/DocFragment[2]/body/div[1]/div[2]/p[1]/text().24",
+"e": "/body/DocFragment[2]/body/div[1]/div[2]/p[1]/text().34",
+"t": "Wonderland",
+"cfi": "epubcfi(/6/4!/4/2[pg-header]/6[pg-machine-header]/2,/1:24,/1:34)"
+},
+{
+"s": "/body/DocFragment[2]/body/h1/text().6",
+"e": "/body/DocFragment[2]/body/h1/text().7",
+"t": "s",
+"cfi": "epubcfi(/6/4!/4/4/4[pgepubid00000],/1:6,/1:7)"
+},
+{
+"s": "/body/DocFragment[2]/body/table/tbody/tr[6]/td[1]/a/text().0",
+"e": "/body/DocFragment[2]/body/table/tbody/tr[6]/td[1]/a/text().7",
+"t": "CHAPTER",
+"cfi": "epubcfi(/6/4!/4/4/14/2/12/2/2,/1:0,/1:7)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[1]/text().21",
+"e": "/body/DocFragment[3]/body/div/p[1]/text().23",
+"t": "to",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/2,/1:21,/1:23)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[1]/text().268",
+"e": "/body/DocFragment[3]/body/div/p[1]/text().275",
+"t": "without",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/2,/1:268,/1:275)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[2]/text().243",
+"e": "/body/DocFragment[3]/body/div/p[2]/text().244",
+"t": "a",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/4,/1:243,/1:244)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[3]/text()[3].118",
+"e": "/body/DocFragment[3]/body/div/p[3]/text()[3].128",
+"t": "afterwards",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/6,/5:118,/5:128)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[3]/text()[4].75",
+"e": "/body/DocFragment[3]/body/div/p[3]/text()[4].82",
+"t": "flashed",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/6,/7:75,/7:82)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[3]/text()[4].331",
+"e": "/body/DocFragment[3]/body/div/p[3]/text()[4].335",
+"t": "hole",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/6,/7:331,/7:335)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[5]/text().133",
+"e": "/body/DocFragment[3]/body/div/p[5]/text().135",
+"t": "to",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/10,/1:133,/1:135)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[6]/text().171",
+"e": "/body/DocFragment[3]/body/div/p[6]/text().174",
+"t": "she",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/12,/1:171,/1:174)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[6]/text().423",
+"e": "/body/DocFragment[3]/body/div/p[6]/text().427",
+"t": "upon",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/12,/1:423,/1:427)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[6]/text().682",
+"e": "/body/DocFragment[3]/body/div/p[6]/text().685",
+"t": "the",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/12,/1:682,/1:685)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[7]/text().216",
+"e": "/body/DocFragment[3]/body/div/p[7]/text().218",
+"t": "of",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/14,/1:216,/1:218)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[8]/text()[2].170",
+"e": "/body/DocFragment[3]/body/div/p[8]/text()[2].174",
+"t": "four",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/16,/3:170,/3:174)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[8]/text()[3].105",
+"e": "/body/DocFragment[3]/body/div/p[8]/text()[3].113",
+"t": "practice",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/16,/5:105,/5:113)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[9]/text()[1].41",
+"e": "/body/DocFragment[3]/body/div/p[9]/text()[1].42",
+"t": "I",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/18,/1:41,/1:42)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[9]/text()[3].78",
+"e": "/body/DocFragment[3]/body/div/p[9]/text()[3].79",
+"t": "I",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/18,/5:78,/5:79)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[9]/text()[4].81",
+"e": "/body/DocFragment[3]/body/div/p[9]/text()[4].83",
+"t": "an",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/18,/7:81,/7:83)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[10]/text().131",
+"e": "/body/DocFragment[3]/body/div/p[10]/text().136",
+"t": "think",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/20,/1:131,/1:136)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[10]/text().359",
+"e": "/body/DocFragment[3]/body/div/p[10]/text().364",
+"t": "mouse",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/20,/1:359,/1:364)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[10]/text().609",
+"e": "/body/DocFragment[3]/body/div/p[10]/text().610",
+"t": "t",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/20,/1:609,/1:610)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[10]/text().861",
+"e": "/body/DocFragment[3]/body/div/p[10]/text().865",
+"t": "ever",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/20,/1:861,/1:865)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[11]/text().118",
+"e": "/body/DocFragment[3]/body/div/p[11]/text().124",
+"t": "before",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/22,/1:118,/1:124)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[11]/text().366",
+"e": "/body/DocFragment[3]/body/div/p[11]/text().369",
+"t": "how",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/22,/1:366,/1:369)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[12]/text().28",
+"e": "/body/DocFragment[3]/body/div/p[12]/text().31",
+"t": "the",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/24,/1:28,/1:31)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[13]/text().57",
+"e": "/body/DocFragment[3]/body/div/p[13]/text().61",
+"t": "made",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/26,/1:57,/1:61)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[13]/text().298",
+"e": "/body/DocFragment[3]/body/div/p[13]/text().300",
+"t": "it",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/26,/1:298,/1:300)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[13]/text().552",
+"e": "/body/DocFragment[3]/body/div/p[13]/text().558",
+"t": "fitted",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/26,/1:552,/1:558)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[14]/text().252",
+"e": "/body/DocFragment[3]/body/div/p[14]/text().257",
+"t": "those",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/28,/1:252,/1:257)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[14]/text().514",
+"e": "/body/DocFragment[3]/body/div/p[14]/text().515",
+"t": "a",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/28,/1:514,/1:515)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[15]/text().45",
+"e": "/body/DocFragment[3]/body/div/p[15]/text().51",
+"t": "little",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/30,/1:45,/1:51)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[15]/text().306",
+"e": "/body/DocFragment[3]/body/div/p[15]/text().311",
+"t": "round",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/30,/1:306,/1:311)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[16]/text()[2].36",
+"e": "/body/DocFragment[3]/body/div/p[16]/text()[2].39",
+"t": "she",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/32,/3:36,/3:39)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[16]/text()[4].67",
+"e": "/body/DocFragment[3]/body/div/p[16]/text()[4].69",
+"t": "as",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/32,/7:67,/7:69)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[16]/text()[5].148",
+"e": "/body/DocFragment[3]/body/div/p[16]/text()[5].156",
+"t": "disagree",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/32,/9:148,/9:156)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[17]/text()[2].224",
+"e": "/body/DocFragment[3]/body/div/p[17]/text()[2].226",
+"t": "it",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/34,/3:224,/3:226)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[20]/text().65",
+"e": "/body/DocFragment[3]/body/div/p[20]/text().69",
+"t": "face",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/40,/1:65,/1:69)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[20]/text().328",
+"e": "/body/DocFragment[3]/body/div/p[20]/text().333",
+"t": "might",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/40,/1:328,/1:333)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[20]/text().583",
+"e": "/body/DocFragment[3]/body/div/p[20]/text().587",
+"t": "seen",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/40,/1:583,/1:587)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[21]/text().241",
+"e": "/body/DocFragment[3]/body/div/p[21]/text().243",
+"t": "it",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/42,/1:241,/1:243)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[21]/text().492",
+"e": "/body/DocFragment[3]/body/div/p[21]/text().497",
+"t": "thing",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/42,/1:492,/1:497)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[22]/text()[1].260",
+"e": "/body/DocFragment[3]/body/div/p[22]/text()[1].265",
+"t": "bring",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/44,/1:260,/1:265)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[22]/text()[1].524",
+"e": "/body/DocFragment[3]/body/div/p[22]/text()[1].529",
+"t": "Alice",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/44,/1:524,/1:529)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[23]/text().143",
+"e": "/body/DocFragment[3]/body/div/p[23]/text().146",
+"t": "EAT",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/46,/1:143,/1:146)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[23]/text().382",
+"e": "/body/DocFragment[3]/body/div/p[23]/text().385",
+"t": "don",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/46,/1:382,/1:385)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[24]/text().228",
+"e": "/body/DocFragment[3]/body/div/p[24]/text().232",
+"t": "sure",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/48,/1:228,/1:232)"
+},
+{
+"s": "/body/DocFragment[3]/body/div/p[25]/text().25",
+"e": "/body/DocFragment[3]/body/div/p[25]/text().29",
+"t": "very",
+"cfi": "epubcfi(/6/6!/4/2[pgepubid00003]/4[chap01]/50,/1:25,/1:29)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[1]/text()[1].109",
+"e": "/body/DocFragment[4]/body/div/p[1]/text()[1].111",
+"t": "to",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/2,/1:109,/1:111)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[1]/text()[1].366",
+"e": "/body/DocFragment[4]/body/div/p[1]/text()[1].369",
+"t": "put",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/2,/1:366,/1:369)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[1]/text()[2].168",
+"e": "/body/DocFragment[4]/body/div/p[1]/text()[2].175",
+"t": "perhaps",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/2,/3:168,/3:175)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[2]/text().127",
+"e": "/body/DocFragment[4]/body/div/p[2]/text().131",
+"t": "seem",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/4,/1:127,/1:131)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[4]/text().73",
+"e": "/body/DocFragment[4]/body/div/p[4]/text().76",
+"t": "now",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/10,/1:73,/1:76)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[5]/text().126",
+"e": "/body/DocFragment[4]/body/div/p[5]/text().133",
+"t": "through",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/12,/1:126,/1:133)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[6]/text().181",
+"e": "/body/DocFragment[4]/body/div/p[6]/text().184",
+"t": "all",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/14,/1:181,/1:184)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[7]/text().123",
+"e": "/body/DocFragment[4]/body/div/p[7]/text().125",
+"t": "It",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/16,/1:123,/1:125)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[7]/text().381",
+"e": "/body/DocFragment[4]/body/div/p[7]/text().383",
+"t": "if",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/16,/1:381,/1:383)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[7]/text().638",
+"e": "/body/DocFragment[4]/body/div/p[7]/text().641",
+"t": "and",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/16,/1:638,/1:641)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[8]/text()[1].199",
+"e": "/body/DocFragment[4]/body/div/p[8]/text()[1].203",
+"t": "just",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/18,/1:199,/1:203)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[8]/text()[1].431",
+"e": "/body/DocFragment[4]/body/div/p[8]/text()[1].436",
+"t": "world",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/18,/1:431,/1:436)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[9]/text()[1].44",
+"e": "/body/DocFragment[4]/body/div/p[9]/text()[1].48",
+"t": "hair",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/20,/1:44,/1:48)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[9]/text()[3].11",
+"e": "/body/DocFragment[4]/body/div/p[9]/text()[3].15",
+"t": "dear",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/20,/5:11,/5:15)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[9]/text()[3].246",
+"e": "/body/DocFragment[4]/body/div/p[9]/text()[3].249",
+"t": "the",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/20,/5:246,/5:249)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[9]/text()[5].8",
+"e": "/body/DocFragment[4]/body/div/p[9]/text()[5].11",
+"t": "she",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/20,/9:8,/9:11)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[10]/text()[3].14",
+"e": "/body/DocFragment[4]/body/div/p[10]/text()[3].20",
+"t": "waters",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/22,/5:14,/5:20)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[11]/text()[1].109",
+"e": "/body/DocFragment[4]/body/div/p[11]/text()[1].111",
+"t": "on",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/24,/1:109,/1:111)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[11]/text()[1].327",
+"e": "/body/DocFragment[4]/body/div/p[11]/text()[1].328",
+"t": "I",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/24,/1:327,/1:328)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[11]/text()[1].555",
+"e": "/body/DocFragment[4]/body/div/p[11]/text()[1].556",
+"t": "I",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/24,/1:555,/1:556)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[12]/text()[1].48",
+"e": "/body/DocFragment[4]/body/div/p[12]/text()[1].51",
+"t": "and",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/26,/1:48,/1:51)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[12]/text()[2].125",
+"e": "/body/DocFragment[4]/body/div/p[12]/text()[2].128",
+"t": "and",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/26,/3:125,/3:128)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[13]/text()[1].2",
+"e": "/body/DocFragment[4]/body/div/p[13]/text()[1].6",
+"t": "That",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/28,/1:2,/1:6)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[13]/text()[2].255",
+"e": "/body/DocFragment[4]/body/div/p[13]/text()[2].261",
+"t": "little",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/28,/3:255,/3:261)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[14]/text().47",
+"e": "/body/DocFragment[4]/body/div/p[14]/text().49",
+"t": "in",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/30,/1:47,/1:49)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[14]/text().292",
+"e": "/body/DocFragment[4]/body/div/p[14]/text().295",
+"t": "had",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/30,/1:292,/1:295)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[14]/text().566",
+"e": "/body/DocFragment[4]/body/div/p[14]/text().569",
+"t": "out",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/30,/1:566,/1:569)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[15]/text()[1].146",
+"e": "/body/DocFragment[4]/body/div/p[15]/text()[1].153",
+"t": "drowned",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/32,/1:146,/1:153)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[16]/text().151",
+"e": "/body/DocFragment[4]/body/div/p[16]/text().153",
+"t": "be",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/34,/1:151,/1:153)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[17]/text().96",
+"e": "/body/DocFragment[4]/body/div/p[17]/text().99",
+"t": "the",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/36,/1:96,/1:99)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[17]/text().338",
+"e": "/body/DocFragment[4]/body/div/p[17]/text().340",
+"t": "be",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/36,/1:338,/1:340)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[17]/text().592",
+"e": "/body/DocFragment[4]/body/div/p[17]/text().595",
+"t": "her",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/36,/1:592,/1:595)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[18]/text().213",
+"e": "/body/DocFragment[4]/body/div/p[18]/text().221",
+"t": "anything",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/38,/1:213,/1:221)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[18]/text().485",
+"e": "/body/DocFragment[4]/body/div/p[18]/text().488",
+"t": "had",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/38,/1:485,/1:488)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[20]/text().83",
+"e": "/body/DocFragment[4]/body/div/p[20]/text().86",
+"t": "yet",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/42,/1:83,/1:86)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[20]/text().313",
+"e": "/body/DocFragment[4]/body/div/p[20]/text().315",
+"t": "so",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/42,/1:313,/1:315)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[20]/text().559",
+"e": "/body/DocFragment[4]/body/div/p[20]/text().562",
+"t": "she",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/42,/1:559,/1:562)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[21]/text()[3].7",
+"e": "/body/DocFragment[4]/body/div/p[21]/text()[3].12",
+"t": "nasty",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/44,/5:7,/5:12)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[22]/text().191",
+"e": "/body/DocFragment[4]/body/div/p[22]/text().195",
+"t": "nice",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/46,/1:191,/1:195)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[22]/text().435",
+"e": "/body/DocFragment[4]/body/div/p[22]/text().436",
+"t": "I",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/46,/1:435,/1:436)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[22]/text().663",
+"e": "/body/DocFragment[4]/body/div/p[22]/text().665",
+"t": "it",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/46,/1:663,/1:665)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[23]/text().113",
+"e": "/body/DocFragment[4]/body/div/p[23]/text().116",
+"t": "you",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/48,/1:113,/1:116)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[23]/text().361",
+"e": "/body/DocFragment[4]/body/div/p[23]/text().364",
+"t": "and",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/48,/1:361,/1:364)"
+},
+{
+"s": "/body/DocFragment[4]/body/div/p[24]/text().186",
+"e": "/body/DocFragment[4]/body/div/p[24]/text().193",
+"t": "curious",
+"cfi": "epubcfi(/6/8!/4/2[pgepubid00004]/4[chap02]/50,/1:186,/1:193)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[1]/text().156",
+"e": "/body/DocFragment[5]/body/div/p[1]/text().159",
+"t": "all",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/2,/1:156,/1:159)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[2]/text().235",
+"e": "/body/DocFragment[5]/body/div/p[2]/text().241",
+"t": "Indeed",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/4,/1:235,/1:241)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[2]/text().495",
+"e": "/body/DocFragment[5]/body/div/p[2]/text().500",
+"t": "there",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/4,/1:495,/1:500)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[3]/text()[2].77",
+"e": "/body/DocFragment[5]/body/div/p[3]/text()[2].80",
+"t": "the",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/6,/3:77,/3:80)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[4]/text().100",
+"e": "/body/DocFragment[5]/body/div/p[4]/text().107",
+"t": "Silence",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/8,/1:100,/1:107)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[5]/text().23",
+"e": "/body/DocFragment[5]/body/div/p[5]/text().27",
+"t": "with",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/10,/1:23,/1:27)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[8]/text().168",
+"e": "/body/DocFragment[5]/body/div/p[8]/text().170",
+"t": "of",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/16,/1:168,/1:170)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[11]/text()[2].82",
+"e": "/body/DocFragment[5]/body/div/p[11]/text()[2].86",
+"t": "what",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/22,/3:82,/3:86)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[12]/text().252",
+"e": "/body/DocFragment[5]/body/div/p[12]/text().255",
+"t": "now",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/24,/1:252,/1:255)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[14]/text().113",
+"e": "/body/DocFragment[5]/body/div/p[14]/text().121",
+"t": "adoption",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/28,/1:113,/1:121)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[16]/text().2",
+"e": "/body/DocFragment[5]/body/div/p[16]/text().6",
+"t": "What",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/32,/1:2,/1:6)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[17]/text()[2].104",
+"e": "/body/DocFragment[5]/body/div/p[17]/text()[2].108",
+"t": "that",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/34,/3:104,/3:108)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[19]/text().1",
+"e": "/body/DocFragment[5]/body/div/p[19]/text().6",
+"t": "First",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/38,/1:1,/1:6)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[19]/text().262",
+"e": "/body/DocFragment[5]/body/div/p[19]/text().265",
+"t": "off",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/38,/1:262,/1:265)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[19]/text().514",
+"e": "/body/DocFragment[5]/body/div/p[19]/text().520",
+"t": "asking",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/38,/1:514,/1:520)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[20]/text()[1].245",
+"e": "/body/DocFragment[5]/body/div/p[20]/text()[1].252",
+"t": "silence",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/40,/1:245,/1:252)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[22]/text()[2].119",
+"e": "/body/DocFragment[5]/body/div/p[22]/text()[2].122",
+"t": "out",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/44,/3:119,/3:122)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[23]/text().212",
+"e": "/body/DocFragment[5]/body/div/p[23]/text().213",
+"t": "a",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/46,/1:212,/1:213)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[28]/text().1",
+"e": "/body/DocFragment[5]/body/div/p[28]/text().5",
+"t": "Then",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/56,/1:1,/1:5)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[29]/text().82",
+"e": "/body/DocFragment[5]/body/div/p[29]/text().85",
+"t": "did",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/58,/1:82,/1:85)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[30]/text().124",
+"e": "/body/DocFragment[5]/body/div/p[30]/text().127",
+"t": "not",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/60,/1:124,/1:127)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[31]/text().64",
+"e": "/body/DocFragment[5]/body/div/p[31]/text().67",
+"t": "and",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/62,/1:64,/1:67)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[33]/text()[2].63",
+"e": "/body/DocFragment[5]/body/div/p[33]/text()[2].65",
+"t": "at",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/66,/3:63,/3:65)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/div/text()[6].14",
+"e": "/body/DocFragment[5]/body/div/div/text()[6].16",
+"t": "to",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/68,/11:14,/11:16)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/div/text()[33].8",
+"e": "/body/DocFragment[5]/body/div/div/text()[33].13",
+"t": "judge",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/68,/65:8,/65:13)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[35]/text().78",
+"e": "/body/DocFragment[5]/body/div/p[35]/text().79",
+"t": "I",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/72,/1:78,/1:79)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[38]/text().81",
+"e": "/body/DocFragment[5]/body/div/p[38]/text().84",
+"t": "You",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/78,/1:81,/1:84)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[41]/text().121",
+"e": "/body/DocFragment[5]/body/div/p[41]/text().124",
+"t": "but",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/84,/1:121,/1:124)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[42]/text()[1].177",
+"e": "/body/DocFragment[5]/body/div/p[42]/text()[1].178",
+"t": "a",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/86,/1:177,/1:178)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[43]/text().103",
+"e": "/body/DocFragment[5]/body/div/p[43]/text().107",
+"t": "soon",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/88,/1:103,/1:107)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[45]/text().154",
+"e": "/body/DocFragment[5]/body/div/p[45]/text().157",
+"t": "And",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/92,/1:154,/1:157)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[46]/text().155",
+"e": "/body/DocFragment[5]/body/div/p[46]/text().164",
+"t": "remarking",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/94,/1:155,/1:164)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[46]/text().412",
+"e": "/body/DocFragment[5]/body/div/p[46]/text().416",
+"t": "soon",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/94,/1:412,/1:416)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[47]/text().218",
+"e": "/body/DocFragment[5]/body/div/p[47]/text().222",
+"t": "more",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/96,/1:218,/1:222)"
+},
+{
+"s": "/body/DocFragment[5]/body/div/p[47]/text().492",
+"e": "/body/DocFragment[5]/body/div/p[47]/text().496",
+"t": "back",
+"cfi": "epubcfi(/6/10!/4/2[pgepubid00005]/4[chap03]/96,/1:492,/1:496)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[1]/text()[1].198",
+"e": "/body/DocFragment[6]/body/div/p[1]/text()[1].202",
+"t": "paws",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/2,/1:198,/1:202)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[1]/text()[2].159",
+"e": "/body/DocFragment[6]/body/div/p[1]/text()[2].166",
+"t": "hunting",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/2,/3:159,/3:166)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[2]/text()[1].75",
+"e": "/body/DocFragment[6]/body/div/p[2]/text()[1].78",
+"t": "out",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/4,/1:75,/1:78)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[2]/text()[2].187",
+"e": "/body/DocFragment[6]/body/div/p[2]/text()[2].194",
+"t": "without",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/4,/3:187,/3:194)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[3]/text().183",
+"e": "/body/DocFragment[6]/body/div/p[3]/text().187",
+"t": "them",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/6,/1:183,/1:187)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[3]/text().444",
+"e": "/body/DocFragment[6]/body/div/p[3]/text().446",
+"t": "be",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/6,/1:444,/1:446)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[4]/text().196",
+"e": "/body/DocFragment[6]/body/div/p[4]/text().200",
+"t": "Miss",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/8,/1:196,/1:200)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[4]/text().437",
+"e": "/body/DocFragment[6]/body/div/p[4]/text().443",
+"t": "people",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/8,/1:437,/1:443)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[5]/text()[1].203",
+"e": "/body/DocFragment[6]/body/div/p[5]/text()[1].205",
+"t": "of",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/10,/1:203,/1:205)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[5]/text()[2].1",
+"e": "/body/DocFragment[6]/body/div/p[5]/text()[2].12",
+"t": "interesting",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/10,/3:1,/3:12)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[6]/text().11",
+"e": "/body/DocFragment[6]/body/div/p[6]/text().17",
+"t": "indeed",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/12,/1:11,/1:17)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[6]/text().279",
+"e": "/body/DocFragment[6]/body/div/p[6]/text().283",
+"t": "shan",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/12,/1:279,/1:283)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[7]/text()[1].117",
+"e": "/body/DocFragment[6]/body/div/p[7]/text()[1].119",
+"t": "in",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/14,/1:117,/1:119)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[7]/text()[1].369",
+"e": "/body/DocFragment[6]/body/div/p[7]/text()[1].372",
+"t": "and",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/14,/1:369,/1:372)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[8]/text().151",
+"e": "/body/DocFragment[6]/body/div/p[8]/text().153",
+"t": "to",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/16,/1:151,/1:153)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[9]/text()[1].168",
+"e": "/body/DocFragment[6]/body/div/p[9]/text()[1].172",
+"t": "hadn",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/18,/1:168,/1:172)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[9]/text()[2].118",
+"e": "/body/DocFragment[6]/body/div/p[9]/text()[2].120",
+"t": "in",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/18,/3:118,/3:120)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[10]/text()[1].2",
+"e": "/body/DocFragment[6]/body/div/p[10]/text()[1].5",
+"t": "But",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/20,/1:2,/1:5)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[11]/text()[1].57",
+"e": "/body/DocFragment[6]/body/div/p[11]/text()[1].60",
+"t": "you",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/22,/1:57,/1:60)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[12]/text().149",
+"e": "/body/DocFragment[6]/body/div/p[12]/text().154",
+"t": "voice",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/24,/1:149,/1:154)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[13]/text().238",
+"e": "/body/DocFragment[6]/body/div/p[13]/text().242",
+"t": "that",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/26,/1:238,/1:242)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[14]/text().145",
+"e": "/body/DocFragment[6]/body/div/p[14]/text().149",
+"t": "that",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/28,/1:145,/1:149)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[15]/text()[2].151",
+"e": "/body/DocFragment[6]/body/div/p[15]/text()[2].152",
+"t": "a",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/30,/3:151,/3:152)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[16]/text().11",
+"e": "/body/DocFragment[6]/body/div/p[16]/text().13",
+"t": "an",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/32,/1:11,/1:13)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[17]/text()[2].25",
+"e": "/body/DocFragment[6]/body/div/p[17]/text()[2].30",
+"t": "glass",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/34,/3:25,/3:30)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[21]/text().53",
+"e": "/body/DocFragment[6]/body/div/p[21]/text().57",
+"t": "that",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/42,/1:53,/1:57)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[23]/text()[1].163",
+"e": "/body/DocFragment[6]/body/div/p[23]/text()[1].166",
+"t": "you",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/46,/1:163,/1:166)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[23]/text()[2].147",
+"e": "/body/DocFragment[6]/body/div/p[23]/text()[2].149",
+"t": "As",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/46,/3:147,/3:149)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[24]/text()[1].132",
+"e": "/body/DocFragment[6]/body/div/p[24]/text()[1].138",
+"t": "voices",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/48,/1:132,/1:138)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[24]/text()[1].377",
+"e": "/body/DocFragment[6]/body/div/p[24]/text()[1].383",
+"t": "enough",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/48,/1:377,/1:383)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[24]/text()[1].618",
+"e": "/body/DocFragment[6]/body/div/p[24]/text()[1].622",
+"t": "down",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/48,/1:618,/1:622)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[25]/text()[1].89",
+"e": "/body/DocFragment[6]/body/div/p[25]/text()[1].93",
+"t": "seem",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/50,/1:89,/1:93)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[26]/text().83",
+"e": "/body/DocFragment[6]/body/div/p[26]/text().84",
+"t": "a",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/52,/1:83,/1:84)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[27]/text().41",
+"e": "/body/DocFragment[6]/body/div/p[27]/text().47",
+"t": "chorus",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/54,/1:41,/1:47)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[28]/text().6",
+"e": "/body/DocFragment[6]/body/div/p[28]/text().10",
+"t": "came",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/56,/1:6,/1:10)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[28]/text().243",
+"e": "/body/DocFragment[6]/body/div/p[28]/text().247",
+"t": "goes",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/56,/1:243,/1:247)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[31]/text()[1].47",
+"e": "/body/DocFragment[6]/body/div/p[31]/text()[1].54",
+"t": "thought",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/62,/1:47,/1:54)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[32]/text()[2].17",
+"e": "/body/DocFragment[6]/body/div/p[32]/text()[2].20",
+"t": "but",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/64,/3:17,/3:20)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[32]/text()[2].251",
+"e": "/body/DocFragment[6]/body/div/p[32]/text()[2].255",
+"t": "that",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/64,/3:251,/3:255)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[33]/text()[2].1",
+"e": "/body/DocFragment[6]/body/div/p[33]/text()[2].7",
+"t": "change",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/66,/3:1,/3:7)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[34]/text().158",
+"e": "/body/DocFragment[6]/body/div/p[34]/text().161",
+"t": "ran",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/68,/1:158,/1:161)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[34]/text().412",
+"e": "/body/DocFragment[6]/body/div/p[34]/text().418",
+"t": "moment",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/68,/1:412,/1:418)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[35]/text().137",
+"e": "/body/DocFragment[6]/body/div/p[35]/text().143",
+"t": "second",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/70,/1:137,/1:143)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[36]/text().169",
+"e": "/body/DocFragment[6]/body/div/p[36]/text().172",
+"t": "she",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/72,/1:169,/1:172)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[37]/text().148",
+"e": "/body/DocFragment[6]/body/div/p[37]/text().153",
+"t": "Alice",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/74,/1:148,/1:153)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[38]/text().21",
+"e": "/body/DocFragment[6]/body/div/p[38]/text().24",
+"t": "she",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/76,/1:21,/1:24)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[38]/text().267",
+"e": "/body/DocFragment[6]/body/div/p[38]/text().268",
+"t": "a",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/76,/1:267,/1:268)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[38]/text().522",
+"e": "/body/DocFragment[6]/body/div/p[38]/text().524",
+"t": "of",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/76,/1:522,/1:524)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[38]/text().788",
+"e": "/body/DocFragment[6]/body/div/p[38]/text().791",
+"t": "the",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/76,/1:788,/1:791)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[39]/text().115",
+"e": "/body/DocFragment[6]/body/div/p[39]/text().120",
+"t": "tired",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/78,/1:115,/1:120)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[40]/text()[1].179",
+"e": "/body/DocFragment[6]/body/div/p[40]/text()[1].181",
+"t": "it",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/80,/1:179,/1:181)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[40]/text()[2].73",
+"e": "/body/DocFragment[6]/body/div/p[40]/text()[2].76",
+"t": "but",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/80,/3:73,/3:76)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[41]/text().246",
+"e": "/body/DocFragment[6]/body/div/p[41]/text().250",
+"t": "near",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/82,/1:246,/1:250)"
+},
+{
+"s": "/body/DocFragment[6]/body/div/p[42]/text().41",
+"e": "/body/DocFragment[6]/body/div/p[42]/text().47",
+"t": "peeped",
+"cfi": "epubcfi(/6/12!/4/2[pgepubid00006]/4[chap04]/84,/1:41,/1:47)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/h2/text()[2].15",
+"e": "/body/DocFragment[7]/body/div/h2/text()[2].26",
+"t": "Caterpillar",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/2/2[chap05],/3:15,/3:26)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[3]/text()[1].72",
+"e": "/body/DocFragment[7]/body/div/p[3]/text()[1].78",
+"t": "rather",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/6,/1:72,/1:78)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[5]/text()[1].10",
+"e": "/body/DocFragment[7]/body/div/p[5]/text()[1].17",
+"t": "explain",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/10,/1:10,/1:17)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[7]/text().139",
+"e": "/body/DocFragment[7]/body/div/p[7]/text().148",
+"t": "different",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/14,/1:139,/1:148)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[9]/text().183",
+"e": "/body/DocFragment[7]/body/div/p[9]/text().186",
+"t": "you",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/18,/1:183,/1:186)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[13]/text()[1].34",
+"e": "/body/DocFragment[7]/body/div/p[13]/text()[1].37",
+"t": "the",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/26,/1:34,/1:37)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[15]/text()[1].44",
+"e": "/body/DocFragment[7]/body/div/p[15]/text()[1].49",
+"t": "Alice",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/30,/1:44,/1:49)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[18]/text().12",
+"e": "/body/DocFragment[7]/body/div/p[18]/text().18",
+"t": "temper",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/36,/1:12,/1:18)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[21]/text().152",
+"e": "/body/DocFragment[7]/body/div/p[21]/text().154",
+"t": "it",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/42,/1:152,/1:154)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[22]/text().84",
+"e": "/body/DocFragment[7]/body/div/p[22]/text().88",
+"t": "keep",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/44,/1:84,/1:88)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[26]/text().7",
+"e": "/body/DocFragment[7]/body/div/p[26]/text().13",
+"t": "folded",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/52,/1:7,/1:13)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[27]/text()[7].18",
+"e": "/body/DocFragment[7]/body/div/p[27]/text()[7].23",
+"t": "might",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/54,/13:18,/13:23)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[27]/text()[14].19",
+"e": "/body/DocFragment[7]/body/div/p[27]/text()[14].22",
+"t": "the",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/54,/27:19,/27:22)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[27]/text()[21].51",
+"e": "/body/DocFragment[7]/body/div/p[27]/text()[21].54",
+"t": "too",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/54,/41:51,/41:54)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[27]/text()[28].37",
+"e": "/body/DocFragment[7]/body/div/p[27]/text()[28].41",
+"t": "gave",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/54,/55:37,/55:41)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[27]/text()[36].24",
+"e": "/body/DocFragment[7]/body/div/p[27]/text()[36].33",
+"t": "questions",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/54,/71:24,/71:33)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[29]/text()[2].43",
+"e": "/body/DocFragment[7]/body/div/p[29]/text()[2].47",
+"t": "some",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/58,/3:43,/3:47)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[33]/text().44",
+"e": "/body/DocFragment[7]/body/div/p[33]/text().51",
+"t": "hastily",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/66,/1:44,/1:51)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[37]/text()[1].8",
+"e": "/body/DocFragment[7]/body/div/p[37]/text()[1].9",
+"t": "I",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/74,/1:8,/1:9)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[39]/text().8",
+"e": "/body/DocFragment[7]/body/div/p[39]/text().9",
+"t": "m",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/78,/1:8,/1:9)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[41]/text().1",
+"e": "/body/DocFragment[7]/body/div/p[41]/text().5",
+"t": "This",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/82,/1:1,/1:5)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[41]/text().266",
+"e": "/body/DocFragment[7]/body/div/p[41]/text().270",
+"t": "went",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/82,/1:266,/1:270)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[43]/text().106",
+"e": "/body/DocFragment[7]/body/div/p[43]/text().109",
+"t": "out",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/86,/1:106,/1:109)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[44]/text().255",
+"e": "/body/DocFragment[7]/body/div/p[44]/text().260",
+"t": "would",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/88,/1:255,/1:260)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[45]/text().189",
+"e": "/body/DocFragment[7]/body/div/p[45]/text().193",
+"t": "foot",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/90,/1:189,/1:193)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[46]/text().239",
+"e": "/body/DocFragment[7]/body/div/p[46]/text().243",
+"t": "foot",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/92,/1:239,/1:243)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[48]/text().18",
+"e": "/body/DocFragment[7]/body/div/p[48]/text().22",
+"t": "free",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/96,/1:18,/1:22)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[48]/text().280",
+"e": "/body/DocFragment[7]/body/div/p[48]/text().282",
+"t": "of",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/96,/1:280,/1:282)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[49]/text()[3].120",
+"e": "/body/DocFragment[7]/body/div/p[49]/text()[3].126",
+"t": "result",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/98,/5:120,/5:126)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[50]/text().177",
+"e": "/body/DocFragment[7]/body/div/p[50]/text().180",
+"t": "any",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/100,/1:177,/1:180)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[50]/text().436",
+"e": "/body/DocFragment[7]/body/div/p[50]/text().440",
+"t": "draw",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/100,/1:436,/1:440)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[53]/text().78",
+"e": "/body/DocFragment[7]/body/div/p[53]/text().83",
+"t": "added",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/106,/1:78,/1:83)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[55]/text().95",
+"e": "/body/DocFragment[7]/body/div/p[55]/text().97",
+"t": "on",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/110,/1:95,/1:97)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[57]/text().77",
+"e": "/body/DocFragment[7]/body/div/p[57]/text().81",
+"t": "must",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/114,/1:77,/1:81)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[59]/text().44",
+"e": "/body/DocFragment[7]/body/div/p[59]/text().47",
+"t": "the",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/118,/1:44,/1:47)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[60]/text()[2].44",
+"e": "/body/DocFragment[7]/body/div/p[60]/text()[2].45",
+"t": "I",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/120,/3:44,/3:45)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[63]/text()[1].45",
+"e": "/body/DocFragment[7]/body/div/p[63]/text()[1].46",
+"t": "a",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/126,/1:45,/1:46)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[63]/text()[2].135",
+"e": "/body/DocFragment[7]/body/div/p[63]/text()[2].141",
+"t": "tasted",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/126,/3:135,/3:141)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[65]/text().98",
+"e": "/body/DocFragment[7]/body/div/p[65]/text().99",
+"t": "s",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/130,/1:98,/1:99)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[66]/text()[2].56",
+"e": "/body/DocFragment[7]/body/div/p[66]/text()[2].58",
+"t": "re",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/132,/3:56,/3:58)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[68]/text().42",
+"e": "/body/DocFragment[7]/body/div/p[68]/text().43",
+"t": "a",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/136,/1:42,/1:43)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[68]/text().303",
+"e": "/body/DocFragment[7]/body/div/p[68]/text().308",
+"t": "still",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/136,/1:303,/1:308)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[69]/text()[1].26",
+"e": "/body/DocFragment[7]/body/div/p[69]/text()[1].29",
+"t": "had",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/138,/1:26,/1:29)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[69]/text()[1].277",
+"e": "/body/DocFragment[7]/body/div/p[69]/text()[1].278",
+"t": "I",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/138,/1:277,/1:278)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[69]/text()[2].92",
+"e": "/body/DocFragment[7]/body/div/p[69]/text()[2].98",
+"t": "little",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/138,/3:92,/3:98)"
+},
+{
+"s": "/body/DocFragment[7]/body/div/p[69]/text()[3].146",
+"e": "/body/DocFragment[7]/body/div/p[69]/text()[3].150",
+"t": "till",
+"cfi": "epubcfi(/6/14!/4/2[pgepubid00007]/4[chap05]/138,/5:146,/5:150)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[1]/text().175",
+"e": "/body/DocFragment[8]/body/div/p[1]/text().182",
+"t": "footman",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/2,/1:175,/1:182)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[1]/text().444",
+"e": "/body/DocFragment[8]/body/div/p[1]/text().451",
+"t": "noticed",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/2,/1:444,/1:451)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[2]/text().100",
+"e": "/body/DocFragment[8]/body/div/p[2]/text().103",
+"t": "and",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/4,/1:100,/1:103)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[2]/text().375",
+"e": "/body/DocFragment[8]/body/div/p[2]/text().377",
+"t": "to",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/4,/1:375,/1:377)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[4]/text().176",
+"e": "/body/DocFragment[8]/body/div/p[4]/text().183",
+"t": "sitting",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/8,/1:176,/1:183)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[6]/text()[1].135",
+"e": "/body/DocFragment[8]/body/div/p[6]/text()[1].138",
+"t": "you",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/12,/1:135,/1:138)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[6]/text()[2].154",
+"e": "/body/DocFragment[8]/body/div/p[6]/text()[2].156",
+"t": "to",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/12,/3:154,/3:156)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[8]/text()[2].44",
+"e": "/body/DocFragment[8]/body/div/p[8]/text()[2].47",
+"t": "you",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/16,/3:44,/3:47)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[8]/text()[3].57",
+"e": "/body/DocFragment[8]/body/div/p[8]/text()[3].63",
+"t": "answer",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/16,/5:57,/5:63)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[10]/text().153",
+"e": "/body/DocFragment[8]/body/div/p[10]/text().159",
+"t": "pieces",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/20,/1:153,/1:159)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[13]/text()[2].50",
+"e": "/body/DocFragment[8]/body/div/p[13]/text()[2].53",
+"t": "the",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/26,/3:50,/3:53)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[15]/text().67",
+"e": "/body/DocFragment[8]/body/div/p[15]/text().70",
+"t": "his",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/30,/1:67,/1:70)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[18]/text().91",
+"e": "/body/DocFragment[8]/body/div/p[18]/text().94",
+"t": "And",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/36,/1:91,/1:94)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[19]/text().217",
+"e": "/body/DocFragment[8]/body/div/p[19]/text().218",
+"t": "a",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/38,/1:217,/1:218)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[21]/text().108",
+"e": "/body/DocFragment[8]/body/div/p[21]/text().110",
+"t": "it",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/42,/1:108,/1:110)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[22]/text().59",
+"e": "/body/DocFragment[8]/body/div/p[22]/text().62",
+"t": "for",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/44,/1:59,/1:62)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[24]/text().83",
+"e": "/body/DocFragment[8]/body/div/p[24]/text().86",
+"t": "saw",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/48,/1:83,/1:86)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[26]/text().45",
+"e": "/body/DocFragment[8]/body/div/p[26]/text().47",
+"t": "of",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/52,/1:45,/1:47)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[29]/text().64",
+"e": "/body/DocFragment[8]/body/div/p[29]/text().66",
+"t": "it",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/58,/1:64,/1:66)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[29]/text().322",
+"e": "/body/DocFragment[8]/body/div/p[29]/text().326",
+"t": "came",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/58,/1:322,/1:326)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[30]/text()[2].15",
+"e": "/body/DocFragment[8]/body/div/p[30]/text()[2].17",
+"t": "re",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/60,/3:15,/3:17)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[31]/text().96",
+"e": "/body/DocFragment[8]/body/div/p[31]/text().98",
+"t": "go",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/62,/1:96,/1:98)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[32]/text()[2].201",
+"e": "/body/DocFragment[8]/body/div/p[32]/text()[2].207",
+"t": "twenty",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/64,/3:201,/3:207)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[34]/text()[1].161",
+"e": "/body/DocFragment[8]/body/div/p[34]/text()[1].164",
+"t": "she",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/68,/1:161,/1:164)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[35]/text()[2].162",
+"e": "/body/DocFragment[8]/body/div/p[35]/text()[2].163",
+"t": "a",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/70,/3:162,/3:163)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[39]/text().35",
+"e": "/body/DocFragment[8]/body/div/p[39]/text().40",
+"t": "verse",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/78,/1:35,/1:40)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[42]/text().2",
+"e": "/body/DocFragment[8]/body/div/p[42]/text().5",
+"t": "Wow",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/84,/1:2,/1:5)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[43]/text().227",
+"e": "/body/DocFragment[8]/body/div/p[43]/text().230",
+"t": "pan",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/86,/1:227,/1:230)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[44]/text().212",
+"e": "/body/DocFragment[8]/body/div/p[44]/text().216",
+"t": "like",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/88,/1:212,/1:216)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[45]/text().55",
+"e": "/body/DocFragment[8]/body/div/p[45]/text().57",
+"t": "it",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/90,/1:55,/1:57)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[45]/text().290",
+"e": "/body/DocFragment[8]/body/div/p[45]/text().295",
+"t": "Alice",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/90,/1:290,/1:295)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[45]/text().530",
+"e": "/body/DocFragment[8]/body/div/p[45]/text().533",
+"t": "not",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/90,/1:530,/1:533)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[46]/text()[2].50",
+"e": "/body/DocFragment[8]/body/div/p[46]/text()[2].54",
+"t": "nose",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/92,/3:50,/3:54)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[47]/text().30",
+"e": "/body/DocFragment[8]/body/div/p[47]/text().33",
+"t": "you",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/94,/1:30,/1:33)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[48]/text()[1].16",
+"e": "/body/DocFragment[8]/body/div/p[48]/text()[1].25",
+"t": "beginning",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/96,/1:16,/1:25)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[48]/text()[2].48",
+"e": "/body/DocFragment[8]/body/div/p[48]/text()[2].52",
+"t": "than",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/96,/3:48,/3:52)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[49]/text().163",
+"e": "/body/DocFragment[8]/body/div/p[49]/text().167",
+"t": "made",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/98,/1:163,/1:167)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[49]/text().420",
+"e": "/body/DocFragment[8]/body/div/p[49]/text().426",
+"t": "little",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/98,/1:420,/1:426)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[50]/text()[2].65",
+"e": "/body/DocFragment[8]/body/div/p[50]/text()[2].67",
+"t": "be",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/100,/3:65,/3:67)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[51]/text().246",
+"e": "/body/DocFragment[8]/body/div/p[51]/text().251",
+"t": "ought",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/102,/1:246,/1:251)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[55]/text()[2].21",
+"e": "/body/DocFragment[8]/body/div/p[55]/text()[2].32",
+"t": "explanation",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/110,/3:21,/3:32)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[58]/text()[2].64",
+"e": "/body/DocFragment[8]/body/div/p[58]/text()[2].70",
+"t": "Hatter",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/116,/3:64,/3:70)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[60]/text().72",
+"e": "/body/DocFragment[8]/body/div/p[60]/text().75",
+"t": "You",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/120,/1:72,/1:75)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[64]/text().18",
+"e": "/body/DocFragment[8]/body/div/p[64]/text().22",
+"t": "said",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/128,/1:18,/1:22)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[66]/text()[2].41",
+"e": "/body/DocFragment[8]/body/div/p[66]/text()[2].45",
+"t": "when",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/132,/3:41,/3:45)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[70]/text().9",
+"e": "/body/DocFragment[8]/body/div/p[70]/text().12",
+"t": "see",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/140,/1:9,/1:12)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[72]/text().55",
+"e": "/body/DocFragment[8]/body/div/p[72]/text().56",
+"t": "I",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/144,/1:55,/1:56)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[75]/text().79",
+"e": "/body/DocFragment[8]/body/div/p[75]/text().82",
+"t": "and",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/150,/1:79,/1:82)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[75]/text().324",
+"e": "/body/DocFragment[8]/body/div/p[75]/text().327",
+"t": "mad",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/150,/1:324,/1:327)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[77]/text().53",
+"e": "/body/DocFragment[8]/body/div/p[77]/text().54",
+"t": "t",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/154,/1:53,/1:54)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[79]/text().13",
+"e": "/body/DocFragment[8]/body/div/p[79]/text().18",
+"t": "often",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/158,/1:13,/1:18)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[80]/text().111",
+"e": "/body/DocFragment[8]/body/div/p[80]/text().114",
+"t": "the",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/160,/1:111,/1:114)"
+},
+{
+"s": "/body/DocFragment[8]/body/div/p[80]/text().368",
+"e": "/body/DocFragment[8]/body/div/p[80]/text().372",
+"t": "high",
+"cfi": "epubcfi(/6/16!/4/2[pgepubid00008]/4[chap06]/160,/1:368,/1:372)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[1]/text().52",
+"e": "/body/DocFragment[9]/body/div/p[1]/text().55",
+"t": "the",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/2,/1:52,/1:55)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[1]/text().332",
+"e": "/body/DocFragment[9]/body/div/p[1]/text().334",
+"t": "as",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/2,/1:332,/1:334)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[2]/text()[2].43",
+"e": "/body/DocFragment[9]/body/div/p[2]/text()[2].46",
+"t": "sat",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/4,/3:43,/3:46)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[5]/text().20",
+"e": "/body/DocFragment[9]/body/div/p[5]/text().24",
+"t": "said",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/10,/1:20,/1:24)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[8]/text()[2].38",
+"e": "/body/DocFragment[9]/body/div/p[8]/text()[2].43",
+"t": "great",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/16,/3:38,/3:43)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[11]/text()[1].19",
+"e": "/body/DocFragment[9]/body/div/p[11]/text()[1].22",
+"t": "his",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/22,/1:19,/1:22)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[13]/text().19",
+"e": "/body/DocFragment[9]/body/div/p[13]/text().22",
+"t": "you",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/26,/1:19,/1:22)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[16]/text().96",
+"e": "/body/DocFragment[9]/body/div/p[16]/text().100",
+"t": "know",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/32,/1:96,/1:100)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[18]/text().86",
+"e": "/body/DocFragment[9]/body/div/p[18]/text().90",
+"t": "same",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/36,/1:86,/1:90)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[20]/text()[2].36",
+"e": "/body/DocFragment[9]/body/div/p[20]/text()[2].42",
+"t": "Hatter",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/40,/3:36,/3:42)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[21]/text().96",
+"e": "/body/DocFragment[9]/body/div/p[21]/text().98",
+"t": "to",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/42,/1:96,/1:98)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[23]/text().66",
+"e": "/body/DocFragment[9]/body/div/p[23]/text().70",
+"t": "suit",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/46,/1:66,/1:70)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[26]/text()[1].25",
+"e": "/body/DocFragment[9]/body/div/p[26]/text()[1].30",
+"t": "watch",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/52,/1:25,/1:30)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[27]/text().64",
+"e": "/body/DocFragment[9]/body/div/p[27]/text().68",
+"t": "What",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/54,/1:64,/1:68)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[29]/text().75",
+"e": "/body/DocFragment[9]/body/div/p[29]/text().78",
+"t": "the",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/58,/1:75,/1:78)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[31]/text().169",
+"e": "/body/DocFragment[9]/body/div/p[31]/text().171",
+"t": "as",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/62,/1:169,/1:171)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[34]/text().19",
+"e": "/body/DocFragment[9]/body/div/p[34]/text().22",
+"t": "the",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/68,/1:19,/1:22)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[38]/text().82",
+"e": "/body/DocFragment[9]/body/div/p[38]/text().86",
+"t": "said",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/76,/1:82,/1:86)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[41]/text().41",
+"e": "/body/DocFragment[9]/body/div/p[41]/text().48",
+"t": "tossing",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/82,/1:41,/1:48)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[43]/text().101",
+"e": "/body/DocFragment[9]/body/div/p[43]/text().106",
+"t": "terms",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/86,/1:101,/1:106)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[43]/text().353",
+"e": "/body/DocFragment[9]/body/div/p[43]/text().357",
+"t": "time",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/86,/1:353,/1:357)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[46]/text().74",
+"e": "/body/DocFragment[9]/body/div/p[46]/text().78",
+"t": "past",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/92,/1:74,/1:78)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[48]/text()[2].93",
+"e": "/body/DocFragment[9]/body/div/p[48]/text()[2].100",
+"t": "concert",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/96,/3:93,/3:100)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[53]/text()[1].15",
+"e": "/body/DocFragment[9]/body/div/p[53]/text()[1].20",
+"t": "world",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/106,/1:15,/1:20)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[55]/text().46",
+"e": "/body/DocFragment[9]/body/div/p[55]/text().50",
+"t": "said",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/110,/1:46,/1:50)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[57]/text().109",
+"e": "/body/DocFragment[9]/body/div/p[57]/text().114",
+"t": "clock",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/114,/1:109,/1:114)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[60]/text().2",
+"e": "/body/DocFragment[9]/body/div/p[60]/text().6",
+"t": "Then",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/120,/1:2,/1:6)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[63]/text().99",
+"e": "/body/DocFragment[9]/body/div/p[63]/text().100",
+"t": "I",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/126,/1:99,/1:100)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[66]/text().41",
+"e": "/body/DocFragment[9]/body/div/p[66]/text().45",
+"t": "wasn",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/132,/1:41,/1:45)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[70]/text().7",
+"e": "/body/DocFragment[9]/body/div/p[70]/text().11",
+"t": "upon",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/140,/1:7,/1:11)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[71]/text().98",
+"e": "/body/DocFragment[9]/body/div/p[71]/text().106",
+"t": "drinking",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/142,/1:98,/1:106)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[75]/text().67",
+"e": "/body/DocFragment[9]/body/div/p[75]/text().73",
+"t": "living",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/150,/1:67,/1:73)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[77]/text().66",
+"e": "/body/DocFragment[9]/body/div/p[77]/text().69",
+"t": "can",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/154,/1:66,/1:69)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[81]/text().50",
+"e": "/body/DocFragment[9]/body/div/p[81]/text().53",
+"t": "she",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/162,/1:50,/1:53)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[83]/text().2",
+"e": "/body/DocFragment[9]/body/div/p[83]/text().7",
+"t": "There",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/166,/1:2,/1:7)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[84]/text()[1].54",
+"e": "/body/DocFragment[9]/body/div/p[84]/text()[1].63",
+"t": "interrupt",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/168,/1:54,/1:63)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[87]/text().51",
+"e": "/body/DocFragment[9]/body/div/p[87]/text().53",
+"t": "at",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/174,/1:51,/1:53)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[89]/text().168",
+"e": "/body/DocFragment[9]/body/div/p[89]/text().171",
+"t": "The",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/178,/1:168,/1:171)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[90]/text().81",
+"e": "/body/DocFragment[9]/body/div/p[90]/text().84",
+"t": "But",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/180,/1:81,/1:84)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[92]/text()[2].40",
+"e": "/body/DocFragment[9]/body/div/p[92]/text()[2].43",
+"t": "not",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/184,/3:40,/3:43)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[95]/text().87",
+"e": "/body/DocFragment[9]/body/div/p[95]/text().89",
+"t": "it",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/190,/1:87,/1:89)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[99]/text().84",
+"e": "/body/DocFragment[9]/body/div/p[99]/text().86",
+"t": "on",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/198,/1:84,/1:86)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[99]/text().332",
+"e": "/body/DocFragment[9]/body/div/p[99]/text().334",
+"t": "as",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/198,/1:332,/1:334)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[102]/text().119",
+"e": "/body/DocFragment[9]/body/div/p[102]/text().125",
+"t": "asleep",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/204,/1:119,/1:125)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[103]/text()[1].19",
+"e": "/body/DocFragment[9]/body/div/p[103]/text()[1].24",
+"t": "never",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/206,/1:19,/1:24)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[104]/text().105",
+"e": "/body/DocFragment[9]/body/div/p[104]/text().112",
+"t": "curious",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/208,/1:105,/1:112)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[105]/text()[1].146",
+"e": "/body/DocFragment[9]/body/div/p[105]/text()[1].151",
+"t": "began",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/210,/1:146,/1:151)"
+},
+{
+"s": "/body/DocFragment[9]/body/div/p[105]/i/text().0",
+"e": "/body/DocFragment[9]/body/div/p[105]/i/text().4",
+"t": "then",
+"cfi": "epubcfi(/6/18!/4/2[pgepubid00009]/4[chap07]/210/2,/1:0,/1:4)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[1]/text().128",
+"e": "/body/DocFragment[10]/body/div/p[1]/text().130",
+"t": "it",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/2,/1:128,/1:130)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[2]/text().18",
+"e": "/body/DocFragment[10]/body/div/p[2]/text().20",
+"t": "it",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/4,/1:18,/1:20)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[5]/text().18",
+"e": "/body/DocFragment[10]/body/div/p[5]/text().21",
+"t": "the",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/10,/1:18,/1:21)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[8]/text().62",
+"e": "/body/DocFragment[10]/body/div/p[8]/text().65",
+"t": "the",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/16,/1:62,/1:65)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[10]/text()[1].16",
+"e": "/body/DocFragment[10]/body/div/p[10]/text()[1].20",
+"t": "said",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/20,/1:16,/1:20)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[10]/text()[2].101",
+"e": "/body/DocFragment[10]/body/div/p[10]/text()[2].105",
+"t": "have",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/20,/3:101,/3:105)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[10]/text()[2].383",
+"e": "/body/DocFragment[10]/body/div/p[10]/text()[2].386",
+"t": "was",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/20,/3:383,/3:386)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[11]/text().208",
+"e": "/body/DocFragment[10]/body/div/p[11]/text().216",
+"t": "diamonds",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/22,/1:208,/1:216)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[11]/text().493",
+"e": "/body/DocFragment[10]/body/div/p[11]/text().497",
+"t": "them",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/22,/1:493,/1:497)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[11]/text().783",
+"e": "/body/DocFragment[10]/body/div/p[11]/text().786",
+"t": "THE",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/22,/1:783,/1:786)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[12]/text().243",
+"e": "/body/DocFragment[10]/body/div/p[12]/text().245",
+"t": "if",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/24,/1:243,/1:245)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[13]/text().133",
+"e": "/body/DocFragment[10]/body/div/p[13]/text().135",
+"t": "it",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/26,/1:133,/1:135)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[15]/text().99",
+"e": "/body/DocFragment[10]/body/div/p[15]/text().102",
+"t": "Why",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/30,/1:99,/1:102)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[16]/text()[2].154",
+"e": "/body/DocFragment[10]/body/div/p[16]/text()[2].159",
+"t": "their",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/32,/3:154,/3:159)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[18]/text().26",
+"e": "/body/DocFragment[10]/body/div/p[18]/text().30",
+"t": "with",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/36,/1:26,/1:30)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[20]/text().89",
+"e": "/body/DocFragment[10]/body/div/p[20]/text().94",
+"t": "child",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/40,/1:89,/1:94)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[23]/text().138",
+"e": "/body/DocFragment[10]/body/div/p[23]/text().141",
+"t": "the",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/46,/1:138,/1:141)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[25]/text().90",
+"e": "/body/DocFragment[10]/body/div/p[25]/text().92",
+"t": "he",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/50,/1:90,/1:92)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[27]/text().39",
+"e": "/body/DocFragment[10]/body/div/p[27]/text().42",
+"t": "and",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/54,/1:39,/1:42)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[29]/text().56",
+"e": "/body/DocFragment[10]/body/div/p[29]/text().64",
+"t": "soldiers",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/58,/1:56,/1:64)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[33]/text().107",
+"e": "/body/DocFragment[10]/body/div/p[33]/text().111",
+"t": "next",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/66,/1:107,/1:111)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[36]/text().75",
+"e": "/body/DocFragment[10]/body/div/p[36]/text().79",
+"t": "over",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/72,/1:75,/1:79)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[39]/text().44",
+"e": "/body/DocFragment[10]/body/div/p[39]/text().46",
+"t": "it",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/78,/1:44,/1:46)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[41]/text().2",
+"e": "/body/DocFragment[10]/body/div/p[41]/text().5",
+"t": "Get",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/82,/1:2,/1:5)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[41]/text().280",
+"e": "/body/DocFragment[10]/body/div/p[41]/text().282",
+"t": "in",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/82,/1:280,/1:282)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[42]/text()[1].73",
+"e": "/body/DocFragment[10]/body/div/p[42]/text()[1].76",
+"t": "she",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/84,/1:73,/1:76)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[42]/text()[2].32",
+"e": "/body/DocFragment[10]/body/div/p[42]/text()[2].34",
+"t": "in",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/84,/3:32,/3:34)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[42]/text()[2].295",
+"e": "/body/DocFragment[10]/body/div/p[42]/text()[2].302",
+"t": "besides",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/84,/3:295,/3:302)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[42]/text()[2].556",
+"e": "/body/DocFragment[10]/body/div/p[42]/text()[2].560",
+"t": "very",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/84,/3:556,/3:560)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[43]/text().255",
+"e": "/body/DocFragment[10]/body/div/p[43]/text().259",
+"t": "head",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/86,/1:255,/1:259)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[44]/text().231",
+"e": "/body/DocFragment[10]/body/div/p[44]/text().237",
+"t": "people",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/88,/1:231,/1:237)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[45]/text().204",
+"e": "/body/DocFragment[10]/body/div/p[45]/text().212",
+"t": "watching",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/90,/1:204,/1:212)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[46]/text().85",
+"e": "/body/DocFragment[10]/body/div/p[46]/text().90",
+"t": "speak",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/92,/1:85,/1:90)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[47]/text().255",
+"e": "/body/DocFragment[10]/body/div/p[47]/text().258",
+"t": "the",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/94,/1:255,/1:258)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[48]/text().95",
+"e": "/body/DocFragment[10]/body/div/p[48]/text().98",
+"t": "all",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/96,/1:95,/1:98)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[48]/text().348",
+"e": "/body/DocFragment[10]/body/div/p[48]/text().349",
+"t": "I",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/96,/1:348,/1:349)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[50]/text().6",
+"e": "/body/DocFragment[10]/body/div/p[50]/text().8",
+"t": "at",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/100,/1:6,/1:8)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[52]/text()[2].33",
+"e": "/body/DocFragment[10]/body/div/p[52]/text()[2].38",
+"t": "going",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/104,/3:33,/3:38)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[54]/text().87",
+"e": "/body/DocFragment[10]/body/div/p[54]/text().89",
+"t": "it",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/108,/1:87,/1:89)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[57]/text().81",
+"e": "/body/DocFragment[10]/body/div/p[57]/text().82",
+"t": "t",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/114,/1:81,/1:82)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[59]/text().88",
+"e": "/body/DocFragment[10]/body/div/p[59]/text().92",
+"t": "head",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/118,/1:88,/1:92)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[61]/text().149",
+"e": "/body/DocFragment[10]/body/div/p[61]/text().152",
+"t": "She",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/122,/1:149,/1:152)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[61]/text().397",
+"e": "/body/DocFragment[10]/body/div/p[61]/text().399",
+"t": "in",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/122,/1:397,/1:399)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[62]/text().260",
+"e": "/body/DocFragment[10]/body/div/p[62]/text().263",
+"t": "see",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/124,/1:260,/1:263)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[63]/text().181",
+"e": "/body/DocFragment[10]/body/div/p[63]/text().187",
+"t": "arches",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/126,/1:181,/1:187)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[64]/text().80",
+"e": "/body/DocFragment[10]/body/div/p[64]/text().85",
+"t": "crowd",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/128,/1:80,/1:85)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[65]/text().85",
+"e": "/body/DocFragment[10]/body/div/p[65]/text().88",
+"t": "and",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/130,/1:85,/1:88)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[66]/text()[1].110",
+"e": "/body/DocFragment[10]/body/div/p[66]/text()[1].114",
+"t": "that",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/132,/1:110,/1:114)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[68]/text().27",
+"e": "/body/DocFragment[10]/body/div/p[68]/text().31",
+"t": "that",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/136,/1:27,/1:31)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[69]/text()[1].74",
+"e": "/body/DocFragment[10]/body/div/p[69]/text()[1].77",
+"t": "you",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/138,/1:74,/1:77)"
+},
+{
+"s": "/body/DocFragment[10]/body/div/p[71]/text().101",
+"e": "/body/DocFragment[10]/body/div/p[71]/text().108",
+"t": "Duchess",
+"cfi": "epubcfi(/6/20!/4/2[pgepubid00010]/4[chap08]/142,/1:101,/1:108)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[1]/text().54",
+"e": "/body/DocFragment[11]/body/div/p[1]/text().58",
+"t": "dear",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/2,/1:54,/1:58)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[2]/text().152",
+"e": "/body/DocFragment[11]/body/div/p[2]/text().156",
+"t": "they",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/4,/1:152,/1:156)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[3]/text()[3].101",
+"e": "/body/DocFragment[11]/body/div/p[3]/text()[3].105",
+"t": "very",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/6,/5:101,/5:105)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[3]/text()[4].40",
+"e": "/body/DocFragment[11]/body/div/p[3]/text()[4].42",
+"t": "it",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/6,/7:40,/7:42)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[4]/text().239",
+"e": "/body/DocFragment[11]/body/div/p[4]/text().241",
+"t": "of",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/8,/1:239,/1:241)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[7]/text()[1].1",
+"e": "/body/DocFragment[11]/body/div/p[7]/text()[1].6",
+"t": "Alice",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/14,/1:1,/1:6)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[7]/text()[2].183",
+"e": "/body/DocFragment[11]/body/div/p[7]/text()[2].186",
+"t": "she",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/14,/3:183,/3:186)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[10]/text().11",
+"e": "/body/DocFragment[11]/body/div/p[10]/text().15",
+"t": "said",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/20,/1:11,/1:15)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[11]/text()[2].44",
+"e": "/body/DocFragment[11]/body/div/p[11]/text()[2].48",
+"t": "will",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/22,/3:44,/3:48)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[13]/text().155",
+"e": "/body/DocFragment[11]/body/div/p[13]/text().157",
+"t": "of",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/26,/1:155,/1:157)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[16]/text().21",
+"e": "/body/DocFragment[11]/body/div/p[16]/text().22",
+"t": "a",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/32,/1:21,/1:22)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[19]/text().125",
+"e": "/body/DocFragment[11]/body/div/p[19]/text().129",
+"t": "near",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/38,/1:125,/1:129)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[21]/text().21",
+"e": "/body/DocFragment[11]/body/div/p[21]/text().24",
+"t": "you",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/42,/1:21,/1:24)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[21]/text().264",
+"e": "/body/DocFragment[11]/body/div/p[21]/text().273",
+"t": "otherwise",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/42,/1:264,/1:273)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[23]/text().37",
+"e": "/body/DocFragment[11]/body/div/p[23]/text().39",
+"t": "if",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/46,/1:37,/1:39)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[26]/text().28",
+"e": "/body/DocFragment[11]/body/div/p[26]/text().35",
+"t": "thought",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/52,/1:28,/1:35)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[28]/text().71",
+"e": "/body/DocFragment[11]/body/div/p[28]/text().75",
+"t": "feel",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/56,/1:71,/1:75)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[30]/text().157",
+"e": "/body/DocFragment[11]/body/div/p[30]/text().162",
+"t": "began",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/60,/1:157,/1:162)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[32]/text().78",
+"e": "/body/DocFragment[11]/body/div/p[32]/text().81",
+"t": "she",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/64,/1:78,/1:81)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[34]/text().92",
+"e": "/body/DocFragment[11]/body/div/p[34]/text().95",
+"t": "say",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/68,/1:92,/1:95)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[35]/text().207",
+"e": "/body/DocFragment[11]/body/div/p[35]/text().212",
+"t": "would",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/70,/1:207,/1:212)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[36]/text().248",
+"e": "/body/DocFragment[11]/body/div/p[36]/text().253",
+"t": "being",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/72,/1:248,/1:253)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[37]/text().51",
+"e": "/body/DocFragment[11]/body/div/p[37]/text().55",
+"t": "said",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/74,/1:51,/1:55)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[41]/text().23",
+"e": "/body/DocFragment[11]/body/div/p[41]/text().26",
+"t": "the",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/82,/1:23,/1:26)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[42]/text()[2].82",
+"e": "/body/DocFragment[11]/body/div/p[42]/text()[2].84",
+"t": "of",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/84,/3:82,/3:84)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[43]/text().218",
+"e": "/body/DocFragment[11]/body/div/p[43]/text().222",
+"t": "hear",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/86,/1:218,/1:222)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[43]/text().475",
+"e": "/body/DocFragment[11]/body/div/p[43]/text().477",
+"t": "it",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/86,/1:475,/1:477)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[46]/text()[1].2",
+"e": "/body/DocFragment[11]/body/div/p[46]/text()[1].5",
+"t": "Why",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/92,/1:2,/1:5)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[48]/text().35",
+"e": "/body/DocFragment[11]/body/div/p[48]/text().38",
+"t": "saw",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/96,/1:35,/1:38)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[48]/text().305",
+"e": "/body/DocFragment[11]/body/div/p[48]/text().311",
+"t": "nearly",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/96,/1:305,/1:311)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[50]/text().34",
+"e": "/body/DocFragment[11]/body/div/p[50]/text().41",
+"t": "Gryphon",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/100,/1:34,/1:41)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[52]/text()[1].60",
+"e": "/body/DocFragment[11]/body/div/p[52]/text()[1].67",
+"t": "thought",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/104,/1:60,/1:67)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[54]/text()[1].69",
+"e": "/body/DocFragment[11]/body/div/p[54]/text()[1].79",
+"t": "occasional",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/108,/1:69,/1:79)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[55]/text().2",
+"e": "/body/DocFragment[11]/body/div/p[55]/text().6",
+"t": "When",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/110,/1:2,/1:6)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[56]/text().46",
+"e": "/body/DocFragment[11]/body/div/p[56]/text().49",
+"t": "one",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/112,/1:46,/1:49)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[58]/text().158",
+"e": "/body/DocFragment[11]/body/div/p[58]/text().163",
+"t": "ready",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/116,/1:158,/1:163)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[60]/text().15",
+"e": "/body/DocFragment[11]/body/div/p[60]/text().16",
+"t": "I",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/120,/1:15,/1:16)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[64]/text()[2].34",
+"e": "/body/DocFragment[11]/body/div/p[64]/text()[2].39",
+"t": "Alice",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/128,/3:34,/3:39)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[69]/text()[1].61",
+"e": "/body/DocFragment[11]/body/div/p[69]/text()[1].67",
+"t": "Turtle",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/138,/1:61,/1:67)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[71]/text().55",
+"e": "/body/DocFragment[11]/body/div/p[71]/text().59",
+"t": "with",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/142,/1:55,/1:59)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[75]/text().1",
+"e": "/body/DocFragment[11]/body/div/p[75]/text().4",
+"t": "The",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/150,/1:1,/1:4)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[77]/i/text().0",
+"e": "/body/DocFragment[11]/body/div/p[77]/i/text().3",
+"t": "are",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/154/2,/1:0,/1:3)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[79]/text()[1].132",
+"e": "/body/DocFragment[11]/body/div/p[79]/text()[1].142",
+"t": "Seaography",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/158,/1:132,/1:142)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[81]/text().79",
+"e": "/body/DocFragment[11]/body/div/p[81]/text().82",
+"t": "the",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/162,/1:79,/1:82)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[84]/text().16",
+"e": "/body/DocFragment[11]/body/div/p[84]/text().18",
+"t": "he",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/168,/1:16,/1:18)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[86]/text().70",
+"e": "/body/DocFragment[11]/body/div/p[86]/text().72",
+"t": "so",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/172,/1:70,/1:72)"
+},
+{
+"s": "/body/DocFragment[11]/body/div/p[89]/text().122",
+"e": "/body/DocFragment[11]/body/div/p[89]/text().125",
+"t": "day",
+"cfi": "epubcfi(/6/22!/4/2[pgepubid00011]/4[chap09]/178,/1:122,/1:125)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/h2/text()[2].13",
+"e": "/body/DocFragment[12]/body/div/h2/text()[2].22",
+"t": "Quadrille",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/2/2[chap10],/3:13,/3:22)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[1]/text().240",
+"e": "/body/DocFragment[12]/body/div/p[1]/text().242",
+"t": "to",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/2,/1:240,/1:242)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[2]/text().116",
+"e": "/body/DocFragment[12]/body/div/p[2]/text().118",
+"t": "to",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/4,/1:116,/1:118)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[4]/text().42",
+"e": "/body/DocFragment[12]/body/div/p[4]/text().46",
+"t": "into",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/8,/1:42,/1:46)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[8]/text().37",
+"e": "/body/DocFragment[12]/body/div/p[8]/text().42",
+"t": "cried",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/16,/1:37,/1:42)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[13]/text().17",
+"e": "/body/DocFragment[12]/body/div/p[13]/text().20",
+"t": "sea",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/26,/1:17,/1:20)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[17]/text().78",
+"e": "/body/DocFragment[12]/body/div/p[17]/text().86",
+"t": "suddenly",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/34,/1:78,/1:86)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[19]/text().46",
+"e": "/body/DocFragment[12]/body/div/p[19]/text().49",
+"t": "the",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/38,/1:46,/1:49)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[23]/text().42",
+"e": "/body/DocFragment[12]/body/div/p[23]/text().47",
+"t": "round",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/46,/1:42,/1:47)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[24]/text()[2].27",
+"e": "/body/DocFragment[12]/body/div/p[24]/text()[2].33",
+"t": "behind",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/48,/3:27,/3:33)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[24]/text()[6].15",
+"e": "/body/DocFragment[12]/body/div/p[24]/text()[6].16",
+"t": "t",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/48,/11:15,/11:16)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[24]/text()[10].59",
+"e": "/body/DocFragment[12]/body/div/p[24]/text()[10].66",
+"t": "askance",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/48,/19:59,/19:66)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[24]/text()[15].51",
+"e": "/body/DocFragment[12]/body/div/p[24]/text()[15].58",
+"t": "replied",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/48,/29:51,/29:58)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[24]/text()[20].11",
+"e": "/body/DocFragment[12]/body/div/p[24]/text()[20].14",
+"t": "won",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/48,/39:11,/39:14)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[26]/text().16",
+"e": "/body/DocFragment[12]/body/div/p[26]/text().23",
+"t": "whiting",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/52,/1:16,/1:23)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[28]/text().111",
+"e": "/body/DocFragment[12]/body/div/p[28]/text().115",
+"t": "what",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/56,/1:111,/1:115)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[30]/text()[2].34",
+"e": "/body/DocFragment[12]/body/div/p[30]/text()[2].37",
+"t": "the",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/60,/3:34,/3:37)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[31]/text()[2].75",
+"e": "/body/DocFragment[12]/body/div/p[31]/text()[2].78",
+"t": "had",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/62,/3:75,/3:78)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[33]/text().33",
+"e": "/body/DocFragment[12]/body/div/p[33]/text().35",
+"t": "if",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/66,/1:33,/1:35)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[37]/text()[1].7",
+"e": "/body/DocFragment[12]/body/div/p[37]/text()[1].11",
+"t": "what",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/74,/1:7,/1:11)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[39]/text().64",
+"e": "/body/DocFragment[12]/body/div/p[39]/text().69",
+"t": "voice",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/78,/1:64,/1:69)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[42]/text()[1].55",
+"e": "/body/DocFragment[12]/body/div/p[42]/text()[1].59",
+"t": "were",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/84,/1:55,/1:59)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[44]/text().34",
+"e": "/body/DocFragment[12]/body/div/p[44]/text().36",
+"t": "in",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/88,/1:34,/1:36)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[47]/text()[1].46",
+"e": "/body/DocFragment[12]/body/div/p[47]/text()[1].48",
+"t": "in",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/94,/1:46,/1:48)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[49]/text().21",
+"e": "/body/DocFragment[12]/body/div/p[49]/text().25",
+"t": "said",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/98,/1:21,/1:25)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[51]/text()[1].148",
+"e": "/body/DocFragment[12]/body/div/p[51]/text()[1].151",
+"t": "two",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/102,/1:148,/1:151)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[51]/text()[3].23",
+"e": "/body/DocFragment[12]/body/div/p[51]/text()[3].26",
+"t": "and",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/102,/5:23,/5:26)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[53]/text().96",
+"e": "/body/DocFragment[12]/body/div/p[53]/text().99",
+"t": "and",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/106,/1:96,/1:99)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[55]/text().75",
+"e": "/body/DocFragment[12]/body/div/p[55]/text().80",
+"t": "Alice",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/110,/1:75,/1:80)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[56]/text()[1].33",
+"e": "/body/DocFragment[12]/body/div/p[56]/text()[1].34",
+"t": "I",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/112,/1:33,/1:34)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[56]/text()[7].35",
+"e": "/body/DocFragment[12]/body/div/p[56]/text()[7].38",
+"t": "gay",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/112,/13:35,/13:38)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[58]/text().16",
+"e": "/body/DocFragment[12]/body/div/p[58]/text().21",
+"t": "heard",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/116,/1:16,/1:21)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[61]/text().12",
+"e": "/body/DocFragment[12]/body/div/p[61]/text().19",
+"t": "explain",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/122,/1:12,/1:19)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[63]/text().109",
+"e": "/body/DocFragment[12]/body/div/p[63]/text().111",
+"t": "to",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/126,/1:109,/1:111)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[66]/text()[1].30",
+"e": "/body/DocFragment[12]/body/div/p[66]/text()[1].36",
+"t": "marked",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/132,/1:30,/1:36)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[66]/text()[7].46",
+"e": "/body/DocFragment[12]/body/div/p[66]/text()[7].50",
+"t": "boon",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/132,/13:46,/13:50)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[67]/text()[2].123",
+"e": "/body/DocFragment[12]/body/div/p[67]/text()[2].127",
+"t": "most",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/134,/3:123,/3:127)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[69]/text().127",
+"e": "/body/DocFragment[12]/body/div/p[69]/text().131",
+"t": "song",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/138,/1:127,/1:131)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[71]/text().64",
+"e": "/body/DocFragment[12]/body/div/p[71]/text().70",
+"t": "choked",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/142,/1:64,/1:70)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[72]/text()[8].20",
+"e": "/body/DocFragment[12]/body/div/p[72]/text()[8].27",
+"t": "evening",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/144,/15:20,/15:27)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[72]/text()[19].16",
+"e": "/body/DocFragment[12]/body/div/p[72]/text()[19].22",
+"t": "beauti",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/144,/37:16,/37:22)"
+},
+{
+"s": "/body/DocFragment[12]/body/div/p[74]/text().106",
+"e": "/body/DocFragment[12]/body/div/p[74]/text().108",
+"t": "of",
+"cfi": "epubcfi(/6/24!/4/2[pgepubid00012]/4[chap10]/148,/1:106,/1:108)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/h2/text()[1].8",
+"e": "/body/DocFragment[13]/body/div/h2/text()[1].10",
+"t": "XI",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/2/2[chap11],/1:8,/1:10)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[1]/text().243",
+"e": "/body/DocFragment[13]/body/div/p[1]/text().244",
+"t": "a",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/2,/1:243,/1:244)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[1]/text().481",
+"e": "/body/DocFragment[13]/body/div/p[1]/text().483",
+"t": "so",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/2,/1:481,/1:483)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[2]/text().7",
+"e": "/body/DocFragment[13]/body/div/p[2]/text().10",
+"t": "had",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/4,/1:7,/1:10)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[3]/text().19",
+"e": "/body/DocFragment[13]/body/div/p[3]/text().22",
+"t": "way",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/6,/1:19,/1:22)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[4]/text().61",
+"e": "/body/DocFragment[13]/body/div/p[4]/text().70",
+"t": "creatures",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/8,/1:61,/1:70)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[4]/text().339",
+"e": "/body/DocFragment[13]/body/div/p[4]/text().342",
+"t": "few",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/8,/1:339,/1:342)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[5]/text().157",
+"e": "/body/DocFragment[13]/body/div/p[5]/text().163",
+"t": "before",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/10,/1:157,/1:163)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[7]/text().131",
+"e": "/body/DocFragment[13]/body/div/p[7]/text().136",
+"t": "court",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/14,/1:131,/1:136)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[8]/text().176",
+"e": "/body/DocFragment[13]/body/div/p[8]/text().179",
+"t": "one",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/16,/1:176,/1:179)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[9]/i/text().0",
+"e": "/body/DocFragment[13]/body/div/p[9]/i/text().3",
+"t": "not",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/18/2,/1:0,/1:3)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[9]/text()[2].245",
+"e": "/body/DocFragment[13]/body/div/p[9]/text()[2].252",
+"t": "hunting",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/18,/3:245,/3:252)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[11]/text().47",
+"e": "/body/DocFragment[13]/body/div/p[11]/text().50",
+"t": "the",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/22,/1:47,/1:50)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[14]/text().15",
+"e": "/body/DocFragment[13]/body/div/p[14]/text().18",
+"t": "yet",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/28,/1:15,/1:18)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[16]/text().67",
+"e": "/body/DocFragment[13]/body/div/p[16]/text().71",
+"t": "hand",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/32,/1:67,/1:71)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[18]/text()[1].19",
+"e": "/body/DocFragment[13]/body/div/p[18]/text()[1].21",
+"t": "at",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/36,/1:19,/1:21)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[21]/text().79",
+"e": "/body/DocFragment[13]/body/div/p[21]/text().82",
+"t": "all",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/42,/1:79,/1:82)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[24]/text()[2].78",
+"e": "/body/DocFragment[13]/body/div/p[24]/text()[2].81",
+"t": "the",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/48,/3:78,/3:81)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[27]/text().49",
+"e": "/body/DocFragment[13]/body/div/p[27]/text().51",
+"t": "be",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/54,/1:49,/1:51)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[28]/text().199",
+"e": "/body/DocFragment[13]/body/div/p[28]/text().202",
+"t": "the",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/56,/1:199,/1:202)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[29]/text().237",
+"e": "/body/DocFragment[13]/body/div/p[29]/text().245",
+"t": "thoughts",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/58,/1:237,/1:245)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[32]/text()[1].9",
+"e": "/body/DocFragment[13]/body/div/p[32]/text()[1].11",
+"t": "no",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/64,/1:9,/1:11)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[34]/text()[2].139",
+"e": "/body/DocFragment[13]/body/div/p[34]/text()[2].143",
+"t": "side",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/68,/3:139,/3:143)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[35]/text().236",
+"e": "/body/DocFragment[13]/body/div/p[35]/text().242",
+"t": "Hatter",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/70,/1:236,/1:242)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[37]/text().101",
+"e": "/body/DocFragment[13]/body/div/p[37]/text().104",
+"t": "not",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/74,/1:101,/1:104)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[40]/text().67",
+"e": "/body/DocFragment[13]/body/div/p[40]/text().70",
+"t": "you",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/80,/1:67,/1:70)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[44]/text().29",
+"e": "/body/DocFragment[13]/body/div/p[44]/text().33",
+"t": "Hare",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/88,/1:29,/1:33)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[47]/text().54",
+"e": "/body/DocFragment[13]/body/div/p[47]/text().59",
+"t": "bread",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/94,/1:54,/1:59)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[51]/text().91",
+"e": "/body/DocFragment[13]/body/div/p[51]/text().92",
+"t": "I",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/102,/1:91,/1:92)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[53]/text().165",
+"e": "/body/DocFragment[13]/body/div/p[53]/text().168",
+"t": "was",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/106,/1:165,/1:168)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[54]/text().94",
+"e": "/body/DocFragment[13]/body/div/p[54]/text().97",
+"t": "end",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/108,/1:94,/1:97)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[56]/text().29",
+"e": "/body/DocFragment[13]/body/div/p[56]/text().32",
+"t": "the",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/112,/1:29,/1:32)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[60]/text().46",
+"e": "/body/DocFragment[13]/body/div/p[60]/text().50",
+"t": "with",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/120,/1:46,/1:50)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[62]/text().80",
+"e": "/body/DocFragment[13]/body/div/p[62]/text().83",
+"t": "but",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/124,/1:80,/1:83)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[64]/text().141",
+"e": "/body/DocFragment[13]/body/div/p[64]/text().146",
+"t": "court",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/128,/1:141,/1:146)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[68]/text().19",
+"e": "/body/DocFragment[13]/body/div/p[68]/text().20",
+"t": "I",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/136,/1:19,/1:20)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[71]/text().2",
+"e": "/body/DocFragment[13]/body/div/p[71]/text().8",
+"t": "Collar",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/142,/1:2,/1:8)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[72]/text().144",
+"e": "/body/DocFragment[13]/body/div/p[72]/text().155",
+"t": "disappeared",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/144,/1:144,/1:155)"
+},
+{
+"s": "/body/DocFragment[13]/body/div/p[74]/text()[1].51",
+"e": "/body/DocFragment[13]/body/div/p[74]/text()[1].54",
+"t": "the",
+"cfi": "epubcfi(/6/26!/4/2[pgepubid00013]/4[chap11]/148,/1:51,/1:54)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/h2/text()[2].9",
+"e": "/body/DocFragment[14]/body/div[1]/h2/text()[2].17",
+"t": "Evidence",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/2/2[chap12],/3:9,/3:17)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[1]/text().248",
+"e": "/body/DocFragment[14]/body/div[1]/p[1]/text().253",
+"t": "heads",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/2,/1:248,/1:253)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[2]/text()[2].106",
+"e": "/body/DocFragment[14]/body/div[1]/p[2]/text()[2].111",
+"t": "could",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/4,/3:106,/3:111)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[3]/text()[1].67",
+"e": "/body/DocFragment[14]/body/div[1]/p[3]/text()[1].72",
+"t": "until",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/6,/1:67,/1:72)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[4]/text()[1].131",
+"e": "/body/DocFragment[14]/body/div[1]/p[4]/text()[1].137",
+"t": "waving",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/8,/1:131,/1:137)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[4]/text()[2].44",
+"e": "/body/DocFragment[14]/body/div[1]/p[4]/text()[2].49",
+"t": "other",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/8,/3:44,/3:49)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[5]/text().255",
+"e": "/body/DocFragment[14]/body/div[1]/p[5]/text().259",
+"t": "much",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/10,/1:255,/1:259)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[10]/text()[1].41",
+"e": "/body/DocFragment[14]/body/div[1]/p[10]/text()[1].48",
+"t": "turning",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/20,/1:41,/1:48)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[11]/text()[2].32",
+"e": "/body/DocFragment[14]/body/div[1]/p[11]/text()[2].35",
+"t": "the",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/22,/3:32,/3:35)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[13]/text().142",
+"e": "/body/DocFragment[14]/body/div[1]/p[13]/text().145",
+"t": "but",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/26,/1:142,/1:145)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[14]/i/text().47",
+"e": "/body/DocFragment[14]/body/div[1]/p[14]/i/text().52",
+"t": "court",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/28/2,/1:47,/1:52)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[20]/text().11",
+"e": "/body/DocFragment[14]/body/div[1]/p[20]/text().17",
+"t": "oldest",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/40,/1:11,/1:17)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[23]/text().59",
+"e": "/body/DocFragment[14]/body/div[1]/p[23]/text().63",
+"t": "said",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/46,/1:59,/1:63)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[26]/text().10",
+"e": "/body/DocFragment[14]/body/div[1]/p[26]/text().14",
+"t": "have",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/52,/1:10,/1:14)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[28]/text()[2].19",
+"e": "/body/DocFragment[14]/body/div[1]/p[28]/text()[2].24",
+"t": "paper",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/56,/3:19,/3:24)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[30]/text().99",
+"e": "/body/DocFragment[14]/body/div[1]/p[30]/text().105",
+"t": "looked",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/60,/1:99,/1:105)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[33]/text()[1].21",
+"e": "/body/DocFragment[14]/body/div[1]/p[33]/text()[1].23",
+"t": "it",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/66,/1:21,/1:23)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[35]/text()[1].2",
+"e": "/body/DocFragment[14]/body/div[1]/p[35]/text()[1].6",
+"t": "That",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/70,/1:2,/1:6)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[39]/text().27",
+"e": "/body/DocFragment[14]/body/div[1]/p[39]/text().30",
+"t": "the",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/78,/1:27,/1:30)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[41]/text()[6].9",
+"e": "/body/DocFragment[14]/body/div[1]/p[41]/text()[6].13",
+"t": "them",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/82,/11:9,/11:13)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[41]/text()[16].1",
+"e": "/body/DocFragment[14]/body/div[1]/p[41]/text()[16].3",
+"t": "If",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/82,/31:1,/31:3)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[41]/text()[26].15",
+"e": "/body/DocFragment[14]/body/div[1]/p[41]/text()[26].19",
+"t": "know",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/82,/51:15,/51:19)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[43]/text()[1].25",
+"e": "/body/DocFragment[14]/body/div[1]/p[43]/text()[1].32",
+"t": "explain",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/86,/1:25,/1:32)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[44]/text()[2].1",
+"e": "/body/DocFragment[14]/body/div[1]/p[44]/text()[2].6",
+"t": "doesn",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/88,/3:1,/3:6)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[45]/text()[1].134",
+"e": "/body/DocFragment[14]/body/div[1]/p[45]/text()[1].135",
+"t": "t",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/90,/1:134,/1:135)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[46]/text()[1].21",
+"e": "/body/DocFragment[14]/body/div[1]/p[46]/text()[1].25",
+"t": "head",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/92,/1:21,/1:25)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[47]/i[2]/text().7",
+"e": "/body/DocFragment[14]/body/div[1]/p[47]/i[2]/text().10",
+"t": "her",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/94/4,/1:7,/1:10)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[49]/text()[1].112",
+"e": "/body/DocFragment[14]/body/div[1]/p[49]/text()[1].116",
+"t": "than",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/98,/1:112,/1:116)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[50]/text().165",
+"e": "/body/DocFragment[14]/body/div[1]/p[50]/text().167",
+"t": "as",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/100,/1:165,/1:167)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[52]/text().5",
+"e": "/body/DocFragment[14]/body/div[1]/p[52]/text().6",
+"t": "s",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/104,/1:5,/1:6)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[54]/text().75",
+"e": "/body/DocFragment[14]/body/div[1]/p[54]/text().80",
+"t": "first",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/108,/1:75,/1:80)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[58]/text().103",
+"e": "/body/DocFragment[14]/body/div[1]/p[58]/text().107",
+"t": "pack",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/116,/1:103,/1:107)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[59]/text().227",
+"e": "/body/DocFragment[14]/body/div[1]/p[59]/text().229",
+"t": "of",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/118,/1:227,/1:229)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[61]/text()[1].67",
+"e": "/body/DocFragment[14]/body/div[1]/p[61]/text()[1].73",
+"t": "sister",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/122,/1:67,/1:73)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[61]/text()[2].83",
+"e": "/body/DocFragment[14]/body/div[1]/p[61]/text()[2].85",
+"t": "So",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/122,/3:83,/3:85)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[62]/text().145",
+"e": "/body/DocFragment[14]/body/div[1]/p[62]/text().154",
+"t": "wonderful",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/126,/1:145,/1:154)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[63]/text()[1].188",
+"e": "/body/DocFragment[14]/body/div[1]/p[63]/text()[1].191",
+"t": "her",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/128,/1:188,/1:191)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[64]/text().1",
+"e": "/body/DocFragment[14]/body/div[1]/p[64]/text().4",
+"t": "The",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/130,/1:1,/1:4)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[64]/text().276",
+"e": "/body/DocFragment[14]/body/div[1]/p[64]/text().284",
+"t": "ordering",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/130,/1:276,/1:284)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[64]/text().561",
+"e": "/body/DocFragment[14]/body/div[1]/p[64]/text().564",
+"t": "the",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/130,/1:561,/1:564)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[65]/text().196",
+"e": "/body/DocFragment[14]/body/div[1]/p[65]/text().199",
+"t": "the",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/132,/1:196,/1:199)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[65]/text().455",
+"e": "/body/DocFragment[14]/body/div[1]/p[65]/text().461",
+"t": "noises",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/132,/1:455,/1:461)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[66]/text()[1].89",
+"e": "/body/DocFragment[14]/body/div[1]/p[66]/text()[1].93",
+"t": "time",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/134,/1:89,/1:93)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[1]/p[66]/text()[2].71",
+"e": "/body/DocFragment[14]/body/div[1]/p[66]/text()[2].76",
+"t": "dream",
+"cfi": "epubcfi(/6/28!/4/2[pgepubid00014]/4[chap12]/134,/3:71,/3:76)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[1]/span/text().72",
+"e": "/body/DocFragment[14]/body/div[3]/div[1]/span/text().73",
+"t": "*",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/2[pg-end-separator]/2,/1:72,/1:73)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[3]/text().197",
+"e": "/body/DocFragment[14]/body/div[3]/div[3]/text().199",
+"t": "in",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/6,/1:197,/1:199)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[3]/text().532",
+"e": "/body/DocFragment[14]/body/div[3]/div[3]/text().535",
+"t": "not",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/6,/1:532,/1:535)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[3]/text().818",
+"e": "/body/DocFragment[14]/body/div[3]/div[3]/text().822",
+"t": "this",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/6,/1:818,/1:822)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[3]/text().1129",
+"e": "/body/DocFragment[14]/body/div[3]/div[3]/text().1138",
+"t": "trademark",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/6,/1:1129,/1:1138)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[6]/text().171",
+"e": "/body/DocFragment[14]/body/div[3]/div[6]/text().174",
+"t": "way",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/14,/1:171,/1:174)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[8]/text().30",
+"e": "/body/DocFragment[14]/body/div[3]/div[8]/text().34",
+"t": "part",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/18,/1:30,/1:34)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[8]/text().329",
+"e": "/body/DocFragment[14]/body/div[3]/div[8]/text().331",
+"t": "or",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/18,/1:329,/1:331)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[8]/text().594",
+"e": "/body/DocFragment[14]/body/div[3]/div[8]/text().597",
+"t": "the",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/18,/1:594,/1:597)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[9]/text().164",
+"e": "/body/DocFragment[14]/body/div[3]/div[9]/text().169",
+"t": "terms",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/20,/1:164,/1:169)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[9]/text().444",
+"e": "/body/DocFragment[14]/body/div[3]/div[9]/text().450",
+"t": "follow",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/20,/1:444,/1:450)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[10]/text().197",
+"e": "/body/DocFragment[14]/body/div[3]/div[10]/text().202",
+"t": "works",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/22,/1:197,/1:202)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[10]/text().487",
+"e": "/body/DocFragment[14]/body/div[3]/div[10]/text().497",
+"t": "derivative",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/22,/1:487,/1:497)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[10]/text().791",
+"e": "/body/DocFragment[14]/body/div[3]/div[10]/text().798",
+"t": "keeping",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/22,/1:791,/1:798)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[11]/text().38",
+"e": "/body/DocFragment[14]/body/div[3]/div[11]/text().43",
+"t": "where",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/24,/1:38,/1:43)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[11]/text().325",
+"e": "/body/DocFragment[14]/body/div[3]/div[11]/text().335",
+"t": "performing",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/24,/1:325,/1:335)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[13]/text().8",
+"e": "/body/DocFragment[14]/body/div[3]/div[13]/text().11",
+"t": "The",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/28,/1:8,/1:11)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[13]/text().343",
+"e": "/body/DocFragment[14]/body/div[3]/div[13]/text().349",
+"t": "viewed",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/2[chap12]/28,/1:343,/1:349)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/blockquote/div/text()[1].230",
+"e": "/body/DocFragment[14]/body/div[3]/blockquote/div/text()[1].239",
+"t": "Gutenberg",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/4/4/2[chap12],/1:246,/1:255)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[14]/text().62",
+"e": "/body/DocFragment[14]/body/div[3]/div[14]/text().69",
+"t": "derived",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/6,/1:62,/1:69)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[14]/text().350",
+"e": "/body/DocFragment[14]/body/div[3]/div[14]/text().359",
+"t": "providing",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/6,/1:350,/1:359)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[14]/text().628",
+"e": "/body/DocFragment[14]/body/div[3]/div[14]/text().630",
+"t": "in",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/6,/1:628,/1:630)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[15]/text().229",
+"e": "/body/DocFragment[14]/body/div[3]/div[15]/text().232",
+"t": "the",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/8,/1:229,/1:232)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[16]/text().99",
+"e": "/body/DocFragment[14]/body/div[3]/div[16]/text().101",
+"t": "or",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/10,/1:99,/1:101)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[17]/text().198",
+"e": "/body/DocFragment[14]/body/div[3]/div[17]/text().202",
+"t": "with",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/12,/1:198,/1:202)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[18]/text().212",
+"e": "/body/DocFragment[14]/body/div[3]/div[18]/text().222",
+"t": "distribute",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/14,/1:212,/1:222)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[18]/text().503",
+"e": "/body/DocFragment[14]/body/div[3]/div[18]/text().505",
+"t": "of",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/14,/1:503,/1:505)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[19]/text().28",
+"e": "/body/DocFragment[14]/body/div[3]/div[19]/text().31",
+"t": "for",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/16,/1:28,/1:31)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/ul/li[1]/text().6",
+"e": "/body/DocFragment[14]/body/div[3]/ul/li[1]/text().9",
+"t": "pay",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/20/2,/1:6,/1:9)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/ul/li[1]/text().286",
+"e": "/body/DocFragment[14]/body/div[3]/ul/li[1]/text().291",
+"t": "under",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/20/2,/1:318,/1:323)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/ul/li[1]/text().604",
+"e": "/body/DocFragment[14]/body/div[3]/ul/li[1]/text().611",
+"t": "Archive",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/20/2,/1:676,/1:683)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/ul/li[2]/text().144",
+"e": "/body/DocFragment[14]/body/div[3]/ul/li[2]/text().149",
+"t": "agree",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/20/4,/1:160,/1:165)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/ul/li[3]/text().34",
+"e": "/body/DocFragment[14]/body/div[3]/ul/li[3]/text().43",
+"t": "paragraph",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/20/6,/1:34,/1:43)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/ul/li[4]/text().61",
+"e": "/body/DocFragment[14]/body/div[3]/ul/li[4]/text().73",
+"t": "distribution",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/20/8,/1:69,/1:81)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[21]/text().260",
+"e": "/body/DocFragment[14]/body/div[3]/div[21]/text().267",
+"t": "manager",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/22,/1:260,/1:267)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[23]/text().208",
+"e": "/body/DocFragment[14]/body/div[3]/div[23]/text().217",
+"t": "Gutenberg",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/26,/1:208,/1:217)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[23]/text().553",
+"e": "/body/DocFragment[14]/body/div[3]/div[23]/text().561",
+"t": "computer",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/26,/1:553,/1:561)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[24]/text().226",
+"e": "/body/DocFragment[14]/body/div[3]/div[24]/text().229",
+"t": "and",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/28,/1:226,/1:229)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[24]/text().551",
+"e": "/body/DocFragment[14]/body/div[3]/div[24]/text().552",
+"t": "F",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/28,/1:551,/1:552)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[25]/text().40",
+"e": "/body/DocFragment[14]/body/div[3]/div[25]/text().46",
+"t": "REFUND",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/30,/1:40,/1:46)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[25]/text().296",
+"e": "/body/DocFragment[14]/body/div[3]/div[25]/text().297",
+"t": "a",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/30,/1:296,/1:297)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[25]/text().583",
+"e": "/body/DocFragment[14]/body/div[3]/div[25]/text().589",
+"t": "choose",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/30,/1:583,/1:589)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[26]/text().62",
+"e": "/body/DocFragment[14]/body/div[3]/div[26]/text().65",
+"t": "set",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/32,/1:62,/1:65)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[27]/text().64",
+"e": "/body/DocFragment[14]/body/div[3]/div[27]/text().74",
+"t": "warranties",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/34,/1:64,/1:74)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[27]/text().378",
+"e": "/body/DocFragment[14]/body/div[3]/div[27]/text().388",
+"t": "invalidity",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/34,/1:378,/1:388)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[28]/text().217",
+"e": "/body/DocFragment[14]/body/div[3]/div[28]/text().226",
+"t": "agreement",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/36,/1:217,/1:226)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[28]/text().549",
+"e": "/body/DocFragment[14]/body/div[3]/div[28]/text().558",
+"t": "Gutenberg",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/36,/1:549,/1:558)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[30]/text().145",
+"e": "/body/DocFragment[14]/body/div[3]/div[30]/text().153",
+"t": "obsolete",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/40,/1:145,/1:153)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[31]/text().159",
+"e": "/body/DocFragment[14]/body/div[3]/div[31]/text().166",
+"t": "Project",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/42,/1:159,/1:166)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[31]/text().505",
+"e": "/body/DocFragment[14]/body/div[3]/div[31]/text().508",
+"t": "can",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/42,/1:505,/1:508)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[33]/text().154",
+"e": "/body/DocFragment[14]/body/div[3]/div[33]/text().157",
+"t": "and",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/46,/1:154,/1:157)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[34]/text().16",
+"e": "/body/DocFragment[14]/body/div[3]/div[34]/text().17",
+"t": "s",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/48,/1:16,/1:17)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[35]/text().47",
+"e": "/body/DocFragment[14]/body/div[3]/div[35]/text().54",
+"t": "Project",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/50,/1:47,/1:54)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[36]/text().296",
+"e": "/body/DocFragment[14]/body/div[3]/div[36]/text().304",
+"t": "outdated",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/52,/1:296,/1:304)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[37]/text()[1].194",
+"e": "/body/DocFragment[14]/body/div[3]/div[37]/text()[1].195",
+"t": "a",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/54,/1:194,/1:195)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[38]/text().1",
+"e": "/body/DocFragment[14]/body/div[3]/div[38]/text().6",
+"t": "While",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/56,/1:1,/1:6)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[39]/text().84",
+"e": "/body/DocFragment[14]/body/div[3]/div[39]/text().94",
+"t": "concerning",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/58,/1:84,/1:94)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[40]/text().203",
+"e": "/body/DocFragment[14]/body/div[3]/div[40]/text().209",
+"t": "donate",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/60,/1:203,/1:209)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[42]/text().216",
+"e": "/body/DocFragment[14]/body/div[3]/div[42]/text().222",
+"t": "eBooks",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/64,/1:216,/1:222)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[43]/text().246",
+"e": "/body/DocFragment[14]/body/div[3]/div[43]/text().256",
+"t": "particular",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/66,/1:246,/1:256)"
+},
+{
+"s": "/body/DocFragment[14]/body/div[3]/div[45]/text().206",
+"e": "/body/DocFragment[14]/body/div[3]/div[45]/text().209",
+"t": "our",
+"cfi": "epubcfi(/6/28!/4/4/2[pg-footer]/70,/1:206,/1:209)"
+}
+]
+}

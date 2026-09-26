@@ -73,7 +73,8 @@ function useMenu() {
     closeTimer.current = setTimeout(() => setOpen(false), 140);
   };
   const onTriggerClick = () => {
-    const next = !open;
+    clearClose();
+    const next = !pinnedRef.current;
     pinnedRef.current = next;
     setOpen(next);
   };

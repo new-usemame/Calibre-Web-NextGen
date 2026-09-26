@@ -10,7 +10,7 @@ function setup(options={}){
  const context=vm.createContext({window,Headers});vm.runInContext(classic,context);
  return {classic:window.webreaderDeviceHeaders,storage,count:()=>mintedCount};
 }
-for(const [name,options,want] of [['existing SPA UUID',{stored:existing},existing],['mint and reuse',{},minted],['replace invalid',{stored:'bad'},minted],['denied get',{denyGet:true},null],['denied set',{denySet:true},null],['crypto unavailable', {noCrypto:true},null],['existing survives crypto unavailable',{stored:existing,noCrypto:true},existing]]){
+for(const [name,options,want] of [['existing SPA UUID ignored',{stored:existing},null],['no identifier minted',{},null],['invalid stored id ignored',{stored:'bad'},null],['denied get',{denyGet:true},null],['denied set',{denySet:true},null],['crypto unavailable', {noCrypto:true},null],['existing survives crypto unavailable',{stored:existing,noCrypto:true},null]]){
  const h=setup(options);for(let i=0;i<2;i++){const result=h.classic(base);assert.equal(result.get(header),want,name);assert.equal(result.get('X-CSRFToken'),base['X-CSRFToken']);assert.equal(result.get('Content-Type'),base['Content-Type'])}
- if(want===minted)assert.equal(h.count(),1);console.log('PASS',name,'preserves base headers');
+ assert.equal(h.count(),0, 'account source never mints an installation id');console.log('PASS',name,'preserves base headers');
 }

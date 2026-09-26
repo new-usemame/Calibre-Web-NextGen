@@ -26,6 +26,9 @@ def init_cache_busting(app):
     because whenever the resource changes, so does its URL.
     """
 
+    if app.extensions.get("cps_cache_busting_registered"):
+        return
+
     static_folder = os.path.join(app.static_folder, '')  # path to the static file folder, with trailing slash
 
     hash_table = {}  # map of file hashes
@@ -74,3 +77,5 @@ def init_cache_busting(app):
     # Replace the default static file view with our debusting view.
     original_static_view = app.view_functions["static"]
     app.view_functions["static"] = debusting_static_view
+
+    app.extensions["cps_cache_busting_registered"] = True

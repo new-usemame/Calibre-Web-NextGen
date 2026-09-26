@@ -15,7 +15,7 @@ import logging
 
 import pytest
 
-from tests.unit.test_1925_kobo_sync_dedownload import sync_harness
+from tests.unit.test_1925_kobo_sync_dedownload import sync_harness, _record_downloads
 
 
 pytestmark = pytest.mark.unit
@@ -112,6 +112,8 @@ def _establish_acknowledged_ledgers(sync_harness, monkeypatch):
         "ChangedEntitlement": 1,
         "IsRemoved": 1,
     }
+    # The reader downloads each book it was sent New.
+    _record_downloads(sync_harness, initial)
 
     old_clock = datetime(2026, 8, 29, 2, 19, 2)
     book_rows = sync_harness.session.query(
@@ -606,27 +608,50 @@ def test_forensic_empty_flat_markers_reset_suppresses_without_restamp(
     }
 
 
-def test_forensic_classification_migration_restamps_all_and_emits_new(
+def test_forensic_classification_migration_keeps_a_single_kobo_ledger_silent(
     sync_harness, monkeypatch,
 ):
-    """The v0-to-v1 audit deletes uncertain rows, then reannounces them New."""
-    from cps import ub
+    """The v0-to-v1 audit of a real v4.1.43 ledger announces no held book.
 
-    _establish_acknowledged_ledgers(sync_harness, monkeypatch)
+    The audit only ever meets rows v4.1.43 wrote, so they are rewritten into
+    that shape first: fingerprints that hash ``DownloadUrls[].Size`` (today's
+    schema-2 hash does not), ``payload_schema_version`` 1 and ``change_basis``
+    NULL from the upgrade's ALTER TABLE.  On main this candidate reproduced
+    the incident's wire exactly: the audit deleted the ledger, so a stale
+    cursor reannounced all 18 held books New with the tombstone replayed --
+    what the reporters saw as books flipping to "Download".  With one paired
+    Kobo the rows are now kept and, their books unchanged since the rows were
+    written, stamped with the current change basis, so the same stale cursor
+    is answered by the declared-shape re-fingerprint (#1953): nothing for the
+    held books, and the rows end at the current schema.  The deleted-book rows
+    are still cleared, as on main, because v4.1.43's seed marked every
+    tombstone acknowledged; the one old removal is therefore sent once more.
+    """
+    from cps import kobo, ub
+    from tests.unit.test_1925_kobo_sync_dedownload import (
+        _rewrite_ledger_as_v4_1_43,
+    )
+
+    books, _token = _establish_acknowledged_ledgers(sync_harness, monkeypatch)
+    assert _rewrite_ledger_as_v4_1_43(sync_harness) == _HELD_BOOK_COUNT
     before = _snapshot(sync_harness)
     seed = sync_harness.session.get(
         ub.KoboDeviceEntitlementSeed, sync_harness.device.id,
     )
     seed.classification_version = 0
     sync_harness.session.commit()
+    expected_bases = {
+        book.id: kobo._book_entitlement_change_basis(book.last_modified, None)
+        for book in books
+    }
 
     page = sync_harness.sync(_stale_valid_token(), acknowledge=False)
-    assert sync_harness.session.query(
-        ub.KoboDeviceBookEntitlement,
-    ).filter_by(device_id=sync_harness.device.id).count() == 0
-    assert sync_harness.session.query(
-        ub.KoboDeviceDeletedEntitlement,
-    ).filter_by(device_id=sync_harness.device.id).count() == 0
+    audited = _snapshot(sync_harness)
+    assert {
+        book_id: row["basis"] for book_id, row in audited["books"].items()
+    } == expected_bases
+    assert {row["schema"] for row in audited["books"].values()} == {1}
+    assert audited["deleted"] == {}
     assert sync_harness.session.get(
         ub.KoboDeviceEntitlementSeed, sync_harness.device.id,
     ).classification_version == 1
@@ -638,12 +663,24 @@ def test_forensic_classification_migration_restamps_all_and_emits_new(
     signature = _signature(before, after)
     _print_result("classification_v0_to_v1", page, ack, signature)
 
-    assert _matches_incident_signature(signature)
     assert _wire_counts(page) == {
-        "NewEntitlement": _HELD_BOOK_COUNT,
+        "NewEntitlement": 0,
         "ChangedEntitlement": 1,
         "IsRemoved": 1,
     }
+    assert _wire_counts(ack) == {
+        "NewEntitlement": 0,
+        "ChangedEntitlement": 0,
+        "IsRemoved": 0,
+    }
+    assert set(after["books"]) == set(before["books"])
+    assert {row["schema"] for row in after["books"].values()} == {
+        kobo.ENTITLEMENT_PAYLOAD_SCHEMA_VERSION,
+    }
+    assert {
+        book_id: row["basis"] for book_id, row in after["books"].items()
+    } == expected_bases
+    assert set(after["deleted"]) == {_DELETED_UUID}
 
 
 def test_forensic_payload_schema_transition_restamps_without_wire_entitlement(

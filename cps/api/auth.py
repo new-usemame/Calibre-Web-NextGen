@@ -11,7 +11,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import api_v1
 from .serializers import serialize_user
-from .. import ub, config, constants, limiter, services, logger
+from .. import ub, config, constants, limiter, services, logger, rate_limits
 from ..config_sql import uploads_enabled
 from ..progress_syncing.settings import is_koreader_sync_enabled
 from ..cw_login import current_user, login_user
@@ -152,13 +152,7 @@ def _check_rate_limit():
 
 def _clear_current_rate_limits():
     """Clear every bucket evaluated for the successful request, best-effort."""
-    if limiter is None:
-        return
-    try:
-        for request_limit in limiter.current_limits:
-            limiter.limiter.storage.clear(request_limit.key)
-    except Exception as ex:
-        log.error("Connection error clearing limiter backend after login: %s", ex)
+    rate_limits.clear_current_limits(limiter)
 
 
 @api_v1.route("/auth/csrf")
@@ -278,8 +272,8 @@ def auth_login():
     if rate_limit_error is not None:
         return rate_limit_error
 
-    # I2: Honour config_disable_standard_login.
-    if config.config_disable_standard_login:
+    # I2: Honour "Disable Standard Login" while SSO can replace it.
+    if config.standard_login_disabled():
         return jsonify({"error": {"code": "standard_login_disabled",
                                   "message": "Standard login is disabled"}}), 403
 
@@ -302,6 +296,7 @@ def auth_login():
                 login_result, error = services.ldap.bind_user(user.name, password)
                 if login_result:
                     login_user(user, remember=bool(data.get("remember")))
+                    _clear_current_rate_limits()
                     return jsonify(_me_payload(user))
                 if error is not None:
                     log.error("LDAP bind error for '%s': %s", username, error)
@@ -317,7 +312,7 @@ def auth_login():
                 if login_result:
                     ldap_user_details = services.ldap.get_object_details(username)
                     if ldap_user_details:
-                        from . import admin as admin_mod
+                        from .. import admin as admin_mod
                         create_result, error_msg = admin_mod.ldap_import_create_user(
                             username, ldap_user_details)
                         if create_result:
@@ -327,6 +322,7 @@ def auth_login():
                                 log.info("LDAP auto-created user '%s' via SPA login",
                                          username)
                                 login_user(user, remember=bool(data.get("remember")))
+                                _clear_current_rate_limits()
                                 return jsonify(_me_payload(user))
                     log.warning("LDAP auth succeeded but user creation failed for '%s'",
                                 username)
@@ -372,7 +368,7 @@ def auth_config():
         "public_registration": bool(getattr(config, "config_public_reg", False)),
         "register_email": bool(getattr(config, "config_register_email", False)),
         "mail_configured": mail_ok,
-        "standard_login_disabled": bool(getattr(config, "config_disable_standard_login", False)),
+        "standard_login_disabled": config.standard_login_disabled(),
         "oauth_providers": _oauth_providers(),
         "remote_login": remote_login,
         "remote_login_url": remote_login_url,

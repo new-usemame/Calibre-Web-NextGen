@@ -206,6 +206,158 @@ def test_positions_crengine_does_not_have_are_refused_not_moved():
         "/body/DocFragment[1]/body/div/h2/text()[1].0")
 
 
+def _head_voids_engine_words():
+    """crengine's words of ``head-voids.epub``, by DocFragment (spine order in
+    ``engine/make_head_voids.py``: 1 open.html, 2 closed.html, 3 bodyvoid.html,
+    4 badhead.html, 5 open.xhtml)."""
+    by_fragment = {}
+    for word in _json("engine-words.json")["head-voids"]["words"]:
+        number = int(re.match(r"/body/DocFragment\[(\d+)\]", word["s"]).group(1))
+        by_fragment.setdefault(number, []).append(word)
+    return by_fragment
+
+
+def test_html_chapter_with_open_head_voids_converts_like_its_self_closed_twin():
+    # <meta charset="utf-8"> and <link ...> left open in an .html chapter's
+    # head: the browser's HTML parser treats them as void and crengine is
+    # lenient, so both readers see the tree of the self-closed twin.
+    epub = FIXTURES / "head-voids.epub"
+    oracle = _EpubJs(epub)
+    words = _head_voids_engine_words()
+    twins = {(w["s"], w["e"]) for w in words[2]}
+    converted = 0
+    for word in words[1]:
+        twin_s, twin_e = (word[k].replace("DocFragment[1]", "DocFragment[2]") for k in "se")
+        # crengine itself reads the two files as the same tree.
+        assert (twin_s, twin_e) in twins, word
+        cfi = kx.xpointers_to_cfi_range(epub, word["s"], word["e"])
+        twin_cfi = kx.xpointers_to_cfi_range(epub, twin_s, twin_e)
+        if "/body/p[3]/" in word["s"]:
+            # The verse is white-space: pre-wrap by the stylesheet the open
+            # <link> names: the repaired head still brings its CSS along.
+            assert cfi is None and twin_cfi is None, word
+            continue
+        assert twin_cfi is not None, word
+        assert cfi == twin_cfi.replace("epubcfi(/6/4!", "epubcfi(/6/2!", 1), word
+        framed = re.sub(r"\s+", " ", oracle.range_text(twin_cfi))
+        assert framed == word["t"], (word, framed)
+        assert kx.cfi_range_to_xpointers(epub, cfi) == (word["s"], word["e"]), word
+        point = kx.xpointer_to_cfi(epub, word["s"])
+        assert point is not None and kx.cfi_to_xpointer(epub, point) == word["s"], word
+        converted += 1
+    assert converted > 60
+
+
+def test_open_voids_are_repaired_only_in_the_head_of_an_html_chapter():
+    epub = FIXTURES / "head-voids.epub"
+    words = _head_voids_engine_words()
+    # 3: an open <br> in the BODY (crengine even puts the following text
+    #    inside it); 4: a head still malformed once its voids are closed;
+    # 5: an .xhtml member, which the browser parses as XML and cannot render.
+    for number in (3, 4, 5):
+        assert words[number]
+        for word in words[number]:
+            assert kx.xpointers_to_cfi_range(epub, word["s"], word["e"]) is None, word
+            assert kx.xpointer_to_cfi(epub, word["s"]) is None, word
+    for cfi in ("epubcfi(/6/6!/4/2/1:0)", "epubcfi(/6/8!/4/2/1:0)",
+                "epubcfi(/6/10!/4/4/1:0)"):
+        assert kx.cfi_to_xpointer(epub, cfi) is None, cfi
+    # The same body in the .html twins does convert.
+    assert kx.cfi_to_xpointer(epub, "epubcfi(/6/2!/4/4/1:0)") == (
+        "/body/DocFragment[1]/body/p[1]/text().0")
+
+
+def test_gutenberg_html_chapters_map_to_the_cfis_chromium_gives_their_words():
+    # alice-pg11.epub is today's Project Gutenberg build: every chapter has
+    # <a id="…"/> or <div/>, which the browser's HTML parser reads as OPEN
+    # tags -- the <a> ends up wrapping the rest of the chapter -- while
+    # crengine keeps them empty. Each row pairs crengine's XPointers for a
+    # word with the CFI epub.js itself produced for it in Chromium.
+    epub = FIXTURES / "alice-pg11.epub"
+    words = _json("alice-pg11.browser.json")["words"]
+    failures = []
+    for word in words:
+        cfi = kx.xpointers_to_cfi_range(epub, word["s"], word["e"])
+        back = kx.cfi_range_to_xpointers(epub, word["cfi"])
+        point = kx.xpointer_to_cfi(epub, word["s"])
+        if (cfi != word["cfi"] or back != (word["s"], word["e"])
+                or point is None or kx.cfi_to_xpointer(epub, point) != word["s"]):
+            failures.append((word, cfi, back, point))
+    assert not failures, failures[:3]
+    assert len(words) > 500
+    # The tree really differs: the browser's paths run through the <a>.
+    assert any("[chap" in w["cfi"] or "[pgepubid" in w["cfi"] for w in words)
+
+
+def _html_book(tmp_path, bodies):
+    """An EPUB whose spine is one .html chapter per body."""
+    manifest = "".join(f'<item id="c{i}" href="c{i}.html" media-type="application/xhtml+xml"/>'
+                       for i in range(len(bodies)))
+    spine = "".join(f'<itemref idref="c{i}"/>' for i in range(len(bodies)))
+    path = tmp_path / "book.epub"
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("mimetype", "application/epub+zip")
+        z.writestr("META-INF/container.xml", '<?xml version="1.0"?><container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container"><rootfiles><rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/></rootfiles></container>')
+        z.writestr("OEBPS/content.opf", '<?xml version="1.0"?><package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id"><metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="id">t</dc:identifier><dc:title>t</dc:title><dc:language>en</dc:language></metadata>'
+                   f"<manifest>{manifest}</manifest><spine>{spine}</spine></package>")
+        for i, body in enumerate(bodies):
+            z.writestr(f"OEBPS/c{i}.html", '<?xml version="1.0" encoding="utf-8"?>\n'
+                       '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>t</title></head>'
+                       f"<body>{body}</body></html>")
+    return path
+
+
+def test_chapters_the_browser_reorders_or_swallows_are_refused(tmp_path):
+    epub = _html_book(tmp_path, [
+        # 1: <div/> swallows what follows; the text is unchanged: modelled.
+        '<p>before</p><div/><p>after</p>',
+        # 2: <script/> opens a script: the rest of the body becomes its source.
+        '<p>before</p><script src="x.js"/><p>after</p>',
+        # 3: text inside a table but outside a cell is moved before the table.
+        '<div/><table><tr><td>cell</td></tr>loose<tr><td>two</td></tr></table><p>after</p>',
+        # 4: the same with nothing self-closed: the <p> moves out before the
+        # table, so the <p> after it is one element further on in the browser.
+        '<table><tbody><tr><td>cell</td></tr><p>moved</p></tbody></table><p>after</p>',
+        # 5: moved text equal to a cell's: the order of strings is unchanged,
+        # only which node is which.
+        '<div/><table><tbody><tr><td>same</td></tr>same</tbody></table>',
+    ])
+    assert kx.xpointer_to_cfi(epub, "/body/DocFragment[1]/body/p[2]/text().0") == (
+        "epubcfi(/6/2!/4/4/2/1:0)")  # <p>after</p> is the swallowing div's child
+    assert kx.xpointer_to_cfi(epub, "/body/DocFragment[2]/body/p[1]/text().0") is None
+    assert kx.xpointer_to_cfi(epub, "/body/DocFragment[3]/body/p/text().0") is None
+    assert kx.xpointer_to_cfi(epub, "/body/DocFragment[4]/body/p/text().0") is None
+    assert kx.xpointer_to_cfi(epub, "/body/DocFragment[5]/body/table/tbody/tr/td/text().0") is None
+
+
+def test_without_html5lib_a_restructured_chapter_is_refused_as_before(tmp_path, monkeypatch):
+    epub = tmp_path / "copy.epub"  # nothing of it cached yet
+    shutil.copy(FIXTURES / "alice-pg11.epub", epub)
+    word = _json("alice-pg11.browser.json")["words"][100]
+    monkeypatch.setitem(__import__("sys").modules, "html5lib", None)
+    assert kx.xpointers_to_cfi_range(epub, word["s"], word["e"]) is None
+    assert kx.cfi_range_to_xpointers(epub, word["cfi"]) is None
+
+
+def test_a_restructured_chapter_above_the_size_cap_is_refused_not_parsed_twice(
+        tmp_path, monkeypatch):
+    epub = _html_book(tmp_path, ['<p>before</p><div/><p>after</p>'])
+    monkeypatch.setattr(kx, "MAX_HTML5_CHAPTER_BYTES", 64)  # the chapter is ~150 bytes
+    assert kx.xpointer_to_cfi(epub, "/body/DocFragment[1]/body/p[2]/text().0") is None
+    assert kx.cfi_to_xpointer(epub, "epubcfi(/6/2!/4/4/2/1:0)") is None
+
+
+def test_an_unreadable_chapter_is_parsed_once_not_on_every_request(tmp_path, monkeypatch):
+    epub = tmp_path / "copy.epub"  # a fresh path: nothing of it is cached yet
+    shutil.copy(FIXTURES / "head-voids.epub", epub)
+    loads = []
+    real = kx._load_chapter
+    monkeypatch.setattr(kx, "_load_chapter", lambda *a: loads.append(a) or real(*a))
+    for _ in range(3):
+        assert kx.cfi_to_xpointer(epub, "epubcfi(/6/8!/4/2/1:0)") is None
+    assert len(loads) == 1
+
+
 def test_rig_highlights_convert_both_ways_only_when_they_frame_their_text():
     epub = FIXTURES / "metamorphosis-221.epub"
     shudder, alth = _json("rig-web-rows.json")

@@ -1,0 +1,19 @@
+{
+  "area": "shelves",
+  "body": "P2. #2078 cps/api/shelves.py:124,cps/shelf.py:907,cps/opds.py:987 bypass membership for public-shelf listings. Book detail cps/api/books.py:490 and cover helper1870 require browse_global; download helper2948-2957 requires personal membership for nonadmin. Real SQLite/helper probe: managed personal viewer sees public book1, regular lookup=None, actual get_download_link HTTP404; same user monolibrary resolves1. Managed viewer cannot self-add. OPDS acquisition also broken without membership for nonadmin browse-global viewer. Define safe public-resource continuation or actionable discovery flow, retaining existing content restrictions/private shelf ACLs. No demonstrated private-data leak. Main1ec1bfe677 audit2026-09-08.",
+  "created": "2026-09-08",
+  "id": "F-36b518",
+  "refs": [
+    "#2078"
+  ],
+  "resolution": {
+    "commit": "04bbc96a33",
+    "date": "2026-09-08",
+    "note": "Explicit public-shelf continuation through filtered detail, cover, browser reader and web/OPDS acquisition; private content, role and selected-shelf gates retained. Real SQLite HTTP red/green flow and 492 adjacent tests passed. See docs/shared-book-and-smart-shelf-audit-verification.md; frontend combined verification remains with release audit.",
+    "release": ""
+  },
+  "severity": "correctness",
+  "source": "audit",
+  "status": "resolved",
+  "title": "Public shelf entries advertise resources unavailable to personal-library viewers"
+}

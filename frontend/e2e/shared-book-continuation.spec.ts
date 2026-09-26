@@ -1,0 +1,131 @@
+import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
+
+async function csrf(page: Page) {
+  const response = await page.request.get('/api/v1/auth/csrf');
+  expect(response.ok()).toBeTruthy();
+  return { 'X-CSRFToken': (await response.json()).csrf_token };
+}
+
+test('a public shelf offers reading and downloads without adding personal membership', async ({ page: admin, secondaryUser }) => {
+  const page = secondaryUser.page;
+  const headers = await csrf(admin);
+  expect((await admin.request.post(`/api/v1/admin/users/${secondaryUser.id}`, {
+    headers, data: { roles: { browse_global: false }, library_mode: 'personal_library' },
+  })).ok()).toBeTruthy();
+  const catalog = await (await page.request.get('/api/v1/books?sort=new&per_page=200')).json();
+  const readable: { id: number; title: string }[] = [];
+  for (const candidate of catalog.items) {
+    const detail = await (await page.request.get(`/api/v1/books/${candidate.id}`)).json();
+    if (detail.formats.some((format: { format: string }) => format.format === 'EPUB')) {
+      readable.push(candidate);
+      if (readable.length === 2) break;
+    }
+  }
+  expect(readable.length, 'fixture needs two readable EPUBs').toBe(2);
+  // `selected` leaves the reader's library and comes back through the shelf;
+  // `member` stays in it as the control.
+  const [selected, member] = readable;
+  expect((await page.request.delete(`/api/v1/books/${selected.id}/my-library`, {
+    headers: await csrf(page),
+  })).ok()).toBeTruthy();
+  const created = await admin.request.post('/api/v1/shelves', {
+    headers, data: { name: `Shared continuation ${secondaryUser.username}`, is_public: true },
+  });
+  expect(created.ok()).toBeTruthy();
+  const shelf = await created.json();
+  try {
+    expect((await admin.request.post(`/api/v1/shelves/${shelf.id}/books/${selected.id}`, { headers })).ok()).toBeTruthy();
+    await page.goto(`/app/shelf/${shelf.id}`);
+    await page.getByRole('link', { name: `Open details for ${selected.title}`, exact: true }).click();
+    await expect(page.getByRole('link', { name: 'Read now', exact: true })).toBeVisible();
+    // Downloads live in the book page's Files section, one row per format.
+    const download = page.getByTestId('book-files').getByRole('listitem')
+      .filter({ hasText: 'EPUB' }).locator('a[download]');
+    await expect(download).toBeVisible();
+    const response = await page.request.get((await download.getAttribute('href'))!);
+    expect(response.ok()).toBeTruthy();
+    expect((await response.body()).length).toBeGreaterThan(0);
+    // Reading through a public shelf never offers membership changes, nor a
+    // private cover: the server keeps one only for the reader's own books.
+    await expect(page.getByTestId('remove-from-my-library')).toHaveCount(0);
+    await expect(page.getByTestId('edit-cover-action')).toHaveCount(0);
+    await page.getByTestId('book-actions-menu').click();
+    const menu = page.getByTestId('book-actions-menu-list');
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: 'Add to library', exact: true })).toHaveCount(0);
+    await expect(menu.getByRole('menuitem', { name: 'Not in your library', exact: true })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: 'Edit cover…', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await page.getByRole('link', { name: 'Read now', exact: true }).click();
+    await expect(page).toHaveURL(/\/read\//);
+    await expect(page.locator('iframe').first()).toBeVisible();
+    // Cover pages can be image-only (including SVG wrappers). Exercise an
+    // actual page turn and require readable content from the next section.
+    await page.getByRole('button', { name: 'Next page', exact: true }).click();
+    await expect(page.frameLocator('iframe').first().locator('body')).not.toBeEmpty();
+    // The reader's own reading places load for a shared book too (#2284
+    // review F4); without membership the panel used to show only an error.
+    await page.getByRole('button', { name: 'Reading places', exact: true }).click();
+    const places = page.getByRole('dialog', { name: 'Reading places', exact: true });
+    await expect(places.getByText('No saved reading places yet.', { exact: true })
+      .or(places.getByRole('list'))).toBeVisible();
+    await expect(places.getByRole('alert')).toHaveCount(0);
+    await places.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(places).toHaveCount(0);
+    const detail = await (await page.request.get(`/api/v1/books/${selected.id}`)).json();
+    expect(detail.in_my_library).toBe(false);
+    expect(detail.accessible_via_public_shelf).toBe(true);
+    // The reader's own book keeps its cover editor.
+    await page.goto(`/app/book/${member.id}`);
+    await expect(page.getByTestId('edit-cover-action')).toBeVisible();
+    // Nor does its menu call it missing: removal is the visible button.
+    await expect(page.getByTestId('remove-from-my-library')).toBeVisible();
+    await page.getByTestId('book-actions-menu').click();
+    const memberMenu = page.getByTestId('book-actions-menu-list');
+    await expect(memberMenu.getByRole('menuitem', { name: /^Mark as (?:un)?read$/ })).toBeVisible();
+    await expect(memberMenu.getByRole('menuitem', { name: 'Not in your library', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    await expect(memberMenu).toHaveCount(0);
+    // The classic book page opens the shared book as well, but keeps sending
+    // and the library's own controls for the reader's library, as the new UI
+    // does: sending looks there, and the book is not theirs to mark or remove.
+    expect((await page.request.post('/api/v1/account/profile', {
+      headers: await csrf(page), data: { kindle_mail: 'shared-reader@example.com' },
+    })).ok()).toBeTruthy();
+    // A private shelf of the reader's own gives the page a shelf to offer.
+    const ownShelf = await page.request.post('/api/v1/shelves', {
+      headers: await csrf(page), data: { name: `Own shelf ${secondaryUser.username}`, is_public: false },
+    });
+    expect(ownShelf.ok()).toBeTruthy();
+    const origin = new URL(page.url()).origin;
+    await page.context().addCookies([{ name: 'cwng_prefer_spa', value: '0', url: origin }]);
+    const libraryControls = ['#sendToEReaderBtn', '#toggle-read-btn', '#toggle-favorite-btn',
+      '#toggle-archive-btn', '#remove-from-my-library-btn', '#toggle-hide-btn', '#addShelfMenu',
+      '#add-shelf-pill'];
+    await page.goto(`/book/${selected.id}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#title')).toHaveText(selected.title);
+    for (const control of libraryControls) {
+      await expect(page.locator(control), control).toHaveCount(0);
+    }
+    await page.goto(`/book/${member.id}`, { waitUntil: 'domcontentloaded' });
+    await expect(page.locator('#title')).toHaveText(member.title);
+    for (const control of libraryControls) {
+      await expect(page.locator(control), control).toBeAttached();
+    }
+    await page.context().clearCookies({ name: 'cwng_prefer_spa' });
+    expect((await page.request.post(`/api/v1/shelves/${(await ownShelf.json()).id}/delete`, {
+      headers: await csrf(page),
+    })).ok()).toBeTruthy();
+    expect((await admin.request.post(`/api/v1/admin/users/${secondaryUser.id}`, {
+      headers, data: { roles: { viewer: false, download: false } },
+    })).ok()).toBeTruthy();
+    await page.goto(`/app/book/${selected.id}`);
+    await expect(page.getByRole('heading', { name: selected.title, exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Read now', exact: true })).toHaveCount(0);
+    await expect(page.locator('a[download]')).toHaveCount(0);
+  } finally {
+    expect((await admin.request.post(`/api/v1/shelves/${shelf.id}/delete`, { headers })).ok()).toBeTruthy();
+  }
+});

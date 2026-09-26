@@ -10,9 +10,12 @@ import shutil
 import stat
 import sys
 import json
+import threading
 
 from sqlalchemy import Column, String, Integer, SmallInteger, Boolean, BLOB, JSON
-from sqlalchemy.exc import OperationalError
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import text
 from sqlalchemy import exists
 from cryptography.fernet import Fernet
@@ -318,9 +321,16 @@ class ConfigSQL(object):
     # pylint: disable=no-member
     def __init__(self):
         self.__dict__["dirty"] = list()
+        # The thread that serves web requests; see _require_serving_thread().
+        self.__dict__["_serving_thread"] = None
         self.cli = None
 
     def init_config(self, session, secret_key, cli):
+        # create_app() runs this on the thread that goes on to serve requests
+        # (gevent's hub, without monkey-patching, so every request greenlet
+        # shares it).  The native id is used because it stays the OS thread's
+        # even if gevent ever patches threading.get_ident().
+        self.__dict__["_serving_thread"] = threading.get_native_id()
         self._session = session
         self._settings = None
         self.db_configured = None
@@ -447,6 +457,24 @@ class ConfigSQL(object):
 
     def get_mail_settings(self):
         return {k: v for k, v in self.__dict__.items() if k.startswith('mail_')}
+
+    def standard_login_disabled(self):
+        """Whether the username/password login is actually withheld.
+
+        "Disable Standard Login" only takes effect while OAuth is the login type
+        and a provider is registered to sign in with instead. The flag survives
+        a switch back to standard or LDAP login and every provider being turned
+        off; honouring it then hides the only way in (discussion #2272).
+        """
+        if not self.config_disable_standard_login:
+            return False
+        if self.config_login_type != constants.LOGIN_OAUTH:
+            return False
+        try:
+            from .oauth_bb import oauth_check
+        except ImportError:
+            return False
+        return bool(oauth_check)
 
     def get_mail_server_configured(self):
         return bool((self.mail_server != constants.DEFAULT_MAIL_SERVER and self.mail_server_type == 0)
@@ -649,9 +677,47 @@ class ConfigSQL(object):
                 return raw.strip()
         return _read_secret_file(os.environ.get("COMICVINE_API_KEY_FILE"))
 
+    def _on_serving_thread(self):
+        serving = self.__dict__.get("_serving_thread")
+        return serving is None or serving == threading.get_native_id()
+
+    def _require_serving_thread(self, operation):
+        """Refuse to touch the session that web requests share from any other thread.
+
+        ``self._session`` is ``ub.session``: one SQLAlchemy Session used by every
+        request greenlet, and a Session is not thread-safe.  Committing it from
+        WorkerThread or the scheduler fails a request that is using it at that
+        moment with "This session is in 'prepared' state", and it writes
+        whatever a request has assigned but not yet validated.  Failing here
+        makes such a caller visible in tests instead of intermittent in
+        production.
+        """
+        if not self._on_serving_thread():
+            raise RuntimeError(
+                "ConfigSQL.{}() must run on the thread that serves web requests; "
+                "background code persists settings with save_fields()".format(operation))
+
+    def _metadata_db_present(self):
+        if not self.config_calibre_dir:
+            return False
+        return os.path.isfile(os.path.join(self.config_calibre_dir, 'metadata.db'))
+
     def load(self):
         """Load all configuration values from the underlying storage."""
+        self._require_serving_thread("load")
         s = self._read_from_storage()  # type: _Settings
+        # save_fields() commits from a task on a session of its own, which
+        # leaves this session's copy of the row as it was; read it afresh.
+        # A new query also recovers a row the session has let go of. If the
+        # database cannot answer now (locked, or a transaction awaiting its
+        # rollback), the copy already held is what a reload has always used.
+        try:
+            fresh = self._session.query(_Settings).populate_existing().first()
+        except SQLAlchemyError as ex:
+            log.warning("Settings reload kept the loaded values: %s", ex)
+        else:
+            if fresh is not None:
+                s = self._settings = fresh
         for k, v in s.__dict__.items():
             if k[0] != '_':
                 if v is None:
@@ -684,11 +750,7 @@ class ConfigSQL(object):
                 log.error('Database error: %s', e)
                 self._session.rollback()
 
-        have_metadata_db = bool(self.config_calibre_dir)
-        if have_metadata_db:
-            db_file = os.path.join(self.config_calibre_dir, 'metadata.db')
-            have_metadata_db = os.path.isfile(db_file)
-        self.db_configured = have_metadata_db
+        self.db_configured = self._metadata_db_present()
         
         from . import cli_param
         if os.environ.get('FLASK_DEBUG'):
@@ -717,7 +779,12 @@ class ConfigSQL(object):
 
     def save(self):
         """Apply all configuration values to the underlying storage."""
+        self._require_serving_thread("save")
         s = self._read_from_storage()  # type: _Settings
+        if sa_inspect(s).detached:
+            # The requests' session let go of the row (closed after a failed
+            # rollback); an expired detached row cannot even be assigned to.
+            s = self._settings = self._session.query(_Settings).first()
 
         for k in self.dirty:
             if k[0] == '_':
@@ -737,10 +804,49 @@ class ConfigSQL(object):
             self._session.rollback()
         self.load()
 
+    def save_fields(self, **values):
+        """Persist exactly ``values`` from a thread that does not serve requests.
+
+        ``save()`` commits the session web requests share and writes every field
+        anyone has assigned (see ``_require_serving_thread``).  This writes only
+        the named settings, through a session of its own on the same database,
+        and applies them to this process after the commit succeeds, so a failed
+        write raises and leaves memory agreeing with app.db.
+
+        Only plain stored settings are accepted: SQLAlchemy would keep a
+        misspelt name on the row object without ever writing it, and an
+        encrypted (``*_e``) setting needs the encryption ``save()`` applies.
+        """
+        stored = sa_inspect(_Settings).column_attrs.keys()
+        for name in values:
+            if name.startswith("_") or name.endswith("_e") or name not in stored:
+                raise AttributeError("{!r} is not a plain stored setting".format(name))
+        session = Session(bind=self._session.get_bind())
+        try:
+            settings = session.query(_Settings).first()
+            if settings is None:
+                raise RuntimeError("app.db has no settings row")
+            for name, value in values.items():
+                setattr(settings, name, value)
+            session.commit()
+        finally:
+            session.close()
+        # Not through __setattr__: that would queue these fields in ``dirty``
+        # as if a request had edited them, for its next save() to write again.
+        self.__dict__.update(values)
+
     def invalidate(self, error=None):
         if error:
             log.error(error)
         log.warning("invalidating configuration")
+        if not self._on_serving_thread():
+            # setup_db() failed during a Calibre DB reconnect on WorkerThread or
+            # the scheduler.  db_configured is not a stored setting, so there is
+            # nothing to save (save() would commit the requests' session and a
+            # request's pending edits).  Leave it as save() -> load() does on
+            # the serving thread: configured exactly when metadata.db exists.
+            self.__dict__["db_configured"] = self._metadata_db_present()
+            return
         self.db_configured = False
         self.save()
 

@@ -69,6 +69,9 @@
 
   /* ---- Color: status ---- */
   --danger:        #e0685f;
+  /* Small danger text on raised/tinted surfaces needs a brighter foreground
+     than the danger fill: 6.26:1 on surface-2, 5.29:1 on its danger-soft hover. */
+  --danger-text:   #ff8f86;
   --danger-soft:   rgba(224, 104, 95, 0.14);
   --success:       #6cc08a;
   --danger-border: rgba(224, 104, 95, 0.32);
@@ -192,6 +195,7 @@
   --hb-support-icon:       #09647d;
   --hb-support-link-hover: #074d61;
   --danger:        #b12318;
+  --danger-text:   var(--danger);
   --danger-soft:   rgba(177, 35, 24, 0.10);
   --success:       #1f7a44;
   /* Shadows are near-invisible on a light surface at dark-theme opacities;
@@ -241,6 +245,7 @@
   --hb-support-icon:       #2f6064;
   --hb-support-link-hover: #254d50;
   --danger:        #9c2c1c;
+  --danger-text:   #8c2315;
   --danger-soft:   rgba(156, 44, 28, 0.12);
   --success:       #3a6b28;
   --elev-1:        0 1px 2px rgba(60,40,10,.10), 0 2px 8px rgba(60,40,10,.07);
@@ -290,6 +295,7 @@
   --hb-support-icon:       #ffffff;
   --hb-support-link-hover: #ffffff;
   --danger:        #ff7c72;
+  --danger-text:   var(--danger);
   --danger-soft:   rgba(255, 124, 114, 0.20);
   --success:       #5ee08a;
 }
@@ -334,6 +340,7 @@
   --hb-support-icon:       #13c3ff;
   --hb-support-link-hover: #a5ecff;
   --danger:        #e57369;
+  --danger-text:   var(--danger);
   --danger-soft:   rgba(229, 115, 105, 0.14);
   --success:       #6cc08a;
   --cover-shadow:  0 6px 18px rgba(0,0,0,.70);

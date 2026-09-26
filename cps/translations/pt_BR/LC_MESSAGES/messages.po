@@ -340,8 +340,8 @@ msgstr ""
 #: cps/admin.py
 #, python-brace-format
 msgid ""
-"Book {0} was not in the sync record for user {1}; last_modified bumped so "
-"the device will receive on next sync"
+"Book {0} was not in the sync record for user {1}; the device will receive it "
+"on next sync"
 msgstr ""
 
 #: cps/admin.py cps/templates/kobo_reconcile.html
@@ -4134,6 +4134,14 @@ msgid "Open search"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Browse the Global Library"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Open device administration"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Editions"
 msgstr ""
 
@@ -4686,6 +4694,14 @@ msgid "(replace cover)"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "1 annotation assigned to this source"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "1 annotation from this source"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "1 selected."
 msgstr ""
 
@@ -4805,6 +4821,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "All books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"All browsers and computers signed in to your account share one Browser "
+"reading source."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5046,13 +5068,11 @@ msgid ""
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Browser reading sources"
+msgid "Browser"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid ""
-"Browsers appear after saving reading progress or annotations. Different "
-"browsers or profiles can appear separately."
+msgid "Browser reading source"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5315,12 +5335,12 @@ msgid "Could not load device annotations."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Could not load duplicates."
-msgstr "Não foi possível carregar duplicados."
+msgid "Could not load devices and browsers."
+msgstr ""
 
 #: cps/spa_strings.py
-msgid "Could not load e-readers."
-msgstr ""
+msgid "Could not load duplicates."
+msgstr "Não foi possível carregar duplicados."
 
 #: cps/spa_strings.py
 msgid "Could not load highlights and notes."
@@ -5336,6 +5356,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not load reading positions."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load removal details. Try again."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5387,8 +5411,16 @@ msgid "Could not reload metadata"
 msgstr "Não foi possível recarregar os metadados"
 
 #: cps/spa_strings.py
+msgid "Could not remove this source. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Could not rename shelf."
 msgstr "Não foi possível renomear a estante."
+
+#: cps/spa_strings.py
+msgid "Could not rename this source. Try again."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Could not request deletion from this device."
@@ -5397,6 +5429,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "Não foi possível redefinir a senha."
+
+#: cps/spa_strings.py
+msgid "Could not restore this source. Try again."
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/shelf_reorder.html
 msgid "Could not save order."
@@ -5749,7 +5785,13 @@ msgid "Devices"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Devices appear here after their first sync."
+msgid "Devices and browsers"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Devices appear after their first sync. Browser appears after saving reading "
+"progress or annotations."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6504,6 +6546,10 @@ msgid "Loading device library…"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Loading devices and browsers…"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Loading new Discover picks."
 msgstr ""
 
@@ -6588,7 +6634,7 @@ msgid "Manage admin role from OAuth group"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Manage e-readers"
+msgid "Manage devices and browsers"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6701,7 +6747,9 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
+msgid ""
+"My Library setup is incomplete for {accounts} account(s). You can retry or "
+"undo."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6813,6 +6861,10 @@ msgid "No contents found."
 msgstr "Nenhum conteúdo encontrado."
 
 #: cps/spa_strings.py
+msgid "No devices or browser reading data yet."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "No duplicate groups found."
 msgstr "Nenhum grupo duplicado encontrado."
 
@@ -6820,10 +6872,6 @@ msgstr "Nenhum grupo duplicado encontrado."
 msgid ""
 "No e-reader is waiting with this code. Check it, or get a new code on the e-"
 "reader."
-msgstr ""
-
-#: cps/spa_strings.py
-msgid "No e-readers yet."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7314,8 +7362,8 @@ msgstr "Aparência da leitura"
 
 #: cps/spa_strings.py
 msgid ""
-"Reading data is kept. Future browser saves can appear under an unidentified "
-"browser source."
+"Reading data is kept. Browser reappears when you next save reading progress "
+"or annotations."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7505,6 +7553,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Retry"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Retry finishes the remaining accounts without changing completed selections. "
+"Undo restores the settings from before setup began."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8305,10 +8359,6 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Mostrar"
-
-#: cps/spa_strings.py
-msgid "Unidentified browser source"
-msgstr ""
 
 #: cps/spa_strings.py
 msgid "Unknown color"
@@ -9475,6 +9525,14 @@ msgstr ""
 #, fuzzy
 msgid "Hardcover Sync"
 msgstr "Ativar Hardcover sync"
+
+#: cps/tasks/hardcover_sync.py
+msgid "Marking books read on Hardcover"
+msgstr ""
+
+#: cps/tasks/hardcover_sync.py
+msgid "Syncing reading progress to Hardcover"
+msgstr ""
 
 #: cps/tasks/kepub_backfill.py
 msgid "Convert Kobo books missing KEPUB"

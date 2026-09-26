@@ -107,6 +107,9 @@ _CHECKSUM_RE = re.compile(r"^[0-9a-fA-F]{32}$")
 # of ':' for internal use.
 PERCENTAGE_ONLY_LOCATOR = "cwng:percentage"
 
+# ``KOSyncProgress.device`` of a row the web reader wrote (#1366).
+WEB_READER_DEVICE = "Web reader"
+
 # Query parameter a client sends on GET to say which position encodings it can
 # act on. Absent means "locator only", which is every plugin released before
 # percentage-only rows existed, so those rows stay invisible to them.
@@ -825,6 +828,54 @@ def record_percentage_only_progress(user_id, book_id, percentage: float,
     return outcome if _return_outcome else True
 
 
+def _exact_xpointer(user_id, book_id, progress_record, document):
+    """XPointer of a web reader's or Kobo's position in the requesting device's file.
+
+    Best-effort: any failure leaves the row served as a percentage.
+    """
+    try:
+        from ...services.koreader_position import (kobo_position_for_device,
+                                                   web_position_for_device)
+        for place in (web_position_for_device, kobo_position_for_device):
+            xpointer = place(user_id=user_id, book_id=book_id,
+                             record=progress_record, document=document)
+            if xpointer:
+                return xpointer
+    except Exception:
+        log.warning("Could not place the %s position exactly for book %s",
+                    getattr(progress_record, "device", None), book_id, exc_info=True)
+    return None
+
+
+def _journal_koreader_report(user_id, internal_device_id, book_id, document,
+                             progress, percentage, observed_at):
+    """Keep this device's own report, and which file it addresses (#324).
+
+    The shared row is keyed by book id, so it cannot say which file its
+    XPointer belongs to; the per-device journal keeps the digest the device
+    reported under. Best-effort, after the progress commit.
+    """
+    from ...services import kobo_resume, koreader_position
+    try:
+        koreader_position.journal_report(
+            ub.session, device_id=internal_device_id, book_id=book_id,
+            document=document, progress=progress, percentage=percentage,
+            observed_at=observed_at,
+        )
+        ub.session.commit()
+    except Exception:
+        ub.session.rollback()
+        log.warning("Could not journal the KOReader position of user %s book %s",
+                    user_id, book_id, exc_info=True)
+        return
+    if koreader_position.is_xpointer(progress):
+        # Start the web reader's exact conversion now, off this request, so
+        # the browser opened right after the device finds it ready.
+        kobo_resume.exact_resume(book_id, document,
+                                 koreader_position.KOREADER_LOCATION_TYPE,
+                                 progress, wait=False)
+
+
 def _conditional_kosync_progress(
     *, user_id, document, progress, percentage, device, device_id, timestamp,
     equal_accepts, same_device_rewind=False,
@@ -1001,18 +1052,28 @@ def get_progress(document: str):
         percentage_decimal = progress_record.percentage / 100.0
 
         percentage_only = is_percentage_only(progress_record)
+        # The sentinel is an internal marker, never a position — send null
+        # so no client can mistake it for an xpointer.
+        progress_value = None if percentage_only else progress_record.progress
+        if percentage_only and book_id:
+            # The web reader's or Kobo's own place, when it can be expressed
+            # exactly in the very file this device holds (#324); otherwise the
+            # percentage.
+            exact = _exact_xpointer(user.id, book_id, progress_record, document)
+            if exact:
+                progress_value, percentage_only = exact, False
 
         response_updates = {
             "document": document,
-            # The sentinel is an internal marker, never a position — send null
-            # so no client can mistake it for an xpointer.
-            "progress": None if percentage_only else progress_record.progress,
+            "progress": progress_value,
             "position_kind": (POSITION_KIND_PERCENTAGE if percentage_only
                               else POSITION_KIND_LOCATOR),
             "percentage": percentage_decimal,
             "device": progress_record.device,
             "device_id": progress_record.device_id,
-            "timestamp": int(progress_record.timestamp.timestamp())
+            # Stored as naive UTC: read as local time, a server with TZ set
+            # would serve every position hours in the future.
+            "timestamp": int(_aware_datetime(progress_record.timestamp).timestamp())
         }
 
         response_data = {**response_data, **response_updates}
@@ -1229,6 +1290,9 @@ def _delivery_identity(data, allowed_fields):
     return device_name, raw_device_id
 
 
+DEVICE_IDENTITY_UNAVAILABLE = "Device identity could not be registered for this account"
+
+
 def _registered_delivery_device(user, device_name, raw_device_id):
     from ...services.device_registry import register_koreader_device_best_effort
     internal_id = register_koreader_device_best_effort(
@@ -1237,9 +1301,7 @@ def _registered_delivery_device(user, device_name, raw_device_id):
         device_name=device_name,
     )
     if internal_id is None:
-        raise device_delivery.DeliveryValidationError(
-            "Device identity could not be registered for this account"
-        )
+        raise device_delivery.DeliveryValidationError(DEVICE_IDENTITY_UNAVAILABLE)
     return internal_id
 
 
@@ -1333,7 +1395,7 @@ def claim_delivery():
     except device_delivery.DeliveryValidationError as error:
         ub.session.rollback()
         message = str(error)
-        if message == "Device identity could not be registered for this account":
+        if message == DEVICE_IDENTITY_UNAVAILABLE:
             return _delivery_error(message, 409, "device_identity_unavailable")
         return _delivery_error(message)
     except device_capabilities.CapabilityValidationError as error:
@@ -1419,7 +1481,11 @@ def claim_device_deletion():
         })
     except (BadRequest, device_delivery.DeliveryValidationError) as error:
         ub.session.rollback()
-        return _delivery_error(str(error))
+        message = str(error)
+        if message == DEVICE_IDENTITY_UNAVAILABLE:
+            # Same contract as the delivery claim: the request was well formed.
+            return _delivery_error(message, 409, "device_identity_unavailable")
+        return _delivery_error(message)
 
 
 @csrf.exempt
@@ -2028,6 +2094,8 @@ def update_progress():
             raise KOSyncError(ERROR_INVALID_FIELDS, f"Invalid percentage value: {e}")
 
         timestamp = datetime.now(timezone.utc)
+        received_at = timestamp
+        reported_document = document
 
         response_data = {
             "document": document,
@@ -2111,11 +2179,12 @@ def update_progress():
         # this optional side effect outside that session and outside the endpoint
         # contract. A missing device_id has no stable identity to fingerprint.
         if device_id:
+            internal_device_id = None
             try:
                 from ...services.device_registry import (
                     register_koreader_device_best_effort,
                 )
-                register_koreader_device_best_effort(
+                internal_device_id = register_koreader_device_best_effort(
                     user_id=user.id,
                     device_id=device_id,
                     device_name=device,
@@ -2124,6 +2193,11 @@ def update_progress():
                 log.warning(
                     "Best-effort KOReader device registration from progress failed",
                     exc_info=True,
+                )
+            if internal_device_id and book_id:
+                _journal_koreader_report(
+                    user.id, internal_device_id, book_id, reported_document,
+                    progress, proposed_percentage, received_at,
                 )
 
         # Update user's ReadBook status if we matched a book

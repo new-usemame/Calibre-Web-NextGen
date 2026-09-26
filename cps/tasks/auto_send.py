@@ -28,6 +28,11 @@ class TaskAutoSend(CalibreTask):
     def run(self, worker_thread):
         """Auto-send newly ingested book to user's eReader addresses"""
         self.worker_thread = worker_thread
+        # WorkerThread must not use ub.session: every web request shares it and
+        # a SQLAlchemy session is not thread-safe, so committing the download
+        # record there could fail a request mid-query or commit its pending
+        # changes.  This task reads and writes app.db through its own session.
+        app_session = None
 
         try:
             # Delay is now handled by the scheduler; begin processing immediately
@@ -43,7 +48,8 @@ class TaskAutoSend(CalibreTask):
             self.progress = 0.3
 
             # Get user data
-            user = ub.session.query(ub.User).filter(ub.User.id == self.user_id).first()
+            app_session = ub.owned_session()
+            user = app_session.query(ub.User).filter(ub.User.id == self.user_id).first()
             if not user or not user.auto_send_enabled:
                 self._handleError(f"User {self.user_id} not found or auto-send disabled")
                 return
@@ -82,7 +88,7 @@ class TaskAutoSend(CalibreTask):
 
             if result is None:
                 # Update download stats
-                ub.update_download(self.book_id, int(user.id))
+                ub.update_download(self.book_id, int(user.id), _session=app_session)
                 self.progress = 1.0
                 self.message = N_("Auto-send completed successfully")
                 self._handleSuccess()
@@ -93,6 +99,8 @@ class TaskAutoSend(CalibreTask):
         except Exception as e:
             self._handleError(f"Auto-send task failed: {str(e)}")
         finally:
+            if app_session is not None:
+                app_session.close()
             if 'calibre_db_instance' in locals():
                 session = getattr(calibre_db_instance, "session", None)
                 if session:

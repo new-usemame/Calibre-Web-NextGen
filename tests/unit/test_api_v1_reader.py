@@ -229,6 +229,7 @@ def test_reading_sources_matches_hidden_archived_global_detail_visibility():
         allow_show_archived=True,
         allow_show_hidden=True,
         allow_show_global=True,
+        allow_public_shelf_books=True,
     )
 
 
@@ -289,5 +290,73 @@ def test_reading_sources_returns_devices_and_separate_resolved_carrier(monkeypat
     assert response.json["sources"][0]["progress_percent"] == 12.5
     assert response.json["sources"][1]["provenance"] == "unknown"
     assert all(row.get("label") != "Someone else" for row in response.json["sources"])
+    session.close()
+    engine.dispose()
+
+
+@pytest.mark.unit
+def test_reading_sources_list_one_browser_after_browsers_are_consolidated(
+        monkeypatch, tmp_path):
+    """Two browsers recorded separately become the account's one Browser place.
+
+    The upgrade keeps each folded browser as an inactive alias that still
+    holds its historical position rows. A reading place is a source the reader
+    can choose, so an alias must not come back as a second, stale browser; its
+    latest position already lives on Browser.
+    """
+    from datetime import datetime, timedelta
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from cps import ub
+    from cps.api import reader as mod
+    from cps.services.browser_source import migrate_account_browser_source
+
+    engine = create_engine(f"sqlite:///{tmp_path / 'app.db'}")
+    ub.Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+    monkeypatch.setattr(ub, "session", session)
+    session.add(ub.User(id=1, name="reader", email="reader@example.invalid"))
+    laptop = ub.Device(user_id=1, kind="webreader", display_name="Web reader",
+                       active=True, created_by="auto")
+    phone = ub.Device(user_id=1, kind="webreader", display_name="Web reader 2",
+                      active=True, created_by="auto")
+    session.add_all([laptop, phone])
+    session.flush()
+    then = datetime(2026, 9, 20, 12, 0)
+    later = then + timedelta(hours=1)
+    session.add_all([
+        ub.DeviceReadingPosition(
+            device_id=laptop.id, book_id=5, progress_percent=12.5,
+            cfi="epubcfi(/6/4!/4/2:4)", client_modified_at=then,
+            server_modified_at=then,
+        ),
+        ub.DeviceReadingPosition(
+            device_id=phone.id, book_id=5, progress_percent=40.0,
+            cfi="epubcfi(/6/8!/4/2:4)", client_modified_at=later,
+            server_modified_at=later,
+        ),
+    ])
+    session.commit()
+    migrate_account_browser_source(engine)
+    session.expire_all()
+
+    book = SimpleNamespace(
+        id=5, title="Book", path="Author/Book (5)",
+        authors=[SimpleNamespace(name="Author")], data=[],
+    )
+    app = flask.Flask(__name__)
+    app.add_url_rule(
+        "/api/v1/books/<int:book_id>/reading-sources",
+        view_func=inspect.unwrap(mod.get_reading_sources),
+    )
+    with patch.object(mod, "current_user", _auth_user()), \
+         patch.object(mod.calibre_db, "get_filtered_book", return_value=book), \
+         patch.object(mod.storyteller_source, "configured_client", return_value=None):
+        response = app.test_client().get("/api/v1/books/5/reading-sources")
+
+    assert response.status_code == 200
+    assert [(row["label"], row["progress_percent"]) for row in response.json["sources"]] == [
+        ("Browser", 40.0),
+    ]
     session.close()
     engine.dispose()

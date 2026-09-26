@@ -946,21 +946,10 @@ def get_book_ids_for_magic_shelf(shelf_id, sort_order=None, sort_param='stored',
         from . import calibre_db
         if calibre_db._desktop_compat:
             bypass_cache = True
-        if not bypass_cache and current_user.is_authenticated:
-            cache = ub.session.query(ub.MagicShelfCache).filter_by(
-                shelf_id=shelf_id,
-                user_id=current_user.id,
-                sort_param=sort_param,
-            ).first()
-            if cache:
-                created_at = cache.created_at
-                if created_at.tzinfo is None:
-                    created_at = created_at.replace(tzinfo=timezone.utc)
-                is_expired = (datetime.now(timezone.utc) - created_at) > timedelta(minutes=30)
-                if not is_expired:
-                    log.debug(f"Magic shelf {shelf_id} ID list served from cache ({cache.total_count} books)")
-                    return cache.book_ids, cache.total_count
-
+        # Cached membership is a Kobo generation ledger, not permission to
+        # serve an old result. Re-evaluate the live query before using it:
+        # membership, mode, content policy and rule data can change through
+        # multiple writers, including external Calibre edits.
         query, magic_shelf = build_book_query_for_magic_shelf(
             shelf_id, sort_order=sort_order, sort_join=sort_join
         )
@@ -1002,6 +991,13 @@ def get_book_ids_for_magic_shelf(shelf_id, sort_order=None, sort_param='stored',
                 for cache_row in existing_rows
                 if cache_row.created_at is not None
             ), default=None) if membership_unchanged else None
+            if membership_unchanged and any(
+                row.sort_param == sort_param and row.book_ids == all_ids
+                and row.total_count == total_count
+                for row in existing_rows
+            ):
+                # A read/no-op must not write or advance the device watermark.
+                return all_ids, total_count
             stale_cache_query = ub.session.query(ub.MagicShelfCache).filter_by(
                 shelf_id=shelf_id,
                 user_id=current_user.id,

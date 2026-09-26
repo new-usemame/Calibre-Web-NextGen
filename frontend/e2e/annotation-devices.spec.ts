@@ -8,16 +8,37 @@ const device = {
   annotation_count: 312, active: true,
 };
 
+test('device manager keeps its heading while loading and can retry a failed list', async ({ page }) => {
+  let release!: () => void;
+  const ready = new Promise<void>(resolve => { release = resolve; });
+  let recovered = false;
+  await page.route('**/api/annotations/devices?*', async route => {
+    await ready;
+    if (!recovered) await route.fulfill({ status: 503, json: { error: 'unavailable' } });
+    else await route.fulfill({ json: { devices: [device], total: 1, limit: 100, offset: 0 } });
+  });
+  try {
+    await page.goto('/app/account/devices');
+    await expect(page.getByRole('heading', { name: 'Devices and browsers', exact: true })).toBeVisible();
+    await expect(page.getByRole('status', { name: 'Loading' })).toBeVisible();
+    await expect(page.getByText('No devices or browser reading data yet.')).toHaveCount(0);
+    release();
+    await expect(page.getByRole('alert').filter({ hasText: 'Could not load devices and browsers.' })).toBeVisible({ timeout: 15000 });
+    recovered = true;
+    await page.getByRole('button', { name: 'Try again', exact: true }).click();
+    await expect(page.getByRole('link', { name: device.label, exact: true })).toBeVisible();
+    await expect(page.getByText('Could not load devices and browsers.', { exact: true })).toHaveCount(0);
+  } finally { release(); }
+});
+
 test('reader sources separate browsers and distinguish missing from empty inventory', async ({ page }) => {
   const physical = { ...device, origin_annotation_count: 19, annotation_count: 0,
     inventory_count: 0, inventory_observed: null };
   const browser = { ...physical, public_id: 'browser-1', type: 'webreader', kind: 'webreader',
-    label: 'My browser', model: 'CWNG web reader', browser_identity: 'identified',
+    label: 'Browser', model: 'CWNG web reader', browser_identity: 'account',
     origin_annotation_count: 2 };
-  const fallback = { ...browser, public_id: 'browser-2', label: 'Custom source name',
-    browser_identity: 'unidentified' };
   await page.route('**/api/annotations/devices?*', route => route.fulfill({ json: {
-    devices: [physical, browser, fallback], total: 3, limit: 100, offset: 0,
+    devices: [physical, browser], total: 2, limit: 100, offset: 0,
   } }));
   let observed = false;
   await page.route('**/api/annotations/devices/device-1/inventory?*', route => route.fulfill({ json: {
@@ -25,9 +46,10 @@ test('reader sources separate browsers and distinguish missing from empty invent
     observed_at: observed ? '2026-09-08T12:00:00Z' : null,
   } }));
   await page.goto('/app/account/devices');
-  const browsers = page.getByRole('region', { name: 'Browser reading sources' });
-  await expect(browsers.getByRole('link', { name: 'My browser', exact: true })).toBeVisible();
-  await expect(browsers.getByText('Unidentified browser source', { exact: true })).toBeVisible();
+  const browsers = page.getByRole('region', { name: 'Browser reading source' });
+  await expect(browsers.getByRole('link', { name: 'Browser', exact: true })).toBeVisible();
+  await expect(browsers.getByRole('listitem')).toHaveCount(1);
+  await expect(browsers).toContainText('All browsers and computers signed in to your account share one Browser reading source.');
   await expect(browsers.getByRole('button', { name: 'View device library' })).toHaveCount(0);
   await expect(browsers.getByText(/books in latest inventory/)).toHaveCount(0);
   const clara = page.getByRole('listitem').filter({ has: page.getByRole('link', { name: device.label, exact: true }) });
@@ -44,8 +66,8 @@ test('reader sources separate browsers and distinguish missing from empty invent
   expect(scan.violations.filter(v => ['critical', 'serious'].includes(v.impact ?? ''))).toEqual([]);
 });
 
-async function stubDevices(page: import('@playwright/test').Page) {
-  let current = { ...device };
+async function stubDevices(page: import('@playwright/test').Page, fixture = device) {
+  let current = { ...fixture };
   let restored = 0;
   let deletePreflights = 0;
   await page.route('**/api/annotations/devices?*', async (route) => {
@@ -88,7 +110,7 @@ test('device actions menu dismisses on an outside pointer press', async ({ page 
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   await expect(remove).toBeVisible();
 
-  const heading = page.getByRole('heading', { name: 'E-readers' });
+  const heading = page.getByRole('heading', { name: 'Devices and browsers' });
   const box = await heading.boundingBox();
   expect(box).not.toBeNull();
   await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
@@ -169,7 +191,7 @@ test('touch dismissal does not activate the control beneath the press', async ({
 test('device manager renames and removes only through counted confirmation, then restores', async ({ page }) => {
   const calls = await stubDevices(page);
   await page.goto('/app/account/devices');
-  await expect(page.getByRole('heading', { name: 'E-readers' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Devices and browsers' })).toBeVisible();
   await expect(page.getByText('312 annotations assigned to this source')).toBeVisible();
 
   await page.getByRole('button', { name: 'Rename Libra Colour' }).click();
@@ -191,11 +213,162 @@ test('device manager renames and removes only through counted confirmation, then
   expect(calls.restored()).toBe(1);
 });
 
-test('device manager is axe-clean and has no 390px overflow', async ({ page }, testInfo) => {
-  await stubDevices(page);
-  if (testInfo.project.name === 'desktop') await page.setViewportSize({ width: 390, height: 844 });
+test('removing the Browser names it in the reader\'s language, in the dialog and the Undo notice', async ({ page }) => {
+  await page.route('**/api/v1/auth/me', async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: { ...(await response.json()), locale: 'fr' } });
+  });
+  const calls = await stubDevices(page, { ...device, type: 'webreader', label: 'Browser', model: 'CWNG web reader' });
   await page.goto('/app/account/devices');
-  await expect(page.getByRole('heading', { name: 'E-readers' })).toBeVisible();
+  await page.getByRole('button', { name: "Plus d'actions pour Navigateur" }).click();
+  await page.getByRole('button', { name: "Supprimer l'appareil" }).click();
+  const dialog = page.getByRole('alertdialog', { name: 'Supprimer Navigateur ?' });
+  await dialog.getByRole('button', { name: "Supprimer l'appareil" }).click();
+  await expect(dialog).toHaveCount(0);
+  // The notice is the Undo button's container; the announcer repeats its text.
+  const undo = page.getByRole('button', { name: 'Annuler', exact: true });
+  await expect(undo.locator('xpath=..')).toHaveText(/^Navigateur supprimé\.\s*Annuler$/);
+  await undo.click();
+  await expect(page.getByRole('link', { name: 'Navigateur', exact: true })).toBeVisible();
+  expect(calls.restored()).toBe(1);
+});
+
+test('failed device changes explain the failure and retain a working retry', async ({ page }) => {
+  await stubDevices(page);
+  // Fail each wire operation once; the original handlers provide the retry.
+  for (const [path, method] of [
+    ['device-1', 'PATCH'], ['device-1/delete-preflight', 'GET'],
+    ['device-1', 'DELETE'], ['device-1/restore', 'POST'],
+  ]) {
+    let failed = false;
+    await page.route(`**/api/annotations/devices/${path}`, async route => {
+      if (!failed && route.request().method() === method) {
+        failed = true;
+        await route.fulfill({ status: 503, json: { error: 'Temporarily unavailable' } });
+      } else await route.fallback();
+    });
+  }
+  await page.goto('/app/account/devices');
+  await page.getByRole('button', { name: 'Rename Libra Colour' }).click();
+  const input = page.getByRole('textbox', { name: 'Device name' });
+  await input.fill('Travel Kobo');
+  await input.press('Enter');
+  await expect(page.getByRole('alert').filter({ hasText: 'Could not rename' })).toBeVisible();
+  await expect(input).toHaveValue('Travel Kobo');
+  await input.press('Enter');
+  await expect(page.getByRole('heading', { name: 'Travel Kobo' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'More actions for Travel Kobo' }).click();
+  await page.getByRole('button', { name: 'Remove device', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Could not load removal details' })).toBeVisible();
+  await expect(page.getByRole('alertdialog')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Remove device', exact: true }).click();
+  const dialog = page.getByRole('alertdialog');
+  await dialog.getByRole('button', { name: 'Remove device', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toContainText('Could not remove');
+  await expect(page.getByRole('heading', { name: 'Travel Kobo', exact: true })).toBeVisible();
+  await dialog.getByRole('button', { name: 'Remove device', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Could not restore' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Travel Kobo', exact: true })).toBeVisible();
+});
+
+test('canceling a device removal returns keyboard focus to its surviving action', async ({ page }) => {
+  await stubDevices(page);
+  await page.goto('/app/account/devices');
+  const trigger = page.getByRole('button', { name: 'More actions for Libra Colour' });
+  await trigger.click();
+  await page.getByRole('button', { name: 'Remove device', exact: true }).click();
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(dialog.getByRole('button', { name: 'Remove device', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
+test('slow device changes cannot be restarted or leak an undo error to another source', async ({ page }) => {
+  let rows = [{ ...device }, { ...device, public_id: 'device-2', label: 'Second Kobo' }];
+  let finishRename!: () => void;
+  let finishRemove!: () => void;
+  const renameReady = new Promise<void>(resolve => { finishRename = resolve; });
+  const removeReady = new Promise<void>(resolve => { finishRemove = resolve; });
+  let patches = 0;
+  let deletes = 0;
+  await page.route('**/api/annotations/devices?*', route => route.fulfill({ json: {
+    devices: rows, total: rows.length, limit: 100, offset: 0,
+  } }));
+  await page.route('**/api/annotations/devices/*/delete-preflight', route => route.fulfill({ json: { origin_count: 0, assigned_count: 0 } }));
+  await page.route('**/api/annotations/devices/*/restore', route => route.fulfill({ status: 503, json: { error: 'unavailable' } }));
+  await page.route('**/api/annotations/devices/device-*', async route => {
+    const id = new URL(route.request().url()).pathname.split('/').pop()!;
+    if (route.request().method() === 'PATCH') {
+      patches++;
+      await renameReady;
+      rows = rows.map(row => row.public_id === id ? { ...row, label: 'Travel Kobo' } : row);
+      await route.fulfill({ json: rows.find(row => row.public_id === id) });
+    } else if (route.request().method() === 'DELETE') {
+      deletes++;
+      if (id === 'device-1') await removeReady;
+      rows = rows.filter(row => row.public_id !== id);
+      await route.fulfill({ json: {} });
+    } else await route.fallback();
+  });
+  try {
+    await page.goto('/app/account/devices');
+    const rename = page.getByRole('button', { name: 'Rename Libra Colour', exact: true });
+    await rename.click();
+    const input = page.getByRole('textbox', { name: 'Device name' });
+    await input.fill('Travel Kobo');
+    await input.press('Enter');
+    await expect.poll(() => patches).toBe(1);
+    await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeDisabled();
+    await expect(rename).toBeDisabled();
+    await page.keyboard.press('Escape');
+    await expect(input).toBeVisible();
+    finishRename();
+    await expect(page.getByRole('heading', { name: 'Travel Kobo', exact: true })).toBeVisible();
+    const travelRename = page.getByRole('button', { name: 'Rename Travel Kobo', exact: true });
+    await expect(travelRename).toBeFocused();
+    await travelRename.click();
+    await input.press('Escape');
+    await expect(travelRename).toBeFocused();
+
+    await page.getByRole('button', { name: 'More actions for Travel Kobo' }).click();
+    await page.getByRole('button', { name: 'Remove device', exact: true }).click();
+    const dialog = page.getByRole('alertdialog');
+    await dialog.getByRole('button', { name: 'Remove device', exact: true }).click();
+    await expect.poll(() => deletes).toBe(1);
+    await expect(dialog.getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'More actions for Second Kobo' })).toBeDisabled();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeVisible();
+    finishRemove();
+    await expect(page.getByRole('button', { name: 'Undo' })).toBeFocused();
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByRole('alert').filter({ hasText: 'Could not restore' })).toBeVisible();
+    await page.getByRole('button', { name: 'More actions for Second Kobo' }).click();
+    await page.getByRole('button', { name: 'Remove device', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Remove device', exact: true }).click();
+    await expect(page.getByText('Second Kobo removed.', { exact: true })).toBeVisible();
+    await expect(page.getByRole('alert').filter({ hasText: 'Could not restore' })).toHaveCount(0);
+    expect(patches).toBe(1);
+    expect(deletes).toBe(2);
+  } finally { finishRename(); finishRemove(); }
+});
+
+test('device manager keeps long source names readable without narrow-screen overflow', async ({ page }, testInfo) => {
+  await stubDevices(page, { ...device, label: 'ReadingCompanion'.repeat(4) });
+  if (testInfo.project.name === 'desktop') await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto('/app/account/devices');
+  await expect(page.getByRole('heading', { name: 'Devices and browsers' })).toBeVisible();
+  await expect(page.getByRole('main')).toHaveCount(1);
   const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag22aa']).analyze();
   expect(results.violations.filter((v) => ['critical', 'serious'].includes(v.impact || ''))).toEqual([]);
   await assertNoHorizontalOverflow(page);
@@ -255,11 +428,36 @@ test('device inventory renders one bounded window and reports the true total', a
 });
 
 test('account summary makes the e-reader manager discoverable', async ({ page }) => {
-  await stubDevices(page);
+  await page.route('**/api/annotations/devices?*', route => route.fulfill({ json: {
+    devices: [{ ...device, annotation_count: 1 }, { ...device, public_id: 'browser-1', label: 'Browser', type: 'webreader',
+      origin_annotation_count: 1, annotation_count: 0 }], total: 2, limit: 100, offset: 0,
+  } }));
   await page.goto('/app/account');
-  const card = page.getByRole('region', { name: 'E-readers' });
-  await expect(card).toContainText('Libra Colour · 312 annotations assigned to this source');
-  await expect(card.getByRole('link', { name: 'Manage e-readers' })).toHaveAttribute('href', '/app/account/devices');
+  const card = page.getByRole('region', { name: 'Devices and browsers' });
+  const physical = card.getByRole('listitem').filter({ hasText: 'Libra Colour' });
+  await expect(physical).toContainText('1 annotation assigned to this source');
+  const browser = card.getByRole('listitem').filter({ hasText: 'Browser' });
+  await expect(browser).toContainText('1 annotation from this source');
+  await expect(card.getByRole('link')).toHaveCount(2);
+  await card.getByRole('link', { name: 'Manage devices and browsers' }).click();
+  await expect(page).toHaveURL(/\/app\/account\/devices$/);
+  await expect(page.getByRole('heading', { name: 'Devices and browsers', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Browser', exact: true })).toBeVisible();
+});
+
+test('account summary can retry a failed device list', async ({ page }) => {
+  let available = false;
+  await page.route('**/api/annotations/devices?*', route => available
+    ? route.fulfill({ json: { devices: [device], total: 1, limit: 100, offset: 0 } })
+    : route.fulfill({ status: 503, json: { error: 'unavailable' } }));
+  await page.goto('/app/account');
+  const card = page.getByRole('region', { name: 'Devices and browsers' });
+  await expect(card.getByRole('alert')).toHaveText('Could not load devices and browsers.', { timeout: 15000 });
+  available = true;
+  await card.getByRole('button', { name: 'Try again', exact: true }).click();
+  await expect(card.getByRole('listitem').filter({ hasText: 'Libra Colour' })).toBeVisible();
+  await expect(card.getByRole('alert')).toHaveCount(0);
+  await expect(card.getByRole('button', { name: 'Try again', exact: true })).toHaveCount(0);
 });
 
 test('device manager owns pairing instead of sending users to the classic account page', async ({ page }) => {

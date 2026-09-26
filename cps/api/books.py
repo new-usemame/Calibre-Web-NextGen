@@ -18,28 +18,11 @@ from ..annotations import count_user_annotations
 from ..cw_login import current_user
 from ..services import user_cover
 from ..helper import edit_book_read_status, book_in_progress_ids, book_is_in_progress, \
-    get_convert_options, get_kosync_progress_display, \
-    SQLITE_IN_CHUNK_SIZE as _SQLITE_IN_CHUNK
+    get_convert_options, get_kosync_progress_display, hot_books_page
 from ..sort_orders import BOOK_SORT_ORDERS, book_sort_order, viewer_id
 from ..usermanagement import login_required_if_no_ano
 
 log = logger.create()
-
-def _visible_ids_for_chunk(book_ids):
-    query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
-    return {row[0] for row in query.filter(calibre_db.common_filters())
-            .filter(db.Books.id.in_(book_ids))
-            .with_entities(db.Books.id).all()}
-
-
-def _visible_hot_book_ids(book_ids):
-    """Return visible ids in hotness order without an unbounded SQL ``IN``."""
-    visible = set()
-    for start in range(0, len(book_ids), _SQLITE_IN_CHUNK):
-        visible.update(_visible_ids_for_chunk(
-            book_ids[start:start + _SQLITE_IN_CHUNK]))
-    return [book_id for book_id in book_ids if book_id in visible]
-
 
 def _detail_custom_columns():
     """Classic-parity display definitions, degrading safely if DB metadata is unavailable.
@@ -348,22 +331,8 @@ def list_books():
         return jsonify({"items": items, "page": 1, "per_page": per_page, "total": len(items)})
 
     if filter_val == "hot":
-        # Most-downloaded, paginated by the downloads table (mirrors render_hot_books).
-        off = per_page * (page - 1)
-        all_hot_ids = [row[0] for row in (ub.session.query(ub.Downloads.book_id)
-                   .group_by(ub.Downloads.book_id)
-                   .order_by(*BOOK_SORT_ORDERS["hotdesc"]))]
-        # Filter before paginating: otherwise a hidden/restricted book leaves a
-        # short page while the header still counts it.
-        visible_hot_ids = _visible_hot_book_ids(all_hot_ids)
-        total = len(visible_hot_ids)
-        hot_ids = visible_hot_ids[off:off + per_page]
-        entries = []
-        if hot_ids:
-            q = calibre_db.generate_linked_query(config.config_read_column, db.Books)
-            rows = q.filter(calibre_db.common_filters()).filter(db.Books.id.in_(hot_ids)).all()
-            book_map = {r.Books.id: r for r in rows}
-            entries = [book_map[i] for i in hot_ids if i in book_map]  # preserve hotness order
+        entries, total = hot_books_page(calibre_db.common_filters(), BOOK_SORT_ORDERS["hotdesc"],
+                                        per_page * (page - 1), per_page)
         return jsonify({"items": to_items(entries),
                         "page": page, "per_page": per_page, "total": total})
 
@@ -502,22 +471,21 @@ def book_detail(book_id):
         book_id, config.config_read_column,
         allow_show_archived=True, allow_show_hidden=True,
         allow_show_global=allow_show_global,
+        allow_public_shelf_books=True,
     )
     if not result:
         return jsonify({"error": {"code": "not_found", "message": "Book not found"}}), 404
 
     book, read_status, is_archived = result
 
-    personal_library = (
-        user_library.mode_for_user(current_user)
-        == constants.LIBRARY_MODE_PERSONAL
-    )
-    in_my_library = not personal_library
-    if personal_library and current_user.is_authenticated and not current_user.is_anonymous:
-        in_my_library = ub.session.query(ub.UserLibraryBook.id).filter(
-            ub.UserLibraryBook.user_id == int(current_user.id),
-            ub.UserLibraryBook.book_id == int(book_id),
-        ).first() is not None
+    # The detail lookup already applied every content restriction. Only a
+    # book on a currently public shelf can extend access beyond membership.
+    accessible_via_public_shelf = calibre_db.session.query(db.Books.id).filter(
+        db.Books.id == book_id,
+        db.public_shelf_book_filter(ub.session, calibre_db.session),
+    ).first() is not None
+
+    in_my_library = user_library.contains_book(current_user, book_id)
 
     # Enrich language objects with display name so serialize_book_detail stays pure
     for lang in getattr(book, "languages", None) or []:
@@ -525,12 +493,13 @@ def book_detail(book_id):
 
     # Per-user favorite + hidden state (presence-based rows). Anonymous/guest
     # sessions have no real id, so they simply read back as not-favorited/hidden.
+    show_personal_state = in_my_library or accessible_via_public_shelf
     favorited = hidden = False
     annotation_count = 0
     kosync_progress = None
     kosync_progress_timestamp = None
     kosync_progress_created_at = None
-    if in_my_library and current_user.is_authenticated and not current_user.is_anonymous:
+    if show_personal_state and current_user.is_authenticated and not current_user.is_anonymous:
         uid = int(current_user.id)
         favorited = (ub.session.query(ub.FavoriteBook)
                      .filter(ub.FavoriteBook.user_id == uid, ub.FavoriteBook.book_id == book_id)
@@ -555,7 +524,7 @@ def book_detail(book_id):
     # With a custom read column, get_book_read_archived returns the column's value
     # (truthy = read); otherwise the built-in ub.ReadBook.read_status. Match the
     # list badge's logic (fork #579) so both surfaces agree.
-    read = in_my_library and (
+    read = show_personal_state and (
         bool(read_status) if config.config_read_column
         else read_status == ub.ReadBook.STATUS_FINISHED
     )
@@ -563,7 +532,7 @@ def book_detail(book_id):
     # page renders this marker off read_status_raw == STATUS_IN_PROGRESS; the SPA
     # book page never received the flag, so the badge was missing in the new UI.
     # Derive it from the shared helper so both surfaces stay in agreement.
-    in_progress = in_my_library and book_is_in_progress(
+    in_progress = show_personal_state and book_is_in_progress(
         book_id, read_status, config.config_read_column, current_user)
     body = serialize_book_detail(
         book,
@@ -578,6 +547,7 @@ def book_detail(book_id):
         cover_override=user_cover.override_for_user(_real_user_id(), book_id),
     )
     body["in_my_library"] = in_my_library
+    body["accessible_via_public_shelf"] = accessible_via_public_shelf
     source_formats, target_formats = get_convert_options(book)
     body["convert_options"] = {
         "sources": source_formats,

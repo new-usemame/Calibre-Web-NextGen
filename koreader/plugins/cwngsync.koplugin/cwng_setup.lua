@@ -109,6 +109,8 @@ function Setup.pairingOutcome(ok, body, reason, fallback_server)
             return { state = "error", message = "approval arrived without sign-in details" }
         elseif status == "pending" or status == "denied" or status == "expired" then
             return { state = status }
+        elseif status == "slow_down" then
+            return { state = "slow_down", interval = tonumber(body.interval) }
         end
     end
     if reason == "HTTP 410" then return { state = "expired" } end

@@ -375,8 +375,8 @@ msgstr ""
 #: cps/admin.py
 #, python-brace-format
 msgid ""
-"Book {0} was not in the sync record for user {1}; last_modified bumped so "
-"the device will receive on next sync"
+"Book {0} was not in the sync record for user {1}; the device will receive it "
+"on next sync"
 msgstr ""
 
 #: cps/admin.py cps/templates/kobo_reconcile.html
@@ -4353,6 +4353,14 @@ msgid "Open search"
 msgstr "Ouvrir la recherche"
 
 #: cps/spa_strings.py
+msgid "Browse the Global Library"
+msgstr "Parcourir la bibliothèque globale"
+
+#: cps/spa_strings.py
+msgid "Open device administration"
+msgstr "Ouvrir l’administration des appareils"
+
+#: cps/spa_strings.py
 msgid "Editions"
 msgstr "Éditions"
 
@@ -4922,6 +4930,15 @@ msgstr "(aucun texte enregistré)"
 msgid "(replace cover)"
 msgstr "(remplacer la couverture)"
 
+# Devices and browsers: one Browser reading source per account
+#: cps/spa_strings.py
+msgid "1 annotation assigned to this source"
+msgstr "1 annotation attribuée à cette source"
+
+#: cps/spa_strings.py
+msgid "1 annotation from this source"
+msgstr "1 annotation provenant de cette source"
+
 #: cps/spa_strings.py
 msgid "1 selected."
 msgstr "1 sélectionné."
@@ -5052,6 +5069,14 @@ msgstr "Toutes les annotations"
 #: cps/spa_strings.py
 msgid "All books"
 msgstr "Tous les livres"
+
+#: cps/spa_strings.py
+msgid ""
+"All browsers and computers signed in to your account share one Browser "
+"reading source."
+msgstr ""
+"Tous les navigateurs et ordinateurs connectés à votre compte partagent une "
+"seule source de lecture Navigateur."
 
 #: cps/spa_strings.py
 msgid "All shelves"
@@ -5304,17 +5329,12 @@ msgstr ""
 "synchronisation. Ils restent dans votre bibliothèque ici."
 
 #: cps/spa_strings.py
-msgid "Browser reading sources"
-msgstr "Sources de lecture dans le navigateur"
+msgid "Browser"
+msgstr "Navigateur"
 
 #: cps/spa_strings.py
-msgid ""
-"Browsers appear after saving reading progress or annotations. Different "
-"browsers or profiles can appear separately."
-msgstr ""
-"Les navigateurs apparaissent après l’enregistrement de la progression de "
-"lecture ou d’annotations. Chaque navigateur ou profil peut apparaître "
-"séparément."
+msgid "Browser reading source"
+msgstr "Source de lecture du navigateur"
 
 #: cps/spa_strings.py
 msgid "Built-in"
@@ -5583,12 +5603,12 @@ msgid "Could not load device annotations."
 msgstr "Impossible de charger les annotations de l’appareil."
 
 #: cps/spa_strings.py
-msgid "Could not load duplicates."
-msgstr "Impossible de charger les doublons."
+msgid "Could not load devices and browsers."
+msgstr "Impossible de charger les appareils et les navigateurs."
 
 #: cps/spa_strings.py
-msgid "Could not load e-readers."
-msgstr "Impossible de charger les liseuses."
+msgid "Could not load duplicates."
+msgstr "Impossible de charger les doublons."
 
 #: cps/spa_strings.py
 msgid "Could not load highlights and notes."
@@ -5605,6 +5625,10 @@ msgstr "Impossible de charger les positions de lecture."
 #: cps/spa_strings.py
 msgid "Could not load reading positions."
 msgstr "Impossible de charger les positions de lecture."
+
+#: cps/spa_strings.py
+msgid "Could not load removal details. Try again."
+msgstr "Impossible de charger les détails de suppression. Réessayez."
 
 #: cps/spa_strings.py
 msgid "Could not load stats."
@@ -5655,8 +5679,16 @@ msgid "Could not reload metadata"
 msgstr "Impossible de recharger les métadonnées"
 
 #: cps/spa_strings.py
+msgid "Could not remove this source. Try again."
+msgstr "Impossible de supprimer cette source. Réessayez."
+
+#: cps/spa_strings.py
 msgid "Could not rename shelf."
 msgstr "Impossible de renommer l’étagère."
+
+#: cps/spa_strings.py
+msgid "Could not rename this source. Try again."
+msgstr "Impossible de renommer cette source. Réessayez."
 
 #: cps/spa_strings.py
 msgid "Could not request deletion from this device."
@@ -5665,6 +5697,10 @@ msgstr "Impossible de demander la suppression sur cet appareil."
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "Impossible de réinitialiser le mot de passe."
+
+#: cps/spa_strings.py
+msgid "Could not restore this source. Try again."
+msgstr "Impossible de restaurer cette source. Réessayez."
 
 #: cps/spa_strings.py cps/templates/shelf_reorder.html
 msgid "Could not save order."
@@ -6036,8 +6072,17 @@ msgid "Devices"
 msgstr "Appareils"
 
 #: cps/spa_strings.py
-msgid "Devices appear here after their first sync."
-msgstr "Les appareils apparaissent ici après leur première synchronisation."
+msgid "Devices and browsers"
+msgstr "Appareils et navigateurs"
+
+#: cps/spa_strings.py
+msgid ""
+"Devices appear after their first sync. Browser appears after saving reading "
+"progress or annotations."
+msgstr ""
+"Les appareils apparaissent après leur première synchronisation. Le "
+"navigateur apparaît après l’enregistrement de la progression de lecture ou "
+"d’annotations."
 
 #: cps/spa_strings.py
 msgid "Different edition"
@@ -6825,6 +6870,10 @@ msgid "Loading device library…"
 msgstr "Chargement de la bibliothèque de l’appareil…"
 
 #: cps/spa_strings.py
+msgid "Loading devices and browsers…"
+msgstr "Chargement des appareils et des navigateurs…"
+
+#: cps/spa_strings.py
 msgid "Loading new Discover picks."
 msgstr "Chargement d’une nouvelle sélection Découvrir."
 
@@ -6909,8 +6958,8 @@ msgid "Manage admin role from OAuth group"
 msgstr "Gérer le rôle administrateur depuis le groupe OAuth"
 
 #: cps/spa_strings.py
-msgid "Manage e-readers"
-msgstr "Gérer les liseuses"
+msgid "Manage devices and browsers"
+msgstr "Gérer les appareils et les navigateurs"
 
 #: cps/spa_strings.py
 msgid "Manage presets"
@@ -7022,10 +7071,12 @@ msgstr "Ma bibliothèque est maintenant active pour {accounts} comptes."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
+msgid ""
+"My Library setup is incomplete for {accounts} account(s). You can retry or "
+"undo."
 msgstr ""
-"Ma bibliothèque est active pour {accounts} comptes ; {errors} comptes ont "
-"échoué."
+"La configuration de Ma bibliothèque est incomplète pour {accounts} "
+"compte(s). Vous pouvez réessayer ou annuler."
 
 #: cps/spa_strings.py
 msgid "My account"
@@ -7141,6 +7192,10 @@ msgid "No contents found."
 msgstr "Aucun sommaire trouvé."
 
 #: cps/spa_strings.py
+msgid "No devices or browser reading data yet."
+msgstr "Aucun appareil ni donnée de lecture dans le navigateur pour le moment."
+
+#: cps/spa_strings.py
 msgid "No duplicate groups found."
 msgstr "Aucun groupe de doublons trouvé."
 
@@ -7151,10 +7206,6 @@ msgid ""
 msgstr ""
 "Aucune liseuse n’attend avec ce code. Vérifiez-le, ou demandez un nouveau "
 "code sur la liseuse."
-
-#: cps/spa_strings.py
-msgid "No e-readers yet."
-msgstr "Aucune liseuse pour le moment."
 
 #: cps/spa_strings.py
 msgid "No excluded tags"
@@ -7676,11 +7727,11 @@ msgstr "Apparence de lecture"
 
 #: cps/spa_strings.py
 msgid ""
-"Reading data is kept. Future browser saves can appear under an unidentified "
-"browser source."
+"Reading data is kept. Browser reappears when you next save reading progress "
+"or annotations."
 msgstr ""
-"Les données de lecture sont conservées. Les prochains enregistrements du "
-"navigateur peuvent apparaître sous une source de navigateur non identifiée."
+"Les données de lecture sont conservées. Le navigateur réapparaît au prochain "
+"enregistrement de la progression de lecture ou d’annotations."
 
 #: cps/spa_strings.py
 msgid "Reading from here. This is now your Browser position."
@@ -7877,6 +7928,15 @@ msgstr "Reprendre à {percent} depuis un autre appareil"
 #: cps/spa_strings.py
 msgid "Retry"
 msgstr "Réessayer"
+
+#: cps/spa_strings.py
+msgid ""
+"Retry finishes the remaining accounts without changing completed selections. "
+"Undo restores the settings from before setup began."
+msgstr ""
+"Réessayer termine la configuration des comptes restants sans modifier les "
+"sélections déjà terminées. Annuler restaure les paramètres précédant la "
+"configuration."
 
 #: cps/spa_strings.py
 msgid "Reverse-proxy header login"
@@ -8744,10 +8804,6 @@ msgstr "Annulation…"
 #: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Afficher"
-
-#: cps/spa_strings.py
-msgid "Unidentified browser source"
-msgstr "Source de navigateur non identifiée"
 
 #: cps/spa_strings.py
 msgid "Unknown color"
@@ -9968,6 +10024,14 @@ msgstr ""
 #, fuzzy
 msgid "Hardcover Sync"
 msgstr "Activer la synchronisation Hardcover"
+
+#: cps/tasks/hardcover_sync.py
+msgid "Marking books read on Hardcover"
+msgstr ""
+
+#: cps/tasks/hardcover_sync.py
+msgid "Syncing reading progress to Hardcover"
+msgstr ""
 
 #: cps/tasks/kepub_backfill.py
 msgid "Convert Kobo books missing KEPUB"
@@ -16000,6 +16064,46 @@ msgstr "Synchroniser les étagères sélectionnées avec Kobo"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Afficher la section Lu / Non lu"
+
+#~ msgid "Browser reading sources"
+#~ msgstr "Sources de lecture dans le navigateur"
+
+#~ msgid ""
+#~ "Browsers appear after saving reading progress or annotations. Different "
+#~ "browsers or profiles can appear separately."
+#~ msgstr ""
+#~ "Les navigateurs apparaissent après l’enregistrement de la progression de "
+#~ "lecture ou d’annotations. Chaque navigateur ou profil peut apparaître "
+#~ "séparément."
+
+#~ msgid "Could not load e-readers."
+#~ msgstr "Impossible de charger les liseuses."
+
+#~ msgid "Devices appear here after their first sync."
+#~ msgstr "Les appareils apparaissent ici après leur première synchronisation."
+
+#~ msgid "Manage e-readers"
+#~ msgstr "Gérer les liseuses"
+
+#~ msgid "No e-readers yet."
+#~ msgstr "Aucune liseuse pour le moment."
+
+#~ msgid ""
+#~ "Reading data is kept. Future browser saves can appear under an "
+#~ "unidentified browser source."
+#~ msgstr ""
+#~ "Les données de lecture sont conservées. Les prochains enregistrements du "
+#~ "navigateur peuvent apparaître sous une source de navigateur non "
+#~ "identifiée."
+
+#~ msgid "Unidentified browser source"
+#~ msgstr "Source de navigateur non identifiée"
+
+#, python-brace-format
+#~ msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
+#~ msgstr ""
+#~ "Ma bibliothèque est active pour {accounts} comptes ; {errors} comptes ont "
+#~ "échoué."
 
 #~ msgid "Not in current file"
 #~ msgstr "Absent du fichier actuel"

@@ -678,7 +678,7 @@ test.describe('reader column count (#325)', () => {
       let oneUp = 0;
       await expect.poll(async () => {
         const measured = await layout();
-        if (!measured || measured.column <= twoUp * 1.5
+        if (!measured || !(measured.column > 0) || measured.column <= twoUp * 1.5
           || measured.column < measured.viewport * 0.8) return false;
         oneUp = measured.column;
         return true;

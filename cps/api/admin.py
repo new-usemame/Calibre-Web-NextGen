@@ -165,7 +165,12 @@ def admin_my_library_intro_enable():
     guard = _require_admin()
     if guard:
         return guard
-    payload, report = user_library.enable_my_library_for_all()
+    try:
+        payload, report = user_library.enable_my_library_for_all()
+    except user_library.UserLibraryBusy as ex:
+        return _err('intro_busy', str(ex), 409)
+    except user_library.UserLibraryError as ex:
+        return _err('intro_enable_rejected', str(ex), 409)
     return jsonify({
         **payload,
         "results": report,
@@ -184,6 +189,8 @@ def admin_my_library_intro_undo():
         return guard
     try:
         payload, restored = user_library.undo_my_library_for_all()
+    except user_library.UserLibraryBusy as ex:
+        return _err("intro_busy", str(ex), 409)
     except user_library.UserLibraryError as ex:
         return _err("intro_undo_rejected", str(ex), 409)
     return jsonify({**payload, "restored_accounts": restored})
@@ -198,6 +205,8 @@ def admin_my_library_intro_dismiss():
         return guard
     try:
         payload = user_library.dismiss_my_library_admin_intro()
+    except user_library.UserLibraryBusy as ex:
+        return _err("intro_busy", str(ex), 409)
     except user_library.UserLibraryError as ex:
         return _err("intro_dismiss_rejected", str(ex), 409)
     return jsonify(payload)
@@ -544,8 +553,8 @@ def admin_delete_user(user_id):
     if not user:
         return _err("not_found", "User not found", 404)
     try:
-        # _delete_user enforces the last-admin + Guest guards and purges the
-        # user's per-book data (read status, bookmarks, annotations + backups).
+        # _delete_user enforces the last-admin + Guest guards and purges
+        # everything app.db holds for the account (cps/user_account_data.py).
         _delete_user(user)
     except Exception as ex:
         ub.session.rollback()

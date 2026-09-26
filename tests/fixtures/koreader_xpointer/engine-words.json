@@ -6267,5 +6267,1370 @@
 "e": "/body/DocFragment[3]/body/p[1]/text()[3].111"
 }
 ]
+},
+"head-voids": {
+"engine_word_count": 272,
+"words": [
+{
+"e": "/body/DocFragment[1]/body/h1/text().8",
+"s": "/body/DocFragment[1]/body/h1/text().5",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[1]/body/h1/text().15",
+"s": "/body/DocFragment[1]/body/h1/text().9",
+"t": "Rabbit"
+},
+{
+"e": "/body/DocFragment[1]/body/h1/text().20",
+"s": "/body/DocFragment[1]/body/h1/text().16",
+"t": "Hole"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().5",
+"s": "/body/DocFragment[1]/body/p[1]/text().0",
+"t": "Alice"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().9",
+"s": "/body/DocFragment[1]/body/p[1]/text().6",
+"t": "was"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().19",
+"s": "/body/DocFragment[1]/body/p[1]/text().10",
+"t": "beginning"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().22",
+"s": "/body/DocFragment[1]/body/p[1]/text().20",
+"t": "to"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().26",
+"s": "/body/DocFragment[1]/body/p[1]/text().23",
+"t": "get"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().31",
+"s": "/body/DocFragment[1]/body/p[1]/text().27",
+"t": "very"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().37",
+"s": "/body/DocFragment[1]/body/p[1]/text().32",
+"t": "tired"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().40",
+"s": "/body/DocFragment[1]/body/p[1]/text().38",
+"t": "of"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().48",
+"s": "/body/DocFragment[1]/body/p[1]/text().41",
+"t": "sitting"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().51",
+"s": "/body/DocFragment[1]/body/p[1]/text().49",
+"t": "by"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().55",
+"s": "/body/DocFragment[1]/body/p[1]/text().52",
+"t": "her"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().62",
+"s": "/body/DocFragment[1]/body/p[1]/text().56",
+"t": "sister"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().65",
+"s": "/body/DocFragment[1]/body/p[1]/text().63",
+"t": "on"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().69",
+"s": "/body/DocFragment[1]/body/p[1]/text().66",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().74",
+"s": "/body/DocFragment[1]/body/p[1]/text().70",
+"t": "bank"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().79",
+"s": "/body/DocFragment[1]/body/p[1]/text().76",
+"t": "and"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().82",
+"s": "/body/DocFragment[1]/body/p[1]/text().80",
+"t": "of"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().89",
+"s": "/body/DocFragment[1]/body/p[1]/text().83",
+"t": "having"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().97",
+"s": "/body/DocFragment[1]/body/p[1]/text().90",
+"t": "nothing"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().100",
+"s": "/body/DocFragment[1]/body/p[1]/text().98",
+"t": "to"
+},
+{
+"e": "/body/DocFragment[1]/body/p[1]/text().103",
+"s": "/body/DocFragment[1]/body/p[1]/text().101",
+"t": "do"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[1].4",
+"s": "/body/DocFragment[1]/body/p[2]/text()[1].0",
+"t": "Once"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[1].7",
+"s": "/body/DocFragment[1]/body/p[2]/text()[1].5",
+"t": "or"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[1].13",
+"s": "/body/DocFragment[1]/body/p[2]/text()[1].8",
+"t": "twice"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[1].17",
+"s": "/body/DocFragment[1]/body/p[2]/text()[1].14",
+"t": "she"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[1].21",
+"s": "/body/DocFragment[1]/body/p[2]/text()[1].18",
+"t": "had"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[1].28",
+"s": "/body/DocFragment[1]/body/p[2]/text()[1].22",
+"t": "peeped"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[1].33",
+"s": "/body/DocFragment[1]/body/p[2]/text()[1].29",
+"t": "into"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[1].37",
+"s": "/body/DocFragment[1]/body/p[2]/text()[1].34",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/i/text().4",
+"s": "/body/DocFragment[1]/body/p[2]/i/text().0",
+"t": "book"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[2].4",
+"s": "/body/DocFragment[1]/body/p[2]/text()[2].1",
+"t": "her"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[2].11",
+"s": "/body/DocFragment[1]/body/p[2]/text()[2].5",
+"t": "sister"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[2].15",
+"s": "/body/DocFragment[1]/body/p[2]/text()[2].12",
+"t": "was"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[2].23",
+"s": "/body/DocFragment[1]/body/p[2]/text()[2].16",
+"t": "reading"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[2].28",
+"s": "/body/DocFragment[1]/body/p[2]/text()[2].25",
+"t": "but"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[2].31",
+"s": "/body/DocFragment[1]/body/p[2]/text()[2].29",
+"t": "it"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[2].35",
+"s": "/body/DocFragment[1]/body/p[2]/text()[2].32",
+"t": "had"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[2].38",
+"s": "/body/DocFragment[1]/body/p[2]/text()[2].36",
+"t": "no"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/b/text().8",
+"s": "/body/DocFragment[1]/body/p[2]/b/text().0",
+"t": "pictures"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[3].3",
+"s": "/body/DocFragment[1]/body/p[2]/text()[3].1",
+"t": "or"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[3].17",
+"s": "/body/DocFragment[1]/body/p[2]/text()[3].4",
+"t": "conversations"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[3].20",
+"s": "/body/DocFragment[1]/body/p[2]/text()[3].18",
+"t": "in"
+},
+{
+"e": "/body/DocFragment[1]/body/p[2]/text()[3].23",
+"s": "/body/DocFragment[1]/body/p[2]/text()[3].21",
+"t": "it"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[1]/text().4",
+"s": "/body/DocFragment[1]/body/div/p[1]/text().1",
+"t": "and"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[1]/text().9",
+"s": "/body/DocFragment[1]/body/div/p[1]/text().5",
+"t": "what"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[1]/text().12",
+"s": "/body/DocFragment[1]/body/div/p[1]/text().10",
+"t": "is"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[1]/text().16",
+"s": "/body/DocFragment[1]/body/div/p[1]/text().13",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[1]/text().20",
+"s": "/body/DocFragment[1]/body/div/p[1]/text().17",
+"t": "use"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[1]/text().23",
+"s": "/body/DocFragment[1]/body/div/p[1]/text().21",
+"t": "of"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[1]/text().25",
+"s": "/body/DocFragment[1]/body/div/p[1]/text().24",
+"t": "a"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[1]/text().30",
+"s": "/body/DocFragment[1]/body/div/p[1]/text().26",
+"t": "book"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[1]/text().40",
+"s": "/body/DocFragment[1]/body/div/p[1]/text().33",
+"t": "thought"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[1]/text().46",
+"s": "/body/DocFragment[1]/body/div/p[1]/text().41",
+"t": "Alice"
+},
+{
+"e": "/body/DocFragment[1]/body/div/text()[1].9",
+"s": "/body/DocFragment[1]/body/div/text()[1].2",
+"t": "without"
+},
+{
+"e": "/body/DocFragment[1]/body/div/em/text().8",
+"s": "/body/DocFragment[1]/body/div/em/text().0",
+"t": "pictures"
+},
+{
+"e": "/body/DocFragment[1]/body/div/text()[2].3",
+"s": "/body/DocFragment[1]/body/div/text()[2].1",
+"t": "or"
+},
+{
+"e": "/body/DocFragment[1]/body/div/text()[2].17",
+"s": "/body/DocFragment[1]/body/div/text()[2].4",
+"t": "conversations"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[2]/text().2",
+"s": "/body/DocFragment[1]/body/div/p[2]/text().0",
+"t": "So"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[2]/text().6",
+"s": "/body/DocFragment[1]/body/div/p[2]/text().3",
+"t": "she"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[2]/text().10",
+"s": "/body/DocFragment[1]/body/div/p[2]/text().7",
+"t": "was"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[2]/text().22",
+"s": "/body/DocFragment[1]/body/div/p[2]/text().11",
+"t": "considering"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[2]/text().25",
+"s": "/body/DocFragment[1]/body/div/p[2]/text().23",
+"t": "in"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[2]/text().29",
+"s": "/body/DocFragment[1]/body/div/p[2]/text().26",
+"t": "her"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[2]/text().33",
+"s": "/body/DocFragment[1]/body/div/p[2]/text().30",
+"t": "own"
+},
+{
+"e": "/body/DocFragment[1]/body/div/p[2]/text().38",
+"s": "/body/DocFragment[1]/body/div/p[2]/text().34",
+"t": "mind"
+},
+{
+"e": "/body/DocFragment[1]/body/p[3]/text().3",
+"s": "/body/DocFragment[1]/body/p[3]/text().0",
+"t": "How"
+},
+{
+"e": "/body/DocFragment[1]/body/p[3]/text().8",
+"s": "/body/DocFragment[1]/body/p[3]/text().4",
+"t": "doth"
+},
+{
+"e": "/body/DocFragment[1]/body/p[3]/text().12",
+"s": "/body/DocFragment[1]/body/p[3]/text().9",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[1]/body/p[3]/text().19",
+"s": "/body/DocFragment[1]/body/p[3]/text().13",
+"t": "little"
+},
+{
+"e": "/body/DocFragment[1]/body/p[3]/text().29",
+"s": "/body/DocFragment[1]/body/p[3]/text().20",
+"t": "crocodile"
+},
+{
+"e": "/body/DocFragment[1]/body/p[3]/text().41",
+"s": "/body/DocFragment[1]/body/p[3]/text().34",
+"t": "Improve"
+},
+{
+"e": "/body/DocFragment[1]/body/p[3]/text().45",
+"s": "/body/DocFragment[1]/body/p[3]/text().42",
+"t": "his"
+},
+{
+"e": "/body/DocFragment[1]/body/p[3]/text().53",
+"s": "/body/DocFragment[1]/body/p[3]/text().46",
+"t": "shining"
+},
+{
+"e": "/body/DocFragment[1]/body/p[3]/text().58",
+"s": "/body/DocFragment[1]/body/p[3]/text().54",
+"t": "tail"
+},
+{
+"e": "/body/DocFragment[1]/body/p[4]/text()[1].5",
+"s": "/body/DocFragment[1]/body/p[4]/text()[1].0",
+"t": "There"
+},
+{
+"e": "/body/DocFragment[1]/body/p[4]/text()[1].9",
+"s": "/body/DocFragment[1]/body/p[4]/text()[1].6",
+"t": "was"
+},
+{
+"e": "/body/DocFragment[1]/body/p[4]/text()[1].17",
+"s": "/body/DocFragment[1]/body/p[4]/text()[1].10",
+"t": "nothing"
+},
+{
+"e": "/body/DocFragment[1]/body/p[4]/text()[1].20",
+"s": "/body/DocFragment[1]/body/p[4]/text()[1].18",
+"t": "so"
+},
+{
+"e": "/body/DocFragment[1]/body/p[4]/span/text().4",
+"s": "/body/DocFragment[1]/body/p[4]/span/text().0",
+"t": "very"
+},
+{
+"e": "/body/DocFragment[1]/body/p[4]/text()[2].11",
+"s": "/body/DocFragment[1]/body/p[4]/text()[2].1",
+"t": "remarkable"
+},
+{
+"e": "/body/DocFragment[1]/body/p[4]/text()[2].14",
+"s": "/body/DocFragment[1]/body/p[4]/text()[2].12",
+"t": "in"
+},
+{
+"e": "/body/DocFragment[1]/body/p[4]/text()[2].19",
+"s": "/body/DocFragment[1]/body/p[4]/text()[2].15",
+"t": "that"
+},
+{
+"e": "/body/DocFragment[2]/body/h1/text().4",
+"s": "/body/DocFragment[2]/body/h1/text().0",
+"t": "Down"
+},
+{
+"e": "/body/DocFragment[2]/body/h1/text().8",
+"s": "/body/DocFragment[2]/body/h1/text().5",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[2]/body/h1/text().15",
+"s": "/body/DocFragment[2]/body/h1/text().9",
+"t": "Rabbit"
+},
+{
+"e": "/body/DocFragment[2]/body/h1/text().20",
+"s": "/body/DocFragment[2]/body/h1/text().16",
+"t": "Hole"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().5",
+"s": "/body/DocFragment[2]/body/p[1]/text().0",
+"t": "Alice"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().9",
+"s": "/body/DocFragment[2]/body/p[1]/text().6",
+"t": "was"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().19",
+"s": "/body/DocFragment[2]/body/p[1]/text().10",
+"t": "beginning"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().22",
+"s": "/body/DocFragment[2]/body/p[1]/text().20",
+"t": "to"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().26",
+"s": "/body/DocFragment[2]/body/p[1]/text().23",
+"t": "get"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().31",
+"s": "/body/DocFragment[2]/body/p[1]/text().27",
+"t": "very"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().37",
+"s": "/body/DocFragment[2]/body/p[1]/text().32",
+"t": "tired"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().40",
+"s": "/body/DocFragment[2]/body/p[1]/text().38",
+"t": "of"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().48",
+"s": "/body/DocFragment[2]/body/p[1]/text().41",
+"t": "sitting"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().51",
+"s": "/body/DocFragment[2]/body/p[1]/text().49",
+"t": "by"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().55",
+"s": "/body/DocFragment[2]/body/p[1]/text().52",
+"t": "her"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().62",
+"s": "/body/DocFragment[2]/body/p[1]/text().56",
+"t": "sister"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().65",
+"s": "/body/DocFragment[2]/body/p[1]/text().63",
+"t": "on"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().69",
+"s": "/body/DocFragment[2]/body/p[1]/text().66",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().74",
+"s": "/body/DocFragment[2]/body/p[1]/text().70",
+"t": "bank"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().79",
+"s": "/body/DocFragment[2]/body/p[1]/text().76",
+"t": "and"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().82",
+"s": "/body/DocFragment[2]/body/p[1]/text().80",
+"t": "of"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().89",
+"s": "/body/DocFragment[2]/body/p[1]/text().83",
+"t": "having"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().97",
+"s": "/body/DocFragment[2]/body/p[1]/text().90",
+"t": "nothing"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().100",
+"s": "/body/DocFragment[2]/body/p[1]/text().98",
+"t": "to"
+},
+{
+"e": "/body/DocFragment[2]/body/p[1]/text().103",
+"s": "/body/DocFragment[2]/body/p[1]/text().101",
+"t": "do"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[1].4",
+"s": "/body/DocFragment[2]/body/p[2]/text()[1].0",
+"t": "Once"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[1].7",
+"s": "/body/DocFragment[2]/body/p[2]/text()[1].5",
+"t": "or"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[1].13",
+"s": "/body/DocFragment[2]/body/p[2]/text()[1].8",
+"t": "twice"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[1].17",
+"s": "/body/DocFragment[2]/body/p[2]/text()[1].14",
+"t": "she"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[1].21",
+"s": "/body/DocFragment[2]/body/p[2]/text()[1].18",
+"t": "had"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[1].28",
+"s": "/body/DocFragment[2]/body/p[2]/text()[1].22",
+"t": "peeped"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[1].33",
+"s": "/body/DocFragment[2]/body/p[2]/text()[1].29",
+"t": "into"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[1].37",
+"s": "/body/DocFragment[2]/body/p[2]/text()[1].34",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/i/text().4",
+"s": "/body/DocFragment[2]/body/p[2]/i/text().0",
+"t": "book"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[2].4",
+"s": "/body/DocFragment[2]/body/p[2]/text()[2].1",
+"t": "her"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[2].11",
+"s": "/body/DocFragment[2]/body/p[2]/text()[2].5",
+"t": "sister"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[2].15",
+"s": "/body/DocFragment[2]/body/p[2]/text()[2].12",
+"t": "was"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[2].23",
+"s": "/body/DocFragment[2]/body/p[2]/text()[2].16",
+"t": "reading"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[2].28",
+"s": "/body/DocFragment[2]/body/p[2]/text()[2].25",
+"t": "but"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[2].31",
+"s": "/body/DocFragment[2]/body/p[2]/text()[2].29",
+"t": "it"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[2].35",
+"s": "/body/DocFragment[2]/body/p[2]/text()[2].32",
+"t": "had"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[2].38",
+"s": "/body/DocFragment[2]/body/p[2]/text()[2].36",
+"t": "no"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/b/text().8",
+"s": "/body/DocFragment[2]/body/p[2]/b/text().0",
+"t": "pictures"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[3].3",
+"s": "/body/DocFragment[2]/body/p[2]/text()[3].1",
+"t": "or"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[3].17",
+"s": "/body/DocFragment[2]/body/p[2]/text()[3].4",
+"t": "conversations"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[3].20",
+"s": "/body/DocFragment[2]/body/p[2]/text()[3].18",
+"t": "in"
+},
+{
+"e": "/body/DocFragment[2]/body/p[2]/text()[3].23",
+"s": "/body/DocFragment[2]/body/p[2]/text()[3].21",
+"t": "it"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[1]/text().4",
+"s": "/body/DocFragment[2]/body/div/p[1]/text().1",
+"t": "and"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[1]/text().9",
+"s": "/body/DocFragment[2]/body/div/p[1]/text().5",
+"t": "what"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[1]/text().12",
+"s": "/body/DocFragment[2]/body/div/p[1]/text().10",
+"t": "is"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[1]/text().16",
+"s": "/body/DocFragment[2]/body/div/p[1]/text().13",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[1]/text().20",
+"s": "/body/DocFragment[2]/body/div/p[1]/text().17",
+"t": "use"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[1]/text().23",
+"s": "/body/DocFragment[2]/body/div/p[1]/text().21",
+"t": "of"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[1]/text().25",
+"s": "/body/DocFragment[2]/body/div/p[1]/text().24",
+"t": "a"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[1]/text().30",
+"s": "/body/DocFragment[2]/body/div/p[1]/text().26",
+"t": "book"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[1]/text().40",
+"s": "/body/DocFragment[2]/body/div/p[1]/text().33",
+"t": "thought"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[1]/text().46",
+"s": "/body/DocFragment[2]/body/div/p[1]/text().41",
+"t": "Alice"
+},
+{
+"e": "/body/DocFragment[2]/body/div/text()[1].9",
+"s": "/body/DocFragment[2]/body/div/text()[1].2",
+"t": "without"
+},
+{
+"e": "/body/DocFragment[2]/body/div/em/text().8",
+"s": "/body/DocFragment[2]/body/div/em/text().0",
+"t": "pictures"
+},
+{
+"e": "/body/DocFragment[2]/body/div/text()[2].3",
+"s": "/body/DocFragment[2]/body/div/text()[2].1",
+"t": "or"
+},
+{
+"e": "/body/DocFragment[2]/body/div/text()[2].17",
+"s": "/body/DocFragment[2]/body/div/text()[2].4",
+"t": "conversations"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[2]/text().2",
+"s": "/body/DocFragment[2]/body/div/p[2]/text().0",
+"t": "So"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[2]/text().6",
+"s": "/body/DocFragment[2]/body/div/p[2]/text().3",
+"t": "she"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[2]/text().10",
+"s": "/body/DocFragment[2]/body/div/p[2]/text().7",
+"t": "was"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[2]/text().22",
+"s": "/body/DocFragment[2]/body/div/p[2]/text().11",
+"t": "considering"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[2]/text().25",
+"s": "/body/DocFragment[2]/body/div/p[2]/text().23",
+"t": "in"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[2]/text().29",
+"s": "/body/DocFragment[2]/body/div/p[2]/text().26",
+"t": "her"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[2]/text().33",
+"s": "/body/DocFragment[2]/body/div/p[2]/text().30",
+"t": "own"
+},
+{
+"e": "/body/DocFragment[2]/body/div/p[2]/text().38",
+"s": "/body/DocFragment[2]/body/div/p[2]/text().34",
+"t": "mind"
+},
+{
+"e": "/body/DocFragment[2]/body/p[3]/text().3",
+"s": "/body/DocFragment[2]/body/p[3]/text().0",
+"t": "How"
+},
+{
+"e": "/body/DocFragment[2]/body/p[3]/text().8",
+"s": "/body/DocFragment[2]/body/p[3]/text().4",
+"t": "doth"
+},
+{
+"e": "/body/DocFragment[2]/body/p[3]/text().12",
+"s": "/body/DocFragment[2]/body/p[3]/text().9",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[2]/body/p[3]/text().19",
+"s": "/body/DocFragment[2]/body/p[3]/text().13",
+"t": "little"
+},
+{
+"e": "/body/DocFragment[2]/body/p[3]/text().29",
+"s": "/body/DocFragment[2]/body/p[3]/text().20",
+"t": "crocodile"
+},
+{
+"e": "/body/DocFragment[2]/body/p[3]/text().41",
+"s": "/body/DocFragment[2]/body/p[3]/text().34",
+"t": "Improve"
+},
+{
+"e": "/body/DocFragment[2]/body/p[3]/text().45",
+"s": "/body/DocFragment[2]/body/p[3]/text().42",
+"t": "his"
+},
+{
+"e": "/body/DocFragment[2]/body/p[3]/text().53",
+"s": "/body/DocFragment[2]/body/p[3]/text().46",
+"t": "shining"
+},
+{
+"e": "/body/DocFragment[2]/body/p[3]/text().58",
+"s": "/body/DocFragment[2]/body/p[3]/text().54",
+"t": "tail"
+},
+{
+"e": "/body/DocFragment[2]/body/p[4]/text()[1].5",
+"s": "/body/DocFragment[2]/body/p[4]/text()[1].0",
+"t": "There"
+},
+{
+"e": "/body/DocFragment[2]/body/p[4]/text()[1].9",
+"s": "/body/DocFragment[2]/body/p[4]/text()[1].6",
+"t": "was"
+},
+{
+"e": "/body/DocFragment[2]/body/p[4]/text()[1].17",
+"s": "/body/DocFragment[2]/body/p[4]/text()[1].10",
+"t": "nothing"
+},
+{
+"e": "/body/DocFragment[2]/body/p[4]/text()[1].20",
+"s": "/body/DocFragment[2]/body/p[4]/text()[1].18",
+"t": "so"
+},
+{
+"e": "/body/DocFragment[2]/body/p[4]/span/text().4",
+"s": "/body/DocFragment[2]/body/p[4]/span/text().0",
+"t": "very"
+},
+{
+"e": "/body/DocFragment[2]/body/p[4]/text()[2].11",
+"s": "/body/DocFragment[2]/body/p[4]/text()[2].1",
+"t": "remarkable"
+},
+{
+"e": "/body/DocFragment[2]/body/p[4]/text()[2].14",
+"s": "/body/DocFragment[2]/body/p[4]/text()[2].12",
+"t": "in"
+},
+{
+"e": "/body/DocFragment[2]/body/p[4]/text()[2].19",
+"s": "/body/DocFragment[2]/body/p[4]/text()[2].15",
+"t": "that"
+},
+{
+"e": "/body/DocFragment[3]/body/p/text().4",
+"s": "/body/DocFragment[3]/body/p/text().0",
+"t": "Down"
+},
+{
+"e": "/body/DocFragment[3]/body/p/text().10",
+"s": "/body/DocFragment[3]/body/p/text().6",
+"t": "down"
+},
+{
+"e": "/body/DocFragment[3]/body/p/text().16",
+"s": "/body/DocFragment[3]/body/p/text().12",
+"t": "down"
+},
+{
+"e": "/body/DocFragment[3]/body/p/br/text().5",
+"s": "/body/DocFragment[3]/body/p/br/text().0",
+"t": "Would"
+},
+{
+"e": "/body/DocFragment[3]/body/p/br/text().9",
+"s": "/body/DocFragment[3]/body/p/br/text().6",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[3]/body/p/br/text().14",
+"s": "/body/DocFragment[3]/body/p/br/text().10",
+"t": "fall"
+},
+{
+"e": "/body/DocFragment[3]/body/p/br/text().20",
+"s": "/body/DocFragment[3]/body/p/br/text().15",
+"t": "never"
+},
+{
+"e": "/body/DocFragment[3]/body/p/br/text().25",
+"s": "/body/DocFragment[3]/body/p/br/text().21",
+"t": "come"
+},
+{
+"e": "/body/DocFragment[3]/body/p/br/text().28",
+"s": "/body/DocFragment[3]/body/p/br/text().26",
+"t": "to"
+},
+{
+"e": "/body/DocFragment[3]/body/p/br/text().31",
+"s": "/body/DocFragment[3]/body/p/br/text().29",
+"t": "an"
+},
+{
+"e": "/body/DocFragment[3]/body/p/br/text().35",
+"s": "/body/DocFragment[3]/body/p/br/text().32",
+"t": "end"
+},
+{
+"e": "/body/DocFragment[4]/body/p/text().9",
+"s": "/body/DocFragment[4]/body/p/text().0",
+"t": "Presently"
+},
+{
+"e": "/body/DocFragment[4]/body/p/text().13",
+"s": "/body/DocFragment[4]/body/p/text().10",
+"t": "she"
+},
+{
+"e": "/body/DocFragment[4]/body/p/text().19",
+"s": "/body/DocFragment[4]/body/p/text().14",
+"t": "began"
+},
+{
+"e": "/body/DocFragment[4]/body/p/text().25",
+"s": "/body/DocFragment[4]/body/p/text().20",
+"t": "again"
+},
+{
+"e": "/body/DocFragment[5]/body/h1/text().4",
+"s": "/body/DocFragment[5]/body/h1/text().0",
+"t": "Down"
+},
+{
+"e": "/body/DocFragment[5]/body/h1/text().8",
+"s": "/body/DocFragment[5]/body/h1/text().5",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[5]/body/h1/text().15",
+"s": "/body/DocFragment[5]/body/h1/text().9",
+"t": "Rabbit"
+},
+{
+"e": "/body/DocFragment[5]/body/h1/text().20",
+"s": "/body/DocFragment[5]/body/h1/text().16",
+"t": "Hole"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().5",
+"s": "/body/DocFragment[5]/body/p[1]/text().0",
+"t": "Alice"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().9",
+"s": "/body/DocFragment[5]/body/p[1]/text().6",
+"t": "was"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().19",
+"s": "/body/DocFragment[5]/body/p[1]/text().10",
+"t": "beginning"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().22",
+"s": "/body/DocFragment[5]/body/p[1]/text().20",
+"t": "to"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().26",
+"s": "/body/DocFragment[5]/body/p[1]/text().23",
+"t": "get"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().31",
+"s": "/body/DocFragment[5]/body/p[1]/text().27",
+"t": "very"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().37",
+"s": "/body/DocFragment[5]/body/p[1]/text().32",
+"t": "tired"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().40",
+"s": "/body/DocFragment[5]/body/p[1]/text().38",
+"t": "of"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().48",
+"s": "/body/DocFragment[5]/body/p[1]/text().41",
+"t": "sitting"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().51",
+"s": "/body/DocFragment[5]/body/p[1]/text().49",
+"t": "by"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().55",
+"s": "/body/DocFragment[5]/body/p[1]/text().52",
+"t": "her"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().62",
+"s": "/body/DocFragment[5]/body/p[1]/text().56",
+"t": "sister"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().65",
+"s": "/body/DocFragment[5]/body/p[1]/text().63",
+"t": "on"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().69",
+"s": "/body/DocFragment[5]/body/p[1]/text().66",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().74",
+"s": "/body/DocFragment[5]/body/p[1]/text().70",
+"t": "bank"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().79",
+"s": "/body/DocFragment[5]/body/p[1]/text().76",
+"t": "and"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().82",
+"s": "/body/DocFragment[5]/body/p[1]/text().80",
+"t": "of"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().89",
+"s": "/body/DocFragment[5]/body/p[1]/text().83",
+"t": "having"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().97",
+"s": "/body/DocFragment[5]/body/p[1]/text().90",
+"t": "nothing"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().100",
+"s": "/body/DocFragment[5]/body/p[1]/text().98",
+"t": "to"
+},
+{
+"e": "/body/DocFragment[5]/body/p[1]/text().103",
+"s": "/body/DocFragment[5]/body/p[1]/text().101",
+"t": "do"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[1].4",
+"s": "/body/DocFragment[5]/body/p[2]/text()[1].0",
+"t": "Once"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[1].7",
+"s": "/body/DocFragment[5]/body/p[2]/text()[1].5",
+"t": "or"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[1].13",
+"s": "/body/DocFragment[5]/body/p[2]/text()[1].8",
+"t": "twice"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[1].17",
+"s": "/body/DocFragment[5]/body/p[2]/text()[1].14",
+"t": "she"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[1].21",
+"s": "/body/DocFragment[5]/body/p[2]/text()[1].18",
+"t": "had"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[1].28",
+"s": "/body/DocFragment[5]/body/p[2]/text()[1].22",
+"t": "peeped"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[1].33",
+"s": "/body/DocFragment[5]/body/p[2]/text()[1].29",
+"t": "into"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[1].37",
+"s": "/body/DocFragment[5]/body/p[2]/text()[1].34",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/i/text().4",
+"s": "/body/DocFragment[5]/body/p[2]/i/text().0",
+"t": "book"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[2].4",
+"s": "/body/DocFragment[5]/body/p[2]/text()[2].1",
+"t": "her"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[2].11",
+"s": "/body/DocFragment[5]/body/p[2]/text()[2].5",
+"t": "sister"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[2].15",
+"s": "/body/DocFragment[5]/body/p[2]/text()[2].12",
+"t": "was"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[2].23",
+"s": "/body/DocFragment[5]/body/p[2]/text()[2].16",
+"t": "reading"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[2].28",
+"s": "/body/DocFragment[5]/body/p[2]/text()[2].25",
+"t": "but"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[2].31",
+"s": "/body/DocFragment[5]/body/p[2]/text()[2].29",
+"t": "it"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[2].35",
+"s": "/body/DocFragment[5]/body/p[2]/text()[2].32",
+"t": "had"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[2].38",
+"s": "/body/DocFragment[5]/body/p[2]/text()[2].36",
+"t": "no"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/b/text().8",
+"s": "/body/DocFragment[5]/body/p[2]/b/text().0",
+"t": "pictures"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[3].3",
+"s": "/body/DocFragment[5]/body/p[2]/text()[3].1",
+"t": "or"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[3].17",
+"s": "/body/DocFragment[5]/body/p[2]/text()[3].4",
+"t": "conversations"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[3].20",
+"s": "/body/DocFragment[5]/body/p[2]/text()[3].18",
+"t": "in"
+},
+{
+"e": "/body/DocFragment[5]/body/p[2]/text()[3].23",
+"s": "/body/DocFragment[5]/body/p[2]/text()[3].21",
+"t": "it"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[1]/text().4",
+"s": "/body/DocFragment[5]/body/div/p[1]/text().1",
+"t": "and"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[1]/text().9",
+"s": "/body/DocFragment[5]/body/div/p[1]/text().5",
+"t": "what"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[1]/text().12",
+"s": "/body/DocFragment[5]/body/div/p[1]/text().10",
+"t": "is"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[1]/text().16",
+"s": "/body/DocFragment[5]/body/div/p[1]/text().13",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[1]/text().20",
+"s": "/body/DocFragment[5]/body/div/p[1]/text().17",
+"t": "use"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[1]/text().23",
+"s": "/body/DocFragment[5]/body/div/p[1]/text().21",
+"t": "of"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[1]/text().25",
+"s": "/body/DocFragment[5]/body/div/p[1]/text().24",
+"t": "a"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[1]/text().30",
+"s": "/body/DocFragment[5]/body/div/p[1]/text().26",
+"t": "book"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[1]/text().40",
+"s": "/body/DocFragment[5]/body/div/p[1]/text().33",
+"t": "thought"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[1]/text().46",
+"s": "/body/DocFragment[5]/body/div/p[1]/text().41",
+"t": "Alice"
+},
+{
+"e": "/body/DocFragment[5]/body/div/text()[1].9",
+"s": "/body/DocFragment[5]/body/div/text()[1].2",
+"t": "without"
+},
+{
+"e": "/body/DocFragment[5]/body/div/em/text().8",
+"s": "/body/DocFragment[5]/body/div/em/text().0",
+"t": "pictures"
+},
+{
+"e": "/body/DocFragment[5]/body/div/text()[2].3",
+"s": "/body/DocFragment[5]/body/div/text()[2].1",
+"t": "or"
+},
+{
+"e": "/body/DocFragment[5]/body/div/text()[2].17",
+"s": "/body/DocFragment[5]/body/div/text()[2].4",
+"t": "conversations"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[2]/text().2",
+"s": "/body/DocFragment[5]/body/div/p[2]/text().0",
+"t": "So"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[2]/text().6",
+"s": "/body/DocFragment[5]/body/div/p[2]/text().3",
+"t": "she"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[2]/text().10",
+"s": "/body/DocFragment[5]/body/div/p[2]/text().7",
+"t": "was"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[2]/text().22",
+"s": "/body/DocFragment[5]/body/div/p[2]/text().11",
+"t": "considering"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[2]/text().25",
+"s": "/body/DocFragment[5]/body/div/p[2]/text().23",
+"t": "in"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[2]/text().29",
+"s": "/body/DocFragment[5]/body/div/p[2]/text().26",
+"t": "her"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[2]/text().33",
+"s": "/body/DocFragment[5]/body/div/p[2]/text().30",
+"t": "own"
+},
+{
+"e": "/body/DocFragment[5]/body/div/p[2]/text().38",
+"s": "/body/DocFragment[5]/body/div/p[2]/text().34",
+"t": "mind"
+},
+{
+"e": "/body/DocFragment[5]/body/p[3]/text().3",
+"s": "/body/DocFragment[5]/body/p[3]/text().0",
+"t": "How"
+},
+{
+"e": "/body/DocFragment[5]/body/p[3]/text().8",
+"s": "/body/DocFragment[5]/body/p[3]/text().4",
+"t": "doth"
+},
+{
+"e": "/body/DocFragment[5]/body/p[3]/text().12",
+"s": "/body/DocFragment[5]/body/p[3]/text().9",
+"t": "the"
+},
+{
+"e": "/body/DocFragment[5]/body/p[3]/text().19",
+"s": "/body/DocFragment[5]/body/p[3]/text().13",
+"t": "little"
+},
+{
+"e": "/body/DocFragment[5]/body/p[3]/text().29",
+"s": "/body/DocFragment[5]/body/p[3]/text().20",
+"t": "crocodile"
+},
+{
+"e": "/body/DocFragment[5]/body/p[3]/text().41",
+"s": "/body/DocFragment[5]/body/p[3]/text().34",
+"t": "Improve"
+},
+{
+"e": "/body/DocFragment[5]/body/p[3]/text().45",
+"s": "/body/DocFragment[5]/body/p[3]/text().42",
+"t": "his"
+},
+{
+"e": "/body/DocFragment[5]/body/p[3]/text().53",
+"s": "/body/DocFragment[5]/body/p[3]/text().46",
+"t": "shining"
+},
+{
+"e": "/body/DocFragment[5]/body/p[3]/text().58",
+"s": "/body/DocFragment[5]/body/p[3]/text().54",
+"t": "tail"
+},
+{
+"e": "/body/DocFragment[5]/body/p[4]/text()[1].5",
+"s": "/body/DocFragment[5]/body/p[4]/text()[1].0",
+"t": "There"
+},
+{
+"e": "/body/DocFragment[5]/body/p[4]/text()[1].9",
+"s": "/body/DocFragment[5]/body/p[4]/text()[1].6",
+"t": "was"
+},
+{
+"e": "/body/DocFragment[5]/body/p[4]/text()[1].17",
+"s": "/body/DocFragment[5]/body/p[4]/text()[1].10",
+"t": "nothing"
+},
+{
+"e": "/body/DocFragment[5]/body/p[4]/text()[1].20",
+"s": "/body/DocFragment[5]/body/p[4]/text()[1].18",
+"t": "so"
+},
+{
+"e": "/body/DocFragment[5]/body/p[4]/span/text().4",
+"s": "/body/DocFragment[5]/body/p[4]/span/text().0",
+"t": "very"
+},
+{
+"e": "/body/DocFragment[5]/body/p[4]/text()[2].11",
+"s": "/body/DocFragment[5]/body/p[4]/text()[2].1",
+"t": "remarkable"
+},
+{
+"e": "/body/DocFragment[5]/body/p[4]/text()[2].14",
+"s": "/body/DocFragment[5]/body/p[4]/text()[2].12",
+"t": "in"
+},
+{
+"e": "/body/DocFragment[5]/body/p[4]/text()[2].19",
+"s": "/body/DocFragment[5]/body/p[4]/text()[2].15",
+"t": "that"
+}
+]
 }
 }

@@ -46,7 +46,7 @@ from .gdriveutils import getFileFromEbooksFolder, do_gdrive_download
 from .helper import check_valid_domain, check_email, check_username, \
     get_book_cover, get_series_cover_thumbnail, get_download_link, send_mail, generate_random_password, \
     send_registration_mail, check_send_to_ereader, check_read_formats, tags_filters, reset_password, valid_email, \
-    edit_book_read_status, valid_password, get_kosync_progress_display
+    edit_book_read_status, valid_password, get_kosync_progress_display, get_sendable_book
 from .pagination import Pagination
 from .sort_orders import BOOK_SORT_ORDERS, book_sort_order, viewer_id
 from .custom_column_sort import (
@@ -61,7 +61,7 @@ from .kobo_sync_status import remove_synced_book
 from . import magic_shelf
 from .render_template import render_title_template, get_custom_column_visibility_options
 from .kobo_sync_status import change_archived_books
-from . import limiter
+from . import limiter, rate_limits
 from .services.worker import WorkerThread
 from .services.parallel import run_blocking as _run_blocking
 from .tasks_status import render_task_status
@@ -200,15 +200,12 @@ def add_security_headers(resp):
 #
 # They were not cached at all. Flask's SEND_FILE_MAX_AGE_DEFAULT is None, which
 # makes send_file emit `Cache-Control: no-cache`, so a ~640 KB bundle was
-# revalidated on every single page load. The app does ship a cache-buster
-# (cache_buster.init_cache_busting) that would let us cache more broadly, but
-# it is only installed under FLASK_DEBUG and it only rewrites url_for('static')
-# links — the SPA's asset URLs are baked into the built index.html and never go
-# through url_for. So the rule below is deliberately narrow: ONLY the paths that
-# carry a content hash in the filename. Everything else under /static (js/, css/,
-# the fonts and images the classic UI references by fixed name) keeps
-# revalidating, because an upgrade changes those bytes WITHOUT changing their
-# URL and a long-lived copy would pin a user to the previous release's assets.
+# revalidated on every single page load. The app's cache-buster adds content
+# query hashes to url_for('static') links in every environment. The SPA's asset
+# URLs are baked into the built index.html and never go through url_for.
+# The rule below remains deliberately narrow: ONLY paths carrying a content
+# hash in the filename get immutable caching. Other /static paths can still be
+# requested without a query hash, so they keep revalidating after upgrades.
 _HASHED_ASSET_PREFIX = '/static/app/assets/'
 _HASHED_ASSET_RE = re.compile(r'-[A-Za-z0-9_-]{8}\.[A-Za-z0-9]+$')
 IMMUTABLE_ASSET_CACHE_CONTROL = 'public, max-age=31536000, immutable'
@@ -852,38 +849,10 @@ def render_hot_books(page, order):
                      .order_by(func.random())
                      .limit(config.config_random_books).all())
 
-        off = int(config.config_books_per_page) * (page - 1)
-
-        # Get total count for pagination
-        total_hot_books = ub.session.query(func.count(ub.Downloads.book_id.distinct())).scalar()
-
-        # Get the book_ids for the current page
-        hot_book_ids_query = (ub.session.query(ub.Downloads.book_id)
-                              .group_by(ub.Downloads.book_id)
-                              .order_by(*order[0])
-                              .offset(off)
-                              .limit(config.config_books_per_page))
-
-        hot_book_ids = [item[0] for item in hot_book_ids_query]
-
-        entries = []
-        if hot_book_ids:
-            query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
-            # Fetch all book details in one query
-            book_details = query.filter(calibre_db.common_filters()).filter(db.Books.id.in_(hot_book_ids)).all()
-
-            # Create a dictionary for quick lookups
-            book_map = {book.Books.id: book for book in book_details}
-
-            # Reorder the entries to match the "hotness" order
-            for book_id in hot_book_ids:
-                if book_id in book_map:
-                    entries.append(book_map[book_id])
-                else:
-                    # This book might have been deleted from calibre but still in downloads table
-                    ub.delete_download(book_id)
-
-        pagination = Pagination(page, config.config_books_per_page, total_hot_books)
+        per_page = int(config.config_books_per_page)
+        entries, total_hot_books = helper.hot_books_page(
+            calibre_db.common_filters(), order[0], per_page * (page - 1), per_page)
+        pagination = Pagination(page, per_page, total_hot_books)
         return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
                                      title=_("Hot Books (Most Downloaded)"), page="hot", order=order[1])
     else:
@@ -907,10 +876,6 @@ def render_downloaded_books(page, order, user_id):
                                                             db.Books.id == db.books_series_link.c.book,
                                                             db.Series,
                                                             ub.Downloads, db.Books.id == ub.Downloads.book_id)
-        for book in entries:
-            if not (calibre_db.session.query(db.Books).filter(calibre_db.common_filters())
-                    .filter(db.Books.id == book.Books.id).first()):
-                ub.delete_download(book.Books.id)
         return render_title_template('index.html',
                                      random=random,
                                      entries=entries,
@@ -2709,7 +2674,8 @@ def serve_book(book_id, book_format, anyname):
     book_format = book_format.split(".")[0]
     # allow_show_hidden=True: the user can download their own hidden books
     # from the detail page; the serve flow must mirror that (#319 pushback).
-    book = calibre_db.get_filtered_book(book_id, allow_show_hidden=True)
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_hidden=True, allow_public_shelf_books=True)
     if not book:
         return "File not in Database"
     data = calibre_db.get_book_format(book_id, book_format.upper())
@@ -2775,7 +2741,8 @@ def serve_book(book_id, book_format, anyname):
 @download_required
 def download_link(book_id, book_format, anyname):
     client = "kobo" if "Kobo" in request.headers.get('User-Agent', "") else ""
-    return get_download_link(book_id, book_format, client)
+    return get_download_link(
+        book_id, book_format, client, allow_public_shelf_books=True)
 
 
 @web.route('/send/<int:book_id>/<book_format>/<int:convert>', methods=["POST"])
@@ -2960,7 +2927,7 @@ def handle_login_user(user, remember, message, category):
         log.debug(f"Failed to log login activity: {e}")
     
     flash(message, category=category)
-    [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+    rate_limits.clear_current_limits(limiter)
 
     # Clear redirect-loop and automatic OAuth-attempt state on success.
     flask_session.pop(oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY, None)
@@ -3088,7 +3055,7 @@ def login():
 @limiter.limit("40/day", key_func=lambda: strip_whitespaces(request.form.get('username', "")).lower())
 @limiter.limit("3/minute", key_func=lambda: strip_whitespaces(request.form.get('username', "")).lower())
 def login_post():
-    if config.config_disable_standard_login:
+    if config.standard_login_disabled():
         flash(_("Standard login is disabled."), category="error")
         return render_login()
 
@@ -3765,7 +3732,8 @@ def read_book(book_id, book_format):
     # allow_show_hidden=True: a user can read their own hidden book — the
     # detail page's reading icon must not bounce with "unavailable" just
     # because the book is on the user's hide list (#319 pushback @droM4X).
-    book = calibre_db.get_filtered_book(book_id, allow_show_hidden=True)
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_hidden=True, allow_public_shelf_books=True)
 
     if not book:
         flash(_("Oops! Selected book is unavailable. File does not exist or is not accessible"),
@@ -3976,7 +3944,8 @@ def show_book(book_id):
     # this the detail route 404s for hidden books and recovery is impossible
     # (issue #319).
     entries = calibre_db.get_book_read_archived(book_id, config.config_read_column,
-                                                allow_show_archived=True, allow_show_hidden=True)
+                                                allow_show_archived=True, allow_show_hidden=True,
+                                                allow_public_shelf_books=True)
     if entries:
         read_book = entries[1]
         archived_book = entries[2]
@@ -4028,8 +3997,15 @@ def show_book(book_id):
 
         entry.ordered_authors = calibre_db.order_authors([entry])
 
-        entry.email_share_list = check_send_to_ereader(entry)
+        # Offer sending only where send_mail sends: a book reached through a
+        # public shelf opens here without membership, but it is not sent.
+        entry.email_share_list = (check_send_to_ereader(entry)
+                                  if get_sendable_book(book_id, current_user) else [])
         entry.reader_list = check_read_formats(entry)
+        # Such a book is not in the reader's library either, so the page keeps
+        # the library's own controls (shelves, favorite, read and archive
+        # state, hiding, removal) for books that are, as the new UI does.
+        in_my_library = user_library.contains_book(current_user, book_id)
 
         entry.audio_entries = []
         for media_format in entry.data:
@@ -4095,6 +4071,7 @@ def show_book(book_id):
                                      kosync_progress_created_at=kosync_progress_created_at,
                                      is_hidden=is_hidden,
                                      is_favorited=is_favorited,
+                                     in_my_library=in_my_library,
                                      other_users_with_kindle=other_users_with_kindle,
                                      page="book")
     else:

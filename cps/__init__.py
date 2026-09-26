@@ -19,7 +19,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from . import logger
 from . import constants
 from .cli import CliParameter
-from .reverseproxy import ReverseProxied
+from .reverseproxy import ReverseProxied, TrustedProxyPeers, parse_trusted_networks
 from .server import WebServer
 from .updater import Updater
 from . import config_sql
@@ -115,7 +115,8 @@ def _configure_base_app(application, runtime_config=None):
 
     # Fix for running behind reverse proxy (e.g. nginx, apache, caddy, ...)
     # Without it, url_for will generate http:// urls even if https:// is used.
-    # Preserve the existing defaults exactly; PROXY-01 changes them in P2.02.
+    # The hops are believed only from a trusted peer: create_app puts
+    # TrustedProxyPeers in front of this and ReverseProxied.
     application.wsgi_app = ProxyFix(application.wsgi_app, **proxyfix_hops)
     application.extensions[_PROXY_FIX_MARKER] = True
     if len(set(proxyfix_hops.values())) == 1:
@@ -130,7 +131,7 @@ def _configure_base_app(application, runtime_config=None):
 
 
 # These values intentionally remain import-time environment reads. Moving the
-# read to saved configuration would alter PROXY-01 rather than expose a seam.
+# read to saved configuration would change who is trusted, not add a seam.
 num_proxies = int(os.environ.get('TRUSTED_PROXY_COUNT', '1'))
 proxyfix_hops = {
     'x_for': int(os.environ.get('PROXYFIX_X_FOR', num_proxies)),
@@ -138,6 +139,9 @@ proxyfix_hops = {
     'x_host': int(os.environ.get('PROXYFIX_X_HOST', num_proxies)),
     'x_prefix': num_proxies,
 }
+# The peers those hops are believed from (cps/reverseproxy.py); a client that
+# reaches the listener from anywhere else is taken at its own address.
+trusted_proxy_networks = parse_trusted_networks(os.environ.get('TRUSTED_PROXY_NETWORKS'))
 
 # Compatibility singleton: imports of ``cps.app`` keep the same hook and
 # middleware they had before the factory seam. Explicit factory callers use
@@ -163,7 +167,12 @@ web_server = WebServer()
 updater_thread = Updater()
 
 if limiter_present:
-    limiter = Limiter(key_func=True, headers_enabled=True, auto_check=False, swallow_errors=False)
+    # An admin can put the limits in Redis or Memcached. If that store stops
+    # answering, the limits carry on in this process's memory until it
+    # recovers: no sign-in is refused or answered 500 because of the store,
+    # and wrong passwords are still paced.
+    limiter = Limiter(key_func=True, headers_enabled=True, auto_check=False, swallow_errors=False,
+                      in_memory_fallback_enabled=True)
 else:
     limiter = None
 
@@ -488,11 +497,14 @@ def create_app(config=None, services=None):
     if first_process_initialization:
         updater_thread.start()
     if not application.extensions.get("cps_reverse_proxy_registered"):
-        application.wsgi_app = ReverseProxied(application.wsgi_app)
+        # TrustedProxyPeers goes outermost: it decides whether the proxy
+        # headers ReverseProxied and ProxyFix read may be believed at all.
+        application.wsgi_app = TrustedProxyPeers(
+            ReverseProxied(application.wsgi_app), trusted_proxy_networks)
+        log.info("Reverse-proxy headers are believed from: %s", application.wsgi_app.describe())
         application.extensions["cps_reverse_proxy_registered"] = True
 
-    if os.environ.get('FLASK_DEBUG'):
-        cache_buster.init_cache_busting(application)
+    cache_buster.init_cache_busting(application)
     log.info('Starting Calibre Web...')
     Principal(application)
     app_login_manager.init_app(application)

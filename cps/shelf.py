@@ -189,6 +189,50 @@ def _classic_shelf_add_refusal_response(ex, xhr):
     return message, 403
 
 
+def _actor_browses_global():
+    try:
+        return bool(current_user.role_browse_global())
+    except (AttributeError, RuntimeError):
+        return False
+
+
+def _actor_owns(owner_id):
+    return owner_id is not None and owner_id == int(current_user.id)
+
+
+def _placeable_book(book_id, actor_owns_shelf):
+    """Return the book if the actor may put it on the shelf, else ``None``.
+
+    A shelf never lets its editor place a book the editor cannot open. For the
+    owner, that is the owner's own catalogue. Any account may read a book on a
+    public shelf, so an editor of someone else's public shelf could otherwise
+    share itself a book its administrator never gave it. A non-owner may place
+    only books it can open itself: those in its own library, or in the global
+    library when it may browse that. A monolibrary account's filter has no
+    membership term, so this changes nothing for it.
+    """
+    if actor_owns_shelf:
+        visibility_filter = calibre_db.common_filters()
+    else:
+        visibility_filter = calibre_db.common_filters(
+            allow_show_global=_actor_browses_global())
+    return (calibre_db.session.query(db.Books)
+            .filter(db.Books.id == book_id)
+            .filter(visibility_filter).one_or_none())
+
+
+def _refuse_book_outside_managed_actor_library():
+    """A non-owner whose library an administrator manages is refused uniformly.
+
+    Every book outside its library gets the same answer, so the refusal does
+    not reveal which ids exist in the global library.
+    """
+    if (user_library.mode_for_user(current_user) == constants.LIBRARY_MODE_PERSONAL
+            and not _actor_browses_global()):
+        raise ShelfAddRefusal(SHELF_ADD_REFUSAL_SELF_MANAGED,
+                              SHELF_MANAGED_MEMBERSHIP_REFUSAL)
+
+
 def prepare_user_shelf_add(shelf_obj, book_id):
     """Establish owner membership for an explicit regular-shelf add gesture.
 
@@ -198,7 +242,9 @@ def prepare_user_shelf_add(shelf_obj, book_id):
     actor. Smart shelves never reach this path, and the type guard keeps that
     invariant intact if a future caller passes one explicitly. Ownerless
     shelves remain usable without granting anyone membership; invalid non-NULL
-    owners fail closed.
+    owners fail closed. Nothing is granted for an add the actor may not make:
+    ``add_book_to_shelf`` refuses it, and a grant committed and then reverted
+    would still reach the owner's Kobo sync in between.
     """
     owner_id, shelf_owner = _resolve_shelf_owner(shelf_obj)
     if shelf_owner is None:
@@ -209,6 +255,8 @@ def prepare_user_shelf_add(shelf_obj, book_id):
                   .filter(ub.UserLibraryBook.user_id == owner_id,
                           ub.UserLibraryBook.book_id == int(book_id)).first())
     if membership is not None:
+        return None
+    if not _actor_owns(owner_id) and _placeable_book(book_id, False) is None:
         return None
     if not shelf_owner.role_browse_global():
         if owner_id == int(current_user.id):
@@ -278,16 +326,11 @@ def add_book_to_shelf(shelf_obj, book_id):
         return SHELF_ALREADY_PRESENT, "Book is already part of the shelf: %s" % shelf_obj.name
 
     owner_id, _shelf_owner = _resolve_shelf_owner(shelf_obj)
-    actor_owns_shelf = owner_id is not None and owner_id == int(current_user.id)
-    visibility_filter = (
-        calibre_db.common_filters()
-        if actor_owns_shelf
-        else calibre_db.common_filters(allow_show_global=True)
-    )
-    book = (calibre_db.session.query(db.Books)
-            .filter(db.Books.id == book_id)
-            .filter(visibility_filter).one_or_none())
+    actor_owns_shelf = _actor_owns(owner_id)
+    book = _placeable_book(book_id, actor_owns_shelf)
     if not book:
+        if not actor_owns_shelf:
+            _refuse_book_outside_managed_actor_library()
         visible_global_book = (calibre_db.session.query(db.Books.id)
                                .filter(db.Books.id == book_id)
                                .filter(calibre_db.common_filters(

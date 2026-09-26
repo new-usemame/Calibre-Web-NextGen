@@ -354,39 +354,3 @@ def test_list_books_handles_discovery_filters():
     src = _inspect.getsource(books_mod.list_books)
     for value in ('favorites', 'rated', 'discover', 'hot'):
         assert 'filter_val == "%s"' % value in src, "discovery filter %r missing" % value
-
-
-@pytest.mark.unit
-def test_hot_visibility_filter_chunks_large_libraries_without_losing_order(monkeypatch):
-    """The app and calibre catalogs use separate SQLite sessions, so hot-book
-    ids must cross the boundary in bounded batches rather than one huge IN().
-
-    The input is a *seeded shuffle* — not ``range(2005)`` — so hotness order and
-    ascending order genuinely differ. That is what makes the order assertion
-    real: an implementation that re-sorted the visible set (or returned raw
-    ``set`` iteration order) yields ascending ids and fails here, where an
-    ascending input would have let it pass silently (#937).
-    """
-    import random
-    from cps.api import books as books_mod
-
-    ids = list(range(2005))
-    random.Random(1337).shuffle(ids)
-    chunks = []
-
-    def visible_even_ids(chunk):
-        chunks.append(list(chunk))
-        return {book_id for book_id in chunk if book_id % 2 == 0}
-
-    monkeypatch.setattr(books_mod, "_visible_ids_for_chunk", visible_even_ids)
-    result = books_mod._visible_hot_book_ids(ids)
-
-    # Chunk sizes stay under the SQLite host-parameter ceiling regardless of order.
-    assert [len(chunk) for chunk in chunks] == [900, 900, 205]
-    assert all(len(chunk) <= books_mod._SQLITE_IN_CHUNK for chunk in chunks)
-    # Hotness (input) order is preserved, not ascending/sorted order.
-    expected = [book_id for book_id in ids if book_id % 2 == 0]
-    assert result == expected
-    # Self-guard: the shuffle must make hotness order differ from sorted order,
-    # or this test would go vacuous again (the exact regression #937 caught).
-    assert expected != sorted(expected)

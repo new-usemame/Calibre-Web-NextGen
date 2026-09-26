@@ -980,6 +980,12 @@ def rank_typeahead_names(names, query):
     return sorted(names, key=sort_key)
 
 
+# How often a request may stat metadata.db for an outside replacement, and how
+# old a replacement must be before it is trusted to be completely written.
+METADATA_DB_REPLACEMENT_CHECK_SECONDS = 5.0
+METADATA_DB_SETTLE_SECONDS = 2.0
+
+
 class CalibreDB:
     _init = False
     engine = None
@@ -990,6 +996,14 @@ class CalibreDB:
     # instances alive once they reach the end of their respective scopes
     instances = WeakSet()
     _reconnect_lock = threading.RLock()  # Reentrant lock to prevent concurrent reconnect operations
+    # The metadata.db this process opened, as (path, (st_dev, st_ino)). A sync tool
+    # that swaps in a new file leaves the open connection on the old one (#2291).
+    _metadata_db_path = None
+    _metadata_db_identity = None
+    _metadata_db_content = None
+    _replacement_checked_at = None
+    _replacement_candidate = None
+    _replacement_check_gate = threading.Lock()
 
     def __init__(self, expire_on_commit=True, init=False):
         """ Initialize a new CalibreDB session
@@ -1537,8 +1551,76 @@ class CalibreDB:
                 except Exception:
                     pass
 
+            try:
+                st = os.stat(dbpath)
+                cls._metadata_db_identity = (st.st_dev, st.st_ino)
+                cls._metadata_db_content = (st.st_size, st.st_mtime_ns)
+                cls._metadata_db_path = dbpath
+            except OSError:
+                cls._metadata_db_identity = None
+            cls._replacement_candidate = None
+
             cls._init = True
         # End of with cls._reconnect_lock
+
+    @classmethod
+    def reconnect_if_metadata_db_replaced(cls, app_db_path):
+        """Reconnect when metadata.db on disk is no longer the file we opened.
+
+        Copy and sync tools (rsync, Syncthing, most NAS sync apps) write a new
+        file and rename it over metadata.db. The engine's connection stays on
+        the replaced file, so new books stay invisible until a manual
+        "Reconnect Calibre Database" (#2291). SQLite itself never replaces the
+        file, so a changed device/inode always means an outside copy.
+
+        Cheap enough for every request: one stat per interval, and requests
+        that arrive while another one is checking skip the check. A file that
+        was modified in the last few seconds may still be being written, so it
+        is only adopted once it is seen unchanged on a later check.
+        """
+        path = cls._metadata_db_path
+        if not path or cls._metadata_db_identity is None or cls.config is None:
+            return False
+        now = time.monotonic()
+        checked_at = cls._replacement_checked_at
+        if checked_at is not None and now - checked_at < METADATA_DB_REPLACEMENT_CHECK_SECONDS:
+            return False
+        if not cls._replacement_check_gate.acquire(blocking=False):
+            return False
+        try:
+            cls._replacement_checked_at = now
+            try:
+                st = os.stat(path)
+            except OSError:
+                # Mid-swap (deleted, not yet recreated): look again next time.
+                cls._replacement_candidate = None
+                return False
+            content = (st.st_size, st.st_mtime_ns)
+            if (st.st_dev, st.st_ino) == cls._metadata_db_identity:
+                cls._metadata_db_content = content
+                cls._replacement_candidate = None
+                return False
+            if content == cls._metadata_db_content:
+                # Same bytes under a new inode number: SMB mounts with
+                # noserverino renumber files the client re-looks-up.
+                cls._metadata_db_identity = (st.st_dev, st.st_ino)
+                return False
+            observation = (st.st_dev, st.st_ino, st.st_size, st.st_mtime_ns)
+            settled = (observation == cls._replacement_candidate
+                       or time.time() - st.st_mtime >= METADATA_DB_SETTLE_SECONDS)
+            if not settled:
+                cls._replacement_candidate = observation
+                return False
+            log.info("metadata.db at %s was replaced on disk (e.g. by a sync tool); "
+                     "reconnecting to the new file", path)
+            cls._reconnect(cls.config, app_db_path)
+            if cls._metadata_db_identity != observation[:2]:
+                # setup_db could not open the new file and logged why. Stop
+                # retrying this file every interval; a later swap is new work.
+                cls._metadata_db_identity = observation[:2]
+            return True
+        finally:
+            cls._replacement_check_gate.release()
 
     def get_book(self, book_id):
         self.ensure_session()
@@ -2483,26 +2565,30 @@ class CalibreDB:
                     Base.metadata.remove(table)
 
     def reconnect_db(self, config, app_db_path):
+        self._reconnect(config, app_db_path)
+
+    @classmethod
+    def _reconnect(cls, config, app_db_path):
         # Use lock to ensure atomic reconnect operation
-        with self._reconnect_lock:
+        with cls._reconnect_lock:
             # Be resilient if database wasn't initialized yet
             try:
-                self.dispose()
+                cls.dispose()
             except Exception:
                 # Ignore dispose errors during reconnect
                 pass
 
             # engine is a class-level attribute that may be None before first setup
             try:
-                if getattr(self, 'engine', None) is not None:
-                    self.engine.dispose()
+                if getattr(cls, 'engine', None) is not None:
+                    cls.engine.dispose()
             except Exception:
                 # Ignore engine dispose errors; we'll rebuild below
                 pass
 
             # Rebuild engine/session factory and update config
-            self.setup_db(config.config_calibre_dir, app_db_path)
-            self.update_config(config)
+            cls.setup_db(config.config_calibre_dir, app_db_path)
+            cls.update_config(config)
 
     @classmethod
     def refresh_for_new_data(cls):

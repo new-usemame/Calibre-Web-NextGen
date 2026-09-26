@@ -726,6 +726,16 @@ def create_app(config=None, services=None):
             session.pop("pending_app_password", None)
 
     @application.before_request
+    def _adopt_replaced_metadata_db():
+        from flask import request
+        if request.endpoint == 'static':
+            return
+        try:
+            calibre_db.reconnect_if_metadata_db_replaced(ub.app_DB_path)
+        except Exception as e:
+            log.warning("Could not reconnect to a replaced metadata.db: %s", e)
+
+    @application.before_request
     def _desktop_compat_fresh_snapshot():
         from flask import request
         # Rollback ends the SERIALIZABLE snapshot so the next query sees Calibre desktop's writes.

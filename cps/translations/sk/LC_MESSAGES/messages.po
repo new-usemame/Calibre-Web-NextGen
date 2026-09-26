@@ -3892,7 +3892,7 @@ msgstr "Vydavatelia (oddelení čiarkou)"
 
 #: cps/spa_strings.py cps/templates/image.html cps/templates/listenmp3.html
 msgid "Read"
-msgstr "Čítať"
+msgstr "Prečítané"
 
 #: cps/spa_strings.py cps/templates/image.html
 msgid "Reading"

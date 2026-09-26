@@ -308,8 +308,8 @@ def test_settings_save_and_reload_work_after_the_session_lets_go_of_the_row(app_
     The session is closed when a failed rollback has to be abandoned, after a
     commit or rollback has already expired the settings row the configuration
     holds; closing detaches it. Saving and reloading must still work and read
-    what is stored. Breaks if ``save()`` assigns to the detached row, or if
-    ``load()`` refreshes it in place: either raises on every settings request.
+    what is stored. Breaks if ``save()`` assigns to the detached row, which
+    raises on every settings save until the server restarts.
     """
     app_db.config.load()
     ub.session.commit()  # expires the held row, as the request's commit does

@@ -1738,17 +1738,19 @@ def test_entitlement_payload_shape_matches_declared_schema_version(
     pinned_schema_and_hashes = {
         # v2: DownloadUrls[].Size is excluded from the fingerprint so that an
         # on-demand KEPUB materialised from the stored EPUB does not re-send.
+        # v3: so are BookMetadata.CoverImageId and DownloadUrls[].Url, which
+        # follow file times and the address the device uses, not the book.
         "live": (
-            2,
-            "2af6cd084a1ef108e0ac55a0749d1283f15a0c87bbd8cbe533d50cbc425b7bfe",
+            3,
+            "284c2a6d36293818b56ded3f4180fd297cde29fa93e0464c4a00b0f6f3680c81",
         ),
         "archived_live": (
-            2,
-            "3cd2f24b0cd16744100508bd58afe1c2d9f1f8e447d837e257854c452bd7d521",
+            3,
+            "a94235b4ea56106d2fcbdbcf6b777fee0c751df7d257a9d2debb3832698110e1",
         ),
         "hard_delete": (
-            2,
-            "8d72ce590309549d65cf110a0d44b61d2145bb2401ca4d6bf204ad41f5244011",
+            3,
+            "01783c900c2983c507c1ae9d8830d9b3a8f5817c262496c41febf4401740b847",
         ),
     }
     rendered_variants = {
@@ -2276,11 +2278,12 @@ def test_upgrade_reannounces_a_household_seed_copy_without_starvation(
             ub.KoboDeviceBookEntitlement.book_id == sync_harness.book.id,
         ).all()
     }
-    assert first_book_hashes[sync_harness.device.id] != \
-        first_book_hashes[second_device.id], (
-            "confirmed hashes must come from each device's acknowledged "
-            "payload, not copied user-wide upgrade history"
-        )
+    # Both Kobos hold the same book, so since schema 3 (the per-model cover
+    # id is not fingerprinted) the payloads they were sent hash the same.
+    assert set(first_book_hashes.values()).isdisjoint({"a" * 64, "b" * 64}), (
+        "confirmed hashes must come from each device's acknowledged "
+        "payload, not copied user-wide upgrade history"
+    )
 
     summaries = [
         record.getMessage() for record in caplog.records

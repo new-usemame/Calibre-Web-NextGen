@@ -277,6 +277,30 @@ def test_background_marker_save_does_not_persist_a_requests_unsaved_setting(app_
     assert row["title_regex"] == stored_regex
 
 
+def test_a_settings_reload_keeps_a_background_marker_save(app_db):
+    """Reloading settings on the serving thread reads what a task saved.
+
+    An admin settings form that fails validation reloads the settings. The
+    requests' session still holds the row it read at boot, so a reload that
+    trusted it put the boot-time marker back in memory, and the task it
+    guards would run again in this process. Breaks if ``load()`` reads the
+    cached row instead of the database.
+    """
+    app_db.config.__dict__["_settings"] = None
+    app_db.config.load()  # a warm boot leaves the row loaded
+    assert app_db.config.config_kobo_kepub_backfill_completed is False
+
+    thread, outcome = _in_worker(
+        lambda: kepub_backfill.TaskKepubBackfill._persist_completion(True))
+    _finish(thread)
+    assert "error" not in outcome, outcome.get("error")
+
+    app_db.config.load()
+
+    assert app_db.config.config_kobo_kepub_backfill_completed is True
+    assert _settings_row(app_db.path)["backfill_completed"] == 1
+
+
 @pytest.mark.parametrize("operation", ["save", "load"])
 def test_config_session_access_off_the_serving_thread_is_refused(app_db, operation):
     """``ConfigSQL.save()``/``load()`` refuse to run on a thread that does not serve requests.

@@ -706,6 +706,9 @@ class ConfigSQL(object):
         """Load all configuration values from the underlying storage."""
         self._require_serving_thread("load")
         s = self._read_from_storage()  # type: _Settings
+        # save_fields() commits from a task on a session of its own, which
+        # leaves this session's copy of the row as it was; read it afresh.
+        self._session.refresh(s)
         for k, v in s.__dict__.items():
             if k[0] != '_':
                 if v is None:

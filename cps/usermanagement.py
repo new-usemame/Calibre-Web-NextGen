@@ -163,22 +163,26 @@ def _verify_slower_credentials(user, username, password):
     """The account's directory or local password, then pre-digest app passwords.
 
     With no account yet, a directory sign-in may create one (OPDS/API access).
+    Returns (user or None, answered): answered is False when the directory
+    could not be asked and nothing else accepted the password.
     """
     if user:
+        answered = True
         if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
             login_result, error = services.ldap.bind_user(user.name, password)
             if login_result:
-                return user
+                return user, True
             if error is not None:
                 log.error(error)
+                answered = False
         else:
             if check_password_hash(str(user.password), password):
-                return user
+                return user, True
         # App passwords saved before digests existed cost a slow hash each,
         # so they come after the account password; each is slow only once.
         if _verify_app_password_older(user, password):
-            return user
-        return None
+            return user, True
+        return None, answered
 
     # Handle new LDAP users (auto-creation for OPDS/API access)
     if config.config_login_type == constants.LOGIN_LDAP and services.ldap and getattr(config, 'config_ldap_auto_create_users', True):
@@ -196,14 +200,16 @@ def _verify_slower_credentials(user, username, password):
                         user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).first()
                         if user:
                             log.info("LDAP auto-created user for OPDS/API: '%s'", username)
-                            return user
+                            return user, True
 
                 log.warning("LDAP authentication succeeded but user creation failed for '%s'", username)
             elif error:
                 log.debug("LDAP authentication failed for new user '%s': %s", username, error)
+                return None, False
         except Exception as ex:
             log.error("LDAP auto-creation error for OPDS user '%s': %s", username, ex)
-    return None
+            return None, False
+    return None, True
 
 
 @auth.verify_password
@@ -240,10 +246,15 @@ def verify_password(username, password):
     pacing.refuse_if_paced(username)
     if pacing.already_refused(username, password):
         return None
-    user = _verify_slower_credentials(user, username, password)
+    user, answered = _verify_slower_credentials(user, username, password)
     if user:
         pacing.succeeded(username)
         return user
+    if not answered:
+        # The directory could not say, so the password is neither right nor
+        # wrong: remembering it as wrong would refuse it once it is back.
+        log.warning('OPDS Login for user "%s" not checked: directory unavailable', username)
+        return None
     pacing.failed(username, password)
 
     # Issue #121: only warn when a non-empty username actually failed to

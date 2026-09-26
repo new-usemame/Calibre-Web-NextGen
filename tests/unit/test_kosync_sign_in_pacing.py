@@ -66,6 +66,7 @@ def test_a_client_guessing_passwords_is_paced(world):
     client.environ_base["REMOTE_ADDR"] = GUESSER
     paced = client.get("/kosync/users/auth", headers=world.basic("alice", "more"))
     assert paced.status_code == 429 and 1 <= int(paced.headers["Retry-After"]) <= 61
+    assert paced.get_json()["error"] == 2001  # KOReader's own shape for a refusal
     # Once paced, even a right guess is refused: pacing that let the right
     # password through would tell a guesser which one it was.
     assert _sign_ins(world, GUESSER, ["alice-password"]) == [429]
@@ -176,8 +177,12 @@ def test_pacing_fails_open_when_the_limiter_is_off_or_its_store_errors(world, mo
 class _Directory:
     def __init__(self):
         self.binds = 0
+        self.down = False
 
     def get_object_details(self, user=None, **_):
+        if self.down:
+            from flask_simpleldap import LDAPException
+            raise LDAPException("Can't contact LDAP server")
         return {"uid": [user]}
 
     def bind_user(self, username, password):
@@ -215,4 +220,18 @@ def test_a_stale_device_costs_the_directory_one_bind_a_minute(world, directory):
     assert _sign_ins(world, HOME, ["old-password"] * 10) == [401] * 10
     assert directory.binds == 1
     assert _sign_ins(world, HOME, ["directory-password"]) == [200]
+
+
+def test_a_directory_outage_is_not_remembered_as_wrong_passwords(world, directory):
+    """A sign-in the directory could not answer is neither right nor wrong.
+
+    A household's devices keep syncing through an outage. When the directory
+    comes back, their right password must work at once, not be refused as
+    one already known to be wrong, nor paced for the outage's failures.
+    """
+    directory.down = True
+    assert _sign_ins(world, HOME, ["directory-password"] * 5) == [401] * 5
+    directory.down = False
+    assert _sign_ins(world, HOME, ["directory-password"]) == [200]
+    assert directory.binds == 1
 

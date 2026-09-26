@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, patch
 import flask
 import pytest
 from flask_limiter import Limiter
+from flask_simpleldap import LDAPException
 
 from cps import constants, usermanagement
 from cps.services import simpleldap
@@ -30,10 +31,17 @@ GUESSES = ["guess-%d" % n for n in range(ATTEMPTS_PER_MINUTE + 2)]
 class _Directory:
     """Knows one person, whose password is ``right``."""
 
+    down = False
+
     def get_object_details(self, user=None, **_):
+        if self.down:
+            raise LDAPException("Can't contact LDAP server")
         return {"uid": [user]}
 
+    binds = 0
+
     def bind_user(self, username, password):
+        type(self).binds += 1
         return True if password == "right" else None
 
 
@@ -171,3 +179,48 @@ def test_a_sign_in_succeeds_when_its_pace_cannot_be_cleared():
         for p in reversed(patches):
             p.stop()
     assert statuses == [401, 200]
+
+
+def test_a_directory_outage_is_not_remembered_as_wrong_passwords():
+    """The right password works as soon as the directory is back."""
+    app, patches = _catalogue(constants.LOGIN_LDAP, existing_user=True)
+    directory = next(p.new for p in patches if isinstance(p.new, _Directory))
+    for p in patches:
+        p.start()
+    try:
+        client = app.test_client()
+        directory.down = True
+        during = [client.get("/catalogue", auth=("alice", "right")).status_code for _ in range(5)]
+        directory.down = False
+        after = client.get("/catalogue", auth=("alice", "right")).status_code
+    finally:
+        for p in reversed(patches):
+            p.stop()
+    assert (during, after) == ([401] * 5, 200)
+
+
+
+def test_an_outage_is_not_counted_against_an_account_not_yet_imported():
+    """Nobody is paced for sign-ins the directory never answered."""
+    app, patches = _catalogue(constants.LOGIN_LDAP, existing_user=False)
+    directory = next(p.new for p in patches if isinstance(p.new, _Directory))
+    for p in patches:
+        p.start()
+    try:
+        client = app.test_client()
+        directory.down = True
+        during = [client.get("/catalogue", auth=("alice", g)).status_code for g in GUESSES]
+        directory.down = False
+        after = [client.get("/catalogue", auth=("alice", g)).status_code for g in GUESSES]
+    finally:
+        for p in reversed(patches):
+            p.stop()
+    assert during == [401] * len(GUESSES)
+    assert after == [401] * ATTEMPTS_PER_MINUTE + [429, 429]
+
+
+def test_a_stale_catalogue_app_costs_the_directory_one_bind_a_minute():
+    # A failed bind is one a directory may count towards locking the account.
+    _Directory.binds = 0
+    assert _statuses(constants.LOGIN_LDAP, ["old-password"] * 6) == [401] * 6
+    assert _Directory.binds == 1

@@ -338,9 +338,17 @@ def authenticate_user() -> Optional[ub.User]:
         pacing.failed(username, password)
         return None
 
-    if _verify_slower_credentials(user, username, password):
+    signed_in, answered = _verify_slower_credentials(user, username, password)
+    if signed_in:
         pacing.succeeded(username)
         return user
+    if not answered:
+        # The directory could not say, so the password is neither right nor
+        # wrong: remembering it as wrong would refuse it once the directory
+        # is back.
+        log.info("KOReader auth: could not check the password for user: %s "
+                 "(directory unavailable)", username)
+        return None
 
     # Fork issue #312: promoted from DEBUG. Invalid-password attempts
     # for a real user are exactly the signal needed to diagnose stale
@@ -350,15 +358,21 @@ def authenticate_user() -> Optional[ub.User]:
     return None
 
 
-def _verify_slower_credentials(user, username, password) -> bool:
-    """The directory, the account password, then pre-digest app passwords."""
+def _verify_slower_credentials(user, username, password) -> Tuple[bool, bool]:
+    """The directory, the account password, then pre-digest app passwords.
+
+    Returns (signed in, answered): answered is False when the directory
+    could not be asked and nothing else accepted the password.
+    """
+    answered = True
     # Check if LDAP authentication is enabled
     if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
         # Try LDAP authentication
         login_result, error = services.ldap.bind_user(user.name, password)
         if login_result:
             log.debug("KOReader auth: authenticated via LDAP: %s", user.name)
-            return True
+            return True, True
+        answered = error is None
 
         # Log LDAP failure but continue to local check (fallback)
         # We use debug level here because failure is expected if the user is using a local password
@@ -369,15 +383,15 @@ def _verify_slower_credentials(user, username, password) -> bool:
     # Check if user has a local password set before attempting verification
     if user.password and check_password_hash(str(user.password), password):
         log.debug("KOReader auth: authenticated: %s", username)
-        return True
+        return True, True
 
     # App passwords saved before digests existed cost a slow hash each, so
     # they come last; the first sign-in with one gives it its digest. This
     # login path is shared by KOReader progress, annotation and library sync.
     if usermanagement._verify_app_password_older(user, password):
         log.debug("KOReader auth: authenticated via app password: %s", username)
-        return True
-    return False
+        return True, True
+    return False, answered
 
 
 def create_sync_response(data: Dict[str, Any], status_code: int = 200) -> tuple:

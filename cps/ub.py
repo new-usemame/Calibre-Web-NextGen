@@ -35,6 +35,7 @@ from sqlalchemy import create_engine, DDL, exc, exists, event, text
 from sqlalchemy import CheckConstraint, Column, ForeignKey, Index, UniqueConstraint
 from sqlalchemy import String, Integer, SmallInteger, Boolean, DateTime, Float, JSON, Text, BLOB
 from sqlalchemy.orm.attributes import flag_modified
+from sqlalchemy.pool import NullPool
 from sqlalchemy.sql.expression import func
 try:
     # Compatibility with sqlalchemy 2.0
@@ -5407,7 +5408,7 @@ def begin_contained_nested(db_session):
     return db_session.begin_nested()
 
 
-def _create_app_db_engine(app_db_path):
+def _create_app_db_engine(app_db_path, **engine_options):
     """Create an app.db engine with WAL and legacy sqlite3 transactions.
 
     Python's sqlite3 legacy transaction mode emits BEGIN for DML only. A
@@ -5425,6 +5426,7 @@ def _create_app_db_engine(app_db_path):
         'sqlite:///{0}'.format(app_db_path),
         echo=False,
         connect_args={'timeout': 30},
+        **engine_options,
     )
     wal_mode = {'configured': False}
     wal_mode_lock = threading.Lock()
@@ -5487,24 +5489,32 @@ def owned_session():
     through it can fail a request mid-query ("This session is in 'prepared'
     state") or commit a request's unfinished changes.  The caller owns the
     returned Session and closes it (it is a context manager).  It shares the
-    engine, whose pool is thread-safe, instead of building one per call as
-    ``init_db_thread()`` once did.
+    task engine instead of building one per call as ``init_db_thread()`` once
+    did.
     """
     return sessionmaker(bind=_shared_app_db_engine())()
 
 
-def _shared_app_db_engine():
-    """app.db's one engine, lent to every session opened off the serving thread.
+_task_engine = None
+_task_engine_lock = threading.Lock()
 
-    Its pool is thread-safe and bounded, and closing a session hands the
-    connection back to it.  An engine per session kept each connection it
-    opened (and its WAL files) until the process exited.  Only between
-    ``dispose()`` and the next ``init_db()`` is there no shared engine; a
-    session opened then gets its own.
+
+def _shared_app_db_engine():
+    """The one app.db engine for sessions opened off the serving thread.
+
+    An engine per session kept each connection it opened (and its WAL files)
+    until the process exited. This engine does not pool: closing a session
+    closes its connection. It is also not the web requests' engine, so a task
+    stuck in an image library while holding a connection takes nothing from
+    the pool every request draws on.
     """
-    if session is not None:
-        return session.get_bind()
-    return _create_app_db_engine(app_DB_path)
+    global _task_engine
+    with _task_engine_lock:
+        if _task_engine is None or _task_engine.url.database != app_DB_path:
+            if _task_engine is not None:
+                _task_engine.dispose()
+            _task_engine = _create_app_db_engine(app_DB_path, poolclass=NullPool)
+        return _task_engine
 
 
 def init_db(app_db_path):
@@ -5592,8 +5602,12 @@ def get_new_session_instance():
 
 
 def dispose():
-    global session
+    global session, _task_engine
 
+    with _task_engine_lock:
+        if _task_engine is not None:
+            _task_engine.dispose()
+            _task_engine = None
     old_session = session
     session = None
     if old_session:

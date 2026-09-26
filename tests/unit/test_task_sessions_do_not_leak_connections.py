@@ -16,6 +16,7 @@ import threading
 from types import SimpleNamespace
 
 import pytest
+from sqlalchemy import text
 
 from cps import ub
 
@@ -111,3 +112,57 @@ def test_a_task_session_reads_what_a_request_committed(app_db):
     worker.join(timeout=30)
 
     assert "written-by-a-request" in seen.names
+
+
+STUCK_TASKS = 16  # more than the web pool's 5 + 10 overflow
+
+
+def test_stuck_task_sessions_leave_the_web_requests_pool_alone(app_db):
+    """A task wedged mid-run (say, in an image library) holds its connection
+    until it returns. However many are stuck, a request still gets one."""
+    release = threading.Event()
+    holding = threading.Semaphore(0)
+
+    def stuck_task():
+        task_session = ub.get_new_session_instance()
+        task_session.query(ub.User).count()
+        holding.release()
+        release.wait(30)
+        task_session.remove()
+
+    stuck = [threading.Thread(target=stuck_task) for _ in range(STUCK_TASKS)]
+    for thread in stuck:
+        thread.start()
+    try:
+        for _ in stuck:
+            assert holding.acquire(timeout=10)
+        answered = SimpleNamespace(count=None)
+
+        def request():
+            # A request thread of its own: the requests' session is not
+            # thread-safe, but its pool is what this measures.
+            request_session = ub.session.get_bind().connect()
+            try:
+                answered.count = request_session.execute(
+                    text("SELECT count(*) FROM user")).scalar()
+            finally:
+                request_session.close()
+
+        web = threading.Thread(target=request)
+        web.start()
+        web.join(timeout=5)
+        assert not web.is_alive(), "a request waited on connections stuck tasks hold"
+        assert answered.count is not None
+    finally:
+        release.set()
+        for thread in stuck:
+            thread.join(timeout=30)
+
+
+def test_task_sessions_wait_out_a_busy_database_as_long_as_they_always_did(app_db):
+    session = ub.get_new_session_instance()
+    try:
+        timeout = session.execute(text("PRAGMA busy_timeout")).scalar()
+    finally:
+        session.remove()
+    assert timeout == 30000

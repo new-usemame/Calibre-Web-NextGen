@@ -172,17 +172,17 @@ def _verify_slower_credentials(user, username, password):
         if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
             login_result, error = services.ldap.bind_user(user.name, password)
             if login_result:
-                return user, True
+                return user, False
             if error is not None:
                 log.error(error)
                 wrong = False
         else:
             if check_password_hash(str(user.password), password):
-                return user, True
+                return user, False
         # App passwords saved before digests existed cost a slow hash each,
         # so they come after the account password; each is slow only once.
         if _verify_app_password_older(user, password):
-            return user, True
+            return user, False
         return None, wrong
 
     # Handle new LDAP users (auto-creation for OPDS/API access)
@@ -201,12 +201,12 @@ def _verify_slower_credentials(user, username, password):
                         user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).first()
                         if user:
                             log.info("LDAP auto-created user for OPDS/API: '%s'", username)
-                            return user, True
+                            return user, False
 
                 log.warning("LDAP authentication succeeded but user creation failed for '%s'", username)
                 return None, False
             elif error:
-                log.debug("LDAP authentication failed for new user '%s': %s", username, error)
+                log.warning("LDAP sign-in for new user '%s' not checked: %s", username, error)
                 return None, False
         except Exception as ex:
             log.error("LDAP auto-creation error for OPDS user '%s': %s", username, ex)

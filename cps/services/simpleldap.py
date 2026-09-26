@@ -6,11 +6,17 @@
 # See CONTRIBUTORS for full list of authors.
 
 import base64
+import threading
 
 from flask_simpleldap import LDAP, LDAPException
 from flask_simpleldap import ldap as pyLDAP
-from flask import current_app
+from flask import current_app, has_app_context
 from .. import constants, logger
+
+try:  # pragma: no cover - environment branch
+    from gevent.threadpool import ThreadPool as _GeventThreadPool
+except ImportError:  # pragma: no cover - environment branch
+    _GeventThreadPool = None
 
 try:
     from ldap.pkginfo import __version__ as ldapVersion
@@ -126,8 +132,86 @@ def init_app(app, config):
         log.error(e)
 
 
+# python-ldap waits on the network inside C, holding the one OS thread the
+# gevent hub runs on (this app does not monkey-patch), so every request
+# waited on each directory call, and on a directory that does not answer, for
+# the whole connect timeout (flask-simpleldap's default is 10 s) per sign-in.
+# Directory calls run on a few worker threads instead, and the calling
+# greenlet yields while it waits.
+_DIRECTORY_THREADS = 4
+_pool = None
+_UNREACHABLE = ("Can't contact LDAP server", "Timed out")
+
+
+class _Reachability:
+    """While the directory is unreachable, one call at a time tries it.
+
+    The others are answered "Can't contact LDAP server" at once rather than
+    each waiting out the connect timeout. The first call that gets through
+    marks it reachable again, so recovery is noticed on the next sign-in.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.unreachable = False
+        self._trying = False
+
+    def enter(self):
+        """True if this call may reach the directory; False to fail fast."""
+        with self._lock:
+            if not self.unreachable:
+                return True
+            if self._trying:
+                return False
+            self._trying = True
+            return True
+
+    def leave(self, reached):
+        with self._lock:
+            if reached and self.unreachable:
+                log.info("LDAP server reachable again")
+            elif not reached and not self.unreachable:
+                log.warning("LDAP server unreachable; sign-ins that need it fail "
+                            "at once until a retry reaches it")
+            self.unreachable = not reached
+            self._trying = False
+
+
+_reachability = _Reachability()
+
+
+def _in_directory_thread(function, *args, **kwargs):
+    """Run a directory call off the hub, failing fast while it is unreachable."""
+    if not _reachability.enter():
+        raise LDAPException(_UNREACHABLE[0])
+    reached = True
+    try:
+        return _run_off_the_hub(function, *args, **kwargs)
+    except LDAPException as ex:
+        reached = ex.message not in _UNREACHABLE
+        raise
+    finally:
+        _reachability.leave(reached)
+
+
+def _run_off_the_hub(function, *args, **kwargs):
+    global _pool
+    if _GeventThreadPool is None or not has_app_context():
+        return function(*args, **kwargs)
+    app = current_app._get_current_object()
+
+    def call():
+        # flask-simpleldap reads its settings from current_app.
+        with app.app_context():
+            return function(*args, **kwargs)
+
+    if _pool is None:
+        _pool = _GeventThreadPool(_DIRECTORY_THREADS)
+    return _pool.apply(call)
+
+
 def get_object_details(user=None, query_filter=None):
-    return _ldap.get_object_details(user, query_filter=query_filter)
+    return _in_directory_thread(_ldap.get_object_details, user, query_filter=query_filter)
 
 
 def bind():
@@ -135,7 +219,7 @@ def bind():
 
 
 def get_group_members(group):
-    return _ldap.get_group_members(group)
+    return _in_directory_thread(_ldap.get_group_members, group)
 
 
 def basic_auth_required(func):
@@ -154,12 +238,16 @@ def bind_user(username, password):
         return False, None
     # Escape LDAP special characters to prevent LDAP injection in search filters
     safe_username = _escape_ldap_filter(username)
-    try:
+
+    def look_up_and_bind():
         if _ldap.get_object_details(safe_username):
-            result = _ldap.bind_user(safe_username, password)
-            log.debug("LDAP login '%s': %r", username, result)
-            return result is not None, None
-        return None, None       # User not found
+            return _ldap.bind_user(safe_username, password) is not None
+        return None
+
+    try:
+        result = _in_directory_thread(look_up_and_bind)
+        log.debug("LDAP login '%s': %r", username, result)
+        return result, None     # None: user not found
     except (TypeError, AttributeError, KeyError) as ex:
         error = ("LDAP bind_user: %s" % ex)
         return None, error

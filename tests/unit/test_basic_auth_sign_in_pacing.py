@@ -226,18 +226,28 @@ def test_a_stale_catalogue_app_costs_the_directory_one_bind_a_minute():
     assert _Directory.binds == 1
 
 
-@pytest.mark.parametrize("import_fails", [
-    MagicMock(return_value=(False, "database is locked")),
-    MagicMock(side_effect=RuntimeError("database is locked")),
-], ids=["refused", "raised"])
-def test_a_right_password_whose_account_import_failed_is_not_remembered_as_wrong(import_fails):
+def _failed_import(how):
+    """The directory accepts the password; creating the account then fails."""
+    if how == "refused":
+        return [patch("cps.admin.ldap_import_create_user",
+                      MagicMock(return_value=(False, "database is locked")))]
+    if how == "raised":
+        return [patch("cps.admin.ldap_import_create_user",
+                      MagicMock(side_effect=RuntimeError("database is locked")))]
+    # The directory has no details to create the account from.
+    return [patch.object(simpleldap, "get_object_details", return_value=None)]
+
+
+@pytest.mark.parametrize("how", ["refused", "raised", "no_details"])
+def test_a_right_password_whose_account_import_failed_is_not_remembered_as_wrong(how):
     """The directory said yes; only creating the account failed.
 
-    Each retry must try the import again, not be answered from a record of
-    the password as wrong.
+    Each retry must ask the directory and try the import again, not be
+    answered from a record of the password as wrong.
     """
     app, patches = _catalogue(constants.LOGIN_LDAP, existing_user=False)
-    patches[-1] = patch("cps.admin.ldap_import_create_user", import_fails)
+    patches += _failed_import(how)
+    _Directory.binds = 0
     for p in patches:
         p.start()
     try:
@@ -248,4 +258,25 @@ def test_a_right_password_whose_account_import_failed_is_not_remembered_as_wrong
         for p in reversed(patches):
             p.stop()
     assert statuses == [401] * 4
-    assert import_fails.call_count == 4
+    assert _Directory.binds == 4
+
+
+def test_a_directory_user_signs_in_once_their_account_can_be_created():
+    app, patches = _catalogue(constants.LOGIN_LDAP, existing_user=False)
+    created = usermanagement.ub.User()
+    created.id, created.name = 8, "alice"
+    session = patches[1].new
+    # Looked up before each sign-in, and once more after the import that worked.
+    session.query.return_value.filter.return_value.first.side_effect = [None, None, created]
+    patches[-1] = patch("cps.admin.ldap_import_create_user",
+                        MagicMock(side_effect=[(False, "database is locked"), (True, "")]))
+    for p in patches:
+        p.start()
+    try:
+        client = app.test_client()
+        statuses = [client.get("/catalogue", auth=("alice", "right")).status_code
+                    for _ in range(2)]
+    finally:
+        for p in reversed(patches):
+            p.stop()
+    assert statuses == [401, 200]

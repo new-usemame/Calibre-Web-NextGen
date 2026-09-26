@@ -160,5 +160,10 @@ def _limiter_back_on_its_own_store():
     yield
     cps = sys.modules.get("cps")
     limiter = getattr(cps, "limiter", None)
-    if limiter is not None and getattr(limiter, "_storage_dead", False):
-        limiter._storage_dead = False
+    if limiter is None:
+        return
+    # flask-limiter's own flag; if an upgrade renames it, say so rather than
+    # let this reset silently stop working.
+    assert hasattr(limiter, "_storage_dead"), \
+        "flask-limiter no longer has _storage_dead: update this fixture"
+    limiter._storage_dead = False

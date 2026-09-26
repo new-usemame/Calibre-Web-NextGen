@@ -78,6 +78,18 @@ def _store_returns(monkeypatch):
     limiter._storage_dead = False
 
 
+def _app_sign_in(client, address):
+    """Sign in through the app's own API, as the single-page app does."""
+    environ = {"REMOTE_ADDR": address}
+    token = client.get("/api/v1/auth/csrf", environ_overrides=environ) \
+        .get_json()["csrf_token"]
+    return client.post(
+        "/api/v1/auth/login",
+        json={"username": fixture.READER_NAME, "password": fixture.READER_PASSWORD},
+        headers={"X-CSRFToken": token}, environ_overrides=environ,
+    ).status_code
+
+
 def test_sign_in_survives_a_dead_limiter_store(kobo_real_app, monkeypatch):
     """Intent: a limiter-store outage costs neither a 500 nor a lockout.
 
@@ -105,6 +117,11 @@ def test_sign_in_survives_a_dead_limiter_store(kobo_real_app, monkeypatch):
     browser = kobo_real_app.test_client()
     browser.environ_base["REMOTE_ADDR"] = "192.0.2.45"
     fixture.login(browser)  # asserts the right password is answered 302
+    _store_returns(monkeypatch)
+
+    # The same through the app's own sign-in API.
+    _store_dies(monkeypatch, at_first_clear=True)
+    assert _app_sign_in(kobo_real_app.test_client(), "192.0.2.47") == 200
     _store_returns(monkeypatch)
 
     # The store dies as a Kobo's valid token is cleared: it keeps syncing.

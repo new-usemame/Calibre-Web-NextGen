@@ -8,6 +8,8 @@
 import datetime
 import threading
 
+from markupsafe import escape
+
 from . import config, constants, logger
 from .services.background_scheduler import BackgroundScheduler, CronTrigger, IntervalTrigger, use_APScheduler, DateTrigger
 from .tasks.database import TaskReconnectDatabase, TaskCleanArchivedBooks
@@ -179,7 +181,7 @@ def register_startup_tasks():
                         except Exception:
                             pass
                         if should_enqueue and bid is not None and uid is not None:
-                            WorkerThread.add(u, TaskAutoSend(f"Auto-sending '{t}' to user's eReader(s)", bid, uid, delay_minutes), hidden=False)
+                            WorkerThread.add(u, TaskAutoSend(f"Auto-sending '{escape(t)}' to user's eReader(s)", bid, uid, delay_minutes), hidden=False)
 
                     job = scheduler.schedule(func=_rehydrate_enqueue, trigger=DateTrigger(run_date=run_at_local), name=f"rehydrated auto-send {schedule_id}")
                     try:

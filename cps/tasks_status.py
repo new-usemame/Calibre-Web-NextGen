@@ -65,6 +65,11 @@ def render_task_status(tasklist):
                 else:
                     ret['status'] = _('Unknown Status')
 
+            # task.message is left as-is: several tasks build it as HTML on
+            # purpose (a link to the book), and escape the dynamic parts where
+            # the message is built. task.error carries converter output (calibre
+            # or kepubify stderr), which can contain stray HTML, so it's escaped
+            # below the same way `user` is.
             ret['taskMessage'] = "{}: {}".format(task.name, task.message) if task.message else task.name
             ret['progress'] = "{} %".format(int(task.progress * 100))
             ret['user'] = escape(user)  # prevent xss
@@ -73,7 +78,7 @@ def render_task_status(tasklist):
             ret['task_id'] = task.id
             ret['stat'] = task.stat
             ret['is_cancellable'] = task.is_cancellable
-            ret['error'] = task.error
+            ret['error'] = escape(task.error) if task.error else task.error
 
             rendered_tasklist.append(ret)
 

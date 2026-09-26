@@ -373,7 +373,7 @@ def send_broadcast_email(subject, body_html, recipients, sender_name):
                 attachment=None,
                 settings=settings,
                 recipient=email,
-                task_message=N_("Announcement Email to %(email)s", email=email),
+                task_message=N_("Announcement Email to %(email)s", email=escape(email)),
                 text=text_fallback,
                 html=wrapped_html,
             ))

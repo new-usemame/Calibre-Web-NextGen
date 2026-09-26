@@ -220,8 +220,23 @@ const READER_TO_THEME: Record<ReaderTheme, ReaderSettings['theme']> = {
 };
 const FONT_FAMILY: Record<ReaderSettings['font'], string> = {
   default: '', Yahei: 'Microsoft YaHei, sans-serif', SimSun: 'SimSun, serif',
-  KaiTi: 'KaiTi, serif', Arial: 'Arial, sans-serif',
+  KaiTi: 'KaiTi, serif', Arial: 'Arial, sans-serif', Literata: "'Literata', serif",
 };
+
+// Bundled reading-optimised serif. Content only gets font-family applied via
+// CSS (FONT_FAMILY / rendition.themes.font) — without an actual @font-face
+// declared inside each chapter iframe's own document, 'Literata' silently
+// falls back to a system font. resourceUrl() keeps this correct behind a
+// reverse-proxy mount prefix, same as every other server asset here.
+const LITERATA_FONT_FACE_CSS = ([
+  ['normal', 'normal', 'Literata-Regular'],
+  ['normal', 'italic', 'Literata-Italic'],
+  ['bold', 'normal', 'Literata-Bold'],
+  ['bold', 'italic', 'Literata-BoldItalic'],
+] as const).map(([weight, style, file]) =>
+  `@font-face{font-family:'Literata';font-weight:${weight};font-style:${style};` +
+  `font-display:swap;src:url('${resourceUrl(`/static/fonts/literata/${file}.woff2`)}') format('woff2');}`
+).join('');
 
 /** The table of contents as nested lists, so every level is reachable and a
  *  screen reader announces where each entry sits in the book's outline. */
@@ -1605,6 +1620,14 @@ export function Reader({ id }: { id: string }) {
           void fonts?.ready?.then(() => scheduleLinkSync()).catch(() => {});
         });
 
+        rendition.hooks.content.register((contents: any) => {
+          try {
+            contents.addStylesheetCss(LITERATA_FONT_FACE_CSS, 'literata-font-face');
+          } catch {
+            // non-XHTML content may not support stylesheet injection
+          }
+        });
+
         Object.entries(THEMES).forEach(([name, t]) => rendition.themes.register(name, t));
         const initialAppearance = appearanceRef.current;
         rendition.themes.select(initialAppearance.theme);
@@ -2345,7 +2368,7 @@ export function Reader({ id }: { id: string }) {
                 setFontFamily(value); persistSetting('font', value);
               }}>
                 <option value="default">{t('Book default')}</option>
-                <option value="Arial">Arial</option><option value="Yahei">Microsoft YaHei</option>
+                <option value="Arial">Arial</option><option value="Literata">Literata</option><option value="Yahei">Microsoft YaHei</option>
                 <option value="SimSun">SimSun</option><option value="KaiTi">KaiTi</option>
               </select>
             </label>

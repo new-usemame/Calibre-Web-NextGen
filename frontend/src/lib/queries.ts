@@ -1277,7 +1277,7 @@ export function useSetCover(id: string | number) {
 
 export interface ReaderSettings {
   theme: 'lightTheme' | 'sepiaTheme' | 'darkTheme' | 'blackTheme';
-  font: 'default' | 'Yahei' | 'SimSun' | 'KaiTi' | 'Arial';
+  font: 'default' | 'Yahei' | 'SimSun' | 'KaiTi' | 'Arial' | 'Literata';
   fontSize: number;
   margin: number;
   lineHeight: number;

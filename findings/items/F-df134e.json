@@ -4,8 +4,14 @@
   "created": "2026-09-26",
   "id": "F-df134e",
   "refs": [],
+  "resolution": {
+    "commit": "bac76ce5e",
+    "date": "2026-09-26",
+    "note": "Fixed by #2320: fingerprint schema 3 leaves BookMetadata.CoverImageId and DownloadUrls[].Url out of the projection (Size already was), and the declared transition re-stamps unchanged rows so no device sees a one-time resend.",
+    "release": ""
+  },
   "severity": "correctness",
   "source": "audit",
-  "status": "open",
+  "status": "resolved",
   "title": "A cover file's modification time reaches the Kobo entitlement fingerprint"
 }

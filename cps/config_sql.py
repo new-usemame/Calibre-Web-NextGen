@@ -14,7 +14,7 @@ import threading
 
 from sqlalchemy import Column, String, Integer, SmallInteger, Boolean, BLOB, JSON
 from sqlalchemy import inspect as sa_inspect
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session
 from sqlalchemy.sql.expression import text
 from sqlalchemy import exists
@@ -706,6 +706,18 @@ class ConfigSQL(object):
         """Load all configuration values from the underlying storage."""
         self._require_serving_thread("load")
         s = self._read_from_storage()  # type: _Settings
+        # save_fields() commits from a task on a session of its own, which
+        # leaves this session's copy of the row as it was; read it afresh.
+        # A new query also recovers a row the session has let go of. If the
+        # database cannot answer now (locked, or a transaction awaiting its
+        # rollback), the copy already held is what a reload has always used.
+        try:
+            fresh = self._session.query(_Settings).populate_existing().first()
+        except SQLAlchemyError as ex:
+            log.warning("Settings reload kept the loaded values: %s", ex)
+        else:
+            if fresh is not None:
+                s = self._settings = fresh
         for k, v in s.__dict__.items():
             if k[0] != '_':
                 if v is None:
@@ -769,6 +781,10 @@ class ConfigSQL(object):
         """Apply all configuration values to the underlying storage."""
         self._require_serving_thread("save")
         s = self._read_from_storage()  # type: _Settings
+        if sa_inspect(s).detached:
+            # The requests' session let go of the row (closed after a failed
+            # rollback); an expired detached row cannot even be assigned to.
+            s = self._settings = self._session.query(_Settings).first()
 
         for k in self.dirty:
             if k[0] == '_':

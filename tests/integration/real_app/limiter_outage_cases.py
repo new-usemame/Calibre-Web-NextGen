@@ -38,31 +38,54 @@ def _initialization(client, token, times):
             for _ in range(times)]
 
 
-STORE_WRITES = ("incr", "acquire_entry", "acquire_sliding_window_entry")
-STORE_READS = ("get", "get_expiry", "clear", "reset", "get_moving_window",
-               "get_sliding_window")
+STORE_METHODS = ("incr", "acquire_entry", "acquire_sliding_window_entry", "get",
+                 "get_expiry", "clear", "reset", "get_moving_window",
+                 "get_sliding_window")
 
 
-def _fail(monkeypatch, names):
+def _store_dies(monkeypatch, *, at_first_clear):
+    """Make the limiter's own store fail, now or from the first clear on.
+
+    Dying at the first clear is the outage that lands between a counted
+    check and the rest of the request: the sign-in has succeeded, and its
+    clean-up and the rate-limit headers find the store gone.
+    """
     from cps import limiter
 
-    def down(*_args, **_kwargs):
-        raise ConnectionError("limiter store unreachable")
-
     storage = limiter.storage
-    for name in names:
+    state = {"dead": not at_first_clear}
+
+    def failing(name, real):
+        def method(*args, **kwargs):
+            if name == "clear":
+                state["dead"] = True
+            if state["dead"]:
+                raise ConnectionError("limiter store unreachable")
+            return real(*args, **kwargs)
+        return method
+
+    for name in STORE_METHODS:
         if hasattr(storage, name):
-            monkeypatch.setattr(storage, name, down)
-    monkeypatch.setattr(storage, "check", lambda: False)
+            monkeypatch.setattr(storage, name, failing(name, getattr(storage, name)))
+    monkeypatch.setattr(storage, "check", lambda: not state["dead"])
+
+
+def _store_returns(monkeypatch):
+    """Undo the outage and put the limiter straight back on its own store."""
+    from cps import limiter
+
+    monkeypatch.undo()
+    limiter._storage_dead = False
 
 
 def test_sign_in_survives_a_dead_limiter_store(kobo_real_app, monkeypatch):
     """Intent: a limiter-store outage costs neither a 500 nor a lockout.
 
-    Breaks if: the header step or the check reaches the dead store unguarded
-    (500s), a Kobo's successful sign-in stops clearing its count (a healthy
-    Kobo is refused from its fourth request a minute), or the outage turns
-    pacing off altogether (wrong tokens never 429).
+    Breaks if: the clean-up after a successful sign-in, or the rate-limit
+    headers, reach the dead store unguarded (500s); a Kobo's successful
+    sign-in stops clearing its count (a healthy Kobo is refused from its
+    fourth request a minute); or the outage turns pacing off altogether
+    (wrong tokens never 429).
     """
     from cps import config
 
@@ -77,16 +100,22 @@ def test_sign_in_survives_a_dead_limiter_store(kobo_real_app, monkeypatch):
     assert _initialization(client, "0" * 32, PER_MINUTE + 1) == \
         [401] * PER_MINUTE + [429]
 
-    # The store dies mid-request: the check is counted, then the clear and
-    # the rate-limit headers find it gone. The right password still signs in.
-    _fail(monkeypatch, STORE_READS)
+    # The store dies as a right web password is cleared: still signed in.
+    _store_dies(monkeypatch, at_first_clear=True)
     browser = kobo_real_app.test_client()
     browser.environ_base["REMOTE_ADDR"] = "192.0.2.45"
     fixture.login(browser)  # asserts the right password is answered 302
+    _store_returns(monkeypatch)
 
-    # Then it is gone altogether.
-    _fail(monkeypatch, STORE_WRITES + STORE_READS)
+    # The store dies as a Kobo's valid token is cleared: it keeps syncing.
+    _store_dies(monkeypatch, at_first_clear=True)
+    kobo = kobo_real_app.test_client()
+    kobo.environ_base["REMOTE_ADDR"] = "192.0.2.46"
+    assert _initialization(kobo, token, PER_MINUTE + 3) == [200] * (PER_MINUTE + 3)
+    _store_returns(monkeypatch)
 
+    # Then it is gone altogether: devices sync, strangers are still paced.
+    _store_dies(monkeypatch, at_first_clear=False)
     other = kobo_real_app.test_client()
     other.environ_base["REMOTE_ADDR"] = "192.0.2.44"
     assert _initialization(other, token, PER_MINUTE + 3) == [200] * (PER_MINUTE + 3)

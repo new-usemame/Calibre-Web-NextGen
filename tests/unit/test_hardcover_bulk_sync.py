@@ -374,6 +374,9 @@ class TestShelfCallSitePins:
         )
 
     def test_task_creates_one_client_for_the_batch(self):
-        assert TASK_SRC.count("hardcover.HardcoverClient(") == 1, (
+        # Scoped to the bulk task: the web-reader progress task (#2289) makes
+        # its own single client in the same module.
+        bulk_src = TASK_SRC.split("class TaskHardcoverBulkSync", 1)[1].split("\nclass ", 1)[0]
+        assert bulk_src.count("hardcover.HardcoverClient(") == 1, (
             "the task must create one client per batch, not per book"
         )

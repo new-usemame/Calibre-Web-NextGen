@@ -33,6 +33,7 @@ from .cover_version import COVER_VERSION_ARG, cover_version_token
 from sqlalchemy.sql.expression import true, false, and_, or_, text, func
 from sqlalchemy.exc import InvalidRequestError, OperationalError
 from werkzeug.datastructures import Headers
+from werkzeug.http import parse_options_header
 from werkzeug.security import generate_password_hash
 from markupsafe import escape
 from urllib.parse import quote
@@ -566,6 +567,19 @@ def check_read_formats(entry):
 # 1: If epub file is existing, it's directly send to eReader email,
 # 2: If mobi file is existing, it's converted and send to eReader email,
 # 3: If Pdf file is existing, it's directly send to eReader email
+def get_sendable_book(book_id, user=None):
+    """Return the book ``send_mail`` sends for ``user``, else ``None``.
+
+    Sending follows the account's own library view, including its own hidden
+    and archived books. A book reached only through a public shelf can be read
+    and downloaded without membership, but it is not sent, so the book pages
+    must not offer to send it.
+    """
+    return calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_hidden=True, user=user,
+    )
+
+
 def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id,
               subject=None, user=None):
     """Send email with attachments"""
@@ -575,10 +589,7 @@ def send_mail(book_id, book_format, convert, ereader_mail, calibrepath, user_id,
     filter_user = user if user is not None else (
         current_user if has_request_context() else None
     )
-    book = calibre_db.get_filtered_book(
-        book_id, allow_show_archived=True, allow_show_hidden=True,
-        user=filter_user,
-    )
+    book = get_sendable_book(book_id, filter_user)
     if not book:
         return _("Book not found")
 
@@ -721,6 +732,49 @@ def get_sorted_author(value):
 # SQLite builds vary in their host-parameter ceiling. Keep IN clauses below the
 # conservative historical limit while leaving ordinary list pages as one query.
 SQLITE_IN_CHUNK_SIZE = 900
+
+
+def hot_books_page(visibility_filter, order, offset, limit):
+    """One page of the downloaded books the viewer can see, and their count.
+
+    Returns ``(entries, total)``: read-status rows (``generate_linked_query``)
+    in ``order``, and how many books the viewer can page through.  Filtering
+    before paging keeps pages full and the count true.
+
+    Download records are each account's own history, and the Kobo upgrade
+    audit reads them as proof that an account took delivery of a book, so a
+    book the viewer cannot see keeps every account's records.  Only the
+    records of a book the library deleted go: an id below the library's
+    highest one that no book answers to.  A higher id is not a deletion; the
+    library may be an older copy.
+    """
+    ranked = [row[0] for row in ub.session.query(ub.Downloads.book_id)
+              .group_by(ub.Downloads.book_id).order_by(*order)]
+    highest = calibre_db.session.query(func.max(db.Books.id)).scalar() or 0
+    visible = []
+    for start in range(0, len(ranked), SQLITE_IN_CHUNK_SIZE):
+        chunk = ranked[start:start + SQLITE_IN_CHUNK_SIZE]
+        present, shown = _present_and_visible_book_ids(chunk, visibility_filter)
+        visible.extend(book_id for book_id in chunk if book_id in shown)
+        for book_id in chunk:
+            if book_id not in present and book_id < highest:
+                ub.delete_download(book_id)
+    page_ids = visible[offset:offset + limit]
+    entries = []
+    if page_ids:
+        rows = (calibre_db.generate_linked_query(config.config_read_column, db.Books)
+                .filter(visibility_filter).filter(db.Books.id.in_(page_ids)).all())
+        by_id = {row.Books.id: row for row in rows}
+        entries = [by_id[book_id] for book_id in page_ids if book_id in by_id]
+    return entries, len(visible)
+
+
+def _present_and_visible_book_ids(book_ids, visibility_filter):
+    present = {row[0] for row in calibre_db.session.query(db.Books.id)
+               .filter(db.Books.id.in_(book_ids))}
+    visible = {row[0] for row in calibre_db.session.query(db.Books.id)
+               .filter(visibility_filter).filter(db.Books.id.in_(book_ids))}
+    return present, visible
 
 
 def book_in_progress_ids(book_read_statuses, read_column_configured, user):
@@ -1035,7 +1089,63 @@ def set_custom_read_column_value(book_id, value, source="read-status"):
     return False
 
 
-def edit_book_read_status(book_id, read_status=None):
+def queue_hardcover_mark_read(book_ids):
+    """Queue the background Hardcover "mark as read" for books the current user
+    just marked read (#2289). Same gate as the Kobo and KOReader progress push:
+    the server-wide Hardcover switch, the user's own token, and the per-book
+    reading-progress blacklist. The token is captured here because the worker
+    thread has no request context. Never raises: Hardcover is best-effort and
+    must not fail the read-status change that already committed."""
+    try:
+        from .services import hardcover
+        if not (book_ids and config.hardcover_sync_enabled() and bool(hardcover)):
+            return
+        token = getattr(current_user, "hardcover_token", None)
+        if not token:
+            log.info("User %s has no Hardcover token, not marking books read on Hardcover",
+                     current_user.name)
+            return
+        blocked = {row.book_id for row in ub.session.query(ub.HardcoverBookBlacklist).filter(
+            ub.HardcoverBookBlacklist.book_id.in_(book_ids),
+            ub.HardcoverBookBlacklist.blacklist_reading_progress.is_(True))}
+        wanted = [book_id for book_id in book_ids if book_id not in blocked]
+        if not wanted:
+            return
+        from .tasks.hardcover_sync import TaskHardcoverMarkRead
+        WorkerThread.add(current_user.name, TaskHardcoverMarkRead(token, wanted))
+    except Exception as ex:
+        log.warning("Could not queue Hardcover mark-read for books %s: %s", book_ids, ex)
+
+
+def queue_hardcover_reading_progress(user, book_id, percentage):
+    """Queue the web reader's accepted position for Hardcover (#2289), behind
+    the same gate as ``queue_hardcover_mark_read``. The push is coalesced per
+    book on the worker (``queue_reading_progress``), so page turns never wait
+    on Hardcover. Never raises: the bookmark save must not fail over it."""
+    try:
+        from .services import hardcover
+        if not (config.hardcover_sync_enabled() and bool(hardcover)):
+            return
+        token = getattr(user, "hardcover_token", None)
+        if not token:
+            return
+        blocked = ub.session.query(ub.HardcoverBookBlacklist).filter(
+            ub.HardcoverBookBlacklist.book_id == book_id,
+            ub.HardcoverBookBlacklist.blacklist_reading_progress.is_(True)).first()
+        if blocked:
+            return
+        from .tasks.hardcover_sync import queue_reading_progress
+        queue_reading_progress(user.name, token, user.id, book_id, percentage)
+    except Exception as ex:
+        log.warning("Could not queue Hardcover progress for book %s: %s", book_id, ex)
+
+
+def edit_book_read_status(book_id, read_status=None, sync_hardcover=True):
+    """Set or toggle the current user's read status for one book.
+
+    ``sync_hardcover=False`` lets a bulk caller queue one Hardcover task for the
+    whole selection instead of one per book (see ``queue_hardcover_mark_read``).
+    """
     if not config.config_read_column:
         book = ub.session.query(ub.ReadBook).filter(and_(ub.ReadBook.user_id == int(current_user.id),
                                                          ub.ReadBook.book_id == book_id)).first()
@@ -1116,6 +1226,8 @@ def edit_book_read_status(book_id, read_status=None):
         # keeps owning the position rows and its own accounting.
         mirror_read_status_to_readbook(ub.session, current_user.id, book_id, not now_unread)
         ub.session_commit("Read status updated for book {}".format(book_id))
+    if sync_hardcover and not now_unread:
+        queue_hardcover_mark_read([book_id])
     return ""
 
 
@@ -1910,6 +2022,7 @@ def get_book_cover(book_id, resolution=None):
         allow_show_archived=True,
         allow_show_hidden=True,
         allow_show_global=allow_show_global,
+        allow_public_shelf_books=True,
     )
     return get_book_cover_internal(book, resolution=resolution)
 
@@ -2869,23 +2982,10 @@ def do_download_file(book, book_format, client, data, headers, cover_user_id=Non
                 download_name = book_name
                 metadata_was_embedded = False
 
-            # Rename the exported file to match the expected download name (from Content-Disposition)
-            # This ensures KOReader calculates the checksum on the same file we calculated it on
-            if filename and download_name:
-                uuid_file = os.path.join(filename, download_name + "." + book_format)
-                expected_file = os.path.join(filename, book_name + "." + book_format)
-
-                if os.path.exists(uuid_file) and uuid_file != expected_file:
-                    try:
-                        # Remove the target file if it already exists
-                        if os.path.exists(expected_file):
-                            os.remove(expected_file)
-                        # Rename UUID file to expected name
-                        os.rename(uuid_file, expected_file)
-                        download_name = book_name
-                        log.info(f'Renamed exported file to match expected name: {book_name}.{book_format}')
-                    except Exception as e:
-                        log.error(f'Failed to rename exported file: {e}')
+            # Keep Calibre's unique staging name. Renaming every export to
+            # the shared library basename lets concurrent downloads overwrite
+            # and unlink one another. Checksum registration receives the client
+            # filename separately below.
         else:
             download_name = book_name
 
@@ -2936,7 +3036,10 @@ def do_download_file(book, book_format, client, data, headers, cover_user_id=Non
                     calculate_and_store_checksum(
                         book_id=book.id,
                         book_format=book_format,
-                        file_path=exported_file
+                        file_path=exported_file,
+                        filename_for_matching=parse_options_header(
+                            headers.get("Content-Disposition", "")
+                        )[1].get("filename", book_name + "." + book_format),
                     )
         except Exception as e:
             checksum_source = "embedded" if metadata_was_embedded else "original"
@@ -3097,13 +3200,16 @@ def check_valid_domain(domain_text):
     return not len(ub.session.query(ub.Registration).from_statement(text(sql)).params(domain=domain_text).all())
 
 
-def get_download_link(book_id, book_format, client):
+def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=False):
     book_format = book_format.split(".")[0]
     # Try filtered view first to respect user restrictions.
     # allow_show_hidden=True: a user's own hidden book is still downloadable
     # through Send-to-eReader and OPDS — hidden hides from listings, not from
     # the user's own access (#319 pushback).
-    book = calibre_db.get_filtered_book(book_id, allow_show_archived=True, allow_show_hidden=True)
+    book = calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_hidden=True,
+        allow_public_shelf_books=allow_public_shelf_books,
+    )
 
     # If not found but user is admin, fall back to unfiltered direct lookup
     if not book and getattr(current_user, 'role_admin', lambda: False)():

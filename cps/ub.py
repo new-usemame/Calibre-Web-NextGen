@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-import atexit
 import os
 import re
 import sys
@@ -36,6 +35,7 @@ from sqlalchemy import create_engine, DDL, exc, exists, event, text
 from sqlalchemy import CheckConstraint, Column, ForeignKey, Index, UniqueConstraint
 from sqlalchemy import String, Integer, SmallInteger, Boolean, DateTime, Float, JSON, Text, BLOB
 from sqlalchemy.orm.attributes import flag_modified
+from sqlalchemy.pool import NullPool
 from sqlalchemy.sql.expression import func
 try:
     # Compatibility with sqlalchemy 2.0
@@ -701,7 +701,8 @@ class MyLibraryAdminIntro(Base):
     administrator and must survive sessions, so it lives in app.db rather than
     per-user rows or browser storage. ``snapshot_json`` holds the pre-enable
     restore point — {user_id: {"browse_global": bool, "has_own_library": bool}}
-    for every account the enable action touched — so Undo is a true restore
+    for every account the enable action touched, plus a completion receipt and
+    any last error for resumable setup — so Undo is a true restore
     rather than a re-derivation. Membership rows and the seed-once fence are
     deliberately NOT part of the snapshot: undo leaves each selection dormant
     (the keep-dormant guarantee), exactly like a per-user mode switch back to
@@ -710,6 +711,7 @@ class MyLibraryAdminIntro(Base):
     __tablename__ = 'my_library_admin_intro'
 
     STATUS_NOT_ENABLED = 'not_enabled'
+    STATUS_INCOMPLETE = 'incomplete'
     STATUS_ENABLED = 'enabled'
 
     id = Column(Integer, primary_key=True)
@@ -1033,8 +1035,9 @@ class KoboDeviceBookEntitlement(Base):
     # Canonical, constituent-preserving book/archive clock encoding that
     # justified the delivered entitlement. A declared renderer-schema
     # transition may replace the fingerprint only while this entire non-null
-    # tuple is byte-identical. NULL is retained for #1925 rows and deliberately
-    # fails open on a changed payload.
+    # tuple is byte-identical. The one-time classification audit stamps it on
+    # a kept #1925 row only when neither clock moved after the row was
+    # written; any other NULL fails open on a changed payload.
     change_basis = Column(Text, nullable=True)
     updated_at = Column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
@@ -1135,9 +1138,12 @@ class KoboDeviceEntitlementSeed(Base):
     seeded_at = Column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc),
     )
-    # Version 1 means the per-device rows were audited against the legacy
-    # New/Changed classifier.  Version 0 rows predate #1735 and may include
-    # fingerprints for ChangedEntitlements a device could not apply.
+    # Version 1 means the one-time pre-#2025 audit has run for this device.
+    # Version 0 rows were written by the shipped v4.1.43 seed, which copied
+    # the user-wide flat history onto every Kobo it sealed, and by v4.1.43's
+    # deliveries, recorded when sent.  The audit keeps the rows whose books
+    # the account took delivery of, stamps the change basis each kept row can
+    # vouch for, and clears every recorded tombstone.
     classification_version = Column(
         Integer, nullable=False, default=0, server_default="0",
     )
@@ -1410,6 +1416,8 @@ class Device(Base):
     __table_args__ = (
         Index('ix_device_user_active_last_seen', 'user_id', 'active', 'last_seen_at'),
         Index('ix_device_user_display_name', 'user_id', 'display_name'),
+        Index('uq_device_account_browser', 'user_id', unique=True,
+              sqlite_where=text("kind = 'webreader' AND created_by = 'account-browser'")),
     )
 
 
@@ -5184,6 +5192,8 @@ def migrate_Database(_session):
     migrate_device_reading_position_slice(engine, _session)
     migrate_kobo_annotation_seed_pipeline(engine, _session)
     migrate_kobo_two_way_annotation_sync(engine, _session)
+    from .services.browser_source import migrate_account_browser_source
+    migrate_account_browser_source(engine)
     migrate_book_cover_preview_table(engine, _session)
     migrate_user_book_cover_table(engine, _session)
     migrate_koreader_pairing_table(engine, _session)
@@ -5290,16 +5300,17 @@ def clean_database(_session):
 
 
 # Save downloaded books per user in calibre-web's own database
-def update_download(book_id, user_id):
-    check = session.query(Downloads).filter(Downloads.user_id == user_id).filter(Downloads.book_id == book_id).first()
+def update_download(book_id, user_id, _session=None):
+    s = _session if _session else session
+    check = s.query(Downloads).filter(Downloads.user_id == user_id).filter(Downloads.book_id == book_id).first()
 
     if not check:
         new_download = Downloads(user_id=user_id, book_id=book_id)
-        session.add(new_download)
+        s.add(new_download)
         try:
-            session.commit()
+            s.commit()
         except exc.OperationalError:
-            session.rollback()
+            s.rollback()
 
 
 # Delete non existing downloaded books in calibre-web's own database
@@ -5397,7 +5408,7 @@ def begin_contained_nested(db_session):
     return db_session.begin_nested()
 
 
-def _create_app_db_engine(app_db_path):
+def _create_app_db_engine(app_db_path, **engine_options):
     """Create an app.db engine with WAL and legacy sqlite3 transactions.
 
     Python's sqlite3 legacy transaction mode emits BEGIN for DML only. A
@@ -5415,6 +5426,7 @@ def _create_app_db_engine(app_db_path):
         'sqlite:///{0}'.format(app_db_path),
         echo=False,
         connect_args={'timeout': 30},
+        **engine_options,
     )
     wal_mode = {'configured': False}
     wal_mode_lock = threading.Lock()
@@ -5454,7 +5466,38 @@ def _create_app_db_engine(app_db_path):
 
 
 def init_db_thread():
-    global app_DB_path
+    return sessionmaker(bind=_shared_app_db_engine())()
+
+
+def owned_session():
+    """Return a new Session on app.db's engine for code off the serving thread.
+
+    ``session`` belongs to the web requests: every request greenlet shares that
+    one object on the thread that serves HTTP, and a SQLAlchemy Session is not
+    thread-safe.  WorkerThread and scheduler code that reads or writes app.db
+    through it can fail a request mid-query ("This session is in 'prepared'
+    state") or commit a request's unfinished changes.  The caller owns the
+    returned Session and closes it (it is a context manager).  It shares the
+    task engine instead of building one per call as ``init_db_thread()`` once
+    did.
+    """
+    return sessionmaker(bind=_shared_app_db_engine())()
+
+
+_task_engine = None
+_task_engine_lock = threading.Lock()
+
+
+def _shared_app_db_engine():
+    """The one app.db engine for sessions opened off the serving thread.
+
+    An engine per session kept each connection it opened (and its WAL files)
+    until the process exited. This engine does not pool: closing a session
+    closes its connection. It is also not the web requests' engine, so a task
+    stuck in an image library while holding a connection takes nothing from
+    the pool every request draws on.
+    """
+    global _task_engine
     if not app_DB_path:
         # Without this guard, 'sqlite:///{}'.format(None) builds the URL
         # 'sqlite:///None' and SQLite silently creates (and writes real
@@ -5463,13 +5506,14 @@ def init_db_thread():
         # committed in #440 (the annotation-backup worker fires this in
         # contexts where init_db() was never called, e.g. unit tests).
         raise RuntimeError(
-            "ub.init_db_thread() called before ub.init_db(); app_DB_path "
-            "is unset, refusing to create a stray 'None' SQLite file")
-    engine = _create_app_db_engine(app_DB_path)
-
-    Session = scoped_session(sessionmaker())
-    Session.configure(bind=engine)
-    return Session()
+            "an app.db task session was requested before ub.init_db(); "
+            "app_DB_path is unset, refusing to create a stray 'None' SQLite file")
+    with _task_engine_lock:
+        if _task_engine is None or _task_engine.url.database != app_DB_path:
+            if _task_engine is not None:
+                _task_engine.dispose()
+            _task_engine = _create_app_db_engine(app_DB_path, poolclass=NullPool)
+        return _task_engine
 
 
 def init_db(app_db_path):
@@ -5553,18 +5597,16 @@ def password_change(user_credentials=None):
 
 
 def get_new_session_instance():
-    new_engine = _create_app_db_engine(app_DB_path)
-    new_session = scoped_session(sessionmaker())
-    new_session.configure(bind=new_engine)
-
-    atexit.register(lambda: new_session.remove() if new_session else True)
-
-    return new_session
+    return scoped_session(sessionmaker(bind=_shared_app_db_engine()))
 
 
 def dispose():
-    global session
+    global session, _task_engine
 
+    with _task_engine_lock:
+        if _task_engine is not None:
+            _task_engine.dispose()
+            _task_engine = None
     old_session = session
     session = None
     if old_session:

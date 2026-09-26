@@ -153,7 +153,7 @@ def test_backfill_is_composite_idempotent_preserves_sync_rows_and_skips_gdrive(m
     monkeypatch.setattr(kepub_backfill.config, "config_use_google_drive", False, raising=False)
     monkeypatch.setattr(kepub_backfill.config, "config_kepubifypath", "/bin/kepubify", raising=False)
     monkeypatch.setattr(kepub_backfill.config, "get_book_path", lambda: "/books", raising=False)
-    monkeypatch.setattr(kepub_backfill.config, "save", lambda: None, raising=False)
+    monkeypatch.setattr(kepub_backfill.config, "save_fields", lambda **_values: None, raising=False)
 
     kepub_backfill.TaskKepubBackfill().run(None)
     kepub_backfill.TaskKepubBackfill().run(None)
@@ -205,13 +205,12 @@ def test_backfill_continues_after_per_book_oserror_and_completes(monkeypatch):
     monkeypatch.setattr(kepub_backfill.config, "config_kepubifypath", "/bin/kepubify", raising=False)
     monkeypatch.setattr(kepub_backfill.config, "config_kobo_kepub_backfill_completed", False, raising=False)
     monkeypatch.setattr(kepub_backfill.config, "get_book_path", lambda: "/books", raising=False)
-    monkeypatch.setattr(
-        kepub_backfill.config,
-        "save",
-        lambda: saved.append(
-            kepub_backfill.config.config_kobo_kepub_backfill_completed),
-        raising=False,
-    )
+    def save_fields(**values):
+        # Like ConfigSQL.save_fields: record the write, then publish it.
+        saved.append(values["config_kobo_kepub_backfill_completed"])
+        kepub_backfill.config.__dict__.update(values)
+
+    monkeypatch.setattr(kepub_backfill.config, "save_fields", save_fields, raising=False)
 
     task = kepub_backfill.TaskKepubBackfill()
     task.run(None)

@@ -40,6 +40,25 @@ crengine (``lvtinydom.cpp`` / ``lvxml.cpp`` / ``epubfmt.cpp``)
   * a text node longer than 8192 source characters is split into several;
     a comment is not a node, but the text either side of it stays two nodes.
 
+Chapters are parsed as strict XML: that is crengine's tree. An ``.html`` or
+``.htm`` member is read by epub.js with the browser's HTML parser, so two
+leniencies apply there:
+
+  * void elements left open in ``<head>`` -- ``<meta charset="utf-8">``,
+    ``<link ...>`` -- are self-closed and the file parsed again, since both
+    engines treat them as void. The body must still parse strictly, and the
+    refusals below judge the file as written.
+  * a self-closed non-void element (``<a id="x"/>``, ``<div/>``: every Project
+    Gutenberg chapter) is an OPEN tag to the browser, which then nests what
+    follows inside it, while crengine keeps it empty (checked with the engine
+    harness). The browser's tree is built with html5lib, the WHATWG algorithm
+    browsers implement, and a position crosses between the two trees through
+    its text node: the chapter is modelled only when both trees hold the same
+    non-whitespace text nodes in the same order (``_BrowserView``); a chapter
+    the browser reorders (a table fostering content out) or swallows (``<script/>``)
+    is refused, as is every such chapter when html5lib is not installed or the
+    chapter is over ``MAX_HTML5_CHAPTER_BYTES``.
+
 Anything outside the modelled subset (pre-formatted text, CSS that may change
 an element's display/float/white-space where it matters, markup the browser's
 HTML parser would restructure, split text nodes, ...) returns ``None``: an
@@ -50,6 +69,7 @@ from __future__ import annotations
 
 import os
 import posixpath
+from bisect import bisect_right
 import re
 import zipfile
 from dataclasses import dataclass
@@ -74,6 +94,9 @@ _XHTML_MEDIA_TYPE = "application/xhtml+xml"
 MAX_ARCHIVE_BYTES = 256 * 1024 * 1024
 MAX_CHAPTER_BYTES = 8 * 1024 * 1024
 MAX_POSITION_CHARS = 4096
+# html5lib is pure Python (~0.3 ms per KiB measured on Gutenberg chapters);
+# a chapter it would take long to parse keeps today's refusal instead.
+MAX_HTML5_CHAPTER_BYTES = 1024 * 1024
 
 # crengine hands at most this many raw characters to one text node before it
 # splits (lvxml.cpp TEXT_SPLIT_SIZE); longer nodes are refused.
@@ -127,6 +150,7 @@ def xpointer_to_cfi(epub_path, xpointer: str) -> Optional[str]:
     if point is None:
         return None
     book, item, pos = point
+    pos = _in_browser(pos)
     steps = _cfi_steps(pos)
     if steps is None:
         return None
@@ -161,6 +185,7 @@ def xpointers_to_cfi_range(epub_path, start_xpointer: str,
     (book, item, start), (_book, _item, end) = points
     if _order(start) > _order(end):
         return None
+    start, end = _in_browser(start), _in_browser(end)
     start_steps, end_steps = _cfi_steps(start), _cfi_steps(end)
     if start_steps is None or end_steps is None:
         return None
@@ -265,6 +290,87 @@ def _text_between(start: "_Pos", end: "_Pos") -> Optional[str]:
     return (start.text.value[start.offset:]
             + "".join(value for _p, _o, value in nodes[i + 1:j])
             + end.text.value[:end.offset])
+
+
+# --- Text anchors: a place named by the book's text, not its tree ------------
+#
+# Another file made from this EPUB (a KEPUB: kepubify wraps each sentence in a
+# span, and CWNG may split a chapter file into pieces) shares its text but not
+# its tree or its file names. A place crosses over as the number of
+# non-whitespace characters before it in its chapter's <body>; the caller must
+# first check that both books hold exactly the same non-whitespace characters
+# (``spine_solid_texts``), or the count means nothing.
+
+
+def spine_solid_texts(epub_path) -> Optional[tuple]:
+    """``(member, text)`` for every spine item in reading order, or None.
+
+    ``text`` is every non-whitespace character of the item's <body>, in
+    order. A spine item that cannot be read as an XHTML document makes the
+    whole book None: its text is unknown. (Chapters refused for conversion
+    still count: their text is known even where positions in them are not.)
+    """
+    def run(book):
+        out = []
+        for item in book.items:
+            chapter = _parsed_chapter(book, item)
+            if chapter is None:
+                return None
+            out.append((item.member, _solid(chapter).text))
+        return tuple(out)
+    return _resolve(epub_path, run)
+
+
+def xpointer_at_solid_index(epub_path, member: str, index: int,
+                            expected: str) -> Optional[str]:
+    """XPointer of the ``index``-th non-whitespace character of ``member``.
+
+    ``expected`` is the chapter's non-whitespace text as the caller aligned it
+    (``spine_solid_texts``); a chapter that no longer reads so gives None.
+    """
+    def run(book):
+        found = _item_and_chapter(book, member)
+        if found is None or isinstance(index, bool) or not isinstance(index, int):
+            return None
+        item, chapter = found
+        solid = _solid(chapter)
+        if solid.text != expected or not 0 <= index < len(solid.text):
+            return None
+        k = bisect_right(solid.starts, index) - 1
+        parent, ordinal, value = solid.nodes[k]
+        need = index - solid.starts[k]
+        for raw, char in enumerate(value):
+            if char not in _XML_SPACE:
+                if not need:
+                    break
+                need -= 1
+        return _xpointer_string(book, item, _Pos(parent, _Text(parent, ordinal, value),
+                                                 raw, chapter))
+    return _resolve(epub_path, run)
+
+
+def solid_index_of_xpointer(epub_path, xpointer: str) -> Optional[tuple[str, int]]:
+    """``(member, index)`` of the character a crengine XPointer points at.
+
+    ``index`` counts the non-whitespace characters before it in the chapter's
+    body, so a point on whitespace counts as the character that follows it.
+    An element position, or a point after the chapter's last character, is
+    None.
+    """
+    def run(book):
+        point = _point_from_xpointer(book, xpointer)
+        if point is None:
+            return None
+        _book, item, pos = point
+        if pos.text is None:
+            return None
+        solid = _solid(pos.chapter)
+        k = solid.position.get((pos.text.parent, pos.text.ordinal))
+        if k is None:
+            return None  # a whitespace-only node
+        index = solid.starts[k] + len(pos.text.value[:pos.offset].translate(_NO_SPACE))
+        return (item.member, index) if index < len(solid.text) else None
+    return _resolve(epub_path, run)
 
 
 # ---------------------------------------------------------------------------
@@ -375,6 +481,10 @@ class _Chapter:
     split_texts: frozenset  # decoded text of source runs crengine splits
     text_nodes: Optional[list] = None   # (parent, ordinal, value) in order
     _text_index: Optional[dict] = None
+    # The browser's own tree, when its HTML parser builds a different one
+    # (see ``_browser_view``); None when the XML tree is the browser's tree.
+    browser: Optional["_BrowserView"] = None
+    solid: Optional["_Solid"] = None    # see ``_solid``
 
     def text_order(self) -> dict:
         """(parent, ordinal) -> document-order index of every DOM text node."""
@@ -396,15 +506,64 @@ class _Chapter:
 
 
 def _chapter(book: _Book, item: _SpineItem) -> Optional[_Chapter]:
-    if item.member is None:
-        return None
-    cached = book.chapters.get(item.member)
-    if cached is None:
-        cached = _load_chapter(book.path, item.member)
-        book.chapters[item.member] = cached
+    """The chapter of ``item`` if positions in it can be converted."""
+    cached = _parsed_chapter(book, item)
     if cached is None or cached.refusal:
         return None
     return cached
+
+
+def _parsed_chapter(book: _Book, item: _SpineItem) -> Optional[_Chapter]:
+    """The parsed chapter of ``item``, refused or not; None if unreadable."""
+    if item.member is None:
+        return None
+    # A chapter that cannot be read is remembered as None too, so a book with
+    # an unreadable chapter is not re-read and re-parsed on every request.
+    if item.member in book.chapters:
+        cached = book.chapters[item.member]
+    else:
+        try:
+            cached = _load_chapter(book.path, item.member)
+        except (etree.XMLSyntaxError, UnicodeDecodeError, KeyError):
+            log.debug("koreader_xpointer: cannot parse %s in %s", item.member,
+                      book.path, exc_info=True)
+            cached = None
+        book.chapters[item.member] = cached
+    return cached
+
+
+def _item_and_chapter(book: _Book, member: str):
+    """The one trusted spine item reading ``member``, and its chapter."""
+    items = [i for i in book.items if i.member == member]
+    if len(items) != 1 or not items[0].fragment_trusted:
+        return None
+    chapter = _chapter(book, items[0])
+    return None if chapter is None else (items[0], chapter)
+
+
+_NO_SPACE = {ord(c): None for c in _XML_SPACE}
+
+
+@dataclass(frozen=True)
+class _Solid:
+    text: str          # every non-whitespace character of the body, in order
+    starts: list       # index in ``text`` of each node's first one
+    nodes: list        # (parent, ordinal, value) of each such text node
+    position: dict     # (parent, ordinal) -> its place in ``nodes``
+
+
+def _solid(chapter: "_Chapter") -> _Solid:
+    if chapter.solid is None:
+        parts, starts, nodes, position, count = [], [], [], {}, 0
+        for parent, ordinal, value in _solid_texts(chapter.body):
+            packed = value.translate(_NO_SPACE)
+            position[(parent, ordinal)] = len(nodes)
+            starts.append(count)
+            nodes.append((parent, ordinal, value))
+            parts.append(packed)
+            count += len(packed)
+        chapter.solid = _Solid("".join(parts), starts, nodes, position)
+    return chapter.solid
 
 
 def _load_chapter(path: str, member: str) -> Optional[_Chapter]:
@@ -414,13 +573,60 @@ def _load_chapter(path: str, member: str) -> Optional[_Chapter]:
             return None
         raw = archive.read(member)
         text = raw.decode("utf-8-sig", errors="strict")
-        root = _xml(_numeric_named_entities(text).encode("utf-8"))
+        source = _numeric_named_entities(text)
+        try:
+            root = _xml(source.encode("utf-8"))
+        except etree.XMLSyntaxError:
+            repaired = _close_head_voids(source, member)
+            if repaired is None:
+                raise
+            root = _xml(repaired.encode("utf-8"))
         body = root.find(f"{{{_XHTML_NS}}}body")
         if body is None or etree.QName(root).localname != "html":
             return None
-        refusal = _chapter_refusal(text, root, member)
+        browser = None
+        if (posixpath.splitext(member)[1] in (".html", ".htm")
+                and info.file_size <= MAX_HTML5_CHAPTER_BYTES
+                and _html_self_closing(text)):
+            browser = _browser_view(text, body)
+        # Refusals judge the file as written, not the repaired copy.
+        refusal = _chapter_refusal(text, root, member, browser_tree=browser is not None)
         css = _chapter_css(archive, member, root)
-    return _Chapter(body, refusal, tuple(_css_rules(css)), {}, _split_texts(text))
+    return _Chapter(body, refusal, tuple(_css_rules(css)), {}, _split_texts(text),
+                    browser=browser)
+
+
+# A start tag of a void element the head may carry, not already self-closed.
+# Quoted attribute values may contain '>' or '/'.
+_OPEN_HEAD_VOID = re.compile(
+    r"<(meta|link|base)(\s(?:[^<>\"']|\"[^\"]*\"|'[^']*')*?)?(?<!/)>")
+_HEAD = re.compile(r"(<head(?:\s[^<>]*)?>)(.*?)(</head\s*>)", re.S)
+
+
+def _close_head_voids(text: str, member: str) -> Optional[str]:
+    """``text`` with the void elements of its ``<head>`` self-closed, or None.
+
+    HTML-style ``<meta charset="utf-8">`` / ``<link ...>`` in a chapter's head
+    is ordinary in calibre-converted and retail books. The browser parses an
+    ``.html`` member with its HTML parser, where these elements are void, and
+    crengine is lenient, so both readers build the tree the self-closed file
+    would have. Only the head is repaired: positions live in the body, which
+    must still parse strictly. An ``.xhtml`` member is not repaired, because
+    the browser parses it as XML, fails, and renders no body at all (epub.js
+    chooses the parser from the member's extension, case-sensitively).
+    """
+    if posixpath.splitext(member)[1] not in (".html", ".htm"):
+        return None
+    match = _HEAD.search(text)
+    if match is None:
+        return None
+
+    def close(tag):
+        return f"<{tag.group(1)}{tag.group(2) or ''}/>"
+    head = _OPEN_HEAD_VOID.sub(close, match.group(2))
+    if head == match.group(2):
+        return None
+    return text[:match.start(2)] + head + text[match.end(2):]
 
 
 def _split_texts(text: str) -> frozenset:
@@ -454,17 +660,26 @@ _WS_CHAR_REF = re.compile(
     r"&#(?:0*(?:9|10|13|32)|[xX]0*(?:9|[aAdD]|20));|&(?:Tab|NewLine);")
 
 
-def _chapter_refusal(text: str, root, member: str) -> Optional[str]:
-    """Why the two engines might build different trees for this file, or None."""
+def _chapter_refusal(text: str, root, member: str, browser_tree: bool = False) -> Optional[str]:
+    """Why the two engines might build different trees for this file, or None.
+
+    ``browser_tree``: the browser's own tree of this file is modelled
+    (``_browser_view``), so a self-closed element it reads differently is
+    accounted for rather than a reason to refuse.
+    """
     if _WS_CHAR_REF.search(text):
         # crengine inserts referenced whitespace without condensing it.
         return "whitespace character reference"
     if "<![CDATA[" in text:
         return "CDATA section"
-    if member.lower().endswith((".html", ".htm")) and _html_self_closing(text):
+    if (not browser_tree and member.lower().endswith((".html", ".htm"))
+            and _html_self_closing(text)):
         # epub.js parses .html members with the HTML parser, which treats a
         # self-closed non-void element as an open tag.
         return "self-closed non-void element"
+    if member.lower().endswith((".html", ".htm")) and _fosters(root):
+        # The HTML parser moves it out in front of the table.
+        return "content a table fosters out"
     for el in root.iter():
         if not isinstance(el.tag, str):
             continue
@@ -945,7 +1160,9 @@ def _point_from_xpointer(book: _Book, xpointer):
                 return None
             text = texts[pick]
             raw_offset = _condensed_to_raw(text.value, offset)
-            if raw_offset is None or not _browser_keeps_path(node):
+            if raw_offset is None:
+                return None
+            if chapter.browser is None and not _browser_keeps_path(node):
                 return None
             return book, item, _Pos(node, text, raw_offset, chapter)
         same = [c for c in node if isinstance(c.tag, str) and _local(c) == name]
@@ -988,6 +1205,112 @@ def _xpointer_string(book: _Book, item: _SpineItem, pos: _Pos) -> Optional[str]:
     if len(texts) > 1:
         step += f"[{texts.index(pos.text) + 1}]"
     return f"{head}{step}.{_raw_to_condensed(pos.text.value, pos.offset)}"
+
+
+# --- The browser's tree -------------------------------------------------------
+
+
+@dataclass
+class _BrowserView:
+    """The tree the browser's HTML parser builds for an ``.html`` chapter.
+
+    epub.js reads ``.html`` members with the browser's HTML parser, and a
+    self-closed non-void element (``<div/>``, ``<a id="x"/>``) is an OPEN tag
+    there: it swallows what follows (``<a>`` is even re-opened around later
+    text), while crengine reads the XML tree, where the element is empty. CFIs
+    are therefore written in this tree and XPointers in the XML one, and a
+    position crosses between them through its text node: the two trees' text
+    nodes that are not whitespace-only must be the same strings in the same
+    order, node for node, or the chapter is not modelled at all.
+    """
+    body: object
+    to_xml: dict        # (browser parent, ordinal) -> (xml parent, ordinal)
+    to_browser: dict    # (xml parent, ordinal) -> (browser parent, ordinal)
+
+
+_TABLE_PARTS = frozenset("table thead tbody tfoot tr".split())
+_TABLE_CONTENT = frozenset("caption colgroup col thead tbody tfoot tr td th script template style".split())
+
+
+def _fosters(xml_body) -> bool:
+    """True if the browser would move content out of a table (foster parenting).
+
+    That reorders the tree -- and can reorder text so that equal strings trade
+    places, which aligning text nodes by order cannot see -- so such an
+    ``.html`` chapter is refused outright (``_chapter_refusal``)."""
+    for el in xml_body.iter():
+        if not isinstance(el.tag, str) or not _xhtml(el) or _local(el) not in _TABLE_PARTS:
+            continue
+        if not _is_ws(el.text or ""):
+            return True
+        for child in el:
+            if not _is_ws(child.tail or ""):
+                return True
+            if isinstance(child.tag, str) and (not _xhtml(child)
+                                               or _local(child) not in _TABLE_CONTENT):
+                return True
+    return False
+
+
+def _solid_texts(body) -> list:
+    """``(parent, ordinal, value)`` of every text node that is not whitespace-only."""
+    out = []
+
+    def walk(el):
+        ordinal = 0
+        for child in _raw_children(el):
+            if isinstance(child, str):
+                if not _is_ws(child):
+                    out.append((el, ordinal, child))
+                ordinal += 1
+            elif isinstance(child.tag, str):
+                walk(child)
+    walk(body)
+    return out
+
+
+def _browser_view(text: str, xml_body) -> Optional[_BrowserView]:
+    """The browser's tree of this chapter aligned to the XML one, or None."""
+    try:
+        import html5lib  # the WHATWG parsing algorithm, as browsers implement it
+    except ImportError:
+        return None
+    try:
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")  # lxml's infoset coercion notices
+            document = html5lib.parse(text, treebuilder="lxml")
+    except Exception:
+        log.debug("koreader_xpointer: html5lib could not parse a chapter", exc_info=True)
+        return None
+    body = document.getroot().find(f"{{{_XHTML_NS}}}body")
+    if body is None:
+        return None
+    xml_texts, browser_texts = _solid_texts(xml_body), _solid_texts(body)
+    if len(xml_texts) != len(browser_texts) or any(
+            x[2] != b[2] for x, b in zip(xml_texts, browser_texts)):
+        return None  # the browser dropped, merged or split text
+    return _BrowserView(
+        body,
+        {(b[0], b[1]): (x[0], x[1]) for x, b in zip(xml_texts, browser_texts)},
+        {(x[0], x[1]): (b[0], b[1]) for x, b in zip(xml_texts, browser_texts)},
+    )
+
+
+def _in_browser(pos: Optional[_Pos]) -> Optional[_Pos]:
+    """``pos`` (in the XML tree) as a position in the tree the browser builds."""
+    if pos is None:
+        return None
+    browser = pos.chapter.browser
+    if browser is None:
+        return pos
+    if pos.text is None:
+        return None
+    mapped = browser.to_browser.get((pos.text.parent, pos.text.ordinal))
+    if mapped is None:
+        return None
+    parent, ordinal = mapped
+    return _Pos(parent, _Text(parent, ordinal, pos.text.value), pos.offset, pos.chapter)
 
 
 # --- CFI --------------------------------------------------------------------
@@ -1068,10 +1391,12 @@ def _point_from_cfi(book: _Book, base, steps):
     if chapter is None or not steps:
         return None
     first = steps[0]
-    body_id = chapter.body.get("id")
+    browser = chapter.browser
+    body = browser.body if browser is not None else chapter.body
+    body_id = body.get("id")
     if first[0] != 4 or first[2] is not None or (first[1] is not None and first[1] != body_id):
         return None
-    node = chapter.body
+    node = body
     rest = steps[1:]
     for position, (number, assertion, offset) in enumerate(rest):
         last = position == len(rest) - 1
@@ -1086,11 +1411,19 @@ def _point_from_cfi(book: _Book, base, steps):
             raw_offset = _from_utf16(value, offset)
             if raw_offset is None:
                 return None
+            if browser is not None:
+                # The same text node in the tree crengine reads.
+                mapped = browser.to_xml.get((node, k))
+                if mapped is None:
+                    return None
+                node, k = mapped
+            elif not _browser_keeps_path(node):
+                return None
             text = _Text(node, k, value)
             kept = _crengine_texts(chapter, node)
             if kept is None:
                 return None
-            if text not in kept or not _browser_keeps_path(node):
+            if text not in kept:
                 # (A whitespace-only node crengine dropped is collapsed space
                 # between blocks: there is no crengine position to give.)
                 return None
@@ -1106,6 +1439,8 @@ def _point_from_cfi(book: _Book, base, steps):
             return None
         if not _xhtml(node) and not (_local(node) == "svg" and last):
             return None
+    if browser is not None:
+        return None  # elements are not mapped between the two trees
     if node is chapter.body or not _browser_keeps_path(node):
         return None
     return book, item, _Pos(node, None, 0, chapter)
@@ -1118,8 +1453,10 @@ def _cfi_base(book: _Book, item: _SpineItem) -> str:
     return step
 
 
-def _cfi_steps(pos: _Pos) -> Optional[list]:
+def _cfi_steps(pos: Optional[_Pos]) -> Optional[list]:
     """epub.js steps from <body> (inclusive) down to the position's node."""
+    if pos is None:
+        return None
     steps = []
     node = pos.element
     chain = []
@@ -1129,7 +1466,8 @@ def _cfi_steps(pos: _Pos) -> Optional[list]:
     chain.reverse()  # body ... element
     for el in chain:
         parent = el.getparent()
-        if el is pos.chapter.body:
+        if el is pos.chapter.body or (pos.chapter.browser is not None
+                                      and el is pos.chapter.browser.body):
             # The browser's HTML parser always gives <html> a <head> first.
             step = "/4"
         else:

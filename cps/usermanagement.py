@@ -15,7 +15,7 @@ from flask_httpauth import HTTPBasicAuth
 from werkzeug.datastructures import Authorization
 from werkzeug.security import check_password_hash
 
-from . import lm, ub, config, logger, limiter, constants, services
+from . import lm, ub, config, logger, limiter, constants, services, rate_limits
 from .services import app_passwords
 from .ui_themes import config_theme_code
 
@@ -183,28 +183,30 @@ def verify_password(username, password):
         # passwords first — see fork issue #95. This is the digest lookup:
         # no slow hash, and an app password never reaches LDAP as a bind.
         if _verify_app_password_digest(user, password):
-            [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+            rate_limits.clear_current_limits(limiter)
             return user
+        # Directory and local passwords are paced alike; a sign-in clears it.
+        rate_limits.pace(limiter)
         if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
             login_result, error = services.ldap.bind_user(user.name, password)
             if login_result:
-                [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+                rate_limits.clear_current_limits(limiter)
                 return user
             if error is not None:
                 log.error(error)
         else:
-            limiter.check()
             if check_password_hash(str(user.password), password):
-                [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+                rate_limits.clear_current_limits(limiter)
                 return user
         # App passwords saved before digests existed cost a slow hash each,
         # so they come after the account password; each is slow only once.
         if _verify_app_password_older(user, password):
-            [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+            rate_limits.clear_current_limits(limiter)
             return user
     
     # Handle new LDAP users (auto-creation for OPDS/API access)
     elif config.config_login_type == constants.LOGIN_LDAP and services.ldap and getattr(config, 'config_ldap_auto_create_users', True):
+        rate_limits.pace(limiter)
         try:
             # Try LDAP authentication for new user
             login_result, error = services.ldap.bind_user(username, password)
@@ -219,7 +221,7 @@ def verify_password(username, password):
                         user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).first()
                         if user:
                             log.info("LDAP auto-created user for OPDS/API: '%s'", username)
-                            [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+                            rate_limits.clear_current_limits(limiter)
                             return user
                 
                 log.warning("LDAP authentication succeeded but user creation failed for '%s'", username)
@@ -327,7 +329,7 @@ def load_user_from_reverse_proxy_header(req):
     # Look for existing user first
     user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == rp_header_username.lower()).first()
     if user:
-        [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+        rate_limits.clear_current_limits(limiter)
         log.debug("Reverse proxy authentication: found existing user '%s'", user.name)
         return user
     
@@ -340,7 +342,7 @@ def load_user_from_reverse_proxy_header(req):
         
         user = create_authenticated_user(rp_header_username, email, "reverse proxy")
         if user:
-            [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+            rate_limits.clear_current_limits(limiter)
             log.info("Reverse proxy authentication: successfully created user '%s'", user.name)
             return user
         else:

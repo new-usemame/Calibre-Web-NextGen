@@ -1,3 +1,0 @@
-### Added
-
-- **Admins can send a book to another user's eReader from the New UI again.** The classic book page has long let an admin tick another user's eReader in the send dialog, for example to email a book to a friend who doesn't use the app. The New UI's send panel had no way to reach those addresses. It now lists every other user who has an eReader address, as checkboxes under the recipients. Ticking one adds their address to the recipients, and only admins see the list. A book an admin sends only to someone else no longer shows up in the admin's own download history, matching the classic page. Reported by @Glennza1962 (#2296).

@@ -32,7 +32,7 @@ async function introState(page: import('@playwright/test').Page) {
 }
 
 async function undoIfEnabled(page: import('@playwright/test').Page) {
-  if ((await introState(page)).status !== 'enabled') return;
+  if (!['enabled', 'incomplete'].includes((await introState(page)).status)) return;
   const res = await page.request.post('/api/v1/admin/my-library/intro/undo', {
     headers: { 'X-CSRFToken': await csrf(page) },
   });
@@ -101,3 +101,52 @@ test.describe('My Library admin intro card', () => {
     }
   });
 });
+
+// UI contract for the persisted partial response. Durable failure/restart and
+// failed-only retry are exercised against real SQLite in the backend suite.
+for (const action of ['Retry', 'Undo'] as const) {
+  test(`incomplete setup exposes ${action} and cannot be dismissed`, async ({ page }) => {
+    await undoIfEnabled(page);
+    if (action === 'Undo') {
+      const enabled = await page.request.post('/api/v1/admin/my-library/intro/enable', {
+        headers: { 'X-CSRFToken': await csrf(page) },
+      });
+      expect(enabled.ok()).toBeTruthy();
+    }
+    let attempted = false;
+    const pending = {
+      status: 'incomplete', dismissed: false, snapshot_accounts: 2,
+      pending_accounts: 1,
+      failed_accounts: [{ user_id: 999999, name: 'Interrupted reader', error: 'Temporary seed failure' }],
+    };
+    await page.route('**/api/v1/admin/my-library/intro', async route => {
+      if (attempted) return route.continue();
+      await route.fulfill({ json: pending });
+    });
+    const path = `/api/v1/admin/my-library/intro/${action === 'Retry' ? 'enable' : 'undo'}`;
+    await page.route(`**${path}`, async route => {
+      attempted = true;
+      // Exercise real action/CSRF/session, then real returned state and me refresh.
+      await route.continue();
+    });
+    try {
+      await page.goto('/app/admin');
+      const card = page.getByRole('region', { name: 'New Feature!' });
+      await expect(card).toContainText('incomplete for 1 account(s)');
+      await expect(card).toContainText('Interrupted reader: Temporary seed failure');
+      await expect(card.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0);
+      await expect(card.getByRole('button', { name: 'Dismiss introduction' })).toHaveCount(0);
+      await expect(card.getByRole('button', { name: 'Retry', exact: true })).toBeEnabled();
+      await expect(card.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
+      const response = page.waitForResponse(r => r.url().endsWith(path) && r.request().method() === 'POST');
+      await card.getByRole('button', { name: action, exact: true }).click();
+      expect((await response).ok()).toBeTruthy();
+      await expect(card).not.toContainText('Temporary seed failure');
+      if (action === 'Retry') await expect(card.getByRole('button', { name: 'Close', exact: true })).toBeVisible();
+      else await expect(card.getByRole('button', { name: 'Try My Library', exact: true })).toBeVisible();
+    } finally {
+      await page.unrouteAll({ behavior: 'wait' });
+      await undoIfEnabled(page);
+    }
+  });
+}

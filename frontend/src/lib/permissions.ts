@@ -6,7 +6,7 @@
  * format) that each had to agree on the same two-part rule, and the server-side
  * half of that rule was missing entirely. One predicate, one place to fix.
  */
-import type { Me } from './api';
+import type { Me, Shelf } from './api';
 
 /**
  * May this user add book files right now?
@@ -46,4 +46,35 @@ export function canDownloadBooks(me: Me | undefined | null): boolean {
  */
 export function canDeleteBooks(me: Me | undefined | null): boolean {
   return !!me?.role?.delete_books && !!me?.role?.edit;
+}
+
+/**
+ * May this user open the cover editor for a book?
+ *
+ * Editors change the library cover of any book they can see
+ * (`cps/cover_picker.py::_load_book`). Everyone else edits a private cover,
+ * which the server keeps for a book in their library or, with Global Library
+ * access, any book they may browse (`cps/api/actions.py::_personal_cover_book`).
+ * A book reached only through a public shelf is neither, so the editor could
+ * only fail there. Guests have no private cover.
+ */
+export function canEditBookCover(me: Me | undefined | null, inLibrary: boolean): boolean {
+  if (!me || me.role?.anonymous) return false;
+  return inLibrary || !!(me.role?.edit || me.role?.admin || me.role?.browse_global);
+}
+
+/**
+ * May this user add books to this shelf, or take them off it?
+ *
+ * The server's one rule (`cps/shelf.py::check_shelf_edit_permissions`, used by
+ * the classic routes and `/api/v1/shelves/*` alike): a private shelf by its
+ * owner only, a public shelf only with the "Edit public shelves" role. Owning a
+ * public shelf is not enough: an admin can take the role away after the shelf
+ * was made public, and the server then refuses its owner too.
+ */
+export function canEditShelf(
+  me: Me | undefined | null,
+  shelf: Pick<Shelf, 'is_public' | 'is_owner'>,
+): boolean {
+  return shelf.is_public ? !!me?.role?.edit_shelfs : shelf.is_owner;
 }

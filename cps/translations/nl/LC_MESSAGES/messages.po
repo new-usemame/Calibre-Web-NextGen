@@ -361,8 +361,8 @@ msgstr ""
 #: cps/admin.py
 #, python-brace-format
 msgid ""
-"Book {0} was not in the sync record for user {1}; last_modified bumped so "
-"the device will receive on next sync"
+"Book {0} was not in the sync record for user {1}; the device will receive it "
+"on next sync"
 msgstr ""
 
 #: cps/admin.py cps/templates/kobo_reconcile.html
@@ -4236,6 +4236,14 @@ msgid "Open search"
 msgstr "Zoeken openen"
 
 #: cps/spa_strings.py
+msgid "Browse the Global Library"
+msgstr "De globale bibliotheek verkennen"
+
+#: cps/spa_strings.py
+msgid "Open device administration"
+msgstr "Apparaatbeheer openen"
+
+#: cps/spa_strings.py
 msgid "Editions"
 msgstr "Edities"
 
@@ -4797,6 +4805,15 @@ msgstr "(geen tekst vastgelegd)"
 msgid "(replace cover)"
 msgstr "(omslag vervangen)"
 
+# Devices and browsers: one Browser reading source per account
+#: cps/spa_strings.py
+msgid "1 annotation assigned to this source"
+msgstr "1 annotatie toegewezen aan deze bron"
+
+#: cps/spa_strings.py
+msgid "1 annotation from this source"
+msgstr "1 annotatie uit deze bron"
+
 #: cps/spa_strings.py
 msgid "1 selected."
 msgstr "1 geselecteerd."
@@ -4927,6 +4944,14 @@ msgstr "Alle annotaties"
 #: cps/spa_strings.py
 msgid "All books"
 msgstr "Alle boeken"
+
+#: cps/spa_strings.py
+msgid ""
+"All browsers and computers signed in to your account share one Browser "
+"reading source."
+msgstr ""
+"Alle browsers en computers waarop je bent aangemeld bij je account delen één "
+"leesbron Browser."
 
 #: cps/spa_strings.py
 msgid "All shelves"
@@ -5179,16 +5204,12 @@ msgstr ""
 "reader. Ze blijven wel in je bibliotheek hier."
 
 #: cps/spa_strings.py
-msgid "Browser reading sources"
-msgstr "Leesbronnen in de browser"
+msgid "Browser"
+msgstr "Browser"
 
 #: cps/spa_strings.py
-msgid ""
-"Browsers appear after saving reading progress or annotations. Different "
-"browsers or profiles can appear separately."
-msgstr ""
-"Browsers verschijnen na het opslaan van leesvoortgang of annotaties. "
-"Verschillende browsers of profielen kunnen afzonderlijk verschijnen."
+msgid "Browser reading source"
+msgstr "Leesbron van de browser"
 
 #: cps/spa_strings.py
 msgid "Built-in"
@@ -5456,12 +5477,12 @@ msgid "Could not load device annotations."
 msgstr "Kan apparaatannotaties niet laden."
 
 #: cps/spa_strings.py
-msgid "Could not load duplicates."
-msgstr "Kan duplicaten niet laden."
+msgid "Could not load devices and browsers."
+msgstr "Apparaten en browsers konden niet worden geladen."
 
 #: cps/spa_strings.py
-msgid "Could not load e-readers."
-msgstr "E-readers konden niet worden geladen."
+msgid "Could not load duplicates."
+msgstr "Kan duplicaten niet laden."
 
 #: cps/spa_strings.py
 msgid "Could not load highlights and notes."
@@ -5478,6 +5499,10 @@ msgstr "Kan leesposities niet laden."
 #: cps/spa_strings.py
 msgid "Could not load reading positions."
 msgstr "Kan leesposities niet laden."
+
+#: cps/spa_strings.py
+msgid "Could not load removal details. Try again."
+msgstr "Kan de verwijderingsdetails niet laden. Probeer het opnieuw."
 
 #: cps/spa_strings.py
 msgid "Could not load stats."
@@ -5528,8 +5553,16 @@ msgid "Could not reload metadata"
 msgstr "Kan metagegevens niet opnieuw laden"
 
 #: cps/spa_strings.py
+msgid "Could not remove this source. Try again."
+msgstr "Kan deze bron niet verwijderen. Probeer het opnieuw."
+
+#: cps/spa_strings.py
 msgid "Could not rename shelf."
 msgstr "Kan boekenplank niet hernoemen."
+
+#: cps/spa_strings.py
+msgid "Could not rename this source. Try again."
+msgstr "Kan deze bron niet hernoemen. Probeer het opnieuw."
 
 #: cps/spa_strings.py
 msgid "Could not request deletion from this device."
@@ -5538,6 +5571,10 @@ msgstr "Verwijdering van dit apparaat kon niet worden aangevraagd."
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "Kan wachtwoord niet herstellen."
+
+#: cps/spa_strings.py
+msgid "Could not restore this source. Try again."
+msgstr "Kan deze bron niet herstellen. Probeer het opnieuw."
 
 #: cps/spa_strings.py cps/templates/shelf_reorder.html
 msgid "Could not save order."
@@ -5905,8 +5942,16 @@ msgid "Devices"
 msgstr "Apparaten"
 
 #: cps/spa_strings.py
-msgid "Devices appear here after their first sync."
-msgstr "Apparaten verschijnen hier na hun eerste synchronisatie."
+msgid "Devices and browsers"
+msgstr "Apparaten en browsers"
+
+#: cps/spa_strings.py
+msgid ""
+"Devices appear after their first sync. Browser appears after saving reading "
+"progress or annotations."
+msgstr ""
+"Apparaten verschijnen na hun eerste synchronisatie. Browser verschijnt na "
+"het opslaan van leesvoortgang of annotaties."
 
 #: cps/spa_strings.py
 msgid "Different edition"
@@ -6688,6 +6733,10 @@ msgid "Loading device library…"
 msgstr "Apparaatbibliotheek laden…"
 
 #: cps/spa_strings.py
+msgid "Loading devices and browsers…"
+msgstr "Apparaten en browsers laden…"
+
+#: cps/spa_strings.py
 msgid "Loading new Discover picks."
 msgstr "Nieuwe Verkennen-keuzes worden geladen."
 
@@ -6772,8 +6821,8 @@ msgid "Manage admin role from OAuth group"
 msgstr "Beheerdersrol beheren via OAuth-groep"
 
 #: cps/spa_strings.py
-msgid "Manage e-readers"
-msgstr "E-readers beheren"
+msgid "Manage devices and browsers"
+msgstr "Apparaten en browsers beheren"
 
 #: cps/spa_strings.py
 msgid "Manage presets"
@@ -6885,10 +6934,12 @@ msgstr "Mijn bibliotheek is nu actief voor {accounts} accounts."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
+msgid ""
+"My Library setup is incomplete for {accounts} account(s). You can retry or "
+"undo."
 msgstr ""
-"Mijn bibliotheek is actief voor {accounts} accounts; bij {errors} accounts "
-"is het mislukt."
+"Het instellen van Mijn bibliotheek is onvolledig voor {accounts} account(s). "
+"Je kunt het opnieuw proberen of ongedaan maken."
 
 #: cps/spa_strings.py
 msgid "My account"
@@ -7002,6 +7053,10 @@ msgid "No contents found."
 msgstr "Geen inhoud gevonden."
 
 #: cps/spa_strings.py
+msgid "No devices or browser reading data yet."
+msgstr "Nog geen apparaten of leesgegevens uit de browser."
+
+#: cps/spa_strings.py
 msgid "No duplicate groups found."
 msgstr "Geen duplicaat groepen gevonden."
 
@@ -7012,10 +7067,6 @@ msgid ""
 msgstr ""
 "Er wacht geen e-reader met deze code. Controleer de code of vraag een nieuwe "
 "aan op de e-reader."
-
-#: cps/spa_strings.py
-msgid "No e-readers yet."
-msgstr "Nog geen e-readers."
 
 #: cps/spa_strings.py
 msgid "No excluded tags"
@@ -7532,11 +7583,11 @@ msgstr "Leesweergave"
 
 #: cps/spa_strings.py
 msgid ""
-"Reading data is kept. Future browser saves can appear under an unidentified "
-"browser source."
+"Reading data is kept. Browser reappears when you next save reading progress "
+"or annotations."
 msgstr ""
-"Leesgegevens blijven bewaard. Toekomstige opslagacties in de browser kunnen "
-"onder een niet-geïdentificeerde browserbron verschijnen."
+"Leesgegevens blijven behouden. Browser verschijnt opnieuw wanneer je "
+"leesvoortgang of annotaties opslaat."
 
 #: cps/spa_strings.py
 msgid "Reading from here. This is now your Browser position."
@@ -7731,6 +7782,14 @@ msgstr "Verder lezen bij {percent} vanaf een ander apparaat"
 #: cps/spa_strings.py
 msgid "Retry"
 msgstr "Opnieuw proberen"
+
+#: cps/spa_strings.py
+msgid ""
+"Retry finishes the remaining accounts without changing completed selections. "
+"Undo restores the settings from before setup began."
+msgstr ""
+"Opnieuw proberen voltooit de resterende accounts zonder voltooide selecties "
+"te wijzigen. Ongedaan maken herstelt de instellingen van vóór het instellen."
 
 #: cps/spa_strings.py
 msgid "Reverse-proxy header login"
@@ -8595,10 +8654,6 @@ msgstr "Ongedaan maken…"
 #: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Zichtbaar maken"
-
-#: cps/spa_strings.py
-msgid "Unidentified browser source"
-msgstr "Niet-geïdentificeerde browserbron"
 
 #: cps/spa_strings.py
 msgid "Unknown color"
@@ -9810,6 +9865,14 @@ msgstr ""
 #, fuzzy
 msgid "Hardcover Sync"
 msgstr "Zet Hardcover-sync aan"
+
+#: cps/tasks/hardcover_sync.py
+msgid "Marking books read on Hardcover"
+msgstr ""
+
+#: cps/tasks/hardcover_sync.py
+msgid "Syncing reading progress to Hardcover"
+msgstr ""
 
 #: cps/tasks/kepub_backfill.py
 msgid "Convert Kobo books missing KEPUB"
@@ -15649,6 +15712,44 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#~ msgid "Browser reading sources"
+#~ msgstr "Leesbronnen in de browser"
+
+#~ msgid ""
+#~ "Browsers appear after saving reading progress or annotations. Different "
+#~ "browsers or profiles can appear separately."
+#~ msgstr ""
+#~ "Browsers verschijnen na het opslaan van leesvoortgang of annotaties. "
+#~ "Verschillende browsers of profielen kunnen afzonderlijk verschijnen."
+
+#~ msgid "Could not load e-readers."
+#~ msgstr "E-readers konden niet worden geladen."
+
+#~ msgid "Devices appear here after their first sync."
+#~ msgstr "Apparaten verschijnen hier na hun eerste synchronisatie."
+
+#~ msgid "Manage e-readers"
+#~ msgstr "E-readers beheren"
+
+#~ msgid "No e-readers yet."
+#~ msgstr "Nog geen e-readers."
+
+#~ msgid ""
+#~ "Reading data is kept. Future browser saves can appear under an "
+#~ "unidentified browser source."
+#~ msgstr ""
+#~ "Leesgegevens blijven bewaard. Toekomstige opslagacties in de browser "
+#~ "kunnen onder een niet-geïdentificeerde browserbron verschijnen."
+
+#~ msgid "Unidentified browser source"
+#~ msgstr "Niet-geïdentificeerde browserbron"
+
+#, python-brace-format
+#~ msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
+#~ msgstr ""
+#~ "Mijn bibliotheek is actief voor {accounts} accounts; bij {errors} "
+#~ "accounts is het mislukt."
 
 #~ msgid "Not in current file"
 #~ msgstr "Niet in het huidige bestand"

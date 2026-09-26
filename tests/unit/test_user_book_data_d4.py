@@ -381,6 +381,16 @@ class TestPurge:
                 confirmation_json="{}",
             ),
         ])
+        session.flush()
+        # Annotation children with no ORM cascade: left behind, they attach
+        # to whichever annotation next reuses the id.
+        session.add_all([
+            ub.AnnotationDeviceState(annotation_id=ann.id, device_id=device.id),
+            ub.DeviceRetiredAssignment(annotation_id=ann.id, device_id=device.id),
+            ub.AnnotationContentIdMigration(
+                annotation_row_id=ann.id, original_content_id="a",
+                normalized_content_id="b"),
+        ])
         _shelf_link(session, ub, LOSER, 1, 1)
         session.commit()
 
@@ -395,7 +405,9 @@ class TestPurge:
         for model in (ub.Annotation, ub.AnnotationSyncTarget, ub.KoboReadingState,
                       ub.KoboBookmark, ub.KoboStatistics, ub.ReadBook, ub.Bookmark,
                       ub.ArchivedBook, ub.Downloads, ub.BookShelf, ub.KoboSyncedBooks,
-                      ub.KoboDeviceBookEntitlement, ub.KoboDevicePendingSyncPage):
+                      ub.KoboDeviceBookEntitlement, ub.KoboDevicePendingSyncPage,
+                      ub.AnnotationDeviceState, ub.DeviceRetiredAssignment,
+                      ub.AnnotationContentIdMigration):
             assert session.query(model).count() == 0, model.__name__
 
     def test_purge_by_book_leaves_other_books_alone(self, session):
@@ -662,11 +674,3 @@ class TestCallSitesPinned:
         block = src[idx:idx + 800]
         assert "purge_user_book_data()" in block
         assert "ub.session.query(ub.Downloads).delete()" not in block
-
-    def test_admin_user_delete_purges_via_helper(self):
-        src = (REPO / "cps" / "admin.py").read_text(encoding="utf-8")
-        body = src.split("def _delete_user", 1)[1].split("\ndef ", 1)[0]
-        assert "purge_user_book_data(user_id=content.id)" in body
-        for stale in ("ub.ReadBook.user_id", "ub.Bookmark.user_id",
-                      "ub.KoboSyncedBooks.user_id", "ub.KoboReadingState.user_id"):
-            assert stale not in body, f"hand-list remnant in _delete_user: {stale}"

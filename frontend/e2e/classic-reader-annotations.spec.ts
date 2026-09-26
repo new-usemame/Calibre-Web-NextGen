@@ -8,7 +8,7 @@ const builder = fileURLToPath(new URL('../../tests/fixtures/reader_archive.py', 
 const installation = '293e761d-9fc4-4d78-a2c7-6aaeb29edc77';
 const quote = 'Native reader passage for testing.';
 
-test('classic annotation tab, exact jump, selection save and reading progress use the same browser identity', async ({ page }) => {
+test('classic annotation navigation, selection and progress work without a browser installation identity', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await page.addInitScript((installation) => {
@@ -76,7 +76,7 @@ test('classic annotation tab, exact jump, selection save and reading progress us
   await expect(page.locator('.cwa-ann-save')).toBeVisible();
   await page.locator('.cwa-ann-save').click();
   await expect.poll(() => saves.length).toBe(1);
-  expect(saves[0]).toEqual({ installation, body: {
+  expect(saves[0]).toEqual({ installation: undefined, body: {
     start_kobospan: 'kobo.15.1', end_kobospan: 'kobo.15.1', start_offset: 0, end_offset: 6,
     chapter_filename: 'part1/chapter.xhtml', highlighted_text: selected, highlight_color: 'yellow', note_text: '',
   } });
@@ -84,7 +84,7 @@ test('classic annotation tab, exact jump, selection save and reading progress us
   // The actual native jump/selection has moved into the second chapter.
   await expect.poll(() => bookmarks.some((request) =>
     new URLSearchParams(request.body || '').get('bookmark')?.includes('/6/4'))).toBe(true);
-  expect(bookmarks.every((request) => request.installation === installation)).toBe(true);
+  expect(bookmarks.every((request) => request.installation === undefined)).toBe(true);
   expect(bookmarks.some((request) => new URLSearchParams(request.body || '').has('bookmark'))).toBe(true);
   expect(errors).toEqual([]);
 });

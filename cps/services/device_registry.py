@@ -11,36 +11,39 @@ import re
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import IntegrityError
+
+from .browser_source import ACCOUNT_BROWSER, canonical_browser
 
 log = logging.getLogger(__name__)
 SCHEME = "kobo-header-hmac-sha256-v1"
 KOBO_SESSION_DEVICE_KEY = "_kobo_device_public_id"
 KOREADER_SCHEME = "koreader-client-hmac-sha256-v1"
 WEBREADER_SCHEME = "webreader-cookie-hmac-sha256-v2"
-WEBREADER_SCHEME_PREFIX = "webreader-cookie-hmac-sha256-"
 WEBREADER_INSTALLATION_ID_HEADER = "X-CWNG-Webreader-Installation-Id"
 LAST_SEEN_WRITE_INTERVAL = timedelta(minutes=5)
-# A hard cap over identity-backed browser rows (including retired rows) is
-# deliberately stronger than an active-only cap: soft-delete/recreate churn
-# must not turn a client-controlled header into unbounded persistent rows.
-MAX_WEBREADER_DEVICES_PER_USER = 20
-_webreader_cap_logged_users = set()
 # Kobo hardware identifiers are client-controlled too. Count every retained
 # identity, including retired devices, so identity rotation cannot grow the
 # device, delivery-ledger, and pending-response tables without bound.
-MAX_KOBO_DEVICES_PER_USER = MAX_WEBREADER_DEVICES_PER_USER
+MAX_KOBO_DEVICES_PER_USER = 20
 KOBO_DEVICE_LIMIT_MESSAGE = (
     "Kobo device limit reached; use an already registered device"
 )
 _kobo_cap_logged_users = set()
-# KOReader's device_id is client-controlled in the same way as the browser
-# installation id and Kobo headers. Retained identities, including retired
+# KOReader's device_id is client-controlled in the same way as Kobo headers. Retained identities, including retired
 # devices, are the durable unit that must stay bounded.
-MAX_KOREADER_DEVICES_PER_USER = MAX_WEBREADER_DEVICES_PER_USER
+MAX_KOREADER_DEVICES_PER_USER = 20
 KOREADER_DEVICE_LIMIT_MESSAGE = (
     "KOReader device limit reached; ignoring new device identity"
 )
 _koreader_cap_logged_users = set()
+# Identity key versions. Version 1 derived one server-wide fingerprint per
+# physical reader, so a reader could belong to a single account for good: the
+# next account that paired it was refused a device row. Version 2 mixes the
+# account into the derivation, so every account gets its own row for the same
+# hardware and cannot find, claim or change another account's row.
+KEY_VERSION_SERVER_WIDE = 1
+KEY_VERSION_PER_ACCOUNT = 2
 
 
 class KoboDeviceLimitReached(RuntimeError):
@@ -56,14 +59,21 @@ def _bounded_header(value, limit):
     return value
 
 
-def _fingerprint(raw_id, secret_key):
+def _account_namespace(namespace, user_id):
+    return namespace + b"\0" + str(int(user_id)).encode()
+
+
+def _fingerprint(raw_id, secret_key, *, user_id=None):
+    """Kobo hardware fingerprint; passing ``user_id`` selects key version 2."""
     raw_id = _bounded_header(raw_id, 128)
     if not raw_id or not re.fullmatch(r"[0-9A-Fa-f]{64}", raw_id):
         return None
     key = secret_key.encode() if isinstance(secret_key, str) else secret_key
     if not key:
         return None
-    return hmac.new(key, b"cwng-device:kobo:v1\0" + raw_id.lower().encode(), hashlib.sha256).hexdigest()
+    namespace = (b"cwng-device:kobo:v1" if user_id is None
+                 else _account_namespace(b"cwng-device:kobo:v2", user_id))
+    return hmac.new(key, namespace + b"\0" + raw_id.lower().encode(), hashlib.sha256).hexdigest()
 
 
 def _opaque_fingerprint(raw_id, secret_key, *, namespace):
@@ -74,49 +84,48 @@ def _opaque_fingerprint(raw_id, secret_key, *, namespace):
     return hmac.new(key, namespace + b"\0" + raw_id.encode(), hashlib.sha256).hexdigest()
 
 
-def _webreader_fingerprint(user_id, installation_id, secret_key):
-    """Key a browser-held installation id without retaining the raw value."""
-    installation_id = _bounded_header(installation_id, 100)
-    key = secret_key.encode() if isinstance(secret_key, str) else secret_key
-    try:
-        user_id_bytes = str(int(user_id)).encode("ascii")
-    except (TypeError, ValueError):
-        return None
-    if not installation_id or not key:
-        return None
-    # The namespace stays v1 because it identifies the message format; the
-    # DeviceIdentity scheme is v2 because user-domain separation changed the
-    # preimage. v1 rows existed only on the unreleased #1942 feature branch.
-    message = (
-        b"cwng-device:webreader:v1\0"
-        + user_id_bytes
-        + b"\0"
-        + installation_id.encode()
+def _koreader_fingerprint(raw_id, secret_key, *, user_id=None):
+    """KOReader device_id fingerprint; passing ``user_id`` selects version 2."""
+    namespace = (b"cwng-device:koreader:v1" if user_id is None
+                 else _account_namespace(b"cwng-device:koreader:v2", user_id))
+    return _opaque_fingerprint(raw_id, secret_key, namespace=namespace)
+
+
+def _account_identity(session, ub, *, scheme, user_id, account_fingerprint,
+                      legacy_fingerprint, now):
+    """Return ``(identity, written)`` for this account's row of one reader.
+
+    A version-2 identity is scoped to the account by construction. A
+    version-1 (server-wide) identity is honoured only for the account that
+    owns it: it gains a version-2 sibling, so later lookups are one indexed
+    hit, and the legacy row stays so a rolled-back server still finds the
+    device. A version-1 identity owned by another account is never returned,
+    reused or modified, and does not stop this account getting its own row.
+    """
+    identity = session.query(ub.DeviceIdentity).filter_by(
+        scheme=scheme, key_version=KEY_VERSION_PER_ACCOUNT,
+        fingerprint=account_fingerprint,
+    ).first()
+    if identity is not None:
+        # The derivation already binds the account; keep ownership explicit.
+        if identity.device.user_id != user_id:
+            log.warning("Ignoring device identity owned by another account")
+            return None, False
+        return identity, False
+    legacy = session.query(ub.DeviceIdentity).filter_by(
+        scheme=scheme, key_version=KEY_VERSION_SERVER_WIDE,
+        fingerprint=legacy_fingerprint,
+    ).first()
+    if legacy is None or legacy.device.user_id != user_id:
+        return None, False
+    identity = ub.DeviceIdentity(
+        device=legacy.device, scheme=scheme, key_version=KEY_VERSION_PER_ACCOUNT,
+        fingerprint=account_fingerprint,
+        first_seen_at=legacy.first_seen_at or now,
+        last_seen_at=legacy.last_seen_at or now,
     )
-    return hmac.new(key, message, hashlib.sha256).hexdigest()
-
-
-def _log_webreader_cap_once(user_id):
-    """Emit one privacy-safe process-lifetime diagnostic for each capped user."""
-    if user_id in _webreader_cap_logged_users:
-        return
-    _webreader_cap_logged_users.add(user_id)
-    log.info("Web-reader device limit reached; using the legacy device bucket")
-
-
-def _webreader_identity_count(session, ub, *, user_id):
-    """Count all browser identities, active or retired, to bound stored rows."""
-    return (
-        session.query(ub.Device.id)
-        .join(ub.DeviceIdentity, ub.DeviceIdentity.device_id == ub.Device.id)
-        .filter(
-            ub.Device.user_id == user_id,
-            ub.Device.kind == "webreader",
-            ub.DeviceIdentity.scheme.like(f"{WEBREADER_SCHEME_PREFIX}%"),
-        )
-        .distinct()
-        .count()
-    )
+    session.add(identity)
+    return identity, True
 
 
 def _kobo_identity_count(session, ub, *, user_id):
@@ -166,48 +175,11 @@ def _log_koreader_cap_once(user_id):
 
 
 def _ensure_legacy_webreader_device(session, ub, *, user_id, seen_at=None):
-    """Return the bounded historical fallback, reactivating it if retired."""
-    device = (
-        session.query(ub.Device)
-        .filter_by(user_id=user_id, kind="webreader", created_by="auto")
-        .filter(~ub.Device.identities.any(
-            ub.DeviceIdentity.scheme.like(f"{WEBREADER_SCHEME_PREFIX}%"),
-        ))
-        .order_by(ub.Device.id.asc())
-        .first()
+    """Compatibility entry point: headerless clients use the account source."""
+    return upsert_webreader_device(
+        session, user_id=user_id, installation_id=None, secret_key=None,
+        seen_at=seen_at,
     )
-    now = seen_at or datetime.now(timezone.utc)
-    if device is None:
-        device = ub.Device(
-            user_id=user_id,
-            kind="webreader",
-            display_name=_deduplicated_label(
-                session, ub, user_id=user_id, base="Web reader",
-            ),
-            model="CWNG web reader",
-            platform="epub.js",
-            first_seen_at=now,
-            last_seen_at=now,
-            last_metadata_at=now,
-            active=True,
-            created_by="auto",
-        )
-        session.add(device)
-        session.flush()
-    elif not device.active:
-        # This row is the logical fallback bucket, not a physical browser.
-        # Reactivating the same singleton prevents delete/recreate cycles from
-        # becoming another persistent-row growth path.
-        device.active = True
-        device.last_seen_at = now
-        session.flush()
-    elif (device.last_seen_at is None
-          or now - device.last_seen_at.replace(tzinfo=now.tzinfo) >= LAST_SEEN_WRITE_INTERVAL):
-        # Headerless reading writes use the same coarse monotonic heartbeat as
-        # identified browsers, rather than leaving an active source stale forever.
-        device.last_seen_at = now
-        session.flush()
-    return device
 
 
 def _deduplicated_label(session, ub, *, user_id, base):
@@ -222,14 +194,18 @@ def _deduplicated_label(session, ub, *, user_id, base):
 
 def upsert_kobo_device(session, *, user_id, headers, secret_key, seen_at=None):
     from cps import ub
-    fingerprint = _fingerprint(headers.get("x-kobo-deviceid"), secret_key)
+    raw_id = headers.get("x-kobo-deviceid")
+    fingerprint = _fingerprint(raw_id, secret_key, user_id=user_id)
     if not fingerprint:
         return None
     now = seen_at or datetime.now(timezone.utc)
-    identity = session.query(ub.DeviceIdentity).filter_by(scheme=SCHEME, fingerprint=fingerprint).first()
-    if identity and identity.device.user_id != user_id:
-        log.warning("Ignoring Kobo device identity already bound to another user")
-        return None
+    # A Kobo signed in to another account on this server keeps that account's
+    # row; this account gets its own.
+    identity, _ = _account_identity(
+        session, ub, scheme=SCHEME, user_id=user_id,
+        account_fingerprint=fingerprint,
+        legacy_fingerprint=_fingerprint(raw_id, secret_key), now=now,
+    )
     model = _bounded_header(headers.get("x-kobo-devicemodel"), 160)
     firmware = _bounded_header(headers.get("x-kobo-appversion"), 64)
     if identity is None:
@@ -245,7 +221,8 @@ def upsert_kobo_device(session, *, user_id, headers, secret_key, seen_at=None):
                            platform="nickel", firmware_version=firmware,
                            first_seen_at=now, last_seen_at=now, last_metadata_at=now,
                            active=True, created_by="auto")
-        identity = ub.DeviceIdentity(device=device, scheme=SCHEME, key_version=1,
+        identity = ub.DeviceIdentity(device=device, scheme=SCHEME,
+                                     key_version=KEY_VERSION_PER_ACCOUNT,
                                      fingerprint=fingerprint, first_seen_at=now, last_seen_at=now)
         session.add(device)
     else:
@@ -334,121 +311,69 @@ def register_kobo_device_best_effort(*, user_id, headers, secret_key=None, retur
                 pass
 
 
-def upsert_webreader_device(session, *, user_id, installation_id, secret_key, seen_at=None):
-    """Resolve one browser installation to one Device without storing its id."""
+def upsert_webreader_device(session, *, user_id, installation_id=None, secret_key=None, seen_at=None):
+    """Return the account's Browser source, including for cached old clients.
+
+    Installation IDs and server secrets deliberately do not affect attribution.
+    The partial unique index arbitrates simultaneous first writes; a losing
+    insert rolls back only its savepoint, not the caller's reading-data work.
+    """
     from cps import ub
 
-    fingerprint = _webreader_fingerprint(user_id, installation_id, secret_key)
-    if not fingerprint:
-        return None
-    identity = session.query(ub.DeviceIdentity).filter_by(
-        scheme=WEBREADER_SCHEME,
-        key_version=1,
-        fingerprint=fingerprint,
-    ).first()
-    if identity and identity.device.user_id != user_id:
-        # Defensive only: v2 fingerprints are user-domain-separated.
-        log.warning("Ignoring web-reader device identity with inconsistent ownership")
-        return None
+    def lookup():
+        return session.query(ub.Device).filter_by(
+            user_id=user_id, kind="webreader", created_by=ACCOUNT_BROWSER,
+        ).one_or_none()
 
+    device = lookup()
     now = seen_at or datetime.now(timezone.utc)
-    if identity is not None and not identity.device.active:
-        # Device deletion is explicit in the management UI. Do not silently
-        # undo it; the write uses the legacy bucket until the user restores the
-        # browser, at which point this identity resolves normally again.
-        return None
-
-    if identity is None:
-        if _webreader_identity_count(session, ub, user_id=user_id) >= MAX_WEBREADER_DEVICES_PER_USER:
-            _log_webreader_cap_once(user_id)
-            return None
-        device = ub.Device(
-            user_id=user_id,
-            kind="webreader",
-            display_name=_deduplicated_label(
-                session, ub, user_id=user_id, base="Web reader",
-            ),
-            model="CWNG web reader",
-            platform="epub.js",
-            first_seen_at=now,
-            last_seen_at=now,
-            last_metadata_at=now,
-            active=True,
-            created_by="auto",
-        )
-        identity = ub.DeviceIdentity(
-            device=device,
-            scheme=WEBREADER_SCHEME,
-            key_version=1,
-            fingerprint=fingerprint,
-            first_seen_at=now,
-            last_seen_at=now,
-        )
-        session.add(device)
-    else:
-        device = identity.device
-        observed_is_newer = (
-            device.last_seen_at is None
-            or now >= device.last_seen_at.replace(tzinfo=now.tzinfo)
-        )
-        last_seen_due = (
-            device.last_seen_at is None
-            or now - device.last_seen_at.replace(tzinfo=now.tzinfo)
-            >= LAST_SEEN_WRITE_INTERVAL
-        )
-        # Browser position writes can arrive every 800ms. Keep the identity
-        # observation read-only until the same coarse heartbeat Kobo uses is
-        # due, so those saves do not add another SQLite writer-lock contender.
-        if observed_is_newer and last_seen_due:
-            device.last_seen_at = now
-            identity.last_seen_at = now
+    if device is None:
+        try:
+            with ub.begin_contained_nested(session):
+                device = ub.Device(
+                    user_id=user_id, kind="webreader", display_name="Browser",
+                    model="CWNG web reader", platform="web",
+                    first_seen_at=now, last_seen_at=now, last_metadata_at=now,
+                    active=True, created_by=ACCOUNT_BROWSER,
+                )
+                session.add(device)
+                session.flush()
+        except IntegrityError:
+            device = lookup()
+            if device is None:
+                raise
+    elif not device.active:
+        # Removing a logical source hides it until the next browser activity.
+        # Reuse its ID; do not restore cleared assignments implicitly.
+        device.active = True
+        device.last_seen_at = (max(now, device.last_seen_at.replace(tzinfo=now.tzinfo))
+                               if device.last_seen_at else now)
+    elif (device.last_seen_at is None
+          or now - device.last_seen_at.replace(tzinfo=now.tzinfo) >= LAST_SEEN_WRITE_INTERVAL):
+        device.last_seen_at = now
     session.flush()
     return device
 
 
 def ensure_webreader_device_best_effort(*, user_id, installation_id=None,
                                         secret_key=None):
-    """Return a per-browser device id, or the historical singleton fallback."""
+    """Observe browser activity using one source per authenticated account."""
     owned = None
     try:
-        from flask import current_app
         from cps import ub
-        key = secret_key if secret_key is not None else current_app.secret_key
         owned = sessionmaker(bind=ub.session.get_bind())()
-        if installation_id:
-            device = upsert_webreader_device(
-                owned,
-                user_id=user_id,
-                installation_id=installation_id,
-                secret_key=key,
-            )
-            if device is None:
-                device = _ensure_legacy_webreader_device(
-                    owned, ub, user_id=user_id,
-                )
-        else:
-            device = _ensure_legacy_webreader_device(
-                owned, ub, user_id=user_id,
-            )
-        if device is None:
-            return None
+        device = upsert_webreader_device(owned, user_id=user_id)
         device_id = device.id
         owned.commit()
         return device_id
     except Exception:
         if owned is not None:
-            try:
-                owned.rollback()
-            except Exception:
-                pass
-        log.warning("Best-effort web-reader device registration failed", exc_info=True)
+            owned.rollback()
+        log.warning("Best-effort browser source registration failed", exc_info=True)
         return None
     finally:
         if owned is not None:
-            try:
-                owned.close()
-            except Exception:
-                pass
+            owned.close()
 
 
 def resolve_owned_device_best_effort(*, user_id, public_id):
@@ -459,8 +384,9 @@ def resolve_owned_device_best_effort(*, user_id, public_id):
     try:
         from cps import ub
         owned = sessionmaker(bind=ub.session.get_bind())()
-        row = owned.query(ub.Device.id).filter_by(user_id=user_id, public_id=public_id).first()
-        return row[0] if row else None
+        row = owned.query(ub.Device).filter_by(user_id=user_id, public_id=public_id).first()
+        row = canonical_browser(row, owned, ub)
+        return row.id if row else None
     except Exception:
         log.warning("Best-effort annotation device resolution failed", exc_info=True)
         return None
@@ -480,22 +406,20 @@ def register_koreader_device_best_effort(*, user_id, device_id, device_name=None
         from flask import current_app
         from cps import ub
         key = secret_key if secret_key is not None else current_app.secret_key
-        fingerprint = _opaque_fingerprint(
-            device_id, key, namespace=b"cwng-device:koreader:v1",
-        )
+        fingerprint = _koreader_fingerprint(device_id, key, user_id=user_id)
         if not fingerprint:
             return None
         owned = sessionmaker(bind=ub.session.get_bind())()
-        identity = owned.query(ub.DeviceIdentity).filter_by(
-            scheme=KOREADER_SCHEME, key_version=1, fingerprint=fingerprint,
-        ).first()
-        if identity and identity.device.user_id != user_id:
-            log.warning("Ignoring KOReader device identity already bound to another user")
-            return None
         now = datetime.now(timezone.utc)
+        # One reader moves between accounts (the plugin sets the previous
+        # account's books aside); each account resolves only its own row.
+        identity, write_needed = _account_identity(
+            owned, ub, scheme=KOREADER_SCHEME, user_id=user_id,
+            account_fingerprint=fingerprint,
+            legacy_fingerprint=_koreader_fingerprint(device_id, key), now=now,
+        )
         label_base = _bounded_header(device_name, 55)
         model = _bounded_header(device_name, 160)
-        write_needed = False
         if identity is None:
             if (_koreader_identity_count(owned, ub, user_id=user_id)
                     >= MAX_KOREADER_DEVICES_PER_USER):
@@ -511,7 +435,8 @@ def register_koreader_device_best_effort(*, user_id, device_id, device_name=None
                 active=True, created_by="auto",
             )
             identity = ub.DeviceIdentity(
-                device=device, scheme=KOREADER_SCHEME, key_version=1,
+                device=device, scheme=KOREADER_SCHEME,
+                key_version=KEY_VERSION_PER_ACCOUNT,
                 fingerprint=fingerprint, first_seen_at=now, last_seen_at=now,
             )
             owned.add(device)
@@ -540,7 +465,20 @@ def register_koreader_device_best_effort(*, user_id, device_id, device_name=None
                 device.last_metadata_at = now
                 write_needed = True
         if write_needed:
-            owned.commit()
+            try:
+                owned.commit()
+            except IntegrityError:
+                # A freshly paired reader sends several requests at once; the
+                # one that lost the insert race resolves the winner's row
+                # instead of failing that request's delivery or report.
+                owned.rollback()
+                winner = owned.query(ub.DeviceIdentity).filter_by(
+                    scheme=KOREADER_SCHEME, key_version=KEY_VERSION_PER_ACCOUNT,
+                    fingerprint=fingerprint,
+                ).first()
+                if winner is None or winner.device.user_id != user_id:
+                    raise
+                return winner.device_id
         return device.id
     except Exception:
         if owned is not None:

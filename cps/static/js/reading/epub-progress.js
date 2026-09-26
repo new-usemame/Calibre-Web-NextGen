@@ -147,7 +147,7 @@ function persistCfi(cfi, keepalive, percentage) {
     }
     return fetch(window.calibre.bookmarkUrl, {
         method: 'POST',
-        headers: window.webreaderDeviceHeaders({
+        headers: new Headers({
             'Content-Type': 'application/x-www-form-urlencoded',
             'X-CSRFToken': token || ''
         }),

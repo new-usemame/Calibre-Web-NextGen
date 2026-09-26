@@ -33,8 +33,8 @@ def test_classic_overlays_and_navigation_resolve_one_unambiguous_spine_section()
 
 
 @pytest.mark.unit
-def test_classic_reader_identity_reuses_browser_storage_and_survives_denial():
-    """Real JS must reuse the SPA UUID or preserve the write without an ID."""
+def test_cached_classic_reader_uses_account_source_without_installation_identity():
+    """Cached readers keep CSRF headers without minting or sending installation IDs."""
     root = Path(__file__).resolve().parents[2]
     subprocess.run([
         'node', str(root / 'tests/fixtures/js/classic_reader_identity.cjs'), str(root),

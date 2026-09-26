@@ -22,6 +22,7 @@ except ImportError:  # pragma: no cover - unit/minimal environments
     _HAVE_GEVENT_POOL = False
 
 from .file_helper import get_temp_dir
+from .services.calibre_db_lock import metadata_db_write_lock
 from .subproc_wrapper import process_open
 from . import logger, config
 from .constants import SUPPORTED_CALIBRE_BINARIES
@@ -90,18 +91,26 @@ def _do_calibre_export_blocking(book_id, book_format):
                        '--with-library', library_path,
                        '--to-dir', tmp_dir, '--formats', book_format, "--template", "{}".format(temp_file_name),
                        str(book_id)]
-        p = process_open(opf_command, quotes, my_env)
         embed_timeout = _embed_timeout()
-        try:
-            _, err = p.communicate(timeout=embed_timeout)
-        except subprocess.TimeoutExpired:
-            _kill_export_tree(p)
-            log.error('Metadata embed timed out after %ss for book %s (%s); '
-                      'falling back to the original file without embedded metadata',
-                      embed_timeout, book_id, book_format)
-            return None, None
+        # Calibre takes an exclusive library lock even for export. Coordinate
+        # with other exports and ingest/metadata writers, on this OS worker so
+        # waiting never parks the request hub.
+        with metadata_db_write_lock(timeout=embed_timeout):
+            p = process_open(opf_command, quotes, my_env)
+            try:
+                _, err = p.communicate(timeout=embed_timeout)
+            except subprocess.TimeoutExpired:
+                _kill_export_tree(p)
+                log.error('Metadata embed timed out after %ss for book %s (%s); '
+                          'falling back to the original file without embedded metadata',
+                          embed_timeout, book_id, book_format)
+                return None, None
         if err:
             log.error('Metadata embedder encountered an error: %s', err)
+        if getattr(p, "returncode", 0):
+            log.warning('Metadata export failed for book %s (%s); using original file',
+                        book_id, book_format)
+            return None, None
 
         # calibredb export with --template may create either:
         # 1. A subdirectory with the template name containing the file
@@ -129,8 +138,9 @@ def _do_calibre_export_blocking(book_id, book_format):
 
             log.warning(f'No file named {expected_filename} found in {tmp_dir}')
 
-        # Fallback to original behavior
-        return tmp_dir, temp_file_name
+        # Never advertise a path Calibre did not create. Callers use this
+        # failure value to deliver the original instead of returning a 404.
+        return None, None
     except OSError as ex:
         # ToDo real error handling
         log.error_or_exception(ex)

@@ -18,7 +18,7 @@ from flask_limiter import Limiter
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 import cps
-from cps.reverseproxy import ReverseProxied
+from cps.reverseproxy import ReverseProxied, TrustedProxyPeers
 
 
 def _stub_real_bootstrap(monkeypatch):
@@ -130,7 +130,7 @@ def _middleware_names(application):
     while id(middleware) not in seen:
         seen.add(id(middleware))
         names.append(type(middleware).__name__)
-        if isinstance(middleware, ReverseProxied):
+        if isinstance(middleware, (TrustedProxyPeers, ReverseProxied)):
             middleware = middleware.app
         elif isinstance(middleware, ProxyFix):
             middleware = middleware.app
@@ -179,6 +179,8 @@ def test_factory_constructs_two_independent_apps_without_process_job_duplication
         assert after_hooks.count(web.add_static_asset_cache_headers) == 1
     assert _middleware_names(first).count("ProxyFix") == 1
     assert _middleware_names(second).count("ProxyFix") == 1
+    assert _middleware_names(first)[0] == _middleware_names(second)[0] == "TrustedProxyPeers"
+    assert _middleware_names(first).count("TrustedProxyPeers") == 1
     assert first_jobs == (1, 1, 1)
     assert second_jobs == first_jobs
 
@@ -582,3 +584,41 @@ print('completed')
     )
     assert result.returncode == 0
     assert result.stdout.strip().endswith("completed")
+
+
+@pytest.mark.unit
+def test_production_static_urls_track_release_bytes_and_cache_hooks_are_idempotent(monkeypatch, tmp_path):
+    from flask import url_for
+    from cps.cache_buster import init_cache_busting
+
+    services, _, _, _ = _stub_real_bootstrap(monkeypatch)
+    monkeypatch.delenv("FLASK_DEBUG", raising=False)
+    asset = tmp_path / "reader.js"
+    asset.write_bytes(b"reader release one")
+    monkeypatch.setattr(cps, "Flask", lambda *args, **kwargs: Flask(
+        *args, **kwargs, static_folder=str(tmp_path), static_url_path="/static"
+    ))
+
+    first = cps.create_app(cps.config, services)
+    with first.test_request_context():
+        first_url = url_for("static", filename="reader.js")
+    assert "?q=" in first_url
+    response = first.test_client().get(first_url)
+    assert response.status_code == 200
+    assert response.data == b"reader release one"
+
+    hook_count = sum(len(hooks) for hooks in first.url_default_functions.values())
+    static_view = first.view_functions["static"]
+    init_cache_busting(first)
+    init_cache_busting(first)
+    assert sum(len(hooks) for hooks in first.url_default_functions.values()) == hook_count
+    assert first.view_functions["static"] is static_view
+
+    asset.write_bytes(b"reader release two")
+    second = cps.create_app(cps.config, services)
+    with second.test_request_context():
+        second_url = url_for("static", filename="reader.js")
+    assert second_url != first_url
+    response = second.test_client().get(second_url)
+    assert response.status_code == 200
+    assert response.data == b"reader release two"

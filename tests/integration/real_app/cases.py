@@ -71,13 +71,14 @@ def test_second_app_preserves_live_runtime(real_app):
 
 
 def test_real_bootstrap(real_app):
-    from cps.reverseproxy import ReverseProxied
+    from cps.reverseproxy import ReverseProxied, TrustedProxyPeers
 
     import cps
 
     assert cps.config.db_configured
     assert real_app.blueprints
-    assert isinstance(real_app.wsgi_app, ReverseProxied)
+    assert isinstance(real_app.wsgi_app, TrustedProxyPeers)
+    assert isinstance(real_app.wsgi_app.app, ReverseProxied)
     assert "csrf" in real_app.extensions
     assert real_app.error_handler_spec
     response = real_app.test_client().get("/login")

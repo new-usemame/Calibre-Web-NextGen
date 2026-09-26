@@ -214,20 +214,16 @@ class TestIngestChecksumGeneration:
 
         original_checksum = checksums_before[0][2]
 
-        # Restart container (if we have container control)
-        # This might not work in all test environments
-        try:
-            subprocess.run(['docker', 'restart', container_name], check=True, timeout=30)
-            time.sleep(20)  # Wait for restart
+        # The fixture owns this container. Restart or persistence failures
+        # must fail the gate, rather than becoming an environment skip.
+        subprocess.run(['docker', 'restart', container_name], check=True, timeout=30)
+        time.sleep(20)  # Wait for restart
 
-            # Verify checksum still exists
-            db_path = get_db_path(library_folder / "metadata.db")
-            checksums_after = get_book_checksums(db_path, book_id)
+        db_path = get_db_path(library_folder / "metadata.db")
+        checksums_after = get_book_checksums(db_path, book_id)
+        assert len(checksums_after) > 0
+        assert checksums_after[0][2] == original_checksum
 
-            assert len(checksums_after) > 0
-            assert checksums_after[0][2] == original_checksum
-        except Exception as e:
-            pytest.skip(f"Container restart not available in this test environment: {e}")
 
 
 @pytest.mark.docker_integration
@@ -386,46 +382,51 @@ class TestIngestChecksumLogic:
 @pytest.mark.slow
 @pytest.mark.usefixtures("_enable_koreader_sync")
 class TestChecksumInitialization:
-    """Test the one-time checksum generation at container startup."""
+    """The shipped startup service fills missing rows; there is no sentinel."""
 
-    def test_checksums_generated_on_first_startup(
-        self, cwa_container, library_folder
+    def test_backfill_restores_missing_checksum_and_preserves_existing_rows(
+        self, container_name, ingest_folder, library_folder, test_epub
     ):
-        """Test that existing books get checksums on first container startup."""
-        from tests.conftest import get_db_path
+        from tests.conftest import volume_copy, get_db_path
 
-        # This test assumes container was just started for the first time
-        # and the init script ran
+        before = get_latest_book_id(get_db_path(library_folder / "metadata.db")) or 0
+        destination = ingest_folder / "backfill-oracle.epub"
+        volume_copy(test_epub, destination)
+        deadline = time.monotonic() + 90
+        while destination.exists() and time.monotonic() < deadline:
+            time.sleep(1)
+        assert not destination.exists(), "backfill fixture book was not ingested"
+        book_id = get_latest_book_id(get_db_path(library_folder / "metadata.db"))
+        assert book_id is not None and book_id > before
 
-        db_path = get_db_path(library_folder / "metadata.db")
+        def persisted_rows():
+            with sqlite3.connect(get_db_path(library_folder / "metadata.db"), timeout=30) as conn:
+                return conn.execute(
+                    "SELECT id, format, checksum, version, created "
+                    "FROM book_format_checksums WHERE book=? ORDER BY id", (book_id,)
+                ).fetchall()
 
-        # Check if any checksums exist
-        all_checksums = get_book_checksums(db_path)
+        original = persisted_rows()
+        binary = next(row for row in original if row[1] == 'EPUB' and row[3] == 'koreader')
+        retained = [row for row in original if row != binary]
+        assert retained, "fixture must retain the independent filename checksum"
+        subprocess.run([
+            'docker', 'exec', container_name, 'sqlite3', '/calibre-library/metadata.db',
+            'DELETE FROM book_format_checksums WHERE id=%d' % binary[0],
+        ], check=True, timeout=10)
+        assert persisted_rows() == retained
 
-        # If library had books before startup, they should have checksums now
-        # If library is empty, this test would be skipped
+        command = ['docker', 'exec', container_name,
+                   '/etc/s6-overlay/s6-rc.d/cwa-checksum-backfill/run']
+        subprocess.run(command, check=True, timeout=90)
+        restored = persisted_rows()
+        assert sorted(row[1:4] for row in restored) == sorted(row[1:4] for row in original)
+        assert set(retained).issubset(restored), "backfill rewrote existing checksum rows"
 
-        if all_checksums:
-            # Verify all are valid
-            for book_id, fmt, checksum in all_checksums:
-                assert len(checksum) == 32
-                assert all(c in '0123456789abcdef' for c in checksum.lower())
-
-    def test_sentinel_file_prevents_regeneration(self, container_name):
-        """Test that checksum generation only runs once per library."""
-        import subprocess
-
-        # Check if sentinel file exists
-        try:
-            result = subprocess.run(
-                ['docker', 'exec', container_name, 'test', '-f', '/config/.checksums_generated'],
-                capture_output=True
-            )
-
-            # Sentinel should exist after first run
-            assert result.returncode == 0, "Sentinel file should exist after initialization"
-        except Exception as e:
-            pytest.skip(f"Cannot check sentinel file: {e}")
+        # A second startup pass preserves the durable row identities/timestamps;
+        # observing a marker or a success log cannot establish this behavior.
+        subprocess.run(command, check=True, timeout=90)
+        assert persisted_rows() == restored
 
 
 @pytest.fixture

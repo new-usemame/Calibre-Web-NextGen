@@ -24,7 +24,9 @@ import { ApiError, resourceUrl, resourceSrcSet } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { getPrimaryReadTarget } from '../lib/readerTarget';
 import { hasRecipients, toggleRecipients } from '../lib/sendRecipients';
-import { canDeleteBooks, canDownloadBooks, canReadBooks, canUploadBooks } from '../lib/permissions';
+import {
+  canDeleteBooks, canDownloadBooks, canEditBookCover, canReadBooks, canUploadBooks,
+} from '../lib/permissions';
 import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
@@ -409,6 +411,13 @@ export function BookDetail() {
   const me = useMe().data;
   const selectionMode = me?.library_mode === 'personal_library';
   const inLibrary = !!book && (!selectionMode || book.in_my_library !== false);
+  // A book on a public shelf can be read and downloaded, and carries the
+  // reader's own notes and progress, without personal membership. Membership
+  // actions (shelves, favorites, archive, removal) still require inLibrary.
+  const canAccessBook = inLibrary || book?.accessible_via_public_shelf === true;
+  // The cover editor needs the library cover (editors) or a private cover the
+  // server keeps for this book; a public shelf alone grants neither.
+  const canEditCover = canEditBookCover(me, inLibrary);
   const toggleRead = useToggleRead(id);
   const toggleFavorite = useToggleFavorite(id);
   const toggleArchived = useToggleArchived(id);
@@ -605,12 +614,14 @@ export function BookDetail() {
         }),
         testId: 'menu-add-to-library',
       });
-    } else {
-      // Not toggleable for this user: show the current state, disabled.
+    } else if (!inLibrary) {
+      // Not addable by this user: show the current state, disabled. A book
+      // already in the library needs no entry here; its removal is the
+      // visible "Remove from my library" button.
       menuItems.push({ id: 'not-in-library', label: t('Not in your library'), icon: <BookPlus size={15} />, disabled: true });
     }
   }
-  if (inLibrary) {
+  if (canAccessBook) {
     const annotationCount = book.annotation_count ?? 0;
     menuItems.push({
       id: 'highlights',
@@ -635,7 +646,7 @@ export function BookDetail() {
       to: `/book/${book.id}/edit`,
     });
   }
-  if (!me?.role?.anonymous) {
+  if (canEditCover) {
     menuItems.push({
       id: 'edit-cover',
       label: t('Edit cover…'),
@@ -676,13 +687,13 @@ export function BookDetail() {
           to the far edge without letting it become an orphaned mobile row. */}
       <div className={styles.actions} data-testid="book-actions">
         <div className={styles.actionsGroup}>
-          {inLibrary && primaryReadTarget ? (
+          {canAccessBook && primaryReadTarget ? (
             <Link href={primaryReadTarget} className={styles.actionPrimary}>
               {t('Read now')}
             </Link>
           ) : null}
 
-          {!me?.role?.anonymous && (
+          {canEditCover && (
             <Link href={`/book/${book.id}/cover`} className={styles.actionSecondary}
               data-testid="edit-cover-action">
               <ImageIcon size={15} aria-hidden="true" focusable={false} />
@@ -867,7 +878,7 @@ export function BookDetail() {
             {/* Passive "currently reading" marker (fork #634) — mirrors the classic
                 detail page. Sync-driven display only; the gear menu's read/unread
                 item stays a 2-state control. Shows the synced percent when known. */}
-            {inLibrary && book.in_progress && (
+            {canAccessBook && book.in_progress && (
               <div className={styles.readProgressWrap}>
                 <p className={styles.currentlyReading}>
                   <BookOpen size={14} aria-hidden="true" focusable={false} />
@@ -908,13 +919,13 @@ export function BookDetail() {
                 <dd className={styles.metaValue}>{book.original_filename}</dd>
               </>
             )}
-            {inLibrary && book.kosync_progress != null && (
+            {canAccessBook && book.kosync_progress != null && (
               <>
                 <dt className={styles.metaLabel}>{t('KOReader Progress')}</dt>
                 <dd className={styles.metaValue}>{book.kosync_progress.toFixed(1)}%</dd>
               </>
             )}
-            {inLibrary && book.kosync_progress_created_at !== null && (
+            {canAccessBook && book.kosync_progress_created_at !== null && (
               <>
                 <dt className={styles.metaLabel} title={t('When reading progress was first synced')}>
                   {t('Started reading')}
@@ -922,7 +933,7 @@ export function BookDetail() {
                 <dd className={styles.metaValue}>{formatDate(book.kosync_progress_created_at, true)}</dd>
               </>
             )}
-            {inLibrary && book.kosync_progress_timestamp !== null && (
+            {canAccessBook && book.kosync_progress_timestamp !== null && (
               <>
                 <dt className={styles.metaLabel}>{t('Last synced')}</dt>
                 <dd className={styles.metaValue}>{formatDate(book.kosync_progress_timestamp, true)}</dd>
@@ -1058,7 +1069,7 @@ export function BookDetail() {
       {/* Files — the per-format downloads (out of the action row) plus the
           delete/convert/add-format controls that used to sit at the foot of
           the edit-metadata page. Last on the page by design. */}
-      <FilesSection id={id} />
+      <FilesSection id={id} canAccessBook={canAccessBook} />
     </main>
   );
 }
@@ -1067,7 +1078,7 @@ export function BookDetail() {
  *  Delete (delete+edit roles), the Convert from/to control (edit role — the
  *  endpoint is _require_edit), and "Add a format" (upload role + the
  *  instance's upload switch). Moved here from Edit metadata. */
-function FilesSection({ id }: { id: string }) {
+function FilesSection({ id, canAccessBook }: { id: string; canAccessBook: boolean }) {
   const t = useT();
   const { data: book } = useBook(id);
   const me = useMe().data;
@@ -1085,7 +1096,9 @@ function FilesSection({ id }: { id: string }) {
   const sources = (convertOptions?.sources.length ? convertOptions.sources : formats.map((f) => f.toLowerCase()));
   const targets = convertOptions?.targets ?? [];
   if (!book || book.formats.length === 0) return null;
-  const canDownload = canDownloadBooks(me);
+  // Download needs content access (membership or a public shelf) as well as
+  // the role: a non-member's link would only reach the server's 404.
+  const canDownload = canAccessBook && canDownloadBooks(me);
   const canDelete = canDeleteBooks(me);
   // #1288: "Add a format" POSTs to /api/v1/books/<id>/formats, which requires
   // role_upload and honours the admin's "Enable Uploads" switch.

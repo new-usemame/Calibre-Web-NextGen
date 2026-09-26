@@ -20,7 +20,7 @@ from sqlalchemy.exc import InvalidRequestError, OperationalError
 
 from . import logger, config, db, calibre_db, ub, isoLanguages, constants, magic_shelf, hierarchy
 from .usermanagement import requires_basic_auth_if_no_ano, auth
-from .helper import get_download_link, get_book_cover
+from .helper import get_download_link, get_book_cover, hot_books_page
 from .pagination import Pagination
 from .sort_orders import BOOK_SORT_ORDERS
 from .web import render_read_books
@@ -452,10 +452,11 @@ def authorize_opds_entity(entity, user=None, entity_type=None):
     return entity
 
 
-def get_opds_restricted_common_filter(user=None):
+def get_opds_restricted_common_filter(user=None, *, allow_public_shelf_books=False):
     return calibre_db.common_filters(
         user=user,
         extra_filter=get_opds_book_filter(user),
+        allow_public_shelf_books=allow_public_shelf_books,
     )
 
 
@@ -520,7 +521,7 @@ def is_opds_book_exposed(book_id, user=None):
         return False
     entry = calibre_db.session.query(db.Books.id).filter(
         db.Books.id == normalized_book_id,
-        get_opds_restricted_common_filter(user),
+        get_opds_restricted_common_filter(user, allow_public_shelf_books=True),
     ).first()
     return entry is not None
 
@@ -682,22 +683,11 @@ def feed_best_rated():
 def feed_hot():
     if not auth.current_user().check_visibility(constants.SIDEBAR_HOT):
         abort(404)
-    off = request.args.get("offset") or 0
-    all_books = ub.session.query(ub.Downloads, func.count(ub.Downloads.book_id)).order_by(
-        *BOOK_SORT_ORDERS["hotdesc"]).group_by(ub.Downloads.book_id)
-    hot_books = all_books.offset(off).limit(config.config_books_per_page)
-    entries = list()
-    for book in hot_books:
-        query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
-        download_book = query.filter(get_opds_restricted_common_filter()).filter(
-            book.Downloads.book_id == db.Books.id).first()
-        if download_book:
-            entries.append(download_book)
-        else:
-            ub.delete_download(book.Downloads.book_id)
-    num_books = entries.__len__()
-    pagination = Pagination((int(off) / (int(config.config_books_per_page)) + 1),
-                            config.config_books_per_page, num_books)
+    off = int(request.args.get("offset") or 0)
+    per_page = int(config.config_books_per_page)
+    entries, num_books = hot_books_page(
+        get_opds_restricted_common_filter(), BOOK_SORT_ORDERS["hotdesc"], off, per_page)
+    pagination = Pagination(off / per_page + 1, per_page, num_books)
     return render_xml_template('feed.xml', entries=entries, pagination=pagination)
 
 
@@ -1118,7 +1108,8 @@ def opds_download_link(book_id, book_format):
         return abort(401)
     abort_unless_opds_book_exposed(book_id)
     client = "kobo" if "Kobo" in request.headers.get('User-Agent', "") else ""
-    return get_download_link(book_id, book_format.lower(), client)
+    return get_download_link(
+        book_id, book_format.lower(), client, allow_public_shelf_books=True)
 
 
 @opds.route("/ajax/book/<string:uuid>/<library>")

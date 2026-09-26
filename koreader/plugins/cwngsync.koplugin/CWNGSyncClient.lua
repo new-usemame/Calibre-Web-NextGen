@@ -55,11 +55,22 @@ function CWNGSyncClient.statusOf(reason)
 end
 
 -- The same reason in words for the screen. crash.log keeps the exact text.
+-- The secure connection failed because the other end does not speak TLS:
+-- an https request sent to a plain http port. LuaSec says "wantread" when the
+-- reply to its hello never parses as a handshake.
+function CWNGSyncClient.notHttps(reason)
+    local lower = type(reason) == "string" and reason:lower() or ""
+    return lower:find("wantread", 1, true) ~= nil or lower:find("wantwrite", 1, true) ~= nil
+        or lower:find("wrong version number", 1, true) ~= nil or lower:find("unknown protocol", 1, true) ~= nil
+end
+
 function CWNGSyncClient.plainReason(reason)
     if type(reason) ~= "string" or reason == "" then return _("no response from server") end
     local lower = reason:lower()
     if lower:find("timeout", 1, true) or lower:find("timed out", 1, true) then
         return _("the server took too long to answer")
+    elseif CWNGSyncClient.notHttps(reason) then
+        return _("that address does not answer over https")
     elseif lower:find("refused", 1, true) then
         return _("nothing answered at that address")
     elseif lower:find("host not found", 1, true) or lower:find("name or service", 1, true) then
@@ -71,7 +82,8 @@ function CWNGSyncClient.plainReason(reason)
     if status then
         return (_("the server answered with error %1"):gsub("%%1", tostring(status)))
     end
-    return reason
+    -- Where in KOReader's code it was raised means nothing to a reader.
+    return (reason:gsub("^[^%s:]+%.lua:%d+:%s*", ""))
 end
 
 

@@ -12,7 +12,7 @@ import operator
 import sys
 import string
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from datetime import time as datetime_time
 from functools import wraps
 from urllib.parse import urlparse
@@ -32,7 +32,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
 from sqlalchemy.sql.expression import func, or_, text
 
 from . import constants, converter, logger, helper, services, cli_param, apply_https_runtime_config
-from . import user_book_data
+from . import user_account_data, user_book_data
 from . import db, calibre_db, ub, web_server, config, updater_thread, gdriveutils, \
     kobo_sync_status, schedule
 from .helper import check_valid_domain, send_test_mail, reset_password, generate_password_hash, check_email, \
@@ -40,7 +40,7 @@ from .helper import check_valid_domain, send_test_mail, reset_password, generate
 from .embed_helper import get_calibre_binarypath
 from .gdriveutils import is_gdrive_ready, gdrive_support
 from .render_template import render_title_template, get_sidebar_config
-from .services import file_lock, koreader_pairing
+from .services import file_lock
 from .services.worker import WorkerThread
 from .services.kobo_import import (
     KoboContentDatabaseError,
@@ -1463,9 +1463,17 @@ def do_full_kobo_sync(userid):
     ub.session.query(ub.KoboDeviceDeletedEntitlement).filter(
         ub.KoboDeviceDeletedEntitlement.device_id.in_(device_ids),
     ).delete(synchronize_session=False)
-    ub.session.query(ub.KoboDeviceEntitlementSeed).filter(
-        ub.KoboDeviceEntitlementSeed.device_id.in_(device_ids),
-    ).delete(synchronize_session=False)
+    # A reset has already decided that everything goes out New.  Leave every
+    # Kobo sealed and audited, or the next sync's one-time audit would turn a
+    # saved reading position into a row that announces its book Changed.
+    from .kobo import ENTITLEMENT_CLASSIFICATION_VERSION
+    kobo_ids = [row.id for row in ub.session.query(ub.Device.id).filter(
+        ub.Device.user_id == userid, ub.Device.kind == "kobo",
+    ).all()]
+    kobo_sync_status.mark_device_entitlement_ledgers_seeded(kobo_ids)
+    kobo_sync_status.mark_device_entitlement_classification(
+        kobo_ids, ENTITLEMENT_CLASSIFICATION_VERSION,
+    )
     ub.session.query(ub.KoboDevicePendingSyncPage).filter(
         ub.KoboDevicePendingSyncPage.device_id.in_(device_ids),
     ).delete(synchronize_session=False)
@@ -1486,47 +1494,24 @@ def ajax_kobo_resend(userid, bookid):
 
 
 def do_kobo_resend(userid, bookid):
-    # Force re-delivery of one book to one user's Kobo on the next sync.
-    #
-    # Three writes across the two databases, and only the timestamp bump does
-    # what it says on its own:
-    #
-    #   * bump Books.last_modified, so the sync filter
-    #     (Books.last_modified > sync_token.books_last_modified) picks the book
-    #     up regardless of where the device's cursor sits;
-    #   * clear the (user_id, book_id) row from kobo_synced_books;
-    #   * clear every per-device entitlement fingerprint for this user/book,
-    #     otherwise Layer 2 can suppress the requested replay as an exact
-    #     match even though last_modified selected it for delivery.
-    #
-    # ⚠️ This comment used to say the deletion is what makes the sync emit
-    # NewEntitlement. It is not, and believing so is what made the only
-    # regression test for this helper assert a causal chain the code cannot
-    # perform (F-cc5efb). get_kobo_created_ts (cps/kobo.py) derives the
-    # NewEntitlement / ChangedEntitlement choice from Books.timestamp and the
-    # joined date_added ONLY — it never reads kobo_synced_books, and the sync
-    # query deliberately does not filter on that table either because it is
-    # user-keyed and doing so would break multi-device sync (cps/kobo.py, see
-    # the comments around the changed-book query).
-    #
-    # The deletion still matters, by a different route: HandleSyncRequest resets
-    # the WHOLE sync token — books_last_created included — to datetime.min when
-    # the user has no kobo_synced_books rows left at all (cps/kobo.py, "if no
-    # books synced don't respect sync_token"). So removing the user's LAST row
-    # does produce NewEntitlement, which is the single-book case anyone would
-    # test by hand and is presumably how the wrong explanation survived. With
-    # any other synced row remaining, this emits ChangedEntitlement.
-    #
-    # 🚨 Whether a Kobo re-downloads the file on a ChangedEntitlement is
-    # UNOBSERVED (F-3e383a). The success message below tells the requester the
-    # device "will re-receive the book"; that claim is only established for the
-    # empty-table case above. Do not strengthen it without measuring on
-    # hardware.
+    # Re-deliver one book to the user's Kobos on the next sync.  Clearing its
+    # ledger rows is enough: the sync's recovery arm reselects a book missing
+    # from a Kobo's ledger wherever the cursor sits, and classifies it New.
+    # Never touch Books.last_modified: that clock is the library's, and every
+    # other account's Kobo holding the book would get it as Changed.  Run the
+    # one-time upgrade audit first: run later, it would give a book with a
+    # saved reading position a sentinel row and announce it Changed, which a
+    # reader that no longer holds the book can drop.
+    from .kobo import (_migrate_device_entitlement_classification,
+                       _seed_existing_device_entitlement_ledgers)
     book = calibre_db.session.query(db.Books).filter(db.Books.id == bookid).first()
     if book is None:
         message = _("Book {} not found").format(bookid)
         return Response(json.dumps([{"type": "danger", "message": message}]),
                         mimetype='application/json')
+    if (not _seed_existing_device_entitlement_ledgers(userid)
+            or not _migrate_device_entitlement_classification(userid)):
+        abort(503)
     device_ids = ub.session.query(ub.Device.id).filter(
         ub.Device.user_id == userid,
     ).scalar_subquery()
@@ -1544,15 +1529,12 @@ def do_kobo_resend(userid, bookid):
         ub.KoboSyncedBooks.user_id == userid,
         ub.KoboSyncedBooks.book_id == bookid,
     ).delete()
-    book.last_modified = datetime.now(timezone.utc)
-    calibre_db.session.commit()
     if deleted or ledger_deleted:
         message = _("Cleared sync state for book {0} (user {1}); the device "
                     "will re-receive the book on next sync").format(bookid, userid)
     else:
-        message = _("Book {0} was not in the sync record for user {1}; "
-                    "last_modified bumped so the device will receive on next "
-                    "sync").format(bookid, userid)
+        message = _("Book {0} was not in the sync record for user {1}; the "
+                    "device will receive it on next sync").format(bookid, userid)
     ub.session_commit(message)
     return Response(json.dumps([{"type": "success", "message": message}]),
                     mimetype='application/json')
@@ -3223,29 +3205,16 @@ def _delete_user(content):
     if ub.session.query(ub.User).filter(ub.User.role.op('&')(constants.ROLE_ADMIN) == constants.ROLE_ADMIN,
                                         ub.User.id != content.id).count():
         if content.name != "Guest":
-            # Per-user-book rows (read status, downloads, bookmarks,
-            # annotations + their on-disk backup files, Kobo state…) go
-            # through the single enumerator (D4). The old hand-written list
-            # here left the user's annotation rows and backup gzips behind
-            # (PII surviving the account deletion).
-            user_book_data.purge_user_book_data(user_id=content.id)
-            # UserLibraryBook is included in that enumerator because SQLite
-            # foreign-key cascades are not enabled. User-scoped (not
-            # per-book) rows + the user itself stay here.
-            for us in ub.session.query(ub.Shelf).filter(content.id == ub.Shelf.user_id):
-                ub.session.query(ub.BookShelf).filter(us.id == ub.BookShelf.shelf).delete()
-            ub.session.query(ub.Shelf).filter(content.id == ub.Shelf.user_id).delete()
-            ub.session.query(ub.User).filter(ub.User.id == content.id).delete()
-            ub.session.query(ub.RemoteAuthToken).filter(ub.RemoteAuthToken.user_id == content.id).delete()
-            ub.session.query(ub.User_Sessions).filter(ub.User_Sessions.user_id == content.id).delete()
-            # Credentials go with the account: its app passwords and any
-            # e-reader pairing it answered.
-            ub.session.query(ub.UserAppPassword).filter(
-                ub.UserAppPassword.user_id == content.id).delete()
-            koreader_pairing.forget_user(content.id)
+            # Everything app.db holds for the account — per-user-book rows,
+            # devices and their ledgers, KOReader progress, shelves and magic
+            # shelves, credentials — goes through the single enumerator. The
+            # hand-written list that used to live here fell behind the schema
+            # and left devices, reading positions and magic shelves behind.
+            name = content.name
+            user_account_data.purge_user_account(content.id)
             ub.session_commit()
-            log.info("User {} deleted".format(content.name))
-            return _("User '%(nick)s' deleted", nick=content.name)
+            log.info("User {} deleted".format(name))
+            return _("User '%(nick)s' deleted", nick=name)
         else:
             # log.warning(_("Can't delete Guest User"))
             raise Exception(_("Can't delete Guest User"))

@@ -183,7 +183,8 @@ local function isPlaceholderFile(plugin, path, attributes)
 end
 
 -- Book files in the library folder that the library does not track: deliveries,
--- books kept from another account, copies made over USB. A stray placeholder
+-- books that left the chosen shelves, copies made over USB. (Another account's
+-- books are moved out of the folder when the account changes.) A stray placeholder
 -- (say, one an interrupted sync left) is not a book the reader has.
 local function untrackedFiles(plugin, root, tracked)
     local files = {}
@@ -370,6 +371,9 @@ function Home:render(view, page)
     self.header:setActive(not view.query and view.tab or nil)
     local kind, list, title = self:viewContent(view)
     local items, subtitle
+    -- A message is read to the end: Menu cuts an item at one line unless it
+    -- may shrink the font to fit it (a list of names keeps the user's choice).
+    self.multilines_show_more_text = #list == 0 or nil
     if #list == 0 then
         self:useGrid(false)
         items = { { text = self:emptyText(view), dim = true } }

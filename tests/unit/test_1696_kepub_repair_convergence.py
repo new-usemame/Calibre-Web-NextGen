@@ -149,6 +149,11 @@ class _FakeMetadataSession:
         return None
 
 
+def _publishing_save_fields(**values):
+    # Like ConfigSQL.save_fields after a successful commit: publish to memory.
+    repair_task.config.__dict__.update(values)
+
+
 def _install_task_harness(monkeypatch, tmp_path, app_session, inspect_package):
     book_dir = tmp_path / "Author" / "Title"
     book_dir.mkdir(parents=True)
@@ -199,7 +204,7 @@ def _install_task_harness(monkeypatch, tmp_path, app_session, inspect_package):
         raising=False,
     )
     monkeypatch.setattr(repair_task.config, "get_book_path", lambda: str(tmp_path))
-    monkeypatch.setattr(repair_task.config, "save", lambda: None)
+    monkeypatch.setattr(repair_task.config, "save_fields", _publishing_save_fields)
     monkeypatch.setattr(
         repair_task,
         "kepub_package_needs_normalization",
@@ -322,7 +327,7 @@ def test_existing_book_repair_does_not_split_multichapter_document(
         raising=False,
     )
     monkeypatch.setattr(repair_task.config, "get_book_path", lambda: str(tmp_path))
-    monkeypatch.setattr(repair_task.config, "save", lambda: None)
+    monkeypatch.setattr(repair_task.config, "save_fields", _publishing_save_fields)
     monkeypatch.setattr(
         repair_task,
         "kepub_package_needs_normalization",
@@ -479,12 +484,12 @@ def test_completion_marker_save_failure_does_not_report_success(
         repair_task.kepub_package_needs_normalization,
     )
 
-    def swallow_failed_save():
-        # ConfigSQL.save() reloads the persisted value after swallowing an
-        # OperationalError, so the in-memory attribute returns to its old value.
-        repair_task.config.config_kobo_kepub_package_repair_version = 0
+    def failed_save(**_values):
+        # ConfigSQL.save_fields raises when its commit fails and leaves the
+        # in-memory value unpublished.
+        raise RuntimeError("database is locked")
 
-    monkeypatch.setattr(repair_task.config, "save", swallow_failed_save)
+    monkeypatch.setattr(repair_task.config, "save_fields", failed_save)
 
     assert repair_task.enqueue_startup_kepub_package_repair() is True
     task = queued[-1]

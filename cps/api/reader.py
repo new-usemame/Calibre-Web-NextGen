@@ -18,6 +18,7 @@ from . import api_v1
 from .. import calibre_db, config, logger, ub
 from ..cw_login import current_user
 from ..services import reading_position, reading_sources, storyteller_source
+from ..services.browser_source import BROWSER_ALIAS
 from ..usermanagement import login_required_if_no_ano
 from ..reader_settings import merged_reader_settings, resolved_reader_settings
 
@@ -162,19 +163,26 @@ def get_reading_sources(book_id):
         return guard
     # Match the authorized reader/book-detail surface: hidden and archived are
     # listing states, while a curator may deep-link into the global catalogue.
+    # A book on a public shelf opens in the reader without membership, so its
+    # reader gets its own places here too; every row below is that user's own.
     # common_filters() still enforces language/content/role restrictions.
     book = calibre_db.get_filtered_book(
         book_id,
         allow_show_archived=True,
         allow_show_hidden=True,
         allow_show_global=_can_browse_global(),
+        allow_public_shelf_books=True,
     )
     if book is None:
         return _err("not_found", "Book not found", 404)
 
     user_id = int(current_user.id)
+    # A browser alias was folded into the account's one Browser source, which
+    # already holds its latest position; listing it would offer a stale second
+    # browser as a place to open.
     devices = (ub.session.query(ub.Device)
-               .filter(ub.Device.user_id == user_id)
+               .filter(ub.Device.user_id == user_id,
+                       ub.Device.created_by != BROWSER_ALIAS)
                .order_by(ub.Device.active.desc(), ub.Device.id)
                .all())
     positions = (ub.session.query(ub.DeviceReadingPosition)

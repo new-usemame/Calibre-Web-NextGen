@@ -351,8 +351,8 @@ msgstr ""
 #: cps/admin.py
 #, python-brace-format
 msgid ""
-"Book {0} was not in the sync record for user {1}; last_modified bumped so "
-"the device will receive on next sync"
+"Book {0} was not in the sync record for user {1}; the device will receive it "
+"on next sync"
 msgstr ""
 "Kniha {0} nebola v zázname synchronizácie používateľa {1}; last_modified "
 "bolo aktualizované, takže ju zariadenie pri ďalšej synchronizácii dostane"
@@ -4271,6 +4271,14 @@ msgid "Open search"
 msgstr "Otvoriť vyhľadávanie"
 
 #: cps/spa_strings.py
+msgid "Browse the Global Library"
+msgstr "Prehliadať globálnu knižnicu"
+
+#: cps/spa_strings.py
+msgid "Open device administration"
+msgstr "Otvoriť správu zariadení"
+
+#: cps/spa_strings.py
 msgid "Editions"
 msgstr "Vydania"
 
@@ -4832,6 +4840,14 @@ msgid "(replace cover)"
 msgstr "(nahradiť obálku)"
 
 #: cps/spa_strings.py
+msgid "1 annotation assigned to this source"
+msgstr "1 anotácia priradená k tomuto zdroju"
+
+#: cps/spa_strings.py
+msgid "1 annotation from this source"
+msgstr "1 anotácia z tohto zdroja"
+
+#: cps/spa_strings.py
 msgid "1 selected."
 msgstr "1 vybraná."
 
@@ -4955,6 +4971,14 @@ msgstr "Všetky anotácie"
 #: cps/spa_strings.py
 msgid "All books"
 msgstr "Všetky knihy"
+
+#: cps/spa_strings.py
+msgid ""
+"All browsers and computers signed in to your account share one Browser "
+"reading source."
+msgstr ""
+"Všetky prehliadače a počítače prihlásené vo vašom účte zdieľajú jeden zdroj "
+"čítania Prehliadač."
 
 #: cps/spa_strings.py
 msgid "All shelves"
@@ -5203,13 +5227,11 @@ msgstr ""
 "synchronizácii zmiznú z knižnice čítačky. Tu vo vašej knižnici zostanú."
 
 #: cps/spa_strings.py
-msgid "Browser reading sources"
-msgstr "Zdroje čítania v prehliadači"
+msgid "Browser"
+msgstr "Prehliadač"
 
 #: cps/spa_strings.py
-msgid ""
-"Browsers appear after saving reading progress or annotations. Different "
-"browsers or profiles can appear separately."
+msgid "Browser reading source"
 msgstr ""
 "Prehliadače sa zobrazia po uložení priebehu čítania alebo anotácií. Rôzne "
 "prehliadače alebo profily sa môžu zobraziť samostatne."
@@ -5478,12 +5500,12 @@ msgid "Could not load device annotations."
 msgstr "Anotácie zo zariadenia sa nepodarilo načítať."
 
 #: cps/spa_strings.py
-msgid "Could not load duplicates."
-msgstr "Duplikáty sa nepodarilo načítať."
+msgid "Could not load devices and browsers."
+msgstr "Zariadenia a prehliadače sa nepodarilo načítať."
 
 #: cps/spa_strings.py
-msgid "Could not load e-readers."
-msgstr "Čítačky sa nepodarilo načítať."
+msgid "Could not load duplicates."
+msgstr "Duplikáty sa nepodarilo načítať."
 
 #: cps/spa_strings.py
 msgid "Could not load highlights and notes."
@@ -5500,6 +5522,10 @@ msgstr "Miesta čítania sa nepodarilo načítať."
 #: cps/spa_strings.py
 msgid "Could not load reading positions."
 msgstr "Pozície čítania sa nepodarilo načítať."
+
+#: cps/spa_strings.py
+msgid "Could not load removal details. Try again."
+msgstr "Podrobnosti o odstránení sa nepodarilo načítať. Skúste to znova."
 
 #: cps/spa_strings.py
 msgid "Could not load stats."
@@ -5550,8 +5576,16 @@ msgid "Could not reload metadata"
 msgstr "Metadáta sa nepodarilo znova načítať"
 
 #: cps/spa_strings.py
+msgid "Could not remove this source. Try again."
+msgstr "Tento zdroj sa nepodarilo odstrániť. Skúste to znova."
+
+#: cps/spa_strings.py
 msgid "Could not rename shelf."
 msgstr "Policu sa nepodarilo premenovať."
+
+#: cps/spa_strings.py
+msgid "Could not rename this source. Try again."
+msgstr "Tento zdroj sa nepodarilo premenovať. Skúste to znova."
 
 #: cps/spa_strings.py
 msgid "Could not request deletion from this device."
@@ -5560,6 +5594,10 @@ msgstr "Zmazanie z tohto zariadenia sa nepodarilo vyžiadať."
 #: cps/spa_strings.py
 msgid "Could not reset password."
 msgstr "Heslo sa nepodarilo obnoviť."
+
+#: cps/spa_strings.py
+msgid "Could not restore this source. Try again."
+msgstr "Tento zdroj sa nepodarilo obnoviť. Skúste to znova."
 
 #: cps/spa_strings.py cps/templates/shelf_reorder.html
 msgid "Could not save order."
@@ -5925,8 +5963,16 @@ msgid "Devices"
 msgstr "Zariadenia"
 
 #: cps/spa_strings.py
-msgid "Devices appear here after their first sync."
-msgstr "Zariadenia sa tu zobrazia po prvej synchronizácii."
+msgid "Devices and browsers"
+msgstr "Zariadenia a prehliadače"
+
+#: cps/spa_strings.py
+msgid ""
+"Devices appear after their first sync. Browser appears after saving reading "
+"progress or annotations."
+msgstr ""
+"Zariadenia sa zobrazia po prvej synchronizácii. Prehliadač sa zobrazí po "
+"uložení priebehu čítania alebo anotácií."
 
 #: cps/spa_strings.py
 msgid "Different edition"
@@ -6702,6 +6748,10 @@ msgid "Loading device library…"
 msgstr "Načítava sa knižnica zariadenia…"
 
 #: cps/spa_strings.py
+msgid "Loading devices and browsers…"
+msgstr "Načítavajú sa zariadenia a prehliadače…"
+
+#: cps/spa_strings.py
 msgid "Loading new Discover picks."
 msgstr "Načítava sa nový výber pre Objaviť."
 
@@ -6786,8 +6836,8 @@ msgid "Manage admin role from OAuth group"
 msgstr "Spravovať rolu správcu podľa skupiny OAuth"
 
 #: cps/spa_strings.py
-msgid "Manage e-readers"
-msgstr "Spravovať čítačky"
+msgid "Manage devices and browsers"
+msgstr "Spravovať zariadenia a prehliadače"
 
 #: cps/spa_strings.py
 msgid "Manage presets"
@@ -6899,7 +6949,9 @@ msgstr "Moja knižnica je teraz zapnutá pre účty: {accounts}."
 
 #: cps/spa_strings.py
 #, python-brace-format
-msgid "My Library is on for {accounts} accounts; {errors} accounts failed."
+msgid ""
+"My Library setup is incomplete for {accounts} account(s). You can retry or "
+"undo."
 msgstr ""
 "Moja knižnica je zapnutá pre účty: {accounts}; zlyhalo účtov: {errors}."
 
@@ -7016,6 +7068,10 @@ msgid "No contents found."
 msgstr "Nenašiel sa žiadny obsah."
 
 #: cps/spa_strings.py
+msgid "No devices or browser reading data yet."
+msgstr "Zatiaľ žiadne zariadenia ani údaje o čítaní z prehliadača."
+
+#: cps/spa_strings.py
 msgid "No duplicate groups found."
 msgstr "Nenašli sa žiadne skupiny duplikátov."
 
@@ -7026,10 +7082,6 @@ msgid ""
 msgstr ""
 "S týmto kódom nečaká žiadna čítačka. Skontrolujte ho alebo si na čítačke "
 "vyžiadajte nový kód."
-
-#: cps/spa_strings.py
-msgid "No e-readers yet."
-msgstr "Zatiaľ žiadne čítačky."
 
 #: cps/spa_strings.py
 msgid "No excluded tags"
@@ -7546,8 +7598,8 @@ msgstr "Vzhľad čítania"
 
 #: cps/spa_strings.py
 msgid ""
-"Reading data is kept. Future browser saves can appear under an unidentified "
-"browser source."
+"Reading data is kept. Browser reappears when you next save reading progress "
+"or annotations."
 msgstr ""
 "Údaje o čítaní zostanú zachované. Budúce uloženia z prehliadača sa môžu "
 "zobraziť pod neidentifikovaným zdrojom prehliadača."
@@ -7745,6 +7797,14 @@ msgstr "Pokračovať na {percent} z iného zariadenia"
 #: cps/spa_strings.py
 msgid "Retry"
 msgstr "Skúsiť znova"
+
+#: cps/spa_strings.py
+msgid ""
+"Retry finishes the remaining accounts without changing completed selections. "
+"Undo restores the settings from before setup began."
+msgstr ""
+"Skúsiť znova dokončí zostávajúce účty bez zmeny už dokončených výberov. "
+"Vrátiť späť obnoví nastavenia spred začiatku nastavovania."
 
 #: cps/spa_strings.py
 msgid "Reverse-proxy header login"
@@ -8594,10 +8654,6 @@ msgstr "Vracia sa späť…"
 #: cps/spa_strings.py
 msgid "Unhide"
 msgstr "Zrušiť skrytie"
-
-#: cps/spa_strings.py
-msgid "Unidentified browser source"
-msgstr "Neidentifikovaný zdroj prehliadača"
 
 #: cps/spa_strings.py
 msgid "Unknown color"
@@ -9785,6 +9841,14 @@ msgstr "Synchronizujú sa pridania na police do Hardcover"
 #: cps/tasks/hardcover_sync.py
 msgid "Hardcover Sync"
 msgstr "Synchronizácia Hardcover"
+
+#: cps/tasks/hardcover_sync.py
+msgid "Marking books read on Hardcover"
+msgstr "Označujú sa knihy ako prečítané na Hardcover"
+
+#: cps/tasks/hardcover_sync.py
+msgid "Syncing reading progress to Hardcover"
+msgstr "Synchronizuje sa priebeh čítania s Hardcover"
 
 #: cps/tasks/kepub_backfill.py
 msgid "Convert Kobo books missing KEPUB"

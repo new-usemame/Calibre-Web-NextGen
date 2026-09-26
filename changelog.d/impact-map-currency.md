@@ -1,3 +1,0 @@
-### Fixed
-
-- **Impact-map currency and recall misses are visible in CI.** CI publishes a fresh map, recall report, and currency summary. Stale snapshots and misses caused by source relocation or removal remain advisory. Missing history and generation errors fail the required test summary, but Impact Map failures never authorize an automatic revert. Publication guards protect repository inputs and linked targets, and repeated refreshes invalidate obsolete currency metadata. The committed snapshot retains an eight-hit recall floor while accepting improvements; call accounting is also checked on freshly generated graphs.

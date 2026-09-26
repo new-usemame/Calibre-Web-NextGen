@@ -13,7 +13,7 @@ import {
   type BulkFailureDetail,
   type BulkFailureReasonFor,
 } from '../lib/bulkResults';
-import { canDeleteBooks } from '../lib/permissions';
+import { canDeleteBooks, canEditShelf } from '../lib/permissions';
 import styles from './BulkBar.module.css';
 
 interface BulkBarProps {
@@ -103,10 +103,7 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged,
   }, [shelfOpen]);
 
   const canDelete = canDeleteBooks(me);
-  const canEditPublic = !!me?.role?.edit_shelfs;
-  const editableShelves = (shelvesData?.items ?? []).filter(
-    (s) => s.is_owner || (s.is_public && canEditPublic),
-  );
+  const editableShelves = (shelvesData?.items ?? []).filter((s) => canEditShelf(me, s));
   const busy = markRead.isPending || addToShelf.isPending || deleteBooks.isPending
     || removeFromMyLibrary.isPending
     || setMetadata.isPending || mergeBooks.isPending;

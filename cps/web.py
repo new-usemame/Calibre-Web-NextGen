@@ -61,7 +61,7 @@ from .kobo_sync_status import remove_synced_book
 from . import magic_shelf
 from .render_template import render_title_template, get_custom_column_visibility_options
 from .kobo_sync_status import change_archived_books
-from . import limiter
+from . import limiter, rate_limits
 from .services.worker import WorkerThread
 from .services.parallel import run_blocking as _run_blocking
 from .tasks_status import render_task_status
@@ -2927,7 +2927,7 @@ def handle_login_user(user, remember, message, category):
         log.debug(f"Failed to log login activity: {e}")
     
     flash(message, category=category)
-    [limiter.limiter.storage.clear(k.key) for k in limiter.current_limits]
+    rate_limits.clear_current_limits(limiter)
 
     # Clear redirect-loop and automatic OAuth-attempt state on success.
     flask_session.pop(oauth_auto_redirect.LOGIN_REDIRECT_COUNT_KEY, None)

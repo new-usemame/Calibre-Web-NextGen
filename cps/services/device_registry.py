@@ -107,6 +107,10 @@ def _account_identity(session, ub, *, scheme, user_id, account_fingerprint,
         fingerprint=account_fingerprint,
     ).first()
     if identity is not None:
+        # The derivation already binds the account; keep ownership explicit.
+        if identity.device.user_id != user_id:
+            log.warning("Ignoring device identity owned by another account")
+            return None, False
         return identity, False
     legacy = session.query(ub.DeviceIdentity).filter_by(
         scheme=scheme, key_version=KEY_VERSION_SERVER_WIDE,

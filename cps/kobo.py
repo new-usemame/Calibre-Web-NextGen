@@ -12,6 +12,7 @@ import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
 import os
+import re
 import secrets
 import uuid
 import zipfile
@@ -126,6 +127,36 @@ def _entitlement_fingerprint(entitlement):
     return hashlib.sha256(payload).hexdigest()
 
 
+# convert_to_kobo_timestamp_string writes a year below 1000 unpadded, the
+# bytes the released image has always sent ("101-01-01T00:00:00Z" for
+# Calibre's "no date"). Servers on macOS or Python 3.14 padded it instead, so
+# the fingerprints they stored differ only there; this finds that twin.
+_UNPADDED_KOBO_YEAR = re.compile(r"^(\d{1,3})(-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)$")
+
+
+def _pad_kobo_years(value):
+    if isinstance(value, dict):
+        return {key: _pad_kobo_years(member) for key, member in value.items()}
+    if isinstance(value, list):
+        return [_pad_kobo_years(item) for item in value]
+    if isinstance(value, str):
+        match = _UNPADDED_KOBO_YEAR.match(value)
+        if match:
+            return "%04d%s" % (int(match.group(1)), match.group(2))
+    return value
+
+
+def _entitlement_fingerprint_twin(entitlement):
+    """The fingerprint this payload had on a server that padded early years.
+
+    None when the payload has no year below 1000, so no twin exists.
+    """
+    padded = _pad_kobo_years(entitlement)
+    if padded == entitlement:
+        return None
+    return _entitlement_fingerprint(padded)
+
+
 def _capture_query_identities(query, identity_column):
     """Freeze one ordered candidate membership without rendering payloads."""
     identity_rows = (
@@ -199,7 +230,8 @@ def _deleted_entitlement_change_basis(deleted_at):
     return "v1|deleted={}".format(_ledger_timestamp_component(deleted_at))
 
 
-def _entitlement_replay_decision(record, fingerprint, change_basis):
+def _entitlement_replay_decision(record, fingerprint, change_basis,
+                                 twin_fingerprint=None):
     """Return ``(suppress, shape_reseed, refresh_record)`` for one candidate.
 
     Exact bytes are always safe to suppress. A differing fingerprint is safe
@@ -209,6 +241,10 @@ def _entitlement_replay_decision(record, fingerprint, change_basis):
     Out-of-tree metadata writers must advance ``Books.last_modified`` for each
     payload-affecting edit; direct writes that do not are indistinguishable
     from the declared renderer change at this server-side boundary.
+
+    ``twin_fingerprint`` (a callable, only asked on a mismatch) gives the same
+    payload as a server that padded years below 1000 rendered it; a record
+    stored that way is the same book and is re-stamped, not re-delivered.
     """
     if record is None:
         return False, False, False
@@ -221,6 +257,9 @@ def _entitlement_replay_decision(record, fingerprint, change_basis):
             or stored_basis != change_basis
         )
         return True, False, refresh_record
+
+    if twin_fingerprint is not None and record.fingerprint == twin_fingerprint():
+        return True, False, True
 
     declared_shape_transition = (
         record.payload_schema_version != ENTITLEMENT_PAYLOAD_SCHEMA_VERSION
@@ -1569,8 +1608,16 @@ def make_proxy_response(store_response: requests.Response) -> Response:
 
 
 def convert_to_kobo_timestamp_string(timestamp):
+    # Written out rather than strftime("%Y-..."): %Y leaves a year below 1000
+    # unpadded under the image's Python 3.13 on glibc and pads it elsewhere
+    # (macOS, Python 3.14). Calibre's "no date" is year 101, so the payload
+    # of every undated book would change with the interpreter and each Kobo
+    # would be sent all of them again as Changed. This keeps the bytes the
+    # server has always sent: "101-01-01T00:00:00Z".
     try:
-        return timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
+        t = timestamp.timetuple()
+        return "%d-%02d-%02dT%02d:%02d:%02dZ" % (
+            t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
     except AttributeError as exc:
         log.debug("Timestamp not valid: {}".format(exc))
         # A response-generation timestamp makes an unchanged payload mutate
@@ -2460,6 +2507,7 @@ def HandleSyncRequest():
                     prior_entitlement_fingerprints.get(book.Books.id),
                     entitlement_fingerprint,
                     entitlement_change_basis,
+                    lambda: _entitlement_fingerprint_twin(entitlement),
                 )
             else:
                 entitlement_is_unchanged = False

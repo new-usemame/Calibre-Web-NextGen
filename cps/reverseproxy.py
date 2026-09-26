@@ -41,7 +41,121 @@
 #
 # Inspired by http://flask.pocoo.org/snippets/35/
 
+import ipaddress
 import os
+
+from . import logger
+
+log = logger.create()
+
+# Where a reverse proxy normally sits: the same host, the docker network, the
+# LAN, a Tailscale tailnet (100.64/10) or an IPv6 private range.
+DEFAULT_TRUSTED_PROXY_NETWORKS = (
+    "127.0.0.0/8", "::1/128",
+    "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",
+    "169.254.0.0/16", "fe80::/10",
+    "100.64.0.0/10", "fc00::/7",
+)
+
+# Headers only a reverse proxy has any business setting. ProxyFix and
+# ReverseProxied turn them into the client's address, scheme, host and mount
+# prefix, so a client that reaches the app directly must not be able to.
+_PROXY_HEADERS = (
+    "HTTP_X_FORWARDED_FOR", "HTTP_X_FORWARDED_PROTO", "HTTP_X_FORWARDED_HOST",
+    "HTTP_X_FORWARDED_PORT", "HTTP_X_FORWARDED_PREFIX", "HTTP_FORWARDED",
+    "HTTP_X_SCHEME", "HTTP_X_SCRIPT_NAME", "HTTP_X_REAL_IP",
+)
+
+DIRECT_PEER = "cps.direct_peer"
+
+
+def parse_trusted_networks(value):
+    """The networks a reverse proxy may connect from, from TRUSTED_PROXY_NETWORKS.
+
+    Unset means the private ranges above. ``*`` trusts every peer (the
+    behaviour before this setting existed). Entries are separated by commas
+    or spaces; one that is not an address or network is logged and skipped.
+    """
+    if value is None:
+        entries = DEFAULT_TRUSTED_PROXY_NETWORKS
+    else:
+        entries = value.replace(",", " ").split()
+        if "*" in entries:
+            return None
+    networks = []
+    for entry in entries:
+        try:
+            networks.append(ipaddress.ip_network(entry, strict=False))
+        except ValueError:
+            log.error("TRUSTED_PROXY_NETWORKS: %r is not an address or network; ignored", entry)
+    return tuple(networks)
+
+
+def _address(value):
+    try:
+        address = ipaddress.ip_address((value or "").split("%", 1)[0])
+    except ValueError:
+        return None
+    if address.version == 6 and address.ipv4_mapped:
+        return address.ipv4_mapped
+    return address
+
+
+def is_loopback(value):
+    address = _address(value)
+    return address is not None and address.is_loopback
+
+
+class TrustedProxyPeers(object):
+    """Honour reverse-proxy headers only from a peer on a trusted network.
+
+    It wraps everything that reads those headers (ReverseProxied, ProxyFix),
+    so it must be the outermost middleware. A request from any other peer
+    has them removed before anything sees them: the app then takes the peer
+    at its own address and scheme. The peer's own address is kept in the
+    environ under ``DIRECT_PEER`` for checks that must not trust any header.
+    """
+
+    # Peers already told about in the log; bounded so a stream of clients
+    # sending proxy headers cannot grow it or flood the log.
+    _WARN_AT_MOST = 32
+
+    def __init__(self, app, networks):
+        self.app = app
+        self.networks = networks
+        self._warned = set()
+
+    def trusts(self, peer):
+        if self.networks is None:
+            return True
+        address = _address(peer)
+        if address is None:
+            # Not an IP peer: a Unix socket, which only this host can reach.
+            return True
+        return any(address in network for network in self.networks)
+
+    def __call__(self, environ, start_response):
+        peer = environ.get("REMOTE_ADDR", "")
+        environ[DIRECT_PEER] = peer
+        if not self.trusts(peer):
+            dropped = [header for header in _PROXY_HEADERS if environ.pop(header, None) is not None]
+            if dropped and peer not in self._warned and len(self._warned) < self._WARN_AT_MOST:
+                self._warned.add(peer)
+                log.warning(
+                    "Ignoring reverse-proxy headers from %s: it is not on a trusted proxy "
+                    "network. If it is your proxy, add it to TRUSTED_PROXY_NETWORKS.", peer)
+        return self.app(environ, start_response)
+
+    @property
+    def is_proxied(self):
+        # Kobo URL building asks the outermost middleware this
+        # (current_app.wsgi_app.is_proxied); ReverseProxied, inside, knows.
+        return getattr(self.app, "is_proxied", False)
+
+    def describe(self):
+        if self.networks is None:
+            return "every peer (TRUSTED_PROXY_NETWORKS=*)"
+        return ", ".join(str(network) for network in self.networks) or "no peer"
 
 
 class ReverseProxied(object):

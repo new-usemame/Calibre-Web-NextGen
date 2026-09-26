@@ -7,7 +7,7 @@
 from flask import Blueprint, redirect, flash, url_for, request, send_from_directory, abort, jsonify, current_app
 from flask_babel import gettext as _, lazy_gettext as _l
 
-from . import logger, config, constants, csrf, helper, ub, calibre_db
+from . import logger, config, constants, csrf, helper, ub, calibre_db, reverseproxy
 from .constants import LOG_ARCHIVE
 from .metadata_constants import DEFAULT_METADATA_PROVIDER_HIERARCHY_JSON
 from .usermanagement import login_required_if_no_ano, user_login_required
@@ -16,6 +16,7 @@ from .render_template import render_title_template
 from .cw_login import login_user, logout_user, current_user
 
 import subprocess
+from functools import wraps
 import sqlite3
 from pathlib import Path
 from time import sleep
@@ -67,6 +68,33 @@ cwa_settings = Blueprint('cwa_settings', __name__)
 cwa_logs = Blueprint('cwa_logs', __name__)
 profile_pictures = Blueprint('profile_pictures', __name__)
 cwa_internal = Blueprint('cwa_internal', __name__)
+
+
+def _is_local_call():
+    """True for a call from this host itself, not one relayed to it.
+
+    The peer that connected must be loopback, whatever any header says. So
+    must every hop a proxy recorded: a reverse proxy on this host connects
+    from 127.0.0.1 and names the client it relays in X-Forwarded-For.
+    """
+    peer = request.environ.get(reverseproxy.DIRECT_PEER)
+    if peer is None:
+        orig = request.environ.get("werkzeug.proxy_fix.orig") or {}
+        peer = orig.get("REMOTE_ADDR", request.remote_addr)
+    if not reverseproxy.is_loopback(peer):
+        return False
+    hops = [hop.strip() for hop in request.headers.get("X-Forwarded-For", "").split(",")]
+    return all(reverseproxy.is_loopback(hop) for hop in hops if hop)
+
+
+def _local_calls_only(view):
+    """Refuse (403) any caller but this host, before the view runs."""
+    @wraps(view)
+    def local_only(*args, **kwargs):
+        if not _is_local_call():
+            abort(403)
+        return view(*args, **kwargs)
+    return local_only
 
 log = logger.create()
 
@@ -330,6 +358,7 @@ def get_library_refresh_messages():
 
 @csrf.exempt
 @cwa_internal.route('/cwa-internal/schedule-auto-send', methods=["POST"])
+@_local_calls_only
 def cwa_internal_schedule_auto_send():
     """Schedule an Auto-Send task in the web process scheduler.
 
@@ -337,11 +366,6 @@ def cwa_internal_schedule_auto_send():
     Payload JSON: {book_id:int, user_id:int, delay_minutes:int, username:str, title:str}
     """
     try:
-        # Basic origin check: allow only localhost
-        remote = request.headers.get('X-Forwarded-For', request.remote_addr)
-        if remote not in (None, '127.0.0.1', '::1'):
-            abort(403)
-
         data = request.get_json(force=True, silent=True) or {}
         book_id = int(data.get('book_id'))
         user_id = int(data.get('user_id'))
@@ -413,6 +437,7 @@ def cwa_internal_schedule_auto_send():
 
 @csrf.exempt
 @cwa_internal.route('/cwa-internal/queue-duplicate-scan', methods=["POST"])
+@_local_calls_only
 def cwa_internal_queue_duplicate_scan():
     """Debounce and queue an incremental duplicate scan in the web process.
 
@@ -420,10 +445,6 @@ def cwa_internal_queue_duplicate_scan():
     Payload JSON: {delay_seconds:int, book_ids:[int]}
     """
     try:
-        remote = request.headers.get('X-Forwarded-For', request.remote_addr)
-        if remote not in (None, '127.0.0.1', '::1'):
-            abort(403)
-
         data = request.get_json(force=True, silent=True) or {}
         result = queue_debounced_duplicate_scan(
             delay_seconds=data.get('delay_seconds'),
@@ -437,6 +458,7 @@ def cwa_internal_queue_duplicate_scan():
 
 @csrf.exempt
 @cwa_internal.route('/cwa-internal/run-duplicate-scan', methods=["POST"])
+@_local_calls_only
 def cwa_internal_run_duplicate_scan():
     """Run a bounded incremental duplicate scan synchronously in the web process.
 
@@ -444,10 +466,6 @@ def cwa_internal_run_duplicate_scan():
     Payload JSON: {book_ids:[int]}
     """
     try:
-        remote = request.headers.get('X-Forwarded-For', request.remote_addr)
-        if remote not in (None, '127.0.0.1', '::1'):
-            abort(403)
-
         data = request.get_json(force=True, silent=True) or {}
         book_ids = _coerce_book_ids(data.get('book_ids'))
         if not book_ids:
@@ -478,13 +496,10 @@ def cwa_internal_run_duplicate_scan():
 
 @csrf.exempt
 @cwa_internal.route('/cwa-internal/duplicate-scan-status', methods=["GET", "POST"])
+@_local_calls_only
 def cwa_internal_duplicate_scan_status():
     """Expose duplicate scan worker state to localhost-only ingest helpers."""
     try:
-        remote = request.headers.get('X-Forwarded-For', request.remote_addr)
-        if remote not in (None, '127.0.0.1', '::1'):
-            abort(403)
-
         return jsonify({
             "success": True,
             "full_scan_running": _duplicate_full_scan_running(),
@@ -555,6 +570,7 @@ def duplicate_scan_debounce_pending():
 
 @csrf.exempt
 @cwa_internal.route('/cwa-internal/schedule-convert-library', methods=["POST"])
+@_local_calls_only
 def cwa_internal_schedule_convert_library():
     """Schedule a Convert Library run in the web process scheduler.
 
@@ -562,10 +578,6 @@ def cwa_internal_schedule_convert_library():
     Payload JSON: {delay_minutes:int, username:str}
     """
     try:
-        remote = request.headers.get('X-Forwarded-For', request.remote_addr)
-        if remote not in (None, '127.0.0.1', '::1'):
-            abort(403)
-
         data = request.get_json(force=True, silent=True) or {}
         delay_minutes = int(data.get('delay_minutes', 5))
         delay_minutes = max(0, min(60, delay_minutes))
@@ -616,6 +628,7 @@ def cwa_internal_schedule_convert_library():
 
 @csrf.exempt
 @cwa_internal.route('/cwa-internal/schedule-epub-fixer', methods=["POST"])
+@_local_calls_only
 def cwa_internal_schedule_epub_fixer():
     """Schedule an EPUB Fixer run in the web process scheduler.
 
@@ -623,10 +636,6 @@ def cwa_internal_schedule_epub_fixer():
     Payload JSON: {delay_minutes:int, username:str}
     """
     try:
-        remote = request.headers.get('X-Forwarded-For', request.remote_addr)
-        if remote not in (None, '127.0.0.1', '::1'):
-            abort(403)
-
         data = request.get_json(force=True, silent=True) or {}
         delay_minutes = int(data.get('delay_minutes', 5))
         delay_minutes = max(0, min(60, delay_minutes))
@@ -675,6 +684,7 @@ def cwa_internal_schedule_epub_fixer():
 
 @csrf.exempt
 @cwa_internal.route('/cwa-internal/reconnect-db', methods=["POST"])
+@_local_calls_only
 def cwa_internal_reconnect_db():
     """Refresh the SQLAlchemy session so new books from ingest are
     visible to the next request.
@@ -687,10 +697,6 @@ def cwa_internal_reconnect_db():
 
     Security: Only accepts localhost callers.
     """
-    remote = request.headers.get('X-Forwarded-For', request.remote_addr)
-    if remote not in (None, '127.0.0.1', '::1'):
-        abort(403)
-
     try:
         # Fork PR #199 ships a synchronous CalibreDB.refresh_for_new_data()
         # in place of TaskReconnectDatabase via WorkerThread.add, which

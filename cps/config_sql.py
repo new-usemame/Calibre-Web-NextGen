@@ -781,6 +781,10 @@ class ConfigSQL(object):
         """Apply all configuration values to the underlying storage."""
         self._require_serving_thread("save")
         s = self._read_from_storage()  # type: _Settings
+        if sa_inspect(s).detached:
+            # The requests' session let go of the row (closed after a failed
+            # rollback); an expired detached row cannot even be assigned to.
+            s = self._settings = self._session.query(_Settings).first()
 
         for k in self.dirty:
             if k[0] == '_':

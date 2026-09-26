@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
+import sqlalchemy.exc
 from cryptography.fernet import Fernet
 from PIL import Image
 from sqlalchemy import event
@@ -304,12 +305,14 @@ def test_a_settings_reload_keeps_a_background_marker_save(app_db):
 def test_settings_save_and_reload_work_after_the_session_lets_go_of_the_row(app_db):
     """A closed requests' session does not turn settings pages into errors.
 
-    The session is closed when a failed rollback has to be abandoned, which
-    detaches the settings row the configuration holds. Saving and reloading
-    must still work and read what is stored. Breaks if ``load()`` refreshes
-    the held row in place: that raises for a detached row on every request.
+    The session is closed when a failed rollback has to be abandoned, after a
+    commit or rollback has already expired the settings row the configuration
+    holds; closing detaches it. Saving and reloading must still work and read
+    what is stored. Breaks if ``save()`` assigns to the detached row, or if
+    ``load()`` refreshes it in place: either raises on every settings request.
     """
     app_db.config.load()
+    ub.session.commit()  # expires the held row, as the request's commit does
     ub.session.close()
 
     app_db.config.config_title_regex = "saved-after-close"
@@ -318,6 +321,28 @@ def test_settings_save_and_reload_work_after_the_session_lets_go_of_the_row(app_
 
     assert app_db.config.config_title_regex == "saved-after-close"
     assert _settings_row(app_db.path)["title_regex"] == "saved-after-close"
+
+
+def test_a_settings_reload_the_database_cannot_answer_keeps_what_is_loaded(app_db):
+    """A reload while the session is waiting on a rollback is not an error.
+
+    A request whose write failed leaves the requests' session unusable until
+    it is rolled back, and admin error paths reload settings in that state.
+    Breaks if ``load()`` lets the database error escape: that page is a 500.
+    """
+    stored_regex = _settings_row(app_db.path)["title_regex"]
+    for _ in range(2):
+        clash = ub.User()
+        clash.name = clash.email = "same-name@example.invalid"
+        clash.password = "unused"
+        ub.session.add(clash)
+    with pytest.raises(sqlalchemy.exc.IntegrityError):
+        ub.session.flush()
+
+    app_db.config.load()
+
+    assert app_db.config.config_title_regex == stored_regex
+    ub.session.rollback()
 
 
 @pytest.mark.parametrize("operation", ["save", "load"])

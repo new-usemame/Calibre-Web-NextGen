@@ -32,7 +32,7 @@ from sqlalchemy.exc import IntegrityError, OperationalError, InvalidRequestError
 from sqlalchemy.sql.expression import func, or_, text
 
 from . import constants, converter, logger, helper, services, cli_param, apply_https_runtime_config
-from . import user_book_data
+from . import user_account_data, user_book_data
 from . import db, calibre_db, ub, web_server, config, updater_thread, gdriveutils, \
     kobo_sync_status, schedule
 from .helper import check_valid_domain, send_test_mail, reset_password, generate_password_hash, check_email, \
@@ -40,7 +40,7 @@ from .helper import check_valid_domain, send_test_mail, reset_password, generate
 from .embed_helper import get_calibre_binarypath
 from .gdriveutils import is_gdrive_ready, gdrive_support
 from .render_template import render_title_template, get_sidebar_config
-from .services import file_lock, koreader_pairing
+from .services import file_lock
 from .services.worker import WorkerThread
 from .services.kobo_import import (
     KoboContentDatabaseError,
@@ -3205,29 +3205,16 @@ def _delete_user(content):
     if ub.session.query(ub.User).filter(ub.User.role.op('&')(constants.ROLE_ADMIN) == constants.ROLE_ADMIN,
                                         ub.User.id != content.id).count():
         if content.name != "Guest":
-            # Per-user-book rows (read status, downloads, bookmarks,
-            # annotations + their on-disk backup files, Kobo state…) go
-            # through the single enumerator (D4). The old hand-written list
-            # here left the user's annotation rows and backup gzips behind
-            # (PII surviving the account deletion).
-            user_book_data.purge_user_book_data(user_id=content.id)
-            # UserLibraryBook is included in that enumerator because SQLite
-            # foreign-key cascades are not enabled. User-scoped (not
-            # per-book) rows + the user itself stay here.
-            for us in ub.session.query(ub.Shelf).filter(content.id == ub.Shelf.user_id):
-                ub.session.query(ub.BookShelf).filter(us.id == ub.BookShelf.shelf).delete()
-            ub.session.query(ub.Shelf).filter(content.id == ub.Shelf.user_id).delete()
-            ub.session.query(ub.User).filter(ub.User.id == content.id).delete()
-            ub.session.query(ub.RemoteAuthToken).filter(ub.RemoteAuthToken.user_id == content.id).delete()
-            ub.session.query(ub.User_Sessions).filter(ub.User_Sessions.user_id == content.id).delete()
-            # Credentials go with the account: its app passwords and any
-            # e-reader pairing it answered.
-            ub.session.query(ub.UserAppPassword).filter(
-                ub.UserAppPassword.user_id == content.id).delete()
-            koreader_pairing.forget_user(content.id)
+            # Everything app.db holds for the account — per-user-book rows,
+            # devices and their ledgers, KOReader progress, shelves and magic
+            # shelves, credentials — goes through the single enumerator. The
+            # hand-written list that used to live here fell behind the schema
+            # and left devices, reading positions and magic shelves behind.
+            name = content.name
+            user_account_data.purge_user_account(content.id)
             ub.session_commit()
-            log.info("User {} deleted".format(content.name))
-            return _("User '%(nick)s' deleted", nick=content.name)
+            log.info("User {} deleted".format(name))
+            return _("User '%(nick)s' deleted", nick=name)
         else:
             # log.warning(_("Can't delete Guest User"))
             raise Exception(_("Can't delete Guest User"))

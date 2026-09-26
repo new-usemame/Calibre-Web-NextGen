@@ -142,7 +142,9 @@ def test_different_format_checksums_converge_on_the_same_work(inventory_protocol
 
 
 @pytest.mark.unit
-def test_same_hardware_identity_cannot_cross_bind_between_users(inventory_protocol):
+def test_same_hardware_identity_never_reports_into_another_users_device(inventory_protocol):
+    # One reader switched between two accounts: each account's report lands
+    # on that account's own device row, never on the other's.
     client, session, current_user = inventory_protocol
     raw_id = "identity-shared-by-two-authenticated-users"
 
@@ -151,10 +153,12 @@ def test_same_hardware_identity_cannot_cross_bind_between_users(inventory_protoc
     second = _report(client, [_entry("Books/Two.mobi", MOBI_CHECKSUM)], device_id=raw_id)
 
     assert first.status_code == 200
-    assert second.status_code == 409
-    assert second.get_json()["error"] == "device_identity_unavailable"
-    assert session.query(ub.DeviceInventoryItem).count() == 1
-    assert session.query(ub.DeviceInventoryItem).one().device.user_id == 1
+    assert second.status_code == 200
+    held = {
+        item.lpath: item.device.user_id
+        for item in session.query(ub.DeviceInventoryItem).all()
+    }
+    assert held == {"Books/One.epub": 1, "Books/Two.mobi": 2}
 
 
 @pytest.mark.unit

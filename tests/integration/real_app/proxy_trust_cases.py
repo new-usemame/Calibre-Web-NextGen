@@ -83,6 +83,12 @@ RELAYED = [
     ("::1", {"X-Forwarded-For": "127.0.0.1, 198.51.100.1"}),
     ("::ffff:127.0.0.1", {"Forwarded": "for=198.51.100.1"}),
     ("127.0.0.1", {"X-Real-IP": "198.51.100.1"}),
+    # Two proxies on this host: the second appends the first's address.
+    ("127.0.0.1", {"X-Forwarded-For": "198.51.100.1, 127.0.0.1"}),
+    # The client's own Forwarded element, then the proxy's.
+    ("127.0.0.1", {"Forwarded": "for=127.0.0.1, for=198.51.100.1"}),
+    # RFC 7239 parameter names are case-insensitive.
+    ("127.0.0.1", {"Forwarded": "For=198.51.100.1"}),
 ]
 
 

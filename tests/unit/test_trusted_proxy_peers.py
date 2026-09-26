@@ -19,7 +19,7 @@ import flask
 import pytest
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-from cps.reverseproxy import (ReverseProxied, TrustedProxyPeers,
+from cps.reverseproxy import (ReverseProxied, TrustedProxyPeers, named_clients,
                               parse_trusted_networks)
 
 pytestmark = pytest.mark.unit
@@ -147,3 +147,17 @@ def test_only_a_believed_proxy_marks_the_app_as_proxied():
     assert gate.is_proxied is False
     app_client.get("/who", headers=PROXY_HEADERS_SENT, environ_base={"REMOTE_ADDR": "172.18.0.2"})
     assert gate.is_proxied is True
+
+
+@pytest.mark.parametrize("sent, names", [
+    ({"HTTP_X_FORWARDED_FOR": "198.51.100.1, 10.0.0.2 ,127.0.0.1"},
+     ["198.51.100.1", "10.0.0.2", "127.0.0.1"]),
+    ({"HTTP_X_REAL_IP": " 198.51.100.1 "}, ["198.51.100.1"]),
+    ({"HTTP_FORWARDED": 'for=127.0.0.1;proto=https, For="[2001:db8::1]:4711", FOR=198.51.100.1:80'},
+     ["127.0.0.1", "2001:db8::1", "198.51.100.1"]),
+    ({"HTTP_FORWARDED": "for=unknown, for=_hidden"}, ["unknown", "_hidden"]),
+    ({}, []),
+])
+def test_every_client_a_proxy_named_is_found(sent, names):
+    """Every hop and every Forwarded element counts, not only the nearest one."""
+    assert named_clients(sent) == names

@@ -24,7 +24,7 @@ import time
 
 from cps import db, logger
 from cps.services import hardcover
-from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED, WorkerThread
+from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED
 from flask_babel import lazy_gettext as N_
 
 # Pause between books so a big series add doesn't burst-hammer the API.
@@ -185,6 +185,7 @@ def queue_reading_progress(owner, token, user_id, book_id, percentage):
         _pending_progress[key] = (token, percentage)
     if coalesced:
         return False
+    from cps.services.worker import WorkerThread
     try:
         WorkerThread.add(owner, TaskHardcoverReadingProgress(user_id, book_id),
                          hidden=True)

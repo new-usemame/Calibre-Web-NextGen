@@ -52,7 +52,8 @@ def web_reader(monkeypatch):
     monkeypatch.setattr(hardcover_sync, "_pending_progress", {})
 
     queued = []
-    monkeypatch.setattr(hardcover_sync.WorkerThread, "add",
+    from cps.services.worker import WorkerThread
+    monkeypatch.setattr(WorkerThread, "add",
                         staticmethod(lambda owner, task, **k: queued.append((owner, task, k))))
 
     pushed = []
@@ -147,12 +148,12 @@ def test_a_book_blacklisted_for_progress_is_not_sent(web_reader):
 
 
 def test_a_failed_enqueue_does_not_silence_the_book_for_good(web_reader):
-    from cps.tasks import hardcover_sync
+    from cps.services.worker import WorkerThread
 
     def refuse(*a, **k):
         raise RuntimeError("worker unavailable")
     with web_reader.monkeypatch.context() as m:
-        m.setattr(hardcover_sync.WorkerThread, "add", staticmethod(refuse))
+        m.setattr(WorkerThread, "add", staticmethod(refuse))
         # The bookmark save itself still succeeds.
         assert web_reader.save(30.0) is True
 

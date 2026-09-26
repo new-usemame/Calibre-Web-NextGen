@@ -46,10 +46,16 @@ class BasicAuthPacing:
       right guess is refused too until the minute is out;
     - an app password is checked before the bucket: it is a random token no
       one can guess, so devices using one are never refused;
-    - a right password clears the bucket.
+    - a right password clears the bucket;
+    - a wrong password this client already sent this minute is answered
+      without checking it again, so a stale device costs neither a password
+      hash nor a directory bind (a failed bind a directory may count towards
+      locking the account) on every sync.
 
-    When the limiter is off, not yet set up, or its store is down, requests
-    are let through: an outage must not lock readers out.
+    When the limiter's store stops answering, pacing carries on in memory,
+    as the limiter's own checks do. It lets requests through only when the
+    limiter is off, not yet set up, or memory fails too: an outage must not
+    lock readers out.
     """
 
     SIGN_IN_ATTEMPTS = parse("3/minute")
@@ -69,44 +75,82 @@ class BasicAuthPacing:
             return None
         return self.limiter.limiter
 
+    def _run(self, operation):
+        """Run ``operation(strategy)``, on the in-memory fallback if the store fails.
+
+        The limiter switches to its fallback only inside its own checks, which
+        these sign-ins do not go through, so the switch is made here the same
+        way. Its checks switch back once the store answers again.
+        """
+        strategy = self._strategy()
+        if strategy is None:
+            return None
+        try:
+            return operation(strategy)
+        except Exception as ex:
+            limiter = self.limiter
+            if (not getattr(limiter, "_in_memory_fallback_enabled", False)
+                    or getattr(limiter, "_storage_dead", False)
+                    or getattr(limiter, "_fallback_limiter", None) is None):
+                raise
+            log.warning("Rate limit storage unreachable (%s); pacing sign-ins in memory", ex)
+            limiter._storage_dead = True
+            return operation(limiter.limiter)
+
     def _bucket(self, account):
         return (self.scope, request.remote_addr or "",
                 (account or "").strip().lower())
 
+    def _seen(self, password):
+        return hmac.new(self._SEEN_KEY, (password or "").encode("utf-8"),
+                        hashlib.sha256).hexdigest()[:32]
+
     def refuse_if_paced(self, account):
         """Raise 429 when this client has used up its guesses for ``account``."""
-        try:
-            strategy = self._strategy()
-            if strategy is None:
-                return
-            bucket = self._bucket(account)
+        bucket = self._bucket(account)
+
+        def reset_if_full(strategy):
             if strategy.test(self.SIGN_IN_ATTEMPTS, *bucket):
-                return
-            reset = strategy.get_window_stats(self.SIGN_IN_ATTEMPTS, *bucket).reset_time
+                return None
+            return strategy.get_window_stats(self.SIGN_IN_ATTEMPTS, *bucket).reset_time
+
+        try:
+            reset = self._run(reset_if_full)
         except Exception as ex:
             log.error("Rate limiter backend error: %s", ex)
             return
-        raise TooManyRequests(retry_after=max(1, int(reset - time.time()) + 1))
+        if reset is not None:
+            raise TooManyRequests(retry_after=max(1, int(reset - time.time()) + 1))
+
+    def already_refused(self, account, password):
+        """True when this client sent this wrong password this minute."""
+        bucket = self._bucket(account)
+        seen = self._seen(password)
+        try:
+            return bool(self._run(
+                lambda strategy: not strategy.test(self._ONCE_A_MINUTE, "seen", seen, *bucket)))
+        except Exception as ex:
+            log.error("Rate limiter backend error: %s", ex)
+            return False
 
     def failed(self, account, password):
         """Count a wrong password, unless this client already sent it."""
-        try:
-            strategy = self._strategy()
-            if strategy is None:
-                return
-            bucket = self._bucket(account)
-            seen = hmac.new(self._SEEN_KEY, (password or "").encode("utf-8"),
-                            hashlib.sha256).hexdigest()[:32]
+        bucket = self._bucket(account)
+        seen = self._seen(password)
+
+        def count(strategy):
             if strategy.hit(self._ONCE_A_MINUTE, "seen", seen, *bucket):
                 strategy.hit(self.SIGN_IN_ATTEMPTS, *bucket)
+
+        try:
+            self._run(count)
         except Exception as ex:
             log.error("Rate limiter backend error: %s", ex)
 
     def succeeded(self, account):
+        bucket = self._bucket(account)
         try:
-            strategy = self._strategy()
-            if strategy is not None:
-                strategy.clear(self.SIGN_IN_ATTEMPTS, *self._bucket(account))
+            self._run(lambda strategy: strategy.clear(self.SIGN_IN_ATTEMPTS, *bucket))
         except Exception as ex:
             log.error("Connection error clearing limiter backend after login: %s", ex)
 

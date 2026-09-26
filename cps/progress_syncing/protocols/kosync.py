@@ -326,6 +326,9 @@ def authenticate_user() -> Optional[ub.User]:
     # 429 before their password is looked at (rate_limits.BasicAuthPacing).
     pacing = rate_limits.BasicAuthPacing(limiter, "kosync")
     pacing.refuse_if_paced(username)
+    if pacing.already_refused(username, password):
+        log.info("KOReader auth: Invalid password for user: %s (repeated)", username)
+        return None
 
     if not user:
         # Fork issue #312: promoted from DEBUG so kosync auth failures
@@ -2304,10 +2307,12 @@ def handle_unauthorized(error):
 @kosync.errorhandler(429)
 def handle_too_many_attempts(error):
     """Too many wrong passwords from this client for this account."""
-    return create_sync_response({
+    body, status = create_sync_response({
         "error": ERROR_UNAUTHORIZED_USER,
         "message": "Too many sign-in attempts; try again in a minute"
     }, 429)
+    retry_after = getattr(error, "retry_after", None)
+    return body, status, ({"Retry-After": str(retry_after)} if isinstance(retry_after, int) else {})
 
 
 @kosync.errorhandler(500)

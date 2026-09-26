@@ -104,6 +104,23 @@ def test_a_reader_app_stuck_on_an_old_password_is_not_a_guesser(login_type):
     assert statuses == [401] * 10 + [200]
 
 
+def test_a_device_with_an_app_password_is_never_refused():
+    app, patches = _catalogue(constants.LOGIN_STANDARD, existing_user=True)
+    patches = [p for p in patches if getattr(p, "attribute", "") != "_verify_app_password_digest"]
+    patches.append(patch.object(usermanagement, "_verify_app_password_digest",
+                                side_effect=lambda _user, password: password == "device-token"))
+    for p in patches:
+        p.start()
+    try:
+        client = app.test_client()
+        statuses = [client.get("/catalogue", auth=("alice", pw)).status_code
+                    for pw in GUESSES + ["device-token"] * 3]
+    finally:
+        for p in reversed(patches):
+            p.stop()
+    assert statuses == [401] * ATTEMPTS_PER_MINUTE + [429, 429] + [200] * 3
+
+
 def test_a_directory_account_not_yet_imported_is_paced_too():
     statuses = _statuses(constants.LOGIN_LDAP, GUESSES[:ATTEMPTS_PER_MINUTE + 1],
                          existing_user=False, username="newcomer")

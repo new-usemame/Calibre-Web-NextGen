@@ -62,6 +62,10 @@ def _app_password(world):
 
 def test_a_client_guessing_passwords_is_paced(world):
     assert _sign_ins(world, GUESSER, GUESSES) == [401] * PER_MINUTE + [429, 429]
+    client = world.app.test_client()
+    client.environ_base["REMOTE_ADDR"] = GUESSER
+    paced = client.get("/kosync/users/auth", headers=world.basic("alice", "more"))
+    assert paced.status_code == 429 and 1 <= int(paced.headers["Retry-After"]) <= 61
     # Once paced, even a right guess is refused: pacing that let the right
     # password through would tell a guesser which one it was.
     assert _sign_ins(world, GUESSER, ["alice-password"]) == [429]
@@ -119,9 +123,40 @@ def test_a_paced_progress_read_is_answered_429_not_500(world):
     assert statuses == [401] * PER_MINUTE + [429]
 
 
+def test_the_same_guesses_at_another_account_are_new_guesses(world):
+    world.add_user("bob", password="bob-password")
+    assert _sign_ins(world, GUESSER, GUESSES[:PER_MINUTE]) == [401] * PER_MINUTE
+    assert _sign_ins(world, GUESSER, GUESSES[:PER_MINUTE + 1], account="bob") == \
+        [401] * PER_MINUTE + [429]
+
+
 def test_guesses_at_an_unknown_account_are_paced_too(world):
     assert _sign_ins(world, GUESSER, GUESSES, account="nobody") == \
         [401] * PER_MINUTE + [429, 429]
+
+
+STORE_METHODS = ("incr", "get", "get_expiry", "clear", "reset", "acquire_entry",
+                 "get_moving_window", "acquire_sliding_window_entry", "get_sliding_window")
+
+
+def _store_dies(monkeypatch, limiter):
+    def unreachable(*_args, **_kwargs):
+        raise ConnectionError("limiter store unreachable")
+
+    for method in STORE_METHODS:
+        if hasattr(limiter.storage, method):
+            monkeypatch.setattr(limiter.storage, method, unreachable)
+
+
+def test_pacing_carries_on_in_memory_when_the_store_dies(world, monkeypatch):
+    """The app's limiter falls back to memory; so must these sign-ins (#2315)."""
+    limiter = Limiter(key_func=lambda: "unused", auto_check=False, storage_uri="memory://",
+                      in_memory_fallback_enabled=True)
+    limiter.init_app(world.app)
+    monkeypatch.setattr(world.kosync, "limiter", limiter)
+    _store_dies(monkeypatch, limiter)
+    assert _sign_ins(world, GUESSER, GUESSES) == [401] * PER_MINUTE + [429, 429]
+    assert _sign_ins(world, OWNERS_PHONE, ["alice-password"] * 3) == [200] * 3
 
 
 def test_pacing_fails_open_when_the_limiter_is_off_or_its_store_errors(world, monkeypatch):
@@ -173,4 +208,11 @@ def test_a_directory_sign_in_clears_its_clients_count(world, directory):
 def test_a_paced_client_costs_the_directory_nothing(world, directory):
     assert _sign_ins(world, GUESSER, GUESSES) == [401] * PER_MINUTE + [429, 429]
     assert directory.binds == PER_MINUTE
+
+
+def test_a_stale_device_costs_the_directory_one_bind_a_minute(world, directory):
+    # A failed bind is one a directory may count towards locking the account.
+    assert _sign_ins(world, HOME, ["old-password"] * 10) == [401] * 10
+    assert directory.binds == 1
+    assert _sign_ins(world, HOME, ["directory-password"]) == [200]
 

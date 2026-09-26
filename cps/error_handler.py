@@ -39,6 +39,8 @@ def error_http(error):
             return redirect(target, code=307)
 
     headers = {'WWW-Authenticate': f'Basic realm="{config.config_calibre_web_title or "calibre-web-automated"}"'} if error.code == 401 else {}
+    if isinstance(getattr(error, "retry_after", None), int):
+        headers["Retry-After"] = str(error.retry_after)
     return render_template('http_error.html',
                            error_code="Error {0}".format(error.code),
                            error_name=error.name,

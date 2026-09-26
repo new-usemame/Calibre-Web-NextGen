@@ -238,6 +238,8 @@ def verify_password(username, password):
     # A right password clears the count.
     pacing = rate_limits.BasicAuthPacing(limiter, "opds")
     pacing.refuse_if_paced(username)
+    if pacing.already_refused(username, password):
+        return None
     user = _verify_slower_credentials(user, username, password)
     if user:
         pacing.succeeded(username)

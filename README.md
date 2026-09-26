@@ -556,6 +556,28 @@ The corresponding ProxyFix arguments are `x_for`, `x_proto`, and `x_host`.
 Count only proxies you control and that overwrite or sanitize the corresponding
 header.
 
+These headers are believed only when the connection comes from a trusted proxy
+network. By default that is this host, private networks (the docker network,
+your LAN), and Tailscale's `100.64.0.0/10`. A client that reaches CWNG directly
+from anywhere else is taken at its own address and scheme, whatever headers it
+sends. If your proxy connects from a public address, add it to
+`TRUSTED_PROXY_NETWORKS`. That includes Cloudflare's proxy forwarding straight
+to the container, with no proxy of your own in between: list Cloudflare's
+published IP ranges.
+
+Without the setting, CWNG sees every visitor as the proxy. Sign-in pacing is
+then shared by everyone, links come out as `http://` behind an HTTPS proxy,
+and sign-in providers may reject the callback address. The log says
+`Ignoring reverse-proxy headers from <address>` when this applies.
+
+```yaml
+- TRUSTED_PROXY_NETWORKS=private, 203.0.113.7, 198.51.100.0/24
+```
+
+Entries are addresses or networks, separated by commas or spaces. `private`
+stands for the default list, so keep it when you add your proxy. `*` trusts
+every peer, which was the behaviour before this setting existed.
+
 ### Hardcover metadata provider
 
 [Hardcover](https://hardcover.app/) is a free metadata provider. To enable it:
@@ -766,34 +788,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Swedish (`sv`) | `███████████████████░` 97% | 3292/3380 | 0 |
-| Italian (`it`) | `██████████████████░░` 92% | 3103/3380 | 0 |
-| Spanish (`es`) | `██████████████████░░` 91% | 3087/3380 | 0 |
-| French (`fr`) | `█████████████████░░░` 84% | 2843/3380 | 125 |
-| Russian (`ru`) | `█████████████████░░░` 83% | 2800/3380 | 0 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `████████████████░░░░` 78% | 2654/3380 | 181 |
-| Polish (`pl`) | `███████████████░░░░░` 76% | 2570/3380 | 0 |
-| Dutch (`nl`) | `██████████████░░░░░░` 71% | 2390/3380 | 288 |
-| German (`de`) | `██████████████░░░░░░` 68% | 2281/3380 | 12 |
-| Hungarian (`hu`) | `██████████░░░░░░░░░░` 48% | 1636/3380 | 119 |
-| Portuguese (Brazil) (`pt_BR`) | `████████░░░░░░░░░░░░` 41% | 1396/3380 | 305 |
-| Japanese (`ja`) | `████████░░░░░░░░░░░░` 39% | 1310/3380 | 244 |
-| Slovenian (`sl`) | `███████░░░░░░░░░░░░░` 36% | 1204/3380 | 312 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `███████░░░░░░░░░░░░░` 34% | 1167/3380 | 342 |
-| Korean (`ko`) | `██████░░░░░░░░░░░░░░` 28% | 939/3380 | 266 |
-| Arabic (`ar`) | `█████░░░░░░░░░░░░░░░` 23% | 784/3380 | 281 |
-| Slovak (`sk`) | `████░░░░░░░░░░░░░░░░` 22% | 745/3380 | 307 |
-| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 21% | 697/3380 | 354 |
-| Galician (`gl`) | `████░░░░░░░░░░░░░░░░` 20% | 673/3380 | 355 |
-| Indonesian (`id`) | `████░░░░░░░░░░░░░░░░` 20% | 674/3380 | 356 |
-| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 15% | 505/3380 | 393 |
-| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 14% | 476/3380 | 402 |
-| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 13% | 445/3380 | 367 |
-| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 13% | 430/3380 | 430 |
-| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 12% | 423/3380 | 351 |
-| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 10% | 356/3380 | 382 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 9% | 290/3380 | 379 |
-| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 208/3380 | 339 |
+| Swedish (`sv`) | `███████████████████░` 97% | 3292/3381 | 0 |
+| Italian (`it`) | `██████████████████░░` 92% | 3103/3381 | 0 |
+| Spanish (`es`) | `██████████████████░░` 91% | 3087/3381 | 0 |
+| French (`fr`) | `█████████████████░░░` 84% | 2843/3381 | 125 |
+| Russian (`ru`) | `█████████████████░░░` 83% | 2800/3381 | 0 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `████████████████░░░░` 78% | 2654/3381 | 181 |
+| Polish (`pl`) | `███████████████░░░░░` 76% | 2570/3381 | 0 |
+| Dutch (`nl`) | `██████████████░░░░░░` 71% | 2390/3381 | 288 |
+| German (`de`) | `██████████████░░░░░░` 68% | 2281/3381 | 12 |
+| Hungarian (`hu`) | `██████████░░░░░░░░░░` 48% | 1636/3381 | 119 |
+| Portuguese (Brazil) (`pt_BR`) | `████████░░░░░░░░░░░░` 41% | 1396/3381 | 305 |
+| Japanese (`ja`) | `████████░░░░░░░░░░░░` 39% | 1310/3381 | 244 |
+| Slovenian (`sl`) | `███████░░░░░░░░░░░░░` 36% | 1204/3381 | 312 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `███████░░░░░░░░░░░░░` 34% | 1167/3381 | 342 |
+| Korean (`ko`) | `██████░░░░░░░░░░░░░░` 28% | 939/3381 | 266 |
+| Arabic (`ar`) | `█████░░░░░░░░░░░░░░░` 23% | 784/3381 | 281 |
+| Slovak (`sk`) | `████░░░░░░░░░░░░░░░░` 22% | 745/3381 | 307 |
+| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 21% | 697/3381 | 354 |
+| Galician (`gl`) | `████░░░░░░░░░░░░░░░░` 20% | 673/3381 | 355 |
+| Indonesian (`id`) | `████░░░░░░░░░░░░░░░░` 20% | 674/3381 | 356 |
+| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 15% | 505/3381 | 393 |
+| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 14% | 476/3381 | 402 |
+| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 13% | 445/3381 | 367 |
+| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 13% | 430/3381 | 430 |
+| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 12% | 423/3381 | 351 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 10% | 356/3381 | 382 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 9% | 290/3381 | 379 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 208/3381 | 339 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---

@@ -9870,6 +9870,10 @@ msgstr "Zet Hardcover-sync aan"
 msgid "Marking books read on Hardcover"
 msgstr ""
 
+#: cps/tasks/hardcover_sync.py
+msgid "Syncing reading progress to Hardcover"
+msgstr ""
+
 #: cps/tasks/kepub_backfill.py
 msgid "Convert Kobo books missing KEPUB"
 msgstr ""

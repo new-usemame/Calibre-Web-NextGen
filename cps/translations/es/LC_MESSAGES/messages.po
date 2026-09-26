@@ -9865,6 +9865,10 @@ msgstr "Sincronización con Hardcover"
 msgid "Marking books read on Hardcover"
 msgstr ""
 
+#: cps/tasks/hardcover_sync.py
+msgid "Syncing reading progress to Hardcover"
+msgstr ""
+
 #: cps/tasks/kepub_backfill.py
 msgid "Convert Kobo books missing KEPUB"
 msgstr "Convertir libros de Kobo sin KEPUB"

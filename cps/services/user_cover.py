@@ -123,11 +123,11 @@ def overrides_for_user(user_id, book_ids, *, session=None):
 def kobo_resource_version_for_user(user_id, *, session=None) -> str | None:
     """Version Kobo's image URL template without versioning entitlements.
 
-    Kobo uses ``CoverImageId`` in both its local image cache and the book
-    metadata that CWNG fingerprints for replay suppression. A digest of this
-    user's usable preferences belongs on the image *template* instead: set or
-    clear changes the fetched URL, while the held book's entitlement remains
-    byte-identical and its device ledger stays intact.
+    Kobo keys its local image cache on ``CoverImageId``, which is book
+    metadata: a held book is not re-sent when only its cover id changes. A
+    digest of this user's usable preferences belongs on the image *template*
+    instead: set or clear changes the fetched URL, while the held book's
+    entitlement and its device ledger stay as they are.
     """
     if user_id is None:
         return None

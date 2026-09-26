@@ -77,7 +77,15 @@ KOB0_COVER_RESET_PROGRESS_EPSILON = 1.0
 # (``last_modified``) stayed put; that was delivered as a ChangedEntitlement
 # and de-downloaded the book on the device that had just fetched it. Content
 # provenance is the basis; Size is a description of a derived artifact.
-ENTITLEMENT_PAYLOAD_SCHEMA_VERSION = 2
+# v3: nor ``BookMetadata.CoverImageId`` or ``DownloadUrls[].Url``. The cover id
+# carries cover.jpg's file time and the padding settings for the requesting
+# model, and the URL carries the host, port and auth token the device reached
+# the server by. A library copied without its file times, a new domain or a
+# regenerated token changed every held book's fingerprint without changing the
+# book, and the next time those books were candidates (a stale token after a
+# USB eject, a shelf edit) each was re-sent as Changed and re-downloaded. A
+# real edit, cover included, advances ``LastModified``, which is still covered.
+ENTITLEMENT_PAYLOAD_SCHEMA_VERSION = 3
 
 # Stored in KoboDeviceEntitlementSeed, never sent to the device. Version 1
 # replaces Books.timestamp watermark classification with the physical-device
@@ -91,14 +99,23 @@ kobo_auth.register_url_value_preprocessor(kobo)
 log = logger.create()
 
 
+# Values that describe how this server and this device reach a book, not the
+# book itself (see ENTITLEMENT_PAYLOAD_SCHEMA_VERSION).
+_TRANSPORT_ONLY_DOWNLOAD_MEMBERS = frozenset({"Size", "Url"})
+_TRANSPORT_ONLY_MEMBERS = frozenset({"CoverImageId"})
+
+
 def _fingerprint_projection(value):
-    """Copy ``value`` without the download ``Size`` members (schema v2)."""
+    """Copy ``value`` without its transport-only members (schema v3)."""
     if isinstance(value, dict):
         projected = {}
         for key, member in value.items():
+            if key in _TRANSPORT_ONLY_MEMBERS:
+                continue
             if key == "DownloadUrls" and isinstance(member, list):
                 projected[key] = [
-                    {k: v for k, v in entry.items() if k != "Size"}
+                    {k: v for k, v in entry.items()
+                     if k not in _TRANSPORT_ONLY_DOWNLOAD_MEMBERS}
                     if isinstance(entry, dict) else entry
                     for entry in member
                 ]
@@ -115,8 +132,10 @@ def _entitlement_fingerprint(entitlement):
 
     ``DownloadUrls[].Size`` is excluded: it changes when a derived artifact
     (on-demand KEPUB) replaces the served row without any change to the
-    source bytes the device already holds. Real content changes advance
-    ``Books.last_modified`` and are caught by the change basis.
+    source bytes the device already holds. The cover id and download URL are
+    excluded because they follow file times and the address the device uses.
+    Real content changes advance ``Books.last_modified`` and are caught by the
+    change basis and the payload's ``LastModified``.
     """
     payload = json.dumps(
         _fingerprint_projection(entitlement),
@@ -3607,10 +3626,11 @@ def _get_cover_image_id(book):
     try:
         # A personal preference changes only the bytes returned by the
         # authenticated image endpoint. It must never change BookMetadata:
-        # CoverImageId participates in the entitlement fingerprint, and
-        # changing it makes a held book look like a new/changed entitlement.
-        # HandleInitRequest versions the per-user image URL template instead,
-        # refreshing the image without touching book metadata or device ledgers.
+        # the book is not re-sent for it (CoverImageId is not fingerprinted
+        # since entitlement schema 3), so a new id would never reach a device
+        # that holds the book. HandleInitRequest versions the per-user image
+        # URL template instead, refreshing the image without touching book
+        # metadata or device ledgers.
         cover_path = None
         if not config.config_use_google_drive:
             cover_path = os.path.join(config.get_book_path(), book.path, "cover.jpg")
@@ -3621,8 +3641,8 @@ def _get_cover_image_id(book):
             cover_path=cover_path,
         )
         # When server-side padding is on, append its settings hash so a
-        # device whose cached cover was rendered with old settings
-        # re-fetches after the admin changes the aspect or fill style.
+        # device that is next sent the book re-fetches a cover rendered with
+        # old settings. Changing them does not re-send any book on its own.
         padding = _current_padding_settings()
         if padding.enabled:
             image_id = f"{image_id}-p{padding.settings_hash()}"

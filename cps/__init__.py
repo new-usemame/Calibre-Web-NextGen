@@ -163,7 +163,12 @@ web_server = WebServer()
 updater_thread = Updater()
 
 if limiter_present:
-    limiter = Limiter(key_func=True, headers_enabled=True, auto_check=False, swallow_errors=False)
+    # An admin can put the limits in Redis or Memcached. If that store stops
+    # answering, the limits carry on in this process's memory until it
+    # recovers: no sign-in is refused or answered 500 because of the store,
+    # and wrong passwords are still paced.
+    limiter = Limiter(key_func=True, headers_enabled=True, auto_check=False, swallow_errors=False,
+                      in_memory_fallback_enabled=True)
 else:
     limiter = None
 

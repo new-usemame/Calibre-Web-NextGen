@@ -13,10 +13,9 @@ from .cw_login import login_required
 from flask import request, g, make_response
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.datastructures import Authorization
-from werkzeug.exceptions import HTTPException
 from werkzeug.security import check_password_hash
 
-from . import lm, ub, config, logger, limiter, constants, services
+from . import lm, ub, config, logger, limiter, constants, services, rate_limits
 from .services import app_passwords
 from .ui_themes import config_theme_code
 
@@ -160,30 +159,6 @@ def create_authenticated_user(username, email=None, auth_source="unknown"):
         return None
 
 
-def _pace_sign_in():
-    """Count one password attempt against this request's sign-in limits.
-
-    Too many attempts raise RateLimitExceeded (a 429). A broken limiter store
-    is logged and lets the attempt through, as the API sign-in does, so an
-    outage of an external store cannot lock every client out.
-    """
-    try:
-        limiter.check()
-    except HTTPException:
-        raise
-    except Exception as ex:
-        log.error("Rate limiter backend error: %s", ex)
-
-
-def _clear_sign_in_pace():
-    """A successful sign-in clears its limits, best-effort."""
-    try:
-        for request_limit in limiter.current_limits:
-            limiter.limiter.storage.clear(request_limit.key)
-    except Exception as ex:
-        log.error("Connection error clearing limiter backend after login: %s", ex)
-
-
 @auth.verify_password
 def verify_password(username, password):
     # Issue #121: OPDS clients (Readest, etc.) commonly issue an
@@ -208,30 +183,30 @@ def verify_password(username, password):
         # passwords first — see fork issue #95. This is the digest lookup:
         # no slow hash, and an app password never reaches LDAP as a bind.
         if _verify_app_password_digest(user, password):
-            _clear_sign_in_pace()
+            rate_limits.clear_current_limits(limiter)
             return user
         # Directory and local passwords are paced alike; a sign-in clears it.
-        _pace_sign_in()
+        rate_limits.pace(limiter)
         if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
             login_result, error = services.ldap.bind_user(user.name, password)
             if login_result:
-                _clear_sign_in_pace()
+                rate_limits.clear_current_limits(limiter)
                 return user
             if error is not None:
                 log.error(error)
         else:
             if check_password_hash(str(user.password), password):
-                _clear_sign_in_pace()
+                rate_limits.clear_current_limits(limiter)
                 return user
         # App passwords saved before digests existed cost a slow hash each,
         # so they come after the account password; each is slow only once.
         if _verify_app_password_older(user, password):
-            _clear_sign_in_pace()
+            rate_limits.clear_current_limits(limiter)
             return user
     
     # Handle new LDAP users (auto-creation for OPDS/API access)
     elif config.config_login_type == constants.LOGIN_LDAP and services.ldap and getattr(config, 'config_ldap_auto_create_users', True):
-        _pace_sign_in()
+        rate_limits.pace(limiter)
         try:
             # Try LDAP authentication for new user
             login_result, error = services.ldap.bind_user(username, password)
@@ -246,7 +221,7 @@ def verify_password(username, password):
                         user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username.lower()).first()
                         if user:
                             log.info("LDAP auto-created user for OPDS/API: '%s'", username)
-                            _clear_sign_in_pace()
+                            rate_limits.clear_current_limits(limiter)
                             return user
                 
                 log.warning("LDAP authentication succeeded but user creation failed for '%s'", username)
@@ -354,7 +329,7 @@ def load_user_from_reverse_proxy_header(req):
     # Look for existing user first
     user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == rp_header_username.lower()).first()
     if user:
-        _clear_sign_in_pace()
+        rate_limits.clear_current_limits(limiter)
         log.debug("Reverse proxy authentication: found existing user '%s'", user.name)
         return user
     
@@ -367,7 +342,7 @@ def load_user_from_reverse_proxy_header(req):
         
         user = create_authenticated_user(rp_header_username, email, "reverse proxy")
         if user:
-            _clear_sign_in_pace()
+            rate_limits.clear_current_limits(limiter)
             log.info("Reverse proxy authentication: successfully created user '%s'", user.name)
             return user
         else:

@@ -172,6 +172,11 @@ def _limiter_back_on_its_own_store():
     ``init_app`` keeps it, and only the limiter's own recovery check, a second
     or more later, switches back. A test starting inside that window counts
     some requests in each store and sees its limits drift.
+
+    Both stores are emptied too. Sign-in pacing remembers a client's wrong
+    passwords per address and account, and every test client signs in from
+    the same address, so without this one test's typo is the next test's
+    repeated password.
     """
     yield
     cps = sys.modules.get("cps")
@@ -183,3 +188,6 @@ def _limiter_back_on_its_own_store():
     assert hasattr(limiter, "_storage_dead"), \
         "flask-limiter no longer has _storage_dead: update this fixture"
     limiter._storage_dead = False
+    for store in (getattr(limiter, "_storage", None), getattr(limiter, "_fallback_storage", None)):
+        if store is not None:
+            store.reset()

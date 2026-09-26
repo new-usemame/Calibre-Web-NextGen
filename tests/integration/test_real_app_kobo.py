@@ -22,6 +22,7 @@ pytestmark = pytest.mark.integration
 # cases, or skips one, still exits 0. An expected count turns that into a
 # failure. Update it in the same commit as any added or removed case.
 EXPECTED_PASSES = {
+    "basic_auth_pacing_cases.py": 2,
     "kobo_authority_cases.py": 4,
     "kobo_containment_cases.py": 1,
     "limiter_outage_cases.py": 1,

@@ -9,4 +9,5 @@
   it to the new `TRUSTED_PROXY_NETWORKS` setting. The common case is
   Cloudflare's proxy forwarding straight to the container, with no proxy of
   your own in between. Set it to `*` to trust every peer as before. The log
-  names any peer whose proxy headers are ignored.
+  names any peer whose proxy headers are ignored. Write `private` in the list
+  to keep the default networks alongside your proxy.

@@ -74,17 +74,26 @@ def _is_local_call():
     """True for a call from this host itself, not one relayed to it.
 
     The peer that connected must be loopback, whatever any header says. So
-    must every hop a proxy recorded: a reverse proxy on this host connects
-    from 127.0.0.1 and names the client it relays in X-Forwarded-For.
+    must every client a proxy named: a reverse proxy on this host connects
+    from 127.0.0.1 and names the client it relays. Those names are read as
+    the connection sent them, including when the proxy is not trusted and
+    they were removed before the app saw them.
     """
-    peer = request.environ.get(reverseproxy.DIRECT_PEER)
+    environ = request.environ
+    peer = environ.get(reverseproxy.DIRECT_PEER)
     if peer is None:
-        orig = request.environ.get("werkzeug.proxy_fix.orig") or {}
+        orig = environ.get("werkzeug.proxy_fix.orig") or {}
         peer = orig.get("REMOTE_ADDR", request.remote_addr)
     if not reverseproxy.is_loopback(peer):
         return False
-    hops = [hop.strip() for hop in request.headers.get("X-Forwarded-For", "").split(",")]
-    return all(reverseproxy.is_loopback(hop) for hop in hops if hop)
+    sent = environ.get(reverseproxy.SENT_PROXY_HEADERS)
+    if sent is None:
+        orig = environ.get("werkzeug.proxy_fix.orig") or {}
+        sent = {"HTTP_X_FORWARDED_FOR": orig.get("HTTP_X_FORWARDED_FOR")
+                or environ.get("HTTP_X_FORWARDED_FOR", ""),
+                "HTTP_X_REAL_IP": environ.get("HTTP_X_REAL_IP", ""),
+                "HTTP_FORWARDED": environ.get("HTTP_FORWARDED", "")}
+    return all(reverseproxy.is_loopback(name) for name in reverseproxy.named_clients(sent))
 
 
 def _local_calls_only(view):

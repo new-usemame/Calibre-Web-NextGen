@@ -25,7 +25,7 @@ EXPECTED_PASSES = {
     "kobo_authority_cases.py": 4,
     "kobo_containment_cases.py": 1,
     "limiter_outage_cases.py": 1,
-    "proxy_trust_cases.py": 1,
+    "proxy_trust_cases.py": 2,
 }
 
 _OUTCOME = re.compile(r"(\d+) (passed|failed|skipped|error|errors|xfailed|xpassed)")

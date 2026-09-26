@@ -69,6 +69,49 @@ def test_a_proxy_where_proxies_sit_is_believed(peer):
     assert _who(peer) == {"addr": "127.0.0.1", "scheme": "https", "host": "books.example.com"}
 
 
+EVERY_PROXY_HEADER = dict(PROXY_HEADERS_SENT, **{
+    "X-Forwarded-Port": "8443", "X-Forwarded-Prefix": "/elsewhere",
+    "Forwarded": "for=127.0.0.1;proto=https", "X-Scheme": "https",
+    "X-Script-Name": "/elsewhere", "X-Real-IP": "127.0.0.1"})
+
+
+def test_no_proxy_header_from_a_direct_client_reaches_the_app():
+    app = flask.Flask(__name__)
+
+    @app.route("/<path:anything>")
+    def echo(anything):
+        environ = flask.request.environ
+        return {"proxy_headers": sorted(k for k in environ if k.startswith("HTTP_X_")
+                                        or k == "HTTP_FORWARDED"),
+                "script_name": environ.get("SCRIPT_NAME", ""),
+                "scheme": flask.request.scheme, "addr": flask.request.remote_addr}
+
+    inner = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+    app.wsgi_app = TrustedProxyPeers(ReverseProxied(inner), parse_trusted_networks(None))
+    seen = app.test_client().get("/elsewhere/page", headers=EVERY_PROXY_HEADER,
+                                 environ_base={"REMOTE_ADDR": "198.51.100.23"}).get_json()
+    assert seen == {"proxy_headers": [], "script_name": "", "scheme": "http",
+                    "addr": "198.51.100.23"}
+
+
+@pytest.mark.parametrize("peer", ["", "0.0.0.0"])
+def test_a_unix_socket_peer_is_this_host(peer):
+    # gevent reports no address for a Unix-socket client, tornado 0.0.0.0.
+    assert _who(peer)["scheme"] == "https"
+
+
+def test_private_keeps_the_default_networks_in_a_list():
+    networks = parse_trusted_networks("private, 203.0.113.7")
+    assert _who("203.0.113.7", networks=networks)["scheme"] == "https"
+    assert _who("172.18.0.2", networks=networks)["scheme"] == "https"
+    assert _who("198.51.100.23", networks=networks)["scheme"] == "http"
+
+
+@pytest.mark.parametrize("value", ["", "localhost nginx"])
+def test_a_list_with_nothing_usable_means_the_default(value):
+    assert parse_trusted_networks(value) == parse_trusted_networks(None)
+
+
 def test_the_setting_replaces_the_default_networks():
     networks = parse_trusted_networks("203.0.113.7, 10.0.0.0/8")
     assert _who("203.0.113.7", networks=networks)["scheme"] == "https"

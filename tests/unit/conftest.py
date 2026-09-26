@@ -36,6 +36,8 @@ import tempfile
 import types
 from pathlib import Path
 
+import pytest
+
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -143,3 +145,19 @@ def _preload_cps_services() -> None:
 _preload_real_constants()
 _preload_real_cps_package()
 _preload_cps_services()
+
+
+@pytest.fixture(autouse=True)
+def _no_annotation_backup_worker(monkeypatch):
+    """Unit tests never start the annotation-backup worker thread.
+
+    The worker is a daemon that outlives the test which queued it, and its
+    sessions borrow app.db's engine from whatever ``ub.session`` is current, so
+    it would query, and race the disposal of, another test's database. Tests of
+    backups call ``run_backup_now`` or inspect the queue instead.
+    """
+    try:
+        from cps.services import annotation_backup
+    except Exception:  # a stubbed cps in this process: nothing to start
+        return
+    monkeypatch.setattr(annotation_backup, "WORKER_AUTOSTART", False)

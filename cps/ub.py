@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # See CONTRIBUTORS for full list of authors.
 
-import atexit
 import os
 import re
 import sys
@@ -5476,11 +5475,7 @@ def init_db_thread():
         raise RuntimeError(
             "ub.init_db_thread() called before ub.init_db(); app_DB_path "
             "is unset, refusing to create a stray 'None' SQLite file")
-    engine = _create_app_db_engine(app_DB_path)
-
-    Session = scoped_session(sessionmaker())
-    Session.configure(bind=engine)
-    return Session()
+    return sessionmaker(bind=_shared_app_db_engine())()
 
 
 def owned_session():
@@ -5493,9 +5488,23 @@ def owned_session():
     state") or commit a request's unfinished changes.  The caller owns the
     returned Session and closes it (it is a context manager).  It shares the
     engine, whose pool is thread-safe, instead of building one per call as
-    ``init_db_thread()`` does.
+    ``init_db_thread()`` once did.
     """
-    return sessionmaker(bind=session.get_bind())()
+    return sessionmaker(bind=_shared_app_db_engine())()
+
+
+def _shared_app_db_engine():
+    """app.db's one engine, lent to every session opened off the serving thread.
+
+    Its pool is thread-safe and bounded, and closing a session hands the
+    connection back to it.  An engine per session kept each connection it
+    opened (and its WAL files) until the process exited.  Only between
+    ``dispose()`` and the next ``init_db()`` is there no shared engine; a
+    session opened then gets its own.
+    """
+    if session is not None:
+        return session.get_bind()
+    return _create_app_db_engine(app_DB_path)
 
 
 def init_db(app_db_path):
@@ -5579,13 +5588,7 @@ def password_change(user_credentials=None):
 
 
 def get_new_session_instance():
-    new_engine = _create_app_db_engine(app_DB_path)
-    new_session = scoped_session(sessionmaker())
-    new_session.configure(bind=new_engine)
-
-    atexit.register(lambda: new_session.remove() if new_session else True)
-
-    return new_session
+    return scoped_session(sessionmaker(bind=_shared_app_db_engine()))
 
 
 def dispose():

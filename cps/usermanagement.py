@@ -163,18 +163,19 @@ def _verify_slower_credentials(user, username, password):
     """The account's directory or local password, then pre-digest app passwords.
 
     With no account yet, a directory sign-in may create one (OPDS/API access).
-    Returns (user or None, answered): answered is False when the directory
-    could not be asked and nothing else accepted the password.
+    Returns (user or None, wrong): wrong is True only when the checks said
+    the password is wrong. It is False when the directory could not be
+    asked, or accepted the password but the account could not be created.
     """
     if user:
-        answered = True
+        wrong = True
         if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
             login_result, error = services.ldap.bind_user(user.name, password)
             if login_result:
                 return user, True
             if error is not None:
                 log.error(error)
-                answered = False
+                wrong = False
         else:
             if check_password_hash(str(user.password), password):
                 return user, True
@@ -182,7 +183,7 @@ def _verify_slower_credentials(user, username, password):
         # so they come after the account password; each is slow only once.
         if _verify_app_password_older(user, password):
             return user, True
-        return None, answered
+        return None, wrong
 
     # Handle new LDAP users (auto-creation for OPDS/API access)
     if config.config_login_type == constants.LOGIN_LDAP and services.ldap and getattr(config, 'config_ldap_auto_create_users', True):
@@ -203,6 +204,7 @@ def _verify_slower_credentials(user, username, password):
                             return user, True
 
                 log.warning("LDAP authentication succeeded but user creation failed for '%s'", username)
+                return None, False
             elif error:
                 log.debug("LDAP authentication failed for new user '%s': %s", username, error)
                 return None, False
@@ -246,14 +248,15 @@ def verify_password(username, password):
     pacing.refuse_if_paced(username)
     if pacing.already_refused(username, password):
         return None
-    user, answered = _verify_slower_credentials(user, username, password)
+    user, wrong = _verify_slower_credentials(user, username, password)
     if user:
         pacing.succeeded(username)
         return user
-    if not answered:
-        # The directory could not say, so the password is neither right nor
-        # wrong: remembering it as wrong would refuse it once it is back.
-        log.warning('OPDS Login for user "%s" not checked: directory unavailable', username)
+    if not wrong:
+        # The directory could not say, or said yes but the account could not
+        # be created: remembering the password as wrong would refuse it once
+        # the directory or the import works again.
+        log.warning('OPDS Login for user "%s" could not be completed', username)
         return None
     pacing.failed(username, password)
 

@@ -166,3 +166,37 @@ def test_task_sessions_wait_out_a_busy_database_as_long_as_they_always_did(app_d
     finally:
         session.remove()
     assert timeout == 30000
+
+
+@pytest.mark.parametrize("factory", [ub.get_new_session_instance, ub.init_db_thread,
+                                     ub.owned_session],
+                         ids=["new-session", "db-thread", "owned-session"])
+def test_no_task_session_before_the_app_database_is_known(monkeypatch, tmp_path, factory):
+    """Asked for too early, a task session refuses rather than creating a
+    database file named "None" in the working directory."""
+    monkeypatch.setattr(ub, "app_DB_path", None)
+    monkeypatch.chdir(tmp_path)
+
+    with pytest.raises(RuntimeError):
+        factory()
+    assert not (tmp_path / "None").exists()
+
+
+def test_a_failing_thumbnail_cache_clear_still_gives_back_its_connection(app_db, monkeypatch):
+    from cps.tasks import thumbnail
+
+    task = thumbnail.TaskClearCoverThumbnailCache(-1)
+    removed = []
+    real_remove = task.app_db_session.remove
+    monkeypatch.setattr(task.app_db_session, "remove",
+                        lambda: removed.append(True) or real_remove())
+
+    def fails():
+        task.app_db_session.query(ub.User).count()  # holds a connection
+        raise OSError("cache directory unreadable")
+
+    monkeypatch.setattr(task, "delete_all_thumbnails", fails)
+
+    with pytest.raises(OSError):
+        task.run(worker_thread=None)
+    assert removed == [True]

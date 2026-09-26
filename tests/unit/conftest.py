@@ -152,9 +152,9 @@ def _no_annotation_backup_worker(monkeypatch):
     """Unit tests never start the annotation-backup worker thread.
 
     The worker is a daemon that outlives the test which queued it, and its
-    sessions borrow app.db's engine from whatever ``ub.session`` is current, so
-    it would query, and race the disposal of, another test's database. Tests of
-    backups call ``run_backup_now`` or inspect the queue instead.
+    sessions open whatever app.db is current when it next wakes, so it would
+    query, and race the teardown of, another test's database. Tests of backups
+    call ``run_backup_now`` or inspect the queue instead.
     """
     try:
         from cps.services import annotation_backup

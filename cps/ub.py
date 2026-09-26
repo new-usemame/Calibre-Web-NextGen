@@ -5466,17 +5466,6 @@ def _create_app_db_engine(app_db_path, **engine_options):
 
 
 def init_db_thread():
-    global app_DB_path
-    if not app_DB_path:
-        # Without this guard, 'sqlite:///{}'.format(None) builds the URL
-        # 'sqlite:///None' and SQLite silently creates (and writes real
-        # data into) a phantom DB file literally named 'None' in the
-        # working directory — that's how the stray 0-byte 'None' file got
-        # committed in #440 (the annotation-backup worker fires this in
-        # contexts where init_db() was never called, e.g. unit tests).
-        raise RuntimeError(
-            "ub.init_db_thread() called before ub.init_db(); app_DB_path "
-            "is unset, refusing to create a stray 'None' SQLite file")
     return sessionmaker(bind=_shared_app_db_engine())()
 
 
@@ -5509,6 +5498,16 @@ def _shared_app_db_engine():
     the pool every request draws on.
     """
     global _task_engine
+    if not app_DB_path:
+        # Without this guard, 'sqlite:///{}'.format(None) builds the URL
+        # 'sqlite:///None' and SQLite silently creates (and writes real
+        # data into) a phantom DB file literally named 'None' in the
+        # working directory — that's how the stray 0-byte 'None' file got
+        # committed in #440 (the annotation-backup worker fires this in
+        # contexts where init_db() was never called, e.g. unit tests).
+        raise RuntimeError(
+            "an app.db task session was requested before ub.init_db(); "
+            "app_DB_path is unset, refusing to create a stray 'None' SQLite file")
     with _task_engine_lock:
         if _task_engine is None or _task_engine.url.database != app_DB_path:
             if _task_engine is not None:

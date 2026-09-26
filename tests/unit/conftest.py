@@ -36,6 +36,8 @@ import tempfile
 import types
 from pathlib import Path
 
+import pytest
+
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -143,3 +145,41 @@ def _preload_cps_services() -> None:
 _preload_real_constants()
 _preload_real_cps_package()
 _preload_cps_services()
+
+
+@pytest.fixture(autouse=True)
+def _no_annotation_backup_worker(monkeypatch):
+    """Unit tests never start the annotation-backup worker thread.
+
+    The worker is a daemon that outlives the test which queued it, and its
+    sessions open whatever app.db is current when it next wakes, so it would
+    query, and race the teardown of, another test's database. Tests of backups
+    call ``run_backup_now`` or inspect the queue instead.
+    """
+    try:
+        from cps.services import annotation_backup
+    except Exception:  # a stubbed cps in this process: nothing to start
+        return
+    monkeypatch.setattr(annotation_backup, "WORKER_AUTOSTART", False)
+
+
+@pytest.fixture(autouse=True)
+def _limiter_back_on_its_own_store():
+    """Put the process limiter back on its own store after each test.
+
+    A test that makes the limiter's store raise switches ``cps.limiter`` to
+    its in-memory fallback, and that switch is process state: a later app's
+    ``init_app`` keeps it, and only the limiter's own recovery check, a second
+    or more later, switches back. A test starting inside that window counts
+    some requests in each store and sees its limits drift.
+    """
+    yield
+    cps = sys.modules.get("cps")
+    limiter = getattr(cps, "limiter", None)
+    if limiter is None:
+        return
+    # flask-limiter's own flag; if an upgrade renames it, say so rather than
+    # let this reset silently stop working.
+    assert hasattr(limiter, "_storage_dead"), \
+        "flask-limiter no longer has _storage_dead: update this fixture"
+    limiter._storage_dead = False

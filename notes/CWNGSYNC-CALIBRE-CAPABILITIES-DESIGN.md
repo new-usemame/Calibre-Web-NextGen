@@ -88,7 +88,7 @@ server to remove anything.
 
 **Test first:** inventory push with an unknown checksum; with a book that exists under
 a different format checksum (the #633 convergence case); with two devices owned by
-different users (must not cross-bind — `register_*_best_effort` already refuses this);
+different users (must not cross-bind — each account gets its own device row for the same hardware);
 and an inventory that omits a previously-reported book (must NOT delete server rows).
 
 ## Phase 2 — send-to-device (push without a socket)

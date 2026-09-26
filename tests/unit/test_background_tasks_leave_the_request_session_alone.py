@@ -27,6 +27,7 @@ from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
+import sqlalchemy.exc
 from cryptography.fernet import Fernet
 from PIL import Image
 from sqlalchemy import event
@@ -275,6 +276,73 @@ def test_background_marker_save_does_not_persist_a_requests_unsaved_setting(app_
     row = _settings_row(app_db.path)
     assert row["backfill_completed"] == 1
     assert row["title_regex"] == stored_regex
+
+
+def test_a_settings_reload_keeps_a_background_marker_save(app_db):
+    """Reloading settings on the serving thread reads what a task saved.
+
+    An admin settings form that fails validation reloads the settings. The
+    requests' session still holds the row it read at boot, so a reload that
+    trusted it put the boot-time marker back in memory, and the task it
+    guards would run again in this process. Breaks if ``load()`` reads the
+    cached row instead of the database.
+    """
+    app_db.config.__dict__["_settings"] = None
+    app_db.config.load()  # a warm boot leaves the row loaded
+    assert app_db.config.config_kobo_kepub_backfill_completed is False
+
+    thread, outcome = _in_worker(
+        lambda: kepub_backfill.TaskKepubBackfill._persist_completion(True))
+    _finish(thread)
+    assert "error" not in outcome, outcome.get("error")
+
+    app_db.config.load()
+
+    assert app_db.config.config_kobo_kepub_backfill_completed is True
+    assert _settings_row(app_db.path)["backfill_completed"] == 1
+
+
+def test_settings_save_and_reload_work_after_the_session_lets_go_of_the_row(app_db):
+    """A closed requests' session does not turn settings pages into errors.
+
+    The session is closed when a failed rollback has to be abandoned, after a
+    commit or rollback has already expired the settings row the configuration
+    holds; closing detaches it. Saving and reloading must still work and read
+    what is stored. Breaks if ``save()`` assigns to the detached row, which
+    raises on every settings save until the server restarts.
+    """
+    app_db.config.load()
+    ub.session.commit()  # expires the held row, as the request's commit does
+    ub.session.close()
+
+    app_db.config.config_title_regex = "saved-after-close"
+    app_db.config.save()
+    app_db.config.load()
+
+    assert app_db.config.config_title_regex == "saved-after-close"
+    assert _settings_row(app_db.path)["title_regex"] == "saved-after-close"
+
+
+def test_a_settings_reload_the_database_cannot_answer_keeps_what_is_loaded(app_db):
+    """A reload while the session is waiting on a rollback is not an error.
+
+    A request whose write failed leaves the requests' session unusable until
+    it is rolled back, and admin error paths reload settings in that state.
+    Breaks if ``load()`` lets the database error escape: that page is a 500.
+    """
+    stored_regex = _settings_row(app_db.path)["title_regex"]
+    for _ in range(2):
+        clash = ub.User()
+        clash.name = clash.email = "same-name@example.invalid"
+        clash.password = "unused"
+        ub.session.add(clash)
+    with pytest.raises(sqlalchemy.exc.IntegrityError):
+        ub.session.flush()
+
+    app_db.config.load()
+
+    assert app_db.config.config_title_regex == stored_regex
+    ub.session.rollback()
 
 
 @pytest.mark.parametrize("operation", ["save", "load"])

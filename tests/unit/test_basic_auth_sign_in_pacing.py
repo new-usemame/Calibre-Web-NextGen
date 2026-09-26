@@ -224,3 +224,28 @@ def test_a_stale_catalogue_app_costs_the_directory_one_bind_a_minute():
     _Directory.binds = 0
     assert _statuses(constants.LOGIN_LDAP, ["old-password"] * 6) == [401] * 6
     assert _Directory.binds == 1
+
+
+@pytest.mark.parametrize("import_fails", [
+    MagicMock(return_value=(False, "database is locked")),
+    MagicMock(side_effect=RuntimeError("database is locked")),
+], ids=["refused", "raised"])
+def test_a_right_password_whose_account_import_failed_is_not_remembered_as_wrong(import_fails):
+    """The directory said yes; only creating the account failed.
+
+    Each retry must try the import again, not be answered from a record of
+    the password as wrong.
+    """
+    app, patches = _catalogue(constants.LOGIN_LDAP, existing_user=False)
+    patches[-1] = patch("cps.admin.ldap_import_create_user", import_fails)
+    for p in patches:
+        p.start()
+    try:
+        client = app.test_client()
+        statuses = [client.get("/catalogue", auth=("alice", "right")).status_code
+                    for _ in range(4)]
+    finally:
+        for p in reversed(patches):
+            p.stop()
+    assert statuses == [401] * 4
+    assert import_fails.call_count == 4

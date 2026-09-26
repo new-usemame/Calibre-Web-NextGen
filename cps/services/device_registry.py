@@ -37,6 +37,13 @@ KOREADER_DEVICE_LIMIT_MESSAGE = (
     "KOReader device limit reached; ignoring new device identity"
 )
 _koreader_cap_logged_users = set()
+# Identity key versions. Version 1 derived one server-wide fingerprint per
+# physical reader, so a reader could belong to a single account for good: the
+# next account that paired it was refused a device row. Version 2 mixes the
+# account into the derivation, so every account gets its own row for the same
+# hardware and cannot find, claim or change another account's row.
+KEY_VERSION_SERVER_WIDE = 1
+KEY_VERSION_PER_ACCOUNT = 2
 
 
 class KoboDeviceLimitReached(RuntimeError):
@@ -52,14 +59,21 @@ def _bounded_header(value, limit):
     return value
 
 
-def _fingerprint(raw_id, secret_key):
+def _account_namespace(namespace, user_id):
+    return namespace + b"\0" + str(int(user_id)).encode()
+
+
+def _fingerprint(raw_id, secret_key, *, user_id=None):
+    """Kobo hardware fingerprint; passing ``user_id`` selects key version 2."""
     raw_id = _bounded_header(raw_id, 128)
     if not raw_id or not re.fullmatch(r"[0-9A-Fa-f]{64}", raw_id):
         return None
     key = secret_key.encode() if isinstance(secret_key, str) else secret_key
     if not key:
         return None
-    return hmac.new(key, b"cwng-device:kobo:v1\0" + raw_id.lower().encode(), hashlib.sha256).hexdigest()
+    namespace = (b"cwng-device:kobo:v1" if user_id is None
+                 else _account_namespace(b"cwng-device:kobo:v2", user_id))
+    return hmac.new(key, namespace + b"\0" + raw_id.lower().encode(), hashlib.sha256).hexdigest()
 
 
 def _opaque_fingerprint(raw_id, secret_key, *, namespace):
@@ -68,6 +82,46 @@ def _opaque_fingerprint(raw_id, secret_key, *, namespace):
     if not raw_id or not key:
         return None
     return hmac.new(key, namespace + b"\0" + raw_id.encode(), hashlib.sha256).hexdigest()
+
+
+def _koreader_fingerprint(raw_id, secret_key, *, user_id=None):
+    """KOReader device_id fingerprint; passing ``user_id`` selects version 2."""
+    namespace = (b"cwng-device:koreader:v1" if user_id is None
+                 else _account_namespace(b"cwng-device:koreader:v2", user_id))
+    return _opaque_fingerprint(raw_id, secret_key, namespace=namespace)
+
+
+def _account_identity(session, ub, *, scheme, user_id, account_fingerprint,
+                      legacy_fingerprint, now):
+    """Return ``(identity, written)`` for this account's row of one reader.
+
+    A version-2 identity is scoped to the account by construction. A
+    version-1 (server-wide) identity is honoured only for the account that
+    owns it: it gains a version-2 sibling, so later lookups are one indexed
+    hit, and the legacy row stays so a rolled-back server still finds the
+    device. A version-1 identity owned by another account is never returned,
+    reused or modified, and does not stop this account getting its own row.
+    """
+    identity = session.query(ub.DeviceIdentity).filter_by(
+        scheme=scheme, key_version=KEY_VERSION_PER_ACCOUNT,
+        fingerprint=account_fingerprint,
+    ).first()
+    if identity is not None:
+        return identity, False
+    legacy = session.query(ub.DeviceIdentity).filter_by(
+        scheme=scheme, key_version=KEY_VERSION_SERVER_WIDE,
+        fingerprint=legacy_fingerprint,
+    ).first()
+    if legacy is None or legacy.device.user_id != user_id:
+        return None, False
+    identity = ub.DeviceIdentity(
+        device=legacy.device, scheme=scheme, key_version=KEY_VERSION_PER_ACCOUNT,
+        fingerprint=account_fingerprint,
+        first_seen_at=legacy.first_seen_at or now,
+        last_seen_at=legacy.last_seen_at or now,
+    )
+    session.add(identity)
+    return identity, True
 
 
 def _kobo_identity_count(session, ub, *, user_id):
@@ -136,14 +190,18 @@ def _deduplicated_label(session, ub, *, user_id, base):
 
 def upsert_kobo_device(session, *, user_id, headers, secret_key, seen_at=None):
     from cps import ub
-    fingerprint = _fingerprint(headers.get("x-kobo-deviceid"), secret_key)
+    raw_id = headers.get("x-kobo-deviceid")
+    fingerprint = _fingerprint(raw_id, secret_key, user_id=user_id)
     if not fingerprint:
         return None
     now = seen_at or datetime.now(timezone.utc)
-    identity = session.query(ub.DeviceIdentity).filter_by(scheme=SCHEME, fingerprint=fingerprint).first()
-    if identity and identity.device.user_id != user_id:
-        log.warning("Ignoring Kobo device identity already bound to another user")
-        return None
+    # A Kobo signed in to another account on this server keeps that account's
+    # row; this account gets its own.
+    identity, _ = _account_identity(
+        session, ub, scheme=SCHEME, user_id=user_id,
+        account_fingerprint=fingerprint,
+        legacy_fingerprint=_fingerprint(raw_id, secret_key), now=now,
+    )
     model = _bounded_header(headers.get("x-kobo-devicemodel"), 160)
     firmware = _bounded_header(headers.get("x-kobo-appversion"), 64)
     if identity is None:
@@ -159,7 +217,8 @@ def upsert_kobo_device(session, *, user_id, headers, secret_key, seen_at=None):
                            platform="nickel", firmware_version=firmware,
                            first_seen_at=now, last_seen_at=now, last_metadata_at=now,
                            active=True, created_by="auto")
-        identity = ub.DeviceIdentity(device=device, scheme=SCHEME, key_version=1,
+        identity = ub.DeviceIdentity(device=device, scheme=SCHEME,
+                                     key_version=KEY_VERSION_PER_ACCOUNT,
                                      fingerprint=fingerprint, first_seen_at=now, last_seen_at=now)
         session.add(device)
     else:
@@ -343,22 +402,20 @@ def register_koreader_device_best_effort(*, user_id, device_id, device_name=None
         from flask import current_app
         from cps import ub
         key = secret_key if secret_key is not None else current_app.secret_key
-        fingerprint = _opaque_fingerprint(
-            device_id, key, namespace=b"cwng-device:koreader:v1",
-        )
+        fingerprint = _koreader_fingerprint(device_id, key, user_id=user_id)
         if not fingerprint:
             return None
         owned = sessionmaker(bind=ub.session.get_bind())()
-        identity = owned.query(ub.DeviceIdentity).filter_by(
-            scheme=KOREADER_SCHEME, key_version=1, fingerprint=fingerprint,
-        ).first()
-        if identity and identity.device.user_id != user_id:
-            log.warning("Ignoring KOReader device identity already bound to another user")
-            return None
         now = datetime.now(timezone.utc)
+        # One reader moves between accounts (the plugin sets the previous
+        # account's books aside); each account resolves only its own row.
+        identity, write_needed = _account_identity(
+            owned, ub, scheme=KOREADER_SCHEME, user_id=user_id,
+            account_fingerprint=fingerprint,
+            legacy_fingerprint=_koreader_fingerprint(device_id, key), now=now,
+        )
         label_base = _bounded_header(device_name, 55)
         model = _bounded_header(device_name, 160)
-        write_needed = False
         if identity is None:
             if (_koreader_identity_count(owned, ub, user_id=user_id)
                     >= MAX_KOREADER_DEVICES_PER_USER):
@@ -374,7 +431,8 @@ def register_koreader_device_best_effort(*, user_id, device_id, device_name=None
                 active=True, created_by="auto",
             )
             identity = ub.DeviceIdentity(
-                device=device, scheme=KOREADER_SCHEME, key_version=1,
+                device=device, scheme=KOREADER_SCHEME,
+                key_version=KEY_VERSION_PER_ACCOUNT,
                 fingerprint=fingerprint, first_seen_at=now, last_seen_at=now,
             )
             owned.add(device)
@@ -403,7 +461,20 @@ def register_koreader_device_best_effort(*, user_id, device_id, device_name=None
                 device.last_metadata_at = now
                 write_needed = True
         if write_needed:
-            owned.commit()
+            try:
+                owned.commit()
+            except IntegrityError:
+                # A freshly paired reader sends several requests at once; the
+                # one that lost the insert race resolves the winner's row
+                # instead of failing that request's delivery or report.
+                owned.rollback()
+                winner = owned.query(ub.DeviceIdentity).filter_by(
+                    scheme=KOREADER_SCHEME, key_version=KEY_VERSION_PER_ACCOUNT,
+                    fingerprint=fingerprint,
+                ).first()
+                if winner is None or winner.device.user_id != user_id:
+                    raise
+                return winner.device_id
         return device.id
     except Exception:
         if owned is not None:

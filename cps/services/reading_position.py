@@ -268,6 +268,11 @@ def record_web_reader_progress(user, book_id: int, percentage: float,
 
     log.debug("Web reader advanced progress for user %s book %s to %.2f%%",
               user_id, book_id, percentage)
+    # Hardcover is the third carrier Kobo and KOReader progress already
+    # reaches (#2289). Only an advanced position goes, so a browser behind a
+    # device never pulls Hardcover back.
+    from ..helper import queue_hardcover_reading_progress
+    queue_hardcover_reading_progress(user, book_id, percentage)
     return True
 
 

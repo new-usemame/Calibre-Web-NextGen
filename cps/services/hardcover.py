@@ -195,6 +195,12 @@ class HardcoverClient:
 
     # TODO Add option for autocreate if missing books instead of forcing it.
     def update_reading_progress(self, identifiers, progress_percent):
+        # Our devices and the web reader finish a book at 99% (the tail is notes
+        # and index), so Hardcover must agree or a finished book stays Reading
+        # there (#2289). Imported here: kosync imports cps.kobo, which imports us.
+        from ..progress_syncing.protocols.kosync import FINISHED_PERCENT_THRESHOLD
+        if progress_percent >= FINISHED_PERCENT_THRESHOLD:
+            progress_percent = MAX_PROGRESS_PERCENTAGE
         ids = self.parse_identifiers(identifiers)
         if len(ids) != 0:
             book = self.get_user_book(ids)

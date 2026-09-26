@@ -2278,9 +2278,23 @@ def test_upgrade_reannounces_a_household_seed_copy_without_starvation(
             ub.KoboDeviceBookEntitlement.book_id == sync_harness.book.id,
         ).all()
     }
-    # Both Kobos hold the same book, so since schema 3 (the per-model cover
-    # id is not fingerprinted) the payloads they were sent hash the same.
-    assert set(first_book_hashes.values()).isdisjoint({"a" * 64, "b" * 64}), (
+    received = {
+        device_id: next(
+            item["NewEntitlement"]
+            for response in responses
+            for item in _entitlements(response)
+            if item["NewEntitlement"]["BookEntitlement"]["Id"]
+            == str(sync_harness.book.uuid)
+        )
+        for device_id, responses in pages_by_device.items()
+    }
+    assert first_book_hashes == {
+        device_id: kobo._entitlement_fingerprint({
+            "BookEntitlement": body["BookEntitlement"],
+            "BookMetadata": body["BookMetadata"],
+        })
+        for device_id, body in received.items()
+    }, (
         "confirmed hashes must come from each device's acknowledged "
         "payload, not copied user-wide upgrade history"
     )

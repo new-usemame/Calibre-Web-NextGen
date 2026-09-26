@@ -3626,10 +3626,11 @@ def _get_cover_image_id(book):
     try:
         # A personal preference changes only the bytes returned by the
         # authenticated image endpoint. It must never change BookMetadata:
-        # CoverImageId participates in the entitlement fingerprint, and
-        # changing it makes a held book look like a new/changed entitlement.
-        # HandleInitRequest versions the per-user image URL template instead,
-        # refreshing the image without touching book metadata or device ledgers.
+        # the book is not re-sent for it (CoverImageId is not fingerprinted
+        # since entitlement schema 3), so a new id would never reach a device
+        # that holds the book. HandleInitRequest versions the per-user image
+        # URL template instead, refreshing the image without touching book
+        # metadata or device ledgers.
         cover_path = None
         if not config.config_use_google_drive:
             cover_path = os.path.join(config.get_book_path(), book.path, "cover.jpg")
@@ -3640,8 +3641,8 @@ def _get_cover_image_id(book):
             cover_path=cover_path,
         )
         # When server-side padding is on, append its settings hash so a
-        # device whose cached cover was rendered with old settings
-        # re-fetches after the admin changes the aspect or fill style.
+        # device that is next sent the book re-fetches a cover rendered with
+        # old settings. Changing them does not re-send any book on its own.
         padding = _current_padding_settings()
         if padding.enabled:
             image_id = f"{image_id}-p{padding.settings_hash()}"

@@ -11,7 +11,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import api_v1
 from .serializers import serialize_user
-from .. import ub, config, constants, limiter, services, logger
+from .. import ub, config, constants, limiter, services, logger, rate_limits
 from ..config_sql import uploads_enabled
 from ..progress_syncing.settings import is_koreader_sync_enabled
 from ..cw_login import current_user, login_user
@@ -152,13 +152,7 @@ def _check_rate_limit():
 
 def _clear_current_rate_limits():
     """Clear every bucket evaluated for the successful request, best-effort."""
-    if limiter is None:
-        return
-    try:
-        for request_limit in limiter.current_limits:
-            limiter.limiter.storage.clear(request_limit.key)
-    except Exception as ex:
-        log.error("Connection error clearing limiter backend after login: %s", ex)
+    rate_limits.clear_current_limits(limiter)
 
 
 @api_v1.route("/auth/csrf")

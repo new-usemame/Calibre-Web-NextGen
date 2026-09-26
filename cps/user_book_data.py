@@ -72,11 +72,29 @@ def _annotation_is_newer(candidate, current):
     return (candidate.content_revision or 0) > (current.content_revision or 0)
 
 
+def _annotation_children():
+    """``(model, column)`` for annotation children with no ORM cascade.
+
+    SQLite FK cascades are off, and annotation ids are not AUTOINCREMENT, so
+    a child left behind attaches itself to whichever annotation next reuses
+    the id (device delivery state, a retired assignment, an undo journal).
+    """
+    return (
+        (ub.AnnotationDeviceState, ub.AnnotationDeviceState.annotation_id),
+        (ub.DeviceRetiredAssignment, ub.DeviceRetiredAssignment.annotation_id),
+        (ub.AnnotationContentIdMigration,
+         ub.AnnotationContentIdMigration.annotation_row_id),
+    )
+
+
 def _delete_annotation(session, annotation):
     """Delete an annotation and children SQLite will not cascade itself."""
     session.query(ub.AnnotationSyncTarget).filter(
         ub.AnnotationSyncTarget.annotation_id == annotation.id,
     ).delete(synchronize_session=False)
+    for model, column in _annotation_children():
+        session.query(model).filter(column == annotation.id).delete(
+            synchronize_session=False)
     session.delete(annotation)
 
 # Models tied to a user and book handled by this module, with merge semantics
@@ -85,7 +103,8 @@ def _delete_annotation(session, annotation):
 # AnnotationSyncTarget are children reached through their parents; all are
 # still handled below.
 PER_USER_BOOK_MODELS = (
-    "Annotation",            # + AnnotationSyncTarget children
+    "Annotation",            # + sync-target, device-state, retired-assignment,
+                             #   content-id journal and materialization children
     "Bookmark",
     "ReadBook",
     "KoboReadingState",      # + KoboBookmark/KoboStatistics children
@@ -343,6 +362,10 @@ def purge_user_book_data(book_id=None, user_id=None, session=None,
     session.query(ub.AnnotationSyncTarget).filter(
         ub.AnnotationSyncTarget.annotation_id.in_(
             ann_ids.scalar_subquery())).delete(synchronize_session=False)
+    for model, column in _annotation_children():
+        session.query(model).filter(
+            column.in_(ann_ids.scalar_subquery())).delete(
+            synchronize_session=False)
     _scoped(session.query(ub.Annotation), ub.Annotation).delete(
         synchronize_session=False)
 

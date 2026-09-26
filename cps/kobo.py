@@ -12,6 +12,7 @@ import hashlib
 import logging
 from datetime import datetime, timedelta, timezone
 import os
+import re
 import secrets
 import uuid
 import zipfile
@@ -76,7 +77,15 @@ KOB0_COVER_RESET_PROGRESS_EPSILON = 1.0
 # (``last_modified``) stayed put; that was delivered as a ChangedEntitlement
 # and de-downloaded the book on the device that had just fetched it. Content
 # provenance is the basis; Size is a description of a derived artifact.
-ENTITLEMENT_PAYLOAD_SCHEMA_VERSION = 2
+# v3: nor ``BookMetadata.CoverImageId`` or ``DownloadUrls[].Url``. The cover id
+# carries cover.jpg's file time and the padding settings for the requesting
+# model, and the URL carries the host, port and auth token the device reached
+# the server by. A library copied without its file times, a new domain or a
+# regenerated token changed every held book's fingerprint without changing the
+# book, and the next time those books were candidates (a stale token after a
+# USB eject, a shelf edit) each was re-sent as Changed and re-downloaded. A
+# real edit, cover included, advances ``LastModified``, which is still covered.
+ENTITLEMENT_PAYLOAD_SCHEMA_VERSION = 3
 
 # Stored in KoboDeviceEntitlementSeed, never sent to the device. Version 1
 # replaces Books.timestamp watermark classification with the physical-device
@@ -90,14 +99,23 @@ kobo_auth.register_url_value_preprocessor(kobo)
 log = logger.create()
 
 
+# Values that describe how this server and this device reach a book, not the
+# book itself (see ENTITLEMENT_PAYLOAD_SCHEMA_VERSION).
+_TRANSPORT_ONLY_DOWNLOAD_MEMBERS = frozenset({"Size", "Url"})
+_TRANSPORT_ONLY_MEMBERS = frozenset({"CoverImageId"})
+
+
 def _fingerprint_projection(value):
-    """Copy ``value`` without the download ``Size`` members (schema v2)."""
+    """Copy ``value`` without its transport-only members (schema v3)."""
     if isinstance(value, dict):
         projected = {}
         for key, member in value.items():
+            if key in _TRANSPORT_ONLY_MEMBERS:
+                continue
             if key == "DownloadUrls" and isinstance(member, list):
                 projected[key] = [
-                    {k: v for k, v in entry.items() if k != "Size"}
+                    {k: v for k, v in entry.items()
+                     if k not in _TRANSPORT_ONLY_DOWNLOAD_MEMBERS}
                     if isinstance(entry, dict) else entry
                     for entry in member
                 ]
@@ -114,8 +132,10 @@ def _entitlement_fingerprint(entitlement):
 
     ``DownloadUrls[].Size`` is excluded: it changes when a derived artifact
     (on-demand KEPUB) replaces the served row without any change to the
-    source bytes the device already holds. Real content changes advance
-    ``Books.last_modified`` and are caught by the change basis.
+    source bytes the device already holds. The cover id and download URL are
+    excluded because they follow file times and the address the device uses.
+    Real content changes advance ``Books.last_modified`` and are caught by the
+    change basis and the payload's ``LastModified``.
     """
     payload = json.dumps(
         _fingerprint_projection(entitlement),
@@ -124,6 +144,36 @@ def _entitlement_fingerprint(entitlement):
         ensure_ascii=False,
     ).encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
+
+
+# convert_to_kobo_timestamp_string writes a year below 1000 unpadded, the
+# bytes the released image has always sent ("101-01-01T00:00:00Z" for
+# Calibre's "no date"). Servers on macOS or Python 3.14 padded it instead, so
+# the fingerprints they stored differ only there; this finds that twin.
+_UNPADDED_KOBO_YEAR = re.compile(r"(\d{1,3})(-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)", re.ASCII)
+
+
+def _pad_kobo_years(value):
+    if isinstance(value, dict):
+        return {key: _pad_kobo_years(member) for key, member in value.items()}
+    if isinstance(value, list):
+        return [_pad_kobo_years(item) for item in value]
+    if isinstance(value, str):
+        match = _UNPADDED_KOBO_YEAR.fullmatch(value)
+        if match:
+            return "%04d%s" % (int(match.group(1)), match.group(2))
+    return value
+
+
+def _entitlement_fingerprint_twin(entitlement):
+    """The fingerprint this payload had on a server that padded early years.
+
+    None when the payload has no year below 1000, so no twin exists.
+    """
+    padded = _pad_kobo_years(entitlement)
+    if padded == entitlement:
+        return None
+    return _entitlement_fingerprint(padded)
 
 
 def _capture_query_identities(query, identity_column):
@@ -199,7 +249,8 @@ def _deleted_entitlement_change_basis(deleted_at):
     return "v1|deleted={}".format(_ledger_timestamp_component(deleted_at))
 
 
-def _entitlement_replay_decision(record, fingerprint, change_basis):
+def _entitlement_replay_decision(record, fingerprint, change_basis,
+                                 twin_fingerprint=None):
     """Return ``(suppress, shape_reseed, refresh_record)`` for one candidate.
 
     Exact bytes are always safe to suppress. A differing fingerprint is safe
@@ -209,6 +260,10 @@ def _entitlement_replay_decision(record, fingerprint, change_basis):
     Out-of-tree metadata writers must advance ``Books.last_modified`` for each
     payload-affecting edit; direct writes that do not are indistinguishable
     from the declared renderer change at this server-side boundary.
+
+    ``twin_fingerprint`` (a callable, only asked on a mismatch) gives the same
+    payload as a server that padded years below 1000 rendered it; a record
+    stored that way is the same book and is re-stamped, not re-delivered.
     """
     if record is None:
         return False, False, False
@@ -221,6 +276,9 @@ def _entitlement_replay_decision(record, fingerprint, change_basis):
             or stored_basis != change_basis
         )
         return True, False, refresh_record
+
+    if twin_fingerprint is not None and record.fingerprint == twin_fingerprint():
+        return True, False, True
 
     declared_shape_transition = (
         record.payload_schema_version != ENTITLEMENT_PAYLOAD_SCHEMA_VERSION
@@ -1569,8 +1627,16 @@ def make_proxy_response(store_response: requests.Response) -> Response:
 
 
 def convert_to_kobo_timestamp_string(timestamp):
+    # Written out rather than strftime("%Y-..."): %Y leaves a year below 1000
+    # unpadded under the image's Python 3.13 on glibc and pads it elsewhere
+    # (macOS, Python 3.14). Calibre's "no date" is year 101, so the payload
+    # of every undated book would change with the interpreter and each Kobo
+    # would be sent all of them again as Changed. This keeps the bytes the
+    # server has always sent: "101-01-01T00:00:00Z".
     try:
-        return timestamp.strftime("%Y-%m-%dT%H:%M:%SZ")
+        t = timestamp.timetuple()
+        return "%d-%02d-%02dT%02d:%02d:%02dZ" % (
+            t.tm_year, t.tm_mon, t.tm_mday, t.tm_hour, t.tm_min, t.tm_sec)
     except AttributeError as exc:
         log.debug("Timestamp not valid: {}".format(exc))
         # A response-generation timestamp makes an unchanged payload mutate
@@ -2460,6 +2526,7 @@ def HandleSyncRequest():
                     prior_entitlement_fingerprints.get(book.Books.id),
                     entitlement_fingerprint,
                     entitlement_change_basis,
+                    lambda: _entitlement_fingerprint_twin(entitlement),
                 )
             else:
                 entitlement_is_unchanged = False
@@ -3559,10 +3626,11 @@ def _get_cover_image_id(book):
     try:
         # A personal preference changes only the bytes returned by the
         # authenticated image endpoint. It must never change BookMetadata:
-        # CoverImageId participates in the entitlement fingerprint, and
-        # changing it makes a held book look like a new/changed entitlement.
-        # HandleInitRequest versions the per-user image URL template instead,
-        # refreshing the image without touching book metadata or device ledgers.
+        # the book is not re-sent for it (CoverImageId is not fingerprinted
+        # since entitlement schema 3), so a new id would never reach a device
+        # that holds the book. HandleInitRequest versions the per-user image
+        # URL template instead, refreshing the image without touching book
+        # metadata or device ledgers.
         cover_path = None
         if not config.config_use_google_drive:
             cover_path = os.path.join(config.get_book_path(), book.path, "cover.jpg")
@@ -3573,8 +3641,8 @@ def _get_cover_image_id(book):
             cover_path=cover_path,
         )
         # When server-side padding is on, append its settings hash so a
-        # device whose cached cover was rendered with old settings
-        # re-fetches after the admin changes the aspect or fill style.
+        # device that is next sent the book re-fetches a cover rendered with
+        # old settings. Changing them does not re-send any book on its own.
         padding = _current_padding_settings()
         if padding.enabled:
             image_id = f"{image_id}-p{padding.settings_hash()}"

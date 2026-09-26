@@ -1290,6 +1290,9 @@ def _delivery_identity(data, allowed_fields):
     return device_name, raw_device_id
 
 
+DEVICE_IDENTITY_UNAVAILABLE = "Device identity could not be registered for this account"
+
+
 def _registered_delivery_device(user, device_name, raw_device_id):
     from ...services.device_registry import register_koreader_device_best_effort
     internal_id = register_koreader_device_best_effort(
@@ -1298,9 +1301,7 @@ def _registered_delivery_device(user, device_name, raw_device_id):
         device_name=device_name,
     )
     if internal_id is None:
-        raise device_delivery.DeliveryValidationError(
-            "Device identity could not be registered for this account"
-        )
+        raise device_delivery.DeliveryValidationError(DEVICE_IDENTITY_UNAVAILABLE)
     return internal_id
 
 
@@ -1394,7 +1395,7 @@ def claim_delivery():
     except device_delivery.DeliveryValidationError as error:
         ub.session.rollback()
         message = str(error)
-        if message == "Device identity could not be registered for this account":
+        if message == DEVICE_IDENTITY_UNAVAILABLE:
             return _delivery_error(message, 409, "device_identity_unavailable")
         return _delivery_error(message)
     except device_capabilities.CapabilityValidationError as error:
@@ -1480,7 +1481,11 @@ def claim_device_deletion():
         })
     except (BadRequest, device_delivery.DeliveryValidationError) as error:
         ub.session.rollback()
-        return _delivery_error(str(error))
+        message = str(error)
+        if message == DEVICE_IDENTITY_UNAVAILABLE:
+            # Same contract as the delivery claim: the request was well formed.
+            return _delivery_error(message, 409, "device_identity_unavailable")
+        return _delivery_error(message)
 
 
 @csrf.exempt

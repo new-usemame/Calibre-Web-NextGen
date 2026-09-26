@@ -161,3 +161,25 @@ def _no_annotation_backup_worker(monkeypatch):
     except Exception:  # a stubbed cps in this process: nothing to start
         return
     monkeypatch.setattr(annotation_backup, "WORKER_AUTOSTART", False)
+
+
+@pytest.fixture(autouse=True)
+def _limiter_back_on_its_own_store():
+    """Put the process limiter back on its own store after each test.
+
+    A test that makes the limiter's store raise switches ``cps.limiter`` to
+    its in-memory fallback, and that switch is process state: a later app's
+    ``init_app`` keeps it, and only the limiter's own recovery check, a second
+    or more later, switches back. A test starting inside that window counts
+    some requests in each store and sees its limits drift.
+    """
+    yield
+    cps = sys.modules.get("cps")
+    limiter = getattr(cps, "limiter", None)
+    if limiter is None:
+        return
+    # flask-limiter's own flag; if an upgrade renames it, say so rather than
+    # let this reset silently stop working.
+    assert hasattr(limiter, "_storage_dead"), \
+        "flask-limiter no longer has _storage_dead: update this fixture"
+    limiter._storage_dead = False

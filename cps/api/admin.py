@@ -553,8 +553,8 @@ def admin_delete_user(user_id):
     if not user:
         return _err("not_found", "User not found", 404)
     try:
-        # _delete_user enforces the last-admin + Guest guards and purges the
-        # user's per-book data (read status, bookmarks, annotations + backups).
+        # _delete_user enforces the last-admin + Guest guards and purges
+        # everything app.db holds for the account (cps/user_account_data.py).
         _delete_user(user)
     except Exception as ex:
         ub.session.rollback()

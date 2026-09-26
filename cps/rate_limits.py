@@ -75,8 +75,8 @@ class BasicAuthPacing:
             return None
         return self.limiter.limiter
 
-    def _run(self, operation):
-        """Run ``operation(strategy)``, on the in-memory fallback if the store fails.
+    def _run(self, account, operation):
+        """Run ``operation(strategy, bucket)``, on the in-memory fallback if the store fails.
 
         The limiter switches to its fallback only inside its own checks, which
         these sign-ins do not go through, so the switch is made here the same
@@ -85,8 +85,9 @@ class BasicAuthPacing:
         strategy = self._strategy()
         if strategy is None:
             return None
+        bucket = self._bucket(account)
         try:
-            return operation(strategy)
+            return operation(strategy, bucket)
         except Exception as ex:
             limiter = self.limiter
             if (not getattr(limiter, "_in_memory_fallback_enabled", False)
@@ -95,7 +96,7 @@ class BasicAuthPacing:
                 raise
             log.warning("Rate limit storage unreachable (%s); pacing sign-ins in memory", ex)
             limiter._storage_dead = True
-            return operation(limiter.limiter)
+            return operation(limiter.limiter, bucket)
 
     def _bucket(self, account):
         return (self.scope, request.remote_addr or "",
@@ -107,15 +108,13 @@ class BasicAuthPacing:
 
     def refuse_if_paced(self, account):
         """Raise 429 when this client has used up its guesses for ``account``."""
-        bucket = self._bucket(account)
-
-        def reset_if_full(strategy):
+        def reset_if_full(strategy, bucket):
             if strategy.test(self.SIGN_IN_ATTEMPTS, *bucket):
                 return None
             return strategy.get_window_stats(self.SIGN_IN_ATTEMPTS, *bucket).reset_time
 
         try:
-            reset = self._run(reset_if_full)
+            reset = self._run(account, reset_if_full)
         except Exception as ex:
             log.error("Rate limiter backend error: %s", ex)
             return
@@ -124,33 +123,31 @@ class BasicAuthPacing:
 
     def already_refused(self, account, password):
         """True when this client sent this wrong password this minute."""
-        bucket = self._bucket(account)
         seen = self._seen(password)
         try:
-            return bool(self._run(
-                lambda strategy: not strategy.test(self._ONCE_A_MINUTE, "seen", seen, *bucket)))
+            return bool(self._run(account, lambda strategy, bucket: not strategy.test(
+                self._ONCE_A_MINUTE, "seen", seen, *bucket)))
         except Exception as ex:
             log.error("Rate limiter backend error: %s", ex)
             return False
 
     def failed(self, account, password):
         """Count a wrong password, unless this client already sent it."""
-        bucket = self._bucket(account)
         seen = self._seen(password)
 
-        def count(strategy):
+        def count(strategy, bucket):
             if strategy.hit(self._ONCE_A_MINUTE, "seen", seen, *bucket):
                 strategy.hit(self.SIGN_IN_ATTEMPTS, *bucket)
 
         try:
-            self._run(count)
+            self._run(account, count)
         except Exception as ex:
             log.error("Rate limiter backend error: %s", ex)
 
     def succeeded(self, account):
-        bucket = self._bucket(account)
         try:
-            self._run(lambda strategy: strategy.clear(self.SIGN_IN_ATTEMPTS, *bucket))
+            self._run(account, lambda strategy, bucket: strategy.clear(
+                self.SIGN_IN_ATTEMPTS, *bucket))
         except Exception as ex:
             log.error("Connection error clearing limiter backend after login: %s", ex)
 

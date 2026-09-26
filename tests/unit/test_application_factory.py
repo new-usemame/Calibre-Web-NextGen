@@ -18,7 +18,7 @@ from flask_limiter import Limiter
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 import cps
-from cps.reverseproxy import ReverseProxied
+from cps.reverseproxy import ReverseProxied, TrustedProxyPeers
 
 
 def _stub_real_bootstrap(monkeypatch):
@@ -130,7 +130,7 @@ def _middleware_names(application):
     while id(middleware) not in seen:
         seen.add(id(middleware))
         names.append(type(middleware).__name__)
-        if isinstance(middleware, ReverseProxied):
+        if isinstance(middleware, (TrustedProxyPeers, ReverseProxied)):
             middleware = middleware.app
         elif isinstance(middleware, ProxyFix):
             middleware = middleware.app
@@ -179,6 +179,8 @@ def test_factory_constructs_two_independent_apps_without_process_job_duplication
         assert after_hooks.count(web.add_static_asset_cache_headers) == 1
     assert _middleware_names(first).count("ProxyFix") == 1
     assert _middleware_names(second).count("ProxyFix") == 1
+    assert _middleware_names(first)[0] == _middleware_names(second)[0] == "TrustedProxyPeers"
+    assert _middleware_names(first).count("TrustedProxyPeers") == 1
     assert first_jobs == (1, 1, 1)
     assert second_jobs == first_jobs
 

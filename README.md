@@ -556,6 +556,28 @@ The corresponding ProxyFix arguments are `x_for`, `x_proto`, and `x_host`.
 Count only proxies you control and that overwrite or sanitize the corresponding
 header.
 
+These headers are believed only when the connection comes from a trusted proxy
+network. By default that is this host, private networks (the docker network,
+your LAN), and Tailscale's `100.64.0.0/10`. A client that reaches CWNG directly
+from anywhere else is taken at its own address and scheme, whatever headers it
+sends. If your proxy connects from a public address, add it to
+`TRUSTED_PROXY_NETWORKS`. That includes Cloudflare's proxy forwarding straight
+to the container, with no proxy of your own in between: list Cloudflare's
+published IP ranges.
+
+Without the setting, CWNG sees every visitor as the proxy. Sign-in pacing is
+then shared by everyone, links come out as `http://` behind an HTTPS proxy,
+and sign-in providers may reject the callback address. The log says
+`Ignoring reverse-proxy headers from <address>` when this applies.
+
+```yaml
+- TRUSTED_PROXY_NETWORKS=private, 203.0.113.7, 198.51.100.0/24
+```
+
+Entries are addresses or networks, separated by commas or spaces. `private`
+stands for the default list, so keep it when you add your proxy. `*` trusts
+every peer, which was the behaviour before this setting existed.
+
 ### Hardcover metadata provider
 
 [Hardcover](https://hardcover.app/) is a free metadata provider. To enable it:

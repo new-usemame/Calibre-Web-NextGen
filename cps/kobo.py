@@ -131,7 +131,7 @@ def _entitlement_fingerprint(entitlement):
 # bytes the released image has always sent ("101-01-01T00:00:00Z" for
 # Calibre's "no date"). Servers on macOS or Python 3.14 padded it instead, so
 # the fingerprints they stored differ only there; this finds that twin.
-_UNPADDED_KOBO_YEAR = re.compile(r"^(\d{1,3})(-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)$")
+_UNPADDED_KOBO_YEAR = re.compile(r"(\d{1,3})(-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z)", re.ASCII)
 
 
 def _pad_kobo_years(value):
@@ -140,7 +140,7 @@ def _pad_kobo_years(value):
     if isinstance(value, list):
         return [_pad_kobo_years(item) for item in value]
     if isinstance(value, str):
-        match = _UNPADDED_KOBO_YEAR.match(value)
+        match = _UNPADDED_KOBO_YEAR.fullmatch(value)
         if match:
             return "%04d%s" % (int(match.group(1)), match.group(2))
     return value

@@ -44,13 +44,17 @@ from tests.unit.test_1925_kobo_sync_dedownload import (  # noqa: E402,F401 - fix
 )
 
 
-def _seed_ledger_as_a_padding_server(sync_harness, monkeypatch):
+def _seed_ledger_as_a_padding_server(sync_harness, monkeypatch, undated_added=False):
     from cps import kobo, ub
 
     monkeypatch.setattr(
         kobo.config, "config_kobo_suppress_replayed_entitlements", True,
     )
     assert sync_harness.book.pubdate.year == 101
+    if undated_added:
+        # A second year-101 field: the twin must pad every one, not one key.
+        sync_harness.book.timestamp = datetime(101, 1, 1)
+        sync_harness.session.commit()
     unpadded = kobo.convert_to_kobo_timestamp_string
 
     def padded(timestamp):
@@ -65,13 +69,15 @@ def _seed_ledger_as_a_padding_server(sync_harness, monkeypatch):
     ).one().fingerprint
 
 
+@pytest.mark.parametrize("undated_added", [False, True],
+                         ids=["no-publication-date", "no-dates-at-all"])
 def test_an_undated_book_is_not_resent_after_moving_off_a_padding_server(
-    sync_harness, monkeypatch,
+    sync_harness, monkeypatch, undated_added,
 ):
     from cps import kobo, ub
 
     padded_fingerprint = _seed_ledger_as_a_padding_server(
-        sync_harness, monkeypatch,
+        sync_harness, monkeypatch, undated_added,
     )
     stale_token = kobo.SyncToken.SyncToken().build_sync_token()
 

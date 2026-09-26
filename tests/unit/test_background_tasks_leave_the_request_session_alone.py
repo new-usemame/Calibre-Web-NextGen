@@ -301,6 +301,25 @@ def test_a_settings_reload_keeps_a_background_marker_save(app_db):
     assert _settings_row(app_db.path)["backfill_completed"] == 1
 
 
+def test_settings_save_and_reload_work_after_the_session_lets_go_of_the_row(app_db):
+    """A closed requests' session does not turn settings pages into errors.
+
+    The session is closed when a failed rollback has to be abandoned, which
+    detaches the settings row the configuration holds. Saving and reloading
+    must still work and read what is stored. Breaks if ``load()`` refreshes
+    the held row in place: that raises for a detached row on every request.
+    """
+    app_db.config.load()
+    ub.session.close()
+
+    app_db.config.config_title_regex = "saved-after-close"
+    app_db.config.save()
+    app_db.config.load()
+
+    assert app_db.config.config_title_regex == "saved-after-close"
+    assert _settings_row(app_db.path)["title_regex"] == "saved-after-close"
+
+
 @pytest.mark.parametrize("operation", ["save", "load"])
 def test_config_session_access_off_the_serving_thread_is_refused(app_db, operation):
     """``ConfigSQL.save()``/``load()`` refuse to run on a thread that does not serve requests.

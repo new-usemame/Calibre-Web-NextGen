@@ -13,11 +13,28 @@ Callers pass their own module's ``limiter`` so a test that replaces it there
 still governs the call.
 """
 
+import json
+
+from flask import request
 from werkzeug.exceptions import HTTPException
 
 from . import logger
 
 log = logger.create()
+
+
+def basic_auth_client_key():
+    """One sign-in bucket per client address and HTTP Basic account name.
+
+    A bucket keyed on the account alone could be filled by anyone who knows
+    the name, and by one device still sending an old password, and once full
+    it refuses the owner's right password from every other client too. The
+    address confines each bucket to the client filling it, as the app's own
+    sign-in does.
+    """
+    auth = request.authorization
+    account = (auth.username or "").strip().lower() if auth else ""
+    return json.dumps([request.remote_addr or "", account], separators=(",", ":"))
 
 
 def pace(limiter):

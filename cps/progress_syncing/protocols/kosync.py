@@ -54,9 +54,9 @@ from flask_babel import gettext as _
 from werkzeug.security import check_password_hash
 from sqlalchemy import func, desc, cast, String
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, InvalidRequestError
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import BadRequest, HTTPException
 
-from ... import logger, ub, csrf, config, constants, services, usermanagement
+from ... import logger, ub, csrf, config, constants, services, usermanagement, limiter, rate_limits
 from ...render_template import render_title_template
 from ..models import KOSyncProgress
 from ..settings import is_koreader_sync_enabled
@@ -324,7 +324,12 @@ def authenticate_user() -> Optional[ub.User]:
     # each signed in. Refused ones stay at INFO (#312).
     if usermanagement._verify_app_password_digest(user, password):
         log.debug("KOReader auth: authenticated via app password: %s", username)
+        rate_limits.clear_current_limits(limiter)
         return user
+
+    # Every slower check is a password guess: count it, and let a sign-in
+    # clear the count. Too many raise RateLimitExceeded, answered 429.
+    rate_limits.pace(limiter)
 
     # Check if LDAP authentication is enabled
     if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
@@ -332,6 +337,7 @@ def authenticate_user() -> Optional[ub.User]:
         login_result, error = services.ldap.bind_user(user.name, password)
         if login_result:
             log.debug("KOReader auth: authenticated via LDAP: %s", user.name)
+            rate_limits.clear_current_limits(limiter)
             return user
 
         # Log LDAP failure but continue to local check (fallback)
@@ -343,6 +349,7 @@ def authenticate_user() -> Optional[ub.User]:
     # Check if user has a local password set before attempting verification
     if user.password and check_password_hash(str(user.password), password):
         log.debug("KOReader auth: authenticated: %s", username)
+        rate_limits.clear_current_limits(limiter)
         return user
 
     # App passwords saved before digests existed cost a slow hash each, so
@@ -350,6 +357,7 @@ def authenticate_user() -> Optional[ub.User]:
     # login path is shared by KOReader progress, annotation and library sync.
     if usermanagement._verify_app_password_older(user, password):
         log.debug("KOReader auth: authenticated via app password: %s", username)
+        rate_limits.clear_current_limits(limiter)
         return user
 
     # Fork issue #312: promoted from DEBUG. Invalid-password attempts
@@ -1084,6 +1092,8 @@ def get_progress(document: str):
 
     except KOSyncError as e:
         return handle_sync_error(e)
+    except HTTPException:
+        raise
     except SQLAlchemyError as e:
         log.error(f"get_progress: Database error: {str(e)}")
         return handle_sync_error(KOSyncError(ERROR_INTERNAL, "Database error"))
@@ -1985,6 +1995,8 @@ def export_progress():
 
         return jsonify(result)
 
+    except HTTPException:
+        raise
     except SQLAlchemyError as e:
         log.error("export_progress: database error: %s", e)
         return handle_sync_error(KOSyncError(ERROR_INTERNAL, "Database error"))
@@ -2247,6 +2259,8 @@ def update_progress():
 
     except KOSyncError as e:
         return handle_sync_error(e)
+    except HTTPException:
+        raise
     except SQLAlchemyError as e:
         log.error(f"update_progress: Database error: {str(e)}")
         ub.session.rollback()
@@ -2277,6 +2291,15 @@ def handle_unauthorized(error):
         "error": ERROR_UNAUTHORIZED_USER,
         "message": "Unauthorized"
     }, 401)
+
+
+@kosync.errorhandler(429)
+def handle_too_many_attempts(error):
+    """Too many wrong passwords from this client for this account."""
+    return create_sync_response({
+        "error": ERROR_UNAUTHORIZED_USER,
+        "message": "Too many sign-in attempts; try again in a minute"
+    }, 429)
 
 
 @kosync.errorhandler(500)

@@ -8,13 +8,9 @@
 import os
 import sys
 
-from . import create_app, limiter
+from . import create_app, limiter, rate_limits
 from .jinjia import jinjia
-from flask import request, g
-
-
-def request_username():
-    return request.authorization.username
+from flask import g
 
 
 def hide_console_windows():
@@ -104,7 +100,7 @@ def register_blueprints(app):
     app.register_blueprint(web)
     app.register_blueprint(opds)
     if not getattr(opds, "_cps_rate_limit_registered", False):
-        limiter.limit("3/minute", key_func=request_username)(opds)
+        limiter.limit("3/minute", key_func=rate_limits.basic_auth_client_key)(opds)
         opds._cps_rate_limit_registered = True
     app.register_blueprint(jinjia)
     app.register_blueprint(about)
@@ -118,6 +114,11 @@ def register_blueprints(app):
     app.register_blueprint(cover_preview_bp)
     app.register_blueprint(annotations_bp)
     app.register_blueprint(kosync)
+    if not getattr(kosync, "_cps_rate_limit_registered", False):
+        # Counted only where authenticate_user paces a password; the pairing
+        # routes declare their own limits, which replace this one.
+        limiter.limit("3/minute", key_func=rate_limits.basic_auth_client_key)(kosync)
+        kosync._cps_rate_limit_registered = True
     app.register_blueprint(duplicates)
     app.register_blueprint(api_v1)
     app.register_blueprint(spa)

@@ -209,14 +209,19 @@ def test_native_lock_stalls_greenlets(real_app):
 
     assert not monkey.is_module_patched("threading")
     held = threading.Event()
+    contending = threading.Event()
     release = threading.Event()
     events = []
 
     def owner():
         with cps._process_runtime_lock:
             held.set()
-            # Bounded OS wait guarantees release even if the hub is blocked.
-            release.wait(timeout=0.2)
+            # The bounded wait starts once the contender is at the lock, so a
+            # slow scheduler cannot let it run out first. It is bounded so the
+            # lock is released even though the blocked hub never runs the
+            # observer that would release it.
+            contending.wait(timeout=5)
+            release.wait(timeout=0.5)
             events.append("os_release")
 
     thread = threading.Thread(target=owner)
@@ -225,6 +230,7 @@ def test_native_lock_stalls_greenlets(real_app):
 
     def contender():
         events.append("lock_wait")
+        contending.set()
         with cps._process_runtime_lock:
             events.append("lock_acquired")
 

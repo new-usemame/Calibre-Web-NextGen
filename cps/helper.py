@@ -1117,6 +1117,29 @@ def queue_hardcover_mark_read(book_ids):
         log.warning("Could not queue Hardcover mark-read for books %s: %s", book_ids, ex)
 
 
+def queue_hardcover_reading_progress(user, book_id, percentage):
+    """Queue the web reader's accepted position for Hardcover (#2289), behind
+    the same gate as ``queue_hardcover_mark_read``. The push is coalesced per
+    book on the worker (``queue_reading_progress``), so page turns never wait
+    on Hardcover. Never raises: the bookmark save must not fail over it."""
+    try:
+        from .services import hardcover
+        if not (config.hardcover_sync_enabled() and bool(hardcover)):
+            return
+        token = getattr(user, "hardcover_token", None)
+        if not token:
+            return
+        blocked = ub.session.query(ub.HardcoverBookBlacklist).filter(
+            ub.HardcoverBookBlacklist.book_id == book_id,
+            ub.HardcoverBookBlacklist.blacklist_reading_progress.is_(True)).first()
+        if blocked:
+            return
+        from .tasks.hardcover_sync import queue_reading_progress
+        queue_reading_progress(user.name, token, user.id, book_id, percentage)
+    except Exception as ex:
+        log.warning("Could not queue Hardcover progress for book %s: %s", book_id, ex)
+
+
 def edit_book_read_status(book_id, read_status=None, sync_hardcover=True):
     """Set or toggle the current user's read status for one book.
 

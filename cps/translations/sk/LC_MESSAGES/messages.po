@@ -354,8 +354,8 @@ msgid ""
 "Book {0} was not in the sync record for user {1}; the device will receive it "
 "on next sync"
 msgstr ""
-"Kniha {0} nebola v zázname synchronizácie používateľa {1}; last_modified "
-"bolo aktualizované, takže ju zariadenie pri ďalšej synchronizácii dostane"
+"Kniha {0} nebola v zázname synchronizácie používateľa {1}; zariadenie ju "
+"dostane pri ďalšej synchronizácii"
 
 #: cps/admin.py cps/templates/kobo_reconcile.html
 #, python-format
@@ -5232,9 +5232,7 @@ msgstr "Prehliadač"
 
 #: cps/spa_strings.py
 msgid "Browser reading source"
-msgstr ""
-"Prehliadače sa zobrazia po uložení priebehu čítania alebo anotácií. Rôzne "
-"prehliadače alebo profily sa môžu zobraziť samostatne."
+msgstr "Zdroj čítania Prehliadač"
 
 #: cps/spa_strings.py
 msgid "Built-in"
@@ -6953,7 +6951,8 @@ msgid ""
 "My Library setup is incomplete for {accounts} account(s). You can retry or "
 "undo."
 msgstr ""
-"Moja knižnica je zapnutá pre účty: {accounts}; zlyhalo účtov: {errors}."
+"Nastavenie Mojej knižnice nie je dokončené pre účty: {accounts}. Môžete to "
+"skúsiť znova alebo vrátiť späť."
 
 #: cps/spa_strings.py
 msgid "My account"
@@ -7601,8 +7600,8 @@ msgid ""
 "Reading data is kept. Browser reappears when you next save reading progress "
 "or annotations."
 msgstr ""
-"Údaje o čítaní zostanú zachované. Budúce uloženia z prehliadača sa môžu "
-"zobraziť pod neidentifikovaným zdrojom prehliadača."
+"Údaje o čítaní zostanú zachované. Prehliadač sa znova zobrazí, keď nabudúce "
+"uložíte priebeh čítania alebo anotácie."
 
 #: cps/spa_strings.py
 msgid "Reading from here. This is now your Browser position."

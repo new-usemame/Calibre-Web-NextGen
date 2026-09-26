@@ -24,7 +24,7 @@ except ImportError:  # pragma: no cover - unit/minimal environments
 from .file_helper import get_temp_dir
 from .services.calibre_db_lock import metadata_db_write_lock
 from .subproc_wrapper import process_open
-from . import logger, config
+from . import logger, config, content_server
 from .constants import SUPPORTED_CALIBRE_BINARIES
 
 log = logger.create()
@@ -74,7 +74,6 @@ def _kill_export_tree(p):
 def _do_calibre_export_blocking(book_id, book_format):
     """Run and reap one calibre export on an OS worker thread."""
     try:
-        quotes = [4, 6]
         tmp_dir = get_temp_dir()
         calibredb_binarypath = get_calibre_binarypath("calibredb")
         temp_file_name = str(uuid4())
@@ -87,16 +86,22 @@ def _do_calibre_export_blocking(book_id, book_format):
         if config.config_calibre_split:
             my_env['CALIBRE_OVERRIDE_DATABASE_PATH'] = os.path.join(config.config_calibre_dir, "metadata.db")
         library_path = config.get_book_path()
-        opf_command = [calibredb_binarypath, 'export', '--dont-write-opf', '--dont-save-cover',
-                       '--with-library', library_path,
-                       '--to-dir', tmp_dir, '--formats', book_format, "--template", "{}".format(temp_file_name),
-                       str(book_id)]
+        target = content_server.library_target()
+        library_args = target.args or ['--with-library', library_path]
+        opf_command = ([calibredb_binarypath, 'export', '--dont-write-opf', '--dont-save-cover']
+                       + library_args
+                       + ['--to-dir', tmp_dir, '--formats', book_format, "--template", "{}".format(temp_file_name),
+                          str(book_id)])
+        # Windows quoting is positional and the library arguments vary in
+        # length, so the indices are derived from the command that was built:
+        # the library itself, and the output directory.
+        quotes = [3 + len(library_args), 5 + len(library_args)]
         embed_timeout = _embed_timeout()
         # Calibre takes an exclusive library lock even for export. Coordinate
         # with other exports and ingest/metadata writers, on this OS worker so
         # waiting never parks the request hub.
         with metadata_db_write_lock(timeout=embed_timeout):
-            p = process_open(opf_command, quotes, my_env)
+            p = process_open(opf_command, quotes, my_env, stdin_payload=target.stdin)
             try:
                 _, err = p.communicate(timeout=embed_timeout)
             except subprocess.TimeoutExpired:

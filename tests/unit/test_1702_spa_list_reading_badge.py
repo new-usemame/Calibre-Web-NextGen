@@ -48,6 +48,9 @@ def readbook_db():
 
     engine = create_engine("sqlite:///:memory:")
     ub.ReadBook.__table__.create(engine)
+    # Shelf tables back the per-page shelf-tag lookup (#1254).
+    ub.Shelf.__table__.create(engine)
+    ub.BookShelf.__table__.create(engine)
     session = sessionmaker(bind=engine)()
     try:
         yield ub, engine, session
@@ -104,9 +107,10 @@ def test_list_endpoint_exposes_in_progress_for_only_the_reading_book(
             ub.ReadBook(user_id=9, book_id=2, read_status=ub.ReadBook.STATUS_IN_PROGRESS),
         ])
         session.commit()
-        # One read-status lookup plus one bulk personal-cover lookup. The
-        # latter stays one query for the page, never one per book.
-        expected_queries = 2
+        # One read-status lookup, one bulk personal-cover lookup and one bulk
+        # shelf-membership lookup (#1254). Each stays one query for the page,
+        # never one per book.
+        expected_queries = 3
     else:
         rows = [
             SimpleNamespace(
@@ -122,8 +126,9 @@ def test_list_endpoint_exposes_in_progress_for_only_the_reading_book(
                 read_status=ub.ReadBook.STATUS_UNREAD,
             ),
         ]
-        # Cover preferences are app.db state and resolve once per page.
-        expected_queries = 1
+        # Cover preferences and shelf membership (#1254) are app.db state and
+        # each resolve once per page.
+        expected_queries = 2
 
     statements = []
 
@@ -175,7 +180,12 @@ def test_anonymous_list_never_queries_or_exposes_in_progress(readbook_db):
         event.remove(engine, "before_cursor_execute", count_statement)
 
     assert body["items"][0]["in_progress"] is False
-    assert statements == []
+    # The per-user read table is never touched for the shared guest row. The
+    # one query is the shelf-tag lookup (#1254), and it asks for public shelves
+    # only -- never shelves owned by whichever user id the guest row carries.
+    assert not any("book_read_link" in statement for statement in statements)
+    assert len(statements) == 1 and "shelf.is_public" in statements[0]
+    assert "shelf.user_id =" not in statements[0]
 
 
 def test_custom_read_column_chunks_oversized_in_progress_lookup(readbook_db):

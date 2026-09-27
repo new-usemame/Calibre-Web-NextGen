@@ -19,6 +19,7 @@ import { useT } from '../lib/i18n';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
+import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
 import { getShelfVisibilityAction } from '../lib/shelfVisibility';
 import { shelfMarkAudience, shelfMarksReachDevices } from '../lib/ereaderWording';
 import { SORT_OPTIONS } from '../lib/bookSortOptions';
@@ -48,6 +49,7 @@ function dedupAppend(prev: Book[], next: Book[]): Book[] {
 export function Shelf({ id }: { id: string }) {
   const [cardActionsHidden] = useCardActionsHidden();
   const [readingTagsHidden] = useReadingTagsHidden();
+  const [shelfBadgesHidden] = useShelfBadgesHidden();
   const t = useT();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
@@ -430,6 +432,8 @@ export function Shelf({ id }: { id: string }) {
                 canRead={!!me?.role?.viewer}
                 hideActions={cardActionsHidden}
                 hideReadingTags={readingTagsHidden}
+                hideShelfTags={shelfBadgesHidden}
+                excludeShelfId={Number(id)}
               />
             ))}
           </div>

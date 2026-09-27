@@ -16,6 +16,7 @@ import { ApiError } from '../lib/api';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
+import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
 import { shelfMarkAudience, shelfMarksReachDevices } from '../lib/ereaderWording';
 import {
   canonicalMagicShelfSortAdoption,
@@ -44,6 +45,7 @@ function dedupAppend(prev: Book[], next: Book[]): Book[] {
 export function MagicShelfView({ id }: { id: string }) {
   const [cardActionsHidden] = useCardActionsHidden();
   const [readingTagsHidden] = useReadingTagsHidden();
+  const [shelfBadgesHidden] = useShelfBadgesHidden();
   const t = useT();
   const [, navigate] = useLocation();
   const [page, setPage] = useState(1);
@@ -307,6 +309,7 @@ export function MagicShelfView({ id }: { id: string }) {
               <BookCard key={b.id} book={b}
                 selectable={selecting} selectionDisabled={bulkBusy} selected={selected.has(b.id)} onToggleSelect={toggleSelect}
                 hideActions={cardActionsHidden} hideReadingTags={readingTagsHidden}
+                hideShelfTags={shelfBadgesHidden}
                 canRead={!!me?.role?.viewer}
                 style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }} />
             ))}

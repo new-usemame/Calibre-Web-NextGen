@@ -23,6 +23,7 @@ _UNSET_PREFERENCES = {
     "show_hidden_books": None,
     "card_actions_hidden": None,
     "reading_tags_hidden": None,
+    "shelf_badges_hidden": None,
 }
 
 
@@ -60,7 +61,23 @@ def test_me_serializes_named_preference_and_unset_state():
         "show_hidden_books": False,
         "card_actions_hidden": True,
         "reading_tags_hidden": False,
+        "shelf_badges_hidden": None,
     }
+
+
+def test_shelf_badge_preference_is_the_classic_grid_toggle():
+    """#1254: the new UI's shelf-tag switch and the classic grid's "Hide shelf
+    badges on covers" are one setting, so a user who hid them in one UI does
+    not get them back by switching to the other."""
+    from cps.api.serializers import serialize_user
+
+    classic_hid_them = _serializable_user({"cover": {"hide_shelf_badges": True}})
+    assert serialize_user(classic_hid_them)["preferences"]["shelf_badges_hidden"] is True
+
+    user = _FakeUser()
+    response, _session = _call({"preferences": {"shelf_badges_hidden": True}}, user)
+    assert _status(response) == 200
+    assert user.view_settings == {"cover": {"hide_shelf_badges": True}}
 
 
 def test_me_ignores_malformed_stored_preference():
@@ -132,8 +149,11 @@ def test_endpoint_persists_each_known_boolean_and_returns_state(name):
     user = _FakeUser()
     response, session = _call({"preferences": {name: True}}, user)
 
+    from cps.user_preferences import NAMED_BOOLEAN_PREFERENCE_PATHS
+
+    section, prop = NAMED_BOOLEAN_PREFERENCE_PATHS[name]
     assert _status(response) == 200
-    assert user.view_settings == {"preferences": {name: True}}
+    assert user.view_settings == {section: {prop: True}}
     expected = {**_UNSET_PREFERENCES, name: True}
     assert _json(response) == {"preferences": expected}
     session.commit.assert_called_once_with()
@@ -152,7 +172,7 @@ def test_endpoint_updates_multiple_preferences_in_one_transaction():
 
     assert _status(response) == 200
     assert user.view_settings == {"preferences": updates}
-    assert _json(response) == {"preferences": updates}
+    assert _json(response) == {"preferences": {**_UNSET_PREFERENCES, **updates}}
     session.commit.assert_called_once_with()
 
 

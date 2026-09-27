@@ -12,6 +12,9 @@ NAMED_BOOLEAN_PREFERENCE_PATHS = {
     "show_hidden_books": ("preferences", "show_hidden_books"),
     "card_actions_hidden": ("preferences", "card_actions_hidden"),
     "reading_tags_hidden": ("preferences", "reading_tags_hidden"),
+    # The classic grid's "Hide shelf badges on covers" toggle already stores
+    # this; sharing its path keeps one answer across both UIs (#1254).
+    "shelf_badges_hidden": ("cover", "hide_shelf_badges"),
 }
 
 

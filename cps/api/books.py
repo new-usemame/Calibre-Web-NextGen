@@ -17,6 +17,7 @@ from .. import (
 from ..annotations import count_user_annotations
 from ..cw_login import current_user
 from ..services import user_cover
+from ..shelf import sort_shelves_for_user
 from ..helper import edit_book_read_status, book_in_progress_ids, book_is_in_progress, \
     get_convert_options, get_kosync_progress_display, hot_books_page
 from ..sort_orders import BOOK_SORT_ORDERS, book_sort_order, viewer_id
@@ -143,6 +144,48 @@ def _row_to_item(e, in_progress_ids, hidden_ids=None, cover_override=None):
     )
 
 
+def _visible_shelves_by_book(book_ids):
+    """Shelves each listed book sits on, for the card's shelf chips (#1254).
+
+    One query per list page. Visibility is the same rule as the per-book
+    ``/books/<id>/shelves`` membership endpoint: the viewer's own shelves plus
+    every public shelf -- never another user's private shelf, whose name would
+    otherwise leak through any book that happens to be on it. The anonymous
+    guest sees public shelves only. Chips follow the viewer's own shelf order,
+    so they read the same way as the sidebar.
+    """
+    if not book_ids:
+        return {}
+    uid = _real_user_id()
+    visibility = ub.Shelf.is_public == 1
+    if uid is not None:
+        visibility = or_(ub.Shelf.user_id == uid, ub.Shelf.is_public == 1)
+    try:
+        rows = (ub.session.query(ub.BookShelf.book_id, ub.Shelf)
+                .join(ub.Shelf, ub.Shelf.id == ub.BookShelf.shelf)
+                .filter(ub.BookShelf.book_id.in_(book_ids))
+                .filter(visibility)
+                .all())
+    except (SQLAlchemyError, AttributeError):
+        # Tags are supplementary: an unreadable app DB (or the reconnect
+        # window, where the session is absent) costs the tags, not the page.
+        log.warning("Shelf membership unavailable for book list", exc_info=True)
+        return {}
+    if not rows:
+        return {}
+    shelves = list({shelf.id: shelf for _book_id, shelf in rows}.values())
+    sort_shelves_for_user(shelves, current_user)
+    rank = {shelf.id: index for index, shelf in enumerate(shelves)}
+    by_book = {}
+    for book_id, shelf in rows:
+        by_book.setdefault(int(book_id), []).append(shelf)
+    return {
+        book_id: [{"id": shelf.id, "name": shelf.name}
+                  for shelf in sorted(on, key=lambda s: rank[s.id])]
+        for book_id, on in by_book.items()
+    }
+
+
 def _rows_to_items(entries, hidden_ids=None):
     """Serialize one list page after resolving its in-progress ids in bulk."""
     entries = list(entries)
@@ -155,13 +198,16 @@ def _rows_to_items(entries, hidden_ids=None):
     books = [getattr(entry, "Books", entry) for entry in entries]
     overrides = user_cover.overrides_for_user(
         _real_user_id(), [book.id for book in books])
-    return [
-        _row_to_item(
+    shelves_by_book = _visible_shelves_by_book([int(book.id) for book in books])
+    items = []
+    for entry, book in zip(entries, books):
+        item = _row_to_item(
             entry, in_progress_ids, hidden_ids,
             cover_override=overrides.get(int(book.id)),
         )
-        for entry, book in zip(entries, books)
-    ]
+        item["shelves"] = shelves_by_book.get(int(book.id), [])
+        items.append(item)
+    return items
 
 
 def _build_entity_filter(author, series, tag, publisher, language, rating=None, book_format=None):

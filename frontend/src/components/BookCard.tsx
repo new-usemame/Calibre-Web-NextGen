@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { BookOpen, BookCheck, BookPlus, Check, EyeOff, X, Pencil } from 'lucide-react';
+import { BookOpen, BookCheck, BookPlus, Check, EyeOff, List, X, Pencil } from 'lucide-react';
 import { Link } from 'wouter';
 import type { Book } from '../lib/api';
 import { useT } from '../lib/i18n';
@@ -41,6 +41,11 @@ interface BookCardProps {
   /** Hide the compact Reading / Read status badges while leaving book state,
    * filters, progress and ordinary metadata tags untouched. */
   hideReadingTags?: boolean;
+  /** Hide the shelf tags on the cover (#1254) — the per-user "Show shelf tags"
+   *  view setting, shared with the classic grid's "Hide shelf badges". */
+  hideShelfTags?: boolean;
+  /** On a shelf's own page every card is on that shelf, so its tag is noise. */
+  excludeShelfId?: number;
   /** Global-library surfaces only. The Add action stays visible even when the
    * user hid ordinary card actions, because adding is this surface's purpose. */
   membership?: 'owned' | 'unowned';
@@ -53,6 +58,11 @@ interface BookCardProps {
    *  can never infer file access from the formats it happens to receive. */
   canRead?: boolean;
 }
+
+/** How many shelf names a cover shows before the rest fold into "+N". Two, not
+ *  the classic grid's three: an SPA phone card is ~80px wide, and a third
+ *  stacked tag would cover most of the art. The +N tag names the rest. */
+const MAX_SHELF_TAGS = 2;
 
 /** Format a Calibre series_index (a float, e.g. 1.0, 2.5) for display: whole
  *  numbers show as "1", fractional as "2.5". Returns null when there's nothing
@@ -69,6 +79,8 @@ function BookCardInner({
   quickEdit = false,
   hideActions = false,
   hideReadingTags = false,
+  hideShelfTags = false,
+  excludeShelfId,
   membership,
   onAddToLibrary,
   addPending = false,
@@ -94,6 +106,15 @@ function BookCardInner({
         : book.series
       : null;
 
+  // Shelf tags (#1254, reported by @lguerard; #2261 asked the same through the
+  // feedback form). The classic grid put the shelf name on the cover and people
+  // switched back to it to see where a book was filed.
+  const shelves = hideShelfTags
+    ? []
+    : (book.shelves ?? []).filter((s) => s.id !== excludeShelfId);
+  const shownShelves = shelves.slice(0, MAX_SHELF_TAGS);
+  const extraShelves = shelves.slice(MAX_SHELF_TAGS);
+
   // Cover + overlay badges. All non-interactive (pointer-events: none via CSS) so
   // the single wrapping control (link or toggle button) is the only tab stop.
   const cover = (
@@ -105,6 +126,32 @@ function BookCardInner({
           the read badge moving down here (#1117) would have made a third.
           A flex row makes overlap impossible by construction instead of by
           each badge hoping the others are absent. */}
+      {/* Top-right, stacked: top-left belongs to the selection checkbox and the
+          shelf page's remove button, bottom-left to the status badge row. When
+          either top-left control can appear, the row's left edge is inset past
+          it so a long shelf name truncates instead of running under it;
+          otherwise the name gets the full cover width. */}
+      {shelves.length > 0 && (
+        <div
+          className={selectable || onRemove ? `${styles.shelfRow} ${styles.shelfRowInset}` : styles.shelfRow}
+          data-testid="shelf-tags"
+        >
+          {shownShelves.map((s) => (
+            <span key={s.id} className={styles.shelfBadge} role="img"
+              aria-label={t('On shelf {name}', { name: s.name })} title={s.name}>
+              <List size={11} strokeWidth={2.5} aria-hidden="true" focusable={false} />
+              <span className={styles.shelfBadgeName} dir="auto">{s.name}</span>
+            </span>
+          ))}
+          {extraShelves.length > 0 && (
+            <span className={styles.shelfBadge} role="img"
+              aria-label={t('Also on {names}', { names: extraShelves.map((s) => s.name).join(', ') })}
+              title={extraShelves.map((s) => s.name).join(', ')}>
+              +{extraShelves.length}
+            </span>
+          )}
+        </div>
+      )}
       <div className={styles.badgeRow}>
         {/* role=img + aria-label on these badges is the established pattern from
             the WCAG pass: it announces the badge once, rather than letting the

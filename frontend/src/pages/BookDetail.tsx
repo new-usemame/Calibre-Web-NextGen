@@ -30,6 +30,7 @@ import {
 import styles from './BookDetail.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
+import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
 import { BookUserNotices } from '../components/UserNotices';
 import { backTarget } from '../lib/backLink';
 import { useAnnouncer } from '../lib/a11y/announcer';
@@ -402,6 +403,7 @@ function DescriptionBlock({ html, bookId }: { html: string; bookId: number }) {
 export function BookDetail() {
   const [cardActionsHidden] = useCardActionsHidden();
   const [readingTagsHidden] = useReadingTagsHidden();
+  const [shelfBadgesHidden] = useShelfBadgesHidden();
   const t = useT();
   const announce = useAnnouncer();
   const params = useParams<{ id: string }>();
@@ -1058,6 +1060,7 @@ export function BookDetail() {
         <MoreByAuthor
           hideActions={cardActionsHidden}
           hideReadingTags={readingTagsHidden}
+                hideShelfTags={shelfBadgesHidden}
           canRead={canReadBooks(me)}
           key={book.id}
           authorId={book.authors[0].id}

@@ -147,6 +147,9 @@ export interface Book {
   archived?: boolean;
   /** Personal-library declutter state. Present on list items from current servers. */
   hidden?: boolean;
+  /** Shelves the viewer can see that hold this book, in their shelf order
+   *  (#1254). Absent on older servers → no shelf tags. */
+  shelves?: { id: number; name: string }[];
   /** Global-library lists only. Absent means the server predates My Library and
    * the book is treated as part of the whole library. */
   in_my_library?: boolean;

@@ -249,6 +249,57 @@
   white-space: nowrap;
 }
 
+/* Shelf tags (#1254): which shelves hold the book, as the classic grid showed.
+   Top-right and stacked. .shelfRowInset reserves the top-left 24px control
+   lane (checkbox / remove) on cards that can show one, so a long name
+   ellipsises instead of sliding under it.
+   Same self-contained cover-control colours as .hiddenBadge, so it reads on
+   any cover art in every theme. */
+.shelfRow {
+  position: absolute;
+  top: var(--sp-2);
+  right: var(--sp-2);
+  left: var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--sp-1);
+  pointer-events: none;
+}
+
+.shelfRowInset {
+  left: calc(var(--sp-2) * 2 + 24px);
+}
+
+.shelfBadge {
+  max-width: 100%;
+  min-height: 20px;
+  padding: 0 var(--sp-2);
+  border-radius: var(--r-full);
+  background: var(--cover-control-bg);
+  color: var(--cover-control-fg);
+  border: 1px solid var(--cover-control-border);
+  box-shadow: var(--elev-1);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semi);
+  line-height: 1;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.shelfBadge > svg {
+  flex: none;
+}
+
+.shelfBadgeName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Series position (#573). Sits in .badgeRow; shown only in a series view. */
 .seriesBadge {
   min-width: 24px;

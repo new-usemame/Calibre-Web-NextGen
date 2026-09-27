@@ -8120,6 +8120,18 @@ msgid "Show Reading tags"
 msgstr "Leesstatuslabels tonen"
 
 #: cps/spa_strings.py
+msgid "Show shelf tags"
+msgstr "Boekenplanklabels tonen"
+
+#: cps/spa_strings.py
+msgid "On shelf {name}"
+msgstr "Op boekenplank {name}"
+
+#: cps/spa_strings.py
+msgid "Also on {names}"
+msgstr "Ook op {names}"
+
+#: cps/spa_strings.py
 msgid "Show Table view"
 msgstr "Tabelweergave tonen"
 

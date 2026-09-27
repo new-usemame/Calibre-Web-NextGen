@@ -16,6 +16,7 @@ import { useT } from '../lib/i18n';
 import styles from './AdvancedSearch.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
+import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
 
 type ReadStatus = 'all' | 'read' | 'unread';
 
@@ -78,6 +79,7 @@ function formFrom(params: AdvancedSearchParams | null): FormState {
 export function AdvancedSearch() {
   const [cardActionsHidden] = useCardActionsHidden();
   const [readingTagsHidden] = useReadingTagsHidden();
+  const [shelfBadgesHidden] = useShelfBadgesHidden();
   const t = useT();
   const qc = useQueryClient();
   const me = useMe().data;
@@ -316,6 +318,7 @@ export function AdvancedSearch() {
                   <BookCard key={book.id} book={book} quickEdit={canEdit} canRead={!!me?.role?.viewer}
                     hideActions={cardActionsHidden}
                     hideReadingTags={readingTagsHidden}
+                hideShelfTags={shelfBadgesHidden}
                     style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }} />
                 ))}
               </div>

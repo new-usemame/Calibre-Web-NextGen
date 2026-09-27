@@ -21,6 +21,7 @@ import { useNamedPreference } from '../lib/useNamedPreference';
 import { usePersistentChoice } from '../lib/usePersistentChoice';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
+import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { measureCatalogColumnCount } from '../lib/catalogGridMeasurement';
@@ -344,6 +345,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
     = useCardActionsHidden({ onError: catalogPreferenceError });
   const [readingTagsHidden, setReadingTagsHidden, readingTagsPreferenceSaving]
     = useReadingTagsHidden({ onError: catalogPreferenceError });
+  // #1254: shelf tags on covers, shared with the classic grid's toggle.
+  const [shelfBadgesHidden, setShelfBadgesHidden, shelfBadgesPreferenceSaving]
+    = useShelfBadgesHidden({ onError: catalogPreferenceError });
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsMenuRef = useRef<HTMLDivElement>(null);
   const [density, setDensity] = usePersistentChoice(
@@ -1028,6 +1032,17 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   />
                   <span>{t('Show Reading tags')}</span>
                 </label>
+                <label className={styles.settingsItem}>
+                  <input
+                    type="checkbox"
+                    data-testid="show-shelf-tags"
+                    className={styles.settingsCheck}
+                    checked={!shelfBadgesHidden}
+                    disabled={shelfBadgesPreferenceSaving}
+                    onChange={(e) => setShelfBadgesHidden(!e.target.checked)}
+                  />
+                  <span>{t('Show shelf tags')}</span>
+                </label>
                 <fieldset className={styles.densityField}>
                   <legend>{t('Book density')}</legend>
                   {DENSITY_OPTIONS.map((option) => (
@@ -1082,6 +1097,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           closeDisabled={discoverPreferenceSaving}
           hideActions={cardActionsHidden}
           hideReadingTags={readingTagsHidden}
+          hideShelfTags={shelfBadgesHidden}
         />
       )}
 
@@ -1125,6 +1141,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   canRead={!!me?.role?.viewer}
                   hideActions={cardActionsHidden}
                   hideReadingTags={readingTagsHidden}
+                  hideShelfTags={shelfBadgesHidden}
                   selectable={selecting}
                   selected={selected.has(book.id)}
                   onToggleSelect={(b) =>

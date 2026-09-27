@@ -57,10 +57,12 @@ def test_failed_response_commit_retries_tagged_pending_delete(sync_harness, monk
                                 '00000000-0000-0000-0000-000000000222']
 
 
-@pytest.mark.parametrize('action', ['fullsync', 'resend'])
+@pytest.mark.parametrize('action', ['fullsync', 'resend', 'spa-fullsync'])
 @pytest.mark.parametrize('seed_exists', [True, False])
 def test_explicit_reset_reannounces_previously_read_book_new(sync_harness, monkeypatch, action, seed_exists):
+    import inspect
     from cps import admin
+    from cps.api import kobo_pairing
     from datetime import datetime
     h = sync_harness
     state = _restore_tagged_database(h)
@@ -74,6 +76,13 @@ def test_explicit_reset_reannounces_previously_read_book_new(sync_harness, monke
     with h.app.test_request_context('/ajax/fullsync/17', method='POST'):
         if action == 'fullsync':
             response = admin.do_full_kobo_sync(h.user.id)
+        elif action == 'spa-fullsync':
+            # #2334: the new UI's button reaches the same reset through the API.
+            from types import SimpleNamespace
+            monkeypatch.setattr(kobo_pairing, 'current_user', SimpleNamespace(
+                id=h.user.id, is_authenticated=True, is_anonymous=False, role_admin=lambda: False))
+            response = inspect.unwrap(kobo_pairing.force_kobo_full_sync)()
+            assert response.get_json()['user_id'] == h.user.id
         else:
             response = admin.do_kobo_resend(h.user.id, state['book_id'])
         assert response.status_code == 200

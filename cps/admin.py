@@ -1455,6 +1455,18 @@ def ajax_pathchooser():
 
 
 def do_full_kobo_sync(userid):
+    count, _committed = reset_kobo_sync_state(userid)
+    message = _("{} sync entries deleted").format(count)
+    return Response(json.dumps([{"type": "success", "message": message}]), mimetype='application/json')
+
+
+def reset_kobo_sync_state(userid):
+    """Forget what every one of the user's Kobos has been sent.
+
+    The next sync then delivers the whole library again, each book as New.
+    Returns ``(synced_book_rows_deleted, committed)``; shared by the classic
+    profile button and the SPA device page (#2334).
+    """
     device_ids = ub.session.query(ub.Device.id).filter(
         ub.Device.user_id == userid).scalar_subquery()
     ub.session.query(ub.KoboDeviceBookEntitlement).filter(
@@ -1478,9 +1490,8 @@ def do_full_kobo_sync(userid):
         ub.KoboDevicePendingSyncPage.device_id.in_(device_ids),
     ).delete(synchronize_session=False)
     count = ub.session.query(ub.KoboSyncedBooks).filter(userid == ub.KoboSyncedBooks.user_id).delete()
-    message = _("{} sync entries deleted").format(count)
-    ub.session_commit(message)
-    return Response(json.dumps([{"type": "success", "message": message}]), mimetype='application/json')
+    committed = ub.session_commit("Kobo full sync: {} sync entries deleted for user {}".format(count, userid))
+    return count, committed
 
 
 @admi.route("/ajax/kobo_resend/<int:userid>/<int:bookid>", methods=["POST"])

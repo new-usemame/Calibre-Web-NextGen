@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Cable, CheckCircle2, Copy, RefreshCw, Trash2 } from 'lucide-react';
+import { Cable, CheckCircle2, Copy, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { apiUrl, ApiError } from '../lib/api';
 import {
-  useCreateKoboSyncToken, useDeleteKoboSyncToken, useKoboSyncToken,
+  useCreateKoboSyncToken, useDeleteKoboSyncToken, useForceKoboFullSync, useKoboSyncToken,
 } from '../lib/queries';
 import {
   koboConfigLine, latestPairingDevice, pairingVisibility,
@@ -49,11 +49,12 @@ export function KoboPairing({ devices, enabled, koreaderEnabled }: {
   const token = useKoboSyncToken();
   const createToken = useCreateKoboSyncToken();
   const deleteToken = useDeleteKoboSyncToken();
+  const fullSync = useForceKoboFullSync();
   const [copied, setCopied] = useState<'kobo' | 'koreader' | null>(null);
   const [copyError, setCopyError] = useState('');
   const recheckTimers = useRef<number[]>([]);
   const seen = latestPairingDevice(devices);
-  const mutationError = createToken.error ?? deleteToken.error;
+  const mutationError = createToken.error ?? deleteToken.error ?? fullSync.error;
   const configured = !!token.data?.configured && !!token.data.sync_url;
   const visibility = pairingVisibility(enabled, configured);
   const serverUrl = token.data?.server_url
@@ -98,6 +99,14 @@ export function KoboPairing({ devices, enabled, koreaderEnabled }: {
     deleteToken.mutate(undefined, {
       onSuccess: () => announce(t('Kobo sync URL deleted.')),
       onError: () => announce(t('Could not delete the Kobo sync URL.'), { assertive: true }),
+    });
+  };
+
+  const forceFullSync = () => {
+    if (!window.confirm(t('Send every book to your Kobo again on its next sync? Books already on it are sent again too.'))) return;
+    fullSync.mutate(undefined, {
+      onSuccess: () => announce(t('Full sync requested. Sync your Kobo to receive your library again.')),
+      onError: () => announce(t('Could not request a full Kobo sync.'), { assertive: true }),
     });
   };
 
@@ -171,6 +180,17 @@ export function KoboPairing({ devices, enabled, koreaderEnabled }: {
                 <li>{t('Save the file, safely eject the Kobo, then restart it.')}</li>
                 <li>{t('Tap Sync on the Kobo. Your NextGen books should appear.')}</li>
               </ol>
+              <div className={styles.fullSyncRow}>
+                <button type="button" disabled={fullSync.isPending} onClick={forceFullSync}>
+                  <RotateCcw size={16} aria-hidden="true" focusable={false} />
+                  {t('Force full kobo sync')}
+                </button>
+                {fullSync.isSuccess && (
+                  <p role="status" className={styles.pairingStatus}>
+                    {t('Full sync requested. Sync your Kobo to receive your library again.')}
+                  </p>
+                )}
+              </div>
               <button type="button" className={styles.deleteTokenButton}
                 disabled={deleteToken.isPending} onClick={revoke}>
                 <Trash2 size={16} aria-hidden="true" focusable={false} />

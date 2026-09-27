@@ -158,15 +158,15 @@
   padding: var(--sp-3) var(--sp-4); color: var(--text); background: var(--danger-soft);
   border: 1px solid var(--danger-border); border-radius: var(--r-md); line-height: var(--lh-base);
 }
-.primaryButton, .pairingUrlRow button, .deleteTokenButton, .deviceSeen button, .deviceWaiting button {
+.primaryButton, .pairingUrlRow button, .fullSyncRow button, .deleteTokenButton, .deviceSeen button, .deviceWaiting button {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
   min-height: 44px; padding: 0 var(--sp-4); border: 1px solid var(--border);
   border-radius: var(--r-md); color: var(--text); font-weight: var(--fw-medium);
   transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
 .primaryButton { color: var(--accent-text); background: var(--accent-soft); border-color: var(--accent); }
-.primaryButton:hover, .pairingUrlRow button:hover, .deviceSeen button:hover, .deviceWaiting button:hover { background: var(--surface-3); border-color: var(--border-strong); }
-.primaryButton:disabled, .deleteTokenButton:disabled { opacity: .6; cursor: default; }
+.primaryButton:hover, .pairingUrlRow button:hover, .fullSyncRow button:hover, .deviceSeen button:hover, .deviceWaiting button:hover { background: var(--surface-3); border-color: var(--border-strong); }
+.primaryButton:disabled, .fullSyncRow button:disabled, .deleteTokenButton:disabled { opacity: .6; cursor: default; }
 .pairingUrlBlock { margin-top: var(--sp-4); }
 .pairingLabel { margin: 0 0 var(--sp-2); font-weight: var(--fw-bold); }
 /* The address and its controls share one row in the full-width panels (Kobo
@@ -230,6 +230,8 @@
 .manualSetup summary { display: flex; align-items: center; gap: var(--sp-2); min-height: 44px; cursor: pointer; color: var(--accent-text); font-weight: var(--fw-medium); }
 .manualSetup summary:hover { color: var(--accent-hover); }
 .manualSetup[open] summary { margin-bottom: var(--sp-2); }
+.fullSyncRow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-top: var(--sp-4); }
+.fullSyncRow p { margin: 0; }
 .deleteTokenButton {
   /* --danger is 4.15:1 on this card's --surface-2 in the dark palette, so it
      remains the non-text destructive cue while the small label uses AA text. */

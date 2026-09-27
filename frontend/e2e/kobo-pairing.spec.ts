@@ -151,3 +151,34 @@ test('KOReader setup remains discoverable without stock Kobo sync or a token', a
     hasText: /^Kobo sync is not enabled on this server\.$/,
   })).toHaveText('Kobo sync is not enabled on this server.');
 });
+
+test('a paired user can force a full Kobo sync, and cancelling sends nothing (#2334)', async ({ page }) => {
+  await enableKoboFeature(page);
+  await page.route('**/api/v1/account/kobo-sync-token', (route) => route.fulfill({ json: {
+    user_id: 1, configured: true, sync_url: syncUrl, server_url: serverUrl, is_localhost: false,
+  } }));
+  await page.route('**/api/annotations/devices?*', (route) => route.fulfill({ json: {
+    devices: [], limit: 100, offset: 0, total: 0,
+  } }));
+  const resets: string[] = [];
+  await page.route('**/api/v1/account/kobo-full-sync', async (route) => {
+    resets.push(route.request().method());
+    await route.fulfill({ json: { user_id: 1, sync_entries_deleted: 12 } });
+  });
+
+  await page.goto('/app/account/devices#kobo-pairing');
+  const pairing = page.getByRole('region', { name: 'Pair a Kobo or KOReader' });
+  const force = pairing.getByRole('button', { name: 'Force full kobo sync' });
+  await expect(force).toBeVisible();
+
+  page.once('dialog', (dialog) => void dialog.dismiss());
+  await force.click();
+  await expect(pairing.getByText('Full sync requested.', { exact: false })).toHaveCount(0);
+  expect(resets).toEqual([]);
+
+  page.once('dialog', (dialog) => void dialog.accept());
+  await force.click();
+  await expect(pairing.getByRole('status').filter({ hasText: 'Full sync requested.' }))
+    .toHaveText('Full sync requested. Sync your Kobo to receive your library again.');
+  expect(resets).toEqual(['POST']);
+});

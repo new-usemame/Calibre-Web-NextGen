@@ -1476,6 +1476,17 @@ export function useDeleteKoboSyncToken() {
   });
 }
 
+/** Forget what this account's Kobos were sent, so the next sync delivers the
+ *  whole library again as New (#2334; the classic profile's "Force full kobo
+ *  sync"). Nothing cached on this page describes that ledger. */
+export function useForceKoboFullSync() {
+  return useMutation({
+    mutationFn: () => apiPost<{ user_id: number; sync_entries_deleted: number }>(
+      '/api/v1/account/kobo-full-sync',
+    ),
+  });
+}
+
 // ── KOReader: pairing by code and the ready-made plugin ──
 
 const koreaderPairPath = (code: string) =>

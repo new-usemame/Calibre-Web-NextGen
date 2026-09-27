@@ -1283,7 +1283,11 @@ function CWNGSync:syncDeviceCapabilities(interactive, ensure_networking)
                             table.insert(deleted_paths, deleted_path)
                         end
                         if remaining > 1 then
-                            UIManager:nextTick(function() drainDeletions(remaining - 1) end)
+                            -- Not nextTick: sync requests block unless Turbo
+                            -- is on, and KOReader runs a nextTick chain to the
+                            -- end before it reads a single tap. A task that is
+                            -- not yet due lets the reader in between deletions.
+                            UIManager:scheduleIn(0.5, function() drainDeletions(remaining - 1) end)
                         else
                             finishDeletions()
                         end

@@ -43,11 +43,45 @@ local function newHarness(options)
         rows[index] = { id = index, lpath = path, claim_token = "t" .. index, state = "requested" }
     end
     local observed = { claims = 0, removed = {}, acks = {}, collections = 0, refreshed = {} }
-    local ticks = {}
+    -- A model of KOReader's main loop (frontend/ui/uimanager.lua handleInput
+    -- and _checkTasks). Due tasks run back to back, and scheduling a task marks
+    -- the queue dirty, so the loop goes round again before it polls input:
+    -- with Turbo off (the default) every sync request blocks, and a nextTick
+    -- chain of them never lets a tap through (#2329). Only a task that is not
+    -- yet due lets the loop reach input. Each blocking request advances the clock.
+    local clock, queue, dirty = 0, {}, false
+    local since_poll = 0
+    observed.most_requests_without_input = 0
+    local function blockingRequest()
+        clock = clock + 0.05
+        since_poll = since_poll + 1
+        if since_poll > observed.most_requests_without_input then
+            observed.most_requests_without_input = since_poll
+        end
+    end
+    local function scheduleIn(_, seconds, fn)
+        table.insert(queue, { time = clock + seconds, fn = fn })
+        table.sort(queue, function(a, b) return a.time < b.time end)
+        dirty = true
+    end
+    local function runLoop()
+        while #queue > 0 do
+            repeat
+                local pass_now = clock
+                dirty = false
+                while queue[1] and queue[1].time <= pass_now do
+                    table.remove(queue, 1).fn()
+                end
+            until not dirty
+            since_poll = 0 -- input is read here
+            if queue[1] and queue[1].time > clock then clock = queue[1].time end
+        end
+    end
 
     local client = {}
     function client.claim_deletion(_, _user, _password, _model, _device_id, callback)
         observed.claims = observed.claims + 1
+        blockingRequest()
         assert(observed.claims <= 200, "deletion claims did not terminate")
         local chosen
         for _, row in ipairs(rows) do
@@ -66,6 +100,7 @@ local function newHarness(options)
     end
     function client.complete_deletion(_, _user, _password, _model, _device_id,
             deletion_id, claim_token, deleted, _reason, callback)
+        blockingRequest()
         if options.fail_ack_on == observed.claims then
             return callback(false, nil, "network down")
         end
@@ -87,7 +122,10 @@ local function newHarness(options)
         lfs = { attributes = function() return {} end },
         util = { removeFile = function() end },
         Device = { model = "test-device" },
-        UIManager = { nextTick = function(_, fn) table.insert(ticks, fn) end },
+        UIManager = {
+            scheduleIn = scheduleIn,
+            nextTick = function(self, fn) return scheduleIn(self, 0, fn) end,
+        },
         DeviceActions = {
             deleteNamed = function(deletion, root)
                 if deletion.lpath == options.refuse then
@@ -119,7 +157,7 @@ local function newHarness(options)
 
     local function sync()
         plugin:syncDeviceCapabilities(true, false)
-        while #ticks > 0 do table.remove(ticks, 1)() end
+        runLoop()
     end
     return sync, observed, rows
 end
@@ -134,6 +172,9 @@ do
     assertEqual(#observed.acks, 3, "every deletion is acknowledged")
     assertEqual(#observed.refreshed, 3, "the library view hears about every removed file")
     assertEqual(observed.collections, 1, "collections sync once, after the drain")
+    -- One claim and its acknowledgement per step, then the reader gets a turn.
+    assertEqual(observed.most_requests_without_input, 2,
+        "the drain lets input through between deletions")
 end
 
 -- An empty queue still reaches the collection step, exactly once.
@@ -181,6 +222,8 @@ do
     assert(#observed.removed >= 20 and #observed.removed < 120,
         "one sync drains a bounded batch, got " .. #observed.removed)
     assertEqual(observed.collections, 1, "a capped drain still syncs collections once")
+    assertEqual(observed.most_requests_without_input, 2,
+        "a long drain never holds input for more than one deletion")
     local first = #observed.removed
     sync()
     assert(#observed.removed > first, "the next sync continues where the last stopped")

@@ -166,9 +166,15 @@ def _visible_shelves_by_book(book_ids):
                 .filter(ub.BookShelf.book_id.in_(book_ids))
                 .filter(visibility)
                 .all())
-    except (SQLAlchemyError, AttributeError):
-        # Tags are supplementary: an unreadable app DB (or the reconnect
-        # window, where the session is absent) costs the tags, not the page.
+    except SQLAlchemyError:
+        # Tags are supplementary: an unreadable app DB costs the tags, not the
+        # page. ub.session is process-wide, so a failed query must not leave it
+        # needing a rollback that every later request would then trip over.
+        log.warning("Shelf membership unavailable for book list", exc_info=True)
+        ub.session.rollback()
+        return {}
+    except AttributeError:
+        # The reconnect window, where the app-DB session is absent.
         log.warning("Shelf membership unavailable for book list", exc_info=True)
         return {}
     if not rows:

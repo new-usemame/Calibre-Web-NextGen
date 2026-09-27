@@ -83,3 +83,18 @@ def test_guest_sees_public_shelves_only(env):
     shelves = env(None)
     assert [s["name"] for s in shelves[10]] == ["Club picks"]
     assert shelves[11] == [] and shelves[12] == []
+
+
+def test_unreadable_app_db_costs_the_tags_not_the_page(env, monkeypatch):
+    """A failed membership query still returns the page, and rolls the shared
+    session back so the next request is not left with a broken transaction."""
+    from unittest.mock import MagicMock
+    from sqlalchemy.exc import OperationalError
+    from cps import ub
+
+    broken = MagicMock()
+    broken.query.side_effect = OperationalError("SELECT", {}, Exception("locked"))
+    monkeypatch.setattr(ub, "session", broken)
+    shelves = env(READER)
+    assert shelves == {10: [], 11: [], 12: []}
+    broken.rollback.assert_called_once_with()

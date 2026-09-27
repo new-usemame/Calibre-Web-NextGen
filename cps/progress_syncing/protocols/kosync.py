@@ -25,7 +25,7 @@ Security:
     - All API endpoints use HTTP Basic Authentication
     - Document identifiers validated to prevent injection attacks
     - Session management via SQLAlchemy with proper isolation
-    - Rate limiting should be applied at reverse proxy level
+    - Wrong passwords are paced per client and account (authenticate_user)
 
 Integration:
     - Syncs with Calibre library via BookFormatChecksum table
@@ -54,9 +54,9 @@ from flask_babel import gettext as _
 from werkzeug.security import check_password_hash
 from sqlalchemy import func, desc, cast, String
 from sqlalchemy.exc import SQLAlchemyError, OperationalError, InvalidRequestError
-from werkzeug.exceptions import BadRequest
+from werkzeug.exceptions import BadRequest, HTTPException
 
-from ... import logger, ub, csrf, config, constants, services, usermanagement
+from ... import logger, ub, csrf, config, constants, services, usermanagement, limiter, rate_limits
 from ...render_template import render_title_template
 from ..models import KOSyncProgress
 from ..settings import is_koreader_sync_enabled
@@ -308,31 +308,71 @@ def authenticate_user() -> Optional[ub.User]:
         log.error(f"Database error during user lookup: {e}")
         return None
 
-    if not user:
-        # Fork issue #312: promoted from DEBUG so kosync auth failures
-        # are visible in default-INFO logs. Includes the username so a
-        # typo or stale device config is identifiable from one line.
-        log.info("KOReader auth: User not found: %s", username)
-        return None
-
     # App passwords first (fork issues #586, #95), found by their digest: one
     # indexed lookup, no slow hash, and never an LDAP bind. KOReader sends
     # its credentials with every request; when this check came last, each
     # request from a device paid the LDAP bind (a failed login on the
     # directory) and the account hash before its own password was looked at.
+    # An app password is a random token, so it is let in before the pacing
+    # below: a device using one is never refused for another's guesses.
     # Successful sign-ins log at DEBUG: a library sync is a burst of requests,
     # each signed in. Refused ones stay at INFO (#312).
-    if usermanagement._verify_app_password_digest(user, password):
+    if user and usermanagement._verify_app_password_digest(user, password):
         log.debug("KOReader auth: authenticated via app password: %s", username)
         return user
 
+    # Every slower check is a password guess. This client's new wrong
+    # passwords for this account are counted, and too many are refused with
+    # 429 before their password is looked at (rate_limits.BasicAuthPacing).
+    pacing = rate_limits.BasicAuthPacing(limiter, "kosync")
+    pacing.refuse_if_paced(username)
+    if pacing.already_refused(username, password):
+        log.info("KOReader auth: Invalid password for user: %s (repeated)", username)
+        return None
+
+    if not user:
+        # Fork issue #312: promoted from DEBUG so kosync auth failures
+        # are visible in default-INFO logs. Includes the username so a
+        # typo or stale device config is identifiable from one line.
+        log.info("KOReader auth: User not found: %s", username)
+        pacing.failed(username, password)
+        return None
+
+    signed_in, answered = _verify_slower_credentials(user, username, password)
+    if signed_in:
+        pacing.succeeded(username)
+        return user
+    if not answered:
+        # The directory could not say, so the password is neither right nor
+        # wrong: remembering it as wrong would refuse it once the directory
+        # is back.
+        log.info("KOReader auth: could not check the password for user: %s "
+                 "(directory unavailable)", username)
+        return None
+
+    # Fork issue #312: promoted from DEBUG. Invalid-password attempts
+    # for a real user are exactly the signal needed to diagnose stale
+    # device-side credentials after a password change.
+    log.info("KOReader auth: Invalid password for user: %s", username)
+    pacing.failed(username, password)
+    return None
+
+
+def _verify_slower_credentials(user, username, password) -> Tuple[bool, bool]:
+    """The directory, the account password, then pre-digest app passwords.
+
+    Returns (signed in, answered): answered is False when the directory
+    could not be asked and nothing else accepted the password.
+    """
+    answered = True
     # Check if LDAP authentication is enabled
     if config.config_login_type == constants.LOGIN_LDAP and services.ldap:
         # Try LDAP authentication
         login_result, error = services.ldap.bind_user(user.name, password)
         if login_result:
             log.debug("KOReader auth: authenticated via LDAP: %s", user.name)
-            return user
+            return True, True
+        answered = error is None
 
         # Log LDAP failure but continue to local check (fallback)
         # We use debug level here because failure is expected if the user is using a local password
@@ -343,20 +383,15 @@ def authenticate_user() -> Optional[ub.User]:
     # Check if user has a local password set before attempting verification
     if user.password and check_password_hash(str(user.password), password):
         log.debug("KOReader auth: authenticated: %s", username)
-        return user
+        return True, True
 
     # App passwords saved before digests existed cost a slow hash each, so
     # they come last; the first sign-in with one gives it its digest. This
     # login path is shared by KOReader progress, annotation and library sync.
     if usermanagement._verify_app_password_older(user, password):
         log.debug("KOReader auth: authenticated via app password: %s", username)
-        return user
-
-    # Fork issue #312: promoted from DEBUG. Invalid-password attempts
-    # for a real user are exactly the signal needed to diagnose stale
-    # device-side credentials after a password change.
-    log.info("KOReader auth: Invalid password for user: %s", username)
-    return None
+        return True, True
+    return False, answered
 
 
 def create_sync_response(data: Dict[str, Any], status_code: int = 200) -> tuple:
@@ -958,10 +993,8 @@ def auth_user():
     Returns:
         200: {"authorized": "OK"} if authentication succeeds
         401: {"error": 2001, "message": "Unauthorized"} if authentication fails
-
-    Note:
-        Rate limiting should be applied at reverse proxy level to prevent
-        brute force attacks (suggested: 10 requests per minute per IP).
+        429: too many different wrong passwords from this client for this
+             account in the last minute (see authenticate_user)
     """
     blocked = _require_kosync_enabled()
     if blocked:
@@ -1084,6 +1117,8 @@ def get_progress(document: str):
 
     except KOSyncError as e:
         return handle_sync_error(e)
+    except HTTPException:
+        raise
     except SQLAlchemyError as e:
         log.error(f"get_progress: Database error: {str(e)}")
         return handle_sync_error(KOSyncError(ERROR_INTERNAL, "Database error"))
@@ -1985,6 +2020,8 @@ def export_progress():
 
         return jsonify(result)
 
+    except HTTPException:
+        raise
     except SQLAlchemyError as e:
         log.error("export_progress: database error: %s", e)
         return handle_sync_error(KOSyncError(ERROR_INTERNAL, "Database error"))
@@ -2247,6 +2284,8 @@ def update_progress():
 
     except KOSyncError as e:
         return handle_sync_error(e)
+    except HTTPException:
+        raise
     except SQLAlchemyError as e:
         log.error(f"update_progress: Database error: {str(e)}")
         ub.session.rollback()
@@ -2277,6 +2316,17 @@ def handle_unauthorized(error):
         "error": ERROR_UNAUTHORIZED_USER,
         "message": "Unauthorized"
     }, 401)
+
+
+@kosync.errorhandler(429)
+def handle_too_many_attempts(error):
+    """Too many wrong passwords from this client for this account."""
+    body, status = create_sync_response({
+        "error": ERROR_UNAUTHORIZED_USER,
+        "message": "Too many sign-in attempts; try again in a minute"
+    }, 429)
+    retry_after = getattr(error, "retry_after", None)
+    return body, status, ({"Retry-After": str(retry_after)} if isinstance(retry_after, int) else {})
 
 
 @kosync.errorhandler(500)

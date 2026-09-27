@@ -10,11 +10,6 @@ import sys
 
 from . import create_app, limiter
 from .jinjia import jinjia
-from flask import request, g
-
-
-def request_username():
-    return request.authorization.username
 
 
 def hide_console_windows():
@@ -102,10 +97,9 @@ def register_blueprints(app):
     app.register_blueprint(search)
     app.register_blueprint(tasks)
     app.register_blueprint(web)
+    # OPDS and KOReader sync pace their HTTP Basic sign-ins themselves
+    # (rate_limits.BasicAuthPacing): per client, counting only new guesses.
     app.register_blueprint(opds)
-    if not getattr(opds, "_cps_rate_limit_registered", False):
-        limiter.limit("3/minute", key_func=request_username)(opds)
-        opds._cps_rate_limit_registered = True
     app.register_blueprint(jinjia)
     app.register_blueprint(about)
     app.register_blueprint(shelf)

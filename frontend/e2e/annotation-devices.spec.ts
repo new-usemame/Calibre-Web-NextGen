@@ -419,6 +419,14 @@ test('device inventory renders one bounded window and reports the true total', a
   await inventory.getByRole('button', { name: 'Next' }).click();
   await expect.poll(() => inventoryRequestUrls[inventoryRequestUrls.length - 1]
     ?.searchParams.get('offset')).toBe('200');
+  // The pager unmounts while the next window loads. Focus must not fall back to
+  // <body>: it lands on the new window's status, in view below the sticky bar.
+  const status = inventory.getByRole('status');
+  await expect(status).toBeFocused();
+  const statusTop = await status.evaluate((element) => element.getBoundingClientRect().top);
+  const barBottom = await page.locator('header').first()
+    .evaluate((element) => element.getBoundingClientRect().bottom);
+  expect(statusTop).toBeGreaterThanOrEqual(barBottom);
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag22aa'])
     .analyze();

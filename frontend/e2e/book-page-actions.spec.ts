@@ -3,8 +3,10 @@ import { collectPageErrors, assertNoPageErrors, assertNoHorizontalOverflow, fetc
 
 /*
  * Book-page actions cleanup contract:
- *   - A task-ordered visible row on the book page (Read now, Edit cover, Add to
- *     shelf, favorite, personal-library removal, then the "More actions" gear);
+ *   - A task-ordered visible row on the book page (Read now, the edit action,
+ *     Add to shelf, favorite, personal-library removal, then the "More actions"
+ *     gear). The edit action is Edit metadata for anyone allowed to edit it, and
+ *     Edit cover for a reader whose only edit is their own cover (#2338);
  *     every other action lives in the gear's
  *     accessible menu, with whole-book deletion in an admin-only danger section.
  *   - An "Edit cover" pill on the artwork opens the cover editor, which now
@@ -98,7 +100,8 @@ test('the gear menu lists every action, with an admin-only delete section', asyn
   // The task-ordered visible controls — and nothing else action-like in the row.
   const actions = page.getByTestId('book-actions');
   await expect(actions.getByRole('link', { name: 'Read now' })).toBeVisible({ timeout: 10_000 });
-  await expect(actions.getByRole('link', { name: 'Edit cover' })).toBeVisible();
+  await expect(actions.getByRole('link', { name: 'Edit metadata' })).toBeVisible();
+  await expect(actions.getByRole('link', { name: 'Edit cover' })).toHaveCount(0);
   await expect(actions.getByRole('button', { name: 'Add to shelf' })).toBeVisible();
   await expect(actions.getByRole('button', { name: /^(Add to favorites|Remove from favorites)$/ })).toBeVisible();
   await expect(actions.getByRole('button', { name: 'Remove from my library' })).toBeVisible();
@@ -124,7 +127,7 @@ test('the gear menu lists every action, with an admin-only delete section', asyn
   assertNoPageErrors(errors);
 });
 
-test('the personal-library action row leads with cover and keeps private removal distinct', async ({ page }) => {
+test('the personal-library action row leads with editing and keeps private removal distinct', async ({ page }) => {
   await page.goto('/app');
   const bookId = await firstBookWithFormats(page);
   test.skip(bookId == null, 'seed has no book with files');
@@ -135,7 +138,7 @@ test('the personal-library action row leads with cover and keeps private removal
   await expect(actions.getByRole('link', { name: 'Read now' })).toBeVisible();
 
   // This is the task order, not just a set-membership assertion: the primary
-  // reading action is followed by the cover editor and shelf chooser, then two
+  // reading action is followed by the metadata editor and shelf chooser, then two
   // compact personal actions. The spacer leaves Settings at the far edge.
   const visibleActions = await actions.locator('a, button').evaluateAll((nodes) =>
     nodes
@@ -150,7 +153,7 @@ test('the personal-library action row leads with cover and keeps private removal
       })),
   );
   expect(visibleActions.slice(0, 6).map((action) => action.name)).toEqual([
-    'Read now', 'Edit cover', 'Add to shelf',
+    'Read now', 'Edit metadata', 'Add to shelf',
     expect.stringMatching(/^(Add to favorites|Remove from favorites)$/),
     'Remove from my library', 'Settings',
   ]);
@@ -208,19 +211,54 @@ test('the menu drives focus by keyboard: open, arrows, Escape restores the trigg
   await expect(trigger).toBeFocused();
 });
 
-test('the Edit cover action opens the cover editor', async ({ page }) => {
+test('an editor reaches Edit metadata from the row and the cover editor from the gear (#2338)', async ({ page }) => {
   await page.goto('/app');
   const bookId = await firstBookWithFormats(page);
   test.skip(bookId == null, 'seed has no book with files');
+  await stubFullAccess(page);
   await mockCoverSources(page);
 
   const errors = collectPageErrors(page);
   await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
-  const action = page.getByTestId('edit-cover-action');
+  const action = page.getByTestId('edit-metadata-action');
   await expect(action).toBeVisible({ timeout: 10_000 });
   await action.click();
+  await expect(page).toHaveURL(new RegExp(`/app/book/${bookId}/edit$`), { timeout: 10_000 });
+  await expect(page.getByRole('heading', { name: 'Edit metadata' })).toBeVisible();
+
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  const menu = await openGearMenu(page);
+  await menu.getByRole('menuitem', { name: 'Edit cover…' }).click();
   await expect(page).toHaveURL(new RegExp(`/app/book/${bookId}/cover`), { timeout: 10_000 });
   await expect(page.getByRole('heading', { name: 'Edit shared library cover' })).toBeVisible();
+
+  assertNoPageErrors(errors);
+});
+
+test('a reader who cannot edit metadata keeps Edit cover in the row (#2338)', async ({ page }) => {
+  await page.goto('/app');
+  const bookId = await firstBookWithFormats(page);
+  test.skip(bookId == null, 'seed has no book with files');
+  await page.route('**/api/v1/auth/me', async (route) => {
+    const got = await fetchJsonSafe(route);
+    if (!got) return;
+    const { response: res, body: me } = got;
+    me.role = { ...me.role, admin: false, edit: false, delete_books: false, browse_global: true };
+    await route.fulfill({ response: res, json: me });
+  });
+  await mockCoverSources(page);
+
+  const errors = collectPageErrors(page);
+  await page.goto(`/app/book/${bookId}`, { waitUntil: 'domcontentloaded' });
+  const actions = page.getByTestId('book-actions');
+  const cover = actions.getByTestId('edit-cover-action');
+  await expect(cover).toBeVisible({ timeout: 10_000 });
+  await expect(actions.getByTestId('edit-metadata-action')).toHaveCount(0);
+  const menu = await openGearMenu(page);
+  await expect(menu.getByRole('menuitem', { name: 'Edit metadata' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await cover.click();
+  await expect(page).toHaveURL(new RegExp(`/app/book/${bookId}/cover`), { timeout: 10_000 });
 
   assertNoPageErrors(errors);
 });

@@ -543,8 +543,9 @@ export function BookDetail() {
   };
 
   /* The "More actions" gear menu — every book action that is not one of the
-     visible controls (Read now, Edit cover, Add to shelf, favorite, personal
-     membership removal, and the gear itself).
+     visible controls (Read now, Add to shelf, favorite, personal membership
+     removal, and the gear itself). Edit metadata and Edit cover stay listed
+     even though one of them is also the row's visible edit action.
      Labels name the ACTION performed (state-aware), per the cleanup brief:
      today's "In your library" state chip becomes "Remove from library". */
   const menuItems: MenuSectionDef['items'] = [];
@@ -684,7 +685,7 @@ export function BookDetail() {
       </Link>
 
       {/* The action row is deliberately ordered by the reader's next likely
-          step: read, edit the artwork, organise, then compact personal state.
+          step: read, edit, organise, then compact personal state.
           The flexible group is the spacer before the gear, which pins Settings
           to the far edge without letting it become an orphaned mobile row. */}
       <div className={styles.actions} data-testid="book-actions">
@@ -695,7 +696,18 @@ export function BookDetail() {
             </Link>
           ) : null}
 
-          {canEditCover && (
+          {/* One visible edit action: Edit metadata for anyone allowed to edit
+              the book, since that is the edit people reach for most (#2338).
+              A reader whose only edit is their own cover keeps Edit cover
+              here. Both stay in the gear menu, and the metadata editor links
+              to the cover editor too. */}
+          {me?.role?.edit ? (
+            <Link href={`/book/${book.id}/edit`} className={styles.actionSecondary}
+              data-testid="edit-metadata-action">
+              <Pencil size={15} aria-hidden="true" focusable={false} />
+              {t('Edit metadata')}
+            </Link>
+          ) : canEditCover && (
             <Link href={`/book/${book.id}/cover`} className={styles.actionSecondary}
               data-testid="edit-cover-action">
               <ImageIcon size={15} aria-hidden="true" focusable={false} />

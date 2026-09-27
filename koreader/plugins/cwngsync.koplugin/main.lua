@@ -1237,38 +1237,60 @@ function CWNGSync:syncDeviceCapabilities(interactive, ensure_networking)
             end)
     end
 
-    client:claim_deletion(
-        self.settings.username, self.settings.password, Device.model, self.device_id,
-        function(ok, body, reason)
-            if not ok or type(body) ~= "table" then
-                logger.warn("CWNGSync: deletion claim failed", reason or "unknown error")
-                syncCollections()
-                return
-            end
-            local deletion = body.deletion
-            if type(deletion) ~= "table" then
-                syncCollections()
-                return
-            end
-            local deleted, delete_reason, deleted_path = DeviceActions.deleteNamed(
-                deletion, root_path, {
-                    attributes = lfs.attributes,
-                    digest = function(path) return self:getDocumentDigest(path) end,
-                    remove = util.removeFile,
-                })
-            client:complete_deletion(
-                self.settings.username, self.settings.password, Device.model, self.device_id,
-                deletion.id, deletion.claim_token, deleted, delete_reason,
-                function(completed, _complete_body, complete_reason)
-                    if completed and deleted_path then
-                        self:refreshLibraryViews({ deleted_path })
-                    elseif not completed then
-                        logger.warn("CWNGSync: deletion acknowledgement failed",
-                            complete_reason or "unknown error")
-                    end
-                    syncCollections()
-                end)
-        end)
+    -- The server hands out one named deletion per claim, so a sync drains the
+    -- queue claim by claim (#2328: claiming once removed one file per sync).
+    local deleted_paths = {}
+    local function finishDeletions()
+        if #deleted_paths > 0 then
+            self:refreshLibraryViews(deleted_paths)
+        end
+        syncCollections()
+    end
+
+    local function drainDeletions(remaining)
+        client:claim_deletion(
+            self.settings.username, self.settings.password, Device.model, self.device_id,
+            function(ok, body, reason)
+                if not ok or type(body) ~= "table" then
+                    logger.warn("CWNGSync: deletion claim failed", reason or "unknown error")
+                    finishDeletions()
+                    return
+                end
+                local deletion = body.deletion
+                if type(deletion) ~= "table" then
+                    finishDeletions()
+                    return
+                end
+                local deleted, delete_reason, deleted_path = DeviceActions.deleteNamed(
+                    deletion, root_path, {
+                        attributes = lfs.attributes,
+                        digest = function(path) return self:getDocumentDigest(path) end,
+                        remove = util.removeFile,
+                    })
+                client:complete_deletion(
+                    self.settings.username, self.settings.password, Device.model, self.device_id,
+                    deletion.id, deletion.claim_token, deleted, delete_reason,
+                    function(completed, _complete_body, complete_reason)
+                        if not completed then
+                            -- The row stays claimed and the next claim would
+                            -- return it again; leave it for the next sync.
+                            logger.warn("CWNGSync: deletion acknowledgement failed",
+                                complete_reason or "unknown error")
+                            finishDeletions()
+                            return
+                        end
+                        if deleted_path then
+                            table.insert(deleted_paths, deleted_path)
+                        end
+                        if remaining > 1 then
+                            UIManager:nextTick(function() drainDeletions(remaining - 1) end)
+                        else
+                            finishDeletions()
+                        end
+                    end)
+            end)
+    end
+    drainDeletions(50)
 end
 
 function CWNGSync:getDeliveryReceipt(delivery_id)

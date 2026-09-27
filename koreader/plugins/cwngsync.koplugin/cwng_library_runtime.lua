@@ -44,7 +44,15 @@ local DOWNLOADING_OPS = { create_placeholder = true, refresh_placeholder = true 
 local STOP_AFTER_FAILED_DOWNLOADS = 3
 -- A proxy answers these for a server that is down or out of reach.
 local GATEWAY_ERRORS = { [502] = true, [503] = true, [504] = true }
-local SAVE_EVERY_SECONDS = 30
+-- The records are saved after this many steps that changed a file, so a
+-- KOReader closed mid-sync fetches at most these again on the next start.
+local SAVE_EVERY_STEPS = 10
+-- KOReader runs every task that is due before it reads a tap, and a nextTick
+-- task is due at once: a chain of them holds the screen until it ends (#2329).
+-- Sync requests block unless Turbo is on, so a step that downloaded, and every
+-- few quick steps, hands the next one to the loop this much later instead.
+local STEP_PAUSE_SECONDS = 0.2
+local QUICK_STEPS_PER_PAUSE = 20
 
 -- Shared by the file browser's and the reader's plugin instances: there is one
 -- library and one sync at a time, whichever instance started it.
@@ -213,13 +221,23 @@ function Runtime:isLibraryPlaceholder(path)
 end
 
 -- isLibraryPlaceholder for a walk over many files: the records are indexed
--- once, when the walk starts.
+-- once, when the walk starts. A file in the library folder with no record at
+-- all is asked directly: a cover fetched just before KOReader closed has no
+-- record yet (#2329), and is still not a book on the device.
 function Runtime:libraryPlaceholderTest()
-    local index = Library.placeholderIndex(self:getLibraryState())
+    local state = self:getLibraryState()
+    local index = Library.placeholderIndex(state)
+    local recorded = {}
+    for _, known in pairs(state.books or {}) do
+        if known.path then recorded[known.path] = true end
+    end
+    local root = self.settings and self.settings.library_root
+    local prefix = type(root) == "string" and root ~= "" and root:gsub("/*$", "/") or nil
     return function(path)
         local known = index[path]
-        if not known then return false end
-        return lfs.attributes(path, "size") == known.size
+        if known then return lfs.attributes(path, "size") == known.size end
+        if recorded[path] or not prefix or path:sub(1, #prefix) ~= prefix then return false end
+        return Runtime.readPlaceholderId(path) ~= nil
     end
 end
 
@@ -637,7 +655,7 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
 
     local index = 0
     local succeeded, failed, failed_downloads_in_a_row = 0, 0, 0
-    local last_saved = os.time()
+    local unsaved, quick_steps = 0, 0
     -- The list is recorded as applied either way: the next sync plans against
     -- it again, so whatever did not happen now happens then.
     local function finish(ok, summary)
@@ -673,6 +691,7 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
         Library.record(state, action, ok, info)
         if ok then
             succeeded = succeeded + 1
+            unsaved = unsaved + 1
             if action.path then changed[#changed + 1] = action.path end
             if action.from then changed[#changed + 1] = action.from end
         elseif action.op ~= "conflict" then
@@ -689,18 +708,24 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
                 return
             end
         end
-        -- Show covers as they arrive rather than all at the end. The records
-        -- are saved at most every half minute meanwhile: a record lost to a
-        -- crash only costs fetching that cover again.
+        -- A record lost to a crash costs fetching that cover again, and
+        -- leaves the cover counted as a book until then.
+        if unsaved >= SAVE_EVERY_STEPS then
+            self:saveLibraryState()
+            unsaved = 0
+        end
+        -- Show covers as they arrive rather than all at the end.
         if #changed >= 18 then
-            if os.time() - (last_saved or 0) >= SAVE_EVERY_SECONDS then
-                self:saveLibraryState()
-                last_saved = os.time()
-            end
             self:refreshLibraryViews(changed)
             changed = {}
         end
-        UIManager:nextTick(step)
+        quick_steps = quick_steps + 1
+        if downloads or quick_steps >= QUICK_STEPS_PER_PAUSE then
+            quick_steps = 0
+            UIManager:scheduleIn(STEP_PAUSE_SECONDS, step)
+        else
+            UIManager:nextTick(step)
+        end
     end
     -- As with the list's callback: an error in a step ends the sync rather
     -- than leaving it marked as running for good.

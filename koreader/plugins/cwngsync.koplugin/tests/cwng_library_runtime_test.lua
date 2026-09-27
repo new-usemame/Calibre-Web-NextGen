@@ -69,10 +69,23 @@ stub("luasettings", { open = function(_, path)
 end })
 local network = { up = true }
 stub("ui/network/manager", { isConnected = function() return network.up end })
+-- KOReader's main loop runs every task that is due before it reads a tap,
+-- and a nextTick task is due at once. Only a task scheduled for later lets
+-- the loop reach input first (frontend/ui/uimanager.lua, handleInput).
+-- `input` counts the blocking requests made between two chances to read one.
 local ticks, shown = {}, {}
+local input = { since = 0, worst = 0 }
+local function blockingRequest()
+    input.since = input.since + 1
+    if input.since > input.worst then input.worst = input.since end
+end
 stub("ui/uimanager", {
     show = function(_, widget) shown[#shown + 1] = widget.text end,
     nextTick = function(_, f) ticks[#ticks + 1] = f end,
+    scheduleIn = function(_, seconds, f)
+        assert(seconds > 0, "a task due at once does not let input through")
+        ticks[#ticks + 1] = function() input.since = 0; f() end
+    end,
 })
 stub("libs/libkoreader-lfs", { attributes = function(path, field)
     local d = io.open(path .. "/.", "rb")
@@ -165,11 +178,13 @@ local function sync(answer, real_apply, fetch, root, broken)
         end
         if type(fetch) == "table" then
             function client:download_file(_, _, _, _, url_path, temp)
+                blockingRequest()
                 outcome.fetched = outcome.fetched + 1
                 return fetch.download(tonumber(url_path:match("/books/(%d+)/")), temp)
             end
         else
             function runtime:fetchPlaceholder(_, book)
+                blockingRequest()
                 outcome.fetched = outcome.fetched + 1
                 return fetch(book)
             end
@@ -370,12 +385,15 @@ local function testTheInventoryKnowsCoversFromBooks()
     local book = put("Book [22].epub")
     local swapped = put("Swapped [23].epub")
     local untracked = put("Untracked.epub")
+    -- A cover fetched just before KOReader was closed, whose record was never
+    -- saved (#2329): still a cover, not a book on the device.
+    local orphan = put("Orphan [24].epub", 24)
     local state = { books = {
         ["21"] = { kind = "placeholder", path = cover, size = 5 },       -- "cover" is 5 bytes
         ["22"] = { kind = "downloaded", path = book, size = 8 },
         ["23"] = { kind = "placeholder", path = swapped, size = 5 },     -- replaced: 8 bytes now
     } }
-    local runtime = setmetatable({}, { __index = Runtime })
+    local runtime = setmetatable({ settings = { library_root = folder } }, { __index = Runtime })
     function runtime:getLibraryState() return state end
     local isPlaceholder = runtime:libraryPlaceholderTest()
     for _, path in ipairs({ cover, book, swapped, untracked }) do
@@ -383,12 +401,65 @@ local function testTheInventoryKnowsCoversFromBooks()
     end
     assertEqual(isPlaceholder(cover), true, "a cover is not a book on the device")
     assertEqual(isPlaceholder(swapped), false, "a cover replaced by a file is")
+    assertEqual(isPlaceholder(untracked), false, "a book the library never saw is a book")
+    assertEqual(isPlaceholder(orphan), true, "a cover whose record was lost is still a cover")
+end
+
+local function testTheReaderCanTapBetweenDownloads()
+    -- #2329: turning the library on fetched every cover back to back, and
+    -- KOReader read no tap until the last one: Android said it was not
+    -- responding. Every download must be followed by a chance to read input.
+    input.since, input.worst = 0, 0
+    local outcome = sync(manyNewBooks(40), true, function() return true, { size = 1, mtime = 1 } end)
+    assertEqual(outcome.ok, true, "the sync finishes")
+    assertEqual(outcome.fetched, 40, "every cover arrives")
+    assertEqual(input.worst, 1, "no two downloads run without KOReader reading input between them")
 end
 
 local function written(name)
     for path, file in pairs(settings_files) do
         if path:sub(-#name) == name then return file end
     end
+end
+
+local function testCoversAlreadyFetchedSurviveKOReaderBeingClosed()
+    -- #2329: the records were saved only every half minute, and only once 18
+    -- covers were waiting to be shown, so a KOReader closed mid-sync lost
+    -- them and fetched every cover again on the next start.
+    for path in pairs(settings_files) do settings_files[path] = nil end
+    package.loaded["cwng_library_runtime"] = nil
+    local fresh = require("cwng_library_runtime")
+    local root = folder .. "/interrupted"
+    assert(os.execute("mkdir -p '" .. root .. "'"))
+    local books = manyNewBooks(100)().books
+    local client = { get_library = function(_, _, _, _, _, _, _, callback)
+        ticks[#ticks + 1] = function() callback(true, { books = books, revision = "r1" }) end
+    end }
+    local runtime = setmetatable({ device_id = "device",
+        settings = { server = "http://books", username = "reader", password = "secret" },
+    }, { __index = fresh })
+    function runtime:libraryEnabled() return true end
+    function runtime:getLibraryRoot() return root end
+    function runtime:newSyncClient() return client end
+    function runtime:refreshLibraryViews() end
+    function runtime:applyLibraryCollections() end
+    runtime:getLibraryState().owner = runtime:accountOwner()
+    local fetched = 0
+    function runtime:fetchPlaceholder()
+        fetched = fetched + 1
+        -- KOReader is closed while the 61st cover downloads.
+        if fetched == 61 then fresh._shared.running = "closed" end
+        return true, { size = 1, mtime = 1 }
+    end
+    runtime:syncLibrary({ force = true })
+    while #ticks > 0 do table.remove(ticks, 1)() end
+    fresh._shared.running = nil
+    local records = written("cwngsync_library.lua")
+    local kept = 0
+    for _ in pairs(records and records.written.state and records.written.state.books or {}) do kept = kept + 1 end
+    assert(kept >= 50, "at most a few covers are fetched again after a restart, but only "
+        .. kept .. " of 61 were saved")
+    package.loaded["cwng_library_runtime"] = Runtime
 end
 
 local function testTheBookListIsWrittenOncePerSyncNotWithEveryRecord()
@@ -726,6 +797,8 @@ testASyncStopsWhenTheNetworkGoesAway()
 testAFewFailedCoversDoNotStopTheRest()
 testBooksThatArrivedDuringTheSyncDoNotStopIt()
 testTheInventoryKnowsCoversFromBooks()
+testTheReaderCanTapBetweenDownloads()
+testCoversAlreadyFetchedSurviveKOReaderBeingClosed()
 testTheBookListIsWrittenOncePerSyncNotWithEveryRecord()
 testALibraryWhoseListWasNotSavedIsNotEmptied()
 testAnErrorInASyncDoesNotStopLaterSyncs()

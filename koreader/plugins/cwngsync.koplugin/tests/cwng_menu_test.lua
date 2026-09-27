@@ -35,6 +35,7 @@ local env = setmetatable({
     hostOf = function(server) return server end,
     UIManager = { show = function(_, widget) shown[#shown + 1] = widget end },
     InfoMessage = { new = function(_, fields) return fields end },
+    Home = { closeFor = function() end },
 }, { __index = _G })
 local CWNGSync = loadAddToMainMenu(env)
 
@@ -77,6 +78,46 @@ local function testTheConnectedEntryExplainsAndStays()
         "it says how to change account")
 end
 
+local function findEntry(items, text)
+    for _, item in pairs(items) do
+        if type(item) == "table" then
+            if item.text == text then return item end
+            local found = findEntry(item.sub_item_table or item, text)
+            if found then return found end
+        end
+    end
+end
+
+-- #2329: a reader with KOReader already set up (their own home folder,
+-- SimpleUI) turned the library on and found their home folder moved into it
+-- and locked, with no way back but by hand.
+local function testTurningTheLibraryOnLeavesTheReadersHomeAlone()
+    local events = {}
+    local plugin = setmetatable({
+        settings = { username = "reader", server = "https://books.example.com" },
+        version = "test",
+    }, { __index = CWNGSync })
+    function plugin:isConfigured() return true end
+    function plugin:getAdvancedMenuItems() return {} end
+    function plugin:hasActiveDocument() return false end
+    function plugin:libraryEnabled() return self.settings.library_enabled == true end
+    function plugin:applyReaderDefaults() events[#events + 1] = "home folder taken" end
+    function plugin:restoreReaderDefaults() events[#events + 1] = "home folder given back" end
+    function plugin:showLibrary() events[#events + 1] = "library shown" end
+    function plugin:syncLibrary() events[#events + 1] = "library synced" end
+    local items = {}
+    plugin:addToMainMenu(items)
+    local entry = assert(findEntry(items, "Show my CWNG library on this device"), "the library entry")
+    entry.callback({ closeMenu = function() end })
+    assertEqual(table.concat(events, ", "), "library shown, library synced",
+        "turning the library on shows it without taking the reader's home folder")
+    events = {}
+    entry.callback({ closeMenu = function() end })
+    assertEqual(table.concat(events, ", "), "home folder given back",
+        "turning it off gives back whatever setup changed")
+end
+
 testConnectingLeavesTheMenuForTheLibrary()
 testTheConnectedEntryExplainsAndStays()
+testTurningTheLibraryOnLeavesTheReadersHomeAlone()
 print("cwng_menu tests passed")

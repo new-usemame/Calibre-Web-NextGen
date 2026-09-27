@@ -351,10 +351,14 @@ function CWNGSync:addToMainMenu(menu_items)
                 callback = function()
                     self.settings.library_enabled = not self.settings.library_enabled
                     if self.settings.library_enabled then
-                        self:applyReaderDefaults()
+                        -- A reader turning this on already has KOReader set up
+                        -- (a home folder, another home-screen plugin): that is
+                        -- theirs, so only the library is shown (#2329).
+                        self:showLibrary()
                         self:syncLibrary({ force = true, interactive = true })
                     else
                         Home.closeFor(self.ui)
+                        self:restoreReaderDefaults()
                     end
                 end,
             },

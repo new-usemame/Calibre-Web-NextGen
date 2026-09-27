@@ -36,14 +36,18 @@ local function newClient(plugin, server)
 end
 
 -- Make the library the home screen, once. Later changes the reader makes to
--- any of these settings are theirs to keep.
+-- any of these settings are theirs to keep. What each setting was before is
+-- kept, so turning the library off gives it back.
 function SetupFlow:applyReaderDefaults()
     local root = self:getLibraryRoot()
     if root and not util.directoryExists(root) then util.makePath(root) end
     if not G_reader_settings:isTrue("cwngsync_reader_defaults_applied") and root then
+        local previous = {}
         for key, value in pairs(Setup.readerDefaults(root)) do
+            previous[key] = { value = G_reader_settings:readSetting(key) }
             G_reader_settings:saveSetting(key, value)
         end
+        G_reader_settings:saveSetting("cwngsync_reader_defaults_previous", previous)
         local coverbrowser = self.ui and self.ui.coverbrowser
         if coverbrowser and coverbrowser.setDisplayMode then
             pcall(coverbrowser.setDisplayMode, coverbrowser, "mosaic_image")
@@ -59,6 +63,26 @@ function SetupFlow:applyReaderDefaults()
     end
     pcall(G_reader_settings.flush, G_reader_settings)
     self:showLibrary()
+end
+
+-- The library is turned off: each setting applyReaderDefaults changed goes
+-- back to what it was, unless the reader has changed it since (#2329).
+function SetupFlow:restoreReaderDefaults()
+    local previous = G_reader_settings:readSetting("cwngsync_reader_defaults_previous")
+    if type(previous) ~= "table" then return end
+    local ours = Setup.readerDefaults(self:getLibraryRoot())
+    for key, before in pairs(previous) do
+        if ours[key] ~= nil and G_reader_settings:readSetting(key) == ours[key] then
+            if type(before) == "table" and before.value ~= nil then
+                G_reader_settings:saveSetting(key, before.value)
+            else
+                G_reader_settings:delSetting(key)
+            end
+        end
+    end
+    G_reader_settings:delSetting("cwngsync_reader_defaults_previous")
+    G_reader_settings:delSetting("cwngsync_reader_defaults_applied")
+    pcall(G_reader_settings.flush, G_reader_settings)
 end
 
 function SetupFlow:showLibrary()

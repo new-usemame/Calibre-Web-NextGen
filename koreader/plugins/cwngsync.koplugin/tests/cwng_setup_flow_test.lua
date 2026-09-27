@@ -278,6 +278,44 @@ local function testAPasswordRefusedOverHttpIsNotSentAgain()
     assert(tostring(shown[#shown].text):find("not accepted", 1, true), "and the reader is told why")
 end
 
+-- #2329: setup makes the library KOReader's home; turning the library off
+-- must give the reader back what they had, except what they changed since.
+local function testTurningTheLibraryOffGivesTheReaderTheirHomeBack()
+    local data = { home_dir = "/sdcard/Books", start_with = "history", collate = "title" }
+    local saved_settings = G_reader_settings
+    G_reader_settings = { -- luacheck: ignore
+        readSetting = function(_, key) return data[key] end,
+        saveSetting = function(_, key, value) data[key] = value end,
+        delSetting = function(_, key) data[key] = nil end,
+        isTrue = function(_, key) return data[key] == true end,
+        makeTrue = function(_, key) data[key] = true end,
+        flush = function() end,
+    }
+    package.loaded["util"].directoryExists = function() return true end
+    local root = "/sdcard/Books/CWNG Library"
+    local plugin = setmetatable({ settings = {} }, { __index = SetupFlow })
+    function plugin:getLibraryRoot() return root end
+    function plugin:showLibrary() end
+
+    plugin:applyReaderDefaults()
+    assertEqual(data.home_dir, root, "setup makes the library the home folder")
+    assertEqual(data.lock_home_folder, true, "and locks it")
+    data.collate = "size" -- the reader's own choice since
+
+    plugin:restoreReaderDefaults()
+    assertEqual(data.home_dir, "/sdcard/Books", "the reader's home folder comes back")
+    assertEqual(data.lock_home_folder, nil, "unlocked, as it was")
+    assertEqual(data.start_with, "history", "KOReader starts where it used to")
+    assertEqual(data.reverse_collate, nil, "a setting that was not set is not left set")
+    assertEqual(data.collate, "size", "a setting the reader changed since is theirs")
+    plugin:applyReaderDefaults()
+    assertEqual(data.home_dir, root, "setting the library up again works as the first time")
+
+    package.loaded["util"].directoryExists = nil
+    G_reader_settings = saved_settings -- luacheck: ignore
+end
+
+testTurningTheLibraryOffGivesTheReaderTheirHomeBack()
 testAnAddressTypedWithoutHttpsFindsAnHttpsOnlyServer()
 testAPlainHttpServerIsAskedOnce()
 testAPlainHttpServerThatFailsSaysWhy()

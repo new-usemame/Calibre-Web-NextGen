@@ -49,6 +49,7 @@ local function newHarness(options)
         inventory = {},
         claims = {},
         ticks = {},
+        delays = {},
     }
     local wait_for_network = options.wait_for_network or false
     local client = {}
@@ -91,6 +92,11 @@ local function newHarness(options)
             show = function() end,
             nextTick = function(_, callback)
                 table.insert(pending.ticks, callback)
+                table.insert(pending.delays, 0)
+            end,
+            scheduleIn = function(_, seconds, callback)
+                table.insert(pending.ticks, callback)
+                table.insert(pending.delays, seconds)
             end,
         },
         Delivery = {
@@ -214,6 +220,11 @@ local function testOverlappingExternalTriggerIsRejectedButContinuationsRun()
 
     assertEqual(#harness.pending.ticks, 1,
         "a successful delivery schedules its pagination continuation")
+    -- #2329: KOReader runs every due task before it reads a tap, and each
+    -- claim, download and acknowledgement blocks, so a continuation due at
+    -- once chains up to 20 book downloads with the screen frozen.
+    assert(harness.pending.delays[1] > 0,
+        "the next book waits until KOReader has had a chance to read input")
     harness.pending.ticks[1]()
     assertEqual(harness.calls.claims, 2,
         "the owner's pagination continuation must remain admissible")

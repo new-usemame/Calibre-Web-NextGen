@@ -1531,7 +1531,10 @@ function CWNGSync:collectDeliveries(
                     self:clearDeliveryReceipt(delivery.id)
                     logger.info("CWNGSync: queued book installed", installed.lpath)
                     if remaining > 1 then
-                        UIManager:nextTick(function()
+                        -- Not nextTick: as with deletions, each claim and
+                        -- download blocks, and a chain of tasks due at once
+                        -- holds the screen until the last book (#2329).
+                        UIManager:scheduleIn(0.5, function()
                             self:collectDeliveries(
                                 interactive, false, remaining - 1, collected + 1,
                                 true, collection_token)

@@ -264,24 +264,6 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
           <X size={20} aria-hidden="true" focusable={false} />
         </button>
 
-        {isDesktopRail && (
-          <div className={styles.pinRow}>
-            <button
-              type="button"
-              className={styles.pinButton}
-              onClick={toggleSidebarPin}
-              aria-label={pinLabel}
-              aria-pressed={sidebarPinned}
-              title={pinLabel}
-            >
-              {sidebarPinned
-                ? <PinOff size={16} aria-hidden="true" focusable={false} />
-                : <Pin size={16} aria-hidden="true" focusable={false} />}
-              <span>{pinLabel}</span>
-            </button>
-          </div>
-        )}
-
         {/* #585 v3: liquid-glass Customize capsule, pinned at the top. Tapping it
             turns the sidebar into an editable list (reorder + hide entries). */}
         {isAuthed && editMode && (
@@ -440,6 +422,25 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
               </div>
             )}
           </>
+        )}
+        {/* #2341: the pin control lives at the foot of the rail. At the top it
+            left an empty slot above Library whenever the rail was collapsed. */}
+        {isDesktopRail && (
+          <div className={styles.pinRow}>
+            <button
+              type="button"
+              className={styles.pinButton}
+              onClick={toggleSidebarPin}
+              aria-label={pinLabel}
+              aria-pressed={sidebarPinned}
+              title={pinLabel}
+            >
+              {sidebarPinned
+                ? <PinOff size={16} aria-hidden="true" focusable={false} />
+                : <Pin size={16} aria-hidden="true" focusable={false} />}
+              <span>{pinLabel}</span>
+            </button>
+          </div>
         )}
         </nav>
       </div>

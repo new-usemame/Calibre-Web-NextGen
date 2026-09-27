@@ -2,6 +2,10 @@
    display-font title, surface-1 cards, accent-tinted section icons, muted
    supporting text, one clearly primary action per surface. */
 .container { max-width: 720px; margin: 0 auto; padding: var(--sp-6) var(--sp-5); color: var(--text); }
+/* The top bar stays sticky here like on every other page (#2341). Keyboard focus
+   and scrollIntoView must stop below it, or a long device inventory lands a row
+   action under the bar. */
+.container :is(a, button, input, select, textarea) { scroll-margin-top: calc(var(--topbar-h) + var(--sp-2)); }
 .back { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--text-muted); font-size: var(--fs-sm); margin-bottom: var(--sp-2); transition: color var(--dur-fast) var(--ease); }
 .back:hover { color: var(--accent); }
 .title { margin: 0 0 var(--sp-5); font-family: var(--font-display); font-size: var(--fs-xl); color: var(--text); }

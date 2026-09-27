@@ -119,7 +119,7 @@
   align-items: center;
   justify-content: flex-end;
   min-height: 32px;
-  margin-bottom: var(--sp-1);
+  margin-top: var(--sp-2);
 }
 
 .pinButton {
@@ -214,6 +214,24 @@
 
   :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .pinButton {
     opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* #2341: the pin control sits at the foot of the rail and stays reachable
+     while a long rail scrolls. Collapsed, it is invisible and lets the pointer
+     through to the item under it; revealed, it gets the rail surface so items
+     scrolling beneath it do not show through. */
+  .pinRow {
+    position: sticky;
+    /* Cover the rail's own bottom padding too, so items scrolling past cannot
+       peek out underneath the control. */
+    bottom: calc(-1 * var(--sp-4));
+    padding-bottom: var(--sp-4);
+    pointer-events: none;
+  }
+
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .pinRow {
+    background: var(--surface-1);
     pointer-events: auto;
   }
 

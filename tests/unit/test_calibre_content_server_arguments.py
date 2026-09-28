@@ -441,3 +441,41 @@ def test_calibre_server_output_reaches_the_app_log(content_server):
     content_server._drain_output(iter(["listening on 127.0.0.1:8081\n", "\n"]))
 
     assert "calibre-server: listening on 127.0.0.1:8081" in content_server.log_records
+
+
+@pytest.mark.parametrize("listen,host,url_host", [
+    ("127.0.0.1", "127.0.0.1", "127.0.0.1"),
+    ("", "127.0.0.1", "127.0.0.1"),
+    ("0.0.0.0", "127.0.0.1", "127.0.0.1"),
+    ("::", "::1", "[::1]"),
+    ("192.168.1.20", "192.168.1.20", "192.168.1.20"),
+    ("example.com", "127.0.0.1", "127.0.0.1"),   # never a name: only this host's own IPs
+])
+def test_calibredb_reaches_the_server_where_it_listens(content_server, monkeypatch, tmp_path,
+                                                        listen, host, url_host):
+    """Review of #2210: with a LAN listen address the loopback probe failed, so
+    every calibredb call went to the library path while the server held it.
+    Both copies (app and standalone scripts) must probe and address the same
+    host."""
+    spec = importlib.util.spec_from_file_location(
+        "calibre_library_target_hostcheck", REPO_ROOT / "scripts" / "calibre_library_target.py")
+    scripts_copy = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, "calibre_library_target_hostcheck", scripts_copy)
+    spec.loader.exec_module(scripts_copy)
+    content_server.config.config_calibre_server_listen = listen
+    probed = []
+    monkeypatch.setattr(content_server.socket, "create_connection",
+                        lambda addr, timeout: probed.append(addr) or _Closing())
+
+    assert content_server.is_answering() is True
+    assert probed == [(host, 7777)]
+    assert content_server.library_url().startswith("http://{}:7777/#".format(url_host))
+    assert scripts_copy.connect_host(listen) == host
+
+
+class _Closing:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exc):
+        return False

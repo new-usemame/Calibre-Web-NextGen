@@ -28,14 +28,15 @@ PASSWORD = "Sup3rSecret-PW-2026"
 
 SETTINGS_COLUMNS = ("config_calibre_server_enabled", "config_calibre_server_port",
                     "config_calibre_server_anonymous_writes", "config_calibre_server_username",
-                    "config_calibre_server_password_e")
+                    "config_calibre_server_password_e", "config_calibre_server_listen")
 
 
-def _make_app_db(path, enabled=1, port=7777, anonymous=0, username="ccsuser", password_e=None):
+def _make_app_db(path, enabled=1, port=7777, anonymous=0, username="ccsuser", password_e=None,
+                 listen="127.0.0.1"):
     con = sqlite3.connect(str(path))
     con.execute("create table settings ({})".format(", ".join(SETTINGS_COLUMNS)))
-    con.execute("insert into settings values (?, ?, ?, ?, ?)",
-                (enabled, port, anonymous, username, password_e))
+    con.execute("insert into settings values (?, ?, ?, ?, ?, ?)",
+                (enabled, port, anonymous, username, password_e, listen))
     con.commit()
     con.close()
 
@@ -53,7 +54,7 @@ def target_module(monkeypatch, tmp_path):
 
     monkeypatch.setattr(module, "app_db_path", lambda: str(app_db))
     monkeypatch.setattr(module, "config_dir", lambda: str(tmp_path))
-    monkeypatch.setattr(module, "_is_answering", lambda port: True)
+    monkeypatch.setattr(module, "_is_answering", lambda host, port: True)
     monkeypatch.setattr(module, "_decrypt", lambda token: PASSWORD if token else "")
     module.app_db = app_db
     return module
@@ -112,7 +113,7 @@ def test_environment_port_overrides_the_database(target_module, monkeypatch):
 def test_a_server_that_is_not_running_falls_back_to_the_library_path(target_module, monkeypatch):
     """Convert Library stops the server for its run, and a server can die."""
     _make_app_db(target_module.app_db, password_e=b"encrypted")
-    monkeypatch.setattr(target_module, "_is_answering", lambda port: False)
+    monkeypatch.setattr(target_module, "_is_answering", lambda host, port: False)
     assert target_module.library_target(LIBRARY).args == ["--library-path=/calibre-library"]
 
 
@@ -151,16 +152,16 @@ def test_ingest_transaction_helper_is_addressed_by_path_only():
 def test_the_fallback_says_why_it_fell_back(target_module, monkeypatch, capsys):
     """An operator reading the ingest log can tell the two paths apart."""
     _make_app_db(target_module.app_db, password_e=b"encrypted")
-    monkeypatch.setattr(target_module, "_is_answering", lambda port: False)
+    monkeypatch.setattr(target_module, "_is_answering", lambda host, port: False)
     target_module.library_target(LIBRARY)
     message = capsys.readouterr().err
-    assert "not answering on port 7777" in message
+    assert "not answering on 127.0.0.1 port 7777" in message
     assert "addressing the library by path instead" in message
 
 
 def test_the_fallback_message_never_carries_the_password(target_module, monkeypatch, capsys):
     _make_app_db(target_module.app_db, password_e=b"encrypted")
-    monkeypatch.setattr(target_module, "_is_answering", lambda port: False)
+    monkeypatch.setattr(target_module, "_is_answering", lambda host, port: False)
     target_module.library_target(LIBRARY)
     assert PASSWORD not in capsys.readouterr().err
 

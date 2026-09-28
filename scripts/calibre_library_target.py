@@ -10,6 +10,7 @@ same decision taken from app.db, for the ingest and enforcement scripts that do
 not import the Flask app.
 """
 
+import ipaddress
 import os
 import socket
 import sqlite3
@@ -62,7 +63,8 @@ def _read_settings():
         return con.execute(
             "select config_calibre_server_enabled, config_calibre_server_port, "
             "config_calibre_server_anonymous_writes, config_calibre_server_username, "
-            "config_calibre_server_password_e from settings").fetchone()
+            "config_calibre_server_password_e, config_calibre_server_listen "
+            "from settings").fetchone()
     finally:
         con.close()
 
@@ -98,9 +100,23 @@ def _decrypt(token):
         return ""
 
 
-def _is_answering(port):
+def connect_host(listen):
+    """Where this host reaches the server; same rule as
+    ``cps.content_server.connect_host``, which this script cannot import."""
+    listen = (listen or "").strip()
+    if listen in ("", "0.0.0.0"):
+        return "127.0.0.1"
+    if listen == "::":
+        return "::1"
     try:
-        with socket.create_connection(("127.0.0.1", int(port)), PROBE_TIMEOUT):
+        return str(ipaddress.ip_address(listen))
+    except ValueError:
+        return "127.0.0.1"
+
+
+def _is_answering(host, port):
+    try:
+        with socket.create_connection((host, int(port)), PROBE_TIMEOUT):
             return True
     except (OSError, ValueError):
         return False
@@ -122,12 +138,14 @@ def library_target(library_dir):
         return _path_target(library_dir)
     if not row or not row[0]:
         return _path_target(library_dir)
-    _enabled, port, anonymous_writes, username, password_e = row
+    _enabled, port, anonymous_writes, username, password_e, listen = row
     port, username, password = _apply_env(port, username, _decrypt(password_e))
-    if not _is_answering(port):
-        _announce_fallback("it is not answering on port {}".format(port))
+    host = connect_host(listen)
+    if not _is_answering(host, port):
+        _announce_fallback("it is not answering on {} port {}".format(host, port))
         return _path_target(library_dir)
-    args = ["--with-library", "http://127.0.0.1:{}/#{}".format(port, library_id(library_dir))]
+    url_host = "[{}]".format(host) if ":" in host else host
+    args = ["--with-library", "http://{}:{}/#{}".format(url_host, port, library_id(library_dir))]
     if anonymous_writes:
         return LibraryTarget(args, None)
     if not (username and password):

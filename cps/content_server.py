@@ -16,6 +16,7 @@
 #   You should have received a copy of the GNU General Public License
 #   along with this program. If not, see <http://www.gnu.org/licenses/>.
 
+import ipaddress
 import os
 import re
 import socket
@@ -117,8 +118,35 @@ def library_id(library_dir):
     return os.path.basename(str(library_dir).rstrip("/")).replace(" ", "_")
 
 
+def connect_host(listen):
+    """Where this host reaches a server listening on ``listen``.
+
+    A wildcard is reached over loopback; a specific address only on itself --
+    calibre-server bound to a LAN address does not answer on 127.0.0.1, and a
+    loopback-only probe then routed every calibredb call to the library path
+    while the server still held it (#2210 review). ``listen`` is validated as
+    an IP address at save; anything else here falls back to loopback, so the
+    address can only ever be one of this host's own. Kept in step with
+    ``scripts/calibre_library_target.py``; a test pins the pair.
+    """
+    listen = (listen or "").strip()
+    if listen in ("", "0.0.0.0"):
+        return "127.0.0.1"
+    if listen == "::":
+        return "::1"
+    try:
+        return str(ipaddress.ip_address(listen))
+    except ValueError:
+        return "127.0.0.1"
+
+
+def _url_host(host):
+    return "[{}]".format(host) if ":" in host else host
+
+
 def library_url():
-    return "http://127.0.0.1:{}/#{}".format(
+    return "http://{}:{}/#{}".format(
+        _url_host(connect_host(setting("config_calibre_server_listen"))),
         setting("config_calibre_server_port"),
         library_id(setting("config_calibre_dir")))
 
@@ -132,7 +160,8 @@ def _auth_enabled():
 def is_answering(timeout=PROBE_TIMEOUT):
     """True when something accepts connections on the content server port."""
     try:
-        with socket.create_connection(("127.0.0.1", int(setting("config_calibre_server_port"))), timeout):
+        with socket.create_connection((connect_host(setting("config_calibre_server_listen")),
+                                       int(setting("config_calibre_server_port"))), timeout):
             return True
     except (OSError, ValueError):
         return False

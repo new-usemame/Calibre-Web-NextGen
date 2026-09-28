@@ -342,7 +342,11 @@ def server_arguments():
         if setting("config_calibre_server_trusted_ips"):
             args += ["--trusted-ips", setting("config_calibre_server_trusted_ips")]
     elif _auth_enabled():
-        args += ["--enable-auth", "--auth-mode", "basic", "--userdb", userdb_path()]
+        # calibre's default auth mode: Digest over plain HTTP, so the password
+        # never crosses the wire in the clear; calibredb authenticates with it
+        # (measured with calibre 9.0). Forcing "basic" sent it base64-encoded
+        # on every request whenever the listen address was not loopback.
+        args += ["--enable-auth", "--userdb", userdb_path()]
     args.append(setting("config_calibre_dir"))
     return args
 

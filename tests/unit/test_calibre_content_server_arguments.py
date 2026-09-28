@@ -157,9 +157,13 @@ def test_authenticated_server_arguments(content_server):
     args = content_server.server_arguments()
     assert args[1:] == ["--port", "7777", "--listen-on", "127.0.0.1",
                         "--disable-fallback-to-detected-interface",
-                        "--enable-auth", "--auth-mode", "basic",
+                        "--enable-auth",
                         "--userdb", content_server.userdb_path(),
                         "/calibre-library"]
+    # No forced "basic": calibre's default is Digest over plain HTTP, which
+    # calibredb speaks (measured, calibre 9.0) and which keeps the password
+    # off the wire; basic sent it base64-encoded on every request (#2210 review).
+    assert "--auth-mode" not in args
 
 
 def test_anonymous_writes_pass_trusted_ips(content_server):

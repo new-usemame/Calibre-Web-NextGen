@@ -3063,15 +3063,15 @@ def _configuration_update_helper():
         reboot_required |= _config_string(to_save, "config_limiter_options")
 
         # Calibre content server configuration
-        server_username = to_save.get("config_calibre_server_username", config.config_calibre_server_username)
-        server_password = to_save.get("config_calibre_server_password_e") or config.config_calibre_server_password_e
+        server_username = to_save.get("config_calibre_server_username", content_server.setting("config_calibre_server_username"))
+        server_password = to_save.get("config_calibre_server_password_e") or content_server.setting("config_calibre_server_password_e")
         if (to_save.get("config_calibre_server_enabled") == "on"
                 and to_save.get("config_calibre_server_anonymous_writes") != "on"
                 and not (server_username and server_password)):
             return _configuration_result(_('Please enter a content server username and password, or allow anonymous writes'))
         problem = content_server.settings_problem(
-            to_save.get("config_calibre_server_port", config.config_calibre_server_port),
-            server_username, to_save.get("config_calibre_server_password_e"), config.config_port)
+            to_save.get("config_calibre_server_port", content_server.setting("config_calibre_server_port")),
+            server_username, to_save.get("config_calibre_server_password_e"), getattr(config, "config_port", None))
         if problem:
             return _configuration_result({
                 "port": _('Content server port must be a number from 1 to 65535'),
@@ -3104,7 +3104,7 @@ def _configuration_update_helper():
         content_server_changed |= _config_checkbox(to_save, "config_calibre_server_anonymous_writes")
         content_server_changed |= _config_string(to_save, "config_calibre_server_trusted_ips")
         content_server_changed |= _config_string(to_save, "config_calibre_server_username")
-        if to_save.get("config_calibre_server_password_e") and not config.config_calibre_server_password_e:
+        if to_save.get("config_calibre_server_password_e") and not content_server.setting("config_calibre_server_password_e"):
             content_server_changed |= _config_string(to_save, "config_calibre_server_password_e")
 
         # Rarfile Content configuration
@@ -3122,7 +3122,7 @@ def _configuration_update_helper():
 
     config.save()
     if content_server_changed:
-        if config.config_calibre_server_enabled:
+        if content_server.setting("config_calibre_server_enabled"):
             content_server.start()
         else:
             content_server.stop()
@@ -3152,11 +3152,11 @@ def _configuration_update_helper():
 def clear_calibre_server_password():
     config.config_calibre_server_password_e = ""
     config.save()
-    if config.config_calibre_server_enabled and not config.config_calibre_server_anonymous_writes:
+    if content_server.setting("config_calibre_server_enabled") and not content_server.setting("config_calibre_server_anonymous_writes"):
         # No password means no authentication; the server stays down until a
         # new one is saved rather than restarting open (#2210 review).
         content_server.stop()
-    elif config.config_calibre_server_enabled:
+    elif content_server.setting("config_calibre_server_enabled"):
         content_server.start()
     return _configuration_result()
 
@@ -3175,8 +3175,8 @@ def _configuration_result(error_flash=None, reboot=False, warning_flash=None):
             resp['result'].append({'type': "warning", 'message': warning_flash})
     resp['reboot'] = reboot
     resp['config_upload'] = config.config_upload_formats
-    resp['calibre_server_password_set'] = bool(config.config_calibre_server_password_e)
-    resp['calibre_server_password_env'] = config.config_calibre_server_env['password']
+    resp['calibre_server_password_set'] = bool(content_server.setting("config_calibre_server_password_e"))
+    resp['calibre_server_password_env'] = getattr(config, 'config_calibre_server_env', {}).get('password', False)
     return Response(json.dumps(resp), mimetype='application/json')
 
 

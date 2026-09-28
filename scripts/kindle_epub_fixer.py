@@ -205,6 +205,26 @@ class EPUBFixer:
         if html_meta:
             return html_meta, 0.95, 'html_meta'
 
+        # Nothing declares an encoding. UTF-8 is the XML default, and text that
+        # is valid multi-byte UTF-8 is overwhelmingly unlikely to be anything
+        # else, so settle it here instead of guessing. The statistical
+        # detectors below are unreliable on short files: chardet 5.2 reads a
+        # file with a single multi-byte character (one "—" or "©") as
+        # Windows-1252 at 0.73, above the acceptance threshold, which turned
+        # "Ghost—Spectres" into "Ghostâ€”Spectres" on ingest. Pure-ASCII data
+        # is left to the detectors: it re-encodes to identical bytes either way.
+        if not data.isascii():
+            try:
+                data.decode('utf-8')
+            except UnicodeDecodeError:
+                pass
+            else:
+                return 'utf-8', 1.0, 'utf8_strict'
+
+        # NOTE: `CharsetMatch` has no `.confidence`, so this branch always
+        # raises and falls through to chardet below. Left as is on purpose: on
+        # short legacy-encoded files charset_normalizer picks worse encodings
+        # (cp1250 for Latin-1 text), so making it live is a separate change.
         if _charset_from_bytes is not None:
             try:
                 best = _charset_from_bytes(data).best()

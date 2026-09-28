@@ -19,6 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from flask_babel import lazy_gettext as N_
 
 from cps.services.worker import CalibreTask
+from cps import content_server
 from cps import db
 from cps import ub
 from cps import logger, config
@@ -411,9 +412,10 @@ class TaskConvert(CalibreTask):
                 else:
                     library_path = config.config_calibre_dir
 
-                opf_command = [calibredb_binarypath, 'show_metadata', '--as-opf', str(self.book_id),
-                               '--with-library', library_path]
-                p = process_open(opf_command, quotes, my_env, newlines=False)
+                target = content_server.library_target()
+                opf_command = ([calibredb_binarypath, 'show_metadata', '--as-opf', str(self.book_id)]
+                               + (target.args or ['--with-library', library_path]))
+                p = process_open(opf_command, quotes, my_env, newlines=False, stdin_payload=target.stdin)
                 lines = list()
                 calibre_traceback = stream_process_output(p, lines.append)
                 check = p.returncode

@@ -11,6 +11,7 @@ import json
 import os
 import subprocess
 import sys
+from calibre_library_target import library_target
 import tempfile
 import time
 import shutil
@@ -2596,9 +2597,10 @@ class NewBookProcessor:
         try:
             mark_ingest_batch_active()
             wait_for_duplicate_full_scan_to_finish()
+            target = library_target(self.library_dir)
             result = subprocess.run([
-                "calibredb", "add_format", str(book_id), str(staged_path), f"--library-path={self.library_dir}"
-            ], env=self.calibre_env, check=True, capture_output=True, text=True)
+                "calibredb", "add_format", str(book_id), str(staged_path), *target.args
+            ], env=self.calibre_env, check=True, capture_output=True, text=True, input=target.stdin)
             print(f"[ingest-processor] Added new format for book id {book_id}: {os.path.basename(str(staged_path))}", flush=True)
             mark_ingest_batch_dirty()
             run_duplicate_scan_for_books([book_id])

@@ -36,7 +36,7 @@ def test_simultaneous_exports_coordinate_the_calibre_library_lock(export_env, mo
     start = threading.Barrier(2)
 
     class Process:
-        def __init__(self, command, *args):
+        def __init__(self, command, *args, **kwargs):
             nonlocal active, maximum
             with guard:
                 active += 1

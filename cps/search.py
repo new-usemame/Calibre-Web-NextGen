@@ -113,6 +113,15 @@ def adv_search_custom_columns(cc, term, q):
                 if c.datatype == 'rating':
                     q = q.filter(getattr(db.Books, 'custom_column_' + str(c.id)).any(
                         db.cc_classes[c.id].value == int(float(custom_query) * 2)))
+                elif c.datatype in ('text', 'enumeration') and \
+                        not calibre_db.is_flat_cc_column(c.id):
+                    # Hierarchical column: match the node itself plus all
+                    # descendants ('Computers' -> 'Computers.DB', ...), the
+                    # same set the browse tree links to. Flat columns keep the
+                    # substring behaviour below — Dewey '778.3' is one string
+                    # to search in, not a path to expand.
+                    q = q.filter(getattr(db.Books, 'custom_column_' + str(c.id)).any(
+                        calibre_db.hierarchical_cc_search_filter(c.id, custom_query)))
                 else:
                     q = q.filter(getattr(db.Books, 'custom_column_' + str(c.id)).any(
                         func.lower(db.cc_classes[c.id].value).ilike("%" + custom_query + "%")))

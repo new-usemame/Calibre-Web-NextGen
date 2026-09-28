@@ -23,6 +23,7 @@ import type {
   GlobalLibraryPage, LibraryModePayload, LibraryRemovalImpact, DeliveryDevice,
   DeviceDeliveryResult, MyLibraryIntroState,
   KoboSyncToken, KoreaderPairRequest,
+  CcColumnsPage, CcTree, CcBooksPage,
 } from './api';
 
 /** Entity kinds the catalog can be filtered by. Singular here; the browse-list
@@ -500,6 +501,50 @@ export function useDismissMyLibraryIntro() {
       qc.setQueryData<Me | null>(['me'], (me) => me ? { ...me, ...payload } : me);
       qc.setQueryData<Account>(['account'], (account) => account ? { ...account, ...payload } : account);
     },
+  });
+}
+
+// ── Custom columns (browse by tag-like column) ───────────────────────────────
+
+/** Browsable custom columns (tag-like text/enumeration), with their hierarchy
+ *  status. Empty items = the library has no browsable columns (or the caller
+ *  hid every one on their profile page). */
+export function useColumns(enabled = true) {
+  return useQuery<CcColumnsPage>({
+    queryKey: ['cc-columns'],
+    queryFn: () => apiGet<CcColumnsPage>('/api/v1/columns'),
+    enabled,
+    staleTime: 60000,
+  });
+}
+
+/** The nodes of one custom column. For a hierarchical column that is the
+ *  nested tree; for a flat one a one-level list of whole values. The response's
+ *  `column.hierarchical` tells the caller which, so one renderer covers both. */
+export function useCcTree(colId: string | number, enabled = true) {
+  return useQuery<CcTree>({
+    queryKey: ['cc-tree', String(colId)],
+    queryFn: () => apiGet<CcTree>(`/api/v1/columns/${colId}/tree`),
+    enabled,
+    staleTime: 60000,
+  });
+}
+
+/** One page of books under a node of a custom column. An empty `path` lists
+ *  every book carrying any value in the column. */
+export function useCcBooks(
+  colId: string | number, path: string, page: number, enabled = true,
+) {
+  return useQuery<CcBooksPage>({
+    queryKey: ['cc-books', String(colId), path, page],
+    queryFn: () => {
+      const params = new URLSearchParams({ page: String(page) });
+      if (path) params.set('path', path);
+      return apiGet<CcBooksPage>(`/api/v1/columns/${colId}/books?${params.toString()}`);
+    },
+    enabled,
+    staleTime: 60000,
+    placeholderData: keepPreviousData,
   });
 }
 

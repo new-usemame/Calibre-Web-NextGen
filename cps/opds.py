@@ -579,18 +579,33 @@ def feed_index():
 
 
 def get_opds_hierarchy_root_entries(user):
-    """One root entry per browsable custom column whose values form a
-    hierarchy; flat columns stay out of the catalog root."""
+    """One root entry per browsable custom column, in either mode.
+
+    Hierarchical and flat columns both appear: the feed itself decides which
+    it is, so a Dewey or LCC column a cataloger defined is reachable from an
+    OPDS client. Excluding flat columns here is what kept them undiscoverable
+    in OPDS even though the browse route already served them.
+    """
     if not user.check_visibility(constants.SIDEBAR_CATEGORY):
         return []
-    hierarchical = calibre_db.get_hierarchical_column_ids()
-    return [{
-        'key': 'cc_%d' % col.id,
-        'title': col.name,
-        'description': _('Books by %(name)s, including every sub-category', name=col.name),
-        'url': url_for('opds.feed_cc_category', column_id=col.id),
-    } for col in calibre_db.get_cc_columns(config)
-        if col.id in hierarchical and col.datatype in ('text', 'enumeration')]
+    entries = []
+    for col in calibre_db.get_cc_columns(config):
+        if col.datatype not in ('text', 'enumeration'):
+            continue
+        # A hierarchical feed offers every sub-category under a node; a flat
+        # one has no sub-categories, so claiming them would be a lie the
+        # reader will not find when it follows the link.
+        if calibre_db.is_flat_cc_column(col.id):
+            description = _('Books by %(name)s', name=col.name)
+        else:
+            description = _('Books by %(name)s, including every sub-category', name=col.name)
+        entries.append({
+            'key': 'cc_%d' % col.id,
+            'title': col.name,
+            'description': description,
+            'url': url_for('opds.feed_cc_category', column_id=col.id),
+        })
+    return entries
 
 
 @opds.route("/opds/osd")
@@ -806,13 +821,18 @@ def feed_category(book_id):
 @opds.route("/opds/custom_column/<int:column_id>/<path:category_path>")
 @requires_basic_auth_if_no_ano
 def feed_cc_category(column_id, category_path):
-    """OPDS navigation/acquisition feed for one hierarchical custom column.
+    """OPDS navigation/acquisition feed for one custom column, in either mode.
 
-    /opds/custom_column/1                    -> top-level nodes
-    /opds/custom_column/1/Computers          -> child nodes (navigation)
-    /opds/custom_column/1/Computers.DB       -> books under the leaf (acquisition)
-    Nodes with children take precedence over directly attached books;
-    those remain reachable through the OPDS search.
+    Hierarchical:
+      /opds/custom_column/1                  -> top-level nodes
+      /opds/custom_column/1/Computers        -> child nodes (navigation)
+      /opds/custom_column/1/Computers.DB     -> books under the leaf (acquisition)
+    Nodes with children take precedence over directly attached books; those
+    remain reachable through the OPDS search.
+
+    Flat (Dewey 778.3 is ONE value, never a 778 node with a 3 child):
+      /opds/custom_column/3                  -> the distinct values
+      /opds/custom_column/3/778.3            -> books with that exact value
     """
     if not auth.current_user().check_visibility(constants.SIDEBAR_CATEGORY):
         abort(404)
@@ -820,14 +840,34 @@ def feed_cc_category(column_id, category_path):
                for col in calibre_db.get_cc_columns(config)):
         abort(404)
 
-    # '/' is part of a value ("Sci-Fi/Fantasy"), never a separator.
-    path = hierarchy.join_path([category_path or ''])
+    is_hierarchical = not calibre_db.is_flat_cc_column(column_id)
+    if is_hierarchical:
+        # '/' is part of a value ("Sci-Fi/Fantasy"), never a separator.
+        path = hierarchy.join_path([category_path or ''])
+    else:
+        # Flat values are opaque atomic strings -- never canonicalised.
+        path = (category_path or '').strip()
     off = int(request.args.get("offset") or 0)
     cc = calibre_db.get_cc_columns(config, filter_config_custom_read=True)
-    opds_tree = calibre_db.get_hierarchical_tree(
-        column_id, book_filter=get_opds_restricted_common_filter())
+    opds_filter = get_opds_restricted_common_filter()
 
-    if path:
+    def cc_book_filter(inner):
+        return getattr(db.Books, 'custom_column_' + str(column_id)).any(inner)
+
+    def books_feed(db_filter):
+        entries, __, pagination = fill_opds_indexpage(
+            (int(off) / (int(config.config_books_per_page)) + 1), 0,
+            db.Books, db_filter,
+            # Shared map entry, tiebreaker included (#1331) — an inline
+            # [db.Books.timestamp.desc()] here paged plan-dependently.
+            BOOK_SORT_ORDERS["new"],
+            True, config.config_read_column)
+        return render_xml_template('feed.xml', entries=entries,
+                                   pagination=pagination, cc=cc)
+
+    if path and is_hierarchical:
+        opds_tree = calibre_db.get_hierarchical_tree(
+            column_id, book_filter=opds_filter)
         node = hierarchy.get_node_by_path(opds_tree, path)
         if node is None:
             abort(404)
@@ -837,22 +877,19 @@ def feed_cc_category(column_id, category_path):
             pagination = Pagination(1, max(len(elements), 1), len(elements))
             return render_xml_template('feed.xml', hierarchyelements=elements,
                                        pagination=pagination, cc=cc)
+        return books_feed(cc_book_filter(
+            calibre_db.hierarchical_cc_filter(column_id, node)))
 
     if path:
-        entries, __, pagination = fill_opds_indexpage(
-            (int(off) / (int(config.config_books_per_page)) + 1), 0,
-            db.Books,
-            getattr(db.Books, 'custom_column_' + str(column_id)).any(
-                calibre_db.hierarchical_cc_filter(column_id, node)),
-            # Shared map entry, tiebreaker included (#1331) — an inline
-            # [db.Books.timestamp.desc()] here paged plan-dependently.
-            BOOK_SORT_ORDERS["new"],
-            True, config.config_read_column)
-        return render_xml_template('feed.xml', entries=entries,
-                                   pagination=pagination, cc=cc)
+        return books_feed(cc_book_filter(
+            calibre_db.flat_cc_filter(column_id, path)))
 
+    if is_hierarchical:
+        nodes = calibre_db.get_hierarchical_tree(column_id, book_filter=opds_filter)
+    else:
+        nodes = calibre_db.get_cc_flat_list(column_id, book_filter=opds_filter)
     elements = [{'column_id': column_id, 'path': n['path'], 'name': n['name']}
-                for n in opds_tree]
+                for n in nodes]
     pagination = Pagination(1, max(len(elements), 1), len(elements))
     return render_xml_template('feed.xml', hierarchyelements=elements,
                                pagination=pagination, cc=cc)

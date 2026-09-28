@@ -316,6 +316,48 @@ export interface BooksPage {
   total: number;
 }
 
+/** One browsable custom column (tag-like: text/enumeration datatype).
+ *  `hierarchical` marks columns whose stored values form a Calibre-style
+ *  dotted hierarchy (e.g. `Computers.DB.Oracle`) — those render as a tree.
+ *  When false the values are atomic strings (Dewey `778.3` is ONE
+ *  classification, not a `778` parent with a `3` child) and the tree
+ *  endpoint returns them as a one-level list of whole values. */
+export interface CcColumn {
+  id: number;
+  name: string;
+  datatype: string;
+  hierarchical: boolean;
+}
+
+export interface CcColumnsPage {
+  items: CcColumn[];
+}
+
+/** One node of a custom column's browse tree. `path` is the canonical dotted
+ *  path from the root (e.g. `Computers.DB`) for a hierarchical column, and the
+ *  whole stored value for a flat one. `count` is direct hits on the exact
+ *  value, `total_count` includes every descendant — always equal for a flat
+ *  node, which has none. */
+export interface CcNode {
+  name: string;
+  path: string;
+  count: number;
+  total_count: number;
+  children: CcNode[];
+}
+
+export interface CcTree {
+  column: CcColumn;
+  nodes: CcNode[];
+}
+
+/** Books under one node of a custom column (or all books carrying any value
+ *  in the column when no path was requested). */
+export interface CcBooksPage extends BooksPage {
+  path: string;
+  column: { id: number; name: string };
+}
+
 /** One row in an entity-browse list, with how many books reference it. */
 export interface EntityListItem extends EntityRef {
   count: number;

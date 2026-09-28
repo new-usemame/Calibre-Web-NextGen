@@ -3761,6 +3761,7 @@ def _acquire_restore_service_locks():
 def restore_calibre_db():
     """Restore Calibre metadata.db and clean app.db book-linked tables (last resort recovery)."""
     lock_handles = []
+    content_server_paused = False
     try:
         restore_lock = _acquire_restore_lock()
         if restore_lock is None:
@@ -3794,6 +3795,10 @@ def restore_calibre_db():
             flash(_("Cover enforcement is in progress; try again when it finishes."), category="error")
             return redirect(url_for("admin.db_configuration"))
         lock_handles.extend(service_lock_handles)
+
+        # calibredb's check_library/restore_database need the library path
+        # itself, which a running content server holds open (#2210 review).
+        content_server_paused = content_server.pause()
 
         # 1. Backup both DBs
         backup_dir = constants.config_path(
@@ -3888,3 +3893,5 @@ def restore_calibre_db():
         return redirect(url_for("admin.db_configuration"))
     finally:
         _release_restore_locks(lock_handles)
+        if content_server_paused:
+            content_server.start()

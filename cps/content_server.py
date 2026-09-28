@@ -323,6 +323,20 @@ def stop():
         _locked_stop()
 
 
+def pause():
+    """Stop the server so calibredb can open the library path directly.
+
+    For work calibredb cannot do through a server (``restore_database``,
+    ``check_library``). Returns whether a server was running, so the caller
+    restarts it only in that case -- from a ``finally``, so a failed run does
+    not leave it stopped for good.
+    """
+    with _lock:
+        was_running = _process is not None and _process.poll() is None
+        _locked_stop()
+    return was_running
+
+
 def _locked_stop():
     global _process, _stopped_on_purpose
     _stopped_on_purpose = True

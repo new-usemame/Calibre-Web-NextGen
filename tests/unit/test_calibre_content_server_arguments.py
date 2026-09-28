@@ -392,3 +392,16 @@ def test_settings_calibre_would_refuse_are_rejected_at_save(content_server, port
     """Review of #2210: each of these was stored as "saved", after which the
     server crash-looped or never started, with the reason only in a log line."""
     assert content_server.settings_problem(port, username, password, 8083) == problem
+
+
+def test_pause_reports_a_running_server_and_stops_it(content_server, monkeypatch, tmp_path):
+    """Restore Calibre DB runs calibredb against the library path, which a
+    running server holds open; it pauses the server and restarts it after,
+    but only if one was running."""
+    launched = _spawns(content_server, monkeypatch, tmp_path)
+    content_server.start()
+    assert len(launched) == 1
+
+    assert content_server.pause() is True
+    assert content_server._process is None
+    assert content_server.pause() is False

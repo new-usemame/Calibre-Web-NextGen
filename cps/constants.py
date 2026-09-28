@@ -131,6 +131,24 @@ def calibre_library_dir():
     )
 
 
+AUTO_LIBRARY_UNIT_DIR = '/etc/s6-overlay/s6-rc.d/cwa-auto-library'
+
+
+def library_location_is_automounted(_isdir=os.path.isdir, _environ=os.environ):
+    """Whether the container's cwa-auto-library unit picks the library at boot.
+
+    Only then is the admin page's Calibre Database location read-only: a path
+    typed there would be replaced on the next start. A bare-metal or Windows
+    install has no such unit, and DISABLE_LIBRARY_AUTOMOUNT (same truthy
+    values as the unit's run script) switches it off inside the container, so
+    in both cases that field is the only way to set the location (#2343).
+    """
+    if not _isdir(AUTO_LIBRARY_UNIT_DIR):
+        return False
+    flag = _environ.get('DISABLE_LIBRARY_AUTOMOUNT') or ''
+    return not (flag.lower() in ('true', 'yes') or flag == '1')
+
+
 def tmp_conversion_dir():
     """Configured conversion scratch directory, without a trailing separator."""
     return _configured_dir(

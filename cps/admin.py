@@ -3132,6 +3132,7 @@ def _db_configuration_result(error_flash=None, gdrive_error=None):
     return render_title_template("config_db.html",
                                  config=config,
                                  backup_root=constants.config_path("backup"),
+                                 library_location_locked=constants.library_location_is_automounted(),
                                  show_authenticate_google_drive=gdrive_authenticate,
                                  gdriveError=gdrive_error,
                                  gdrivefolders=gdrivefolders,

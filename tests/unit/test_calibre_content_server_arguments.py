@@ -373,3 +373,22 @@ def test_both_copies_derive_the_same_library_id(content_server, monkeypatch, pat
 
     assert content_server.library_id(path) == expected
     assert scripts_copy.library_id(path) == expected
+
+
+@pytest.mark.parametrize("port,username,password,problem", [
+    ("8081", "ccsuser", "", None),
+    (8081, "calibre user_1-a", "p@ss w0rd!", None),
+    ("", "ccsuser", "", "port"),                 # was a 500 from int("")
+    ("abc", "ccsuser", "", "port"),
+    ("0", "ccsuser", "", "port"),
+    ("65536", "ccsuser", "", "port"),
+    ("8083", "ccsuser", "", "port-in-use"),       # the web UI's own port
+    ("8081", "me@example", "", "username"),       # calibre rejects . and @
+    ("8081", "a.b", "", "username"),
+    ("8081", "ccsuser", "pässword", "password"),  # calibre: ASCII only
+])
+def test_settings_calibre_would_refuse_are_rejected_at_save(content_server, port, username,
+                                                            password, problem):
+    """Review of #2210: each of these was stored as "saved", after which the
+    server crash-looped or never started, with the reason only in a log line."""
+    assert content_server.settings_problem(port, username, password, 8083) == problem

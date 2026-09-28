@@ -17,6 +17,7 @@
 #   along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import re
 import socket
 import subprocess
 import sys
@@ -61,6 +62,37 @@ SETTING_DEFAULTS = {
 
 def setting(name):
     return getattr(config, name, SETTING_DEFAULTS[name])
+
+
+# calibre.srv.users.validate_username/validate_password, as measured with
+# calibre 9.0: a name outside this set or a non-ASCII password makes the user
+# database helper fail, and the server then never starts while the admin page
+# says "saved" (#2210 review).
+_USERNAME_CHARS = re.compile(r"^[A-Za-z0-9 _-]+$")
+
+
+def settings_problem(port, username, new_password, app_port):
+    """Why these content server settings cannot work, or ``None``.
+
+    Returns a key the admin page turns into a message: ``port`` (not an integer
+    in 1-65535), ``port-in-use`` (the web UI's own port -- calibre-server would
+    crash-loop and the connection probe would then find the web UI answering),
+    ``username`` or ``password`` (rejected by calibre). ``new_password`` is only
+    what was just submitted; an empty value means "unchanged".
+    """
+    try:
+        port = int(str(port).strip())
+    except (TypeError, ValueError):
+        return "port"
+    if not 1 <= port <= 65535:
+        return "port"
+    if app_port and port == int(app_port):
+        return "port-in-use"
+    if username and not _USERNAME_CHARS.match(username):
+        return "username"
+    if new_password and not all(32 <= ord(ch) < 127 for ch in new_password):
+        return "password"
+    return None
 
 
 def library_id(library_dir):

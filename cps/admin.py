@@ -3069,6 +3069,17 @@ def _configuration_update_helper():
                 and to_save.get("config_calibre_server_anonymous_writes") != "on"
                 and not (server_username and server_password)):
             return _configuration_result(_('Please enter a content server username and password, or allow anonymous writes'))
+        problem = content_server.settings_problem(
+            to_save.get("config_calibre_server_port", config.config_calibre_server_port),
+            server_username, to_save.get("config_calibre_server_password_e"), config.config_port)
+        if problem:
+            return _configuration_result({
+                "port": _('Content server port must be a number from 1 to 65535'),
+                "port-in-use": _('Content server port must differ from the port this server listens on'),
+                "username": _('Content server username may only use the letters A-Z, numbers, spaces, '
+                              'underscores and hyphens'),
+                "password": _('Content server password must use only ASCII (English) characters'),
+            }[problem])
         listen_address = strip_whitespaces(to_save.get("config_calibre_server_listen", ""))
         if listen_address:
             try:

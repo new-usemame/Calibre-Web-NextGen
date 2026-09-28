@@ -227,3 +227,38 @@ def test_directory_account_has_no_local_password_to_fall_back_to(ldap_login):
         lambda name, password: (None, 'LDAP Server down: 127.0.0.1:389')
     assert h.login('local-password').status_code == 401
     assert _session_user_id(h.client) == 0
+
+
+def test_local_fallback_sign_in_resets_the_failure_window(ldap_login):
+    """A fallback sign-in clears the failure buckets like a directory bind does.
+
+    Without the reset, the two failures before the fallback and the two after
+    it share one 3-per-minute window: the fourth failure answers 429 and the
+    administrator is locked out of the next, correct, attempt too.
+    """
+    h = ldap_login
+    h.directory.bind_user.side_effect = \
+        lambda name, password: (None, 'LDAP Server down: 127.0.0.1:389')
+    h.existing()
+    assert [h.login('wrong').status_code for _ in range(2)] == [401, 401]
+    assert h.login('local-password').status_code == 200
+    assert [h.login('wrong').status_code for _ in range(2)] == [401, 401]
+    assert h.login('local-password').status_code == 200
+
+
+@pytest.mark.parametrize('login_type', [constants.LOGIN_LDAP, constants.LOGIN_STANDARD])
+@pytest.mark.parametrize('password', [12345, ['local-password'], {'x': 1}, True])
+def test_non_string_password_is_a_plain_failure_for_every_account(
+        ldap_login, monkeypatch, login_type, password):
+    """A malformed password answers 401 whether or not the account has a hash.
+
+    A 500 only for accounts that hold a local hash would tell a caller which
+    names are local-only accounts -- the ones the directory fallback accepts.
+    """
+    h = ldap_login
+    monkeypatch.setattr(config, 'config_login_type', login_type, raising=False)
+    h.existing()
+    for name in ('reader', 'nobody-here'):
+        response = h.client.post('/api/v1/auth/login',
+                                 json={'username': name, 'password': password})
+        assert response.status_code == 401, (name, response.status_code)

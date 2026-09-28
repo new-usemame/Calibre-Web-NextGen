@@ -279,7 +279,10 @@ def auth_login():
 
     data = _request_data()
     username = _normalized_username(data)
-    password = data.get("password") or ""
+    password = data.get("password")
+    # Same rule as the username: a malformed value is a missing one, so it
+    # fails like any wrong password instead of raising inside the hash check.
+    password = password if isinstance(password, str) else ""
     user = ub.session.query(ub.User).filter(func.lower(ub.User.name) == username).first()
 
     # ── LDAP authentication ────────────────────────────────────────────
@@ -309,7 +312,10 @@ def auth_login():
             # (typically an administrator) must still reach an LDAP-enabled
             # instance when the directory is down or does not know the
             # account. Directory-sourced accounts are created with an empty
-            # local hash, so they can never pass this check.
+            # local hash and fail this check until someone gives them a
+            # local password (password reset, profile form, admin edit);
+            # after that, as on /login, a directory rejection no longer
+            # revokes it.
             if user.password and check_password_hash(str(user.password), password):
                 log.info("Local Fallback Login as: '%s' (directory did not "
                          "authenticate this account)", user.name)

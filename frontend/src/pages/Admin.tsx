@@ -57,6 +57,10 @@ export function Admin() {
   const [form, setForm] = useState({ name: '', password: '', email: '', upload: false });
   const [libraryBookIds, setLibraryBookIds] = useState<Record<number, string>>({});
   const [libraryBookErrors, setLibraryBookErrors] = useState<Record<number, string>>({});
+  // The add-book confirmation belongs to the card whose form caused it. The
+  // page banner sits above every card, so by the time an administrator has
+  // scrolled to a user's form it is off-screen and the add looked silent (#1939).
+  const [libraryBookAdded, setLibraryBookAdded] = useState<Record<number, string>>({});
   const [modeHelpOpen, setModeHelpOpen] = useState<Record<number, boolean>>({});
 
   if (isLoading) return <SpinnerCentered size={40} />;
@@ -143,6 +147,7 @@ export function Admin() {
   const addBookForUser = (e: React.FormEvent, user: AdminUser) => {
     e.preventDefault();
     const bookId = Number(libraryBookIds[user.id]);
+    setLibraryBookAdded((added) => ({ ...added, [user.id]: '' }));
     if (!Number.isInteger(bookId) || bookId < 1) {
       setBanner(null);
       setLibraryBookErrors((errors) => ({
@@ -155,9 +160,9 @@ export function Admin() {
     addBookToLibrary.mutate({ userId: user.id, bookId }, {
       onSuccess: (result) => {
         setLibraryBookIds((values) => ({ ...values, [user.id]: '' }));
-        setBanner({ ok: true, text: t('Added book {book} to {name}.', {
+        setLibraryBookAdded((added) => ({ ...added, [user.id]: t('Added book {book} to {name}.', {
           book: result.book_title, name: user.name,
-        }) });
+        }) }));
       },
       onError: (err) => {
         setLibraryBookErrors((errors) => ({
@@ -332,6 +337,11 @@ export function Admin() {
                                   ...errors, [user.id]: '',
                                 }));
                               }
+                              if (libraryBookAdded[user.id]) {
+                                setLibraryBookAdded((added) => ({
+                                  ...added, [user.id]: '',
+                                }));
+                              }
                             }} />
                         </label>
                         <button type="submit" className={styles.submitBtn}
@@ -341,6 +351,8 @@ export function Admin() {
                         {libraryBookErrors[user.id] &&
                           <span id={`library-book-error-${user.id}`} className={styles.fieldError}
                             role="alert">{libraryBookErrors[user.id]}</span>}
+                        <span className={libraryBookAdded[user.id] ? styles.fieldOk : undefined}
+                          role="status">{libraryBookAdded[user.id]}</span>
                       </form>
                     </>}
                 </fieldset>

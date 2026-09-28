@@ -532,10 +532,14 @@ test.describe('My Library', () => {
       )).toBeVisible();
       await card.getByRole('spinbutton', { name: 'Book ID' }).fill(String(book.id));
       await card.getByRole('button', { name: 'Add book to this library' }).click();
-      await expect(adminPage.getByText(
-        `Added book ${book.title} to ${secondaryUser.username}.`,
-        { exact: true },
-      )).toBeVisible();
+      // The confirmation has to be where the administrator is looking: in this
+      // user's card, on screen. A page-top banner passed toBeVisible() while
+      // sitting off-screen above the card, so the add looked silent (#1939).
+      const added = card.getByRole('status').filter({
+        hasText: `Added book ${book.title} to ${secondaryUser.username}.`,
+      });
+      await expect(added).toBeVisible();
+      await expect(added).toBeInViewport();
 
       const library = (await secondaryUser.page.request.get(
         '/api/v1/books?per_page=200',

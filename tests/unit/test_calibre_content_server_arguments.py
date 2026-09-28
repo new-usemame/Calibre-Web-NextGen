@@ -120,7 +120,7 @@ def test_anonymous_target_carries_no_credentials(content_server, monkeypatch):
 def test_library_id_is_the_directory_name_without_trailing_separator(content_server, monkeypatch):
     content_server.config.config_calibre_dir = "/books/My Library/"
     _answering(content_server, monkeypatch)
-    assert content_server.library_target().args[1] == "http://127.0.0.1:7777/#My Library"
+    assert content_server.library_target().args[1] == "http://127.0.0.1:7777/#My_Library"
 
 
 def test_a_server_that_is_not_answering_falls_back_to_the_library_path(content_server, monkeypatch):
@@ -348,3 +348,28 @@ def test_a_start_without_auth_leaves_no_old_password_on_disk(content_server, mon
     content_server.start()
 
     assert not userdb.exists()
+
+
+# calibre's own ``srv.library_broker.library_id_from_path``, measured with
+# calibre 9.0's calibre-debug.
+CALIBRE_LIBRARY_IDS = {
+    "/calibre-library": "calibre-library",
+    "/books/Calibre Library": "Calibre_Library",
+    "/x/My Library/": "My_Library",
+    "/x/a.b-c": "a.b-c",
+}
+
+
+@pytest.mark.parametrize("path,expected", sorted(CALIBRE_LIBRARY_IDS.items()))
+def test_both_copies_derive_the_same_library_id(content_server, monkeypatch, path, expected):
+    """The app and the standalone scripts each build the server URL. Both must
+    name the library the way calibre-server does -- "#Calibre Library" matches
+    no library there -- and they must not drift apart."""
+    spec = importlib.util.spec_from_file_location(
+        "calibre_library_target_idcheck", REPO_ROOT / "scripts" / "calibre_library_target.py")
+    scripts_copy = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, "calibre_library_target_idcheck", scripts_copy)
+    spec.loader.exec_module(scripts_copy)
+
+    assert content_server.library_id(path) == expected
+    assert scripts_copy.library_id(path) == expected

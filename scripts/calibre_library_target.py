@@ -32,6 +32,16 @@ PROBE_TIMEOUT = 0.5
 LibraryTarget = namedtuple("LibraryTarget", "args stdin")
 
 
+def library_id(library_dir):
+    """calibre-server's id for a library: folder name, spaces as ``_``.
+
+    Same rule as ``cps.content_server.library_id`` (calibre's
+    ``library_id_from_path``); this script runs outside the app and cannot
+    import it, so a test pins the two copies together.
+    """
+    return os.path.basename(str(library_dir).rstrip("/")).replace(" ", "_")
+
+
 def _path_target(library_dir):
     return LibraryTarget(["--library-path={}".format(library_dir)], None)
 
@@ -117,8 +127,7 @@ def library_target(library_dir):
     if not _is_answering(port):
         _announce_fallback("it is not answering on port {}".format(port))
         return _path_target(library_dir)
-    args = ["--with-library", "http://127.0.0.1:{}/#{}".format(
-        port, os.path.basename(str(library_dir).rstrip("/")))]
+    args = ["--with-library", "http://127.0.0.1:{}/#{}".format(port, library_id(library_dir))]
     if anonymous_writes:
         return LibraryTarget(args, None)
     if not (username and password):

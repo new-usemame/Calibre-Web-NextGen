@@ -63,10 +63,22 @@ def setting(name):
     return getattr(config, name, SETTING_DEFAULTS[name])
 
 
+def library_id(library_dir):
+    """The id calibre-server gives a library: its folder name, spaces as ``_``.
+
+    calibre's ``srv.library_broker.library_id_from_path`` rule. The folder name
+    alone is not it: ``#Calibre Library`` (calibre's own default name) matches
+    no library on the server, so every routed calibredb call found nothing.
+    Kept in step with ``scripts/calibre_library_target.py``, which cannot import
+    this module; ``test_both_copies_derive_the_same_library_id`` pins the pair.
+    """
+    return os.path.basename(str(library_dir).rstrip("/")).replace(" ", "_")
+
+
 def library_url():
     return "http://127.0.0.1:{}/#{}".format(
         setting("config_calibre_server_port"),
-        os.path.basename(setting("config_calibre_dir").rstrip("/")))
+        library_id(setting("config_calibre_dir")))
 
 
 def _auth_enabled():

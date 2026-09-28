@@ -129,7 +129,7 @@ def test_an_unreadable_app_db_falls_back_to_the_library_path(target_module, monk
 def test_library_id_is_the_directory_name(target_module):
     _make_app_db(target_module.app_db, password_e=b"encrypted")
     assert target_module.library_target("/books/My Library/").args[1] == \
-        "http://127.0.0.1:7777/#My Library"
+        "http://127.0.0.1:7777/#My_Library"
 
 
 def test_ingest_transaction_helper_is_addressed_by_path_only():
@@ -163,3 +163,4 @@ def test_the_fallback_message_never_carries_the_password(target_module, monkeypa
     monkeypatch.setattr(target_module, "_is_answering", lambda port: False)
     target_module.library_target(LIBRARY)
     assert PASSWORD not in capsys.readouterr().err
+

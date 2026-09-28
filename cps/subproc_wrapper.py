@@ -44,12 +44,15 @@ def process_open(command, quotes=(), env=None, sout=subprocess.PIPE, serr=subpro
                          env=env, **popen_kwargs) # nosec
     if stdin_payload is not None:
         # calibredb reads --password <stdin> before it does anything else,
-        # so the pipe is closed straight away to signal end of input.
+        # so the pipe is closed straight away to signal end of input. The
+        # handle is then dropped: callers reap with communicate(), which
+        # flushes any stdin it still holds and raises on a closed one (#2210).
         try:
             p.stdin.write(stdin_payload if newlines else stdin_payload.encode('utf-8'))
             p.stdin.close()
         except (OSError, ValueError):
             pass
+        p.stdin = None
     return p
 
 

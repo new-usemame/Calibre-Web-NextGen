@@ -389,6 +389,16 @@ export function Reader({ id }: { id: string }) {
    * because at that point the reader really is reading there.
    */
   const previewingRef = useRef(false);
+  /*
+   * True while the book shows its start only as a placeholder: an automatic
+   * device resume is waiting for the locations index before it can jump. A
+   * page turn from that placeholder is not the reader choosing the start of the
+   * book (#2358) -- saving it stamped a web bookmark newer than the device sync,
+   * so the synced position was never used or offered again. Page turns keep the
+   * preview armed until the jump lands or is given up; any other navigation is
+   * an explicit choice and wins over the pending jump.
+   */
+  const autoResumePendingRef = useRef(false);
   // Appearance changes retain the passage explicitly chosen for a preview,
   // which may differ from the first word on its containing page.
   const previewTargetRef = useRef<string | undefined>(undefined);
@@ -1281,20 +1291,20 @@ export function Reader({ id }: { id: string }) {
   }, [fontPct, fontFamily, margin, lineHeight, spread, captureReadingAnchor]);
 
   // A page turn is the reader moving themselves, so it ends any preview: from
-  // here on the relocations are theirs and the position saves again. This is the
-  // ONLY thing that clears the flag — see previewingRef's note.
+  // here on the relocations are theirs and the position saves again -- except
+  // while an automatic resume is still pending (see autoResumePendingRef).
   const goPrev = useCallback(() => {
     setRemoteResume(null);
     setPreviewSource(null);
     if (sourceModeRef.current === 'preview') sourceModeRef.current = 'browser';
-    previewingRef.current = false;
+    if (!autoResumePendingRef.current) previewingRef.current = false;
     return renditionRef.current?.prev();
   }, []);
   const goNext = useCallback(() => {
     setRemoteResume(null);
     setPreviewSource(null);
     if (sourceModeRef.current === 'preview') sourceModeRef.current = 'browser';
-    previewingRef.current = false;
+    if (!autoResumePendingRef.current) previewingRef.current = false;
     return renditionRef.current?.next();
   }, []);
 
@@ -1544,6 +1554,7 @@ export function Reader({ id }: { id: string }) {
     setRendered(false);
     setRenderError(null);
     previewTargetRef.current = undefined;
+    autoResumePendingRef.current = false;
     appearanceAnchorRef.current = undefined;
     // Clear rather than carry: wouter reuses this component across an :id
     // change, so a stale RTL flag would invert the next book's page turns.
@@ -1660,6 +1671,7 @@ export function Reader({ id }: { id: string }) {
           } catch { /* Keep opening the book when its index cannot be generated. */ }
         }
         previewTargetRef.current = initialTarget;
+        autoResumePendingRef.current = !initialTarget && resume?.mode === 'automatic';
         await rendition.display(initialTarget);
         if (cancelled) return;
         // display() resolves only after the package document is parsed, so the
@@ -1683,13 +1695,20 @@ export function Reader({ id }: { id: string }) {
           .then(async () => {
             if (cancelled) return;
             // A slow index may finish after first display. Still apply the
-            // percentage hint unless the reader has already chosen a position.
-            if (!readerMoved && previewingRef.current && !savedCfiRef.current && !initialTarget && resume?.mode === 'automatic') {
+            // percentage hint unless the reader has already chosen a position;
+            // page turns from the placeholder start are not a choice. When they
+            // did choose (a chapter, link, highlight or search hit), keep the
+            // synced position as an offer rather than dropping it.
+            const pending = autoResumePendingRef.current;
+            autoResumePendingRef.current = false;
+            if (pending && resume?.mode === 'automatic') {
               const cfi = resumeCfi(epubBook.locations, resume);
-              if (cfi) {
+              if (cfi && !readerMoved && previewingRef.current && previewTargetRef.current === undefined) {
                 previewTargetRef.current = cfi;
                 await rendition.display(cfi);
                 if (cancelled) return;
+              } else if (cfi) {
+                setRemoteResume({ cfi, percentage: resume.percentage });
               }
             }
             if (!readerMoved && savedCfiRef.current && resume?.mode === 'offer') {
@@ -1701,7 +1720,11 @@ export function Reader({ id }: { id: string }) {
               setProgress(Math.round(epubBook.locations.percentageFromCfi(loc.start.cfi) * 100));
             }
           })
-          .catch(() => {/* locations are best-effort */});
+          .catch(() => {
+            // Locations are best-effort. Without them the jump cannot happen,
+            // so page turns must start saving again.
+            autoResumePendingRef.current = false;
+          });
 
         let lastRelocatedCfi: string | undefined;
         rendition.on('relocated', (location: any) => {

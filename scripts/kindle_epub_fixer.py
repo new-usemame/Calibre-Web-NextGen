@@ -30,11 +30,6 @@ from cwa_db import CWA_DB
 from library_paths import get_calibre_metadata_db_path
 
 try:
-    from charset_normalizer import from_bytes as _charset_from_bytes
-except Exception:
-    _charset_from_bytes = None
-
-try:
     import chardet
 except Exception:
     chardet = None
@@ -205,13 +200,21 @@ class EPUBFixer:
         if html_meta:
             return html_meta, 0.95, 'html_meta'
 
-        if _charset_from_bytes is not None:
+        # Nothing declares an encoding. UTF-8 is the XML default, and text that
+        # is valid multi-byte UTF-8 is overwhelmingly unlikely to be anything
+        # else, so settle it here instead of guessing. The statistical
+        # detector below is unreliable on short files: chardet 5.2 reads a
+        # file with a single multi-byte character (one "—" or "©") as
+        # Windows-1252 at 0.73, above the acceptance threshold, which turned
+        # "Ghost—Spectres" into "Ghostâ€”Spectres" on ingest. Pure-ASCII data
+        # is left to the detector: it re-encodes to identical bytes either way.
+        if not data.isascii():
             try:
-                best = _charset_from_bytes(data).best()
-                if best and best.encoding:
-                    return best.encoding, float(best.confidence or 0.0), 'charset_normalizer'
-            except Exception:
+                data.decode('utf-8')
+            except UnicodeDecodeError:
                 pass
+            else:
+                return 'utf-8', 1.0, 'utf8_strict'
 
         if chardet is not None:
             try:

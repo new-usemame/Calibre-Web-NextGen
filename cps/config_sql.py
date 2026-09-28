@@ -744,7 +744,7 @@ class ConfigSQL(object):
         env_port = os.environ.get("CALIBRE_SERVER_PORT")
         env_username = os.environ.get("CALIBRE_SERVER_USERNAME")
         env_password = os.environ.get("CALIBRE_SERVER_PASSWORD")
-        if env_port and env_port.isdigit():
+        if env_port and env_port.isdigit() and 1 <= int(env_port) <= 65535:
             self.config_calibre_server_port = int(env_port)
         if env_username:
             self.config_calibre_server_username = env_username

@@ -173,9 +173,12 @@ def main():
     _start_runtime_tasks(app)
 
     from . import web_server
-    from . import content_server
+    from . import content_server, logger
 
-    content_server.start()
+    try:
+        content_server.start()
+    except Exception as ex:  # an optional side service must not keep the app down
+        logger.create().error("Calibre content server failed to start: %s", ex)
     success = web_server.start()
     content_server.stop()
     sys.exit(0 if success else 1)

@@ -77,7 +77,7 @@ def _apply_env(port, username, password):
     the environment leaves no credentials here to find.
     """
     env_port = os.environ.get("CALIBRE_SERVER_PORT")
-    if env_port and env_port.isdigit():
+    if env_port and env_port.isdigit() and 1 <= int(env_port) <= 65535:
         port = int(env_port)
     return (port,
             os.environ.get("CALIBRE_SERVER_USERNAME") or username,

@@ -165,3 +165,13 @@ def test_the_fallback_message_never_carries_the_password(target_module, monkeypa
     target_module.library_target(LIBRARY)
     assert PASSWORD not in capsys.readouterr().err
 
+
+
+@pytest.mark.parametrize("env_port", ["0", "65536", "99999"])
+def test_an_out_of_range_env_port_is_ignored(target_module, monkeypatch, env_port):
+    """A port calibre-server could never listen on must not replace the
+    configured one; the app's own config applies the same bound."""
+    _make_app_db(target_module.app_db, password_e=b"token")
+    monkeypatch.setenv("CALIBRE_SERVER_PORT", env_port)
+
+    assert target_module.library_target(LIBRARY).args[1] == "http://127.0.0.1:7777/#calibre-library"

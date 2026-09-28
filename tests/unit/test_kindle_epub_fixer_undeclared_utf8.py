@@ -81,7 +81,9 @@ DECLARED_XHTML = """<?xml version="1.0" encoding="utf-8"?>
 </html>
 """
 
-MOJIBAKE_MARKERS = ("Â", "â€", "Ã")
+# cp1252/Latin-1 misreads produce the first three; a MacRoman misread (what
+# chardet guesses for "Café") produces "√".
+MOJIBAKE_MARKERS = ("Â", "â€", "Ã", "√")
 
 
 class StubCwaDb:
@@ -143,7 +145,8 @@ def assert_no_mojibake(text: str, context: str) -> None:
         # (these two fail on the broken code).
         ("Ghost—Spectres", "Copyright 2012"),  # a lone em dash in the title
         ("Mortality", "Copyright © 2012 by Christopher Hitchens"),  # a lone ©
-        # Guards: these were already read correctly; they pin that they stay so.
+        # Guards: these were already read correctly at the normal threshold;
+        # they pin that they stay so.
         ("Café", "Copyright 2012"),
         ("Gabriel García Márquez", "Copyright © 2012"),
         ("日本語のタイトル", "Copyright 2012"),
@@ -174,7 +177,7 @@ def test_undeclared_utf8_opf_keeps_its_characters(fixer_module, tmp_path, title,
         (
             "OEBPS/chapter.xhtml",
             '<html xmlns="http://www.w3.org/1999/xhtml"><head><title>T</title></head>'
-            "<body><p>Copyright © 2012 — all rights reserved</p></body></html>\n",
+            "<body><p>Copyright 2012 — all rights reserved</p></body></html>\n",
         ),
     ],
 )
@@ -187,6 +190,26 @@ def test_undeclared_utf8_in_other_entries_survives(fixer_module, tmp_path, name,
     text = read_entry(book, name).decode("utf-8")
     assert_no_mojibake(text, name)
     assert "—" in text
+
+
+def test_aggressive_mode_keeps_undeclared_utf8(fixer_module, monkeypatch, tmp_path):
+    """Aggressive mode lowers the acceptance threshold to 0.4, which widened the
+    damage: chardet reads an undeclared OPF titled "Café" as MacRoman at about
+    0.56, below the normal threshold but above the aggressive one, so the title
+    came out as "Caf√©"."""
+    monkeypatch.setattr(
+        fixer_module, "CWA_DB", lambda: StubCwaDb({"kindle_epub_fixer_aggressive": 1})
+    )
+    opf = make_opf(title="Café").encode("utf-8")
+    book = build_epub(tmp_path / "book.epub", opf=opf)
+
+    fixer = fixer_module.EPUBFixer()
+    assert fixer.aggressive_mode
+    fixer.process(str(book), str(book))
+
+    text = read_entry(book, "OEBPS/content.opf").decode("utf-8")
+    assert_no_mojibake(text, "content.opf")
+    assert "<dc:title>Café</dc:title>" in text
 
 
 # --------------------------------------------------------------------------

@@ -203,11 +203,12 @@ class EPUBFixer:
         # Nothing declares an encoding. UTF-8 is the XML default, and text that
         # is valid multi-byte UTF-8 is overwhelmingly unlikely to be anything
         # else, so settle it here instead of guessing. The statistical
-        # detector below is unreliable on short files: chardet 5.2 reads a
-        # file with a single multi-byte character (one "—" or "©") as
-        # Windows-1252 at 0.73, above the acceptance threshold, which turned
+        # detector below misreads text with few multi-byte characters: chardet
+        # 5.2 reads a file with a single one (one "—" or "©"), at any length,
+        # as Windows-1252 at 0.73, above the acceptance threshold, which turned
         # "Ghost—Spectres" into "Ghostâ€”Spectres" on ingest. Pure-ASCII data
-        # is left to the detector: it re-encodes to identical bytes either way.
+        # still goes to the detector, because 7-bit encodings such as
+        # ISO-2022-JP are ASCII bytes that are not UTF-8 text.
         if not data.isascii():
             try:
                 data.decode('utf-8')

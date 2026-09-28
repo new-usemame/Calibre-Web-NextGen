@@ -3141,7 +3141,11 @@ def _configuration_update_helper():
 def clear_calibre_server_password():
     config.config_calibre_server_password_e = ""
     config.save()
-    if config.config_calibre_server_enabled:
+    if config.config_calibre_server_enabled and not config.config_calibre_server_anonymous_writes:
+        # No password means no authentication; the server stays down until a
+        # new one is saved rather than restarting open (#2210 review).
+        content_server.stop()
+    elif config.config_calibre_server_enabled:
         content_server.start()
     return _configuration_result()
 

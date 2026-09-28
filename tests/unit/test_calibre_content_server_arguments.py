@@ -280,3 +280,71 @@ def test_every_setting_read_has_a_default(content_server, monkeypatch):
     monkeypatch.setattr(content_server, "config", types.SimpleNamespace())
     for name in content_server.SETTING_DEFAULTS:
         assert content_server.setting(name) == content_server.SETTING_DEFAULTS[name]
+
+
+def _spawns(module, monkeypatch, tmp_path):
+    """Record every calibre-server launch instead of performing it."""
+    binary = tmp_path / "calibre-server"
+    binary.write_text("")
+    monkeypatch.setattr(module, "server_binary", lambda: str(binary))
+    monkeypatch.setattr(module, "write_userdb", lambda *a, **k: True)
+    monkeypatch.setattr(module.threading, "Thread",
+                        lambda *a, **k: types.SimpleNamespace(start=lambda: None))
+    launched = []
+
+    class _Popen:
+        def __init__(self, args):
+            launched.append(args)
+
+        def poll(self):
+            return None
+
+        def terminate(self):
+            pass
+
+        def wait(self, *_a):
+            return 0
+
+    monkeypatch.setattr(module.subprocess, "Popen", _Popen)
+    return launched
+
+
+@pytest.mark.parametrize("missing", ["config_calibre_server_password_e",
+                                     "config_calibre_server_username"])
+def test_an_enabled_server_without_credentials_is_not_started_open(
+        content_server, monkeypatch, tmp_path, missing):
+    """Review of #2210: "Reset Password", a startup with the credentials gone, or
+    an env var removed before restart all reached a calibre-server with no auth
+    flag at all -- the whole library readable by anyone who can reach the port.
+    Without credentials, and without the explicit anonymous choice, it must not
+    run."""
+    launched = _spawns(content_server, monkeypatch, tmp_path)
+    setattr(content_server.config, missing, "")
+
+    content_server.start()
+
+    assert launched == []
+    assert any("authentication" in r for r in content_server.log_records)
+
+
+def test_the_explicit_anonymous_choice_still_starts(content_server, monkeypatch, tmp_path):
+    launched = _spawns(content_server, monkeypatch, tmp_path)
+    content_server.config.config_calibre_server_anonymous_writes = True
+    content_server.config.config_calibre_server_password_e = ""
+
+    content_server.start()
+
+    assert len(launched) == 1 and "--enable-auth" not in launched[0]
+
+
+def test_a_start_without_auth_leaves_no_old_password_on_disk(content_server, monkeypatch, tmp_path):
+    """calibre keeps the password in cleartext in the userdb; once auth is off,
+    the file has no purpose and must not outlive it."""
+    _spawns(content_server, monkeypatch, tmp_path)
+    userdb = tmp_path / "content_server_users.sqlite"
+    userdb.write_text("old cleartext password")
+    content_server.config.config_calibre_server_anonymous_writes = True
+
+    content_server.start()
+
+    assert not userdb.exists()

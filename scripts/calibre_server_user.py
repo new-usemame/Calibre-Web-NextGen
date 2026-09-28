@@ -27,6 +27,9 @@ def main(argv):
         sys.stderr.write("usage: calibre_server_user.py <userdb> <username>\n")
         return 2
     userdb, username = argv
+    # calibre creates the database 0644 and writes the password in cleartext
+    # before the chmod below; the umask keeps it owner-only from the start.
+    os.umask(0o077)
     password = sys.stdin.readline().rstrip("\r\n")
     if not password:
         sys.stderr.write("no password supplied on stdin\n")

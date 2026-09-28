@@ -208,6 +208,16 @@ def write_userdb(username, password, userdb=None, binary=None):
     return True
 
 
+def _remove_userdb():
+    """calibre keeps the password in cleartext there; without auth it has no use."""
+    try:
+        os.remove(userdb_path())
+    except FileNotFoundError:
+        pass
+    except OSError as ex:
+        log.warning("Could not remove %s: %s", userdb_path(), ex)
+
+
 def server_arguments():
     """The calibre-server command line for the current configuration."""
     args = [server_binary(), "--port", str(setting("config_calibre_server_port")),
@@ -236,8 +246,20 @@ def _locked_start():
     if not os.path.isfile(server_binary()):
         log.error("calibre-server binary not found: %s", server_binary())
         return
-    if _auth_enabled() and not write_userdb(setting("config_calibre_server_username"),
-                                            setting("config_calibre_server_password_e")):
+    anonymous = setting("config_calibre_server_anonymous_writes")
+    if not anonymous and not _auth_enabled():
+        # Without --enable-auth calibre-server serves the whole library to
+        # anyone who reaches the port. The admin form refuses this state, but
+        # a cleared password or credentials removed from the environment reach
+        # it at the next start, so the refusal lives here (#2210 review).
+        log.error("Calibre content server not started: authentication is on but no "
+                  "username/password is configured. Set both, or allow anonymous writes.")
+        _remove_userdb()
+        return
+    if anonymous:
+        _remove_userdb()
+    elif not write_userdb(setting("config_calibre_server_username"),
+                          setting("config_calibre_server_password_e")):
         return
     _stopped_on_purpose = False
     try:

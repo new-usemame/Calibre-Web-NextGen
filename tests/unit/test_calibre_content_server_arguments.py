@@ -293,11 +293,14 @@ def _spawns(module, monkeypatch, tmp_path):
     launched = []
 
     class _Popen:
-        def __init__(self, args):
+        returncode = None
+        stdout = None
+
+        def __init__(self, args, **_kwargs):
             launched.append(args)
 
         def poll(self):
-            return None
+            return self.returncode
 
         def terminate(self):
             pass
@@ -405,3 +408,36 @@ def test_pause_reports_a_running_server_and_stops_it(content_server, monkeypatch
     assert content_server.pause() is True
     assert content_server._process is None
     assert content_server.pause() is False
+
+
+def test_a_server_that_keeps_dying_on_startup_is_left_down_with_its_reason(
+        content_server, monkeypatch, tmp_path):
+    """Review of #2210: a taken port or a bad user database made calibre-server
+    exit at once, and the watcher relaunched it every 5 s forever, with the
+    reason only on the container's stdout. It now gives up after a few quick
+    exits, and says why, until the admin saves again."""
+    launched = _spawns(content_server, monkeypatch, tmp_path)
+    monkeypatch.setattr(content_server.time, "sleep", lambda _s: None)
+    content_server._drain_output(iter(["OSError: [Errno 98] Address already in use\n"]))
+
+    content_server.start()
+    for _ in range(10):
+        process = content_server._process
+        if process is None:
+            break
+        process.returncode = 1                     # died straight after starting
+        content_server._watch(process, str(tmp_path / "metadata.db"))
+
+    assert len(launched) == content_server.MAX_QUICK_EXITS
+    assert content_server._process is None
+    assert any("leaving it stopped" in r and "Address already in use" in r
+               for r in content_server.log_records)
+
+    content_server.start()                         # the admin saves again
+    assert len(launched) == content_server.MAX_QUICK_EXITS + 1
+
+
+def test_calibre_server_output_reaches_the_app_log(content_server):
+    content_server._drain_output(iter(["listening on 127.0.0.1:8081\n", "\n"]))
+
+    assert "calibre-server: listening on 127.0.0.1:8081" in content_server.log_records

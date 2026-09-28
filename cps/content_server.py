@@ -23,7 +23,7 @@ import subprocess
 import sys
 import threading
 import time
-from collections import namedtuple
+from collections import deque, namedtuple
 
 from . import config, constants, logger
 
@@ -36,6 +36,16 @@ _stopped_on_purpose = False
 PROBE_TIMEOUT = 0.5
 WATCH_INTERVAL = 5
 QUIET_BEFORE_RELOAD = 30
+# A server that dies this soon after starting is failing on its configuration
+# (port taken, bad userdb, unreadable library), not crashing at random; after
+# this many such exits in a row it is left down with the reason in the log
+# instead of being relaunched every WATCH_INTERVAL forever (#2210 review).
+QUICK_EXIT_SECONDS = 60
+MAX_QUICK_EXITS = 3
+_quick_exits = 0
+_started_at = None
+# The last lines calibre-server printed, for the give-up message.
+_recent_output = deque(maxlen=20)
 
 # ``args`` extend a calibredb command line; ``stdin`` is the payload that
 # command must be fed, or None. They are produced together because the password
@@ -190,9 +200,7 @@ def _watch(process, db_path):
             if process.poll() is not None:
                 if _stopped_on_purpose:
                     return
-                log.error("Calibre content server exited unexpectedly (code %s), restarting it",
-                          process.returncode)
-                _locked_start()
+                _restart_after_exit(process)
                 return
         mtime = _db_mtime(db_path)
         if mtime is None:
@@ -208,6 +216,39 @@ def _watch(process, db_path):
                 if _process is process and process.poll() is None:
                     _locked_start()
             return
+
+
+def _restart_after_exit(process):
+    """Relaunch a server that died, unless it keeps dying on startup."""
+    global _quick_exits, _process
+    ran_for = time.monotonic() - (_started_at or 0)
+    _quick_exits = _quick_exits + 1 if ran_for < QUICK_EXIT_SECONDS else 1
+    if _quick_exits >= MAX_QUICK_EXITS:
+        log.error("Calibre content server exited %s times within %ss of starting (last code %s); "
+                  "leaving it stopped. Fix the setting it reports and save to try again. "
+                  "Last output: %s", _quick_exits, QUICK_EXIT_SECONDS, process.returncode,
+                  " | ".join(_recent_output) or "(none)")
+        _process = None
+        return
+    log.error("Calibre content server exited unexpectedly (code %s), restarting it",
+              process.returncode)
+    _locked_start()
+
+
+def _drain_output(stream):
+    """Copy calibre-server's own output into this app's log.
+
+    Otherwise the reason it refuses to start (a port in use, a user it cannot
+    load) reaches only the container's stdout, not the log the admin reads.
+    """
+    try:
+        for line in stream:
+            line = line.rstrip()
+            if line:
+                _recent_output.append(line)
+                log.info("calibre-server: %s", line)
+    except (OSError, ValueError):
+        pass
 
 
 def server_binary():
@@ -278,12 +319,18 @@ def server_arguments():
 
 
 def start():
+    """Start (or restart) on request: a save, startup, the end of a pause.
+
+    A deliberate start clears the give-up count, so saving corrected settings
+    is always another attempt."""
+    global _quick_exits
     with _lock:
+        _quick_exits = 0
         _locked_start()
 
 
 def _locked_start():
-    global _process, _stopped_on_purpose
+    global _process, _stopped_on_purpose, _started_at
     _locked_stop()
     if not setting("config_calibre_server_enabled") or not setting("config_calibre_dir"):
         return
@@ -307,11 +354,14 @@ def _locked_start():
         return
     _stopped_on_purpose = False
     try:
-        _process = subprocess.Popen(server_arguments())
+        _process = subprocess.Popen(server_arguments(), stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT, text=True)
     except OSError as ex:
         log.error("Failed to start calibre content server: %s", ex)
         _process = None
         return
+    _started_at = time.monotonic()
+    threading.Thread(target=_drain_output, args=(_process.stdout,), daemon=True).start()
     log.info("Calibre content server started on port %s", setting("config_calibre_server_port"))
     threading.Thread(target=_watch,
                      args=(_process, os.path.join(setting("config_calibre_dir"), "metadata.db")),

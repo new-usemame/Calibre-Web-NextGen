@@ -622,7 +622,7 @@ $(function() {
         // Check all filter dropdowns for date fields
         $('#builder .rule-filter-container select').each(function() {
             var filterId = $(this).val();
-            if (filterId === 'pubdate' || filterId === 'timestamp') {
+            if (filterId === 'pubdate' || filterId === 'timestamp' || filterId === 'last_modified') {
                 hasDateField = true;
                 return false; // break out of each loop
             }
@@ -654,7 +654,7 @@ $(function() {
             var $rule = $input.closest('.rule-container');
             var filterId = $rule.find('.rule-filter-container select').val();
             
-            if (filterId === 'pubdate' || filterId === 'timestamp') {
+            if (filterId === 'pubdate' || filterId === 'timestamp' || filterId === 'last_modified') {
                 var operator = $rule.find('.rule-operator-container select').val();
                 if (operator === 'in_last_days' || operator === 'not_in_last_days') return;
                 $input.off('blur.dateValidation').on('blur.dateValidation', function() {

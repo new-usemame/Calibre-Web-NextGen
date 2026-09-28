@@ -110,6 +110,9 @@ _NATIVE_RULE_FIELDS = (
     {'id': 'timestamp', 'label': 'Date Added', 'type': 'datetime',
      'validation': {'format': 'YYYY-MM-DD'}, 'description': 'When the book was added',
      'operators': _DATE_OPERATORS, '_binding': (db.Books, 'timestamp')},
+    {'id': 'last_modified', 'label': 'Last Modified', 'type': 'datetime',
+     'validation': {'format': 'YYYY-MM-DD'}, 'description': 'When the book was last modified',
+     'operators': _DATE_OPERATORS, '_binding': (db.Books, 'last_modified')},
     {'id': 'has_cover', 'label': 'Has Cover', 'type': 'integer', 'input': 'radio',
      'values': {1: 'Yes', 0: 'No'}, 'description': 'Whether the book has cover art',
      'operators': _SELECT_OPERATORS, '_binding': (db.Books, 'has_cover')},
@@ -578,7 +581,7 @@ def build_filter_from_rule(rule, user_id=None):
     # Relative date windows requested in #467. Store the duration, not a
     # frozen date, so the shelf keeps moving without an edit or migration.
     if operator_name in ('in_last_days', 'not_in_last_days'):
-        if field_name not in ('pubdate', 'timestamp'):
+        if field_name not in ('pubdate', 'timestamp', 'last_modified'):
             return None
         if isinstance(value, bool):
             return None

@@ -41,11 +41,12 @@ def test_canonical_schema_covers_engine_and_dynamic_columns():
     )
     assert fields["pubdate"]["label"] == "Publication Date"
     assert fields["timestamp"]["label"] == "Date Added"
+    assert fields["last_modified"]["label"] == "Last Modified"
     assert fields["language"]["values"] == {"eng": "English"}
     assert fields["custom_column_71"]["type"] == "integer"
     assert fields["custom_column_72"]["values"] == {"Calm": "Calm", "Tense": "Tense"}
 
-    for field_id in ("pubdate", "timestamp"):
+    for field_id in ("pubdate", "timestamp", "last_modified"):
         assert fields[field_id]["type"] == "datetime", (
             "QueryBuilder only exposes relative-date operators to datetime fields"
         )
@@ -77,7 +78,7 @@ def _books_session():
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("field_id", ["timestamp", "pubdate"])
+@pytest.mark.parametrize("field_id", ["timestamp", "pubdate", "last_modified"])
 def test_relative_date_rules_filter_real_rows(field_id):
     session = _books_session()
     now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -89,7 +90,7 @@ def test_relative_date_rules_filter_real_rows(field_id):
     old = db.Books(
         title="Old", sort="Old", author_sort="Author", path="old",
         timestamp=now - timedelta(days=90), pubdate=now - timedelta(days=120),
-        series_index=1.0, last_modified=now, has_cover=0, authors=[], tags=[],
+        series_index=1.0, last_modified=now - timedelta(days=60), has_cover=0, authors=[], tags=[],
     )
     session.add_all([recent, old])
     session.commit()

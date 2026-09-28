@@ -2071,10 +2071,19 @@ def _service_status(log_filename: str):
 ##———————————————————END OF SHARED VARIABLES & FUNCTIONS———————————————————————##
 
 def convert_library_start(queue):
-    # convert_library works on the format files on disk, so it needs the library to itself
-    content_server.stop()
-    cl_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'convert_library.py')])
-    Thread(target=_restart_content_server_when_done, args=(cl_process,), daemon=True).start()
+    # convert_library works on the format files on disk, so it needs the library
+    # to itself. The server comes back only if it was running, and also when the
+    # run cannot be launched at all -- otherwise a failed launch left it stopped
+    # until the next save or restart (#2210 review).
+    server_paused = content_server.pause()
+    try:
+        cl_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'convert_library.py')])
+    except Exception:
+        if server_paused:
+            content_server.start()
+        raise
+    if server_paused:
+        Thread(target=_restart_content_server_when_done, args=(cl_process,), daemon=True).start()
     queue.put(cl_process)
 
 def get_tmp_conversion_dir() -> str:

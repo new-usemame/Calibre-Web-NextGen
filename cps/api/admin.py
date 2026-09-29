@@ -23,6 +23,7 @@ from ..ui_themes import ALLOWED_THEME_SLUGS, config_theme_code, config_theme_slu
 from ..ui_font_preferences import (seed_new_user_ui_font_defaults,
                                    validate_default_font_updates)
 from ..admin import _delete_user
+from ..services.opds_filename import validate_template as validate_opds_filename_template
 
 # UI-configuration fields the SPA admin form can read/write natively. Scoped to
 # the safe, high-traffic display settings — the deep security config (LDAP,
@@ -35,7 +36,8 @@ from ..admin import _delete_user
 _UI_CONFIG_INT = ("config_books_per_page", "config_random_books",
                   "config_authors_max")
 _UI_CONFIG_STR = ("config_calibre_web_title", "config_default_language",
-                  "config_default_locale", "config_server_announcement")
+                  "config_default_locale", "config_server_announcement",
+                  "config_opds_filename_template")
 
 # SPA role key -> the User.role bitmask bit. ROLE_ANONYMOUS is intentionally
 # excluded — it's not an admin-assignable permission.
@@ -284,6 +286,7 @@ def _ui_config_payload():
         "config_default_ui_font_body": getattr(config, "config_default_ui_font_body", ""),
         "config_default_ui_font_display": getattr(config, "config_default_ui_font_display", ""),
         "config_server_announcement": config.config_server_announcement or "",
+        "config_opds_filename_template": getattr(config, "config_opds_filename_template", "") or "",
         # Shared with the account form so the two settings pages can never
         # disagree about these options again (#886).
         "locales": locale_options(),
@@ -373,6 +376,11 @@ def admin_update_config():
         font_updates = validate_default_font_updates(data)
     except ValueError as ex:
         return _err("invalid_request", str(ex), 400)
+    if "config_opds_filename_template" in data:
+        try:
+            validate_opds_filename_template(data["config_opds_filename_template"])
+        except ValueError as error:
+            return _err("invalid_request", str(error), 400)
     for key in _UI_CONFIG_INT:
         if key in data:
             try:

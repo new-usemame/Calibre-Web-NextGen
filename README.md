@@ -647,7 +647,9 @@ CWA has built-in KOReader sync; no separate kosync server is needed. With the pl
 
 If your update manager is still pointed at this repository, switch it. That setup keeps working — a release that changes the plugin attaches the plugin download — but the plugin only appears on those releases, which is easy to misread as "no update available". The download on `/kosync` always serves the plugin bundled with your running server if you would rather update by hand.
 
-**Matching filenames across devices (OPDS downloads).** If you download books to KOReader over OPDS and sync progress by filename across several e-readers, turn on **Use server filenames** in KOReader's OPDS catalog settings (the checkbox when you add or edit the catalog). By default KOReader names a downloaded file `Author - Title.epub` from the catalog entry, which differs from the on-disk library name `Title - Author.epub` and forces a manual rename. CWA already sends the library name in the download's `Content-Disposition` header; with **Use server filenames** on, KOReader uses that name, so the file matches your library and your other devices without renaming.
+For matching OPDS filenames across devices, enable Use server filenames in KOReader's OPDS catalog configuration. KOReader normally builds `Author - Title.epub` from the feed. The server normally suggests `Title - Author.epub`, with only the first author. With Use server filenames enabled, KOReader uses the server's suggested name.
+
+Administrators can change that name through the OPDS download filename template preference. For fields, examples, and device limits, see [OPDS download filenames](docs/opds-filename-template.md). A blank preference keeps the existing naming behavior.
 
 ### Kobo sync
 

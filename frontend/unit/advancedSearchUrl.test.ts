@@ -41,3 +41,22 @@ test('values the form cannot show are dropped instead of being searched for', ()
     { title: 'dune' },
   );
 });
+
+/* #2365: custom-column criteria ride the same URL, or a custom-column search
+ * is lost on the first back-navigation or reload. */
+test('custom-column criteria survive the URL round trip on their own', () => {
+  const params = {
+    custom: {
+      custom_column_4: 'Cover & spine',
+      custom_column_2_low: '100',
+      custom_column_3_end: '2026-09-01',
+      custom_column_1: 'Empty',
+    },
+  };
+  assert.deepEqual(advancedSearchFromQuery(advancedSearchToQuery(params)), params);
+});
+
+test('blank custom fields and foreign custom-looking keys are not carried', () => {
+  assert.equal(advancedSearchToQuery({ custom: { custom_column_4: ' ', custom_column_x: 'a' } }), '');
+  assert.equal(advancedSearchFromQuery('custom_column_2_median=5&custom_column_=1'), null);
+});

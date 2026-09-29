@@ -19,6 +19,7 @@ const ID_LIST_KEYS = [
 const FORMAT_LIST_KEYS = ['include_extension', 'exclude_extension'] as const;
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const CUSTOM_KEY_RE = /^custom_column_\d+(?:_low|_high|_start|_end)?$/;
 const RATING_RE = /^[1-5]$/;
 
 /** Serialize submitted criteria to a query string (no leading `?`). Empty
@@ -35,6 +36,10 @@ export function advancedSearchToQuery(params: AdvancedSearchParams): string {
   }
   for (const key of [...ID_LIST_KEYS, ...FORMAT_LIST_KEYS]) {
     for (const value of params[key] ?? []) out.append(key, String(value));
+  }
+  for (const [key, raw] of Object.entries(params.custom ?? {})) {
+    const value = (raw ?? '').trim();
+    if (value && CUSTOM_KEY_RE.test(key)) out.set(key, value);
   }
   return out.toString();
 }
@@ -75,5 +80,13 @@ export function advancedSearchFromQuery(search: string): AdvancedSearchParams | 
     const values = query.getAll(key).filter(Boolean);
     if (values.length) { params[key] = values; found = true; }
   }
+  // Custom-column criteria (#2365). The server validates each value against
+  // the column's type, so only the key shape is checked here.
+  const custom: Record<string, string> = {};
+  for (const [key, raw] of query.entries()) {
+    const value = raw.trim();
+    if (value && CUSTOM_KEY_RE.test(key)) custom[key] = value;
+  }
+  if (Object.keys(custom).length) { params.custom = custom; found = true; }
   return found ? params : null;
 }

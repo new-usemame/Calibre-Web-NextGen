@@ -322,11 +322,20 @@ export interface ShelfDetail extends Shelf {
   can_edit: boolean;
 }
 
+/** A custom column the advanced search can filter on (#2365). */
+export interface SearchCustomColumn {
+  id: number;
+  name: string;
+  datatype: 'bool' | 'int' | 'float' | 'datetime' | 'text' | 'series' | 'comments' | 'enumeration' | 'rating';
+  enum_values?: string[];
+}
+
 export interface SearchOptions {
   tags: EntityRef[];
   series: EntityRef[];
   languages: EntityRef[];
   formats: string[];
+  custom_columns?: SearchCustomColumn[];
 }
 
 export interface AdvancedSearchParams {
@@ -347,6 +356,10 @@ export interface AdvancedSearchParams {
   exclude_language?: (string | number)[];
   include_extension?: string[];
   exclude_extension?: string[];
+  /** Custom-column criteria keyed by the classic form's field names:
+   *  custom_column_<id> (text/series/enumeration/rating/Yes-No) and
+   *  custom_column_<id>_low|_high (numbers) or _start|_end (dates). */
+  custom?: Record<string, string>;
   sort?: string;
 }
 

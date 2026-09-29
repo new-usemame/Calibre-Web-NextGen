@@ -1509,6 +1509,68 @@ class NewBookProcessor:
             return False
 
 
+    def _load_acquisition_intent(self, manifest):
+        from cps.services.acquisition import ingest, runtime
+        with runtime.open_ingest_repository(get_app_db_path()) as repo:
+            self.acquisition_intent = ingest.load_intent(
+                repo, self.filepath, self.ingest_folder, manifest
+            )
+        self.acquisition_acknowledged = False
+
+    def _finish_acquisition(self, result):
+        from cps.services.acquisition import ingest, runtime
+        try:
+            with runtime.open_ingest_repository(get_app_db_path()) as repo:
+                ingest.finalize(repo, self.acquisition_intent, result, self.metadata_db, self.library_dir)
+            self.acquisition_acknowledged = True
+            # Receipt-only cleanup still runs when acquisition has been paused
+            # and its download scheduler is no longer registered.
+            try:
+                from cps.services.acquisition.staging import cleanup_completed
+                with runtime.open_ingest_repository(get_app_db_path()) as repo:
+                    cleanup_completed(repo, Path(get_app_db_path()).parent / "acquisition-staging",
+                                      self.acquisition_intent.job_id)
+            except Exception:
+                print("[ingest-processor] WARN: Completed acquisition staging cleanup deferred", flush=True)
+        except Exception:
+            raise RetryIngestSourceError("Acquisition acknowledgment failed; original retained") from None
+
+    def _after_acquisition_import(self, staged_path, book_path):
+        # Only a fresh new edition runs normal best-effort enrichment. Receipt
+        # recovery/retained editions never repeat notifications or rewrite a
+        # user's existing metadata. Failures cannot undo an acknowledged import.
+        operations = [
+            lambda: self.backup(str(staged_path), backup_type="imported") if self.cwa_settings.get("auto_backup_imports") else None,
+            lambda: self.db.import_add_entry(staged_path.stem, str(self.cwa_settings.get("auto_backup_imports", False))),
+            lambda: gdrive_sync_if_enabled(),
+            lambda: self.fetch_metadata_if_enabled(book_id=self.last_added_book_id),
+            lambda: self._fix_unicode_path(self.last_added_book_id),
+            lambda: self.trigger_auto_send_if_enabled(book_id=self.last_added_book_id, book_path=book_path),
+            lambda: self.generate_book_checksums(staged_path.stem, book_id=self.last_added_book_id) if _is_koreader_sync_enabled() else None,
+            lambda: run_duplicate_scan_for_books(self.last_added_book_ids),
+        ]
+        for operation in operations:
+            try:
+                operation()
+            except Exception:
+                print("[ingest-processor] WARN: Acquisition post-import follow-up failed", flush=True)
+        try:
+            with sqlite3.connect(self.metadata_db, timeout=30) as con:
+                if self._register_title_sort_function(con):
+                    stamp_books_with_import_time(con, self.last_added_book_ids,
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S+00:00"))
+        except Exception:
+            print("[ingest-processor] WARN: Acquisition import timestamp update failed", flush=True)
+
+    def _acquisition_result(self, source_digest):
+        from cps.services.acquisition import ingest
+        outcome = ingest.read_result(self.metadata_db, source_digest, self.library_dir)
+        if outcome is None:
+            return None
+        return {"status": "already_imported", "source_sha256": outcome.source_sha256,
+                "imported_sha256": outcome.imported_sha256,
+                "book_ids": list(outcome.book_ids), "disposition": outcome.disposition}
+
     def record_original_filename(self) -> None:
         """Persist the as-imported filename for every book id this add
         produced (fork #346) — the one stable reference for recognizing
@@ -1899,6 +1961,8 @@ class NewBookProcessor:
             "--automerge", self.cwa_settings["auto_ingest_automerge"],
             "--metadata-json", json.dumps(metadata_override),
         ]
+        if getattr(self, "acquisition_intent", None):
+            command.append("--acquisition")
         database_override = self.calibre_env.get("CALIBRE_OVERRIDE_DATABASE_PATH")
         if database_override:
             command.extend(["--database-path", database_override])
@@ -2144,7 +2208,7 @@ class NewBookProcessor:
         source_digest: str,
         metadata_override: dict,
     ) -> list[Path]:
-        if self.cwa_settings.get("auto_ingest_automerge") != "overwrite":
+        if getattr(self, "acquisition_intent", None) or self.cwa_settings.get("auto_ingest_automerge") != "overwrite":
             return []
         inspection = self._run_calibre_transaction(
             staged_path,
@@ -2177,6 +2241,15 @@ class NewBookProcessor:
         # retry identity is therefore the staged source that generated the
         # package, while the imported package gets a separate integrity hash.
         identity_source_path = Path(identity_path or book_path)
+        acquisition = getattr(self, "acquisition_intent", None)
+        if acquisition:
+            # Processing may modify its input. Always leave the published source
+            # untouched until the durable app.db receipt acknowledges Calibre.
+            identity_source_path = acquisition.source_path
+            processing_dir = Path(tempfile.mkdtemp(prefix="acquisition-process-", dir=self.tmp_conversion_dir))
+            processing_path = processing_dir / Path(book_path).name
+            shutil.copy2(book_path, processing_path)
+            book_path = str(processing_path)
         # Normalize a KEPUB before it enters the library (#1715). Every ingest
         # route lands here -- kepubify output, a file already in the target
         # format, and a format the user told CWA not to convert -- and none of
@@ -2278,10 +2351,15 @@ class NewBookProcessor:
             # package Calibre will copy. The helper rehashes both paths.
             imported_digest = _sha256_file(staged_path)
             source_digest = _sha256_file(staged_identity_path)
-            already_imported_ids = self._content_marker_book_ids(source_digest)
+            if acquisition and source_digest != acquisition.source_sha256:
+                raise PreserveIngestSourceError("Acquisition source identity changed; original retained")
+            prior_acquisition = self._acquisition_result(source_digest) if acquisition else None
+            already_imported_ids = (prior_acquisition["book_ids"] if prior_acquisition else []) if acquisition else self._content_marker_book_ids(source_digest)
             if already_imported_ids:
                 self.last_added_book_ids = already_imported_ids
                 self.last_added_book_id = already_imported_ids[-1]
+                if acquisition:
+                    self._finish_acquisition(prior_acquisition)
                 print(
                     f"[ingest-processor] Content already imported; skipping duplicate add: {staged_path.name}",
                     flush=True,
@@ -2427,6 +2505,8 @@ class NewBookProcessor:
                 if imported_ids:
                     self.last_added_book_ids = imported_ids
                     self.last_added_book_id = imported_ids[-1]
+                if acquisition:
+                    self._finish_acquisition(transaction_result)
                 print(
                     f"[ingest-processor] Concurrent import already committed; skipping duplicate add: {staged_path.name}",
                     flush=True,
@@ -2438,7 +2518,15 @@ class NewBookProcessor:
                 self.last_added_book_ids = imported_ids
                 self.last_added_book_id = imported_ids[-1]
             else:
+                if acquisition:
+                    raise PreserveIngestSourceError("Acquisition returned no authoritative book IDs")
                 self._fallback_last_added_book_id()
+            if acquisition:
+                self._finish_acquisition(transaction_result)
+                mark_ingest_batch_dirty()
+                if transaction_result.get("disposition") == "imported":
+                    self._after_acquisition_import(staged_path, book_path)
+                return
             print(f"[ingest-processor] Added {staged_path.stem} to Calibre database", flush=True)
             self.record_original_filename()
 
@@ -2975,12 +3063,18 @@ def main(filepath=None):
 
         # Sidecar manifest handling for explicit actions (e.g., add_format)
         manifest_path = filepath + ".cwa.json"
+        nbp.acquisition_required = Path(filepath).name.startswith("cwng-acquisition-")
         try:
             if Path(manifest_path).exists():
+                if nbp.acquisition_required and (Path(manifest_path).is_symlink() or Path(manifest_path).stat().st_size > 16384):
+                    raise PreserveIngestSourceError("Invalid acquisition manifest file")
                 with open(manifest_path, 'r', encoding='utf-8') as mf:
                     manifest = json.load(mf)
                 action = manifest.get("action")
-                if action == "import":
+                if action == "acquisition_import" or nbp.acquisition_required:
+                    nbp.acquisition_required = True
+                    nbp._load_acquisition_intent(manifest)
+                if action == "import" and not nbp.acquisition_required:
                     original_filename = manifest.get("original_filename")
                     if isinstance(original_filename, str) and original_filename:
                         nbp.original_filename = Path(original_filename).name
@@ -3029,7 +3123,11 @@ def main(filepath=None):
                     nbp.set_library_permissions()
                     nbp.delete_current_file()
                     return 0
+            if nbp.acquisition_required and not getattr(nbp, "acquisition_intent", None):
+                raise PreserveIngestSourceError("Acquisition manifest missing; original retained")
         except Exception as e:
+            if getattr(nbp, "acquisition_required", False):
+                raise PreserveIngestSourceError("Acquisition intent unavailable or invalid; original retained") from None
             print(f"[ingest-processor] Error processing manifest file: {e}", flush=True)
             # Continue with normal processing if manifest handling fails
 
@@ -3087,7 +3185,8 @@ def main(filepath=None):
 
                     # If the original format should be retained, also add it as an additional format
                     if (
-                        is_a_book_format(nbp.input_format)
+                        not getattr(nbp, "acquisition_required", False)
+                        and is_a_book_format(nbp.input_format)
                         and nbp.input_format in nbp.convert_retained_formats
                         and nbp.input_format not in nbp.ingest_ignored_formats
                     ):
@@ -3131,6 +3230,8 @@ def main(filepath=None):
                 else:
                     _fail_not_a_book_input(nbp, filepath)
 
+        if getattr(nbp, "acquisition_required", False) and not getattr(nbp, "acquisition_acknowledged", False):
+            raise RetryIngestSourceError("Acquisition import incomplete; original retained")
         return 0
 
     except PreserveIngestSourceError as error:
@@ -3153,6 +3254,16 @@ def main(filepath=None):
                 print(f"[ingest-processor] Error setting library permissions during cleanup: {e}", flush=True)
 
             try:
+                if getattr(nbp, "acquisition_required", False):
+                    if not getattr(nbp, "acquisition_acknowledged", False):
+                        skip_delete = True
+                    else:
+                        # Keep capability until source removal succeeds, so a
+                        # crash cannot leave an unacknowledgeable retry file.
+                        nbp.delete_current_file()
+                        if not os.path.exists(nbp.filepath):
+                            Path(nbp.filepath + ".cwa.json").unlink(missing_ok=True)
+                        skip_delete = True
                 if skip_delete:
                     print(f"[ingest-processor] Skipping delete for ignored/temporary file: {nbp.filename}", flush=True)
                 else:

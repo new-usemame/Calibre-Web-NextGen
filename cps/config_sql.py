@@ -122,6 +122,8 @@ class _Settings(_Base):
     # Sync annotations to Hardcover
     config_hardcover_annotations_sync = Column(Boolean, default=False)
 
+    # Experimental acquisition remains dormant until explicit admin enablement.
+    config_acquisition_enabled = Column(Boolean, nullable=False, default=False)
     config_default_role = Column(SmallInteger, default=0)
     config_default_show = Column(SmallInteger, default=constants.ADMIN_USER_SIDEBAR)
     config_default_language = Column(String(3), default="all")

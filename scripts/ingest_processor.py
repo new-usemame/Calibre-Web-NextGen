@@ -2798,9 +2798,11 @@ class NewBookProcessor:
                 CHECKSUM_VERSION,
             )
 
-            calibre_db_path = os.path.join(self.library_dir, 'metadata.db')
-
-            with sqlite3.connect(calibre_db_path, timeout=30) as con:
+            # self.metadata_db, never library_dir + "metadata.db": on a split
+            # library __init__ repoints library_dir at book storage, and
+            # sqlite3.connect() on that path creates an empty metadata.db
+            # there before failing with "no such table: books" (#2371).
+            with sqlite3.connect(self.metadata_db, timeout=30) as con:
                 cur = con.cursor()
 
                 book_row = None

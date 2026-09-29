@@ -131,9 +131,13 @@ export function AdminAcquisition() {
       setAcquisitionConnectionEnabled(variables.id, variables.enabled),
     onSuccess: () => { succeeded('connection'); refresh('connections'); },
     onError: (error) => {
-      failed('connection', errorCode(error) === 'not_found'
-        ? t('That catalog no longer exists.')
-        : t('The catalog could not be changed.'));
+      const code = errorCode(error);
+      failed('connection',
+        // Switching a catalog on re-checks the migration, so this is the
+        // likeliest refusal, not a missing row.
+        code === 'needs_review' ? t('Legacy acquisition permissions need review before a catalog can be made available.')
+          : code === 'not_found' ? t('That catalog no longer exists.')
+            : t('The catalog could not be changed.'));
       refresh('connections');
     },
   });
@@ -168,10 +172,13 @@ export function AdminAcquisition() {
         void queryClient.invalidateQueries({ queryKey: ['acquisition', 'bootstrap'] });
       }
     },
-    onError: (error) => {
-      failed('grant', errorCode(error) === 'invalid_request'
-        ? t('An account cannot skip approval without also being allowed to request.')
-        : t('That permission could not be changed.'));
+    onError: () => {
+      // Every AdmissionError flattens to invalid_request on the wire, so the
+      // client cannot tell "auto-approve without access" (which this page's
+      // own checkboxes already prevent from being sent) from "the feature was
+      // switched off underneath you" — which is the one that actually happens.
+      // Don't assert a cause the response does not carry.
+      failed('grant', t('That permission could not be changed. Check that book sources are still switched on, then try again.'));
       refresh('grants');
     },
   });
@@ -184,7 +191,8 @@ export function AdminAcquisition() {
       failed('queue',
         code === 'forbidden' ? t('That account is no longer allowed to request books.')
           : code === 'not_found' ? t('That request is no longer waiting.')
-            : t('The request could not be approved.'));
+            : code === 'conflict' ? t('That request has already moved on.')
+              : t('The request could not be approved.'));
       refresh('queue');
     },
   });

@@ -3,6 +3,7 @@ local ConfirmBox = require("ui/widget/confirmbox")
 local Delivery = require("delivery")
 local DeviceActions = require("device_actions")
 local DeviceCollections = require("device_collections")
+local DeviceIdentity = require("device_identity")
 local Device = require("device")
 local Dispatcher = require("dispatcher")
 local Event = require("ui/event")
@@ -32,9 +33,11 @@ local LibraryRuntime = require("cwng_library_runtime")
 local Setup = require("cwng_setup")
 local SetupFlow = require("cwng_setup_flow")
 
-if G_reader_settings:hasNot("device_id") then
-    G_reader_settings:saveSetting("device_id", random.uuid())
-end
+-- A settings file copied from another e-reader carries that e-reader's ID.
+local device_id_replaced = DeviceIdentity.settle(G_reader_settings, {
+    isKindle = Device:isKindle(),
+    isKobo = Device:isKobo(),
+}, md5, random.uuid)
 
 local CWNGSync = WidgetContainer:extend{
     name = "cwngsync",
@@ -118,6 +121,14 @@ function CWNGSync:init()
     self.settings = migrated_settings
         or G_reader_settings:readSetting("cwngsync", self.default_settings)
     self.device_id = G_reader_settings:readSetting("device_id")
+    if device_id_replaced then
+        device_id_replaced = false
+        UIManager:nextTick(function()
+            UIManager:show(InfoMessage:new{
+                text = _("KOReader's settings on this e-reader were copied from another device, including its sync ID. This e-reader now has its own ID, so the server lists it as a separate device."),
+            })
+        end)
+    end
 
     self.ui.menu:registerToMainMenu(self)
     self:installOpenHook()

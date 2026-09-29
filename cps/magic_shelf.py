@@ -373,10 +373,10 @@ SYSTEM_SHELF_TEMPLATES = {
                 {
                     'id': 'timestamp',
                     'field': 'timestamp',
-                    'type': 'date',
+                    'type': 'datetime',
                     'input': 'text',
-                    'operator': 'greater',
-                    'value': (datetime.now(timezone.utc) - timedelta(days=30)).strftime('%Y-%m-%d')
+                    'operator': 'in_last_days',
+                    'value': '30'
                 }
             ]
         }
@@ -463,10 +463,10 @@ SYSTEM_SHELF_TEMPLATES = {
                 {
                     'id': 'pubdate',
                     'field': 'pubdate',
-                    'type': 'date',
+                    'type': 'datetime',
                     'input': 'text',
-                    'operator': 'greater',
-                    'value': (datetime.now(timezone.utc) - timedelta(days=730)).strftime('%Y-%m-%d')
+                    'operator': 'in_last_days',
+                    'value': '730'
                 }
             ]
         }

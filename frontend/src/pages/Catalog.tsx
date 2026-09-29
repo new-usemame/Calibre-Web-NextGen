@@ -26,6 +26,7 @@ import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { measureCatalogColumnCount } from '../lib/catalogGridMeasurement';
 import styles from './Catalog.module.css';
+import { advancedSearchHref } from '../lib/advancedSearchUrl';
 import { canUploadBooks } from '../lib/permissions';
 import {
   LIBRARY_SORT_KEY, LIBRARY_SORT_KEY_LEGACY, SORT_OPTIONS,
@@ -797,7 +798,11 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
             onClick={() => { setShowingAll(true); setPage(1); }}>
             {t('Show all books')}
           </button>
-          <Link href="/search" className={styles.defaultFilterEdit}>{t('Edit default view')}</Link>
+          {/* Open the form ON the saved criteria: a bare /search showed an
+              empty form, so "editing" the view meant rebuilding it from memory. */}
+          <Link href={advancedSearchHref(defaultFilter)} className={styles.defaultFilterEdit}>
+            {t('Edit default view')}
+          </Link>
         </div>
       )}
 

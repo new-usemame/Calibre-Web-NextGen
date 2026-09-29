@@ -44,6 +44,13 @@ export function advancedSearchToQuery(params: AdvancedSearchParams): string {
   return out.toString();
 }
 
+/** The in-app link to the advanced-search form opened on `params` (the
+ *  saved default library view's "Edit" link), or on an empty form. */
+export function advancedSearchHref(params: AdvancedSearchParams | null | undefined): string {
+  const query = params ? advancedSearchToQuery(params) : '';
+  return query ? `/search?${query}` : '/search';
+}
+
 /** Read criteria back from a query string. Returns null when the URL carries
  *  no criteria, so a bare /search opens on an empty form with no results.
  *  Values the form cannot represent (an unknown read status, a rating outside

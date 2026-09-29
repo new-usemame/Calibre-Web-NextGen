@@ -60,3 +60,14 @@ test('blank custom fields and foreign custom-looking keys are not carried', () =
   assert.equal(advancedSearchToQuery({ custom: { custom_column_4: ' ', custom_column_x: 'a' } }), '');
   assert.equal(advancedSearchFromQuery('custom_column_2_median=5&custom_column_=1'), null);
 });
+
+/* "Edit default view" must open the form on the saved criteria, custom
+ * columns included; it linked to a bare /search, an empty form. */
+test('the edit link for a saved default view carries its criteria', async () => {
+  const { advancedSearchHref } = await import('../src/lib/advancedSearchUrl.ts');
+  const saved = { include_tag: [3], read_status: 'unread' as const, custom: { custom_column_1: 'dark' } };
+  const href = advancedSearchHref(saved);
+  assert.equal(href.split('?')[0], '/search');
+  assert.deepEqual(advancedSearchFromQuery(href.slice(href.indexOf('?'))), saved);
+  assert.equal(advancedSearchHref(null), '/search');
+});

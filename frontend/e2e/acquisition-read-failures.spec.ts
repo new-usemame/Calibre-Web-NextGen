@@ -28,12 +28,20 @@ interface Reply { status?: number; body?: unknown; delayMs?: number }
 
 /** Answer specific `/api/v1` paths and let everything else reach the server.
  *  Dispatching on the exact pathname rather than on globs keeps
- *  `/admin/acquisition` from swallowing `/admin/acquisition/connections`. */
+ *  `/admin/acquisition` from swallowing `/admin/acquisition/connections`.
+ *
+ *  Unmatched paths `fallback()` rather than `continue()`. Playwright checks
+ *  the most recently registered handler FIRST, so this catch-all is reached
+ *  before any narrower `page.route` a test registered earlier. `continue()`
+ *  sends the request straight to the network and skips those handlers;
+ *  `fallback()` offers it to the next matching one and only then hits the
+ *  network. With `continue()` here, the `/auth/me` override below was dead
+ *  code and every test that relied on it silently tested the ungranted page. */
 async function intercept(page: Page, replies: Record<string, Reply>): Promise<void> {
   await page.route(`**${V1}/**`, async (route: Route) => {
     const { pathname } = new URL(route.request().url());
     const reply = replies[pathname];
-    if (!reply) return route.continue();
+    if (!reply) return route.fallback();
     if (reply.delayMs) await new Promise((resolve) => setTimeout(resolve, reply.delayMs));
     const status = reply.status ?? 200;
     await route.fulfill({
@@ -128,7 +136,12 @@ test.describe('acquisition admin — a failed read is not an empty one', () => {
     await openAdmin(page);
 
     await expect(page.getByText('No catalogs yet.')).toBeVisible();
-    await expect(page.getByRole('alert')).toHaveCount(0);
+    // The app shell always renders one PERMANENTLY EMPTY role="alert" live
+    // region (it is how announcements get spoken), so a bare alert count can
+    // never be 0 and asserting that only ever failed. Assert the thing meant:
+    // no alert anywhere carries any text. Deliberately not filtered on
+    // "could not be loaded" — any wording of any error here is a bug.
+    await expect(page.getByRole('alert').filter({ hasText: /\S/ })).toHaveCount(0);
     // An empty queue stays hidden — it is not news.
     await expect(page.getByRole('heading', { name: 'Waiting for approval' })).toHaveCount(0);
   });
@@ -310,11 +323,19 @@ test.describe('acquisition admin — controls stay usable', () => {
 });
 
 test.describe('find books — a failed activity read is not an empty one', () => {
-  /** The page is gated on `me.acquisition_access`, which is false by default.
-   *  Grant it in the response only, so the page renders without touching any
-   *  server state — these specs are about its failure handling, not the gate. */
+  /** The page is gated on `me.acquisition_access`, which is false by default
+   *  (the feature ships switched off), and `App.tsx` renders <NotFound/> when
+   *  it is falsy. Grant it in the response only, so the page renders without
+   *  touching any server state — these specs are about its failure handling,
+   *  not the gate.
+   *
+   *  The path is `/api/v1/auth/me` (`lib/queries.ts`, served by
+   *  `cps/api/auth.py`), not `/api/v1/me`. An earlier draft routed the latter,
+   *  which matches no request at all, so the real ungranted payload was used
+   *  and all three specs below drove the SPA's 404 page instead of the one
+   *  under test. */
   async function grantAccessInResponse(page: Page): Promise<void> {
-    await page.route(`**${V1}/me`, async (route) => {
+    await page.route(`**${V1}/auth/me`, async (route) => {
       const response = await route.fetch();
       const body = await response.json();
       await route.fulfill({

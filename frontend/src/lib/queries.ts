@@ -734,6 +734,7 @@ export interface AdminConfig {
   config_default_language: string;
   config_default_locale: string;
   config_server_announcement: string;
+  config_opds_filename_template: string;
   locales: { id: string; name: string }[];
   languages: { id: string; name: string }[];
 }

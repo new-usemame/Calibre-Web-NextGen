@@ -1109,7 +1109,8 @@ def opds_download_link(book_id, book_format):
     abort_unless_opds_book_exposed(book_id)
     client = "kobo" if "Kobo" in request.headers.get('User-Agent', "") else ""
     return get_download_link(
-        book_id, book_format.lower(), client, allow_public_shelf_books=True)
+        book_id, book_format.lower(), client, allow_public_shelf_books=True,
+        filename_template=getattr(config, 'config_opds_filename_template', ''))
 
 
 @opds.route("/ajax/book/<string:uuid>/<library>")

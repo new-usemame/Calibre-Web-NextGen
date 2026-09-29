@@ -131,6 +131,8 @@ class _Settings(_Base):
     # the existing 'en' fallback; setting a value pins anon OPDS responses
     # to that locale unless the client overrides via ?lang= or Accept-Language.
     config_opds_default_locale = Column(String(8), default="")
+    # Empty preserves legacy title/first-author naming. Only OPDS uses this.
+    config_opds_filename_template = Column(String(1024), default="")
     config_columns_to_ignore = Column(String)
     # Comma-separated Calibre custom-column IDs selected by an administrator.
     # Request-time use is revalidated against the live Calibre schema.

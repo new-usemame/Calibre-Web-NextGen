@@ -660,8 +660,15 @@ $(function() {
             
             if (dateFieldIds.indexOf(filterId) !== -1) {
                 var operator = $rule.find('.rule-operator-container select').val();
-                if (operator === 'in_last_days' || operator === 'not_in_last_days') return;
-                $input.off('blur.dateValidation').on('blur.dateValidation', function() {
+                // Relative windows take a day count; drop any date check and its
+                // error left over from an absolute operator on the same input.
+                $input.off('blur.dateValidation');
+                if (operator === 'in_last_days' || operator === 'not_in_last_days') {
+                    $input.css('border-color', '');
+                    $input.next('.date-error').remove();
+                    return;
+                }
+                $input.on('blur.dateValidation', function() {
                     var value = $(this).val();
                     if (value && !isValidDate(value)) {
                         $(this).css('border-color', '#d9534f');

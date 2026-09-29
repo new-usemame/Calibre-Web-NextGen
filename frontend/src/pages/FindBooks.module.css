@@ -18,7 +18,21 @@
 }
 .notice > svg { flex: none; margin-top: 2px; color: var(--danger); }
 .noticeTitle { margin: 0 0 var(--sp-1); font-weight: var(--fw-semi); font-size: var(--fs-sm); }
-.reasons { margin: 0; padding-left: var(--sp-4); color: var(--text-muted); font-size: var(--fs-sm); }
+/* list-style is restored explicitly: the global reset clears it, and the
+   padding-left here only ever made room for bullets that were not drawn. */
+.reasons {
+  margin: 0; padding-left: var(--sp-4); list-style: disc;
+  color: var(--text-muted); font-size: var(--fs-sm);
+}
+
+/* A read that failed, standing where its rows would have been. */
+.sectionError {
+  display: flex; flex-wrap: wrap; gap: var(--sp-2);
+  align-items: center; justify-content: space-between;
+  margin: 0 0 var(--sp-3); padding: var(--sp-3);
+  border: 1px solid var(--danger); border-radius: var(--r-md); background: var(--surface-2);
+}
+.sectionError > p { margin: 0; color: var(--danger); font-size: var(--fs-sm); min-width: 0; }
 
 .controls {
   display: flex; flex-wrap: wrap; gap: var(--sp-3);

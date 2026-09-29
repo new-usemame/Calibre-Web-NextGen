@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { Link } from 'wouter';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ChevronLeft, CheckCircle2, Globe, Plus, Users } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, CheckCircle2, Globe, Plus, RefreshCw, Users } from 'lucide-react';
 import {
   approveAcquisitionJob,
   createAcquisitionConnection,
@@ -16,6 +16,13 @@ import {
   type AcquisitionConnectionInput,
   type AcquisitionProbe,
 } from '../lib/acquisition';
+import { useRuntimeReasonText } from '../lib/acquisitionCopy';
+import {
+  acquisitionRequesterLabel,
+  acquisitionSectionView,
+  connectionSwitchDisabled,
+  isRowPending,
+} from '../lib/acquisitionViewState';
 import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { useMe } from '../lib/queries';
@@ -28,6 +35,30 @@ function errorCode(error: unknown): string | undefined {
     return error.detail.code;
   }
   return undefined;
+}
+
+/** A read that failed, said out loud and with a way back.
+ *
+ *  Every one of these sections used to render a failed read as its empty
+ *  state, so "we could not ask the server" and "the server says there is
+ *  nothing" looked identical. `role="alert"` because it replaces content the
+ *  administrator asked for; the retry is here because reloading the whole
+ *  page to re-run one query is a poor answer to a transient 502. */
+function SectionError({ message, onRetry, retrying }: {
+  message: string;
+  onRetry: () => void;
+  retrying?: boolean;
+}) {
+  const t = useT();
+  return (
+    <div className={styles.sectionError} role="alert">
+      <p>{message}</p>
+      <button type="button" className={styles.secondary} onClick={onRetry} disabled={retrying}>
+        <RefreshCw size={14} aria-hidden="true" focusable={false} />
+        <span>{t('Try again')}</span>
+      </button>
+    </div>
+  );
 }
 
 const EMPTY_CONNECTION: AcquisitionConnectionInput & { label: string } = {
@@ -44,6 +75,7 @@ export function AdminAcquisition() {
   const announce = useAnnouncer();
   const queryClient = useQueryClient();
   const formId = useId();
+  const reasonText = useRuntimeReasonText();
 
   const [draft, setDraft] = useState(EMPTY_CONNECTION);
   const [formError, setFormError] = useState<string | null>(null);
@@ -199,9 +231,65 @@ export function AdminAcquisition() {
 
   if (settings.isLoading) return <SpinnerCentered />;
 
+  // Without the settings payload every control below is drawn from `undefined`
+  // — the feature reads as off, the migration reads as not-ready, and every
+  // switch is disabled. That is indistinguishable from a correctly configured
+  // server with the feature deliberately off, so say what happened instead of
+  // showing a page that quietly lies about the state of the instance.
+  if (settings.isError) {
+    return (
+      <div className={styles.container}>
+        <Link href="/admin" className={styles.back}>
+          <ChevronLeft size={16} aria-hidden="true" focusable={false} />
+          <span>{t('Admin')}</span>
+        </Link>
+        <header className={styles.heading}>
+          <Globe aria-hidden="true" focusable={false} />
+          <h1>{t('Book sources')}</h1>
+        </header>
+        <SectionError
+          message={errorCode(settings.error) === 'forbidden'
+            ? t('This account is no longer an administrator.')
+            : t('These settings could not be loaded, so nothing on this page can be trusted yet.')}
+          onRetry={() => void settings.refetch()}
+          retrying={settings.isFetching}
+        />
+      </div>
+    );
+  }
+
   const runtime = settings.data?.runtime;
   const rows = connections.data?.connections ?? [];
-  const ownerNames = new Map((grants.data?.users ?? []).map((user) => [user.id, user.name]));
+  const connectionsView = acquisitionSectionView({
+    isLoading: connections.isLoading,
+    isError: connections.isError,
+    hasData: connections.isSuccess,
+    isEmpty: rows.length === 0,
+  });
+
+  const grantRows = grants.data?.users ?? [];
+  const grantsView = acquisitionSectionView({
+    enabled,
+    isLoading: grants.isLoading,
+    isError: grants.isError,
+    hasData: grants.isSuccess,
+    isEmpty: grantRows.length === 0,
+  });
+
+  const queueRows = queue.data?.jobs ?? [];
+  const queueView = acquisitionSectionView({
+    enabled,
+    isLoading: queue.isLoading,
+    isError: queue.isError,
+    hasData: queue.isSuccess,
+    isEmpty: queueRows.length === 0,
+  });
+
+  // Only a *successful* grants read is evidence about who exists. Built from
+  // `isSuccess` rather than from the map being non-empty, so the queue — which
+  // loads independently and can answer first — cannot report a live account as
+  // deleted while the directory is still on its way.
+  const ownerNames = new Map(grantRows.map((user) => [user.id, user.name]));
 
   return (
     <div className={styles.container}>
@@ -248,13 +336,21 @@ export function AdminAcquisition() {
 
         {actionErrors.feature && <p className={styles.bad} role="alert">{actionErrors.feature}</p>}
 
-        {runtime && (
-          <p className={styles.status} data-ok={runtime.available}>
-            {runtime.available
-              ? t('Ready to run requests.')
-              : t('Requests cannot run yet: {reasons}', { reasons: runtime.reasons.join(', ') })}
-          </p>
-        )}
+        {runtime && (runtime.available ? (
+          <p className={styles.status} data-ok={true}>{t('Ready to run requests.')}</p>
+        ) : (
+          <div className={styles.status} data-ok={false}>
+            <p>{t('Requests cannot run yet:')}</p>
+            {/* The administrator is the person who can actually fix these, so
+                they get the sentence, not the machine code they used to get.
+                role="list" is explicit because the global reset sets
+                list-style:none, which drops list semantics in Safari/VoiceOver
+                and would announce these as loose text. */}
+            <ul className={styles.reasons} role="list">
+              {runtime.reasons.map((reason) => <li key={reason}>{reasonText(reason)}</li>)}
+            </ul>
+          </div>
+        ))}
       </section>
 
       <section className={styles.card} aria-labelledby={`${formId}-connections`}>
@@ -262,9 +358,18 @@ export function AdminAcquisition() {
 
         {actionErrors.connection && <p className={styles.bad} role="alert">{actionErrors.connection}</p>}
 
-        {connections.isLoading ? <SpinnerCentered size={24} /> : rows.length === 0 ? (
+        {connectionsView.showError && (
+          <SectionError
+            message={t('The catalogs could not be loaded.')}
+            onRetry={() => void connections.refetch()}
+            retrying={connections.isFetching}
+          />
+        )}
+
+        {connectionsView.body === 'loading' ? <SpinnerCentered size={24} />
+          : connectionsView.body === 'empty' ? (
           <p className={styles.hint}>{t('No catalogs yet.')}</p>
-        ) : (
+        ) : connectionsView.body === 'ready' ? (
           <ul className={styles.connections} role="list">
             {rows.map((connection) => {
               const result = probes[connection.id];
@@ -273,7 +378,11 @@ export function AdminAcquisition() {
                   <div className={styles.connectionMain}>
                     <p className={styles.connectionLabel}>{connection.label}</p>
                     {result && 'error' in result ? (
-                      <p className={styles.bad}>{result.error}</p>
+                      // A failed test announces, the same way a successful one
+                      // does. Without this the administrator who is listening
+                      // rather than looking hears confirmation of success and
+                      // silence on failure.
+                      <p className={styles.bad} role="alert">{result.error}</p>
                     ) : result ? (
                       <p className={styles.ok}>
                         <CheckCircle2 size={14} aria-hidden="true" focusable={false} />
@@ -291,7 +400,8 @@ export function AdminAcquisition() {
                     <button
                       type="button"
                       className={styles.secondary}
-                      disabled={probe.isPending}
+                      // Only this catalog's test, not every catalog's.
+                      disabled={isRowPending(probe.isPending, probe.variables, connection.id)}
                       onClick={() => probe.mutate(connection.id)}
                     >
                       {t('Test connection')}
@@ -300,7 +410,16 @@ export function AdminAcquisition() {
                       <input
                         type="checkbox"
                         checked={connection.enabled}
-                        disabled={toggleConnection.isPending || migration !== 'ready'}
+                        // Withdrawing a catalog is a safety control: the server
+                        // refuses only the enable direction while the migration
+                        // is unresolved, so only that direction is blocked here.
+                        disabled={connectionSwitchDisabled({
+                          currentlyEnabled: connection.enabled,
+                          migrationStatus: migration,
+                          pending: isRowPending(
+                            toggleConnection.isPending, toggleConnection.variables?.id, connection.id,
+                          ),
+                        })}
                         onChange={(event) => toggleConnection.mutate({ id: connection.id, enabled: event.target.checked })}
                       />
                       <span>{t('Available to users')}</span>
@@ -310,7 +429,7 @@ export function AdminAcquisition() {
               );
             })}
           </ul>
-        )}
+        ) : null}
 
         <form
           className={styles.form}
@@ -395,20 +514,33 @@ export function AdminAcquisition() {
           <Users size={16} aria-hidden="true" focusable={false} />
           {t('Who can use it')}
         </h2>
-        {!enabled ? (
+        {actionErrors.grant && <p className={styles.bad} role="alert">{actionErrors.grant}</p>}
+        {grantsView.showError && (
+          <SectionError
+            message={t('The list of people could not be loaded.')}
+            onRetry={() => void grants.refetch()}
+            retrying={grants.isFetching}
+          />
+        )}
+        {grantsView.body === 'idle' ? (
           <p className={styles.hint}>{t('Turn the feature on to grant access.')}</p>
-        ) : grants.isLoading ? <SpinnerCentered size={24} /> : (
-          <>
-            {actionErrors.grant && <p className={styles.bad} role="alert">{actionErrors.grant}</p>}
+        ) : grantsView.body === 'loading' ? <SpinnerCentered size={24} />
+          : grantsView.body === 'empty' ? (
+            <p className={styles.hint}>{t('There are no other accounts on this server yet.')}</p>
+          ) : grantsView.body === 'ready' ? (
             <ul className={styles.grants} role="list">
-            {(grants.data?.users ?? []).map((user) => (
+            {grantRows.map((user) => {
+              // One grants mutation serves every row; only the account being
+              // changed is busy.
+              const busy = isRowPending(grant.isPending, grant.variables?.id, user.id);
+              return (
               <li key={user.id} className={styles.grantRow}>
                 <span className={styles.grantName}>{user.name}</span>
                 <label className={styles.inlineSwitch}>
                   <input
                     type="checkbox"
                     checked={user.access}
-                    disabled={grant.isPending}
+                    disabled={busy}
                     onChange={(event) => grant.mutate({
                       id: user.id,
                       access: event.target.checked,
@@ -423,7 +555,7 @@ export function AdminAcquisition() {
                   <input
                     type="checkbox"
                     checked={user.auto_approve}
-                    disabled={grant.isPending || !user.access}
+                    disabled={busy || !user.access}
                     onChange={(event) => grant.mutate({
                       id: user.id, access: user.access, auto_approve: event.target.checked,
                     })}
@@ -431,37 +563,57 @@ export function AdminAcquisition() {
                   <span>{t('No approval needed')}</span>
                 </label>
               </li>
-            ))}
+              );
+            })}
             </ul>
-          </>
-        )}
+          ) : null}
       </section>
 
-      {enabled && (queue.data?.jobs.length ?? 0) > 0 && (
+      {/* Shown when there is something to approve OR when we could not find
+          out. The old condition was "more than zero rows", and a failed read
+          produces zero rows — so a 502 on this endpoint silently removed the
+          entire approval queue and the administrator was never told that
+          people were waiting. An genuinely empty queue stays hidden. */}
+      {enabled && (queueView.body === 'ready' || queueView.showError) && (
         <section className={styles.card} aria-labelledby={`${formId}-queue`}>
           <h2 id={`${formId}-queue`}>{t('Waiting for approval')}</h2>
           {actionErrors.queue && <p className={styles.bad} role="alert">{actionErrors.queue}</p>}
+          {queueView.showError && (
+            <SectionError
+              message={t('The approval queue could not be loaded, so requests may be waiting unseen.')}
+              onRetry={() => void queue.refetch()}
+              retrying={queue.isFetching}
+            />
+          )}
           <ul className={styles.grants} role="list">
-            {(queue.data?.jobs ?? []).map((job) => {
+            {queueRows.map((job) => {
               // Approving is a decision about a person as much as a book, so
               // name the requester. The grants list is the only place their
-              // display name exists; an account removed since asking falls
-              // back to the id rather than silently reading as nobody.
-              const requester = ownerNames.get(job.owner_id);
+              // display name exists, and it is a separate request that can
+              // still be in flight — so "we do not know yet" is kept distinct
+              // from "this account is gone". Claiming the latter about a live
+              // user is a statement an administrator may act on.
+              const requester = acquisitionRequesterLabel({
+                ownerId: job.owner_id, names: ownerNames, resolved: grants.isSuccess,
+              });
               return (
                 <li key={job.id} className={styles.grantRow}>
                   <span className={styles.queueName}>
                     {job.title || t('Untitled book')}
                     <span className={styles.queueRequester}>
-                      {requester
-                        ? t('Requested by {name}', { name: requester })
-                        : t('Requested by a removed account')}
+                      {requester.kind === 'named'
+                        ? t('Requested by {name}', { name: requester.name })
+                        : requester.kind === 'removed'
+                          ? t('Requested by a removed account')
+                          : grants.isError
+                            ? t('Could not look up who asked')
+                            : t('Looking up who asked…')}
                     </span>
                   </span>
                   <button
                     type="button"
                     className={styles.primary}
-                    disabled={approve.isPending}
+                    disabled={isRowPending(approve.isPending, approve.variables, job.id)}
                     onClick={() => approve.mutate(job.id)}
                   >
                     {t('Approve')}

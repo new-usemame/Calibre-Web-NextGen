@@ -14,6 +14,19 @@
 .lede { margin: 0 0 var(--sp-4); color: var(--text-muted); font-size: var(--fs-sm); max-width: 70ch; }
 .hint { margin: 0; color: var(--text-muted); font-size: var(--fs-sm); }
 .bad { margin: 0; color: var(--danger); font-size: var(--fs-sm); }
+
+/* A read that failed, standing where its rows would have been. Bordered
+   rather than a bare line of red text because it replaces content the
+   administrator asked for, and the retry has to read as part of the same
+   message rather than as another of the section's controls. */
+.sectionError {
+  display: flex; flex-wrap: wrap; gap: var(--sp-2);
+  align-items: center; justify-content: space-between;
+  margin: 0 0 var(--sp-3); padding: var(--sp-3);
+  border: 1px solid var(--danger); border-radius: var(--r-md); background: var(--surface-2);
+}
+.sectionError > p { margin: 0; color: var(--danger); font-size: var(--fs-sm); min-width: 0; }
+
 .ok { display: inline-flex; align-items: center; gap: var(--sp-1); margin: 0; color: var(--text); font-size: var(--fs-sm); }
 .ok > svg { flex: none; color: var(--success-border, var(--accent)); }
 
@@ -43,6 +56,11 @@
 
 .status { margin: var(--sp-3) 0 0; font-size: var(--fs-sm); color: var(--danger); overflow-wrap: anywhere; }
 .status[data-ok='true'] { color: var(--text-muted); }
+.status > p { margin: 0; }
+/* Keeps the bullet: the global reset sets list-style:none, and these reasons
+   are a genuine list the administrator has to work through one at a time. */
+.reasons { margin: var(--sp-1) 0 0; padding-left: var(--sp-4); list-style: disc; }
+.reasons > li { margin-top: var(--sp-1); }
 
 .connections { display: flex; flex-direction: column; gap: var(--sp-2); margin: 0 0 var(--sp-4); padding: 0; }
 .connection {

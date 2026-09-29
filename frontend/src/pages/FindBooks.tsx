@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Link } from 'wouter';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertTriangle, BookOpen, ChevronRight, Download, FolderOpen, Search, Send, X,
+  AlertTriangle, BookOpen, ChevronRight, Download, FolderOpen, RefreshCw, Search, Send, X,
 } from 'lucide-react';
 import {
   ACQUISITION_CANCELLABLE_STATES,
@@ -18,6 +18,8 @@ import {
   type AcquisitionNavigation,
   type AcquisitionPublication,
 } from '../lib/acquisition';
+import { useRuntimeReasonText } from '../lib/acquisitionCopy';
+import { acquisitionSectionView, hasVisibleReceipt, isRowPending } from '../lib/acquisitionViewState';
 import { ApiError } from '../lib/api';
 import { useMe } from '../lib/queries';
 import { useT } from '../lib/i18n';
@@ -32,27 +34,6 @@ interface Step {
   title: string;
   selection?: string;
   query?: string;
-}
-
-/** Why the server says acquisition cannot run. Deliberately specific: "it is
- *  off" and "the ingest folder is not writable" need different actions from
- *  the administrator, and a single generic sentence hides which one applies. */
-function useRuntimeReasonText(): (reason: string) => string {
-  const t = useT();
-  return useCallback((reason: string) => {
-    switch (reason) {
-      case 'scheduler_unavailable': return t('The background scheduler is not running.');
-      case 'migration_unavailable': return t('The acquisition tables are not ready.');
-      case 'formats_disabled': return t('No accepted upload format allows EPUB or PDF.');
-      case 'key_unavailable': return t('The acquisition key is missing.');
-      case 'repository_unavailable': return t('The acquisition database could not be opened.');
-      case 'ingest_unwritable': return t('The ingest folder is not writable.');
-      case 'ingest_unavailable': return t('The ingest folder could not be found.');
-      case 'library_unavailable': return t('The Calibre library folder could not be found.');
-      case 'ingest_service_unavailable': return t('The ingest service is not running.');
-      default: return reason;
-    }
-  }, [t]);
 }
 
 function useJobStateText(): (job: AcquisitionJob) => { label: string; tone: 'active' | 'ok' | 'bad' | 'muted' } {
@@ -71,7 +52,12 @@ function useJobStateText(): (job: AcquisitionJob) => { label: string; tone: 'act
       case 'staged': return { label: t('Downloaded, waiting to import'), tone: 'active' as const };
       case 'publishing': return { label: t('Handing over to the library'), tone: 'active' as const };
       case 'importing': return { label: t('Importing'), tone: 'active' as const };
-      case 'imported': return { label: t('In your library'), tone: 'ok' as const };
+      // The import succeeded either way. "In your library" is only true when
+      // there is something this account can open; without a visible receipt id
+      // it would promise a book the user cannot reach.
+      case 'imported': return hasVisibleReceipt(job.result?.book_ids)
+        ? { label: t('In your library'), tone: 'ok' as const }
+        : { label: t('Imported into the library'), tone: 'ok' as const };
       case 'failed': return { label: t('Failed'), tone: 'bad' as const };
       case 'cancelled': return { label: t('Request cancelled'), tone: 'muted' as const };
       default: return { label: job.state, tone: 'muted' as const };
@@ -227,6 +213,16 @@ export function FindBooks() {
   const personalLibrary = me?.library_mode === 'personal_library';
   const searchCapability = catalog.data?.searches?.[0];
 
+  const jobRows = jobs.data?.jobs ?? [];
+  // "You have asked for nothing" and "we could not find out what you asked
+  // for" are different sentences, and only the first one is reassuring.
+  const jobsView = acquisitionSectionView({
+    isLoading: jobs.isLoading,
+    isError: jobs.isError,
+    hasData: jobs.isSuccess,
+    isEmpty: jobRows.length === 0,
+  });
+
   const openSelection = (nav: AcquisitionNavigation) => {
     setTrail((steps) => [...steps, { title: nav.title || t('Catalog'), selection: nav.selection }]);
   };
@@ -271,7 +267,10 @@ export function FindBooks() {
           <AlertTriangle size={16} aria-hidden="true" focusable={false} />
           <div>
             <p className={styles.noticeTitle}>{t('Requests are paused')}</p>
-            <ul className={styles.reasons}>
+            {/* role="list" is explicit: the global reset sets list-style:none,
+                which makes Safari/VoiceOver stop announcing this as a list and
+                read the reasons as loose sentences with no count. */}
+            <ul className={styles.reasons} role="list">
               {runtime.reasons.map((reason) => <li key={reason}>{reasonText(reason)}</li>)}
             </ul>
           </div>
@@ -356,17 +355,32 @@ export function FindBooks() {
           {catalog.isLoading && <SpinnerCentered />}
 
           {catalog.isError && (
-            <EmptyState
-              icon={AlertTriangle}
-              title={t('The catalog could not be read')}
-              message={errorCode(catalog.error) === 'not_found'
-                ? t('That page expired. Go back to the top and try again.')
-                : t('The source did not answer with a catalog we can read.')}
-            >
-              <button type="button" className={styles.secondary} onClick={() => setTrail([])}>
-                {t('Back to top')}
-              </button>
-            </EmptyState>
+            // role="alert": browsing is a keyboard-and-listening activity as
+            // much as a visual one, and a page that silently swaps its results
+            // for a failure leaves a screen-reader user waiting for a list
+            // that is never coming.
+            <div role="alert">
+              <EmptyState
+                icon={AlertTriangle}
+                title={t('The catalog could not be read')}
+                message={errorCode(catalog.error) === 'not_found'
+                  ? t('That page expired. Go back to the top and try again.')
+                  : t('The source did not answer with a catalog we can read.')}
+              >
+                <button type="button" className={styles.secondary} onClick={() => setTrail([])}>
+                  {t('Back to top')}
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondary}
+                  onClick={() => void catalog.refetch()}
+                  disabled={catalog.isFetching}
+                >
+                  <RefreshCw size={14} aria-hidden="true" focusable={false} />
+                  <span>{t('Try again')}</span>
+                </button>
+              </EmptyState>
+            </div>
           )}
 
           {catalog.data && (
@@ -385,11 +399,31 @@ export function FindBooks() {
       <section className={styles.activity} aria-labelledby="acquisition-activity">
         <h2 id="acquisition-activity">{t('Your requests')}</h2>
         {activityError && <p className={styles.error} role="alert">{activityError}</p>}
-        {jobs.isLoading ? <SpinnerCentered size={24} /> : !jobs.data?.jobs.length ? (
+        {/* A failed read used to arrive here as "Nothing requested yet.", so a
+            user whose session had expired, or who hit a 502, was told their
+            requests did not exist. They ask again; the idempotency key is
+            per-page-load, so asking again after a reload really does queue a
+            second job. */}
+        {jobsView.showError && (
+          <div className={styles.sectionError} role="alert">
+            <p>{t('Your requests could not be loaded. They have not been lost.')}</p>
+            <button
+              type="button"
+              className={styles.secondary}
+              onClick={() => void jobs.refetch()}
+              disabled={jobs.isFetching}
+            >
+              <RefreshCw size={14} aria-hidden="true" focusable={false} />
+              <span>{t('Try again')}</span>
+            </button>
+          </div>
+        )}
+        {jobsView.body === 'loading' ? <SpinnerCentered size={24} />
+          : jobsView.body === 'empty' ? (
           <p className={styles.muted}>{t('Nothing requested yet.')}</p>
-        ) : (
+        ) : jobsView.body === 'ready' ? (
           <ul className={styles.jobs} role="list">
-            {jobs.data.jobs.map((job) => {
+            {jobRows.map((job) => {
               const state = jobStateText(job);
               const finished = job.state === 'imported';
               // Only where the server will actually accept it, so the button
@@ -428,7 +462,7 @@ export function FindBooks() {
                       <button
                         type="button"
                         className={styles.secondary}
-                        disabled={retry.isPending}
+                        disabled={isRowPending(retry.isPending, retry.variables, job.id)}
                         onClick={() => retry.mutate(job.id)}
                       >
                         {t('Try again')}
@@ -438,7 +472,7 @@ export function FindBooks() {
                       <button
                         type="button"
                         className={styles.secondary}
-                        disabled={cancel.isPending}
+                        disabled={isRowPending(cancel.isPending, cancel.variables, job.id)}
                         onClick={() => cancel.mutate(job.id)}
                       >
                         <X size={14} aria-hidden="true" focusable={false} />
@@ -450,7 +484,7 @@ export function FindBooks() {
               );
             })}
           </ul>
-        )}
+        ) : null}
       </section>
     </div>
   );

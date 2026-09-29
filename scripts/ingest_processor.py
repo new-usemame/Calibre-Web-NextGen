@@ -2798,7 +2798,15 @@ class NewBookProcessor:
                 CHECKSUM_VERSION,
             )
 
-            calibre_db_path = os.path.join(self.library_dir, 'metadata.db')
+            # self.library_dir is repointed at book storage for a split
+            # library (see __init__, lines ~1214-1219), so it is NOT where
+            # metadata.db lives. self.metadata_db was computed before that
+            # reassignment and is always correct; reconstructing the path
+            # from self.library_dir here opened a nonexistent path on a
+            # split library ("<book_storage>/metadata.db"), which
+            # sqlite3.connect() then silently created as an empty file
+            # before the query failed with "no such table: books".
+            calibre_db_path = self.metadata_db
 
             with sqlite3.connect(calibre_db_path, timeout=30) as con:
                 cur = con.cursor()

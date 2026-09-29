@@ -10,6 +10,7 @@ import re
 from datetime import datetime
 
 from flask import jsonify, request
+from flask_babel import gettext as _
 from sqlalchemy import func
 
 from . import api_v1
@@ -126,6 +127,22 @@ def _json_to_term(data, columns=()):
     }
 
 
+def _humanize_bool_criteria(criteria, columns):
+    """The shared builder renders a Yes/No column criterion with its raw term
+    value ("Finished: True", or "Finished: " for a never-set flag). Show the
+    choice the user made instead. Display only; segment-exact, so a text
+    column's criterion that happens to read "True" is untouched."""
+    shown = {"True": _("Yes"), "False": _("No"), "": _("Empty")}
+    labels = {}
+    for c in columns:
+        if c.datatype == "bool":
+            for raw, label in shown.items():
+                labels["{}: {}".format(c.name, raw)] = "{}: {}".format(c.name, label)
+    if not criteria or not labels:
+        return criteria
+    return " + ".join(labels.get(part, part) for part in criteria.split(" + "))
+
+
 def _custom_column_options(columns):
     """The searchable custom columns, in the order the classic form lists them."""
     out = []
@@ -184,7 +201,8 @@ def advanced_search():
     per_page = int(data.get("per_page", config.config_books_per_page) or config.config_books_per_page)
     order = SORT_MAP.get(data.get("sort", "new"), SORT_MAP["new"])
 
-    term = _json_to_term(data, calibre_db.get_cc_columns(config, filter_config_custom_read=True))
+    columns = calibre_db.get_cc_columns(config, filter_config_custom_read=True)
+    term = _json_to_term(data, columns)
     query, criteria = build_adv_search_query(term)
     # build_adv_search_query always adds a BookShelf outerjoin (shelf include/
     # exclude support), so a book on N shelves yields N identical result rows.
@@ -204,6 +222,7 @@ def advanced_search():
     criteria_str = (criteria_str
                     .replace("Read Status = 'True'", "Read")
                     .replace("Read Status = 'False'", "Unread"))
+    criteria_str = _humanize_bool_criteria(criteria_str, columns)
 
     return jsonify({
         "items": _rows_to_items(rows),

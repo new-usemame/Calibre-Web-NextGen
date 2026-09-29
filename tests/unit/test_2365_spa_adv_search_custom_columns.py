@@ -90,3 +90,13 @@ def test_options_list_searchable_columns_with_their_enum_values():
     options = _custom_column_options(COLUMNS)
     assert [o["id"] for o in options] == [1, 2, 3, 4, 5, 6, 7]  # composite has no search input
     assert options[-1] == {"id": 7, "name": "Status", "datatype": "enumeration", "enum_values": ["todo", "done"]}
+
+
+def test_the_summary_line_names_the_yes_no_choice_not_the_raw_term(monkeypatch):
+    from cps.api import search as api_search
+    monkeypatch.setattr(api_search, "_", lambda s: s)
+    columns = [col(1, "bool", "Finished"), col(4, "text", "Source")]
+    assert api_search._humanize_bool_criteria(
+        "Finished: True + Source: True + Title: dune", columns) == "Finished: Yes + Source: True + Title: dune"
+    assert api_search._humanize_bool_criteria("Finished: ", columns) == "Finished: Empty"
+    assert api_search._humanize_bool_criteria("Finished: False", columns) == "Finished: No"

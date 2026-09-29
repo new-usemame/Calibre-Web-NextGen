@@ -71,7 +71,13 @@ def test_spa_enabled_serves_shell(monkeypatch, tmp_path):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("path", ["/app", "/app/", "/app/book/5", "/app/authors"])
+@pytest.mark.parametrize("path", [
+    "/app", "/app/", "/app/book/5", "/app/authors",
+    # Virtual library. These exist only as client-side routes, so a bookmark or
+    # a pasted link reaches them solely because the shell answers their path; a
+    # green Vite build proves the bundle compiles, not that the URL resolves.
+    "/app/find-books", "/app/admin/acquisition",
+])
 def test_spa_serves_all_client_routes(monkeypatch, tmp_path, path):
     """The shell must answer /app, /app/ (trailing slash) and any deep client-side
     route, so a hard reload / shared link on any SPA path boots the app instead of

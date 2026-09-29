@@ -132,14 +132,12 @@ def _humanize_bool_criteria(criteria, columns):
     value ("Finished: True", or "Finished: " for a never-set flag). Show the
     choice the user made instead. Display only; segment-exact, so a text
     column's criterion that happens to read "True" is untouched."""
-    shown = {"True": _("Yes"), "False": _("No"), "": _("Empty")}
-    labels = {}
-    for c in columns:
-        if c.datatype == "bool":
-            for raw, label in shown.items():
-                labels["{}: {}".format(c.name, raw)] = "{}: {}".format(c.name, label)
-    if not criteria or not labels:
+    names = [c.name for c in columns if c.datatype == "bool"]
+    if not criteria or not names:
         return criteria
+    shown = {"True": _("Yes"), "False": _("No"), "": _("Empty")}
+    labels = {"{}: {}".format(name, raw): "{}: {}".format(name, label)
+              for name in names for raw, label in shown.items()}
     return " + ".join(labels.get(part, part) for part in criteria.split(" + "))
 
 

@@ -39,6 +39,8 @@ export const SPA_ROUTES = {
   upload: '/upload',
   admin: '/admin',
   adminDevices: '/admin/devices',
+  adminAcquisition: '/admin/acquisition',
+  findBooks: '/find-books',
   whatsNew: '/whats-new',
   about: '/about',
   tasks: '/tasks',

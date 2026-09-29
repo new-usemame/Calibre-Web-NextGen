@@ -1,0 +1,569 @@
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Link } from 'wouter';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  AlertTriangle, BookOpen, ChevronRight, Download, FolderOpen, Search, Send, X,
+} from 'lucide-react';
+import {
+  ACQUISITION_ACTIVE_STATES,
+  cancelAcquisitionJob,
+  createAcquisitionJob,
+  getAcquisitionBootstrap,
+  getAcquisitionCatalog,
+  getAcquisitionJobs,
+  retryAcquisitionJob,
+  type AcquisitionCatalog,
+  type AcquisitionJob,
+  type AcquisitionNavigation,
+  type AcquisitionPublication,
+} from '../lib/acquisition';
+import { ApiError } from '../lib/api';
+import { useMe } from '../lib/queries';
+import { useT } from '../lib/i18n';
+import { useAnnouncer } from '../lib/a11y/announcer';
+import { EmptyState } from '../components/EmptyState';
+import { SpinnerCentered } from '../components/Spinner';
+import styles from './FindBooks.module.css';
+
+/** One step of the browse trail. `selection` is the server's opaque cursor;
+ *  the root step has none, meaning "the connection's configured endpoint". */
+interface Step {
+  title: string;
+  selection?: string;
+  query?: string;
+}
+
+/** Why the server says acquisition cannot run. Deliberately specific: "it is
+ *  off" and "the ingest folder is not writable" need different actions from
+ *  the administrator, and a single generic sentence hides which one applies. */
+function useRuntimeReasonText(): (reason: string) => string {
+  const t = useT();
+  return useCallback((reason: string) => {
+    switch (reason) {
+      case 'scheduler_unavailable': return t('The background scheduler is not running.');
+      case 'migration_unavailable': return t('The acquisition tables are not ready.');
+      case 'formats_disabled': return t('No accepted upload format allows EPUB or PDF.');
+      case 'key_unavailable': return t('The acquisition key is missing.');
+      case 'repository_unavailable': return t('The acquisition database could not be opened.');
+      case 'ingest_unwritable': return t('The ingest folder is not writable.');
+      case 'ingest_unavailable': return t('The ingest folder could not be found.');
+      case 'library_unavailable': return t('The Calibre library folder could not be found.');
+      case 'ingest_service_unavailable': return t('The ingest service is not running.');
+      default: return reason;
+    }
+  }, [t]);
+}
+
+function useJobStateText(): (job: AcquisitionJob) => { label: string; tone: 'active' | 'ok' | 'bad' | 'muted' } {
+  const t = useT();
+  return useCallback((job: AcquisitionJob) => {
+    if (job.cancel_requested && ACQUISITION_ACTIVE_STATES.has(job.state)) {
+      return { label: t('Cancelling…'), tone: 'muted' as const };
+    }
+    switch (job.state) {
+      case 'awaiting_approval': return { label: t('Waiting for approval'), tone: 'muted' as const };
+      case 'queued': return { label: t('Queued'), tone: 'active' as const };
+      case 'resolving': return { label: t('Contacting the source'), tone: 'active' as const };
+      case 'downloading': return { label: t('Downloading'), tone: 'active' as const };
+      // Bytes are on disk but no book exists yet. Saying "done" here is the
+      // exact confusion the import receipt exists to prevent.
+      case 'staged': return { label: t('Downloaded, waiting to import'), tone: 'active' as const };
+      case 'publishing': return { label: t('Handing over to the library'), tone: 'active' as const };
+      case 'importing': return { label: t('Importing'), tone: 'active' as const };
+      case 'imported': return { label: t('In your library'), tone: 'ok' as const };
+      case 'failed': return { label: t('Failed'), tone: 'bad' as const };
+      case 'cancelled': return { label: t('Cancelled'), tone: 'muted' as const };
+      case 'source_busy': return { label: t('Waiting for source'), tone: 'active' as const };
+      default: return { label: job.state, tone: 'muted' as const };
+    }
+  }, [t]);
+}
+
+function errorCode(error: unknown): string | undefined {
+  if (error instanceof ApiError && error.detail && typeof error.detail.code === 'string') {
+    return error.detail.code;
+  }
+  return undefined;
+}
+
+export function FindBooks() {
+  const t = useT();
+  const announce = useAnnouncer();
+  const queryClient = useQueryClient();
+  const { data: me } = useMe();
+  const reasonText = useRuntimeReasonText();
+  const jobStateText = useJobStateText();
+  const searchInputId = useId();
+
+  const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [trail, setTrail] = useState<Step[]>([]);
+  const [draftQuery, setDraftQuery] = useState('');
+  const [addToMyLibrary, setAddToMyLibrary] = useState(true);
+  const [requestError, setRequestError] = useState<string | null>(null);
+
+  // One idempotency key per offer for the lifetime of the page. A double-click,
+  // or a retry after an ambiguous 5xx, therefore resolves to the SAME job on the
+  // server instead of queueing the book twice.
+  const requestKeys = useRef(new Map<string, string>());
+  const keyFor = (offerId: string) => {
+    const existing = requestKeys.current.get(offerId);
+    if (existing) return existing;
+    const fresh = (globalThis.crypto?.randomUUID?.()
+      ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    requestKeys.current.set(offerId, fresh);
+    return fresh;
+  };
+
+  const bootstrap = useQuery({
+    queryKey: ['acquisition', 'bootstrap'],
+    queryFn: getAcquisitionBootstrap,
+  });
+
+  const connections = useMemo(
+    () => bootstrap.data?.connections.filter((c) => c.enabled) ?? [],
+    [bootstrap.data],
+  );
+
+  // Settle on a connection once they load, and recover if the chosen one is
+  // withdrawn by an administrator while the page is open.
+  useEffect(() => {
+    if (!connections.length) {
+      if (connectionId !== null) setConnectionId(null);
+      return;
+    }
+    if (!connectionId || !connections.some((c) => c.id === connectionId)) {
+      setConnectionId(connections[0].id);
+      setTrail([]);
+    }
+  }, [connections, connectionId]);
+
+  const current = trail.length ? trail[trail.length - 1] : undefined;
+
+  const catalog = useQuery<AcquisitionCatalog>({
+    queryKey: ['acquisition', 'catalog', connectionId, current?.selection ?? null, current?.query ?? null],
+    queryFn: () => getAcquisitionCatalog(connectionId as string, {
+      selection: current?.selection,
+      query: current?.query,
+    }),
+    enabled: !!connectionId,
+    retry: false,
+  });
+
+  const jobs = useQuery({
+    queryKey: ['acquisition', 'jobs'],
+    queryFn: getAcquisitionJobs,
+    // Only poll while the server still owes an answer, so an idle page is quiet.
+    refetchInterval: (query) => {
+      const rows = query.state.data?.jobs ?? [];
+      return rows.some((job) => ACQUISITION_ACTIVE_STATES.has(job.state)) ? 3000 : false;
+    },
+  });
+
+  const invalidateJobs = () => { void queryClient.invalidateQueries({ queryKey: ['acquisition', 'jobs'] }); };
+
+  const request = useMutation({
+    mutationFn: (variables: { offerId: string; format: string }) => createAcquisitionJob({
+      connection_id: connectionId as string,
+      offer_id: variables.offerId,
+      idempotency_key: keyFor(variables.offerId),
+      add_to_my_library: addToMyLibrary,
+    }),
+    onSuccess: (job) => {
+      setRequestError(null);
+      invalidateJobs();
+      announce(job.state === 'awaiting_approval'
+        ? t('Requested. An administrator has to approve it.')
+        : t('Added to your activity.'));
+    },
+    onError: (error) => {
+      const code = errorCode(error);
+      setRequestError(
+        code === 'selections_full'
+          ? t('Too many open selections. Wait a little, then try again.')
+          : code === 'acquisition_unavailable'
+            ? t('Acquisition is not ready right now. Ask an administrator to check its status.')
+            : code === 'not_found'
+              ? t('That choice expired. Refresh the page and pick the file again.')
+              : t('The request could not be made.'),
+      );
+    },
+  });
+
+  const cancel = useMutation({
+    mutationFn: cancelAcquisitionJob,
+    onSuccess: () => { invalidateJobs(); announce(t('Cancelling…')); },
+  });
+  const retry = useMutation({
+    mutationFn: retryAcquisitionJob,
+    onSuccess: () => { invalidateJobs(); announce(t('Retrying.')); },
+  });
+
+  const runtime = bootstrap.data?.runtime;
+  const canAcquire = !!bootstrap.data?.can_acquire;
+  const personalLibrary = me?.library_mode === 'personal_library';
+  const searchCapability = catalog.data?.searches?.[0];
+
+  const openSelection = (nav: AcquisitionNavigation) => {
+    setTrail((steps) => [...steps, { title: nav.title || t('Catalog'), selection: nav.selection }]);
+  };
+
+  const runSearch = (event: React.FormEvent) => {
+    event.preventDefault();
+    const term = draftQuery.trim();
+    if (!term || !searchCapability) return;
+    setTrail((steps) => [...steps, {
+      title: t('Search: {query}', { query: term }),
+      selection: searchCapability.selection,
+      query: term,
+    }]);
+  };
+
+  if (bootstrap.isLoading) return <SpinnerCentered />;
+
+  if (bootstrap.isError) {
+    return (
+      <div className={styles.container}>
+        <EmptyState
+          icon={AlertTriangle}
+          title={t('Find books is unavailable')}
+          message={t('This account cannot use book sources, or the feature is switched off.')}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.container}>
+      <header className={styles.heading}>
+        <BookOpen aria-hidden="true" focusable={false} />
+        <h1>{t('Find books')}</h1>
+      </header>
+      <p className={styles.lede}>
+        {t('Browse the catalogs your administrator has added. A book you pick is imported into the library here — it is not just downloaded to your device.')}
+      </p>
+
+      {runtime && !runtime.available && (
+        <div className={styles.notice} role="status">
+          <AlertTriangle size={16} aria-hidden="true" focusable={false} />
+          <div>
+            <p className={styles.noticeTitle}>{t('Requests are paused')}</p>
+            <ul className={styles.reasons}>
+              {runtime.reasons.map((reason) => <li key={reason}>{reasonText(reason)}</li>)}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {!connections.length ? (
+        <EmptyState
+          icon={FolderOpen}
+          title={t('No catalogs yet')}
+          message={t('An administrator has not added a book source, or none is switched on.')}
+        />
+      ) : (
+        <>
+          <div className={styles.controls}>
+            {connections.length > 1 && (
+              <label className={styles.field}>
+                <span>{t('Catalog')}</span>
+                <select
+                  value={connectionId ?? ''}
+                  onChange={(event) => { setConnectionId(event.target.value); setTrail([]); }}
+                >
+                  {connections.map((connection) => (
+                    <option key={connection.id} value={connection.id}>{connection.label}</option>
+                  ))}
+                </select>
+              </label>
+            )}
+
+            {searchCapability ? (
+              <form className={styles.search} onSubmit={runSearch} role="search">
+                <label className={styles.srOnly} htmlFor={searchInputId}>{t('Search this catalog')}</label>
+                <input
+                  id={searchInputId}
+                  type="search"
+                  value={draftQuery}
+                  onChange={(event) => setDraftQuery(event.target.value)}
+                  placeholder={t('Search this catalog')}
+                  maxLength={500}
+                />
+                <button type="submit" disabled={!draftQuery.trim()}>
+                  <Search size={16} aria-hidden="true" focusable={false} />
+                  <span>{t('Search')}</span>
+                </button>
+              </form>
+            ) : (
+              catalog.data && <p className={styles.muted}>{t('This catalog does not offer search.')}</p>
+            )}
+          </div>
+
+          {trail.length > 0 && (
+            <nav className={styles.crumbs} aria-label={t('Catalog trail')}>
+              <button type="button" onClick={() => setTrail([])}>{t('Top')}</button>
+              {trail.map((step, index) => (
+                <span key={`${step.selection ?? 'root'}-${index}`} className={styles.crumb}>
+                  <ChevronRight size={14} aria-hidden="true" focusable={false} />
+                  {index === trail.length - 1 ? (
+                    <span aria-current="page">{step.title}</span>
+                  ) : (
+                    <button type="button" onClick={() => setTrail((steps) => steps.slice(0, index + 1))}>
+                      {step.title}
+                    </button>
+                  )}
+                </span>
+              ))}
+            </nav>
+          )}
+
+          {personalLibrary && (
+            <label className={styles.checkbox}>
+              <input
+                type="checkbox"
+                checked={addToMyLibrary}
+                onChange={(event) => setAddToMyLibrary(event.target.checked)}
+              />
+              <span>{t('Also add the book to My Library')}</span>
+            </label>
+          )}
+
+          {requestError && <p className={styles.error} role="alert">{requestError}</p>}
+
+          {catalog.isLoading && <SpinnerCentered />}
+
+          {catalog.isError && (
+            <EmptyState
+              icon={AlertTriangle}
+              title={t('The catalog could not be read')}
+              message={errorCode(catalog.error) === 'not_found'
+                ? t('That page expired. Go back to the top and try again.')
+                : t('The source did not answer with a catalog we can read.')}
+            >
+              <button type="button" className={styles.secondary} onClick={() => setTrail([])}>
+                {t('Back to top')}
+              </button>
+            </EmptyState>
+          )}
+
+          {catalog.data && (
+            <CatalogView
+              catalog={catalog.data}
+              canAcquire={canAcquire}
+              requestsPaused={!runtime?.available}
+              pendingOffer={request.isPending ? request.variables?.offerId : undefined}
+              onOpen={openSelection}
+              onRequest={(offerId, format) => request.mutate({ offerId, format })}
+            />
+          )}
+        </>
+      )}
+
+      <section className={styles.activity} aria-labelledby="acquisition-activity">
+        <h2 id="acquisition-activity">{t('Your requests')}</h2>
+        {jobs.isLoading ? <SpinnerCentered size={24} /> : !jobs.data?.jobs.length ? (
+          <p className={styles.muted}>{t('Nothing requested yet.')}</p>
+        ) : (
+          <ul className={styles.jobs} role="list">
+            {jobs.data.jobs.map((job) => {
+              const state = jobStateText(job);
+              const finished = job.state === 'imported';
+              const cancellable = ACQUISITION_ACTIVE_STATES.has(job.state) || job.state === 'awaiting_approval';
+              return (
+                <li key={job.id} className={styles.job} data-state={job.state}>
+                  <div className={styles.jobMain}>
+                    <p className={styles.jobTitle}>{job.title || t('Untitled book')}</p>
+                    <p className={styles.jobMeta}>
+                      <span className={styles.pill} data-tone={state.tone}>{state.label}</span>
+                      {job.state === 'failed' && job.error_code && (
+                        <span className={styles.muted}>
+                          {job.error_code === 'source_busy'
+                            ? t('The source asked us to wait.')
+                            : t('The transfer did not complete.')}
+                        </span>
+                      )}
+                      {finished && job.result?.disposition === 'existing_retained' && (
+                        <span className={styles.muted}>{t('A copy was already in the library; it was kept.')}</span>
+                      )}
+                      {finished && job.result?.disposition === 'already_imported' && (
+                        <span className={styles.muted}>{t('This book was already imported.')}</span>
+                      )}
+                    </p>
+                  </div>
+                  <div className={styles.jobActions}>
+                    {/* Only a receipt produces a link, and only for books this
+                        account is actually allowed to see. */}
+                    {job.result?.book_ids.map((id) => (
+                      <Link key={id} href={`/book/${id}`} className={styles.primaryLink}>
+                        {t('Open book')}
+                      </Link>
+                    ))}
+                    {job.state === 'failed' && (
+                      <button
+                        type="button"
+                        className={styles.secondary}
+                        disabled={retry.isPending}
+                        onClick={() => retry.mutate(job.id)}
+                      >
+                        {t('Try again')}
+                      </button>
+                    )}
+                    {cancellable && !job.cancel_requested && (
+                      <button
+                        type="button"
+                        className={styles.secondary}
+                        disabled={cancel.isPending}
+                        onClick={() => cancel.mutate(job.id)}
+                      >
+                        <X size={14} aria-hidden="true" focusable={false} />
+                        <span>{t('Cancel')}</span>
+                      </button>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+    </div>
+  );
+}
+
+function CatalogView({ catalog, canAcquire, requestsPaused, pendingOffer, onOpen, onRequest }: {
+  catalog: AcquisitionCatalog;
+  canAcquire: boolean;
+  requestsPaused: boolean;
+  pendingOffer?: string;
+  onOpen: (nav: AcquisitionNavigation) => void;
+  onRequest: (offerId: string, format: string) => void;
+}) {
+  const t = useT();
+  const sections = [
+    { title: '', publications: catalog.publications, navigation: catalog.navigation },
+    ...catalog.groups,
+  ].filter((section) => section.publications.length || section.navigation.length);
+
+  if (!sections.length) {
+    return <EmptyState icon={FolderOpen} message={t('This catalog page is empty.')} />;
+  }
+
+  return (
+    <>
+      {catalog.facets.map((facet) => (
+        <section key={facet.title} className={styles.facet}>
+          <h2>{facet.title || t('Filter')}</h2>
+          <ul className={styles.navList} role="list">
+            {facet.navigation.map((nav) => (
+              <li key={nav.selection}>
+                <button type="button" className={styles.navChip} onClick={() => onOpen(nav)}>{nav.title}</button>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+
+      {sections.map((section, index) => (
+        <section key={section.title || `section-${index}`} className={styles.section}>
+          {section.title && <h2>{section.title}</h2>}
+          {section.navigation.length > 0 && (
+            <ul className={styles.navList} role="list">
+              {section.navigation.map((nav) => (
+                <li key={nav.selection}>
+                  <button type="button" className={styles.navChip} onClick={() => onOpen(nav)}>
+                    {nav.title || t('Browse')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {section.publications.length > 0 && (
+            <ul className={styles.publications} role="list">
+              {section.publications.map((publication) => (
+                <PublicationCard
+                  key={publication.identity}
+                  publication={publication}
+                  canAcquire={canAcquire}
+                  requestsPaused={requestsPaused}
+                  pendingOffer={pendingOffer}
+                  onOpen={onOpen}
+                  onRequest={onRequest}
+                />
+              ))}
+            </ul>
+          )}
+        </section>
+      ))}
+
+      {catalog.pagination.length > 0 && (
+        <nav className={styles.pagination} aria-label={t('Catalog pages')}>
+          {catalog.pagination.map((nav) => (
+            <button key={nav.selection} type="button" className={styles.secondary} onClick={() => onOpen(nav)}>
+              {nav.title || nav.relations.join(' ')}
+            </button>
+          ))}
+        </nav>
+      )}
+    </>
+  );
+}
+
+function PublicationCard({ publication, canAcquire, requestsPaused, pendingOffer, onOpen, onRequest }: {
+  publication: AcquisitionPublication;
+  canAcquire: boolean;
+  requestsPaused: boolean;
+  pendingOffer?: string;
+  onOpen: (nav: AcquisitionNavigation) => void;
+  onRequest: (offerId: string, format: string) => void;
+}) {
+  const t = useT();
+  const authors = publication.authors.join(', ');
+  return (
+    <li className={styles.publication}>
+      <h3>{publication.title}</h3>
+      {authors && <p className={styles.authors}>{authors}</p>}
+      {publication.languages.length > 0 && (
+        <p className={styles.muted}>{publication.languages.join(', ')}</p>
+      )}
+      {publication.description && <p className={styles.description}>{publication.description}</p>}
+
+      {publication.offers.length > 0 ? (
+        <div className={styles.offers}>
+          {publication.offers.map((offer) => (
+            <button
+              key={offer.identity}
+              type="button"
+              className={styles.primary}
+              disabled={requestsPaused || pendingOffer === offer.offer_id}
+              onClick={() => onRequest(offer.offer_id, offer.format)}
+            >
+              {canAcquire
+                ? <Download size={15} aria-hidden="true" focusable={false} />
+                : <Send size={15} aria-hidden="true" focusable={false} />}
+              <span>
+                {canAcquire
+                  ? t('Download {format}', { format: offer.format })
+                  : t('Request {format}', { format: offer.format })}
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        // Buy / borrow / preview / templated links are deliberately not offered
+        // here: they are not a complete file this server can import.
+        <p className={styles.muted}>{t('No EPUB or PDF available from this catalog.')}</p>
+      )}
+
+      {publication.navigation.length > 0 && (
+        <ul className={styles.navList} role="list">
+          {publication.navigation.map((nav) => (
+            <li key={nav.selection}>
+              <button type="button" className={styles.navChip} onClick={() => onOpen(nav)}>
+                {nav.title || t('More')}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </li>
+  );
+}

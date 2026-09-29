@@ -380,11 +380,11 @@ function CustomColumnInput({ column, values, onChange }: {
         onChange={(e) => onChange(key + high, e.target.value)} />
     </div>
   );
-  const choice = (options: { value: string; label: string }[]) => (
+  const choice = (options: { value: string; text: string }[]) => (
     <select className={styles.input} value={value()} aria-label={column.name}
       onChange={(e) => onChange(key, e.target.value)}>
       <option value="">{t('Any')}</option>
-      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      {options.map((o) => <option key={o.value} value={o.value}>{o.text}</option>)}
     </select>
   );
 
@@ -396,14 +396,14 @@ function CustomColumnInput({ column, values, onChange }: {
       return range('date', '_start', '_end');
     case 'bool':
       return choice([
-        { value: 'True', label: t('Yes') },
-        { value: 'False', label: t('No') },
-        { value: 'Empty', label: t('Empty') },
+        { value: 'True', text: t('Yes') },
+        { value: 'False', text: t('No') },
+        { value: 'Empty', text: t('Empty') },
       ]);
     case 'enumeration':
-      return choice((column.enum_values ?? []).map((v) => ({ value: v, label: v })));
+      return choice((column.enum_values ?? []).map((v) => ({ value: v, text: v })));
     case 'rating':
-      return choice(CC_STARS.map((r) => ({ value: r, label: '★'.repeat(Number(r)) })));
+      return choice(CC_STARS.map((r) => ({ value: r, text: '★'.repeat(Number(r)) })));
     default:
       return (
         <input className={styles.input} value={value()} aria-label={column.name}

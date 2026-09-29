@@ -16,6 +16,236 @@ is for things you can see or feel when running the app.
 
 ## [Unreleased]
 
+## [v4.1.45] - 2026-09-29
+
+### Added
+
+- **Magic Shelves can filter on when a book was last modified.** "Last
+  Modified" now sits next to Date Added and Publication Date in the rule
+  builder, in both the classic and the New UI, with the same options, including
+  "in the last N days". A shelf of books updated in the last 30 days keeps
+  moving on its own, which suits web serials and other books that are re-fetched
+  as new chapters come out. Last Modified changes whenever a book's metadata,
+  cover or files change, so a bulk edit or metadata fetch moves every book it
+  touches into such a shelf. Custom date columns in the classic builder now get
+  the same date-format hint and check as the built-in date fields. Thanks to
+  @trallen. (#2364)
+
+- **The New UI's Advanced search can filter on custom columns.** Every
+  custom column you can see gets a field, the same ones the classic search
+  has: a From/To range for numbers and dates, Yes/No/Empty for Yes/No
+  columns, the column's own values for fixed lists, a star count for ratings,
+  and "contains" for text. The criteria stay in the page address and in a
+  saved default library view. Reported in #2365.
+
+- **Book covers in the new UI show which shelves each book is on.** The
+  classic library grid put a shelf tag on each cover, and the new UI never
+  did, so the only way to see where a book was filed was to open "Add to
+  shelf" on it. Covers now carry up to two shelf names in the top corner, with
+  a "+N" tag naming any others. You only see your own shelves and public ones;
+  another reader's private shelf is never shown. On a shelf's own page that
+  shelf's tag is left out. **View settings → Show shelf tags** turns them off,
+  and it is the same setting as the classic grid's "Hide shelf badges on
+  covers", so both views agree. Requested by @lguerard (#1254) and through the
+  feedback form (#2261).
+
+- **Calibre-Web NextGen is now fully translated into Slovak.** Every remaining
+  string in the Slovak catalog — the new interface, My Library, magic and
+  smart shelves, Kobo and KOReader pairing, cover designer, duplicates manager,
+  annotations and the NextGen admin pages — is translated. Existing Slovak
+  strings were aligned with the Calibre-Web-Automated Slovak translation, which
+  also fixes a number of typos and missing diacritics.
+
+### Changed
+
+- **Reverse-proxy headers are believed only from where a proxy sits.** CWNG
+  reads the client's address, scheme and host from `X-Forwarded-For`,
+  `X-Forwarded-Proto` and the other proxy headers. It now does so only when the
+  connection comes from this host, a private network (the docker network, your
+  LAN) or a Tailscale tailnet. Anything else is taken at its own address. Most
+  setups need no change. If your proxy reaches CWNG from a public address, add
+  it to the new `TRUSTED_PROXY_NETWORKS` setting. The common case is
+  Cloudflare's proxy forwarding straight to the container, with no proxy of
+  your own in between. Set it to `*` to trust every peer as before. The log
+  names any peer whose proxy headers are ignored. Write `private` in the list
+  to keep the default networks alongside your proxy.
+
+### Fixed
+
+- **Reading in the web reader now updates your progress on Hardcover.** Before, only a Kobo or KOReader reached Hardcover; reading in the browser moved your place on your devices but not there. With Hardcover sync on and your own API key set, your place goes to Hardcover in the background as you read, with the same limits as your devices: a book needs a `hardcover-id`, page progress needs an edition, and a place behind one your devices already reported isn't sent. Also, a book you finish at 99% or more (where CWNG already counts it as finished) is now marked Read on Hardcover. Before, it stayed on "Currently Reading". Thanks to @ashtakom (#2289).
+
+- **"Force full kobo sync" is back, now in the new UI.** When Kobo pairing moved to Account → E-readers, the button that makes your Kobo receive your whole library again stayed behind on the classic profile page. It's now under the Stock Kobo sync URL on the e-reader page. It asks before it does anything, and your Kobo gets every book again on its next sync. Admins still use the classic user page to do this for another user. Thanks to @Glennza1962 (#2334).
+
+- **The top bar no longer scrolls away on the Devices pages.** On
+  Account → Devices and browsers (and each device's page) the top bar scrolled
+  off with the page while the sidebar stayed put, leaving an empty band above
+  it. The bar now stays at the top like everywhere else, and keyboard focus
+  still stops below it on long device lists. (#2341)
+
+- **"Pin sidebar" moved to the foot of the sidebar.** In the collapsed desktop
+  sidebar it left an empty slot above Library; it now sits at the bottom and
+  stays in reach while a long sidebar scrolls. (#2341)
+
+- **Paging a device's library keeps your place.** Next and Previous in a
+  device's library list used to drop keyboard focus and leave the page
+  scrolled to wherever the pager had been. Now you land on the new page's
+  status line, at the top of the device card. (#2341)
+
+- **"Recent" no longer lists every book you have finished first.** The Library's
+  Recent order is meant to put the books you are reading on top, then everything
+  else newest added. It was also counting finished books as "reading", so anyone
+  with a long reading history had to scroll past all of them to reach anything
+  unread. A finished book now takes its date-added place with the rest, and
+  starting it over brings it back to the top. When read status is kept in a
+  Calibre Yes/No column, that column decides what counts as finished. (#2360)
+
+- **"Edit default view" opens the form on your saved view.** It used to open
+  an empty search form.
+
+- **Split libraries: importing a book no longer logs "Error generating book checksums: no such table: books" or leaves an empty `metadata.db` in your book folder.** With KOReader sync on and book files stored separately from the library database, the post-import step looked for the database in the book folder, so new books had no KOReader sync checksums until the next container restart filled them in. The empty (0-byte) `metadata.db` that earlier imports left in the book folder is safe to delete. Reported and first fixed by @sgreadly (#2371, #2372).
+
+- **Adding a book to a user's library from User administration now confirms it
+  where you added it.** The confirmation used to appear at the top of the page,
+  off-screen by the time you had scrolled to that user's card, so the add looked
+  silent. It now shows next to the "Add book to this library" button in that
+  user's card. Reported by @vinxa.
+
+- **Edit metadata is back on the book page's button row.** In the new UI the
+  row showed Edit cover and hid Edit metadata inside the gear menu, so the
+  more common edit took two clicks. Anyone who can edit a book now gets Edit
+  metadata in the row; Edit cover stays in the gear menu and on the metadata
+  editor. A reader who can only change their own cover still sees Edit cover
+  in the row. Reported by @magdalar (#2338).
+
+- **Installs outside Docker can set their Calibre library from the Database
+  Configuration page again.** On a native Windows or bare-metal install the
+  "Location of Calibre Database" field was read-only and its folder button did
+  nothing, so a first run had no way to point the app at a library short of
+  editing `app.db` by hand. The field is now locked only inside the container,
+  where the startup library scan picks the library on every boot; elsewhere,
+  and in the container when `DISABLE_LIBRARY_AUTOMOUNT=true`, you can type the
+  path or browse to it. Reported by @Rol3333 (#2343).
+
+- **Deleting a user now removes everything the server kept for that
+  account.** The account's e-readers and browsers (with their names and
+  sync records), KOReader reading positions, magic shelves, favourites,
+  personal covers, cover-design presets, linked sign-in providers and
+  notices used to stay behind after an admin deleted the user. They are now
+  deleted with it. A public shelf or magic shelf the user owned is deleted
+  too, as public shelves always were, along with other readers' hidden or
+  cached copies of it. Deleting a book now also removes the delivery records
+  that belonged to its highlights on each e-reader.
+
+- **Removing several files from a KOReader device now takes one sync, not one sync per file.** Marking multiple files for removal on the Devices page and then running "Sync now" in the CWNGSync plugin removed only one of them; each later sync removed one more. The plugin now works through the whole removal queue in a single sync (up to 50 files at a time, with the rest picked up on the next sync). A file the device declines to remove is reported back and no longer holds up the others. Reported in [#2328](https://github.com/new-usemame/Calibre-Web-NextGen/issues/2328) by @magdalar.
+
+- **Books with a lone "—" or "©" in their metadata no longer come out of import with garbled text like "Ghostâ€”Spectres".** With the Kindle EPUB fixer on, a book whose metadata file (or stylesheet) had no encoding declaration and contained just one character like an em dash or a copyright sign could be misread, so a title such as "Ghost—Spectres" was saved as "Ghostâ€”Spectres" in your library and in the book's folder name. With the fixer's aggressive mode on, accented titles such as "Café" could be damaged the same way ("Caf√©"). Text like this is now read as the UTF-8 it is. Books already imported this way keep the damaged text until you fix the title or import them again from the original file. Thanks to @sgreadly for the report and the fix.
+
+- **Moving your library no longer makes Kobos download their books again.**
+  Copying a library to a new disk without keeping file times, or moving the
+  server to a new address, used to mark every book on a Kobo as changed the
+  next time it synced after an interrupted sync or a shelf edit, and the Kobo
+  then downloaded each one again. Books you have really edited, a new cover
+  included, still update on the device.
+
+- **Undated books are no longer re-sent to Kobo when the server's Python version or operating system changes.**
+  Books with no publication date were described to Kobo slightly differently
+  depending on the Python version and operating system running the server, so
+  moving an install (for example from a Mac source install to the Docker image)
+  made every Kobo re-download those books and lose its place in them. The dates
+  are now written the same way everywhere, and a Kobo that last synced with the
+  other form keeps its books.
+
+- **Two e-readers set up by copying the koreader folder no longer show up as
+  one device.** Copying KOReader's settings from one Kindle or Kobo to another
+  also copied its sync ID, so the server merged both e-readers into one device
+  and each skipped the other's reading progress as its own. The CWNG Sync
+  plugin now notices when its settings came from a different e-reader, gives
+  that e-reader its own ID, and says so once. Other KOReader devices keep
+  their ID unchanged. E-readers set up by copying before this update still
+  share an ID: delete the `["device_id"]` line from `koreader/settings.reader.lua`
+  on one of them, as described in #2351. (#2351, reported by @befeil)
+
+- **KOReader no longer freezes while it collects books sent from the website.**
+  When several books were waiting, KOReader downloaded them back to back and
+  ignored taps until the last one arrived. It now reads taps between books
+  (#2329).
+
+- **KOReader no longer freezes when you turn on Library mode.** Library mode
+  downloaded a placeholder for every book one after another, and KOReader
+  read no taps until the last one arrived. On Android that looked like
+  "KOReader isn't responding". KOReader now reads taps between downloads.
+  Progress is saved every few books, so restarting KOReader no longer starts
+  the download over. Placeholders are no longer counted as books on the
+  device's page, even after a restart. Turning Library mode on from the menu
+  now leaves your home folder alone, and turning it off restores the home
+  folder settings that setup changed. Reported by @magdalar (#2329).
+
+- **Sign-in and Kobo sync keep working when the rate limiter's external store goes down.**
+  With the limiter pointed at Redis or Memcached, an outage of that store made
+  every Kobo sync fail with "too many requests", refused web sign-ins with
+  "contact your administrator", and could answer a right password with a server
+  error. The limits now carry on in the server's own memory until the store
+  comes back, so everyone can still sign in and repeated wrong passwords are
+  still slowed down.
+
+- **An e-reader moved to another account now registers there.** A KOReader
+  device or Kobo that was used with one account and then paired to another on
+  the same server was refused as a device for the new account, so Send to
+  device, its device page, the book list it reports and removing books from it
+  all failed. Each account now gets its own entry for the reader. Switching
+  back finds the first account's entry again with its name and history, and
+  neither account can see or change the other's.
+
+- **Turning a page while a book opens no longer loses your place from your
+  e-reader.** When a book had a KOReader or Kobo position and the New UI reader
+  opened it at the start while it worked out where that position was, a page
+  turn in those first seconds saved the start of the book as your place, and
+  the reader never took you to the synced position again. Those early page
+  turns now wait for the jump, which still happens. If you pick a chapter,
+  link, highlight or search result in that time, the reader keeps your choice
+  and offers the synced position instead.
+
+- **A settings page that fails validation no longer undoes a background
+  task's progress.** Reloading settings after a rejected change now reads
+  what is stored, so a finished KEPUB repair or backfill is not scheduled to
+  run again in the same session.
+
+- **Saving settings works again after the server recovers from a database
+  error.** Once the web session had to be reset after a failed rollback, every
+  admin settings save failed until the server was restarted.
+
+- **A local-only account can sign in to the New UI when LDAP cannot.** The
+  `/app/` sign-in endpoint now falls back to the stored local password after
+  the directory rejects the account or cannot be reached, matching the classic
+  `/login` form, so an administrator of an LDAP instance is not locked out
+  during a directory outage. Reported by @justemu.
+
+- **KOReader sync and OPDS sign-ins now slow down password guessing without
+  locking out your devices.** A device or app that keeps sending *different*
+  wrong passwords for an account is refused for a minute after three. A device
+  stuck on an old or revoked password is sending the same wrong password each
+  time, so it gets "wrong password", never a lockout. Your other devices, and a
+  right password on the same home network, keep signing in straight away.
+  Devices that sign in with an app password are never slowed. A sign-in your
+  LDAP directory could not answer because it was down is not counted, so the
+  right password works as soon as the directory is back; the same goes for a
+  directory user's first OPDS sign-in when creating their account fails.
+  Before, KOReader sync did not slow wrong passwords at all. OPDS paced every
+  sign-in to an account together, so one misconfigured reader app could keep
+  the account's other OPDS apps waiting.
+
+- **Books copied onto the server by a sync tool now appear without "Reconnect
+  Calibre Database".** Tools such as rsync, Syncthing and NAS sync apps replace
+  `metadata.db` with a new file, and the server kept reading the old one until
+  someone reconnected by hand. The server now notices the replaced file within
+  a few seconds and switches to it on its own (#2291, thanks @Dirk71).
+
+- **Long-running servers no longer creep towards "too many open files".**
+  Each run of a background task (thumbnails, temp-folder cleanup, KEPUB
+  repair, annotation backup and sync, conversions) opened a fresh connection
+  pool to the app database, and many of those connections stayed open until the
+  server restarted. Each task's connection now closes when the task finishes.
+
 ## [v4.1.44] - 2026-09-26
 
 ### Added

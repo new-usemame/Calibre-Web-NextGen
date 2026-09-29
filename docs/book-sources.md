@@ -4,13 +4,24 @@ Find books connects an administrator's catalogs to CWNG's library. Accounts with
 
 This feature is off by default. Existing accounts and library selections do not gain acquisition permissions automatically.
 
+Both screens live in the New UI only. The classic interface has no book-sources
+panel and no **Find books** entry, so an administrator working in classic sees
+the feature exactly as an account without access does: not at all. That is
+deliberate rather than unfinished. The feature talks to the `/api/v1`
+acquisition routes and gates its navigation on the `acquisition_access` flag
+from `/me`, neither of which the classic templates consume; a classic twin
+would mean a second set of routes handling remote fetches, stored credentials
+and ingest, which is the part of this feature least worth duplicating. It
+follows the same pattern as the New UI's device administration.
+
 ## Connect a catalog
 
-1. Open **Administration → Find books · Beta → Manage book sources**.
-2. Add a connection with a name and an **OPDS catalog URL**. Select no authentication, HTTP Basic, or Bearer authentication as required by the catalog. Enter the credentials your catalog supplies.
-3. Test the connection, then enable it. A successful catalog test confirms that CWNG can read the catalog; it does not download a book.
-4. Enable the Beta feature and grant the intended accounts access. Grant direct imports only to accounts that should bypass approval. Other accounts can submit requests for an administrator to approve.
-5. Open **Find books**, select the catalog, and browse or search when the catalog advertises search. Choose a file format and add it to the library or submit a request.
+1. Open **Administration → Book sources**.
+2. Switch on **Allow requests from book sources**. Nothing is fetched and no account gains a permission until you do.
+3. Add a catalog with a name and an **OPDS catalog address**. Select no sign-in, username and password, or a token, as the catalog requires.
+4. Choose **Test connection**, then mark the catalog **Available to users**. A successful test confirms only that CWNG can read the catalog; it does not download a book.
+5. Under **Who can use it**, grant the intended accounts **Can browse and request**. Add **No approval needed** only for accounts that should bypass approval; everyone else's requests appear under **Waiting for approval** for an administrator to approve.
+6. The granted account opens **Find books**, selects the catalog, and browses or searches when the catalog advertises search. They choose a format, and the book is requested or imported according to their permission.
 
 New connections start disabled. The setup page reports runtime problems such as an unavailable ingest service, a missing connection key, or no supported file formats. Correct those before requesting imports. This Beta requires CWNG's container ingest service and existing background scheduler.
 

@@ -77,6 +77,25 @@ def _books_session():
     return sessionmaker(bind=engine)()
 
 
+def _fields_offering_relative_dates():
+    schema = magic_shelf.build_rule_schema()
+    return [field["id"] for field in schema["fields"] if "in_last_days" in field["operators"]]
+
+
+@pytest.mark.unit
+def test_every_field_offered_a_relative_window_is_one_the_engine_filters():
+    # Both rule builders offer "in the last N days" wherever the schema lists it.
+    # A field the engine then declines is a rule that saves fine and is silently
+    # dropped from the shelf's query, so the offer and the engine must stay one list.
+    offered = _fields_offering_relative_dates()
+    assert set(offered) >= {"timestamp", "pubdate", "last_modified"}
+    for field_id in offered:
+        for operator in ("in_last_days", "not_in_last_days"):
+            assert magic_shelf.build_filter_from_rule(
+                {"id": field_id, "operator": operator, "value": "30"}
+            ) is not None, (field_id, operator)
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize("field_id", ["timestamp", "pubdate", "last_modified"])
 def test_relative_date_rules_filter_real_rows(field_id):

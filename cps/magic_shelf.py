@@ -526,6 +526,13 @@ def system_magic_shelf_display_name(shelf):
 # field cannot silently leave one UI behind.
 FIELD_MAP = {definition['id']: definition['_binding'] for definition in _NATIVE_RULE_FIELDS}
 
+# Native fields the builders offer "in the last N days" for. Derived from the
+# same definitions so a date field added there is filtered, not silently dropped.
+_RELATIVE_DATE_FIELDS = frozenset(
+    definition['id'] for definition in _NATIVE_RULE_FIELDS
+    if 'in_last_days' in definition['operators']
+)
+
 # Mapping from UI operators to SQLAlchemy functions/operators
 OPERATOR_MAP = {
     # 'equals': lambda col, val: col == val,  # Not used by QueryBuilder
@@ -581,7 +588,7 @@ def build_filter_from_rule(rule, user_id=None):
     # Relative date windows requested in #467. Store the duration, not a
     # frozen date, so the shelf keeps moving without an edit or migration.
     if operator_name in ('in_last_days', 'not_in_last_days'):
-        if field_name not in ('pubdate', 'timestamp', 'last_modified'):
+        if field_name not in _RELATIVE_DATE_FIELDS:
             return None
         if isinstance(value, bool):
             return None

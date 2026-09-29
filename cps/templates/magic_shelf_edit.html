@@ -582,6 +582,10 @@ $(function() {
     // Query Builder Configuration
     var ruleSchema = JSON.parse(document.getElementById('magic-shelf-rule-schema').textContent);
     var fields = ruleSchema.fields;
+    // Fields whose values are YYYY-MM-DD dates, straight from the schema.
+    var dateFieldIds = fields.filter(function(field) {
+        return field.validation && field.validation.format === 'YYYY-MM-DD';
+    }).map(function(field) { return field.id; });
     var operators = ruleSchema.operators;
     var operatorLabels = {};
     operators.forEach(function(operator) {
@@ -622,7 +626,7 @@ $(function() {
         // Check all filter dropdowns for date fields
         $('#builder .rule-filter-container select').each(function() {
             var filterId = $(this).val();
-            if (filterId === 'pubdate' || filterId === 'timestamp' || filterId === 'last_modified') {
+            if (dateFieldIds.indexOf(filterId) !== -1) {
                 hasDateField = true;
                 return false; // break out of each loop
             }
@@ -654,7 +658,7 @@ $(function() {
             var $rule = $input.closest('.rule-container');
             var filterId = $rule.find('.rule-filter-container select').val();
             
-            if (filterId === 'pubdate' || filterId === 'timestamp' || filterId === 'last_modified') {
+            if (dateFieldIds.indexOf(filterId) !== -1) {
                 var operator = $rule.find('.rule-operator-container select').val();
                 if (operator === 'in_last_days' || operator === 'not_in_last_days') return;
                 $input.off('blur.dateValidation').on('blur.dateValidation', function() {

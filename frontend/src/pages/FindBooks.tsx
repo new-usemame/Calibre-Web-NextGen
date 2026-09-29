@@ -5,12 +5,13 @@ import {
   AlertTriangle, BookOpen, ChevronRight, Download, FolderOpen, Search, Send, X,
 } from 'lucide-react';
 import {
-  ACQUISITION_ACTIVE_STATES,
+  ACQUISITION_CANCELLABLE_STATES,
   cancelAcquisitionJob,
   createAcquisitionJob,
   getAcquisitionBootstrap,
   getAcquisitionCatalog,
   getAcquisitionJobs,
+  isAcquisitionPending,
   retryAcquisitionJob,
   type AcquisitionCatalog,
   type AcquisitionJob,
@@ -57,7 +58,7 @@ function useRuntimeReasonText(): (reason: string) => string {
 function useJobStateText(): (job: AcquisitionJob) => { label: string; tone: 'active' | 'ok' | 'bad' | 'muted' } {
   const t = useT();
   return useCallback((job: AcquisitionJob) => {
-    if (job.cancel_requested && ACQUISITION_ACTIVE_STATES.has(job.state)) {
+    if (job.cancel_requested && isAcquisitionPending(job.state)) {
       return { label: t('Cancelling…'), tone: 'muted' as const };
     }
     switch (job.state) {
@@ -72,8 +73,7 @@ function useJobStateText(): (job: AcquisitionJob) => { label: string; tone: 'act
       case 'importing': return { label: t('Importing'), tone: 'active' as const };
       case 'imported': return { label: t('In your library'), tone: 'ok' as const };
       case 'failed': return { label: t('Failed'), tone: 'bad' as const };
-      case 'cancelled': return { label: t('Cancelled'), tone: 'muted' as const };
-      case 'source_busy': return { label: t('Waiting for source'), tone: 'active' as const };
+      case 'cancelled': return { label: t('Request cancelled'), tone: 'muted' as const };
       default: return { label: job.state, tone: 'muted' as const };
     }
   }, [t]);
@@ -100,6 +100,9 @@ export function FindBooks() {
   const [draftQuery, setDraftQuery] = useState('');
   const [addToMyLibrary, setAddToMyLibrary] = useState(true);
   const [requestError, setRequestError] = useState<string | null>(null);
+  // Cancel and retry act on the activity list, which is far down the page from
+  // the catalog, so their failures get their own line next to the jobs.
+  const [activityError, setActivityError] = useState<string | null>(null);
 
   // One idempotency key per offer for the lifetime of the page. A double-click,
   // or a retry after an ambiguous 5xx, therefore resolves to the SAME job on the
@@ -152,10 +155,12 @@ export function FindBooks() {
   const jobs = useQuery({
     queryKey: ['acquisition', 'jobs'],
     queryFn: getAcquisitionJobs,
-    // Only poll while the server still owes an answer, so an idle page is quiet.
+    // Only poll while the server still owes an answer, so an idle page is
+    // quiet. "Owes an answer" includes `awaiting_approval`: the administrator
+    // may approve at any moment and the user must see it without reloading.
     refetchInterval: (query) => {
       const rows = query.state.data?.jobs ?? [];
-      return rows.some((job) => ACQUISITION_ACTIVE_STATES.has(job.state)) ? 3000 : false;
+      return rows.some((job) => isAcquisitionPending(job.state)) ? 3000 : false;
     },
   });
 
@@ -191,11 +196,30 @@ export function FindBooks() {
 
   const cancel = useMutation({
     mutationFn: cancelAcquisitionJob,
-    onSuccess: () => { invalidateJobs(); announce(t('Cancelling…')); },
+    onSuccess: () => { setActivityError(null); invalidateJobs(); announce(t('Cancelling…')); },
+    onError: (error) => {
+      // A 409 means the job moved on while the button was on screen — the
+      // refetch below replaces the row with its real state.
+      setActivityError(errorCode(error) === 'conflict'
+        ? t('That request has already moved on and can no longer be stopped.')
+        : t('The request could not be stopped.'));
+      invalidateJobs();
+    },
   });
   const retry = useMutation({
     mutationFn: retryAcquisitionJob,
-    onSuccess: () => { invalidateJobs(); announce(t('Retrying.')); },
+    onSuccess: () => { setActivityError(null); invalidateJobs(); announce(t('Retrying.')); },
+    onError: (error) => {
+      const code = errorCode(error);
+      setActivityError(
+        code === 'forbidden'
+          ? t('This request needs an administrator to approve it again.')
+          : code === 'conflict'
+            ? t('That request is no longer in a state that can be retried.')
+            : t('The request could not be retried.'),
+      );
+      invalidateJobs();
+    },
   });
 
   const runtime = bootstrap.data?.runtime;
@@ -300,7 +324,7 @@ export function FindBooks() {
 
           {trail.length > 0 && (
             <nav className={styles.crumbs} aria-label={t('Catalog trail')}>
-              <button type="button" onClick={() => setTrail([])}>{t('Top')}</button>
+              <button type="button" onClick={() => setTrail([])}>{t('Top of catalog')}</button>
               {trail.map((step, index) => (
                 <span key={`${step.selection ?? 'root'}-${index}`} className={styles.crumb}>
                   <ChevronRight size={14} aria-hidden="true" focusable={false} />
@@ -360,6 +384,7 @@ export function FindBooks() {
 
       <section className={styles.activity} aria-labelledby="acquisition-activity">
         <h2 id="acquisition-activity">{t('Your requests')}</h2>
+        {activityError && <p className={styles.error} role="alert">{activityError}</p>}
         {jobs.isLoading ? <SpinnerCentered size={24} /> : !jobs.data?.jobs.length ? (
           <p className={styles.muted}>{t('Nothing requested yet.')}</p>
         ) : (
@@ -367,7 +392,9 @@ export function FindBooks() {
             {jobs.data.jobs.map((job) => {
               const state = jobStateText(job);
               const finished = job.state === 'imported';
-              const cancellable = ACQUISITION_ACTIVE_STATES.has(job.state) || job.state === 'awaiting_approval';
+              // Only where the server will actually accept it, so the button
+              // never produces a 409 the user did not ask for.
+              const cancellable = ACQUISITION_CANCELLABLE_STATES.has(job.state);
               return (
                 <li key={job.id} className={styles.job} data-state={job.state}>
                   <div className={styles.jobMain}>

@@ -18,6 +18,7 @@ import {
 } from '../lib/acquisition';
 import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
+import { useMe } from '../lib/queries';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { SpinnerCentered } from '../components/Spinner';
 import styles from './AdminAcquisition.module.css';
@@ -33,6 +34,11 @@ const EMPTY_CONNECTION: AcquisitionConnectionInput & { label: string } = {
   label: '', endpoint: '', auth_kind: 'none', username: '', secret: '',
 };
 
+/** Where a failed action's message belongs. Each one is rendered beside the
+ *  control that caused it: a message at the top of the page for a switch far
+ *  down it is a message the administrator does not connect to what they did. */
+type ActionScope = 'feature' | 'connection' | 'grant' | 'queue';
+
 export function AdminAcquisition() {
   const t = useT();
   const announce = useAnnouncer();
@@ -41,10 +47,22 @@ export function AdminAcquisition() {
 
   const [draft, setDraft] = useState(EMPTY_CONNECTION);
   const [formError, setFormError] = useState<string | null>(null);
+  const [actionErrors, setActionErrors] = useState<Partial<Record<ActionScope, string>>>({});
   const [probes, setProbes] = useState<Record<string, AcquisitionProbe | { error: string }>>({});
+
+  const failed = (scope: ActionScope, message: string) =>
+    setActionErrors((current) => ({ ...current, [scope]: message }));
+  const succeeded = (scope: ActionScope) =>
+    setActionErrors((current) => {
+      if (!(scope in current)) return current;
+      const next = { ...current };
+      delete next[scope];
+      return next;
+    });
 
   const settings = useQuery({ queryKey: ['acquisition', 'admin', 'settings'], queryFn: getAcquisitionSettings });
   const connections = useQuery({ queryKey: ['acquisition', 'admin', 'connections'], queryFn: getAcquisitionConnections });
+  const { data: me } = useMe();
 
   const enabled = !!settings.data?.enabled;
   const migration = settings.data?.migration_status;
@@ -70,12 +88,21 @@ export function AdminAcquisition() {
   const toggleFeature = useMutation({
     mutationFn: setAcquisitionEnabled,
     onSuccess: (state) => {
+      succeeded('feature');
       queryClient.setQueryData(['acquisition', 'admin', 'settings'], state);
       refresh('grants', 'queue', 'connections');
       // The nav gate and the user page both read /me and the user bootstrap.
       void queryClient.invalidateQueries({ queryKey: ['me'] });
       void queryClient.invalidateQueries({ queryKey: ['acquisition', 'bootstrap'] });
       announce(state.enabled ? t('Book sources are on.') : t('Book sources are off.'));
+    },
+    onError: (error) => {
+      failed('feature', errorCode(error) === 'needs_review'
+        ? t('Legacy acquisition permissions need review before this can be switched on.')
+        : t('The setting could not be changed.'));
+      // The switch is drawn from server state, so re-read it rather than leave
+      // the checkbox showing a change that did not happen.
+      refresh('settings');
     },
   });
 
@@ -102,7 +129,13 @@ export function AdminAcquisition() {
   const toggleConnection = useMutation({
     mutationFn: (variables: { id: string; enabled: boolean }) =>
       setAcquisitionConnectionEnabled(variables.id, variables.enabled),
-    onSuccess: () => refresh('connections'),
+    onSuccess: () => { succeeded('connection'); refresh('connections'); },
+    onError: (error) => {
+      failed('connection', errorCode(error) === 'not_found'
+        ? t('That catalog no longer exists.')
+        : t('The catalog could not be changed.'));
+      refresh('connections');
+    },
   });
 
   const probe = useMutation({
@@ -124,18 +157,43 @@ export function AdminAcquisition() {
   const grant = useMutation({
     mutationFn: (variables: { id: number; access: boolean; auto_approve: boolean }) =>
       setAcquisitionGrant(variables.id, { access: variables.access, auto_approve: variables.auto_approve }),
-    onSuccess: () => refresh('grants'),
+    onSuccess: (_result, variables) => {
+      succeeded('grant');
+      refresh('grants');
+      // An administrator granting themselves access changes their own nav gate.
+      // /me is what decides whether "Find books" is there at all, so without
+      // this they would not see the entry until a reload.
+      if (me && variables.id === me.id) {
+        void queryClient.invalidateQueries({ queryKey: ['me'] });
+        void queryClient.invalidateQueries({ queryKey: ['acquisition', 'bootstrap'] });
+      }
+    },
+    onError: (error) => {
+      failed('grant', errorCode(error) === 'invalid_request'
+        ? t('An account cannot skip approval without also being allowed to request.')
+        : t('That permission could not be changed.'));
+      refresh('grants');
+    },
   });
 
   const approve = useMutation({
     mutationFn: approveAcquisitionJob,
-    onSuccess: () => { refresh('queue'); announce(t('Request approved.')); },
+    onSuccess: () => { succeeded('queue'); refresh('queue'); announce(t('Request approved.')); },
+    onError: (error) => {
+      const code = errorCode(error);
+      failed('queue',
+        code === 'forbidden' ? t('That account is no longer allowed to request books.')
+          : code === 'not_found' ? t('That request is no longer waiting.')
+            : t('The request could not be approved.'));
+      refresh('queue');
+    },
   });
 
   if (settings.isLoading) return <SpinnerCentered />;
 
   const runtime = settings.data?.runtime;
   const rows = connections.data?.connections ?? [];
+  const ownerNames = new Map((grants.data?.users ?? []).map((user) => [user.id, user.name]));
 
   return (
     <div className={styles.container}>
@@ -180,6 +238,8 @@ export function AdminAcquisition() {
           </span>
         </label>
 
+        {actionErrors.feature && <p className={styles.bad} role="alert">{actionErrors.feature}</p>}
+
         {runtime && (
           <p className={styles.status} data-ok={runtime.available}>
             {runtime.available
@@ -191,6 +251,8 @@ export function AdminAcquisition() {
 
       <section className={styles.card} aria-labelledby={`${formId}-connections`}>
         <h2 id={`${formId}-connections`}>{t('Catalogs')}</h2>
+
+        {actionErrors.connection && <p className={styles.bad} role="alert">{actionErrors.connection}</p>}
 
         {connections.isLoading ? <SpinnerCentered size={24} /> : rows.length === 0 ? (
           <p className={styles.hint}>{t('No catalogs yet.')}</p>
@@ -328,7 +390,9 @@ export function AdminAcquisition() {
         {!enabled ? (
           <p className={styles.hint}>{t('Turn the feature on to grant access.')}</p>
         ) : grants.isLoading ? <SpinnerCentered size={24} /> : (
-          <ul className={styles.grants} role="list">
+          <>
+            {actionErrors.grant && <p className={styles.bad} role="alert">{actionErrors.grant}</p>}
+            <ul className={styles.grants} role="list">
             {(grants.data?.users ?? []).map((user) => (
               <li key={user.id} className={styles.grantRow}>
                 <span className={styles.grantName}>{user.name}</span>
@@ -360,27 +424,43 @@ export function AdminAcquisition() {
                 </label>
               </li>
             ))}
-          </ul>
+            </ul>
+          </>
         )}
       </section>
 
       {enabled && (queue.data?.jobs.length ?? 0) > 0 && (
         <section className={styles.card} aria-labelledby={`${formId}-queue`}>
           <h2 id={`${formId}-queue`}>{t('Waiting for approval')}</h2>
+          {actionErrors.queue && <p className={styles.bad} role="alert">{actionErrors.queue}</p>}
           <ul className={styles.grants} role="list">
-            {(queue.data?.jobs ?? []).map((job) => (
-              <li key={job.id} className={styles.grantRow}>
-                <span className={styles.grantName}>{job.title || t('Untitled book')}</span>
-                <button
-                  type="button"
-                  className={styles.primary}
-                  disabled={approve.isPending}
-                  onClick={() => approve.mutate(job.id)}
-                >
-                  {t('Approve')}
-                </button>
-              </li>
-            ))}
+            {(queue.data?.jobs ?? []).map((job) => {
+              // Approving is a decision about a person as much as a book, so
+              // name the requester. The grants list is the only place their
+              // display name exists; an account removed since asking falls
+              // back to the id rather than silently reading as nobody.
+              const requester = ownerNames.get(job.owner_id);
+              return (
+                <li key={job.id} className={styles.grantRow}>
+                  <span className={styles.queueName}>
+                    {job.title || t('Untitled book')}
+                    <span className={styles.queueRequester}>
+                      {requester
+                        ? t('Requested by {name}', { name: requester })
+                        : t('Requested by a removed account')}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.primary}
+                    disabled={approve.isPending}
+                    onClick={() => approve.mutate(job.id)}
+                  >
+                    {t('Approve')}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

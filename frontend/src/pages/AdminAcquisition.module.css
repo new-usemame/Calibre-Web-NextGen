@@ -83,6 +83,14 @@
 }
 .grantName { font-size: var(--fs-sm); font-weight: var(--fw-medium); min-width: 0; overflow-wrap: anywhere; }
 
+/* A queued request is a book AND the person who asked for it, stacked so the
+   requester stays legible when the title wraps. */
+.queueName {
+  display: flex; flex-direction: column; gap: var(--sp-1); min-width: 0;
+  font-size: var(--fs-sm); font-weight: var(--fw-medium); overflow-wrap: anywhere;
+}
+.queueRequester { color: var(--text-muted); font-weight: var(--fw-normal); }
+
 .primary, .secondary {
   display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-1);
   min-height: 40px; padding: 0 var(--sp-3);

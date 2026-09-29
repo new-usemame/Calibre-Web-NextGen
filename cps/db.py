@@ -2493,29 +2493,6 @@ class CalibreDB:
         return (col_id in cc_classes
                 and col_id not in self.get_hierarchical_column_ids())
 
-    def hierarchical_cc_search_filter(self, col_id, term):
-        """Calibre-style search on a hierarchical column.
-
-        A term matches the node it names plus every descendant, so searching
-        'Computers' finds 'Computers.DB' — the same set the browse tree
-        links to. Resolved through the tree rather than a LIKE prefix, so
-        search and navigation cannot drift apart: 'ComputersX' never matches
-        'Computers', and a different-case 'computers.DB' stays under its own
-        node.
-
-        A term that names no node falls back to the plain substring search
-        rather than matching nothing, so a partially typed or misspelled
-        value still finds books.
-        """
-        cc = cc_classes.get(col_id)
-        if cc is None:
-            return false()
-        term = (term or '').strip()
-        node = hierarchy.get_node_by_path(self.get_hierarchical_tree(col_id), term)
-        if node is None:
-            return func.lower(cc.value).ilike("%" + term + "%")
-        return cc.value.in_(hierarchy.subtree_values(node))
-
     def get_hierarchical_column_ids(self, ttl=300):
         """Return the set of custom column ids that behave as hierarchies.
 

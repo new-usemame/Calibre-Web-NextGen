@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Link, useSearch } from 'wouter';
 import { ChevronLeft, ChevronRight, Folder, FolderOpen, Tag } from 'lucide-react';
 import { useColumns, useCcTree, useCcBooks, useMe } from '../lib/queries';
@@ -7,6 +7,7 @@ import { BookCard } from '../components/BookCard';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { useT } from '../lib/i18n';
+import { clampPage } from '../lib/pagination';
 import { canReadBooks } from '../lib/permissions';
 import { usePersistentBool } from '../lib/usePersistentBool';
 import styles from './CcBrowse.module.css';
@@ -136,20 +137,56 @@ function ColumnTree({ colId, selected, booksSlot }: {
 }
 
 /** Books under the selected node, paged. An empty `path` lists every book
- *  carrying any value in the column. */
+ *  carrying any value in the column.
+ *
+ *  Two failure modes this has to survive, both from holding the page in
+ *  component state while the node lives in the URL:
+ *
+ *  - The page belongs to the node it was requested for. `NodeBooks` stays
+ *    mounted when `path` changes (only the query key changes), so page 3 of a
+ *    large node used to carry over to a one-page node. The result was an empty
+ *    grid with NO pager at all — `last > 1` was false, so the Previous button
+ *    that would have walked the page back was not rendered either, leaving a
+ *    full reload as the only escape. The reset below puts the page back to 1
+ *    whenever the node changes; the clamp then self-heals a page that is out of
+ *    range for any other reason (a stale link, a result set that shrank).
+ *  - A failed request is not an empty result. `useCcBooks` rejects on any
+ *    non-2xx, and reading only `data` turned a 404 (or a 403, or a 500 from a
+ *    locked metadata.db) into "No books here yet", hiding the API's own error
+ *    message. The error is surfaced instead. */
 function NodeBooks({ colId, path, variant }: {
   colId: string; path: string; variant: 'section' | 'inset';
 }) {
   const t = useT();
   const [page, setPage] = useState(1);
-  const { data, isLoading, isFetching } = useCcBooks(colId, path, page);
+  // Render-phase state adjustment (React re-renders immediately, before
+  // paint, with no wasted fetch) rather than an effect, so the new node is
+  // never shown carrying the previous node's page.
+  const queryId = `${colId}\u0000${path}`;
+  const [lastQueryId, setLastQueryId] = useState(queryId);
+  if (lastQueryId !== queryId) {
+    setLastQueryId(queryId);
+    setPage(1);
+  }
+  const { data, isLoading, isFetching, isError, error } = useCcBooks(colId, path, page);
   const { data: me } = useMe();
-  if (!canReadBooks(me)) return null;
-  if (isLoading) return <SpinnerCentered size={40} />;
-  const items = data?.items ?? [];
   const total = data?.total ?? 0;
   const perPage = data?.per_page || 24;
   const last = Math.max(1, Math.ceil(total / perPage));
+  // Shared clamp, not a local Math.min: this is the same "the page you were
+  // reading no longer exists" case the other paginated surfaces handle, and
+  // one helper is one place to keep correct.
+  const clamped = clampPage(page, last);
+  useEffect(() => {
+    if (clamped !== page) setPage(clamped);
+  }, [clamped, page]);
+  if (!canReadBooks(me)) return null;
+  if (isLoading) return <SpinnerCentered size={40} />;
+  if (isError) {
+    return <EmptyState title={t('Could not load books')}
+      message={(error as Error | null)?.message || t('Please try again.')} />;
+  }
+  const items = data?.items ?? [];
   if (total === 0) {
     return <EmptyState title={t('No books here yet')}
       message={t('Nothing in this column matches the selected value.')} />;
@@ -162,17 +199,22 @@ function NodeBooks({ colId, path, variant }: {
         </span>
         <span className={styles.count}>{t('{count} books', { count: total })}</span>
       </div>
-      <ul className={variant === 'inset' ? styles.insetGrid : styles.grid}>
-        {items.map((book) => <li key={book.id}><BookCard book={book} /></li>)}
-      </ul>
+      {items.length === 0 ? (
+        <EmptyState title={t('Nothing on this page')}
+          message={t('This node has fewer pages than the one you were reading.')} />
+      ) : (
+        <ul className={variant === 'inset' ? styles.insetGrid : styles.grid}>
+          {items.map((book) => <li key={book.id}><BookCard book={book} /></li>)}
+        </ul>
+      )}
       {last > 1 && (
         <nav className={styles.pager} aria-label={t('Pagination')}>
-          <button type="button" disabled={page <= 1 || isFetching}
+          <button type="button" disabled={clamped <= 1 || isFetching}
             onClick={() => setPage((p) => Math.max(1, p - 1))}>
             <ChevronLeft size={16} aria-hidden="true" focusable={false} /> {t('Previous')}
           </button>
-          <span aria-current="page">{t('Page {page} of {last}', { page, last })}</span>
-          <button type="button" disabled={page >= last || isFetching}
+          <span aria-current="page">{t('Page {page} of {last}', { page: clamped, last })}</span>
+          <button type="button" disabled={clamped >= last || isFetching}
             onClick={() => setPage((p) => Math.min(last, p + 1))}>
             {t('Next')} <ChevronRight size={16} aria-hidden="true" focusable={false} />
           </button>

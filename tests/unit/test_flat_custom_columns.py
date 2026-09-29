@@ -246,41 +246,33 @@ def test_a_flat_node_matches_only_its_exact_value(library):
     assert books_for("77") == set(), "there is no LIKE here to over-match"
 
 
-# ── search ──────────────────────────────────────────────────────────────────
+# ── search stays a substring search ───────────────────────────────
 
 
-def test_search_on_a_hierarchical_column_covers_descendants(library):
-    """The term is resolved to a node, then to that node's EXACT stored values.
+def test_search_keeps_the_substring_match_on_every_text_column():
+    """Advanced search must NOT be narrowed by the browse work (SPA_fixes_01
+    finding 1).
 
-    The set is what matters, so it is read off the compiled expression: that is
-    the contract search and the browse tree share, and it is why a LIKE prefix
-    (which would drag in 'Artful' for the term 'Art') is not used.
+    Routing a hierarchical column through ``hierarchical_cc_search_filter``
+    changed two things a user could see. A term naming a node started matching
+    only that node's exact subtree, so "Computers" stopped finding "Old
+    Computers"; and because the term is resolved to a node by an exact-string
+    lookup before the fallback runs, "Computers" and "computers" reached
+    different code paths and returned different sets.
+
+    The coupling was one branch in one function, so it is pinned at the call
+    site rather than through the filter's own tests.
     """
-    calibre, _, _ = library
-    calibre.get_hierarchical_tree = lambda col_id, **kw: hierarchy.parse_tag_hierarchy([
-        (1, "Art"), (2, "Art.Painting"), (3, "Artful")])
+    code = _function_code("cps/search.py", "adv_search_custom_columns")
+    assert "is_flat_cc_column" not in code, (
+        "search must not branch on the hierarchy detector — whether a column "
+        "renders as a tree is the browse surface's decision, not search's")
+    assert "hierarchical_cc_search_filter" not in code, (
+        "search must not resolve a term to a tree node; that narrowed a "
+        "substring search to an exact-subtree one")
+    assert code.count("ilike") == 1, (
+        "one tag-like substring filter for every text/enumeration column")
 
-    def in_values(term):
-        expr = calibre.hierarchical_cc_search_filter(2, term)
-        sql = str(expr.compile(compile_kwargs={"literal_binds": True}))
-        return re.search(r"IN \(([^)]*)\)", sql).group(1)
-
-    # 'Artful' is a sibling root, not a descendant, so it must be absent.
-    assert in_values("Art") == "'Art', 'Art.Painting'"
-    assert in_values("Art.Painting") == "'Art.Painting'"
-    assert in_values("Artful") == "'Artful'"
-    assert "Artful" not in in_values("Art")
-
-
-def test_search_falls_back_to_a_substring_when_the_term_names_no_node(library):
-    """A partially typed or misspelled term must still find books rather than
-    silently matching nothing."""
-    calibre, _, _ = library
-    calibre.get_hierarchical_tree = lambda col_id, **kw: hierarchy.parse_tag_hierarchy(
-        [(1, "Art"), (2, "Art.Painting")])
-    expr = calibre.hierarchical_cc_search_filter(2, "Art.P")
-    sql = str(expr.compile(compile_kwargs={"literal_binds": True})).lower()
-    assert "like" in sql and "'%art.p%'" in sql, sql
 
 
 # ── enumeration is not gated on hierarchy ────────────────────────────────────
@@ -376,6 +368,64 @@ def test_the_classic_route_serves_both_modes(library, monkeypatch):
     # empty panel that promises children the value does not have.
     flat_branch = render[render.index("A flat node is an exact-value match"):]
     assert "subcategories=" not in flat_branch.split("# Root:")[0]
+
+
+# ── path normalisation agrees across the three server surfaces ──────────────
+
+
+def test_all_three_server_surfaces_normalise_a_path_the_same_way():
+    """A '/' is part of a stored value, not a separator — and every surface
+    that resolves a node path has to agree on that (SPA_fixes_01 finding 2).
+
+    The API endpoint rewrote '/' to '.' while the classic route and OPDS did
+    not. The comment above the API line even said '/' was part of a value. The
+    effect was that a node like 'Photography.B/W' resolved to 'Photography.B.W',
+    matched no node, and 404'd — a value the classic UI lists fine. A
+    one-character divergence between three call sites is exactly what a text
+    assertion will not catch a third time, so this pins the *transform* each
+    surface applies rather than the presence of a function call.
+    """
+    import re as _re
+
+    def normaliser(rel, func):
+        code = _function_code(rel, func)
+        # Every rewrite that is not a plain join_path is a divergence.
+        return _re.findall(r"join_path\(\[([^\]]*)\]\)", code), code
+
+    for rel, func in (("cps/web.py", "render_cc_category"),
+                      ("cps/opds.py", "feed_cc_category"),
+                      ("cps/api/columns.py", "column_books")):
+        args, code = normaliser(rel, func)
+        assert args, "%s::%s must normalise through join_path" % (rel, func)
+        for arg in args:
+            assert "replace" not in arg, (
+                "%s::%s rewrites the path before joining (%s); a '/' is part of a "
+                "stored value, so 'Photography.B/W' must survive intact"
+                % (rel, func, arg))
+            assert "SEPARATOR" not in arg, (
+                "%s::%s substitutes a separator into the path" % (rel, func))
+
+
+def test_a_path_containing_a_slash_survives_normalisation():
+    """The behaviour the parity test above protects, exercised on real values.
+
+    Both of these are stored values in the reference library, and both are
+    leaves, so there is no other route to their books.
+    """
+    for stored in ("Photography.B/W", "Software Development.C/C++",
+                   "AC/DC.Live", "Computers.DB"):
+        normalised = hierarchy.join_path([stored])
+        assert normalised == stored, stored
+        # And the node is findable under exactly that path.
+        tree = hierarchy.parse_tag_hierarchy([(1, stored)])
+        assert hierarchy.get_node_by_path(tree, normalised) is not None, stored
+        if "/" in stored:
+            # The rewrite that caused the 404 must not be recoverable: with a
+            # single value in the tree, the rewritten path names a node that
+            # was never stored.
+            assert hierarchy.get_node_by_path(
+                tree,
+                hierarchy.join_path([stored.replace("/", hierarchy.SEPARATOR)])) is None, stored
 
 
 def test_the_detail_page_links_a_flat_value_instead_of_printing_it(library):

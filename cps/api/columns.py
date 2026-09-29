@@ -189,10 +189,14 @@ def column_books(col_id):
     is_hierarchical = not calibre_db.is_flat_cc_column(col_id)
 
     if is_hierarchical:
-        # Normalise the same way web.py::render_cc_category does: segments are
-        # stripped and empty ones collapse, and a '/' is part of a value
-        # ("Sci-Fi/Fantasy"), never a separator.
-        path = hierarchy.join_path([raw_path.replace('/', hierarchy.SEPARATOR)]) if raw_path else ''
+        # Normalise exactly the way web.py::render_cc_category and
+        # opds.py::feed_cc_category do: segments are stripped and empty ones
+        # collapse. A '/' is part of a stored value ("Photography.B/W",
+        # "Software Development.C/C++"), NEVER a separator -- rewriting it to a
+        # '.' here made such a node unresolvable, and the endpoint then 404'd a
+        # value the classic UI lists fine. All three surfaces must agree, so
+        # this stays a plain join_path with no substitution.
+        path = hierarchy.join_path([raw_path]) if raw_path else ''
     else:
         # Flat values are atomic: a trailing dot, a doubled dot or a space
         # around one is part of the stored string, so it is used verbatim.

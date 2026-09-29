@@ -216,10 +216,14 @@ export function FindBooks() {
   const jobRows = jobs.data?.jobs ?? [];
   // "You have asked for nothing" and "we could not find out what you asked
   // for" are different sentences, and only the first one is reassuring.
+  //
+  // `hasData` is tested on the payload, never on `isSuccess`: query-core sets
+  // `status: 'error'` on a background failure while keeping the previous
+  // `data`, so `isSuccess` goes false with a perfectly good list still in hand.
   const jobsView = acquisitionSectionView({
     isLoading: jobs.isLoading,
     isError: jobs.isError,
-    hasData: jobs.isSuccess,
+    hasData: jobs.data !== undefined,
     isEmpty: jobRows.length === 0,
   });
 
@@ -240,14 +244,45 @@ export function FindBooks() {
 
   if (bootstrap.isLoading) return <SpinnerCentered />;
 
-  if (bootstrap.isError) {
+  // Only when there is nothing to draw. A refresh-on-focus that fails behind
+  // a page the user is already browsing must not replace it with "this is
+  // unavailable" — the catalogs they can see are stale, not withdrawn.
+  const bootstrapView = acquisitionSectionView({
+    isLoading: bootstrap.isLoading,
+    isError: bootstrap.isError,
+    hasData: bootstrap.data !== undefined,
+    isEmpty: false,
+  });
+
+  if (bootstrapView.body === 'error') {
+    // 404 is the gate — the feature is off or this account was not granted
+    // access. Anything else is the server having a problem, and telling
+    // someone their permissions are wrong when the truth is a 502 sends them
+    // to an administrator who finds nothing to fix.
+    const gated = errorCode(bootstrap.error) === 'not_found';
     return (
       <div className={styles.container}>
-        <EmptyState
-          icon={AlertTriangle}
-          title={t('Find books is unavailable')}
-          message={t('This account cannot use book sources, or the feature is switched off.')}
-        />
+        <div role="alert">
+          <EmptyState
+            icon={AlertTriangle}
+            title={t('Find books is unavailable')}
+            message={gated
+              ? t('This account cannot use book sources, or the feature is switched off.')
+              : t('Book sources could not be reached just now. This is not a change to your access.')}
+          >
+            {!gated && (
+              <button
+                type="button"
+                className={styles.secondary}
+                onClick={() => void bootstrap.refetch()}
+                disabled={bootstrap.isFetching}
+              >
+                <RefreshCw size={14} aria-hidden="true" focusable={false} />
+                <span>{t('Try again')}</span>
+              </button>
+            )}
+          </EmptyState>
+        </div>
       </div>
     );
   }
@@ -261,6 +296,23 @@ export function FindBooks() {
       <p className={styles.lede}>
         {t('Browse the catalogs your administrator has added. A book you pick is imported into the library here — it is not just downloaded to your device.')}
       </p>
+
+      {/* Reached only with catalogs still on screen from an earlier, good
+          read. Keep them — they are stale, not gone — and say so. */}
+      {bootstrapView.showError && (
+        <div className={styles.sectionError} role="alert">
+          <p>{t('This page could not be refreshed, so what is shown may be out of date.')}</p>
+          <button
+            type="button"
+            className={styles.secondary}
+            onClick={() => void bootstrap.refetch()}
+            disabled={bootstrap.isFetching}
+          >
+            <RefreshCw size={14} aria-hidden="true" focusable={false} />
+            <span>{t('Try again')}</span>
+          </button>
+        </div>
+      )}
 
       {runtime && !runtime.available && (
         <div className={styles.notice} role="status">

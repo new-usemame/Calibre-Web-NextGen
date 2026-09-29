@@ -132,6 +132,56 @@ test.describe('acquisition admin — a failed read is not an empty one', () => {
     // An empty queue stays hidden — it is not news.
     await expect(page.getByRole('heading', { name: 'Waiting for approval' })).toHaveCount(0);
   });
+
+  test('a settings refresh that fails behind a working page leaves the page standing', async ({ page }) => {
+    // The counterpart to the full-page error above, and the reason `hasData`
+    // is read off the payload rather than off `isSuccess`: query-core flips
+    // status to 'error' on a BACKGROUND failure while keeping the previous
+    // data, so keying the teardown off `isSuccess` would demolish a working
+    // page over one transient refresh.
+    await intercept(page, {
+      [ADMIN.connections]: { body: { connections: [] } },
+      [ADMIN.users]: { body: { users: [] } },
+      [ADMIN.jobs]: { body: { jobs: [] } },
+    });
+
+    let settingsReads = 0;
+    await page.route(`**${ADMIN.settings}`, async (route) => {
+      if (route.request().method() !== 'GET') {
+        // The PATCH fails, which is what makes the page re-read its settings.
+        return route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: { code: 'acquisition_unavailable', message: 'nope' } }),
+        });
+      }
+      settingsReads += 1;
+      if (settingsReads === 1) {
+        return route.fulfill({
+          status: 200, contentType: 'application/json', body: JSON.stringify(READY),
+        });
+      }
+      return route.fulfill({
+        status: 503,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'acquisition_unavailable', message: 'nope' } }),
+      });
+    });
+
+    await openAdmin(page);
+    const feature = page.getByRole('checkbox', { name: /Allow requests from book sources/ });
+    await expect(feature).toBeVisible();
+
+    await feature.click();
+
+    // The failed write reports, the failed re-read reports — and the page the
+    // administrator was using is still there underneath both.
+    await expect(
+      page.getByRole('alert').filter({ hasText: 'could not be refreshed' }),
+    ).toBeVisible();
+    await expect(feature).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Catalogs' })).toBeVisible();
+  });
 });
 
 test.describe('acquisition admin — the approval queue does not libel the requester', () => {

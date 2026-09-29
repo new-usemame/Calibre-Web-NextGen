@@ -236,7 +236,24 @@ export function AdminAcquisition() {
   // switch is disabled. That is indistinguishable from a correctly configured
   // server with the feature deliberately off, so say what happened instead of
   // showing a page that quietly lies about the state of the instance.
-  if (settings.isError) {
+  //
+  // Only when there is nothing to draw, though. A refresh-on-focus that fails
+  // behind a page the administrator is already using must not replace it: the
+  // settings it is showing are stale, not absent, and that case is handled
+  // below with a message that leaves the page standing.
+  // `hasData` is tested on the payload, never on `isSuccess`. query-core sets
+  // `status: 'error'` on a background failure while deliberately keeping the
+  // previous `data` — so `isSuccess` goes false with perfectly good settings
+  // still in hand, and keying off it would tear the page down for exactly the
+  // transient failure this branch exists to survive.
+  const settingsView = acquisitionSectionView({
+    isLoading: settings.isLoading,
+    isError: settings.isError,
+    hasData: settings.data !== undefined,
+    isEmpty: false,
+  });
+
+  if (settingsView.body === 'error') {
     return (
       <div className={styles.container}>
         <Link href="/admin" className={styles.back}>
@@ -263,7 +280,7 @@ export function AdminAcquisition() {
   const connectionsView = acquisitionSectionView({
     isLoading: connections.isLoading,
     isError: connections.isError,
-    hasData: connections.isSuccess,
+    hasData: connections.data !== undefined,
     isEmpty: rows.length === 0,
   });
 
@@ -272,7 +289,7 @@ export function AdminAcquisition() {
     enabled,
     isLoading: grants.isLoading,
     isError: grants.isError,
-    hasData: grants.isSuccess,
+    hasData: grants.data !== undefined,
     isEmpty: grantRows.length === 0,
   });
 
@@ -281,14 +298,15 @@ export function AdminAcquisition() {
     enabled,
     isLoading: queue.isLoading,
     isError: queue.isError,
-    hasData: queue.isSuccess,
+    hasData: queue.data !== undefined,
     isEmpty: queueRows.length === 0,
   });
 
-  // Only a *successful* grants read is evidence about who exists. Built from
-  // `isSuccess` rather than from the map being non-empty, so the queue — which
+  // Only an actual directory is evidence about who exists. Built from the
+  // payload rather than from the map being non-empty, so the queue — which
   // loads independently and can answer first — cannot report a live account as
-  // deleted while the directory is still on its way.
+  // deleted while the directory is still on its way. A stale-but-present
+  // directory still answers the question better than a guess does.
   const ownerNames = new Map(grantRows.map((user) => [user.id, user.name]));
 
   return (
@@ -305,6 +323,18 @@ export function AdminAcquisition() {
       <p className={styles.lede}>
         {t('Let people request books from an OPDS catalog. A requested book is imported into this library through the normal ingest path, credited to the account that asked for it.')}
       </p>
+
+      {/* Reached only with settings still on screen from an earlier, good
+          read. The page stays up — losing it to a transient refresh failure
+          would cost the administrator more than the staleness does — but the
+          switches below are no longer confirmed by the server, so say so. */}
+      {settingsView.showError && (
+        <SectionError
+          message={t('These settings could not be refreshed, so what is shown may be out of date.')}
+          onRetry={() => void settings.refetch()}
+          retrying={settings.isFetching}
+        />
+      )}
 
       {migration === 'needs_review' && (
         <div className={styles.notice} role="status">
@@ -594,7 +624,7 @@ export function AdminAcquisition() {
               // from "this account is gone". Claiming the latter about a live
               // user is a statement an administrator may act on.
               const requester = acquisitionRequesterLabel({
-                ownerId: job.owner_id, names: ownerNames, resolved: grants.isSuccess,
+                ownerId: job.owner_id, names: ownerNames, resolved: grants.data !== undefined,
               });
               return (
                 <li key={job.id} className={styles.grantRow}>

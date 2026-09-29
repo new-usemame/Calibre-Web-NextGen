@@ -4456,6 +4456,10 @@ msgid "Date Added"
 msgstr "Дата добавления"
 
 #: cps/spa_strings.py
+msgid "Last Modified"
+msgstr "Последнее изменение"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete “{name}”? It is removed from {count} book, which is kept."
 msgstr ""

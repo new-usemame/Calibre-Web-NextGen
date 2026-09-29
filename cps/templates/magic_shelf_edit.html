@@ -626,6 +626,8 @@ $(function() {
         // Check all filter dropdowns for date fields
         $('#builder .rule-filter-container select').each(function() {
             var filterId = $(this).val();
+            var operator = $(this).closest('.rule-container').find('.rule-operator-container select').val();
+            if (operator === 'in_last_days' || operator === 'not_in_last_days') return;
             if (dateFieldIds.indexOf(filterId) !== -1) {
                 hasDateField = true;
                 return false; // break out of each loop

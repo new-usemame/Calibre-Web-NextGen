@@ -4308,6 +4308,10 @@ msgid "Date Added"
 msgstr "Hozzáadás dátuma"
 
 #: cps/spa_strings.py
+msgid "Last Modified"
+msgstr "Utoljára módosítva"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Delete “{name}”? It is removed from {count} book, which is kept."
 msgstr ""

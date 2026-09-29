@@ -526,11 +526,12 @@ def system_magic_shelf_display_name(shelf):
 # field cannot silently leave one UI behind.
 FIELD_MAP = {definition['id']: definition['_binding'] for definition in _NATIVE_RULE_FIELDS}
 
-# Native fields the builders offer "in the last N days" for. Derived from the
-# same definitions so a date field added there is filtered, not silently dropped.
+# Native fields the engine can filter "in the last N days" on: offered by the
+# schema and stored directly on Books. Derived from the same definitions, so a
+# date field added there is filtered rather than silently dropped.
 _RELATIVE_DATE_FIELDS = frozenset(
     definition['id'] for definition in _NATIVE_RULE_FIELDS
-    if 'in_last_days' in definition['operators']
+    if 'in_last_days' in definition['operators'] and definition['_binding'][0] is db.Books
 )
 
 # Mapping from UI operators to SQLAlchemy functions/operators

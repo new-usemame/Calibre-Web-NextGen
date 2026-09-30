@@ -15555,3 +15555,245 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+
+#: cps/spa_strings.py
+msgid "A download redirect tried to send a credential to another origin and was blocked."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "API endpoint"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "API key"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Add a connection"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Add connection"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Additional local download origins"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Book category ID"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "CWNG cannot read the mapped completed folder. Check its mount and permissions."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Cancel editing"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Catalogs and download clients"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Choose a SABnzbd connection"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Completed folder as SABnzbd sees it"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Confirm deletion"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection saved. Test it, then switch it on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection type"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Delete this connection and its saved credentials? Request history is kept."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Download client"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Download release"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Edit connection"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Edit {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enabled"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Finish or cancel outstanding requests before editing this connection."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "If Prowlarr redirects to another source on your local network, list its exact origin here. Separate origins with commas. Credentials stay scoped to their original origin."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Indexer preset"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep connection"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Leave the credential blank to keep it. Saving switches the connection off and expires old selections; test it before enabling it again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Let people request books from an OPDS catalog or an indexer connected to SABnzbd. A requested book is imported into this library through the normal ingest path, credited to the account that asked for it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Newznab / Torznab indexer"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "OPDS catalog"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Reject"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request rejected"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request rejected."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request release"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "SABnzbd category"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "SABnzbd did not report a completed folder and category that could be verified."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "SABnzbd download client"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "SABnzbd reported that this download failed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Same completed folder inside CWNG"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Save connection"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The completed download contains multiple books. A single-book release is required."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The completed download contains no usable EPUB or PDF."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The completed download is outside its mapped folder or uses an unsafe file path."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The completed-folder mapping does not cover the configured SABnzbd category."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The connection could not be deleted. Finish or cancel outstanding requests first."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The connection settings could not be loaded."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The download client for this source is unavailable. Ask an administrator to check it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The download client is unavailable or its settings changed. Make a new selection after an administrator checks it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The indexer did not return a valid NZB descriptor."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The indexer does not advertise a supported keyword search."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The indexer does not advertise this book category."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The request could not be rejected. It may have already moved on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The source or download client rejected its API key. Ask an administrator to check the credential."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The source redirected to a network address that this connection does not allow."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The submission could not be confirmed. Check SABnzbd queue and history before trying again; CWNG will not blindly send a duplicate."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This category does not exist in SABnzbd."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This is a torrent release. A compatible torrent client is required; SABnzbd accepts NZB releases."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This job is no longer in SABnzbd queue or history. It will not be submitted again automatically."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This page is not available to this account."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection changed. Reload its settings before saving."
+msgstr ""

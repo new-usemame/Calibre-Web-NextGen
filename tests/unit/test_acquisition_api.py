@@ -486,3 +486,66 @@ def test_admin_opts_a_home_catalog_in_and_cannot_open_loopback(api,monkeypatch):
         'endpoint':'http://192.168.1.5:8080/opds','private_origins':['http://192.168.1.5:8080'],
         'private_networks':['127.0.0.0/8']}})
     assert refused.status_code==400 and refused.get_json()['error']['code']=='private_network_not_allowed'
+
+
+def test_reject_route_remains_available_while_feature_is_paused(api):
+    client,repo,actor,module,connection,offer,database=api
+    job = post_job(api).get_json()
+    actor.id = 1
+    with repo.engine.begin() as conn:
+        conn.execute(text('UPDATE settings SET config_acquisition_enabled=0'))
+    response = client.post(f"/api/v1/admin/acquisition/jobs/{job['id']}/reject")
+    assert response.status_code == 200
+    assert repo.get_job(2,job['id']).state == 'rejected'
+    assert repo.claim() is None
+
+
+def test_admin_edit_preserves_redacted_credentials_and_delete_keeps_history(api):
+    client,repo,actor,module,connection,offer,database=api
+    actor.id = 1
+    private = repo.connection_config(connection.id).config
+    private.update(endpoint='https://catalog.invalid/feed?key=SECRET_QUERY', auth_kind='bearer', secret='SECRET_CREDENTIAL')
+    repo.update_connection(connection.id,label=connection.label,config=private)
+    path = f'/api/v1/admin/acquisition/connections/{connection.id}'
+    response = client.get(path)
+    config = response.get_json()['config']
+    assert 'SECRET' not in response.get_data(as_text=True)
+    assert config['has_secret'] and config['has_endpoint_query']
+    response = client.patch(path,json={'label':'Renamed','config':{'endpoint':config['endpoint']}})
+    assert response.status_code == 200
+    kept = repo.connection_config(connection.id,include_disabled=True).config
+    assert kept['secret'] == 'SECRET_CREDENTIAL' and 'SECRET_QUERY' in kept['endpoint']
+    assert client.delete(path).status_code == 200
+    assert client.get(path).status_code == 404
+
+
+def test_stale_admin_form_cannot_send_rotated_key_to_old_endpoint(api):
+    client,repo,actor,module,connection,offer,database=api
+    actor.id=1
+    original=repo.connection_config(connection.id).config
+    repo.update_connection(connection.id,label='New',config=dict(original, endpoint='https://new.invalid/feed', secret='ROTATED', auth_kind='bearer'))
+    response=client.patch(f'/api/v1/admin/acquisition/connections/{connection.id}',json={
+        'expected_revision':1,'label':'Old form','config':{'endpoint':original['endpoint']}})
+    assert response.status_code==409 and response.get_json()['error']['code']=='connection_changed'
+    assert repo.connection_config(connection.id,include_disabled=True).config['endpoint']=='https://new.invalid/feed'
+
+
+def test_removing_download_origin_revokes_only_its_derived_private_scope(api):
+    client,repo,actor,module,connection,offer,database=api;actor.id=1
+    sab=repo.create_connection('Client','sabnzbd',{},enabled=True)
+    config=module.indexer_config({'endpoint':'http://prowlarr.local:9696/1/api','secret':'PRIVATE',
+        'category':'7020','client_id':sab.id,'allow_private_network':True,
+        'download_origins':['http://retired.local:8090']})
+    config['private_origins'].append('http://intentional.local:8090')
+    c=repo.create_connection('Indexer','newznab',config,enabled=True)
+    path=f'/api/v1/admin/acquisition/connections/{c.id}'
+    response=client.patch(path,json={'expected_revision':1,'config':{'download_origins':['http://replacement.local:8090']}})
+    assert response.status_code==200
+    current=repo.connection_config(c.id,include_disabled=True).config
+    assert 'http://retired.local:8090' not in current['private_origins']
+    assert 'http://replacement.local:8090' in current['private_origins']
+    assert 'http://intentional.local:8090' in current['private_origins']
+    assert current['private_networks']==config['private_networks']
+    assert client.patch(path,json={'expected_revision':2,'config':{'download_origins':[]}}).status_code==200
+    current=repo.connection_config(c.id,include_disabled=True).config
+    assert current['private_origins']==['http://prowlarr.local:9696/1/api','http://intentional.local:8090']

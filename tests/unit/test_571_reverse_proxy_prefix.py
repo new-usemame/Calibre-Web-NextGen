@@ -215,9 +215,13 @@ def test_notfound_prefix_matched_literally():
     """The NotFound legacy-link must strip the <prefix>/app base with a literal
     string compare, not an unescaped RegExp (a dotted prefix like /app.v2 would
     otherwise match loosely)."""
-    src = (_FE / "pages" / "NotFound.tsx").read_text()
-    assert "startsWith(appBase)" in src
-    assert "new RegExp(" not in src
+    import subprocess
+    result = subprocess.run(
+        ["node", "--experimental-strip-types", "--test", str(_FE.parent / "unit" / "classicFallback.test.ts")],
+        capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "pass 2" in result.stdout
+
 
 
 @pytest.mark.unit

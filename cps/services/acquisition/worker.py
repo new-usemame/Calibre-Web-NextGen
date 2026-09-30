@@ -7,6 +7,8 @@ machine against an owned local catalog without a Flask request or fake user.
 """
 from pathlib import Path
 import re
+import os
+from dataclasses import replace
 import secrets
 import shutil
 import time
@@ -16,6 +18,7 @@ from .http import TransportError, run_transfer
 from .staging import (StagingError, cleanup_settled, digest, discard_publication, persist_capability,
                       publish, publication_state, validate_book)
 from .storage import Conflict
+from .sabnzbd import SABClient, ClientError, completed_book, open_completed_file, validate_nzb
 
 # A conversion of a large book can legitimately run for a long time, and a
 # terminal processor result is reported explicitly, so this bound only exists
@@ -39,8 +42,9 @@ class AcquisitionWorker:
                  enabled=lambda: True, execution_allowed=None, media_allowed=lambda media: True,
                  transfer=run_transfer, max_bytes=100 * 1024 * 1024,
                  import_deadline_seconds=IMPORT_DEADLINE_SECONDS,
-                 import_recheck_seconds=IMPORT_RECHECK_SECONDS):
+                 import_recheck_seconds=IMPORT_RECHECK_SECONDS, client_factory=SABClient):
         self.repository = repository
+        self.client_factory = client_factory
         self.staging_dir, self.ingest_dir = Path(staging_dir), Path(ingest_dir)
         self.allowed, self.enabled, self.transfer = allowed, enabled, transfer
         self.max_bytes = max_bytes
@@ -122,9 +126,10 @@ class AcquisitionWorker:
             checkpoint()
             material = repo.material(job.id, token)
             offer, config = material.offer, material.config
-            if offer.get('kind') != 'acquisition' or offer.get('media_type') not in ('application/epub+zip', 'application/pdf'):
+            if offer.get('kind') != 'acquisition' or offer.get('media_type') not in ('application/epub+zip', 'application/pdf', 'application/x-nzb'):
                 raise TransportError('unsupported_offer')
-            media_type = offer['media_type']
+            usenet = offer.get('transport') == 'nzb' and offer['media_type'] == 'application/x-nzb'
+            media_type = None if usenet else offer['media_type']
             checkpoint()
             extension = 'epub' if media_type == 'application/epub+zip' else 'pdf'
             if state == 'queued':
@@ -138,18 +143,35 @@ class AcquisitionWorker:
                 # requests or blind reuse of an interrupted download are implied.
                 if shutil.disk_usage(private).free < self.max_bytes + 64 * 1024 * 1024:
                     raise TransportError('insufficient_storage')
-                downloaded = self.transfer(offer['href'], policy(config, download=True),
-                    destination=source, max_bytes=self.max_bytes, checkpoint=checkpoint)
-                validate_book(source, offer['media_type'], max_bytes=self.max_bytes)
-                if digest(source) != downloaded.sha256:
-                    raise StagingError('source_changed')
+                if usenet:
+                    completed = self._download_usenet(job, token, offer, config, source, checkpoint)
+                    if completed is None:
+                        repo.release(job.id, token, delay_seconds=30)
+                        shutil.rmtree(private)
+                        return repo.get_job(job.owner_id, job.id)
+                    media_type = completed
+                    checkpoint()
+                    validate_book(source, media_type, max_bytes=self.max_bytes)
+                    source_hash = digest(source)
+                else:
+                    downloaded = self.transfer(offer['href'], policy(config, download=True),
+                        destination=source, max_bytes=self.max_bytes, checkpoint=checkpoint)
+                    validate_book(source, offer['media_type'], max_bytes=self.max_bytes)
+                    if digest(source) != downloaded.sha256:
+                        raise StagingError('source_changed')
+                    source_hash = downloaded.sha256
                 checkpoint()
-                advance('staged', source_sha256=downloaded.sha256, staging_key=token)
+                advance('staged', source_sha256=source_hash, staging_key=token)
             source_hash, staging_key = repo.staged_identity(job.id, token)
             private = self._directory(job.id, staging_key)
             source = private / 'source.part'
             if digest(source) != source_hash:
                 raise StagingError('source_changed')
+            if usenet:
+                with source.open('rb') as stream:
+                    media_type = 'application/pdf' if stream.read(5) == b'%PDF-' else 'application/epub+zip'
+                validate_book(source, media_type, max_bytes=self.max_bytes)
+                extension = 'pdf' if media_type == 'application/pdf' else 'epub'
             token_path = private / 'publication.token'
             if token_path.exists() or token_path.is_symlink():
                 if token_path.is_symlink() or not token_path.is_file() or token_path.stat().st_size > 128:
@@ -207,6 +229,81 @@ class AcquisitionWorker:
         if current.state in ('imported', 'failed', 'cancelled'):
             self._cleanup(job.id)
         return current
+
+    def _download_usenet(self, job, token, offer, config, source, checkpoint):
+        repo = self.repository
+        clients = [row for row in repo.list_connections() if row.id == offer.get('client_id')
+            and row.adapter == 'sabnzbd' and row.revision == offer.get('client_revision')]
+        if not clients:
+            raise ClientError('download_client_unavailable')
+        client_config = repo.connection_config(clients[0].id).config
+        client = self.client_factory(client_config, transfer=self.transfer)
+        name = 'cwng-' + repo.box.display_identity(
+            str([offer['release_key'], clients[0].id, clients[0].revision]))
+        external_id, started = repo.external_status(job.id, token)
+        if started is None:
+            repo.begin_submission(job.id, token, create_if_missing=False)
+            external_id, started = repo.external_status(job.id, token)
+        if started is None:
+            # Fetch/validate before issuing the durable POST fence. A bad key or
+            # descriptor here is safely retryable without an uncertain submit.
+            descriptor = self.transfer(offer['href'], replace(policy(config), query_secrets=(config['secret'],)),
+                max_bytes=512 * 1024, checkpoint=checkpoint)
+            validate_nzb(descriptor.body)
+            checkpoint()
+            fresh = repo.begin_submission(job.id, token)
+            if fresh:
+                try:
+                    external_id = client.submit(name, descriptor.body, checkpoint=checkpoint)
+                except TransportError as error:
+                    if error.code in ('needs_auth', 'client_error'):
+                        repo.clear_rejected_submission(job.id, token)
+                    raise
+                repo.record_external(job.id, token, external_id)
+            else:
+                external_id, started = repo.external_status(job.id, token)
+        checkpoint()
+        remote = client.find(name, external_id, checkpoint=checkpoint)
+        if remote is None:
+            raise ClientError('client_job_missing' if external_id else 'submission_ambiguous')
+        if not external_id:
+            repo.record_external(job.id, token, remote.get('nzo_id'))
+        if remote.get('status') == 'Failed':
+            raise ClientError('client_job_failed')
+        if remote.get('status') != 'Completed' or remote.get('loaded') not in (False, None):
+            return None
+        book, media = completed_book(client_config, remote.get('storage'), max_bytes=self.max_bytes)
+        if not self.media_allowed(media):
+            raise ClientError('format_not_allowed')
+        # O_NOFOLLOW + inode/stat comparison fences a completed file changing
+        # while it is copied. Only private staging is ever written by CWNG.
+        before = book.stat()
+        fd = open_completed_file(client_config, book)
+        try:
+            with os.fdopen(fd, 'rb') as input_file, source.open('xb') as output:
+                opened = os.fstat(input_file.fileno())
+                if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+                    raise ClientError('completed_file_changed')
+                count = 0
+                for chunk in iter(lambda: input_file.read(256 * 1024), b''):
+                    checkpoint()
+                    count += len(chunk)
+                    if count > self.max_bytes:
+                        raise ClientError('file_too_large')
+                    output.write(chunk)
+                output.flush()
+                os.fsync(output.fileno())
+                after = os.fstat(input_file.fileno())
+                if (before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (after.st_size, after.st_mtime_ns, after.st_ctime_ns):
+                    raise ClientError('completed_file_changed')
+        except BaseException:
+            source.unlink(missing_ok=True)
+            raise
+        try:
+            validate_book(source, media, max_bytes=self.max_bytes)
+        except StagingError:
+            raise ClientError('no_usable_book') from None
+        return media
 
     def _reconcile_import(self, claim):
         """Read what the ingest service did with a published book.

@@ -17232,3 +17232,246 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+
+#: cps/spa_strings.py
+msgid "A download redirect tried to send a credential to another origin and was blocked."
+msgstr "Een downloadomleiding probeerde een inloggegeven naar een andere oorsprong te sturen en is geblokkeerd."
+
+#: cps/spa_strings.py
+msgid "API endpoint"
+msgstr "API-adres"
+
+#: cps/spa_strings.py
+msgid "API key"
+msgstr "API-sleutel"
+
+#: cps/spa_strings.py
+msgid "Add a connection"
+msgstr "Een verbinding toevoegen"
+
+#: cps/spa_strings.py
+msgid "Add connection"
+msgstr "Verbinding toevoegen"
+
+#: cps/spa_strings.py
+msgid "Additional local download origins"
+msgstr "Aanvullende lokale downloadoorsprongen"
+
+#: cps/spa_strings.py
+msgid "Book category ID"
+msgstr "Boekcategorie-ID"
+
+#: cps/spa_strings.py
+msgid "CWNG cannot read the mapped completed folder. Check its mount and permissions."
+msgstr "CWNG kan de gekoppelde map met voltooide downloads niet lezen. Controleer de koppeling en rechten."
+
+#: cps/spa_strings.py
+msgid "Cancel editing"
+msgstr "Bewerken annuleren"
+
+#: cps/spa_strings.py
+msgid "Catalogs and download clients"
+msgstr "Catalogi en downloadclients"
+
+#: cps/spa_strings.py
+msgid "Choose a SABnzbd connection"
+msgstr "Kies een SABnzbd-verbinding"
+
+#: cps/spa_strings.py
+msgid "Completed folder as SABnzbd sees it"
+msgstr "Map met voltooide downloads zoals SABnzbd die ziet"
+
+#: cps/spa_strings.py
+msgid "Confirm deletion"
+msgstr "Verwijdering bevestigen"
+
+#: cps/spa_strings.py
+msgid "Connection deleted."
+msgstr "Verbinding verwijderd."
+
+#: cps/spa_strings.py
+msgid "Connection saved. Test it, then switch it on."
+msgstr "Verbinding opgeslagen. Test deze en schakel deze daarna in."
+
+#: cps/spa_strings.py
+msgid "Connection type"
+msgstr "Verbindingstype"
+
+#: cps/spa_strings.py
+msgid "Delete this connection and its saved credentials? Request history is kept."
+msgstr "Deze verbinding en de opgeslagen inloggegevens verwijderen? De aanvraaggeschiedenis blijft bewaard."
+
+#: cps/spa_strings.py
+msgid "Download client"
+msgstr "Downloadclient"
+
+#: cps/spa_strings.py
+msgid "Download release"
+msgstr "Release downloaden"
+
+#: cps/spa_strings.py
+msgid "Edit connection"
+msgstr "Verbinding bewerken"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Edit {name}"
+msgstr "{name} bewerken"
+
+#: cps/spa_strings.py
+msgid "Enabled"
+msgstr "Ingeschakeld"
+
+#: cps/spa_strings.py
+msgid "Finish or cancel outstanding requests before editing this connection."
+msgstr "Voltooi of annuleer lopende aanvragen voordat u deze verbinding bewerkt."
+
+#: cps/spa_strings.py
+msgid "If Prowlarr redirects to another source on your local network, list its exact origin here. Separate origins with commas. Credentials stay scoped to their original origin."
+msgstr "Als Prowlarr naar een andere bron op uw lokale netwerk omleidt, vermeld dan hier de exacte oorsprong. Scheid oorsprongen met komma’s. Inloggegevens blijven beperkt tot hun oorspronkelijke oorsprong."
+
+#: cps/spa_strings.py
+msgid "Indexer preset"
+msgstr "Indexervoorinstelling"
+
+#: cps/spa_strings.py
+msgid "Keep connection"
+msgstr "Verbinding behouden"
+
+#: cps/spa_strings.py
+msgid "Leave the credential blank to keep it. Saving switches the connection off and expires old selections; test it before enabling it again."
+msgstr "Laat het veld met inloggegevens leeg om ze te behouden. Opslaan schakelt de verbinding uit en laat oude selecties verlopen; test de verbinding voordat u deze weer inschakelt."
+
+#: cps/spa_strings.py
+msgid "Let people request books from an OPDS catalog or an indexer connected to SABnzbd. A requested book is imported into this library through the normal ingest path, credited to the account that asked for it."
+msgstr "Laat gebruikers boeken aanvragen uit een OPDS-catalogus of een indexer die met SABnzbd verbonden is. Een aangevraagd boek wordt via het normale importproces in deze bibliotheek geïmporteerd en toegeschreven aan het account dat het aanvroeg."
+
+#: cps/spa_strings.py
+msgid "Newznab / Torznab indexer"
+msgstr "Newznab / Torznab-indexer"
+
+#: cps/spa_strings.py
+msgid "OPDS catalog"
+msgstr "OPDS-catalogus"
+
+#: cps/spa_strings.py
+msgid "Reject"
+msgstr "Afwijzen"
+
+#: cps/spa_strings.py
+msgid "Request rejected"
+msgstr "Aanvraag afgewezen"
+
+#: cps/spa_strings.py
+msgid "Request rejected."
+msgstr "Aanvraag afgewezen."
+
+#: cps/spa_strings.py
+msgid "Request release"
+msgstr "Release aanvragen"
+
+#: cps/spa_strings.py
+msgid "SABnzbd category"
+msgstr "SABnzbd-categorie"
+
+#: cps/spa_strings.py
+msgid "SABnzbd did not report a completed folder and category that could be verified."
+msgstr "SABnzbd heeft geen verifieerbare map met voltooide downloads en categorie gemeld."
+
+#: cps/spa_strings.py
+msgid "SABnzbd download client"
+msgstr "SABnzbd-downloadclient"
+
+#: cps/spa_strings.py
+msgid "SABnzbd reported that this download failed."
+msgstr "SABnzbd heeft gemeld dat deze download mislukt is."
+
+#: cps/spa_strings.py
+msgid "Same completed folder inside CWNG"
+msgstr "Dezelfde map met voltooide downloads binnen CWNG"
+
+#: cps/spa_strings.py
+msgid "Save connection"
+msgstr "Verbinding opslaan"
+
+#: cps/spa_strings.py
+msgid "The completed download contains multiple books. A single-book release is required."
+msgstr "De voltooide download bevat meerdere boeken. Een release met één boek is vereist."
+
+#: cps/spa_strings.py
+msgid "The completed download contains no usable EPUB or PDF."
+msgstr "De voltooide download bevat geen bruikbare EPUB of PDF."
+
+#: cps/spa_strings.py
+msgid "The completed download is outside its mapped folder or uses an unsafe file path."
+msgstr "De voltooide download staat buiten de gekoppelde map of gebruikt een onveilig bestandspad."
+
+#: cps/spa_strings.py
+msgid "The completed-folder mapping does not cover the configured SABnzbd category."
+msgstr "De koppeling van de voltooide map omvat de ingestelde SABnzbd-categorie niet."
+
+#: cps/spa_strings.py
+msgid "The connection could not be deleted. Finish or cancel outstanding requests first."
+msgstr "De verbinding kon niet worden verwijderd. Voltooi of annuleer eerst lopende aanvragen."
+
+#: cps/spa_strings.py
+msgid "The connection settings could not be loaded."
+msgstr "De verbindingsinstellingen konden niet worden geladen."
+
+#: cps/spa_strings.py
+msgid "The download client for this source is unavailable. Ask an administrator to check it."
+msgstr "De downloadclient voor deze bron is niet beschikbaar. Vraag een beheerder deze te controleren."
+
+#: cps/spa_strings.py
+msgid "The download client is unavailable or its settings changed. Make a new selection after an administrator checks it."
+msgstr "De downloadclient is niet beschikbaar of de instellingen zijn gewijzigd. Maak een nieuwe selectie nadat een beheerder deze heeft gecontroleerd."
+
+#: cps/spa_strings.py
+msgid "The indexer did not return a valid NZB descriptor."
+msgstr "De indexer heeft geen geldige NZB-beschrijving teruggegeven."
+
+#: cps/spa_strings.py
+msgid "The indexer does not advertise a supported keyword search."
+msgstr "De indexer biedt geen ondersteunde zoekfunctie met trefwoorden aan."
+
+#: cps/spa_strings.py
+msgid "The indexer does not advertise this book category."
+msgstr "De indexer biedt deze boekcategorie niet aan."
+
+#: cps/spa_strings.py
+msgid "The request could not be rejected. It may have already moved on."
+msgstr "De aanvraag kon niet worden afgewezen. Deze is mogelijk al verder verwerkt."
+
+#: cps/spa_strings.py
+msgid "The source or download client rejected its API key. Ask an administrator to check the credential."
+msgstr "De bron of downloadclient heeft zijn API-sleutel geweigerd. Vraag een beheerder de inloggegevens te controleren."
+
+#: cps/spa_strings.py
+msgid "The source redirected to a network address that this connection does not allow."
+msgstr "De bron heeft omgeleid naar een netwerkadres dat deze verbinding niet toestaat."
+
+#: cps/spa_strings.py
+msgid "The submission could not be confirmed. Check SABnzbd queue and history before trying again; CWNG will not blindly send a duplicate."
+msgstr "De verzending kon niet worden bevestigd. Controleer de SABnzbd-wachtrij en geschiedenis voordat u opnieuw probeert; CWNG stuurt niet blind een duplicaat."
+
+#: cps/spa_strings.py
+msgid "This category does not exist in SABnzbd."
+msgstr "Deze categorie bestaat niet in SABnzbd."
+
+#: cps/spa_strings.py
+msgid "This is a torrent release. A compatible torrent client is required; SABnzbd accepts NZB releases."
+msgstr "Dit is een torrentrelease. Een compatibele torrentclient is vereist; SABnzbd accepteert NZB-releases."
+
+#: cps/spa_strings.py
+msgid "This job is no longer in SABnzbd queue or history. It will not be submitted again automatically."
+msgstr "Deze taak staat niet meer in de SABnzbd-wachtrij of geschiedenis. Deze wordt niet automatisch opnieuw verzonden."
+
+#: cps/spa_strings.py
+msgid "This page is not available to this account."
+msgstr "Deze pagina is niet beschikbaar voor dit account."
+
+#: cps/spa_strings.py
+msgid "Connection changed. Reload its settings before saving."
+msgstr "De verbinding is gewijzigd. Laad de instellingen opnieuw voordat u opslaat."
+

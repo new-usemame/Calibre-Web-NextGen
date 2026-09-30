@@ -20,7 +20,7 @@ import time
 from dataclasses import dataclass, field
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit, urlunsplit
+from urllib.parse import urljoin, urlsplit, urlunsplit, unquote
 
 import requests
 
@@ -61,6 +61,7 @@ class HTTPPolicy:
     private_origins: tuple[str, ...] = field(default=(), repr=False)
     private_networks: tuple[str, ...] = ()
     authorization: str | None = field(default=None, repr=False)
+    query_secrets: tuple[str, ...] = field(default=(), repr=False)
     max_redirects: int = 5
     connect_timeout: float = 5.0
     read_timeout: float = 15.0
@@ -72,6 +73,8 @@ class HTTPPolicy:
         for value in self.private_networks:
             ipaddress.ip_network(value, strict=True)
         if self.authorization is not None and (len(self.authorization) > 16384 or any(ord(c) < 32 or ord(c) == 127 for c in self.authorization)):
+            raise TransportError('invalid_authentication')
+        if any(not isinstance(value, str) or not value or len(value) > 16384 for value in self.query_secrets):
             raise TransportError('invalid_authentication')
         timeouts = (self.connect_timeout, self.read_timeout, self.deadline)
         if (type(self.max_redirects) is not int or not 0 <= self.max_redirects <= 10
@@ -153,7 +156,7 @@ def _retry_after(value: str | None) -> int | None:
         return None
 
 
-def _transfer(url, policy, consume, max_bytes, checkpoint, session_factory):
+def _transfer(url, policy, consume, max_bytes, checkpoint, session_factory, *, form=None, upload=None):
     if not isinstance(max_bytes, int) or max_bytes <= 0:
         raise TransportError('invalid_limits')
     url = normalized_url(url)
@@ -172,9 +175,17 @@ def _transfer(url, policy, consume, max_bytes, checkpoint, session_factory):
             headers['Authorization'] = policy.authorization
         try:
             with session_factory(policy, url) as session:
-                with session.get(url, headers=headers, allow_redirects=False, stream=True,
-                                 timeout=(policy.connect_timeout, policy.read_timeout), verify=True) as response:
+                method = session.post if form is not None else session.get
+                options = {}
+                if form is not None:
+                    options['data'] = form
+                if upload is not None:
+                    options['files'] = {'name': (upload[0], upload[1], 'application/x-nzb')}
+                with method(url, headers=headers, allow_redirects=False, stream=True,
+                                 timeout=(policy.connect_timeout, policy.read_timeout), verify=True, **options) as response:
                     if response.status_code in (301, 302, 303, 307, 308):
+                        if form is not None:
+                            raise TransportError('redirect_limit')
                         location = response.headers.get('Location')
                         if not location or hop == policy.max_redirects:
                             raise TransportError('redirect_limit')
@@ -182,6 +193,8 @@ def _transfer(url, policy, consume, max_bytes, checkpoint, session_factory):
                             target = normalized_url(urljoin(url, location))
                         except ValueError:
                             raise TransportError('invalid_url') from None
+                        if origin(target) != origin(url) and any(value in unquote(target) for value in policy.query_secrets):
+                            raise TransportError('credentials_redirected')
                         if origin(url)[0] == 'https' and origin(target)[0] != 'https':
                             raise TransportError('insecure_redirect')
                         url = target
@@ -227,9 +240,9 @@ def _transfer(url, policy, consume, max_bytes, checkpoint, session_factory):
 
 
 def fetch_document(url: str, policy: HTTPPolicy, *, max_bytes: int = 2 * 1024 * 1024,
-                   checkpoint=lambda: None, session_factory=_session) -> FetchedDocument:
+                   checkpoint=lambda: None, session_factory=_session, form=None, upload=None) -> FetchedDocument:
     chunks = []
-    final, _, mime = _transfer(url, policy, chunks.append, max_bytes, checkpoint, session_factory)
+    final, _, mime = _transfer(url, policy, chunks.append, max_bytes, checkpoint, session_factory, form=form, upload=upload)
     return FetchedDocument(b''.join(chunks), final, mime)
 
 
@@ -256,7 +269,7 @@ def download_file(url: str, policy: HTTPPolicy, destination: Path, *, max_bytes:
 
 
 def run_transfer(url: str, policy: HTTPPolicy, *, destination: Path | None = None,
-                 max_bytes: int = 2 * 1024 * 1024, checkpoint=lambda: None):
+                 max_bytes: int = 2 * 1024 * 1024, checkpoint=lambda: None, form=None, upload=None):
     """Production entry point: hard deadline/cancellation around owned child I/O.
 
     A file is first written in a private temporary directory. Only successful
@@ -269,6 +282,13 @@ def run_transfer(url: str, policy: HTTPPolicy, *, destination: Path | None = Non
     import tempfile
     from dataclasses import asdict
     normalized_url(url)
+    if form is not None and (destination is not None or not isinstance(form, dict)
+            or len(form) > 32 or any(not isinstance(k, str) or not isinstance(v, str)
+                or len(k) > 128 or len(v) > 16384 for k, v in form.items())):
+        raise TransportError('invalid_configuration')
+    if upload is not None and (form is None or len(upload) != 2 or not isinstance(upload[0], str)
+            or len(upload[0]) > 128 or not isinstance(upload[1], bytes) or len(upload[1]) > 512 * 1024):
+        raise TransportError('invalid_configuration')
     if destination is not None:
         try:
             destination.lstat()
@@ -280,7 +300,8 @@ def run_transfer(url: str, policy: HTTPPolicy, *, destination: Path | None = Non
         raise TransportError('invalid_limits')
     with tempfile.TemporaryDirectory(prefix='.acquisition-', dir=destination.parent if destination else None) as private:
         staged = Path(private) / 'download.part' if destination else None
-        payload = json.dumps({'url': url, 'policy': asdict(policy), 'destination': str(staged) if staged else None, 'max_bytes': max_bytes}).encode()
+        payload = json.dumps({'url': url, 'policy': asdict(policy), 'destination': str(staged) if staged else None, 'max_bytes': max_bytes, 'form': form,
+            'upload': [upload[0], base64.b64encode(upload[1]).decode('ascii')] if upload else None}).encode()
         child = subprocess.Popen([sys.executable, '-c',
                                   "import runpy,sys; runpy.run_path(sys.argv[1], run_name='__main__')",
                                   str(Path(__file__).resolve()), '--worker'],
@@ -326,8 +347,8 @@ def _worker_main():
     import threading
     from dataclasses import asdict
     try:
-        raw = sys.stdin.buffer.read(65537)
-        if len(raw) > 65536:
+        raw = sys.stdin.buffer.read(1024 * 1024 + 1)
+        if len(raw) > 1024 * 1024:
             raise TransportError('invalid_configuration')
         message = json.loads(raw)
         policy = HTTPPolicy(**message['policy'])
@@ -345,7 +366,9 @@ def _worker_main():
             result = download_file(message['url'], policy, Path(message['destination']), max_bytes=message['max_bytes'])
             output = {'bytes': result.bytes, 'sha256': result.sha256, 'content_type': result.content_type}
         else:
-            result = fetch_document(message['url'], policy, max_bytes=message['max_bytes'])
+            upload = message.get('upload')
+            result = fetch_document(message['url'], policy, max_bytes=message['max_bytes'],
+                form=message.get('form'), upload=(upload[0], base64.b64decode(upload[1], validate=True)) if upload else None)
             output = {'body': base64.b64encode(result.body).decode('ascii'), 'url': result.url, 'content_type': result.content_type}
     except TransportError as exc:
         output = {'error': exc.code, 'retry_after': exc.retry_after}

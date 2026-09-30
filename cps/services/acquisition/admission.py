@@ -62,8 +62,12 @@ def account_allowed(database, owner_id):
 
 def acquisition_offer(payload, allowed_media_types=None):
     if (not isinstance(payload, dict) or payload.get('kind') != 'acquisition'
-            or payload.get('media_type') not in ('application/epub+zip','application/pdf')):
+            or payload.get('media_type') not in ('application/epub+zip','application/pdf','application/x-nzb')):
         raise AdmissionError('unsupported_offer')
+    if payload['media_type'] == 'application/x-nzb':
+        if payload.get('transport') != 'nzb' or not allowed_media_types:
+            raise AdmissionError('format_disabled')
+        return
     if allowed_media_types is not None and payload['media_type'] not in allowed_media_types:
         raise AdmissionError('format_disabled')
 
@@ -77,7 +81,7 @@ def create_request(repo, owner_id, *, connection_id, offer_id, idempotency_key, 
     for value in (connection_id, offer_id, idempotency_key):
         if not isinstance(value, str) or not value.strip() or len(value)>128:
             raise AdmissionError('invalid_request')
-    if not any(row.id==connection_id and row.adapter=='opds' for row in repo.list_connections()):
+    if not any(row.id==connection_id and row.adapter in ('opds', 'newznab') for row in repo.list_connections()):
         raise AdmissionError('unsupported_connection')
     formats=configured_media_types(repo.engine)
     return repo.create_job(owner_id, offer_id, idempotency_key, connection_id=connection_id,

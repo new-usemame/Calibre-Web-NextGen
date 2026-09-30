@@ -24,8 +24,8 @@ test('every state the worker moves through is pending', () => {
   }
 });
 
-test('only imported, failed and cancelled settle a request', () => {
-  assert.deepEqual([...ACQUISITION_TERMINAL_STATES].sort(), ['cancelled', 'failed', 'imported']);
+test('imported, failed, cancelled and rejected settle a request', () => {
+  assert.deepEqual([...ACQUISITION_TERMINAL_STATES].sort(), ['cancelled', 'failed', 'imported', 'rejected']);
   for (const state of ['imported', 'failed', 'cancelled']) {
     assert.equal(isAcquisitionPending(state), false, `${state} should stop the polling`);
   }
@@ -54,4 +54,9 @@ test('cancel is offered only where the server accepts it', () => {
     assert.equal(ACQUISITION_CANCELLABLE_STATES.has(state), false,
       `${state} is past the point the server will stop it`);
   }
+});
+
+test('a rejected request stops polling and cannot be cancelled', () => {
+  assert.equal(isAcquisitionPending('rejected'), false);
+  assert.equal(ACQUISITION_CANCELLABLE_STATES.has('rejected'), false);
 });

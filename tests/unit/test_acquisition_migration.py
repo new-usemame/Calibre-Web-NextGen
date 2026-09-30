@@ -366,3 +366,33 @@ def test_a_database_from_an_earlier_build_gains_the_importing_bound(tmp_path):
         assert 'importing_since' in {c['name'] for c in inspect(engine).get_columns('acquisition_job')}
     finally:
         engine.dispose()
+
+
+def test_existing_opds_requests_survive_additive_usenet_upgrade_and_second_boot(tmp_path):
+    from cps.services.acquisition.migration import migrate_acquisition_schema
+    from cps.services.acquisition.storage import Repository, define_tables
+    from cps.services.acquisition.secrets import SecretBox
+    from sqlalchemy import MetaData
+    engine, _ = _fixture(tmp_path / 'app.db', 'audit')
+    try:
+        marker = migrate_acquisition_schema(engine)
+        tables = define_tables(MetaData())
+        repo = Repository(engine, tables, SecretBox(b'x'*32))
+        source = repo.create_connection('Old OPDS', 'opds', {'endpoint': 'https://catalog.example/feed'}, enabled=True)
+        offer = repo.create_offer(2, source.id, {'title': 'Existing request'})
+        job = repo.create_job(2, offer, 'old-request')
+        before = _roles(engine)
+        with engine.begin() as conn:
+            for column in ('client_revision', 'external_id', 'submission_started'):
+                conn.exec_driver_sql(f'ALTER TABLE acquisition_job DROP COLUMN {column}')
+            conn.exec_driver_sql('ALTER TABLE acquisition_connection DROP COLUMN deleted')
+        for _ in range(2):
+            assert migrate_acquisition_schema(engine) == marker
+            assert repo.get_job(2, job.id).state == 'awaiting_approval'
+            assert repo.get_job(2, job.id).title == 'Existing request'
+            assert repo.connection_config(source.id).config['endpoint'] == 'https://catalog.example/feed'
+            assert _roles(engine) == before
+        with engine.connect() as conn:
+            assert conn.exec_driver_sql('SELECT client_revision, external_id, submission_started FROM acquisition_job WHERE id=?', (job.id,)).one() == (None,None,None)
+    finally:
+        engine.dispose()

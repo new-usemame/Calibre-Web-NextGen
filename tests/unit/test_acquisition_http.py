@@ -284,3 +284,27 @@ def test_unsolicited_compression_is_rejected_before_decompression():
     with pytest.raises(http.TransportError, match='unsupported_content_encoding'):
         http.fetch_document('https://files.example/book', http.HTTPPolicy(), session_factory=Server([reply]))
     assert reply.closed
+
+
+def test_indexer_descriptor_redirect_never_forwards_its_original_api_key():
+    server = Server([Reply(status=301, headers={'Location': 'https://source.example/nzb?apikey=source-key'}), Reply(b'<nzb/>')])
+    policy = http.HTTPPolicy(query_secrets=('PROWLARR_SECRET',))
+    assert http.fetch_document('https://prowlarr.example/download?apikey=PROWLARR_SECRET', policy, session_factory=server).body == b'<nzb/>'
+    assert 'PROWLARR_SECRET' not in server.calls[1][0]
+    malicious = Server([Reply(status=302, headers={'Location': 'https://foreign.example/nzb?x=PROWLARR%5FSECRET'})])
+    with pytest.raises(http.TransportError, match='credentials_redirected'):
+        http.fetch_document('https://prowlarr.example/download?apikey=PROWLARR_SECRET', policy, session_factory=malicious)
+    assert len(malicious.calls) == 1
+
+
+def test_multipart_submission_cannot_redirect_keys_or_descriptor_bytes():
+    class UploadServer(Server):
+        def post(self, url, **kwargs):
+            self.calls.append((url, kwargs))
+            return self.replies.pop(0)
+    server = UploadServer([Reply(status=307, headers={'Location': 'https://foreign.example/api'})])
+    with pytest.raises(http.TransportError, match='redirect_limit'):
+        http.fetch_document('https://sab.example/api', http.HTTPPolicy(), session_factory=server,
+            form={'mode': 'addfile', 'apikey': 'SAB_SECRET'}, upload=('owned.nzb', b'<nzb/>'))
+    assert len(server.calls) == 1
+    assert server.calls[0][1]['files']['name'][1] == b'<nzb/>'

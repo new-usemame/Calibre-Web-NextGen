@@ -3,6 +3,7 @@ import { useTasks, useCancelTask } from '../lib/queries';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { useT } from '../lib/i18n';
+import { taskText } from '../lib/taskText';
 import styles from './Tasks.module.css';
 
 export function Tasks() {
@@ -44,8 +45,8 @@ export function Tasks() {
           <tbody>
             {data.items.map((task) => (
               <tr key={String(task.task_id)}>
-                <td className={styles.taskMsg}>{task.taskMessage}</td>
-                <td>{task.user}</td>
+                <td className={styles.taskMsg}>{taskText(task.taskMessage)}</td>
+                <td>{taskText(task.user)}</td>
                 <td>{task.status ?? '—'}</td>
                 <td>{task.progress}</td>
                 <td>{task.runtime ?? '—'}</td>
@@ -54,7 +55,7 @@ export function Tasks() {
                     <button className={styles.cancelBtn}
                       onClick={() => cancel.mutate(task.task_id)}
                       disabled={cancel.isPending}
-                      aria-label={t('Cancel {task}', { task: task.taskMessage })}>
+                      aria-label={t('Cancel {task}', { task: taskText(task.taskMessage) })}>
                       <X size={15} />
                     </button>
                   )}

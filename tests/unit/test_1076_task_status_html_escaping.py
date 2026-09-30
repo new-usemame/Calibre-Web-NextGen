@@ -91,3 +91,23 @@ def test_registration_task_escapes_self_chosen_username(monkeypatch):
         message = str(queued[0].message)
     assert "<img" not in message
     assert "&lt;img src=x onerror=&#34;alert(1)&#34;&gt;" in message
+
+
+def test_lazy_converter_error_is_escaped_on_the_wire(monkeypatch):
+    # convert.py builds the error with N_(), a flask_babel LazyString. It has
+    # __html__, so markupsafe would pass it through as trusted markup.
+    from flask import Flask
+    from flask_babel import Babel, lazy_gettext as N_
+
+    user = SimpleNamespace(name="alice", role_admin=lambda: False)
+    monkeypatch.setattr(tasks_status, "current_user", user)
+
+    app = Flask(__name__)
+    Babel(app)
+    with app.app_context():
+        task = _task(error=N_("Calibre failed with error: %(error)s", error="<img src=x onerror=alert(1)>"))
+        rendered = tasks_status.render_task_status([(1, "alice", None, task, False)])
+        wire = app.json.dumps(rendered)
+
+    assert "<img" not in wire
+    assert "Calibre failed with error: &lt;img src=x onerror=alert(1)&gt;" in wire

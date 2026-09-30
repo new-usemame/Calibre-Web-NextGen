@@ -1604,6 +1604,14 @@ function CWNGSync:refreshLibraryViews(changed_files)
     end
 end
 
+-- Where a closed book's sidecar says it was, or nil when it has none. Bulk
+-- pull treats every book as unattended: a same-device position is restored
+-- only onto a book with no position of its own (#2380).
+function CWNGSync:readLocalPercentFinished(file_path)
+    local DocSettings = require("docsettings")
+    return DocSettings:open(file_path):readSetting("percent_finished")
+end
+
 function CWNGSync:applyProgressToBook(file_path, progress, percentage)
     local DocSettings = require("docsettings")
     local doc_settings = DocSettings:open(file_path)
@@ -1802,7 +1810,10 @@ function CWNGSync:pullLibraryProgress(ensure_networking)
                     return
                 end
 
-                if SyncLogic.isRemoteProgressFromThisDevice(body, Device.model, self.device_id) then
+                -- The sidecar is only read for this device's own pushes.
+                if SyncLogic.isRemoteProgressFromThisDevice(body, Device.model, self.device_id)
+                        and SyncLogic.shouldIgnoreOwnRemoteProgress(body, Device.model, self.device_id, false,
+                            self:readLocalPercentFinished(file_path)) then
                     logger.dbg("CWNGSync: [Bulk Pull] skipping same-device progress for", file_path)
                     pullNextBook()
                     return
@@ -2090,20 +2101,14 @@ function CWNGSync:getProgress(ensure_networking, interactive)
                 return
             end
 
-            if SyncLogic.isRemoteProgressFromThisDevice(body, Device.model, self.device_id) then
+            local progress = self:getLastProgress()
+            local percentage = self:getLastPercent()
+            if SyncLogic.shouldIgnoreOwnRemoteProgress(body, Device.model, self.device_id, interactive, percentage) then
                 logger.dbg("CWNGSync: [Pull] end for", current_file, "latest progress already belongs to this device")
-                if interactive then
-                    UIManager:show(InfoMessage:new{
-                        text = _("Latest progress is coming from this device."),
-                        timeout = 3,
-                    })
-                end
                 return
             end
 
             body.percentage = Math.roundPercent(tonumber(body.percentage) or 0)
-            local progress = self:getLastProgress()
-            local percentage = self:getLastPercent()
             logger.dbg("CWNGSync: Current progress:", percentage * 100, "% =>", progress)
 
             if percentage == body.percentage
@@ -2120,6 +2125,21 @@ function CWNGSync:getProgress(ensure_networking, interactive)
 
             -- The progress needs to be updated.
             if interactive then
+                -- This device's own push, while the book has a position of its
+                -- own: usually the reader has moved on since, so ask rather
+                -- than jump back (#2380). With no local position it applies
+                -- straight away, like any other device's.
+                if percentage > 0 and SyncLogic.isRemoteProgressFromThisDevice(body, Device.model, self.device_id) then
+                    UIManager:show(ConfirmBox:new{
+                        text = T(_("The latest position on the server, %1%, was saved from this device. Go to it?"),
+                                 Math.round(body.percentage * 100)),
+                        ok_callback = function()
+                            self:syncToProgress(remote)
+                            showSyncedMessage()
+                        end,
+                    })
+                    return
+                end
                 -- If user actively pulls progress from other devices,
                 -- we always update the progress without further confirmation.
                 self:syncToProgress(remote)

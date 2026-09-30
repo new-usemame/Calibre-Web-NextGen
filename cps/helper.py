@@ -373,7 +373,7 @@ def send_broadcast_email(subject, body_html, recipients, sender_name):
                 attachment=None,
                 settings=settings,
                 recipient=email,
-                task_message=N_("Announcement Email to %(email)s", email=email),
+                task_message=N_("Announcement Email to %(email)s", email=escape(email)),
                 text=text_fallback,
                 html=wrapped_html,
             ))
@@ -497,7 +497,7 @@ def send_registration_mail(e_mail, user_name, default_password, resend=False):
         attachment=None,
         settings=config.get_mail_settings(),
         recipient=e_mail,
-        task_message=N_("Registration Email for user: %(name)s", name=user_name),
+        task_message=N_("Registration Email for user: %(name)s", name=escape(user_name)),
         text=txt
     ))
     return

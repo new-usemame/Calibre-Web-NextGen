@@ -1,0 +1,2 @@
+### Security
+- **The Tasks page shows converter errors as text instead of rendering them as HTML.** A failed conversion whose error output contained markup was drawn into the table as page content; the error column is now escaped, while the deliberate link to the book in the task name still works. Book titles in scheduled auto-send tasks and self-chosen usernames in registration-email tasks are escaped too, so neither can inject markup into an admin's Tasks page. Reported in #1076; fix by @aguspatur22 (#2209).

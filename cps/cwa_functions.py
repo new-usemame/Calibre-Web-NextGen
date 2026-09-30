@@ -6,6 +6,7 @@
 
 from flask import Blueprint, redirect, flash, url_for, request, send_from_directory, abort, jsonify, current_app
 from flask_babel import gettext as _, lazy_gettext as _l
+from markupsafe import escape
 
 from . import logger, config, constants, csrf, helper, ub, calibre_db, reverseproxy
 from .constants import LOG_ARCHIVE
@@ -405,7 +406,7 @@ def cwa_internal_schedule_auto_send():
             row_id = None
             log.error(f"Failed to record scheduled auto-send in cwa.db: {e}")
 
-        task_message = f"Auto-sending '{title}' to user's eReader(s)"
+        task_message = f"Auto-sending '{escape(title)}' to user's eReader(s)"
 
         # Closure that marks dispatched and enqueues the task when the time arrives
         def _enqueue_autosend():

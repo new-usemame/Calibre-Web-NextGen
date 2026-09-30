@@ -163,6 +163,13 @@
   .container { padding: var(--sp-4) var(--sp-3); }
   .controls { flex-direction: column; align-items: stretch; }
   .field select, .search { width: 100%; }
+  /* `.search` carries `flex: 1 1 260px` so that on a wide screen it shares the
+     controls row and grows into the slack. A flex basis is measured along the
+     container's MAIN axis, and this block turns that axis vertical, so the
+     same 260px stopped meaning "at least this wide" and became the search
+     field's HEIGHT — a 260px slab, with the input and the button stretched to
+     fill it. Scope the basis to the axis it was written for. */
+  .search { flex: 0 0 auto; }
   .publications { grid-template-columns: 1fr; }
   .offers > .primary { flex: 1 1 140px; }
   .job { align-items: flex-start; }

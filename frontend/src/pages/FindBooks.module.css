@@ -118,7 +118,10 @@
   cursor: pointer; white-space: nowrap;
   transition: filter var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
-.primary, .search button { border: 1px solid transparent; background: var(--accent); color: var(--accent-text); }
+/* --on-accent, not --accent-text: tokens.css defines --accent-text as amber
+   TEXT on a tinted surface and --on-accent as the foreground for amber
+   FILLS. Amber-on-amber measured 1.48:1 against a 4.5:1 requirement. */
+.primary, .search button { border: 1px solid transparent; background: var(--accent); color: var(--on-accent); }
 .primary:hover:not(:disabled), .search button:hover:not(:disabled) { filter: brightness(1.08); }
 .secondary { border: 1px solid var(--border); background: var(--surface-1); color: var(--text); }
 .secondary:hover:not(:disabled) { border-color: var(--border-strong); }
@@ -126,7 +129,7 @@
 
 .primaryLink {
   display: inline-flex; align-items: center; min-height: 40px; padding: 0 var(--sp-3);
-  border-radius: var(--r-md); background: var(--accent); color: var(--accent-text);
+  border-radius: var(--r-md); background: var(--accent); color: var(--on-accent);
   font-size: var(--fs-sm); font-weight: var(--fw-medium); white-space: nowrap;
 }
 .primaryLink:hover { filter: brightness(1.08); }

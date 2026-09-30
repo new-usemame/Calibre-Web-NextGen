@@ -116,7 +116,8 @@
   cursor: pointer; white-space: nowrap;
   transition: filter var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease);
 }
-.primary { border: 1px solid transparent; background: var(--accent); color: var(--accent-text); }
+/* --on-accent, not --accent-text — see the note in FindBooks.module.css. */
+.primary { border: 1px solid transparent; background: var(--accent); color: var(--on-accent); }
 .primary:hover:not(:disabled) { filter: brightness(1.08); }
 .secondary { border: 1px solid var(--border); background: var(--surface-1); color: var(--text); }
 .secondary:hover:not(:disabled) { border-color: var(--border-strong); }

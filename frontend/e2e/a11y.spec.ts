@@ -123,6 +123,140 @@ for (const [label, path] of [
   });
 }
 
+// ── acquisition (book sources) — the two routes this feature adds ───────────
+/*
+ * Both routes are gated and ship switched off, so neither is reachable from
+ * the seeded login: `/app/find-books` renders <NotFound/> unless
+ * `me.acquisition_access` is true, and an empty Book sources page would scan
+ * almost no controls. Grant access in the RESPONSE and serve a POPULATED
+ * catalog, so axe grades the surfaces people actually meet — offer buttons,
+ * state pills, switches, the approval queue, the add-catalog form — rather
+ * than an empty state that hides all of them. Nothing on the server is
+ * touched, so these are safe alongside the parallel lanes.
+ *
+ * Deliberately NOT phone-skipped like the route loop above: this UI is new,
+ * its phone layout was changed in this branch, and mobile is where its
+ * regressions would land.
+ */
+const ACQ_V1 = '/api/v1';
+
+async function serveAcquisition(page: Page, replies: Record<string, unknown>): Promise<void> {
+  // Registered first, reached last: the catch-all below must `fallback()` for
+  // this override to be live at all.
+  await page.route(`**${ACQ_V1}/auth/me`, async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    await route.fulfill({
+      response,
+      contentType: 'application/json',
+      body: JSON.stringify({ ...body, acquisition_access: true }),
+    });
+  });
+  await page.route(`**${ACQ_V1}/**`, async (route) => {
+    const { pathname } = new URL(route.request().url());
+    const body = replies[pathname];
+    if (body === undefined) return route.fallback();
+    await route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify(body),
+    });
+  });
+}
+
+const ACQ_RUNTIME = { available: true, reasons: [] as string[] };
+
+test('find books: no critical/serious a11y violations', async ({ page }) => {
+  await serveAcquisition(page, {
+    [`${ACQ_V1}/acquisition`]: {
+      connections: [
+        { id: 'c1', label: 'Project Gutenberg', adapter: 'opds', enabled: true, revision: 1 },
+        { id: 'c2', label: 'Standard Ebooks', adapter: 'opds', enabled: true, revision: 1 },
+      ],
+      can_acquire: true,
+      runtime: ACQ_RUNTIME,
+    },
+    [`${ACQ_V1}/acquisition/catalog`]: {
+      title: 'Project Gutenberg',
+      protocol: 'opds',
+      publications: [{
+        title: 'Frankenstein; Or, The Modern Prometheus',
+        identity: 'pub-1',
+        authors: ['Mary Wollstonecraft Shelley'],
+        languages: ['en'],
+        description: 'A student of natural philosophy assembles a living creature.',
+        offers: [
+          { format: 'EPUB', label: 'EPUB', identity: 'o-epub', relation: 'acquisition', offer_id: 'offer-epub' },
+          { format: 'PDF', label: 'PDF', identity: 'o-pdf', relation: 'acquisition', offer_id: 'offer-pdf' },
+        ],
+        navigation: [],
+      }],
+      navigation: [
+        { title: 'Popular', relations: [], selection: 'sel-popular' },
+        { title: 'Latest', relations: [], selection: 'sel-latest' },
+      ],
+      pagination: [{ title: 'Next', relations: ['next'], selection: 'sel-next' }],
+      searches: [{ title: 'Search this catalog', selection: 'sel-search' }],
+      groups: [],
+      facets: [{ title: 'Language', navigation: [{ title: 'English', relations: [], selection: 'sel-en' }] }],
+    },
+    // Terminal states only: a job still in flight keeps the page polling, and
+    // `networkidle` would never settle for axe. These also render the richest
+    // row content — a state pill, a receipt link and a retry.
+    [`${ACQ_V1}/acquisition/jobs`]: {
+      jobs: [
+        {
+          id: 'j1', connection_id: 'c1', state: 'imported', add_to_my_library: true,
+          cancel_requested: false, error_code: null, claim_count: 1, title: 'Romeo and Juliet',
+          result: { book_ids: [224], disposition: 'imported' },
+        },
+        {
+          id: 'j2', connection_id: 'c1', state: 'failed', add_to_my_library: false,
+          cancel_requested: false, error_code: 'source_busy', claim_count: 2, title: 'Dracula',
+        },
+      ],
+    },
+  });
+
+  await page.goto('/app/find-books');
+  await expect(page.getByRole('heading', { name: 'Find books', level: 1 })).toBeVisible();
+  await expect(page.locator('main')).toHaveCount(1);
+  await axeScan(page, 'find-books');
+});
+
+test('admin book sources: no critical/serious a11y violations', async ({ page }) => {
+  await serveAcquisition(page, {
+    [`${ACQ_V1}/admin/acquisition`]: {
+      enabled: true, migration_status: 'ready', runtime: ACQ_RUNTIME,
+    },
+    [`${ACQ_V1}/admin/acquisition/connections`]: {
+      connections: [
+        { id: 'c1', label: 'Project Gutenberg', adapter: 'opds', enabled: true, revision: 1 },
+        { id: 'c2', label: 'Standard Ebooks', adapter: 'opds', enabled: false, revision: 1 },
+      ],
+    },
+    [`${ACQ_V1}/admin/acquisition/users`]: {
+      users: [
+        { id: 1, name: 'admin', access: false, auto_approve: false },
+        { id: 496, name: 'vlreader', access: true, auto_approve: false },
+      ],
+    },
+    [`${ACQ_V1}/admin/acquisition/jobs`]: {
+      jobs: [{
+        id: 'j3', connection_id: 'c1', state: 'awaiting_approval', owner_id: 496,
+        add_to_my_library: true, cancel_requested: false, error_code: null,
+        claim_count: 0, title: 'The Yellow Wallpaper',
+      }],
+    },
+  });
+
+  await page.goto('/app/admin/acquisition');
+  await expect(page.getByRole('heading', { name: 'Book sources', level: 1 })).toBeVisible();
+  // The queue is the section a failed read used to delete outright; scanning
+  // it populated is the only way axe sees the Approve control at all.
+  await expect(page.getByRole('heading', { name: 'Waiting for approval' })).toBeVisible();
+  await expect(page.locator('main')).toHaveCount(1);
+  await axeScan(page, 'admin-book-sources');
+});
+
 // Exercise the real reader independently in each palette before taking its
 // static accessibility snapshot. The reader has its own persisted theme.
 for (const theme of ['dark', 'light'] as const) {

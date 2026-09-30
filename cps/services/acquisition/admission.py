@@ -62,10 +62,10 @@ def account_allowed(database, owner_id):
 
 def acquisition_offer(payload, allowed_media_types=None):
     if (not isinstance(payload, dict) or payload.get('kind') != 'acquisition'
-            or payload.get('media_type') not in ('application/epub+zip','application/pdf','application/x-nzb')):
+            or payload.get('media_type') not in ('application/epub+zip','application/pdf','application/x-nzb','application/x-bittorrent')):
         raise AdmissionError('unsupported_offer')
-    if payload['media_type'] == 'application/x-nzb':
-        if payload.get('transport') != 'nzb' or not allowed_media_types:
+    if payload['media_type'] in ('application/x-nzb', 'application/x-bittorrent'):
+        if payload.get('transport') != ('nzb' if payload['media_type'] == 'application/x-nzb' else 'torrent') or not allowed_media_types:
             raise AdmissionError('format_disabled')
         return
     if allowed_media_types is not None and payload['media_type'] not in allowed_media_types:

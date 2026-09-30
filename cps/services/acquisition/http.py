@@ -99,6 +99,8 @@ class FetchedDocument:
     body: bytes = field(repr=False)
     url: str = field(repr=False)
     content_type: str
+    status: int = 200
+    headers: dict = field(default_factory=dict, repr=False)
 
 
 @dataclass(frozen=True)
@@ -156,7 +158,7 @@ def _retry_after(value: str | None) -> int | None:
         return None
 
 
-def _transfer(url, policy, consume, max_bytes, checkpoint, session_factory, *, form=None, upload=None):
+def _transfer(url, policy, consume, max_bytes, checkpoint, session_factory, *, form=None, upload=None, body=None, headers=None, accepted_statuses=(200,), accept_empty=False, upload_field="name"):
     if not isinstance(max_bytes, int) or max_bytes <= 0:
         raise TransportError('invalid_limits')
     url = normalized_url(url)
@@ -170,21 +172,27 @@ def _transfer(url, policy, consume, max_bytes, checkpoint, session_factory, *, f
         checkpoint()
         if time.monotonic() - started >= policy.deadline:
             raise TransportError('transfer_timeout')
-        headers = {'Accept-Encoding': 'identity', 'User-Agent': 'Calibre-Web-NextGen'}
+        request_headers = {'Accept-Encoding': 'identity', 'User-Agent': 'Calibre-Web-NextGen'}
+        if headers:
+            if origin(url) not in {origin(x) for x in policy.credential_origins}:
+                raise TransportError('credentials_redirected')
+            request_headers.update(headers)
         if policy.authorization and origin(url) in {origin(x) for x in policy.credential_origins}:
-            headers['Authorization'] = policy.authorization
+            request_headers['Authorization'] = policy.authorization
         try:
             with session_factory(policy, url) as session:
-                method = session.post if form is not None else session.get
+                method = session.post if form is not None or body is not None else session.get
                 options = {}
                 if form is not None:
                     options['data'] = form
+                if body is not None:
+                    options['data'] = body
                 if upload is not None:
-                    options['files'] = {'name': (upload[0], upload[1], 'application/x-nzb')}
-                with method(url, headers=headers, allow_redirects=False, stream=True,
+                    options['files'] = {upload_field: (upload[0], upload[1], 'application/x-nzb' if upload_field == 'name' else 'application/x-bittorrent')}
+                with method(url, headers=request_headers, allow_redirects=False, stream=True,
                                  timeout=(policy.connect_timeout, policy.read_timeout), verify=True, **options) as response:
                     if response.status_code in (301, 302, 303, 307, 308):
-                        if form is not None:
+                        if form is not None or body is not None or headers:
                             raise TransportError('redirect_limit')
                         location = response.headers.get('Location')
                         if not location or hop == policy.max_redirects:
@@ -199,11 +207,11 @@ def _transfer(url, policy, consume, max_bytes, checkpoint, session_factory, *, f
                             raise TransportError('insecure_redirect')
                         url = target
                         continue
-                    if response.status_code in (401, 403):
+                    if response.status_code in (401, 403) and response.status_code not in accepted_statuses:
                         raise TransportError('needs_auth')
                     if response.status_code in (429, 503):
                         raise TransportError('source_busy', retry_after=_retry_after(response.headers.get('Retry-After')))
-                    if response.status_code != 200:
+                    if response.status_code not in accepted_statuses:
                         raise TransportError('source_http_error')
                     # We negotiate identity. Do not let an unsolicited compressed
                     # body inflate inside Requests before our byte budget runs.
@@ -227,11 +235,11 @@ def _transfer(url, policy, consume, max_bytes, checkpoint, session_factory, *, f
                         if total > max_bytes:
                             raise TransportError('file_too_large')
                         consume(chunk)
-                    if not total:
+                    if not total and not accept_empty:
                         raise TransportError('empty_response')
                     if declared is not None and not response.headers.get('Content-Encoding') and total != declared:
                         raise TransportError('incomplete_response')
-                    return url, total, response.headers.get('Content-Type', '').split(';', 1)[0].strip().lower()
+                    return url, total, response.headers.get('Content-Type', '').split(';', 1)[0].strip().lower(), response.status_code, {key.lower(): value for key, value in response.headers.items() if key.lower() in ('set-cookie', 'x-transmission-session-id') and len(value) <= 4096}
         except TransportError:
             raise
         except requests.RequestException:
@@ -240,10 +248,10 @@ def _transfer(url, policy, consume, max_bytes, checkpoint, session_factory, *, f
 
 
 def fetch_document(url: str, policy: HTTPPolicy, *, max_bytes: int = 2 * 1024 * 1024,
-                   checkpoint=lambda: None, session_factory=_session, form=None, upload=None) -> FetchedDocument:
+                   checkpoint=lambda: None, session_factory=_session, form=None, upload=None, body=None, headers=None, accepted_statuses=(200,), accept_empty=False, upload_field="name") -> FetchedDocument:
     chunks = []
-    final, _, mime = _transfer(url, policy, chunks.append, max_bytes, checkpoint, session_factory, form=form, upload=upload)
-    return FetchedDocument(b''.join(chunks), final, mime)
+    final, _, mime, status, returned_headers = _transfer(url, policy, chunks.append, max_bytes, checkpoint, session_factory, form=form, upload=upload, body=body, headers=headers, accepted_statuses=accepted_statuses, accept_empty=accept_empty, upload_field=upload_field)
+    return FetchedDocument(b''.join(chunks), final, mime, status, returned_headers)
 
 
 def download_file(url: str, policy: HTTPPolicy, destination: Path, *, max_bytes: int,
@@ -258,7 +266,7 @@ def download_file(url: str, policy: HTTPPolicy, destination: Path, *, max_bytes:
             def consume(chunk):
                 output.write(chunk)
                 digest.update(chunk)
-            _, count, mime = _transfer(url, policy, consume, max_bytes, checkpoint, session_factory)
+            _, count, mime, _, _ = _transfer(url, policy, consume, max_bytes, checkpoint, session_factory)
             output.flush()
             os.fsync(output.fileno())
         return DownloadedFile(destination, count, digest.hexdigest(), mime)
@@ -269,7 +277,7 @@ def download_file(url: str, policy: HTTPPolicy, destination: Path, *, max_bytes:
 
 
 def run_transfer(url: str, policy: HTTPPolicy, *, destination: Path | None = None,
-                 max_bytes: int = 2 * 1024 * 1024, checkpoint=lambda: None, form=None, upload=None):
+                 max_bytes: int = 2 * 1024 * 1024, checkpoint=lambda: None, form=None, upload=None, body=None, headers=None, accepted_statuses=(200,), accept_empty=False, upload_field="name"):
     """Production entry point: hard deadline/cancellation around owned child I/O.
 
     A file is first written in a private temporary directory. Only successful
@@ -289,6 +297,13 @@ def run_transfer(url: str, policy: HTTPPolicy, *, destination: Path | None = Non
     if upload is not None and (form is None or len(upload) != 2 or not isinstance(upload[0], str)
             or len(upload[0]) > 128 or not isinstance(upload[1], bytes) or len(upload[1]) > 512 * 1024):
         raise TransportError('invalid_configuration')
+    if body is not None and (not isinstance(body, bytes) or len(body) > 700 * 1024 or form is not None or destination is not None):
+        raise TransportError('invalid_configuration')
+    if (headers is not None and (not isinstance(headers, dict) or set(headers) - {'Cookie', 'Referer', 'Content-Type', 'X-Transmission-Session-Id'}
+            or any(not isinstance(v, str) or len(v) > 4096 or any(ord(c) < 32 or ord(c) == 127 for c in v) for v in headers.values()))
+            or upload_field not in ('name', 'torrents') or set(accepted_statuses) - {200, 204, 400, 401, 403, 409, 415}
+            or destination is not None and (headers or accepted_statuses != (200,) or accept_empty)):
+        raise TransportError('invalid_configuration')
     if destination is not None:
         try:
             destination.lstat()
@@ -300,7 +315,7 @@ def run_transfer(url: str, policy: HTTPPolicy, *, destination: Path | None = Non
         raise TransportError('invalid_limits')
     with tempfile.TemporaryDirectory(prefix='.acquisition-', dir=destination.parent if destination else None) as private:
         staged = Path(private) / 'download.part' if destination else None
-        payload = json.dumps({'url': url, 'policy': asdict(policy), 'destination': str(staged) if staged else None, 'max_bytes': max_bytes, 'form': form,
+        payload = json.dumps({'url': url, 'policy': asdict(policy), 'destination': str(staged) if staged else None, 'max_bytes': max_bytes, 'form': form, 'body': base64.b64encode(body).decode('ascii') if body is not None else None, 'headers': headers, 'accepted_statuses': accepted_statuses, 'accept_empty': accept_empty, 'upload_field': upload_field,
             'upload': [upload[0], base64.b64encode(upload[1]).decode('ascii')] if upload else None}).encode()
         if len(payload) > 1024 * 1024:
             raise TransportError('invalid_configuration')
@@ -341,7 +356,7 @@ def run_transfer(url: str, policy: HTTPPolicy, *, destination: Path | None = Non
                     # link, unlike replace/rename, cannot overwrite an existing file.
                     os.link(staged, destination)
                     return DownloadedFile(destination, result['bytes'], result['sha256'], result['content_type'])
-                return FetchedDocument(base64.b64decode(result['body'], validate=True), result['url'], result['content_type'])
+                return FetchedDocument(base64.b64decode(result['body'], validate=True), result['url'], result['content_type'], result.get('status', 200), result.get('headers', {}))
             finally:
                 if child.poll() is None:
                     child.kill()
@@ -375,8 +390,8 @@ def _worker_main():
         else:
             upload = message.get('upload')
             result = fetch_document(message['url'], policy, max_bytes=message['max_bytes'],
-                form=message.get('form'), upload=(upload[0], base64.b64decode(upload[1], validate=True)) if upload else None)
-            output = {'body': base64.b64encode(result.body).decode('ascii'), 'url': result.url, 'content_type': result.content_type}
+                form=message.get('form'), body=base64.b64decode(message['body'], validate=True) if message.get('body') is not None else None, headers=message.get('headers'), accepted_statuses=message.get('accepted_statuses', [200]), accept_empty=message.get('accept_empty', False), upload_field=message.get('upload_field', 'name'), upload=(upload[0], base64.b64decode(upload[1], validate=True)) if upload else None)
+            output = {'body': base64.b64encode(result.body).decode('ascii'), 'url': result.url, 'content_type': result.content_type, 'status': result.status, 'headers': result.headers}
     except TransportError as exc:
         output = {'error': exc.code, 'retry_after': exc.retry_after}
     except Exception:

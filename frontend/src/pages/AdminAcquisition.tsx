@@ -63,9 +63,12 @@ export function AdminAcquisition() {
 
   const [draft, setDraft] = useState(EMPTY_CONNECTION);
   const [adapter, setAdapter] = useState('opds');
+  const isClient = ['sabnzbd', 'nzbget', 'qbittorrent', 'transmission'].includes(adapter);
+  const passwordClient = ['nzbget', 'qbittorrent', 'transmission'].includes(adapter);
   const [editing, setEditing] = useState<string | null>(null);
   const [loadedPolicy, setLoadedPolicy] = useState<{ endpoint: string; local: boolean; revision: number } | null>(null);
   const [downloadOrigins, setDownloadOrigins] = useState('');
+  const [trackerOrigins, setTrackerOrigins] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
   const formHeading = useRef<HTMLHeadingElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -132,20 +135,20 @@ export function AdminAcquisition() {
     mutationFn: async () => {
       const value: Partial<AcquisitionConnectionInput> = {
         endpoint: draft.endpoint.trim(), auth_kind: draft.auth_kind,
-        username: adapter === 'opds' && draft.auth_kind === 'basic' ? draft.username : '',
+        username: draft.auth_kind === 'basic' ? draft.username : '',
       };
       if (!editing || loadedPolicy?.local !== draft.allow_private_network || loadedPolicy?.endpoint !== draft.endpoint.trim()) {
         value.allow_private_network = draft.allow_private_network;
       }
-      if (!editing || draft.secret) value.secret = adapter === 'opds' && draft.auth_kind === 'none' ? '' : draft.secret;
-      if (adapter === 'newznab') Object.assign(value, { category: draft.category, client_id: draft.client_id, preset: draft.preset, download_origins: downloadOrigins.split(',').map((item) => item.trim()).filter(Boolean) });
-      if (adapter === 'sabnzbd') Object.assign(value, { category: draft.category, remote_path: draft.remote_path, local_path: draft.local_path });
+      if (!editing || draft.secret) value.secret = (adapter === 'opds' || adapter === 'transmission') && draft.auth_kind === 'none' ? '' : draft.secret;
+      if (adapter === 'newznab') Object.assign(value, { category: draft.category, client_id: draft.client_id, preset: draft.preset, download_origins: downloadOrigins.split(',').map((item) => item.trim()).filter(Boolean), tracker_origins: trackerOrigins.split(',').map((item) => item.trim()).filter(Boolean) });
+      if (isClient) Object.assign(value, { category: draft.category, remote_path: draft.remote_path, local_path: draft.local_path });
       if (editing) await editAcquisitionConnection(editing, draft.label.trim(), value, loadedPolicy?.revision);
       else await createAcquisitionConnection(draft.label.trim(), value as AcquisitionConnectionInput, adapter);
     },
     onSuccess: () => {
       setDraft(EMPTY_CONNECTION);
-      setEditing(null); setLoadedPolicy(null); setDownloadOrigins('');
+      setEditing(null); setLoadedPolicy(null); setDownloadOrigins(''); setTrackerOrigins('');
       setAdapter('opds');
       setFormError(null);
       refresh('connections');
@@ -176,6 +179,7 @@ export function AdminAcquisition() {
       setEditing(row.id); setAdapter(row.adapter); setFormError(null);
       setLoadedPolicy({ endpoint: row.config.endpoint, local: !!row.config.private_origins?.length, revision: row.revision });
       setDownloadOrigins(row.config.download_origins?.join(', ') ?? '');
+      setTrackerOrigins(row.config.tracker_origins?.join(', ') ?? '');
       setDraft({ ...EMPTY_CONNECTION, ...row.config, label: row.label, secret: '',
         allow_private_network: !!row.config.private_origins?.length });
       requestAnimationFrame(() => { formHeading.current?.focus(); formHeading.current?.scrollIntoView({ block: 'center' }); });
@@ -219,7 +223,7 @@ export function AdminAcquisition() {
       setProbes((current) => ({
         ...current,
         [id]: { error: errorCode(error) === 'source_unavailable'
-          ? t('The source did not answer with a catalog we can read.')
+          ? t('The connection did not answer with a response we can read.')
           : errorCode(error) ? protocolErrorText(errorCode(error)!) : t('The connection test failed.') },
       }));
     },
@@ -356,7 +360,7 @@ export function AdminAcquisition() {
         <h1>{t('Book sources')}</h1>
       </header>
       <p className={styles.lede}>
-        {t('Let people request books from an OPDS catalog or an indexer connected to SABnzbd. A requested book is imported into this library through the normal ingest path, credited to the account that asked for it.')}
+        {t('Let people request books from an OPDS catalog or an indexer connected to a download client. A requested book is imported into this library through the normal ingest path, credited to the account that asked for it.')}
       </p>
 
       {/* Reached only with settings still on screen from an earlier, good
@@ -495,7 +499,7 @@ export function AdminAcquisition() {
                         })}
                         onChange={(event) => toggleConnection.mutate({ id: connection.id, enabled: event.target.checked })}
                       />
-                      <span>{connection.adapter === 'sabnzbd' ? t('Enabled') : t('Available to users')}</span>
+                      <span>{['sabnzbd', 'nzbget', 'qbittorrent', 'transmission'].includes(connection.adapter) ? t('Enabled') : t('Available to users')}</span>
                     </label>
                   </div>
                   {deleting === connection.id && <div className={styles.connectionActions}>
@@ -521,11 +525,14 @@ export function AdminAcquisition() {
               <span>{t('Connection type')}</span>
               <select aria-invalid={formError ? true : undefined} aria-describedby={formError ? `${formId}-error` : undefined} value={adapter} disabled={!!editing} onChange={(event) => {
                 setAdapter(event.target.value);
-                setDraft({ ...EMPTY_CONNECTION, label: draft.label, category: event.target.value === 'sabnzbd' ? 'books' : '7020' });
+                setDraft({ ...EMPTY_CONNECTION, label: draft.label, category: ['opds', 'newznab'].includes(event.target.value) ? '7020' : 'books', auth_kind: ['nzbget', 'qbittorrent', 'transmission'].includes(event.target.value) ? 'basic' : 'none' });
               }}>
                 <option value="opds">{t('OPDS catalog')}</option>
                 <option value="newznab">{t('Newznab / Torznab indexer')}</option>
                 <option value="sabnzbd">{t('SABnzbd download client')}</option>
+                <option value="nzbget">{t('NZBGet download client')}</option>
+                <option value="qbittorrent">{t('qBittorrent download client')}</option>
+                <option value="transmission">{t('Transmission download client')}</option>
               </select>
             </label>
             {adapter === 'newznab' && <>
@@ -542,18 +549,22 @@ export function AdminAcquisition() {
                   onChange={(event) => setDownloadOrigins(event.target.value)} />
                 <span id={`${formId}-origins-hint`}>{t('If Prowlarr redirects to another source on your local network, list its exact origin here. Separate origins with commas. Credentials stay scoped to their original origin.')}</span>
               </label>
+              <label className={styles.field}><span>{t('Allowed torrent tracker origins')}</span>
+                <input value={trackerOrigins} placeholder="https://tracker.example, udp://tracker.example:6969" aria-invalid={formError ? true : undefined} aria-describedby={`${formId}-trackers-hint${formError ? ` ${formId}-error` : ''}`} onChange={(event) => setTrackerOrigins(event.target.value)} />
+                <span id={`${formId}-trackers-hint`}>{t('List the exact HTTP, HTTPS or UDP tracker origins you trust, separated by commas. Torrents using other trackers are blocked. Source credentials are never sent to trackers.')}</span>
+              </label>
               <label className={styles.field}><span>{t('Download client')}</span>
                 <select aria-invalid={formError ? true : undefined} aria-describedby={formError ? `${formId}-error` : undefined} value={draft.client_id} required onChange={(event) => setDraft({ ...draft, client_id: event.target.value })}>
-                  <option value="">{t('Choose a SABnzbd connection')}</option>
-                  {rows.filter((row) => row.adapter === 'sabnzbd').map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
+                  <option value="">{t('Choose a download client connection')}</option>
+                  {rows.filter((row) => ['sabnzbd', 'nzbget', 'qbittorrent', 'transmission'].includes(row.adapter)).map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
                 </select>
               </label>
             </>}
-            {adapter !== 'opds' && <label className={styles.field}><span>{adapter === 'sabnzbd' ? t('SABnzbd category') : t('Book category ID')}</span>
+            {adapter !== 'opds' && <label className={styles.field}><span>{isClient ? t('Client category or label') : t('Book category ID')}</span>
               <input aria-invalid={formError ? true : undefined} aria-describedby={formError ? `${formId}-error` : undefined} value={draft.category} required onChange={(event) => setDraft({ ...draft, category: event.target.value })} />
             </label>}
-            {adapter === 'sabnzbd' && <>
-              <label className={styles.field}><span>{t('Completed folder as SABnzbd sees it')}</span>
+            {isClient && <>
+              <label className={styles.field}><span>{t('Completed folder as the download client sees it')}</span>
                 <input aria-invalid={formError ? true : undefined} aria-describedby={formError ? `${formId}-error` : undefined} value={draft.remote_path} required placeholder="/downloads/complete" onChange={(event) => setDraft({ ...draft, remote_path: event.target.value })} />
               </label>
               <label className={styles.field}><span>{t('Same completed folder inside CWNG')}</span>
@@ -584,7 +595,7 @@ export function AdminAcquisition() {
                 onChange={(event) => setDraft({ ...draft, endpoint: event.target.value })}
               />
             </label>
-            {adapter === 'opds' && <label className={styles.field}>
+            {(adapter === 'opds' || adapter === 'transmission') && <label className={styles.field}>
               <span>{t('Sign-in')}</span>
               <select
                 value={draft.auth_kind}
@@ -595,7 +606,7 @@ export function AdminAcquisition() {
               >
                 <option value="none">{t('None')}</option>
                 <option value="basic">{t('Username and password')}</option>
-                <option value="bearer">{t('Token')}</option>
+                {adapter === 'opds' && <option value="bearer">{t('Token')}</option>}
               </select>
             </label>}
             {draft.auth_kind === 'basic' && (
@@ -610,9 +621,9 @@ export function AdminAcquisition() {
                 />
               </label>
             )}
-            {(adapter !== 'opds' || draft.auth_kind !== 'none') && (
+            {((adapter !== 'opds' && !passwordClient) || draft.auth_kind !== 'none') && (
               <label className={styles.field}>
-                <span>{adapter !== 'opds' ? t('API key') : draft.auth_kind === 'basic' ? t('Password') : t('Token')}</span>
+                <span>{adapter !== 'opds' && !passwordClient ? t('API key') : draft.auth_kind === 'basic' ? t('Password') : t('Token')}</span>
                 <input
                 aria-invalid={formError ? true : undefined}
                 aria-describedby={formError ? `${formId}-error` : undefined}
@@ -636,13 +647,14 @@ export function AdminAcquisition() {
             />
             <span>
               <span className={styles.switchLabel}>
-                {t('This catalog is on my home or local network')}
+                {t('This connection is on my home or local network')}
               </span>
               <span className={styles.hint}>
-                {t('Turn this on for a catalog running on your own network, such as Calibre or Kavita on a 192.168 or 10.x address. It applies to this catalog only. Loopback, link-local and cloud metadata addresses are never allowed.')}
+                {t('Turn this on for a connection running on your own network, such as a catalog, indexer or download client on a 192.168 or 10.x address. It applies to this connection only. Loopback, link-local and cloud metadata addresses are never allowed.')}
               </span>
             </span>
           </label>
+          {isClient && <p className={styles.hint}>{t('CWNG copies a completed EPUB or PDF from this mapping. It does not move files, delete client jobs, or change seeding limits. NZBGet needs credentials that can read configuration, queue and history. qBittorrent needs an existing category. Transmission uses the configured folder and label.')}</p>}
           {formError && <p id={`${formId}-error`} className={styles.bad} role="alert">{formError}</p>}
           <p className={styles.hint}>
             {t('A new catalog is added switched off. Test it first, then make it available.')}
@@ -657,7 +669,7 @@ export function AdminAcquisition() {
             <span>{editing ? t('Save connection') : t('Add connection')}</span>
           </button>
           {editing && <button type="button" className={styles.secondary} onClick={() => {
-            setEditing(null); setLoadedPolicy(null); setDownloadOrigins(''); setDraft(EMPTY_CONNECTION); setAdapter('opds'); setFormError(null);
+            setEditing(null); setLoadedPolicy(null); setDownloadOrigins(''); setTrackerOrigins(''); setDraft(EMPTY_CONNECTION); setAdapter('opds'); setFormError(null);
           }}>{t('Cancel editing')}</button>}
         </form>
       </section>

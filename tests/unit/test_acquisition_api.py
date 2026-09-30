@@ -573,3 +573,18 @@ def test_endpoint_origin_change_requires_explicit_credential_reentry(api):
     assert updated['secret'] == 'REENTERED_KEY'
     assert updated['credential_origins'] == ['https://foreign.invalid/feed']
     assert client.patch(path, json={'config': {'endpoint': 'not-a-url'}}).status_code == 400
+
+
+@pytest.mark.parametrize('adapter',['nzbget','qbittorrent','transmission'])
+def test_new_client_admin_setup_encrypts_credentials_and_fences_edits(api,adapter):
+    client,repo,actor,module,connection,offer,database=api; actor.id=1
+    body={'label':'Client','adapter':adapter,'config':{'endpoint':'https://client.example/','auth_kind':'basic','username':'fixture','secret':'CLIENT_PASSWORD','category':'books','remote_path':'/downloads','local_path':str(database.parent)}}
+    response=client.post('/api/v1/admin/acquisition/connections',json=body)
+    assert response.status_code==201
+    row=response.get_json(); assert not row['enabled']
+    endpoint='/api/v1/admin/acquisition/connections/'+row['id']
+    safe=client.get(endpoint).get_json(); assert safe['config']['has_secret']
+    assert 'CLIENT_PASSWORD' not in client.get(endpoint).get_data(as_text=True)
+    assert client.patch(endpoint,json={'config':{'category':'ebooks'},'expected_revision':1}).status_code==200
+    assert repo.connection_config(row['id'],include_disabled=True).config['secret']=='CLIENT_PASSWORD'
+    assert client.patch(endpoint,json={'config':{'endpoint':'https://other.example/'},'expected_revision':2}).get_json()['error']['code']=='credential_required_for_new_origin'

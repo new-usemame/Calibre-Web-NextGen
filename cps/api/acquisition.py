@@ -18,6 +18,7 @@ from ..services.acquisition.http import TransportError, origin
 from ..services.acquisition.opds import CatalogParseError
 from ..services.acquisition.newznab import IndexerError, IndexerService, connection_config as indexer_config
 from ..services.acquisition.sabnzbd import ClientError, SABClient, connection_config as client_config
+from ..services.acquisition.clients import CLIENTS, CLIENT_KINDS, connection_config as other_client_config
 from ..services.acquisition.storage import Conflict, ConnectionChanged, NotFound, StorageError
 
 
@@ -186,7 +187,8 @@ def worker_available():
 
 
 
-CONFIGURATORS = {'opds': connection_config, 'newznab': indexer_config, 'sabnzbd': client_config}
+CONFIGURATORS = {'opds': connection_config, 'newznab': indexer_config, 'sabnzbd': client_config,
+    **{kind: (lambda value, kind=kind: other_client_config(kind, value)) for kind in ('nzbget', 'qbittorrent', 'transmission')}}
 
 
 def _require_connection(repo, connection_id, *, include_disabled=False, catalog=False):
@@ -202,7 +204,7 @@ def _validated_config(repo, adapter, value):
     validated = CONFIGURATORS[adapter](value)
     if adapter == 'newznab':
         client = _require_connection(repo, validated['client_id'], include_disabled=True)
-        if client.adapter != 'sabnzbd':
+        if client.adapter not in CLIENT_KINDS:
             raise admission.AdmissionError('invalid_request')
     return validated
 
@@ -365,12 +367,12 @@ def acquisition_admin_probe(connection_id):
         with runtime.open_repository(database) as repo:
             row = _require_connection(repo,connection_id,include_disabled=True)
             value = repo.connection_config(connection_id,include_disabled=True).config
-            if row.adapter == 'sabnzbd':
-                return SABClient(value).probe()
+            if row.adapter in CLIENT_KINDS:
+                return CLIENTS[row.adapter](value).probe()
             if row.adapter == 'newznab':
                 result = IndexerService(repo).probe(value)
                 client = _require_connection(repo, value['client_id'], include_disabled=True)
-                SABClient(repo.connection_config(client.id, include_disabled=True).config).probe()
+                CLIENTS[client.adapter](repo.connection_config(client.id, include_disabled=True).config).probe()
                 result['client_verified'] = True
                 return result
             return CatalogService(repo).probe(value)
@@ -401,7 +403,7 @@ def acquisition_catalog():
             formats={name for name,media in (('EPUB','application/epub+zip'),('PDF','application/pdf')) if media in allowed}
             for section in [result]+result.get('groups',[]):
                 for publication in section.get('publications',[]):
-                    publication['offers']=[offer for offer in publication.get('offers',[]) if offer.get('format') in formats or offer.get('format') == 'NZB' and formats]
+                    publication['offers']=[offer for offer in publication.get('offers',[]) if offer.get('format') in formats or offer.get('format') in ('NZB', 'Torrent') and formats]
             return result
     return jsonify(_run_private_blocking(browse))
 

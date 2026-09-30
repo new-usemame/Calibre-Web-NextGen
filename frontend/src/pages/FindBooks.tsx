@@ -713,8 +713,8 @@ function PublicationCard({ publication, canAcquire, requestsPaused, pendingOffer
                 : <Send size={15} aria-hidden="true" focusable={false} />}
               <span>
                 {canAcquire
-                  ? offer.format === 'NZB' ? t('Download release') : t('Download {format}', { format: offer.format })
-                  : offer.format === 'NZB' ? t('Request release') : t('Request {format}', { format: offer.format })}
+                  ? ['NZB', 'Torrent'].includes(offer.format) ? t('Download release') : t('Download {format}', { format: offer.format })
+                  : ['NZB', 'Torrent'].includes(offer.format) ? t('Request release') : t('Request {format}', { format: offer.format })}
               </span>
             </button>
           ))}
@@ -725,7 +725,7 @@ function PublicationCard({ publication, canAcquire, requestsPaused, pendingOffer
         <p className={styles.muted}>{publication.unavailable_reason === 'untrusted_release_origin'
           ? t('This release’s download address is not trusted by this connection.')
           : publication.unavailable_reason === 'torrent_client_required'
-          ? t('This is a torrent release. A compatible torrent client is required; SABnzbd accepts NZB releases.')
+          ? t('This is a torrent release. Choose qBittorrent or Transmission for this indexer. Usenet clients accept NZB releases.')
           : publication.unavailable_reason === 'download_client_unavailable'
             ? t('The download client for this source is unavailable. Ask an administrator to check it.')
             : t('No EPUB or PDF available from this catalog.')}</p>

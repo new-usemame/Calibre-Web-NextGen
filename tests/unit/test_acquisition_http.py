@@ -182,6 +182,15 @@ def real_source():
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers['Content-Length']))
+            session = self.headers.get('X-Transmission-Session-Id')
+            self.send_response(200 if session == 'owned-session' else 409)
+            self.send_header('X-Transmission-Session-Id', 'owned-session')
+            self.send_header('Set-Cookie', 'SID=owned; HttpOnly')
+            self.send_header('Authorization', 'must-not-return')
+            self.end_headers()
+            if session == 'owned-session': self.wfile.write(body)
         def do_GET(self):
             try:
                 if self.path == '/headers':
@@ -341,3 +350,16 @@ def test_slow_child_start_consumes_entire_large_nzb_before_post(monkeypatch, siz
         assert len(received) == 1 and descriptor in received[0]
     finally:
         server.shutdown(); server.server_close(); thread.join()
+
+
+def test_real_child_raw_rpc_session_challenge_and_empty_body(real_source):
+    from dataclasses import replace
+    policy = replace(local_policy(real_source), credential_origins=(real_source,))
+    request = b'{"method":"session-get","arguments":{}}'
+    challenge = http.run_transfer(real_source, policy, body=request, accepted_statuses=(200,409), accept_empty=True)
+    assert challenge.status == 409 and challenge.body == b''
+    assert challenge.headers == {'x-transmission-session-id':'owned-session', 'set-cookie':'SID=owned; HttpOnly'}
+    result = http.run_transfer(real_source, policy, body=request, headers={'Content-Type':'application/json', 'X-Transmission-Session-Id':challenge.headers['x-transmission-session-id']})
+    assert result.status == 200 and result.body == request
+    with pytest.raises(http.TransportError, match='credentials_redirected'):
+        http.run_transfer(real_source, local_policy(real_source), body=request, headers={'Cookie':'SID=owned'})

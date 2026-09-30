@@ -59,9 +59,13 @@ def completed_book(config, storage, *, max_bytes=100 * 1024 * 1024):
     folder = root.joinpath(*relative.parts)
     if folder.resolve() != folder:
         raise ClientError('unsafe_completed_path')
-    # SAB may use the only completed file as storage, rather than its folder.
+    # A reported file is the owned result, even directly in a category folder.
+    # Scanning its parent could select or reject unrelated sibling downloads.
     if folder.is_file():
-        folder = folder.parent
+        if folder.suffix.lower() not in ('.epub', '.pdf') or not 0 < folder.stat().st_size <= max_bytes:
+            raise ClientError('no_usable_book')
+        media = 'application/epub+zip' if folder.suffix.lower() == '.epub' else 'application/pdf'
+        return folder, media
     if not folder.is_dir() or folder == root:
         raise ClientError('unsafe_completed_path')
     candidates = []
@@ -193,6 +197,8 @@ class SABClient:
         result = self.call('addfile', checkpoint=checkpoint, upload=(name + '.nzb', nzb),
             nzbname=name, cat=self.config['category'], pp='2', script='None', priority='0')
         identifiers = result.get('nzo_ids')
-        if result.get('status') is not True or not isinstance(identifiers, list) or len(identifiers) != 1 or not isinstance(identifiers[0], str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', identifiers[0]):
+        if (result.get('status') is not True or not isinstance(identifiers, list)
+                or len(identifiers) != 1 or not isinstance(identifiers[0], str)
+                or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', identifiers[0])):
             raise ClientError('submission_ambiguous')
         return identifiers[0]

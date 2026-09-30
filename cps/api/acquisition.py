@@ -4,6 +4,7 @@ from dataclasses import asdict
 from functools import wraps
 import os
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from flask import jsonify, request
 from werkzeug.exceptions import HTTPException
@@ -17,7 +18,6 @@ from ..services.acquisition.http import TransportError, origin
 from ..services.acquisition.opds import CatalogParseError
 from ..services.acquisition.newznab import IndexerError, IndexerService, connection_config as indexer_config
 from ..services.acquisition.sabnzbd import ClientError, SABClient, connection_config as client_config
-from urllib.parse import urlsplit, urlunsplit
 from ..services.acquisition.storage import Conflict, ConnectionChanged, NotFound, StorageError
 
 
@@ -340,6 +340,15 @@ def acquisition_admin_connection(connection_id):
                 merged.pop('private_origins', None)
                 merged.pop('private_networks', None)
             try:
+                origin_changed = origin(merged['endpoint']) != origin(material.config['endpoint'])
+                if (material.config.get('secret') and origin_changed
+                        and not (isinstance(changes.get('secret'), str) and changes['secret'].strip())):
+                    return _error('credential_required_for_new_origin', 400)
+                if (origin_changed and merged.get('auth_kind') in ('basic', 'bearer')
+                        and 'credential_origins' not in changes):
+                    # Re-entered credentials are for the newly chosen server;
+                    # inherited redirect scopes do not gain that new credential.
+                    merged['credential_origins'] = [merged['endpoint']]
                 validated = _validated_config(repo, row.adapter, merged)
             except (CatalogError, TransportError) as error:
                 code = error.code if isinstance(error, TransportError) else str(error)

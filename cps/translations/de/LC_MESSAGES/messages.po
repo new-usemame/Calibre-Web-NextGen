@@ -16934,3 +16934,24 @@ msgstr "Diese Seite ist für dieses Konto nicht verfügbar."
 #: cps/spa_strings.py
 msgid "Connection changed. Reload its settings before saving."
 msgstr "Die Verbindung wurde geändert. Laden Sie ihre Einstellungen vor dem Speichern erneut."
+
+#: cps/spa_strings.py
+msgid ""
+"SABnzbd did not finish this download before the waiting limit. Check its "
+"queue before retrying."
+msgstr ""
+"SABnzbd hat diesen Download nicht innerhalb der Wartefrist abgeschlossen. "
+"Prüfe die Warteschlange, bevor du es erneut versuchst."
+
+#: cps/spa_strings.py
+msgid ""
+"Re-enter the credential when changing the connection to a different server."
+msgstr ""
+"Gib die Zugangsdaten erneut ein, wenn du die Verbindung auf einen anderen "
+"Server umstellst."
+
+#: cps/spa_strings.py
+msgid "This release’s download address is not trusted by this connection."
+msgstr ""
+"Die Downloadadresse dieser Veröffentlichung ist für diese Verbindung nicht "
+"vertrauenswürdig."

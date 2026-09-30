@@ -29,6 +29,9 @@ IMPORT_DEADLINE_SECONDS = 6 * 3600
 IMPORT_RECHECK_SECONDS = 30
 
 
+DOWNLOAD_DEADLINE_SECONDS = 7 * 24 * 60 * 60
+
+
 class Paused(Exception):
     pass
 
@@ -42,9 +45,11 @@ class AcquisitionWorker:
                  enabled=lambda: True, execution_allowed=None, media_allowed=lambda media: True,
                  transfer=run_transfer, max_bytes=100 * 1024 * 1024,
                  import_deadline_seconds=IMPORT_DEADLINE_SECONDS,
-                 import_recheck_seconds=IMPORT_RECHECK_SECONDS, client_factory=SABClient):
+                 import_recheck_seconds=IMPORT_RECHECK_SECONDS, client_factory=SABClient,
+                 download_deadline_seconds=DOWNLOAD_DEADLINE_SECONDS):
         self.repository = repository
         self.client_factory = client_factory
+        self.download_deadline_seconds = download_deadline_seconds
         self.staging_dir, self.ingest_dir = Path(staging_dir), Path(ingest_dir)
         self.allowed, self.enabled, self.transfer = allowed, enabled, transfer
         self.max_bytes = max_bytes
@@ -238,12 +243,17 @@ class AcquisitionWorker:
             raise ClientError('download_client_unavailable')
         client_config = repo.connection_config(clients[0].id).config
         client = self.client_factory(client_config, transfer=self.transfer)
-        name = 'cwng-' + repo.box.display_identity(
-            str([offer['release_key'], clients[0].id, clients[0].revision]))
-        external_id, started = repo.external_status(job.id, token)
+        def submission_name(key):
+            identity = [offer['release_key'], clients[0].id, clients[0].revision]
+            # Nullable upgrade preserves existing remote names. New attempts
+            # have their own durable key, including a retry after definite failure.
+            if key:
+                identity.append(key)
+            return 'cwng-' + repo.box.display_identity(str(identity))
+        external_id, started, key = repo.submission_identity(job.id, token)
         if started is None:
             repo.begin_submission(job.id, token, create_if_missing=False)
-            external_id, started = repo.external_status(job.id, token)
+            external_id, started, key = repo.submission_identity(job.id, token)
         if started is None:
             # Fetch/validate before issuing the durable POST fence. A bad key or
             # descriptor here is safely retryable without an uncertain submit.
@@ -252,25 +262,29 @@ class AcquisitionWorker:
             validate_nzb(descriptor.body)
             checkpoint()
             fresh = repo.begin_submission(job.id, token)
+            external_id, started, key = repo.submission_identity(job.id, token)
             if fresh:
                 try:
-                    external_id = client.submit(name, descriptor.body, checkpoint=checkpoint)
+                    external_id = client.submit(submission_name(key), descriptor.body, checkpoint=checkpoint)
                 except TransportError as error:
                     if error.code in ('needs_auth', 'client_error'):
-                        repo.clear_rejected_submission(job.id, token)
+                        repo.clear_rejected_submission(job.id, token, error_code=error.code)
                     raise
                 repo.record_external(job.id, token, external_id)
             else:
-                external_id, started = repo.external_status(job.id, token)
+                external_id, started, key = repo.submission_identity(job.id, token)
         checkpoint()
-        remote = client.find(name, external_id, checkpoint=checkpoint)
+        remote = client.find(submission_name(key), external_id, checkpoint=checkpoint)
         if remote is None:
             raise ClientError('client_job_missing' if external_id else 'submission_ambiguous')
         if not external_id:
             repo.record_external(job.id, token, remote.get('nzo_id'))
         if remote.get('status') == 'Failed':
+            repo.fail_submission_adopters(job.id, token)
             raise ClientError('client_job_failed')
         if remote.get('status') != 'Completed' or remote.get('loaded') not in (False, None):
+            if repo.submission_age(job.id, token) >= self.download_deadline_seconds:
+                raise ClientError('client_job_stalled')
             return None
         book, media = completed_book(client_config, remote.get('storage'), max_bytes=self.max_bytes)
         if not self.media_allowed(media):

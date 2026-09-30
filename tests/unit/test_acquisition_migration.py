@@ -396,3 +396,29 @@ def test_existing_opds_requests_survive_additive_usenet_upgrade_and_second_boot(
             assert conn.exec_driver_sql('SELECT client_revision, external_id, submission_started FROM acquisition_job WHERE id=?', (job.id,)).one() == (None,None,None)
     finally:
         engine.dispose()
+
+
+def test_existing_sab_identity_survives_nullable_attempt_key_upgrade(tmp_path):
+    from cps.services.acquisition.migration import migrate_acquisition_schema
+    from cps.services.acquisition.storage import Repository, define_tables
+    from cps.services.acquisition.secrets import SecretBox
+    from sqlalchemy import MetaData
+    engine, _ = _fixture(tmp_path / 'app.db', 'audit')
+    try:
+        marker = migrate_acquisition_schema(engine)
+        repo = Repository(engine, define_tables(MetaData()), SecretBox(b'x' * 32))
+        client = repo.create_connection('SAB', 'sabnzbd', {}, enabled=True)
+        source = repo.create_connection('Indexer', 'newznab', {}, enabled=True)
+        offer = repo.create_offer(2, source.id, {'transport': 'nzb', 'client_id': client.id, 'client_revision': 1, 'release_key': 'a' * 64})
+        job = repo.create_job(2, offer, 'old-usenet', requires_approval=False)
+        claim = repo.claim(); repo.begin_submission(job.id, claim.token)
+        repo.record_external(job.id, claim.token, 'existing-SAB-id')
+        before = repo.external_status(job.id, claim.token)
+        with engine.begin() as conn:
+            conn.exec_driver_sql('ALTER TABLE acquisition_job DROP COLUMN submission_key')
+            conn.exec_driver_sql('ALTER TABLE acquisition_job DROP COLUMN submission_invalid')
+        for _ in range(2):
+            assert migrate_acquisition_schema(engine) == marker
+            assert repo.submission_identity(job.id, claim.token) == (*before, None)
+    finally:
+        engine.dispose()

@@ -16953,3 +16953,23 @@ msgstr "Ez az oldal nem érhető el ezzel a fiókkal."
 #: cps/spa_strings.py
 msgid "Connection changed. Reload its settings before saving."
 msgstr "A kapcsolat megváltozott. Mentés előtt töltse be újra a beállításait."
+
+#: cps/spa_strings.py
+msgid ""
+"SABnzbd did not finish this download before the waiting limit. Check its "
+"queue before retrying."
+msgstr ""
+"A SABnzbd nem fejezte be a letöltést a várakozási határidőn belül. "
+"Újrapróbálás előtt ellenőrizd a sorát."
+
+#: cps/spa_strings.py
+msgid ""
+"Re-enter the credential when changing the connection to a different server."
+msgstr ""
+"Add meg újra a hitelesítő adatokat, ha a kapcsolatot másik kiszolgálóra "
+"állítod át."
+
+#: cps/spa_strings.py
+msgid "This release’s download address is not trusted by this connection."
+msgstr ""
+"Ennek a kiadásnak a letöltési címe nem megbízható ennél a kapcsolatnál."

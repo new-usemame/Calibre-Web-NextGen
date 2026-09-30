@@ -94,3 +94,32 @@ test('a stale connection edit keeps the form and asks for reloading instead of s
   await expect(page.getByRole('alert').filter({ hasText: 'Reload its settings before saving.' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Edit connection' })).toBeVisible();
 });
+
+test('changing an indexer server asks for credential reentry and preserves the form', async ({ page }) => {
+  let saved = false;
+  await page.route('**/api/v1/admin/acquisition**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/connections/source') && route.request().method() === 'PATCH') {
+      const body = route.request().postDataJSON();
+      if (!body.config.secret) return route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: { code: 'credential_required_for_new_origin' } }) });
+      expect(body.config.secret).toBe('reentered-test-key');
+      expect(body.config.endpoint).toBe('http://replacement:9696/1/api');
+      saved = true;
+      return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ ok: true }) });
+    }
+    const body = path.endsWith('/connections/source') ? { ...source, config: { endpoint: 'http://prowlarr:9696/1/api', auth_kind: 'none', category: '7020', client_id: 'client', preset: 'prowlarr', has_secret: true } }
+      : path.endsWith('/connections') ? { connections: [client, source] }
+        : path.endsWith('/users') ? { users: [] } : path.endsWith('/jobs') ? { jobs: [] } : settings;
+    await route.fulfill({ contentType: 'application/json', body: JSON.stringify(body) });
+  });
+  await page.goto('/app/admin/acquisition');
+  await page.getByRole('button', { name: 'Edit Home Prowlarr' }).click();
+  await page.getByLabel('API endpoint', { exact: true }).fill('http://replacement:9696/1/api');
+  await page.getByRole('button', { name: 'Save connection', exact: true }).click();
+  await expect(page.getByRole('alert').filter({ hasText: 'Re-enter the credential' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Edit connection' })).toBeVisible();
+  await page.getByLabel('API key', { exact: true }).fill('reentered-test-key');
+  await page.getByRole('button', { name: 'Save connection', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Add a connection' })).toBeVisible();
+  expect(saved).toBe(true);
+});

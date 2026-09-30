@@ -153,7 +153,9 @@ export function AdminAcquisition() {
     },
     onError: (error) => {
       const code = errorCode(error);
-      if (code === 'connection_changed') {
+      if (code === 'credential_required_for_new_origin') {
+        setFormError(t('Re-enter the credential when changing the connection to a different server.'));
+      } else if (code === 'connection_changed') {
         setFormError(t('Connection changed. Reload its settings before saving.'));
       } else if (code === 'conflict') {
         setFormError(t('Finish or cancel outstanding requests before editing this connection.'));

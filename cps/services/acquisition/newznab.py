@@ -152,8 +152,14 @@ class IndexerService:
                 'description': None, 'offers': [], 'navigation': []}
             if mime in ('application/x-nzb', 'application/nzb') and href:
                 if client:
+                    try:
+                        descriptor = descriptor_url(config, href)
+                    except TransportError:
+                        publication['unavailable_reason'] = 'untrusted_release_origin'
+                        result['publications'].append(publication)
+                        continue
                     selection = self.repository.create_offer(owner_id, connection_id, {
-                        'kind': 'acquisition', 'transport': 'nzb', 'href': descriptor_url(config, href),
+                        'kind': 'acquisition', 'transport': 'nzb', 'href': descriptor,
                         'media_type': 'application/x-nzb', 'title': title, 'release_key': release_key,
                         'client_id': client.id, 'client_revision': client.revision}, expected_revision=revision)
                     publication['offers'] = [{'format': 'NZB', 'label': None, 'identity': release_key,

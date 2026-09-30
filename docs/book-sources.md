@@ -55,9 +55,11 @@ Anna's Archive and torrent download clients are not implemented by this Beta. To
 
 These presets use the same protocol; they do not create an indexer or NNTP provider inside Prowlarr, Jackett, or SAB. Configure those services yourself and use sources you are authorized to access. SAB performs downloading and any repair/unpacking already configured there. CWNG does not unpack archives or execute scripts from releases. Completed folders must contain exactly one usable EPUB/PDF, so multi-book bundles require separate handling.
 
-SAB receives the NZB bytes, not an indexer URL or its credentials. CWNG stores the remote job identity before continuing and reconciles it after a restart. A lost submit response is handled conservatively: retry looks for the exact owned job and does not blindly submit again. If its acceptance cannot be established, it reports uncertain submission for administrator investigation. Keep the remote queue/history entry until CWNG has completed import.
+SAB receives the NZB bytes, not an indexer URL or its credentials. CWNG stores the remote job identity before continuing and reconciles it after a restart. A lost submit response is handled conservatively: retry looks for the exact owned job and does not blindly submit again. If its acceptance cannot be established, it reports uncertain submission for administrator investigation. Keep the remote queue/history entry until CWNG has completed import. A download still unfinished after seven days fails with a waiting-limit message, releasing the connection for administration. It is not automatically resubmitted. A manual retry after SAB reports a definite failed download creates a new durable attempt; an uncertain submission retains its identity. Definite submission rejection also resolves requests that adopted that attempt.
 
 ## Edit or remove connections
+
+Changing the endpoint to a different origin requires explicitly re-entering the credential; a stored key cannot silently move to another server.
 
 **Edit** refuses a stale form if another administrator has changed the connection. Reload its settings before saving. It keeps the current credential when its field is blank, rotates the configuration revision, and switches the connection off. Test it and enable it again. Previous search selections expire. Outstanding requests must finish or be cancelled before an edit or deletion; this prevents queued work from silently using different credentials or paths. Deletion removes the connection and its stored credential while preserving request history.
 

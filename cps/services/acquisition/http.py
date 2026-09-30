@@ -302,43 +302,50 @@ def run_transfer(url: str, policy: HTTPPolicy, *, destination: Path | None = Non
         staged = Path(private) / 'download.part' if destination else None
         payload = json.dumps({'url': url, 'policy': asdict(policy), 'destination': str(staged) if staged else None, 'max_bytes': max_bytes, 'form': form,
             'upload': [upload[0], base64.b64encode(upload[1]).decode('ascii')] if upload else None}).encode()
-        child = subprocess.Popen([sys.executable, '-c',
-                                  "import runpy,sys; runpy.run_path(sys.argv[1], run_name='__main__')",
-                                  str(Path(__file__).resolve()), '--worker'],
-                                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
-        started = time.monotonic()
-        first = True
-        try:
-            while True:
-                checkpoint()
-                remaining = policy.deadline - (time.monotonic() - started)
-                if remaining <= 0:
-                    raise TransportError('transfer_timeout')
-                try:
-                    output, _ = child.communicate(input=payload if first else None, timeout=min(0.2, remaining))
-                    break
-                except subprocess.TimeoutExpired:
-                    first = False
-            if child.returncode == 124:
-                raise TransportError('transfer_timeout')
-            if child.returncode != 0:
-                raise TransportError('transfer_failed')
+        if len(payload) > 1024 * 1024:
+            raise TransportError('invalid_configuration')
+        # communicate(input=...) can leave a partially written pipe across its
+        # short polling timeouts. An owned 0600 temporary file gives the child
+        # complete input and EOF, independent of when it starts reading.
+        with tempfile.TemporaryFile(dir=private) as request_input:
+            request_input.write(payload)
+            request_input.seek(0)
+            child = subprocess.Popen([sys.executable, '-c',
+                                      "import runpy,sys; runpy.run_path(sys.argv[1], run_name='__main__')",
+                                      str(Path(__file__).resolve()), '--worker'],
+                                     stdin=request_input, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+            started = time.monotonic()
             try:
-                result = json.loads(output)
-            except (ValueError, UnicodeError):
-                raise TransportError('transfer_failed') from None
-            if result.get('error'):
-                raise TransportError(result['error'], retry_after=result.get('retry_after'))
-            checkpoint()
-            if destination:
-                # link, unlike replace/rename, cannot overwrite an existing file.
-                os.link(staged, destination)
-                return DownloadedFile(destination, result['bytes'], result['sha256'], result['content_type'])
-            return FetchedDocument(base64.b64decode(result['body'], validate=True), result['url'], result['content_type'])
-        finally:
-            if child.poll() is None:
-                child.kill()
-            child.communicate()
+                while True:
+                    checkpoint()
+                    remaining = policy.deadline - (time.monotonic() - started)
+                    if remaining <= 0:
+                        raise TransportError('transfer_timeout')
+                    try:
+                        output, _ = child.communicate(timeout=min(0.2, remaining))
+                        break
+                    except subprocess.TimeoutExpired:
+                        pass
+                if child.returncode == 124:
+                    raise TransportError('transfer_timeout')
+                if child.returncode != 0:
+                    raise TransportError('transfer_failed')
+                try:
+                    result = json.loads(output)
+                except (ValueError, UnicodeError):
+                    raise TransportError('transfer_failed') from None
+                if result.get('error'):
+                    raise TransportError(result['error'], retry_after=result.get('retry_after'))
+                checkpoint()
+                if destination:
+                    # link, unlike replace/rename, cannot overwrite an existing file.
+                    os.link(staged, destination)
+                    return DownloadedFile(destination, result['bytes'], result['sha256'], result['content_type'])
+                return FetchedDocument(base64.b64decode(result['body'], validate=True), result['url'], result['content_type'])
+            finally:
+                if child.poll() is None:
+                    child.kill()
+                child.communicate()
 
 
 def _worker_main():

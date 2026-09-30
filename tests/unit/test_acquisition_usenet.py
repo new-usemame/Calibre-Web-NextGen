@@ -417,3 +417,196 @@ def test_another_account_reuses_persisted_sab_job_without_fetching_descriptor_ag
         client_factory=Client,transfer=lambda *a,**k:pytest.fail('Shared descriptor fetched again'))
     assert worker.run_once().id==second.id
     assert repository.get_job(2,second.id).state=='downloading'
+
+
+def test_untrusted_enclosure_disables_only_its_release(repo):
+    n = importlib.import_module(spec.name + '.newznab')
+    h = importlib.import_module(spec.name + '.http')
+    repository, _ = repo
+    client = repository.create_connection('Client', 'sabnzbd', {}, enabled=True)
+    config = n.connection_config({'endpoint': 'https://indexer.example/api', 'secret': 'KEY',
+        'category': '7020', 'client_id': client.id})
+    connection = repository.create_connection('Indexer', 'newznab', config, enabled=True)
+    documents = [b'<caps><searching><search available="yes" supportedParams="q"/></searching><categories><category id="7020"/></categories></caps>',
+        b'<rss><channel><item><title>Untrusted</title><enclosure url="https://foreign.example/get" type="application/x-nzb"/></item><item><title>Good</title><enclosure url="https://indexer.example/get" type="application/x-nzb"/></item></channel></rss>']
+    page = n.IndexerService(repository, transfer=lambda url, *a, **k: h.FetchedDocument(documents.pop(0), url, 'text/xml')).browse(1, connection.id, query='book')
+    assert page['publications'][0]['unavailable_reason'] == 'untrusted_release_origin'
+    assert page['publications'][0]['offers'] == []
+    assert page['publications'][1]['offers'][0]['format'] == 'NZB'
+
+
+def usenet_worker_fixture(repo, tmp_path):
+    n = importlib.import_module(spec.name + '.newznab')
+    b = importlib.import_module(spec.name + '.sabnzbd')
+    repository, now = repo
+    client = repository.create_connection('Client', 'sabnzbd', b.connection_config({
+        'endpoint': 'https://sab.example/api', 'secret': 'PRIVATE', 'category': 'books',
+        'remote_path': '/downloads', 'local_path': str(tmp_path)}), enabled=True)
+    source = repository.create_connection('Indexer', 'newznab', n.connection_config({
+        'endpoint': 'https://indexer.example/api', 'secret': 'PRIVATE', 'category': '7020', 'client_id': client.id}), enabled=True)
+    payload = {'kind': 'acquisition', 'transport': 'nzb', 'href': 'https://indexer.example/nzb',
+        'media_type': 'application/x-nzb', 'client_id': client.id, 'client_revision': 1, 'release_key': 'f' * 64}
+    job = repository.create_job(1, repository.create_offer(1, source.id, payload), 'request', requires_approval=False)
+    return client, source, payload, job
+
+
+def test_stuck_sab_download_expires_and_unblocks_connection_edit(repo, tmp_path):
+    w = importlib.import_module(spec.name + '.worker')
+    h = importlib.import_module(spec.name + '.http')
+    repository, now = repo
+    client, source, payload, job = usenet_worker_fixture(repo, tmp_path)
+    calls = []
+    class Client:
+        def __init__(self, *a, **k): pass
+        def submit(self, name, *a, **k): return 'owned'
+        def find(self, *a, **k): calls.append('poll'); return {'nzo_id': 'owned', 'status': 'Paused'}
+    worker = w.AcquisitionWorker(repository, tmp_path / 'staging', tmp_path, allowed=lambda _: True,
+        transfer=lambda url, *a, **k: h.FetchedDocument(b'<nzb><file/></nzb>', url, 'text/xml'),
+        client_factory=Client)
+    worker.download_deadline_seconds = 60
+    assert worker.run_once().state == 'downloading'
+    now[0] += 61
+    result = worker.run_once()
+    assert result.state == 'failed' and result.error_code == 'client_job_stalled'
+    assert repository.claim() is None
+    repository.update_connection(client.id, label='Repair settings', config={})
+    assert len(calls) <= 2
+
+
+def test_retry_of_definitely_failed_sab_download_uses_new_durable_submission(repo, tmp_path):
+    w = importlib.import_module(spec.name + '.worker')
+    h = importlib.import_module(spec.name + '.http')
+    repository, now = repo
+    client, source, payload, job = usenet_worker_fixture(repo, tmp_path)
+    names, external_ids = [], []
+    class Client:
+        def __init__(self, *a, **k): pass
+        def submit(self, name, *a, **k): names.append(name); return f'owned_{len(names)}'
+        def find(self, name, external_id=None, **k):
+            external_ids.append(external_id)
+            return {'nzo_id': external_id, 'status': 'Failed' if external_id == 'owned_1' else 'Downloading'}
+    worker = w.AcquisitionWorker(repository, tmp_path / 'staging', tmp_path, allowed=lambda _: True,
+        transfer=lambda url, *a, **k: h.FetchedDocument(b'<nzb><file/></nzb>', url, 'text/xml'), client_factory=Client)
+    assert worker.run_once().error_code == 'client_job_failed'
+    repository.retry(1, job.id)
+    assert worker.run_once().state == 'downloading'
+    assert len(names) == 2 and names[0] != names[1]
+    assert external_ids == ['owned_1', 'owned_2']
+
+
+def test_definite_submit_rejection_resolves_existing_adopter_and_allows_retry(repo, tmp_path):
+    repository, now = repo
+    client, source, payload, first = usenet_worker_fixture(repo, tmp_path)
+    original = repository.claim()
+    repository.begin_submission(first.id, original.token)
+    second = repository.create_job(2, repository.create_offer(2, source.id, payload), 'other', requires_approval=False)
+    adopter = repository.claim()
+    assert repository.begin_submission(second.id, adopter.token) is False
+    repository.advance(second.id, adopter.token, 'queued', 'failed', error_code='submission_ambiguous')
+    repository.clear_rejected_submission(first.id, original.token)
+    repository.advance(first.id, original.token, 'queued', 'failed', error_code='client_error')
+    assert repository.get_job(2, second.id).error_code == 'client_error'
+    repository.retry(2, second.id)
+    retried = repository.claim()
+    assert repository.begin_submission(second.id, retried.token) is True
+
+
+def test_sab_storage_file_in_category_folder_ignores_sibling_books(tmp_path):
+    b = importlib.import_module(spec.name + '.sabnzbd')
+    (tmp_path / 'requested.epub').write_bytes(b'book')
+    (tmp_path / 'other.pdf').write_bytes(b'other')
+    config = {'local_path': str(tmp_path), 'remote_path': '/downloads'}
+    path, media = b.completed_book(config, '/downloads/requested.epub')
+    assert path == tmp_path / 'requested.epub' and media == 'application/epub+zip'
+    (tmp_path / 'unrelated.txt').write_bytes(b'not a book')
+    with pytest.raises(b.ClientError, match='no_usable_book'):
+        b.completed_book(config, '/downloads/unrelated.txt')
+
+
+def test_legacy_uncertain_submission_keeps_its_original_remote_name(repo, tmp_path):
+    w = importlib.import_module(spec.name + '.worker')
+    repository, now = repo
+    client, source, payload, job = usenet_worker_fixture(repo, tmp_path)
+    claim = repository.claim()
+    repository.begin_submission(job.id, claim.token)
+    with repository.engine.begin() as conn:
+        conn.execute(repository.tables.jobs.update().where(repository.tables.jobs.c.id == job.id).values(submission_key=None))
+    repository.release(job.id, claim.token)
+    expected = 'cwng-' + repository.box.display_identity(str([payload['release_key'], client.id, client.revision]))
+    class Client:
+        def __init__(self, *a, **k): pass
+        def submit(self, *a, **k): pytest.fail('Legacy uncertain attempt duplicated')
+        def find(self, name, external_id=None, **k):
+            assert name == expected and external_id is None
+            return {'nzo_id': 'legacy-owned', 'status': 'Downloading'}
+    worker = w.AcquisitionWorker(repository, tmp_path / 'staging', tmp_path, allowed=lambda _: True,
+        transfer=lambda *a, **k: pytest.fail('Legacy descriptor refetched'), client_factory=Client)
+    assert worker.run_once().state == 'downloading'
+
+
+def test_failed_retry_lost_response_reconciles_the_new_attempt_only(repo, tmp_path):
+    w = importlib.import_module(spec.name + '.worker')
+    h = importlib.import_module(spec.name + '.http')
+    repository, now = repo
+    client, source, payload, job = usenet_worker_fixture(repo, tmp_path)
+    names, responses = [], []
+    class Client:
+        def __init__(self, *a, **k): pass
+        def submit(self, name, *a, **k):
+            names.append(name)
+            if len(names) == 2: raise h.TransportError('source_unreachable')
+            return 'failed-old'
+        def find(self, name, external_id=None, **k):
+            responses.append(name)
+            return {'nzo_id': 'failed-old' if name == names[0] else 'accepted-new',
+                'status': 'Failed' if name == names[0] else 'Downloading'}
+    worker = w.AcquisitionWorker(repository, tmp_path / 'staging', tmp_path, allowed=lambda _: True,
+        transfer=lambda url, *a, **k: h.FetchedDocument(b'<nzb><file/></nzb>', url, 'text/xml'), client_factory=Client)
+    assert worker.run_once().error_code == 'client_job_failed'
+    repository.retry(1, job.id)
+    assert worker.run_once().error_code == 'source_unreachable'
+    repository.retry(1, job.id)
+    assert worker.run_once().state == 'downloading'
+    assert len(names) == 2 and names[0] != names[1]
+    assert responses == names
+
+
+def test_cancelled_adopter_cannot_revive_definitely_failed_sab_attempt(repo, tmp_path):
+    w = importlib.import_module(spec.name + '.worker')
+    h = importlib.import_module(spec.name + '.http')
+    repository, now = repo
+    client, source, payload, first = usenet_worker_fixture(repo, tmp_path)
+    names = []
+    failed = [False]
+    class Client:
+        def __init__(self, *a, **k): pass
+        def submit(self, name, *a, **k): names.append(name); return f'owned_{len(names)}'
+        def find(self, name, external_id=None, **k):
+            return {'nzo_id': external_id, 'status': 'Failed' if failed[0] and external_id == 'owned_1' else 'Downloading'}
+    worker = w.AcquisitionWorker(repository, tmp_path / 'staging', tmp_path, allowed=lambda _: True,
+        transfer=lambda url, *a, **k: h.FetchedDocument(b'<nzb><file/></nzb>', url, 'text/xml'), client_factory=Client)
+    assert worker.run_once().state == 'downloading'
+    second = repository.create_job(2, repository.create_offer(2, source.id, payload), 'other', requires_approval=False)
+    assert worker.run_once().id == second.id
+    repository.request_cancel(2, second.id)
+    failed[0] = True; now[0] += 31
+    assert worker.run_once().error_code == 'client_job_failed'
+    repository.retry(1, first.id)
+    assert worker.run_once().state == 'downloading'
+    assert len(names) == 2 and names[0] != names[1]
+    assert repository.get_job(2, second.id).state == 'cancelled'
+
+
+def test_cancelled_adopter_cannot_poison_a_definitely_rejected_submission(repo, tmp_path):
+    repository, now = repo
+    client, source, payload, first = usenet_worker_fixture(repo, tmp_path)
+    original = repository.claim(); repository.begin_submission(first.id, original.token)
+    second = repository.create_job(2, repository.create_offer(2, source.id, payload), 'other', requires_approval=False)
+    adopter = repository.claim(); repository.begin_submission(second.id, adopter.token)
+    repository.release(second.id, adopter.token); repository.request_cancel(2, second.id)
+    repository.clear_rejected_submission(first.id, original.token)
+    repository.advance(first.id, original.token, 'queued', 'failed', error_code='client_error')
+    repository.retry(1, first.id)
+    retried = repository.claim()
+    assert repository.begin_submission(first.id, retried.token) is True
+    assert repository.get_job(2, second.id).state == 'cancelled'

@@ -52,6 +52,7 @@ export function useAcquisitionErrorText(): (code: string) => string {
       case 'client_path_mapping_unverified': return t('SABnzbd did not report a completed folder and category that could be verified.');
       case 'completed_path_unreadable': return t('CWNG cannot read the mapped completed folder. Check its mount and permissions.');
       case 'download_client_unavailable': return t('The download client is unavailable or its settings changed. Make a new selection after an administrator checks it.');
+      case 'client_job_stalled': return t('SABnzbd did not finish this download before the waiting limit. Check its queue before retrying.');
       case 'client_job_failed': return t('SABnzbd reported that this download failed.');
       case 'client_job_missing': return t('This job is no longer in SABnzbd queue or history. It will not be submitted again automatically.');
       case 'submission_ambiguous': return t('The submission could not be confirmed. Check SABnzbd queue and history before trying again; CWNG will not blindly send a duplicate.');

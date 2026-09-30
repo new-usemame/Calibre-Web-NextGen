@@ -18000,3 +18000,24 @@ msgstr "Cette page n’est pas accessible à ce compte."
 #: cps/spa_strings.py
 msgid "Connection changed. Reload its settings before saving."
 msgstr "La connexion a changé. Rechargez ses paramètres avant de les enregistrer."
+
+#: cps/spa_strings.py
+msgid ""
+"SABnzbd did not finish this download before the waiting limit. Check its "
+"queue before retrying."
+msgstr ""
+"SABnzbd n’a pas terminé ce téléchargement dans le délai d’attente. Vérifiez "
+"sa file avant de réessayer."
+
+#: cps/spa_strings.py
+msgid ""
+"Re-enter the credential when changing the connection to a different server."
+msgstr ""
+"Saisissez à nouveau les identifiants lorsque vous changez de serveur pour "
+"cette connexion."
+
+#: cps/spa_strings.py
+msgid "This release’s download address is not trusted by this connection."
+msgstr ""
+"L’adresse de téléchargement de cette version n’est pas autorisée par cette "
+"connexion."

@@ -549,3 +549,27 @@ def test_removing_download_origin_revokes_only_its_derived_private_scope(api):
     assert client.patch(path,json={'expected_revision':2,'config':{'download_origins':[]}}).status_code==200
     current=repo.connection_config(c.id,include_disabled=True).config
     assert current['private_origins']==['http://prowlarr.local:9696/1/api','http://intentional.local:8090']
+
+
+def test_endpoint_origin_change_requires_explicit_credential_reentry(api):
+    client, repo, actor, module, connection, offer, database = api
+    actor.id = 1
+    private = repo.connection_config(connection.id).config
+    private.update(auth_kind='bearer', secret='EXISTING_KEY')
+    repo.update_connection(connection.id, label=connection.label, config=private)
+    path = f'/api/v1/admin/acquisition/connections/{connection.id}'
+    revision = repo.list_connections(include_disabled=True)[0].revision
+    for changes in ({'endpoint': 'https://foreign.invalid/feed'}, {'endpoint': 'https://foreign.invalid/feed', 'secret': ''}):
+        response = client.patch(path, json={'expected_revision': revision, 'config': changes})
+        assert response.status_code == 400
+        assert response.get_json()['error']['code'] == 'credential_required_for_new_origin'
+        assert repo.connection_config(connection.id, include_disabled=True).config == private
+    assert client.patch(path, json={'expected_revision': revision,
+        'config': {'endpoint': 'https://catalog.invalid/renamed'}}).status_code == 200
+    revision += 1
+    assert client.patch(path, json={'expected_revision': revision,
+        'config': {'endpoint': 'https://foreign.invalid/feed', 'secret': 'REENTERED_KEY'}}).status_code == 200
+    updated = repo.connection_config(connection.id, include_disabled=True).config
+    assert updated['secret'] == 'REENTERED_KEY'
+    assert updated['credential_origins'] == ['https://foreign.invalid/feed']
+    assert client.patch(path, json={'config': {'endpoint': 'not-a-url'}}).status_code == 400

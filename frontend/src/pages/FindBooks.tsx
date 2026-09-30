@@ -722,7 +722,9 @@ function PublicationCard({ publication, canAcquire, requestsPaused, pendingOffer
       ) : (
         // Buy / borrow / preview / templated links are deliberately not offered
         // here: they are not a complete file this server can import.
-        <p className={styles.muted}>{publication.unavailable_reason === 'torrent_client_required'
+        <p className={styles.muted}>{publication.unavailable_reason === 'untrusted_release_origin'
+          ? t('This release’s download address is not trusted by this connection.')
+          : publication.unavailable_reason === 'torrent_client_required'
           ? t('This is a torrent release. A compatible torrent client is required; SABnzbd accepts NZB releases.')
           : publication.unavailable_reason === 'download_client_unavailable'
             ? t('The download client for this source is unavailable. Ask an administrator to check it.')

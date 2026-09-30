@@ -89,7 +89,7 @@ def migrate_acquisition_schema(engine, metadata=None):
         additions = {
             tables.jobs.name: {'importing_since': 'FLOAT', 'client_id': 'VARCHAR(36)',
                 'client_revision': 'INTEGER', 'external_id': 'VARCHAR(128)',
-                'submission_started': 'FLOAT', 'release_key': 'VARCHAR(64)'},
+                'submission_started': 'FLOAT', 'submission_key': 'VARCHAR(32)', 'submission_invalid': 'BOOLEAN', 'release_key': 'VARCHAR(64)'},
             tables.connections.name: {'deleted': 'BOOLEAN NOT NULL DEFAULT 0'},
         }
         for name, columns in additions.items():

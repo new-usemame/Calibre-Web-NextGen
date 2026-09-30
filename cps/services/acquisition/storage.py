@@ -113,6 +113,7 @@ def define_tables(metadata):
         Column("title", String(512)),
         Column("client_id", String(36)), Column("client_revision", Integer),
         Column("external_id", String(128)), Column("submission_started", Float),
+        Column("submission_key", String(32)), Column("submission_invalid", Boolean),
         Column("release_key", String(64)),
         Column("add_to_my_library", Boolean, nullable=False), Column("cancel_requested", Boolean, nullable=False),
         Column("lease_token", String(64)), Column("lease_expires", Float),
@@ -588,7 +589,13 @@ class Repository:
                 self.tables.connections.c.deleted.is_(False), self.tables.connections.c.revision == row['client_revision'])).first()
             if not connection or not client:
                 raise ConnectionChanged("Connection changed; make a new selection before retrying")
+            submission = {}
+            if row['error_code'] == 'client_job_failed' and not row['publication_proof_hash']:
+                # The remote job definitely failed. A manual retry gets a new
+                # durable attempt/name; uncertain or missing jobs keep theirs.
+                submission = dict(external_id=None, submission_started=None, submission_key=None, submission_invalid=False)
             changed = conn.execute(table.update().where(table.c.id == job_id, table.c.state == "failed").values(
+                **submission,
                 state="publishing" if row["publication_proof_hash"] else "queued",
                 error_code="source_busy" if row["error_code"] == "source_busy" else None,
                 cancel_requested=False, lease_token=None,
@@ -742,8 +749,6 @@ class Repository:
         table, now = self.tables.jobs, self._now()
         with self.engine.begin() as conn:
             _serialize_write(conn)
-            if conn.dialect.name == 'sqlite' and not conn.connection.driver_connection.in_transaction:
-                conn.exec_driver_sql('BEGIN IMMEDIATE')
             row = conn.execute(select(table).where(self._live(job_id, token, now),
                 table.c.cancel_requested.is_(False))).mappings().first()
             if row is None or not row['client_id'] or not row['release_key']:
@@ -752,23 +757,69 @@ class Repository:
                 return False
             previous = conn.execute(select(table).where(table.c.release_key == row['release_key'],
                 table.c.client_id == row['client_id'], table.c.client_revision == row['client_revision'],
-                table.c.submission_started.is_not(None)).order_by(table.c.submission_started).limit(1)).mappings().first()
+                table.c.submission_started.is_not(None),
+                table.c.submission_invalid.is_not(True)).order_by(table.c.submission_started).limit(1)).mappings().first()
             if previous is None and not create_if_missing:
                 return False
             conn.execute(table.update().where(self._live(job_id, token, now)).values(
                 submission_started=previous['submission_started'] if previous else now,
-                external_id=previous['external_id'] if previous else None))
+                external_id=previous['external_id'] if previous else None,
+                submission_key=previous['submission_key'] if previous else random_secrets.token_hex(16),
+                submission_invalid=False))
             return previous is None
 
-    def clear_rejected_submission(self, job_id, token):
-        """Only a definite pre-acceptance error may clear the uncertainty fence."""
+    def _same_submission(self, row):
         table = self.tables.jobs
+        identity = table.c.submission_key == row['submission_key'] if row['submission_key'] else table.c.submission_started == row['submission_started']
+        return and_(table.c.release_key == row['release_key'], table.c.client_id == row['client_id'],
+                    table.c.client_revision == row['client_revision'], identity)
+
+    def clear_rejected_submission(self, job_id, token, *, error_code='client_error'):
+        """A definite rejection resolves all adopters of this attempt as well."""
+        if error_code not in ('needs_auth', 'client_error'):
+            raise StorageError('Submission rejection is not definite')
+        table, now = self.tables.jobs, self._now()
         with self.engine.begin() as conn:
             _serialize_write(conn)
-            result = conn.execute(table.update().where(self._live(job_id, token, self._now()),
-                table.c.external_id.is_(None)).values(submission_started=None))
-            if result.rowcount != 1:
+            row = conn.execute(select(table).where(self._live(job_id, token, now),
+                table.c.external_id.is_(None), table.c.submission_started.is_not(None))).mappings().first()
+            if row is None:
                 raise Conflict("Submission identity is already recorded")
+            # Invalidity belongs to the shared attempt, including terminal
+            # subscribers. Their cancelled/rejected/imported states stay intact.
+            conn.execute(table.update().where(self._same_submission(row)).values(submission_invalid=True))
+            conn.execute(table.update().where(self._same_submission(row), table.c.id != job_id,
+                table.c.external_id.is_(None), table.c.state.in_(('queued', 'resolving', 'downloading', 'failed'))).values(
+                state='failed', error_code=error_code, submission_started=None, submission_key=None,
+                lease_token=None, lease_expires=None, next_attempt_at=now, updated_at=now))
+            conn.execute(table.update().where(self._live(job_id, token, now)).values(
+                submission_started=None, submission_key=None))
+
+    def fail_submission_adopters(self, job_id, token):
+        """A failed remote download is definite for every subscriber to it."""
+        table, now = self.tables.jobs, self._now()
+        with self.engine.begin() as conn:
+            _serialize_write(conn)
+            row = conn.execute(select(table).where(self._live(job_id, token, now))).mappings().first()
+            if row is None or row['submission_started'] is None:
+                raise Conflict('Submission is unavailable')
+            conn.execute(table.update().where(self._same_submission(row)).values(submission_invalid=True))
+            conn.execute(table.update().where(self._same_submission(row), table.c.id != job_id,
+                table.c.state.in_(('queued', 'resolving', 'downloading', 'failed'))).values(
+                state='failed', error_code='client_job_failed', lease_token=None,
+                lease_expires=None, next_attempt_at=now, updated_at=now))
+
+    def submission_identity(self, job_id, token):
+        with self.engine.connect() as conn:
+            row = conn.execute(select(self.tables.jobs).where(
+                self._live(job_id, token, self._now()))).mappings().first()
+            if row is None:
+                raise Conflict("Worker lease is no longer valid")
+            return row['external_id'], row['submission_started'], row['submission_key']
+
+    def submission_age(self, job_id, token):
+        _, started, _ = self.submission_identity(job_id, token)
+        return max(0, self._now() - started) if started is not None else 0
 
     def record_external(self, job_id, token, external_id):
         if not isinstance(external_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', external_id):

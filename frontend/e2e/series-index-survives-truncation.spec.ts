@@ -15,23 +15,25 @@ const LONG_SERIES =
   'The Extraordinarily Long Chronicles of the Seventh Kingdom Beyond the Mountains';
 
 test('#2051 a truncated series name keeps its position visible on the card', async ({ page }) => {
+  // The catalog can issue more than one books request (grid pages, refetches),
+  // so the book to rewrite is fixed by the first response and rewritten in
+  // every later one; the line is then found by its text, not by a card id.
   let targetId: number | null = null;
   await page.route(/\/api\/v1\/books(\?|$)/, async (route) => {
     const response = await route.fetch();
     const body = await response.json();
-    const first = body.items?.[0];
-    if (first) {
-      first.series = LONG_SERIES;
-      first.series_index = 4;
-      targetId = first.id;
+    if (targetId === null && body.items?.[0]) targetId = body.items[0].id;
+    for (const item of body.items ?? []) {
+      if (item.id === targetId) {
+        item.series = LONG_SERIES;
+        item.series_index = 4;
+      }
     }
     await route.fulfill({ response, json: body });
   });
 
   await page.goto('/app/');
-  await expect.poll(() => targetId).not.toBeNull();
-  const card = page.locator(`a[href$="/book/${targetId}"]`).first();
-  const line = card.getByTestId('book-card-series');
+  const line = page.getByTestId('book-card-series').filter({ hasText: LONG_SERIES }).first();
   await expect(line).toBeVisible();
 
   const geometry = await line.evaluate((el) => {

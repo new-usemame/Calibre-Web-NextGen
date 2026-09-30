@@ -28,11 +28,24 @@ def scheduler(api,monkeypatch):
 
 
 def test_full_reregistration_restores_one_direct_acquisition_callback(api,scheduler,monkeypatch):
-    from cps.services.acquisition import runtime
+    # Bind the module the way the scheduler binds it. `cps/schedule.py`'s
+    # `_drain_acquisition_jobs` does `from .services.acquisition.runtime import
+    # drain_acquisition_jobs` at call time, which reads
+    # sys.modules['cps.services.acquisition.runtime']. `from
+    # cps.services.acquisition import runtime` reads the *package attribute*
+    # instead, and the two are not always the same object: the attribute is only
+    # written when the submodule is first imported, so once another test file
+    # re-imports it under a stubbed `cps`, sys.modules holds the newer copy
+    # while the attribute still points at the older one. Patching the older copy
+    # leaves the scheduler calling the real drain.
+    runtime=importlib.import_module('cps.services.acquisition.runtime')
     from cps.services.worker import WorkerThread
     schedule,wrapper,underlying=scheduler
     calls=[]
-    monkeypatch.setattr(runtime,'drain_acquisition_jobs',lambda:calls.append('drain'),raising=False)
+    # No raising=False: drain_acquisition_jobs is a real attribute of that
+    # module, so a miss means we patched the wrong object. Let monkeypatch say
+    # that here instead of letting it surface as an unexplained empty `calls`.
+    monkeypatch.setattr(runtime,'drain_acquisition_jobs',lambda:calls.append('drain'))
     monkeypatch.setattr(WorkerThread,'add',lambda *args,**kwargs:pytest.fail('download entered serial email worker'))
     for _ in range(3): schedule.register_scheduled_tasks()
     jobs=[job for job in underlying.get_jobs() if job.id==schedule.ACQUISITION_JOB_ID]

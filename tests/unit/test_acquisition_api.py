@@ -303,17 +303,36 @@ def test_retry_does_not_bypass_revoked_direct_acquisition_grant(api):
 
 
 def test_catalog_worker_owns_repository_without_using_request_context_in_thread(api,monkeypatch):
+    # Reach the offload seam the way the route reaches it. `_run_private_blocking`
+    # does `from ..services.parallel import run_blocking`, which resolves
+    # sys.modules['cps.services.parallel']. `from cps.services import parallel`
+    # resolves the *package attribute* instead, and the two are not always the
+    # same object: tests/unit/conftest.py evicts and re-imports the cps package
+    # tree to undo other files' stub installers, so the attribute can still point
+    # at a stale copy of the module while sys.modules holds a newer one.
+    #
+    # Patching the stale copy fails silently and reads as flakiness. The real
+    # run_blocking still offloads, so browse still runs off the request thread
+    # and the request still returns 200 with the right body -- only the
+    # instrumentation goes missing. Measured under `-n 4 --dist=loadfile`: the
+    # patched module was id 4507532832 while the route used id 4631330880.
+    import importlib,threading
     from concurrent.futures import ThreadPoolExecutor
     from flask import has_request_context
-    from cps.services import parallel
+    parallel=importlib.import_module('cps.services.parallel')
     client,repo,actor,module,connection,offer,database=api
-    submitted=[]
+    submitted=[];observed={}
+    request_thread=threading.get_ident()
     def run(work):
         with ThreadPoolExecutor(max_workers=1) as executor:
             submitted.append(True)
             return executor.submit(work).result()
     def browse(service,owner,identifier,**options):
-        assert not has_request_context()
+        # Recorded, not asserted, in here: an assertion inside a callback that
+        # never runs is an assertion that never fails, which is how the missing
+        # patch stayed invisible. The checks after the request fail loudly when
+        # browse is skipped altogether.
+        observed['thread']=threading.get_ident();observed['context']=has_request_context()
         assert owner==2 and identifier==connection.id
         assert service.repository.connection_config(identifier).config['endpoint']=='https://catalog.invalid'
         return {'title':'Fixture catalog','publications':[]}
@@ -321,7 +340,10 @@ def test_catalog_worker_owns_repository_without_using_request_context_in_thread(
     monkeypatch.setattr(module.CatalogService,'browse',browse)
     response=client.get('/api/v1/acquisition/catalog',query_string={'connection':connection.id})
     assert response.status_code==200 and response.get_json()['title']=='Fixture catalog'
-    assert submitted==[True]
+    assert observed.get('thread') is not None,'CatalogService.browse never ran'
+    assert observed['context'] is False,'catalog work ran inside the request context'
+    assert observed['thread']!=request_thread,'catalog work ran on the request thread'
+    assert submitted==[True],'the route bypassed services.parallel.run_blocking'
 
 
 @pytest.mark.parametrize('formats,allowed',[('pdf',False),('epub',True),('',True),('mobi',False)])

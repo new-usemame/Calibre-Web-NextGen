@@ -23,6 +23,7 @@ import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
 import { useShelfBadgesHidden } from '../lib/useShelfBadgesHidden';
 import { useT } from '../lib/i18n';
+import { useRangeSelection } from '../lib/useRangeSelection';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { measureCatalogColumnCount } from '../lib/catalogGridMeasurement';
 import styles from './Catalog.module.css';
@@ -317,6 +318,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   // Multi-select / bulk mode
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
+  const toggleSelect = useRangeSelection(setSelected, allBooks.map((book) => book.id), selecting);
 
   // Quick-edit pencil on cards (fork #572) — only for users who can edit, and
   // never while multi-selecting (the whole card toggles selection then).
@@ -1149,14 +1151,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   hideShelfTags={shelfBadgesHidden}
                   selectable={selecting}
                   selected={selected.has(book.id)}
-                  onToggleSelect={(b) =>
-                    setSelected((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(b.id)) next.delete(b.id);
-                      else next.add(b.id);
-                      return next;
-                    })
-                  }
+                  onToggleSelect={toggleSelect}
                   onRemove={personalLibrary && isPlainLibrary && !search && !filterActive && !selecting ? removeBook : undefined}
                   removeLabel={t('Remove {title} from my library', { title: book.title })}
                 />

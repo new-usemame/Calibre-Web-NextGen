@@ -20,7 +20,8 @@ interface BookCardProps {
   selected?: boolean;
   /** Keep an in-flight bulk operation attached to its selection. */
   selectionDisabled?: boolean;
-  onToggleSelect?: (book: Book) => void;
+  /** `extend` is true for Shift+click: select the run from the previous click. */
+  onToggleSelect?: (book: Book, extend: boolean) => void;
   /** When true, show the book's position within its series (#573) — used by the
    *  series view so the reading order is visible without duplicating it in titles. */
   showSeriesIndex?: boolean;
@@ -232,7 +233,9 @@ function BookCardInner({
               ? t('Deselect {title}', { title: book.title })
               : t('Select {title}', { title: book.title })
           }
-          onClick={() => onToggleSelect?.(book)}
+          // Shift+mousedown would otherwise extend a text selection across the cards.
+          onMouseDown={(e) => { if (e.shiftKey) e.preventDefault(); }}
+          onClick={(e) => onToggleSelect?.(book, e.shiftKey)}
         >
           {cover}
           {info}

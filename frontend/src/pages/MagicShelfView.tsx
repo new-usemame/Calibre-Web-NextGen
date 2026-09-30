@@ -11,6 +11,7 @@ import { BookCard } from '../components/BookCard';
 import { Spinner, SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { useT } from '../lib/i18n';
+import { useRangeSelection } from '../lib/useRangeSelection';
 import type { Book } from '../lib/api';
 import { ApiError } from '../lib/api';
 import styles from './Shelf.module.css';
@@ -57,12 +58,6 @@ export function MagicShelfView({ id }: { id: string }) {
     setSelected(new Set());
     setSelecting(false);
   };
-  const toggleSelect = (book: Book) => setSelected((previous) => {
-    const next = new Set(previous);
-    if (next.has(book.id)) next.delete(book.id);
-    else next.add(book.id);
-    return next;
-  });
   const refreshAfterBulk = (changedIds: number[]) => {
     // Successful books leave selection; partial failures remain retryable.
     const changed = new Set(changedIds);
@@ -80,6 +75,7 @@ export function MagicShelfView({ id }: { id: string }) {
   // against the new shelf's own saved value, never the prior shelf's value.
   const sort = sortState.shelfId === id ? sortState.value : savedMagicShelfSort(id);
   const [books, setBooks] = useState<Book[]>([]);
+  const toggleSelect = useRangeSelection(setSelected, books.map((book) => book.id), selecting);
   const accKey = useRef('');
   const { data, isLoading, isFetching, isPlaceholderData, error } = useMagicShelfBooks(
     id, page, sort, revision,

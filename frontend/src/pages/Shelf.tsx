@@ -16,6 +16,7 @@ import { EmptyState } from '../components/EmptyState';
 import type { Book } from '../lib/api';
 import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
+import { useRangeSelection } from '../lib/useRangeSelection';
 import styles from './Shelf.module.css';
 import { useCardActionsHidden } from '../lib/useCardActionsHidden';
 import { useReadingTagsHidden } from '../lib/useReadingTagsHidden';
@@ -61,12 +62,6 @@ export function Shelf({ id }: { id: string }) {
     setSelected(new Set());
     setSelecting(false);
   };
-  const toggleSelect = (book: Book) => setSelected((previous) => {
-    const next = new Set(previous);
-    if (next.has(book.id)) next.delete(book.id);
-    else next.add(book.id);
-    return next;
-  });
   const refreshAfterBulk = (changedIds: number[]) => {
     // Successful books leave selection; partial failures remain retryable.
     const changed = new Set(changedIds);
@@ -76,6 +71,7 @@ export function Shelf({ id }: { id: string }) {
     setRevision((value) => value + 1);
   };
   const [books, setBooks] = useState<Book[]>([]);
+  const toggleSelect = useRangeSelection(setSelected, books.map((book) => book.id), selecting);
   const [sort, setSort] = useState(() => readShelfSort(id));
   const accKeyRef = useRef<string>('');
 

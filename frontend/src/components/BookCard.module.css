@@ -153,10 +153,25 @@
      when you read the stylesheet fails when you measure the pixels — static
      contrast math on the token says 5.71 and never sees it. */
   color: var(--text-muted);
+  /* A flex row, not a one-line clamp of the whole string (#2051): the clamp
+     cut the position off together with a long name. Only .seriesName shrinks. */
+  display: flex;
+  min-width: 0;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
+}
+
+.seriesName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* pre, not nowrap: the translated text around the name starts or ends with the
+   separating space, and a flex item drops leading whitespace otherwise. */
+.seriesIndex {
+  flex: none;
+  white-space: pre;
 }
 
 /* Cover badges live in ONE bottom-left row. Previously .readBadge sat at

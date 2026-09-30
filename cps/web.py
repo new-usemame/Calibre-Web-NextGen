@@ -2475,8 +2475,23 @@ def browsable_cc_column(col_id):
 
 
 def render_cc_category(page, col_id, path, order):
-    """Render either the tree overview (no path) or the filtered book list
-    for one node of a hierarchical custom column."""
+    """Render one custom column's browse view: a tree, a flat list, or the
+    books under one node of either.
+
+    A browsable column is in exactly one of two modes, decided once by
+    ``CalibreDB.is_flat_cc_column``:
+
+    * **hierarchical** -- stored values form a real dotted hierarchy
+      ('Computers' and 'Computers.DB'). A node matches itself plus every
+      descendant.
+    * **flat** -- stored values only *contain* dots (Dewey '778.3', LCC
+      'QA76.76.C68'). Each value is an opaque atomic string that is never
+      split, so Dewey 778.3 is one entry rather than a 778 parent with a 3
+      child, and a node has no descendants.
+
+    The two modes share the node contract (path/name/value, children=[]) so
+    cc_list.html renders both without a template change.
+    """
     # Custom columns are part of the Categories section, and a column the
     # admin hid (config_columns_to_ignore) is not browsable by URL either.
     if not current_user.check_visibility(constants.SIDEBAR_CATEGORY):
@@ -2485,33 +2500,45 @@ def render_cc_category(page, col_id, path, order):
     if col is None:
         abort(404)
 
-    # '/' is part of a value ("Sci-Fi/Fantasy"), never a separator.
-    path = hierarchy.join_path([path or ''])
+    is_hierarchical = not calibre_db.is_flat_cc_column(col_id)
+
+    if is_hierarchical:
+        # '/' is part of a value ("Sci-Fi/Fantasy"), never a separator.
+        path = hierarchy.join_path([path or ''])
+    else:
+        # Flat values are opaque: a trailing dot, a doubled dot or a space
+        # around one is part of the stored string, so the path is used
+        # verbatim. Canonicalising here would turn Dewey '778.3' into
+        # something the stored rows never contained.
+        path = (path or '').strip()
 
     try:
         page = int(page)
     except (TypeError, ValueError):
         page = 1
 
-    if path:
+    cc_rel = getattr(db.Books, 'custom_column_' + str(col_id))
+    order_args = (
+        # The FULL shared ORDER BY, tiebreaker included (#1331). Slicing
+        # order[0][0] out of it dropped Books.id and made paging inside a
+        # node plan-dependent; series context is already inside the
+        # collated authaz/authza orders, so no call-site splice is needed.
+        order[0],
+        True, config.config_read_column,
+        db.books_series_link,
+        db.Books.id == db.books_series_link.c.book,
+        db.Series,
+    )
+
+    if path and is_hierarchical:
         node = hierarchy.get_node_by_path(
             calibre_db.get_hierarchical_tree(col_id), path)
         if node is None:
             abort(404)
-        cc_rel = getattr(db.Books, 'custom_column_' + str(col_id))
         entries, random, pagination = calibre_db.fill_indexpage(
-            page, 0,
-            db.Books,
+            page, 0, db.Books,
             cc_rel.any(calibre_db.hierarchical_cc_filter(col_id, node)),
-            # The FULL shared ORDER BY, tiebreaker included (#1331). Slicing
-            # order[0][0] out of it dropped Books.id and made paging inside a
-            # node plan-dependent; series context is already inside the
-            # collated authaz/authza orders, so no call-site splice is needed.
-            order[0],
-            True, config.config_read_column,
-            db.books_series_link,
-            db.Books.id == db.books_series_link.c.book,
-            db.Series)
+            *order_args)
         # Prepend the column root as first crumb so every level can step back
         # up to /custom_column/<id>
         return render_title_template(
@@ -2525,9 +2552,27 @@ def render_cc_category(page, col_id, path, order):
             breadcrumbs=[[ (col.name, '') ] + hierarchy.breadcrumb_trail(path)],
             subcategories=node['children'], col_id=col_id)
 
-    # Root behaviour: the whole tree, each level with its distinct-book count
+    if path:
+        # A flat node is an exact-value match with no descendants, so it has
+        # no subcategories panel at all: passing none (rather than an empty
+        # list) is what makes index.html render nothing in that slot.
+        entries, random, pagination = calibre_db.fill_indexpage(
+            page, 0, db.Books,
+            cc_rel.any(calibre_db.flat_cc_filter(col_id, path)),
+            *order_args)
+        return render_title_template(
+            'index.html', random=random, entries=entries, pagination=pagination,
+            id=path,
+            title=_("%(column)s: %(name)s", column=escape(col.name), name=escape(path)),
+            page="cc_%d" % col_id, order=order[1],
+            breadcrumbs=[[(col.name, ''), (path, path)]], col_id=col_id)
+
+    # Root: a tree of nodes for a hierarchical column, a plain counted list
+    # of whole values for a flat one.
+    entries = (calibre_db.get_hierarchical_tree(col_id) if is_hierarchical
+               else calibre_db.get_cc_flat_list(col_id))
     return render_title_template(
-        'cc_list.html', entries=calibre_db.get_hierarchical_tree(col_id),
+        'cc_list.html', entries=entries,
         title=col.name, page="cclist", col_id=col_id)
 
 

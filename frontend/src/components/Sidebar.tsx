@@ -1,10 +1,10 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
-  Library, Globe, BookCopy,
+  Library, Globe, BookCopy, Tag,
   Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X, Pin, PinOff,
 } from 'lucide-react';
-import { useShelves, useMe, useMagicShelves, useUpdateSidebar } from '../lib/queries';
+import { useShelves, useMe, useMagicShelves, useUpdateSidebar, useColumns } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useIsDrawerMode } from '../lib/a11y/useIsDrawerMode';
 import { useFocusTrap } from '../lib/a11y/useFocusTrap';
@@ -104,6 +104,12 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const shelves = shelvesData?.items ?? [];
   const magicShelves = useMagicShelves().data?.items ?? [];
   const me = useMe().data;
+  // Custom-column browse (tag-like text/enumeration columns). The entry only
+  // renders when at least one column is browsable, so a library without any
+  // keeps the sidebar unchanged. Pinned rather than added to ORDERABLE_ENTRIES:
+  // those keys map 1:1 to the server's ORDERABLE_SIDEBAR_KEYS contract, and
+  // per-column visibility is already honoured server-side.
+  const ccColumns = useColumns().data?.items ?? [];
   const canEdit = !!me?.role?.edit;
   const isAdmin = !!me?.role?.admin;
   const isAuthed = !!me?.id;
@@ -326,6 +332,25 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
 
             {/* Customizable region (browse-by + discovery + Shelves), in saved order. */}
             {renderOrderedRegion()}
+
+            {/* Custom columns (tag-like text/enumeration; a hierarchical one
+                renders as a tree, a flat one as a plain list of values) —
+                SPA parity with the classic sidebar's per-column entries. */}
+            {ccColumns.length > 0 && (
+              <ul className={styles.list} role="list">
+                <li>
+                  <Link
+                    href="/cc"
+                    className={isActive(location, '/cc', true) ? styles.itemActive : styles.item}
+                    aria-current={isActive(location, '/cc', true) ? 'page' : undefined}
+                    onClick={onNavigate}
+                  >
+                    <Tag size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+                    <span>{t('Custom Columns')}</span>
+                  </Link>
+                </li>
+              </ul>
+            )}
 
             {/* Smart shelves + power features (pinned). */}
             <ul className={styles.list} role="list">

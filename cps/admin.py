@@ -1103,7 +1103,10 @@ def update_view_configuration():
     # Fork #323 (@olskar): admin-set custom CSS injected site-wide.
     _config_string(to_save, "config_custom_css")
 
-    config.config_default_role = constants.selected_roles(to_save)
+    # The classic page has no checkbox for the acquisition grants, and a legacy
+    # Store upgrade can have remapped them into this template.
+    config.config_default_role = (constants.selected_roles(to_save)
+                                  | constants.preserved_roles(to_save, config.config_default_role))
     config.config_default_role &= ~constants.ROLE_ANONYMOUS
 
     config.config_default_show = sum(int(k[5:]) for k in to_save if k.startswith('show_') and not k.startswith('show_magic_shelf_') and not k.startswith('show_custom_shelf_'))
@@ -3435,7 +3438,11 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
             content.locale = validated_locale
     try:
         anonymous = content.is_anonymous
-        content.role = constants.selected_roles(to_save)
+        # Book-source access is granted on the admin Book sources page, which
+        # this form knows nothing about. Rebuilding the mask from the posted
+        # checkboxes alone silently revoked it on any edit, even an email change.
+        content.role = (constants.selected_roles(to_save)
+                        | constants.preserved_roles(to_save, content.role))
         if anonymous:
             content.role |= constants.ROLE_ANONYMOUS
         else:

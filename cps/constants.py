@@ -351,8 +351,29 @@ def has_flag(value, bit_flag):
     return bit_flag == (bit_flag & (value or 0))
 
 
+# Roles that no classic admin page draws a checkbox for. A classic form posts
+# only the boxes it renders, so rebuilding a whole mask from one would silently
+# clear any grant made elsewhere -- the acquisition grants are administered on
+# the Book sources page, not on the user edit form.
+ROLES_WITHOUT_CLASSIC_CHECKBOX = ("acquisition_access_role", "acquisition_auto_approve_role")
+
+
 def selected_roles(dictionary):
     return sum(v for k, v in ALL_ROLES.items() if k in dictionary)
+
+
+def preserved_roles(dictionary, current):
+    """Bits a classic form cannot express, carried over from the mask it edits.
+
+    A role with no checkbox keeps its current value unless the submitted form
+    actually carries its key, so adding the checkbox later starts working --
+    including unticking it -- without touching this function.
+    """
+    keep = 0
+    for key in ROLES_WITHOUT_CLASSIC_CHECKBOX:
+        if key not in dictionary:
+            keep |= (current or 0) & ALL_ROLES[key]
+    return keep
 
 
 # :rtype: BookMeta

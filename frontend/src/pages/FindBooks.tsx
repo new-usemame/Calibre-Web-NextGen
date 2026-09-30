@@ -19,13 +19,21 @@ import {
   type AcquisitionPublication,
 } from '../lib/acquisition';
 import { useRuntimeReasonText } from '../lib/acquisitionCopy';
-import { acquisitionSectionView, hasVisibleReceipt, isRowPending } from '../lib/acquisitionViewState';
+import {
+  acquisitionSectionView,
+  catalogEmptyListingKind,
+  catalogHasControls,
+  catalogListingIsEmpty,
+  hasVisibleReceipt,
+  isRowPending,
+} from '../lib/acquisitionViewState';
 import { ApiError } from '../lib/api';
 import { formatAuthors } from '../lib/authors';
 import { useMe } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { EmptyState } from '../components/EmptyState';
+import { SectionError } from '../components/SectionError';
 import { SpinnerCentered } from '../components/Spinner';
 import styles from './FindBooks.module.css';
 
@@ -228,6 +236,24 @@ export function FindBooks() {
     isEmpty: jobRows.length === 0,
   });
 
+  // The browse listing gets the same treatment as every other read on this
+  // page. It had been deciding for itself, which is why a refresh that failed
+  // behind a perfectly good page of results stacked a full "The catalog could
+  // not be read" panel *on top of* the results it had just contradicted.
+  //
+  // "Empty" here means nothing worth keeping on screen: no listing rows AND
+  // no facets or pagination. A page that is only a "next" link is still worth
+  // holding on to when a refresh fails.
+  const catalogView = acquisitionSectionView({
+    enabled: !!connectionId,
+    isLoading: catalog.isLoading,
+    isError: catalog.isError,
+    hasData: catalog.data !== undefined,
+    isEmpty: catalog.data
+      ? catalogListingIsEmpty(catalog.data) && !catalogHasControls(catalog.data)
+      : undefined,
+  });
+
   const openSelection = (nav: AcquisitionNavigation) => {
     setTrail((steps) => [...steps, { title: nav.title || t('Catalog'), selection: nav.selection }]);
   };
@@ -405,9 +431,9 @@ export function FindBooks() {
 
           {requestError && <p className={styles.error} role="alert">{requestError}</p>}
 
-          {catalog.isLoading && <SpinnerCentered />}
+          {catalogView.body === 'loading' && <SpinnerCentered />}
 
-          {catalog.isError && (
+          {catalogView.body === 'error' && (
             // role="alert": browsing is a keyboard-and-listening activity as
             // much as a visual one, and a page that silently swaps its results
             // for a failure leaves a screen-reader user waiting for a list
@@ -436,15 +462,28 @@ export function FindBooks() {
             </div>
           )}
 
-          {catalog.data && (
-            <CatalogView
-              catalog={catalog.data}
-              canAcquire={canAcquire}
-              requestsPaused={!runtime?.available}
-              pendingOffer={request.isPending ? request.variables?.offerId : undefined}
-              onOpen={openSelection}
-              onRequest={(offerId, format) => request.mutate({ offerId, format })}
-            />
+          {catalog.data && (catalogView.body === 'ready' || catalogView.body === 'empty') && (
+            <>
+              {/* A refresh failed but the previous results are still on
+                  screen. Say so next to them instead of replacing them: the
+                  rows are real, they are just no longer being confirmed. */}
+              {catalogView.showError && (
+                <SectionError
+                  message={t('These results could not be refreshed and may be out of date.')}
+                  onRetry={() => void catalog.refetch()}
+                  retrying={catalog.isFetching}
+                />
+              )}
+              <CatalogView
+                catalog={catalog.data}
+                query={current?.query}
+                canAcquire={canAcquire}
+                requestsPaused={!runtime?.available}
+                pendingOffer={request.isPending ? request.variables?.offerId : undefined}
+                onOpen={openSelection}
+                onRequest={(offerId, format) => request.mutate({ offerId, format })}
+              />
+            </>
           )}
         </>
       )}
@@ -543,8 +582,10 @@ export function FindBooks() {
   );
 }
 
-function CatalogView({ catalog, canAcquire, requestsPaused, pendingOffer, onOpen, onRequest }: {
+function CatalogView({ catalog, query, canAcquire, requestsPaused, pendingOffer, onOpen, onRequest }: {
   catalog: AcquisitionCatalog;
+  /** The search term this page answers, when it answers one. */
+  query?: string;
   canAcquire: boolean;
   requestsPaused: boolean;
   pendingOffer?: string;
@@ -557,14 +598,13 @@ function CatalogView({ catalog, canAcquire, requestsPaused, pendingOffer, onOpen
     ...catalog.groups,
   ].filter((section) => section.publications.length || section.navigation.length);
 
-  if (!sections.length) {
-    return <EmptyState icon={FolderOpen} message={t('This catalog page is empty.')} />;
-  }
-
   return (
     <>
-      {catalog.facets.map((facet) => (
-        <section key={facet.title} className={styles.facet}>
+      {/* Facet titles are catalog-supplied and not guaranteed unique — two
+          "Sort by" groups in one OPDS2 payload would collide on a title-only
+          key and let React reuse the wrong subtree. */}
+      {catalog.facets.map((facet, index) => (
+        <section key={`${facet.title}-${index}`} className={styles.facet}>
           <h2>{facet.title || t('Filter')}</h2>
           <ul className={styles.navList} role="list">
             {facet.navigation.map((nav) => (
@@ -575,6 +615,20 @@ function CatalogView({ catalog, canAcquire, requestsPaused, pendingOffer, onOpen
           </ul>
         </section>
       ))}
+
+      {/* An empty listing is a fact about the rows, not about the page. The
+          facets above and the pagination below came out of the same payload
+          and are exactly what the reader needs to get off an empty page, so
+          the message goes *in* the listing slot rather than replacing
+          everything around it. */}
+      {!sections.length && (
+        <EmptyState
+          icon={FolderOpen}
+          message={catalogEmptyListingKind(query) === 'no-search-results'
+            ? t('No books on this catalog matched that search.')
+            : t('This catalog page is empty.')}
+        />
+      )}
 
       {sections.map((section, index) => (
         <section key={section.title || `section-${index}`} className={styles.section}>

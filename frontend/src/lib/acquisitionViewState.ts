@@ -152,3 +152,62 @@ export function isRowPending<T>(pending: boolean, active: T | undefined, row: T)
 export function hasVisibleReceipt(bookIds?: readonly number[]): boolean {
   return !!bookIds && bookIds.length > 0;
 }
+
+/* -------------------------------------------------------------------------
+ * The browse listing.
+ *
+ * This is the one read on either page that was still deciding for itself, and
+ * it had kept the same mistake in a new shape: it inferred "there is nothing
+ * here" from the absence of *listing rows*, then returned before drawing the
+ * facets and pagination the very same payload had supplied. A page with no
+ * entries but a "next" link is not a dead end; rendering it as one strands
+ * the reader with no control except the browser's back button.
+ * ---------------------------------------------------------------------- */
+
+/** Only the shape the decisions below read. Kept structural so this module
+ *  stays import-free and the node unit lane can exercise it directly. */
+export interface AcquisitionCatalogSectionShape {
+  publications?: readonly unknown[];
+  navigation?: readonly unknown[];
+}
+
+export interface AcquisitionCatalogShape extends AcquisitionCatalogSectionShape {
+  groups?: readonly AcquisitionCatalogSectionShape[];
+  facets?: readonly unknown[];
+  pagination?: readonly unknown[];
+}
+
+function sectionHasRows(section?: AcquisitionCatalogSectionShape): boolean {
+  return ((section?.publications?.length ?? 0) + (section?.navigation?.length ?? 0)) > 0;
+}
+
+/** Whether the listing area — the root section plus any groups — has no rows.
+ *
+ *  Deliberately ignores facets and pagination: those are controls, not
+ *  results, and counting them would hide a genuinely empty result behind a
+ *  populated-looking page. */
+export function catalogListingIsEmpty(catalog: AcquisitionCatalogShape): boolean {
+  return !sectionHasRows(catalog) && !(catalog.groups ?? []).some(sectionHasRows);
+}
+
+/** Whether the payload carries navigation that must outlive an empty listing.
+ *
+ *  Facets can widen a filter that matched nothing and pagination can step off
+ *  a page that ran out; both are most useful in exactly the case the old code
+ *  discarded them. */
+export function catalogHasControls(catalog: AcquisitionCatalogShape): boolean {
+  return ((catalog.facets?.length ?? 0) + (catalog.pagination?.length ?? 0)) > 0;
+}
+
+/** Which "nothing to show" sentence an empty listing has earned.
+ *
+ *  A search that matched nothing is a fact about the query. Reporting it as
+ *  "this catalog page is empty" blames the catalog and invites the reader to
+ *  go looking for a fault that is not there. */
+export type AcquisitionEmptyListingKind = 'empty-page' | 'no-search-results';
+
+export function catalogEmptyListingKind(query?: string): AcquisitionEmptyListingKind {
+  // A submitted query is a search even if it was only spaces: the reader
+  // asked a question and the honest answer is "that found nothing".
+  return query === undefined || query === '' ? 'empty-page' : 'no-search-results';
+}

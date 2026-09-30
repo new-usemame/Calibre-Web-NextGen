@@ -4,6 +4,9 @@ import test from 'node:test';
 import {
   acquisitionRequesterLabel,
   acquisitionSectionView,
+  catalogEmptyListingKind,
+  catalogHasControls,
+  catalogListingIsEmpty,
   connectionEnableRejected,
   connectionSwitchDisabled,
   hasVisibleReceipt,
@@ -230,4 +233,67 @@ test('an import with no ids this account may see is not claimed as openable', ()
   // requester. Saying "in your library" with nothing to open reads as a bug.
   assert.equal(hasVisibleReceipt([]), false);
   assert.equal(hasVisibleReceipt(undefined), false);
+});
+
+// ---------------------------------------------------------------------------
+// The browse listing is the one read on either page that never went through
+// acquisitionSectionView, and it kept two of the exact bugs that helper was
+// written to kill.
+//
+// 1. CatalogView returned an "empty page" state *before* it drew facets or
+//    pagination. A catalog page with no entries but a "next" link — the last
+//    page of a feed that shrank, a filter that matched nothing — threw away
+//    the only controls that could get the reader off it. The payload said
+//    "here is where you can go next"; the screen said "nothing here".
+// 2. A search that matched nothing reported "This catalog page is empty.",
+//    which reads as a broken catalog rather than a query with no hits.
+// ---------------------------------------------------------------------------
+
+test('a listing with neither publications nor navigation is empty', () => {
+  assert.equal(catalogListingIsEmpty({ publications: [], navigation: [], groups: [] }), true);
+});
+
+test('a listing is not empty when the root carries publications', () => {
+  assert.equal(catalogListingIsEmpty({ publications: [{}], navigation: [] }), false);
+});
+
+test('a listing is not empty when only a group carries rows', () => {
+  assert.equal(
+    catalogListingIsEmpty({ publications: [], navigation: [], groups: [{ navigation: [{}] }] }),
+    false,
+  );
+});
+
+test('an absent key is not a populated one', () => {
+  assert.equal(catalogListingIsEmpty({}), true);
+});
+
+// Facets and pagination are not listing rows, so they must not make the
+// listing look populated -- but they must still be drawn.
+test('facets and pagination do not count as listing rows', () => {
+  assert.equal(catalogListingIsEmpty({ facets: [{}], pagination: [{}] }), true);
+});
+
+test('pagination on an empty page is a control worth keeping', () => {
+  assert.equal(catalogHasControls({ publications: [], pagination: [{}] }), true);
+});
+
+test('facets on an empty page are a control worth keeping', () => {
+  assert.equal(catalogHasControls({ facets: [{}] }), true);
+});
+
+test('a page with no facets and no pagination has no controls to keep', () => {
+  assert.equal(catalogHasControls({ publications: [{}] }), false);
+});
+
+test('an empty result for a search names the search, not a broken page', () => {
+  assert.equal(catalogEmptyListingKind('dickens'), 'no-search-results');
+});
+
+test('whitespace is not a search', () => {
+  assert.equal(catalogEmptyListingKind('   '), 'no-search-results');
+});
+
+test('an empty page reached by browsing is an empty page', () => {
+  assert.equal(catalogEmptyListingKind(undefined), 'empty-page');
 });

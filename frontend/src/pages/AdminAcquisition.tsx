@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import { Link } from 'wouter';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangle, ChevronLeft, CheckCircle2, Globe, Plus, RefreshCw, Users } from 'lucide-react';
+import { AlertTriangle, ChevronLeft, CheckCircle2, Globe, Plus, Users } from 'lucide-react';
 import {
   approveAcquisitionJob,
   createAcquisitionConnection,
@@ -28,6 +28,7 @@ import { useT } from '../lib/i18n';
 import { useMe } from '../lib/queries';
 import { useAnnouncer } from '../lib/a11y/announcer';
 import { SpinnerCentered } from '../components/Spinner';
+import { SectionError } from '../components/SectionError';
 import styles from './AdminAcquisition.module.css';
 
 function errorCode(error: unknown): string | undefined {
@@ -35,30 +36,6 @@ function errorCode(error: unknown): string | undefined {
     return error.detail.code;
   }
   return undefined;
-}
-
-/** A read that failed, said out loud and with a way back.
- *
- *  Every one of these sections used to render a failed read as its empty
- *  state, so "we could not ask the server" and "the server says there is
- *  nothing" looked identical. `role="alert"` because it replaces content the
- *  administrator asked for; the retry is here because reloading the whole
- *  page to re-run one query is a poor answer to a transient 502. */
-function SectionError({ message, onRetry, retrying }: {
-  message: string;
-  onRetry: () => void;
-  retrying?: boolean;
-}) {
-  const t = useT();
-  return (
-    <div className={styles.sectionError} role="alert">
-      <p>{message}</p>
-      <button type="button" className={styles.secondary} onClick={onRetry} disabled={retrying}>
-        <RefreshCw size={14} aria-hidden="true" focusable={false} />
-        <span>{t('Try again')}</span>
-      </button>
-    </div>
-  );
 }
 
 const EMPTY_CONNECTION: AcquisitionConnectionInput & { label: string } = {

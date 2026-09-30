@@ -403,3 +403,180 @@ test.describe('find books — a failed activity read is not an empty one', () =>
     await expect(page.getByText('ingest_unwritable')).toHaveCount(0);
   });
 });
+
+test.describe('find books — the browse listing is a read like any other', () => {
+  /* The listing was the one read on either page still deciding for itself,
+   * and it had kept two failures the shared helper exists to prevent:
+   *
+   *   - it drew a full "The catalog could not be read" panel ON TOP of the
+   *     results it had just contradicted whenever a background refresh
+   *     failed, because `isError` and `data` are both truthy in that state;
+   *   - it returned an "empty page" before rendering facets or pagination,
+   *     so a page with no entries but a "next" link lost the only control
+   *     that could get the reader off it.
+   */
+  async function grantAccess(page: Page): Promise<void> {
+    await page.route(`**${V1}/auth/me`, async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      await route.fulfill({
+        response,
+        contentType: 'application/json',
+        body: JSON.stringify({ ...body, acquisition_access: true }),
+      });
+    });
+  }
+
+  const BOOTSTRAP = {
+    connections: [{ id: 'c1', label: 'Gutenberg', adapter: 'opds', enabled: true, revision: 1 }],
+    can_acquire: true,
+    runtime: { available: true, reasons: [] as string[] },
+  };
+
+  const page1 = (publications: unknown[], extra: Record<string, unknown> = {}) => ({
+    title: 'Gutenberg', protocol: 'opds1',
+    publications, navigation: [], searches: [], groups: [], facets: [], pagination: [],
+    ...extra,
+  });
+
+  const nav = (title: string, selection: string) =>
+    ({ title, relations: ['next'], selection });
+
+  const book = {
+    title: 'Moby-Dick', identity: 'pub-1', authors: ['Herman Melville'],
+    languages: ['en'], description: null, navigation: [],
+    offers: [{ format: 'EPUB', label: null, identity: 'off-1', relation: 'download', offer_id: 'o1' }],
+  };
+
+  test('an empty page keeps the pagination that can get the reader off it', async ({ page }) => {
+    await grantAccess(page);
+    await intercept(page, {
+      [`${V1}/acquisition`]: { body: BOOTSTRAP },
+      [`${V1}/acquisition/jobs`]: { body: { jobs: [] } },
+      [`${V1}/acquisition/catalog`]: {
+        body: page1([], { pagination: [nav('Next page', 'sel-next')] }),
+      },
+    });
+
+    await page.goto('/app/find-books');
+    await expect(page.getByText('This catalog page is empty.')).toBeVisible();
+    // The payload carried a way forward. Returning early threw it away and
+    // left the reader on a dead page with only the browser's back button.
+    await expect(page.getByRole('button', { name: 'Next page' })).toBeVisible();
+  });
+
+  test('an empty page keeps the facets that can widen the filter', async ({ page }) => {
+    await grantAccess(page);
+    await intercept(page, {
+      [`${V1}/acquisition`]: { body: BOOTSTRAP },
+      [`${V1}/acquisition/jobs`]: { body: { jobs: [] } },
+      [`${V1}/acquisition/catalog`]: {
+        body: page1([], { facets: [{ title: 'Language', navigation: [nav('English', 'sel-en')] }] }),
+      },
+    });
+
+    await page.goto('/app/find-books');
+    await expect(page.getByText('This catalog page is empty.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'English' })).toBeVisible();
+  });
+
+  test('a refresh that fails behind results keeps them and says they are stale', async ({ page }) => {
+    await grantAccess(page);
+    // The refetch is driven by a real user action, not a synthetic event:
+    // the client sets `refetchOnWindowFocus: false`, so dispatching `focus`
+    // proves nothing. Walking into a subsection and back re-subscribes the
+    // root query, and with the default `staleTime: 0` that re-reads it while
+    // still serving the cached page — exactly the state under test.
+    let rootReads = 0;
+    await page.route(`**${V1}/acquisition/catalog**`, async (route) => {
+      const { searchParams } = new URL(route.request().url());
+      if (searchParams.get('selection') === 'sel-sub') {
+        return route.fulfill({
+          status: 200, contentType: 'application/json', body: JSON.stringify(page1([])),
+        });
+      }
+      rootReads += 1;
+      if (rootReads === 1) {
+        return route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(page1([book], { navigation: [nav('Subsection', 'sel-sub')] })),
+        });
+      }
+      return route.fulfill({
+        status: 502,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'source_unavailable', message: 'nope' } }),
+      });
+    });
+    await intercept(page, {
+      [`${V1}/acquisition`]: { body: BOOTSTRAP },
+      [`${V1}/acquisition/jobs`]: { body: { jobs: [] } },
+    });
+
+    await page.goto('/app/find-books');
+    await expect(page.getByRole('heading', { name: 'Moby-Dick' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Subsection' }).click();
+    await expect(page.getByRole('heading', { name: 'Moby-Dick' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Top of catalog' }).click();
+
+    const stale = page.getByRole('alert')
+      .filter({ hasText: 'These results could not be refreshed' });
+    await expect(stale).toBeVisible();
+    // The results are still real and still on screen. The old code stacked a
+    // full-page "could not be read" panel above them, which reads as a
+    // contradiction: a failure notice sitting on top of a working catalog.
+    await expect(page.getByRole('heading', { name: 'Moby-Dick' })).toBeVisible();
+    await expect(page.getByText('The catalog could not be read')).toHaveCount(0);
+  });
+
+  test('a first read that fails with nothing behind it is still a full failure', async ({ page }) => {
+    // The guard rail: softening the genuine no-data failure into a small
+    // stale-warning would be its own bug.
+    await grantAccess(page);
+    await intercept(page, {
+      [`${V1}/acquisition`]: { body: BOOTSTRAP },
+      [`${V1}/acquisition/jobs`]: { body: { jobs: [] } },
+      [`${V1}/acquisition/catalog`]: { status: 502 },
+    });
+
+    await page.goto('/app/find-books');
+    await expect(page.getByText('The catalog could not be read')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Back to top' })).toBeVisible();
+  });
+
+  test('a search that matched nothing blames the search, not the catalog', async ({ page }) => {
+    await grantAccess(page);
+    await page.route(`**${V1}/acquisition/catalog**`, async (route) => {
+      const { searchParams } = new URL(route.request().url());
+      const searched = searchParams.get('q') !== null;
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          searched
+            ? page1([])
+            : page1([book], { searches: [{ title: 'Search', selection: 'sel-search' }] }),
+        ),
+      });
+    });
+    await intercept(page, {
+      [`${V1}/acquisition`]: { body: BOOTSTRAP },
+      [`${V1}/acquisition/jobs`]: { body: { jobs: [] } },
+    });
+
+    await page.goto('/app/find-books');
+    // Scoped to the catalog's own `role="search"` form: at mobile widths the
+    // app shell adds a "Search the library" button, and an unscoped
+    // name: 'Search' matches both.
+    const searchForm = page.getByRole('search');
+    await searchForm.getByRole('searchbox', { name: 'Search this catalog' }).fill('zzzznothing');
+    await searchForm.getByRole('button', { name: 'Search', exact: true }).click();
+
+    // "This catalog page is empty." sends the reader looking for a fault in
+    // a catalog that answered correctly.
+    await expect(page.getByText('No books on this catalog matched that search.')).toBeVisible();
+    await expect(page.getByText('This catalog page is empty.')).toHaveCount(0);
+  });
+});

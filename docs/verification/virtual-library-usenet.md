@@ -22,6 +22,16 @@ The full backend run passed 10,173 tests, skipped 103, and initially failed thre
 
 Release-image publication and household deployment were not exercised: this milestone is a needs-review PR, with no merge or release authorized.
 
+## Independent review fixes
+
+The review’s slow-child upload defect reproduced with real subprocesses and a local HTTP server: 10 KB passed but 60/200/500 KB timed out after a half-second startup delay. The fixed transport supplies complete temporary-file stdin and EOF; all four sizes pass while existing hard-deadline and cancellation tests remain green.
+
+Other regressions confirm per-release handling of foreign download origins; a seven-day ceiling on unfinished SAB work; fresh durable names after a definite failed download; whole-attempt invalidation even when another subscriber is cancelled; rejection resolving existing subscribers; nullable-key legacy recovery; a lost submit response after a fresh retry; direct completed-file selection without scanning sibling downloads; and explicit credential reentry when the server origin changes.
+
+The final independent backend refuter passed 187 tests and found no remaining concrete blocker. The owner’s broad focused gate passed 413 tests with one skip. The latest desktop/phone settings run passed 11 cases, including credential reentry and retained form state. Frontend unit tests still passed 192, and typecheck/build passed.
+
+After rebasing onto main including #2388, the requested full backend run passed 10,195 tests, skipped 103, and failed only the same two metadata disk-I/O cases reproduced on the untouched baseline. Final Linux CI is recorded in the PR; this local full-suite result is not described as green.
+
 ## Reproduce the offline boundary
 
 Run the fixture on an isolated network; configure Prowlarr Generic Newznab to its `/api` endpoint and disposable `fixture-key`; configure SAB NNTP to the fixture on port 8119. Add a SAB books category and read-only completed-folder mapping to CWNG. Bind the Prowlarr protocol endpoint to that client, explicitly authorize only the needed local origins, probe and enable both connections, and request the fixture release with a granted test account. Compare `/counts`, the SAB identity, and the CWNG receipt before and after restart or a second account request. See [book-source setup](../book-sources.md) for the user-facing configuration.

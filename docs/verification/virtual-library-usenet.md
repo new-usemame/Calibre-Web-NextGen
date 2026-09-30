@@ -16,7 +16,7 @@ Independent backend and browser refuters drove several fix/retest rounds. Deskto
 
 ## Automated evidence and limits
 
-The focused backend gate passed 334 tests with one skip before the final narrow configuration fixes; the final independent API/Usenet/HTTP/storage run passed 130 tests. Frontend unit tests passed 192 tests. Browser read-failure and connection cases passed 41 tests, with a final settings rerun recorded in the PR.
+The final post-rebase acquisition, migration, HTTP, translation, subpath, and changelog gate passed 431 tests with one skip; the independent API/Usenet/HTTP/storage run passed 130 tests. Frontend unit tests passed 192 tests. Browser read-failure and connection cases passed 41 tests, and the final settings rerun passed all nine desktop/phone cases. Twenty-four live requests at parallelism eight resolved to one imported request with no additional descriptor or NNTP article fetch.
 
 The full backend run passed 10,173 tests, skipped 103, and initially failed three. Its changelog-format failure was corrected and checked separately. Two metadata-database disk-I/O tests also failed on the untouched prerequisite baseline (10,147 passed, 103 skipped, the same two failures), while the isolated six-test metadata module passed. The full suite is therefore not claimed green. These failures concern the existing metadata replacement test environment, not acquisition; the PR records their exact names.
 

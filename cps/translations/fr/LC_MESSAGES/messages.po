@@ -18000,4 +18000,3 @@ msgstr "Cette page n’est pas accessible à ce compte."
 #: cps/spa_strings.py
 msgid "Connection changed. Reload its settings before saving."
 msgstr "La connexion a changé. Rechargez ses paramètres avant de les enregistrer."
-

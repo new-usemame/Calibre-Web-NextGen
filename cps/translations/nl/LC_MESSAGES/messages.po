@@ -17137,6 +17137,14 @@ msgid "This catalog does not offer search."
 msgstr "Deze catalogus biedt geen zoekfunctie."
 
 #: cps/spa_strings.py
+msgid "No books on this catalog matched that search."
+msgstr "Geen enkel boek in deze catalogus komt overeen met die zoekopdracht."
+
+#: cps/spa_strings.py
+msgid "These results could not be refreshed and may be out of date."
+msgstr "Deze resultaten konden niet worden vernieuwd en zijn mogelijk verouderd."
+
+#: cps/spa_strings.py
 msgid "This catalog page is empty."
 msgstr "Deze cataloguspagina is leeg."
 

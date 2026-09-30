@@ -10682,7 +10682,7 @@ msgstr ""
 
 #: cps/templates/annotations_view.html
 msgid "Open book"
-msgstr ""
+msgstr "Ouvrir le livre"
 
 #: cps/templates/annotations_view.html
 #, python-format
@@ -17168,3 +17168,564 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid ", search supported"
+msgstr ", recherche prise en charge"
+
+#: cps/spa_strings.py
+msgid "A copy was already in the library; it was kept."
+msgstr "Un exemplaire était déjà dans la bibliothèque ; il a été conservé."
+
+#: cps/spa_strings.py
+msgid ""
+"A new catalog is added switched off. Test it first, then make it "
+"available."
+msgstr ""
+"Un nouveau catalogue est ajouté désactivé. Testez-le d'abord, puis "
+"rendez-le disponible."
+
+#: cps/spa_strings.py
+msgid ""
+"Acquisition is not ready right now. Ask an administrator to check its "
+"status."
+msgstr ""
+"L'acquisition n'est pas prête pour le moment. Demandez à un "
+"administrateur d'en vérifier l'état."
+
+#: cps/spa_strings.py
+msgid "Add a catalog"
+msgstr "Ajouter un catalogue"
+
+#: cps/spa_strings.py
+msgid "Add catalog"
+msgstr "Ajouter le catalogue"
+
+#: cps/spa_strings.py
+msgid "Added to your activity."
+msgstr "Ajouté à votre activité."
+
+#: cps/spa_strings.py
+msgid "Allow requests from book sources"
+msgstr "Autoriser les demandes depuis les sources de livres"
+
+#: cps/spa_strings.py
+msgid "Also add the book to My Library"
+msgstr "Ajouter aussi le livre à Ma bibliothèque"
+
+#: cps/spa_strings.py
+msgid "An administrator has not added a book source, or none is switched on."
+msgstr ""
+"Aucun administrateur n'a ajouté de source de livres, ou aucune n'est "
+"activée."
+
+#: cps/spa_strings.py
+msgid "Available to users"
+msgstr "Disponible pour les utilisateurs"
+
+#: cps/spa_strings.py
+msgid "Back to top"
+msgstr "Retour en haut"
+
+#: cps/spa_strings.py
+msgid "Book sources"
+msgstr "Sources de livres"
+
+#: cps/spa_strings.py
+msgid "Book sources are off."
+msgstr "Les sources de livres sont désactivées."
+
+#: cps/spa_strings.py
+msgid "Book sources are on."
+msgstr "Les sources de livres sont activées."
+
+#: cps/spa_strings.py
+msgid ""
+"Book sources could not be reached just now. This is not a change to your "
+"access."
+msgstr ""
+"Les sources de livres n'ont pas pu être contactées pour le moment. Cela "
+"ne change rien à votre accès."
+
+#: cps/spa_strings.py
+msgid ""
+"Browse the catalogs your administrator has added. A book you pick is "
+"imported into the library here — it is not just downloaded to your "
+"device."
+msgstr ""
+"Parcourez les catalogues ajoutés par votre administrateur. Un livre que "
+"vous choisissez est importé dans la bibliothèque ici — il n'est pas "
+"simplement téléchargé sur votre appareil."
+
+#: cps/spa_strings.py
+msgid "Can browse and request"
+msgstr "Peut parcourir et demander"
+
+#: cps/spa_strings.py
+msgid "Cancelling…"
+msgstr "Annulation…"
+
+#: cps/spa_strings.py
+msgid "Catalog"
+msgstr "Catalogue"
+
+#: cps/spa_strings.py
+msgid "Catalog added. Test it, then switch it on."
+msgstr "Catalogue ajouté. Testez-le, puis activez-le."
+
+#: cps/spa_strings.py
+msgid "Catalog address"
+msgstr "Adresse du catalogue"
+
+#: cps/spa_strings.py
+msgid "Catalog pages"
+msgstr "Pages du catalogue"
+
+#: cps/spa_strings.py
+msgid "Catalog trail"
+msgstr "Fil d'Ariane du catalogue"
+
+#: cps/spa_strings.py
+msgid "Catalogs"
+msgstr "Catalogues"
+
+#: cps/spa_strings.py
+msgid "Check the address and the sign-in details."
+msgstr "Vérifiez l'adresse et les identifiants de connexion."
+
+#: cps/spa_strings.py
+msgid "Connection works."
+msgstr "La connexion fonctionne."
+
+#: cps/spa_strings.py
+msgid "Contacting the source"
+msgstr "Contact de la source en cours"
+
+#: cps/spa_strings.py
+msgid "Could not look up who asked"
+msgstr "Impossible de retrouver l'auteur de la demande"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Download {format}"
+msgstr "Télécharger {format}"
+
+#: cps/spa_strings.py
+msgid "Downloaded, waiting to import"
+msgstr "Téléchargé, en attente d'importation"
+
+#: cps/spa_strings.py
+msgid "Downloading"
+msgstr "Téléchargement"
+
+#: cps/spa_strings.py
+msgid "Feature"
+msgstr "Fonctionnalité"
+
+#: cps/spa_strings.py
+msgid "Filter"
+msgstr "Filtre"
+
+#: cps/spa_strings.py
+msgid "Find books"
+msgstr "Trouver des livres"
+
+#: cps/spa_strings.py
+msgid "Find books is unavailable"
+msgstr "Trouver des livres est indisponible"
+
+#: cps/spa_strings.py
+msgid "Handing over to the library"
+msgstr "Transmission à la bibliothèque"
+
+#: cps/spa_strings.py
+msgid "Imported into the library"
+msgstr "Importé dans la bibliothèque"
+
+#: cps/spa_strings.py
+msgid "Importing"
+msgstr "Importation"
+
+#: cps/spa_strings.py
+msgid "Legacy acquisition permissions need review before a catalog can be added."
+msgstr ""
+"Les anciennes permissions d'acquisition doivent être réexaminées avant de"
+" pouvoir ajouter un catalogue."
+
+#: cps/spa_strings.py
+msgid ""
+"Legacy acquisition permissions need review before a catalog can be made "
+"available."
+msgstr ""
+"Les anciennes permissions d'acquisition doivent être réexaminées avant de"
+" pouvoir rendre un catalogue disponible."
+
+#: cps/spa_strings.py
+msgid "Legacy acquisition permissions need review before this can be switched on."
+msgstr ""
+"Les anciennes permissions d'acquisition doivent être réexaminées avant de"
+" pouvoir activer ceci."
+
+#: cps/spa_strings.py
+msgid ""
+"Let people request books from an OPDS catalog. A requested book is "
+"imported into this library through the normal ingest path, credited to "
+"the account that asked for it."
+msgstr ""
+"Permettez aux personnes de demander des livres depuis un catalogue OPDS. "
+"Un livre demandé est importé dans cette bibliothèque par le circuit "
+"d'ingestion habituel, au crédit du compte qui l'a demandé."
+
+#: cps/spa_strings.py
+msgid "Looking up who asked…"
+msgstr "Recherche de l'auteur de la demande…"
+
+#: cps/spa_strings.py
+msgid "More"
+msgstr "Plus"
+
+#: cps/spa_strings.py
+msgid "No EPUB or PDF available from this catalog."
+msgstr "Aucun EPUB ni PDF disponible dans ce catalogue."
+
+#: cps/spa_strings.py
+msgid "No accepted upload format allows EPUB or PDF."
+msgstr "Aucun format d'envoi accepté n'autorise l'EPUB ni le PDF."
+
+#: cps/spa_strings.py
+msgid "No approval needed"
+msgstr "Aucune approbation nécessaire"
+
+#: cps/spa_strings.py
+msgid "No catalogs yet"
+msgstr "Aucun catalogue pour l'instant"
+
+#: cps/spa_strings.py
+msgid "No catalogs yet."
+msgstr "Aucun catalogue pour l'instant."
+
+#: cps/spa_strings.py
+msgid "Not tested in this session."
+msgstr "Non testé durant cette session."
+
+#: cps/spa_strings.py
+msgid "Nothing requested yet."
+msgstr "Aucune demande pour l'instant."
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. Nothing is fetched and no permission changes until you "
+"turn this on."
+msgstr ""
+"Désactivé par défaut. Rien n'est récupéré et aucune permission ne change "
+"tant que vous n'activez pas ceci."
+
+#: cps/spa_strings.py
+msgid "Queued"
+msgstr "En file d'attente"
+
+#: cps/spa_strings.py
+msgid "Ready to run requests."
+msgstr "Prêt à traiter les demandes."
+
+#: cps/spa_strings.py
+msgid "Request approved."
+msgstr "Demande approuvée."
+
+#: cps/spa_strings.py
+msgid "Request cancelled"
+msgstr "Demande annulée"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request {format}"
+msgstr "Demander {format}"
+
+#: cps/spa_strings.py
+msgid "Requested by a removed account"
+msgstr "Demandé par un compte supprimé"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Requested by {name}"
+msgstr "Demandé par {name}"
+
+#: cps/spa_strings.py
+msgid "Requested. An administrator has to approve it."
+msgstr "Demandé. Un administrateur doit l'approuver."
+
+#: cps/spa_strings.py
+msgid "Requests are paused"
+msgstr "Les demandes sont en pause"
+
+#: cps/spa_strings.py
+msgid "Requests cannot run yet:"
+msgstr "Les demandes ne peuvent pas encore être traitées :"
+
+#: cps/spa_strings.py
+msgid "Retrying."
+msgstr "Nouvelle tentative."
+
+#: cps/spa_strings.py
+msgid "Search this catalog"
+msgstr "Rechercher dans ce catalogue"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Search: {query}"
+msgstr "Recherche : {query}"
+
+#: cps/spa_strings.py
+msgid "Sign-in"
+msgstr "Authentification"
+
+#: cps/spa_strings.py
+msgid "Test connection"
+msgstr "Tester la connexion"
+
+#: cps/spa_strings.py
+msgid "That account is no longer allowed to request books."
+msgstr "Ce compte n'est plus autorisé à demander des livres."
+
+#: cps/spa_strings.py
+msgid "That catalog no longer exists."
+msgstr "Ce catalogue n'existe plus."
+
+#: cps/spa_strings.py
+msgid "That choice expired. Refresh the page and pick the file again."
+msgstr ""
+"Ce choix a expiré. Actualisez la page et sélectionnez à nouveau le "
+"fichier."
+
+#: cps/spa_strings.py
+msgid "That page expired. Go back to the top and try again."
+msgstr "Cette page a expiré. Revenez en haut et réessayez."
+
+#: cps/spa_strings.py
+msgid ""
+"That permission could not be changed. Check that book sources are still "
+"switched on, then try again."
+msgstr ""
+"Cette permission n'a pas pu être modifiée. Vérifiez que les sources de "
+"livres sont toujours activées, puis réessayez."
+
+#: cps/spa_strings.py
+msgid "That request has already moved on and can no longer be stopped."
+msgstr "Cette demande a déjà progressé et ne peut plus être arrêtée."
+
+#: cps/spa_strings.py
+msgid "That request has already moved on."
+msgstr "Cette demande a déjà progressé."
+
+#: cps/spa_strings.py
+msgid "That request is no longer in a state that can be retried."
+msgstr "Cette demande n'est plus dans un état permettant une nouvelle tentative."
+
+#: cps/spa_strings.py
+msgid "That request is no longer waiting."
+msgstr "Cette demande n'est plus en attente."
+
+#: cps/spa_strings.py
+msgid "The Calibre library folder could not be found."
+msgstr "Le dossier de la bibliothèque Calibre est introuvable."
+
+#: cps/spa_strings.py
+msgid "The acquisition database could not be opened."
+msgstr "La base de données d'acquisition n'a pas pu être ouverte."
+
+#: cps/spa_strings.py
+msgid "The acquisition key is missing."
+msgstr "La clé d'acquisition est manquante."
+
+#: cps/spa_strings.py
+msgid "The acquisition tables are not ready."
+msgstr "Les tables d'acquisition ne sont pas prêtes."
+
+#: cps/spa_strings.py
+msgid ""
+"The acquisition tables are not ready. Restart the server, then reload "
+"this page."
+msgstr ""
+"Les tables d'acquisition ne sont pas prêtes. Redémarrez le serveur, puis "
+"rechargez cette page."
+
+#: cps/spa_strings.py
+msgid "The approval queue could not be loaded, so requests may be waiting unseen."
+msgstr ""
+"La file d'approbation n'a pas pu être chargée ; des demandes attendent "
+"peut-être sans être vues."
+
+#: cps/spa_strings.py
+msgid "The background scheduler is not running."
+msgstr "Le planificateur en arrière-plan n'est pas en cours d'exécution."
+
+#: cps/spa_strings.py
+msgid "The catalog could not be changed."
+msgstr "Le catalogue n'a pas pu être modifié."
+
+#: cps/spa_strings.py
+msgid "The catalog could not be read"
+msgstr "Le catalogue n'a pas pu être lu"
+
+#: cps/spa_strings.py
+msgid "The catalogs could not be loaded."
+msgstr "Les catalogues n'ont pas pu être chargés."
+
+#: cps/spa_strings.py
+msgid "The connection test failed."
+msgstr "Le test de connexion a échoué."
+
+#: cps/spa_strings.py
+msgid "The ingest folder could not be found."
+msgstr "Le dossier d'ingestion est introuvable."
+
+#: cps/spa_strings.py
+msgid "The ingest folder is not writable."
+msgstr "Le dossier d'ingestion n'est pas accessible en écriture."
+
+#: cps/spa_strings.py
+msgid "The ingest service is not running."
+msgstr "Le service d'ingestion n'est pas en cours d'exécution."
+
+#: cps/spa_strings.py
+msgid "The list of people could not be loaded."
+msgstr "La liste des personnes n'a pas pu être chargée."
+
+#: cps/spa_strings.py
+msgid "The request could not be approved."
+msgstr "La demande n'a pas pu être approuvée."
+
+#: cps/spa_strings.py
+msgid "The request could not be made."
+msgstr "La demande n'a pas pu être effectuée."
+
+#: cps/spa_strings.py
+msgid "The request could not be retried."
+msgstr "La demande n'a pas pu être relancée."
+
+#: cps/spa_strings.py
+msgid "The request could not be stopped."
+msgstr "La demande n'a pas pu être arrêtée."
+
+#: cps/spa_strings.py
+msgid "The setting could not be changed."
+msgstr "Le réglage n'a pas pu être modifié."
+
+#: cps/spa_strings.py
+msgid "The source asked us to wait."
+msgstr "La source nous a demandé d'attendre."
+
+#: cps/spa_strings.py
+msgid "The source did not answer with a catalog we can read."
+msgstr "La source n'a pas répondu avec un catalogue que nous pouvons lire."
+
+#: cps/spa_strings.py
+msgid "The transfer did not complete."
+msgstr "Le transfert ne s'est pas terminé."
+
+#: cps/spa_strings.py
+msgid "There are no other accounts on this server yet."
+msgstr "Il n'y a pas encore d'autres comptes sur ce serveur."
+
+#: cps/spa_strings.py
+msgid ""
+"These settings could not be loaded, so nothing on this page can be "
+"trusted yet."
+msgstr ""
+"Ces réglages n'ont pas pu être chargés ; rien sur cette page n'est encore"
+" fiable."
+
+#: cps/spa_strings.py
+msgid ""
+"These settings could not be refreshed, so what is shown may be out of "
+"date."
+msgstr ""
+"Ces réglages n'ont pas pu être actualisés ; ce qui est affiché peut être "
+"obsolète."
+
+#: cps/spa_strings.py
+msgid "This account cannot use book sources, or the feature is switched off."
+msgstr ""
+"Ce compte ne peut pas utiliser les sources de livres, ou la "
+"fonctionnalité est désactivée."
+
+#: cps/spa_strings.py
+msgid "This account is no longer an administrator."
+msgstr "Ce compte n'est plus administrateur."
+
+#: cps/spa_strings.py
+msgid "This book was already imported."
+msgstr "Ce livre a déjà été importé."
+
+#: cps/spa_strings.py
+msgid "This catalog does not offer search."
+msgstr "Ce catalogue ne propose pas de recherche."
+
+#: cps/spa_strings.py
+msgid "This catalog page is empty."
+msgstr "Cette page du catalogue est vide."
+
+#: cps/spa_strings.py
+msgid ""
+"This database carries permissions from the old experimental Store. They "
+"need review before book sources can be switched on."
+msgstr ""
+"Cette base de données contient des permissions issues de l'ancienne "
+"boutique expérimentale. Elles doivent être réexaminées avant que les "
+"sources de livres puissent être activées."
+
+#: cps/spa_strings.py
+msgid "This page could not be refreshed, so what is shown may be out of date."
+msgstr ""
+"Cette page n'a pas pu être actualisée ; ce qui est affiché peut être "
+"obsolète."
+
+#: cps/spa_strings.py
+msgid "This request needs an administrator to approve it again."
+msgstr "Cette demande doit être approuvée à nouveau par un administrateur."
+
+#: cps/spa_strings.py
+msgid "Token"
+msgstr "Jeton"
+
+#: cps/spa_strings.py
+msgid "Too many open selections. Wait a little, then try again."
+msgstr "Trop de sélections ouvertes. Patientez un instant, puis réessayez."
+
+#: cps/spa_strings.py
+msgid "Top of catalog"
+msgstr "Haut du catalogue"
+
+#: cps/spa_strings.py
+msgid "Turn the feature on to grant access."
+msgstr "Activez la fonctionnalité pour accorder l'accès."
+
+#: cps/spa_strings.py
+msgid "Untitled catalog"
+msgstr "Catalogue sans titre"
+
+#: cps/spa_strings.py
+msgid "Username and password"
+msgstr "Nom d'utilisateur et mot de passe"
+
+#: cps/spa_strings.py
+msgid "Waiting for approval"
+msgstr "En attente d'approbation"
+
+#: cps/spa_strings.py
+msgid "Who can use it"
+msgstr "Qui peut l'utiliser"
+
+#: cps/spa_strings.py
+msgid "Your requests"
+msgstr "Vos demandes"
+
+#: cps/spa_strings.py
+msgid "Your requests could not be loaded. They have not been lost."
+msgstr "Vos demandes n'ont pas pu être chargées. Elles ne sont pas perdues."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{title} — {protocol}{search}"
+msgstr "{title} — {protocol}{search}"
+

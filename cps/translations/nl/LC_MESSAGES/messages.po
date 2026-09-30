@@ -10530,7 +10530,7 @@ msgstr ""
 
 #: cps/templates/annotations_view.html
 msgid "Open book"
-msgstr ""
+msgstr "Boek openen"
 
 #: cps/templates/annotations_view.html
 #, python-format
@@ -16647,3 +16647,557 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py
+msgid ", search supported"
+msgstr ", zoeken ondersteund"
+
+#: cps/spa_strings.py
+msgid "A copy was already in the library; it was kept."
+msgstr "Er stond al een exemplaar in de bibliotheek; dat is behouden."
+
+#: cps/spa_strings.py
+msgid ""
+"A new catalog is added switched off. Test it first, then make it "
+"available."
+msgstr ""
+"Een nieuwe catalogus wordt uitgeschakeld toegevoegd. Test hem eerst en "
+"maak hem daarna beschikbaar."
+
+#: cps/spa_strings.py
+msgid ""
+"Acquisition is not ready right now. Ask an administrator to check its "
+"status."
+msgstr ""
+"Acquisitie is op dit moment niet gereed. Vraag een beheerder om de status"
+" te controleren."
+
+#: cps/spa_strings.py
+msgid "Add a catalog"
+msgstr "Een catalogus toevoegen"
+
+#: cps/spa_strings.py
+msgid "Add catalog"
+msgstr "Catalogus toevoegen"
+
+#: cps/spa_strings.py
+msgid "Added to your activity."
+msgstr "Toegevoegd aan je activiteit."
+
+#: cps/spa_strings.py
+msgid "Allow requests from book sources"
+msgstr "Aanvragen vanuit boekbronnen toestaan"
+
+#: cps/spa_strings.py
+msgid "Also add the book to My Library"
+msgstr "Voeg het boek ook toe aan Mijn bibliotheek"
+
+#: cps/spa_strings.py
+msgid "An administrator has not added a book source, or none is switched on."
+msgstr "Een beheerder heeft geen boekbron toegevoegd, of geen enkele staat aan."
+
+#: cps/spa_strings.py
+msgid "Available to users"
+msgstr "Beschikbaar voor gebruikers"
+
+#: cps/spa_strings.py
+msgid "Back to top"
+msgstr "Terug naar boven"
+
+#: cps/spa_strings.py
+msgid "Book sources"
+msgstr "Boekbronnen"
+
+#: cps/spa_strings.py
+msgid "Book sources are off."
+msgstr "Boekbronnen staan uit."
+
+#: cps/spa_strings.py
+msgid "Book sources are on."
+msgstr "Boekbronnen staan aan."
+
+#: cps/spa_strings.py
+msgid ""
+"Book sources could not be reached just now. This is not a change to your "
+"access."
+msgstr ""
+"Boekbronnen konden zojuist niet worden bereikt. Dit verandert niets aan "
+"je toegang."
+
+#: cps/spa_strings.py
+msgid ""
+"Browse the catalogs your administrator has added. A book you pick is "
+"imported into the library here — it is not just downloaded to your "
+"device."
+msgstr ""
+"Blader door de catalogi die je beheerder heeft toegevoegd. Een boek dat "
+"je kiest wordt hier in de bibliotheek geïmporteerd — het wordt niet "
+"alleen naar je apparaat gedownload."
+
+#: cps/spa_strings.py
+msgid "Can browse and request"
+msgstr "Mag bladeren en aanvragen"
+
+#: cps/spa_strings.py
+msgid "Cancelling…"
+msgstr "Annuleren…"
+
+#: cps/spa_strings.py
+msgid "Catalog"
+msgstr "Catalogus"
+
+#: cps/spa_strings.py
+msgid "Catalog added. Test it, then switch it on."
+msgstr "Catalogus toegevoegd. Test hem en zet hem daarna aan."
+
+#: cps/spa_strings.py
+msgid "Catalog address"
+msgstr "Catalogusadres"
+
+#: cps/spa_strings.py
+msgid "Catalog pages"
+msgstr "Cataloguspagina's"
+
+#: cps/spa_strings.py
+msgid "Catalog trail"
+msgstr "Kruimelpad van de catalogus"
+
+#: cps/spa_strings.py
+msgid "Catalogs"
+msgstr "Catalogi"
+
+#: cps/spa_strings.py
+msgid "Check the address and the sign-in details."
+msgstr "Controleer het adres en de aanmeldgegevens."
+
+#: cps/spa_strings.py
+msgid "Connection works."
+msgstr "De verbinding werkt."
+
+#: cps/spa_strings.py
+msgid "Contacting the source"
+msgstr "Contact maken met de bron"
+
+#: cps/spa_strings.py
+msgid "Could not look up who asked"
+msgstr "Kon niet opzoeken wie het heeft aangevraagd"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Download {format}"
+msgstr "{format} downloaden"
+
+#: cps/spa_strings.py
+msgid "Downloaded, waiting to import"
+msgstr "Gedownload, wacht op importeren"
+
+#: cps/spa_strings.py
+msgid "Downloading"
+msgstr "Downloaden"
+
+#: cps/spa_strings.py
+msgid "Feature"
+msgstr "Functie"
+
+#: cps/spa_strings.py
+msgid "Filter"
+msgstr "Filter"
+
+#: cps/spa_strings.py
+msgid "Find books"
+msgstr "Boeken zoeken"
+
+#: cps/spa_strings.py
+msgid "Find books is unavailable"
+msgstr "Boeken zoeken is niet beschikbaar"
+
+#: cps/spa_strings.py
+msgid "Handing over to the library"
+msgstr "Overdragen aan de bibliotheek"
+
+#: cps/spa_strings.py
+msgid "Imported into the library"
+msgstr "Geïmporteerd in de bibliotheek"
+
+#: cps/spa_strings.py
+msgid "Importing"
+msgstr "Importeren"
+
+#: cps/spa_strings.py
+msgid "Legacy acquisition permissions need review before a catalog can be added."
+msgstr ""
+"Verouderde acquisitierechten moeten worden nagekeken voordat er een "
+"catalogus kan worden toegevoegd."
+
+#: cps/spa_strings.py
+msgid ""
+"Legacy acquisition permissions need review before a catalog can be made "
+"available."
+msgstr ""
+"Verouderde acquisitierechten moeten worden nagekeken voordat een "
+"catalogus beschikbaar kan worden gemaakt."
+
+#: cps/spa_strings.py
+msgid "Legacy acquisition permissions need review before this can be switched on."
+msgstr ""
+"Verouderde acquisitierechten moeten worden nagekeken voordat dit kan "
+"worden aangezet."
+
+#: cps/spa_strings.py
+msgid ""
+"Let people request books from an OPDS catalog. A requested book is "
+"imported into this library through the normal ingest path, credited to "
+"the account that asked for it."
+msgstr ""
+"Laat mensen boeken aanvragen uit een OPDS-catalogus. Een aangevraagd boek"
+" wordt via het normale ingest-pad in deze bibliotheek geïmporteerd, op "
+"naam van het account dat erom vroeg."
+
+#: cps/spa_strings.py
+msgid "Looking up who asked…"
+msgstr "Opzoeken wie het heeft aangevraagd…"
+
+#: cps/spa_strings.py
+msgid "More"
+msgstr "Meer"
+
+#: cps/spa_strings.py
+msgid "No EPUB or PDF available from this catalog."
+msgstr "Geen EPUB of PDF beschikbaar uit deze catalogus."
+
+#: cps/spa_strings.py
+msgid "No accepted upload format allows EPUB or PDF."
+msgstr "Geen enkel toegestaan uploadformaat staat EPUB of PDF toe."
+
+#: cps/spa_strings.py
+msgid "No approval needed"
+msgstr "Geen goedkeuring nodig"
+
+#: cps/spa_strings.py
+msgid "No catalogs yet"
+msgstr "Nog geen catalogi"
+
+#: cps/spa_strings.py
+msgid "No catalogs yet."
+msgstr "Nog geen catalogi."
+
+#: cps/spa_strings.py
+msgid "Not tested in this session."
+msgstr "Niet getest in deze sessie."
+
+#: cps/spa_strings.py
+msgid "Nothing requested yet."
+msgstr "Nog niets aangevraagd."
+
+#: cps/spa_strings.py
+msgid ""
+"Off by default. Nothing is fetched and no permission changes until you "
+"turn this on."
+msgstr ""
+"Standaard uit. Er wordt niets opgehaald en er verandert geen enkel recht "
+"totdat je dit aanzet."
+
+#: cps/spa_strings.py
+msgid "Queued"
+msgstr "In de wachtrij"
+
+#: cps/spa_strings.py
+msgid "Ready to run requests."
+msgstr "Klaar om aanvragen uit te voeren."
+
+#: cps/spa_strings.py
+msgid "Request approved."
+msgstr "Aanvraag goedgekeurd."
+
+#: cps/spa_strings.py
+msgid "Request cancelled"
+msgstr "Aanvraag geannuleerd"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Request {format}"
+msgstr "{format} aanvragen"
+
+#: cps/spa_strings.py
+msgid "Requested by a removed account"
+msgstr "Aangevraagd door een verwijderd account"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Requested by {name}"
+msgstr "Aangevraagd door {name}"
+
+#: cps/spa_strings.py
+msgid "Requested. An administrator has to approve it."
+msgstr "Aangevraagd. Een beheerder moet het goedkeuren."
+
+#: cps/spa_strings.py
+msgid "Requests are paused"
+msgstr "Aanvragen zijn gepauzeerd"
+
+#: cps/spa_strings.py
+msgid "Requests cannot run yet:"
+msgstr "Aanvragen kunnen nog niet worden uitgevoerd:"
+
+#: cps/spa_strings.py
+msgid "Retrying."
+msgstr "Opnieuw proberen."
+
+#: cps/spa_strings.py
+msgid "Search this catalog"
+msgstr "Zoek in deze catalogus"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Search: {query}"
+msgstr "Zoeken: {query}"
+
+#: cps/spa_strings.py
+msgid "Sign-in"
+msgstr "Aanmelding"
+
+#: cps/spa_strings.py
+msgid "Test connection"
+msgstr "Verbinding testen"
+
+#: cps/spa_strings.py
+msgid "That account is no longer allowed to request books."
+msgstr "Dat account mag geen boeken meer aanvragen."
+
+#: cps/spa_strings.py
+msgid "That catalog no longer exists."
+msgstr "Die catalogus bestaat niet meer."
+
+#: cps/spa_strings.py
+msgid "That choice expired. Refresh the page and pick the file again."
+msgstr "Die keuze is verlopen. Vernieuw de pagina en kies het bestand opnieuw."
+
+#: cps/spa_strings.py
+msgid "That page expired. Go back to the top and try again."
+msgstr "Die pagina is verlopen. Ga terug naar boven en probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid ""
+"That permission could not be changed. Check that book sources are still "
+"switched on, then try again."
+msgstr ""
+"Dat recht kon niet worden gewijzigd. Controleer of boekbronnen nog "
+"aanstaan en probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "That request has already moved on and can no longer be stopped."
+msgstr "Die aanvraag is al verder gegaan en kan niet meer worden gestopt."
+
+#: cps/spa_strings.py
+msgid "That request has already moved on."
+msgstr "Die aanvraag is al verder gegaan."
+
+#: cps/spa_strings.py
+msgid "That request is no longer in a state that can be retried."
+msgstr ""
+"Die aanvraag verkeert niet meer in een toestand waarin opnieuw proberen "
+"mogelijk is."
+
+#: cps/spa_strings.py
+msgid "That request is no longer waiting."
+msgstr "Die aanvraag staat niet meer te wachten."
+
+#: cps/spa_strings.py
+msgid "The Calibre library folder could not be found."
+msgstr "De map van de Calibre-bibliotheek is niet gevonden."
+
+#: cps/spa_strings.py
+msgid "The acquisition database could not be opened."
+msgstr "De acquisitiedatabase kon niet worden geopend."
+
+#: cps/spa_strings.py
+msgid "The acquisition key is missing."
+msgstr "De acquisitiesleutel ontbreekt."
+
+#: cps/spa_strings.py
+msgid "The acquisition tables are not ready."
+msgstr "De acquisitietabellen zijn niet gereed."
+
+#: cps/spa_strings.py
+msgid ""
+"The acquisition tables are not ready. Restart the server, then reload "
+"this page."
+msgstr ""
+"De acquisitietabellen zijn niet gereed. Start de server opnieuw en "
+"herlaad daarna deze pagina."
+
+#: cps/spa_strings.py
+msgid "The approval queue could not be loaded, so requests may be waiting unseen."
+msgstr ""
+"De goedkeuringswachtrij kon niet worden geladen, dus er wachten mogelijk "
+"ongeziene aanvragen."
+
+#: cps/spa_strings.py
+msgid "The background scheduler is not running."
+msgstr "De achtergrondplanner draait niet."
+
+#: cps/spa_strings.py
+msgid "The catalog could not be changed."
+msgstr "De catalogus kon niet worden gewijzigd."
+
+#: cps/spa_strings.py
+msgid "The catalog could not be read"
+msgstr "De catalogus kon niet worden gelezen"
+
+#: cps/spa_strings.py
+msgid "The catalogs could not be loaded."
+msgstr "De catalogi konden niet worden geladen."
+
+#: cps/spa_strings.py
+msgid "The connection test failed."
+msgstr "De verbindingstest is mislukt."
+
+#: cps/spa_strings.py
+msgid "The ingest folder could not be found."
+msgstr "De ingest-map is niet gevonden."
+
+#: cps/spa_strings.py
+msgid "The ingest folder is not writable."
+msgstr "De ingest-map is niet beschrijfbaar."
+
+#: cps/spa_strings.py
+msgid "The ingest service is not running."
+msgstr "De ingest-service draait niet."
+
+#: cps/spa_strings.py
+msgid "The list of people could not be loaded."
+msgstr "De lijst met personen kon niet worden geladen."
+
+#: cps/spa_strings.py
+msgid "The request could not be approved."
+msgstr "De aanvraag kon niet worden goedgekeurd."
+
+#: cps/spa_strings.py
+msgid "The request could not be made."
+msgstr "De aanvraag kon niet worden gedaan."
+
+#: cps/spa_strings.py
+msgid "The request could not be retried."
+msgstr "De aanvraag kon niet opnieuw worden geprobeerd."
+
+#: cps/spa_strings.py
+msgid "The request could not be stopped."
+msgstr "De aanvraag kon niet worden gestopt."
+
+#: cps/spa_strings.py
+msgid "The setting could not be changed."
+msgstr "De instelling kon niet worden gewijzigd."
+
+#: cps/spa_strings.py
+msgid "The source asked us to wait."
+msgstr "De bron vroeg ons te wachten."
+
+#: cps/spa_strings.py
+msgid "The source did not answer with a catalog we can read."
+msgstr "De bron antwoordde niet met een catalogus die we kunnen lezen."
+
+#: cps/spa_strings.py
+msgid "The transfer did not complete."
+msgstr "De overdracht is niet voltooid."
+
+#: cps/spa_strings.py
+msgid "There are no other accounts on this server yet."
+msgstr "Er zijn nog geen andere accounts op deze server."
+
+#: cps/spa_strings.py
+msgid ""
+"These settings could not be loaded, so nothing on this page can be "
+"trusted yet."
+msgstr ""
+"Deze instellingen konden niet worden geladen, dus niets op deze pagina is"
+" nog betrouwbaar."
+
+#: cps/spa_strings.py
+msgid ""
+"These settings could not be refreshed, so what is shown may be out of "
+"date."
+msgstr ""
+"Deze instellingen konden niet worden vernieuwd, dus wat je ziet kan "
+"verouderd zijn."
+
+#: cps/spa_strings.py
+msgid "This account cannot use book sources, or the feature is switched off."
+msgstr "Dit account kan geen boekbronnen gebruiken, of de functie staat uit."
+
+#: cps/spa_strings.py
+msgid "This account is no longer an administrator."
+msgstr "Dit account is geen beheerder meer."
+
+#: cps/spa_strings.py
+msgid "This book was already imported."
+msgstr "Dit boek is al geïmporteerd."
+
+#: cps/spa_strings.py
+msgid "This catalog does not offer search."
+msgstr "Deze catalogus biedt geen zoekfunctie."
+
+#: cps/spa_strings.py
+msgid "This catalog page is empty."
+msgstr "Deze cataloguspagina is leeg."
+
+#: cps/spa_strings.py
+msgid ""
+"This database carries permissions from the old experimental Store. They "
+"need review before book sources can be switched on."
+msgstr ""
+"Deze database bevat rechten uit de oude experimentele Store. Die moeten "
+"worden nagekeken voordat boekbronnen kunnen worden aangezet."
+
+#: cps/spa_strings.py
+msgid "This page could not be refreshed, so what is shown may be out of date."
+msgstr "Deze pagina kon niet worden vernieuwd, dus wat je ziet kan verouderd zijn."
+
+#: cps/spa_strings.py
+msgid "This request needs an administrator to approve it again."
+msgstr "Deze aanvraag moet opnieuw door een beheerder worden goedgekeurd."
+
+#: cps/spa_strings.py
+msgid "Token"
+msgstr "Token"
+
+#: cps/spa_strings.py
+msgid "Too many open selections. Wait a little, then try again."
+msgstr "Te veel openstaande selecties. Wacht even en probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Top of catalog"
+msgstr "Bovenkant van de catalogus"
+
+#: cps/spa_strings.py
+msgid "Turn the feature on to grant access."
+msgstr "Zet de functie aan om toegang te verlenen."
+
+#: cps/spa_strings.py
+msgid "Untitled catalog"
+msgstr "Naamloze catalogus"
+
+#: cps/spa_strings.py
+msgid "Username and password"
+msgstr "Gebruikersnaam en wachtwoord"
+
+#: cps/spa_strings.py
+msgid "Waiting for approval"
+msgstr "Wacht op goedkeuring"
+
+#: cps/spa_strings.py
+msgid "Who can use it"
+msgstr "Wie het mag gebruiken"
+
+#: cps/spa_strings.py
+msgid "Your requests"
+msgstr "Je aanvragen"
+
+#: cps/spa_strings.py
+msgid "Your requests could not be loaded. They have not been lost."
+msgstr "Je aanvragen konden niet worden geladen. Ze zijn niet verloren."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{title} — {protocol}{search}"
+msgstr "{title} — {protocol}{search}"
+

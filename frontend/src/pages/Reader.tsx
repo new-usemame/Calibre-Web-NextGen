@@ -293,6 +293,16 @@ function readingSourcePercent(value: number): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
 }
 
+/** True when a book frame holds a non-empty text selection right now. */
+function liveSelection(rendition: any): boolean {
+  try {
+    return (rendition?.getContents?.() || []).some((contents: any) => {
+      const selection = contents?.window?.getSelection?.();
+      return !!selection && !selection.isCollapsed && !!selection.toString().trim();
+    });
+  } catch { return false; /* a disposed frame has no selection */ }
+}
+
 export function Reader({ id }: { id: string }) {
   const t = useT();
   const announce = useAnnouncer();
@@ -1715,6 +1725,10 @@ export function Reader({ id }: { id: string }) {
             autoResumePendingRef.current = false;
             if (pending && resume?.mode === 'automatic') {
               const cfi = resumeCfi(epubBook.locations, resume);
+              // A selection still inside epub.js's 250ms debounce has not
+              // reached the 'selected' handler yet, so read the live one too:
+              // an index that lands mid-gesture must not re-render under it.
+              if (liveSelection(rendition)) actedOnPlaceholderRef.current = true;
               if (cfi && !readerMoved && !actedOnPlaceholderRef.current
                   && previewingRef.current && previewTargetRef.current === undefined) {
                 previewTargetRef.current = cfi;

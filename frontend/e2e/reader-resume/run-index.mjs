@@ -36,7 +36,7 @@ const showsSyncedPosition = () => expect.poll(() => page.evaluate(() => {
 try {
   // 'turned' last: it ends by reading on, which saves a web bookmark and so
   // turns every later open into an offer rather than an automatic resume.
-  for (const early of ['none', 'selected', 'turned']) {
+  for (const early of ['none', 'selected', 'selected-racing', 'turned']) {
     const turned = early === 'turned';
     await page.goto(base + '/e2e/reader-resume/index.html?holdLocations');
     // The index is still pending: the real rendition must already show text.
@@ -49,6 +49,21 @@ try {
       await page.waitForTimeout(1200); // Past the 800ms persistence debounce.
       assert.equal(await bookmark(), null,
         'a page turn before the automatic jump must not replace the synced position');
+    }
+    if (early === 'selected-racing') {
+      // The CI timing (run 36743406022): the index finishes inside epub.js's
+      // 250ms selection debounce, so the jump is decided BEFORE 'selected'
+      // fires. The live selection itself must hold the page.
+      assert.notEqual(await selectText(), '');
+      await page.evaluate(() => window.releaseLocations());
+      await expect.poll(() => page.evaluate(() => window.locationGenerationMs.length)).toBe(1);
+      await expect(page.getByRole('button', {name:'Add note'})).toBeVisible();
+      await expect(page.getByRole('button', {name:/^Resume at \d+% from another device$/})).toBeVisible();
+      assert.deepEqual(await page.evaluate(() => window.displayTargets), [undefined],
+        'a selection made just before the index lands must keep the reader on its page');
+      assert.equal(await bookmark(), null);
+      console.log('Pending index: a selection racing the index kept its page and popover; the synced position became an offer');
+      continue;
     }
     if (early === 'selected') {
       // Selecting text on the placeholder start is the reader acting on THIS

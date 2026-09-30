@@ -20,6 +20,56 @@ class StagingError(ValueError):
     pass
 
 
+NAME_PREFIX = 'cwng-acquisition-'
+BOOK_EXTENSIONS = ('epub', 'pdf')
+# Written by cwa-ingest-service when the processor ends terminally on an
+# acquisition file (exit 3 retains the book; the safety timeout, 124, removes
+# it). A name the watcher and the processor already skip. It carries no
+# identity: the staging key in the file name binds it to a job, exactly as the
+# publication sidecar does.
+FAILURE_SUFFIX = '.cwa.failed.json'
+
+
+def publication_paths(ingest_dir, staging_key):
+    """Every path publication may have created for one staging identity.
+
+    Both extensions are considered because the caller reconciling a lost book
+    can no longer read the offer that chose it, and because a safety timeout
+    removes the book while leaving its sidecar behind.
+    """
+    if not isinstance(staging_key, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', staging_key):
+        raise StagingError('invalid_staging_identity')
+    directory = Path(ingest_dir)
+    books = [directory / (NAME_PREFIX + staging_key + '.' + extension) for extension in BOOK_EXTENSIONS]
+    return (books, [Path(str(book) + '.cwa.json') for book in books],
+            [Path(str(book) + FAILURE_SUFFIX) for book in books])
+
+
+def _present(paths):
+    return next((path for path in paths if path.is_file() and not path.is_symlink()), None)
+
+
+def publication_state(ingest_dir, staging_key):
+    """What the ingest service has left for this publication, right now."""
+    books, sidecars, markers = publication_paths(ingest_dir, staging_key)
+    return _present(books), _present(sidecars), _present(markers)
+
+
+def discard_publication(ingest_dir, staging_key):
+    """Remove an abandoned publication so nothing re-imports or re-detects it.
+
+    Only ever called after app.db has dropped the capability, so a processor
+    still holding the file cannot acknowledge it afterwards.
+    """
+    removed = False
+    for group in publication_paths(ingest_dir, staging_key):
+        for path in group:
+            if path.is_symlink() or path.is_file():
+                path.unlink(missing_ok=True)
+                removed = True
+    return removed
+
+
 def _regular(path):
     path = Path(path)
     if not stat.S_ISREG(path.lstat().st_mode):
@@ -147,7 +197,7 @@ def publish(source, ingest_dir, permit, extension, *, checkpoint=lambda: None):
         raise StagingError('invalid_staging_identity')
     if digest(source) != permit.source_sha256:
         raise StagingError('source_changed')
-    destination = directory / ('cwng-acquisition-' + permit.staging_key + '.' + extension)
+    destination = directory / (NAME_PREFIX + permit.staging_key + '.' + extension)
     sidecar = Path(str(destination) + '.cwa.json')
     payload = {'action': 'acquisition_import', 'job_id': permit.job_id,
                'publication_token': permit.token, 'staging_key': permit.staging_key}
@@ -202,6 +252,26 @@ def cleanup_completed(repository, staging_dir, job_id):
     if not re.fullmatch(r'[0-9a-f-]{36}', job_id) or root.is_symlink():
         return False
     if repository.completed_job(job_id) is None:
+        return False
+    directory = root / job_id
+    if directory.is_dir() and not directory.is_symlink():
+        shutil.rmtree(directory)
+        return True
+    return False
+
+
+def cleanup_settled(repository, staging_dir, job_id):
+    """Release private staging for any terminal job, not only an imported one.
+
+    Failed and cancelled requests used to keep their downloaded source forever:
+    cleanup ran only behind a receipt, so anything that did not finish left its
+    bytes in `acquisition-staging`. The repository decides what is terminal, and
+    deliberately still protects a failure that can resume its publication.
+    """
+    root = Path(staging_dir)
+    if not re.fullmatch(r'[0-9a-f-]{36}', job_id) or root.is_symlink():
+        return False
+    if repository.settled_job(job_id) is None:
         return False
     directory = root / job_id
     if directory.is_dir() and not directory.is_symlink():

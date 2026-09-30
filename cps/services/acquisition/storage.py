@@ -49,6 +49,9 @@ EXPIRED_OFFER_CLEANUP_BATCH = 100
 
 
 WORK_STATES = ("queued", "resolving", "downloading", "staged", "publishing", "importing")
+# `importing` is owned by the ingest service, not by this worker: a claim on it
+# only reconciles what the processor did, and never repeats an external effect.
+RECONCILE_STATES = ("importing",)
 TRANSITIONS = {
     "queued": {"resolving", "failed", "cancelled"},
     "resolving": {"downloading", "failed", "cancelled"},
@@ -109,6 +112,9 @@ def define_tables(metadata):
         Column("next_attempt_at", Float, nullable=False, index=True), Column("claim_count", Integer, nullable=False),
         Column("source_sha256", String(64)), Column("staging_key", String(128)),
         Column("publication_proof_hash", String(64)),
+        # When the ingest service took ownership. Bounds `importing` so a
+        # processor that dies without any terminal signal cannot strand a job.
+        Column("importing_since", Float),
         Column("error_code", String(64)), Column("created_at", Float, nullable=False),
         Column("updated_at", Float, nullable=False),
         UniqueConstraint("owner_id", "idempotency_key", name="uq_acquisition_job_owner_intent"))
@@ -393,7 +399,8 @@ class Repository:
                            state="awaiting_approval" if requires_approval else "queued", approved_by=None,
                            add_to_my_library=bool(add_to_my_library), cancel_requested=False,
                            lease_token=None, lease_expires=None, next_attempt_at=now, claim_count=0,
-                           source_sha256=None, staging_key=None, publication_proof_hash=None, error_code=None, created_at=now, updated_at=now)
+                           source_sha256=None, staging_key=None, publication_proof_hash=None,
+                           importing_since=None, error_code=None, created_at=now, updated_at=now)
                 conn.execute(table.insert().values(**row))
                 return _job(row)
         except IntegrityError:
@@ -475,11 +482,16 @@ class Repository:
         # this connection. This does not automatically retry the failed job.
         cooling = select(table.c.connection_id).where(
             table.c.error_code == "source_busy", table.c.next_attempt_at > now)
+        # Reconciling a job the ingest service already owns performs no request
+        # against the source. Disabling the connection, or another job cooling
+        # off on it, must not strand that job in `importing` forever with its
+        # published file, sidecar and private staging left on disk.
+        reconcile = table.c.state.in_(RECONCILE_STATES)
         eligible = and_(table.c.state.in_(WORK_STATES), table.c.next_attempt_at <= now,
-                        table.c.connection_id.not_in(cooling),
+                        or_(reconcile, table.c.connection_id.not_in(cooling)),
                         or_(table.c.lease_expires.is_(None), table.c.lease_expires <= now),
-                        table.c.connection_id.in_(select(self.tables.connections.c.id).where(
-                            self.tables.connections.c.enabled.is_(True))))
+                        or_(reconcile, table.c.connection_id.in_(select(self.tables.connections.c.id).where(
+                            self.tables.connections.c.enabled.is_(True)))))
         if max_active is not None:
             if type(max_active) is not int or not 1 <= max_active <= 10:
                 raise StorageError("Invalid active acquisition limit")
@@ -532,6 +544,50 @@ class Repository:
                 self.tables.jobs.c.state == "imported")).mappings().first()
             return _job(row) if row is not None else None
 
+    def settled_job(self, job_id):
+        """Private cleanup seam for every terminal state, not only success.
+
+        A cancelled request is never claimed again, and an abandoned import is
+        restarted by re-downloading, so both release their private source. A
+        failure that still holds its publication capability does NOT: `retry`
+        resumes that publication and needs the staged bytes it already proved.
+        """
+        with self.engine.connect() as conn:
+            row = conn.execute(select(self.tables.jobs).where(
+                self.tables.jobs.c.id == job_id)).mappings().first()
+            if row is None:
+                return None
+            if row["state"] == "cancelled":
+                return _job(row)
+            if row["state"] == "failed":
+                return _job(row) if row["publication_proof_hash"] is None else None
+            if row["state"] != "imported":
+                return None
+            receipt = conn.execute(select(self.tables.receipts.c.job_id).where(
+                self.tables.receipts.c.job_id == job_id)).first()
+            return _job(row) if receipt is not None else None
+
+    def importing_watch(self, job_id, token):
+        """Seconds this job has been owned by the ingest service, under lease.
+
+        A row that reached `importing` without a recorded start — an upgrade
+        from before this column, or a crash between the two writes — adopts the
+        current time instead of being treated as instantly expired, so nothing
+        legitimately mid-import is failed the moment the bound is introduced.
+        """
+        now, table = self._now(), self.tables.jobs
+        with self.engine.begin() as conn:
+            row = conn.execute(select(table).where(self._live(job_id, token, now))).mappings().first()
+            if row is None:
+                raise Conflict("Worker lease is no longer valid")
+            if row["state"] != "importing":
+                return None
+            if row["importing_since"] is None:
+                conn.execute(table.update().where(table.c.id == job_id,
+                    table.c.importing_since.is_(None)).values(importing_since=now))
+                return 0.0
+            return max(0.0, now - row["importing_since"])
+
     def staged_identity(self, job_id, token):
         """Private worker filesystem identity, read only with the live lease."""
         with self.engine.connect() as conn:
@@ -560,17 +616,34 @@ class Repository:
             payload = self.box.open(_sealed(offer, "payload"), scope=scope, identity=offer["id"], field_name="offer")
             return Material(json.loads(config), json.loads(payload))
 
-    def advance(self, job_id, token, expected_state, state, *, source_sha256=None, staging_key=None, error_code=None, retry_delay_seconds=0):
-        """Fenced transition; failed jobs may preserve a bounded earliest retry."""
+    def advance(self, job_id, token, expected_state, state, *, source_sha256=None, staging_key=None,
+                error_code=None, retry_delay_seconds=0, abandon_publication=False):
+        """Fenced transition; failed jobs may preserve a bounded earliest retry.
+
+        abandon_publication additionally drops the issued capability and staged
+        identity in the SAME transaction as the failure. That is what makes
+        giving up on an import safe: a late acknowledgment can no longer match
+        `publication_proof_hash`, so it loses cleanly instead of recording a
+        receipt for bytes the worker is about to delete, and `retry` then
+        restarts the request at `queued` rather than resuming a publication
+        whose source is gone.
+        """
         if (type(retry_delay_seconds) not in (int, float) or not math.isfinite(retry_delay_seconds)
                 or not 0 <= retry_delay_seconds <= 86400
                 or retry_delay_seconds and state != "failed"):
             raise StorageError("Invalid retry delay")
+        if abandon_publication and state != "failed":
+            raise StorageError("Only a failed job abandons its publication")
         if state not in TRANSITIONS.get(expected_state, ()):
             raise Conflict("Unsupported job transition")
         values = dict(state=state, updated_at=self._now())
         if state == "failed":
             values["next_attempt_at"] = values["updated_at"] + retry_delay_seconds
+        if state == "importing":
+            values["importing_since"] = values["updated_at"]
+        if abandon_publication:
+            values.update(publication_proof_hash=None, source_sha256=None,
+                          staging_key=None, importing_since=None)
         if state == "staged":
             values["source_sha256"] = _digest(source_sha256)
             if not isinstance(staging_key, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", staging_key):

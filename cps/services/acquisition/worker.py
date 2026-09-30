@@ -13,8 +13,17 @@ import time
 
 from .catalog import policy
 from .http import TransportError, run_transfer
-from .staging import StagingError, digest, persist_capability, publish, validate_book, cleanup_completed
+from .staging import (StagingError, cleanup_settled, digest, discard_publication, persist_capability,
+                      publish, publication_state, validate_book)
 from .storage import Conflict
+
+# A conversion of a large book can legitimately run for a long time, and a
+# terminal processor result is reported explicitly, so this bound only exists
+# to catch a processor that died without saying anything at all.
+IMPORT_DEADLINE_SECONDS = 6 * 3600
+# An `importing` job is waiting on another service. Re-examining it every few
+# seconds is what turned a stuck import into a hot loop.
+IMPORT_RECHECK_SECONDS = 30
 
 
 class Paused(Exception):
@@ -28,13 +37,17 @@ class Cancelled(Exception):
 class AcquisitionWorker:
     def __init__(self, repository, staging_dir, ingest_dir, *, allowed,
                  enabled=lambda: True, execution_allowed=None, media_allowed=lambda media: True,
-                 transfer=run_transfer, max_bytes=100 * 1024 * 1024):
+                 transfer=run_transfer, max_bytes=100 * 1024 * 1024,
+                 import_deadline_seconds=IMPORT_DEADLINE_SECONDS,
+                 import_recheck_seconds=IMPORT_RECHECK_SECONDS):
         self.repository = repository
         self.staging_dir, self.ingest_dir = Path(staging_dir), Path(ingest_dir)
         self.allowed, self.enabled, self.transfer = allowed, enabled, transfer
         self.max_bytes = max_bytes
         self.media_allowed = media_allowed
         self.execution_allowed = execution_allowed or (lambda job: self.allowed(job.owner_id))
+        self.import_deadline_seconds = import_deadline_seconds
+        self.import_recheck_seconds = import_recheck_seconds
 
     def _directory(self, job_id, key):
         if not re.fullmatch(r'[0-9a-f-]{36}', job_id) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', key):
@@ -53,8 +66,9 @@ class AcquisitionWorker:
         for directory in self.staging_dir.iterdir():
             if not re.fullmatch(r'[0-9a-f-]{36}', directory.name):
                 continue
-            if self.repository.completed_job(directory.name) is not None:
-                self._cleanup(directory.name)
+            # Every settled job, so a request cancelled while nothing held it
+            # — which is never claimed again — still releases its source.
+            self._cleanup(directory.name)
 
     def run_once(self):
         self.cleanup_completed()
@@ -63,6 +77,8 @@ class AcquisitionWorker:
         claim = self.repository.claim(lease_seconds=60, max_active=1)
         if claim is None:
             return None
+        if claim.job.state == 'importing':
+            return self._reconcile_import(claim)
         repo, job, token = self.repository, claim.job, claim.token
         state = job.state
         private = None
@@ -153,7 +169,10 @@ class AcquisitionWorker:
             publish(source, self.ingest_dir, permit, extension, checkpoint=checkpoint)
             if state == 'publishing':
                 advance('importing')
-            repo.release(job.id, token, delay_seconds=5)
+            # The ingest service owns it from here; the next claim only
+            # reconciles, so there is nothing to gain from a fast re-poll.
+            repo.release(job.id, token,
+                delay_seconds=self.import_recheck_seconds if state == 'importing' else 5)
         except Cancelled:
             settle(lambda: advance('cancelled'))
         except Paused:
@@ -183,9 +202,56 @@ class AcquisitionWorker:
                     private.parent.rmdir()
                 except OSError:
                     pass
-        if current.state == 'imported' and repo.get_receipt(job.owner_id, job.id) is not None:
+        # Terminal without a live attempt directory of its own still has to
+        # release whatever earlier attempts left behind.
+        if current.state in ('imported', 'failed', 'cancelled'):
+            self._cleanup(job.id)
+        return current
+
+    def _reconcile_import(self, claim):
+        """Read what the ingest service did with a published book.
+
+        A job in `importing` is never published again and never re-downloaded:
+        the previous behaviour fell through the whole publication path on every
+        claim, re-hashing the source and recreating a book the processor had
+        already taken away, every few seconds, forever.
+        """
+        repo, job, token = self.repository, claim.job, claim.token
+        try:
+            staging_key = repo.staged_identity(job.id, token)[1]
+            if not staging_key:
+                raise StagingError('publication_token_missing')
+            book, sidecar, marker = publication_state(self.ingest_dir, staging_key)
+            if book is None:
+                # The safety timeout copies the book to the failed folder and
+                # removes it. Recreating it here is what filled that folder.
+                reason = 'import_failed'
+            elif marker is not None:
+                reason = 'import_failed'   # terminal processor result, source retained
+            else:
+                waited = repo.importing_watch(job.id, token)
+                reason = 'import_failed' if waited is not None and waited >= self.import_deadline_seconds else None
+            if reason is None:
+                repo.release(job.id, token, delay_seconds=self.import_recheck_seconds)
+            else:
+                # app.db first: dropping the capability makes a late receipt
+                # lose cleanly, so no receipt can name bytes now being deleted.
+                repo.advance(job.id, token, 'importing', 'failed',
+                             error_code=reason, abandon_publication=True)
+                discard_publication(self.ingest_dir, staging_key)
+        except Conflict:
+            # A receipt won, or the lease expired. The winner stays authoritative.
+            pass
+        except (StagingError, OSError, ValueError):
+            try:
+                repo.advance(job.id, token, 'importing', 'failed', error_code='import_failed',
+                             abandon_publication=True)
+            except Conflict:
+                pass
+        current = repo.get_job(job.owner_id, job.id)
+        if current.state in ('imported', 'failed', 'cancelled'):
             self._cleanup(job.id)
         return current
 
     def _cleanup(self, job_id):
-        cleanup_completed(self.repository, self.staging_dir, job_id)
+        cleanup_settled(self.repository, self.staging_dir, job_id)

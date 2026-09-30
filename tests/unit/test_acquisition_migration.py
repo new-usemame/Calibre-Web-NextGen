@@ -271,3 +271,98 @@ def test_fresh_settings_table_carries_the_same_sql_default_the_upgrade_writes(tm
         "default, while the upgrade path adds it with DEFAULT 0 -- the two schemas "
         "disagree and only the upgraded one survives an INSERT that omits the column"
     )
+
+
+def test_unreadable_role_value_leaves_the_app_bootable_and_asks_for_review(tmp_path):
+    """A value this code cannot interpret is not a reason to refuse to start.
+
+    Everything else an account owns is unrelated to acquisition, so the
+    feature reports itself unavailable instead of taking the whole app down.
+    """
+    from cps.services.acquisition.migration import migrate_acquisition_schema
+    from cps.services.acquisition.admission import instance_state
+    database = tmp_path / 'app.db'
+    engine, masks = _fixture(database, 'legacy_store')
+    try:
+        with engine.begin() as conn:
+            conn.exec_driver_sql("UPDATE user SET role='not-a-mask' WHERE id=3")
+        before = _snapshot(engine, ['user', 'settings', 'oauthProvider'])
+        result = migrate_acquisition_schema(engine)
+        assert result['status'] == 'needs_review'
+        assert json.loads(result['role_changes_json']) == []
+        # Two-phase: the valid rows read before the bad one stay untouched too.
+        assert _snapshot(engine, ['user', 'settings', 'oauthProvider']) == before
+        assert 'acquisition_job' in inspect(engine).get_table_names()
+    finally:
+        engine.dispose()
+    assert instance_state(str(database))['migration_status'] == 'needs_review'
+
+
+def test_negative_role_value_is_reviewed_rather_than_reinterpreted(tmp_path):
+    from cps.services.acquisition.migration import migrate_acquisition_schema
+    engine, masks = _fixture(tmp_path / 'app.db', 'legacy_store')
+    try:
+        with engine.begin() as conn:
+            conn.exec_driver_sql('UPDATE user SET role=-1 WHERE id=4')
+        result = migrate_acquisition_schema(engine)
+        assert result['status'] == 'needs_review'
+        assert _roles(engine) == masks[:3] + [-1], 'remapped roles despite an unreadable one'
+    finally:
+        engine.dispose()
+
+
+def test_marker_from_an_unknown_build_is_reported_not_raised(tmp_path):
+    """A newer marker must not stop this build booting, or change any role."""
+    from cps.services.acquisition.migration import migrate_acquisition_schema
+    engine, masks = _fixture(tmp_path / 'app.db', 'legacy_store')
+    try:
+        migrate_acquisition_schema(engine)
+        with engine.begin() as conn:
+            conn.exec_driver_sql('UPDATE acquisition_schema_migration SET version=99')
+        before = _roles(engine)
+        result = migrate_acquisition_schema(engine)
+        assert result['status'] == 'needs_review'
+        assert _roles(engine) == before
+    finally:
+        engine.dispose()
+
+
+def test_role_template_without_identity_keeps_booting_and_changes_no_role(tmp_path):
+    """An ambiguous role table disables acquisition, not the application.
+
+    The id-less table comes after `user` in the scan, so this also pins that
+    the user rows already read are not remapped on the way to finding it.
+    """
+    from cps.services.acquisition.migration import migrate_acquisition_schema
+    from cps.services.acquisition.admission import instance_state
+    database = tmp_path / 'app.db'
+    engine, masks = _fixture(database, 'legacy_store')
+    try:
+        with engine.begin() as conn:
+            conn.exec_driver_sql('DROP TABLE settings')
+            conn.exec_driver_sql('CREATE TABLE settings (config_default_role INTEGER)')
+            conn.exec_driver_sql(f'INSERT INTO settings VALUES ({LEGACY_ACCESS | 16})')
+        result = migrate_acquisition_schema(engine)
+        assert result['status'] == 'needs_review'
+        assert _roles(engine) == masks, 'remapped user roles before refusing the ambiguous table'
+        with engine.connect() as conn:
+            assert conn.exec_driver_sql('SELECT config_default_role FROM settings').scalar_one() == LEGACY_ACCESS | 16
+            assert conn.exec_driver_sql(
+                'SELECT status FROM acquisition_schema_migration').scalar_one() == 'needs_review'
+    finally:
+        engine.dispose()
+    assert instance_state(str(database)) == {'enabled': False, 'migration_status': 'needs_review'}
+
+
+def test_a_database_from_an_earlier_build_gains_the_importing_bound(tmp_path):
+    """The marker makes later boots return early; the new column must not wait on it."""
+    from cps.services.acquisition.migration import migrate_acquisition_schema
+    engine, _ = _fixture(tmp_path / 'app.db', 'pre_personal')
+    try:
+        migrate_acquisition_schema(engine)
+        with engine.begin() as conn:
+            conn.exec_driver_sql('ALTER TABLE acquisition_job DROP COLUMN importing_since')
+        migrate_acquisition_schema(engine)
+        assert 'importing_since' in {c['name'] for c in inspect(engine).get_columns('acquisition_job')}
+    finally:
+        engine.dispose()

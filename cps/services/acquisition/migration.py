@@ -10,8 +10,10 @@ import time
 
 from sqlalchemy import Column, Float, Integer, MetaData, String, Table, Text, inspect, select
 
-from ... import constants
+from ... import constants, logger
 from .storage import define_tables
+
+log = logger.create()
 
 VERSION = 1
 LEGACY_ACCESS = 1 << 9
@@ -67,8 +69,12 @@ def _remap(mask):
 def migrate_acquisition_schema(engine, metadata=None):
     """Capture source and remap only proven Store masks in one transaction.
 
-    Return durable status for admin/runtime diagnostics. Failed capture/remap
-    propagates to the caller: boot must not erase provenance and continue.
+    Return durable status for admin/runtime diagnostics. A role value this
+    code cannot interpret is a reason to leave acquisition switched off and
+    ask an administrator to look, never a reason to refuse to start the
+    application: everything else the user owns is unrelated to this feature.
+    A genuine database write failure still propagates, so a half-applied
+    remap can never be mistaken for a completed one.
     SQLite's explicit write transaction includes DDL under legacy sqlite3 mode.
     """
     metadata = metadata if metadata is not None else MetaData()
@@ -79,34 +85,60 @@ def migrate_acquisition_schema(engine, metadata=None):
             conn.exec_driver_sql('BEGIN IMMEDIATE')
         inspector = inspect(conn)
         table_names = inspector.get_table_names()
+        # A job table from an earlier build of this feature predates the bound
+        # on `importing`. That database already carries a marker and returns
+        # below, and create_all never alters an existing table, so add it here.
+        if tables.jobs.name in table_names and 'importing_since' not in {
+                column['name'] for column in inspector.get_columns(tables.jobs.name)}:
+            conn.exec_driver_sql(f'ALTER TABLE "{tables.jobs.name}" ADD COLUMN importing_since FLOAT')
         if marker.name in table_names:
             recorded = conn.execute(select(marker)).mappings().all()
             if recorded:
                 if len(recorded) != 1 or recorded[0]['version'] != VERSION:
-                    raise RuntimeError('Unsupported acquisition migration version; refusing role reinterpretation')
+                    # A marker this build does not understand is left exactly
+                    # as it is. Reporting it keeps acquisition unavailable
+                    # without touching a single role.
+                    log.warning('Acquisition schema marker is not a single version %s row; '
+                                'leaving acquisition unavailable for administrator review', VERSION)
+                    return dict(version=recorded[0]['version'] if len(recorded) == 1 else None,
+                                source_layout='unknown', status='needs_review',
+                                source_schema_json='{}', role_changes_json='[]',
+                                completed_at=float(recorded[0]['completed_at']) if len(recorded) == 1 else 0.0)
                 return dict(recorded[0])
         # Capture only shape, never credential values or legacy request payloads.
         schema = {name: {column['name'] for column in inspector.get_columns(name)}
                   for name in table_names}
         layout, status = _classify(schema)
-        changes = []
+        # Read and validate every role template BEFORE writing any of them, so
+        # an unreadable value in a later row cannot leave earlier rows remapped.
+        changes, pending, unreviewable = [], [], None
         for table_name, column_name in ROLE_COLUMNS:
             columns = schema.get(table_name, set())
             if column_name not in columns:
                 continue
             if 'id' not in columns:
-                raise RuntimeError('Role template lacks an identity; refusing ambiguous migration')
+                unreviewable = f'{table_name} has no identity column'
+                break
             # Identifiers are fixed local constants; values remain parameters.
             for identity, before in conn.exec_driver_sql(
                     f'SELECT id, "{column_name}" FROM "{table_name}" ORDER BY id'):
                 if before is not None and (not isinstance(before, int) or before < 0):
-                    raise RuntimeError('Invalid stored role mask; refusing role reinterpretation')
+                    unreviewable = f'{table_name}.{column_name} holds a value that is not a role mask'
+                    break
                 after = _remap(before) if layout == 'legacy_store' else before
                 changes.append({'table': table_name, 'id': identity,
                                 'column': column_name, 'before': before, 'after': after})
                 if after != before:
-                    conn.exec_driver_sql(f'UPDATE "{table_name}" SET "{column_name}"=? WHERE id=?',
-                                         (after, identity))
+                    pending.append((table_name, column_name, after, identity))
+            if unreviewable is not None:
+                break
+        if unreviewable is not None:
+            log.warning('Acquisition role migration needs administrator review (%s); '
+                        'no role was changed and acquisition stays unavailable', unreviewable)
+            status, changes, pending = 'needs_review', [], []
+        for table_name, column_name, after, identity in pending:
+            conn.exec_driver_sql(f'UPDATE "{table_name}" SET "{column_name}"=? WHERE id=?',
+                                 (after, identity))
         # Upgrade settings now as well as via config_sql's fresh-install model.
         # Preserve an explicit setting on subsequent boots; no automatic enables.
         if 'settings' in schema and 'config_acquisition_enabled' not in schema['settings']:

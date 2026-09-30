@@ -22,6 +22,8 @@ import { CoverPicker } from './pages/CoverPicker';
 import { Upload } from './pages/Upload';
 import { Admin } from './pages/Admin';
 import { AdminDevices } from './pages/AdminDevices';
+import { AdminAcquisition } from './pages/AdminAcquisition';
+import { FindBooks } from './pages/FindBooks';
 import { About } from './pages/About';
 import { Tasks } from './pages/Tasks';
 import { Table } from './pages/Table';
@@ -273,7 +275,16 @@ export function App() {
           <Route path={SPA_ROUTES.adminDevices}>
             {() => me.role?.admin ? <AdminDevices /> : <NotFound />}
           </Route>
+          <Route path={SPA_ROUTES.adminAcquisition}>
+            {() => me.role?.admin ? <AdminAcquisition /> : <NotFound />}
+          </Route>
           <Route path={SPA_ROUTES.admin}>{() => <Admin />}</Route>
+
+          {/* Virtual library — hidden entirely unless the server says this
+              account may use it (feature on AND granted). */}
+          <Route path={SPA_ROUTES.findBooks}>
+            {() => me.acquisition_access ? <FindBooks /> : <NotFound />}
+          </Route>
 
           {/* Info pages */}
           <Route path={SPA_ROUTES.whatsNew}>{() => <WhatsNew />}</Route>

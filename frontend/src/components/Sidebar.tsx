@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import {
-  Library, Globe, BookCopy,
+  Library, Globe, BookCopy, BookPlus,
   Info, ListChecks, Table2, Wand2, Files, SlidersHorizontal, Check, RotateCcw, X, Pin, PinOff,
 } from 'lucide-react';
 import { useShelves, useMe, useMagicShelves, useUpdateSidebar } from '../lib/queries';
@@ -109,6 +109,9 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const isAuthed = !!me?.id;
   const personalLibrary = me?.library_mode === 'personal_library';
   const showGlobalLibrary = personalLibrary && !!me?.role?.browse_global;
+  // Server-derived: the feature is on AND this account is granted. A fresh or
+  // upgraded install answers false, so the entry simply is not there.
+  const showFindBooks = !!me?.acquisition_access;
   const pinActive = isDesktopRail && sidebarPinned;
   const pinLabel = sidebarPinned ? t('Unpin sidebar') : t('Pin sidebar');
 
@@ -319,6 +322,17 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                     onClick={onNavigate}>
                     <Globe size={18} className={styles.icon} aria-hidden="true" focusable={false} />
                     <span>{t('Global Library')}</span>
+                  </Link>
+                </li>
+              )}
+              {showFindBooks && (
+                <li>
+                  <Link href="/find-books"
+                    className={isActive(location, '/find-books', true) ? styles.itemActive : styles.item}
+                    aria-current={isActive(location, '/find-books', true) ? 'page' : undefined}
+                    onClick={onNavigate}>
+                    <BookPlus size={18} className={styles.icon} aria-hidden="true" focusable={false} />
+                    <span>{t('Find books')}</span>
                   </Link>
                 </li>
               )}

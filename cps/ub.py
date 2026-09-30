@@ -196,6 +196,12 @@ class UserBase:
     def role_viewer(self):
         return self._has_role(constants.ROLE_VIEWER)
 
+    def role_acquisition_access(self):
+        return self._has_role(constants.ROLE_ACQUISITION_ACCESS)
+
+    def role_acquisition_auto_approve(self):
+        return self._has_role(constants.ROLE_ACQUISITION_AUTO_APPROVE)
+
     def role_browse_global(self):
         return self._has_role(constants.ROLE_BROWSE_GLOBAL)
 
@@ -5154,8 +5160,16 @@ def migrate_reading_activity_indexes(engine, _session):
         )
 
 
+def migrate_acquisition_schema(engine, metadata=None):
+    # Keep services initialization out of ub's module import: cps imports ub
+    # before app/config globals exist. Bootstrap invokes this before create_all.
+    from .services.acquisition.migration import migrate_acquisition_schema as migrate
+    return migrate(engine, metadata if metadata is not None else Base.metadata)
+
+
 def migrate_Database(_session):
     engine = _session.bind
+    migrate_acquisition_schema(engine, Base.metadata)
     add_missing_tables(engine, _session)
     migrate_kobo_entitlement_ledger_columns(engine, _session)
     migrate_thumbnail_lookup_index(engine, _session)
@@ -5522,6 +5536,7 @@ def init_db(app_db_path):
     global app_DB_path
 
     app_DB_path = app_db_path
+    database_exists = os.path.exists(app_db_path)
     engine = _create_app_db_engine(app_db_path)
 
     Session = scoped_session(sessionmaker())
@@ -5530,7 +5545,10 @@ def init_db(app_db_path):
 
     _healthcheck_app_db(app_db_path)
 
-    if os.path.exists(app_db_path):
+    # Must precede create_all: it creates user_library_book, erasing whether
+    # bit9 meant legacy Store access or the current Global Library capability.
+    migrate_acquisition_schema(engine, Base.metadata)
+    if database_exists:
         Base.metadata.create_all(engine)
         migrate_Database(session)
         clean_database(session)

@@ -126,6 +126,11 @@ export interface Me {
   show_my_library_intro?: boolean;
   can_switch_library_mode?: boolean;
   library_mode_managed?: boolean;
+  /** Virtual library: this account may browse the admin-configured book
+   *  sources. Server-derived (feature on AND the account is granted), so the
+   *  nav gate never has to reason about role bits. Absent on older servers →
+   *  the entry stays hidden, which is the correct default-off behaviour. */
+  acquisition_access?: boolean;
 }
 
 export interface Book {

@@ -231,6 +231,10 @@ ROLE_VIEWER             = 1 << 8
 # The single whole-archive capability. It gates both Global Library and a
 # user's ability to switch their own account between the two library modes.
 ROLE_BROWSE_GLOBAL      = 1 << 9
+# Bit10 is reserved for the experimental Store's old auto-approval role.
+# Never reuse bits9/10 for acquisition: existing deployments use both layouts.
+ROLE_ACQUISITION_ACCESS = 1 << 11
+ROLE_ACQUISITION_AUTO_APPROVE = 1 << 12
 
 # #1939 user-facing library modes. ``has_own_library`` is the persisted
 # selector, but false is not "feature disabled": it is the named monolibrary
@@ -249,6 +253,8 @@ ALL_ROLES = {
                 "delete_role": ROLE_DELETE_BOOKS,
                 "viewer_role": ROLE_VIEWER,
                 "browse_global_role": ROLE_BROWSE_GLOBAL,
+                "acquisition_access_role": ROLE_ACQUISITION_ACCESS,
+                "acquisition_auto_approve_role": ROLE_ACQUISITION_AUTO_APPROVE,
             }
 
 DETAIL_RANDOM           = 1 <<  0
@@ -294,7 +300,10 @@ sidebar_settings = {
             }
 
 
-ADMIN_USER_ROLES        = sum(r for r in ALL_ROLES.values()) & ~ROLE_ANONYMOUS
+# Acquisition is explicitly opt-in, including for newly created admins.
+ADMIN_USER_ROLES        = (sum(r for r in ALL_ROLES.values())
+                          & ~(ROLE_ANONYMOUS | ROLE_ACQUISITION_ACCESS
+                              | ROLE_ACQUISITION_AUTO_APPROVE))
 ADMIN_USER_SIDEBAR      = (SIDEBAR_FAVORITES << 1) - 1
 
 UPDATE_STABLE       = 0 << 0
@@ -342,8 +351,29 @@ def has_flag(value, bit_flag):
     return bit_flag == (bit_flag & (value or 0))
 
 
+# Roles that no classic admin page draws a checkbox for. A classic form posts
+# only the boxes it renders, so rebuilding a whole mask from one would silently
+# clear any grant made elsewhere -- the acquisition grants are administered on
+# the Book sources page, not on the user edit form.
+ROLES_WITHOUT_CLASSIC_CHECKBOX = ("acquisition_access_role", "acquisition_auto_approve_role")
+
+
 def selected_roles(dictionary):
     return sum(v for k, v in ALL_ROLES.items() if k in dictionary)
+
+
+def preserved_roles(dictionary, current):
+    """Bits a classic form cannot express, carried over from the mask it edits.
+
+    A role with no checkbox keeps its current value unless the submitted form
+    actually carries its key, so adding the checkbox later starts working --
+    including unticking it -- without touching this function.
+    """
+    keep = 0
+    for key in ROLES_WITHOUT_CLASSIC_CHECKBOX:
+        if key not in dictionary:
+            keep |= (current or 0) & ALL_ROLES[key]
+    return keep
 
 
 # :rtype: BookMeta

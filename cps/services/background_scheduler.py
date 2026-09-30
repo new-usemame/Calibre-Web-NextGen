@@ -19,6 +19,7 @@ try:
     use_APScheduler = True
 except (ImportError, RuntimeError) as e:
     use_APScheduler = False
+    CronTrigger = IntervalTrigger = DateTrigger = None
     log = logger.create()
     log.info('APScheduler not found. Unable to schedule tasks.')
 
@@ -40,9 +41,16 @@ class BackgroundScheduler:
 
         return cls._instance
 
-    def schedule(self, func, trigger, name=None):
+    def schedule(self, func, trigger, name=None, *, job_id=None, max_instances=None, coalesce=None):
         if use_APScheduler:
-            return self.scheduler.add_job(func=func, trigger=trigger, name=name)
+            options = {}
+            if job_id is not None:
+                options.update(id=job_id, replace_existing=True)
+            if max_instances is not None:
+                options['max_instances'] = max_instances
+            if coalesce is not None:
+                options['coalesce'] = coalesce
+            return self.scheduler.add_job(func=func, trigger=trigger, name=name, **options)
 
     def remove_job(self, job_id: str):
         if use_APScheduler and job_id:

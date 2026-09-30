@@ -293,6 +293,16 @@ function readingSourcePercent(value: number): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
 }
 
+/** True when a book frame holds a non-empty text selection right now. */
+function liveSelection(rendition: any): boolean {
+  try {
+    return (rendition?.getContents?.() || []).some((contents: any) => {
+      const selection = contents?.window?.getSelection?.();
+      return !!selection && !selection.isCollapsed && !!selection.toString().trim();
+    });
+  } catch { return false; /* a disposed frame has no selection */ }
+}
+
 export function Reader({ id }: { id: string }) {
   const t = useT();
   const announce = useAnnouncer();
@@ -399,6 +409,15 @@ export function Reader({ id }: { id: string }) {
    * an explicit choice and wins over the pending jump.
    */
   const autoResumePendingRef = useRef(false);
+  /*
+   * Set when the reader works with the text on the placeholder page while that
+   * jump is pending -- selecting a passage or tapping one of their highlights.
+   * That is acting on this page, like the highlight choice that already wins
+   * over the jump. Left armed, the late jump re-rendered the view under the
+   * open popover, so the selection and its "Add note" button vanished
+   * mid-gesture. The synced position becomes the "Resume at N%" offer instead.
+   */
+  const actedOnPlaceholderRef = useRef(false);
   // Appearance changes retain the passage explicitly chosen for a preview,
   // which may differ from the first word on its containing page.
   const previewTargetRef = useRef<string | undefined>(undefined);
@@ -740,6 +759,7 @@ export function Reader({ id }: { id: string }) {
   // Open the edit/remove popover for a highlight the reader was tapped on (#782).
   // Closes the create-color popover so the two never show at once.
   const openHighlightEditor = useCallback((cfiRange: string, annotationId: string, color: string) => {
+    if (autoResumePendingRef.current) actedOnPlaceholderRef.current = true;
     setPendingSel(null);
     setComposer(null);
     setActiveHl({ cfiRange, id: annotationId, color, note: notesRef.current.get(annotationId) || '' });
@@ -1555,6 +1575,7 @@ export function Reader({ id }: { id: string }) {
     setRenderError(null);
     previewTargetRef.current = undefined;
     autoResumePendingRef.current = false;
+    actedOnPlaceholderRef.current = false;
     appearanceAnchorRef.current = undefined;
     // Clear rather than carry: wouter reuses this component across an :id
     // change, so a stale RTL flag would invert the next book's page turns.
@@ -1697,13 +1718,19 @@ export function Reader({ id }: { id: string }) {
             // A slow index may finish after first display. Still apply the
             // percentage hint unless the reader has already chosen a position;
             // page turns from the placeholder start are not a choice. When they
-            // did choose (a chapter, link, highlight or search hit), keep the
+            // did choose (a chapter, link, highlight or search hit, or they
+            // selected text on the placeholder page), keep the
             // synced position as an offer rather than dropping it.
             const pending = autoResumePendingRef.current;
             autoResumePendingRef.current = false;
             if (pending && resume?.mode === 'automatic') {
               const cfi = resumeCfi(epubBook.locations, resume);
-              if (cfi && !readerMoved && previewingRef.current && previewTargetRef.current === undefined) {
+              // A selection still inside epub.js's 250ms debounce has not
+              // reached the 'selected' handler yet, so read the live one too:
+              // an index that lands mid-gesture must not re-render under it.
+              if (liveSelection(rendition)) actedOnPlaceholderRef.current = true;
+              if (cfi && !readerMoved && !actedOnPlaceholderRef.current
+                  && previewingRef.current && previewTargetRef.current === undefined) {
                 previewTargetRef.current = cfi;
                 await rendition.display(cfi);
                 if (cancelled) return;
@@ -1811,6 +1838,7 @@ export function Reader({ id }: { id: string }) {
           let text = '';
           try { text = (contents?.window?.getSelection?.().toString() || '').trim(); } catch { /* noop */ }
           if (cfiRange) {
+            if (autoResumePendingRef.current) actedOnPlaceholderRef.current = true;
             setActiveHl(null);
             setPendingSel({ cfiRange, text });
           }

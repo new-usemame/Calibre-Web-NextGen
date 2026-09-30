@@ -229,6 +229,13 @@ def _me_payload(user):
     user_library.mark_response_user_specific()
     payload = serialize_user(user)
     payload["features"] = _server_features()
+    from ..services.acquisition.admission import instance_enabled, account_allowed
+    payload["acquisition_access"] = bool(
+        getattr(user, "is_authenticated", False)
+        and not getattr(user, "is_anonymous", True)
+        and instance_enabled(ub.app_DB_path)
+        and account_allowed(ub.app_DB_path, user.id)
+    )
     payload["instance_name"] = _instance_name()
     payload["avatar"] = _user_avatar(user.name)
     catalog_settings = (getattr(user, "view_settings", None) or {}).get("catalog", {})

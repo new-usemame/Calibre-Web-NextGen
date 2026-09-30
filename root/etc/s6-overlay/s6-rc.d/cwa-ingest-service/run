@@ -774,6 +774,18 @@ startup_ingest_sweep() {
         fi
 }
 
+record_acquisition_failure() {
+        # A requested book (Book sources) is imported by a job that waits for
+        # the processor's receipt. A terminal failure writes no receipt, so
+        # leave the job an explicit result beside the book; the acquisition
+        # worker fails the job and removes the book, its sidecar and this file.
+        # `.cwa.failed.json` is a name the watcher and the processor ignore.
+        local filepath="$1" exit_code="$2"
+        [[ "$(basename "$filepath")" == cwng-acquisition-* ]] || return 0
+        printf '{"exit_code": %d}\n' "$exit_code" > "$filepath.cwa.failed.json" 2>/dev/null || \
+                echo "[cwa-ingest-service] ERROR: could not record acquisition failure for $filepath" >&2
+}
+
 handle_event() {
         local filepath="$1"
         local events="${2:-}"
@@ -871,6 +883,7 @@ handle_event() {
                         echo "[cwa-ingest-service] Moving $filename to /config/processed_books/failed/$failed_filename"
                         cp "$filepath" "/config/processed_books/failed/$failed_filename" 2>/dev/null || true
                 fi
+                record_acquisition_failure "$filepath" "$exit_code"
                 rm -f "$filepath" 2>/dev/null || true
                 mark_recent_path "$filepath"
         elif [ $exit_code -eq 2 ]; then
@@ -882,6 +895,7 @@ handle_event() {
         elif [ $exit_code -eq 3 ]; then
                 echo "[cwa-ingest-service] Terminal ingest failure; source retained: $filepath" >&2
                 echo "error:$filename:source_retained:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"
+                record_acquisition_failure "$filepath" "$exit_code"
         elif [ $exit_code -ne 0 ]; then
                 echo "[cwa-ingest-service] Error processing $filepath (exit code: $exit_code)"
                 echo "error:$filename:$exit_code:$(date '+%Y-%m-%d %H:%M:%S')" > "$STATUS_FILE"

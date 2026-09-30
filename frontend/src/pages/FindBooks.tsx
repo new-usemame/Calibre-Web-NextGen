@@ -21,6 +21,7 @@ import {
 import { useRuntimeReasonText } from '../lib/acquisitionCopy';
 import { acquisitionSectionView, hasVisibleReceipt, isRowPending } from '../lib/acquisitionViewState';
 import { ApiError } from '../lib/api';
+import { formatAuthors } from '../lib/authors';
 import { useMe } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
@@ -629,7 +630,11 @@ function PublicationCard({ publication, canAcquire, requestsPaused, pendingOffer
   onRequest: (offerId: string, format: string) => void;
 }) {
   const t = useT();
-  const authors = publication.authors.join(', ');
+  // ' & ', not ', ' -- an author display name can itself contain a comma
+  // ("Leckie, Ann"), so a comma separator makes the list ambiguous (#948).
+  // Languages below are a plain comma list on purpose: those values have no
+  // commas in them.
+  const authors = formatAuthors(publication.authors);
   return (
     <li className={styles.publication}>
       <h3>{publication.title}</h3>

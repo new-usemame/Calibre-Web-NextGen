@@ -212,3 +212,62 @@ def test_concurrent_boots_capture_legacy_masks_once(tmp_path):
         assert len(_snapshot(engine,['acquisition_schema_migration'])['acquisition_schema_migration'])==1
     finally:
         engine.dispose()
+
+
+def test_settings_row_without_the_acquisition_column_still_writes_and_reads_off(tmp_path):
+    """A write that never heard of this feature must still succeed.
+
+    `default=False` is client-side: SQLAlchemy supplies it only when its own
+    mapper performs the INSERT. Every other writer -- an older database being
+    upgraded, a fixture, any raw ``INSERT INTO settings (...)`` naming only the
+    columns it knows about -- reached a NOT NULL column with no value and died
+    with "NOT NULL constraint failed: settings.config_acquisition_enabled".
+
+    That is the inverse of shipping switched off: a dormant feature's column was
+    breaking writes that have nothing to do with the feature. Four unrelated
+    suites (hidden books, custom column sort, checksum table creation) failed on
+    it, which is what a schema-level break looks like from the outside.
+    """
+    engine = create_engine(f"sqlite:///{tmp_path / 'app.db'}")
+    config_sql._Settings.__table__.create(engine)
+
+    with engine.begin() as conn:
+        conn.exec_driver_sql("INSERT INTO settings (id) VALUES (1)")
+
+    with engine.connect() as conn:
+        stored = conn.exec_driver_sql(
+            "SELECT config_acquisition_enabled FROM settings WHERE id=1"
+        ).scalar()
+
+    assert not stored, (
+        "a settings row created without naming the acquisition column must read "
+        f"as switched off, got {stored!r}"
+    )
+
+
+def test_fresh_settings_table_carries_the_same_sql_default_the_upgrade_writes(tmp_path):
+    """Fresh install and upgrade must not disagree about the schema.
+
+    ``migrate_acquisition_schema`` adds the column with ``DEFAULT 0`` on an
+    existing database. If the model omits ``server_default`` then a freshly
+    created table has no default at all, so the two supported ways of arriving
+    at the current version produce different schemas -- and only one of them
+    tolerates a write that omits the column. Pin the DDL property itself, so
+    dropping ``server_default`` fails here even if no raw INSERT happens to
+    exercise it.
+    """
+    engine = create_engine(f"sqlite:///{tmp_path / 'fresh.db'}")
+    config_sql._Settings.__table__.create(engine)
+
+    with engine.connect() as conn:
+        defaults = {
+            row[1]: row[4]
+            for row in conn.exec_driver_sql("PRAGMA table_info(settings)")
+        }
+
+    assert "config_acquisition_enabled" in defaults, "column missing from a fresh table"
+    assert defaults["config_acquisition_enabled"] is not None, (
+        "the freshly created settings table gives config_acquisition_enabled no SQL "
+        "default, while the upgrade path adds it with DEFAULT 0 -- the two schemas "
+        "disagree and only the upgraded one survives an INSERT that omits the column"
+    )

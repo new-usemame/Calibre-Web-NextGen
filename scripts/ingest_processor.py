@@ -1546,7 +1546,7 @@ class NewBookProcessor:
             lambda: self.fetch_metadata_if_enabled(book_id=self.last_added_book_id),
             lambda: self._fix_unicode_path(self.last_added_book_id),
             lambda: self.trigger_auto_send_if_enabled(book_id=self.last_added_book_id, book_path=book_path),
-            lambda: self.generate_book_checksums(staged_path.stem, book_id=self.last_added_book_id) if _is_koreader_sync_enabled() else None,
+            lambda: self.generate_book_checksums_if_enabled(staged_path.stem, book_id=self.last_added_book_id),
             lambda: run_duplicate_scan_for_books(self.last_added_book_ids),
         ]
         for operation in operations:
@@ -2862,6 +2862,25 @@ class NewBookProcessor:
 
         except Exception as e:
             print(f"[ingest-processor] Error in auto-send trigger: {e}", flush=True)
+
+
+    def generate_book_checksums_if_enabled(self, book_title: str, book_id: int | None = None) -> None:
+        """Run the checksum work only when KOReader sync is on.
+
+        The post-import operation list already states intent this way with
+        ``fetch_metadata_if_enabled`` and ``trigger_auto_send_if_enabled``: the
+        gate lives with the operation, not at the call site, so a new caller
+        cannot forget it. The acquisition import path originally inlined the
+        gate as a trailing ``... if _is_koreader_sync_enabled() else None``,
+        which is correct but puts the condition after the call -- unreadable in
+        a list of lambdas, and invisible to the source pin that exists to prove
+        every call site is gated (fork issue #219, PR #94).
+
+        Disabled instances skip the slow partial-MD5 work entirely.
+        """
+        if not _is_koreader_sync_enabled():
+            return
+        self.generate_book_checksums(book_title, book_id=book_id)
 
 
     def generate_book_checksums(self, book_title: str, book_id: int | None = None) -> None:

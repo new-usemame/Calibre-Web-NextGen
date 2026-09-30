@@ -123,7 +123,18 @@ class _Settings(_Base):
     config_hardcover_annotations_sync = Column(Boolean, default=False)
 
     # Experimental acquisition remains dormant until explicit admin enablement.
-    config_acquisition_enabled = Column(Boolean, nullable=False, default=False)
+    #
+    # server_default is load-bearing, not decoration. SQLAlchemy's `default=` is
+    # client-side: it only fills the value when this mapper performs the INSERT.
+    # A settings row created any other way -- an older database being migrated, a
+    # fixture, any raw `INSERT INTO settings (...)` that does not name this column
+    # -- got no value at all and died on "NOT NULL constraint failed:
+    # settings.config_acquisition_enabled". services/acquisition/migration.py
+    # already adds the column with `DEFAULT 0`, so omitting it here also made a
+    # freshly created table and an upgraded one disagree about the schema.
+    config_acquisition_enabled = Column(
+        Boolean, nullable=False, default=False, server_default=text("0"),
+    )
     config_default_role = Column(SmallInteger, default=0)
     config_default_show = Column(SmallInteger, default=constants.ADMIN_USER_SIDEBAR)
     config_default_language = Column(String(3), default="all")

@@ -2650,8 +2650,11 @@ def modify_identifiers(input_identifiers, db_identifiers, db_session):
             changed = True
         else:
             input_identifier = input_dict[identifier_type]
-            identifier.type = input_identifier.type
-            identifier.val = input_identifier.val
+            if (identifier.type != input_identifier.type
+                    or identifier.val != input_identifier.val):
+                identifier.type = input_identifier.type
+                identifier.val = input_identifier.val
+                changed = True
     # add input identifiers not present in db
     for identifier_type, identifier in input_dict.items():
         if identifier_type not in db_dict.keys():

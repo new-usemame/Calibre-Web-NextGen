@@ -137,6 +137,10 @@ export interface AcquisitionConnectionInput {
   auth_kind: 'none' | 'basic' | 'bearer';
   username: string;
   secret: string;
+  /** Let this one catalog resolve to a private (home or LAN) address. The
+   *  server expands it to the allowed ranges and scopes it to this catalog's
+   *  origin; loopback, link-local and cloud metadata stay denied either way. */
+  allow_private_network?: boolean;
 }
 
 const BASE = '/api/v1';

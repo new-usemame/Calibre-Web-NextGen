@@ -180,17 +180,19 @@ def main():
         results = []
         try:
             with open_repository(root / "app.db", initialize_key=True) as repo:
+                # This probe's catalog is a throwaway HTTP server bound to
+                # loopback, which no administrator is allowed to configure:
+                # `connection_config` refuses 127.0.0.0/8 so a whitelist entry
+                # cannot be used to walk past advocate's loopback rule.
+                # Still go through that validation for everything else it
+                # checks, then widen the one field the harness needs -- rather
+                # than hand-building the config and testing nothing.
+                material = connection_config(dict(endpoint=origin + "/catalog"))
+                assert material["private_networks"] == []
+                material["private_origins"] = [origin]
+                material["private_networks"] = ["127.0.0.0/8"]
                 connection = repo.create_connection(
-                    "Owned local HTTP",
-                    "opds",
-                    connection_config(
-                        dict(
-                            endpoint=origin + "/catalog",
-                            private_origins=[origin],
-                            private_networks=["127.0.0.0/8"],
-                        )
-                    ),
-                    enabled=True,
+                    "Owned local HTTP", "opds", material, enabled=True,
                 )
                 service = CatalogService(repo)
                 page = service.browse(owner, connection.id)

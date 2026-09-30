@@ -149,3 +149,110 @@ def test_catalog_identity_survives_offer_rotation_but_is_scoped_to_account(store
     assert a['offer_id'] != b['offer_id']
     assert 'SECRET' not in json.dumps(first)
     with pytest.raises(store_module.NotFound): service.request(1,connection.id,a['identity'],'identity-is-not-authority')
+
+
+@pytest.mark.parametrize('network', [
+    '127.0.0.0/8',          # loopback
+    '127.0.0.1/32',
+    '169.254.0.0/16',       # link-local
+    '169.254.169.254/32',   # cloud instance metadata
+    'fd00:ec2::254/128',    # the same, over IPv6
+    '0.0.0.0/0',            # catch-all: would re-admit every range above
+    '::/0',
+    '0.0.0.0/8',
+    '::1/128',              # loopback, v6
+    'fe80::/10',            # link-local, v6
+    '224.0.0.0/4',          # multicast
+    '8.8.8.8/32',           # public space is not a "private network"
+    '100.100.100.200/32',   # Alibaba Cloud instance metadata
+    '100.64.0.0/10',        # all of CGNAT: contains the address above
+    'fd20:ce::254/128',     # GCP metadata over IPv6
+    'fc00::/7',             # all of unique-local: contains both v6 metadata addresses
+    'not-a-network',
+])
+def test_admin_cannot_open_a_catalog_onto_a_network_that_must_stay_denied(network):
+    with pytest.raises(c.CatalogError):
+        c.connection_config({'endpoint': 'http://192.168.1.5:8080/catalog',
+                             'private_origins': ['http://192.168.1.5:8080'],
+                             'private_networks': [network]})
+
+
+@pytest.mark.parametrize('network', [
+    '192.168.0.0/16', '192.168.1.0/24', '10.0.0.0/8', '172.16.0.0/12',
+    '100.101.0.0/16',           # part of CGNAT, which is how Tailscale addresses look
+    'fd3a:9c2b:1f4e::/48',      # a real RFC 4193 unique-local prefix
+])
+def test_a_home_network_catalog_is_reachable_once_the_admin_opts_in(network):
+    config = c.connection_config({'endpoint': 'http://192.168.1.5:8080/catalog',
+                                  'private_origins': ['http://192.168.1.5:8080'],
+                                  'private_networks': [network]})
+    assert config['private_networks'] == [network]
+    assert config['private_origins'] == ['http://192.168.1.5:8080']
+
+
+def test_the_guard_is_the_only_thing_standing_between_an_admin_and_loopback():
+    """Why `home_networks` cannot be delegated to the transport.
+
+    advocate consults its whitelist before the loopback and link-local rules,
+    so by the time a request is made a whitelisted 127.0.0.1 is already
+    allowed. Pin that, so nobody removes the guard believing the layer below
+    would still refuse.
+    """
+    import ipaddress as ip
+    from cps.cw_advocate.addrvalidator import AddrValidator
+    permissive = AddrValidator(ip_whitelist={ip.ip_network('127.0.0.0/8')},
+                               port_whitelist={8080}, allow_ipv6=True)
+    assert permissive.is_ip_allowed('127.0.0.1') is True
+    with pytest.raises(c.CatalogError):
+        c.home_networks(['127.0.0.0/8'])
+
+
+def test_the_admin_opt_in_reaches_a_home_catalog_and_nothing_else():
+    """One checkbox, expanded server-side, scoped to this catalog's origin."""
+    config = c.connection_config({'endpoint': 'http://192.168.1.5:8080/catalog',
+                                  'allow_private_network': True})
+    assert config['private_origins'] == ['http://192.168.1.5:8080/catalog']
+    assert config['private_networks'] == [str(net) for net in c.DEFAULT_HOME_NETWORKS]
+    policy = c.policy(config)
+    # The allowance only applies to the catalog's own origin.
+    assert h.origin('http://192.168.1.5:8080/other') in {
+        h.origin(x) for x in policy.private_origins}
+    assert h.origin('http://10.1.2.3:8080/catalog') not in {
+        h.origin(x) for x in policy.private_origins}
+    # And, as the transport builds its validator for this origin, it reaches
+    # the home network while metadata and loopback stay denied.
+    import ipaddress as ip
+    from cps.cw_advocate.addrvalidator import AddrValidator
+    validator = AddrValidator(ip_whitelist={ip.ip_network(x) for x in policy.private_networks},
+                              port_whitelist={8080}, allow_ipv6=True)
+    for reachable in ('192.168.1.5', '10.1.2.3', '100.101.2.3', '100.100.100.199'):
+        assert validator.is_ip_allowed(reachable), reachable
+    for denied in ('127.0.0.1', '169.254.169.254', '100.100.100.200', 'fd00:ec2::254'):
+        assert not validator.is_ip_allowed(denied), denied
+
+
+def test_the_opt_in_is_off_by_default_and_cannot_be_combined_with_raw_ranges():
+    plain = c.connection_config({'endpoint': 'https://example.org/catalog'})
+    assert plain['private_origins'] == [] and plain['private_networks'] == []
+    with pytest.raises(c.CatalogError):
+        c.connection_config({'endpoint': 'http://192.168.1.5:8080/catalog',
+                             'allow_private_network': True,
+                             'private_networks': ['10.0.0.0/8'],
+                             'private_origins': ['http://192.168.1.5:8080']})
+    with pytest.raises(c.CatalogError):
+        c.connection_config({'endpoint': 'http://192.168.1.5:8080/catalog',
+                             'allow_private_network': 'yes'})
+
+
+def test_an_opted_in_catalog_can_still_be_switched_on_later():
+    """Enabling a connection revalidates its stored configuration.
+
+    Whatever the opt-in expands to therefore has to survive `connection_config`
+    a second time, or a catalog could be added and then never switched on.
+    """
+    stored = c.connection_config({'endpoint': 'http://192.168.1.5:8080/catalog',
+                                  'allow_private_network': True})
+    assert 'allow_private_network' not in stored, 'the flag must not round-trip'
+    assert c.connection_config(stored) == stored
+    for network in stored['private_networks']:
+        c.home_networks([network])

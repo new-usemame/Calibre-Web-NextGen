@@ -25,8 +25,18 @@ def _error(code, status):
         'acquisition_unavailable':'Acquisition is not ready; ask an administrator to check its status',
         'needs_review':'Legacy acquisition permissions need administrator review',
         'source_unavailable':'The catalog could not be read', 'rate_limit_exceeded':'Too many requests; try again later',
+        'private_network_not_allowed':'Only a home or local network range can be allowed. '
+            'Loopback, link-local and cloud metadata addresses cannot.',
+        'invalid_network_policy':'Check the network settings for this catalog',
         'selections_full':'Too many active catalog selections. Wait for older selections to expire, then try again.'}
     return jsonify({'error':{'code':code,'message':messages.get(code,'Acquisition request failed')}}),status
+
+
+# Codes connection_config raises for administrator input. They describe the
+# submitted form, not an unreachable source, so they answer 400 rather than
+# falling through to the generic CatalogError -> 502 "could not be read".
+CONFIG_ERRORS = frozenset({'private_network_not_allowed', 'invalid_network_policy',
+    'private_origin_and_network_required', 'invalid_connection', 'invalid_authentication'})
 
 
 def _owner():
@@ -39,7 +49,29 @@ def _key():
     return 'acquisition:' + str(_owner() or 'anonymous') + ':' + (request.remote_addr or '')
 
 
-def _endpoint(*, admin=False, available=False):
+# flask-limiter gives each decorated endpoint its own bucket, so these are not
+# one shared allowance across the API. What *did* share a bucket was GET and
+# POST on a single route: /acquisition/jobs both lists jobs and creates them,
+# and the job page polls the list every 3s (20/min per open tab). Two tabs
+# plus a little browsing spent the allowance, and because the writes drew on
+# the same bucket, "request this book" started failing with 429 while nothing
+# was wrong. per_method splits reads from writes so polling can no longer
+# starve a deliberate action, and reads get the larger share because polling
+# is what generates the volume.
+# Writes keep the allowance they already had, so nothing that worked before
+# gets tighter; reads are the ones that needed room.
+READ_RATE = '120/minute'        # status polling: 20/min for each open tab
+WRITE_RATE = '60/minute'        # deliberate actions: create, cancel, retry, approve
+REMOTE_READ_RATE = '60/minute'  # browsing a catalog reaches the source server
+
+
+def _rate(read, write):
+    def chosen():
+        return read if request.method in ('GET', 'HEAD') else write
+    return chosen
+
+
+def _endpoint(*, admin=False, available=False, read=READ_RATE, write=WRITE_RATE):
     def decorate(function):
         @wraps(function)
         def wrapped(*args,**kwargs):
@@ -81,7 +113,9 @@ def _endpoint(*, admin=False, available=False):
                 # Config/credential/HTTP dependencies can include private URLs
                 # in their exception chain. Do not pass them to generic logging.
                 return _error('acquisition_unavailable',503)
-        return limiter.limit('60/minute',key_func=_key)(wrapped) if limiter is not None else wrapped
+        if limiter is None:
+            return wrapped
+        return limiter.limit(_rate(read,write),key_func=_key,per_method=True)(wrapped)
     return decorate
 
 
@@ -211,7 +245,11 @@ def acquisition_admin_connections():
     if body.get('adapter','opds')!='opds': raise admission.AdmissionError('invalid_request')
     if not isinstance(body.get('label'),str) or not body['label'].strip() or len(body['label'])>200:
         raise admission.AdmissionError('invalid_request')
-    validated=connection_config(body.get('config'))
+    try:
+        validated=connection_config(body.get('config'))
+    except CatalogError as error:
+        code=str(error)
+        return _error(code if code in CONFIG_ERRORS else 'invalid_request',400)
     with runtime.open_repository(ub.app_DB_path,initialize_key=True) as repo:
         row=repo.create_connection(body.get('label'),'opds',validated,enabled=False)
         return jsonify(asdict(row)),201
@@ -253,7 +291,7 @@ def acquisition_bootstrap():
 
 
 @api_v1.route('/acquisition/catalog',methods=['GET'])
-@_endpoint()
+@_endpoint(read=REMOTE_READ_RATE)
 def acquisition_catalog():
     if set(request.args)-{'connection','selection','q'}: raise admission.AdmissionError('invalid_request')
     database,owner,connection_id=ub.app_DB_path,_owner(),request.args.get('connection')

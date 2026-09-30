@@ -9,7 +9,7 @@ from sqlalchemy import MetaData, create_engine, text
 
 
 @pytest.fixture
-def api(tmp_path,monkeypatch):
+def api(tmp_path,monkeypatch,request):
     from cps import constants, ub
     from cps.api import api_v1
     import cps.api as blueprint
@@ -35,7 +35,10 @@ def api(tmp_path,monkeypatch):
     monkeypatch.setattr(ub,'app_DB_path',str(database))
     monkeypatch.setattr(blueprint,'config',SimpleNamespace(config_allow_reverse_proxy_header_login=False,config_anonbrowse=0))
     monkeypatch.setattr(module,'worker_available',lambda:{'available':True,'reasons':[]})
-    app=Flask(__name__);app.config.update(SECRET_KEY='fixture-secret',RATELIMIT_ENABLED=False,WTF_CSRF_ENABLED=False)
+    # Rate limits are off unless a test asks for them: they are a shared
+    # module-level singleton, so leaving them on would couple tests together.
+    app=Flask(__name__);app.config.update(SECRET_KEY='fixture-secret',
+        RATELIMIT_ENABLED=getattr(request,'param',False),WTF_CSRF_ENABLED=False)
     if module.limiter is not None: module.limiter.init_app(app)
     app.register_blueprint(api_v1)
     yield app.test_client(),repo,actor,module,connection,offer,database
@@ -431,3 +434,55 @@ def test_selection_capacity_returns_actionable_safe_rate_response(api,monkeypatc
     error=response.get_json()['error']
     assert error['code']=='selections_full' and 'expire' in error['message']
     assert 'private upstream' not in response.get_data(as_text=True)
+
+
+@pytest.mark.parametrize('api',[True],indirect=True)
+def test_job_polling_cannot_starve_the_request_that_creates_a_job(api):
+    """The job page polls the same route it posts to.
+
+    /acquisition/jobs answers GET (the list the page polls every 3s) and POST
+    (request this book). While both drew on one bucket, a couple of open tabs
+    spent the allowance on polling and then "request this book" failed with a
+    429 although nothing was wrong. Reads and writes must not share a bucket.
+    """
+    client,repo,actor,module,connection,offer,database=api
+    module.limiter.storage.reset()
+    codes=[client.get('/api/v1/acquisition/jobs').status_code for _ in range(200)]
+    assert 429 in codes, 'the read allowance must still be bounded'
+    assert client.get('/api/v1/acquisition/jobs').status_code==429
+
+    created=post_job(api)
+    assert created.status_code==202, (
+        'job creation was starved by polling: %s' % created.get_data(as_text=True))
+    assert repo.list_jobs(2), 'the job must actually have been recorded'
+
+
+@pytest.mark.parametrize('api',[True],indirect=True)
+def test_a_breached_read_allowance_still_answers_as_json(api):
+    client,repo,actor,module,connection,offer,database=api
+    module.limiter.storage.reset()
+    breached=None
+    for _ in range(400):
+        response=client.get('/api/v1/acquisition/jobs')
+        if response.status_code==429:
+            breached=response
+            break
+    assert breached is not None
+    assert breached.get_json()['error']['code']=='rate_limit_exceeded'
+
+
+def test_admin_opts_a_home_catalog_in_and_cannot_open_loopback(api,monkeypatch):
+    """The Book sources form's home-network switch, through the real route."""
+    client,repo,actor,module,connection,offer,database=api;actor.id=1
+    monkeypatch.setattr(module.CatalogService,'probe',lambda *args:pytest.fail('saving configuration contacted source'))
+    url='/api/v1/admin/acquisition/connections'
+    response=client.post(url,json={'label':'Home Calibre','adapter':'opds','config':{
+        'endpoint':'http://192.168.1.5:8080/opds','allow_private_network':True}})
+    assert response.status_code==201
+    stored=repo.connection_config(response.get_json()['id'],include_disabled=True).config
+    assert stored['private_origins']==['http://192.168.1.5:8080/opds'] and '192.168.0.0/16' in stored['private_networks']
+    assert client.patch(url+'/'+response.get_json()['id'],json={'enabled':True}).status_code==200
+    refused=client.post(url,json={'label':'Loopback','adapter':'opds','config':{
+        'endpoint':'http://192.168.1.5:8080/opds','private_origins':['http://192.168.1.5:8080'],
+        'private_networks':['127.0.0.0/8']}})
+    assert refused.status_code==400 and refused.get_json()['error']['code']=='private_network_not_allowed'

@@ -40,6 +40,7 @@ function errorCode(error: unknown): string | undefined {
 
 const EMPTY_CONNECTION: AcquisitionConnectionInput & { label: string } = {
   label: '', endpoint: '', auth_kind: 'none', username: '', secret: '',
+  allow_private_network: false,
 };
 
 /** Where a failed action's message belongs. Each one is rendered beside the
@@ -121,6 +122,7 @@ export function AdminAcquisition() {
       auth_kind: draft.auth_kind,
       username: draft.auth_kind === 'basic' ? draft.username : '',
       secret: draft.auth_kind === 'none' ? '' : draft.secret,
+      allow_private_network: draft.allow_private_network,
     }),
     onSuccess: () => {
       setDraft(EMPTY_CONNECTION);
@@ -129,9 +131,14 @@ export function AdminAcquisition() {
       announce(t('Catalog added. Test it, then switch it on.'));
     },
     onError: (error) => {
-      setFormError(errorCode(error) === 'needs_review'
-        ? t('Legacy acquisition permissions need review before a catalog can be added.')
-        : t('Check the address and the sign-in details.'));
+      const code = errorCode(error);
+      if (code === 'needs_review') {
+        setFormError(t('Legacy acquisition permissions need review before a catalog can be added.'));
+      } else if (code === 'private_network_not_allowed') {
+        setFormError(t('That address cannot be reached on a local network. Loopback, link-local and cloud metadata addresses are never allowed.'));
+      } else {
+        setFormError(t('Check the address and the sign-in details.'));
+      }
     },
   });
 
@@ -500,6 +507,23 @@ export function AdminAcquisition() {
               </label>
             )}
           </div>
+          <label className={styles.switchRow}>
+            <input
+              type="checkbox"
+              checked={draft.allow_private_network ?? false}
+              onChange={(event) => setDraft({
+                ...draft, allow_private_network: event.target.checked,
+              })}
+            />
+            <span>
+              <span className={styles.switchLabel}>
+                {t('This catalog is on my home or local network')}
+              </span>
+              <span className={styles.hint}>
+                {t('Turn this on for a catalog running on your own network, such as Calibre or Kavita on a 192.168 or 10.x address. It applies to this catalog only. Loopback, link-local and cloud metadata addresses are never allowed.')}
+              </span>
+            </span>
+          </label>
           {formError && <p className={styles.bad} role="alert">{formError}</p>}
           <p className={styles.hint}>
             {t('A new catalog is added switched off. Test it first, then make it available.')}

@@ -17209,3 +17209,15 @@ msgstr "Je aanvragen konden niet worden geladen. Ze zijn niet verloren."
 msgid "{title} — {protocol}{search}"
 msgstr "{title} — {protocol}{search}"
 
+
+#: cps/spa_strings.py
+msgid "That address cannot be reached on a local network. Loopback, link-local and cloud metadata addresses are never allowed."
+msgstr "Dat adres kan niet worden bereikt op een lokaal netwerk. Loopback-, link-local- en cloudmetadata-adressen zijn nooit toegestaan."
+
+#: cps/spa_strings.py
+msgid "This catalog is on my home or local network"
+msgstr "Deze catalogus staat op mijn thuis- of lokale netwerk"
+
+#: cps/spa_strings.py
+msgid "Turn this on for a catalog running on your own network, such as Calibre or Kavita on a 192.168 or 10.x address. It applies to this catalog only. Loopback, link-local and cloud metadata addresses are never allowed."
+msgstr "Schakel dit in voor een catalogus op je eigen netwerk, zoals Calibre of Kavita op een 192.168- of 10.x-adres. Het geldt alleen voor deze catalogus. Loopback-, link-local- en cloudmetadata-adressen zijn nooit toegestaan."

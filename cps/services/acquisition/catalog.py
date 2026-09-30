@@ -4,6 +4,7 @@
 The caller authenticates accounts and checks acquisition permissions. Source
 URLs and credentials stay server-side; this service never submits a download.
 """
+import ipaddress
 import re
 import json
 from urllib.parse import quote
@@ -18,27 +19,100 @@ class CatalogError(ValueError):
     pass
 
 
+# Ranges an administrator may open one catalog onto. The allowance exists so a
+# home catalog on a LAN can be reached; it is not a general hole, so it is an
+# allow-list of private space rather than a deny-list of the dangerous parts.
+# Loopback, link-local (which carries 169.254.169.254), the unspecified and
+# catch-all networks, multicast and public space are all absent, so all of them
+# are refused without needing to be enumerated.
+HOME_NETWORKS = tuple(ipaddress.ip_network(value) for value in (
+    '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16',   # RFC 1918
+    '100.64.0.0/10',                                   # CGNAT, incl. Tailscale
+    'fc00::/7',                                        # IPv6 unique local
+))
+# Inside that private space but never a catalog: cloud instance metadata.
+# (169.254.169.254 and its kin are link-local, which is outside the list above.)
+METADATA_NETWORKS = tuple(ipaddress.ip_network(value) for value in (
+    '100.100.100.200/32',                              # Alibaba Cloud, inside CGNAT
+    'fd00:ec2::254/128',                               # AWS IMDS over IPv6
+    'fd20:ce::254/128',                                # GCP metadata over IPv6
+))
+
+
+def _without_metadata(network):
+    pieces = [network]
+    for hole in METADATA_NETWORKS:
+        pieces = [part for piece in pieces for part in (
+            piece.address_exclude(hole) if hole.version == piece.version and hole.subnet_of(piece)
+            else (piece,))]
+    return sorted(pieces)
+
+
+# What the administrator's one-click opt-in expands to: IPv4 private space with
+# the metadata addresses carved out, because the transport honours its allow
+# list before any deny rule. IPv6 unique-local is left to an explicit range --
+# a site using it sets its own RFC 4193 prefix.
+DEFAULT_HOME_NETWORKS = tuple(part for value in (
+    '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '100.64.0.0/10',
+) for part in _without_metadata(ipaddress.ip_network(value)))
+
+
+def home_networks(values):
+    """Reject an allowance advocate itself would honour but must not.
+
+    `AddrValidator` checks its whitelist *before* the loopback and link-local
+    rules, so a whitelisted 127.0.0.0/8 or 169.254.0.0/16 is simply allowed.
+    Nothing below this call will refuse them, so this is the only place that
+    can, and it is reached by every administrator-supplied configuration.
+    """
+    for value in values:
+        try:
+            network = ipaddress.ip_network(value, strict=True)
+        except ValueError:
+            raise CatalogError('invalid_network_policy') from None
+        family = [net for net in HOME_NETWORKS if net.version == network.version]
+        if not any(network.subnet_of(net) for net in family):
+            raise CatalogError('private_network_not_allowed') from None
+        if any(network.overlaps(net) for net in METADATA_NETWORKS
+               if net.version == network.version):
+            raise CatalogError('private_network_not_allowed') from None
+    return tuple(values)
+
+
 def connection_config(value):
     """Validate administrator-supplied OPDS configuration, without a probe."""
     if not isinstance(value, dict) or set(value) - {
             'endpoint', 'auth_kind', 'username', 'secret', 'credential_origins',
-            'private_origins', 'private_networks'}:
+            'private_origins', 'private_networks', 'allow_private_network'}:
         raise CatalogError('invalid_connection')
     endpoint = normalized_url(value.get('endpoint'))
     auth_kind = value.get('auth_kind', 'none')
     secret, username = value.get('secret', ''), value.get('username', '')
     if not all(isinstance(x, str) for x in (auth_kind, secret, username)):
         raise CatalogError('invalid_authentication')
+    allow_private = value.get('allow_private_network', False)
+    if not isinstance(allow_private, bool):
+        raise CatalogError('invalid_connection')
     auth = authorization(auth_kind, secret, username)
     def strings(key, default):
         values = value.get(key, default)
-        if not isinstance(values, (list, tuple)) or len(values) > 16 or any(not isinstance(x, str) or len(x) > 8192 for x in values):
+        # 32 leaves room for the opt-in's ranges, which the metadata carve-out
+        # splits into 25 (one hole in 100.64.0.0/10 costs 22 prefixes).
+        if not isinstance(values, (list, tuple)) or len(values) > 32 or any(not isinstance(x, str) or len(x) > 8192 for x in values):
             raise CatalogError('invalid_network_policy')
         return tuple(values)
     # A catalog's redirects never acquire credentials for additional origins.
     credentials = strings('credential_origins', [endpoint] if auth else [])
     private = strings('private_origins', [])
-    networks = strings('private_networks', [])
+    networks = home_networks(strings('private_networks', []))
+    if allow_private:
+        # The administrator's opt-in, expanded here rather than in the browser
+        # so the allowed ranges have one definition. It is scoped to this one
+        # catalog's origin, so it widens nothing else.
+        if private or networks:
+            raise CatalogError('invalid_connection')
+        private = (endpoint,)
+        networks = tuple(str(net) for net in DEFAULT_HOME_NETWORKS)
     try:
         HTTPPolicy(credential_origins=credentials, private_origins=private,
                    private_networks=networks, authorization=auth)

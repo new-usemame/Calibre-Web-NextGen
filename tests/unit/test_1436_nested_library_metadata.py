@@ -103,10 +103,11 @@ def test_checksum_service_polls_and_backfills_nested_library(tmp_path):
         "BACKFILL_ARGS": str(invocation),
         "SQLITE_ARGS": str(sqlite_invocation),
         "PATH": f"{bin_dir}:{env['PATH']}",
+        "CWA_RUN_AS": str(wrapper),
     })
 
     result = subprocess.run(
-        ["bash", str(REPO_ROOT / "root/etc/s6-overlay/s6-rc.d/cwa-checksum-backfill/run")],
+        ["bash", str(REPO_ROOT / "scripts/services/cwa-checksum-backfill.sh")],
         env=env,
         text=True,
         capture_output=True,

@@ -8,6 +8,7 @@
 from pathlib import Path
 
 import pytest
+from tests.fixtures.service_sources import service_source
 
 
 pytestmark = pytest.mark.unit
@@ -32,7 +33,7 @@ ROOT_SERVICES = (
 
 
 def _run_script(service):
-    return (S6_ROOT / service / "run").read_text(encoding="utf-8")
+    return service_source(service)
 
 
 def _live_lines(source):
@@ -97,12 +98,12 @@ def test_audit_names_every_s6_service_reaching_a_calibre_tool():
     #   ebook-convert/calibredb/kepubify
     expected = set(ABC_SERVICES + ROOT_SERVICES)
     all_sources = {
-        path.parent.name: path.read_text(encoding="utf-8")
+        path.parent.name: service_source(path.parent.name)
         for path in S6_ROOT.glob("*/run")
     }
     reachability_markers = {
         "calibre-binaries-setup": "timeout 10 calibredb --version",
-        "cwa-auto-library": "python3 /app/calibre-web-automated/scripts/auto_library.py",
+        "cwa-auto-library": '"$CWA_PYTHON" "$CWA_SCRIPTS/auto_library.py"',
         "cwa-ingest-service": "python3 /app/calibre-web-automated/scripts/ingest_processor.py",
         "metadata-change-detector": "metadata_change_dispatch.py",
         "svc-calibre-web-automated": (

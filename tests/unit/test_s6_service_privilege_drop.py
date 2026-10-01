@@ -29,6 +29,7 @@ import re
 from pathlib import Path
 
 import pytest
+from tests.fixtures.service_sources import service_source
 
 pytestmark = pytest.mark.unit
 
@@ -59,6 +60,12 @@ AS_ABC_HELPER = REPO_ROOT / "root" / "usr" / "local" / "bin" / "cwa-as-abc"
 # though the service scripts never changed.
 DROP_TO_ABC = r"(?:s6-setuidgid\s+abc|cwa-as-abc)"
 
+# Service bodies in scripts/services drop through cwa_run_as, which runs
+# $CWA_RUN_AS; the s6 run file sets that to cwa-as-abc (#2094).
+COMMON_SH = REPO_ROOT / "scripts" / "services" / "_common.sh"
+DROP_OR_RUN_AS = r"(?:s6-setuidgid\s+abc|cwa-as-abc|cwa_run_as)"
+PYTHON = r'(?:python3?|"\$CWA_PYTHON")'
+
 
 def test_the_helper_still_performs_the_drop():
     """``cwa-as-abc`` is only an acceptable stand-in for a bare
@@ -86,11 +93,11 @@ def test_cwa_auto_zipper_invokes_auto_zip_under_s6_setuidgid():
     """Every uncommented invocation of auto_zip.py in the auto-zipper
     run script must drop privileges to ``abc`` first."""
     assert AUTO_ZIPPER_RUN.exists(), f"missing {AUTO_ZIPPER_RUN}"
-    text = AUTO_ZIPPER_RUN.read_text()
+    text = service_source("cwa-auto-zipper")
     assert "auto_zip.py" in text, "cwa-auto-zipper run script no longer references auto_zip.py"
 
     setuid_pattern = re.compile(
-        rf"\b{DROP_TO_ABC}\b.*python3?\b.*auto_zip\.py"
+        rf"\b{DROP_OR_RUN_AS}\b.*{PYTHON}.*auto_zip\.py"
     )
     offenders = []
     saw_invocation = False
@@ -111,6 +118,24 @@ def test_cwa_auto_zipper_invokes_auto_zip_under_s6_setuidgid():
         "cwa-auto-zipper invokes auto_zip.py without dropping to `abc` "
         "(neither `s6-setuidgid abc` nor `cwa-as-abc`) — "
         f"would regress issue #162: {offenders}"
+    )
+
+
+def test_cwa_run_as_drops_to_abc_in_the_image():
+    """``cwa_run_as`` is only a drop when the run file sets CWA_RUN_AS to
+    cwa-as-abc before exec'ing the service body, and the helper actually
+    runs that prefix."""
+    common = COMMON_SH.read_text()
+    assert re.search(r'\$CWA_RUN_AS\s+"\$@"', common), (
+        "_common.sh's cwa_run_as no longer runs $CWA_RUN_AS — service bodies "
+        "would run Python as root in the image, regressing issue #162."
+    )
+    run = AUTO_ZIPPER_RUN.read_text()
+    export = run.find("export CWA_RUN_AS=cwa-as-abc")
+    exec_at = run.find("exec /app/calibre-web-automated/scripts/services/cwa-auto-zipper.sh")
+    assert 0 <= export < exec_at, (
+        "cwa-auto-zipper/run must export CWA_RUN_AS=cwa-as-abc before "
+        "exec'ing its service body, or auto_zip.py runs as root (#162)."
     )
 
 

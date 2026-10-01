@@ -86,15 +86,15 @@ async function turnClassicPage(page: Page, before: string | null) {
   }
 }
 
-async function classicLocalPosition(page: Page) {
-  return page.evaluate(() => {
-    const bookUrl = (window as any).calibre?.bookUrl;
+async function classicLocalPosition(page: Page, key?: string) {
+  return page.evaluate(savedKey => {
+    const bookUrl = savedKey || (window as any).calibre?.bookUrl;
     if (!bookUrl) return null;
     return {
       progress: localStorage.getItem(`calibre.reader.progress.${bookUrl}`),
       cfi: localStorage.getItem(`calibre.reader.cfi.${bookUrl}`),
     };
-  });
+  }, key);
 }
 
 async function moveClassicReader(page: Page, until: (progress: number, cfi: string | null) => boolean) {
@@ -229,9 +229,12 @@ test('lookup survives navigation without replacing the saved place or Reading ma
   await expect.poll(() => bookmark(page, id), { timeout: 20_000 }).not.toBe(normalClassicBookmark);
   await expect.poll(() => classicProgress(page)).toBeGreaterThan(0);
   await capture(page, testInfo, 'classic-normal-reader');
-  const classicLookupLocalBefore = await classicLocalPosition(page);
+  const classicBookUrl = await page.evaluate(() => (window as any).calibre.bookUrl as string);
 
   await page.goto(`/book/${id}`);
+  // Take the baseline after leaving the ordinary reader: its pagehide save
+  // belongs to normal reading, not to the lookup session being measured.
+  const classicLookupLocalBefore = await classicLocalPosition(page, classicBookUrl);
   await expect(page.locator('#currently-reading-badge')).toBeVisible();
   const classicSaved = await bookmark(page, id);
   await capture(page, testInfo, 'classic-reading-actions');

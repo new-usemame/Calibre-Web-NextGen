@@ -66,6 +66,9 @@ test('the classic book page offers removal only from shelves the reader can chan
     const readersName = `e2e-offers-reader-${stamp}`;
     const readersShelf = await createShelf(reader, readersName, false);
     await shelve(reader, readersShelf, book.id);
+    const readersPublicName = `e2e-offers-reader-public-${stamp}`;
+    const readersPublicShelf = await createShelf(reader, readersPublicName, true);
+    await shelve(reader, readersPublicShelf, book.id);
 
     await secondaryUser.context.addCookies([
       { name: 'cwng_prefer_spa', value: '0', url: new URL(reader.url()).origin },
@@ -75,15 +78,17 @@ test('the classic book page offers removal only from shelves the reader can chan
     await reader.locator('#removeShelfMenu').click();
     const offers = reader.locator('#remove-from-shelves a[data-shelf-action="remove"]');
     await expect(offers.first()).toBeVisible();
-    await expect(offers).toHaveText([readersName]);
+    await expect(offers).toHaveText([readersName, `${readersPublicName} (Public)`]);
 
     // Once the reader's own shelf lets the book go, only shelves the reader
     // cannot change still hold it: there is nothing to offer.
-    const released = await reader.request.post(
-      `/api/v1/shelves/${readersShelf}/books/${book.id}/delete`,
-      { headers: await headersFor(reader) },
-    );
-    expect(released.ok(), await released.text()).toBeTruthy();
+    for (const shelfId of [readersShelf, readersPublicShelf]) {
+      const released = await reader.request.post(
+        `/api/v1/shelves/${shelfId}/books/${book.id}/delete`,
+        { headers: await headersFor(reader) },
+      );
+      expect(released.ok(), await released.text()).toBeTruthy();
+    }
     await reader.goto(`/book/${book.id}`, { waitUntil: 'domcontentloaded' });
     await expect(reader.locator('#title')).toBeVisible();
     await expect(reader.locator('#removeShelfMenu')).toHaveCount(0);

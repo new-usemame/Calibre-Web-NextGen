@@ -222,7 +222,7 @@ function Runtime:libraryProbe()
             if not a or a.mode ~= "file" then return nil end
             return { size = a.size, modification = a.modification }
         end,
-        digest = function(path) return self:getDocumentDigest(path) end,
+        digest = function(path) return self:getDocumentContentDigest(path) end,
         placeholderId = Runtime.readPlaceholderId,
         isOpen = function(path) return openDocumentPath() == path end,
     }
@@ -390,7 +390,7 @@ local function stillAsPlanned(self, action)
         return open ~= action.path and Runtime.readPlaceholderId(action.path) == action.book_id
     elseif op == "remove_download" then
         return open ~= action.path
-            and (action.checksum == nil or self:getDocumentDigest(action.path) == action.checksum)
+            and (action.checksum == nil or self:getDocumentContentDigest(action.path) == action.checksum)
     elseif op == "move_download" then
         return open ~= action.from and lfs.attributes(action.path, "mode") == nil
     end
@@ -442,7 +442,7 @@ function Runtime:performLibraryAction(client, action)
     elseif op == "adopt_download" then
         local info = fileInfo(action.path)
         if not info then return false end
-        info.checksum = self:getDocumentDigest(action.path)
+        info.checksum = self:getDocumentContentDigest(action.path)
         if action.from and not DocSettings:hasSidecarFile(action.path) then
             -- A move whose record was lost may have lost its sidecar move too.
             pcall(DocSettings.updateLocation, action.from, action.path)
@@ -949,7 +949,7 @@ function Runtime:downloadLibraryBook(book_id, path, title)
         os.remove(temp)
         return false, _("the download was incomplete")
     end
-    local digest = self:getDocumentDigest(temp)
+    local digest = self:getDocumentContentDigest(temp)
     if checksum and checksum ~= "" and digest ~= checksum then
         os.remove(temp)
         return false, _("the downloaded file was damaged")

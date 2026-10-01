@@ -83,6 +83,8 @@ CWNGSync.default_settings = {
     -- Highlight sync writes into the device's KoboReader.sqlite — opt-in,
     -- default off until the user explicitly enables it (Kobo only).
     sync_annotations = false,
+    -- Existing devices keep matching file bytes unless explicitly changed.
+    document_matching = "binary",
     -- The CWNG library folder (covers of every book in scope, downloaded on
     -- tap). Turned on by setup; an existing install keeps its folders.
     library_enabled = false,
@@ -485,6 +487,24 @@ function CWNGSync:getAdvancedMenuItems()
                 separator = true,
             },
             {
+                text = _("Document matching method"),
+                help_text = _([[Binary matches file contents. Filename matches the exact name, including its extension, without reading file contents. Use Filename for sideloaded copies whose bytes changed during conversion or metadata editing, keeping the same library or download name. Renamed files will not match; different books with identical names can match each other. Already queued updates keep the identity they were captured with.]]),
+                sub_item_table = {
+                    {
+                        text = _("Binary: match file contents"),
+                        radio = true,
+                        checked_func = function() return self.settings.document_matching ~= "filename" end,
+                        callback = function() self:setDocumentMatching("binary") end,
+                    },
+                    {
+                        text = _("Filename: match exact names"),
+                        radio = true,
+                        checked_func = function() return self.settings.document_matching == "filename" end,
+                        callback = function() self:setDocumentMatching("filename") end,
+                    },
+                },
+            },
+            {
                 text_func = function()
                     return T(_("Periodically sync every # pages (%1)"), self:getSyncPeriod())
                 end,
@@ -820,12 +840,38 @@ function CWNGSync:getCurrentDocumentFile()
     return nil
 end
 
--- Resolve the digest the server keys this book's progress on. Precedence lives
--- in SyncLogic.resolveDocumentDigest: the bytes on disk win, KOReader's cached
--- sidecar value is only a fallback. See the comment there for why (#991).
+-- A new matching choice affects future captures, not the identity stored in
+-- an offline queue. Persist immediately so the reader and library instances
+-- continue with the same choice after the book closes or KOReader restarts.
+function CWNGSync:setDocumentMatching(method)
+    if method ~= "binary" and method ~= "filename" then return false end
+    self.settings.document_matching = method
+    G_reader_settings:saveSetting(self.settings_key, self.settings)
+    if G_reader_settings.flush then G_reader_settings:flush() end
+    self.push_timestamp = 0
+    self.pull_timestamp = 0
+    return true
+end
+
+-- Resolve the identity used for progress and annotation matching. Filename
+-- matching never substitutes for byte integrity when installing managed files.
 function CWNGSync:getDocumentDigest(file_path)
-    -- When called without a path we are on the open document, whose settings are
-    -- already loaded; with a path we have to open that document's sidecar.
+    if self.settings and self.settings.document_matching == "filename" then
+        file_path = file_path or self:getCurrentDocumentFile()
+        -- Hash the exact UTF-8 basename including its extension, as KOReader's
+        -- KOSync filename channel does. No case folding or sidecar fallback.
+        if type(file_path) ~= "string" then return nil end
+        local filename = file_path:match("([^/]+)$")
+        if not filename then return nil end
+        return md5(filename)
+    end
+    return self:getDocumentContentDigest(file_path)
+end
+
+-- Binary partial MD5 for download verification and managed-file
+-- ownership, independent of the reader's document matching preference.
+-- Bytes on disk win; KOReader's cached sidecar value remains a fallback (#991).
+function CWNGSync:getDocumentContentDigest(file_path)
     local settings_path = file_path
     if not file_path then
         file_path = self:getCurrentDocumentFile()
@@ -1279,7 +1325,7 @@ function CWNGSync:syncDeviceCapabilities(interactive, ensure_networking)
                 local deleted, delete_reason, deleted_path = DeviceActions.deleteNamed(
                     deletion, root_path, {
                         attributes = lfs.attributes,
-                        digest = function(path) return self:getDocumentDigest(path) end,
+                        digest = function(path) return self:getDocumentContentDigest(path) end,
                         remove = util.removeFile,
                     })
                 client:complete_deletion(
@@ -1459,7 +1505,7 @@ function CWNGSync:collectDeliveries(
             local installed, install_error, refusal_space = Delivery.install(delivery, root_path, {
                 receipt = self:getDeliveryReceipt(delivery.id),
                 attributes = lfs.attributes,
-                digest = function(path) return self:getDocumentDigest(path) end,
+                digest = function(path) return self:getDocumentContentDigest(path) end,
                 sanitize = function(name, path)
                     return util.getSafeFilename(name, path, 230, 0)
                 end,

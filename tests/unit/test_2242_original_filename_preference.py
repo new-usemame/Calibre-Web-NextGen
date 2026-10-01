@@ -101,5 +101,6 @@ def test_classic_book_detail_obeys_account_filename_preference(monkeypatch, tmp_
     from tests.fixtures.detail_template import render_detail
 
     filename = "very-long-source-name.epub"
+    assert filename in render_detail(original_filename=filename)
     assert filename in render_detail(original_filename=filename, show_original_filename=True)
     assert filename not in render_detail(original_filename=filename, show_original_filename=False)

@@ -1,0 +1,2 @@
+### Fixed
+- **KOReader stays responsive while Library mode loads your book list.** Turning Library mode on with a large library fetched the whole book list, and worked out what to add, without letting KOReader read a tap, so Android showed "KOReader isn't responding" and switching tabs during the first fill did the same. The list now comes in small pages with a pause for input between each, and a notice shows how far the list and the first fill have got ("Adding books to your library: 120 of 800"). Update the plugin from your server after upgrading. Reported in #2329.

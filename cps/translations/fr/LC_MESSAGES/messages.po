@@ -8281,6 +8281,15 @@ msgstr "Supprimer la règle"
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "Remove tag \"{tag}\""
+msgstr "Retirer l’étiquette « {tag} »"
+
+#: cps/spa_strings.py
+msgid "Remove these"
+msgstr "Retirer ceux-ci"
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "Remove {name}?"
 msgstr "Supprimer {name} ?"
 
@@ -9071,6 +9080,16 @@ msgstr "Vue en tableau"
 msgid "Tag"
 msgstr "Étiquette"
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Tag removed from {n} book(s)."
+msgstr "Étiquette retirée de {n} livre(s)."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Tag removed from {succeeded}; {failed} failed."
+msgstr "Étiquette retirée de {succeeded} ; {failed} en échec."
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/search_form.html
 msgid "Tags"
@@ -9204,6 +9223,14 @@ msgid ""
 msgstr ""
 "La file d'approbation n'a pas pu être chargée ; des demandes attendent peut-"
 "être sans être vues."
+
+#: cps/spa_strings.py
+msgid ""
+"The authors, tags, publishers, and languages you enter will be removed from "
+"each selected book. Books without them are left unchanged."
+msgstr ""
+"Les auteurs, étiquettes, éditeurs et langues saisis seront retirés de chaque "
+"livre sélectionné. Les livres qui ne les ont pas restent inchangés."
 
 #: cps/spa_strings.py
 msgid "The background scheduler is not running."

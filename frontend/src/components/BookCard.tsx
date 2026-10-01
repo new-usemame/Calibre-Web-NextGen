@@ -99,13 +99,23 @@ function BookCardInner({
   // wherever a book appears in a general list; suppressed in the series-detail
   // view (showSeriesIndex), where every card is the same series and the position
   // already shows as the #N badge, so a repeated name would be noise.
+  //
+  // The name and the position are separate elements (#2051, reported by
+  // @magdalar): as one clamped string, any name long enough to ellipsise took
+  // the position with it. Only the name shrinks now; whatever the translation
+  // puts around it ("#4", "Band 4", "nº 4") stays pinned beside it. The template
+  // is rendered with the placeholder left in place and split there, so a locale
+  // keeps its own wording and order.
   const cardIndexLabel = formatSeriesIndex(book.series_index);
-  const seriesLine =
-    !showSeriesIndex && book.series
-      ? cardIndexLabel
-        ? t('{series} #{n}', { series: book.series, n: cardIndexLabel })
-        : book.series
+  let seriesParts: { before: string; name: string; after: string } | null = null;
+  if (!showSeriesIndex && book.series) {
+    const parts = cardIndexLabel
+      ? t('{series} #{n}', { series: '{series}', n: cardIndexLabel }).split('{series}')
       : null;
+    seriesParts = parts && parts.length === 2
+      ? { before: parts[0], name: book.series, after: parts[1] }
+      : { before: '', name: book.series, after: cardIndexLabel ? ` #${cardIndexLabel}` : '' };
+  }
 
   // Shelf tags (#1254, reported by @lguerard; #2261 asked the same through the
   // feedback form). The classic grid put the shelf name on the cover and people
@@ -212,8 +222,17 @@ function BookCardInner({
     <div className={styles.info}>
       <p className={styles.title} dir="auto">{book.title}</p>
       <p className={styles.author} dir="auto">{authorStr}</p>
-      {seriesLine && (
-        <p className={styles.series} dir="auto" data-testid="book-card-series">{seriesLine}</p>
+      {seriesParts && (
+        <p
+          className={styles.series}
+          dir="auto"
+          data-testid="book-card-series"
+          title={seriesParts.before + seriesParts.name + seriesParts.after}
+        >
+          {seriesParts.before && <span className={styles.seriesIndex}>{seriesParts.before}</span>}
+          <span className={styles.seriesName}>{seriesParts.name}</span>
+          {seriesParts.after && <span className={styles.seriesIndex}>{seriesParts.after}</span>}
+        </p>
       )}
     </div>
   );

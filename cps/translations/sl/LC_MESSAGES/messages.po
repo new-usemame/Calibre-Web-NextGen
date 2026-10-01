@@ -7906,6 +7906,15 @@ msgstr ""
 
 #: cps/spa_strings.py
 #, python-brace-format
+msgid "Remove tag \"{tag}\""
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Remove these"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
 msgid "Remove {name}?"
 msgstr ""
 
@@ -8650,6 +8659,16 @@ msgstr ""
 msgid "Tag"
 msgstr ""
 
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Tag removed from {n} book(s)."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Tag removed from {succeeded}; {failed} failed."
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/book_edit.html
 #: cps/templates/search_form.html
 msgid "Tags"
@@ -8770,6 +8789,12 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "The approval queue could not be loaded, so requests may be waiting unseen."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The authors, tags, publishers, and languages you enter will be removed from "
+"each selected book. Books without them are left unchanged."
 msgstr ""
 
 #: cps/spa_strings.py

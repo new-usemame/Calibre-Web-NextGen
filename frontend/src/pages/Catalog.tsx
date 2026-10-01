@@ -1238,6 +1238,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
             setSelecting(false);
           }}
           onRetryable={(failedIds) => setSelected(new Set(failedIds))}
+          currentTag={entityKind === 'tag' ? entityName : undefined}
           onChanged={() => {
             // A bulk action changed read state / membership / removed books.
             // Reset the accumulated grid so the refetched first page replaces it

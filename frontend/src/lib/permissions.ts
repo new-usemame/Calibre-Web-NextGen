@@ -8,6 +8,13 @@
  */
 import type { Me, Shelf } from './api';
 
+/** Menus and donation prompts share the account's instance support policy. */
+export function showsProjectSupport(me: Me | undefined | null): boolean {
+  // Wait for policy. Older servers omit support and retain the existing
+  // destinations once the account is available.
+  return !!me && (!!me.role.admin || me.support?.show_project_links !== false);
+}
+
 /**
  * May this user add book files right now?
  *

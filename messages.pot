@@ -16168,3 +16168,31 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+#: cps/spa_strings.py
+msgid "Could not select all books. Try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Select all is limited to {max} books. Narrow the current view and try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Select all {count} books"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Selected all {count} books in this view."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Selecting all books in this view…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Selecting…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "and {count} more"
+msgstr ""

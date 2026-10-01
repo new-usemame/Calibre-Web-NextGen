@@ -18061,3 +18061,31 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py
+msgid "Could not select all books. Try again."
+msgstr "Kan niet alle boeken selecteren. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Select all is limited to {max} books. Narrow the current view and try again."
+msgstr "Alles selecteren is beperkt tot {max} boeken. Verfijn de huidige weergave en probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "Select all {count} books"
+msgstr "Alle {count} boeken selecteren"
+
+#: cps/spa_strings.py
+msgid "Selected all {count} books in this view."
+msgstr "Alle {count} boeken in deze weergave geselecteerd."
+
+#: cps/spa_strings.py
+msgid "Selecting all books in this view…"
+msgstr "Alle boeken in deze weergave selecteren…"
+
+#: cps/spa_strings.py
+msgid "Selecting…"
+msgstr "Selecteren…"
+
+#: cps/spa_strings.py
+msgid "and {count} more"
+msgstr "en nog {count} meer"

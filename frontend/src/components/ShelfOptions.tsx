@@ -5,9 +5,9 @@ import styles from '../pages/Shelves.module.css';
 
 /** The two shelf types share visibility/device choices; device marks stay
  * owner-only and OPDS exposure belongs to the viewer's own account. */
-export function ShelfOptions({ me, smart = false, owner = true, canShare, isPublic,
+export function ShelfOptions({ me, smart = false, owner = true, showSharing = true, canShare, isPublic,
   koboSync, opdsExpose, onPublic, onKobo, onOpds }: {
-  me?: Me | null; smart?: boolean; owner?: boolean; canShare: boolean;
+  me?: Me | null; smart?: boolean; owner?: boolean; showSharing?: boolean; canShare: boolean;
   isPublic: boolean; koboSync: boolean; opdsExpose: boolean;
   onPublic: (value: boolean) => void; onKobo: (value: boolean) => void; onOpds: (value: boolean) => void;
 }) {
@@ -16,12 +16,12 @@ export function ShelfOptions({ me, smart = false, owner = true, canShare, isPubl
     && (!smart || !!me?.features?.kobo_sync_magic_shelves);
   return <fieldset className={styles.options}>
     <legend>{t('Shelf options')}</legend>
-    <label className={styles.option}>
-      <input type="checkbox" checked={isPublic} disabled={!canShare && !isPublic}
+    {showSharing && <label className={styles.option}>
+      <input type="checkbox" checked={isPublic} disabled={!canShare && !(owner && isPublic)}
         onChange={(e) => onPublic(e.target.checked)} />
       <span>{t('Share with everyone')}</span>
-    </label>
-    {!canShare && !isPublic && <p className={styles.hint}>{t('Your administrator has disabled sharing your own shelves.')}</p>}
+    </label>}
+    {showSharing && owner && !canShare && !isPublic && <p className={styles.hint}>{t('Your administrator has disabled sharing your own shelves.')}</p>}
     {owner && <>
       <label className={styles.option}>
         <input type="checkbox" checked={koboSync} disabled={!syncAvailable}

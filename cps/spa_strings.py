@@ -692,6 +692,7 @@ _("All browsers and computers signed in to your account share one Browser readin
 _("All shelves")
 _("Allow remote (magic-link) login")
 _("Allow requests from book sources")
+_("Allow sharing your own shelves")
 _("Allowed groups (comma-separated)")
 _("Allowed torrent tracker origins")
 _("Also add the book to My Library")

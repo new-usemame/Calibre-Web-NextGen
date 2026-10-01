@@ -10031,9 +10031,9 @@ msgid "Permission denied to change public status"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Shelf name is required"
-msgstr "Αυτό το Πεδίο Απαιτείται"
+msgstr ""
+
 
 #: cps/web.py
 #, fuzzy
@@ -15449,9 +15449,9 @@ msgid "Scrollbar"
 msgstr ""
 
 #: cps/templates/readcbr.html
-#, fuzzy
 msgid "Show"
-msgstr "Προβολή Όλων"
+msgstr ""
+
 
 #: cps/templates/readdjvu.html
 #, fuzzy

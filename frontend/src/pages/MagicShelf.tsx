@@ -260,8 +260,8 @@ export function MagicShelf({ editId }: { editId?: string }) {
         </label>
       </div>
 
-      <ShelfOptions me={me} smart owner={!editId || !!existing.data?.is_owner}
-        canShare={!editId || existing.data?.is_owner ? !!me?.role.share_shelfs : !!me?.role.admin}
+      <ShelfOptions me={me} smart showSharing={!isSystem} owner={!editId || !!existing.data?.is_owner}
+        canShare={!editId || existing.data?.is_owner ? !!me?.role.share_shelfs : !!me?.role.edit_shelfs}
         isPublic={isPublic} koboSync={koboSync} opdsExpose={opdsExpose}
         onPublic={setPublic} onKobo={setKobo} onOpds={setOpds} />
 

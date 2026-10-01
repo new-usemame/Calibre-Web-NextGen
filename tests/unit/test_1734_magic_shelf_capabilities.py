@@ -363,3 +363,15 @@ def test_spa_gates_each_control_on_its_matching_capability():
     # The e-reader sync mark also reaches the KOReader library, so the control
     # shows once either sync is on (frontend/src/lib/ereaderWording.ts).
     assert "data.can_kobo_sync && shelfMarksReachDevices(me?.features)" in source
+
+
+@pytest.mark.unit
+def test_system_shelf_visibility_cannot_be_changed_by_direct_request(classic_route_app):
+    shelf = _shelf(is_system=True, is_public=0)
+    response, session = _dispatch_classic_route(
+        classic_route_app, "/magicshelf/17/edit", "POST", shelf,
+        _user(user_id=41), {"is_public": True},
+    )
+    assert response.status_code == 403
+    assert shelf.is_public == 0
+    assert session.commits == 0

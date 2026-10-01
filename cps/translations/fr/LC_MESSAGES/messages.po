@@ -18283,3 +18283,114 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "Allow sharing your own shelves"
+msgstr "Autoriser le partage de ses propres étagères"
+
+#: cps/spa_strings.py
+msgid "An administrator must enable shelf sync before this option is available."
+msgstr "Un administrateur doit activer la synchronisation des étagères pour rendre cette option disponible."
+
+#: cps/spa_strings.py
+msgid "Built-in smart shelf"
+msgstr "Étagère intelligente intégrée"
+
+#: cps/spa_strings.py
+msgid "Collect books in shelves. Use settings to rename, share or choose device visibility."
+msgstr "Regroupez les livres dans des étagères. Les paramètres permettent de les renommer, de les partager et de choisir leur visibilité sur les appareils."
+
+#: cps/spa_strings.py
+msgid "Create shelf"
+msgstr "Créer une étagère"
+
+#: cps/spa_strings.py
+msgid "Hidden from navigation"
+msgstr "Masquée dans la navigation"
+
+#: cps/spa_strings.py
+msgid "Hide {name}"
+msgstr "Masquer {name}"
+
+#: cps/spa_strings.py
+msgid "No shelves yet. Create a shelf to start collecting books."
+msgstr "Aucune étagère pour le moment. Créez-en une pour commencer à regrouper vos livres."
+
+#: cps/spa_strings.py
+msgid "No smart shelves yet. Create one to collect books automatically."
+msgstr "Aucune étagère intelligente pour le moment. Créez-en une pour regrouper les livres automatiquement."
+
+#: cps/spa_strings.py
+msgid "Settings for {name}"
+msgstr "Paramètres de {name}"
+
+#: cps/spa_strings.py
+msgid "Share with everyone"
+msgstr "Partager avec tout le monde"
+
+#: cps/spa_strings.py
+msgid "Shelf options"
+msgstr "Options de l’étagère"
+
+#: cps/spa_strings.py
+msgid "Shelf settings"
+msgstr "Paramètres de l’étagère"
+
+#: cps/spa_strings.py
+msgid "Shelf visibility saved."
+msgstr "Visibilité de l’étagère enregistrée."
+
+#: cps/spa_strings.py
+msgid "Show in my OPDS feed"
+msgstr "Afficher dans mon flux OPDS"
+
+#: cps/spa_strings.py
+msgid "Show {name}"
+msgstr "Afficher {name}"
+
+#: cps/spa_strings.py
+msgid "Smart shelf"
+msgstr "Étagère intelligente"
+
+#: cps/spa_strings.py
+msgid "Smart shelves collect books automatically using rules. Hidden shelves stay here so you can show them again."
+msgstr "Les étagères intelligentes regroupent automatiquement les livres selon des règles. Les étagères masquées restent ici pour que vous puissiez les réafficher."
+
+#: cps/spa_strings.py
+msgid "Sync to Kobo"
+msgstr "Synchroniser avec Kobo"
+
+#: cps/spa_strings.py
+msgid "Sync to e-readers"
+msgstr "Synchroniser avec les liseuses"
+
+#: cps/spa_strings.py
+msgid "Toggle shelf list"
+msgstr "Déplier ou replier la liste des étagères"
+
+#: cps/spa_strings.py
+msgid "Toggle smart shelf list"
+msgstr "Déplier ou replier la liste des étagères intelligentes"
+
+#: cps/spa_strings.py
+msgid "Your OPDS feed includes all visible shelves. Enable selected shelves only in your account settings to choose individual shelves."
+msgstr "Votre flux OPDS inclut toutes les étagères visibles. Activez l’option limitant le flux aux étagères sélectionnées dans les paramètres de votre compte pour les choisir individuellement."
+
+#: cps/spa_strings.py
+msgid "Your account currently syncs the whole library. Select shelf-only sync in your account settings to use shelf marks."
+msgstr "Votre compte synchronise actuellement toute la bibliothèque. Choisissez la synchronisation des seules étagères sélectionnées dans les paramètres de votre compte pour utiliser ces marques."
+
+#: cps/spa_strings.py
+msgid "Your administrator has disabled sharing your own shelves."
+msgstr "Votre administrateur a désactivé le partage de vos propres étagères."
+
+#: cps/spa_strings.py
+msgid "Permission denied to share shelves"
+msgstr "Vous n’avez pas l’autorisation de partager des étagères"
+
+#: cps/spa_strings.py
+msgid "Only the shelf owner can change Kobo sync"
+msgstr "Seul le propriétaire de l’étagère peut modifier sa synchronisation Kobo"
+
+msgid "You are not allowed to edit this shelf"
+msgstr "Vous n’avez pas l’autorisation de modifier cette étagère"

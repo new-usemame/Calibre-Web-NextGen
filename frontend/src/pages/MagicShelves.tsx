@@ -19,7 +19,7 @@ export function MagicShelves() {
     <div className={styles.header}>
       <h1 className={styles.title}>{t('Smart shelves')}</h1>
       {data && <span className={styles.count}>{data.items.length}</span>}
-      {me?.id && <Link href="/magic/new" className={styles.createButton}>
+      {me?.id && !me.role.anonymous && <Link href="/magic/new" className={styles.createButton}>
         <Plus size={16} aria-hidden="true" focusable={false} /> {t('Create smart shelf')}
       </Link>}
     </div>

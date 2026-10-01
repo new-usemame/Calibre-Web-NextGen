@@ -226,7 +226,7 @@ def update_shelf_api(shelf_id):
     target_public = shelf.is_public
     if "is_public" in data:
         target_public = 1 if data["is_public"] else 0
-        if target_public and not (current_user.role_share_shelfs()
+        if target_public and not shelf.is_public and not (current_user.role_share_shelfs()
                                   if shelf.user_id == _uid() else current_user.role_edit_shelfs()):
             return _err("forbidden", "You are not allowed to make a shelf public", 403)
 

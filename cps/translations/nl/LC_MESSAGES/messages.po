@@ -17758,3 +17758,114 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py
+msgid "Allow sharing your own shelves"
+msgstr "Delen van eigen planken toestaan"
+
+#: cps/spa_strings.py
+msgid "An administrator must enable shelf sync before this option is available."
+msgstr "Een beheerder moet planksynchronisatie inschakelen voordat deze optie beschikbaar is."
+
+#: cps/spa_strings.py
+msgid "Built-in smart shelf"
+msgstr "Ingebouwde slimme plank"
+
+#: cps/spa_strings.py
+msgid "Collect books in shelves. Use settings to rename, share or choose device visibility."
+msgstr "Verzamel boeken op planken. Gebruik de instellingen om de naam, het delen of de zichtbaarheid op apparaten te wijzigen."
+
+#: cps/spa_strings.py
+msgid "Create shelf"
+msgstr "Plank maken"
+
+#: cps/spa_strings.py
+msgid "Hidden from navigation"
+msgstr "Verborgen in de navigatie"
+
+#: cps/spa_strings.py
+msgid "Hide {name}"
+msgstr "{name} verbergen"
+
+#: cps/spa_strings.py
+msgid "No shelves yet. Create a shelf to start collecting books."
+msgstr "Nog geen planken. Maak een plank om boeken te verzamelen."
+
+#: cps/spa_strings.py
+msgid "No smart shelves yet. Create one to collect books automatically."
+msgstr "Nog geen slimme planken. Maak er een om boeken automatisch te verzamelen."
+
+#: cps/spa_strings.py
+msgid "Settings for {name}"
+msgstr "Instellingen voor {name}"
+
+#: cps/spa_strings.py
+msgid "Share with everyone"
+msgstr "Delen met iedereen"
+
+#: cps/spa_strings.py
+msgid "Shelf options"
+msgstr "Plankopties"
+
+#: cps/spa_strings.py
+msgid "Shelf settings"
+msgstr "Plankinstellingen"
+
+#: cps/spa_strings.py
+msgid "Shelf visibility saved."
+msgstr "Zichtbaarheid van de plank opgeslagen."
+
+#: cps/spa_strings.py
+msgid "Show in my OPDS feed"
+msgstr "Tonen in mijn OPDS-feed"
+
+#: cps/spa_strings.py
+msgid "Show {name}"
+msgstr "{name} tonen"
+
+#: cps/spa_strings.py
+msgid "Smart shelf"
+msgstr "Slimme plank"
+
+#: cps/spa_strings.py
+msgid "Smart shelves collect books automatically using rules. Hidden shelves stay here so you can show them again."
+msgstr "Slimme planken verzamelen boeken automatisch met regels. Verborgen planken blijven hier staan zodat je ze weer kunt tonen."
+
+#: cps/spa_strings.py
+msgid "Sync to Kobo"
+msgstr "Synchroniseren met Kobo"
+
+#: cps/spa_strings.py
+msgid "Sync to e-readers"
+msgstr "Synchroniseren met e-readers"
+
+#: cps/spa_strings.py
+msgid "Toggle shelf list"
+msgstr "Plankenlijst in- of uitklappen"
+
+#: cps/spa_strings.py
+msgid "Toggle smart shelf list"
+msgstr "Slimme-plankenlijst in- of uitklappen"
+
+#: cps/spa_strings.py
+msgid "Your OPDS feed includes all visible shelves. Enable selected shelves only in your account settings to choose individual shelves."
+msgstr "Je OPDS-feed bevat alle zichtbare planken. Schakel in je accountinstellingen alleen geselecteerde planken in om afzonderlijke planken te kiezen."
+
+#: cps/spa_strings.py
+msgid "Your account currently syncs the whole library. Select shelf-only sync in your account settings to use shelf marks."
+msgstr "Je account synchroniseert nu de hele bibliotheek. Kies in je accountinstellingen synchronisatie van alleen geselecteerde planken om plankmarkeringen te gebruiken."
+
+#: cps/spa_strings.py
+msgid "Your administrator has disabled sharing your own shelves."
+msgstr "Je beheerder heeft het delen van eigen planken uitgeschakeld."
+
+#: cps/spa_strings.py
+msgid "Permission denied to share shelves"
+msgstr "Geen toestemming om planken te delen"
+
+#: cps/spa_strings.py
+msgid "Only the shelf owner can change Kobo sync"
+msgstr "Alleen de eigenaar kan Kobo-synchronisatie wijzigen"
+
+msgid "You are not allowed to edit this shelf"
+msgstr "Je mag deze plank niet bewerken"

@@ -10019,9 +10019,9 @@ msgid "Permission denied to change public status"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Shelf name is required"
-msgstr "Dette feltet er obligatorisk"
+msgstr ""
+
 
 #: cps/web.py
 #, fuzzy
@@ -15420,9 +15420,9 @@ msgid "Scrollbar"
 msgstr ""
 
 #: cps/templates/readcbr.html
-#, fuzzy
 msgid "Show"
-msgstr "Vis alt"
+msgstr ""
+
 
 #: cps/templates/readdjvu.html
 msgid "DJVU Reader"

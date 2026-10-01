@@ -9949,9 +9949,9 @@ msgid "Permission denied to change public status"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Shelf name is required"
-msgstr "이 항목은 필수입니다."
+msgstr ""
+
 
 #: cps/web.py
 #, fuzzy

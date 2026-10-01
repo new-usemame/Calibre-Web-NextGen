@@ -10058,9 +10058,9 @@ msgid "Permission denied to change public status"
 msgstr "Dovoljenje za spreminjanje javnega statusa je zavrnjeno"
 
 #: cps/web.py
-#, fuzzy
 msgid "Shelf name is required"
-msgstr "To polje je obvezno"
+msgstr ""
+
 
 #: cps/web.py
 #, fuzzy

@@ -15382,9 +15382,9 @@ msgid "Scrollbar"
 msgstr ""
 
 #: cps/templates/readcbr.html
-#, fuzzy
 msgid "Show"
-msgstr "Zobrazit vše"
+msgstr ""
+
 
 #: cps/templates/readdjvu.html
 #, fuzzy

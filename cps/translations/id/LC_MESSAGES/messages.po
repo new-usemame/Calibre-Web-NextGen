@@ -10011,9 +10011,9 @@ msgid "Permission denied to change public status"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Shelf name is required"
-msgstr "Isian Ini Diperlukan"
+msgstr ""
+
 
 #: cps/web.py
 #, fuzzy

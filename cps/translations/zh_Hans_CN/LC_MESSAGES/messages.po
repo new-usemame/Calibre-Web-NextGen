@@ -9962,9 +9962,9 @@ msgid "Permission denied to change public status"
 msgstr "拒绝更改公开状态的权限"
 
 #: cps/web.py
-#, fuzzy
 msgid "Shelf name is required"
-msgstr "此栏必须填写"
+msgstr ""
+
 
 #: cps/web.py
 #, fuzzy

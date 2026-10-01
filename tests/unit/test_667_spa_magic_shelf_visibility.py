@@ -19,26 +19,12 @@ FIX (cps/api/magicshelves.py): the endpoint now delegates to
 of truth. Anonymous callers (no user row to hide against) keep the public-only
 path.
 
-Two guards, matching the repo's pattern for app-init-bound endpoint functions
-(behavioural model on a real in-memory session + AST/source pin — cf.
-test_468_magic_shelf_membership_timestamp.py):
-
-  1. Behavioural — the canonical engine excludes a hidden system-template
-     shelf and a hidden public shelf while keeping the visible ones. This pins
-     the contract the endpoint now depends on.
-  2. Source-pin — ``list_magic_shelves`` calls
-     ``get_visible_magic_shelves_for_user`` and no longer builds its own
-     visibility query, so the wiring can't silently regress.
+The endpoint dispatch is covered by test_smart_shelf_management.py, including
+visible navigation, hidden management rows, and inaccessible private shelves.
 """
-import ast
-import pathlib
-
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
-
-_API = pathlib.Path(__file__).resolve().parents[2] / "cps" / "api" / "magicshelves.py"
 
 
 def _fresh_ub_session():
@@ -81,35 +67,3 @@ def test_visible_engine_filters_hidden_shelves(monkeypatch):
     assert "Someone's Public" not in names, "hidden public shelf must be filtered out"
     assert "My Reading Pile" in names, "the user's own shelf must stay visible"
     assert "Kept Public" in names, "a non-hidden public shelf must stay visible"
-
-
-def _list_magic_shelves_body():
-    tree = ast.parse(_API.read_text())
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name == "list_magic_shelves":
-            return ast.get_source_segment(_API.read_text(), node)
-    raise AssertionError("list_magic_shelves not found in cps/api/magicshelves.py")
-
-
-@pytest.mark.unit
-def test_endpoint_delegates_to_canonical_engine():
-    """/api/v1/magicshelves must route through the shared visibility engine."""
-    body = _list_magic_shelves_body()
-    assert "get_visible_magic_shelves_for_user" in body, (
-        "list_magic_shelves must delegate to the canonical visibility engine "
-        "so it honours hidden_magic_shelf_templates (#667)"
-    )
-
-
-@pytest.mark.unit
-def test_endpoint_has_no_bespoke_visibility_query():
-    """The authenticated path must not rebuild its own MagicShelf visibility
-    query — that bypass is exactly what let hidden shelves through."""
-    body = _list_magic_shelves_body()
-    # The old bug: an or_()-based ownership/public filter fed straight to the
-    # query. The public-only anon fallback (a plain is_public==1 filter) is
-    # fine; a resurrected or_() visibility clause is the regression.
-    assert "or_(" not in body, (
-        "list_magic_shelves must not rebuild an or_() visibility filter; "
-        "delegate to get_visible_magic_shelves_for_user instead (#667)"
-    )

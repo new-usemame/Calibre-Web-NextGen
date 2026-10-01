@@ -14,7 +14,7 @@ export function Shelves() {
     <div className={styles.header}>
       <h1 className={styles.title}>{t('Shelves')}</h1>
       {data && <span className={styles.count}>{data.items.length}</span>}
-      {me?.id && <Link href="/shelves/new" className={styles.createButton}>
+      {me?.id && !me.role.anonymous && <Link href="/shelves/new" className={styles.createButton}>
         <Plus size={16} aria-hidden="true" focusable={false} /> {t('Create shelf')}
       </Link>}
     </div>

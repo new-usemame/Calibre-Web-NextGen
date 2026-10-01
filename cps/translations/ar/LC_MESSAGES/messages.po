@@ -9973,9 +9973,9 @@ msgid "Permission denied to change public status"
 msgstr ""
 
 #: cps/web.py
-#, fuzzy
 msgid "Shelf name is required"
-msgstr "هذا الحقل مطلوب"
+msgstr ""
+
 
 #: cps/web.py
 #, fuzzy

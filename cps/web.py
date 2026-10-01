@@ -1874,6 +1874,8 @@ def edit_magic_shelf(shelf_id):
         
         # Only allow changing public status if user has permission
         if is_public != (shelf.is_public == 1):
+            if shelf.is_system:
+                return jsonify({"success": False, "message": _("Permission denied to change public status")}), 403
             if is_owner and is_public and not current_user.role_share_shelfs():
                 return jsonify({"success": False, "message": _("Permission denied to share shelves")}), 403
             if not is_owner and not current_user.role_edit_shelfs():
@@ -1902,7 +1904,7 @@ def edit_magic_shelf(shelf_id):
             shelf.kobo_sync = kobo_sync
             shelf.is_public = 1 if is_public else 0
             flag_modified(shelf, "rules")
-            if current_user.opds_only_shelves_sync:
+            if current_user.opds_only_shelves_sync and 'opds_expose' in data:
                 ub.set_opds_magic_shelf_exposed_for_user(
                     current_user.id,
                     shelf.id,

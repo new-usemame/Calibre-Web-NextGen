@@ -61,3 +61,13 @@ def test_public_shelf_owner_can_edit_when_sharing_is_separate_from_editor_role()
     viewer = SimpleNamespace(id=99, role_edit_shelfs=lambda: False)
     with patch.object(shelf_module, "current_user", viewer):
         assert shelf_module.check_shelf_edit_permissions(shelf) is False
+
+
+@pytest.mark.unit
+def test_anonymous_guest_cannot_edit_a_public_shelf_owned_by_guest_account():
+    from cps import shelf as shelf_module
+
+    shelf = SimpleNamespace(id=8, name="Guest shelf", is_public=1, user_id=12)
+    guest = SimpleNamespace(id=12, is_anonymous=True, role_edit_shelfs=lambda: True)
+    with patch.object(shelf_module, "current_user", guest):
+        assert shelf_module.check_shelf_edit_permissions(shelf) is False

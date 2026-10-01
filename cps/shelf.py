@@ -767,6 +767,8 @@ def order_shelf(shelf_id):
 
 
 def check_shelf_edit_permissions(cur_shelf):
+    if getattr(current_user, "is_anonymous", False):
+        return False
     if cur_shelf.user_id == int(current_user.id):
         return True
     if cur_shelf.is_public and current_user.role_edit_shelfs():
@@ -802,18 +804,21 @@ def create_edit_shelf(shelf, page_title, page, shelf_id=False):
         can_share_own = current_user.role_share_shelfs()
         can_edit_public = current_user.role_edit_shelfs()
         requested_public = to_save.get("is_public") == "on"
-        if shelf_id and not can_share_own and shelf.user_id == int(current_user.id):
+        if shelf_id and not can_share_own and shelf.user_id == int(current_user.id) and not to_save.get('_visibility_present'):
             # A hidden checkbox must not turn an existing public shelf private
             # during an unrelated edit. Keep its current state when sharing is
             # disabled for this account.
             is_public = bool(shelf.is_public)
         else:
             is_public = requested_public
-        if requested_public and not (can_share_own or (shelf_id and can_edit_public)):
+        if requested_public and not (can_share_own if not shelf_id or shelf.user_id == int(current_user.id) else can_edit_public) and not (shelf_id and shelf.is_public):
             flash(_("Sorry you are not allowed to create a public shelf"), category="error")
             return redirect(url_for('web.index'))
         is_public = 1 if is_public else 0
-        if ereader_scope.shelf_marks_enabled(config):
+        is_owner = not shelf_id or shelf.user_id == int(current_user.id)
+        if not is_owner and 'kobo_sync' in to_save:
+            abort(403)
+        if is_owner and ereader_scope.shelf_marks_enabled(config):
             shelf.kobo_sync = True if to_save.get("kobo_sync") else False
             if shelf.kobo_sync:
                 ub.session.query(ub.ShelfArchive).filter(ub.ShelfArchive.user_id == current_user.id).filter(

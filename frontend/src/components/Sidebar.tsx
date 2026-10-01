@@ -108,7 +108,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
   const me = useMe().data;
   const canEdit = !!me?.role?.edit;
   const isAdmin = !!me?.role?.admin;
-  const isAuthed = !!me?.id;
+  const isAuthed = !!me?.id && !me.role.anonymous;
   const personalLibrary = me?.library_mode === 'personal_library';
   const showGlobalLibrary = personalLibrary && !!me?.role?.browse_global;
   // Server-derived: the feature is on AND this account is granted. A fresh or
@@ -190,8 +190,9 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
           <Plus size={16} aria-hidden="true" focusable={false} />
         </Link>}
       </div>
-      {shelves.length > 0 && shelvesExpanded && (
-        <ul id="sidebar-shelves" className={styles.shelfList} role="list">
+      <div id="sidebar-shelves" hidden={!shelvesExpanded}>
+      {shelves.length > 0 && (
+        <ul className={styles.shelfList} role="list">
           {shelves.map((s) => {
             const href = `/shelf/${s.id}`;
             const active = location === href;
@@ -212,6 +213,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
           })}
         </ul>
       )}
+      </div>
       <div className={styles.sectionHeader}>
                 <Link
                   href="/magic"
@@ -230,7 +232,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                   <Plus size={16} aria-hidden="true" focusable={false} />
                 </Link>}
       </div>
-      {smartExpanded && <ul id="sidebar-smart-shelves" className={styles.shelfList} role="list">
+      <div id="sidebar-smart-shelves" hidden={!smartExpanded}><ul className={styles.shelfList} role="list">
               {magicShelves.map((ms) => {
                 const href = `/magic/${ms.id}`;
                 const active = location === href;
@@ -250,7 +252,7 @@ export function Sidebar({ open, onClose, onNavigate }: SidebarProps) {
                   </li>
                 );
               })}
-      </ul>}
+      </ul></div>
     </Fragment>
   );
 

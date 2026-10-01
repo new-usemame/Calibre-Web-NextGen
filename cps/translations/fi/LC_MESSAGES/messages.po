@@ -15364,9 +15364,9 @@ msgid "Scrollbar"
 msgstr ""
 
 #: cps/templates/readcbr.html
-#, fuzzy
 msgid "Show"
-msgstr "Näytä kaikki"
+msgstr ""
+
 
 #: cps/templates/readdjvu.html
 #, fuzzy

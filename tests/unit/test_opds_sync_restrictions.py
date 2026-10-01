@@ -294,7 +294,7 @@ def test_feed_search_passes_opds_filter_to_search_results(monkeypatch):
         return FakeSearchQuery()
 
     monkeypatch.setattr(opds.calibre_db, "search_query", fake_search_query)
-    monkeypatch.setattr(opds, "get_opds_book_filter", lambda user=None: "FILTER")
+    monkeypatch.setattr(opds, "get_opds_restricted_common_filter", lambda user=None: "FILTER")
     monkeypatch.setattr(opds, "render_xml_template", lambda *_args, **kwargs: kwargs)
 
     result = opds.feed_search("space")

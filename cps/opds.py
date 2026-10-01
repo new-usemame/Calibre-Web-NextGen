@@ -453,6 +453,10 @@ def authorize_opds_entity(entity, user=None, entity_type=None):
 
 
 def get_opds_restricted_common_filter(user=None, *, allow_public_shelf_books=False):
+    # OPDS clients authenticate with HTTP Basic. ``db.common_filters`` defaults
+    # to Flask-Login's cookie user, which can be Guest or a different browser
+    # account on the same request; always pass the OPDS identity explicitly.
+    user = user if user is not None else auth.current_user()
     return calibre_db.common_filters(
         user=user,
         extra_filter=get_opds_book_filter(user),
@@ -1233,9 +1237,10 @@ class FeedObject:
 
 def feed_search(term):
     if term:
-        # Keep OPDS search filtering local to opds.py so this feature does not widen
-        # the shared CalibreDB search API surface just for OPDS-only restrictions.
-        entries = calibre_db.search_query(term, config=config).filter(get_opds_book_filter()) \
+        # Search results must use the same content, account, and OPDS exposure
+        # policy as every other catalog feed. The helper supplies the Basic-auth
+        # identity explicitly to common_filters rather than Flask-Login's user.
+        entries = calibre_db.search_query(term, config=config).filter(get_opds_restricted_common_filter()) \
             .order_by(func.ng_sort_key(db.Books.sort), db.Books.sort, db.Books.id).all()
         entries_count = len(entries) if len(entries) > 0 else 1
         pagination = Pagination(1, entries_count, entries_count)

@@ -4922,6 +4922,10 @@ msgid "Allowed groups (comma-separated)"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Allowed torrent tracker origins"
+msgstr "Engedélyezett torrenttracker-címek"
+
+#: cps/spa_strings.py
 msgid "Also add the book to My Library"
 msgstr ""
 
@@ -5233,6 +5237,21 @@ msgstr ""
 "Ellenőrizze a csatolást és a jogosultságokat."
 
 #: cps/spa_strings.py
+msgid ""
+"CWNG copies a completed EPUB or PDF from this mapping. It does not move "
+"files, delete client jobs, or change seeding limits. NZBGet needs "
+"credentials that can read configuration, queue and history. qBittorrent "
+"needs an existing category. Transmission uses the configured folder and "
+"label."
+msgstr ""
+"A CWNG egy kész EPUB- vagy PDF-fájlt másol erről a megfeleltetésről. Nem "
+"mozgat fájlokat, nem töröl kliensfeladatokat, és nem módosítja a "
+"visszaosztási korlátokat. Az NZBGethez a beállításokat, várólistát és "
+"előzményeket olvasni képes hitelesítő adatok szükségesek. A qBittorrent "
+"meglévő kategóriát igényel. A Transmission a beállított mappát és címkét "
+"használja."
+
+#: cps/spa_strings.py
 msgid "Can browse and request"
 msgstr ""
 
@@ -5323,16 +5342,16 @@ msgid "Checking…"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Choose a SABnzbd connection"
-msgstr "SABnzbd-kapcsolat kiválasztása"
-
-#: cps/spa_strings.py
 msgid "Choose a cover"
 msgstr ""
 
 #: cps/spa_strings.py
 msgid "Choose a cover image to upload"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Choose a download client connection"
+msgstr "Válasszon letöltőkliens-kapcsolatot"
 
 #: cps/spa_strings.py
 msgid "Choose an image…"
@@ -5365,6 +5384,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Client ID"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "Client category or label"
+msgstr "Klienskategória vagy címke"
 
 #: cps/spa_strings.py
 msgid "Client secret"
@@ -5403,8 +5426,8 @@ msgid "Compact"
 msgstr "Kompakt"
 
 #: cps/spa_strings.py
-msgid "Completed folder as SABnzbd sees it"
-msgstr "A befejezett letöltések mappája a SABnzbd szerint"
+msgid "Completed folder as the download client sees it"
+msgstr "Kész letöltések mappája a letöltőkliensben"
 
 #: cps/spa_strings.py
 msgid "Configuration"
@@ -6870,13 +6893,13 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"Let people request books from an OPDS catalog or an indexer connected to "
-"SABnzbd. A requested book is imported into this library through the normal "
-"ingest path, credited to the account that asked for it."
+"Let people request books from an OPDS catalog or an indexer connected to a "
+"download client. A requested book is imported into this library through the "
+"normal ingest path, credited to the account that asked for it."
 msgstr ""
-"Engedélyezze a könyvek igénylését OPDS-katalógusból vagy SABnzbd-hez "
-"kapcsolt indexelőből. Az igényelt könyv a szokásos importálási folyamaton "
-"keresztül kerül a könyvtárba, az igénylő fiókhoz rendelve."
+"Engedélyezze könyvek kérését OPDS-katalógusból vagy letöltőklienshez "
+"kapcsolt indexelőből. A kért könyv a szokásos feldolgozással kerül a "
+"könyvtárba, a kérelmező fiókhoz rendelve."
 
 #: cps/spa_strings.py
 msgid "Lettering"
@@ -6893,6 +6916,16 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Link address"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"List the exact HTTP, HTTPS or UDP tracker origins you trust, separated by "
+"commas. Torrents using other trackers are blocked. Source credentials are "
+"never sent to trackers."
+msgstr ""
+"Adja meg a megbízható HTTP-, HTTPS- vagy UDP-trackerek pontos címét, "
+"vesszővel elválasztva. Más trackert használó torrentek tiltva vannak. A "
+"forrás hitelesítő adatai soha nem kerülnek a trackerekhez."
 
 #: cps/spa_strings.py
 msgid "Load more"
@@ -7138,6 +7171,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "My private cover"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "NZBGet download client"
+msgstr "NZBGet letöltőkliens"
 
 #: cps/spa_strings.py
 msgid "Name"
@@ -8094,32 +8131,8 @@ msgid "Run time"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "SABnzbd category"
-msgstr "SABnzbd-kategória"
-
-#: cps/spa_strings.py
-msgid ""
-"SABnzbd did not finish this download before the waiting limit. Check its "
-"queue before retrying."
-msgstr ""
-"A SABnzbd nem fejezte be a letöltést a várakozási határidőn belül. "
-"Újrapróbálás előtt ellenőrizd a sorát."
-
-#: cps/spa_strings.py
-msgid ""
-"SABnzbd did not report a completed folder and category that could be "
-"verified."
-msgstr ""
-"A SABnzbd nem jelzett ellenőrizhető befejezett letöltési mappát és "
-"kategóriát."
-
-#: cps/spa_strings.py
 msgid "SABnzbd download client"
 msgstr "SABnzbd-letöltőkliens"
-
-#: cps/spa_strings.py
-msgid "SABnzbd reported that this download failed."
-msgstr "A SABnzbd a letöltés sikertelenségét jelezte."
 
 #: cps/spa_strings.py
 msgid "SMTP server"
@@ -8856,10 +8869,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"The completed-folder mapping does not cover the configured SABnzbd category."
+"The completed-folder mapping does not cover the configured download client "
+"folder."
 msgstr ""
-"A befejezett letöltési mappa hozzárendelése nem fedi le a beállított SABnzbd-"
-"kategóriát."
+"A kész letöltések mappájának megfeleltetése nem fedi le a kliens beállított "
+"mappáját."
 
 #: cps/spa_strings.py
 msgid ""
@@ -8870,12 +8884,32 @@ msgstr ""
 "lévő kérelmeket."
 
 #: cps/spa_strings.py
+msgid "The connection did not answer with a response we can read."
+msgstr "A kapcsolat nem adott olvasható választ."
+
+#: cps/spa_strings.py
 msgid "The connection settings could not be loaded."
 msgstr "A kapcsolat beállításai nem tölthetők be."
 
 #: cps/spa_strings.py
 msgid "The connection test failed."
 msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The download client did not finish this download before the waiting limit. "
+"Check its queue before retrying."
+msgstr ""
+"A letöltőkliens nem fejezte be a letöltést a várakozási határidőig. "
+"Újrapróbálás előtt ellenőrizze a várólistáját."
+
+#: cps/spa_strings.py
+msgid ""
+"The download client did not report a completed folder and category that "
+"could be verified."
+msgstr ""
+"A letöltőkliens nem jelentett ellenőrizhető készletöltés-mappát és "
+"kategóriát."
 
 #: cps/spa_strings.py
 msgid ""
@@ -8891,6 +8925,10 @@ msgid ""
 msgstr ""
 "A letöltőkliens nem érhető el, vagy megváltoztak a beállításai. "
 "Rendszergazdai ellenőrzés után válassza ki újra a kiadást."
+
+#: cps/spa_strings.py
+msgid "The download client reported that this download failed."
+msgstr "A letöltőkliens a letöltés sikertelenségét jelentette."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "The global library"
@@ -8989,11 +9027,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"The source or download client rejected its API key. Ask an administrator to "
-"check the credential."
+"The source or download client rejected its credentials. Ask an administrator "
+"to check the credential."
 msgstr ""
-"A forrás vagy a letöltőkliens elutasította az API-kulcsát. Kérjen "
-"rendszergazdai ellenőrzést a hitelesítő adathoz."
+"A forrás vagy a letöltőkliens elutasította a hitelesítő adatokat. Kérje meg "
+"a rendszergazdát azok ellenőrzésére."
 
 #: cps/spa_strings.py
 msgid ""
@@ -9005,11 +9043,18 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"The submission could not be confirmed. Check SABnzbd queue and history "
-"before trying again; CWNG will not blindly send a duplicate."
+"The submission could not be confirmed. Check the download client queue and "
+"history before trying again; CWNG will not blindly send a duplicate."
 msgstr ""
-"A beküldés nem erősíthető meg. Újrapróbálás előtt ellenőrizze a SABnzbd "
-"sorát és előzményeit; a CWNG nem küld be vakon másolatot."
+"A beküldést nem sikerült megerősíteni. Újrapróbálás előtt ellenőrizze a "
+"letöltőkliens várólistáját és előzményeit; a CWNG nem küld vakon másolatot."
+
+#: cps/spa_strings.py
+msgid ""
+"The torrent descriptor is unsupported or contains unsafe paths or links."
+msgstr ""
+"A torrentleíró nem támogatott, vagy nem biztonságos útvonalat vagy "
+"hivatkozást tartalmaz."
 
 #: cps/spa_strings.py
 msgid "The transfer did not complete."
@@ -9051,16 +9096,12 @@ msgid "This catalog does not offer search."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "This catalog is on my home or local network"
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "This catalog page is empty."
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "This category does not exist in SABnzbd."
-msgstr "Ez a kategória nem létezik a SABnzbd-ben."
+msgid "This category does not exist in the download client."
+msgstr "Ez a kategória nem létezik a letöltőkliensben."
 
 #: cps/spa_strings.py
 msgid ""
@@ -9079,6 +9120,10 @@ msgid "This code has already been approved or declined."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "This connection is on my home or local network"
+msgstr "Ez a kapcsolat az otthoni vagy helyi hálózatomon van"
+
+#: cps/spa_strings.py
 msgid ""
 "This database carries permissions from the old experimental Store. They need "
 "review before book sources can be switched on."
@@ -9091,6 +9136,14 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "This device will no longer sync."
 msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This download client API version is not supported. Check the documented "
+"supported versions."
+msgstr ""
+"A letöltőkliens API-verziója nem támogatott. Ellenőrizze a dokumentált "
+"támogatott verziókat."
 
 #: cps/spa_strings.py
 msgid "This e-reader is unavailable or belongs to another account."
@@ -9110,11 +9163,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"This is a torrent release. A compatible torrent client is required; SABnzbd "
-"accepts NZB releases."
+"This is a torrent release. Choose qBittorrent or Transmission for this "
+"indexer. Usenet clients accept NZB releases."
 msgstr ""
-"Ez torrentkiadás. Kompatibilis torrentkliens szükséges; a SABnzbd NZB-"
-"kiadásokat fogad."
+"Ez torrentkiadás. Válassza a qBittorrentet vagy a Transmissiont ehhez az "
+"indexelőhöz. A Usenet-kliensek NZB-kiadásokat fogadnak."
 
 #: cps/spa_strings.py
 msgid ""
@@ -9125,11 +9178,11 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"This job is no longer in SABnzbd queue or history. It will not be submitted "
-"again automatically."
+"This job is no longer in the download client queue or history. It will not "
+"be submitted again automatically."
 msgstr ""
-"Ez a feladat már nincs a SABnzbd sorában vagy előzményeiben. Nem lesz "
-"automatikusan újra beküldve."
+"Ez a feladat már nincs a letöltőkliens várólistáján vagy előzményeiben. Nem "
+"kerül automatikusan újra beküldésre."
 
 #: cps/spa_strings.py
 msgid "This magic link can’t be checked. Generate a new one to try again."
@@ -9175,6 +9228,21 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "This shelf is empty. Add books from any book's page."
 msgstr "Ez a polc üres. Könyveket bármely könyv oldaláról hozzáadhatsz."
+
+#: cps/spa_strings.py
+msgid ""
+"This torrent already exists outside this request. CWNG will not adopt or "
+"change an unrelated client job."
+msgstr ""
+"Ez a torrent már létezik ettől a kéréstől függetlenül. A CWNG nem vesz át és "
+"nem módosít idegen kliensfeladatot."
+
+#: cps/spa_strings.py
+msgid ""
+"This torrent uses a tracker outside the origins allowed by the administrator."
+msgstr ""
+"Ez a torrent a rendszergazda által engedélyezett címeken kívüli trackert "
+"használ."
 
 #: cps/spa_strings.py
 msgid "Title A–Z"
@@ -9227,6 +9295,10 @@ msgid "Top of catalog"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Transmission download client"
+msgstr "Transmission letöltőkliens"
+
+#: cps/spa_strings.py
 msgid "Trust authentication header"
 msgstr ""
 
@@ -9244,10 +9316,15 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"Turn this on for a catalog running on your own network, such as Calibre or "
-"Kavita on a 192.168 or 10.x address. It applies to this catalog only. "
-"Loopback, link-local and cloud metadata addresses are never allowed."
+"Turn this on for a connection running on your own network, such as a "
+"catalog, indexer or download client on a 192.168 or 10.x address. It applies "
+"to this connection only. Loopback, link-local and cloud metadata addresses "
+"are never allowed."
 msgstr ""
+"Kapcsolja be saját hálózatán működő kapcsolatnál, például 192.168 vagy 10.x "
+"címen futó katalógusnál, indexelőnél vagy letöltőkliensnél. Csak erre a "
+"kapcsolatra érvényes. A visszacsatolási, kapcsolati helyi és felhőmetaadat-"
+"címek soha nem engedélyezettek."
 
 #: cps/spa_strings.py cps/templates/read.html
 msgid "Two columns"
@@ -9638,6 +9715,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "just now"
 msgstr ""
+
+#: cps/spa_strings.py
+msgid "qBittorrent download client"
+msgstr "qBittorrent letöltőkliens"
 
 #: cps/spa_strings.py
 msgid "shared"
@@ -16434,6 +16515,79 @@ msgstr "Kiválasztott polcok szinkronizációja Kobo eszközzel"
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr "Olvasott/olvasatlan mutatása"
+
+#~ msgid "Choose a SABnzbd connection"
+#~ msgstr "SABnzbd-kapcsolat kiválasztása"
+
+#~ msgid "Completed folder as SABnzbd sees it"
+#~ msgstr "A befejezett letöltések mappája a SABnzbd szerint"
+
+#~ msgid ""
+#~ "Let people request books from an OPDS catalog or an indexer connected to "
+#~ "SABnzbd. A requested book is imported into this library through the "
+#~ "normal ingest path, credited to the account that asked for it."
+#~ msgstr ""
+#~ "Engedélyezze a könyvek igénylését OPDS-katalógusból vagy SABnzbd-hez "
+#~ "kapcsolt indexelőből. Az igényelt könyv a szokásos importálási folyamaton "
+#~ "keresztül kerül a könyvtárba, az igénylő fiókhoz rendelve."
+
+#~ msgid "SABnzbd category"
+#~ msgstr "SABnzbd-kategória"
+
+#~ msgid ""
+#~ "SABnzbd did not finish this download before the waiting limit. Check its "
+#~ "queue before retrying."
+#~ msgstr ""
+#~ "A SABnzbd nem fejezte be a letöltést a várakozási határidőn belül. "
+#~ "Újrapróbálás előtt ellenőrizd a sorát."
+
+#~ msgid ""
+#~ "SABnzbd did not report a completed folder and category that could be "
+#~ "verified."
+#~ msgstr ""
+#~ "A SABnzbd nem jelzett ellenőrizhető befejezett letöltési mappát és "
+#~ "kategóriát."
+
+#~ msgid "SABnzbd reported that this download failed."
+#~ msgstr "A SABnzbd a letöltés sikertelenségét jelezte."
+
+#~ msgid ""
+#~ "The completed-folder mapping does not cover the configured SABnzbd "
+#~ "category."
+#~ msgstr ""
+#~ "A befejezett letöltési mappa hozzárendelése nem fedi le a beállított "
+#~ "SABnzbd-kategóriát."
+
+#~ msgid ""
+#~ "The source or download client rejected its API key. Ask an administrator "
+#~ "to check the credential."
+#~ msgstr ""
+#~ "A forrás vagy a letöltőkliens elutasította az API-kulcsát. Kérjen "
+#~ "rendszergazdai ellenőrzést a hitelesítő adathoz."
+
+#~ msgid ""
+#~ "The submission could not be confirmed. Check SABnzbd queue and history "
+#~ "before trying again; CWNG will not blindly send a duplicate."
+#~ msgstr ""
+#~ "A beküldés nem erősíthető meg. Újrapróbálás előtt ellenőrizze a SABnzbd "
+#~ "sorát és előzményeit; a CWNG nem küld be vakon másolatot."
+
+#~ msgid "This category does not exist in SABnzbd."
+#~ msgstr "Ez a kategória nem létezik a SABnzbd-ben."
+
+#~ msgid ""
+#~ "This is a torrent release. A compatible torrent client is required; "
+#~ "SABnzbd accepts NZB releases."
+#~ msgstr ""
+#~ "Ez torrentkiadás. Kompatibilis torrentkliens szükséges; a SABnzbd NZB-"
+#~ "kiadásokat fogad."
+
+#~ msgid ""
+#~ "This job is no longer in SABnzbd queue or history. It will not be "
+#~ "submitted again automatically."
+#~ msgstr ""
+#~ "Ez a feladat már nincs a SABnzbd sorában vagy előzményeiben. Nem lesz "
+#~ "automatikusan újra beküldve."
 
 #~ msgid "Only jpg/jpeg/png/webp/bmp files are supported as coverfile"
 #~ msgstr "Csak jpg/jpeg/png/webp/bmp fájlok támogatottak borítófájlként"

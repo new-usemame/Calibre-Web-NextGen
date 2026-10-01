@@ -478,14 +478,14 @@ class Repository:
                 if validate_offer is not None:
                     # Pure validation only; do not contact sources in a transaction.
                     validate_offer(payload)
-                if payload.get('transport') == 'nzb':
+                if payload.get('transport') in ('nzb', 'torrent'):
                     release_key = _text(payload.get('release_key'), 64)
                     prior = previous(conn)
                     if prior is not None:
                         return prior
                     client = conn.execute(select(self.tables.connections).where(
                         self.tables.connections.c.id == payload.get('client_id'),
-                        self.tables.connections.c.adapter == 'sabnzbd',
+                        self.tables.connections.c.adapter.in_(('sabnzbd', 'nzbget') if payload.get('transport') == 'nzb' else ('qbittorrent', 'transmission')),
                         self.tables.connections.c.enabled.is_(True),
                         self.tables.connections.c.revision == payload.get('client_revision'))).mappings().first()
                     if client is None:
@@ -584,16 +584,25 @@ class Repository:
                 self.tables.offers.c.id == row['offer_id'], self.tables.connections.c.enabled.is_(True),
                 self.tables.connections.c.deleted.is_(False),
                 self.tables.connections.c.revision == self.tables.offers.c.connection_revision)).first()
-            client = row['client_id'] is None or conn.execute(select(self.tables.connections.c.id).where(
+            client = row['client_id'] is None or conn.execute(select(self.tables.connections.c.id, self.tables.connections.c.adapter).where(
                 self.tables.connections.c.id == row['client_id'], self.tables.connections.c.enabled.is_(True),
                 self.tables.connections.c.deleted.is_(False), self.tables.connections.c.revision == row['client_revision'])).first()
             if not connection or not client:
                 raise ConnectionChanged("Connection changed; make a new selection before retrying")
             submission = {}
-            if row['error_code'] == 'client_job_failed' and not row['publication_proof_hash']:
+            if (row['error_code'] == 'client_job_failed' and not row['publication_proof_hash']
+                    and client is not True and client.adapter in ('sabnzbd', 'nzbget')):
+                # Usenet jobs get a fresh attempt. Torrents retain their hash
+                # and owned tag so a repaired job is reconciled without changing
+                # seeding/data policy or adopting an unrelated pre-existing hash.
                 # The remote job definitely failed. A manual retry gets a new
                 # durable attempt/name; uncertain or missing jobs keep theirs.
                 submission = dict(external_id=None, submission_started=None, submission_key=None, submission_invalid=False)
+            elif (row['error_code'] == 'client_job_failed' and client is not True
+                    and client.adapter in ('qbittorrent', 'transmission')):
+                # Explicit retry reopens this retained, owned attempt to new
+                # subscribers. Existing terminal subscribers keep their outcomes.
+                submission = dict(submission_invalid=False)
             changed = conn.execute(table.update().where(table.c.id == job_id, table.c.state == "failed").values(
                 **submission,
                 state="publishing" if row["publication_proof_hash"] else "queued",

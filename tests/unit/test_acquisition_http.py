@@ -182,8 +182,22 @@ def real_source():
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers['Content-Length']))
+            session = self.headers.get('X-Transmission-Session-Id')
+            self.send_response(200 if session == 'owned-session' else 409)
+            self.send_header('X-Transmission-Session-Id', 'owned-session')
+            self.send_header('Set-Cookie', 'SID=owned; HttpOnly')
+            self.send_header('Authorization', 'must-not-return')
+            self.end_headers()
+            if session == 'owned-session': self.wfile.write(body)
         def do_GET(self):
             try:
+                if self.path == '/magnet':
+                    self.send_response(302)
+                    self.send_header('Location', 'magnet:?xt=urn:btih:'+'a'*40)
+                    self.end_headers()
+                    return
                 if self.path == '/headers':
                     stop.wait(10)
                     return
@@ -341,3 +355,55 @@ def test_slow_child_start_consumes_entire_large_nzb_before_post(monkeypatch, siz
         assert len(received) == 1 and descriptor in received[0]
     finally:
         server.shutdown(); server.server_close(); thread.join()
+
+
+def test_real_child_raw_rpc_session_challenge_and_empty_body(real_source):
+    from dataclasses import replace
+    policy = replace(local_policy(real_source), credential_origins=(real_source,))
+    request = b'{"method":"session-get","arguments":{}}'
+    challenge = http.run_transfer(real_source, policy, body=request, accepted_statuses=(200,409), accept_empty=True)
+    assert challenge.status == 409 and challenge.body == b''
+    assert challenge.headers == {'x-transmission-session-id':'owned-session', 'set-cookie':'SID=owned; HttpOnly'}
+    result = http.run_transfer(real_source, policy, body=request, headers={'Content-Type':'application/json', 'X-Transmission-Session-Id':challenge.headers['x-transmission-session-id']})
+    assert result.status == 200 and result.body == request
+    with pytest.raises(http.TransportError, match='credentials_redirected'):
+        http.run_transfer(real_source, local_policy(real_source), body=request, headers={'Cookie':'SID=owned'})
+
+
+def test_descriptor_only_magnet_redirect_is_terminal_and_never_fetched():
+    magnet='magnet:?xt=urn:btih:'+'a'*40+'&tr=https%3A%2F%2Ftracker.example%2Fannounce'
+    server=Server([Reply(status=302,headers={'Location':magnet})])
+    policy=http.HTTPPolicy(authorization='Bearer PRIVATE',credential_origins=('https://indexer.example',),query_secrets=('PRIVATE',))
+    from dataclasses import replace
+    doc=http.fetch_document('https://indexer.example/download?apikey=PRIVATE',replace(policy,allow_magnet_redirect=True),session_factory=server)
+    assert doc.url==magnet and doc.body==b'' and len(server.calls)==1
+    assert 'PRIVATE' not in repr(doc)
+    with pytest.raises(http.TransportError):
+        http.fetch_document('https://indexer.example/book',policy,session_factory=Server([Reply(status=302,headers={'Location':magnet})]))
+
+
+@pytest.mark.parametrize('location',['magnet:?xt=urn:btih:'+'a'*40+'&dn=%2550%2552%2549%2556%2541%2554%2545','magnet:'+('x'*8193),'magnet:?xt=urn:btih:'+'a'*40+'\x7f'])
+def test_magnet_redirect_rejects_source_secret_and_unbounded_uri(location):
+    server=Server([Reply(status=302,headers={'Location':location})])
+    with pytest.raises(http.TransportError):
+        http.fetch_document('https://indexer.example/download',http.HTTPPolicy(allow_magnet_redirect=True,query_secrets=('PRIVATE',)),session_factory=server)
+    assert len(server.calls)==1
+
+
+def test_real_child_returns_descriptor_magnet_without_fetching(real_source,tmp_path):
+    from dataclasses import replace
+    policy=replace(local_policy(real_source),allow_magnet_redirect=True)
+    doc=http.run_transfer(real_source+'/magnet',policy)
+    assert doc.url=='magnet:?xt=urn:btih:'+'a'*40 and doc.body==b''
+    with pytest.raises(http.TransportError):
+        http.download_file(real_source+'/magnet',policy,tmp_path/'book',max_bytes=1000)
+    assert not (tmp_path/'book').exists()
+
+
+@pytest.mark.parametrize('secret,encoded',[('PRIVATE KEY','PRIVATE+KEY'),('PRIVATE+KEY','PRIVATE%2BKEY'),('PRIVATE KEY','PRIVATE%2520KEY')])
+def test_magnet_redirect_checks_literal_and_form_decoded_source_secrets(secret,encoded):
+    location='magnet:?xt=urn:btih:'+'a'*40+'&dn='+encoded
+    server=Server([Reply(status=302,headers={'Location':location})])
+    with pytest.raises(http.TransportError,match='credentials_redirected'):
+        http.fetch_document('https://indexer.example/download',http.HTTPPolicy(allow_magnet_redirect=True,query_secrets=(secret,)),session_factory=server)
+    assert len(server.calls)==1

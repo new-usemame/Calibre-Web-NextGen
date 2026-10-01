@@ -42,7 +42,7 @@ export interface AcquisitionInstanceState {
 }
 
 export interface AcquisitionOffer {
-  format: 'EPUB' | 'PDF' | 'NZB';
+  format: 'EPUB' | 'PDF' | 'NZB' | 'Torrent';
   label: string | null;
   /** Stable per-file display identity — a React key, never an authorization. */
   identity: string;
@@ -143,6 +143,7 @@ export interface AcquisitionConnectionInput {
    *  origin; loopback, link-local and cloud metadata stay denied either way. */
   allow_private_network?: boolean;
   download_origins?: string[];
+  tracker_origins?: string[];
   category?: string;
   client_id?: string;
   preset?: 'newznab' | 'torznab' | 'prowlarr' | 'jackett';

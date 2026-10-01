@@ -43,24 +43,30 @@ export function useAcquisitionErrorText(): (code: string) => string {
   const t = useT();
   return useCallback((code: string) => {
     switch (code) {
-      case 'needs_auth': return t('The source or download client rejected its API key. Ask an administrator to check the credential.');
+      case 'needs_auth': return t('The source or download client rejected its credentials. Ask an administrator to check the credential.');
       case 'source_busy': return t('The source asked us to wait.');
       case 'book_category_unavailable': return t('The indexer does not advertise this book category.');
       case 'search_unavailable': return t('The indexer does not advertise a supported keyword search.');
-      case 'client_category_unavailable': return t('This category does not exist in SABnzbd.');
-      case 'client_path_mapping_mismatch': return t('The completed-folder mapping does not cover the configured SABnzbd category.');
-      case 'client_path_mapping_unverified': return t('SABnzbd did not report a completed folder and category that could be verified.');
+      case 'client_category_unavailable': return t('This category does not exist in the download client.');
+      case 'client_path_mapping_mismatch': return t('The completed-folder mapping does not cover the configured download client folder.');
+      case 'client_path_mapping_unverified': return t('The download client did not report a completed folder and category that could be verified.');
       case 'completed_path_unreadable': return t('CWNG cannot read the mapped completed folder. Check its mount and permissions.');
       case 'download_client_unavailable': return t('The download client is unavailable or its settings changed. Make a new selection after an administrator checks it.');
-      case 'client_job_stalled': return t('SABnzbd did not finish this download before the waiting limit. Check its queue before retrying.');
-      case 'client_job_failed': return t('SABnzbd reported that this download failed.');
-      case 'client_job_missing': return t('This job is no longer in SABnzbd queue or history. It will not be submitted again automatically.');
-      case 'submission_ambiguous': return t('The submission could not be confirmed. Check SABnzbd queue and history before trying again; CWNG will not blindly send a duplicate.');
+      case 'client_job_stalled': return t('The download client did not finish this download before the waiting limit. Check its queue before retrying.');
+      case 'client_job_failed': return t('The download client reported that this download failed.');
+      case 'client_job_missing': return t('This job is no longer in the download client queue or history. It will not be submitted again automatically.');
+      case 'submission_ambiguous': return t('The submission could not be confirmed. Check the download client queue and history before trying again; CWNG will not blindly send a duplicate.');
       case 'no_usable_book': return t('The completed download contains no usable EPUB or PDF.');
       case 'multiple_books': return t('The completed download contains multiple books. A single-book release is required.');
       case 'unsafe_completed_path': return t('The completed download is outside its mapped folder or uses an unsafe file path.');
       case 'credentials_redirected': return t('A download redirect tried to send a credential to another origin and was blocked.');
       case 'network_not_allowed': return t('The source redirected to a network address that this connection does not allow.');
+      case 'unsupported_client_version': return t('This download client API version is not supported. Check the documented supported versions.');
+      case 'torrent_already_exists': return t('This torrent already exists outside this request. CWNG will not adopt or change an unrelated client job.');
+      case 'untrusted_torrent_tracker': return t('This torrent uses a tracker outside the origins allowed by the administrator.');
+      case 'invalid_torrent':
+      case 'unsafe_torrent':
+      case 'invalid_magnet': return t('The torrent descriptor is unsupported or contains unsafe paths or links.');
       case 'invalid_nzb': return t('The indexer did not return a valid NZB descriptor.');
       default: return t('The transfer did not complete.');
     }

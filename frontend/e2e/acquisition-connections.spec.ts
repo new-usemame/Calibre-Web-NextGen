@@ -123,3 +123,31 @@ test('changing an indexer server asks for credential reentry and preserves the f
   await expect(page.getByRole('heading', { name: 'Add a connection' })).toBeVisible();
   expect(saved).toBe(true);
 });
+
+for (const adapter of ['nzbget', 'qbittorrent', 'transmission']) {
+  test(`${adapter} setup submits password, category and completed mapping`, async ({ page }) => {
+    const writes: { adapter: string; config: Record<string, unknown> }[] = [];
+    await page.route('**/api/v1/admin/acquisition**', async (route) => {
+      const req = route.request(); const path = new URL(req.url()).pathname;
+      if (req.method() === 'POST' && path.endsWith('/connections')) {
+        writes.push(req.postDataJSON());
+        return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 'created' }) });
+      }
+      const value = path.endsWith('/connections') ? { connections: [] }
+        : path.endsWith('/users') ? { users: [] } : path.endsWith('/jobs') ? { jobs: [] } : settings;
+      await route.fulfill({ contentType: 'application/json', body: JSON.stringify(value) });
+    });
+    await page.goto('/app/admin/acquisition');
+    await page.getByRole('combobox', { name: 'Connection type', exact: true }).selectOption(adapter);
+    await page.getByLabel('Name', { exact: true }).fill('Own client');
+    await page.getByLabel('API endpoint', { exact: true }).fill('http://client:8080/');
+    await page.getByLabel('Username', { exact: true }).fill('fixture');
+    await page.getByLabel('Password', { exact: true }).fill('fixture-password');
+    await page.getByLabel('Client category or label', { exact: true }).fill('books');
+    await page.getByLabel('Completed folder as the download client sees it', { exact: true }).fill('/downloads');
+    await page.getByLabel('Same completed folder inside CWNG', { exact: true }).fill('/completed');
+    await page.getByRole('button', { name: 'Add connection', exact: true }).click();
+    await expect.poll(() => writes.length).toBe(1);
+    expect(writes[0]).toMatchObject({ adapter, config: { auth_kind: 'basic', username: 'fixture', secret: 'fixture-password', category: 'books', remote_path: '/downloads', local_path: '/completed' } });
+  });
+}

@@ -18,7 +18,7 @@ class IndexerError(TransportError):
 def connection_config(value):
     if not isinstance(value, dict):
         raise IndexerError('invalid_connection')
-    extra = {'category', 'client_id', 'preset', 'download_origins'}
+    extra = {'category', 'client_id', 'preset', 'download_origins', 'tracker_origins'}
     if not {'category', 'client_id'} <= set(value):
         raise IndexerError('invalid_connection')
     config = transport_config({key: val for key, val in value.items() if key not in extra})
@@ -42,10 +42,17 @@ def connection_config(value):
             raise IndexerError('invalid_network_policy')
     if downloads and config['private_networks']:
         config['private_origins'] = list(dict.fromkeys(config['private_origins'] + downloads))
+    from .torrent import tracker_origin
+    trackers = value.get('tracker_origins', [])
+    if not isinstance(trackers, list) or len(trackers) > 16: raise IndexerError('invalid_network_policy')
+    for item in trackers:
+        tracker_origin(item)
+        parts = urlsplit(item)
+        if parts.path not in ('', '/') or parts.query or parts.fragment: raise IndexerError('invalid_network_policy')
     preset = value.get('preset', 'newznab')
     if preset not in ('newznab', 'torznab', 'prowlarr', 'jackett'):
         raise IndexerError('invalid_connection')
-    return dict(config, category=category, client_id=client, preset=preset, download_origins=downloads)
+    return dict(config, category=category, client_id=client, preset=preset, download_origins=downloads, tracker_origins=trackers)
 
 
 def xml_document(raw):
@@ -139,7 +146,7 @@ class IndexerService:
         root = xml_document(document.body)
         if root.tag != 'rss':
             raise IndexerError('invalid_indexer_response')
-        clients = [row for row in self.repository.list_connections() if row.id == config['client_id'] and row.adapter == 'sabnzbd']
+        clients = [row for row in self.repository.list_connections() if row.id == config['client_id'] and row.adapter in ('sabnzbd', 'nzbget', 'qbittorrent', 'transmission')]
         client = clients[0] if clients else None
         for item in root.findall('./channel/item')[:50]:
             title = (item.findtext('title') or 'Untitled release')[:512]
@@ -150,24 +157,29 @@ class IndexerService:
             release_key = self.repository.box.display_identity(json.dumps([connection_id, revision, identity, client.id if client else None, client.revision if client else None]))
             publication = {'title': title, 'identity': release_key, 'authors': [], 'languages': [],
                 'description': None, 'offers': [], 'navigation': []}
-            if mime in ('application/x-nzb', 'application/nzb') and href:
-                if client:
-                    try:
+            transport = 'nzb' if mime in ('application/x-nzb', 'application/nzb') else 'torrent' if mime in ('application/x-bittorrent', 'application/x-torrent') or href and href.startswith('magnet:') else None
+            compatible = client and client.adapter in (('sabnzbd', 'nzbget') if transport == 'nzb' else ('qbittorrent', 'transmission'))
+            if transport and href and compatible:
+                try:
+                    if transport == 'torrent' and href.startswith('magnet:'):
+                        from .torrent import validate_magnet
+                        validate_magnet(href, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
+                        descriptor = href
+                    else:
                         descriptor = descriptor_url(config, href)
-                    except TransportError:
-                        publication['unavailable_reason'] = 'untrusted_release_origin'
-                        result['publications'].append(publication)
-                        continue
-                    selection = self.repository.create_offer(owner_id, connection_id, {
-                        'kind': 'acquisition', 'transport': 'nzb', 'href': descriptor,
-                        'media_type': 'application/x-nzb', 'title': title, 'release_key': release_key,
-                        'client_id': client.id, 'client_revision': client.revision}, expected_revision=revision)
-                    publication['offers'] = [{'format': 'NZB', 'label': None, 'identity': release_key,
-                        'relation': 'download', 'offer_id': selection}]
-                else:
-                    publication['unavailable_reason'] = 'download_client_unavailable'
+                except TransportError:
+                    publication['unavailable_reason'] = 'untrusted_release_origin'
+                    result['publications'].append(publication)
+                    continue
+                selection = self.repository.create_offer(owner_id, connection_id, {
+                    'kind': 'acquisition', 'transport': transport, 'href': descriptor,
+                    'media_type': 'application/x-nzb' if transport == 'nzb' else 'application/x-bittorrent',
+                    'title': title, 'release_key': release_key,
+                    'client_id': client.id, 'client_revision': client.revision}, expected_revision=revision)
+                publication['offers'] = [{'format': 'NZB' if transport == 'nzb' else 'Torrent', 'label': None, 'identity': release_key,
+                    'relation': 'download', 'offer_id': selection}]
             else:
-                publication['unavailable_reason'] = 'torrent_client_required' if mime in ('application/x-bittorrent', 'application/x-torrent') else 'unsupported_release'
+                publication['unavailable_reason'] = 'torrent_client_required' if transport == 'torrent' else 'download_client_unavailable' if transport == 'nzb' else 'unsupported_release'
             result['publications'].append(publication)
         response = next((node for node in root.findall('./channel/*') if node.tag.split('}')[-1] == 'response'), None)
         try:

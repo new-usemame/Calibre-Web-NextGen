@@ -18,6 +18,8 @@ from .http import TransportError, run_transfer
 from .staging import (StagingError, cleanup_settled, digest, discard_publication, persist_capability,
                       publish, publication_state, validate_book)
 from .storage import Conflict
+from .clients import CLIENTS, USENET_KINDS, TORRENT_KINDS, torrent_book
+from .torrent import validate_magnet, validate_torrent
 from .sabnzbd import SABClient, ClientError, completed_book, open_completed_file, validate_nzb
 
 # A conversion of a large book can legitimately run for a long time, and a
@@ -45,7 +47,7 @@ class AcquisitionWorker:
                  enabled=lambda: True, execution_allowed=None, media_allowed=lambda media: True,
                  transfer=run_transfer, max_bytes=100 * 1024 * 1024,
                  import_deadline_seconds=IMPORT_DEADLINE_SECONDS,
-                 import_recheck_seconds=IMPORT_RECHECK_SECONDS, client_factory=SABClient,
+                 import_recheck_seconds=IMPORT_RECHECK_SECONDS, client_factory=None,
                  download_deadline_seconds=DOWNLOAD_DEADLINE_SECONDS):
         self.repository = repository
         self.client_factory = client_factory
@@ -131,9 +133,9 @@ class AcquisitionWorker:
             checkpoint()
             material = repo.material(job.id, token)
             offer, config = material.offer, material.config
-            if offer.get('kind') != 'acquisition' or offer.get('media_type') not in ('application/epub+zip', 'application/pdf', 'application/x-nzb'):
+            if offer.get('kind') != 'acquisition' or offer.get('media_type') not in ('application/epub+zip', 'application/pdf', 'application/x-nzb', 'application/x-bittorrent'):
                 raise TransportError('unsupported_offer')
-            usenet = offer.get('transport') == 'nzb' and offer['media_type'] == 'application/x-nzb'
+            usenet = offer.get('transport') in ('nzb', 'torrent')
             media_type = None if usenet else offer['media_type']
             checkpoint()
             extension = 'epub' if media_type == 'application/epub+zip' else 'pdf'
@@ -149,7 +151,7 @@ class AcquisitionWorker:
                 if shutil.disk_usage(private).free < self.max_bytes + 64 * 1024 * 1024:
                     raise TransportError('insufficient_storage')
                 if usenet:
-                    completed = self._download_usenet(job, token, offer, config, source, checkpoint)
+                    completed = self._download_client(job, token, offer, config, source, checkpoint)
                     if completed is None:
                         repo.release(job.id, token, delay_seconds=30)
                         shutil.rmtree(private)
@@ -235,14 +237,14 @@ class AcquisitionWorker:
             self._cleanup(job.id)
         return current
 
-    def _download_usenet(self, job, token, offer, config, source, checkpoint):
+    def _download_client(self, job, token, offer, config, source, checkpoint):
         repo = self.repository
         clients = [row for row in repo.list_connections() if row.id == offer.get('client_id')
-            and row.adapter == 'sabnzbd' and row.revision == offer.get('client_revision')]
+            and row.adapter in (USENET_KINDS if offer['transport'] == 'nzb' else TORRENT_KINDS) and row.revision == offer.get('client_revision')]
         if not clients:
             raise ClientError('download_client_unavailable')
         client_config = repo.connection_config(clients[0].id).config
-        client = self.client_factory(client_config, transfer=self.transfer)
+        client = (self.client_factory or CLIENTS[clients[0].adapter])(client_config, transfer=self.transfer)
         def submission_name(key):
             identity = [offer['release_key'], clients[0].id, clients[0].revision]
             # Nullable upgrade preserves existing remote names. New attempts
@@ -257,15 +259,22 @@ class AcquisitionWorker:
         if started is None:
             # Fetch/validate before issuing the durable POST fence. A bad key or
             # descriptor here is safely retryable without an uncertain submit.
-            descriptor = self.transfer(offer['href'], replace(policy(config), query_secrets=(config['secret'],)),
-                max_bytes=512 * 1024, checkpoint=checkpoint)
-            validate_nzb(descriptor.body)
+            if offer['transport'] == 'torrent' and offer['href'].startswith('magnet:'):
+                descriptor = offer['href']
+                validate_magnet(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
+            else:
+                document = self.transfer(offer['href'], replace(policy(config), query_secrets=(config['secret'],) if config['secret'] else (),
+                    allow_magnet_redirect=offer['transport'] == 'torrent'), max_bytes=512 * 1024, checkpoint=checkpoint)
+                descriptor = document.url if document.url.startswith('magnet:') else document.body
+                if offer['transport'] == 'nzb': validate_nzb(descriptor)
+                elif isinstance(descriptor, str): validate_magnet(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
+                else: validate_torrent(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
             checkpoint()
             fresh = repo.begin_submission(job.id, token)
             external_id, started, key = repo.submission_identity(job.id, token)
             if fresh:
                 try:
-                    external_id = client.submit(submission_name(key), descriptor.body, checkpoint=checkpoint)
+                    external_id = client.submit(submission_name(key), descriptor, checkpoint=checkpoint)
                 except TransportError as error:
                     if error.code in ('needs_auth', 'client_error'):
                         repo.clear_rejected_submission(job.id, token, error_code=error.code)
@@ -286,7 +295,21 @@ class AcquisitionWorker:
             if repo.submission_age(job.id, token) >= self.download_deadline_seconds:
                 raise ClientError('client_job_stalled')
             return None
-        book, media = completed_book(client_config, remote.get('storage'), max_bytes=self.max_bytes)
+        try:
+            return self._copy_client_book(client_config, remote, source, checkpoint, torrent=offer['transport'] == 'torrent')
+        except FileNotFoundError:
+            if offer['transport'] != 'torrent': raise
+            # Download completion can precede the final directory move, in
+            # either client. Preserve the owned submission and poll again.
+            if repo.submission_age(job.id, token) >= self.download_deadline_seconds:
+                raise ClientError('client_job_stalled')
+            return None
+
+    def _copy_client_book(self, client_config, remote, source, checkpoint, *, torrent):
+        if torrent:
+            book, media = torrent_book(client_config, remote.get('directory'), remote.get('files'), max_bytes=self.max_bytes)
+        else:
+            book, media = completed_book(client_config, remote.get('storage'), max_bytes=self.max_bytes)
         if not self.media_allowed(media):
             raise ClientError('format_not_allowed')
         # O_NOFOLLOW + inode/stat comparison fences a completed file changing

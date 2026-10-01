@@ -1,6 +1,6 @@
 # Book sources (Beta)
 
-Find books connects an administrator's catalogs to CWNG's library. Accounts with access can browse a connected catalog, choose an available EPUB/PDF or NZB release, and request its import. Indexer releases download through a connected SABnzbd client. The file goes through CWNG's existing ingest and configured processing before appearing in the Global Library. Accounts using My Library can also add the resulting book to their own selection.
+Find books connects an administrator's catalogs to CWNG's library. Accounts with access can browse a connected catalog, choose an available EPUB/PDF, NZB or torrent release, and request its import. Indexer releases download through a connected SABnzbd, NZBGet, qBittorrent or Transmission client. The file goes through CWNG's existing ingest and configured processing before appearing in the Global Library. Accounts using My Library can also add the resulting book to their own selection.
 
 This feature is off by default. Existing accounts and library selections do not gain acquisition permissions automatically.
 
@@ -34,15 +34,15 @@ The public Project Gutenberg OPDS entrypoint is `https://www.gutenberg.org/ebook
 | Catalogs | OPDS 1 Atom and OPDS 2 JSON; Newznab/Torznab search, including Prowlarr and Jackett presets |
 | Browsing | Catalog navigation, groups, facets and pagination |
 | Search | Advertised OpenSearch descriptions and supported OPDS 2 keyword templates |
-| Files | Direct EPUB/PDF links and NZB releases containing exactly one completed EPUB/PDF, intersected with allowed upload formats |
-| Download client | SABnzbd; waits for successful postprocessing before import |
+| Files | Direct EPUB/PDF links, NZB releases and v1 torrent files/magnets containing exactly one completed EPUB/PDF, intersected with allowed upload formats |
+| Download client | SABnzbd/NZBGet after successful postprocessing; qBittorrent/Transmission after every file finishes downloading |
 | Authentication | None, HTTP Basic, or Bearer credentials scoped to configured origins |
 | Local services | Explicit administrator configuration of private origins and network ranges |
 | Import | Existing CWNG ingest, configured repair/conversion, durable import receipt and account attribution |
 
 A catalog may list books without a supported direct file. Purchase, borrowing, DRM, previews, HTML landing pages and indirect acquisition flows are not presented as downloadable files. Inline catalog artwork is optional and is not downloaded.
 
-Anna's Archive and torrent download clients are not implemented by this Beta. Torznab torrent results can be discovered but cannot be requested through SABnzbd. They are not shown as working providers. The framework separates catalog discovery, file transport and library ingestion so additional protocol adapters can reuse the same permission, request and import boundaries.
+Anna's Archive is outside this Beta. Shelfmark is deferred because this slice has no inexpensive completion contract that attributes its result to a CWNG request. Torrent results require qBittorrent or Transmission; Usenet clients accept NZB results. The framework separates catalog discovery, file transport and library ingestion so additional protocol adapters can reuse the same permission, request and import boundaries.
 
 ## Connect an existing Usenet stack
 
@@ -57,6 +57,36 @@ These presets use the same protocol; they do not create an indexer or NNTP provi
 
 SAB receives the NZB bytes, not an indexer URL or its credentials. CWNG stores the remote job identity before continuing and reconciles it after a restart. A lost submit response is handled conservatively: retry looks for the exact owned job and does not blindly submit again. If its acceptance cannot be established, it reports uncertain submission for administrator investigation. Keep the remote queue/history entry until CWNG has completed import. A download still unfinished after seven days fails with a waiting-limit message, releasing the connection for administration. It is not automatically resubmitted. A manual retry after SAB reports a definite failed download creates a new durable attempt; an uncertain submission retains its identity. Definite submission rejection also resolves requests that adopted that attempt.
 
+## Connect NZBGet, qBittorrent or Transmission
+
+Add the download client first, map its completed folder into CWNG read-only, test it, then enable it. Bind the indexer to that enabled client. New connections remain disabled until enabled explicitly.
+
+| Client | Endpoint and credentials | Category, label and path check |
+| --- | --- | --- |
+| NZBGet | JSON-RPC endpoint, usually `http://nzbget:6789/jsonrpc`; username/password able to read `version`, `config`, `listgroups` and `history`, and submit `append` | Existing category; its destination (or global `DestDir`) must lie within the remote mapping. CWNG waits for successful completed postprocessing. |
+| qBittorrent | WebUI root, usually `http://qbittorrent:8080/`, or its `/api/v2` root; username/password | Existing category; its save path, or default save path if empty, must lie within the mapping. Submissions use the configured category and folder with automatic torrent management disabled for that torrent. |
+| Transmission | RPC endpoint, usually `http://transmission:9091/transmission/rpc`; username/password or explicit no authentication on an appropriately protected service | Configured download folder and label. CWNG checks RPC field access and reported free space for that folder. Labels are attached to new torrents; there is no pre-existing category to create. |
+
+Usenet results can use SABnzbd or NZBGet. Torznab results can use qBittorrent or Transmission. Set **Allowed torrent tracker origins** on the indexer to the exact trusted HTTP, HTTPS or UDP origins, for example `https://tracker.example, udp://tracker.example:6969`. Descriptors mentioning other trackers are blocked before submission. An empty list accepts no tracker URLs. Indexer keys are not passed to a tracker or client as source URLs. Web seeds, alternate magnet download URLs and metainfo bootstrap-node extensions are refused.
+
+This authority controls tracker URLs in submitted descriptors. It does not sandbox the download client's subsequent peer, DHT or DNS networking. Configure the client's own networking and firewall for the sources you trust. A trackerless magnet may depend on the client's existing peer-discovery configuration.
+
+Only v1 info hashes are supported; pure v2/hybrid descriptors with unsupported fields, multi-book bundles, traversal, symlinks and unreported paths are rejected. A multi-file torrent can contain one EPUB/PDF with non-book companions. CWNG checks aggregate completion **and every reported file**, including companions: entering a seeding state from a partial download is insufficient. It copies only the reported regular book file. It never moves/deletes client files or jobs, sets seed ratios/time limits, or stops seeding. Cancelling a CWNG request affects its import, not the client download.
+
+A missing queue/history entry, client error, unusable book or seven-day waiting limit produces an explicit failed request. No automatic resubmission occurs. Manual Retry reconciles a failed torrent by its original hash and owned tag/labels; repair it in the client first. A definite failed Usenet download gets a fresh durable attempt. Uncertain submission keeps its identity. Duplicate requests share the owned remote attempt across accounts while retaining private request histories and normal ingest receipts. A torrent already present outside that owned attempt is refused.
+
+### API compatibility
+
+These are deliberate protocol bounds, not an assertion that every version has been run live:
+
+| Client | Accepted protocol | Pinned compatibility fixture | Live verification |
+| --- | --- | --- | --- |
+| NZBGet | Version 21.x–26.x JSON-RPC | Released 24.8 and 26.3; append gains `AutoCategory` at 25.2 | 26.3 |
+| qBittorrent | WebUI API 2.8.0–2.15.1 | Released 5.0.0/API 2.9.3 (`SID`, `Ok.`) and 5.2.4/API 2.15.1 (204 login, `QBT_SID_<port>`, JSON add acknowledgement) | 5.2.4/API 2.15.1 |
+| Transmission | Legacy RPC 17, 18 or 19 | Released 4.0.6/RPC 17 and 4.1.3/RPC 19, including 409 session-ID handshake | 4.1.3/RPC 19 |
+
+The fixtures are in `tests/fixtures/acquisition-clients.json`. See [the client verification record](verification/virtual-library-clients.md) for released primary references and the isolated real-client proof.
+
 ## Edit or remove connections
 
 Changing the endpoint to a different origin requires explicitly re-entering the credential; a stored key cannot silently move to another server.
@@ -65,13 +95,13 @@ Changing the endpoint to a different origin requires explicitly re-entering the 
 
 ## Requests and existing books
 
-Requests belong to the account that created them. Requests for the same indexer release resolve to one request per account. Separate accounts retain private request histories while reusing the same SAB download. A rejected or cancelled release remains in that account’s history; another click returns that request rather than bypassing the earlier decision. Repeating the same submission after an uncertain response returns the original request. Accounts cannot use another account's catalog selections or inspect its requests.
+Requests belong to the account that created them. Requests for the same indexer release resolve to one request per account. Separate accounts retain private request histories while reusing the same client download. A rejected or cancelled release remains in that account’s history; another click returns that request rather than bypassing the earlier decision. Repeating the same submission after an uncertain response returns the original request. Accounts cannot use another account's catalog selections or inspect its requests.
 
 Imported means that CWNG has recorded the actual library book IDs and completed its import receipt. A download finishing alone does not mean the book is available. The book links still follow normal library visibility rules.
 
 Acquisition preserves an existing same-format edition when Calibre matches its title and author. It does not overwrite that edition, even when ordinary ingest is configured to overwrite duplicates. Its result identifies that the existing edition was retained. A different format may create a separate library record. Existing highlights and reading positions are not reassigned to a downloaded replacement.
 
-Before publication, cancellation, revoked account permissions, disabled connections and changes to allowed file formats stop further work. Pausing the feature stops dispatching downloads. An already authorized file entering ingest can still finish and record its receipt while the feature is paused. Its original request information is retained across a failed acknowledgment so retry can recover the same import. Cancelling a request stops its import; it does not delete or cancel SAB data, because another account may share that download.
+Before publication, cancellation, revoked account permissions, disabled connections and changes to allowed file formats stop further work. Pausing the feature stops dispatching downloads. An already authorized file entering ingest can still finish and record its receipt while the feature is paused. Its original request information is retained across a failed acknowledgment so retry can recover the same import. Cancelling a request stops its import; it does not delete or cancel client data, because another account may share that download.
 
 ## Credentials and recovery
 
@@ -84,3 +114,15 @@ Catalog selections expire. Expired selections that are not referenced by a reque
 ## Offline verification fixture
 
 Developers can run `tests/fixtures/virtual_library_fixture.py` on an isolated Docker network. It exposes a local Newznab endpoint on port 8090 and an NNTP server on port 8119, generates an original EPUB, and serves one yEnc article. Its disposable API key is `fixture-key`. Add it as a Generic Newznab source in Prowlarr, configure that NNTP server in SABnzbd, and connect CWNG to the two real services. The fixture has no outbound requests. `/counts` reports search, descriptor, and article activity so a restart or second account's request can prove it reused a download rather than submitting another.
+
+`tests/fixtures/virtual_library_torrents.py` extends that fixture with an original EPUB, a local Torznab endpoint, v1 single/multi-file descriptors and a compact local tracker. Run it with a real owned seeder on the same isolated network. It generates all payloads locally and makes no provider or public tracker requests.
+
+### Download-client polling limits
+
+Transmission setup requests hashes only. Recovery without a stored hash requests hashes and ownership labels, then requests file details for the single owned hash; it never retrieves every torrent's files. Discovery responses are capped at 8 MiB, individual/control responses at 2 MiB. Tracker warnings/errors do not invalidate complete peer downloads; local errors fail immediately, and an incomplete download still has the seven-day deadline.
+
+NZBGet's released queue/history RPCs do not support pagination or ID filters. Queue and visible-history snapshots are capped at 32 MiB and 10,000 rows; other RPC responses remain capped at 2 MiB. Setup avoids retained history, and a known queued job is polled without fetching history. `SUCCESS/PAR` and `WARNING/SCRIPT` allow selection of the final book, which must still pass format/path validation. Damaged, repairable, move failures and user-marked successes do not bypass those status checks.
+
+Torrent copies wait for a settled client state and for the reported final file to appear. A final-directory move can therefore defer an import without issuing a second download. A missing file remains subject to the same seven-day deadline; unsafe paths, symlinks and non-file results are refused. HTTP descriptor redirects ending in a magnet are resolved without fetching the magnet; its v1 hash, tracker origins and credential safety are validated before any submission.
+
+Tracker origins must be configured explicitly; an empty list deliberately trusts no tracker URLs. Magnet trackers are checked during discovery. HTTP `.torrent` links are checked when their bounded descriptor is fetched for a request, so discovery does not fetch every result or spend provider quotas. Unknown metainfo extensions remain unsupported pending a reviewed fixture: accepting them blindly could introduce network or file semantics not covered by the v1 checks.

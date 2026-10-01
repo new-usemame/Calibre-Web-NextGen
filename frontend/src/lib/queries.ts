@@ -642,7 +642,7 @@ export function useBookShelves(bookId: string | number, options?: { enabled?: bo
 export function useCreateShelf() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { name: string; is_public?: boolean }) =>
+    mutationFn: (vars: { name: string; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
       apiPost<Shelf>('/api/v1/shelves', vars),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['shelves'] }),
   });
@@ -651,7 +651,7 @@ export function useCreateShelf() {
 export function useUpdateShelf(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { name?: string; is_public?: boolean; kobo_sync?: boolean }) =>
+    mutationFn: (vars: { name?: string; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
       apiPost<Shelf>(`/api/v1/shelves/${id}`, vars),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['shelves'] });
@@ -1664,16 +1664,18 @@ export function useMagicShelfPreview() {
 }
 
 export function useCreateMagicShelf() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet }) =>
+    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
       apiPost<{ success: boolean; shelf_id?: number; message?: string }>('/magicshelf', v),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['magicshelves'] }),
   });
 }
 
 export function useEditMagicShelf(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet }) =>
+    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
       apiPost<{ success: boolean; message?: string }>(`/magicshelf/${id}/edit`, v),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['magicshelves'] });
@@ -1705,6 +1707,7 @@ export function useToggleMagicShelfKoboSync(id: string | number) {
 }
 
 export interface MagicShelfItem {
+  rules?: MagicRuleSet;
   id: number;
   name: string;
   icon: string;
@@ -1716,12 +1719,15 @@ export interface MagicShelfItem {
   can_delete: boolean;
   can_duplicate: boolean;
   can_kobo_sync: boolean;
+  opds_expose?: boolean;
+  can_hide?: boolean;
+  is_hidden?: boolean;
 }
 
-export function useMagicShelves() {
+export function useMagicShelves(manage = false) {
   return useQuery<{ items: MagicShelfItem[] }>({
-    queryKey: ['magicshelves'],
-    queryFn: () => apiGet<{ items: MagicShelfItem[] }>('/api/v1/magicshelves'),
+    queryKey: ['magicshelves', { manage }],
+    queryFn: () => apiGet<{ items: MagicShelfItem[] }>(`/api/v1/magicshelves${manage ? '?manage=1' : ''}`),
     staleTime: 30000,
   });
 }
@@ -1869,5 +1875,15 @@ export function useCancelTask() {
     mutationFn: (taskId: number | string) =>
       apiPost(`/api/v1/tasks/${encodeURIComponent(String(taskId))}/cancel`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['tasks'] }),
+  });
+}
+
+
+export function useMagicShelfVisibility() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; visible: boolean }) =>
+      apiPost(`/api/v1/magicshelves/${v.id}/visibility`, { visible: v.visible }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['magicshelves'] }),
   });
 }

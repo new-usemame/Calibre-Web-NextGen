@@ -99,7 +99,7 @@ test('edit book: no critical/serious a11y violations', async ({ page }) => {
 });
 
 test('smart shelf builder: no critical/serious a11y violations', async ({ page }) => {
-  await page.goto('/app/magic');
+  await page.goto('/app/magic/new');
   // The signed-in test user may use any supported locale. Identify the route by
   // structure rather than an English accessible name, and pin its one-landmark
   // invariant so a nested page-level <main> cannot return.

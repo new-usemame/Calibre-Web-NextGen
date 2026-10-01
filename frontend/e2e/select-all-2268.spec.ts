@@ -71,7 +71,7 @@ test('library select-all uses complete server result and bulk changes books beyo
     await expect(page.getByTestId('catalog-grid').getByRole('link', {
       name: `Open details for ${visible[1].title}`,
     })).toBeVisible();
-    await expect.poll(() => page.getByRole('link', { name: /^Open details for / }).count()).toBeLessThan(expected.total);
+    await expect.poll(() => page.getByTestId('catalog-grid').getByRole('link', { name: /^Open details for / }).count()).toBeLessThan(expected.total);
     await selectAllOn(page);
     const selected = page.getByRole('region', { name: `${expected.total} selected`, exact: true });
     await expect(selected).toBeVisible();

@@ -18306,3 +18306,55 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+# Private book reviews (#917).
+msgid "Your review"
+msgstr "Jouw recensie"
+
+msgid "Private to your account. This does not change the shared Description."
+msgstr "Privé voor jouw account. Dit wijzigt de gedeelde Beschrijving niet."
+
+msgid "Keep your thoughts about this book here."
+msgstr "Bewaar hier je gedachten over dit boek."
+
+msgid "Review or note"
+msgstr "Recensie of notitie"
+
+msgid "Add a review"
+msgstr "Recensie toevoegen"
+
+msgid "Edit review"
+msgstr "Recensie bewerken"
+
+msgid "Save review"
+msgstr "Recensie opslaan"
+
+msgid "Delete review"
+msgstr "Recensie verwijderen"
+
+msgid "Delete your review?"
+msgstr "Jouw recensie verwijderen?"
+
+msgid "This removes your private review or note for this book."
+msgstr "Hiermee verwijder je jouw privérecensie of notitie voor dit boek."
+
+msgid "Review saved."
+msgstr "Recensie opgeslagen."
+
+msgid "Review deleted."
+msgstr "Recensie verwijderd."
+
+msgid "Could not load your review."
+msgstr "Jouw recensie kon niet worden geladen."
+
+msgid "Could not save review."
+msgstr "Recensie kon niet worden opgeslagen."
+
+msgid "Could not delete review."
+msgstr "Recensie kon niet worden verwijderd."
+
+msgid "{n} of {max} characters"
+msgstr "{n} van {max} tekens"
+
+msgid "Review text exceeds 10000 characters"
+msgstr "De recensie bevat meer dan 10000 tekens"

@@ -1,4 +1,5 @@
 {% extends is_xhr|yesno("fragment.html", "layout.html") %}
+{% from 'modal_dialogs.html' import delete_book with context %}
 {% block header %}
     <meta property="og:type" content="book" />
     <meta property="og:title" content="{{ entry.title|truncate(35) }}" />
@@ -1167,6 +1168,9 @@
                         <div dir="auto">{{ entry.comments[0].text|clean_string|safe }}</div>
                     </div>
                 {% endif %}
+                {% if current_user.is_authenticated and not current_user.is_anonymous %}
+                    {% include "book_review.html" %}
+                {% endif %}
                 <div id="shelf-action-errors" class="pull-left" role="alert"></div>
             </div>
         </div>
@@ -1268,6 +1272,8 @@
 {% endblock %}
 
 {% block js %}
+<script src="{{ url_for('static', filename='js/book-review.js') }}"></script>
+
 <script type="text/template" id="template-shelf-add">
     <li>
         <a data-href="<%= add %>" data-remove-href="<%= remove %>" data-shelf-action="add">

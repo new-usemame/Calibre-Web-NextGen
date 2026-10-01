@@ -18848,3 +18848,57 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+# Private book reviews (#917).
+msgid "Your review"
+msgstr "Votre avis"
+
+msgid "Private to your account. This does not change the shared Description."
+msgstr ""
+"Privé et réservé à votre compte. Cela ne modifie pas la Description "
+"partagée."
+
+msgid "Keep your thoughts about this book here."
+msgstr "Gardez ici vos impressions sur ce livre."
+
+msgid "Review or note"
+msgstr "Avis ou note"
+
+msgid "Add a review"
+msgstr "Ajouter un avis"
+
+msgid "Edit review"
+msgstr "Modifier l’avis"
+
+msgid "Save review"
+msgstr "Enregistrer l’avis"
+
+msgid "Delete review"
+msgstr "Supprimer l’avis"
+
+msgid "Delete your review?"
+msgstr "Supprimer votre avis ?"
+
+msgid "This removes your private review or note for this book."
+msgstr "Cela supprime votre avis ou note privé sur ce livre."
+
+msgid "Review saved."
+msgstr "Avis enregistré."
+
+msgid "Review deleted."
+msgstr "Avis supprimé."
+
+msgid "Could not load your review."
+msgstr "Impossible de charger votre avis."
+
+msgid "Could not save review."
+msgstr "Impossible d’enregistrer l’avis."
+
+msgid "Could not delete review."
+msgstr "Impossible de supprimer l’avis."
+
+msgid "{n} of {max} characters"
+msgstr "{n} caractères sur {max}"
+
+msgid "Review text exceeds 10000 characters"
+msgstr "Le texte de l’avis dépasse 10000 caractères"

@@ -16391,3 +16391,54 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+# Private book reviews (#917).
+msgid "Your review"
+msgstr ""
+
+msgid "Private to your account. This does not change the shared Description."
+msgstr ""
+
+msgid "Keep your thoughts about this book here."
+msgstr ""
+
+msgid "Review or note"
+msgstr ""
+
+msgid "Add a review"
+msgstr ""
+
+msgid "Edit review"
+msgstr ""
+
+msgid "Save review"
+msgstr ""
+
+msgid "Delete review"
+msgstr ""
+
+msgid "Delete your review?"
+msgstr ""
+
+msgid "This removes your private review or note for this book."
+msgstr ""
+
+msgid "Review saved."
+msgstr ""
+
+msgid "Review deleted."
+msgstr ""
+
+msgid "Could not load your review."
+msgstr ""
+
+msgid "Could not save review."
+msgstr ""
+
+msgid "Could not delete review."
+msgstr ""
+
+msgid "{n} of {max} characters"
+msgstr ""
+
+msgid "Review text exceeds 10000 characters"
+msgstr ""

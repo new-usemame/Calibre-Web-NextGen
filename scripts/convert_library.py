@@ -135,6 +135,28 @@ def _acquire_lock_or_exit():
 # The ebook-convert / kepubify / calibredb process currently running, if any.
 _current_child = None
 
+# Convert Library works in its own directory next to the shared tmp_conversion_dir.
+# The ingest processor rmtree()s the shared one after every run and Convert Library
+# emptied it after every book, and the two have separate locks, so a run during an
+# ingest could delete the file the other was converting. Keep this prefix in sync
+# with remove_convert_library_tmp_dirs() in cps/cwa_functions.py.
+PRIVATE_TMP_PREFIX = ".cwa_convert_library_"
+
+
+def make_private_tmp_dir(shared_tmp_dir):
+    """Create this run's working directory beside the shared one and return it with a trailing slash.
+
+    Leftovers from runs that were killed are removed first. That is safe because the
+    caller holds the convert_library lock, so no other run is using them.
+    """
+    parent = os.path.dirname(shared_tmp_dir.rstrip("/")) or "."
+    os.makedirs(parent, exist_ok=True)
+    for leftover in Path(parent).glob(PRIVATE_TMP_PREFIX + "*"):
+        shutil.rmtree(leftover, ignore_errors=True)
+    path = tempfile.mkdtemp(prefix=PRIVATE_TMP_PREFIX, dir=parent)
+    atexit.register(shutil.rmtree, path, True)
+    return path + "/"
+
 
 def _stop_on_sigterm(signum, frame):
     """Stop the running tool, then exit normally so atexit removes the lock.
@@ -218,6 +240,7 @@ class LibraryConverter:
 
         self.current_book = 1
         self.ingest_folder, self.library_dir, self.tmp_conversion_dir = self.get_dirs(str(app_paths.dirs_json()))
+        self.tmp_conversion_dir = make_private_tmp_dir(self.tmp_conversion_dir)
         # ingest_processor.py removes this directory outright when it finishes and
         # recreates it on its next run, so it is absent for every Convert Library
         # run that follows an ingest. Own it here rather than depending on another

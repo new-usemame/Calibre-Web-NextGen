@@ -16,8 +16,11 @@ async function selectAllOn(page: import('@playwright/test').Page) {
   await all.click();
 }
 
-test('library select-all uses complete server result and bulk changes books beyond the loaded page', async ({ secondaryUser }) => {
+test('library select-all uses complete server result and bulk changes books beyond the loaded page', async ({ secondaryUser }, testInfo) => {
   const page = secondaryUser.page;
+  const viewport = testInfo.project.name === 'mobile'
+    ? { width: 375, height: 812 }
+    : { width: 1280, height: 800 };
   const headers = await csrf(page);
   const themeResponse = await page.request.post('/api/v1/account/profile', { headers, data: { theme: 'light' } });
   expect(themeResponse.ok(), await themeResponse.text()).toBeTruthy();
@@ -54,7 +57,7 @@ test('library select-all uses complete server result and bulk changes books beyo
       await route.continue();
     }
   });
-  await page.setViewportSize({ width: 390, height: 844 });
+  await page.setViewportSize(viewport);
   await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
   await page.goto('/app');
   await expect(page.getByRole('heading', { name: 'Your Library' })).toBeVisible();
@@ -66,7 +69,11 @@ test('library select-all uses complete server result and bulk changes books beyo
   const selected = page.getByRole('region', { name: `${expected.total} selected`, exact: true });
   await expect(selected).toBeVisible();
   expect(ordinaryPageItems).toBeLessThan(expected.total);
-  await page.screenshot({ path: test.info().outputPath('select-all-library-phone-light.png') });
+  await page.screenshot({
+    path: testInfo.outputPath(`library-select-all-${viewport.width}-selected.jpg`),
+    type: 'jpeg',
+    quality: 75,
+  });
   const axe = await new AxeBuilder({ page }).include('main').analyze();
   expect(axe.violations.filter(issue => ['critical', 'serious'].includes(issue.impact ?? ''))).toEqual([]);
 
@@ -97,6 +104,11 @@ test('library select-all uses complete server result and bulk changes books beyo
   await expect(page.getByRole('button', {
     name: `Deselect ${visible[1].title}`, exact: true,
   })).toBeVisible();
+  await page.screenshot({
+    path: testInfo.outputPath(`library-select-all-${viewport.width}-retryable-failure.jpg`),
+    type: 'jpeg',
+    quality: 75,
+  });
   // The mutation failure was intercepted for one selected book. Retry it
   // through the real API and confirm the full select-all result is now read.
   await page.unroute('**/api/v1/books/*/read');
@@ -106,7 +118,11 @@ test('library select-all uses complete server result and bulk changes books beyo
   expect(readResponse.ok(), await readResponse.text()).toBeTruthy();
   const readIds = (await readResponse.json() as { ids: number[] }).ids;
   for (const id of expected.ids) expect(readIds).toContain(id);
-  await page.screenshot({ path: test.info().outputPath('select-all-library-phone-light-result.png') });
+  await page.screenshot({
+    path: testInfo.outputPath(`library-select-all-${viewport.width}-retry-complete.jpg`),
+    type: 'jpeg',
+    quality: 75,
+  });
 });
 
 test('library search select-all uses the current server-matched query', async ({ secondaryUser }, testInfo) => {
@@ -328,9 +344,6 @@ test('manual and smart shelf navigation returns to page one after viewing later 
       await expect(page.getByRole('heading', { name: next.name, exact: false })).toBeVisible();
       await expect(page.getByRole('link', { name: `Open details for ${newBook.title}`, exact: true })).toBeVisible();
       await expect(page.locator(`main a[href="/book/${old.previous[0].id}"]`)).toHaveCount(0);
-      if ((await page.evaluate(() => window.innerWidth)) >= 700) {
-        await page.screenshot({ path: test.info().outputPath(`shelf-${kind}-page-reset.png`) });
-      }
       await page.unroute(`**/api/v1/${resource}/${old.id}?*`);
       await page.unroute(`**/api/v1/${resource}/${next.id}?*`);
     }

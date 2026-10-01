@@ -169,6 +169,24 @@ def test_save_reader_settings_merges_partial_patch_without_erasing_siblings():
 
 
 @pytest.mark.unit
+def test_save_reader_settings_accepts_literata_and_returns_saved_font():
+    from cps.api import reader as mod
+    user = _auth_user()
+    user.view_settings = {"reader": {"font": "Arial", "margin": 32}}
+    mock_ub = MagicMock()
+    with _ctx("/api/v1/reader/settings", method="POST", body={"font": "Literata"}):
+        with patch.object(mod, "current_user", user), \
+             patch.object(mod, "ub", mock_ub), \
+             patch.object(mod, "flag_modified"):
+            response = inspect.unwrap(mod.save_reader_settings)()
+
+    assert response.status_code == 200
+    assert user.view_settings["reader"] == {"font": "Literata", "margin": 32}
+    assert json.loads(response.get_data())["reader"]["font"] == "Literata"
+    mock_ub.session.commit.assert_called_once()
+
+
+@pytest.mark.unit
 def test_save_reader_settings_rejects_non_object_payload():
     from cps.api import reader as mod
     user = _auth_user()

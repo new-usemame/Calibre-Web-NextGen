@@ -2433,7 +2433,7 @@ export function Reader({ id }: { id: string }) {
                 setFontFamily(value); persistSetting('font', value);
               }}>
                 <option value="default">{t('Book default')}</option>
-                <option value="Arial">Arial</option><option value="Literata">Literata</option><option value="Yahei">Microsoft YaHei</option>
+                <option value="Arial">Arial</option><option value="Literata">{t('Literata')}</option><option value="Yahei">Microsoft YaHei</option>
                 <option value="SimSun">SimSun</option><option value="KaiTi">KaiTi</option>
               </select>
             </label>

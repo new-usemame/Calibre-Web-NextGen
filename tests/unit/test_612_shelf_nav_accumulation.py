@@ -105,29 +105,8 @@ def test_magic_shelf_accumulator_skips_placeholder_data(magic_src):
     ).group(0), "MagicShelfView.tsx must destructure isPlaceholderData"
 
 
-# --- layer 3: paging must reset when the shelf id changes ---------------------
-
-
-def _has_page_reset_on_id(src: str) -> bool:
-    """An effect that calls setPage(1) with [id] as its dependency array."""
-    return bool(
-        re.search(
-            r"useEffect\(\s*\(\)\s*=>\s*\{[^}]*setPage\(1\)[^}]*\}\s*,\s*\[\s*id\s*\]\s*\)",
-            src,
-            re.S,
-        )
-    )
-
-
-def test_shelf_resets_page_on_id_change(shelf_src):
-    """#612 follow-on: arriving on shelf B while paged to A's page N skipped
-    shelf B's first pages entirely."""
-    assert _has_page_reset_on_id(shelf_src), (
-        "Shelf.tsx must reset page to 1 when the shelf id changes"
-    )
-
-
-def test_magic_shelf_resets_page_on_id_change(magic_src):
-    assert _has_page_reset_on_id(magic_src), (
-        "MagicShelfView.tsx must reset page to 1 when the shelf id changes"
-    )
+# Page reset on both route-reused shelf surfaces is exercised against the real
+# query/UI in `frontend/e2e/select-all-2268.spec.ts`: it navigates from a later
+# page of one shelf to a one-book shelf and verifies the latter's page-one book
+# is rendered without carrying the prior shelf's cards forward. The assertions
+# above remain focused on query placeholder scope and accumulator behavior.

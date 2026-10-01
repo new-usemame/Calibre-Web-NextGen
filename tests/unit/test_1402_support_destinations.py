@@ -72,6 +72,26 @@ def test_support_label_rejects_overlong_or_control_text(label):
         validate_support_settings("https://club.example/help", label)
 
 
+@pytest.mark.parametrize(("url", "label"), [
+    ("https://club.example/\u0080help", "Help"),
+    ("\nhttps://club.example/help", "Help"),
+    ("https://club.example/help", "Help\u009fdesk"),
+])
+def test_support_settings_reject_unicode_and_boundary_control_characters(url, label):
+    from cps.services.support_policy import validate_support_settings
+
+    with pytest.raises(ValueError):
+        validate_support_settings(url, label)
+
+
+def test_support_settings_allow_internationalized_and_rtl_labels():
+    from cps.services.support_policy import validate_support_settings
+
+    assert validate_support_settings("https://club.example/support", "الدعم متاح") == (
+        "https://club.example/support", "الدعم متاح",
+    )
+
+
 def _prepare_admin_save(monkeypatch):
     import cps.admin as admin
 

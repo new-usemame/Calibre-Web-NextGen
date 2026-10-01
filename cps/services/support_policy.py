@@ -1,5 +1,6 @@
 """Policy and validation for the site support destinations (issue #1402)."""
 
+import unicodedata
 from urllib.parse import urlsplit
 
 
@@ -17,15 +18,15 @@ def validate_support_settings(url, label):
     if not isinstance(url, str) or not isinstance(label, str):
         raise ValueError("Support URL and label must be text")
 
+    if _has_control_characters(url) or _has_control_characters(label):
+        raise ValueError("Support URL and label cannot contain control characters")
+
     url = url.strip()
     label = label.strip()
     if len(url) > MAX_SUPPORT_URL_LENGTH:
         raise ValueError("Support URL must be at most 2048 characters")
     if len(label) > MAX_SUPPORT_LABEL_LENGTH:
         raise ValueError("Support label must be at most 80 characters")
-    if _has_control_characters(url) or _has_control_characters(label):
-        raise ValueError("Support URL and label cannot contain control characters")
-
     if url:
         try:
             parsed = urlsplit(url)
@@ -74,4 +75,4 @@ def support_policy(settings, *, is_admin=False, contact_support_label="Contact s
 
 
 def _has_control_characters(value):
-    return any(ord(character) < 32 or ord(character) == 127 for character in value)
+    return any(unicodedata.category(character) == "Cc" for character in value)

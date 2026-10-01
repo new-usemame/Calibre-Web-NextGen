@@ -535,7 +535,7 @@ end
 -- The library manifest: which books this device should show, one page at a
 -- time. `if_revision` lets an unchanged library answer in one small response.
 function CWNGSyncClient:get_library(
-        username, password, device, device_id, cursor, if_revision, callback)
+        username, password, device, device_id, cursor, if_revision, limit, callback)
     self.client:reset_middlewares()
     self.client:enable("Format.JSON")
     self.client:enable("GinClient")
@@ -548,6 +548,7 @@ function CWNGSyncClient:get_library(
                 device = device,
                 device_id = device_id,
                 cursor = cursor,
+                limit = limit,
                 if_revision = if_revision,
             })
         end)

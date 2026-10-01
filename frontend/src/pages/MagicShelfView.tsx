@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import { ChevronLeft, Copy, Trash2, Pencil, Smartphone, Info, ListChecks } from 'lucide-react';
@@ -60,6 +60,8 @@ export function MagicShelfView({ id }: { id: string }) {
   const [selectAllError, setSelectAllError] = useState('');
   const selectAllRequest = useRef(0);
   const clearSelection = () => {
+    selectAllRequest.current += 1;
+    setSelectAllBusy(false);
     setSelected(new Set());
     setSelecting(false);
   };
@@ -120,7 +122,7 @@ export function MagicShelfView({ id }: { id: string }) {
   const [koboWarning, setKoboWarning] = useState<string | null>(null);
 
   // Route reuse: reset paging when the shelf id changes (#612).
-  useEffect(() => {
+  useLayoutEffect(() => {
     selectAllRequest.current += 1;
     setSelectAllBusy(false);
     setSelectAllError('');
@@ -255,7 +257,7 @@ export function MagicShelfView({ id }: { id: string }) {
           {selecting && (
             <button type="button" className={styles.manageBtn}
               onClick={() => { void selectAllBooks(); }}
-              disabled={selectAllBusy || isFetching || total === 0}
+              disabled={selectAllBusy || bulkBusy || isFetching || total === 0}
               aria-busy={selectAllBusy}>
               {selectAllBusy ? t('Selecting…') : t('Select all {count} books', { count: total })}
             </button>
@@ -350,7 +352,7 @@ export function MagicShelfView({ id }: { id: string }) {
           <div className={styles.grid}>
             {books.map((b, i) => (
               <BookCard key={b.id} book={b}
-                selectable={selecting} selectionDisabled={bulkBusy} selected={selected.has(b.id)} onToggleSelect={toggleSelect}
+                selectable={selecting} selectionDisabled={bulkBusy || selectAllBusy} selected={selected.has(b.id)} onToggleSelect={toggleSelect}
                 hideActions={cardActionsHidden} hideReadingTags={readingTagsHidden}
                 hideShelfTags={shelfBadgesHidden}
                 canRead={!!me?.role?.viewer}
@@ -369,7 +371,8 @@ export function MagicShelfView({ id }: { id: string }) {
           personalLibrary={me?.library_mode === 'personal_library'}
           onClear={clearSelection}
           onRetryable={(failedIds) => setSelected(new Set(failedIds))}
-          onChanged={refreshAfterBulk} onBusyChange={setBulkBusy} />
+          onChanged={refreshAfterBulk} onBusyChange={setBulkBusy}
+          actionsDisabled={selectAllBusy} />
       )}
     </div>
   );

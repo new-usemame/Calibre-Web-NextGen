@@ -409,9 +409,15 @@ def list_books():
                 disc_filter = coalesce(db.cc_classes[config.config_read_column].value, False) != True  # noqa: E712
             except (KeyError, AttributeError):
                 disc_filter = True
+        discover_per_page = config.config_books_per_page if select_all else per_page
         entries, _random, _pg = calibre_db.fill_indexpage(
-            1, per_page, db.Books, disc_filter, [func.randomblob(2)],
-            True, config.config_read_column)
+            1, discover_per_page, db.Books, disc_filter, [func.randomblob(2)],
+            True, config.config_read_column, ids_only=select_all)
+        if select_all:
+            # Discover is deliberately a random, one-page sample. Its current
+            # cards are the complete view; never expand this request to the
+            # 100,001-row safety probe used by normal full-result selection.
+            return _selection_response(entries, len(entries))
         items = to_items(entries)
         return jsonify({"items": items, "page": 1, "per_page": per_page, "total": len(items)})
 

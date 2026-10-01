@@ -319,6 +319,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [selectAllBusy, setSelectAllBusy] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [selectAllError, setSelectAllError] = useState('');
   const selectAllRequest = useRef(0);
   const toggleSelect = useRangeSelection(setSelected, allBooks.map((book) => book.id), selecting);
@@ -650,7 +651,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
   const total = data?.total ?? 0;
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     selectAllRequest.current += 1;
     setSelectAllBusy(false);
     setSelectAllError('');
@@ -1001,6 +1002,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
         <button
           type="button"
           className={selecting ? styles.selectBtnActive : styles.selectBtn}
+          disabled={bulkBusy}
           onClick={() => {
             selectAllRequest.current += 1;
             setSelectAllBusy(false);
@@ -1015,9 +1017,9 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           <span className={styles.selectLabel}>{selecting ? t('Done') : t('Select')}</span>
         </button>
         {selecting && (
-          <button type="button" className={styles.selectBtn}
+          <button type="button" className={styles.selectAllBtn}
             onClick={() => { void selectAllBooks(); }}
-            disabled={selectAllBusy || isFetching || total === 0}
+            disabled={selectAllBusy || bulkBusy || isFetching || total === 0}
             aria-busy={selectAllBusy}>
             {selectAllBusy ? t('Selecting…') : t('Select all {count} books', { count: total })}
           </button>
@@ -1219,6 +1221,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
                   selectable={selecting}
                   selected={selected.has(book.id)}
                   onToggleSelect={toggleSelect}
+                  selectionDisabled={selectAllBusy || bulkBusy}
                   onRemove={personalLibrary && isPlainLibrary && !search && !filterActive && !selecting ? removeBook : undefined}
                   removeLabel={t('Remove {title} from my library', { title: book.title })}
                 />
@@ -1301,10 +1304,18 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
           ids={[...selected]}
           personalLibrary={personalLibrary}
           onClear={() => {
+            selectAllRequest.current += 1;
+            setSelectAllBusy(false);
             setSelected(new Set());
             setSelecting(false);
           }}
-          onRetryable={(failedIds) => setSelected(new Set(failedIds))}
+          onRetryable={(failedIds) => {
+            selectAllRequest.current += 1;
+            setSelectAllBusy(false);
+            setSelected(new Set(failedIds));
+          }}
+          onBusyChange={setBulkBusy}
+          actionsDisabled={selectAllBusy}
           currentTag={entityKind === 'tag' ? entityName : undefined}
           onChanged={() => {
             // A bulk action changed read state / membership / removed books.

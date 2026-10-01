@@ -291,6 +291,15 @@
   border-color: var(--accent);
 }
 
+.selectAllBtn {
+  composes: selectBtn;
+  color: var(--text);
+}
+
+.selectAllBtn:hover {
+  color: var(--text);
+}
+
 /* Hide the "Advanced" word on narrow screens to keep the toolbar compact. */
 @media (max-width: 520px) {
   .advancedLabel { display: none; }

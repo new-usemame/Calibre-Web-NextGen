@@ -26,6 +26,8 @@ interface BulkBarProps {
    *  Pages can refresh their results and retain only retryable selections. */
   onChanged?: (changedIds: number[]) => void;
   onBusyChange?: (busy: boolean) => void;
+  /** Prevent starting a mutation while the full-view selection request is in flight. */
+  actionsDisabled?: boolean;
   /** The tag whose page this selection was made on (#1703): offers a direct
    *  "remove this tag" action so the user need not retype it. */
   currentTag?: string;
@@ -78,7 +80,8 @@ export function BulkSelectionBar({ count, onClear, children, sticky = false, bus
 /** Floating action bar for the catalog's multi-select mode. Uses per-book
  *  accounting whether the server receives individual requests or bounded
  *  membership batches. */
-export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged, onBusyChange, currentTag }: BulkBarProps) {
+export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged, onBusyChange,
+  actionsDisabled = false, currentTag }: BulkBarProps) {
   const t = useT();
   const announce = useAnnouncer();
   const me = useMe().data;
@@ -110,6 +113,10 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged,
   const busy = markRead.isPending || addToShelf.isPending || deleteBooks.isPending
     || removeFromMyLibrary.isPending
     || setMetadata.isPending || mergeBooks.isPending;
+  const actionsBusy = busy || actionsDisabled;
+  useEffect(() => {
+    if (actionsDisabled) setShelfOpen(false);
+  }, [actionsDisabled]);
   useEffect(() => {
     onBusyChange?.(busy);
   }, [busy, onBusyChange]);
@@ -341,29 +348,29 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged,
           <input placeholder={t('Languages (comma separated)')} aria-label={t('Languages (comma separated)')} value={meta.languages}
             onChange={(e) => setMeta({ ...meta, languages: e.target.value })} />
         </div>
-        <button className={styles.metaApply} onClick={applyMeta} disabled={setMetadata.isPending}>
+        <button className={styles.metaApply} onClick={applyMeta} disabled={actionsBusy}>
           {setMetadata.isPending ? t('Applying…') : t('Apply to {n} books', { n: count })}
         </button>
       </div>
     )}
     <BulkSelectionBar count={count} onClear={onClear} busy={busy}>
         {personalLibrary && (
-          <button type="button" className={styles.actionPrimary} disabled={busy}
+          <button type="button" className={styles.actionPrimary} disabled={actionsBusy}
             onClick={onRemoveFromMyLibrary}>
             <BookMinus size={15} aria-hidden="true" focusable={false} /> {t('Remove from my library')}
           </button>
         )}
-        <button className={styles.action} disabled={busy}
+        <button className={styles.action} disabled={actionsBusy}
           onClick={() => doMarkRead(true)}>
           <CheckCheck size={15} aria-hidden="true" focusable={false} /> {t('Mark read')}
         </button>
-        <button className={styles.action} disabled={busy}
+        <button className={styles.action} disabled={actionsBusy}
           onClick={() => doMarkRead(false)}>
           <Check size={15} aria-hidden="true" focusable={false} /> {t('Mark unread')}
         </button>
 
         <div className={styles.shelfWrap} ref={shelfRef}>
-          <button className={styles.action} disabled={busy || editableShelves.length === 0}
+          <button className={styles.action} disabled={actionsBusy || editableShelves.length === 0}
             aria-haspopup="true" aria-expanded={shelfOpen}
             onClick={() => setShelfOpen((o) => !o)}>
             <BookCopy size={15} aria-hidden="true" focusable={false} /> {t('Add to shelf')}
@@ -373,6 +380,7 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged,
             <div className={styles.shelfMenu}>
               {editableShelves.map((s) => (
                 <button key={s.id} className={styles.shelfItem}
+                  disabled={actionsBusy}
                   onClick={() => doAddToShelf(s.id)}>
                   {s.name}
                 </button>
@@ -382,7 +390,7 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged,
         </div>
 
         {canEdit && (
-          <button className={styles.action} disabled={busy} aria-expanded={metaOpen}
+          <button className={styles.action} disabled={actionsBusy} aria-expanded={metaOpen}
             onClick={() => {
               if (metaOpen) setListMode('add');
               setMetaOpen((open) => !open);
@@ -392,19 +400,19 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged,
         )}
 
         {canEdit && currentTag && (
-          <button type="button" className={styles.action} disabled={busy} onClick={removeCurrentTag}>
+          <button type="button" className={styles.action} disabled={actionsBusy} onClick={removeCurrentTag}>
             <TagIcon size={15} aria-hidden="true" focusable={false} /> {t('Remove tag "{tag}"', { tag: currentTag })}
           </button>
         )}
 
         {canEdit && count >= 2 && (
-          <button className={styles.action} disabled={busy} onClick={onMerge}>
+          <button className={styles.action} disabled={actionsBusy} onClick={onMerge}>
             <Combine size={15} aria-hidden="true" focusable={false} /> {t('Merge')}
           </button>
         )}
 
         {canDelete && (
-          <button type="button" className={styles.actionDanger} disabled={busy} onClick={onDelete}>
+          <button type="button" className={styles.actionDanger} disabled={actionsBusy} onClick={onDelete}>
             <Trash2 size={15} aria-hidden="true" focusable={false} /> {t('Delete from the global library')}
           </button>
         )}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useIntersectionObserver } from '../lib/useIntersectionObserver';
 import {
@@ -64,6 +64,8 @@ export function Shelf({ id }: { id: string }) {
   const [selectAllError, setSelectAllError] = useState('');
   const selectAllRequest = useRef(0);
   const clearSelection = () => {
+    selectAllRequest.current += 1;
+    setSelectAllBusy(false);
     setSelected(new Set());
     setSelecting(false);
   };
@@ -121,7 +123,7 @@ export function Shelf({ id }: { id: string }) {
 
   // Route reuse (/shelf/A -> /shelf/B keeps this component mounted): reset
   // paging and per-shelf UI modes when the shelf changes (#612).
-  useEffect(() => {
+  useLayoutEffect(() => {
     selectAllRequest.current += 1;
     setSelectAllBusy(false);
     setSelectAllError('');
@@ -351,7 +353,7 @@ export function Shelf({ id }: { id: string }) {
           {selecting && (
             <button type="button" className={styles.manageBtn}
               onClick={() => { void selectAllBooks(); }}
-              disabled={selectAllBusy || isFetching || total === 0}
+              disabled={selectAllBusy || bulkBusy || isFetching || total === 0}
               aria-busy={selectAllBusy}>
               {selectAllBusy ? t('Selecting…') : t('Select all {count} books', { count: total })}
             </button>
@@ -467,7 +469,7 @@ export function Shelf({ id }: { id: string }) {
               <BookCard
                 key={book.id}
                 book={book}
-                selectable={selecting} selectionDisabled={bulkBusy}
+                selectable={selecting} selectionDisabled={bulkBusy || selectAllBusy}
                 selected={selected.has(book.id)}
                 onToggleSelect={toggleSelect}
                 style={{ animationDelay: i < 24 ? `${i * 35}ms` : '0ms' }}
@@ -498,7 +500,8 @@ export function Shelf({ id }: { id: string }) {
           personalLibrary={me?.library_mode === 'personal_library'}
           onClear={clearSelection}
           onRetryable={(failedIds) => setSelected(new Set(failedIds))}
-          onChanged={refreshAfterBulk} onBusyChange={setBulkBusy} />
+          onChanged={refreshAfterBulk} onBusyChange={setBulkBusy}
+          actionsDisabled={selectAllBusy} />
       )}
     </div>
   );

@@ -117,6 +117,15 @@ async function mockLibrary(page: Page, currentTitle: () => string) {
 /** The edit form's own endpoints. The POST is what the fix hangs off, so it
  *  returns the renamed metadata the way the server would. */
 async function mockEditEndpoints(page: Page, setTitle: (t: string) => void, currentTitle: () => string) {
+  // This fixture book exists only in the mocked library/detail responses, not
+  // in the private E2E database. Model its persisted review state explicitly so
+  // the signed-in detail page sees the same empty-review state as a real book.
+  await page.route(`**/api/v1/books/${TARGET_ID}/review`, async (route) => {
+    if (route.request().method() !== 'GET') return route.continue();
+    await route.fulfill({
+      status: 200, contentType: 'application/json', body: JSON.stringify({ review: null }),
+    });
+  });
   await page.route(`**/api/v1/books/${TARGET_ID}/metadata`, async (route) => {
     if (route.request().method() === 'POST') {
       const sent = route.request().postDataJSON() as Partial<BookMetadata>;

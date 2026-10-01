@@ -32,3 +32,22 @@ One full local smoke/unit run: **10,273 passed,103 skipped,7 failures**. Two met
 Private build evidence includes one Docker Hub frontend TLS handshake timeout before any container mutation and a setup attempt started during an owned rebuild; neither counts as a product/browser pass. Final proof ran only after health. Existing invalid EPUB seed files also produce unrelated scheduled KEPUB backfill errors; no review endpoint traceback remains in the final flow.
 
 Independent source/privacy/security review includes actual owned-user visibility evidence and final source/browser/capture review. CI is the remaining integration gate for this review candidate.
+
+## CI follow-up — run 36936176504
+
+The broad CI run had two deterministic E2E failures in the existing #1169 catalog-edit
+regression, desktop and mobile. Playwright traces showed the only failing resource was
+`GET /api/v1/books/9001/review` returning404: #1169 uses an in-memory synthetic book
+without a database row, while the new signed-in detail widget correctly asks the review
+API for that book's private state. The spec now gives that synthetic fixture an explicit
+empty-review response (`{ review: null }`). Its `assertNoPageErrors` check remains intact.
+The unrelated SC 2.5.8 target-size cases were flaky in that CI run (their initial
+measurement saw a temporarily hidden control; retries passed); this fixture correction
+does not alter those cases.
+
+Against a fresh whole-worktree private image (`calibre-web-nextgen:promised-917`, image
+`sha256:fe6b325687cfd35204dad5f5364fc8986929820d6f6d6ed3ba3cc5063c4457b1`, one boot),
+the served bundle was `index-DirqgK9H.js` (`db65c4f714d91aac9934c8604bef62c6995caae5a898a1c43ee9d71cc0c55000`). The #1169
+“book is still listed” case passed for desktop and mobile with no retries: **3 passed
+including setup**. The broad suite has not been rerun locally; the pushed correction
+restarts CI for that gate.

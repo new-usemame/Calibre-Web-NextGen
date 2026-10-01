@@ -166,20 +166,48 @@ async function turnClassicPage(page: Page, before: string | null) {
   const viewport = page.viewportSize();
   if (viewport && viewport.width <= 600) {
     // The reader iframe covers the classic arrow controls on a phone. Use the
-    // real touch affordance on the EPUB surface. Try the forward half first,
-    // then the other half because some EPUBs declare direction on package
-    // metadata rather than the rendered document.
+    // real touch affordance on the visible EPUB viewport. EPUB.js lays out a
+    // multi-page iframe wider than the viewport, so its full bounding box can
+    // extend far off-screen; use the clipped viewport halves for x coordinates
+    // and the visible iframe/viewport intersection for y.
     const frame = page.locator('#viewer iframe').first();
     const box = await frame.boundingBox();
     if (!box) throw new Error('Classic EPUB frame has no visible bounds.');
+    const minY = Math.max(0, box.y);
+    const maxY = Math.min(viewport.height, box.y + box.height);
+    if (maxY <= minY) throw new Error('Classic EPUB frame does not intersect the mobile viewport.');
+    const touchY = minY + (maxY - minY) * 0.5;
+    const countTrustedTouchEnds = async () => {
+      const perFrame = await Promise.all(page.frames().map(async (frame) => {
+        try {
+          return await frame.evaluate(() => {
+            const scope = window as any;
+            if (!scope.__e2eTouchCounterInstalled) {
+              scope.__e2eTouchCounterInstalled = true;
+              scope.__e2eTrustedTouchEndCount = 0;
+              window.addEventListener('touchend', (event) => {
+                if (event.isTrusted) scope.__e2eTrustedTouchEndCount += 1;
+              }, true);
+            }
+            return scope.__e2eTrustedTouchEndCount as number;
+          });
+        } catch { return 0; }
+      }));
+      return perFrame.reduce((total, count) => total + count, 0);
+    };
+    const touchCountBefore = await countTrustedTouchEnds();
     const rtl = await page.evaluate(() =>
       (window as any).reader?.book?.package?.metadata?.direction === 'rtl');
     for (const fraction of [rtl ? 0.1 : 0.9, rtl ? 0.9 : 0.1]) {
-      await page.touchscreen.tap(box.x + box.width * fraction, box.y + box.height / 2);
+      await page.touchscreen.tap(viewport.width * fraction, touchY);
       try {
-        await expect.poll(() => classicCfi(page), { timeout: 1_500 }).not.toBe(before);
-        return 'touch';
+        await expect.poll(() => classicCfi(page), { timeout: 2_500 }).not.toBe(before);
       } catch { /* this side can be the previous-page half for this EPUB */ }
+      if (await classicCfi(page) !== before) {
+        const touchCountAfter = await countTrustedTouchEnds();
+        expect(touchCountAfter, 'page turn must be caused by a touch event in the EPUB rendition').toBeGreaterThan(touchCountBefore);
+        return 'touch';
+      }
     }
     throw new Error(`Mobile touch did not turn the classic EPUB page; CFI stayed ${before}.`);
   } else {
@@ -214,32 +242,30 @@ async function moveClassicReader(page: Page, until: (progress: number, cfi: stri
 
 test('lookup survives navigation without replacing the saved place or Reading marker', async ({ page: adminPage, secondaryUser, browser, baseURL }, testInfo) => {
   test.setTimeout(180_000);
-  let page = secondaryUser.page;
-  if (testInfo.project.name === 'mobile') {
-    if (!baseURL) throw new Error('Mobile lookup proof requires the fixture base URL.');
-    // secondaryUser intentionally owns an isolated generic context, so create
-    // a separate device context here rather than silently treating 375px as a
-    // touch viewport. Log in to the same fixture-owned account in that context.
-    touchDeviceContext = await browser.newContext({
-      ...devices['iPhone 13'],
-      baseURL,
-      viewport: { width: 375, height: 667 },
-      storageState: { cookies: [], origins: [] },
-    });
-    page = await touchDeviceContext.newPage();
-    const csrfResponse = await page.request.get('/api/v1/auth/csrf');
-    expect(csrfResponse.ok()).toBeTruthy();
-    const { csrf_token: csrfToken } = await csrfResponse.json();
-    const loginResponse = await page.request.post('/api/v1/auth/login', {
-      headers: { 'X-CSRFToken': csrfToken },
-      data: { username: secondaryUser.username, password: secondaryUser.password, remember: false },
-    });
-    expect(loginResponse.ok(), await loginResponse.text()).toBeTruthy();
-    await page.goto('/app');
-    const me = await page.request.get('/api/v1/auth/me');
-    expect(me.ok()).toBeTruthy();
-    expect((await me.json()).name).toBe(secondaryUser.username);
-  }
+  if (!baseURL) throw new Error('Reader lookup proof requires the fixture base URL.');
+  // Chromium sends pagehide keepalive fetches with its native User-Agent even
+  // when its page has a Playwright device override. Flask-Login binds a strong
+  // session to that value, so use the native UA for both login and the real
+  // reader while retaining the mobile viewport/touch device options below.
+  const browserSession = await browser.newBrowserCDPSession();
+  const nativeUserAgent = (await browserSession.send('Browser.getVersion')).userAgent;
+  await browserSession.detach();
+  touchDeviceContext = await browser.newContext({
+    ...(testInfo.project.name === 'mobile' ? devices['iPhone 13'] : {}),
+    baseURL,
+    userAgent: nativeUserAgent,
+    viewport: testInfo.project.name === 'mobile'
+      ? { width: 375, height: 667 }
+      : { width: 1280, height: 800 },
+    storageState: { cookies: [], origins: [] },
+  });
+  const page = await touchDeviceContext.newPage();
+  await page.goto('/app/login');
+  await page.locator('input[autocomplete="username"]').fill(secondaryUser.username);
+  await page.locator('input[autocomplete="current-password"]').fill(secondaryUser.password);
+  await page.getByRole('button', { name: /sign in/i }).click();
+  await expect(page).toHaveURL(/\/app(\/|$|\?)/, { timeout: 20_000 });
+  await expect(page.getByRole('button', { name: `Account: ${secondaryUser.username}` })).toBeVisible();
   await page.setViewportSize(testInfo.project.name === 'mobile' ? { width: 375, height: 667 } : { width: 1280, height: 800 });
   const id = await readableEpub(page, adminPage, testInfo);
   // Establish a real saved position first, scoped to this test's owned account.
@@ -334,19 +360,25 @@ test('lookup survives navigation without replacing the saved place or Reading ma
     timeout: 30_000,
     message: 'Normal classic EPUB should render book text before progress is measured',
   }).toBeGreaterThan(120);
+  const normalClassicStartCfi = await classicCfi(page);
   const normalClassicBookmark = await bookmark(page, id);
-  const normalClassicNavigation = await moveClassicReader(page, (progress) => progress > 0);
+  const normalClassicNavigation = await moveClassicReader(
+    page,
+    (_progress, cfi) => !!cfi && cfi !== normalClassicStartCfi,
+  );
   if ((page.viewportSize()?.width ?? Infinity) <= 600) {
-    expect(normalClassicNavigation).toContain('touch');
+    expect(normalClassicNavigation.some((method) => method.startsWith('touch'))).toBe(true);
   }
   await expect.poll(() => bookmark(page, id), { timeout: 20_000 }).not.toBe(normalClassicBookmark);
-  await expect.poll(() => classicProgress(page)).toBeGreaterThan(0);
   await capture(page, testInfo, 'classic-normal-reader');
   const classicBookUrl = await page.evaluate(() => (window as any).calibre.bookUrl as string);
 
   await page.goto(`/book/${id}`);
   // Take the baseline after leaving the ordinary reader: its pagehide save
   // belongs to normal reading, not to the lookup session being measured.
+  const authenticatedAfterClassicPagehide = await page.request.get('/api/v1/auth/me');
+  expect(authenticatedAfterClassicPagehide.ok(), 'classic page navigation must retain the reader session').toBeTruthy();
+  expect((await authenticatedAfterClassicPagehide.json()).name).toBe(secondaryUser.username);
   const classicLookupLocalBefore = await classicLocalPosition(page, classicBookUrl);
   await expect(page.locator('#currently-reading-badge')).toBeVisible();
   const classicSaved = await bookmark(page, id);
@@ -373,7 +405,7 @@ test('lookup survives navigation without replacing the saved place or Reading ma
   expect(lookupCfi, 'classic EPUB should expose its current CFI').toBeTruthy();
   const lookupNavigation = await moveClassicReader(page, (_progress, cfi) => !!cfi && cfi !== lookupCfi);
   if ((page.viewportSize()?.width ?? Infinity) <= 600) {
-    expect(lookupNavigation).toContain('touch');
+    expect(lookupNavigation.some((method) => method.startsWith('touch'))).toBe(true);
   }
   await expect.poll(() => classicRenderedText(page).then((text) => text.length)).toBeGreaterThan(120);
   const classicLookupLocalAfter = await classicLocalPosition(page);

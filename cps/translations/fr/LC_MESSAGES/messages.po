@@ -9117,6 +9117,24 @@ msgstr ""
 "Affichage de {shown} livres sur {total} dans le dernier inventaire de "
 "l’appareil."
 
+msgid "Minimum books"
+msgstr "Nombre minimum de livres"
+
+msgid "Leave blank to show any number of books. The minimum is inclusive."
+msgstr "Laissez vide pour afficher tout nombre de livres. Le minimum est inclusif."
+
+msgid "Enter a whole number of at least 1."
+msgstr "Saisissez un nombre entier d’au moins 1."
+
+msgid "Correct the minimum books value to see results."
+msgstr "Corrigez le nombre minimum de livres pour afficher les résultats."
+
+msgid "No matching {items} for the selected filters."
+msgstr "Aucun résultat pour {items} avec les filtres sélectionnés."
+
+msgid "Showing {shown} of {total} {items}."
+msgstr "Affichage de {shown} sur {total} {items}."
+
 #: cps/spa_strings.py
 msgid "Shuffle picks"
 msgstr "Mélanger la sélection"

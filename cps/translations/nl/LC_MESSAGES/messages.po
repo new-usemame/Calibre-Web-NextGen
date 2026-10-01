@@ -8964,6 +8964,24 @@ msgstr ""
 "{shown} van {total} boeken uit de nieuwste apparaatinventaris worden "
 "weergegeven."
 
+msgid "Minimum books"
+msgstr "Minimum aantal boeken"
+
+msgid "Leave blank to show any number of books. The minimum is inclusive."
+msgstr "Laat leeg om elk aantal boeken te tonen. Het minimum is inclusief."
+
+msgid "Enter a whole number of at least 1."
+msgstr "Voer een geheel getal van minstens 1 in."
+
+msgid "Correct the minimum books value to see results."
+msgstr "Corrigeer de waarde voor minimum aantal boeken om resultaten te zien."
+
+msgid "No matching {items} for the selected filters."
+msgstr "Geen {items} gevonden met de gekozen filters."
+
+msgid "Showing {shown} of {total} {items}."
+msgstr "Weergave van {shown} van {total} {items}."
+
 #: cps/spa_strings.py
 msgid "Shuffle picks"
 msgstr "Selectie schudden"

@@ -49,12 +49,25 @@ from .pagination import Pagination
 from .string_helper import strip_whitespaces
 from .sqlite_utils import network_share_mode_enabled
 from .unicode_collation import unicode_initial, unicode_sort_key
+from .services.restriction_columns import restriction_predicate
 
 log = logger.create()
 
 
 class FilteredBookVisibilityUnavailable(RuntimeError):
     """The configured filtered-library policy could not be resolved safely."""
+
+
+def _restriction_datatype(value_model):
+    """Return the policy-relevant datatype for a dynamic custom column.
+
+    Text and enumeration columns both retain their literal-string matching;
+    only Boolean columns need three-state interpretation.
+    """
+    return "bool" if isinstance(
+        value_model.value.property.columns[0].type, Boolean
+    ) else "text"
+
 
 # Rate-limit author-sort drift diagnostics. Books.author_sort is denormalized
 # from Authors.sort and can drift after an Authors edit; the divergence is
@@ -1719,14 +1732,17 @@ class CalibreDB:
                     values = cc_classes[self.config.config_restricted_column]
                     allowed_values = filter_user.list_allowed_column_values()
                     denied_values = filter_user.list_denied_column_values()
-                    allowed_column_filter = (
-                        true() if allowed_values == [""]
-                        else column.any(values.value.in_(allowed_values))
+                    column_policy = restriction_predicate(
+                        column,
+                        values,
+                        _restriction_datatype(values),
+                        allowed_values,
+                        denied_values,
                     )
-                    denied_column_filter = (
-                        false() if denied_values == [""]
-                        else column.any(values.value.in_(denied_values))
-                    )
+                    # Invalid persisted Boolean values fail closed inside the
+                    # shared predicate rather than broadening this user's view.
+                    allowed_column_filter = column_policy
+                    denied_column_filter = false()
                 except (KeyError, AttributeError, IndexError):
                     log.error(
                         "Custom Column No.%s does not exist in calibre database",
@@ -1941,14 +1957,20 @@ class CalibreDB:
         pos_content_tags_filter = true() if postags_list == [''] else Books.tags.any(Tags.name.in_(postags_list))
         if self.config.config_restricted_column:
             try:
-                pos_cc_list = filter_user.allowed_column_value.split(',')
-                pos_content_cc_filter = true() if pos_cc_list == [''] else \
-                    getattr(Books, 'custom_column_' + str(self.config.config_restricted_column)). \
-                    any(cc_classes[self.config.config_restricted_column].value.in_(pos_cc_list))
-                neg_cc_list = filter_user.denied_column_value.split(',')
-                neg_content_cc_filter = false() if neg_cc_list == [''] else \
-                    getattr(Books, 'custom_column_' + str(self.config.config_restricted_column)). \
-                    any(cc_classes[self.config.config_restricted_column].value.in_(neg_cc_list))
+                column = getattr(
+                    Books,
+                    'custom_column_' + str(self.config.config_restricted_column),
+                )
+                values = cc_classes[self.config.config_restricted_column]
+                column_policy = restriction_predicate(
+                    column,
+                    values,
+                    _restriction_datatype(values),
+                    filter_user.allowed_column_value,
+                    filter_user.denied_column_value,
+                )
+                pos_content_cc_filter = column_policy
+                neg_content_cc_filter = false()
             except (KeyError, AttributeError, IndexError):
                 pos_content_cc_filter = false()
                 neg_content_cc_filter = true()

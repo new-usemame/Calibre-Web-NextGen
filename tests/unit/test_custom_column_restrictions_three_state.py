@@ -157,14 +157,25 @@ def test_invalid_boolean_restriction_fails_closed(restriction_world):
     assert _visible_ids(session, predicate) == []
 
 
+@pytest.mark.parametrize("allowed,denied,expected", [
+    ("undefined", "", [3, 4]),
+    ("false", "", [2]),
+    ("true,false,undefined", "false", [1, 3, 4]),
+    ("", "undefined", [1, 2]),
+    ("false,undefined", "undefined", [2]),
+    ("true", "true", []),
+    ("", "", [1, 2, 3, 4]),
+    ("unexpected", "", []),
+    ("", "unexpected", []),
+])
 def test_common_and_multi_user_policy_seams_apply_the_same_boolean_states(
-        restriction_world, monkeypatch):
+        restriction_world, monkeypatch, allowed, denied, expected):
     metadata_session, books = restriction_world
     app_engine = create_engine("sqlite://")
     ub.Base.metadata.create_all(app_engine)
     app_session = sessionmaker(bind=app_engine)()
     monkeypatch.setattr(db.ub, "session", app_session)
-    user = _user(allowed="undefined", denied="")
+    user = _user(allowed=allowed, denied=denied)
     cdb = object.__new__(db.CalibreDB)
     cdb.session = metadata_session
     cdb.config = SimpleNamespace(config_restricted_column=BOOL_COLUMN_ID)
@@ -177,7 +188,7 @@ def test_common_and_multi_user_policy_seams_apply_the_same_boolean_states(
         {user.id: [book.id for book in books]},
     )[user.id]
 
-    assert common_visible == [books[2].id, books[3].id]
+    assert common_visible == expected
     assert batch_visible == frozenset(common_visible)
     app_session.close()
     app_engine.dispose()

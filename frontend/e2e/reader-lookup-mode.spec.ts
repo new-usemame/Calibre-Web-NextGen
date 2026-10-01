@@ -1,10 +1,43 @@
 import { test, expect } from './fixtures';
 import { devices, type BrowserContext, type Page, type TestInfo } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import JSZip from 'jszip';
 
 let touchDeviceContext: BrowserContext | undefined;
+let cleanupAdminPage: Page | undefined;
+let uploadedBookId: number | undefined;
+let uploadedFilename: string | undefined;
+let uploadedTitle: string | undefined;
+const READER_LOOKUP_EPUB = path.resolve(
+  process.cwd(),
+  '../tests/fixtures/sample_books/reader_lookup_2400.epub',
+);
+
 test.afterEach(async () => {
+  if (cleanupAdminPage && uploadedFilename) {
+    // Import runs asynchronously. If the test failed while waiting for the
+    // ingest task, make one bounded cleanup attempt by its unique source name.
+    if (uploadedBookId === undefined) {
+      uploadedBookId = await findReaderFixture(cleanupAdminPage, uploadedFilename, uploadedTitle!, 15_000)
+        .catch(() => undefined);
+    }
+    if (uploadedBookId !== undefined) {
+      const csrf = await csrfToken(cleanupAdminPage);
+      const deleted = await cleanupAdminPage.request.post(
+        `/api/v1/books/${uploadedBookId}/delete`,
+        { headers: { 'X-CSRFToken': csrf } },
+      );
+      expect(deleted.status(), 'delete the temporary reader lookup book').toBe(204);
+    }
+  }
   await touchDeviceContext?.close();
   touchDeviceContext = undefined;
+  cleanupAdminPage = undefined;
+  uploadedBookId = undefined;
+  uploadedFilename = undefined;
+  uploadedTitle = undefined;
 });
 
 async function capture(page: Page, info: TestInfo, name: string) {
@@ -20,16 +53,86 @@ async function detail(page: Page, id: number) {
 async function bookmark(page: Page, id: number) {
   return (await (await page.request.get(`/api/v1/books/${id}/bookmark?format=epub`)).json()).bookmark;
 }
-async function readableEpub(page: Page) {
-  const response = await page.request.get('/api/v1/books?per_page=100&sort=new');
-  for (const item of (await response.json()).items ?? []) {
-    if (!item.formats.some((f: string) => f.toLowerCase() === 'epub')) continue;
-    const book = await detail(page, item.id);
-    const format = book.formats.find((f: { format: string; size_bytes: number }) =>
-      f.format.toLowerCase() === 'epub' && f.size_bytes >= 60_000);
-    if (format && (await page.request.get(format.content_url || `/show/${item.id}/epub`)).ok()) return item.id as number;
+async function csrfToken(page: Page): Promise<string> {
+  const response = await page.request.get('/api/v1/auth/csrf');
+  expect(response.ok()).toBeTruthy();
+  return (await response.json()).csrf_token;
+}
+
+async function findReaderFixture(page: Page, filename: string, title: string, timeout: number): Promise<number> {
+  let found: number | undefined;
+  await expect.poll(async () => {
+    const response = await page.request.get('/api/v1/books?per_page=100&sort=new');
+    if (!response.ok()) return false;
+    const items = (await response.json()).items ?? [];
+    for (const item of items) {
+      if (item.title !== title) continue;
+      const book = await detail(page, item.id);
+      if (book.original_filename === filename) {
+        found = item.id;
+        return true;
+      }
+    }
+    return false;
+  }, { timeout, intervals: [500, 1000, 2000] }).toBe(true);
+  if (found === undefined) throw new Error(`Uploaded EPUB ${filename} was not indexed.`);
+  return found;
+}
+
+async function uploadReaderFixture(adminPage: Page, testInfo: TestInfo): Promise<number> {
+  const me = await adminPage.request.get('/api/v1/auth/me');
+  expect(me.ok()).toBeTruthy();
+  expect((await me.json()).role.admin, 'the E2E upload/cleanup session is an administrator').toBe(true);
+
+  uploadedFilename = `reader-lookup-2400-${testInfo.project.name}-${testInfo.parallelIndex}-${randomUUID()}.epub`;
+  const fixtureId = randomUUID();
+  uploadedTitle = `CWNG 2400 Reader Lookup Fixture ${fixtureId.slice(0, 12)}`;
+  cleanupAdminPage = adminPage;
+  const zip = await JSZip.loadAsync(await readFile(READER_LOOKUP_EPUB));
+  const packageFile = zip.file('EPUB/package.opf');
+  if (!packageFile) throw new Error('The reader lookup EPUB fixture has no package document.');
+  const packageDocument = await packageFile.async('string');
+  const packageId = `urn:uuid:${fixtureId}`;
+  if (!packageDocument.includes('urn:uuid:cwng-2400-reader-lookup-fixture')) {
+    throw new Error('The reader lookup EPUB fixture has no expected identifier.');
   }
-  throw new Error('This reader test needs a real EPUB with enough prose to turn pages.');
+  if (!packageDocument.includes('<dc:title>CWNG 2400 Reader Lookup Fixture</dc:title>')) {
+    throw new Error('The reader lookup EPUB fixture has no expected title.');
+  }
+  zip.file(
+    'EPUB/package.opf',
+    packageDocument
+      .replace('urn:uuid:cwng-2400-reader-lookup-fixture', packageId)
+      .replace('<dc:title>CWNG 2400 Reader Lookup Fixture</dc:title>', `<dc:title>${uploadedTitle}</dc:title>`),
+  );
+  // Calibre deduplicates identical uploads. A unique package identifier keeps
+  // this test's real EPUB import owned by this run even when desktop/mobile or
+  // CI retries upload the same deterministic chapters in parallel.
+  const file = await zip.generateAsync({ type: 'nodebuffer', compression: 'STORE' });
+  const response = await adminPage.request.post('/api/v1/upload', {
+    headers: { 'X-CSRFToken': await csrfToken(adminPage) },
+    multipart: {
+      file: {
+        name: uploadedFilename,
+        mimeType: 'application/epub+zip',
+        buffer: file,
+      },
+    },
+  });
+  expect(response.ok(), await response.text()).toBeTruthy();
+  expect((await response.json()).queued).toContain(uploadedFilename);
+  uploadedBookId = await findReaderFixture(adminPage, uploadedFilename, uploadedTitle, 60_000);
+  return uploadedBookId;
+}
+
+async function readableEpub(page: Page, adminPage: Page, testInfo: TestInfo) {
+  const id = await uploadReaderFixture(adminPage, testInfo);
+  const book = await detail(page, id);
+  const format = book.formats.find((f: { format: string }) => f.format.toLowerCase() === 'epub');
+  if (!format || !(await page.request.get(format.content_url || `/show/${id}/epub`)).ok()) {
+    throw new Error('The owned reader lookup EPUB was not available after ingest.');
+  }
+  return id;
 }
 async function readerReady(page: Page) {
   await expect(page.locator('iframe').first()).toBeVisible({ timeout: 30_000 });
@@ -109,8 +212,8 @@ async function moveClassicReader(page: Page, until: (progress: number, cfi: stri
   throw new Error(`Classic reader did not reach the requested state after 16 page turns (progress ${await classicProgress(page)}%).`);
 }
 
-test('lookup survives navigation without replacing the saved place or Reading marker', async ({ secondaryUser, browser, baseURL }, testInfo) => {
-  test.setTimeout(75_000);
+test('lookup survives navigation without replacing the saved place or Reading marker', async ({ page: adminPage, secondaryUser, browser, baseURL }, testInfo) => {
+  test.setTimeout(180_000);
   let page = secondaryUser.page;
   if (testInfo.project.name === 'mobile') {
     if (!baseURL) throw new Error('Mobile lookup proof requires the fixture base URL.');
@@ -138,7 +241,7 @@ test('lookup survives navigation without replacing the saved place or Reading ma
     expect((await me.json()).name).toBe(secondaryUser.username);
   }
   await page.setViewportSize(testInfo.project.name === 'mobile' ? { width: 375, height: 667 } : { width: 1280, height: 800 });
-  const id = await readableEpub(page);
+  const id = await readableEpub(page, adminPage, testInfo);
   // Establish a real saved position first, scoped to this test's owned account.
   await page.goto(`/app/read/${id}`);
   await readerReady(page);
@@ -206,6 +309,16 @@ test('lookup survives navigation without replacing the saved place or Reading ma
     await page.keyboard.press('ArrowRight');
     return false;
   }, { timeout: 20_000, intervals: [1500] }).toBe(true);
+
+  // Start the classic-reader half at the beginning. The SPA has already
+  // proved ordinary persistence above; keeping its CFI here would make this
+  // test depend on two different epub.js builds interpreting the same CFI
+  // identically before it reaches the classic lookup behavior under test.
+  const resetBookmark = await page.request.post(`/api/v1/books/${id}/bookmark`, {
+    headers: { 'X-CSRFToken': await csrfToken(page), 'Content-Type': 'application/json' },
+    data: { format: 'epub', bookmark: '' },
+  });
+  expect(resetBookmark.status()).toBe(204);
 
   await page.goto(`/app/book/${id}`);
   await page.context().addCookies([{ name: 'cwng_prefer_spa', value: '0', url: new URL(page.url()).origin }]);

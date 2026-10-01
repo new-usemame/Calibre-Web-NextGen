@@ -17758,3 +17758,56 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py
+msgid "All catalogs"
+msgstr "Alle catalogi"
+
+#: cps/spa_strings.py
+msgid "Browse this catalog"
+msgstr "Deze catalogus bekijken"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Checked {count} catalogs for “{query}”."
+msgstr "{count} catalogi doorzocht op “{query}”."
+
+#: cps/spa_strings.py
+msgid ""
+"Results stay separate by catalog so you can choose the edition and format."
+msgstr ""
+"De resultaten blijven per catalogus gescheiden, zodat je de editie en het "
+"formaat kunt kiezen."
+
+#: cps/spa_strings.py
+msgid "Search all catalogs"
+msgstr "Alle catalogi doorzoeken"
+
+#: cps/spa_strings.py
+msgid "Search remaining catalogs"
+msgstr "Overige catalogi doorzoeken"
+
+#: cps/spa_strings.py
+msgid "Searching catalogs…"
+msgstr "Catalogi doorzoeken…"
+
+#: cps/spa_strings.py
+msgid "Searching this catalog…"
+msgstr "Deze catalogus doorzoeken…"
+
+#: cps/spa_strings.py
+msgid ""
+"This catalog could not be searched. Results from other catalogs are still "
+"available."
+msgstr ""
+"Deze catalogus kon niet worden doorzocht. Resultaten van andere catalogi "
+"blijven beschikbaar."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} catalogs have not been searched yet."
+msgstr "{count} catalogi zijn nog niet doorzocht."
+
+#: cps/spa_strings.py
+msgid "Refresh catalogs"
+msgstr "Catalogi vernieuwen"

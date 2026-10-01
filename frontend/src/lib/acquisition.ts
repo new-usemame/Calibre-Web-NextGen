@@ -164,12 +164,12 @@ export function getAcquisitionBootstrap(): Promise<AcquisitionBootstrap> {
  *  is only legal alongside a search selection. */
 export function getAcquisitionCatalog(
   connection: string,
-  options?: { selection?: string; query?: string },
+  options?: { selection?: string; query?: string; signal?: AbortSignal },
 ): Promise<AcquisitionCatalog> {
   const params = new URLSearchParams({ connection });
   if (options?.selection) params.set('selection', options.selection);
   if (options?.query) params.set('q', options.query);
-  return apiGet<AcquisitionCatalog>(`${BASE}/acquisition/catalog?${params.toString()}`);
+  return apiGet<AcquisitionCatalog>(`${BASE}/acquisition/catalog?${params.toString()}`, { signal: options?.signal });
 }
 
 export function getAcquisitionJobs(): Promise<{ jobs: AcquisitionJob[] }> {

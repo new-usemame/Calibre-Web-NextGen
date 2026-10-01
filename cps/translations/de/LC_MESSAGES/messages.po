@@ -17198,3 +17198,56 @@ msgstr "Zeige Gelesen/Ungelesen-Abschnitt"
 #~ msgstr ""
 #~ "Bücher müssen zuerst archiviert werden und dann mit dem Gerät "
 #~ "synchronisiert werden, bevor ein Buch sicher gelöscht werden kann."
+
+#: cps/spa_strings.py
+msgid "All catalogs"
+msgstr "Alle Kataloge"
+
+#: cps/spa_strings.py
+msgid "Browse this catalog"
+msgstr "Diesen Katalog durchsuchen"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Checked {count} catalogs for “{query}”."
+msgstr "{count} Kataloge nach „{query}“ durchsucht."
+
+#: cps/spa_strings.py
+msgid ""
+"Results stay separate by catalog so you can choose the edition and format."
+msgstr ""
+"Die Ergebnisse bleiben nach Katalog getrennt, damit Sie Ausgabe und Format "
+"auswählen können."
+
+#: cps/spa_strings.py
+msgid "Search all catalogs"
+msgstr "Alle Kataloge durchsuchen"
+
+#: cps/spa_strings.py
+msgid "Search remaining catalogs"
+msgstr "Weitere Kataloge durchsuchen"
+
+#: cps/spa_strings.py
+msgid "Searching catalogs…"
+msgstr "Kataloge werden durchsucht…"
+
+#: cps/spa_strings.py
+msgid "Searching this catalog…"
+msgstr "Dieser Katalog wird durchsucht…"
+
+#: cps/spa_strings.py
+msgid ""
+"This catalog could not be searched. Results from other catalogs are still "
+"available."
+msgstr ""
+"Dieser Katalog konnte nicht durchsucht werden. Ergebnisse anderer Kataloge "
+"sind weiterhin verfügbar."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} catalogs have not been searched yet."
+msgstr "{count} Kataloge wurden noch nicht durchsucht."
+
+#: cps/spa_strings.py
+msgid "Refresh catalogs"
+msgstr "Kataloge aktualisieren"

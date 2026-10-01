@@ -15909,3 +15909,52 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+#: cps/spa_strings.py
+msgid "All catalogs"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Browse this catalog"
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Checked {count} catalogs for “{query}”."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Results stay separate by catalog so you can choose the edition and format."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search all catalogs"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Search remaining catalogs"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Searching catalogs…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Searching this catalog…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This catalog could not be searched. Results from other catalogs are still "
+"available."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} catalogs have not been searched yet."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Refresh catalogs"
+msgstr ""

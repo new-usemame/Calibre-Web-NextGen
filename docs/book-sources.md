@@ -27,13 +27,21 @@ New connections start disabled. The setup page reports runtime problems such as 
 
 The public Project Gutenberg OPDS entrypoint is `https://www.gutenberg.org/ebooks/search.opds/`. Gutenberg publishes its supported machine-readable entrypoints in its [catalog documentation](https://www.gutenberg.org/ebooks/offline_catalogs.html). Use a provider's documented catalog endpoint rather than its HTML search page.
 
+## Search connected catalogs together
+
+When two or more catalogs are available, choose **All catalogs** in **Find books** and enter a keyword. CWNG searches four catalogs at a time. Each result group keeps its catalog name, editions, languages and formats; matching titles from different sources remain separate so you can choose the intended edition.
+
+Results arrive as each source answers. A failed source reports the failure and has its own **Try again** button; other results stay available. A catalog that does not advertise search has a **Browse this catalog** button. **Search remaining catalogs** starts the next group of up to four sources. Loading the page does not start a shared search.
+
+A result's navigation or next page opens that exact page in individual catalog browsing. Download/request buttons use the result's own source and the existing approval and import flow. **Refresh catalogs** reloads the available connections. Withdrawing or editing a source clears its results for the current query; re-enabling it requires a fresh search. A new query clears earlier results and cancels pending browser reads.
+
 ## What is supported
 
 | Capability | Current support |
 | --- | --- |
 | Catalogs | OPDS 1 Atom and OPDS 2 JSON; Newznab/Torznab search, including Prowlarr and Jackett presets |
 | Browsing | Catalog navigation, groups, facets and pagination |
-| Search | Advertised OpenSearch descriptions and supported OPDS 2 keyword templates |
+| Search | Individual or shared keyword search using advertised OpenSearch descriptions, supported OPDS 2 templates and Newznab/Torznab book search |
 | Files | Direct EPUB/PDF links, NZB releases and v1 torrent files/magnets containing exactly one completed EPUB/PDF, intersected with allowed upload formats |
 | Download client | SABnzbd/NZBGet after successful postprocessing; qBittorrent/Transmission after every file finishes downloading |
 | Authentication | None, HTTP Basic, or Bearer credentials scoped to configured origins |

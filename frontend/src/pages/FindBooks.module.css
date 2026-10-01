@@ -178,3 +178,6 @@
   .job { align-items: flex-start; }
   .jobActions { width: 100%; }
 }
+
+/* Error borders convey severity; body text must remain readable in every theme. */
+.searchFailure > p { color: var(--text); }

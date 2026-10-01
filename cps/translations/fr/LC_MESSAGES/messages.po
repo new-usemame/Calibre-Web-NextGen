@@ -18283,3 +18283,56 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "All catalogs"
+msgstr "Tous les catalogues"
+
+#: cps/spa_strings.py
+msgid "Browse this catalog"
+msgstr "Parcourir ce catalogue"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Checked {count} catalogs for “{query}”."
+msgstr "{count} catalogues consultés pour « {query} »."
+
+#: cps/spa_strings.py
+msgid ""
+"Results stay separate by catalog so you can choose the edition and format."
+msgstr ""
+"Les résultats restent séparés par catalogue pour choisir l’édition et le "
+"format."
+
+#: cps/spa_strings.py
+msgid "Search all catalogs"
+msgstr "Rechercher dans tous les catalogues"
+
+#: cps/spa_strings.py
+msgid "Search remaining catalogs"
+msgstr "Rechercher dans les catalogues restants"
+
+#: cps/spa_strings.py
+msgid "Searching catalogs…"
+msgstr "Recherche dans les catalogues…"
+
+#: cps/spa_strings.py
+msgid "Searching this catalog…"
+msgstr "Recherche dans ce catalogue…"
+
+#: cps/spa_strings.py
+msgid ""
+"This catalog could not be searched. Results from other catalogs are still "
+"available."
+msgstr ""
+"La recherche dans ce catalogue a échoué. Les résultats des autres catalogues"
+" restent disponibles."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{count} catalogs have not been searched yet."
+msgstr "{count} catalogues n’ont pas encore été consultés."
+
+#: cps/spa_strings.py
+msgid "Refresh catalogs"
+msgstr "Actualiser les catalogues"

@@ -664,6 +664,7 @@ export function navigateToLogout(): void {
 
 export interface ApiRequestOptions {
   auth?: 'protected' | 'public';
+  signal?: AbortSignal;
 }
 
 function isProtected(options?: ApiRequestOptions): boolean {
@@ -832,7 +833,7 @@ function clearCsrf() {
 }
 
 export async function apiGet<T>(path: string, options?: ApiRequestOptions): Promise<T> {
-  const res = await classifiedFetch(path, { credentials: 'include' }, options);
+  const res = await classifiedFetch(path, { credentials: 'include', signal: options?.signal }, options);
   if (!res.ok) {
     const parsed = await readApiError(res);
     throw new ApiError(res.status, parsed.message, parsed.detail);

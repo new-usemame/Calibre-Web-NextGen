@@ -24,7 +24,8 @@
   container: book-card / inline-size;
 }
 
-/* The single focusable control (a <Link> or a toggle <button>). */
+/* The book-detail link or selection toggle fills the card area. In browse mode,
+   the series link is a separate sibling immediately below it. */
 .card, .cardSelected {
   display: flex;
   flex-direction: column;
@@ -158,6 +159,24 @@
   display: flex;
   min-width: 0;
   overflow: hidden;
+}
+
+.seriesLink {
+  /* 25px leaves a little room for fractional grid/layout rounding at 375px; a
+     nominal 24px measured just under the WCAG target on desktop Chromium. */
+  min-height: 25px;
+  align-items: center;
+  border-radius: var(--r-sm);
+  text-decoration: none;
+}
+
+.seriesLink:hover .seriesName {
+  text-decoration: underline;
+}
+
+.seriesLink:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
 }
 
 .seriesName {

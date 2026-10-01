@@ -145,6 +145,8 @@ export interface Book {
   title: string;
   authors: string[];
   series: string | null;
+  /** First associated series ID, for direct navigation from book cards. */
+  series_id?: number | null;
   series_index: number | null;
   cover_url: string | null;
   formats: string[];

@@ -222,26 +222,28 @@ function BookCardInner({
     <div className={styles.info}>
       <p className={styles.title} dir="auto">{book.title}</p>
       <p className={styles.author} dir="auto">{authorStr}</p>
-      {seriesParts && (
-        <p
-          className={styles.series}
-          dir="auto"
-          data-testid="book-card-series"
-          title={seriesParts.before + seriesParts.name + seriesParts.after}
-        >
-          {seriesParts.before && <span className={styles.seriesIndex}>{seriesParts.before}</span>}
-          <span className={styles.seriesName}>{seriesParts.name}</span>
-          {seriesParts.after && <span className={styles.seriesIndex}>{seriesParts.after}</span>}
-        </p>
-      )}
     </div>
+  );
+
+  const seriesContent = seriesParts && (
+    <>
+      {seriesParts.before && <span className={styles.seriesIndex}>{seriesParts.before}</span>}
+      <span className={styles.seriesName}>{seriesParts.name}</span>
+      {seriesParts.after && <span className={styles.seriesIndex}>{seriesParts.after}</span>}
+    </>
+  );
+  const seriesTitle = seriesParts && seriesParts.before + seriesParts.name + seriesParts.after;
+  const seriesLine = seriesParts && (
+    <p className={styles.series} dir="auto" data-testid="book-card-series" title={seriesTitle!}>
+      {seriesContent}
+    </p>
   );
 
   // Selection mode: the whole card is a single toggle button. aria-pressed is
   // valid here (a real button) and announces the selection state.
   if (selectable) {
     return (
-      <div className={styles.wrap} style={style}>
+      <div className={styles.wrap} style={style} data-book-id={book.id}>
         <button
           type="button"
           className={selected ? styles.cardSelected : styles.card}
@@ -258,13 +260,15 @@ function BookCardInner({
         >
           {cover}
           {info}
+          {seriesLine}
         </button>
       </div>
     );
   }
 
-  // Browse mode: the card is a single link. Action controls are SIBLINGS of the
-  // link (never nested inside <a> — that's invalid + a second tab stop).
+  // Browse mode: the cover, title and author open the book; the series line has
+  // its own sibling destination below. Both series and action controls remain
+  // outside the book link (never nested inside <a>).
   //
   // The read + edit controls share one flex row in NORMAL FLOW below the
   // metadata (#1166). They used to be absolutely positioned over the bottom of
@@ -283,7 +287,7 @@ function BookCardInner({
   const hasActionRow = hasAddAction || (!hideActions && (Boolean(readTarget) || quickEdit));
 
   return (
-    <div className={styles.wrap} style={style}>
+    <div className={styles.wrap} style={style} data-book-id={book.id}>
       {detailsEnabled ? (
         <Link href={`/book/${book.id}`} className={styles.card} aria-label={t('Open details for {title}', { title: book.title })}>
           {cover}{info}
@@ -291,6 +295,14 @@ function BookCardInner({
       ) : (
         <div className={styles.card} aria-label={book.title}>{cover}{info}</div>
       )}
+      {seriesLine && (detailsEnabled && book.series_id != null ? (
+        <Link href={`/series/${book.series_id}`} className={`${styles.series} ${styles.seriesLink}`}
+          dir="auto" data-testid="book-card-series" title={seriesTitle!}>
+          {seriesContent}
+        </Link>
+      ) : (
+        seriesLine
+      ))}
       {onRemove && (
         <button
           type="button"

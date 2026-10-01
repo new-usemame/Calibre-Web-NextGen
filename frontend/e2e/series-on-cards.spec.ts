@@ -78,7 +78,7 @@ test.describe('#657 series on book cards', () => {
       .toBe(seriesId);
   });
 
-  test('series is a direct sibling link with keyboard, phone, and selection behavior', async ({ page }) => {
+  test('series is a direct sibling link with keyboard and selection behavior', async ({ page }, testInfo) => {
     await page.goto('/app/');
     const { bookId, title, series, seriesId } = await probeSeriesBook(page);
     test.skip(!bookId || !seriesId, 'seed has no book with a resolvable series');
@@ -95,7 +95,8 @@ test.describe('#657 series on book cards', () => {
       }
       await route.fulfill({ response, json: body });
     });
-    await page.setViewportSize({ width: 375, height: 812 });
+    await page.setViewportSize(testInfo.project.name === 'mobile'
+      ? { width: 375, height: 812 } : { width: 1280, height: 800 });
     const searchResponse = page.waitForResponse((response) => {
       const url = new URL(response.url());
       return url.pathname.endsWith('/api/v1/books') && url.searchParams.get('search') === title;
@@ -140,8 +141,8 @@ test.describe('#657 series on book cards', () => {
         `series destination passes axe in ${theme} theme`,
       ).toEqual([]);
       await page.screenshot({
-        path: test.info().outputPath(`series-link-phone-focus-${theme}.png`),
-        type: 'png',
+        path: test.info().outputPath(`series-link-focus-${testInfo.project.name}-${theme}.jpg`),
+        type: 'jpeg', quality: 75,
       });
     }
 
@@ -174,8 +175,8 @@ test.describe('#657 series on book cards', () => {
         `selection card passes axe in ${theme} theme`,
       ).toEqual([]);
       await page.screenshot({
-        path: test.info().outputPath(`series-selection-phone-${theme}.png`),
-        type: 'png',
+        path: test.info().outputPath(`series-selection-${testInfo.project.name}-${theme}.jpg`),
+        type: 'jpeg', quality: 75,
       });
     }
   });

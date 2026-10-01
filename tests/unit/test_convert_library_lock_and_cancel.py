@@ -145,3 +145,15 @@ def test_running_the_script_clears_a_stale_lock_and_cancel_runs_atexit(tmp_path)
         if proc.poll() is None:
             proc.kill()
             proc.wait()
+
+
+def test_remove_lock_only_removes_our_own_lock(tmp_path):
+    """Cancel deletes the lock right after SIGTERM; a new run may take it before this one exits."""
+    lock = tmp_path / "convert_library.lock"
+    lock.write_text(str(os.getpid()))
+    convert_library.removeLock(str(lock))
+    assert not lock.exists()
+
+    lock.write_text("999999999")  # another run's lock
+    convert_library.removeLock(str(lock))
+    assert lock.read_text() == "999999999"

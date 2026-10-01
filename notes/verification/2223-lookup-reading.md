@@ -1,0 +1,21 @@
+# Open without saving progress (#2223)
+
+Lookup mode is selected when opening the reader and remains active for that whole session. It may read the existing saved position, but page turns, TOC/search/highlight jumps, theme changes and closing the reader do not save progress or change the book's read/reading status. The banner says “Progress is not being saved.” This is deliberately a progress mode: appearance preferences and explicit annotation edits remain usable, and no privacy/incognito claim is made. Returning to ordinary Read starts a normal saving session; there is no switch inside the lookup reader that could accidentally save the inspected position.
+
+“Remove from Currently Reading” changes only this account's existing IN_PROGRESS status to unread. Saved web/device positions, counters, history, annotations and start times are retained; normal status-modification/sync signaling still runs. Finished books, including a true Calibre read-column value, are protected. A later reader/device progress report can restore Reading. The action does not queue a Hardcover progress/finish update.
+
+The New UI guards coalesced progress saves, retries and unmount keepalive, and carries lookup mode into classic/native fallbacks. Classic suppresses read-open status/session/activity writes, manual bookmark writes, EPUB localStorage/server CFI saves, audio position saves and comic page saves. Native formats with no progress writer remain read-only as before, with the same visible banner. The legacy bookmark endpoint also rejects lookup writes defensively. Existing saved resume positions are still available.
+
+## Evidence
+
+Focused backend checks for caller scope, inaccessible books, Guest, finished/custom-read guards, status-only changes and lookup read-open/bookmark writes passed with adjacent resume/currently-reading tests (40 total). Translation/SPA anchors and new reader checks passed (85, 1 skip); frontend units/type check passed all 193 cases and production build passed.
+
+A private real-book Playwright regression was seen red on the prior image at the missing removal action, after creating a real saved bookmark/Reading marker. Initial fixture assumptions were strengthened: an early CFI may be saved before the EPUB location index creates a real percentage, so the test waits for the actual server Reading state.
+
+The New UI flow at desktop and phone width removes Reading, verifies the saved bookmark remains, opens lookup, turns pages, changes light/dark appearance, jumps via TOC, waits beyond the debounce, and closes; watched progress/status requests and saved server state remain unchanged. Ordinary Read afterward saves a changed bookmark again.
+
+Image inspection caught a weak classic assertion: iframe visibility did not prove prose was loaded, and the first phone capture was blank. The stronger flow now requires actual iframe prose, a changed live navigation CFI, and a normal-classic positive control that updates the bookmark. The secondary-user fixture creates a generic context, so the phone case explicitly creates an isolated iPhone descriptor/touch context for that owned user. Classic phone pagination must turn the page through real touch with no keyboard fallback. Lookup keeps both server state and localStorage position carriers unchanged; desktop uses the real next-page button. This corrected flow passed 3 cases including setup. Fresh captures show actual book prose.
+
+One complete local backend run passed 10,282 cases with 103 skipped and three failures. Two metadata-replacement SQLite I/O failures reproduce on clean main; the new failure came from an older template caller omitting lookup_mode. Default false was added to three JS-config templates, and affected default/template/new-feature/classifier checks passed (14). The classifier README count was updated for the new service.
+
+Independent implementation review found no blocker and personally ran the 9 new backend and all 193 frontend cases. Final cached image rebuild and repeated strengthened browser flow are pending at this note revision. Actual browser evidence is EPUB; PDF/audio/comic guards were inspected and backend/target propagation tested, without claiming physical-device or each-format interactive verification. Bulky request traces and JPEGs live on X8 under `agent-scratch/cwng-promised-2223`.

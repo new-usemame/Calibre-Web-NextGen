@@ -50,6 +50,7 @@ def _fake_user(**kw):
     for role in ("admin", "upload", "edit", "download", "delete_books",
                  "edit_shelfs", "viewer", "passwd", "anonymous"):
         setattr(user, "role_" + role, lambda: False)
+    user.role_share_shelfs = lambda: True
     return user
 
 

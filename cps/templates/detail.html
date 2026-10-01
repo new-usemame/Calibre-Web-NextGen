@@ -98,6 +98,14 @@
             font-size: 16px;
             top: 2px;
         }
+        .book-read-lookup-cta {
+            display: inline-block;
+            margin: 0.5em auto 0;
+            color: inherit;
+            font-size: 0.92em;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
 
         .book-detail-cover img {
             width: 100%;
@@ -633,6 +641,10 @@
                     <span class="glyphicon glyphicon-book" aria-hidden="true"></span>
                     <span>{{ _('Read now') }}</span>
                 </a>
+                <a class="book-read-lookup-cta" target="_blank"
+                   href="{{ url_for('web.read_book', book_id=entry.id, book_format=entry.reader_list[0], lookup=1) }}">
+                    {{ _('Open without saving progress') }}
+                </a>
                 {% endif %}
                 </div>
                     <div class="book-detail-meta">
@@ -886,6 +898,14 @@
                         <p class="currently-reading cover-badge-in-progress" id="currently-reading-badge">
                             <span class="glyphicon glyphicon-book" aria-hidden="true"></span>
                             {{ _('Currently reading') }}
+                            {% if not current_user.is_anonymous %}
+                            <button type="button" class="btn btn-default btn-xs" id="remove-currently-reading-btn"
+                                    data-url="{{ url_for('web.stop_reading', book_id=entry.id) }}"
+                                    data-toast-success="{{ _('Removed from Currently Reading.') }}"
+                                    data-toast-error="{{ _('Could not remove this book from Currently Reading.') }}">
+                                {{ _('Remove from Currently Reading') }}
+                            </button>
+                            {% endif %}
                         </p>
                         {% endif %}
                         {% set current_rating = (entry.ratings[0].rating / 2)|int if entry.ratings|length > 0 else 0 %}
@@ -1367,6 +1387,23 @@
                 },
                 error: function () {
                     $cb.prop("checked", !nextChecked);
+                }
+            });
+        });
+
+        $("#remove-currently-reading-btn").on("click", function () {
+            var $button = $(this).prop("disabled", true);
+            $.ajax({
+                url: $button.data("url"),
+                method: "POST",
+                headers: {"X-CSRFToken": {{ csrf_token()|tojson }}},
+                success: function () {
+                    $("#currently-reading-badge").remove();
+                    showActionToast($button.data("toast-success"), $button[0]);
+                },
+                error: function () {
+                    $button.prop("disabled", false);
+                    showActionToast($button.data("toast-error"), $button[0]);
                 }
             });
         });

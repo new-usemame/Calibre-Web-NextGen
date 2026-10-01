@@ -6006,6 +6006,26 @@ msgstr "Huidig wachtwoord"
 msgid "Currently reading"
 msgstr "Momenteel aan het lezen"
 
+#: cps/templates/detail.html
+msgid "Open without saving progress"
+msgstr "Openen zonder voortgang op te slaan"
+
+#: cps/templates/_reader_lookup_banner.html
+msgid "Progress is not being saved."
+msgstr "Voortgang wordt niet opgeslagen."
+
+#: cps/templates/detail.html
+msgid "Remove from Currently Reading"
+msgstr "Verwijderen uit Momenteel aan het lezen"
+
+#: cps/templates/detail.html
+msgid "Removed from Currently Reading."
+msgstr "Verwijderd uit Momenteel aan het lezen."
+
+#: cps/templates/detail.html
+msgid "Could not remove this book from Currently Reading."
+msgstr "Dit boek kon niet uit Momenteel aan het lezen worden verwijderd."
+
 #: cps/spa_strings.py
 msgid "Custom"
 msgstr "Aangepast"

@@ -302,6 +302,9 @@ var reader;
      * @param {string|int} location - Location or zero
      */
     function updateBookmark(action, location) {
+        // Lookup mode keeps reader navigation local to this tab. Existing
+        // positions still load, but adding/removing a bookmark cannot persist.
+        if (calibre.lookupMode) return;
         // Remove other bookmarks (there can only be one)
         if (action === "add") {
             this.settings.bookmarks.filter(function (bookmark) {

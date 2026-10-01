@@ -41,6 +41,7 @@ from .services.ereader_send import (
     send_includes_own_address,
 )
 from .services import app_passwords, ereader_scope, reading_position
+from .services.read_status import stop_reading as stop_reading_status
 from .search import render_search_results, render_adv_search_results
 from .gdriveutils import getFileFromEbooksFolder, do_gdrive_download
 from .helper import check_valid_domain, check_email, check_username, \
@@ -296,6 +297,11 @@ def get_email_status_json():
 @web.route("/ajax/bookmark/<int:book_id>/<book_format>", methods=['POST'])
 @user_login_required
 def set_bookmark(book_id, book_format):
+    # A lookup reader may load an existing position but cannot replace or
+    # clear it. This request-level guard also protects older classic clients
+    # that keep the bookmark URL and send an empty value when unbookmarking.
+    if request.args.get("lookup") == "1":
+        return "", 204
     try:
         from .services.device_registry import (
             WEBREADER_INSTALLATION_ID_HEADER,
@@ -359,6 +365,38 @@ def set_bookmark(book_id, book_format):
     if not ub.session_commit("Bookmark for user {} in book {} created".format(current_user.id, book_id)):
         return "", 500
     return "", 201
+
+
+@web.route("/ajax/stopreading/<int:book_id>", methods=["POST"])
+@user_login_required
+def stop_reading(book_id):
+    """Remove this user's in-progress marker without resetting saved state."""
+    if current_user.is_anonymous:
+        abort(403)
+    result = calibre_db.get_book_read_archived(
+        book_id, config.config_read_column,
+        allow_show_archived=True, allow_show_hidden=True,
+        allow_show_global=current_user.role_browse_global(),
+        allow_public_shelf_books=True,
+    )
+    if not result:
+        abort(404)
+    _, custom_read, _ = result
+    if config.config_read_column and custom_read:
+        return jsonify({"error": "finished_books_cannot_be_removed"}), 409
+
+    row = ub.session.query(ub.ReadBook).filter(
+        ub.ReadBook.user_id == int(current_user.id),
+        ub.ReadBook.book_id == int(book_id),
+    ).one_or_none()
+    if row is not None and row.read_status == ub.ReadBook.STATUS_FINISHED:
+        return jsonify({"error": "finished_books_cannot_be_removed"}), 409
+
+    changed = stop_reading_status(ub.session, current_user.id, book_id, ub.ReadBook)
+    if changed and not ub.session_commit("Stopped reading book {} for user {}".format(
+            book_id, current_user.id)):
+        return jsonify({"error": "could_not_update_reading_status"}), 500
+    return jsonify({"ok": True, "changed": changed})
 
 
 @web.route("/ajax/toggleread/<int:book_id>", methods=['POST'])
@@ -3754,6 +3792,7 @@ def app_password_revoke(app_password_id):
 @login_required_if_no_ano
 @viewer_required
 def read_book(book_id, book_format):
+    lookup_mode = request.args.get("lookup") == "1"
     # allow_show_hidden=True: a user can read their own hidden book — the
     # detail page's reading icon must not bounce with "unavailable" just
     # because the book is on the user's hide list (#319 pushback @droM4X).
@@ -3822,7 +3861,7 @@ def read_book(book_id, book_format):
         except Exception as e:
             log.debug(f"Failed to load KOReader progress for book {book_id}: {e}")
     # Track read activity
-    if current_user.is_authenticated:
+    if current_user.is_authenticated and not lookup_mode:
         try:
             from cps.cwa_db_loader import load_cwa_db
             CWA_DB = load_cwa_db().CWA_DB
@@ -3867,7 +3906,7 @@ def read_book(book_id, book_format):
     # reader tab or hitting Back/Forward doesn't count as a new
     # reading session. Always touch `last_time_started_reading` so
     # "recently read" sorting reflects every open.
-    if current_user.is_authenticated:
+    if current_user.is_authenticated and not lookup_mode:
         try:
             read_row = ub.session.query(ub.ReadBook).filter(
                 ub.ReadBook.user_id == int(current_user.id),
@@ -3910,17 +3949,20 @@ def read_book(book_id, book_format):
         return render_title_template('read.html', bookid=book_id, title=book.title,
                                      bookmark=bookmark, kosync_progress=kosync_progress,
                                      reader_settings=json.dumps(reader_settings),
+                                     lookup_mode=lookup_mode,
                                      book_format=book_format.lower())
     elif book_format.lower() == "pdf":
         log.debug("Start pdf reader for %d", book_id)
-        return render_title_template('readpdf.html', pdffile=book_id, title=book.title)
+        return render_title_template('readpdf.html', pdffile=book_id, title=book.title,
+                                     lookup_mode=lookup_mode)
     elif book_format.lower() == "txt":
         log.debug("Start txt reader for %d", book_id)
-        return render_title_template('readtxt.html', txtfile=book_id, title=book.title)
+        return render_title_template('readtxt.html', txtfile=book_id, title=book.title,
+                                     lookup_mode=lookup_mode)
     elif book_format.lower() in ["djvu", "djv"]:
         log.debug("Start djvu reader for %d", book_id)
         return render_title_template('readdjvu.html', djvufile=book_id, title=book.title,
-                                     extension=book_format.lower())
+                                     extension=book_format.lower(), lookup_mode=lookup_mode)
     else:
         for fileExt in constants.EXTENSIONS_AUDIO:
             if book_format.lower() == fileExt:
@@ -3930,7 +3972,7 @@ def read_book(book_id, book_format):
                 entries = calibre_db.get_filtered_book(book_id, allow_show_hidden=True)
                 log.debug("Start mp3 listening for %d", book_id)
                 return render_title_template('listenmp3.html', mp3file=book_id, audioformat=book_format.lower(),
-                                             entry=entries, bookmark=bookmark)
+                                             entry=entries, bookmark=bookmark, lookup_mode=lookup_mode)
         for fileExt in ["cbr", "cbt", "cbz"]:
             if book_format.lower() == fileExt:
                 all_name = str(book_id)
@@ -3941,7 +3983,7 @@ def read_book(book_id, book_format):
                         title = title + " #" + '{0:.2f}'.format(book.series_index).rstrip('0').rstrip('.')
                 log.debug("Start comic reader for %d", book_id)
                 return render_title_template('readcbr.html', comicfile=all_name, title=title,
-                                             extension=fileExt, bookmark=bookmark)
+                                             extension=fileExt, bookmark=bookmark, lookup_mode=lookup_mode)
         log.debug("Reader requested for an unsupported format: %s", book_format)
         # 404, not a redirect to the library.
         #

@@ -6132,6 +6132,26 @@ msgstr "Mot de passe actuel"
 msgid "Currently reading"
 msgstr "Lecture en cours"
 
+#: cps/templates/detail.html
+msgid "Open without saving progress"
+msgstr "Ouvrir sans enregistrer la progression"
+
+#: cps/templates/_reader_lookup_banner.html
+msgid "Progress is not being saved."
+msgstr "La progression n’est pas enregistrée."
+
+#: cps/templates/detail.html
+msgid "Remove from Currently Reading"
+msgstr "Retirer de « Lecture en cours »"
+
+#: cps/templates/detail.html
+msgid "Removed from Currently Reading."
+msgstr "Retiré de « Lecture en cours »."
+
+#: cps/templates/detail.html
+msgid "Could not remove this book from Currently Reading."
+msgstr "Impossible de retirer ce livre de « Lecture en cours »."
+
 #: cps/spa_strings.py
 msgid "Custom"
 msgstr "Personnalisé"

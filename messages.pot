@@ -5725,6 +5725,26 @@ msgstr ""
 msgid "Custom border colour"
 msgstr ""
 
+#: cps/templates/detail.html cps/templates/_reader_lookup_banner.html
+msgid "Open without saving progress"
+msgstr ""
+
+#: cps/templates/_reader_lookup_banner.html
+msgid "Progress is not being saved."
+msgstr ""
+
+#: cps/templates/detail.html
+msgid "Remove from Currently Reading"
+msgstr ""
+
+#: cps/templates/detail.html
+msgid "Removed from Currently Reading."
+msgstr ""
+
+#: cps/templates/detail.html
+msgid "Could not remove this book from Currently Reading."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Custom colours"
 msgstr ""
@@ -16053,4 +16073,3 @@ msgstr ""
 #: cps/templates/user_table.html
 msgid "Show Read/Unread Section"
 msgstr ""
-

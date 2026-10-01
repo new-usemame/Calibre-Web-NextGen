@@ -634,6 +634,10 @@ _("Top and bottom of the wash")
 _("Middle of the wash")
 _("All three text blocks")
 _("Unused by this arrangement")
+_("Book details")
+_("Show original filename")
+_("Keep the imported file name visible on book detail pages.")
+_("Shows the name a book had when it was imported.")
 
 
 # ==== BEGIN AUTOGEN (scripts/extract_spa_strings.py --write) ====

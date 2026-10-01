@@ -927,10 +927,10 @@ export function BookDetail() {
 
           {/* Metadata definition list */}
           <dl className={styles.meta}>
-            {book.original_filename && (
+            {book.original_filename && me?.preferences?.show_original_filename !== false && (
               <>
                 <dt className={styles.metaLabel}>{t('Imported as')}</dt>
-                <dd className={styles.metaValue}>{book.original_filename}</dd>
+                <dd className={`${styles.metaValue} original-filename-value`}>{book.original_filename}</dd>
               </>
             )}
             {canAccessBook && book.kosync_progress != null && (

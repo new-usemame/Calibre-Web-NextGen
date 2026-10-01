@@ -437,6 +437,14 @@
           <input type="checkbox" name="Show_detail_random" id="Show_detail_random" {% if content.show_detail_random() %}checked{% endif %} style="accent-color: var(--color-secondary);">
           <label for="Show_detail_random">{{_('Show Random Books in Detail View')}}</label>
         </div>
+        {% if profile and not content.role_anonymous() %}
+        <div>
+          <input type="hidden" name="show_original_filename_present" value="1">
+          <input type="checkbox" name="show_original_filename" id="show_original_filename" {% if content.get_view_property('preferences', 'show_original_filename') is not sameas false %}checked{% endif %} style="accent-color: var(--color-secondary);">
+          <label for="show_original_filename">{{_('Show original filename')}}</label>
+          <p class="help-block">{{_('Shows the name a book had when it was imported.')}}</p>
+        </div>
+        {% endif %}
       </div>
       
       {% if ( current_user and current_user.role_admin() and not new_user ) and not simple %}

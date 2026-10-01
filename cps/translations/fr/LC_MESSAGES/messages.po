@@ -18427,3 +18427,15 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+msgid "Book details"
+msgstr "Détails du livre"
+
+msgid "Show original filename"
+msgstr "Afficher le nom de fichier d’origine"
+
+msgid "Keep the imported file name visible on book detail pages."
+msgstr "Afficher le nom du fichier importé sur les pages de détail du livre."
+
+msgid "Shows the name a book had when it was imported."
+msgstr "Affiche le nom du livre lors de son importation."

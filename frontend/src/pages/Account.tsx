@@ -7,6 +7,7 @@ import {
   useCreateAppPassword, useRevokeAppPassword,
   useKoboTwoWayAnnotations, useUpdateKoboTwoWayAnnotations, useSetKoboTwoWayBook,
   useUpdateLibraryMode,
+  useUpdateNamedPreferences,
 } from '../lib/queries';
 import type { Device } from '../components/DeviceInventory';
 import { Avatar } from '../components/Avatar';
@@ -52,6 +53,7 @@ export function Account() {
     queryKey: ['annotation-devices'], queryFn: () => apiGet('/api/annotations/devices?active=true'),
   });
   const updateLibraryMode = useUpdateLibraryMode();
+  const updateNamedPreferences = useUpdateNamedPreferences();
   const [libraryModeError, setLibraryModeError] = useState('');
 
   // Kobo two-way annotation sync (Stage 0 — a preference surface over a
@@ -191,6 +193,7 @@ export function Account() {
 
   const activeRoles = Object.entries(account.role).filter(([, v]) => v);
   const selectedTheme = THEMES.find((o) => o.slug === theme);
+  const showOriginalFilename = me?.preferences?.show_original_filename !== false;
 
   /* Non-optimistic on purpose: this preference guards a feature that can
    * destroy device-side annotations once it goes live, so the control shows
@@ -303,6 +306,24 @@ export function Account() {
           ) : <p className={styles.muted}>{t('Your library contents are managed by an administrator.')}</p>}
         </fieldset>
         <span className={libraryModeError ? styles.msgErr : undefined} role="alert">{libraryModeError}</span>
+      </section>
+
+      <section className={styles.card} aria-labelledby="book-details-title">
+        <fieldset className={styles.scopeGroup}>
+          <legend id="book-details-title" className={styles.cardTitle}>{t('Book details')}</legend>
+          <label className={styles.scopeOption}>
+            <input type="checkbox" checked={showOriginalFilename}
+              disabled={updateNamedPreferences.isPending}
+              onChange={(event) => updateNamedPreferences.mutate({
+                show_original_filename: event.currentTarget.checked,
+              })} />
+            <span className={styles.scopeText}><strong>{t('Show original filename')}</strong>
+              <small>{t('Keep the imported file name visible on book detail pages.')}</small></span>
+          </label>
+          {updateNamedPreferences.isError && (
+            <p className={styles.msgErr} role="alert">{t('Could not save.')}</p>
+          )}
+        </fieldset>
       </section>
 
       {/* Kobo two-way annotation sync — Stage 0 (BETA). Both server gates stay

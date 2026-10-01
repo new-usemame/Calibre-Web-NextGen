@@ -17896,3 +17896,15 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+msgid "Book details"
+msgstr "Boekgegevens"
+
+msgid "Show original filename"
+msgstr "Oorspronkelijke bestandsnaam tonen"
+
+msgid "Keep the imported file name visible on book detail pages."
+msgstr "Toon de bestandsnaam waarmee het boek is geïmporteerd op boekpagina's."
+
+msgid "Shows the name a book had when it was imported."
+msgstr "Toont de naam die het boek had toen het werd geïmporteerd."

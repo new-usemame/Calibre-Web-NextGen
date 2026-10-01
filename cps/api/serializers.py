@@ -376,6 +376,8 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
         "identifiers": identifiers,
         "custom_columns": _serialize_custom_columns(book, custom_column_definitions),
         "formats": formats,
+        # This diagnostic field remains in API data for edit/diagnostic screens;
+        # the per-account preference controls presentation on book detail only.
         "original_filename": original_filename,
         "read": bool(read),
         "archived": bool(archived),

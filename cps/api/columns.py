@@ -35,6 +35,7 @@ from . import api_v1
 from .books import _rows_to_items
 from .. import calibre_db, config, constants, db, hierarchy
 from ..cw_login import current_user
+from ..custom_column_visibility import is_cc_visible
 from ..sort_orders import book_sort_order
 from ..usermanagement import login_required_if_no_ano
 
@@ -44,9 +45,16 @@ _BROWSABLE_DATATYPES = ('text', 'enumeration')
 
 
 def _cc_disabled(col_id):
-    """Whether the caller hid this column's section on their profile page."""
+    """Whether the caller hid this column's section on their profile page.
+
+    Delegates to the shared resolver so this surface, the classic sidebar, the
+    classic browse route and both OPDS feeds can never disagree about what a
+    user may browse. The ``try/except`` mirrors the previous inline check: a
+    user object that cannot answer degrades to visible rather than 500ing the
+    browse surface.
+    """
     try:
-        return current_user.get_view_property('cc_sidebar', 'show_cc_%d' % col_id) is False
+        return not is_cc_visible(current_user, col_id)
     except Exception:
         return False
 

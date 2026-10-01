@@ -54,6 +54,7 @@ from .custom_column_sort import (
     load_configured_columns,
     resolve_magic_shelf_sort,
 )
+from .custom_column_visibility import is_cc_visible, load_browsable_columns, seed_cc_visibility
 from .redirect import get_redirect_location
 from .cw_babel import get_available_locale, get_available_translations, sanitize_locale_for_write
 from .usermanagement import login_required_if_no_ano
@@ -2695,6 +2696,12 @@ def render_cc_category(page, col_id, path, order):
     col = browsable_cc_column(col_id)
     if col is None:
         abort(404)
+    # ...and a column the user hid on their profile page is not reachable by
+    # URL either. The sidebar omits it, so honouring the toggle only in the
+    # navigation would let anyone who knows the URL keep browsing it. The SPA
+    # API already 404s here; this is the same contract for the classic route.
+    if not is_cc_visible(current_user, col_id):
+        abort(404)
 
     is_hierarchical = not calibre_db.is_flat_cc_column(col_id)
 
@@ -3120,6 +3127,14 @@ def register_post():
         except Exception:
             pass
         seed_new_user_ui_font_defaults(content, config)
+        # Frozen per-column browse visibility, same as the other signup paths.
+        try:
+            _cc_columns = load_browsable_columns()
+            if _cc_columns:
+                seed_cc_visibility(content, _cc_columns, commit=False)
+        except Exception:
+            log.error("Could not seed custom column visibility for the new user",
+                      exc_info=True)
         try:
             ub.session.add(content)
             ub.session.commit()

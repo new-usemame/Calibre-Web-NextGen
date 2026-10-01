@@ -14,6 +14,7 @@ from .cw_login import current_user
 from sqlalchemy.sql.expression import or_
 
 from . import config, constants, logger, ub
+from .custom_column_visibility import is_cc_visible
 from .ub import User
 from .duplicate_notice import duplicate_setup_notice_dismissed
 from .translation_notice import last_notified, record_notified
@@ -302,8 +303,7 @@ def get_custom_column_sidebar_entries():
         for col in calibre_db.get_cc_columns(config):
             if col.datatype not in ('text', 'enumeration'):
                 continue
-            prop = 'show_cc_%d' % col.id
-            if current_user.get_view_property('cc_sidebar', prop) is False:
+            if not is_cc_visible(current_user, col.id):
                 continue
             entries.append({
                 "glyph": "glyphicon-tags",
@@ -343,8 +343,7 @@ def get_custom_column_visibility_options():
             options.append({
                 'id': col.id,
                 'name': col.name,
-                'visible': current_user.get_view_property(
-                    'cc_sidebar', 'show_cc_%d' % col.id) is not False,
+                'visible': is_cc_visible(current_user, col.id),
             })
     except Exception:
         log.debug("Could not build custom column visibility options", exc_info=True)

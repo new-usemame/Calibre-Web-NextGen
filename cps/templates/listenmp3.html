@@ -344,7 +344,7 @@ window.calibre = {
         cssPath: "{{ url_for('static', filename='css/') }}",
         bookUrl: "{{ url_for('static', filename=mp3file) }}/",
         bookmarkUrl: "{{ url_for('web.set_bookmark', book_id=mp3file, book_format=audioformat.upper(), lookup=1 if lookup_mode else None) }}",
-        lookupMode: {{ lookup_mode|tojson }},
+        lookupMode: {{ lookup_mode|default(false)|tojson }},
         bookmark: "{{ bookmark.bookmark_key if bookmark != None }}",
         useBookmarks: "{{ current_user.is_authenticated | tojson }}"
 

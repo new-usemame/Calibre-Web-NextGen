@@ -45,9 +45,15 @@ test('library select-all uses complete server result and bulk changes books beyo
   // Keep the catalog on the real API but bound ordinary card pages to three;
   // select_all requests still go unchanged to the server's full-view query.
   let ordinaryPageItems = 0;
+  let releaseLaterPages!: () => void;
+  const laterPages = new Promise<void>(resolve => { releaseLaterPages = resolve; });
   await page.route('**/api/v1/books?*', async route => {
     const url = new URL(route.request().url());
     if (!url.searchParams.has('select_all')) {
+      // Infinite scrolling can auto-fill a small CI seed before selection.
+      // Hold later real page responses until this scenario has proved that
+      // bulk selection reaches beyond the first loaded page.
+      if (Number(url.searchParams.get('page') || '1') > 1) await laterPages;
       url.searchParams.set('per_page', '3');
       const response = await route.fetch({ url: url.toString() });
       const body = await response.json().catch(() => null) as { items?: unknown[] } | null;
@@ -57,72 +63,77 @@ test('library select-all uses complete server result and bulk changes books beyo
       await route.continue();
     }
   });
-  await page.setViewportSize(viewport);
-  await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
-  await page.goto('/app');
-  await expect(page.getByRole('heading', { name: 'Your Library' })).toBeVisible();
-  await expect(page.getByTestId('catalog-grid').getByRole('link', {
-    name: `Open details for ${visible[1].title}`,
-  })).toBeVisible();
-  await expect.poll(() => page.getByRole('link', { name: /^Open details for / }).count()).toBeLessThan(expected.total);
-  await selectAllOn(page);
-  const selected = page.getByRole('region', { name: `${expected.total} selected`, exact: true });
-  await expect(selected).toBeVisible();
-  expect(ordinaryPageItems).toBeLessThan(expected.total);
-  await page.screenshot({
-    path: testInfo.outputPath(`library-select-all-${viewport.width}-selected.jpg`),
-    type: 'jpeg',
-    quality: 75,
-  });
-  const axe = await new AxeBuilder({ page }).include('main').analyze();
-  expect(axe.violations.filter(issue => ['critical', 'serious'].includes(issue.impact ?? ''))).toEqual([]);
+  try {
+    await page.setViewportSize(viewport);
+    await page.emulateMedia({ colorScheme: 'light', reducedMotion: 'reduce' });
+    await page.goto('/app');
+    await expect(page.getByRole('heading', { name: 'Your Library' })).toBeVisible();
+    await expect(page.getByTestId('catalog-grid').getByRole('link', {
+      name: `Open details for ${visible[1].title}`,
+    })).toBeVisible();
+    await expect.poll(() => page.getByRole('link', { name: /^Open details for / }).count()).toBeLessThan(expected.total);
+    await selectAllOn(page);
+    const selected = page.getByRole('region', { name: `${expected.total} selected`, exact: true });
+    await expect(selected).toBeVisible();
+    expect(ordinaryPageItems).toBeLessThan(expected.total);
+    await page.screenshot({
+      path: testInfo.outputPath(`library-select-all-${viewport.width}-selected.jpg`),
+      type: 'jpeg',
+      quality: 75,
+    });
+    const axe = await new AxeBuilder({ page }).include('main').analyze();
+    expect(axe.violations.filter(issue => ['critical', 'serious'].includes(issue.impact ?? ''))).toEqual([]);
 
-  // Mark read is a real bulk mutation. The resulting server query must include
-  // every selected ID, including records that never appeared in the 3-card page.
-  let releaseMutation!: () => void;
-  const mutationGate = new Promise<void>(resolve => { releaseMutation = resolve; });
-  let failOneMutation = true;
-  await page.route('**/api/v1/books/*/read', async route => {
-    await mutationGate;
-    const url = new URL(route.request().url());
-    if (failOneMutation && url.pathname === `/api/v1/books/${visible[1].id}/read`) {
-      failOneMutation = false;
-      await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({
-        error: 'injected_read_failure', message: 'Injected one-book read failure.',
-      }) });
-    } else {
-      await route.continue();
-    }
-  });
-  await selected.getByRole('button', { name: 'Mark read', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: `Deselect ${visible[1].title}`, exact: true })).toBeDisabled();
-  releaseMutation();
-  await expect(page.getByText(/The failed books remain selected/)).toBeVisible();
-  const retrySelection = page.getByRole('region', { name: '1 selected', exact: true });
-  await expect(retrySelection).toBeVisible();
-  await expect(page.getByRole('button', {
-    name: `Deselect ${visible[1].title}`, exact: true,
-  })).toBeVisible();
-  await page.screenshot({
-    path: testInfo.outputPath(`library-select-all-${viewport.width}-retryable-failure.jpg`),
-    type: 'jpeg',
-    quality: 75,
-  });
-  // The mutation failure was intercepted for one selected book. Retry it
-  // through the real API and confirm the full select-all result is now read.
-  await page.unroute('**/api/v1/books/*/read');
-  await retrySelection.getByRole('button', { name: 'Mark read', exact: true }).click();
-  await expect(page.locator('[aria-live="polite"]')).toContainText('1 marked as read.');
-  const readResponse = await page.request.get('/api/v1/books?filter=read&select_all=1&sort=new');
-  expect(readResponse.ok(), await readResponse.text()).toBeTruthy();
-  const readIds = (await readResponse.json() as { ids: number[] }).ids;
-  for (const id of expected.ids) expect(readIds).toContain(id);
-  await page.screenshot({
-    path: testInfo.outputPath(`library-select-all-${viewport.width}-retry-complete.jpg`),
-    type: 'jpeg',
-    quality: 75,
-  });
+    // Mark read is a real bulk mutation. The resulting server query must include
+    // every selected ID, including records that never appeared in the 3-card page.
+    let releaseMutation!: () => void;
+    const mutationGate = new Promise<void>(resolve => { releaseMutation = resolve; });
+    let failOneMutation = true;
+    await page.route('**/api/v1/books/*/read', async route => {
+      await mutationGate;
+      const url = new URL(route.request().url());
+      if (failOneMutation && url.pathname === `/api/v1/books/${visible[1].id}/read`) {
+        failOneMutation = false;
+        await route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({
+          error: 'injected_read_failure', message: 'Injected one-book read failure.',
+        }) });
+      } else {
+        await route.continue();
+      }
+    });
+    await selected.getByRole('button', { name: 'Mark read', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Done', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: `Deselect ${visible[1].title}`, exact: true })).toBeDisabled();
+    releaseMutation();
+    await expect(page.getByText(/The failed books remain selected/)).toBeVisible();
+    const retrySelection = page.getByRole('region', { name: '1 selected', exact: true });
+    await expect(retrySelection).toBeVisible();
+    await expect(page.getByRole('button', {
+      name: `Deselect ${visible[1].title}`, exact: true,
+    })).toBeVisible();
+    await page.screenshot({
+      path: testInfo.outputPath(`library-select-all-${viewport.width}-retryable-failure.jpg`),
+      type: 'jpeg',
+      quality: 75,
+    });
+    // The mutation failure was intercepted for one selected book. Retry it
+    // through the real API and confirm the full select-all result is now read.
+    await page.unroute('**/api/v1/books/*/read');
+    await retrySelection.getByRole('button', { name: 'Mark read', exact: true }).click();
+    await expect(page.locator('[aria-live="polite"]')).toContainText('1 marked as read.');
+    const readResponse = await page.request.get('/api/v1/books?filter=read&select_all=1&sort=new');
+    expect(readResponse.ok(), await readResponse.text()).toBeTruthy();
+    const readIds = (await readResponse.json() as { ids: number[] }).ids;
+    for (const id of expected.ids) expect(readIds).toContain(id);
+    await page.screenshot({
+      path: testInfo.outputPath(`library-select-all-${viewport.width}-retry-complete.jpg`),
+      type: 'jpeg',
+      quality: 75,
+    });
+  } finally {
+    releaseLaterPages();
+    await page.unrouteAll({ behavior: 'wait' });
+  }
 });
 
 test('library search select-all uses the current server-matched query', async ({ secondaryUser }, testInfo) => {

@@ -20,3 +20,7 @@ Bulk work uses at most eight concurrent per-book requests. Every failure retains
 ## Limits
 
 This adds New UI bulk selection; classic is unchanged. Browser evidence uses copied private test data and owned temporary users/shelves, not production accounts. Existing count/permission policies are reused, without a physical-device sync claim. Operator owns merging and releasing.
+
+## Broad CI follow-up
+
+Run 36852036795 passed 918 browser cases and failed the desktop/phone beyond-loaded-page precondition: a six-book visible CI library auto-filled both three-card pages before Select all. The test now holds later real page responses until bulk proof is complete, releasing them in finally. It still uses actual server listing/selection/mutations and requires fewer loaded cards than selected IDs; no assertion or product behavior is relaxed. All 13 focused cases passed after the boundary fix. Final cleanup waits for owned route handlers before fixture teardown. A fresh broad CI run is required.

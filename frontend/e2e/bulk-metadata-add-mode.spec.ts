@@ -288,3 +288,80 @@ test('accepting Replace sends list_mode=replace to every selected book', async (
   expect(payloads.every((payload) => payload.list_mode === 'replace')).toBe(true);
   expect(payloads.every((payload) => payload.authors === 'Replacement Author')).toBe(true);
 });
+
+/*
+ * #1703 — Remove drops the named values from each selected book. Series is
+ * single-valued, so a series typed before switching modes must not be sent.
+ */
+test('Remove sends list_mode=remove with only the multi-value fields', async ({ page }) => {
+  const payloads: MetadataUpdate[] = [];
+  await page.route('**/api/v1/books/*/metadata', async (route) => {
+    payloads.push(route.request().postDataJSON() as MetadataUpdate);
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+  });
+
+  await selectBothAndOpenMetadata(page);
+  const panel = page.getByRole('region', { name: 'Apply metadata' });
+  await panel.getByLabel('Series').fill('Typed before switching');
+  await panel.getByText('Remove these', { exact: true }).click();
+  await expect(panel.getByRole('radio', { name: 'Remove these' })).toBeChecked();
+  await expect(panel.getByLabel('Series')).toHaveCount(0);
+  await panel.getByLabel('Tags (comma separated)').fill('Existing tag');
+  await panel.getByRole('button', { name: 'Apply to 2 books' }).click();
+
+  await expect.poll(() => payloads.length).toBe(2);
+  expect(payloads).toEqual([
+    { tags: 'Existing tag', list_mode: 'remove' },
+    { tags: 'Existing tag', list_mode: 'remove' },
+  ]);
+});
+
+/*
+ * The endpoint answers 200 while naming a rejected field in `errors`. Counting
+ * that as applied told the user every book changed and cleared the selection.
+ */
+test('a field error in a 200 response is reported as a failed book, not applied', async ({ page }) => {
+  await page.route('**/api/v1/books/*/metadata', async (route) => {
+    const failing = route.request().url().includes(`/books/${BOOKS[1].id}/`);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(failing ? { errors: { authors: 'A book must keep at least one author' } } : {}),
+    });
+  });
+
+  await selectBothAndOpenMetadata(page);
+  const panel = page.getByRole('region', { name: 'Apply metadata' });
+  await panel.getByText('Remove these', { exact: true }).click();
+  await panel.getByLabel('Authors (separate with &)').fill('Another Author');
+  await panel.getByRole('button', { name: 'Apply to 2 books' }).click();
+
+  await expect(page.getByText(/Metadata applied to 1; 1 failed/).first()).toBeAttached();
+  await expect(page.getByRole('region', { name: '1 selected' })).toBeVisible();
+});
+
+test('a tag page offers removing that tag from the selection directly', async ({ page }) => {
+  await page.route('**/api/v1/tags', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ items: [{ id: 40, name: 'Existing tag', count: 2 }] }),
+  }));
+  const payloads: MetadataUpdate[] = [];
+  await page.route('**/api/v1/books/*/metadata', async (route) => {
+    payloads.push(route.request().postDataJSON() as MetadataUpdate);
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+  });
+
+  await page.goto('/app/tags/40');
+  await page.getByRole('button', { name: 'Select', exact: true }).click();
+  await page.getByRole('button', { name: `Select ${BOOKS[0].title}` })
+    .click({ position: { x: 12, y: 12 } });
+  await page.getByRole('button', { name: `Select ${BOOKS[1].title}` })
+    .click({ position: { x: 12, y: 12 } });
+  await page.getByRole('button', { name: 'Remove tag "Existing tag"' }).click();
+
+  await expect.poll(() => payloads.length).toBe(2);
+  expect(payloads.every((p) => p.tags === 'Existing tag' && p.list_mode === 'remove')).toBe(true);
+  // The books left this tag; the bar must not keep counting them.
+  await expect(page.getByRole('region', { name: '2 selected' })).toHaveCount(0);
+});

@@ -18094,3 +18094,23 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "Remove tag \"{tag}\""
+msgstr "Retirer l’étiquette « {tag} »"
+
+#: cps/spa_strings.py
+msgid "Remove these"
+msgstr "Retirer ceux-ci"
+
+#: cps/spa_strings.py
+msgid "Tag removed from {n} book(s)."
+msgstr "Étiquette retirée de {n} livre(s)."
+
+#: cps/spa_strings.py
+msgid "Tag removed from {succeeded}; {failed} failed."
+msgstr "Étiquette retirée de {succeeded} ; {failed} en échec."
+
+#: cps/spa_strings.py
+msgid "The authors, tags, publishers, and languages you enter will be removed from each selected book. Books without them are left unchanged."
+msgstr "Les auteurs, étiquettes, éditeurs et langues saisis seront retirés de chaque livre sélectionné. Les livres qui ne les ont pas restent inchangés."

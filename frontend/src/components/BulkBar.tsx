@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Check, X, BookCopy, BookMinus, Trash2, CheckCheck, Pencil, Combine } from 'lucide-react';
+import { Check, X, BookCopy, BookMinus, Trash2, CheckCheck, Pencil, Combine, Tag as TagIcon } from 'lucide-react';
 import { useBulkActions, useShelves, useMe, useMergeBooks } from '../lib/queries';
 import { useT } from '../lib/i18n';
 import { useAnnouncer } from '../lib/a11y/announcer';
@@ -26,6 +26,9 @@ interface BulkBarProps {
    *  Pages can refresh their results and retain only retryable selections. */
   onChanged?: (changedIds: number[]) => void;
   onBusyChange?: (busy: boolean) => void;
+  /** The tag whose page this selection was made on (#1703): offers a direct
+   *  "remove this tag" action so the user need not retype it. */
+  currentTag?: string;
 }
 
 export function BulkSelectionBar({ count, onClear, children, sticky = false, busy = false }: {
@@ -75,7 +78,7 @@ export function BulkSelectionBar({ count, onClear, children, sticky = false, bus
 /** Floating action bar for the catalog's multi-select mode. Uses per-book
  *  accounting whether the server receives individual requests or bounded
  *  membership batches. */
-export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged, onBusyChange }: BulkBarProps) {
+export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged, onBusyChange, currentTag }: BulkBarProps) {
   const t = useT();
   const announce = useAnnouncer();
   const me = useMe().data;
@@ -240,7 +243,9 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged,
     // after this check so selecting a mode alone cannot issue empty writes.
     const fields: MetadataUpdate = {};
     if (meta.tags.trim()) fields.tags = meta.tags.trim();
-    if (meta.series.trim()) fields.series = meta.series.trim();
+    // Series is single-valued, so Remove has nothing to apply it to; the input
+    // is hidden in that mode and a value typed earlier must not be sent.
+    if (listMode !== 'remove' && meta.series.trim()) fields.series = meta.series.trim();
     if (meta.publishers.trim()) fields.publishers = meta.publishers.trim();
     if (meta.languages.trim()) fields.languages = meta.languages.trim();
     if (meta.authors.trim()) fields.authors = meta.authors.trim();
@@ -267,6 +272,25 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged,
     });
   };
 
+  // #1703 — on a tag's own page, drop that one tag from the selection without
+  // opening the editor. Books without it are left untouched by the server.
+  const removeCurrentTag = () => {
+    if (!currentTag) return;
+    setMetadata.mutate({ ids, fields: { tags: currentTag, list_mode: 'remove' } }, {
+      onSuccess: (result) => {
+        const succeeded = result.succeededIds.length;
+        const failed = result.failedIds.length;
+        reportAccounting(result, failed
+          ? t('Tag removed from {succeeded}; {failed} failed.', { succeeded, failed })
+          : t('Tag removed from {n} book(s).', { n: succeeded }));
+        if (succeeded) onChanged?.(result.succeededIds);
+        // Books that lost the tag leave this tag's page; keep only failures
+        // selected so the bar never counts books the user can no longer see.
+        if (!failed) onRetryable([]);
+      },
+    });
+  };
+
   return (
     <div className={styles.bulkStack}>
     {metaOpen && (
@@ -284,18 +308,27 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged,
                 checked={listMode === 'replace'} onChange={() => setListMode('replace')} />
               {t('Replace existing')}
             </label>
+            <label className={listMode === 'remove' ? styles.modeActive : styles.modeChoice}>
+              <input type="radio" name="bulk-list-mode" value="remove"
+                checked={listMode === 'remove'} onChange={() => setListMode('remove')} />
+              {t('Remove these')}
+            </label>
           </div>
         </fieldset>
         <p className={styles.metaHint} aria-live="polite">
           {listMode === 'add'
             ? t("New authors, tags, publishers, and languages will be added after each book's existing values. Filled single-value fields will be replaced.")
-            : t("Every filled field will replace each book's existing values.")}
+            : listMode === 'remove'
+              ? t('The authors, tags, publishers, and languages you enter will be removed from each selected book. Books without them are left unchanged.')
+              : t("Every filled field will replace each book's existing values.")}
         </p>
         <div className={styles.metaGrid}>
           <input placeholder={t('Authors (separate with &)')} aria-label={t('Authors (separate with &)')} value={meta.authors}
             onChange={(e) => setMeta({ ...meta, authors: e.target.value })} />
-          <input placeholder={t('Series')} aria-label={t('Series')} value={meta.series}
-            onChange={(e) => setMeta({ ...meta, series: e.target.value })} />
+          {listMode !== 'remove' && (
+            <input placeholder={t('Series')} aria-label={t('Series')} value={meta.series}
+              onChange={(e) => setMeta({ ...meta, series: e.target.value })} />
+          )}
           <input placeholder={t('Tags (comma separated)')} aria-label={t('Tags (comma separated)')} value={meta.tags}
             onChange={(e) => setMeta({ ...meta, tags: e.target.value })} />
           <input placeholder={t('Publishers (comma separated)')} aria-label={t('Publishers (comma separated)')} value={meta.publishers}
@@ -350,6 +383,12 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged,
               setMetaOpen((open) => !open);
             }}>
             <Pencil size={15} aria-hidden="true" focusable={false} /> {t('Edit metadata')}
+          </button>
+        )}
+
+        {canEdit && currentTag && (
+          <button type="button" className={styles.action} disabled={busy} onClick={removeCurrentTag}>
+            <TagIcon size={15} aria-hidden="true" focusable={false} /> {t('Remove tag "{tag}"', { tag: currentTag })}
           </button>
         )}
 

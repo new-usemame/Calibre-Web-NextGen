@@ -17567,3 +17567,23 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py
+msgid "Remove tag \"{tag}\""
+msgstr "Label \"{tag}\" verwijderen"
+
+#: cps/spa_strings.py
+msgid "Remove these"
+msgstr "Deze verwijderen"
+
+#: cps/spa_strings.py
+msgid "Tag removed from {n} book(s)."
+msgstr "Label verwijderd van {n} boek(en)."
+
+#: cps/spa_strings.py
+msgid "Tag removed from {succeeded}; {failed} failed."
+msgstr "Label verwijderd van {succeeded}; {failed} mislukt."
+
+#: cps/spa_strings.py
+msgid "The authors, tags, publishers, and languages you enter will be removed from each selected book. Books without them are left unchanged."
+msgstr "De ingevoerde auteurs, labels, uitgevers en talen worden van elk geselecteerd boek verwijderd. Boeken zonder deze waarden blijven ongewijzigd."

@@ -1037,7 +1037,14 @@ export function useBulkActions() {
   // mode to every selected book via the per-book metadata endpoint.
   const setMetadata = useMutation({
     mutationFn: (v: { ids: number[]; fields: MetadataUpdate }) =>
-      settleById(v.ids, (id) => apiPost(`/api/v1/books/${id}/metadata`, v.fields)),
+      settleById(v.ids, async (id) => {
+        // The endpoint answers 200 even when a field was rejected, naming it in
+        // `errors`; a bulk edit must count that book as failed, not applied.
+        const result = await apiPost<BookMetadata>(`/api/v1/books/${id}/metadata`, v.fields);
+        const fieldErrors = Object.values(result?.errors ?? {});
+        if (fieldErrors.length) throw new Error(fieldErrors.join('; '));
+        return result;
+      }),
     onSuccess: refresh,
   });
   return { markRead, addToShelf, deleteBooks, removeFromMyLibrary, setMetadata };

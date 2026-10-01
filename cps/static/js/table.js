@@ -853,7 +853,16 @@ $(function() {
         $("#add_element_bool").toggleClass("hidden", !boolMode);
         if (boolMode) {
             elementHeader.attr("data-editable-type", "select");
-            elementHeader.attr("data-editable-source", JSON.stringify(boolChoices));
+            var editableBoolChoices = boolChoices.map(function(choice) {
+                return {value: "bool:" + choice.value, text: choice.text};
+            });
+            // bootstrap-table reads header data-* values through jQuery.data(),
+            // which parses a JSON array into objects. The editable extension
+            // writes those values into a generated HTML attribute, where an
+            // object array becomes `[object Object],...`; entity-escape the
+            // quotes so jQuery keeps the source as JSON text and x-editable can
+            // parse it after the browser decodes the generated attribute.
+            elementHeader.attr("data-editable-source", JSON.stringify(editableBoolChoices).replace(/"/g, "&quot;"));
         } else {
             elementHeader.attr("data-editable-type", "text");
             elementHeader.removeAttr("data-editable-source");
@@ -904,6 +913,9 @@ $(function() {
         });
         $("#restrict-elements-table").removeClass("table-hover");
         $("#restrict-elements-table").off("editable-save.bs.table").on("editable-save.bs.table", function (e, field, row) {
+            if (boolMode && field === "Element" && typeof row.Element === "string" && row.Element.indexOf("bool:") === 0) {
+                row.Element = row.Element.substring(5);
+            }
             $.ajax({
                 url: getPath() + "/ajax/editrestriction/" + type + "/" + userId,
                 type: "Post",
@@ -1114,11 +1126,13 @@ function RestrictionActions (value, row) {
 }
 
 function restrictionValueFormatter(value) {
+    // Keep a stable token in the widget cell so bootstrap-editable can match
+    // its select source and render the translated label. X-editable reads
+    // data-value through jQuery, which turns `true` and `false` into booleans;
+    // use a string prefix in the widget and strip it from edit submissions.
     var $table = $("#restrict-elements-table");
-    if ($table.attr("data-bool-mode") === "true") {
-        var choices = $table.data("bool-choices") || [];
-        var selected = choices.find(function(choice) { return choice.value === value; });
-        if (selected) return selected.text;
+    if ($table.attr("data-bool-mode") === "true" && ["true", "false", "undefined"].indexOf(value) !== -1) {
+        return "bool:" + value;
     }
     return $("<span>").text(value == null ? "" : value).html();
 }

@@ -58,6 +58,39 @@ def test_service_script_is_free_of_container_paths(script):
     assert not offenders, f"{script.name} still depends on the image layout: {offenders}"
 
 
+@pytest.mark.parametrize("script", sorted(SERVICES_DIR.glob("[!_]*.sh")), ids=lambda p: p.name)
+def test_external_commands_never_wrap_the_cwa_run_as_function(script):
+    """timeout, exec and friends run programs, not shell functions; they take
+    "${CWA_RUN_AS_ARGV[@]}" instead."""
+    wrapped = re.compile(r"\b(?:timeout|exec|xargs|nohup|env|setsid|nice|flock)\b[^|;&#]*\bcwa_run_as\b")
+    offenders = [
+        line.strip()
+        for line in script.read_text(encoding="utf-8").splitlines()
+        if not line.lstrip().startswith("#") and wrapped.search(line)
+    ]
+    assert not offenders, f"{script.name}: {offenders}"
+
+
+def test_cwa_run_as_argv_works_under_timeout(tmp_path):
+    marker = tmp_path / "prefix-ran"
+    prefix = tmp_path / "as-user"
+    prefix.write_text(f'#!/bin/sh\necho "$@" > "{marker}"\n')
+    prefix.chmod(0o755)
+    snippet = f'. "{SERVICES_DIR / "_common.sh"}"; timeout 5 "${{CWA_RUN_AS_ARGV[@]}}" echo direct'
+
+    bare = subprocess.run(
+        ["bash", "-c", snippet], env={**os.environ, "CWA_RUN_AS": ""},
+        capture_output=True, text=True, check=True,
+    )
+    assert bare.stdout.strip() == "direct"
+
+    subprocess.run(
+        ["bash", "-c", snippet], env={**os.environ, "CWA_RUN_AS": str(prefix)},
+        capture_output=True, text=True, check=True,
+    )
+    assert marker.read_text().strip() == "echo direct"
+
+
 def test_cwa_run_as_runs_the_prefix_or_the_bare_command(tmp_path):
     marker = tmp_path / "prefix-ran"
     prefix = tmp_path / "as-user"

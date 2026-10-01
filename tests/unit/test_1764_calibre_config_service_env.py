@@ -104,7 +104,7 @@ def test_audit_names_every_s6_service_reaching_a_calibre_tool():
     reachability_markers = {
         "calibre-binaries-setup": "timeout 10 calibredb --version",
         "cwa-auto-library": '"$CWA_PYTHON" "$CWA_SCRIPTS/auto_library.py"',
-        "cwa-ingest-service": "python3 /app/calibre-web-automated/scripts/ingest_processor.py",
+        "cwa-ingest-service": '"$CWA_PYTHON" "$CWA_SCRIPTS/ingest_processor.py"',
         "metadata-change-detector": "metadata_change_dispatch.py",
         "svc-calibre-web-automated": (
             "cwa-as-abc /usr/bin/env -u PYTHONPATH "

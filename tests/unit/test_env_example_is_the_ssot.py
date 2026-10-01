@@ -32,6 +32,7 @@ ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "examples" / ".env.example"
 PYTHON_ROOTS = (ROOT / "cps", ROOT / "scripts")
 S6_ROOT = ROOT / "root" / "etc" / "s6-overlay"
+SERVICE_SCRIPTS_ROOT = ROOT / "scripts" / "services"
 FRONTEND_ROOT = ROOT / "frontend"
 
 # name -> (argument index containing the environment key, files defining/calling it)
@@ -58,6 +59,7 @@ DYNAMIC_PYTHON_READERS = frozenset(
 # These names are intentionally outside the deployment SSOT. Each is owned by an
 # external runtime/tool rather than accepted as CWNG configuration.
 SSOT_EXCEPTIONS = {
+    "BASH_SOURCE": "provided by bash; the service scripts locate themselves with it",
     "CALIBRE_CONFIG_DIRECTORY": "written by CWNG for Calibre child processes; Calibre owns and consumes it",
     "CI": "provided and interpreted by the CI and Playwright runtimes",
     "CONFIG_DIR": "Compose interpolation helper; CWNG reads the resulting CALIBRE_DBPATH instead",
@@ -331,6 +333,16 @@ def _shell_env_reads() -> dict[str, set[str]]:
         except UnicodeDecodeError:
             continue
         for key, locations in found.items():
+            reads.setdefault(key, set()).update(locations)
+    # The service bodies the s6 run files exec (#2094). Each sources _common.sh
+    # first, so names it assigns are not environment reads in the script.
+    common = SERVICE_SCRIPTS_ROOT / "_common.sh"
+    common_assigned = set(SHELL_ASSIGNMENT.findall(common.read_text(encoding="utf-8")))
+    for path in sorted(SERVICE_SCRIPTS_ROOT.glob("*.sh")):
+        found = _shell_env_reads_from_source(path, path.read_text(encoding="utf-8"))
+        for key, locations in found.items():
+            if path != common and key in common_assigned:
+                continue
             reads.setdefault(key, set()).update(locations)
     return reads
 

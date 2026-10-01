@@ -63,7 +63,7 @@ DROP_TO_ABC = r"(?:s6-setuidgid\s+abc|cwa-as-abc)"
 # Service bodies in scripts/services drop through cwa_run_as, which runs
 # $CWA_RUN_AS; the s6 run file sets that to cwa-as-abc (#2094).
 COMMON_SH = REPO_ROOT / "scripts" / "services" / "_common.sh"
-DROP_OR_RUN_AS = r"(?:s6-setuidgid\s+abc|cwa-as-abc|cwa_run_as)"
+DROP_OR_RUN_AS = r'(?:s6-setuidgid\s+abc|cwa-as-abc|cwa_run_as|"\$\{CWA_RUN_AS_ARGV\[@\]\}")'
 PYTHON = r'(?:python3?|"\$CWA_PYTHON")'
 
 
@@ -126,7 +126,7 @@ def test_cwa_run_as_drops_to_abc_in_the_image():
     cwa-as-abc before exec'ing the service body, and the helper actually
     runs that prefix."""
     common = COMMON_SH.read_text()
-    assert re.search(r'\$CWA_RUN_AS\s+"\$@"', common), (
+    assert re.search(r'"\$\{CWA_RUN_AS_ARGV\[@\]\}"\s+"\$@"', common), (
         "_common.sh's cwa_run_as no longer runs $CWA_RUN_AS — service bodies "
         "would run Python as root in the image, regressing issue #162."
     )
@@ -145,11 +145,9 @@ def test_cwa_ingest_service_still_uses_s6_setuidgid_for_python():
     which is why .epub outputs in fixed_originals are PUID-owned. If
     this assertion breaks, the regression test above loses its
     comparator."""
-    run = REPO_ROOT / "root" / "etc" / "s6-overlay" / "s6-rc.d" / "cwa-ingest-service" / "run"
-    assert run.exists(), f"missing {run}"
-    text = run.read_text()
+    text = service_source("cwa-ingest-service")
     assert re.search(
-        rf"{DROP_TO_ABC}\s+(?:\S+\s+)*python3?\s+/app/calibre-web-automated/scripts/ingest_processor\.py",
+        rf"{DROP_OR_RUN_AS}\s+(?:\S+\s+)*{PYTHON}\s+(?:/app/calibre-web-automated/scripts/|\"\$CWA_SCRIPTS/)ingest_processor\.py",
         text,
     ), (
         "cwa-ingest-service no longer drops to `abc` before invoking "

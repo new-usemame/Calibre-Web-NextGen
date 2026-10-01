@@ -17912,3 +17912,15 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+msgid "Cannot select this Boolean column until incompatible global and user restrictions are corrected or cleared."
+msgstr "Deze Booleaanse kolom kan pas worden geselecteerd nadat incompatibele globale en gebruikersbeperkingen zijn gecorrigeerd of gewist."
+
+msgid "Boolean restrictions must be Yes, No, or Undefined."
+msgstr "Booleaanse beperkingen moeten Ja, Nee of Ongedefinieerd zijn."
+
+msgid "Restrict book visibility based on values in a Calibre text, enumeration, or Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
+msgstr "Beperk de zichtbaarheid van boeken op basis van waarden in een Calibre-aangepaste kolom van het type tekst, opsomming of Booleaans. Booleaanse kolommen onderscheiden Ja, Nee en Ongedefinieerd."
+
+msgid "Undefined"
+msgstr "Ongedefinieerd"

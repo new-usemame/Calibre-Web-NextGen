@@ -16035,3 +16035,18 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+#: cps/admin.py
+msgid "Cannot select this Boolean column until incompatible global and user restrictions are corrected or cleared."
+msgstr ""
+
+#: cps/admin.py
+msgid "Boolean restrictions must be Yes, No, or Undefined."
+msgstr ""
+
+#: cps/templates/config_view_edit.html
+msgid "Restrict book visibility based on values in a Calibre text, enumeration, or Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
+msgstr ""
+
+#: cps/templates/modal_dialogs.html
+msgid "Undefined"
+msgstr ""

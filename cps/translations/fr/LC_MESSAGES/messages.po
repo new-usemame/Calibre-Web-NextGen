@@ -18443,3 +18443,15 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+msgid "Cannot select this Boolean column until incompatible global and user restrictions are corrected or cleared."
+msgstr "Impossible de sélectionner cette colonne booléenne avant d'avoir corrigé ou supprimé les restrictions globales et utilisateur incompatibles."
+
+msgid "Boolean restrictions must be Yes, No, or Undefined."
+msgstr "Les restrictions booléennes doivent être Oui, Non ou Non défini."
+
+msgid "Restrict book visibility based on values in a Calibre text, enumeration, or Boolean custom column. Boolean columns distinguish Yes, No, and Undefined."
+msgstr "Restreindre la visibilité des livres selon les valeurs d'une colonne personnalisée Calibre de type texte, énumération ou booléen. Les colonnes booléennes distinguent Oui, Non et Non défini."
+
+msgid "Undefined"
+msgstr "Non défini"

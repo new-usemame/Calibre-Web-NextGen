@@ -1745,7 +1745,7 @@ def auto_resolve_duplicates(strategy='newest', dry_run=False, user_id=None, trig
         # Disk space check (strategy-dependent thresholds)
         try:
             import shutil as shutil_disk
-            stat = shutil_disk.disk_usage('/config')
+            stat = shutil_disk.disk_usage(constants.CONFIG_DIR)
             available_gb = stat.free / (1024**3)
             
             # Merge strategy needs more space (copies formats before deletion)

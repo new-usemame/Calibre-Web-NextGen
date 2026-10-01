@@ -463,7 +463,8 @@ def _get_ingest_path(uploaded_file, prefix_parts=None):
     # Ensure proper ownership of ingest directory (fix for issue #603)
     try:
         nsm = network_share_mode_enabled()
-        if not (nsm and ingest_dir == "/cwa-book-ingest"):
+        # Like cwa-init, a network share is never chowned, wherever it is mounted.
+        if not nsm:
             # Set ownership to abc:abc (uid=1000, gid=1000)
             uid = _get_ingest_owner_id("PUID")
             gid = _get_ingest_owner_id("PGID")

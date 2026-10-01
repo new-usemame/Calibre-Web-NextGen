@@ -435,6 +435,12 @@ def create_app(config=None, services=None):
         state.config_fingerprint = _process_config_fingerprint(runtime_config)
         state.goodreads_support = getattr(runtime_services, "goodreads_support", None)
 
+    # Resolve declarative Generic OIDC before cookie policy and route setup.
+    # A complete environment-owned provider selects OAuth for this process
+    # without persisting config_login_type to app.db.
+    from . import oauth_config
+    oauth_config.prepare_application(application, runtime_config)
+
     # Intelligent Security Configuration
     # Force SESSION_COOKIE_SECURE if OAuth is enabled OR if "Use via HTTPS" is checked.
     if config is None:

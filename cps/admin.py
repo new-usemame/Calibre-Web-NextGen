@@ -674,10 +674,21 @@ def configuration():
             hardcover_status["expires_label"] = _("Hardcover token expires")
         except Exception:
             log.debug("Unable to inspect Hardcover token status", exc_info=True)
+    providers = [dict(provider) for provider in oauth_bb.get_oauth_blueprints()]
+    environment = current_app.extensions.get("cps_generic_oauth_environment", {})
+    for provider in providers:
+        if provider.get("provider_name") == "generic" and provider.get("environment_managed"):
+            # The runtime descriptor must retain the secret for Flask-Dance,
+            # but an admin page never needs the value.
+            provider["oauth_client_secret"] = ""
+
     return render_title_template("config_edit.html",
                                  config=config,
-                                 provider=oauth_bb.get_oauth_blueprints(),
+                                 provider=providers,
                                  feature_support=feature_support,
+                                 generic_oauth_environment_managed=bool(environment.get("managed")),
+                                 generic_oauth_environment_active=bool(environment.get("active")),
+                                 generic_oauth_environment_error=environment.get("error"),
                                  kobo_two_way_emergency_disabled=(
                                      os.environ.get("CWNG_KOBO_TWO_WAY_ANNOTATIONS", "").strip().lower()
                                      in {"0", "false", "off", "no"}
@@ -2052,6 +2063,10 @@ def _configuration_oauth_helper(to_save):
     for element in oauth_bb.get_oauth_blueprints():
         update = {}
         if element["provider_name"] == "generic":
+            if element.get("environment_managed"):
+                # Deployment owns every Generic OIDC setting, including the
+                # secret and activation state. Ignore even forged POST values.
+                continue
             if to_save["config_generic_oauth_client_id"] != element["oauth_client_id"]:
                 reboot_required = True
                 update["oauth_client_id"] = to_save["config_generic_oauth_client_id"]
@@ -3109,7 +3124,9 @@ def _configuration_update_helper():
             to_save["config_converterpath"] = get_calibre_binarypath("ebook-convert")
             _config_string(to_save, "config_converterpath")
 
-        reboot_required |= _config_int(to_save, "config_login_type")
+        env_oauth = current_app.extensions.get("cps_generic_oauth_environment", {})
+        if not (env_oauth.get("managed") and env_oauth.get("active")):
+            reboot_required |= _config_int(to_save, "config_login_type")
 
         # LDAP configurator
         if config.config_login_type == constants.LOGIN_LDAP:

@@ -276,6 +276,8 @@ corrected.
 
 The Admin → Settings panel has many optional toggles (auto-convert formats, automatic backups, EPUB fixer, KOReader sync, OAuth, etc.). The [upstream wiki](https://github.com/crocodilestick/Calibre-Web-Automated/wiki) is the source of truth for those; this fork doesn't change them.
 
+For deployment-managed Generic OIDC credentials and endpoint settings, see the [environment configuration guide](docs/OAUTH-ENVIRONMENT-CONFIGURATION.md).
+
 ---
 
 ## Updating

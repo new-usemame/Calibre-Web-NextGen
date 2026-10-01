@@ -797,6 +797,13 @@ class ConfigSQL(object):
             except OperationalError as e:
                 log.error('Database error: %s', e)
                 self._session.rollback()
+        runtime_login_type = self.__dict__.get("_runtime_login_type_override")
+        if runtime_login_type is not None:
+            # Environment-managed OIDC selects OAuth for this process without
+            # changing the stored login type. Preserve that startup decision
+            # across admin saves/reloads; the value is private runtime state,
+            # so bypass ConfigSQL.__setattr__ and never add it to app.db.
+            self.__dict__["config_login_type"] = runtime_login_type
         self.__dict__["dirty"] = list()
 
     def save(self):

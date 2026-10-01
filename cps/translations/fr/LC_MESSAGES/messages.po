@@ -12683,6 +12683,24 @@ msgid "Use OAuth"
 msgstr "Utiliser OAuth"
 
 #: cps/templates/config_edit.html
+msgid ""
+"Generic OIDC is managed by the environment. Its settings and secret cannot "
+"be changed here; secret-file rotation takes effect after restart."
+msgstr ""
+"Generic OIDC est géré par l’environnement. Ses paramètres et son secret ne "
+"peuvent pas être modifiés ici ; le renouvellement du secret monté prend effet "
+"après redémarrage."
+
+#: cps/templates/config_edit.html
+#, python-format
+msgid ""
+"Generic OIDC is inactive because its environment configuration is incomplete "
+"or invalid: %(reason)s"
+msgstr ""
+"Generic OIDC est inactif car sa configuration d’environnement est "
+"incomplète ou invalide : %(reason)s"
+
+#: cps/templates/config_edit.html
 msgid "Server Configuration"
 msgstr "Configuration du serveur"
 
@@ -13185,6 +13203,19 @@ msgid "Generic OAuth Provider"
 msgstr "Fournisseur OAuth générique"
 
 #: cps/templates/config_edit.html
+msgid ""
+"Generic OIDC settings are supplied by the environment and are read-only "
+"here. They are not saved to the application database."
+msgstr ""
+"Les paramètres Generic OIDC sont fournis par l’environnement et sont en "
+"lecture seule ici. Ils ne sont pas enregistrés dans la base de données de "
+"l’application."
+
+#: cps/templates/config_edit.html
+msgid "Environment-managed Generic OIDC settings"
+msgstr "Paramètres Generic OIDC gérés par l’environnement"
+
+#: cps/templates/config_edit.html
 msgid "OAuth Metadata URL (for auto-discovery)"
 msgstr "URL de métadonnées OAuth (pour auto-découverte)"
 
@@ -13271,6 +13302,19 @@ msgstr "Client Id OAuth"
 #: cps/templates/config_edit.html
 msgid "OAuth Client Secret"
 msgstr "Client secret OAuth"
+
+#: cps/templates/config_edit.html
+msgid "Supplied by environment"
+msgstr "Fourni par l’environnement"
+
+#: cps/templates/config_edit.html
+msgid ""
+"The secret is never displayed or saved in the application database. Restart "
+"the service after rotating a mounted secret file."
+msgstr ""
+"Le secret n’est jamais affiché ni enregistré dans la base de données de "
+"l’application. Redémarrez le service après avoir renouvelé un fichier de "
+"secret monté."
 
 #: cps/templates/config_edit.html
 msgid "Field Mapping Configuration"

@@ -12508,6 +12508,24 @@ msgid "Use OAuth"
 msgstr "Gebruik OAuth"
 
 #: cps/templates/config_edit.html
+msgid ""
+"Generic OIDC is managed by the environment. Its settings and secret cannot "
+"be changed here; secret-file rotation takes effect after restart."
+msgstr ""
+"Generic OIDC wordt beheerd via de omgeving. De instellingen en het geheim "
+"kunnen hier niet worden gewijzigd; een rotatie van het gemounte geheim is "
+"pas actief na een herstart."
+
+#: cps/templates/config_edit.html
+#, python-format
+msgid ""
+"Generic OIDC is inactive because its environment configuration is incomplete "
+"or invalid: %(reason)s"
+msgstr ""
+"Generic OIDC is inactief omdat de omgevingsconfiguratie onvolledig of "
+"ongeldig is: %(reason)s"
+
+#: cps/templates/config_edit.html
 msgid "Server Configuration"
 msgstr "Serverinstellingen"
 
@@ -12984,6 +13002,18 @@ msgid "Generic OAuth Provider"
 msgstr "Generieke OAuth Provider"
 
 #: cps/templates/config_edit.html
+msgid ""
+"Generic OIDC settings are supplied by the environment and are read-only "
+"here. They are not saved to the application database."
+msgstr ""
+"Generic OIDC-instellingen worden via de omgeving aangeleverd en zijn hier "
+"alleen-lezen. Ze worden niet opgeslagen in de applicatiedatabase."
+
+#: cps/templates/config_edit.html
+msgid "Environment-managed Generic OIDC settings"
+msgstr "Door de omgeving beheerde Generic OIDC-instellingen"
+
+#: cps/templates/config_edit.html
 msgid "OAuth Metadata URL (for auto-discovery)"
 msgstr "OAuth Metadata URL (voor automatische detectie)"
 
@@ -13068,6 +13098,18 @@ msgstr "%(provider)s OAuth Client Id"
 #, fuzzy
 msgid "OAuth Client Secret"
 msgstr "%(provider)s OAuth Client geheim"
+
+#: cps/templates/config_edit.html
+msgid "Supplied by environment"
+msgstr "Aangeleverd via omgeving"
+
+#: cps/templates/config_edit.html
+msgid ""
+"The secret is never displayed or saved in the application database. Restart "
+"the service after rotating a mounted secret file."
+msgstr ""
+"Het geheim wordt nooit weergegeven of opgeslagen in de applicatiedatabase. "
+"Start de service opnieuw nadat u het gemounte geheim hebt geroteerd."
 
 #: cps/templates/config_edit.html
 #, fuzzy

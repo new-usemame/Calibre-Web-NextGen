@@ -18,7 +18,19 @@ pytestmark = pytest.mark.unit
 BOOL_COLUMN_ID = 13222
 
 
-def test_opds_search_hides_boolean_denials_for_the_basic_auth_user(monkeypatch):
+@pytest.mark.parametrize(
+    ("cookie_allowed", "cookie_denied"),
+    [
+        ("", ""),
+        # The browser account's policy is deliberately stricter and opposite:
+        # this distinguishes passing Basic Auth into search_query's own
+        # common_filters() from applying only a later OPDS filter.
+        ("false", "true,undefined"),
+    ],
+    ids=["unrestricted-cookie", "stricter-cookie"],
+)
+def test_opds_search_hides_boolean_denials_for_the_basic_auth_user(
+        monkeypatch, cookie_allowed, cookie_denied):
     if BOOL_COLUMN_ID not in db.cc_classes:
         db.CalibreDB.setup_db_cc_classes([
             SimpleNamespace(id=BOOL_COLUMN_ID, datatype="bool"),
@@ -50,6 +62,14 @@ def test_opds_search_hides_boolean_denials_for_the_basic_auth_user(monkeypatch):
         value_model(book=books[1].id, value=False),
         value_model(book=books[2].id, value=None),
     ])
+    # The same reader owns the read/archive joins returned with each search
+    # result. The cookie user has a conflicting state for this book.
+    session.add_all([
+        ub.ReadBook(book_id=books[0].id, user_id=20, read_status=ub.ReadBook.STATUS_IN_PROGRESS),
+        ub.ReadBook(book_id=books[0].id, user_id=10, read_status=ub.ReadBook.STATUS_UNREAD),
+        ub.ArchivedBook(book_id=books[0].id, user_id=20, is_archived=False),
+        ub.ArchivedBook(book_id=books[0].id, user_id=10, is_archived=True),
+    ])
     # Deliberately make the Flask cookie user unrestricted. OPDS Basic Auth
     # is the policy identity for this request, and denies the explicit False.
     secondary = SimpleNamespace(
@@ -69,8 +89,8 @@ def test_opds_search_hides_boolean_denials_for_the_basic_auth_user(monkeypatch):
         filter_language=lambda: "all",
         list_allowed_tags=lambda: [""],
         list_denied_tags=lambda: [""],
-        allowed_column_value="",
-        denied_column_value="",
+        allowed_column_value=cookie_allowed,
+        denied_column_value=cookie_denied,
         has_own_library=False,
     )
     session.commit()
@@ -97,6 +117,9 @@ def test_opds_search_hides_boolean_denials_for_the_basic_auth_user(monkeypatch):
 
         visible_ids = sorted(entry[0].id for entry in result["entries"])
         assert visible_ids == [books[0].id, books[2].id, books[3].id]
+        first_book_entry = next(entry for entry in result["entries"] if entry[0].id == books[0].id)
+        assert first_book_entry[1] is False
+        assert first_book_entry[2] == ub.ReadBook.STATUS_IN_PROGRESS
     finally:
         session.close()
         engine.dispose()

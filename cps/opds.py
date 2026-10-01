@@ -1237,10 +1237,14 @@ class FeedObject:
 
 def feed_search(term):
     if term:
+        user = auth.current_user()
         # Search results must use the same content, account, and OPDS exposure
-        # policy as every other catalog feed. The helper supplies the Basic-auth
-        # identity explicitly to common_filters rather than Flask-Login's user.
-        entries = calibre_db.search_query(term, config=config).filter(get_opds_restricted_common_filter()) \
+        # policy as every other catalog feed. Pass the Basic-auth identity into
+        # search_query as well as the final OPDS exposure filter: that query
+        # builds both common policy predicates and per-user status joins.
+        entries = calibre_db.search_query(term, config=config, user=user).filter(
+            get_opds_restricted_common_filter(user)
+        ) \
             .order_by(func.ng_sort_key(db.Books.sort), db.Books.sort, db.Books.id).all()
         entries_count = len(entries) if len(entries) > 0 else 1
         pagination = Pagination(1, entries_count, entries_count)

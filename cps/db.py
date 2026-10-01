@@ -2040,14 +2040,15 @@ class CalibreDB:
                     pos_content_cc_filter, ~neg_content_cc_filter, archived_filter,
                     hidden_filter, membership_filter, extra_filter)
 
-    def generate_linked_query(self, config_read_column, database):
+    def generate_linked_query(self, config_read_column, database, user=None):
         # Safety: session can be briefly None during DB reconnects
         self.ensure_session()
+        linked_user = user or current_user
         if not config_read_column:
             query = (self.session.query(database, ub.ArchivedBook.is_archived, ub.ReadBook.read_status)
                      .select_from(Books)
                      .outerjoin(ub.ReadBook,
-                                and_(ub.ReadBook.user_id == int(current_user.id), ub.ReadBook.book_id == Books.id)))
+                                and_(ub.ReadBook.user_id == int(linked_user.id), ub.ReadBook.book_id == Books.id)))
         else:
             try:
                 read_column = cc_classes[config_read_column]
@@ -2059,7 +2060,7 @@ class CalibreDB:
                 # Skip linking read column and return None instead of read status
                 query = self.session.query(database, None, ub.ArchivedBook.is_archived)
         return query.outerjoin(ub.ArchivedBook, and_(Books.id == ub.ArchivedBook.book_id,
-                                                     int(current_user.id) == ub.ArchivedBook.user_id))
+                                                     int(linked_user.id) == ub.ArchivedBook.user_id))
 
     @staticmethod
     def get_checkbox_sorted(inputlist, state, offset, limit, order, combo=False):
@@ -2316,14 +2317,14 @@ class CalibreDB:
         return self.session.query(Books) \
             .filter(and_(Books.authors.any(and_(*q)), func.lower(Books.title).ilike("%" + title + "%"))).first()
 
-    def search_query(self, term, config, *join, allow_show_hidden=False):
+    def search_query(self, term, config, *join, allow_show_hidden=False, user=None):
         self.ensure_session()
         strip_whitespaces(term).lower()
         q = list()
         author_terms = re.split("[, ]+", term)
         for author_term in author_terms:
             q.append(Books.authors.any(func.lower(Authors.name).ilike("%" + author_term + "%")))
-        query = self.generate_linked_query(config.config_read_column, Books)
+        query = self.generate_linked_query(config.config_read_column, Books, user=user)
         if len(join) == 6:
             query = query.outerjoin(join[0], join[1]).outerjoin(join[2]).outerjoin(join[3], join[4]).outerjoin(join[5])
         if len(join) == 3:
@@ -2347,7 +2348,7 @@ class CalibreDB:
                         func.lower(cc_classes[c.id].value).ilike("%" + term + "%")))
         # Eagerly load the data relationship to prevent session errors
         query = query.options(joinedload(Books.data))
-        return query.filter(self.common_filters(True, allow_show_hidden=allow_show_hidden)) \
+        return query.filter(self.common_filters(True, allow_show_hidden=allow_show_hidden, user=user)) \
             .filter(or_(*filter_expression))
 
     def get_cc_columns(self, config, filter_config_custom_read=False):

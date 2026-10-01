@@ -31,9 +31,7 @@ test('reader help follows host policy and keeps documentation and updates', asyn
       localStorage.removeItem('cwng_kofi_banner_dismissed_v1');
     });
     await page.reload();
-    const donation = page.locator('[data-announcement-id="kofi-support-v1"]');
-    if (mode === 'default') await expect(donation).toBeVisible();
-    else await expect(donation).toHaveCount(0);
+    await expect(page.getByRole('button', { name: `Account: ${secondaryUser.username}`, exact: true })).toBeVisible();
     const trigger = page.getByRole('button', { name: /^Help(?: —|$)/ });
     await trigger.click();
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');
@@ -51,6 +49,11 @@ test('reader help follows host policy and keeps documentation and updates', asyn
       await trigger.press('Tab');
       await expect(page.getByRole('link', { name: "What's new", exact: true })).toBeFocused();
     } else await expect(localLink).toHaveCount(0);
+    // Inspect after the account and menu have rendered their policy. An early
+    // absence while /me is still loading cannot prove a hidden announcement.
+    const donation = page.locator('[data-announcement-id="kofi-support-v1"]');
+    if (mode === 'default') await expect(donation).toBeVisible();
+    else await expect(donation).toHaveCount(0);
     await page.emulateMedia({ reducedMotion: 'reduce' });
     for (const theme of ['light', 'dark']) {
       await page.evaluate(value => document.documentElement.setAttribute('data-theme', value), theme);

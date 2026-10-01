@@ -283,6 +283,89 @@ def test_ambiguous_helper_failure_does_not_restore_after_marker_committed(
     assert existing.read_bytes() == b"committed replacement"
 
 
+def test_folder_label_failure_on_preexisting_marker_retains_source_for_retry(
+    ingest_processor, monkeypatch, tmp_path
+):
+    source = tmp_path / "ingest" / "Owner" / "incoming.epub"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"already imported bytes")
+    processor = _processor(ingest_processor, tmp_path)
+    processor.filepath = str(source)
+    processor.ingest_folder = str(tmp_path / "ingest")
+    processor.cwa_settings.update({
+        "auto_ingest_folder_label_target": "#removed",
+        "auto_ingest_folder_label_nested": False,
+    })
+    _disable_post_import_work(ingest_processor, processor, monkeypatch)
+    processor._content_marker_book_ids = lambda _digest: [7]
+
+    def rejecting_transaction(_staged, _identity, _imported, _source_digest, _metadata, action):
+        if action == "inspect":
+            return {"status": "already_imported", "book_ids": [7], "formats": []}
+        raise ingest_processor.subprocess.CalledProcessError(1, ["calibre-debug"])
+
+    processor._run_calibre_transaction = rejecting_transaction
+
+    with pytest.raises(ingest_processor.RetryIngestSourceError):
+        processor.add_book_to_library(str(source))
+    assert source.is_file()
+
+
+@pytest.mark.parametrize("fail_replay", [False, True])
+def test_concurrent_folder_label_replay_skips_unlocked_format_inspection(
+    ingest_processor, monkeypatch, tmp_path, fail_replay
+):
+    source = tmp_path / "ingest" / "Owner" / "incoming.epub"
+    source.parent.mkdir(parents=True)
+    source.write_bytes(b"concurrent duplicate")
+    processor = _processor(ingest_processor, tmp_path)
+    processor.filepath = str(source)
+    processor.ingest_folder = str(tmp_path / "ingest")
+    processor.cwa_settings.update({
+        "auto_ingest_folder_label_target": "tags",
+        "auto_ingest_folder_label_nested": False,
+    })
+    _disable_post_import_work(ingest_processor, processor, monkeypatch)
+    lock_held = False
+
+    @contextmanager
+    def tracked_lock():
+        nonlocal lock_held
+        lock_held = True
+        try:
+            yield
+        finally:
+            lock_held = False
+
+    monkeypatch.setattr(ingest_processor, "metadata_db_write_lock", tracked_lock)
+    marker_reads = []
+
+    def marker_lookup(_digest):
+        marker_reads.append(lock_held)
+        return [7] if lock_held else []
+
+    processor._content_marker_book_ids = marker_lookup
+    actions = []
+
+    def transaction(_staged, _identity, _imported, _digest, _metadata, action):
+        actions.append(action)
+        if fail_replay:
+            raise ingest_processor.subprocess.CalledProcessError(1, ["calibre-debug"])
+        return {"status": "already_imported", "book_ids": [7]}
+
+    processor._run_calibre_transaction = transaction
+    if fail_replay:
+        with pytest.raises(ingest_processor.RetryIngestSourceError):
+            processor.add_book_to_library(str(source))
+        assert source.is_file()
+    else:
+        processor.add_book_to_library(str(source))
+
+    assert marker_reads == ([False, True, True] if fail_replay else [False, True])
+    assert actions == ["apply-folder-labels"]
+    assert processor.last_added_book_id == (None if fail_replay else 7)
+
+
 def test_sanity_check_finishes_before_metadata_write_lock(
     ingest_processor, monkeypatch, tmp_path
 ):

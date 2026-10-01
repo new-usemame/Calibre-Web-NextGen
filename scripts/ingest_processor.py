@@ -1492,6 +1492,39 @@ class NewBookProcessor:
         return ingest_folder, library_dir, tmp_conversion_dir
 
 
+    def _folder_label_metadata(self) -> dict | None:
+        """Build the selected folder-label operation from the original path."""
+        _ensure_project_root_on_path()
+        from cps.services.ingest_folder_labels import (
+            IngestFolderLabelError,
+            TARGET_DISABLED,
+            TARGET_SETTING,
+            NESTED_SETTING,
+            folder_label_values,
+        )
+
+        target = self.cwa_settings.get(TARGET_SETTING, TARGET_DISABLED)
+        if target == TARGET_DISABLED:
+            return None
+        if not isinstance(target, str) or (target != "tags" and not target.startswith("#")):
+            raise PreserveIngestSourceError(
+                "Invalid ingest folder-label target; original file retained"
+            )
+        try:
+            values = folder_label_values(
+                self.filepath,
+                self.ingest_folder,
+                nested=bool(self.cwa_settings.get(NESTED_SETTING, False)),
+            )
+        except IngestFolderLabelError as exc:
+            raise PreserveIngestSourceError(
+                f"Cannot derive configured ingest folder labels: {exc}; original retained"
+            ) from exc
+        if values is None:
+            return None
+        return {"target": target, "values": values}
+
+
     def can_convert_check(self) -> tuple[bool, str]:
         """When the current filepath isn't of the target format, this function will check if the file is able to be converted to the target format,
         returning a can_convert bool with the answer"""
@@ -2210,6 +2243,13 @@ class NewBookProcessor:
     ) -> list[Path]:
         if getattr(self, "acquisition_intent", None) or self.cwa_settings.get("auto_ingest_automerge") != "overwrite":
             return []
+        if metadata_override.get("ingest_folder_labels"):
+            if self._content_marker_book_ids(source_digest):
+                # The surrounding caller holds metadata_db_write_lock for the
+                # transactional retry. A prior source marker makes format
+                # inspection unnecessary: this path only adds label values.
+                self._folder_label_marker_replay = True
+                return []
         inspection = self._run_calibre_transaction(
             staged_path,
             staged_identity_path,
@@ -2237,6 +2277,7 @@ class NewBookProcessor:
         format: str = "text",
         identity_path: str | None = None,
     ) -> None:
+        folder_label_data = self._folder_label_metadata()
         # A converter may emit different package bytes on each run. Its durable
         # retry identity is therefore the staged source that generated the
         # package, while the imported package gets a separate integrity hash.
@@ -2358,10 +2399,36 @@ class NewBookProcessor:
             if already_imported_ids:
                 self.last_added_book_ids = already_imported_ids
                 self.last_added_book_id = already_imported_ids[-1]
+                if folder_label_data is None:
+                    if acquisition:
+                        self._finish_acquisition(prior_acquisition)
+                    print(
+                        f"[ingest-processor] Content already imported; skipping duplicate add: {staged_path.name}",
+                        flush=True,
+                    )
+                    return
+                # A known duplicate only needs a narrow metadata update. Do
+                # not run overwrite inspection or format recovery for it:
+                # those Calibre opens can fail independently of this safe
+                # additive tag operation, and no format should be replaced.
+                with metadata_db_write_lock():
+                    replay_result = self._run_calibre_transaction(
+                        staged_path,
+                        staged_identity_path,
+                        imported_digest,
+                        source_digest,
+                        {"ingest_folder_labels": folder_label_data},
+                        "apply-folder-labels",
+                    )
+                replay_ids = [int(value) for value in replay_result.get("book_ids", [])]
+                if replay_ids:
+                    self.last_added_book_ids = replay_ids
+                    self.last_added_book_id = replay_ids[-1]
                 if acquisition:
-                    self._finish_acquisition(prior_acquisition)
+                    self._finish_acquisition(replay_result)
+                mark_ingest_batch_dirty()
                 print(
-                    f"[ingest-processor] Content already imported; skipping duplicate add: {staged_path.name}",
+                    f"[ingest-processor] Applied folder labels to already imported book: {staged_path.name}",
                     flush=True,
                 )
                 return
@@ -2402,15 +2469,26 @@ class NewBookProcessor:
                 if identifiers:
                     metadata_override["identifiers"] = identifiers
 
+            if folder_label_data is not None:
+                metadata_override["ingest_folder_labels"] = folder_label_data
+
             overwrite_validated = False
+            self._folder_label_marker_replay = False
             try:
-                candidates = self._current_overwrite_candidates(
-                    staged_path,
-                    staged_identity_path,
-                    imported_digest,
-                    source_digest,
-                    metadata_override,
-                )
+                # Folder-label imports defer overwrite inspection until the
+                # shared writer lock is held. Same-content imports can then
+                # observe the marker from the preceding process and skip the
+                # fragile, format-oriented Calibre inspection entirely.
+                if folder_label_data is None:
+                    candidates = self._current_overwrite_candidates(
+                        staged_path,
+                        staged_identity_path,
+                        imported_digest,
+                        source_digest,
+                        metadata_override,
+                    )
+                else:
+                    candidates = []
             except Exception as error:
                 self._quarantine_or_preserve_source(
                     staged_path,
@@ -2458,13 +2536,18 @@ class NewBookProcessor:
                             getattr(self, "_overwrite_recovery_pairs", ())
                         )
                         try:
+                            transaction_action = (
+                                "apply-folder-labels"
+                                if self._folder_label_marker_replay
+                                else "import"
+                            )
                             transaction_result = self._run_calibre_transaction(
                                 staged_path,
                                 staged_identity_path,
                                 imported_digest,
                                 source_digest,
                                 metadata_override,
-                                "import",
+                                transaction_action,
                             )
                         except Exception:
                             # A helper can fail after Calibre replaced the format
@@ -2480,7 +2563,11 @@ class NewBookProcessor:
                                     "Calibre helper failed and commit state could not be "
                                     f"determined; source and recovery retained: {marker_error}"
                                 ) from marker_error
-                            if committed_ids:
+                            # An identity marker may predate this folder-label
+                            # attempt. It cannot prove that the current helper
+                            # transaction applied the newly derived labels.
+                            if (committed_ids and not already_imported_ids
+                                    and not self._folder_label_marker_replay):
                                 transaction_result = {
                                     "status": "already_imported",
                                     "book_ids": committed_ids,

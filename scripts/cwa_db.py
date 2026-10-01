@@ -123,6 +123,11 @@ JSON_SETTINGS = [
     'duplicate_format_priority',
 ]
 
+# This is a scalar lookup key such as ``#owner``. It must not pass through
+# the legacy generic comma-separated settings decoder: a custom-column label
+# may contain punctuation and still names one column.
+COMMA_SCALAR_SETTINGS = {"auto_ingest_folder_label_target"}
+
 
 class CWA_DB:
     def __init__(self, verbose=False):
@@ -741,7 +746,10 @@ class CWA_DB:
         for header in headers:
             if isinstance(cwa_settings[header], int) and header not in INTEGER_SETTINGS and header not in FLOAT_SETTINGS:
                 cwa_settings[header] = bool(cwa_settings[header])
-            elif isinstance(cwa_settings[header], str) and ',' in cwa_settings[header] and header not in JSON_SETTINGS:
+            elif (isinstance(cwa_settings[header], str)
+                  and ',' in cwa_settings[header]
+                  and header not in JSON_SETTINGS
+                  and header not in COMMA_SCALAR_SETTINGS):
                 cwa_settings[header] = cwa_settings[header].split(',')
 
         return cwa_settings

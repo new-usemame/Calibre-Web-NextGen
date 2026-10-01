@@ -18921,3 +18921,69 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+# Ingest folder labels (#1495).
+msgid "Ingest folder labels"
+msgstr "Étiquettes des dossiers d’import"
+
+msgid ""
+"Add ingest subfolder names to book tags or an existing custom column. "
+"Existing values are kept; files in the ingest root add no labels."
+msgstr ""
+"Ajoutez les noms des sous-dossiers d’import aux étiquettes des livres ou à "
+"une colonne personnalisée existante. Les valeurs existantes sont conservées "
+"; les fichiers à la racine ne reçoivent aucune étiquette."
+
+msgid ""
+"For example, ingest/James/scifi adds James by default. Include nested "
+"folders to add scifi too."
+msgstr ""
+"Par exemple, ingest/James/scifi ajoute James par défaut. Incluez les "
+"dossiers imbriqués pour ajouter aussi scifi."
+
+msgid "Write subfolder names to"
+msgstr "Écrire les noms des sous-dossiers dans"
+
+msgid "Include nested folders"
+msgstr "Inclure les dossiers imbriqués"
+
+msgid ""
+"Custom columns must already exist and use comma-separated text, like tags. "
+"Create them in Calibre desktop first."
+msgstr ""
+"Les colonnes personnalisées doivent déjà exister et contenir du texte séparé"
+" par des virgules, comme les étiquettes. Créez-les d’abord dans Calibre pour"
+" ordinateur."
+
+msgid "Unavailable column: {name}"
+msgstr "Colonne indisponible : {name}"
+
+msgid ""
+"The selected column is unavailable. Choose another target or disable folder "
+"labels before importing."
+msgstr ""
+"La colonne sélectionnée est indisponible. Choisissez une autre destination "
+"ou désactivez les étiquettes de dossiers avant d’importer."
+
+msgid "Could not load ingest folder settings."
+msgstr "Impossible de charger les paramètres des dossiers d’import."
+
+msgid "Could not save ingest folder settings."
+msgstr "Impossible d’enregistrer les paramètres des dossiers d’import."
+
+msgid "Ingest folder settings saved."
+msgstr "Paramètres des dossiers d’import enregistrés."
+
+msgid "Save ingest folder settings"
+msgstr "Enregistrer les paramètres des dossiers d’import"
+
+msgid ""
+"Choose Tags or an existing comma-separated text custom column. Folder-label "
+"settings were not saved."
+msgstr ""
+"Choisissez les étiquettes ou une colonne personnalisée existante contenant "
+"du texte séparé par des virgules. Les paramètres des dossiers n’ont pas été "
+"enregistrés."
+
+msgid "Disabled"
+msgstr "Désactivé"

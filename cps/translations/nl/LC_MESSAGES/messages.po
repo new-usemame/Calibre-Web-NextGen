@@ -18378,3 +18378,67 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+# Ingest folder labels (#1495).
+msgid "Ingest folder labels"
+msgstr "Labels uit importmappen"
+
+msgid ""
+"Add ingest subfolder names to book tags or an existing custom column. "
+"Existing values are kept; files in the ingest root add no labels."
+msgstr ""
+"Voeg namen van importsubmappen toe aan boeklabels of een bestaande "
+"aangepaste kolom. Bestaande waarden blijven behouden; bestanden in de "
+"hoofdmap krijgen geen labels."
+
+msgid ""
+"For example, ingest/James/scifi adds James by default. Include nested "
+"folders to add scifi too."
+msgstr ""
+"Bijvoorbeeld: ingest/James/scifi voegt standaard James toe. Neem geneste "
+"mappen mee om ook scifi toe te voegen."
+
+msgid "Write subfolder names to"
+msgstr "Submapnamen schrijven naar"
+
+msgid "Include nested folders"
+msgstr "Geneste mappen meenemen"
+
+msgid ""
+"Custom columns must already exist and use comma-separated text, like tags. "
+"Create them in Calibre desktop first."
+msgstr ""
+"Aangepaste kolommen moeten al bestaan en tekst met komma’s bevatten, zoals "
+"labels. Maak ze eerst in Calibre op de computer."
+
+msgid "Unavailable column: {name}"
+msgstr "Kolom niet beschikbaar: {name}"
+
+msgid ""
+"The selected column is unavailable. Choose another target or disable folder "
+"labels before importing."
+msgstr ""
+"De gekozen kolom is niet beschikbaar. Kies een ander doel of schakel "
+"maplabels uit voordat je importeert."
+
+msgid "Could not load ingest folder settings."
+msgstr "De instellingen voor importmappen konden niet worden geladen."
+
+msgid "Could not save ingest folder settings."
+msgstr "De instellingen voor importmappen konden niet worden opgeslagen."
+
+msgid "Ingest folder settings saved."
+msgstr "Instellingen voor importmappen opgeslagen."
+
+msgid "Save ingest folder settings"
+msgstr "Instellingen voor importmappen opslaan"
+
+msgid ""
+"Choose Tags or an existing comma-separated text custom column. Folder-label "
+"settings were not saved."
+msgstr ""
+"Kies labels of een bestaande aangepaste kolom met tekst gescheiden door "
+"komma’s. De instellingen voor maplabels zijn niet opgeslagen."
+
+msgid "Disabled"
+msgstr "Uitgeschakeld"

@@ -16462,3 +16462,55 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+# Ingest folder labels (#1495).
+msgid "Ingest folder labels"
+msgstr ""
+
+msgid ""
+"Add ingest subfolder names to book tags or an existing custom column. "
+"Existing values are kept; files in the ingest root add no labels."
+msgstr ""
+
+msgid ""
+"For example, ingest/James/scifi adds James by default. Include nested "
+"folders to add scifi too."
+msgstr ""
+
+msgid "Write subfolder names to"
+msgstr ""
+
+msgid "Include nested folders"
+msgstr ""
+
+msgid ""
+"Custom columns must already exist and use comma-separated text, like tags. "
+"Create them in Calibre desktop first."
+msgstr ""
+
+msgid "Unavailable column: {name}"
+msgstr ""
+
+msgid ""
+"The selected column is unavailable. Choose another target or disable folder "
+"labels before importing."
+msgstr ""
+
+msgid "Could not load ingest folder settings."
+msgstr ""
+
+msgid "Could not save ingest folder settings."
+msgstr ""
+
+msgid "Ingest folder settings saved."
+msgstr ""
+
+msgid "Save ingest folder settings"
+msgstr ""
+
+msgid ""
+"Choose Tags or an existing comma-separated text custom column. Folder-label "
+"settings were not saved."
+msgstr ""
+
+msgid "Disabled"
+msgstr ""

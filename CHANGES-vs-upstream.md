@@ -826,3 +826,5 @@ Published to `ghcr.io/new-usemame/calibre-web-nextgen` instead of upstream's `cr
 Every entry in the "Backports" section is a clean cherry-pick of an upstream PR with the original author preserved as committer in the squash-merge message. Original-fork patches in the bottom section are landed as their own commits with focused titles. The squash-merge SHAs above are stable references on this fork's `main`.
 
 For "Original fork patches": the diffs are small and isolated; PR descriptions in this fork link the line-by-line rationale. Upstream is welcome to take them.
+
+| Pending (#1495) | (fork feature request [#1495](https://github.com/new-usemame/Calibre-Web-NextGen/issues/1495)) | Add ingest subfolder names to tags or an existing multivalue text custom column, with opt-in nested folders, additive values and retryable invalid-target failures. Default disabled; original source path used through conversions and duplicate replay. | TBD | TBD |

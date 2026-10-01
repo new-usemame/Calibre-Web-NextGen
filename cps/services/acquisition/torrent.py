@@ -3,9 +3,9 @@
 import base64
 import hashlib
 import re
-from urllib.parse import parse_qsl, urlsplit, unquote
+from urllib.parse import parse_qsl, urlsplit
 
-from .http import TransportError
+from .http import TransportError, query_secret_present
 
 
 def safe_name(value):
@@ -31,14 +31,8 @@ def tracker(value, allowed, secret):
     address = tracker_origin(value)
     if allowed is not None and address not in {tracker_origin(v) for v in allowed}:
         raise TransportError('untrusted_torrent_tracker')
-    if secret:
-        decoded = value
-        for _ in range(8):
-            if secret in decoded: raise TransportError('untrusted_torrent_tracker')
-            next_value = unquote(decoded)
-            if next_value == decoded: break
-            decoded = next_value
-        else: raise TransportError('untrusted_torrent_tracker')
+    if secret and query_secret_present(value, (secret,)):
+        raise TransportError('untrusted_torrent_tracker')
 
 
 def validate_magnet(value, *, tracker_origins=None, secret=None):

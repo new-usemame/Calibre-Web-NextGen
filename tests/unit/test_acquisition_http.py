@@ -398,3 +398,12 @@ def test_real_child_returns_descriptor_magnet_without_fetching(real_source,tmp_p
     with pytest.raises(http.TransportError):
         http.download_file(real_source+'/magnet',policy,tmp_path/'book',max_bytes=1000)
     assert not (tmp_path/'book').exists()
+
+
+@pytest.mark.parametrize('secret,encoded',[('PRIVATE KEY','PRIVATE+KEY'),('PRIVATE+KEY','PRIVATE%2BKEY'),('PRIVATE KEY','PRIVATE%2520KEY')])
+def test_magnet_redirect_checks_literal_and_form_decoded_source_secrets(secret,encoded):
+    location='magnet:?xt=urn:btih:'+'a'*40+'&dn='+encoded
+    server=Server([Reply(status=302,headers={'Location':location})])
+    with pytest.raises(http.TransportError,match='credentials_redirected'):
+        http.fetch_document('https://indexer.example/download',http.HTTPPolicy(allow_magnet_redirect=True,query_secrets=(secret,)),session_factory=server)
+    assert len(server.calls)==1

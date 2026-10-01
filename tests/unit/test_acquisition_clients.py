@@ -370,3 +370,11 @@ def test_torrent_missing_file_does_not_hide_unsafe_companion_or_symlink(tmp_path
     (tmp_path/'missing.epub').symlink_to(tmp_path/'outside.epub')
     with pytest.raises(c.ClientError,match='unsafe_completed_path'):
         c.torrent_book(cfg,'/downloads',[{'name':'missing.epub'}])
+
+
+def test_tracker_query_form_encoding_cannot_forward_source_secret():
+    from urllib.parse import quote
+    t=importlib.import_module(spec.name+'.torrent')
+    tracker='https://tracker.example/announce?apikey=PRIVATE+KEY'
+    with pytest.raises(t.TransportError,match='untrusted_torrent_tracker'):
+        t.validate_magnet('magnet:?xt=urn:btih:'+'a'*40+'&tr='+quote(tracker,safe=''),tracker_origins=['https://tracker.example'],secret='PRIVATE KEY')

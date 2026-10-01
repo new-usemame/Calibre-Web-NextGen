@@ -20,7 +20,7 @@ import time
 from dataclasses import dataclass, field
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit, urlunsplit, unquote
+from urllib.parse import urljoin, urlsplit, urlunsplit, unquote, unquote_plus
 
 import requests
 
@@ -32,6 +32,19 @@ class TransportError(ValueError):
         self.code = code
         self.retry_after = retry_after
         super().__init__(code)
+
+
+def query_secret_present(value, secrets):
+    """Check literal, percent and form-query decoding without forwarding keys."""
+    if not secrets: return False
+    decoded = value
+    for _ in range(8):
+        if any(secret in decoded or secret in unquote_plus(decoded) for secret in secrets):
+            return True
+        next_value = unquote(decoded)
+        if next_value == decoded: return False
+        decoded = next_value
+    return True  # Refuse nested encodings beyond the inspection budget.
 
 
 def normalized_url(value: str) -> str:
@@ -203,20 +216,14 @@ def _transfer(url, policy, consume, max_bytes, checkpoint, session_factory, *, f
                             # caller's torrent/tracker validator. Never fetch it.
                             if len(location) > 8192 or any(ord(c) <= 32 or ord(c) == 127 for c in location):
                                 raise TransportError('invalid_url')
-                            decoded = location
-                            for _ in range(8):
-                                if any(value in decoded for value in policy.query_secrets):
-                                    raise TransportError('credentials_redirected')
-                                next_value = unquote(decoded)
-                                if next_value == decoded: break
-                                decoded = next_value
-                            else: raise TransportError('credentials_redirected')
+                            if query_secret_present(location, policy.query_secrets):
+                                raise TransportError('credentials_redirected')
                             return location, 0, 'application/x-bittorrent', 200, {}
                         try:
                             target = normalized_url(urljoin(url, location))
                         except ValueError:
                             raise TransportError('invalid_url') from None
-                        if origin(target) != origin(url) and any(value in unquote(target) for value in policy.query_secrets):
+                        if origin(target) != origin(url) and query_secret_present(target, policy.query_secrets):
                             raise TransportError('credentials_redirected')
                         if origin(url)[0] == 'https' and origin(target)[0] != 'https':
                             raise TransportError('insecure_redirect')

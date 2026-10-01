@@ -230,6 +230,16 @@ def test_detail_sort_query_is_view_only_and_preserves_manual_order(real_shelf_so
     assert stored_after == stored_before == [(2, 1), (1, 2), (3, 3)]
 
 
+@pytest.mark.unit
+def test_select_all_shelf_returns_ordered_ids_from_real_filtered_query(real_shelf_sort_env):
+    env = real_shelf_sort_env
+    with _ctx("/api/v1/shelves/1?select_all=1&sort=authaz", method="GET"):
+        response = inspect.unwrap(env.module.shelf_detail)(1)
+
+    payload = json.loads(response.get_data())
+    assert payload == {"ids": [3, 1, 2], "total": 3}
+
+
 # ── add book — status mapping ────────────────────────────────────────────────
 
 def _add_with_core_status(status, message=None):

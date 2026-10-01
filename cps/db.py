@@ -2095,13 +2095,14 @@ class CalibreDB:
     def fill_indexpage_with_archived_books(self, page, database, pagesize, db_filter, order, allow_show_archived,
                                            join_archive_read, config_read_column, *join, **kwargs):
         self.ensure_session()
+        ids_only = kwargs.pop('ids_only', False)
         viewing_tag_id = kwargs.get('viewing_tag_id')
         allow_show_hidden = kwargs.get('allow_show_hidden', False)
         allow_show_global = kwargs.get('allow_show_global', False)
         allow_public_shelf_books = kwargs.get('allow_public_shelf_books', False)
         extra_filter = kwargs.get('extra_filter')
         pagesize = pagesize or self.config.config_books_per_page
-        if current_user.show_detail_random():
+        if current_user.show_detail_random() and not ids_only:
             random_query = self.generate_linked_query(config_read_column, database)
             # Eagerly load template relationships to prevent detached lazy-load
             # failures if another request tears down the shared scoped session.
@@ -2130,7 +2131,7 @@ class CalibreDB:
         
         # Eagerly load template relationships to prevent DetachedInstanceError
         # during rendering under concurrent status/notification requests.
-        if database == Books:
+        if database == Books and not ids_only:
             query = query.options(
                 joinedload(Books.authors),
                 joinedload(Books.tags),
@@ -2171,9 +2172,18 @@ class CalibreDB:
             else:
                 total_count = query.count()
             pagination = Pagination(page, pagesize, total_count)
+            if ids_only:
+                entries = [row[0] for row in query.with_entities(database.id).distinct()
+                           .order_by(*order).offset(off).limit(pagesize).all()]
+                return entries, false(), pagination
             entries = query.order_by(*order).offset(off).limit(pagesize).all()
         except Exception as ex:
             log.error_or_exception(ex)
+            # Selection is an all-or-nothing operation. Returning the empty
+            # fallback used by legacy browse callers could silently turn a
+            # failed ID query into a partial selection.
+            if ids_only:
+                raise
         # display authors in right order
         entries = self.order_authors(entries, True, join_archive_read)
         return entries, randm, pagination

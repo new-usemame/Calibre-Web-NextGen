@@ -16,7 +16,7 @@ from sqlalchemy.exc import InvalidRequestError, OperationalError
 
 from . import api_v1
 from .serializers import serialize_shelf
-from .books import _rows_to_items
+from .books import MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response
 from .. import calibre_db, config, db, ub, user_library
 from ..cw_login import current_user
 from ..services import ereader_scope
@@ -99,8 +99,13 @@ def shelf_detail(shelf_id):
     if not check_shelf_view_permissions(shelf):
         return _err("forbidden", "You are not allowed to view this shelf", 403)
 
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", config.config_books_per_page, type=int)
+    select_all = request.args.get("select_all", "").strip().lower() in (
+        "1", "true", "yes", "on"
+    )
+    page = 1 if select_all else request.args.get("page", 1, type=int)
+    per_page = (MAX_SELECT_ALL_BOOKS + 1 if select_all else request.args.get(
+        "per_page", config.config_books_per_page, type=int
+    ))
 
     # Shelf sorting is view-only: "stored", an unknown value, and the two
     # app-DB download-count sorts all retain the manual BookShelf order. Every
@@ -138,7 +143,11 @@ def shelf_detail(shelf_id):
         True, config.config_read_column,
         *joins,
         allow_public_shelf_books=bool(shelf.is_public),
+        ids_only=select_all,
     )
+
+    if select_all:
+        return _selection_response(entries, pagination.total_count)
 
     body = serialize_shelf(shelf, pagination.total_count, is_owner=(shelf.user_id == _uid()))
     body.update({

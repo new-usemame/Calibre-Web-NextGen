@@ -734,7 +734,7 @@ def get_sorted_author(value):
 SQLITE_IN_CHUNK_SIZE = 900
 
 
-def hot_books_page(visibility_filter, order, offset, limit):
+def hot_books_page(visibility_filter, order, offset, limit, ids_only=False):
     """One page of the downloaded books the viewer can see, and their count.
 
     Returns ``(entries, total)``: read-status rows (``generate_linked_query``)
@@ -760,6 +760,8 @@ def hot_books_page(visibility_filter, order, offset, limit):
             if book_id not in present and book_id < highest:
                 ub.delete_download(book_id)
     page_ids = visible[offset:offset + limit]
+    if ids_only:
+        return page_ids, len(visible)
     entries = []
     if page_ids:
         rows = (calibre_db.generate_linked_query(config.config_read_column, db.Books)

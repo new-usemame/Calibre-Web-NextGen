@@ -15,7 +15,7 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import api_v1
-from .books import _rows_to_items
+from .books import MAX_SELECT_ALL_BOOKS, _rows_to_items, _selection_response
 from .. import ub, config, db, calibre_db, logger, magic_shelf
 from ..cw_login import current_user
 from ..services import ereader_scope
@@ -119,8 +119,13 @@ def magic_shelf_books(shelf_id):
     if shelf.user_id != uid and not shelf.is_public:
         return _err("forbidden", "You are not allowed to view this shelf", 403)
 
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", config.config_books_per_page, type=int)
+    select_all = request.args.get("select_all", "").strip().lower() in (
+        "1", "true", "yes", "on"
+    )
+    page = 1 if select_all else request.args.get("page", 1, type=int)
+    per_page = (MAX_SELECT_ALL_BOOKS + 1 if select_all else request.args.get(
+        "per_page", config.config_books_per_page, type=int
+    ))
     configured_sort_columns = load_configured_columns(config)
     resolved_sort = resolve_magic_shelf_sort(
         request.args.get("sort", "new"), config, configured_sort_columns
@@ -134,6 +139,8 @@ def magic_shelf_books(shelf_id):
         query_filter = None
     shelf_item = _shelf_item(shelf, current_user)
     if query_filter is None:
+        if select_all:
+            return _selection_response([], 0)
         return jsonify({**shelf_item, "items": [], "page": 1,
                         "per_page": per_page, "total": 0,
                         "sort": resolved_sort.key,
@@ -143,7 +150,10 @@ def magic_shelf_books(shelf_id):
     series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
     entries, _random, pagination = calibre_db.fill_indexpage(
         page, per_page, db.Books, query_filter, list(resolved_sort.order_by),
-        True, config.config_read_column, *series_join, *resolved_sort.join)
+        True, config.config_read_column, *series_join, *resolved_sort.join,
+        ids_only=select_all)
+    if select_all:
+        return _selection_response(entries, pagination.total_count)
     return jsonify({
         **shelf_item,
         # rules included so the builder can load this shelf for editing

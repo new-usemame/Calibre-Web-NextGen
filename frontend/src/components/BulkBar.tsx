@@ -132,7 +132,8 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged,
       if (presentation.sharedReason) {
         message = joinBulkSentences(message, presentation.sharedReason);
       }
-      const failures = presentation.items
+      const shownFailures = presentation.items.slice(0, 20);
+      const failures = shownFailures
         .map((failure) => failure.reason
           ? t('Book {id}: {message}', {
             id: failure.id,
@@ -140,9 +141,13 @@ export function BulkBar({ ids, personalLibrary, onClear, onRetryable, onChanged,
           })
           : t('Book {id}', { id: failure.id }))
         .join('; ');
+      const omittedFailures = presentation.items.length - shownFailures.length;
+      const failureList = omittedFailures > 0
+        ? `${failures}; ${t('and {count} more', { count: omittedFailures })}`
+        : failures;
       message = joinBulkSentences(message, t(
         'Failed: {failures}. The failed books remain selected; choose the action again to retry.',
-        { failures },
+        { failures: failureList },
       ));
       onRetryable(result.failedIds);
     }

@@ -69,7 +69,7 @@ test('classic Boolean restriction widget renders labels and writes canonical sta
     await page.locator('#add_element_bool').selectOption(state);
     await page.locator(button).click();
     await expect(page.locator('#restrict-elements-table')).toContainText(label);
-    await expect.poll(() => writeLog.at(-1)?.value).toBe(state);
+    await expect.poll(() => writeLog[writeLog.length - 1]?.value).toBe(state);
     const anchor = page.locator(`#restrict-elements-table a[data-value="bool:${state}"]`);
     await expect(anchor).toContainText(label);
   }
@@ -84,14 +84,14 @@ test('classic Boolean restriction widget renders labels and writes canonical sta
   await editor.selectOption('bool:true');
   await page.locator('.editable-submit').click();
   await expect.poll(() => denied[0]).toBe('true');
-  await expect.poll(() => writeLog.at(-1)?.value).toBe('true');
+  await expect.poll(() => writeLog[writeLog.length - 1]?.value).toBe('true');
   await expect(page.locator('#restrict-elements-table')).toContainText('Yes');
 
   // Delete Undefined, then re-open the tag picker and the bool picker. The
   // shared table must swap editable modes without retaining stale jQuery data.
   await page.locator('#restrict-elements-table [data-restriction-id="a1"]').click();
   await expect.poll(() => allowed).toEqual(['true']);
-  expect(writeLog.at(-1)).toEqual({ action: 'delete', value: 'undefined' });
+  expect(writeLog[writeLog.length - 1]).toEqual({ action: 'delete', value: 'undefined' });
   await page.locator('#restrict_close').click();
   await page.locator('#get_tags').click();
   await expect(page.locator('#add_element')).toBeVisible();
@@ -103,5 +103,5 @@ test('classic Boolean restriction widget renders labels and writes canonical sta
   await page.locator('#submit_allow').click();
   await expect(page.locator('#restrict-elements-table')).toContainText('Undefined');
   await expect.poll(() => allowed).toEqual(['true', 'undefined']);
-  expect(writeLog.at(-1)).toEqual({ action: 'add-Allow', value: 'undefined' });
+  expect(writeLog[writeLog.length - 1]).toEqual({ action: 'add-Allow', value: 'undefined' });
 });

@@ -512,11 +512,14 @@ export function Account() {
 
         <div className={styles.field}>
           <label className={styles.toggle}>
-            <input type="checkbox" checked={koboSync} onChange={(e) => setKoboSync(e.target.checked)} />
+            <input type="checkbox" aria-describedby="acc-kobo-sync-help" checked={koboSync} onChange={(e) => setKoboSync(e.target.checked)} />
             {shelfMarkAudience(me?.features) === 'ereader'
               ? t('Sync only selected shelves to e-readers (Kobo and KOReader)')
               : t('Sync only selected shelves to Kobo')}
           </label>
+          <p id="acc-kobo-sync-help" className={styles.hint}>
+            {t('New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its e-reader sync mark. Uncheck this to sync your whole library.')}
+          </p>
           <label className={styles.toggle}>
             <input type="checkbox" checked={opdsSync} onChange={(e) => setOpdsSync(e.target.checked)} />
             {t('Expose only selected shelves over OPDS')}

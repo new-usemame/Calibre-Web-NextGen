@@ -319,7 +319,7 @@ class User(UserBase, Base):
         cascade="all, delete-orphan",
     )
     view_settings = Column(JSON, default={})
-    kobo_only_shelves_sync = Column(Integer, default=0)
+    kobo_only_shelves_sync = Column(Integer, default=1)
     opds_only_shelves_sync = Column(Integer, default=0)
     # Named library-mode selector. False is monolibrary mode: this account's
     # library continuously mirrors the global archive. True is personal mode:
@@ -5379,6 +5379,7 @@ def delete_download(book_id):
 def create_anonymous_user(_session):
     user = User()
     user.name = "Guest"
+    user.kobo_only_shelves_sync = 0
     user.email = 'no@email'
     user.role = constants.ROLE_ANONYMOUS
     user.password = ''

@@ -144,8 +144,8 @@ def create_authenticated_user(username, email=None, auth_source="unknown"):
         # brought six themes back, so honour whatever the admin configured.
         user.theme = config_theme_code(getattr(config, 'config_theme', None))
             
-        # Kobo sync setting defaults to 0 (disabled) for new users
-        user.kobo_only_shelves_sync = 0
+        # Match every other new account: send only selected shelves.
+        user.kobo_only_shelves_sync = 1
         user.opds_only_shelves_sync = 0
         
         ub.session.add(user)

@@ -1904,3 +1904,6 @@ _("← Back to book")
 _("← Back to sign in")
 _("← Library")
 # ==== END AUTOGEN ====
+
+# New-user sync safety (#1057).
+_('New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its e-reader sync mark. Uncheck this to sync your whole library.')

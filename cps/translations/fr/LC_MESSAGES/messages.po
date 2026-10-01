@@ -18658,3 +18658,11 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its e-reader sync mark. Uncheck this to sync your whole library."
+msgstr "Les nouveaux comptes synchronisent uniquement les étagères sélectionnées. Si aucun livre n’arrive, ajoutez des livres à une étagère et activez sa synchronisation avec les liseuses. Décochez cette option pour synchroniser toute votre bibliothèque."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its Kobo sync mark. Uncheck this to sync your whole library."
+msgstr "Les nouveaux comptes synchronisent uniquement les étagères sélectionnées. Si aucun livre n’arrive, ajoutez des livres à une étagère et activez sa synchronisation Kobo. Décochez cette option pour synchroniser toute votre bibliothèque."

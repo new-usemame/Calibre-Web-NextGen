@@ -16228,3 +16228,11 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its e-reader sync mark. Uncheck this to sync your whole library."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its Kobo sync mark. Uncheck this to sync your whole library."
+msgstr ""

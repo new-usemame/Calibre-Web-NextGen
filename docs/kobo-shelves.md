@@ -1,9 +1,10 @@
 # Choosing which books go to your Kobo
 
 Setting up Kobo sync connects the device to your library. It doesn't decide *what*
-lands on it. By default your Kobo syncs your whole library; to send it particular
-shelves instead — and have them appear as **collections** on the device — you need
-a couple of settings that live in different places.
+lands on it. New accounts default to syncing only selected shelves. Existing
+accounts keep their previous choice, including whole-library syncing. To send
+particular shelves — and have them appear as **collections** on the device —
+you need a couple of settings that live in different places.
 
 Which ones depends on whether the shelf is an ordinary shelf or a smart shelf, and
 the two behave differently enough that it's worth knowing which you have.
@@ -49,6 +50,12 @@ depends on where you find it, which does not help:
 All three are the same setting. On the classic pages it is hidden entirely until
 Kobo sync (setting 1) is on; on the new UI account page it is always shown, and
 simply has no effect until then.
+
+New accounts start with setting 3 enabled, including accounts created while
+Kobo sync is disabled. If your first sync brings no books, put books on an
+ordinary shelf and turn on that shelf’s Kobo sync mark. For a smart shelf, also
+enable setting 2. To send the whole library, uncheck setting 3 on your account
+page. Upgrading does not change existing accounts or their device contents.
 
 ## What each setting actually changes
 

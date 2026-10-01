@@ -358,8 +358,9 @@
         <div style="margin-top: 20px;
                     background: #202c34a3;
                     padding: 2rem;">
-          <input type="checkbox" name="kobo_only_shelves_sync" id="kobo_only_shelves_sync" {% if content.kobo_only_shelves_sync %}checked{% endif %} style="accent-color: var(--color-secondary);">
+          <input type="checkbox" name="kobo_only_shelves_sync" id="kobo_only_shelves_sync" aria-describedby="kobo-shelf-sync-help" {% if content.kobo_only_shelves_sync %}checked{% endif %} style="accent-color: var(--color-secondary);">
           <label for="kobo_only_shelves_sync">{{_('Sync only books in selected shelves with Kobo')}}</label>
+          <p id="kobo-shelf-sync-help" class="help-block" style="color: inherit;">{{_('New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its Kobo sync mark. Uncheck this to sync your whole library.')}}</p>
           <div style="margin-top: 12px;">
             <input type="hidden" name="kobo_two_way_annotation_sync_present" value="1">
             <input type="checkbox" name="kobo_two_way_annotation_sync" id="kobo_two_way_annotation_sync" {% if content.kobo_two_way_annotation_sync %}checked{% endif %} aria-describedby="kobo-two-way-user-help" style="accent-color: var(--color-secondary);">

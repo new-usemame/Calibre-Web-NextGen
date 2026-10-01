@@ -2283,6 +2283,7 @@ def simulatedbchange():
 @admin_required
 def new_user():
     content = ub.User()
+    content.kobo_only_shelves_sync = 1
     languages = calibre_db.speaking_language()
     translations = get_available_locale()
     kobo_support = feature_support['kobo'] and config.config_kobo_sync
@@ -3356,8 +3357,13 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         content.denied_tags = config.config_denied_tags
         content.allowed_column_value = config.config_allowed_column_value
         content.denied_column_value = config.config_denied_column_value
-        # No default value for kobo sync shelf setting
-        content.kobo_only_shelves_sync = to_save.get("kobo_only_shelves_sync", 0) == "on"
+        # An unchecked, visible checkbox is an explicit whole-library choice.
+        # When Kobo is disabled the form has no control: retain the new-user
+        # default so enabling Kobo later cannot unexpectedly send everything.
+        if kobo_support:
+            content.kobo_only_shelves_sync = to_save.get("kobo_only_shelves_sync") == "on"
+        else:
+            content.kobo_only_shelves_sync = 1
         content.kobo_two_way_annotation_sync = (
             to_save.get("kobo_two_way_annotation_sync", 0) == "on"
         )

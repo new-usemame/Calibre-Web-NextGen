@@ -18122,3 +18122,11 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its e-reader sync mark. Uncheck this to sync your whole library."
+msgstr "Nieuwe accounts synchroniseren alleen geselecteerde planken. Als er geen boeken verschijnen, voeg dan boeken toe aan een plank en schakel de e-readersynchronisatie in. Vink dit uit om je hele bibliotheek te synchroniseren."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its Kobo sync mark. Uncheck this to sync your whole library."
+msgstr "Nieuwe accounts synchroniseren alleen geselecteerde planken. Als er geen boeken verschijnen, voeg dan boeken toe aan een plank en schakel de Kobo-synchronisatie in. Vink dit uit om je hele bibliotheek te synchroniseren."

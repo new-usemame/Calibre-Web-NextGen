@@ -156,6 +156,8 @@ export interface Book {
   date_added?: string | null;
   last_modified?: string | null;
   read?: boolean;
+  /** Caller-owned favorite state, resolved in bulk for every list page. */
+  favorited?: boolean | null;
   /** Sync-driven tri-state marker for library cards; absent on older servers. */
   in_progress?: boolean;
   archived?: boolean;

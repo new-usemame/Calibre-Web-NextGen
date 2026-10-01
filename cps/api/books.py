@@ -217,6 +217,22 @@ def _rows_to_items(entries, hidden_ids=None):
     overrides = user_cover.overrides_for_user(
         _real_user_id(), [book.id for book in books])
     shelves_by_book = _visible_shelves_by_book([int(book.id) for book in books])
+    user_id = _real_user_id()
+    page_ids = [int(book.id) for book in books]
+    favorite_ids = set()
+    if user_id is not None and page_ids:
+        try:
+            favorite_ids = {int(row[0]) for row in (
+                ub.session.query(ub.FavoriteBook.book_id)
+                .filter(ub.FavoriteBook.user_id == user_id,
+                        ub.FavoriteBook.book_id.in_(page_ids)).all()
+            )}
+        except SQLAlchemyError:
+            # Favorite badges are optional metadata, like shelf tags. A busy or
+            # unavailable app DB must not turn an otherwise readable catalog
+            # page into a 500; mutations still surface their own write errors.
+            favorite_ids = None
+            log.warning("Could not load favorite badges for catalog page")
     items = []
     for entry, book in zip(entries, books):
         item = _row_to_item(
@@ -224,6 +240,7 @@ def _rows_to_items(entries, hidden_ids=None):
             cover_override=overrides.get(int(book.id)),
         )
         item["shelves"] = shelves_by_book.get(int(book.id), [])
+        item["favorited"] = None if favorite_ids is None else int(book.id) in favorite_ids
         items.append(item)
     return items
 

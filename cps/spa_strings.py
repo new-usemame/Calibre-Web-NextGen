@@ -1910,3 +1910,8 @@ _("← Library")
 
 # New-user sync safety (#1057).
 _('New accounts sync only selected shelves. If no books arrive, add books to a shelf and enable its e-reader sync mark. Uncheck this to sync your whole library.')
+
+# Cover card action disclosure (#1412).
+_("Actions for {title}")
+_("Could not update this book. Try again.")
+_("Favorite")

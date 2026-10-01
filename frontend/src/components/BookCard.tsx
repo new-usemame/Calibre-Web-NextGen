@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { BookOpen, BookCheck, BookPlus, Check, EyeOff, List, X, Pencil } from 'lucide-react';
+import { BookOpen, BookCheck, BookPlus, Check, EyeOff, List, X, Star } from 'lucide-react';
 import { Link } from 'wouter';
 import type { Book } from '../lib/api';
 import { useT } from '../lib/i18n';
@@ -8,6 +8,7 @@ import { getPrimaryReadTarget } from '../lib/readerTarget';
 import { formatAuthors } from '../lib/authors';
 import styles from './BookCard.module.css';
 import { Spinner } from './Spinner';
+import { BookCardActions } from './BookCardActions';
 
 interface BookCardProps {
   book: Book;
@@ -29,7 +30,7 @@ interface BookCardProps {
    *  so it only appears where it's wanted (catalog + search) and only for users
    *  who can edit. Suppressed in selection mode. */
   quickEdit?: boolean;
-  /** Drop the whole bottom action row — "Read now" and the edit pencil — for
+  /** Remove the cover action disclosure (read, edit, favorite and read status) for
    *  users who asked to declutter the grid (fork #1054: "many users are reading
    *  on their ereaders, so Read Now is redundant"). Persisted per browser and
    *  toggled from the catalog's View settings.
@@ -92,6 +93,7 @@ function BookCardInner({
   const authorStr = formatAuthors(book.authors);
   const seriesIndexLabel = showSeriesIndex ? formatSeriesIndex(book.series_index) : null;
   const readTarget = getPrimaryReadTarget(book.id, book.formats, canRead);
+  const coverActions = !selectable && !hideActions && membership !== 'unowned';
 
   // Series name + position under the cover (fork #657, #673, #855). Series-heavy
   // libraries navigate by series and want it visible without clicking into each
@@ -144,9 +146,10 @@ function BookCardInner({
           otherwise the name gets the full cover width. */}
       {shelves.length > 0 && (
         <div
-          className={selectable || onRemove ? `${styles.shelfRow} ${styles.shelfRowInset}` : styles.shelfRow}
+          className={selectable || onRemove || coverActions ? `${styles.shelfRow} ${styles.shelfRowInset}` : styles.shelfRow}
           data-testid="shelf-tags"
         >
+          <div className={styles.shelfLabels}>
           {shownShelves.map((s) => (
             <span key={s.id} className={styles.shelfBadge} role="img"
               aria-label={t('On shelf {name}', { name: s.name })} title={s.name}>
@@ -161,6 +164,12 @@ function BookCardInner({
               +{extraShelves.length}
             </span>
           )}
+          </div>
+          <span className={styles.shelfSummary} role="img"
+            aria-label={t('On shelf {name}', { name: shelves.map(s => s.name).join(', ') })}
+            title={shelves.map(s => s.name).join(', ')}>
+            {shelves.length}
+          </span>
         </div>
       )}
       <div className={styles.badgeRow}>
@@ -172,26 +181,26 @@ function BookCardInner({
           <span className={styles.readingBadge} role="img" aria-label={t('Reading')}
             data-testid="reading-badge">
             <BookOpen size={13} strokeWidth={2.5} aria-hidden="true" focusable={false} />
-            {t('Reading')}
+            <span className={styles.badgeLabel}>{t('Reading')}</span>
           </span>
         ) : !hideReadingTags && book.read ? (
           <span className={styles.readBadge} role="img" aria-label={t('Read')}
             data-testid="read-badge">
             <Check size={13} strokeWidth={3} aria-hidden="true" focusable={false} />
-            {t('Read')}
+            <span className={styles.badgeLabel}>{t('Read')}</span>
           </span>
         ) : null}
         {book.hidden && (
           <span className={styles.hiddenBadge} role="img" aria-label={t('Hidden')}
             data-testid="hidden-book-badge">
             <EyeOff size={12} aria-hidden="true" focusable={false} />
-            {t('Hidden')}
+            <span className={styles.badgeLabel}>{t('Hidden')}</span>
           </span>
         )}
         {membership === 'owned' && (
           <span className={styles.libraryBadge} role="img" aria-label={t('In your library')}>
             <BookCheck size={12} aria-hidden="true" focusable={false} />
-            {t('In your library')}
+            <span className={styles.badgeLabel}>{t('In your library')}</span>
           </span>
         )}
         {seriesIndexLabel && (
@@ -203,6 +212,8 @@ function BookCardInner({
             #{seriesIndexLabel}
           </span>
         )}
+        {book.favorited && <span className={styles.favoriteBadge} role="img" aria-label={t('Favorite')}
+          data-testid="favorite-badge"><Star size={14} fill="currentColor" aria-hidden="true" focusable={false} /></span>}
       </div>
       {selectable && (
         <span className={selected ? styles.checkboxOn : styles.checkboxOff} aria-hidden="true">
@@ -266,25 +277,10 @@ function BookCardInner({
     );
   }
 
-  // Browse mode: the cover, title and author open the book; the series line has
-  // its own sibling destination below. Both series and action controls remain
-  // outside the book link (never nested inside <a>).
-  //
-  // The read + edit controls share one flex row in NORMAL FLOW below the
-  // metadata (#1166). They used to be absolutely positioned over the bottom of
-  // the card, with room for the pencil reserved as fixed padding on the label
-  // (#1112) — which holds only while the card is wider than the reservation. On
-  // a 4-column phone grid the card is ~80px and the reservation 60px, so the
-  // label wrapped to two lines, the row grew, and the 44px pencil rose into the
-  // series line. Reported by rogovmtlz, @iroQuai and @HLRobius.
-  //
-  // A real row lets the browser allocate the space instead of the stylesheet
-  // guessing at it, so a control can no longer land on top of card text at any
-  // width, density or locale — the same "impossible by construction" move the
-  // badge row above makes. `.removeBtn` stays absolute: it belongs to the cover,
-  // not to this row.
+  // The cover, title and author open the book; the series line keeps its own
+  // sibling destination. A single sibling disclosure lives inside the cover's
+  // aspect-ratio area, with its portaled panel outside a clipped book rail.
   const hasAddAction = membership === 'unowned' && !!onAddToLibrary;
-  const hasActionRow = hasAddAction || (!hideActions && (Boolean(readTarget) || quickEdit));
 
   return (
     <div className={styles.wrap} style={style} data-book-id={book.id}>
@@ -303,7 +299,11 @@ function BookCardInner({
       ) : (
         seriesLine
       ))}
-      {onRemove && (
+      {coverActions && <div className={styles.coverActions}>
+        <BookCardActions book={book} readTarget={readTarget} quickEdit={quickEdit}
+          onRemove={onRemove} removeLabel={removeLabel} />
+      </div>}
+      {onRemove && !coverActions && (
         <button
           type="button"
           className={styles.removeBtn}
@@ -313,50 +313,14 @@ function BookCardInner({
           <X size={14} strokeWidth={3} aria-hidden="true" />
         </button>
       )}
-      {hasActionRow && (
-        <div className={[
-          styles.actionRow,
-          quickEdit ? styles.actionRowEdit : '',
-        ].filter(Boolean).join(' ')}>
-          {hasAddAction ? (
-            <button type="button" className={`${styles.readNow} ${styles.addToLibrary}`}
-              disabled={addPending}
-              aria-label={t('Add {title} to my library', { title: book.title })}
-              onClick={() => onAddToLibrary?.(book)}>
-              {addPending ? <Spinner size={13} /> : <BookPlus size={15} aria-hidden="true" focusable={false} />}
-              <span className={styles.readNowLabel}>{addPending ? t('Adding…') : t('Add')}</span>
-            </button>
-          ) : readTarget && !hideActions ? (
-            <Link
-              href={readTarget}
-              className={styles.readNow}
-              aria-label={t('Read {title}', { title: book.title })}
-            >
-              <BookOpen size={15} aria-hidden="true" focusable={false} />
-              {/* The text is a span so a narrow card can drop the wording and
-                  keep the icon, rather than ellipsising it to "R…". The
-                  aria-label above still names the action either way. */}
-              <span className={styles.readNowLabel}>{t('Read now')}</span>
-            </Link>
-          ) : null}
-          {quickEdit && !hideActions && (
-            <Link
-              href={`/book/${book.id}/edit`}
-              className={styles.quickEditBtn}
-              aria-label={t('Edit {title}', { title: book.title })}
-              // The pencil is a SIBLING of the card link (never nested in an <a>),
-              // so a click can't bubble to the card's own navigation — stopPropagation
-              // keeps that invariant explicit if the layout is ever re-nested.
-              // wouter's <Link> runs SPA navigation only on a plain left-click; on
-              // ⌘/ctrl/shift/alt-click it returns early without preventDefault, so the
-              // browser opens the edit page in a new tab natively (#798).
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Pencil size={13} strokeWidth={2.5} aria-hidden="true" focusable={false} />
-            </Link>
-          )}
-        </div>
-      )}
+      {hasAddAction && <div className={styles.actionRow}>
+        <button type="button" className={`${styles.readNow} ${styles.addToLibrary}`}
+          disabled={addPending} aria-label={t('Add {title} to my library', { title: book.title })}
+          onClick={() => onAddToLibrary?.(book)}>
+          {addPending ? <Spinner size={13} /> : <BookPlus size={15} aria-hidden="true" focusable={false} />}
+          <span className={styles.readNowLabel}>{addPending ? t('Adding…') : t('Add')}</span>
+        </button>
+      </div>}
     </div>
   );
 }

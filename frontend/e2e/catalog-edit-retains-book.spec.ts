@@ -145,23 +145,13 @@ function targetCard(page: Page) {
   return page.locator(`main a[href$="/book/${TARGET_ID}"]`);
 }
 
-/** Enter the edit flow through the control exposed by the active pointer
- * contract. Fine pointers retain the hover pencil; coarse pointers carry no
- * card actions at all (operator ruling 2026-09-12), so the touch route is the
- * one a phone user has: tap into the book and use the gear menu's "Edit
- * metadata" item (the book page no longer carries a bare Edit link). */
+/** Enter quick edit through the cover disclosure on both pointer types. */
 async function openQuickEdit(page: Page) {
   const card = targetCard(page).first().locator('..');
-  if (test.info().project.use.hasTouch === true) {
-    await targetCard(page).first().click();
-    await page.waitForURL(`**/book/${TARGET_ID}`);
-    await page.getByTestId('book-actions-menu').click();
-    await page.getByRole('menuitem', { name: 'Edit metadata' }).click();
-    return;
-  }
-
-  await card.hover();
-  await card.locator(`a[href$="/book/${TARGET_ID}/edit"]`).click();
+  const trigger = card.getByRole('button', { name: /^Actions for / });
+  if (test.info().project.use.hasTouch === true) await trigger.tap();
+  else { await card.hover(); await trigger.click(); }
+  await page.getByRole('dialog').getByRole('link', { name: 'Edit', exact: true }).click();
 }
 
 /** Walk client-side back to the library.
@@ -240,7 +230,7 @@ test.describe('#1169 an edited book stays in the library listing', () => {
     expect(indexBefore, 'the book under test starts at the top of the grid').toBe(0);
 
     // Client-side into the edit form via the card's own quick-edit control,
-    // using the hover row on fine pointers and its touch disclosure equivalent.
+    // using the cover disclosure on both fine and touch pointers.
     await openQuickEdit(page);
     await page.waitForURL(`**/book/${TARGET_ID}/edit`);
 

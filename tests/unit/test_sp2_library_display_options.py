@@ -81,15 +81,6 @@ def test_discover_honors_instance_random_book_count():
     assert "me?.display?.random_books" in discover
 
 
-def test_touch_action_rows_keep_reserved_bottom_baseline_when_concealed():
-    """The 2026-08-29 reversal changes resting opacity, not row geometry: a
-    focus reveal must not make neighboring cards or the grid reflow."""
-    css = source("frontend/src/components/BookCard.module.css")
-    assert ".wrap {" in css and "height: 100%;" in css
-    assert ".card, .cardSelected" in css and "flex: 1;" in css
-    assert ".readNow" in css and "margin-top: auto;" in css
-
-
 def test_spa_magic_shelf_builder_reads_fields_from_the_shared_schema():
     """The field and operator lists are the engine's to own (#467): a duplicate
     hard-coded copy here is what let classic and the New UI drift apart. Pin the

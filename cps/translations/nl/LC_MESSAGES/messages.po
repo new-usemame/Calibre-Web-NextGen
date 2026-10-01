@@ -17461,8 +17461,9 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr "Meer acties voor {title}"
 
 #, python-brace-format
-#~ msgid "Actions for {title}"
-#~ msgstr "Acties voor {title}"
+#: cps/spa_strings.py
+msgid "Actions for {title}"
+msgstr "Acties voor {title}"
 
 #~ msgid "Design"
 #~ msgstr "Ontwerp"
@@ -18208,3 +18209,7 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py
+msgid "Could not update this book. Try again."
+msgstr "Dit boek kon niet worden bijgewerkt. Probeer het opnieuw."

@@ -321,7 +321,7 @@ export function Shelf({ id }: { id: string }) {
             </div>
           ) : (
             <>
-              <h1 className={styles.title}>{data.name}</h1>
+              <h1 data-testid="shelf-heading" tabIndex={-1} className={styles.title}>{data.name}</h1>
               <span
                 className={styles.visibility}
                 title={data.is_public ? t('Public shelf') : t('Private shelf')}

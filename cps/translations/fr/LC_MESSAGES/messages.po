@@ -17840,8 +17840,9 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr "Plus d’actions pour {title}"
 
 #, python-brace-format
-#~ msgid "Actions for {title}"
-#~ msgstr "Actions pour {title}"
+#: cps/spa_strings.py
+msgid "Actions for {title}"
+msgstr "Actions pour {title}"
 
 #~ msgid "Design"
 #~ msgstr "Modèle"
@@ -18749,3 +18750,7 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "Could not update this book. Try again."
+msgstr "Impossible de mettre à jour ce livre. Réessayez."

@@ -866,7 +866,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
 
       <div className={styles.header}>
         {filtered && <span className={styles.kindLabel}>{t(KIND_OPTIONS[entityKind!].label)}</span>}
-        <h1 className={renamingTag ? 'sr-only' : styles.title}>{heading}</h1>
+        <h1 data-testid="catalog-heading" tabIndex={-1} className={renamingTag ? 'sr-only' : styles.title}>{heading}</h1>
         {renamingTag ? (
           <form className={styles.renameForm} onSubmit={submitTagRename}>
             <label className="sr-only" htmlFor="tag-name-input">{t('Tag name')}</label>

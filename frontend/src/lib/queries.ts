@@ -506,14 +506,24 @@ export function useBook(id: string | number) {
   });
 }
 
+function invalidateBookCardViews(qc: QueryClient) {
+  // Read/favorite changes can remove a row from a filtered result and shift
+  // every subsequent page. Rebuild the accumulated catalog from page 1 instead
+  // of appending a refreshed single page onto stale membership. This also
+  // refreshes advanced-search/default-filter cards through the shared seam.
+  return refreshLibraryViews(qc);
+}
+
 export function useToggleRead(id: string | number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (read: boolean) =>
       apiPost<{ read: boolean }>(`/api/v1/books/${id}/read`, { read }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['book', String(id)] });
-      void queryClient.invalidateQueries({ queryKey: ['books'] });
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['book', String(id)] }),
+        invalidateBookCardViews(queryClient),
+      ]);
     },
   });
 }
@@ -537,7 +547,12 @@ export function useToggleFavorite(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => apiPost<{ favorited: boolean }>(`/api/v1/books/${id}/favorite`),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['book', String(id)] }),
+    onSuccess: () => {
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: ['book', String(id)] }),
+        invalidateBookCardViews(qc),
+      ]);
+    },
   });
 }
 

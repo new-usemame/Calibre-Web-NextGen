@@ -524,3 +524,5 @@
 .dangerButton { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; min-height: 40px; padding-inline: var(--sp-2); border-radius: var(--r-md); color: var(--danger); background: var(--surface-1); border: 1px solid var(--danger); }
 .dangerButton:hover:not(:disabled) { background: var(--danger); color: var(--surface-1); }
 .dangerButton:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 2px; }
+
+.title:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: 4px; }

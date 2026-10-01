@@ -61,6 +61,30 @@ var reader;
         reader.rendition.themes.register(theme, themes[theme].css_path);
     });
 
+    // Custom fonts are served from immutable, same-origin URLs. epub.js renders
+    // each chapter in its own document, so install the validated faces into every
+    // newly rendered content document before applying a saved custom family.
+    function installUploadedFontFaces(contents) {
+        var doc = contents && contents.document;
+        if (!doc || doc.getElementById('cwng-reader-font-faces')) { return; }
+        var rules = (calibre.readerFonts || []).filter(function (font) {
+            return !font.builtin && font.url && /^CWNGUpload_[a-f0-9]{32}$/.test(font.family) &&
+                ['woff', 'woff2', 'truetype', 'opentype'].indexOf(font.format) >= 0;
+        }).map(function (font) {
+            return '@font-face{font-family:' + font.family + ';font-style:normal;font-weight:normal;' +
+                'font-display:swap;src:url(' + JSON.stringify(font.url) + ") format('" + font.format + "');}";
+        }).join('');
+        if (!rules) { return; }
+        var style = doc.createElement('style');
+        style.id = 'cwng-reader-font-faces';
+        style.textContent = rules;
+        (doc.head || doc.documentElement).appendChild(style);
+    }
+    reader.rendition.on('rendered', function () {
+        try { (reader.rendition.getContents() || []).forEach(installUploadedFontFaces); }
+        catch (e) { /* content can be unavailable while epub.js changes sections */ }
+    });
+
     if (calibre.useBookmarks) {
         reader.on("reader:bookmarked", updateBookmark.bind(reader, "add"));
         reader.on("reader:unbookmarked", updateBookmark.bind(reader, "remove"));

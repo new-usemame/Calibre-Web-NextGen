@@ -204,6 +204,7 @@ from . import shelves  # noqa: E402,F401
 from . import search   # noqa: E402,F401
 from . import account  # noqa: E402,F401
 from . import reader   # noqa: E402,F401
+from . import reader_fonts  # noqa: E402,F401
 from . import edit     # noqa: E402,F401
 from . import upload   # noqa: E402,F401
 from . import admin    # noqa: E402,F401

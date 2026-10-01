@@ -80,6 +80,13 @@ const ADMIN_CONTEXT: ContextSidebarDefinition = {
           spa: true,
         },
         {
+          key: 'reader-fonts',
+          href: '/admin#reader-fonts',
+          label: 'Reader fonts',
+          icon: Settings,
+          spa: true,
+        },
+        {
           key: 'email-settings',
           href: '/admin#email-settings',
           label: 'Email server',

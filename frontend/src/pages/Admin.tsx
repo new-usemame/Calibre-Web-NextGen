@@ -12,6 +12,7 @@ import type { SecurityConfig, SecurityUpdate } from '../lib/queries';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
 import { MyLibraryIntro } from '../components/MyLibraryIntro';
+import { ReaderFontsAdmin } from '../components/ReaderFontsAdmin';
 import type { AdminUser } from '../lib/api';
 import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
@@ -365,6 +366,7 @@ export function Admin() {
       </div>
 
       <AdminConfigForm />
+      <ReaderFontsAdmin />
       <MailConfigForm />
       <SecurityConfigForm />
     </div>

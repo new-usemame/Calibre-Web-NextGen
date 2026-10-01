@@ -15699,12 +15699,10 @@ msgid "SimSun"
 msgstr "SimSun"
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "KaiTi"
 msgstr "KaiTi"
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "Arial"
 msgstr "Arial"
 

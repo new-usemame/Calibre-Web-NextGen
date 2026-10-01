@@ -149,6 +149,44 @@ def test_get_reader_settings_returns_complete_defaults_plus_saved_values():
     assert body["theme"] == "lightTheme"
 
 
+def test_get_reader_settings_falls_back_when_uploaded_font_was_deleted():
+    from cps.api import reader as mod
+    user = _auth_user()
+    user.view_settings = {"reader": {"font": "custom:deleted-font-id", "margin": 32}}
+    with _ctx("/api/v1/reader/settings"):
+        with patch.object(mod, "current_user", user), \
+             patch.object(mod.reader_fonts, "custom_font_ids", return_value=set()):
+            resp = inspect.unwrap(mod.get_reader_settings)()
+    body = json.loads(resp.get_data())["reader"]
+    assert body["font"] == "default"
+    assert body["margin"] == 32
+
+
+def test_get_builtin_reader_settings_does_not_depend_on_optional_font_store():
+    from cps.api import reader as mod
+    user = _auth_user()
+    user.view_settings = {"reader": {"font": "Arial", "margin": 32}}
+    with _ctx("/api/v1/reader/settings"):
+        with patch.object(mod, "current_user", user), \
+             patch.object(mod.reader_fonts, "custom_font_ids", side_effect=OSError("catalog offline")) as lookup:
+            resp = inspect.unwrap(mod.get_reader_settings)()
+    assert resp.status_code == 200
+    assert json.loads(resp.get_data())["reader"]["font"] == "Arial"
+    lookup.assert_not_called()
+
+
+def test_get_custom_reader_settings_falls_back_when_font_store_is_unreadable():
+    from cps.api import reader as mod
+    user = _auth_user()
+    user.view_settings = {"reader": {"font": "custom:12345678-1234-5678-1234-567812345678"}}
+    with _ctx("/api/v1/reader/settings"):
+        with patch.object(mod, "current_user", user), \
+             patch.object(mod.reader_fonts, "custom_font_ids", side_effect=OSError("catalog offline")):
+            resp = inspect.unwrap(mod.get_reader_settings)()
+    assert resp.status_code == 200
+    assert json.loads(resp.get_data())["reader"]["font"] == "default"
+
+
 @pytest.mark.unit
 def test_save_reader_settings_merges_partial_patch_without_erasing_siblings():
     from cps.api import reader as mod
@@ -195,6 +233,81 @@ def test_save_reader_settings_rejects_non_object_payload():
         with patch.object(mod, "current_user", user):
             resp = inspect.unwrap(mod.save_reader_settings)()
     assert resp[1] == 400
+
+
+def test_save_reader_settings_accepts_live_uploaded_font_but_rejects_deleted_choice():
+    from cps.api import reader as mod
+    user = _auth_user()
+    user.view_settings = {"reader": {"margin": 24}}
+    mock_ub = MagicMock()
+    custom_id = "custom:12345678-1234-5678-1234-567812345678"
+    with _ctx("/api/v1/reader/settings", method="POST", body={"font": custom_id}):
+        with patch.object(mod, "current_user", user), \
+             patch.object(mod, "ub", mock_ub), \
+             patch.object(mod, "flag_modified"), \
+             patch.object(mod.reader_fonts, "custom_font_ids", return_value={custom_id}):
+            resp = inspect.unwrap(mod.save_reader_settings)()
+    assert resp.status_code == 200
+    assert user.view_settings["reader"]["font"] == custom_id
+
+    with _ctx("/api/v1/reader/settings", method="POST", body={"font": custom_id}):
+        with patch.object(mod, "current_user", user), \
+             patch.object(mod, "ub") as rejected_ub, \
+             patch.object(mod.reader_fonts, "custom_font_ids", return_value=set()):
+            rejected = inspect.unwrap(mod.save_reader_settings)()
+    assert rejected[1] == 400
+    rejected_ub.session.commit.assert_not_called()
+
+
+@pytest.mark.parametrize("malformed", [{"id": "custom:bad"}, ["Arial"], True])
+def test_save_reader_settings_rejects_non_string_font_choice(malformed):
+    from cps.api import reader as mod
+    user = _auth_user()
+    user.view_settings = {"reader": {"font": "Arial"}}
+    with _ctx("/api/v1/reader/settings", method="POST", body={"font": malformed}):
+        with patch.object(mod, "current_user", user):
+            response = inspect.unwrap(mod.save_reader_settings)()
+    assert response[1] == 400
+
+
+def test_save_reader_settings_reports_unavailable_store_for_custom_choice():
+    from cps.api import reader as mod
+    user = _auth_user()
+    user.view_settings = {"reader": {"margin": 24}}
+    mock_ub = MagicMock()
+    custom_id = "custom:12345678-1234-5678-1234-567812345678"
+    with _ctx("/api/v1/reader/settings", method="POST", body={"font": custom_id}):
+        with patch.object(mod, "current_user", user), \
+             patch.object(mod, "ub", mock_ub), \
+             patch.object(mod, "flag_modified"), \
+             patch.object(mod.reader_fonts, "custom_font_ids", side_effect=OSError("catalog offline")):
+            response, status = inspect.unwrap(mod.save_reader_settings)()
+    assert status == 503
+    assert response.get_json()["error"]["code"] == "font_catalog_unavailable"
+    mock_ub.session.commit.assert_not_called()
+
+
+def test_unrelated_reader_patch_preserves_custom_choice_when_catalog_is_unavailable():
+    from cps.api import reader as mod
+
+    custom_id = "custom:12345678-1234-5678-1234-567812345678"
+    user = _auth_user()
+    user.view_settings = {"reader": {"font": custom_id, "margin": 16}}
+    before = {"reader": dict(user.view_settings["reader"])}
+    mock_ub = MagicMock()
+    with _ctx("/api/v1/reader/settings", method="POST", body={"margin": 24}):
+        with patch.object(mod, "current_user", user), \
+             patch.object(mod, "ub", mock_ub), \
+             patch.object(mod, "flag_modified"), \
+             patch.object(mod.reader_fonts, "custom_font_ids", side_effect=OSError("catalog offline")):
+            result = inspect.unwrap(mod.save_reader_settings)()
+
+    response, status = result if isinstance(result, tuple) else (result, result.status_code)
+
+    assert status == 503
+    assert response.get_json()["error"]["code"] == "font_catalog_unavailable"
+    assert user.view_settings == before
+    mock_ub.session.commit.assert_not_called()
 
 
 @pytest.mark.unit

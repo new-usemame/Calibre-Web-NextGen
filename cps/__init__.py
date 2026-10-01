@@ -90,6 +90,32 @@ def protect_user_specific_catalog_responses(response):
 
 _BASE_HOOK_MARKER = "cps_base_after_request_registered"
 _PROXY_FIX_MARKER = "cps_proxy_fix_registered"
+_READER_FONT_UPLOAD_LIMITER_MARKER = "cps_reader_font_upload_limiter_registered"
+
+
+def _limit_reader_font_upload_request():
+    """Bound multipart parsing for the font-upload route before CSRF reads it."""
+    from flask import jsonify, request
+
+    if request.endpoint != "api_v1.admin_upload_reader_font":
+        return None
+    from .services import reader_fonts
+
+    max_request_bytes = reader_fonts.MAX_FONT_FILE_BYTES + 256 * 1024
+    request.max_content_length = max_request_bytes
+    if request.content_length is not None and request.content_length > max_request_bytes:
+        return jsonify({"error": {
+            "code": "font_too_large",
+            "message": "Font upload exceeds the 8 MiB limit",
+        }}), 413
+    return None
+
+
+def _register_reader_font_upload_limiter(application):
+    if application.extensions.get(_READER_FONT_UPLOAD_LIMITER_MARKER):
+        return
+    application.before_request(_limit_reader_font_upload_request)
+    application.extensions[_READER_FONT_UPLOAD_LIMITER_MARKER] = True
 
 
 def _configure_base_app(application, runtime_config=None):
@@ -418,6 +444,12 @@ def create_app(config=None, services=None):
     first_process_initialization = not state.initialized
     if not first_process_initialization:
         _assert_process_runtime_compatible(runtime_config, runtime_services)
+
+    # CSRFProtect inspects request.form before blueprint route handlers run,
+    # which parses multipart uploads before a route-local limit can take effect.
+    # Bound only the reader-font endpoint here so other existing upload routes
+    # retain their own size policies.
+    _register_reader_font_upload_limiter(application)
 
     if csrf:
         csrf.init_app(application)

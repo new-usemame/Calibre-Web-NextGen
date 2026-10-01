@@ -27,15 +27,17 @@ def reader_setting_int(value, lo, hi):
     return None
 
 
-def sanitize_reader_settings(payload):
+def sanitize_reader_settings(payload, custom_font_ids=None):
     """Return only known, typed reader settings from an arbitrary mapping."""
     if not isinstance(payload, dict):
         return {}
     out = {}
     if payload.get("theme") in READER_THEMES:
         out["theme"] = payload["theme"]
-    if payload.get("font") in READER_FONTS:
-        out["font"] = payload["font"]
+    valid_fonts = READER_FONTS | set(custom_font_ids or ())
+    font = payload.get("font")
+    if isinstance(font, str) and font in valid_fonts:
+        out["font"] = font
     if payload.get("spread") in READER_SPREADS:
         out["spread"] = payload["spread"]
     for key, lo, hi in (
@@ -54,15 +56,15 @@ def sanitize_reader_settings(payload):
     return out
 
 
-def merged_reader_settings(current, patch):
+def merged_reader_settings(current, patch, custom_font_ids=None):
     """Merge a partial client patch without erasing unrelated saved controls."""
-    merged = sanitize_reader_settings(current)
-    merged.update(sanitize_reader_settings(patch))
+    merged = sanitize_reader_settings(current, custom_font_ids)
+    merged.update(sanitize_reader_settings(patch, custom_font_ids))
     return merged
 
 
-def resolved_reader_settings(current):
+def resolved_reader_settings(current, custom_font_ids=None):
     """Return the complete client contract, applying defaults to missing keys."""
     resolved = dict(READER_DEFAULTS)
-    resolved.update(sanitize_reader_settings(current))
+    resolved.update(sanitize_reader_settings(current, custom_font_ids))
     return resolved

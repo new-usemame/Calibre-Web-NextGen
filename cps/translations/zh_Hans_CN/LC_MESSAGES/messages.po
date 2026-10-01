@@ -15663,12 +15663,10 @@ msgid "SimSun"
 msgstr "宋体"
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "KaiTi"
-msgstr "楷体"
+msgstr "KaiTi"
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "Arial"
 msgstr "Arial"
 

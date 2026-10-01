@@ -15575,14 +15575,12 @@ msgid "SimSun"
 msgstr ""
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "KaiTi"
-msgstr "Đang chờ"
+msgstr "KaiTi"
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "Arial"
-msgstr "Dọc"
+msgstr "Arial"
 
 #: cps/templates/read.html
 #, fuzzy

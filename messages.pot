@@ -16310,3 +16310,64 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+# Uploaded reader fonts (#915).
+msgid ""
+"Choose fonts you are allowed to share with this server’s readers. Files "
+"stay in the configuration volume across upgrades."
+msgstr ""
+
+msgid "Could not load reader fonts."
+msgstr ""
+
+msgid "Could not remove font."
+msgstr ""
+
+msgid "Could not upload font."
+msgstr ""
+
+msgid "Display name (optional)"
+msgstr ""
+
+msgid "Font file"
+msgstr ""
+
+msgid "Font file is too large."
+msgstr ""
+
+msgid "Font is available in both EPUB readers."
+msgstr ""
+
+msgid "Font removed."
+msgstr ""
+
+msgid "No uploaded fonts yet."
+msgstr ""
+
+msgid "Reader fonts"
+msgstr ""
+
+msgid "Readers using this font return to Book default when they next open a book."
+msgstr ""
+
+msgid "Remove font"
+msgstr ""
+
+#, python-brace-format
+msgid "TTF, OTF, WOFF or WOFF2, up to {n} MiB per file."
+msgstr ""
+
+msgid "Upload font"
+msgstr ""
+
+msgid ""
+"Upload fonts once for everyone using the EPUB readers. Existing font "
+"choices stay available."
+msgstr ""
+
+msgid "Uploaded reader fonts"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Microsoft YaHei"
+msgstr ""

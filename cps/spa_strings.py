@@ -1916,3 +1916,31 @@ _('New accounts sync only selected shelves. If no books arrive, add books to a s
 _("Actions for {title}")
 _("Could not update this book. Try again.")
 _("Favorite")
+
+# Uploaded reader fonts (#915).
+_("Choose fonts you are allowed to share with this server’s readers. Files stay in the configuration volume across upgrades.")
+_("Could not load reader fonts.")
+_("Could not remove font.")
+_("Could not upload font.")
+_("Display name (optional)")
+_("Font file")
+_("Font file is too large.")
+_("Font is available in both EPUB readers.")
+_("Font removed.")
+_("No uploaded fonts yet.")
+_("Reader fonts")
+_("Readers using this font return to Book default when they next open a book.")
+_("Remove")
+_("Remove font")
+_("TTF, OTF, WOFF or WOFF2, up to {n} MiB per file.")
+_("Upload font")
+_("Upload fonts once for everyone using the EPUB readers. Existing font choices stay available.")
+_("Uploaded reader fonts")
+
+_("Arial")
+
+_("KaiTi")
+
+_("Microsoft YaHei")
+
+_("SimSun")

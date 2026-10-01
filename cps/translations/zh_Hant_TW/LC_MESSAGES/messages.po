@@ -15465,9 +15465,8 @@ msgid "KaiTi"
 msgstr "標楷體"
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "Arial"
-msgstr "垂直"
+msgstr "Arial"
 
 #: cps/templates/read.html
 #, fuzzy

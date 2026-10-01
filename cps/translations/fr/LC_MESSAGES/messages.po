@@ -18758,3 +18758,71 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+# Uploaded reader fonts (#915).
+msgid ""
+"Choose fonts you are allowed to share with this server’s readers. Files "
+"stay in the configuration volume across upgrades."
+msgstr ""
+"Choisissez des polices que vous avez le droit de partager avec les "
+"lecteurs de ce serveur. Les fichiers restent dans le volume de "
+"configuration lors des mises à jour."
+
+msgid "Could not load reader fonts."
+msgstr "Impossible de charger les polices de lecture."
+
+msgid "Could not remove font."
+msgstr "Impossible de supprimer la police."
+
+msgid "Could not upload font."
+msgstr "Impossible d’importer la police."
+
+msgid "Display name (optional)"
+msgstr "Nom affiché (facultatif)"
+
+msgid "Font file"
+msgstr "Fichier de police"
+
+msgid "Font file is too large."
+msgstr "Le fichier de police est trop volumineux."
+
+msgid "Font is available in both EPUB readers."
+msgstr "La police est disponible dans les deux lecteurs EPUB."
+
+msgid "Font removed."
+msgstr "Police supprimée."
+
+msgid "No uploaded fonts yet."
+msgstr "Aucune police importée pour le moment."
+
+msgid "Reader fonts"
+msgstr "Polices de lecture"
+
+msgid "Readers using this font return to Book default when they next open a book."
+msgstr ""
+"Les lecteurs utilisant cette police retrouveront la police par défaut du "
+"livre à sa prochaine ouverture."
+
+msgid "Remove font"
+msgstr "Supprimer la police"
+
+#, python-brace-format
+msgid "TTF, OTF, WOFF or WOFF2, up to {n} MiB per file."
+msgstr "TTF, OTF, WOFF ou WOFF2, jusqu’à {n} Mio par fichier."
+
+msgid "Upload font"
+msgstr "Importer une police"
+
+msgid ""
+"Upload fonts once for everyone using the EPUB readers. Existing font "
+"choices stay available."
+msgstr ""
+"Importez des polices une seule fois pour tous les utilisateurs des "
+"lecteurs EPUB. Les polices existantes restent disponibles."
+
+msgid "Uploaded reader fonts"
+msgstr "Polices de lecture importées"
+
+#: cps/spa_strings.py
+msgid "Microsoft YaHei"
+msgstr "Microsoft YaHei"

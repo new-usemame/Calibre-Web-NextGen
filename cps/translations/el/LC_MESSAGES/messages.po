@@ -15684,14 +15684,12 @@ msgid "SimSun"
 msgstr ""
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "KaiTi"
-msgstr "Αναμονή"
+msgstr "KaiTi"
 
 #: cps/templates/read.html
-#, fuzzy
 msgid "Arial"
-msgstr "Κάθετο"
+msgstr "Arial"
 
 #: cps/templates/read.html
 #, fuzzy

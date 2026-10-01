@@ -563,8 +563,7 @@ export function BookDetail() {
       icon: <BookX size={15} />, disabled: stopReading.isPending,
       onSelect: () => stopReading.mutate(undefined, {
         onSuccess: () => announce(t('Removed from Currently Reading.')),
-        onError: (err) => announce(err instanceof ApiError ? err.message
-          : t('Could not remove this book from Currently Reading.'), { assertive: true }),
+        onError: () => announce(t('Could not remove this book from Currently Reading.'), { assertive: true }),
       }), testId: 'menu-stop-reading',
     });
   }

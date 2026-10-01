@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Page, TestInfo } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { collectPageErrors, assertNoPageErrors } from './utils';
 
@@ -15,6 +15,12 @@ import { collectPageErrors, assertNoPageErrors } from './utils';
  * New UI: the Add to shelf menu and bulk bar follow the same owner/non-owner
  * policy, including after an administrator removes "Edit public shelves".
  */
+
+async function capture(page: Page, testInfo: TestInfo, name: string) {
+  const path = testInfo.outputPath(`${name}-${testInfo.project.name}.jpg`);
+  await page.screenshot({ path, type: 'jpeg', quality: 75, animations: 'disabled' });
+  await testInfo.attach(name, { path, contentType: 'image/jpeg' });
+}
 
 async function headersFor(page: Page) {
   const res = await page.request.get('/api/v1/auth/csrf');
@@ -54,8 +60,9 @@ async function deleteShelves(admin: Page, ids: number[]) {
 
 test('the classic book page offers removal only from shelves the reader can change', async ({
   page: admin, secondaryUser,
-}) => {
+}, testInfo) => {
   const reader = secondaryUser.page;
+  await reader.setViewportSize(testInfo.project.name === 'mobile' ? { width: 375, height: 667 } : { width: 1280, height: 800 });
   const book = await firstBook(admin);
   const stamp = Date.now();
   const publicShelf = await createShelf(admin, `e2e-offers-public-${stamp}`, true);
@@ -79,6 +86,7 @@ test('the classic book page offers removal only from shelves the reader can chan
     const offers = reader.locator('#remove-from-shelves a[data-shelf-action="remove"]');
     await expect(offers.first()).toBeVisible();
     await expect(offers).toHaveText([readersName, `${readersPublicName} (Public)`]);
+    await capture(reader, testInfo, 'classic-owned-shelf-offers');
 
     // Once the reader's own shelf lets the book go, only shelves the reader
     // cannot change still hold it: there is nothing to offer.
@@ -100,8 +108,9 @@ test('the classic book page offers removal only from shelves the reader can chan
 
 test('the new UI keeps owned shelves editable while protecting other public shelves', async ({
   page: admin, secondaryUser,
-}) => {
+}, testInfo) => {
   const reader = secondaryUser.page;
+  await reader.setViewportSize(testInfo.project.name === 'mobile' ? { width: 375, height: 667 } : { width: 1280, height: 800 });
   const book = await firstBook(admin);
   const stamp = Date.now();
   const setRole = async (on: boolean) => {
@@ -137,6 +146,7 @@ test('the new UI keeps owned shelves editable while protecting other public shel
     await expect(reader.getByRole('button', { name: privateName })).toBeVisible();
     await expect(reader.getByRole('button', { name: publicName })).toBeVisible();
     await expect(reader.getByRole('button', { name: otherPublicName })).toHaveCount(0);
+    await capture(reader, testInfo, 'new-ui-owned-shelf-offers');
 
     // The bulk bar offers the same shelves.
     await reader.addInitScript(() => localStorage.setItem('cwng_discover_hidden_v1', '1'));
@@ -150,6 +160,7 @@ test('the new UI keeps owned shelves editable while protecting other public shel
     await expect(bar.getByRole('button', { name: privateName, exact: true })).toBeVisible();
     await expect(bar.getByRole('button', { name: publicName, exact: true })).toBeVisible();
     await expect(bar.getByRole('button', { name: otherPublicName, exact: true })).toHaveCount(0);
+    await capture(reader, testInfo, 'new-ui-owned-bulk-shelf-offers');
     assertNoPageErrors(errors);
   } finally {
     // The private one goes with the account.

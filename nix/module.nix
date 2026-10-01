@@ -1,9 +1,8 @@
 # NixOS module for Calibre-Web-NextGen.
 #
-# Runs the web app as a systemd service. Startup does what the container's
-# cwa-init and cwa-auto-library oneshots do: seed app.db and the library on
-# first run and record where the library is. The ingest watcher and the other
-# s6 long-running services are not run yet (see #2094).
+# Runs the web app and the background services from scripts/services as
+# systemd units, in the order the container's s6 services start them. The web
+# app's start also does what cwa-init does off Docker.
 {
   config,
   lib,
@@ -25,6 +24,74 @@ let
 
   app = "${cfg.package}/${cfg.package.appRoot}";
   appDb = "${cfg.configDir}/app.db";
+
+  environment = {
+    HOME = cfg.configDir;
+    CALIBRE_DBPATH = cfg.configDir;
+    CWA_CALIBRE_LIBRARY_DIR = cfg.libraryDir;
+    CWA_INGEST_FOLDER = cfg.ingestDir;
+    CWA_TMP_CONVERSION_DIR = "${cfg.configDir}/.cwa_conversion_tmp";
+    CWA_METADATA_CHANGE_LOGS_DIR = "${cfg.configDir}/metadata_change_logs";
+    CACHE_DIR = "${cfg.configDir}/cache";
+    # A plugin-free Calibre config, as the container's services use.
+    CALIBRE_CONFIG_DIRECTORY = "${cfg.configDir}/.config/calibre-runtime";
+    CWA_PORT_OVERRIDE = toString cfg.port;
+    CWA_PYTHON = "${cfg.package}/bin/cwa-python";
+  }
+  // cfg.environment;
+
+  serviceDefaults = {
+    User = cfg.user;
+    Group = cfg.group;
+    WorkingDirectory = cfg.configDir;
+
+    NoNewPrivileges = true;
+    PrivateTmp = true;
+    ProtectSystem = "strict";
+    ProtectHome = true;
+    ProtectKernelTunables = true;
+    ProtectKernelModules = true;
+    ProtectControlGroups = true;
+    RestrictAddressFamilies = [
+      "AF_UNIX"
+      "AF_INET"
+      "AF_INET6"
+    ];
+    RestrictNamespaces = true;
+    RestrictRealtime = true;
+    LockPersonality = true;
+    ReadWritePaths = [
+      cfg.configDir
+      cfg.libraryDir
+      cfg.ingestDir
+    ];
+  };
+
+  # A background service from scripts/services, started after the web app as in s6.
+  backgroundService = description: script: extra: {
+    inherit description environment;
+    wantedBy = [ "multi-user.target" ];
+    after = [ "calibre-web-nextgen.service" ];
+    requires = [ "calibre-web-nextgen.service" ];
+    partOf = [ "calibre-web-nextgen.service" ];
+    path = servicePath;
+    serviceConfig =
+      serviceDefaults
+      // {
+        ExecStart = "${app}/scripts/services/${script}";
+        Restart = "on-failure";
+        RestartSec = "10s";
+      }
+      // extra;
+  };
+
+  servicePath = [
+    cfg.package
+    pkgs.gawk
+    pkgs.inotify-tools
+    pkgs.lsof
+    pkgs.sqlite
+  ];
 in
 {
   options.services.calibre-web-nextgen = {
@@ -102,89 +169,74 @@ in
       mode = "0750";
     };
 
-    systemd.services.calibre-web-nextgen = {
-      description = "Calibre-Web-NextGen";
-      documentation = [ "https://github.com/new-usemame/Calibre-Web-NextGen/wiki" ];
-      wantedBy = [ "multi-user.target" ];
-      after = [ "network.target" ];
+    systemd.services = {
+      calibre-web-nextgen = {
+        description = "Calibre-Web-NextGen";
+        documentation = [ "https://github.com/new-usemame/Calibre-Web-NextGen/wiki" ];
+        wantedBy = [ "multi-user.target" ];
+        after = [ "network.target" ];
+        inherit environment;
+        path = servicePath;
 
-      environment = {
-        HOME = cfg.configDir;
-        CALIBRE_DBPATH = cfg.configDir;
-        CWA_CALIBRE_LIBRARY_DIR = cfg.libraryDir;
-        CWA_INGEST_FOLDER = cfg.ingestDir;
-        CWA_TMP_CONVERSION_DIR = "${cfg.configDir}/.cwa_conversion_tmp";
-        CACHE_DIR = "${cfg.configDir}/cache";
-        # A plugin-free Calibre config, as the container's services use.
-        CALIBRE_CONFIG_DIRECTORY = "${cfg.configDir}/.config/calibre-runtime";
-        CWA_PORT_OVERRIDE = toString cfg.port;
-      }
-      // cfg.environment;
+        preStart = ''
+          mkdir -p "$CALIBRE_CONFIG_DIRECTORY" "$CACHE_DIR" "$CWA_TMP_CONVERSION_DIR" "$CWA_METADATA_CHANGE_LOGS_DIR"
 
-      path = [ cfg.package ];
+          # Seeds app.db and the library on first run and records the library location.
+          ${app}/scripts/services/cwa-auto-library.sh
 
-      preStart = ''
-        mkdir -p "$CALIBRE_CONFIG_DIRECTORY" "$CACHE_DIR" "$CWA_TMP_CONVERSION_DIR"
+          # Google Drive setup expects this file to exist.
+          if [ ! -f ${escapeShellArg cfg.configDir}/client_secrets.json ]; then
+            echo '{}' > ${escapeShellArg cfg.configDir}/client_secrets.json
+          fi
 
-        # Seeds app.db and the library on first run and records the library location.
-        cwa-python ${app}/scripts/auto_library.py
+          # Point an unset kepubify path at the packaged binary.
+          cwa-python - ${escapeShellArg appDb} ${pkgs.kepubify}/bin/kepubify <<'EOF'
+          import sqlite3, sys
+          with sqlite3.connect(sys.argv[1]) as db:
+              db.execute(
+                  "UPDATE settings SET config_kepubifypath = ? "
+                  "WHERE config_kepubifypath IS NULL OR config_kepubifypath = '''",
+                  (sys.argv[2],),
+              )
+          EOF
+        '';
 
-        # Google Drive setup expects this file to exist.
-        if [ ! -f ${escapeShellArg cfg.configDir}/client_secrets.json ]; then
-          echo '{}' > ${escapeShellArg cfg.configDir}/client_secrets.json
-        fi
-
-        # Point an unset kepubify path at the packaged binary.
-        cwa-python - ${escapeShellArg appDb} ${pkgs.kepubify}/bin/kepubify <<'EOF'
-        import sqlite3, sys
-        with sqlite3.connect(sys.argv[1]) as db:
-            db.execute(
-                "UPDATE settings SET config_kepubifypath = ? "
-                "WHERE config_kepubifypath IS NULL OR config_kepubifypath = '''",
-                (sys.argv[2],),
-            )
-        EOF
-      '';
-
-      serviceConfig = {
-        Type = "simple";
-        User = cfg.user;
-        Group = cfg.group;
-        WorkingDirectory = cfg.configDir;
-        ExecStart = escapeShellArgs (
-          [
-            "${cfg.package}/bin/cps"
-            "-p"
-            appDb
-            "-i"
-            cfg.listenAddress
-          ]
-          ++ cfg.extraArgs
-        );
-        Restart = "on-failure";
-        RestartSec = "10s";
-
-        NoNewPrivileges = true;
-        PrivateTmp = true;
-        ProtectSystem = "strict";
-        ProtectHome = true;
-        ProtectKernelTunables = true;
-        ProtectKernelModules = true;
-        ProtectControlGroups = true;
-        RestrictAddressFamilies = [
-          "AF_UNIX"
-          "AF_INET"
-          "AF_INET6"
-        ];
-        RestrictNamespaces = true;
-        RestrictRealtime = true;
-        LockPersonality = true;
-        ReadWritePaths = [
-          cfg.configDir
-          cfg.libraryDir
-          cfg.ingestDir
-        ];
+        serviceConfig = serviceDefaults // {
+          Type = "simple";
+          ExecStart = escapeShellArgs (
+            [
+              "${cfg.package}/bin/cps"
+              "-p"
+              appDb
+              "-i"
+              cfg.listenAddress
+            ]
+            ++ cfg.extraArgs
+          );
+          Restart = "on-failure";
+          RestartSec = "10s";
+        };
       };
+
+      calibre-web-nextgen-ingest =
+        backgroundService "Calibre-Web-NextGen ingest watcher" "cwa-ingest-service.sh"
+          { };
+      calibre-web-nextgen-metadata =
+        backgroundService "Calibre-Web-NextGen metadata change detector" "metadata-change-detector.sh"
+          { };
+      calibre-web-nextgen-auto-zipper =
+        backgroundService "Calibre-Web-NextGen nightly backup zipper" "cwa-auto-zipper.sh"
+          { };
+      calibre-web-nextgen-preview-cache =
+        backgroundService "Calibre-Web-NextGen cover preview cache sweeper" "cwa-preview-cache-cleanup.sh"
+          { };
+      calibre-web-nextgen-checksums =
+        backgroundService "Calibre-Web-NextGen KOReader checksum backfill" "cwa-checksum-backfill.sh"
+          {
+            Type = "oneshot";
+            RemainAfterExit = true;
+            Restart = "no";
+          };
     };
 
     users.users = mkIf (cfg.user == "calibre-web") {

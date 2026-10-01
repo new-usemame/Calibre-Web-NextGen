@@ -270,7 +270,7 @@ corrected.
 ## NixOS
 
 The repository is a Nix flake with a package and a NixOS module that runs the
-web app as a systemd service:
+web app and its background services as systemd units:
 
 ```nix
 {
@@ -299,10 +299,10 @@ start the service creates `app.db` and an empty library, as the container does.
 The web app listens on `127.0.0.1:8083` by default; `listenAddress`, `port`,
 `openFirewall` and `environment` cover the rest.
 
-The ingest watcher and the other background services are not part of the
-module yet. Until they are, nothing is imported: books dropped into the ingest
-folder and books uploaded through the web interface, which are staged in that
-folder too, wait there.
+Alongside `calibre-web-nextgen.service`, the module starts the ingest watcher,
+the metadata change detector, the nightly backup zipper, the cover-preview cache
+sweeper and the KOReader checksum backfill as `calibre-web-nextgen-*` units,
+from the same `scripts/services` bodies the container runs.
 
 `nix build` builds the package, `nix run` starts it with state in
 `~/.calibre-web-automated`, and `nix flake check` runs a NixOS VM test of the

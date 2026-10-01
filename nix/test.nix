@@ -1,12 +1,17 @@
 # Boots the module, logs in as the default admin and checks the library was set up.
-{ testers, module }:
+{
+  testers,
+  module,
+  sqlite,
+}:
 
 testers.runNixOSTest {
   name = "calibre-web-nextgen";
 
   nodes.machine = {
     imports = [ module ];
-    virtualisation.memorySize = 2048;
+    virtualisation.memorySize = 3072;
+    environment.systemPackages = [ sqlite ];
     services.calibre-web-nextgen = {
       enable = true;
       libraryDir = "/srv/library";
@@ -40,6 +45,26 @@ testers.runNixOSTest {
     # A configured library serves the book list instead of redirecting to setup.
     machine.succeed("curl -sf -b /tmp/jar -o /dev/null -w '%{http_code}' http://127.0.0.1:8083/ | grep -qx 200")
     machine.succeed("curl -sf -o /dev/null http://127.0.0.1:8083/app/")
+
+    # The background services start after the web app.
+    for unit in ("ingest", "metadata", "auto-zipper", "preview-cache", "checksums"):
+        machine.wait_for_unit(f"calibre-web-nextgen-{unit}.service")
+
+    # A book dropped into the ingest folder ends up in the library.
+    machine.succeed(
+        "printf 'A short test book.\\n' > /tmp/test-book.txt && "
+        "install -o calibre-web -g calibre-web -m 0640 /tmp/test-book.txt /srv/ingest/test-book.txt"
+    )
+    machine.wait_until_succeeds(
+        "test \"$(sqlite3 /srv/library/metadata.db 'select count(*) from books')\" -ge 1",
+        timeout=300,
+    )
+    machine.wait_until_succeeds("test ! -e /srv/ingest/test-book.txt", timeout=60)
+    # The follow-up reaches the web app's internal endpoint, which needs its shared secret.
+    machine.wait_until_succeeds(
+        "journalctl -u calibre-web-nextgen-ingest | grep -q 'Post-batch follow-up completed'",
+        timeout=120,
+    )
 
     machine.succeed("systemctl restart calibre-web-nextgen.service")
     machine.wait_for_open_port(8083)

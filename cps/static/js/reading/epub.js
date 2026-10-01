@@ -13,6 +13,18 @@ var reader;
         bookmarks: calibre.bookmark ? [calibre.bookmark] : []
     });
 
+    if (reader && reader.rendition && reader.rendition.hooks && reader.rendition.hooks.content
+        && typeof reader.rendition.hooks.content.register === 'function' && calibre.customFontFaces) {
+        reader.rendition.hooks.content.register(function(contents) {
+            try {
+                contents.addStylesheetCss(calibre.customFontFaces, 'cwa-custom-font-faces');
+            } catch (e) {
+                // Some content types don't support stylesheet injection; that
+                // one piece of content just keeps its fallback font.
+            }
+        });
+    }
+
     function showReaderError(message, error) {
         try {
             console.error(message, error || "");
@@ -369,6 +381,7 @@ var reader;
         // Font
         let fontMap = {
             'default': '',
+            'Gelasio': '"Gelasio", Georgia, serif',
             'Yahei': '"Microsoft YaHei", sans-serif',
             'SimSun': 'SimSun, serif',
             'KaiTi': 'KaiTi, serif',

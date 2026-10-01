@@ -3,7 +3,7 @@
 """Canonical validation and defaults for per-user web-reader appearance."""
 
 READER_THEMES = {"lightTheme", "darkTheme", "sepiaTheme", "blackTheme"}
-READER_FONTS = {"default", "Yahei", "SimSun", "KaiTi", "Arial"}
+READER_FONTS = {"default", "Yahei", "SimSun", "KaiTi", "Arial", "Gelasio"}
 READER_SPREADS = {"spread", "nonespread"}
 
 READER_DEFAULTS = {

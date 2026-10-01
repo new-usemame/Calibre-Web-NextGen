@@ -4,7 +4,7 @@ import {
   withResumeTimeout,
 } from "../lib/readerResume";
 import { useEffect, useRef, useState, useCallback, useId, useMemo } from 'react';
-import { Link } from 'wouter';
+import { Link, useSearch } from 'wouter';
 import ePub from 'epubjs';
 import {
   ChevronLeft, ChevronRight, X, List, Sun, Moon, Coffee, Loader2, Trash2,
@@ -28,7 +28,7 @@ import {
 import { chapterLabelForHref, splitSearchExcerpt } from '../lib/reader/searchUi';
 import { flattenToc, tocFromNavigation, type TocItem } from '../lib/reader/toc';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/safeStorage';
-import { getReaderContentUrl } from '../lib/readerTarget';
+import { getReaderContentUrl, withLookupMode } from '../lib/readerTarget';
 import {
   classifyHref, inBookTarget, isNoteElement, isNoterefAnchor, isOpenableHref,
   sanitizeNoteElement,
@@ -306,7 +306,11 @@ function liveSelection(rendition: any): boolean {
 export function Reader({ id }: { id: string }) {
   const t = useT();
   const announce = useAnnouncer();
-  const requestedSource = new URLSearchParams(window.location.search).get('source');
+  const search = useSearch();
+  const lookupMode = new URLSearchParams(search).get('lookup') === '1';
+  const lookupModeRef = useRef(lookupMode);
+  lookupModeRef.current = lookupMode;
+  const requestedSource = new URLSearchParams(search).get('source');
   const [placesOpen, setPlacesOpen] = useState(false);
   const { data: book, isLoading, error } = useBook(id);
   const { data: savedBookmark, isFetched: isBookmarkFetched } = useBookmark(id, 'epub');
@@ -1182,6 +1186,7 @@ export function Reader({ id }: { id: string }) {
   // that runs on settle picks up wherever the reader has got to by then. One
   // request, always carrying the newest position, is both correct and less work.
   const flushCfiSave = useCallback(() => {
+    if (lookupModeRef.current) return;
     if (saveInFlight.current) { saveCoalesced.current = true; return; }
     const cfi = lastCfiRef.current;
     if (!cfi) return;
@@ -1232,6 +1237,9 @@ export function Reader({ id }: { id: string }) {
 
   const persistCfi = useCallback(
     (cfi: string, percentage?: number) => {
+      // Lookup is a session-long choice; page turns and transient preview
+      // exits must never arm the debounce or the unmount keepalive save.
+      if (lookupModeRef.current) return;
       lastCfiRef.current = cfi;
       // #324: the CFI is private to this reader; the percentage is what the
       // server can share with the user's Kobo and the book-detail row.
@@ -1860,7 +1868,7 @@ export function Reader({ id }: { id: string }) {
         clearTimeout(saveTimer.current);
         saveTimer.current = null;
         const cfi = lastCfiRef.current;
-        if (cfi) {
+        if (cfi && !lookupModeRef.current) {
           const pct = lastPercentRef.current;
           void apiPost(
             `/api/v1/books/${id}/bookmark`,
@@ -1993,7 +2001,7 @@ export function Reader({ id }: { id: string }) {
       <div className={styles.fullCenter}>
         <EmptyState message={t('In-browser reading currently supports EPUB. Use download or the classic reader for other formats.')} />
         <div className={styles.fallbackRow}>
-          {other && <a className={styles.exitLink} href={resourceUrl(other.read_url)}>{t('Open classic reader')}</a>}
+          {other && <a className={styles.exitLink} href={resourceUrl(withLookupMode(other.read_url, lookupMode))}>{t('Open classic reader')}</a>}
           <Link href={`/book/${id}`} className={styles.exitLink}>{t('← Back to book')}</Link>
         </div>
       </div>
@@ -2148,7 +2156,13 @@ export function Reader({ id }: { id: string }) {
         </>
       )}
 
-      {previewSource && (
+      {lookupMode && (
+        <div className={styles.resumeNotice} role="status">
+          <span>{t('Progress is not being saved.')}</span>
+        </div>
+      )}
+
+      {previewSource && !lookupMode && (
         <div className={styles.resumeNotice} role="status">
           <span>{t('Previewing {source}. Its saved position will not change.', {
             source: previewSource.label,
@@ -2171,7 +2185,7 @@ export function Reader({ id }: { id: string }) {
         </div>
       )}
 
-      {remoteResume && !requestedSource && !previewSource && (
+      {remoteResume && !lookupMode && !requestedSource && !previewSource && (
         <div className={styles.resumeNotice} role="status">
           <button onClick={() => {
             previewingRef.current = true;

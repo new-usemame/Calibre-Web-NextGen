@@ -55,6 +55,7 @@ from .services.kobo_reconcile import (
     build_reconciliation_preview,
     scan_from_candidates,
 )
+from .services.support_policy import validate_support_settings
 from .usermanagement import user_login_required
 from .ui_themes import config_theme_code
 from .cw_babel import (get_available_locale,
@@ -1090,6 +1091,20 @@ def update_view_configuration():
               category="error")
         return view_configuration()
 
+    # This settings card is optional on legacy/partial POST clients. Validate
+    # its complete submitted value before mutating any other configuration.
+    support_settings_submitted = request.form.get("support_settings_present") == "1"
+    support_url = support_label = None
+    if support_settings_submitted:
+        try:
+            support_url, support_label = validate_support_settings(
+                request.form.get("config_support_url", ""),
+                request.form.get("config_support_label", ""),
+            )
+        except ValueError:
+            flash(_("Support settings were not saved. Use an HTTP or HTTPS URL without credentials, with a URL up to 2048 characters and a label up to 80 characters."), category="error")
+            return view_configuration()
+
     _config_string(to_save, "config_calibre_web_title")
     _config_string(to_save, "config_columns_to_ignore")
     persist_configured_columns(
@@ -1153,6 +1168,11 @@ def update_view_configuration():
     config.config_default_show = sum(int(k[5:]) for k in to_save if k.startswith('show_') and not k.startswith('show_magic_shelf_') and not k.startswith('show_custom_shelf_'))
     if "Show_detail_random" in to_save:
         config.config_default_show |= constants.DETAIL_RANDOM
+
+    if support_settings_submitted:
+        config.config_show_project_support = "config_show_project_support" in request.form
+        config.config_support_url = support_url
+        config.config_support_label = support_label
 
     config.save()
     flash(_("Calibre-Web NextGen configuration updated"), category="success")

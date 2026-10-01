@@ -3101,6 +3101,19 @@ def migrate_config_table(engine, _session):
             log.error("Failed to add config_custom_css column: %s", e)
             pass
 
+    # Issue #1402: support destinations must retain the current project-link
+    # behavior on upgrade. The PRAGMA-guarded helper makes startup re-entry safe
+    # and ensures legacy rows receive the same default as newly-created settings.
+    for column_name, ddl in (
+        ("config_show_project_support", "config_show_project_support BOOLEAN NOT NULL DEFAULT 1"),
+        ("config_support_url", "config_support_url VARCHAR DEFAULT ''"),
+        ("config_support_label", "config_support_label VARCHAR DEFAULT ''"),
+    ):
+        try:
+            _add_column_if_missing(engine, "settings", column_name, ddl)
+        except Exception as error:
+            log.error("Failed to add %s column: %s", column_name, error)
+
     # Add LDAP auto-create users configuration
     try:
         # Test if the new column exists

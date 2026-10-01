@@ -17955,3 +17955,27 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+msgid "Show Calibre-Web NextGen support links to readers"
+msgstr "Ondersteuningslinks van Calibre-Web NextGen tonen aan lezers"
+
+msgid "When enabled, readers see the project support links. Administrators always see them."
+msgstr "Als dit is ingeschakeld, zien lezers de ondersteuningslinks van het project. Beheerders zien deze altijd."
+
+msgid "Your support URL"
+msgstr "Uw ondersteunings-URL"
+
+msgid "When project support links are hidden, readers can use this destination instead. Leave blank to hide those links without a replacement. Use an absolute HTTP or HTTPS URL without username or password."
+msgstr "Wanneer de ondersteuningslinks van het project verborgen zijn, kunnen lezers in plaats daarvan deze bestemming gebruiken. Laat dit veld leeg om die links zonder vervanging te verbergen. Gebruik een absolute HTTP- of HTTPS-URL zonder gebruikersnaam of wachtwoord."
+
+msgid "Your support link label"
+msgstr "Label voor uw ondersteuningslink"
+
+msgid "Up to 80 characters. If left blank while a URL is set, the link says “Contact support”."
+msgstr "Maximaal 80 tekens. Als dit leeg blijft terwijl er een URL is ingesteld, heet de link “Contact opnemen”."
+
+msgid "Contact support"
+msgstr "Contact opnemen"
+
+msgid "Support settings were not saved. Use an HTTP or HTTPS URL without credentials, with a URL up to 2048 characters and a label up to 80 characters."
+msgstr "De ondersteuningsinstellingen zijn niet opgeslagen. Gebruik een HTTP- of HTTPS-URL zonder inloggegevens van maximaal 2048 tekens en een label van maximaal 80 tekens."

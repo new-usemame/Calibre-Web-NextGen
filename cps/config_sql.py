@@ -213,6 +213,15 @@ class _Settings(_Base):
     # neutralizing </style> breakout at render time (see render_template.py).
     config_custom_css = Column(String, default="")
 
+    # Issue #1402: let hosted instances hide project-specific support links and
+    # point readers to their own support destination. Defaults preserve today's
+    # links for every existing installation.
+    config_show_project_support = Column(
+        Boolean, nullable=False, default=True, server_default=text("1"),
+    )
+    config_support_url = Column(String, default="")
+    config_support_label = Column(String, default="")
+
     config_ldap_provider_url = Column(String, default='example.org')
     config_ldap_port = Column(SmallInteger, default=389)
     config_ldap_authentication = Column(SmallInteger, default=constants.LDAP_AUTH_SIMPLE)

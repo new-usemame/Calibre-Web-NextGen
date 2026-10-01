@@ -19,3 +19,7 @@ Eighteen JPEG captures cover New UI visible/hidden detail and account settings i
 The full local smoke/unit run passed 10,262 tests with 102 skipped and 12 failures: ten old named-preference response expectations were corrected and passed targeted rechecks; two unchanged metadata-replacement SQLite I/O failures reproduce on clean main (the #1734 baseline comparison). CI is the final full-suite gate.
 
 Independent review of the implementation found no blocker in default behavior, account isolation, validation, partial-save handling or authorization. No dependencies or database columns were added.
+
+## Broad CI follow-up
+
+The first broad browser run passed 910 cases with 105 skips and failed the existing reader column-count case on all retries: its `getComputedStyle` measurement received a missing element while epub.js replaced the frame. The measurement now returns unavailable until the root, window and reader container exist. Actual column-width thresholds and saved-preference assertions are unchanged. Independent review approved this narrow harness correction; the actual desktop reader column flow passed a targeted recheck (2 including setup). The immutable-image CI rerun remains the final gate.

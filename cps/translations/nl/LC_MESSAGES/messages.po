@@ -8,12 +8,11 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Calibre-Web (GPLV3)\n"
-"Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
-"Automated\n"
+"Report-Msgid-Bugs-To: https://github.com/new-usemame/Calibre-Web-NextGen\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
 "PO-Revision-Date: 2026-04-26 13:31+0200\n"
-"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at proton."
-"me>\n"
+"Last-Translator: Michiel Cornelissen <michiel.cornelissen+gitbhun at "
+"proton.me>\n"
 "Language-Team: ed.driesen@telenet.be\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
@@ -225,6 +224,14 @@ msgstr "Parameter is niet gevonden"
 #: cps/admin.py
 msgid "Settings DB is not Writeable"
 msgstr "Instellingen database is niet schrijfbaar."
+
+#: cps/admin.py
+msgid "Invalid default body font option"
+msgstr "Ongeldige standaardlettertypeoptie voor tekst"
+
+#: cps/admin.py
+msgid "Invalid default display font option"
+msgstr "Ongeldige standaardlettertypeoptie voor koppen"
 
 #: cps/admin.py
 msgid ""
@@ -3503,6 +3510,20 @@ msgstr ""
 "Geldt voor accounts die vanaf nu worden aangemaakt. Iedereen kiest zelf "
 "onder Account → Thema."
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Default UI body font for new users"
+msgstr "Standaardlettertype voor UI-tekst voor nieuwe gebruikers"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Default UI display font for new users"
+msgstr "Standaardkoplettertype voor nieuwe gebruikers"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Applies to accounts created from now on. Each user can change these fonts "
+"under Account settings."
+msgstr "Geldt voor accounts die vanaf nu worden aangemaakt. Elke gebruiker kan deze lettertypen wijzigen bij Accountinstellingen."
+
 #: cps/spa_strings.py
 msgid "Add a format"
 msgstr "Formaat toevoegen"
@@ -3772,15 +3793,15 @@ msgstr "Standaard (Optima / Sans-Serif)"
 msgid "Default (Bookish Serif)"
 msgstr "Standaard (Bookish Serif)"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "System Sans-Serif"
 msgstr "Systeem Sans-Serif"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Bookish Serif"
 msgstr "Bookish Serif"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Monospace"
 msgstr "Monospace"
 
@@ -6079,7 +6100,7 @@ msgstr "Datum toegevoegd"
 msgid "Declined. {name} was not connected."
 msgstr "Geweigerd. {name} is niet gekoppeld."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Default (System Sans-Serif)"
 msgstr "Standaard (systeem sans-serif)"
 
@@ -9732,8 +9753,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 "Dit is het eigen adres van deze computer, dat de e-reader niet kan bereiken. "
 "Kies ‘Wijzigen’ en voer het adres in dat de e-reader kan gebruiken, zoals "
@@ -10895,8 +10916,8 @@ msgstr "Kies e-mailadressen:"
 #, fuzzy
 msgid "Success! Book queued for sending to the selected address(es)!"
 msgstr ""
-"Het boek is in de wachtrij geplaatst om te worden verstuurd aan "
-"%(eReadermail)s"
+"Het boek is in de wachtrij geplaatst om te worden verstuurd aan %"
+"(eReadermail)s"
 
 #: cps/web.py
 msgid "Please wait one minute to register next user"
@@ -17860,10 +17881,11 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Deze paden zijn alleen intern voor CWA, je kunt aan de linkerkant naar "
 #~ "hartenlust wijzigen waar ze aan gekoppeld zijn, maar er is geen reden om "
-#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je <code>metadata."
-#~ "db</code> bestand op een andere locatie wilt dan de rest van je "
-#~ "bibliotheek, gebruik dan de <b>Scheid Boekbestanden van Bibliotheek Optie "
-#~ "hieronder en voer daar het pad naar de rest van de bibliotheek in</b>"
+#~ "de paden aan de rechterkant te wijzigen.<br><br>Als je je "
+#~ "<code>metadata.db</code> bestand op een andere locatie wilt dan de rest "
+#~ "van je bibliotheek, gebruik dan de <b>Scheid Boekbestanden van "
+#~ "Bibliotheek Optie hieronder en voer daar het pad naar de rest van de "
+#~ "bibliotheek in</b>"
 
 #~ msgid "Enable CWA Auto-Convert"
 #~ msgstr "Schakel CWA Auto-Conversie in"

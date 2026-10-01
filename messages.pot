@@ -1,15 +1,14 @@
-# Translations template for Calibre-Web Automated.
-# Copyright (C) 2026 Calibre-Web Automated Contributors
-# This file is distributed under the same license as the Calibre-Web
-# Automated project.
+# Translations template for Calibre-Web-NextGen.
+# Copyright (C) 2026 Calibre-Web-NextGen Contributors
+# This file is distributed under the same license as the Calibre-Web-NextGen
+# project.
 # FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
 #
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: Calibre-Web Automated v4.0.8\n"
-"Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
-"Automated\n"
+"Project-Id-Version: Calibre-Web-NextGen dev\n"
+"Report-Msgid-Bugs-To: https://github.com/new-usemame/Calibre-Web-NextGen\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
@@ -207,6 +206,14 @@ msgstr ""
 
 #: cps/admin.py
 msgid "Settings DB is not Writeable"
+msgstr ""
+
+#: cps/admin.py
+msgid "Invalid default body font option"
+msgstr ""
+
+#: cps/admin.py
+msgid "Invalid default display font option"
 msgstr ""
 
 #: cps/admin.py
@@ -3287,6 +3294,20 @@ msgid ""
 "Account → Theme."
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Default UI body font for new users"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Default UI display font for new users"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Applies to accounts created from now on. Each user can change these fonts"
+" under Account settings."
+msgstr ""
+
 #: cps/spa_strings.py
 msgid "Add a format"
 msgstr ""
@@ -3552,15 +3573,15 @@ msgstr ""
 msgid "Default (Bookish Serif)"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "System Sans-Serif"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Bookish Serif"
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Monospace"
 msgstr ""
 
@@ -5782,7 +5803,7 @@ msgstr ""
 msgid "Declined. {name} was not connected."
 msgstr ""
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Default (System Sans-Serif)"
 msgstr ""
 

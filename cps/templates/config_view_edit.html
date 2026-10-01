@@ -236,6 +236,26 @@
       </div>
 
       <div class="form-group">
+        <label for="config_default_ui_font_body">{{_('Default UI body font for new users')}}</label>
+        <select name="config_default_ui_font_body" id="config_default_ui_font_body" class="form-control" aria-describedby="default-ui-font-help">
+          <option value="" {% if not conf.config_default_ui_font_body %}selected{% endif %}>{{_('Default (System Sans-Serif)')}}</option>
+          <option value="system-sans" {% if conf.config_default_ui_font_body == "system-sans" %}selected{% endif %}>{{_('System Sans-Serif')}}</option>
+          <option value="serif" {% if conf.config_default_ui_font_body == "serif" %}selected{% endif %}>{{_('Bookish Serif')}}</option>
+          <option value="mono" {% if conf.config_default_ui_font_body == "mono" %}selected{% endif %}>{{_('Monospace')}}</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="config_default_ui_font_display">{{_('Default UI display font for new users')}}</label>
+        <select name="config_default_ui_font_display" id="config_default_ui_font_display" class="form-control" aria-describedby="default-ui-font-help">
+          <option value="" {% if not conf.config_default_ui_font_display %}selected{% endif %}>{{_('Default (System Sans-Serif)')}}</option>
+          <option value="system-sans" {% if conf.config_default_ui_font_display == "system-sans" %}selected{% endif %}>{{_('System Sans-Serif')}}</option>
+          <option value="serif" {% if conf.config_default_ui_font_display == "serif" %}selected{% endif %}>{{_('Bookish Serif')}}</option>
+          <option value="mono" {% if conf.config_default_ui_font_display == "mono" %}selected{% endif %}>{{_('Monospace')}}</option>
+        </select>
+        <p id="default-ui-font-help" class="settings-explanation">{{_('Applies to accounts created from now on. Each user can change these fonts under Account settings.')}}</p>
+      </div>
+
+      <div class="form-group">
         <label for="config_opds_default_locale">{{_('OPDS Default Locale for Anonymous Clients')}}</label>
         <select name="config_opds_default_locale" id="config_opds_default_locale" class="form-control">
           <option value="" {% if not conf.config_opds_default_locale %}selected{% endif %}>{{_('(none — fall back to English)')}}</option>

@@ -18,6 +18,7 @@ from ..progress_syncing.settings import is_koreader_sync_enabled
 from ..cw_login import current_user, login_user
 from ..logout import cleanup_local_logout
 from ..ui_themes import config_theme_code
+from ..ui_font_preferences import seed_new_user_ui_font_defaults
 from ..helper import (
     check_username, check_email, check_valid_domain, reset_password,
     send_registration_mail, generate_random_password,
@@ -560,6 +561,7 @@ def auth_register():
         content.theme = config_theme_code(getattr(config, "config_theme", None))
     except Exception:
         pass
+    seed_new_user_ui_font_defaults(content, config)
     try:
         ub.session.add(content)
         ub.session.commit()

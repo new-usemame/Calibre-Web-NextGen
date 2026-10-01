@@ -23,8 +23,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: Calibre-Web NextGen\n"
-"Report-Msgid-Bugs-To: https://github.com/crocodilestick/Calibre-Web-"
-"Automated\n"
+"Report-Msgid-Bugs-To: https://github.com/new-usemame/Calibre-Web-NextGen\n"
 "POT-Creation-Date: 2026-07-17 21:21-0400\n"
 "PO-Revision-Date: 2025-11-17 21:51+0100\n"
 "Last-Translator: Tex <tex@grosist.fr>\n"
@@ -243,6 +242,14 @@ msgstr "Paramètre non trouvé"
 #: cps/admin.py
 msgid "Settings DB is not Writeable"
 msgstr "La base de données des paramètres n'est pas accessible en écriture"
+
+#: cps/admin.py
+msgid "Invalid default body font option"
+msgstr "Option de police de corps par défaut invalide"
+
+#: cps/admin.py
+msgid "Invalid default display font option"
+msgstr "Option de police d’affichage par défaut invalide"
 
 #: cps/admin.py
 msgid ""
@@ -3617,6 +3624,20 @@ msgstr ""
 "S’applique aux comptes créés à partir de maintenant. Chacun choisit le sien "
 "dans Compte → Thème."
 
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Default UI body font for new users"
+msgstr "Police de corps par défaut de l’interface pour les nouveaux utilisateurs"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Default UI display font for new users"
+msgstr "Police d’affichage par défaut de l’interface pour les nouveaux utilisateurs"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Applies to accounts created from now on. Each user can change these fonts "
+"under Account settings."
+msgstr "S’applique aux comptes créés à partir de maintenant. Chaque utilisateur peut modifier ces polices dans les paramètres du compte."
+
 #: cps/spa_strings.py
 msgid "Add a format"
 msgstr "Ajouter un format"
@@ -3886,15 +3907,15 @@ msgstr "Par défaut (Optima / Sans-Serif)"
 msgid "Default (Bookish Serif)"
 msgstr "Par défaut (Bookish Serif)"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "System Sans-Serif"
 msgstr "Police sans empattement du système"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Bookish Serif"
 msgstr "Bookish Serif"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Monospace"
 msgstr "Chasse fixe"
 
@@ -6207,7 +6228,7 @@ msgstr "Date d'ajout"
 msgid "Declined. {name} was not connected."
 msgstr "Refusé. {name} n’a pas été connecté."
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/config_view_edit.html
 msgid "Default (System Sans-Serif)"
 msgstr "Par défaut (police sans empattement du système)"
 
@@ -9891,8 +9912,8 @@ msgstr ""
 #: cps/spa_strings.py
 msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
-"Change and enter the address the e-reader can use, such as "
-"http://192.168.1.20:8083."
+"Change and enter the address the e-reader can use, such as http://"
+"192.168.1.20:8083."
 msgstr ""
 "Il s’agit de l’adresse propre à cet ordinateur, que la liseuse ne peut pas "
 "joindre. Choisissez « Modifier » et saisissez l’adresse que la liseuse peut "
@@ -9950,8 +9971,8 @@ msgid ""
 "you did not just ask for a code on your own e-reader, choose Deny."
 msgstr ""
 "Cette demande provient d’un autre réseau que celui que vous utilisez. Si "
-"vous ne venez pas de demander un code sur votre propre liseuse, choisissez « "
-"Refuser »."
+"vous ne venez pas de demander un code sur votre propre liseuse, choisissez "
+"« Refuser »."
 
 #: cps/spa_strings.py
 msgid "This request needs an administrator to approve it again."
@@ -11258,8 +11279,8 @@ msgid ""
 "KOReader)' is enabled in CWA Settings."
 msgstr ""
 "La synchronisation des étagères magiques avec les liseuses est désactivée "
-"pour tout le serveur — cette étagère n’atteindra pas vos liseuses tant que « "
-"Synchroniser les étagères magiques avec les liseuses (Kobo et KOReader) » "
+"pour tout le serveur — cette étagère n’atteindra pas vos liseuses tant que "
+"« Synchroniser les étagères magiques avec les liseuses (Kobo et KOReader) » "
 "n’est pas activé dans les paramètres CWA."
 
 #: cps/services/ereader_scope.py
@@ -14055,9 +14076,9 @@ msgid ""
 "\">kindle-epub-fix.netlify.app</a> tool made by <a href=\"https://github.com/"
 "innocenat\">innocenat</a>."
 msgstr ""
-"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-fix."
-"netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a href=\"https://"
-"github.com/innocenat\">innocenat</a>."
+"Cet outil a été adapté à partir de l'outil <a href=\"https://kindle-epub-"
+"fix.netlify.app/\">kindle-epub-fix.netlify.app</a> créé par <a "
+"href=\"https://github.com/innocenat\">innocenat</a>."
 
 #: cps/templates/cwa_settings.html
 msgid "Enable KOReader Sync (NextGen Plugin)"

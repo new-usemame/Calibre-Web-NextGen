@@ -58,6 +58,7 @@ from .services.kobo_reconcile import (
 from .services.support_policy import validate_support_settings
 from .usermanagement import user_login_required
 from .ui_themes import config_theme_code
+from .ui_font_preferences import seed_new_user_ui_font_defaults, validate_default_font_updates
 from .cw_babel import (get_available_locale,
                        get_user_locale_language, sanitize_locale_for_write)
 from . import debug_info
@@ -1116,6 +1117,17 @@ def update_view_configuration():
             flash(_("Support settings were not saved. Use an HTTP or HTTPS URL without credentials, with a URL up to 2048 characters and a label up to 80 characters."), category="error")
             return view_configuration()
 
+    # Validate both presets before any other form fields mutate the config.
+    # This keeps a stale/manual POST from partially applying unrelated settings.
+    try:
+        font_updates = validate_default_font_updates(to_save)
+    except ValueError as ex:
+        message = (_("Invalid default body font option")
+                   if "body" in str(ex)
+                   else _("Invalid default display font option"))
+        flash(message, category="error")
+        return view_configuration()
+
     _config_string(to_save, "config_calibre_web_title")
     _config_string(to_save, "config_columns_to_ignore")
     persist_configured_columns(
@@ -1160,6 +1172,8 @@ def update_view_configuration():
     _config_int(to_save, "config_authors_max")
     _config_string(to_save, "config_default_language")
     _config_string(to_save, "config_default_locale")
+    for key, value in font_updates.items():
+        setattr(config, key, value)
     _config_string(to_save, "config_opds_default_locale")
 
     # Fork #463 (@Andrew-H2O): site-wide appearance settings live on the UI
@@ -2875,6 +2889,7 @@ def ldap_import_create_user(user, user_data):
     # path. Without this the column default (dark) silently wins over whatever
     # the admin configured.
     content.theme = config_theme_code(config.config_theme)
+    seed_new_user_ui_font_defaults(content, config)
     ub.session.add(content)
     try:
         ub.session.commit()
@@ -3385,6 +3400,7 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
             to_save.get("kobo_two_way_annotation_sync", 0) == "on"
         )
         content.opds_only_shelves_sync = to_save.get("opds_only_shelves_sync", 0) == "on"
+        seed_new_user_ui_font_defaults(content, config)
         ub.session.add(content)
         ub.session.commit()
         flash(_("User '%(user)s' created", user=content.name), category="success")

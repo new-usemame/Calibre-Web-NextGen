@@ -16,6 +16,7 @@ import type { AdminUser } from '../lib/api';
 import { ApiError } from '../lib/api';
 import { useT } from '../lib/i18n';
 import { THEMES, DEFAULT_THEME } from '../lib/themes';
+import { UI_BODY_FONTS, UI_DISPLAY_FONTS } from '../lib/fonts';
 import styles from './Admin.module.css';
 
 // Default-role checkboxes auto-granted to new OAuth users. Keys MUST match
@@ -390,6 +391,8 @@ function AdminConfigForm() {
       config_theme: cfg.config_theme,
       config_default_language: cfg.config_default_language,
       config_default_locale: cfg.config_default_locale,
+      config_default_ui_font_body: cfg.config_default_ui_font_body,
+      config_default_ui_font_display: cfg.config_default_ui_font_display,
       config_server_announcement: cfg.config_server_announcement,
     });
   }, [cfg]);
@@ -458,6 +461,25 @@ function AdminConfigForm() {
             onChange={(e) => set('config_default_language', e.target.value)}>
             {cfg.languages.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
           </select>
+        </label>
+        <label className={styles.field}>
+          <span>{t('Default UI body font for new users')}</span>
+          <select value={String(form.config_default_ui_font_body ?? '')}
+            aria-describedby="default-ui-font-help"
+            onChange={(e) => set('config_default_ui_font_body', e.target.value)}>
+            {UI_BODY_FONTS.map((font) => <option key={font.key || 'default'} value={font.key}>{t(font.label)}</option>)}
+          </select>
+        </label>
+        <label className={styles.field}>
+          <span>{t('Default UI display font for new users')}</span>
+          <select value={String(form.config_default_ui_font_display ?? '')}
+            aria-describedby="default-ui-font-help"
+            onChange={(e) => set('config_default_ui_font_display', e.target.value)}>
+            {UI_DISPLAY_FONTS.map((font) => <option key={font.key || 'default'} value={font.key}>{t(font.label)}</option>)}
+          </select>
+          <p id="default-ui-font-help" className={styles.fieldHint}>
+            {t('Applies to accounts created from now on. Each user can change these fonts under Account settings.')}
+          </p>
         </label>
       </div>
       <label className={styles.field}>

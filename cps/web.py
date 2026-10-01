@@ -58,6 +58,7 @@ from .redirect import get_redirect_location
 from .cw_babel import get_available_locale, get_available_translations, sanitize_locale_for_write
 from .usermanagement import login_required_if_no_ano
 from .ui_themes import config_theme_code
+from .ui_font_preferences import seed_new_user_ui_font_defaults
 from .kobo_sync_status import remove_synced_book
 from . import magic_shelf
 from .render_template import render_title_template, get_custom_column_visibility_options
@@ -2934,6 +2935,7 @@ def register_post():
             content.theme = config_theme_code(getattr(config, 'config_theme', None))
         except Exception:
             pass
+        seed_new_user_ui_font_defaults(content, config)
         try:
             ub.session.add(content)
             ub.session.commit()

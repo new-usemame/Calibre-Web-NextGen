@@ -20,19 +20,12 @@ from ..helper import valid_password, valid_email, check_email
 from ..kobo_sync_status import needs_shelf_reconciliation, reconcile_shelves_safely
 from ..services import app_passwords
 from ..ui_themes import ALLOWED_THEME_SLUGS, theme_slug, theme_code
+from ..ui_font_preferences import ALLOWED_UI_FONT_BODY, ALLOWED_UI_FONT_DISPLAY
 from ..user_preferences import (NAMED_BOOLEAN_PREFERENCE_PATHS,
                                 serialize_named_preferences,
                                 set_named_preferences)
 from .serializers import (SIDEBAR_VISIBILITY_BITS, ORDERABLE_SIDEBAR_KEYS,
                           serialize_sidebar_visibility, serialize_sidebar_order)
-
-# #701 — allowed UI font preset KEYS. The keys (not CSS stacks) are stored;
-# the stacks live in the SPA (frontend/src/lib/fonts.ts). These sets MUST match
-# the keys in that module (UI_BODY_FONTS / UI_DISPLAY_FONTS). "" = theme default.
-ALLOWED_UI_FONT_BODY = frozenset({"", "system-sans", "serif", "mono"})
-# #641 — 'serif' is now a valid DISPLAY preset too: once the display default
-# flipped from bookish serif to System sans, serif has to stay reachable here.
-ALLOWED_UI_FONT_DISPLAY = frozenset({"", "system-sans", "serif", "mono"})
 
 log = logger.create()
 

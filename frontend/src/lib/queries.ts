@@ -746,6 +746,8 @@ export interface AdminConfig {
   config_theme: string;
   config_default_language: string;
   config_default_locale: string;
+  config_default_ui_font_body: string;
+  config_default_ui_font_display: string;
   config_server_announcement: string;
   locales: { id: string; name: string }[];
   languages: { id: string; name: string }[];

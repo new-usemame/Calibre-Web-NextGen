@@ -248,6 +248,9 @@ _("Theme saved.")
 _("Could not save theme.")
 _("Default theme for new accounts")
 _("Applies to accounts created from now on. Everyone picks their own under Account → Theme.")
+_("Default UI body font for new users")
+_("Default UI display font for new users")
+_("Applies to accounts created from now on. Each user can change these fonts under Account settings.")
 
 
 # ============================================================================

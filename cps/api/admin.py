@@ -20,6 +20,8 @@ from ..usermanagement import login_required_if_no_ano
 from ..helper import (valid_email, check_email, check_username, valid_password,
                       generate_password_hash, reset_password)
 from ..ui_themes import ALLOWED_THEME_SLUGS, config_theme_code, config_theme_slug, theme_code
+from ..ui_font_preferences import (seed_new_user_ui_font_defaults,
+                                   validate_default_font_updates)
 from ..admin import _delete_user
 
 # UI-configuration fields the SPA admin form can read/write natively. Scoped to
@@ -279,6 +281,8 @@ def _ui_config_payload():
         "config_theme": config_theme_slug(config.config_theme),
         "config_default_language": config.config_default_language,
         "config_default_locale": config.config_default_locale,
+        "config_default_ui_font_body": getattr(config, "config_default_ui_font_body", ""),
+        "config_default_ui_font_display": getattr(config, "config_default_ui_font_display", ""),
         "config_server_announcement": config.config_server_announcement or "",
         # Shared with the account form so the two settings pages can never
         # disagree about these options again (#886).
@@ -365,6 +369,10 @@ def admin_update_config():
     if guard:
         return guard
     data = request.get_json(silent=True) or {}
+    try:
+        font_updates = validate_default_font_updates(data)
+    except ValueError as ex:
+        return _err("invalid_request", str(ex), 400)
     for key in _UI_CONFIG_INT:
         if key in data:
             try:
@@ -381,6 +389,8 @@ def admin_update_config():
     for key in _UI_CONFIG_STR:
         if key in data:
             setattr(config, key, str(data[key] or ""))
+    for key, value in font_updates.items():
+        setattr(config, key, value)
     try:
         config.save()
     except Exception as ex:
@@ -446,6 +456,7 @@ def admin_create_user():
     # Inherit the instance default theme, matching _handle_new_user. The account
     # keeps its own copy from here on — Account -> Theme edits User.theme only.
     new_user.theme = config_theme_code(config.config_theme)
+    seed_new_user_ui_font_defaults(new_user, config)
 
     try:
         ub.session.add(new_user)

@@ -139,6 +139,10 @@ class _Settings(_Base):
     config_default_show = Column(SmallInteger, default=constants.ADMIN_USER_SIDEBAR)
     config_default_language = Column(String(3), default="all")
     config_default_locale = Column(String(2), default="en")
+    # Seed only newly created accounts; an account's own Account-page choice
+    # remains independent after creation.
+    config_default_ui_font_body = Column(String, default="")
+    config_default_ui_font_display = Column(String, default="")
     # Fork issue #160: locale fallback for anonymous OPDS clients (Readest,
     # KOReader, Aldiko) that don't send Accept-Language. Empty string keeps
     # the existing 'en' fallback; setting a value pins anon OPDS responses

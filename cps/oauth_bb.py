@@ -60,6 +60,7 @@ from .usermanagement import user_login_required
 from . import app, config, constants, logger, oauth_auto_redirect, ub
 from . import oauth_config
 from .ui_themes import config_theme_code
+from .ui_font_preferences import seed_new_user_ui_font_defaults
 
 try:
     from .oauth import OAuthBackend, backend_resultcode
@@ -491,6 +492,7 @@ def register_user_from_generic_oauth(token=None):
         # This used to hardcode dark, from when light was deprecated; #845
         # brought six themes back, so honour whatever the admin configured.
         user.theme = config_theme_code(getattr(config, 'config_theme', None))
+        seed_new_user_ui_font_defaults(user, config)
             
         # Match other new accounts: send only selected shelves.
         user.kobo_only_shelves_sync = 1

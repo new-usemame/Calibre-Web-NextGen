@@ -417,6 +417,7 @@ def _ui_config():
         config_books_per_page=20, config_random_books=4, config_authors_max=0,
         config_calibre_web_title="t", config_default_language="all",
         config_default_locale="en", config_server_announcement="",
+        config_default_ui_font_body="", config_default_ui_font_display="",
         save=lambda: None,
     )
 

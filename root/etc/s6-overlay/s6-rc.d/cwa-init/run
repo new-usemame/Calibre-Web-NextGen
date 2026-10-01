@@ -47,14 +47,9 @@ if [[ -f /usr/bin/kepubify ]] && [[ ! -x /usr/bin/kepubify ]]; then
     fi
 fi
 
-# Pre-stage some files & directories for permissions purposes
-if [ "$(id -u)" = "0" ]; then
-  mkdir -p /app/calibre-web-automated/cps/cache
-else
-  echo "[cwa-init] running as uid $(id -u) (not root); skipping cache directory creation in the read-only app tree"
-fi
+# Writable cache is created by the runtime user under /config, or CACHE_DIR.
 
-# permissions (skip chown on network shares for bind mounts, but still fix /app)
+# Config ownership (skip chown on network-share bind mounts).
 #
 # When the container is started as an arbitrary non-root user (`--user`,
 # `--userns=keep-id`), LSIO's init-adduser is skipped, `abc` keeps its
@@ -66,11 +61,8 @@ if [ "$(id -u)" != "0" ]; then
   echo "[cwa-init] running as uid $(id -u) (not root); skipping chown — files keep their current owner"
 elif [ "${NETWORK_SHARE_MODE,,}" = "true" ] || [ "${NETWORK_SHARE_MODE}" = "1" ] || [ "${NETWORK_SHARE_MODE,,}" = "yes" ] || [ "${NETWORK_SHARE_MODE,,}" = "on" ]; then
   echo "[cwa-init] NETWORK_SHARE_MODE=true detected; skipping initial chown of /config"
-  chown -R abc:abc /app/calibre-web-automated/cps/cache
 else
-  chown -R abc:abc \
-    /config \
-    /app/calibre-web-automated/cps/cache
+  chown -R abc:abc /config
 fi
 
 export CALIBRE_DBPATH=/config

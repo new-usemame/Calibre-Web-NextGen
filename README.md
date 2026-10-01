@@ -411,6 +411,21 @@ After Shelfmark starts, open it and pick **Settings → Security → Authenticat
 
 ## Common configurations
 
+### Writable cache storage
+
+The general derived cache defaults to `cache/` under the configured application
+config directory (`/config/cache` in Docker). Set `CACHE_DIR` to keep an explicit
+cache location; that directory must be writable by the service user. Existing
+thumbnail storage stays at `/config/thumbnails`, and metadata change logs and
+scratch storage keep their existing locations under the config directory.
+
+Upgrades regenerate disposable general cache entries in the new default location.
+The old `cps/cache` directory is left untouched; no user data or existing
+thumbnail cache is moved or deleted. Deployments that explicitly set `CACHE_DIR`
+keep that location. Startup no longer creates or changes ownership of the
+image-owned `cps/cache` directory.
+
+
 ### Network shares (NFS, SMB, ZFS)
 
 See [`examples/.env.example`](examples/.env.example) for the complete environment-variable reference and defaults.

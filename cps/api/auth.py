@@ -228,6 +228,9 @@ def _me_payload(user):
     from .. import user_library
     user_library.mark_response_user_specific()
     payload = serialize_user(user)
+    payload["opds_only_shelves_sync"] = bool(
+        getattr(user, "opds_only_shelves_sync", False)
+    )
     payload["features"] = _server_features()
     from ..services.acquisition.admission import instance_enabled, account_allowed
     payload["acquisition_access"] = bool(

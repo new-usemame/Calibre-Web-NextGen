@@ -63,6 +63,7 @@ def test_edit_shelf_does_not_change_opds_exposure_when_checkbox_hidden(monkeypat
         kobo_only_shelves_sync=0,
         opds_only_shelves_sync=0,
         role_edit_shelfs=lambda: True,
+        role_share_shelfs=lambda: True,
     ))
     monkeypatch.setattr(shelf_module.config, "config_kobo_sync", False, raising=False)
     monkeypatch.setattr(shelf_module, "check_shelf_is_unique", lambda *_args, **_kwargs: True)
@@ -89,6 +90,7 @@ def test_edit_shelf_updates_current_users_opds_exposure(monkeypatch):
         kobo_only_shelves_sync=0,
         opds_only_shelves_sync=1,
         role_edit_shelfs=lambda: True,
+        role_share_shelfs=lambda: True,
     ))
     monkeypatch.setattr(shelf_module.config, "config_kobo_sync", False, raising=False)
     monkeypatch.setattr(shelf_module, "check_shelf_is_unique", lambda *_args, **_kwargs: True)

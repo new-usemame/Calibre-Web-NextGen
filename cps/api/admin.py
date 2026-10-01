@@ -71,7 +71,10 @@ def _serialize_user(u):
         "locale": u.locale,
         "default_language": u.default_language,
         "is_guest": u.name == "Guest",
-        "roles": {key: bool(u.role & bit) for key, bit in ROLE_BITS.items()},
+        "roles": {
+            **{key: bool(u.role & bit) for key, bit in ROLE_BITS.items()},
+            "share_shelfs": bool(getattr(u, "share_shelfs", True)),
+        },
     }
     payload.update(user_library.mode_payload(u))
     return payload
@@ -422,6 +425,7 @@ def admin_create_user():
             if roles.get(key):
                 role |= bit
         new_user.role = role
+        new_user.share_shelfs = bool(roles.get("share_shelfs", True))
     else:
         new_user.role = config.config_default_role
 
@@ -502,6 +506,8 @@ def admin_update_user(user_id):
         if losing_admin and _other_admin_count(user.id) == 0:
             return _err("conflict", "Can't remove admin from the last administrator", 400)
         user.role = new_role
+        if "share_shelfs" in data["roles"]:
+            user.share_shelfs = bool(data["roles"]["share_shelfs"])
 
     try:
         if "email" in data:

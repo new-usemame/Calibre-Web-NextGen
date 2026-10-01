@@ -38,6 +38,7 @@ const ROLE_FIELDS: { key: string; label: string }[] = [
   { key: 'download', label: 'Download' },
   { key: 'delete_books', label: 'Delete books' },
   { key: 'edit_shelfs', label: 'Edit public shelves' },
+  { key: 'share_shelfs', label: 'Allow sharing your own shelves' },
   { key: 'passwd', label: 'Change password' },
   { key: 'viewer', label: 'Viewer' },
   { key: 'browse_global', label: 'Browse global library' },
@@ -91,7 +92,7 @@ export function Admin() {
         name: form.name.trim(),
         password: form.password,
         email: form.email.trim() || undefined,
-        roles: { download: true, viewer: true, upload: form.upload },
+        roles: { download: true, viewer: true, upload: form.upload, share_shelfs: true },
       },
       {
         onSuccess: (u) => {

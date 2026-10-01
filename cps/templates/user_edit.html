@@ -521,7 +521,12 @@
         
         <div>
           <input type="checkbox" name="edit_shelf_role" id="edit_shelf_role" {% if content.role_edit_shelfs() %}checked{% endif %} style="accent-color: var(--color-secondary);">
-          <label for="edit_shelf_role">{{_('Allow Editing Public Shelves')}}</label>
+          <label for="edit_shelf_role">{{_('Edit public shelves')}}</label>
+        </div>
+        <input type="hidden" name="share_shelfs_present" value="1">
+        <div>
+          <input type="checkbox" name="share_shelfs" id="share_shelfs" {% if content.share_shelfs is not defined or content.share_shelfs %}checked{% endif %} style="accent-color: var(--color-secondary);">
+          <label for="share_shelfs">{{_('Allow sharing your own shelves')}}</label>
         </div>
         {% endif %}
       </div>

@@ -94,6 +94,7 @@ def serialize_user(user):
             "download": user.role_download(),
             "delete_books": user.role_delete_books(),
             "edit_shelfs": user.role_edit_shelfs(),
+            "share_shelfs": user.role_share_shelfs(),
             "viewer": user.role_viewer(),
             "browse_global": bool(
                 getattr(user, "role_browse_global", lambda: False)()

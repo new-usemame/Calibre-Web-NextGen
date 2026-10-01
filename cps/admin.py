@@ -2138,6 +2138,7 @@ def new_user():
         _handle_new_user(to_save, content, languages, translations, kobo_support)
     else:
         content.role = config.config_default_role
+        content.share_shelfs = True
         content.sidebar_view = config.config_default_show
         content.locale = config.config_default_locale
         content.default_language = config.config_default_language
@@ -3156,6 +3157,7 @@ def _handle_new_user(to_save, content, languages, translations, kobo_support):
         content.sidebar_view |= constants.DETAIL_RANDOM
 
     content.role = constants.selected_roles(to_save)
+    content.share_shelfs = to_save.get("share_shelfs") == "on"
     # Seed the account with the instance default theme (Admin -> Theme). The
     # account owns its theme from here on, via Account -> Theme in the New UI.
     try:
@@ -3443,6 +3445,8 @@ def _handle_edit_user(to_save, content, languages, translations, kobo_support):
         # checkboxes alone silently revoked it on any edit, even an email change.
         content.role = (constants.selected_roles(to_save)
                         | constants.preserved_roles(to_save, content.role))
+        if "share_shelfs_present" in to_save:
+            content.share_shelfs = to_save.get("share_shelfs") == "on"
         if anonymous:
             content.role |= constants.ROLE_ANONYMOUS
         else:

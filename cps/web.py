@@ -1745,9 +1745,10 @@ def create_magic_shelf():
         kobo_sync = data.get('kobo_sync', False)
         is_public = data.get('is_public', False)
         
-        # Only allow public if user has permission
-        if is_public and not current_user.role_edit_shelfs():
-            is_public = False
+        # Publishing your own shelf is a separate capability from editing
+        # somebody else's public shelf.
+        if is_public and not current_user.role_share_shelfs():
+            return jsonify({"success": False, "message": _("Permission denied to share shelves")}), 403
         
         # Validate inputs
         if not name or not rules:
@@ -1805,6 +1806,7 @@ def create_magic_shelf():
     return render_title_template('magic_shelf_edit.html',
                                  title=_("Create Magic Shelf"),
                                  page="magic_shelf_create",
+                                 is_owner=True,
                                  opds_expose_enabled=current_user.opds_only_shelves_sync,
                                  opds_expose_checked=False,
                                  kobo_magic_sync_enabled=bool(config.config_kobo_sync_magic_shelves),
@@ -1845,6 +1847,8 @@ def edit_magic_shelf(shelf_id):
         log.warning(f"Magic shelf {shelf_id} not found")
         abort(404)
 
+    is_owner = int(shelf.user_id) == int(current_user.id)
+
     opds_expose_checked = ub.is_opds_magic_shelf_exposed_for_user(current_user.id, shelf.id)
     
     # Check if user can edit this shelf (owner or admin only)
@@ -1859,10 +1863,20 @@ def edit_magic_shelf(shelf_id):
         icon = data.get('icon', shelf.icon)
         kobo_sync = data.get('kobo_sync', shelf.kobo_sync)
         is_public = data.get('is_public', shelf.is_public == 1)
+
+        # Kobo sync membership is account-owned: only the shelf owner can
+        # change it. Non-owner edits preserve the stored value, and a forged
+        # attempt to change it is rejected.
+        if not is_owner and bool(kobo_sync) != bool(shelf.kobo_sync):
+            return jsonify({"success": False, "message": _("Only the shelf owner can change Kobo sync")}), 403
+        if not is_owner:
+            kobo_sync = shelf.kobo_sync
         
         # Only allow changing public status if user has permission
         if is_public != (shelf.is_public == 1):
-            if not current_user.role_edit_shelfs():
+            if is_owner and is_public and not current_user.role_share_shelfs():
+                return jsonify({"success": False, "message": _("Permission denied to share shelves")}), 403
+            if not is_owner and not current_user.role_edit_shelfs():
                 return jsonify({"success": False, "message": _("Permission denied to change public status")}), 403
         
         # Validate inputs
@@ -1934,6 +1948,7 @@ def edit_magic_shelf(shelf_id):
                                  page="magic_shelf_edit",
                                  opds_expose_enabled=current_user.opds_only_shelves_sync,
                                  opds_expose_checked=opds_expose_checked,
+                                 is_owner=is_owner,
                                  kobo_magic_sync_enabled=bool(config.config_kobo_sync_magic_shelves),
                                  koreader_sync=ereader_scope.koreader_library_on(),
                                  allowed_icons=ALLOWED_ICONS,

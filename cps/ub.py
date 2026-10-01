@@ -190,6 +190,14 @@ class UserBase:
     def role_edit_shelfs(self):
         return self._has_role(constants.ROLE_EDIT_SHELFS)
 
+    def role_share_shelfs(self):
+        """Whether this signed-in account may publish its own shelves."""
+        return bool(
+            self.is_authenticated
+            and not self.is_anonymous
+            and getattr(self, "share_shelfs", True)
+        )
+
     def role_delete_books(self):
         return self._has_role(constants.ROLE_DELETE_BOOKS)
 
@@ -285,6 +293,9 @@ class User(UserBase, Base):
     name = Column(String(64), unique=True)
     email = Column(String(120), unique=True, default="")
     role = Column(SmallInteger, default=constants.ROLE_USER)
+    # Publishing one's own shelves is independent from editing other users'
+    # public shelves (ROLE_EDIT_SHELFS). Existing installs are backfilled on.
+    share_shelfs = Column(Boolean, nullable=False, default=True, server_default=text("1"))
     password = Column(String)
     kindle_mail = Column(String(120), default="")
     kindle_mail_subject = Column(String(256), default="", doc="Subject line for eReader email sending, empty=default")
@@ -2868,6 +2879,10 @@ def migrate_user_table(engine, _session):
             "NOT NULL DEFAULT 0",
         )
 
+    # #1734 — publishing a user's own shelves is independent of the existing
+    # edit-public-shelves role. Preserve current behavior for existing users.
+    migrate_user_share_shelfs(engine)
+
     # Keep full User entity loads below every additive User-column migration.
     # SQLAlchemy selects every mapped column for query(User), so loading rows
     # before a later ALTER makes populated older schemas fail on undeclared
@@ -4504,6 +4519,18 @@ def _add_column_if_missing(engine, table_name, column_name, ddl):
             table_name, column_name,
         )
     return True
+
+
+def migrate_user_share_shelfs(engine):
+    """Add the independent own-shelf sharing capability, defaulting on."""
+    if engine is None:
+        return False
+    return _add_column_if_missing(
+        engine,
+        "user",
+        "share_shelfs",
+        "share_shelfs BOOLEAN NOT NULL DEFAULT 1",
+    )
 
 
 def _ensure_kobo_two_way_gate_columns(engine):

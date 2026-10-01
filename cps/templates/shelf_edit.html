@@ -8,7 +8,7 @@
       <label for="title">{{_('Title')}}</label>
       <input type="text" class="form-control" name="title" id="title" value="{{ shelf.name if shelf.name != None }}">
     </div>
-    {% if current_user.role_edit_shelfs() %}
+    {% if current_user.role_share_shelfs() or (shelf_id and shelf.is_public and shelf.user_id != current_user.id and current_user.role_edit_shelfs()) %}
       <div class="checkbox">
         <label>
           <input type="checkbox" name="is_public" {% if shelf.is_public == 1 %}checked{% endif %}> {{_('Share with Everyone')}}

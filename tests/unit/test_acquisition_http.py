@@ -193,6 +193,11 @@ def real_source():
             if session == 'owned-session': self.wfile.write(body)
         def do_GET(self):
             try:
+                if self.path == '/magnet':
+                    self.send_response(302)
+                    self.send_header('Location', 'magnet:?xt=urn:btih:'+'a'*40)
+                    self.end_headers()
+                    return
                 if self.path == '/headers':
                     stop.wait(10)
                     return
@@ -363,3 +368,33 @@ def test_real_child_raw_rpc_session_challenge_and_empty_body(real_source):
     assert result.status == 200 and result.body == request
     with pytest.raises(http.TransportError, match='credentials_redirected'):
         http.run_transfer(real_source, local_policy(real_source), body=request, headers={'Cookie':'SID=owned'})
+
+
+def test_descriptor_only_magnet_redirect_is_terminal_and_never_fetched():
+    magnet='magnet:?xt=urn:btih:'+'a'*40+'&tr=https%3A%2F%2Ftracker.example%2Fannounce'
+    server=Server([Reply(status=302,headers={'Location':magnet})])
+    policy=http.HTTPPolicy(authorization='Bearer PRIVATE',credential_origins=('https://indexer.example',),query_secrets=('PRIVATE',))
+    from dataclasses import replace
+    doc=http.fetch_document('https://indexer.example/download?apikey=PRIVATE',replace(policy,allow_magnet_redirect=True),session_factory=server)
+    assert doc.url==magnet and doc.body==b'' and len(server.calls)==1
+    assert 'PRIVATE' not in repr(doc)
+    with pytest.raises(http.TransportError):
+        http.fetch_document('https://indexer.example/book',policy,session_factory=Server([Reply(status=302,headers={'Location':magnet})]))
+
+
+@pytest.mark.parametrize('location',['magnet:?xt=urn:btih:'+'a'*40+'&dn=%2550%2552%2549%2556%2541%2554%2545','magnet:'+('x'*8193),'magnet:?xt=urn:btih:'+'a'*40+'\x7f'])
+def test_magnet_redirect_rejects_source_secret_and_unbounded_uri(location):
+    server=Server([Reply(status=302,headers={'Location':location})])
+    with pytest.raises(http.TransportError):
+        http.fetch_document('https://indexer.example/download',http.HTTPPolicy(allow_magnet_redirect=True,query_secrets=('PRIVATE',)),session_factory=server)
+    assert len(server.calls)==1
+
+
+def test_real_child_returns_descriptor_magnet_without_fetching(real_source,tmp_path):
+    from dataclasses import replace
+    policy=replace(local_policy(real_source),allow_magnet_redirect=True)
+    doc=http.run_transfer(real_source+'/magnet',policy)
+    assert doc.url=='magnet:?xt=urn:btih:'+'a'*40 and doc.body==b''
+    with pytest.raises(http.TransportError):
+        http.download_file(real_source+'/magnet',policy,tmp_path/'book',max_bytes=1000)
+    assert not (tmp_path/'book').exists()

@@ -62,6 +62,7 @@ class HTTPPolicy:
     private_networks: tuple[str, ...] = ()
     authorization: str | None = field(default=None, repr=False)
     query_secrets: tuple[str, ...] = field(default=(), repr=False)
+    allow_magnet_redirect: bool = False
     max_redirects: int = 5
     connect_timeout: float = 5.0
     read_timeout: float = 15.0
@@ -77,7 +78,7 @@ class HTTPPolicy:
         if any(not isinstance(value, str) or not value or len(value) > 16384 for value in self.query_secrets):
             raise TransportError('invalid_authentication')
         timeouts = (self.connect_timeout, self.read_timeout, self.deadline)
-        if (type(self.max_redirects) is not int or not 0 <= self.max_redirects <= 10
+        if (type(self.allow_magnet_redirect) is not bool or type(self.max_redirects) is not int or not 0 <= self.max_redirects <= 10
                 or any(type(value) not in (int, float) or not math.isfinite(value) or value <= 0 for value in timeouts)):
             raise TransportError('invalid_limits')
 
@@ -197,6 +198,20 @@ def _transfer(url, policy, consume, max_bytes, checkpoint, session_factory, *, f
                         location = response.headers.get('Location')
                         if not location or hop == policy.max_redirects:
                             raise TransportError('redirect_limit')
+                        if policy.allow_magnet_redirect and location.startswith('magnet:'):
+                            # Descriptor resolution only: return the URI to the
+                            # caller's torrent/tracker validator. Never fetch it.
+                            if len(location) > 8192 or any(ord(c) <= 32 or ord(c) == 127 for c in location):
+                                raise TransportError('invalid_url')
+                            decoded = location
+                            for _ in range(8):
+                                if any(value in decoded for value in policy.query_secrets):
+                                    raise TransportError('credentials_redirected')
+                                next_value = unquote(decoded)
+                                if next_value == decoded: break
+                                decoded = next_value
+                            else: raise TransportError('credentials_redirected')
+                            return location, 0, 'application/x-bittorrent', 200, {}
                         try:
                             target = normalized_url(urljoin(url, location))
                         except ValueError:
@@ -257,6 +272,8 @@ def fetch_document(url: str, policy: HTTPPolicy, *, max_bytes: int = 2 * 1024 * 
 def download_file(url: str, policy: HTTPPolicy, destination: Path, *, max_bytes: int,
                   checkpoint=lambda: None, session_factory=_session) -> DownloadedFile:
     """Write only a new owned staging path. Never replace a file or publish to ingest."""
+    if policy.allow_magnet_redirect:
+        raise TransportError('invalid_configuration')
     digest = hashlib.sha256()
     created = False
     try:
@@ -305,6 +322,7 @@ def run_transfer(url: str, policy: HTTPPolicy, *, destination: Path | None = Non
             or destination is not None and (headers or accepted_statuses != (200,) or accept_empty)):
         raise TransportError('invalid_configuration')
     if destination is not None:
+        if policy.allow_magnet_redirect: raise TransportError('invalid_configuration')
         try:
             destination.lstat()
         except FileNotFoundError:

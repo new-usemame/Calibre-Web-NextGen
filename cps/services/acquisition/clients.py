@@ -71,9 +71,9 @@ def torrent_book(config, directory, files, *, max_bytes=100*1024*1024):
         # Check containment of every file, including non-book companions.
         path_matches(config, remote)
         if PurePosixPath(name).suffix.lower() in ('.epub', '.pdf'):
-            candidates.append(completed_book(config, remote, max_bytes=max_bytes, files_only=True))
+            candidates.append(remote)
     if len(candidates) != 1: raise ClientError('multiple_books' if candidates else 'no_usable_book')
-    return candidates[0]
+    return completed_book(config, candidates[0], max_bytes=max_bytes, files_only=True)
 
 
 class NZBGetClient:
@@ -82,7 +82,9 @@ class NZBGetClient:
     def call(self, method, params=(), *, checkpoint=lambda: None):
         document = self.transfer(self.config['endpoint'], replace(policy(self.config), max_redirects=0),
             body=json.dumps({'method': method, 'params': list(params), 'id': 1}).encode(),
-            headers={'Content-Type': 'application/json'}, max_bytes=2*1024*1024, checkpoint=checkpoint)
+            headers={'Content-Type': 'application/json'},
+            # Released NZBGet has no queue/history filter or pagination.
+            max_bytes=(32 if method in ('listgroups', 'history') else 2)*1024*1024, checkpoint=checkpoint)
         result = parsed(document)
         if not isinstance(result, dict): raise ClientError('invalid_client_response')
         if result.get('error'):
@@ -94,7 +96,7 @@ class NZBGetClient:
     def probe(self):
         version = self.call('version')
         if not isinstance(version, str) or not re.match(r'^(21|22|23|24|25|26)\.', version): raise ClientError('unsupported_client_version')
-        self.call('listgroups'); self.call('history', [False])
+        self.call('listgroups', [0])
         settings = {r.get('Name'): r.get('Value') for r in rows(self.call('config'))}
         prefix = next((key[:-4] for key, value in settings.items() if isinstance(key, str) and re.fullmatch(r'Category[0-9]+\.Name', key) and value == self.config['category']), None)
         if prefix is None: raise ClientError('client_category_unavailable')
@@ -113,7 +115,11 @@ class NZBGetClient:
         return str(result)
 
     def find(self, name, external_id=None, *, checkpoint=lambda: None):
-        queue = rows(self.call('listgroups', checkpoint=checkpoint)); history = rows(self.call('history', [False], checkpoint=checkpoint))
+        queue = rows(self.call('listgroups', [0], checkpoint=checkpoint))
+        # A known queued job cannot be in final history yet. Avoid retrieving
+        # a busy server's entire retained history on every active poll.
+        queued = external_id and any(str(row.get('NZBID')) == external_id for row in queue)
+        history = [] if queued else rows(self.call('history', [False], checkpoint=checkpoint))
         matches = [(row, final) for values, final in ((queue, False), (history, True)) for row in values
             if str(row.get('NZBID')) == external_id or external_id is None and row.get('NZBName', row.get('Name')) == name]
         if len({row.get('NZBID') for row, _ in matches}) > 1: raise ClientError('submission_ambiguous')
@@ -121,7 +127,7 @@ class NZBGetClient:
         row, final = matches[-1]
         if row.get('Category') != self.config['category'] or row.get('NZBName', row.get('Name')) != name: raise ClientError('client_job_mismatch')
         status = row.get('Status', '')
-        return {'nzo_id': str(row['NZBID']), 'status': 'Completed' if final and status in ('SUCCESS/ALL', 'SUCCESS/UNPACK', 'SUCCESS/HEALTH') else 'Failed' if final else 'Downloading',
+        return {'nzo_id': str(row['NZBID']), 'status': 'Completed' if final and status in ('SUCCESS/ALL', 'SUCCESS/UNPACK', 'SUCCESS/HEALTH', 'SUCCESS/PAR', 'WARNING/SCRIPT') else 'Failed' if final else 'Downloading',
             'storage': row.get('FinalDir') or row.get('DestDir')}
 
 
@@ -180,6 +186,7 @@ class QBitClient:
         form = {'category': self.config['category'], 'savepath': self.config['remote_path'], 'tags': name, 'autoTMM': 'false'}
         if isinstance(descriptor, str): form['urls'] = descriptor
         result = self.call('torrents/add', form=form, upload=None if isinstance(descriptor, str) else (name+'.torrent', descriptor), checkpoint=checkpoint)
+        if result.body.strip() == b'Fails.': raise ClientError('client_error')
         if result.body.strip() != b'Ok.':
             try: acknowledgement = json.loads(result.body)
             except (ValueError, UnicodeError): raise ClientError('submission_ambiguous') from None
@@ -202,7 +209,7 @@ class QBitClient:
         identity = row.get('hash')
         if not isinstance(identity, str) or not re.fullmatch('[0-9a-f]{40}', identity): raise ClientError('invalid_client_response')
         files = rows(parsed(self.call('torrents/files', hash=identity, checkpoint=checkpoint)))
-        complete = row.get('progress') == 1 and row.get('amount_left') == 0 and files and all(f.get('progress') == 1 for f in files)
+        complete = row.get('state') in ('uploading', 'stalledUP', 'queuedUP', 'pausedUP', 'stoppedUP', 'forcedUP') and row.get('progress') == 1 and row.get('amount_left') == 0 and files and all(f.get('progress') == 1 for f in files)
         failed = row.get('state') in ('error', 'missingFiles')
         return {'nzo_id': identity, 'status': 'Failed' if failed else 'Completed' if complete else 'Downloading', 'directory': row.get('save_path'), 'files': files}
 
@@ -217,7 +224,8 @@ class TransmissionClient:
             headers = {'Content-Type': 'application/json'}
             if self.session_id: headers['X-Transmission-Session-Id'] = self.session_id
             response = self.transfer(self.config['endpoint'], replace(policy(self.config), max_redirects=0),
-                body=body, headers=headers, accepted_statuses=(200,409), accept_empty=True, checkpoint=checkpoint, max_bytes=2*1024*1024)
+                body=body, headers=headers, accepted_statuses=(200,409), accept_empty=True, checkpoint=checkpoint,
+                max_bytes=(8 if method == 'torrent-get' and 'ids' not in (arguments or {}) else 2)*1024*1024)
             if response.status == 409:
                 session = response.headers.get('x-transmission-session-id', '')
                 if attempt or not re.fullmatch('[A-Za-z0-9_-]{1,256}', session): raise ClientError('needs_auth')
@@ -230,7 +238,7 @@ class TransmissionClient:
         result = self.call('session-get')
         if result.get('rpc-version') not in (17, 18, 19): raise ClientError('unsupported_client_version')
         version = result['rpc-version']
-        self.call('torrent-get', {'fields': self.FIELDS})
+        self.call('torrent-get', {'fields': ['hashString']})
         result = self.call('free-space', {'path': self.config['remote_path']})
         if result.get('path') != self.config['remote_path'] or type(result.get('size-bytes')) is not int or result['size-bytes'] < 0: raise ClientError('client_path_mapping_unverified')
         _safe_root(self.config)
@@ -238,7 +246,7 @@ class TransmissionClient:
 
     def submit(self, name, descriptor, *, checkpoint=lambda: None):
         identity = validate_magnet(descriptor) if isinstance(descriptor, str) else validate_torrent(descriptor)
-        existing = self.call('torrent-get', {'ids': [identity], 'fields': self.FIELDS}, checkpoint=checkpoint)
+        existing = self.call('torrent-get', {'ids': [identity], 'fields': ['hashString']}, checkpoint=checkpoint)
         if rows(existing.get('torrents')): raise ClientError('torrent_already_exists')
         arguments = {'download-dir': self.config['remote_path'], 'labels': [self.config['category'], name], 'paused': False}
         arguments['filename' if isinstance(descriptor, str) else 'metainfo'] = descriptor if isinstance(descriptor, str) else base64.b64encode(descriptor).decode()
@@ -248,17 +256,23 @@ class TransmissionClient:
         return identity
 
     def find(self, name, external_id=None, *, checkpoint=lambda: None):
-        arguments = {'fields': self.FIELDS}
-        if external_id: arguments['ids'] = [external_id]
-        values = rows(self.call('torrent-get', arguments, checkpoint=checkpoint).get('torrents'))
-        matches = [row for row in values if row.get('hashString') == external_id] if external_id else [row for row in values if isinstance(row.get('labels'), list) and name in row['labels']]
+        if not external_id:
+            # Discover ownership cheaply; fetch file details for one owned hash.
+            values = rows(self.call('torrent-get', {'fields': ['hashString', 'labels']}, checkpoint=checkpoint).get('torrents'))
+            matches = [row for row in values if isinstance(row.get('labels'), list) and name in row['labels']]
+            if len(matches) > 1: raise ClientError('submission_ambiguous')
+            if not matches: return None
+            external_id = matches[0].get('hashString')
+            if not isinstance(external_id, str) or not re.fullmatch('[0-9a-f]{40}', external_id): raise ClientError('invalid_client_response')
+        values = rows(self.call('torrent-get', {'fields': self.FIELDS, 'ids': [external_id]}, checkpoint=checkpoint).get('torrents'))
+        matches = [row for row in values if row.get('hashString') == external_id]
         if len(matches) > 1: raise ClientError('submission_ambiguous')
         if not matches: return None
         row = matches[0]
         if not isinstance(row.get('labels'), list) or name not in row['labels'] or self.config['category'] not in row['labels']: raise ClientError('client_job_mismatch')
         files = rows(row.get('files'))
-        complete = row.get('metadataPercentComplete') == 1 and row.get('percentDone') == 1 and row.get('leftUntilDone') == 0 and files and all(type(f.get('length')) is int and f['length'] >= 0 and f.get('bytesCompleted') == f['length'] for f in files)
-        return {'nzo_id': row.get('hashString'), 'status': 'Failed' if row.get('error') else 'Completed' if complete else 'Downloading', 'directory': row.get('downloadDir'), 'files': files}
+        complete = row.get('status') in (0, 5, 6) and row.get('metadataPercentComplete') == 1 and row.get('percentDone') == 1 and row.get('leftUntilDone') == 0 and files and all(type(f.get('length')) is int and f['length'] >= 0 and f.get('bytesCompleted') == f['length'] for f in files)
+        return {'nzo_id': row.get('hashString'), 'status': 'Failed' if row.get('error') == 3 else 'Completed' if complete else 'Downloading', 'directory': row.get('downloadDir'), 'files': files}
 
 
 CLIENTS = {'sabnzbd': SABClient, 'nzbget': NZBGetClient, 'qbittorrent': QBitClient, 'transmission': TransmissionClient}

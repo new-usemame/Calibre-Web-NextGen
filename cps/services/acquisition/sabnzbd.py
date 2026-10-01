@@ -66,6 +66,8 @@ def completed_book(config, storage, *, max_bytes=100 * 1024 * 1024, files_only=F
             raise ClientError('no_usable_book')
         media = 'application/epub+zip' if folder.suffix.lower() == '.epub' else 'application/pdf'
         return folder, media
+    if files_only and not folder.exists():
+        raise FileNotFoundError('Reported completed file is not yet present')
     if files_only or not folder.is_dir() or folder == root:
         raise ClientError('unsafe_completed_path')
     candidates = []
@@ -109,6 +111,8 @@ def open_completed_file(config, path):
             os.close(fd)
             raise ClientError('unsafe_completed_path')
         return fd
+    except FileNotFoundError:
+        raise
     except OSError:
         raise ClientError('unsafe_completed_path') from None
     finally:

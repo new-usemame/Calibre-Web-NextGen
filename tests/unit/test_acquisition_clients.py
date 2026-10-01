@@ -182,7 +182,7 @@ def test_tracker_and_bootstrap_authority_is_admin_defined():
         with pytest.raises(t.TransportError):t.validate_magnet('magnet:?xt=urn:btih:'+'a'*40+'&tr='+url,tracker_origins=['http://tracker.example'])
 
 
-@pytest.mark.parametrize('status,expected',[('SUCCESS/ALL','Completed'),('SUCCESS/UNPACK','Completed'),('SUCCESS/HEALTH','Completed'),('SUCCESS/PAR','Failed'),('SUCCESS/MARK','Failed'),('WARNING/SCRIPT','Failed'),('FAILURE/UNPACK','Failed')])
+@pytest.mark.parametrize('status,expected',[('SUCCESS/ALL','Completed'),('SUCCESS/UNPACK','Completed'),('SUCCESS/HEALTH','Completed'),('SUCCESS/PAR','Completed'),('SUCCESS/MARK','Failed'),('WARNING/SCRIPT','Completed'),('FAILURE/UNPACK','Failed')])
 def test_nzbget_pinned_final_history_statuses(tmp_path,status,expected):
     c=clients()
     def transfer(url,policy,**kw):
@@ -242,3 +242,131 @@ def test_v1_descriptor_refuses_hybrid_and_single_file_symlink_semantics(extra):
     t=importlib.import_module(spec.name+'.torrent')
     raw=encode({'info':dict({'name':'book.epub','length':1,'piece length':16384,'pieces':b'a'*20},**extra)})
     with pytest.raises(t.TransportError,match='invalid_torrent'):t.validate_torrent(raw)
+
+
+@pytest.mark.parametrize('error,complete,expected', [(1,True,'Completed'),(2,True,'Completed'),(2,False,'Downloading'),(3,True,'Failed')])
+def test_transmission_tracker_error_does_not_override_peer_completion(tmp_path,error,complete,expected):
+    c=clients()
+    row={'hashString':'a'*40,'labels':['books','cwng-owned'],'downloadDir':'/downloads','status':6 if complete else 4,'error':error,'percentDone':1 if complete else .5,'leftUntilDone':0 if complete else 12,'metadataPercentComplete':1,'files':[{'name':'book.epub','length':24,'bytesCompleted':24 if complete else 12}]}
+    client=c.TransmissionClient(config(tmp_path,'transmission'),transfer=lambda *a,**k:document({'result':'success','arguments':{'torrents':[row]}}))
+    assert client.find('cwng-owned','a'*40)['status']==expected
+
+
+@pytest.mark.parametrize('state,expected',[('moving','Downloading'),('checkingUP','Downloading'),('uploading','Completed'),('stalledUP','Completed'),('stoppedUP','Completed'),('pausedUP','Completed')])
+def test_qbit_complete_bytes_wait_for_settled_state(tmp_path,state,expected):
+    c=clients()
+    def transfer(url,policy,**kw):
+        if '/torrents/files' in url:return document([{'name':'book.epub','progress':1}])
+        return document([{'hash':'a'*40,'tags':'cwng-owned','category':'books','save_path':'/downloads','state':state,'progress':1,'amount_left':0}])
+    client=c.QBitClient(config(tmp_path,'qbittorrent'),transfer=transfer);client.cookie='SID=fixture'
+    assert client.find('cwng-owned','a'*40)['status']==expected
+
+
+def test_qbit_definite_add_rejection_is_retryable(tmp_path):
+    c=clients()
+    def transfer(url,policy,**kw):return document([]) if '/torrents/info?' in url else document(b'Fails.')
+    client=c.QBitClient(config(tmp_path,'qbittorrent'),transfer=transfer);client.cookie='SID=fixture'
+    with pytest.raises(c.ClientError,match='client_error'):client.submit('cwng-owned','magnet:?xt=urn:btih:'+'a'*40)
+
+
+@pytest.mark.parametrize('adapter',['qbittorrent','transmission'])
+@pytest.mark.parametrize('settles',[True,False])
+def test_completed_torrent_waits_for_reported_file_move_without_resubmitting(repo,tmp_path,adapter,settles):
+    repository,now=repo;c=clients();w=importlib.import_module(spec.name+'.worker')
+    (tmp_path/'ingest').mkdir()
+    client=repository.create_connection('Client',adapter,config(tmp_path,adapter),enabled=True)
+    indexer=repository.create_connection('Indexer','newznab',{'secret':'','auth_kind':'none','username':'','credential_origins':[],'private_origins':[],'private_networks':[]},enabled=True)
+    payload={'kind':'acquisition','transport':'torrent','href':'magnet:?xt=urn:btih:'+'a'*40,'media_type':'application/x-bittorrent','client_id':client.id,'client_revision':1,'release_key':'f'*64}
+    job=repository.create_job(1,repository.create_offer(1,indexer.id,payload),'request',requires_approval=False)
+    submitted=[]
+    class Client:
+        def __init__(self,*a,**k):pass
+        def submit(self,name,*a,**k):submitted.append(name);return 'a'*40
+        def find(self,*a,**k):return {'nzo_id':'a'*40,'status':'Completed','directory':'/downloads','files':[{'name':'owned/book.pdf'}]}
+    def worker():return w.AcquisitionWorker(repository,tmp_path/'staging',tmp_path/'ingest',allowed=lambda _:True,client_factory=Client,download_deadline_seconds=60)
+    result=worker().run_once()
+    assert result.state=='downloading', result.error_code
+    now[0]+=31 if settles else 61
+    if settles:
+        (tmp_path/'owned').mkdir();(tmp_path/'owned/book.pdf').write_bytes(b'%PDF-1.7\nfixture\n%%EOF\n')
+        result=worker().run_once()
+        assert result.state=='importing', result.error_code
+        assert len(list((tmp_path/'ingest').glob('*.pdf')))==1
+    else:assert worker().run_once().error_code=='client_job_stalled'
+    assert len(submitted)==1
+
+
+@pytest.mark.parametrize('adapter',['nzbget','transmission'])
+def test_busy_clients_use_bounded_real_transport_with_scoped_details(tmp_path,adapter):
+    """Normal busy client payloads exceed 2MiB; the real child enforces caps."""
+    import threading
+    from http.server import BaseHTTPRequestHandler,ThreadingHTTPServer
+    c=clients();requests=[]
+    nzb_rows=[{'NZBID':i+1,'NZBName':'other','Category':'books','Status':'SUCCESS/HEALTH','DestDir':'/downloads/other','Parameters':[{'Name':'fixture','Value':'x'*1800}]} for i in range(2000)]
+    nzb_rows.append({'NZBID':3000,'NZBName':'cwng-owned','Category':'books','Status':'SUCCESS/PAR','DestDir':'/downloads/owned'})
+    torrents=[{'hashString':f'{i:040x}','labels':['books','other'],'files':[{'name':'x'*1800}]} for i in range(2000)]
+    torrents.append({'hashString':'a'*40,'labels':['books','cwng-owned'],'downloadDir':'/downloads','status':6,'error':2,'percentDone':1,'leftUntilDone':0,'metadataPercentComplete':1,'files':[{'name':'book.epub','length':24,'bytesCompleted':24}]})
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self,*a):pass
+        def do_POST(self):
+            req=json.loads(self.rfile.read(int(self.headers['Content-Length'])));requests.append(req)
+            method=req['method']
+            if method=='version':result={'result':'26.3'}
+            elif method=='config':result={'result':[{'Name':'Category1.Name','Value':'books'},{'Name':'Category1.DestDir','Value':'/downloads'}]}
+            elif method in ('history','listgroups'):result={'result':nzb_rows if method=='history' else []}
+            elif method=='session-get':result={'result':'success','arguments':{'rpc-version':19}}
+            elif method=='free-space':result={'result':'success','arguments':{'path':'/downloads','size-bytes':1000}}
+            else:
+                args=req['arguments'];selected=[r for r in torrents if r['hashString'] in args['ids']] if 'ids' in args else torrents
+                result={'result':'success','arguments':{'torrents':[{k:v for k,v in r.items() if k in args['fields']} for r in selected]}}
+            body=json.dumps(result).encode();self.send_response(200);self.send_header('Content-Length',str(len(body)));self.end_headers()
+            try:self.wfile.write(body)
+            except (BrokenPipeError,ConnectionResetError):pass
+    server=ThreadingHTTPServer(('127.0.0.1',0),Handler);server.daemon_threads=True
+    thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
+    try:
+        for cls,identity in [(c.CLIENTS[adapter], '3000' if adapter=='nzbget' else 'a'*40)]:
+            cfg=dict(config(tmp_path,adapter),endpoint=f'http://127.0.0.1:{server.server_port}/',private_networks=['127.0.0.1/32'])
+            cfg['private_origins']=cfg['credential_origins']=[cfg['endpoint']]
+            client=cls(cfg)
+            assert client.probe()['completed_path_readable']
+            assert client.find('cwng-owned',identity)['status']=='Completed'
+            assert client.find('cwng-owned')['status']=='Completed'
+        assert all('ids' in r['arguments'] for r in requests if r['method']=='torrent-get' and 'files' in r['arguments']['fields'])
+    finally:server.shutdown();server.server_close();thread.join()
+
+
+@pytest.mark.parametrize('invalid',['valid','untrusted_tracker','alternate_fetch'])
+def test_redirect_magnet_is_validated_before_durable_submit(repo,tmp_path,invalid):
+    repository,now=repo;c=clients();w=importlib.import_module(spec.name+'.worker');h=importlib.import_module(spec.name+'.http')
+    client=repository.create_connection('Client','qbittorrent',config(tmp_path,'qbittorrent'),enabled=True)
+    indexer=repository.create_connection('Indexer','newznab',{'secret':'PRIVATE','auth_kind':'none','username':'','credential_origins':[],'private_origins':[],'private_networks':[],'tracker_origins':[]},enabled=True)
+    payload={'kind':'acquisition','transport':'torrent','href':'https://indexer.example/descriptor','media_type':'application/x-bittorrent','client_id':client.id,'client_revision':1,'release_key':'f'*64}
+    job=repository.create_job(1,repository.create_offer(1,indexer.id,payload),'request',requires_approval=False)
+    magnet='magnet:?xt=urn:btih:'+'a'*40+('&tr=https://untrusted.example/announce' if invalid=='untrusted_tracker' else '&xs=https://untrusted.example/book' if invalid=='alternate_fetch' else '')
+    class Client:
+        def __init__(self,*a,**k):pass
+        def submit(self,name,descriptor,**k):
+            assert invalid=='valid' and descriptor==magnet
+            return 'a'*40
+        def find(self,*a,**k):return {'nzo_id':'a'*40,'status':'Downloading'}
+    def transfer(url,policy,**kw):
+        assert policy.allow_magnet_redirect
+        return h.FetchedDocument(b'',magnet,'application/x-bittorrent')
+    worker=w.AcquisitionWorker(repository,tmp_path/'staging',tmp_path/'ingest',allowed=lambda _:True,client_factory=Client,transfer=transfer)
+    result=worker.run_once()
+    if invalid=='valid':
+        assert result.state=='downloading' and result.error_code is None
+        return
+    assert result.error_code==('untrusted_torrent_tracker' if invalid=='untrusted_tracker' else 'invalid_magnet')
+    claim=repository.get_job(1,job.id)
+    assert claim.state=='failed'
+
+
+def test_torrent_missing_file_does_not_hide_unsafe_companion_or_symlink(tmp_path):
+    c=clients();cfg=config(tmp_path,'qbittorrent')
+    with pytest.raises(c.ClientError,match='unsafe_completed_path'):
+        c.torrent_book(cfg,'/downloads',[{'name':'missing.epub'},{'name':'../escape.txt'}])
+    (tmp_path/'missing.epub').symlink_to(tmp_path/'outside.epub')
+    with pytest.raises(c.ClientError,match='unsafe_completed_path'):
+        c.torrent_book(cfg,'/downloads',[{'name':'missing.epub'}])

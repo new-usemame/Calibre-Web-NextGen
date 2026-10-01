@@ -263,9 +263,11 @@ class AcquisitionWorker:
                 descriptor = offer['href']
                 validate_magnet(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
             else:
-                descriptor = self.transfer(offer['href'], replace(policy(config), query_secrets=(config['secret'],)),
-                    max_bytes=512 * 1024, checkpoint=checkpoint).body
+                document = self.transfer(offer['href'], replace(policy(config), query_secrets=(config['secret'],) if config['secret'] else (),
+                    allow_magnet_redirect=offer['transport'] == 'torrent'), max_bytes=512 * 1024, checkpoint=checkpoint)
+                descriptor = document.url if document.url.startswith('magnet:') else document.body
                 if offer['transport'] == 'nzb': validate_nzb(descriptor)
+                elif isinstance(descriptor, str): validate_magnet(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
                 else: validate_torrent(descriptor, tracker_origins=config.get('tracker_origins', []), secret=config['secret'])
             checkpoint()
             fresh = repo.begin_submission(job.id, token)
@@ -293,7 +295,18 @@ class AcquisitionWorker:
             if repo.submission_age(job.id, token) >= self.download_deadline_seconds:
                 raise ClientError('client_job_stalled')
             return None
-        if offer['transport'] == 'torrent':
+        try:
+            return self._copy_client_book(client_config, remote, source, checkpoint, torrent=offer['transport'] == 'torrent')
+        except FileNotFoundError:
+            if offer['transport'] != 'torrent': raise
+            # Download completion can precede the final directory move, in
+            # either client. Preserve the owned submission and poll again.
+            if repo.submission_age(job.id, token) >= self.download_deadline_seconds:
+                raise ClientError('client_job_stalled')
+            return None
+
+    def _copy_client_book(self, client_config, remote, source, checkpoint, *, torrent):
+        if torrent:
             book, media = torrent_book(client_config, remote.get('directory'), remote.get('files'), max_bytes=self.max_bytes)
         else:
             book, media = completed_book(client_config, remote.get('storage'), max_bytes=self.max_bytes)

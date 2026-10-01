@@ -15,10 +15,11 @@ interface Props {
   quickEdit: boolean;
   onRemove?: (book: Book) => void;
   removeLabel: string;
+  shelfNames: string[];
 }
 
 /** Mount mutations only for the open card, rather than every tile in a library. */
-function ActionDialog({ book, readTarget, quickEdit, onRemove, removeLabel, anchor, onClose, personal, opener }: Props & {
+function ActionDialog({ book, readTarget, quickEdit, onRemove, removeLabel, shelfNames, anchor, onClose, personal, opener }: Props & {
   anchor: DOMRect; onClose: () => void; personal: boolean; opener: HTMLButtonElement | null;
 }) {
   const t = useT();
@@ -91,6 +92,12 @@ function ActionDialog({ book, readTarget, quickEdit, onRemove, removeLabel, anch
           </button>
           <p className={styles.status}>{book.in_progress ? t('Reading') : book.read ? t('Read') : t('Unread')}</p>
         </>}
+        {shelfNames.length > 0 && <section className={styles.shelves} aria-label={t('Shelves')}>
+          <h3>{t('Shelves')}</h3>
+          <ul role="list">
+            {shelfNames.map((name, index) => <li key={`${index}-${name}`} dir="auto">{name}</li>)}
+          </ul>
+        </section>}
         {onRemove && <button type="button" className={styles.action} disabled={busy}
           onClick={() => { onClose(); onRemove(book); }}>
           <X size={18} aria-hidden="true" focusable={false} /> {t(removeLabel)}

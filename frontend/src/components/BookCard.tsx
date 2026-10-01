@@ -301,7 +301,7 @@ function BookCardInner({
       ))}
       {coverActions && <div className={styles.coverActions}>
         <BookCardActions book={book} readTarget={readTarget} quickEdit={quickEdit}
-          onRemove={onRemove} removeLabel={removeLabel} />
+          onRemove={onRemove} removeLabel={removeLabel} shelfNames={shelves.map(shelf => shelf.name)} />
       </div>}
       {onRemove && !coverActions && (
         <button

@@ -50,6 +50,10 @@
 .action:focus-visible, .close:focus-visible { outline: 2px solid var(--accent-ring); outline-offset: -2px; }
 .action:disabled { cursor: wait; opacity: .7; }
 .status { padding-inline: var(--sp-2); color: var(--text-muted); font-size: var(--fs-sm); }
+.shelves { margin: var(--sp-1) var(--sp-2) var(--sp-2); }
+.shelves h3 { margin: 0 0 var(--sp-1); font-size: var(--fs-sm); font-weight: var(--fw-semi); }
+.shelves ul { margin: 0; padding-inline-start: 1.25rem; }
+.shelves li { padding-block: 2px; overflow-wrap: anywhere; }
 .error { color: var(--danger); padding-inline: var(--sp-2); }
 @media (hover: none), (pointer: coarse) {
   .panel { left: 8px !important; top: auto !important; bottom: 8px; width: calc(100vw - 16px); max-height: 75dvh; }

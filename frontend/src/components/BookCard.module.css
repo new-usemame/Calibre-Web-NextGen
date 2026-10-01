@@ -443,9 +443,11 @@
   }
   .badgeLabel { display: none; }
   .seriesBadge { width: 24px; height: 24px; min-width: 24px; padding: 0; overflow: hidden; text-overflow: ellipsis; }
-  .shelfLabels { display: none; }
-  .shelfRow { left: auto; right: 2px; max-width: 24px; }
-  .shelfSummary {
+  /* Some cards have no disclosure at all (for example when actions are
+     disabled). Only compact labels when the disclosure actually rendered. */
+  .wrap:has(.coverActions button[aria-expanded]) .shelfLabels { display: none; }
+  .wrap:has(.coverActions button[aria-expanded]) .shelfRow { left: auto; right: 2px; max-width: 24px; }
+  .wrap:has(.coverActions button[aria-expanded]) .shelfSummary {
     display: inline-flex; align-items: center; justify-content: center;
     width: 24px; height: 24px; flex: none;
     background: var(--cover-control-bg); color: var(--cover-control-fg);

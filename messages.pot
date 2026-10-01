@@ -16306,3 +16306,6 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+#: cps/spa_strings.py
+msgid "Literata"
+msgstr ""

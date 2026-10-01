@@ -92,6 +92,16 @@ def test_startup_created_default_becomes_rolling(session, name, field, days):
     assert rules_of(session, shelf_id) == rolling_rules(field, days)
 
 
+def test_default_saved_unchanged_in_classic_editor_becomes_rolling(session):
+    saved = frozen_rules('timestamp', cutoff(30))
+    saved['valid'] = True
+    saved['rules'][0]['type'] = 'datetime'
+    shelf_id = add_shelf(session, 'Recently Added', saved,
+                         modified=CREATED + timedelta(days=9))
+    ub.migrate_magic_shelf_relative_dates(session)
+    assert rules_of(session, shelf_id) == rolling_rules('timestamp', 30)
+
+
 def test_untouched_shelf_of_account_added_after_startup_becomes_rolling(session):
     # The server had been up five days when this account was created, so its
     # frozen date is five days older than created - 30.
@@ -123,7 +133,7 @@ def test_owner_chosen_dates_are_kept(session, value, modified):
     assert rules_of(session, shelf_id) == before
 
 
-def test_extended_rules_and_user_shelves_are_kept(session):
+def test_extended_kobo_synced_and_user_shelves_are_kept(session):
     extended = frozen_rules('timestamp', cutoff(30))
     extended['rules'].append({'id': 'title', 'field': 'title', 'type': 'string',
                               'input': 'text', 'operator': 'contains', 'value': 'x'})
@@ -131,7 +141,14 @@ def test_extended_rules_and_user_shelves_are_kept(session):
     own_id = add_shelf(session, 'Recently Added', frozen_rules('timestamp', cutoff(30)),
                        is_system=False, user_id=2)
     garbage_id = add_shelf(session, 'Recent Publications', {'rules': 'nope'}, user_id=3)
+    # Narrowing a Kobo-synced shelf would archive books off the device.
+    kobo_id = add_shelf(session, 'Recent Publications', frozen_rules('pubdate', cutoff(730)),
+                        user_id=4)
+    session.get(ub.MagicShelf, kobo_id).kobo_sync = True
+    session.commit()
+    kobo_rules = rules_of(session, kobo_id)
     ub.migrate_magic_shelf_relative_dates(session)
+    assert rules_of(session, kobo_id) == kobo_rules
     assert rules_of(session, extended_id) == extended
     assert rules_of(session, own_id) == frozen_rules('timestamp', cutoff(30))
     assert rules_of(session, garbage_id) == {'rules': 'nope'}

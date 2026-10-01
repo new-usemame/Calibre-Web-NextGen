@@ -3146,6 +3146,9 @@ def migrate_magic_shelf_relative_dates(_session):
             _session.commit()  # Release the read transaction before later DDL.
             return
 
+        # The frozen legacy shape, deliberately not read from
+        # SYSTEM_SHELF_TEMPLATES: later template edits must not change what
+        # this one-shot upgrade recognises.
         legacy_templates = {
             'Recently Added': ('timestamp', 30),
             'Recent Publications': ('pubdate', 730),
@@ -3157,7 +3160,10 @@ def migrate_magic_shelf_relative_dates(_session):
         updated = 0
         for shelf in shelves:
             created = _magic_shelf_utc_naive(shelf.created)
-            if created is None:
+            # A Kobo-synced shelf has been delivering every book since its
+            # frozen date. Narrowing it would archive those books off the
+            # device on the next sync, so its owner opts in by editing it.
+            if created is None or shelf.kobo_sync:
                 continue
             field, days = legacy_templates[shelf.name]
             expected = {'condition': 'AND', 'rules': [{
@@ -3166,12 +3172,17 @@ def migrate_magic_shelf_relative_dates(_session):
             }]}
             rules = shelf.rules
             try:
-                frozen = datetime.strptime(rules['rules'][0]['value'], '%Y-%m-%d').date()
+                rule = rules['rules'][0]
+                frozen = datetime.strptime(rule['value'], '%Y-%m-%d').date()
                 creation_cutoff = (created - timedelta(days=days)).date()
             except (KeyError, IndexError, TypeError, ValueError, OverflowError):
                 continue
-            expected['rules'][0]['value'] = rules['rules'][0]['value']
-            if rules != expected:
+            # Saving unchanged through the classic editor adds valid=true and
+            # reports the field's schema type, datetime; the rule is the same.
+            expected['rules'][0].update(value=rule['value'], type=rule.get('type'))
+            if rule.get('type') not in ('date', 'datetime'):
+                continue
+            if {key: value for key, value in rules.items() if key != 'valid'} != expected:
                 continue
             # The old default froze its date when the server process imported
             # the template, which is at or before the shelf was created. A
@@ -3189,8 +3200,7 @@ def migrate_magic_shelf_relative_dates(_session):
             )
             shelf.rules = expected
             updated += 1
-            # Keep the cache's Kobo membership generation. The live query
-            # re-evaluates rules and refreshes it only if membership changes.
+            # The cache needs no reset: shelf reads re-run the live query.
 
         _session.add(MagicShelfRelativeDateMigration(id=1))
         _session.commit()

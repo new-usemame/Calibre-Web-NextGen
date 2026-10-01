@@ -64,9 +64,19 @@ LOCK_PATH = os.path.join(tempfile.gettempdir(), 'convert_library.lock')
 
 
 # Defining function to delete the lock on script exit
-def removeLock():
+def removeLock(path=None):
+    """Remove the lock, but only while it is still ours.
+
+    The web UI's Cancel deletes the lock itself right after sending SIGTERM, and
+    this run can take a few seconds to stop its child. If a new run has taken the
+    lock in the meantime, it now holds that run's PID and must be left alone.
+    """
+    path = path or LOCK_PATH
     try:
-        os.remove(LOCK_PATH)
+        with open(path) as f:
+            if f.read().strip() != str(os.getpid()):
+                return
+        os.remove(path)
     except FileNotFoundError:
         ...
 

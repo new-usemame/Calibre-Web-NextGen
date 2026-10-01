@@ -284,3 +284,60 @@ def test_unsolicited_compression_is_rejected_before_decompression():
     with pytest.raises(http.TransportError, match='unsupported_content_encoding'):
         http.fetch_document('https://files.example/book', http.HTTPPolicy(), session_factory=Server([reply]))
     assert reply.closed
+
+
+def test_indexer_descriptor_redirect_never_forwards_its_original_api_key():
+    server = Server([Reply(status=301, headers={'Location': 'https://source.example/nzb?apikey=source-key'}), Reply(b'<nzb/>')])
+    policy = http.HTTPPolicy(query_secrets=('PROWLARR_SECRET',))
+    assert http.fetch_document('https://prowlarr.example/download?apikey=PROWLARR_SECRET', policy, session_factory=server).body == b'<nzb/>'
+    assert 'PROWLARR_SECRET' not in server.calls[1][0]
+    malicious = Server([Reply(status=302, headers={'Location': 'https://foreign.example/nzb?x=PROWLARR%5FSECRET'})])
+    with pytest.raises(http.TransportError, match='credentials_redirected'):
+        http.fetch_document('https://prowlarr.example/download?apikey=PROWLARR_SECRET', policy, session_factory=malicious)
+    assert len(malicious.calls) == 1
+
+
+def test_multipart_submission_cannot_redirect_keys_or_descriptor_bytes():
+    class UploadServer(Server):
+        def post(self, url, **kwargs):
+            self.calls.append((url, kwargs))
+            return self.replies.pop(0)
+    server = UploadServer([Reply(status=307, headers={'Location': 'https://foreign.example/api'})])
+    with pytest.raises(http.TransportError, match='redirect_limit'):
+        http.fetch_document('https://sab.example/api', http.HTTPPolicy(), session_factory=server,
+            form={'mode': 'addfile', 'apikey': 'SAB_SECRET'}, upload=('owned.nzb', b'<nzb/>'))
+    assert len(server.calls) == 1
+    assert server.calls[0][1]['files']['name'][1] == b'<nzb/>'
+
+@pytest.mark.parametrize('size', [10000, 60000, 200000, 500000])
+def test_slow_child_start_consumes_entire_large_nzb_before_post(monkeypatch, size):
+    import subprocess
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    descriptor = b'<nzb><file>' + b'x' * size + b'</file></nzb>'
+    received = []
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args): pass
+        def do_POST(self):
+            received.append(self.rfile.read(int(self.headers['Content-Length'])))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"status":true,"nzo_ids":["owned"]}')
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    server.daemon_threads = True
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    original = subprocess.Popen
+    def slow_start(args, **kwargs):
+        args = list(args)
+        args[2] = 'import time; time.sleep(0.5); ' + args[2]
+        return original(args, **kwargs)
+    monkeypatch.setattr(subprocess, 'Popen', slow_start)
+    url = f'http://127.0.0.1:{server.server_port}/api'
+    try:
+        result = http.run_transfer(url, local_policy(url, 2),
+            form={'mode': 'addfile', 'apikey': 'test-key'}, upload=('owned.nzb', descriptor))
+        assert b'"status":true' in result.body
+        assert len(received) == 1 and descriptor in received[0]
+    finally:
+        server.shutdown(); server.server_close(); thread.join()

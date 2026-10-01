@@ -34,6 +34,10 @@ class Conflict(StorageError):
     pass
 
 
+class ConnectionChanged(Conflict):
+    code = 'connection_changed'
+
+
 class SelectionLimit(Conflict):
     """Safe admission result: let existing catalog selections expire first."""
     code = "selections_full"
@@ -92,7 +96,7 @@ def define_tables(metadata):
     connections = Table(names[0], metadata,
         Column("id", String(36), primary_key=True), Column("label", String(200), nullable=False),
         Column("adapter", String(64), nullable=False), Column("enabled", Boolean, nullable=False),
-        Column("revision", Integer, nullable=False), *_sealed_columns("config"),
+        Column("revision", Integer, nullable=False), Column("deleted", Boolean, nullable=False, default=False), *_sealed_columns("config"),
         Column("created_at", Float, nullable=False))
     offers = Table(names[1], metadata,
         Column("id", String(64), primary_key=True),
@@ -107,6 +111,10 @@ def define_tables(metadata):
         Column("idempotency_key", String(128), nullable=False),
         Column("state", String(32), nullable=False, index=True), Column("approved_by", Integer),
         Column("title", String(512)),
+        Column("client_id", String(36)), Column("client_revision", Integer),
+        Column("external_id", String(128)), Column("submission_started", Float),
+        Column("submission_key", String(32)), Column("submission_invalid", Boolean),
+        Column("release_key", String(64)),
         Column("add_to_my_library", Boolean, nullable=False), Column("cancel_requested", Boolean, nullable=False),
         Column("lease_token", String(64)), Column("lease_expires", Float),
         Column("next_attempt_at", Float, nullable=False, index=True), Column("claim_count", Integer, nullable=False),
@@ -117,7 +125,8 @@ def define_tables(metadata):
         Column("importing_since", Float),
         Column("error_code", String(64)), Column("created_at", Float, nullable=False),
         Column("updated_at", Float, nullable=False),
-        UniqueConstraint("owner_id", "idempotency_key", name="uq_acquisition_job_owner_intent"))
+        UniqueConstraint("owner_id", "idempotency_key", name="uq_acquisition_job_owner_intent"),
+        UniqueConstraint("owner_id", "release_key", name="uq_acquisition_job_owner_release"))
     receipts = Table(names[3], metadata,
         Column("job_id", String(36), ForeignKey(names[2] + ".id"), primary_key=True),
         Column("source_sha256", String(64), nullable=False), Column("imported_sha256", String(64), nullable=False),
@@ -168,6 +177,7 @@ class PublicationPermit:
 class Material:
     config: dict = field(repr=False)
     offer: dict = field(repr=False)
+    revision: int | None = None
 
 
 @dataclass(frozen=True)
@@ -221,6 +231,14 @@ def _job(row):
                                      "add_to_my_library", "cancel_requested", "error_code", "claim_count", "title")))
 
 
+def _serialize_write(conn):
+    # sqlite3's legacy SELECT mode does not open a transaction. Acquire the
+    # write reservation before reading admission/config state so another writer
+    # cannot invalidate the decision between that read and its INSERT/UPDATE.
+    if conn.dialect.name == 'sqlite' and not conn.connection.driver_connection.in_transaction:
+        conn.exec_driver_sql('BEGIN IMMEDIATE')
+
+
 class Repository:
     def __init__(self, engine, tables, secret_box, *, clock=time.time):
         self.engine, self.tables, self.box, self.clock = engine, tables, secret_box, clock
@@ -252,13 +270,14 @@ class Repository:
         values.update(_sealed_values("config", self._encode(config, scope="deployment",
                             identity=identifier, field_name="connection-config:1")))
         with self.engine.begin() as conn:
+            _serialize_write(conn)
             conn.execute(self.tables.connections.insert().values(**values))
         return ConnectionStatus(identifier, label, adapter, bool(enabled), 1)
 
     def list_connections(self, *, include_disabled=False):
         """Safe connection labels; caller authorizes deployment access."""
         table = self.tables.connections
-        statement = select(table).order_by(table.c.label, table.c.id)
+        statement = select(table).where(table.c.deleted.is_(False)).order_by(table.c.label, table.c.id)
         if not include_disabled:
             statement = statement.where(table.c.enabled.is_(True))
         with self.engine.connect() as conn:
@@ -269,7 +288,7 @@ class Repository:
     def connection_config(self, connection_id, *, include_disabled=False):
         """Private service-only configuration, never an API representation."""
         table = self.tables.connections
-        statement = select(table).where(table.c.id == connection_id)
+        statement = select(table).where(table.c.id == connection_id, table.c.deleted.is_(False))
         if not include_disabled:
             statement = statement.where(table.c.enabled.is_(True))
         with self.engine.connect() as conn:
@@ -278,7 +297,7 @@ class Repository:
                 raise NotFound("Connection is unavailable")
             config = self.box.open(_sealed(row, "config"), scope="deployment",
                 identity=row["id"], field_name=f"connection-config:{row['revision']}")
-            return Material(json.loads(config), {})
+            return Material(json.loads(config), {}, row["revision"])
 
     def offer_payload(self, owner_id, offer_id, connection_id):
         """Owner-bound, expiring navigation/search/acquisition selection."""
@@ -298,13 +317,69 @@ class Repository:
                 identity=offer_id, field_name="offer")
             return Material({}, json.loads(payload))
 
-    def set_connection_enabled(self, connection_id, enabled):
+    def set_connection_enabled(self, connection_id, enabled, *, expected_revision=None):
         """Caller verifies administrator; disabling prevents new claims/submissions."""
         with self.engine.begin() as conn:
+            _serialize_write(conn)
+            if expected_revision is not None:
+                revision = conn.execute(select(self.tables.connections.c.revision).where(
+                    self.tables.connections.c.id == connection_id, self.tables.connections.c.deleted.is_(False))).scalar()
+                if revision != expected_revision:
+                    raise ConnectionChanged("Connection changed while saving")
             result = conn.execute(self.tables.connections.update().where(
-                self.tables.connections.c.id == connection_id).values(enabled=bool(enabled)))
+                self.tables.connections.c.id == connection_id,
+                self.tables.connections.c.deleted.is_(False)).values(enabled=bool(enabled)))
             if result.rowcount != 1:
                 raise NotFound("Connection is unavailable")
+
+    def _connection_idle(self, conn, connection_id):
+        jobs = self.tables.jobs
+        if conn.execute(select(jobs.c.id).where(
+                or_(jobs.c.connection_id == connection_id, jobs.c.client_id == connection_id),
+                jobs.c.state.not_in(('imported', 'failed', 'cancelled', 'rejected'))).limit(1)).first():
+            raise Conflict("Finish or cancel outstanding requests before editing this connection")
+
+    def update_connection(self, connection_id, *, label, config, expected_revision=None):
+        """Rotate sealed config under CAS; old selections expire, never reroute work."""
+        table = self.tables.connections
+        with self.engine.begin() as conn:
+            _serialize_write(conn)
+            self._connection_idle(conn, connection_id)
+            row = conn.execute(select(table).where(table.c.id == connection_id,
+                table.c.deleted.is_(False))).mappings().first()
+            if row is None:
+                raise NotFound("Connection is unavailable")
+            if expected_revision is not None and row['revision'] != expected_revision:
+                raise ConnectionChanged("Connection changed; reload its settings before saving")
+            revision = row['revision'] + 1
+            values = dict(label=_text(label, 200), revision=revision, enabled=False)
+            values.update(_sealed_values('config', self._encode(config, scope='deployment',
+                identity=connection_id, field_name=f'connection-config:{revision}')))
+            result = conn.execute(table.update().where(table.c.id == connection_id,
+                table.c.revision == row['revision']).values(**values))
+            if result.rowcount != 1:
+                raise ConnectionChanged("Connection changed; refresh its settings")
+
+    def delete_connection(self, connection_id, *, expected_revision=None):
+        """Erase credentials; keep only the FK tombstone needed for job history."""
+        table = self.tables.connections
+        with self.engine.begin() as conn:
+            _serialize_write(conn)
+            self._connection_idle(conn, connection_id)
+            row = conn.execute(select(table).where(table.c.id == connection_id,
+                table.c.deleted.is_(False))).mappings().first()
+            if row is None:
+                raise NotFound("Connection is unavailable")
+            if expected_revision is not None and row['revision'] != expected_revision:
+                raise ConnectionChanged("Connection changed; reload its settings before saving")
+            revision = row['revision'] + 1
+            values = dict(deleted=True, enabled=False, revision=revision)
+            values.update(_sealed_values('config', self._encode({}, scope='deployment',
+                identity=connection_id, field_name=f'connection-config:{revision}')))
+            changed = conn.execute(table.update().where(table.c.id == connection_id,
+                table.c.revision == row['revision']).values(**values))
+            if changed.rowcount != 1:
+                raise ConnectionChanged("Connection changed; refresh its settings")
 
     def _cleanup_expired_offers(self, conn, owner_id, now, limit):
         offers, jobs = self.tables.offers, self.tables.jobs
@@ -324,15 +399,17 @@ class Repository:
         if type(limit) is not int or not 1 <= limit <= 1000:
             raise StorageError("Invalid selection cleanup limit")
         with self.engine.begin() as conn:
+            _serialize_write(conn)
             return self._cleanup_expired_offers(conn, owner_id, self._now(), limit)
 
-    def create_offer(self, owner_id, connection_id, payload, *, lifetime=900):
+    def create_offer(self, owner_id, connection_id, payload, *, lifetime=900, expected_revision=None):
         owner_id = _user(owner_id)
         now = self._now()
         if type(lifetime) not in (int, float) or not math.isfinite(lifetime) or not 0 < lifetime <= 86400:
             raise StorageError("Invalid offer lifetime")
         identifier = random_secrets.token_urlsafe(32)
         with self.engine.begin() as conn:
+            _serialize_write(conn)
             # First statement is a write, even when there are no expired rows.
             # SQLite therefore serializes count + insertion across connections;
             # a SELECT-first limit check could admit concurrent excess offers.
@@ -345,7 +422,7 @@ class Repository:
             connection = conn.execute(select(self.tables.connections).where(
                 self.tables.connections.c.id == connection_id,
                 self.tables.connections.c.enabled.is_(True))).mappings().first()
-            if connection is None:
+            if connection is None or expected_revision is not None and connection["revision"] != expected_revision:
                 raise NotFound("Connection is unavailable")
             scope = f"user:{owner_id}:connection:{connection_id}:revision:{connection['revision']}"
             values = dict(id=identifier, owner_id=owner_id, connection_id=connection_id,
@@ -364,6 +441,7 @@ class Repository:
         owner_id, now = _user(owner_id), self._now()
         key = _text(idempotency_key)
         table = self.tables.jobs
+        release_key = None
 
         def previous(conn):
             row = conn.execute(select(table).where(table.c.owner_id == owner_id,
@@ -373,10 +451,18 @@ class Repository:
                         or connection_id is not None and row["connection_id"] != connection_id):
                     raise Conflict("Idempotency key belongs to a different request")
                 return _job(row)
+            if release_key is not None:
+                row = conn.execute(select(table).where(table.c.owner_id == owner_id,
+                    table.c.release_key == release_key)).mappings().first()
+                if row is not None:
+                    if row['add_to_my_library'] != bool(add_to_my_library):
+                        raise Conflict("This release already has a request with different library options")
+                    return _job(row)
             return None
 
         try:
             with self.engine.begin() as conn:
+                _serialize_write(conn)
                 prior = previous(conn)
                 if prior is not None:
                     return prior
@@ -392,6 +478,18 @@ class Repository:
                 if validate_offer is not None:
                     # Pure validation only; do not contact sources in a transaction.
                     validate_offer(payload)
+                if payload.get('transport') == 'nzb':
+                    release_key = _text(payload.get('release_key'), 64)
+                    prior = previous(conn)
+                    if prior is not None:
+                        return prior
+                    client = conn.execute(select(self.tables.connections).where(
+                        self.tables.connections.c.id == payload.get('client_id'),
+                        self.tables.connections.c.adapter == 'sabnzbd',
+                        self.tables.connections.c.enabled.is_(True),
+                        self.tables.connections.c.revision == payload.get('client_revision'))).mappings().first()
+                    if client is None:
+                        raise NotFound("Download client is unavailable")
                 title = payload.get("title")
                 title = title[:512] if isinstance(title, str) else None
                 row = dict(id=str(uuid.uuid4()), owner_id=owner_id, offer_id=offer_id, title=title,
@@ -400,7 +498,10 @@ class Repository:
                            add_to_my_library=bool(add_to_my_library), cancel_requested=False,
                            lease_token=None, lease_expires=None, next_attempt_at=now, claim_count=0,
                            source_sha256=None, staging_key=None, publication_proof_hash=None,
-                           importing_since=None, error_code=None, created_at=now, updated_at=now)
+                           importing_since=None, error_code=None, created_at=now, updated_at=now,
+                           client_id=payload.get('client_id') if release_key else None,
+                           client_revision=payload.get('client_revision') if release_key else None,
+                           release_key=release_key, external_id=None, submission_started=None)
                 conn.execute(table.insert().values(**row))
                 return _job(row)
         except IntegrityError:
@@ -430,6 +531,7 @@ class Repository:
         """Application must verify administrator role before entering this seam."""
         table = self.tables.jobs
         with self.engine.begin() as conn:
+            _serialize_write(conn)
             changed = conn.execute(table.update().where(table.c.id == job_id,
                 table.c.state == "awaiting_approval", table.c.cancel_requested.is_(False),
                 table.c.connection_id.in_(select(self.tables.connections.c.id).where(
@@ -438,9 +540,20 @@ class Repository:
             if changed.rowcount != 1:
                 raise Conflict("Request cannot be approved")
 
+    def reject(self, job_id, *, admin_actor):
+        table = self.tables.jobs
+        with self.engine.begin() as conn:
+            _serialize_write(conn)
+            changed = conn.execute(table.update().where(table.c.id == job_id,
+                table.c.state == 'awaiting_approval', table.c.cancel_requested.is_(False)).values(
+                state='rejected', approved_by=_user(admin_actor), updated_at=self._now()))
+            if changed.rowcount != 1:
+                raise Conflict("Only requests awaiting approval can be rejected")
+
     def request_cancel(self, owner_id, job_id):
         table, now = self.tables.jobs, self._now()
         with self.engine.begin() as conn:
+            _serialize_write(conn)
             row = conn.execute(select(table).where(table.c.id == job_id,
                 table.c.owner_id == _user(owner_id))).mappings().first()
             if row is None:
@@ -459,13 +572,30 @@ class Repository:
     def retry(self, owner_id, job_id):
         table = self.tables.jobs
         with self.engine.begin() as conn:
+            _serialize_write(conn)
             row = conn.execute(select(table).where(table.c.id == job_id,
                 table.c.owner_id == _user(owner_id))).mappings().first()
             if row is None:
                 raise NotFound("Job is unavailable")
             if row["state"] != "failed":
                 raise Conflict("Only failed jobs can be retried")
+            connection = conn.execute(select(self.tables.connections.c.revision).join(self.tables.offers,
+                self.tables.offers.c.connection_id == self.tables.connections.c.id).where(
+                self.tables.offers.c.id == row['offer_id'], self.tables.connections.c.enabled.is_(True),
+                self.tables.connections.c.deleted.is_(False),
+                self.tables.connections.c.revision == self.tables.offers.c.connection_revision)).first()
+            client = row['client_id'] is None or conn.execute(select(self.tables.connections.c.id).where(
+                self.tables.connections.c.id == row['client_id'], self.tables.connections.c.enabled.is_(True),
+                self.tables.connections.c.deleted.is_(False), self.tables.connections.c.revision == row['client_revision'])).first()
+            if not connection or not client:
+                raise ConnectionChanged("Connection changed; make a new selection before retrying")
+            submission = {}
+            if row['error_code'] == 'client_job_failed' and not row['publication_proof_hash']:
+                # The remote job definitely failed. A manual retry gets a new
+                # durable attempt/name; uncertain or missing jobs keep theirs.
+                submission = dict(external_id=None, submission_started=None, submission_key=None, submission_invalid=False)
             changed = conn.execute(table.update().where(table.c.id == job_id, table.c.state == "failed").values(
+                **submission,
                 state="publishing" if row["publication_proof_hash"] else "queued",
                 error_code="source_busy" if row["error_code"] == "source_busy" else None,
                 cancel_requested=False, lease_token=None,
@@ -499,6 +629,7 @@ class Repository:
                 table.c.state.in_(WORK_STATES), table.c.lease_expires > now).scalar_subquery()
             eligible = and_(eligible, active < max_active)
         with self.engine.begin() as conn:
+            _serialize_write(conn)
             row = conn.execute(select(table).where(eligible).order_by(table.c.next_attempt_at, table.c.id).limit(1)).mappings().first()
             if row is None:
                 return None
@@ -520,6 +651,7 @@ class Repository:
             raise StorageError("Invalid lease duration")
         now = self._now()
         with self.engine.begin() as conn:
+            _serialize_write(conn)
             result = conn.execute(self.tables.jobs.update().where(self._live(job_id, token, now)).values(
                 lease_expires=now + lease_seconds, updated_at=now))
             if result.rowcount != 1:
@@ -577,6 +709,7 @@ class Repository:
         """
         now, table = self._now(), self.tables.jobs
         with self.engine.begin() as conn:
+            _serialize_write(conn)
             row = conn.execute(select(table).where(self._live(job_id, token, now))).mappings().first()
             if row is None:
                 raise Conflict("Worker lease is no longer valid")
@@ -597,6 +730,109 @@ class Repository:
                 raise Conflict("Worker lease is no longer valid")
             return row["source_sha256"], row["staging_key"]
 
+    def external_status(self, job_id, token):
+        with self.engine.connect() as conn:
+            row = conn.execute(select(self.tables.jobs).where(
+                self._live(job_id, token, self._now()))).mappings().first()
+            if row is None:
+                raise Conflict("Worker lease is no longer valid")
+            return row['external_id'], row['submission_started']
+
+    def begin_submission(self, job_id, token, *, create_if_missing=True):
+        """Commit uncertainty BEFORE POST; another account can subscribe safely.
+
+        The runtime holds one global worker slot. BEGIN IMMEDIATE additionally
+        serializes the read-before-write check if another scheduler races it.
+        A lost response is reconciled by an exact, deterministic client job name;
+        absence is never permission to blindly resend.
+        """
+        table, now = self.tables.jobs, self._now()
+        with self.engine.begin() as conn:
+            _serialize_write(conn)
+            row = conn.execute(select(table).where(self._live(job_id, token, now),
+                table.c.cancel_requested.is_(False))).mappings().first()
+            if row is None or not row['client_id'] or not row['release_key']:
+                raise Conflict("Submission is unavailable")
+            if row['submission_started'] is not None:
+                return False
+            previous = conn.execute(select(table).where(table.c.release_key == row['release_key'],
+                table.c.client_id == row['client_id'], table.c.client_revision == row['client_revision'],
+                table.c.submission_started.is_not(None),
+                table.c.submission_invalid.is_not(True)).order_by(table.c.submission_started).limit(1)).mappings().first()
+            if previous is None and not create_if_missing:
+                return False
+            conn.execute(table.update().where(self._live(job_id, token, now)).values(
+                submission_started=previous['submission_started'] if previous else now,
+                external_id=previous['external_id'] if previous else None,
+                submission_key=previous['submission_key'] if previous else random_secrets.token_hex(16),
+                submission_invalid=False))
+            return previous is None
+
+    def _same_submission(self, row):
+        table = self.tables.jobs
+        identity = table.c.submission_key == row['submission_key'] if row['submission_key'] else table.c.submission_started == row['submission_started']
+        return and_(table.c.release_key == row['release_key'], table.c.client_id == row['client_id'],
+                    table.c.client_revision == row['client_revision'], identity)
+
+    def clear_rejected_submission(self, job_id, token, *, error_code='client_error'):
+        """A definite rejection resolves all adopters of this attempt as well."""
+        if error_code not in ('needs_auth', 'client_error'):
+            raise StorageError('Submission rejection is not definite')
+        table, now = self.tables.jobs, self._now()
+        with self.engine.begin() as conn:
+            _serialize_write(conn)
+            row = conn.execute(select(table).where(self._live(job_id, token, now),
+                table.c.external_id.is_(None), table.c.submission_started.is_not(None))).mappings().first()
+            if row is None:
+                raise Conflict("Submission identity is already recorded")
+            # Invalidity belongs to the shared attempt, including terminal
+            # subscribers. Their cancelled/rejected/imported states stay intact.
+            conn.execute(table.update().where(self._same_submission(row)).values(submission_invalid=True))
+            conn.execute(table.update().where(self._same_submission(row), table.c.id != job_id,
+                table.c.external_id.is_(None), table.c.state.in_(('queued', 'resolving', 'downloading', 'failed'))).values(
+                state='failed', error_code=error_code, submission_started=None, submission_key=None,
+                lease_token=None, lease_expires=None, next_attempt_at=now, updated_at=now))
+            conn.execute(table.update().where(self._live(job_id, token, now)).values(
+                submission_started=None, submission_key=None))
+
+    def fail_submission_adopters(self, job_id, token):
+        """A failed remote download is definite for every subscriber to it."""
+        table, now = self.tables.jobs, self._now()
+        with self.engine.begin() as conn:
+            _serialize_write(conn)
+            row = conn.execute(select(table).where(self._live(job_id, token, now))).mappings().first()
+            if row is None or row['submission_started'] is None:
+                raise Conflict('Submission is unavailable')
+            conn.execute(table.update().where(self._same_submission(row)).values(submission_invalid=True))
+            conn.execute(table.update().where(self._same_submission(row), table.c.id != job_id,
+                table.c.state.in_(('queued', 'resolving', 'downloading', 'failed'))).values(
+                state='failed', error_code='client_job_failed', lease_token=None,
+                lease_expires=None, next_attempt_at=now, updated_at=now))
+
+    def submission_identity(self, job_id, token):
+        with self.engine.connect() as conn:
+            row = conn.execute(select(self.tables.jobs).where(
+                self._live(job_id, token, self._now()))).mappings().first()
+            if row is None:
+                raise Conflict("Worker lease is no longer valid")
+            return row['external_id'], row['submission_started'], row['submission_key']
+
+    def submission_age(self, job_id, token):
+        _, started, _ = self.submission_identity(job_id, token)
+        return max(0, self._now() - started) if started is not None else 0
+
+    def record_external(self, job_id, token, external_id):
+        if not isinstance(external_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,128}', external_id):
+            raise StorageError("Invalid external job identity")
+        table = self.tables.jobs
+        with self.engine.begin() as conn:
+            _serialize_write(conn)
+            result = conn.execute(table.update().where(self._live(job_id, token, self._now()),
+                table.c.submission_started.is_not(None),
+                or_(table.c.external_id.is_(None), table.c.external_id == external_id)).values(external_id=external_id))
+            if result.rowcount != 1:
+                raise Conflict("External job identity changed")
+
     def material(self, job_id, token):
         """Private worker-only payload; caller must not serialize/log it."""
         with self.engine.connect() as conn:
@@ -609,7 +845,7 @@ class Repository:
             offer = conn.execute(select(self.tables.offers).where(
                 self.tables.offers.c.id == row["offer_id"], self.tables.offers.c.owner_id == row["owner_id"])).mappings().first()
             if connection is None or offer is None or connection["revision"] != offer["connection_revision"]:
-                raise Conflict("Connection changed or is unavailable")
+                raise ConnectionChanged("Connection changed or is unavailable")
             config = self.box.open(_sealed(connection, "config"), scope="deployment",
                 identity=connection["id"], field_name=f"connection-config:{connection['revision']}")
             scope = f"user:{row['owner_id']}:connection:{connection['id']}:revision:{offer['connection_revision']}"
@@ -662,6 +898,7 @@ class Repository:
         if state != "cancelled":
             conditions.append(table.c.cancel_requested.is_(False))
         with self.engine.begin() as conn:
+            _serialize_write(conn)
             result = conn.execute(table.update().where(*conditions).values(**values))
             if result.rowcount != 1:
                 raise Conflict("Job changed or worker lease expired")
@@ -671,6 +908,7 @@ class Repository:
             raise StorageError("Invalid retry delay")
         now = self._now()
         with self.engine.begin() as conn:
+            _serialize_write(conn)
             result = conn.execute(self.tables.jobs.update().where(self._live(job_id, token, now)).values(
                 lease_token=None, lease_expires=None, next_attempt_at=now + delay_seconds, updated_at=now))
             if result.rowcount != 1:
@@ -693,6 +931,7 @@ class Repository:
         """
         proof, now, table = self._publication_proof(publication_token), self._now(), self.tables.jobs
         with self.engine.begin() as conn:
+            _serialize_write(conn)
             row = conn.execute(select(table).where(self._live(job_id, lease_token, now))).mappings().first()
             if row is None or row["cancel_requested"]:
                 raise Conflict("Worker lease is not actionable")
@@ -757,6 +996,7 @@ class Repository:
             return True
 
         with self.engine.begin() as conn:
+            _serialize_write(conn)
             if existing(conn):
                 return outcome
             # UPDATE first fences concurrent acknowledgments before membership.

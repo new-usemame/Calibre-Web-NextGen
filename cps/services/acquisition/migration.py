@@ -85,12 +85,22 @@ def migrate_acquisition_schema(engine, metadata=None):
             conn.exec_driver_sql('BEGIN IMMEDIATE')
         inspector = inspect(conn)
         table_names = inspector.get_table_names()
-        # A job table from an earlier build of this feature predates the bound
-        # on `importing`. That database already carries a marker and returns
-        # below, and create_all never alters an existing table, so add it here.
-        if tables.jobs.name in table_names and 'importing_since' not in {
-                column['name'] for column in inspector.get_columns(tables.jobs.name)}:
-            conn.exec_driver_sql(f'ALTER TABLE "{tables.jobs.name}" ADD COLUMN importing_since FLOAT')
+        # Add nullable external-job state without changing any existing requests.
+        additions = {
+            tables.jobs.name: {'importing_since': 'FLOAT', 'client_id': 'VARCHAR(36)',
+                'client_revision': 'INTEGER', 'external_id': 'VARCHAR(128)',
+                'submission_started': 'FLOAT', 'submission_key': 'VARCHAR(32)', 'submission_invalid': 'BOOLEAN', 'release_key': 'VARCHAR(64)'},
+            tables.connections.name: {'deleted': 'BOOLEAN NOT NULL DEFAULT 0'},
+        }
+        for name, columns in additions.items():
+            if name in table_names:
+                existing = {column['name'] for column in inspector.get_columns(name)}
+                for column, sql_type in columns.items():
+                    if column not in existing:
+                        conn.exec_driver_sql(f'ALTER TABLE "{name}" ADD COLUMN "{column}" {sql_type}')
+        if tables.jobs.name in table_names:
+            conn.exec_driver_sql('CREATE UNIQUE INDEX IF NOT EXISTS uq_acquisition_job_owner_release '
+                'ON acquisition_job(owner_id, release_key)')
         if marker.name in table_names:
             recorded = conn.execute(select(marker)).mappings().all()
             if recorded:

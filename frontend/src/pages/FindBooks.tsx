@@ -18,7 +18,7 @@ import {
   type AcquisitionNavigation,
   type AcquisitionPublication,
 } from '../lib/acquisition';
-import { useRuntimeReasonText } from '../lib/acquisitionCopy';
+import { useAcquisitionErrorText, useRuntimeReasonText } from '../lib/acquisitionCopy';
 import {
   acquisitionSectionView,
   catalogEmptyListingKind,
@@ -68,6 +68,7 @@ function useJobStateText(): (job: AcquisitionJob) => { label: string; tone: 'act
         ? { label: t('In your library'), tone: 'ok' as const }
         : { label: t('Imported into the library'), tone: 'ok' as const };
       case 'failed': return { label: t('Failed'), tone: 'bad' as const };
+      case 'rejected': return { label: t('Request rejected'), tone: 'muted' as const };
       case 'cancelled': return { label: t('Request cancelled'), tone: 'muted' as const };
       default: return { label: job.state, tone: 'muted' as const };
     }
@@ -87,6 +88,7 @@ export function FindBooks() {
   const queryClient = useQueryClient();
   const { data: me } = useMe();
   const reasonText = useRuntimeReasonText();
+  const protocolErrorText = useAcquisitionErrorText();
   const jobStateText = useJobStateText();
   const searchInputId = useId();
 
@@ -529,9 +531,7 @@ export function FindBooks() {
                       <span className={styles.pill} data-tone={state.tone}>{state.label}</span>
                       {job.state === 'failed' && job.error_code && (
                         <span className={styles.muted}>
-                          {job.error_code === 'source_busy'
-                            ? t('The source asked us to wait.')
-                            : t('The transfer did not complete.')}
+                          {protocolErrorText(job.error_code)}
                         </span>
                       )}
                       {finished && job.result?.disposition === 'existing_retained' && (
@@ -713,8 +713,8 @@ function PublicationCard({ publication, canAcquire, requestsPaused, pendingOffer
                 : <Send size={15} aria-hidden="true" focusable={false} />}
               <span>
                 {canAcquire
-                  ? t('Download {format}', { format: offer.format })
-                  : t('Request {format}', { format: offer.format })}
+                  ? offer.format === 'NZB' ? t('Download release') : t('Download {format}', { format: offer.format })
+                  : offer.format === 'NZB' ? t('Request release') : t('Request {format}', { format: offer.format })}
               </span>
             </button>
           ))}
@@ -722,7 +722,13 @@ function PublicationCard({ publication, canAcquire, requestsPaused, pendingOffer
       ) : (
         // Buy / borrow / preview / templated links are deliberately not offered
         // here: they are not a complete file this server can import.
-        <p className={styles.muted}>{t('No EPUB or PDF available from this catalog.')}</p>
+        <p className={styles.muted}>{publication.unavailable_reason === 'untrusted_release_origin'
+          ? t('This release’s download address is not trusted by this connection.')
+          : publication.unavailable_reason === 'torrent_client_required'
+          ? t('This is a torrent release. A compatible torrent client is required; SABnzbd accepts NZB releases.')
+          : publication.unavailable_reason === 'download_client_unavailable'
+            ? t('The download client for this source is unavailable. Ask an administrator to check it.')
+            : t('No EPUB or PDF available from this catalog.')}</p>
       )}
 
       {publication.navigation.length > 0 && (

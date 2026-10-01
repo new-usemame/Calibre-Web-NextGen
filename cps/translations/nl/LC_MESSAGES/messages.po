@@ -4847,6 +4847,14 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
+"A download redirect tried to send a credential to another origin and was "
+"blocked."
+msgstr ""
+"Een downloadomleiding probeerde een inloggegeven naar een andere oorsprong "
+"te sturen en is geblokkeerd."
+
+#: cps/spa_strings.py
+msgid ""
 "A duplicate scan is already running. This list updates when it finishes."
 msgstr ""
 "Er is al een duplicatenscan bezig. Deze lijst wordt bijgewerkt zodra deze "
@@ -4874,6 +4882,14 @@ msgid ""
 msgstr ""
 "Er is een eenmalige volledige duplicatenscan nodig. Gebruik hierboven "
 "\"Zoeken naar duplicaten\" om deze uit te voeren."
+
+#: cps/spa_strings.py
+msgid "API endpoint"
+msgstr "API-adres"
+
+#: cps/spa_strings.py
+msgid "API key"
+msgstr "API-sleutel"
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "API keys"
@@ -4904,12 +4920,12 @@ msgid "Active"
 msgstr "Actief"
 
 #: cps/spa_strings.py
-msgid "Add a catalog"
-msgstr "Een catalogus toevoegen"
+msgid "Add a connection"
+msgstr "Een verbinding toevoegen"
 
 #: cps/spa_strings.py
-msgid "Add catalog"
-msgstr "Catalogus toevoegen"
+msgid "Add connection"
+msgstr "Verbinding toevoegen"
 
 #: cps/spa_strings.py
 msgid "Add group"
@@ -4948,6 +4964,10 @@ msgstr "Toevoegen aan bibliotheek"
 #: cps/spa_strings.py
 msgid "Added to your activity."
 msgstr "Toegevoegd aan je activiteit."
+
+#: cps/spa_strings.py
+msgid "Additional local download origins"
+msgstr "Aanvullende lokale downloadoorsprongen"
 
 #: cps/spa_strings.py
 msgid "Admin group"
@@ -5212,6 +5232,10 @@ msgid "Bold"
 msgstr "Vet"
 
 #: cps/spa_strings.py
+msgid "Book category ID"
+msgstr "Boekcategorie-ID"
+
+#: cps/spa_strings.py
 msgid "Book default"
 msgstr "Boek standaard"
 
@@ -5325,6 +5349,14 @@ msgid "CWA settings"
 msgstr "CWA-instellingen"
 
 #: cps/spa_strings.py
+msgid ""
+"CWNG cannot read the mapped completed folder. Check its mount and "
+"permissions."
+msgstr ""
+"CWNG kan de gekoppelde map met voltooide downloads niet lezen. Controleer de "
+"koppeling en rechten."
+
+#: cps/spa_strings.py
 msgid "Can browse and request"
 msgstr "Mag bladeren en aanvragen"
 
@@ -5344,6 +5376,10 @@ msgstr "Kan boeken uploaden"
 #: cps/templates/tasks.html cps/templates/user_edit.html
 msgid "Cancel"
 msgstr "Annuleren"
+
+#: cps/spa_strings.py
+msgid "Cancel editing"
+msgstr "Bewerken annuleren"
 
 #: cps/spa_strings.py
 msgid "Cancel rename"
@@ -5367,10 +5403,6 @@ msgid "Catalog"
 msgstr "Catalogus"
 
 #: cps/spa_strings.py
-msgid "Catalog added. Test it, then switch it on."
-msgstr "Catalogus toegevoegd. Test hem en zet hem daarna aan."
-
-#: cps/spa_strings.py
 msgid "Catalog address"
 msgstr "Catalogusadres"
 
@@ -5383,8 +5415,8 @@ msgid "Catalog trail"
 msgstr "Kruimelpad van de catalogus"
 
 #: cps/spa_strings.py
-msgid "Catalogs"
-msgstr "Catalogi"
+msgid "Catalogs and download clients"
+msgstr "Catalogi en downloadclients"
 
 #: cps/spa_strings.py
 msgid "Center"
@@ -5413,6 +5445,10 @@ msgstr "Controleer het adres en de aanmeldgegevens."
 #: cps/spa_strings.py
 msgid "Checking…"
 msgstr "Controleren…"
+
+#: cps/spa_strings.py
+msgid "Choose a SABnzbd connection"
+msgstr "Kies een SABnzbd-verbinding"
 
 #: cps/spa_strings.py
 msgid "Choose a cover"
@@ -5491,6 +5527,10 @@ msgid "Compact"
 msgstr "Compact"
 
 #: cps/spa_strings.py
+msgid "Completed folder as SABnzbd sees it"
+msgstr "Map met voltooide downloads zoals SABnzbd die ziet"
+
+#: cps/spa_strings.py
 msgid "Configuration"
 msgstr "Configuratie"
 
@@ -5504,6 +5544,10 @@ msgstr "Geconfigureerd"
 #, python-brace-format
 msgid "Confirm delete tag {name}"
 msgstr "Verwijderen van label {name} bevestigen"
+
+#: cps/spa_strings.py
+msgid "Confirm deletion"
+msgstr "Verwijdering bevestigen"
 
 #: cps/spa_strings.py
 msgid "Confirm new password"
@@ -5524,6 +5568,23 @@ msgid ""
 msgstr ""
 "Koppel dit account aan een e-reader en synchroniseer eenmaal om te "
 "controleren of de e-reader verbinding met je bibliotheek kan maken."
+
+#: cps/spa_strings.py
+msgid "Connection changed. Reload its settings before saving."
+msgstr ""
+"De verbinding is gewijzigd. Laad de instellingen opnieuw voordat u opslaat."
+
+#: cps/spa_strings.py
+msgid "Connection deleted."
+msgstr "Verbinding verwijderd."
+
+#: cps/spa_strings.py
+msgid "Connection saved. Test it, then switch it on."
+msgstr "Verbinding opgeslagen. Test deze en schakel deze daarna in."
+
+#: cps/spa_strings.py
+msgid "Connection type"
+msgstr "Verbindingstype"
 
 #: cps/spa_strings.py
 msgid "Connection works."
@@ -5974,6 +6035,13 @@ msgstr ""
 "meer op gekoppelde Kobo’s."
 
 #: cps/spa_strings.py
+msgid ""
+"Delete this connection and its saved credentials? Request history is kept."
+msgstr ""
+"Deze verbinding en de opgeslagen inloggegevens verwijderen? De "
+"aanvraaggeschiedenis blijft bewaard."
+
+#: cps/spa_strings.py
 msgid "Delete this smart shelf? Your books are not affected."
 msgstr "Deze slimme boekenplank verwijderen? Je boeken worden niet beïnvloed."
 
@@ -6153,8 +6221,16 @@ msgid "Download"
 msgstr "Downloaden"
 
 #: cps/spa_strings.py
+msgid "Download client"
+msgstr "Downloadclient"
+
+#: cps/spa_strings.py
 msgid "Download ready-made plugin"
 msgstr "Kant-en-klare plug-in downloaden"
+
+#: cps/spa_strings.py
+msgid "Download release"
+msgstr "Release downloaden"
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6251,6 +6327,10 @@ msgid "Edit HTML"
 msgstr "HTML bewerken"
 
 #: cps/spa_strings.py
+msgid "Edit connection"
+msgstr "Verbinding bewerken"
+
+#: cps/spa_strings.py
 msgid "Edit cover"
 msgstr "Omslag bewerken"
 
@@ -6286,6 +6366,11 @@ msgstr "Slimme boekenplank bewerken"
 #, python-brace-format
 msgid "Edit title for {title}"
 msgstr "Titel bewerken voor {title}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Edit {name}"
+msgstr "{name} bewerken"
 
 #: cps/spa_strings.py
 msgid ""
@@ -6335,6 +6420,10 @@ msgstr "Zet Kobo sync aan"
 #: cps/spa_strings.py
 msgid "Enable e-reader sync"
 msgstr "Zet e-reader sync aan"
+
+#: cps/spa_strings.py
+msgid "Enabled"
+msgstr "Ingeschakeld"
 
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
 msgid "Encryption"
@@ -6458,6 +6547,11 @@ msgstr "Boeken zoeken"
 #: cps/spa_strings.py
 msgid "Find books is unavailable"
 msgstr "Boeken zoeken is niet beschikbaar"
+
+#: cps/spa_strings.py
+msgid "Finish or cancel outstanding requests before editing this connection."
+msgstr ""
+"Voltooi of annuleer lopende aanvragen voordat u deze verbinding bewerkt."
 
 #: cps/spa_strings.py
 #, python-brace-format
@@ -6722,6 +6816,16 @@ msgid "Identifiers"
 msgstr "Identificatoren"
 
 #: cps/spa_strings.py
+msgid ""
+"If Prowlarr redirects to another source on your local network, list its "
+"exact origin here. Separate origins with commas. Credentials stay scoped to "
+"their original origin."
+msgstr ""
+"Als Prowlarr naar een andere bron op uw lokale netwerk omleidt, vermeld dan "
+"hier de exacte oorsprong. Scheid oorsprongen met komma’s. Inloggegevens "
+"blijven beperkt tot hun oorspronkelijke oorsprong."
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Image from {source}"
 msgstr "Afbeelding van {source}"
@@ -6768,6 +6872,10 @@ msgid "Included"
 msgstr "Inbegrepen"
 
 #: cps/spa_strings.py
+msgid "Indexer preset"
+msgstr "Indexervoorinstelling"
+
+#: cps/spa_strings.py
 msgid "Install or update the NextGen Sync plugin."
 msgstr "Installeer de NextGen Sync-plug-in of werk deze bij."
 
@@ -6808,6 +6916,10 @@ msgstr "KOReader-voortgang"
 #: cps/spa_strings.py
 msgid "KOReader sync is not enabled on this server."
 msgstr "KOReader-synchronisatie is niet ingeschakeld op deze server."
+
+#: cps/spa_strings.py
+msgid "Keep connection"
+msgstr "Verbinding behouden"
 
 #: cps/spa_strings.py
 msgid "Key file path"
@@ -6903,6 +7015,15 @@ msgid "Leave a field empty to use its default."
 msgstr "Laat een veld leeg om de standaardwaarde te gebruiken."
 
 #: cps/spa_strings.py
+msgid ""
+"Leave the credential blank to keep it. Saving switches the connection off "
+"and expires old selections; test it before enabling it again."
+msgstr ""
+"Laat het veld met inloggegevens leeg om ze te behouden. Opslaan schakelt de "
+"verbinding uit en laat oude selecties verlopen; test de verbinding voordat u "
+"deze weer inschakelt."
+
+#: cps/spa_strings.py
 msgid "Left"
 msgstr "Links"
 
@@ -6930,13 +7051,14 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"Let people request books from an OPDS catalog. A requested book is imported "
-"into this library through the normal ingest path, credited to the account "
-"that asked for it."
+"Let people request books from an OPDS catalog or an indexer connected to "
+"SABnzbd. A requested book is imported into this library through the normal "
+"ingest path, credited to the account that asked for it."
 msgstr ""
-"Laat mensen boeken aanvragen uit een OPDS-catalogus. Een aangevraagd boek "
-"wordt via het normale ingest-pad in deze bibliotheek geïmporteerd, op naam "
-"van het account dat erom vroeg."
+"Laat gebruikers boeken aanvragen uit een OPDS-catalogus of een indexer die "
+"met SABnzbd verbonden is. Een aangevraagd boek wordt via het normale "
+"importproces in deze bibliotheek geïmporteerd en toegeschreven aan het "
+"account dat het aanvroeg."
 
 #: cps/spa_strings.py
 msgid "Lettering"
@@ -7265,6 +7387,10 @@ msgstr "Nieuwste"
 msgid "Newest published"
 msgstr "Nieuwst gepubliceerd"
 
+#: cps/spa_strings.py
+msgid "Newznab / Torznab indexer"
+msgstr "Newznab / Torznab-indexer"
+
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
 #: cps/templates/feed.xml cps/templates/layout.html
 msgid "Next"
@@ -7489,6 +7615,10 @@ msgstr "Nog niets om te tonen."
 #: cps/spa_strings.py
 msgid "Numbered list"
 msgstr "Genummerde lijst"
+
+#: cps/spa_strings.py
+msgid "OPDS catalog"
+msgstr "OPDS-catalogus"
 
 #: cps/spa_strings.py
 msgid ""
@@ -7863,6 +7993,13 @@ msgid "Rating (stars)"
 msgstr "Beoordeling (sterren)"
 
 #: cps/spa_strings.py
+msgid ""
+"Re-enter the credential when changing the connection to a different server."
+msgstr ""
+"Voer de inloggegevens opnieuw in wanneer u de verbinding naar een andere "
+"server wijzigt."
+
+#: cps/spa_strings.py
 msgid "Read from here"
 msgstr "Vanaf hier lezen"
 
@@ -7929,6 +8066,10 @@ msgstr "Verversen"
 #: cps/spa_strings.py
 msgid "Registering…"
 msgstr "Registreren…"
+
+#: cps/spa_strings.py
+msgid "Reject"
+msgstr "Afwijzen"
 
 #: cps/spa_strings.py
 msgid "Reload"
@@ -8053,6 +8194,18 @@ msgid "Request cancelled"
 msgstr "Aanvraag geannuleerd"
 
 #: cps/spa_strings.py
+msgid "Request rejected"
+msgstr "Aanvraag afgewezen"
+
+#: cps/spa_strings.py
+msgid "Request rejected."
+msgstr "Aanvraag afgewezen."
+
+#: cps/spa_strings.py
+msgid "Request release"
+msgstr "Release aanvragen"
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Request {format}"
 msgstr "{format} aanvragen"
@@ -8164,6 +8317,34 @@ msgid "Run time"
 msgstr "Uitvoertijd"
 
 #: cps/spa_strings.py
+msgid "SABnzbd category"
+msgstr "SABnzbd-categorie"
+
+#: cps/spa_strings.py
+msgid ""
+"SABnzbd did not finish this download before the waiting limit. Check its "
+"queue before retrying."
+msgstr ""
+"SABnzbd heeft deze download niet binnen de wachttijd voltooid. Controleer de "
+"wachtrij voordat u opnieuw probeert."
+
+#: cps/spa_strings.py
+msgid ""
+"SABnzbd did not report a completed folder and category that could be "
+"verified."
+msgstr ""
+"SABnzbd heeft geen verifieerbare map met voltooide downloads en categorie "
+"gemeld."
+
+#: cps/spa_strings.py
+msgid "SABnzbd download client"
+msgstr "SABnzbd-downloadclient"
+
+#: cps/spa_strings.py
+msgid "SABnzbd reported that this download failed."
+msgstr "SABnzbd heeft gemeld dat deze download mislukt is."
+
+#: cps/spa_strings.py
 msgid "SMTP server"
 msgstr "SMTP-server"
 
@@ -8174,6 +8355,10 @@ msgstr "SSL/TLS"
 #: cps/spa_strings.py cps/templates/email_edit.html
 msgid "STARTTLS"
 msgstr "STARTTLS"
+
+#: cps/spa_strings.py
+msgid "Same completed folder inside CWNG"
+msgstr "Dezelfde map met voltooide downloads binnen CWNG"
 
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/config_db.html
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
@@ -8187,6 +8372,10 @@ msgstr "Opslaan"
 #: cps/spa_strings.py
 msgid "Save as preset"
 msgstr "Opslaan als voorinstelling"
+
+#: cps/spa_strings.py
+msgid "Save connection"
+msgstr "Verbinding opslaan"
 
 #: cps/spa_strings.py
 msgid "Save email settings"
@@ -8898,12 +9087,78 @@ msgid "The catalogs could not be loaded."
 msgstr "De catalogi konden niet worden geladen."
 
 #: cps/spa_strings.py
+msgid ""
+"The completed download contains multiple books. A single-book release is "
+"required."
+msgstr ""
+"De voltooide download bevat meerdere boeken. Een release met één boek is "
+"vereist."
+
+#: cps/spa_strings.py
+msgid "The completed download contains no usable EPUB or PDF."
+msgstr "De voltooide download bevat geen bruikbare EPUB of PDF."
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download is outside its mapped folder or uses an unsafe file "
+"path."
+msgstr ""
+"De voltooide download staat buiten de gekoppelde map of gebruikt een "
+"onveilig bestandspad."
+
+#: cps/spa_strings.py
+msgid ""
+"The completed-folder mapping does not cover the configured SABnzbd category."
+msgstr ""
+"De koppeling van de voltooide map omvat de ingestelde SABnzbd-categorie niet."
+
+#: cps/spa_strings.py
+msgid ""
+"The connection could not be deleted. Finish or cancel outstanding requests "
+"first."
+msgstr ""
+"De verbinding kon niet worden verwijderd. Voltooi of annuleer eerst lopende "
+"aanvragen."
+
+#: cps/spa_strings.py
+msgid "The connection settings could not be loaded."
+msgstr "De verbindingsinstellingen konden niet worden geladen."
+
+#: cps/spa_strings.py
 msgid "The connection test failed."
 msgstr "De verbindingstest is mislukt."
+
+#: cps/spa_strings.py
+msgid ""
+"The download client for this source is unavailable. Ask an administrator to "
+"check it."
+msgstr ""
+"De downloadclient voor deze bron is niet beschikbaar. Vraag een beheerder "
+"deze te controleren."
+
+#: cps/spa_strings.py
+msgid ""
+"The download client is unavailable or its settings changed. Make a new "
+"selection after an administrator checks it."
+msgstr ""
+"De downloadclient is niet beschikbaar of de instellingen zijn gewijzigd. "
+"Maak een nieuwe selectie nadat een beheerder deze heeft gecontroleerd."
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "The global library"
 msgstr "De globale bibliotheek"
+
+#: cps/spa_strings.py
+msgid "The indexer did not return a valid NZB descriptor."
+msgstr "De indexer heeft geen geldige NZB-beschrijving teruggegeven."
+
+#: cps/spa_strings.py
+msgid "The indexer does not advertise a supported keyword search."
+msgstr "De indexer biedt geen ondersteunde zoekfunctie met trefwoorden aan."
+
+#: cps/spa_strings.py
+msgid "The indexer does not advertise this book category."
+msgstr "De indexer biedt deze boekcategorie niet aan."
 
 #: cps/spa_strings.py
 msgid "The ingest folder could not be found."
@@ -8936,6 +9191,11 @@ msgstr "De aanvraag kon niet worden goedgekeurd."
 #: cps/spa_strings.py
 msgid "The request could not be made."
 msgstr "De aanvraag kon niet worden gedaan."
+
+#: cps/spa_strings.py
+msgid "The request could not be rejected. It may have already moved on."
+msgstr ""
+"De aanvraag kon niet worden afgewezen. Deze is mogelijk al verder verwerkt."
 
 #: cps/spa_strings.py
 msgid "The request could not be retried."
@@ -8989,6 +9249,31 @@ msgid "The source did not answer with a catalog we can read."
 msgstr "De bron antwoordde niet met een catalogus die we kunnen lezen."
 
 #: cps/spa_strings.py
+msgid ""
+"The source or download client rejected its API key. Ask an administrator to "
+"check the credential."
+msgstr ""
+"De bron of downloadclient heeft zijn API-sleutel geweigerd. Vraag een "
+"beheerder de inloggegevens te controleren."
+
+#: cps/spa_strings.py
+msgid ""
+"The source redirected to a network address that this connection does not "
+"allow."
+msgstr ""
+"De bron heeft omgeleid naar een netwerkadres dat deze verbinding niet "
+"toestaat."
+
+#: cps/spa_strings.py
+msgid ""
+"The submission could not be confirmed. Check SABnzbd queue and history "
+"before trying again; CWNG will not blindly send a duplicate."
+msgstr ""
+"De verzending kon niet worden bevestigd. Controleer de SABnzbd-wachtrij en "
+"geschiedenis voordat u opnieuw probeert; CWNG stuurt niet blind een "
+"duplicaat."
+
+#: cps/spa_strings.py
 msgid "The transfer did not complete."
 msgstr "De overdracht is niet voltooid."
 
@@ -9039,6 +9324,10 @@ msgstr "Deze catalogus staat op mijn thuis- of lokale netwerk"
 #: cps/spa_strings.py
 msgid "This catalog page is empty."
 msgstr "Deze cataloguspagina is leeg."
+
+#: cps/spa_strings.py
+msgid "This category does not exist in SABnzbd."
+msgstr "Deze categorie bestaat niet in SABnzbd."
 
 #: cps/spa_strings.py
 msgid ""
@@ -9095,6 +9384,14 @@ msgstr "Deze markering heeft geen opgeslagen positie"
 
 #: cps/spa_strings.py
 msgid ""
+"This is a torrent release. A compatible torrent client is required; SABnzbd "
+"accepts NZB releases."
+msgstr ""
+"Dit is een torrentrelease. Een compatibele torrentclient is vereist; SABnzbd "
+"accepteert NZB-releases."
+
+#: cps/spa_strings.py
+msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
 "Change and enter the address the e-reader can use, such as "
 "http://192.168.1.20:8083."
@@ -9102,6 +9399,14 @@ msgstr ""
 "Dit is het eigen adres van deze computer, dat de e-reader niet kan bereiken. "
 "Kies ‘Wijzigen’ en voer het adres in dat de e-reader kan gebruiken, zoals "
 "http://192.168.1.20:8083."
+
+#: cps/spa_strings.py
+msgid ""
+"This job is no longer in SABnzbd queue or history. It will not be submitted "
+"again automatically."
+msgstr ""
+"Deze taak staat niet meer in de SABnzbd-wachtrij of geschiedenis. Deze wordt "
+"niet automatisch opnieuw verzonden."
 
 #: cps/spa_strings.py
 msgid "This magic link can’t be checked. Generate a new one to try again."
@@ -9124,12 +9429,21 @@ msgid "This page doesn't exist here."
 msgstr "Deze pagina bestaat hier niet."
 
 #: cps/spa_strings.py
+msgid "This page is not available to this account."
+msgstr "Deze pagina is niet beschikbaar voor dit account."
+
+#: cps/spa_strings.py
 msgid ""
 "This page ran into an error and could not be displayed. Your library is fine "
 "— reloading usually fixes it."
 msgstr ""
 "Deze pagina liep tegen een fout aan en kon niet worden weergegeven. Jouw "
 "bibliotheek is in orde — herladen lost het meestal op."
+
+#: cps/spa_strings.py
+msgid "This release’s download address is not trusted by this connection."
+msgstr ""
+"Het downloadadres van deze uitgave wordt niet vertrouwd door deze verbinding."
 
 #: cps/spa_strings.py
 msgid ""
@@ -16333,6 +16647,27 @@ msgstr "Synchroniseer geselecteerde boekenplanken met Kobo"
 #, fuzzy
 msgid "Show Read/Unread Section"
 msgstr "Toon gelezen/niet gelezen selectie"
+
+#~ msgid "Add a catalog"
+#~ msgstr "Een catalogus toevoegen"
+
+#~ msgid "Add catalog"
+#~ msgstr "Catalogus toevoegen"
+
+#~ msgid "Catalog added. Test it, then switch it on."
+#~ msgstr "Catalogus toegevoegd. Test hem en zet hem daarna aan."
+
+#~ msgid "Catalogs"
+#~ msgstr "Catalogi"
+
+#~ msgid ""
+#~ "Let people request books from an OPDS catalog. A requested book is "
+#~ "imported into this library through the normal ingest path, credited to "
+#~ "the account that asked for it."
+#~ msgstr ""
+#~ "Laat mensen boeken aanvragen uit een OPDS-catalogus. Een aangevraagd boek "
+#~ "wordt via het normale ingest-pad in deze bibliotheek geïmporteerd, op "
+#~ "naam van het account dat erom vroeg."
 
 #~ msgid "Browser reading sources"
 #~ msgstr "Leesbronnen in de browser"

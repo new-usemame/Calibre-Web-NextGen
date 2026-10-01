@@ -135,14 +135,12 @@ def test_audit_siblings_remain_prefix_safe():
     """Audit-around-the-ask: the other native <a href> links out to legacy routes
     must stay prefix-safe so #603's class can't reopen next door.
 
-    - NotFound's 'classic interface' link builds BASE_PREFIX + afterApp itself.
+    - NotFound's classic links are exercised by classicFallback.test.ts,
+      including literal dotted mount prefixes and the gated tool pages.
     - The OAuth provider buttons render p.url, which the backend builds with
       Flask url_for (script_root-aware) — pin that server side so it can't
       regress to a root-absolute literal that would strip the prefix.
     """
-    notfound = (_FE / "pages" / "NotFound.tsx").read_text()
-    assert "BASE_PREFIX + afterApp" in notfound, "NotFound legacy link must carry the prefix"
-
     auth = (pathlib.Path(__file__).resolve().parents[2] / "cps" / "api" / "auth.py").read_text()
     # Capture the whole _oauth_providers body: from its def to the next top-level def.
     body = re.search(r"def _oauth_providers\(.*?(?=\n(?:def |@|\Z))", auth, re.S)

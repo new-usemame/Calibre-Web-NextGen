@@ -4879,6 +4879,12 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
+"A download redirect tried to send a credential to another origin and was "
+"blocked."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
 "A duplicate scan is already running. This list updates when it finishes."
 msgstr "En dubblettgenomsökning körs redan. Listan uppdateras när den är klar."
 
@@ -4902,6 +4908,14 @@ msgid ""
 msgstr ""
 "En fullständig dubblettgenomsökning måste köras en gång. Använd ”Sök efter "
 "dubbletter” ovan för att köra den."
+
+#: cps/spa_strings.py
+msgid "API endpoint"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "API key"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/cover_picker.html
 msgid "API keys"
@@ -4930,11 +4944,11 @@ msgid "Active"
 msgstr "Aktiv"
 
 #: cps/spa_strings.py
-msgid "Add a catalog"
+msgid "Add a connection"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Add catalog"
+msgid "Add connection"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -4971,6 +4985,10 @@ msgstr "Lägg till i biblioteket"
 
 #: cps/spa_strings.py
 msgid "Added to your activity."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Additional local download origins"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5227,6 +5245,10 @@ msgid "Bold"
 msgstr "Fet"
 
 #: cps/spa_strings.py
+msgid "Book category ID"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Book default"
 msgstr "Bokens standard"
 
@@ -5331,6 +5353,12 @@ msgid "CWA settings"
 msgstr "CWA-inställningar"
 
 #: cps/spa_strings.py
+msgid ""
+"CWNG cannot read the mapped completed folder. Check its mount and "
+"permissions."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Can browse and request"
 msgstr ""
 
@@ -5350,6 +5378,10 @@ msgstr "Kan ladda upp böcker"
 #: cps/templates/tasks.html cps/templates/user_edit.html
 msgid "Cancel"
 msgstr "Avbryt"
+
+#: cps/spa_strings.py
+msgid "Cancel editing"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Cancel rename"
@@ -5373,10 +5405,6 @@ msgid "Catalog"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Catalog added. Test it, then switch it on."
-msgstr ""
-
-#: cps/spa_strings.py
 msgid "Catalog address"
 msgstr ""
 
@@ -5389,7 +5417,7 @@ msgid "Catalog trail"
 msgstr ""
 
 #: cps/spa_strings.py
-msgid "Catalogs"
+msgid "Catalogs and download clients"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -5419,6 +5447,10 @@ msgstr ""
 #: cps/spa_strings.py
 msgid "Checking…"
 msgstr "Kontrollerar…"
+
+#: cps/spa_strings.py
+msgid "Choose a SABnzbd connection"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Choose a cover"
@@ -5497,6 +5529,10 @@ msgid "Compact"
 msgstr "Kompakt"
 
 #: cps/spa_strings.py
+msgid "Completed folder as SABnzbd sees it"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Configuration"
 msgstr "Konfiguration"
 
@@ -5508,6 +5544,10 @@ msgstr "Konfigurerad"
 #, python-brace-format
 msgid "Confirm delete tag {name}"
 msgstr "Bekräfta borttagning av taggen {name}"
+
+#: cps/spa_strings.py
+msgid "Confirm deletion"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Confirm new password"
@@ -5528,6 +5568,22 @@ msgid ""
 msgstr ""
 "Anslut det här kontot till en e-boksläsare och synkronisera sedan en gång "
 "för att bekräfta att det nådde ditt bibliotek."
+
+#: cps/spa_strings.py
+msgid "Connection changed. Reload its settings before saving."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection deleted."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection saved. Test it, then switch it on."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Connection type"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Connection works."
@@ -5976,6 +6032,11 @@ msgstr ""
 "slutar fungera på varje parkopplad Kobo."
 
 #: cps/spa_strings.py
+msgid ""
+"Delete this connection and its saved credentials? Request history is kept."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Delete this smart shelf? Your books are not affected."
 msgstr "Ta bort den här smarta hyllan? Dina böcker påverkas inte."
 
@@ -6151,7 +6212,15 @@ msgid "Download"
 msgstr "Hämta"
 
 #: cps/spa_strings.py
+msgid "Download client"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Download ready-made plugin"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Download release"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6247,6 +6316,10 @@ msgid "Edit HTML"
 msgstr "Redigera HTML"
 
 #: cps/spa_strings.py
+msgid "Edit connection"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Edit cover"
 msgstr "Redigera omslag"
 
@@ -6282,6 +6355,11 @@ msgstr "Redigera smart hylla"
 #, python-brace-format
 msgid "Edit title for {title}"
 msgstr "Redigera titel för {title}"
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "Edit {name}"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -6328,6 +6406,10 @@ msgstr "Aktivera Kobo sync"
 
 #: cps/spa_strings.py
 msgid "Enable e-reader sync"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Enabled"
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/email_edit.html
@@ -6448,6 +6530,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "Find books is unavailable"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Finish or cancel outstanding requests before editing this connection."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6709,6 +6795,13 @@ msgid "Identifiers"
 msgstr "Identifierare"
 
 #: cps/spa_strings.py
+msgid ""
+"If Prowlarr redirects to another source on your local network, list its "
+"exact origin here. Separate origins with commas. Credentials stay scoped to "
+"their original origin."
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Image from {source}"
 msgstr "Bild från {source}"
@@ -6754,6 +6847,10 @@ msgid "Included"
 msgstr "Inkluderad"
 
 #: cps/spa_strings.py
+msgid "Indexer preset"
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Install or update the NextGen Sync plugin."
 msgstr "Installera eller uppdatera insticksmodulen NextGen Sync."
 
@@ -6792,6 +6889,10 @@ msgstr "KOReader-läsförlopp"
 
 #: cps/spa_strings.py
 msgid "KOReader sync is not enabled on this server."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep connection"
 msgstr ""
 
 #: cps/spa_strings.py
@@ -6888,6 +6989,12 @@ msgid "Leave a field empty to use its default."
 msgstr "Lämna ett fält tomt för att använda dess standardvärde."
 
 #: cps/spa_strings.py
+msgid ""
+"Leave the credential blank to keep it. Saving switches the connection off "
+"and expires old selections; test it before enabling it again."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Left"
 msgstr "Vänster"
 
@@ -6909,9 +7016,9 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
-"Let people request books from an OPDS catalog. A requested book is imported "
-"into this library through the normal ingest path, credited to the account "
-"that asked for it."
+"Let people request books from an OPDS catalog or an indexer connected to "
+"SABnzbd. A requested book is imported into this library through the normal "
+"ingest path, credited to the account that asked for it."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -7239,6 +7346,10 @@ msgstr "Nyast"
 msgid "Newest published"
 msgstr "Senast publicerade"
 
+#: cps/spa_strings.py
+msgid "Newznab / Torznab indexer"
+msgstr ""
+
 #: cps/spa_strings.py cps/templates/cwng_feedback_popup.html
 #: cps/templates/feed.xml cps/templates/layout.html
 msgid "Next"
@@ -7458,6 +7569,10 @@ msgstr "Det finns inget att förhandsvisa ännu."
 #: cps/spa_strings.py
 msgid "Numbered list"
 msgstr "Numrerad lista"
+
+#: cps/spa_strings.py
+msgid "OPDS catalog"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""
@@ -7826,6 +7941,11 @@ msgid "Rating (stars)"
 msgstr "Betyg (stjärnor)"
 
 #: cps/spa_strings.py
+msgid ""
+"Re-enter the credential when changing the connection to a different server."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "Read from here"
 msgstr "Läs från den här platsen"
 
@@ -7890,6 +8010,10 @@ msgstr "Uppdatera"
 #: cps/spa_strings.py
 msgid "Registering…"
 msgstr "Registrerar…"
+
+#: cps/spa_strings.py
+msgid "Reject"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Reload"
@@ -8014,6 +8138,18 @@ msgid "Request cancelled"
 msgstr ""
 
 #: cps/spa_strings.py
+msgid "Request rejected"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request rejected."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Request release"
+msgstr ""
+
+#: cps/spa_strings.py
 #, python-brace-format
 msgid "Request {format}"
 msgstr ""
@@ -8123,6 +8259,30 @@ msgid "Run time"
 msgstr "Körtid"
 
 #: cps/spa_strings.py
+msgid "SABnzbd category"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"SABnzbd did not finish this download before the waiting limit. Check its "
+"queue before retrying."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"SABnzbd did not report a completed folder and category that could be "
+"verified."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "SABnzbd download client"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "SABnzbd reported that this download failed."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "SMTP server"
 msgstr "SMTP-server"
 
@@ -8133,6 +8293,10 @@ msgstr "SSL/TLS"
 #: cps/spa_strings.py cps/templates/email_edit.html
 msgid "STARTTLS"
 msgstr "STARTTLS"
+
+#: cps/spa_strings.py
+msgid "Same completed folder inside CWNG"
+msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html cps/templates/config_db.html
 #: cps/templates/config_edit.html cps/templates/config_view_edit.html
@@ -8146,6 +8310,10 @@ msgstr "Spara"
 #: cps/spa_strings.py
 msgid "Save as preset"
 msgstr "Spara som förinställning"
+
+#: cps/spa_strings.py
+msgid "Save connection"
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "Save email settings"
@@ -8834,12 +9002,67 @@ msgid "The catalogs could not be loaded."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"The completed download contains multiple books. A single-book release is "
+"required."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The completed download contains no usable EPUB or PDF."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The completed download is outside its mapped folder or uses an unsafe file "
+"path."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The completed-folder mapping does not cover the configured SABnzbd category."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The connection could not be deleted. Finish or cancel outstanding requests "
+"first."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The connection settings could not be loaded."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "The connection test failed."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The download client for this source is unavailable. Ask an administrator to "
+"check it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The download client is unavailable or its settings changed. Make a new "
+"selection after an administrator checks it."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/user_edit.html
 msgid "The global library"
 msgstr "Det globala biblioteket"
+
+#: cps/spa_strings.py
+msgid "The indexer did not return a valid NZB descriptor."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The indexer does not advertise a supported keyword search."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The indexer does not advertise this book category."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid "The ingest folder could not be found."
@@ -8871,6 +9094,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "The request could not be made."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The request could not be rejected. It may have already moved on."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -8925,6 +9152,24 @@ msgid "The source did not answer with a catalog we can read."
 msgstr ""
 
 #: cps/spa_strings.py
+msgid ""
+"The source or download client rejected its API key. Ask an administrator to "
+"check the credential."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The source redirected to a network address that this connection does not "
+"allow."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The submission could not be confirmed. Check SABnzbd queue and history "
+"before trying again; CWNG will not blindly send a duplicate."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid "The transfer did not complete."
 msgstr ""
 
@@ -8969,6 +9214,10 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "This catalog page is empty."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "This category does not exist in SABnzbd."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9024,9 +9273,21 @@ msgstr "Den här markeringen har ingen sparad position"
 
 #: cps/spa_strings.py
 msgid ""
+"This is a torrent release. A compatible torrent client is required; SABnzbd "
+"accepts NZB releases."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
 "This is this computer's own address, which the e-reader cannot reach. Choose "
 "Change and enter the address the e-reader can use, such as "
 "http://192.168.1.20:8083."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"This job is no longer in SABnzbd queue or history. It will not be submitted "
+"again automatically."
 msgstr ""
 
 #: cps/spa_strings.py
@@ -9048,12 +9309,20 @@ msgid "This page doesn't exist here."
 msgstr "Den här sidan finns inte här."
 
 #: cps/spa_strings.py
+msgid "This page is not available to this account."
+msgstr ""
+
+#: cps/spa_strings.py
 msgid ""
 "This page ran into an error and could not be displayed. Your library is fine "
 "— reloading usually fixes it."
 msgstr ""
 "Det uppstod ett fel på sidan och den kunde inte visas. Ditt bibliotek är "
 "intakt — det brukar lösa sig om du läser in sidan igen."
+
+#: cps/spa_strings.py
+msgid "This release’s download address is not trusted by this connection."
+msgstr ""
 
 #: cps/spa_strings.py
 msgid ""

@@ -23,7 +23,8 @@ export type AcquisitionJobState =
   | 'importing'
   | 'imported'
   | 'failed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'rejected';
 
 /** The states on which the server owes nothing further. Everything else is
  *  defined against THIS set rather than against a list of busy states, because
@@ -34,7 +35,7 @@ export type AcquisitionJobState =
  *  including one a newer server invented — keeps the page watching instead of
  *  going quiet. */
 export const ACQUISITION_TERMINAL_STATES: ReadonlySet<string> = new Set<AcquisitionJobState>([
-  'imported', 'failed', 'cancelled',
+  'imported', 'failed', 'cancelled', 'rejected',
 ]);
 
 /** True while the job may still change, by the worker or by an administrator. */

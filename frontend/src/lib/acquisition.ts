@@ -8,7 +8,7 @@
  *  2. "Downloaded" is not "imported". A job is only finished when the server
  *     returns a `result` (the import receipt) carrying real Calibre book IDs.
  */
-import { apiGet, apiPatch, apiPost } from './api';
+import { apiDelete, apiGet, apiPatch, apiPost } from './api';
 
 /* The job state machine lives in its own import-free module so the node unit
  * lane can exercise it directly; re-exported here so callers have one import. */
@@ -42,7 +42,7 @@ export interface AcquisitionInstanceState {
 }
 
 export interface AcquisitionOffer {
-  format: 'EPUB' | 'PDF';
+  format: 'EPUB' | 'PDF' | 'NZB';
   label: string | null;
   /** Stable per-file display identity — a React key, never an authorization. */
   identity: string;
@@ -59,6 +59,7 @@ export interface AcquisitionNavigation {
 }
 
 export interface AcquisitionPublication {
+  unavailable_reason?: string;
   title: string;
   identity: string;
   authors: string[];
@@ -141,6 +142,12 @@ export interface AcquisitionConnectionInput {
    *  server expands it to the allowed ranges and scopes it to this catalog's
    *  origin; loopback, link-local and cloud metadata stay denied either way. */
   allow_private_network?: boolean;
+  download_origins?: string[];
+  category?: string;
+  client_id?: string;
+  preset?: 'newznab' | 'torznab' | 'prowlarr' | 'jackett';
+  remote_path?: string;
+  local_path?: string;
 }
 
 const BASE = '/api/v1';
@@ -204,9 +211,10 @@ export function getAcquisitionConnections(): Promise<{ connections: AcquisitionC
 export function createAcquisitionConnection(
   label: string,
   config: AcquisitionConnectionInput,
+  adapter = 'opds',
 ): Promise<AcquisitionConnection> {
   return apiPost<AcquisitionConnection>(`${BASE}/admin/acquisition/connections`, {
-    label, adapter: 'opds', config,
+    label, adapter, config,
   });
 }
 
@@ -237,4 +245,20 @@ export function getAcquisitionApprovalQueue(): Promise<{ jobs: (AcquisitionJob &
 
 export function approveAcquisitionJob(id: string): Promise<AcquisitionJob> {
   return apiPost<AcquisitionJob>(`${BASE}/admin/acquisition/jobs/${encodeURIComponent(id)}/approve`);
+}
+
+export function getAcquisitionConnection(id: string): Promise<AcquisitionConnection & { config: AcquisitionConnectionInput & { has_secret: boolean; private_origins?: string[] } }> {
+  return apiGet(`${BASE}/admin/acquisition/connections/${encodeURIComponent(id)}`);
+}
+
+export function editAcquisitionConnection(id: string, label: string, config: Partial<AcquisitionConnectionInput>, expected_revision?: number): Promise<{ ok: true }> {
+  return apiPatch(`${BASE}/admin/acquisition/connections/${encodeURIComponent(id)}`, { label, config, expected_revision });
+}
+
+export function deleteAcquisitionConnection(id: string): Promise<{ ok: true }> {
+  return apiDelete(`${BASE}/admin/acquisition/connections/${encodeURIComponent(id)}`);
+}
+
+export function rejectAcquisitionJob(id: string): Promise<{ ok: true }> {
+  return apiPost(`${BASE}/admin/acquisition/jobs/${encodeURIComponent(id)}/reject`);
 }

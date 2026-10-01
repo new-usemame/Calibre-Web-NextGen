@@ -199,7 +199,8 @@ class CatalogService:
                 'direct_download_advertised': catalog.capabilities.direct_download}
 
     def browse(self, owner_id, connection_id, *, selection=None, query=None):
-        config = self.repository.connection_config(connection_id).config
+        snapshot = self.repository.connection_config(connection_id)
+        config = snapshot.config
         url = config['endpoint']
         if selection is not None:
             payload = self.repository.offer_payload(owner_id, selection, connection_id).offer
@@ -226,14 +227,14 @@ class CatalogService:
         elif query is not None:
             raise CatalogError('search_selection_required')
         catalog = self._fetch(config, url)
-        return self._present(owner_id, connection_id, catalog)
+        return self._present(owner_id, connection_id, catalog, expected_revision=snapshot.revision)
 
-    def _present(self, owner_id, connection_id, catalog):
+    def _present(self, owner_id, connection_id, catalog, *, expected_revision=None):
         def identity(kind, value):
             return self.repository.box.display_identity(json.dumps(
                 [kind, owner_id, connection_id, value], separators=(',', ':')))
         def selection(payload):
-            return self.repository.create_offer(owner_id, connection_id, payload)
+            return self.repository.create_offer(owner_id, connection_id, payload, expected_revision=expected_revision)
         def navigation(links):
             return [{'title': link.title or '', 'relations': list(link.relations),
                      'selection': selection({'kind': 'navigation', 'href': link.href})}

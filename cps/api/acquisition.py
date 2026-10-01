@@ -4,6 +4,7 @@ from dataclasses import asdict
 from functools import wraps
 import os
 from pathlib import Path
+from urllib.parse import urlsplit, urlunsplit
 
 from flask import jsonify, request
 from werkzeug.exceptions import HTTPException
@@ -13,9 +14,11 @@ from .. import config, constants, limiter, ub
 from ..cw_login import current_user
 from ..services.acquisition import admission, runtime
 from ..services.acquisition.catalog import CatalogService, CatalogError, connection_config
-from ..services.acquisition.http import TransportError
+from ..services.acquisition.http import TransportError, origin
 from ..services.acquisition.opds import CatalogParseError
-from ..services.acquisition.storage import Conflict, NotFound, StorageError
+from ..services.acquisition.newznab import IndexerError, IndexerService, connection_config as indexer_config
+from ..services.acquisition.sabnzbd import ClientError, SABClient, connection_config as client_config
+from ..services.acquisition.storage import Conflict, ConnectionChanged, NotFound, StorageError
 
 
 def _error(code, status):
@@ -97,9 +100,11 @@ def _endpoint(*, admin=False, available=False, read=READ_RATE, write=WRITE_RATE)
             except Conflict as error:
                 if getattr(error,'code',None)=='selections_full':
                     return _error('selections_full',429)
-                return _error('conflict',409)
+                return _error('connection_changed' if getattr(error, 'code', None) == 'connection_changed' else 'conflict',409)
             except admission.AdmissionError:
                 return _error('invalid_request',400)
+            except (IndexerError, ClientError) as error:
+                return _error(error.code, 502)
             except (CatalogError, CatalogParseError, TransportError):
                 return _error('source_unavailable',502)
             except StorageError:
@@ -181,9 +186,39 @@ def worker_available():
 
 
 
-def _require_opds(repo, connection_id, *, include_disabled=False):
-    if not any(row.id==connection_id and row.adapter=='opds' for row in repo.list_connections(include_disabled=include_disabled)):
+CONFIGURATORS = {'opds': connection_config, 'newznab': indexer_config, 'sabnzbd': client_config}
+
+
+def _require_connection(repo, connection_id, *, include_disabled=False, catalog=False):
+    kinds = ('opds', 'newznab') if catalog else tuple(CONFIGURATORS)
+    rows = [row for row in repo.list_connections(include_disabled=include_disabled)
+        if row.id == connection_id and row.adapter in kinds]
+    if not rows:
         raise NotFound('Connection unavailable')
+    return rows[0]
+
+
+def _validated_config(repo, adapter, value):
+    validated = CONFIGURATORS[adapter](value)
+    if adapter == 'newznab':
+        client = _require_connection(repo, validated['client_id'], include_disabled=True)
+        if client.adapter != 'sabnzbd':
+            raise admission.AdmissionError('invalid_request')
+    return validated
+
+
+def _safe_config(config):
+    # Even administrator responses never echo provider tokens in endpoint queries.
+    def address(value):
+        parts = urlsplit(value)
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, '', ''))
+    result = {key: value for key, value in config.items() if key != 'secret'}
+    result['has_secret'] = bool(config.get('secret'))
+    result['has_endpoint_query'] = bool(urlsplit(config['endpoint']).query)
+    result['endpoint'] = address(config['endpoint'])
+    for key in ('credential_origins', 'private_origins'):
+        result[key] = [address(value) for value in config.get(key, [])]
+    return result
 
 
 def _json(allowed):
@@ -238,35 +273,87 @@ def acquisition_admin_connections():
         if not (Path(ub.app_DB_path).parent/'acquisition.key').exists() and not admission.has_connections(ub.app_DB_path):
             return jsonify({'connections':[]})
         with runtime.open_repository(ub.app_DB_path) as repo:
-            return jsonify({'connections':[asdict(row) for row in repo.list_connections(include_disabled=True) if row.adapter=='opds']})
+            return jsonify({'connections':[asdict(row) for row in repo.list_connections(include_disabled=True) if row.adapter in CONFIGURATORS]})
     if admission.instance_state(ub.app_DB_path)['migration_status']!='ready':
         return _error('needs_review',409)
     body=_json({'label','adapter','config'})
-    if body.get('adapter','opds')!='opds': raise admission.AdmissionError('invalid_request')
+    adapter = body.get('adapter', 'opds')
+    if adapter not in CONFIGURATORS: raise admission.AdmissionError('invalid_request')
     if not isinstance(body.get('label'),str) or not body['label'].strip() or len(body['label'])>200:
         raise admission.AdmissionError('invalid_request')
-    try:
-        validated=connection_config(body.get('config'))
-    except CatalogError as error:
-        code=str(error)
-        return _error(code if code in CONFIG_ERRORS else 'invalid_request',400)
     with runtime.open_repository(ub.app_DB_path,initialize_key=True) as repo:
-        row=repo.create_connection(body.get('label'),'opds',validated,enabled=False)
+        try:
+            validated = _validated_config(repo, adapter, body.get('config'))
+        except (CatalogError, TransportError) as error:
+            code = error.code if isinstance(error, TransportError) else str(error)
+            return _error(code if code in CONFIG_ERRORS else 'invalid_request', 400)
+        row=repo.create_connection(body['label'],adapter,validated,enabled=False)
         return jsonify(asdict(row)),201
 
 
-@api_v1.route('/admin/acquisition/connections/<connection_id>',methods=['PATCH'])
+@api_v1.route('/admin/acquisition/connections/<connection_id>',methods=['GET','PATCH','DELETE'])
 @_endpoint(admin=True)
 def acquisition_admin_connection(connection_id):
-    body=_json({'enabled'})
-    if not isinstance(body.get('enabled'),bool): raise admission.AdmissionError('invalid_request')
-    if body['enabled'] and admission.instance_state(ub.app_DB_path)['migration_status']!='ready':
-        return _error('needs_review',409)
     with runtime.open_repository(ub.app_DB_path) as repo:
-        _require_opds(repo,connection_id,include_disabled=True)
-        material=repo.connection_config(connection_id,include_disabled=True)
-        connection_config(material.config)
-        repo.set_connection_enabled(connection_id,body['enabled'])
+        row = _require_connection(repo, connection_id, include_disabled=True)
+        if request.method == 'DELETE':
+            repo.delete_connection(connection_id, expected_revision=row.revision)
+            return jsonify({'ok': True})
+        material = repo.connection_config(connection_id,include_disabled=True)
+        if request.method == 'GET':
+            return jsonify(dict(asdict(row), config=_safe_config(material.config)))
+        body = _json({'enabled', 'label', 'config', 'expected_revision'})
+        if not body or ('enabled' in body and set(body) - {'expected_revision'} != {'enabled'}):
+            raise admission.AdmissionError('invalid_request')
+        if 'expected_revision' in body:
+            if type(body['expected_revision']) is not int or body['expected_revision'] < 1:
+                raise admission.AdmissionError('invalid_request')
+            if body['expected_revision'] != row.revision:
+                raise ConnectionChanged('Connection changed since loading the form')
+        if 'enabled' in body:
+            if not isinstance(body['enabled'], bool): raise admission.AdmissionError('invalid_request')
+            if body['enabled'] and admission.instance_state(ub.app_DB_path)['migration_status']!='ready':
+                return _error('needs_review',409)
+            repo.set_connection_enabled(connection_id,body['enabled'], expected_revision=row.revision)
+        else:
+            if admission.instance_state(ub.app_DB_path)['migration_status'] != 'ready':
+                return _error('needs_review',409)
+            label = body.get('label', row.label)
+            if not isinstance(label, str) or not label.strip() or len(label) > 200:
+                raise admission.AdmissionError('invalid_request')
+            changes = body.get('config', {})
+            if not isinstance(changes, dict): raise admission.AdmissionError('invalid_request')
+            merged = dict(material.config, **changes)
+            # Query credentials are redacted in GET. An unchanged displayed
+            # endpoint preserves its sealed query rather than erasing it.
+            if changes.get('endpoint') == _safe_config(material.config)['endpoint'] and urlsplit(material.config['endpoint']).query:
+                merged['endpoint'] = material.config['endpoint']
+            # Reconcile derived redirect allowances when an admin removes them.
+            # Preserve the endpoint allowance and unrelated advanced scopes.
+            if row.adapter == 'newznab' and 'download_origins' in changes:
+                derived = {origin(value) for value in material.config.get('download_origins', [])}
+                endpoint_origin = origin(material.config['endpoint'])
+                merged['private_origins'] = [value for value in merged.get('private_origins', [])
+                    if origin(value) == endpoint_origin or origin(value) not in derived]
+            # Friendly LAN checkbox replaces the expanded policy as on creation.
+            if 'allow_private_network' in changes:
+                merged.pop('private_origins', None)
+                merged.pop('private_networks', None)
+            try:
+                origin_changed = origin(merged['endpoint']) != origin(material.config['endpoint'])
+                if (material.config.get('secret') and origin_changed
+                        and not (isinstance(changes.get('secret'), str) and changes['secret'].strip())):
+                    return _error('credential_required_for_new_origin', 400)
+                if (origin_changed and merged.get('auth_kind') in ('basic', 'bearer')
+                        and 'credential_origins' not in changes):
+                    # Re-entered credentials are for the newly chosen server;
+                    # inherited redirect scopes do not gain that new credential.
+                    merged['credential_origins'] = [merged['endpoint']]
+                validated = _validated_config(repo, row.adapter, merged)
+            except (CatalogError, TransportError) as error:
+                code = error.code if isinstance(error, TransportError) else str(error)
+                return _error(code if code in CONFIG_ERRORS else 'invalid_request',400)
+            repo.update_connection(connection_id,label=label,config=validated,expected_revision=row.revision)
     return jsonify({'ok':True})
 
 
@@ -276,8 +363,17 @@ def acquisition_admin_probe(connection_id):
     database=ub.app_DB_path
     def probe():
         with runtime.open_repository(database) as repo:
-            _require_opds(repo,connection_id,include_disabled=True)
-            return CatalogService(repo).probe(repo.connection_config(connection_id,include_disabled=True).config)
+            row = _require_connection(repo,connection_id,include_disabled=True)
+            value = repo.connection_config(connection_id,include_disabled=True).config
+            if row.adapter == 'sabnzbd':
+                return SABClient(value).probe()
+            if row.adapter == 'newznab':
+                result = IndexerService(repo).probe(value)
+                client = _require_connection(repo, value['client_id'], include_disabled=True)
+                SABClient(repo.connection_config(client.id, include_disabled=True).config).probe()
+                result['client_verified'] = True
+                return result
+            return CatalogService(repo).probe(value)
     return jsonify(_run_private_blocking(probe))
 
 
@@ -286,7 +382,7 @@ def acquisition_admin_probe(connection_id):
 def acquisition_bootstrap():
     role=admission.account_role(ub.app_DB_path,_owner()) or 0
     with runtime.open_repository(ub.app_DB_path) as repo:
-        return jsonify({'connections':[asdict(row) for row in repo.list_connections() if row.adapter=='opds'],
+        return jsonify({'connections':[asdict(row) for row in repo.list_connections() if row.adapter in ('opds', 'newznab')],
             'can_acquire':bool(role & constants.ROLE_ACQUISITION_AUTO_APPROVE),'runtime':worker_available()})
 
 
@@ -298,13 +394,14 @@ def acquisition_catalog():
     selection,query=request.args.get('selection'),request.args.get('q')
     def browse():
         with runtime.open_repository(database) as repo:
-            _require_opds(repo,connection_id)
-            result=CatalogService(repo).browse(owner,connection_id,selection=selection,query=query)
+            row = _require_connection(repo,connection_id,catalog=True)
+            service = IndexerService(repo) if row.adapter == 'newznab' else CatalogService(repo)
+            result=service.browse(owner,connection_id,selection=selection,query=query)
             allowed=admission.configured_media_types(repo.engine)
             formats={name for name,media in (('EPUB','application/epub+zip'),('PDF','application/pdf')) if media in allowed}
             for section in [result]+result.get('groups',[]):
                 for publication in section.get('publications',[]):
-                    publication['offers']=[offer for offer in publication.get('offers',[]) if offer.get('format') in formats]
+                    publication['offers']=[offer for offer in publication.get('offers',[]) if offer.get('format') in formats or offer.get('format') == 'NZB' and formats]
             return result
     return jsonify(_run_private_blocking(browse))
 
@@ -366,6 +463,15 @@ def acquisition_approve(job_id):
         if not admission.account_allowed(repo.engine,owner): return _error('forbidden',403)
         repo.approve(job_id,admin_actor=_owner())
         return jsonify(_job(repo,repo.get_job(owner,job_id))),202
+
+
+@api_v1.route('/admin/acquisition/jobs/<job_id>/reject',methods=['POST'])
+@_endpoint(admin=True)
+def acquisition_reject(job_id):
+    # Refusal remains available even while the feature/worker is paused.
+    with runtime.open_repository(ub.app_DB_path) as repo:
+        repo.reject(job_id, admin_actor=_owner())
+    return jsonify({'ok': True})
 
 
 @api_v1.route('/admin/acquisition/jobs',methods=['GET'])

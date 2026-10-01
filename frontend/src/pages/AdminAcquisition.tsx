@@ -1,9 +1,13 @@
-import { useId, useState } from 'react';
+import { useId, useRef, useState } from 'react';
 import { Link } from 'wouter';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ChevronLeft, CheckCircle2, Globe, Plus, Users } from 'lucide-react';
 import {
   approveAcquisitionJob,
+  rejectAcquisitionJob,
+  getAcquisitionConnection,
+  editAcquisitionConnection,
+  deleteAcquisitionConnection,
   createAcquisitionConnection,
   getAcquisitionApprovalQueue,
   getAcquisitionConnections,
@@ -16,7 +20,7 @@ import {
   type AcquisitionConnectionInput,
   type AcquisitionProbe,
 } from '../lib/acquisition';
-import { useRuntimeReasonText } from '../lib/acquisitionCopy';
+import { useAcquisitionErrorText, useRuntimeReasonText } from '../lib/acquisitionCopy';
 import {
   acquisitionRequesterLabel,
   acquisitionSectionView,
@@ -40,7 +44,8 @@ function errorCode(error: unknown): string | undefined {
 
 const EMPTY_CONNECTION: AcquisitionConnectionInput & { label: string } = {
   label: '', endpoint: '', auth_kind: 'none', username: '', secret: '',
-  allow_private_network: false,
+  allow_private_network: false, category: '7020', client_id: '', preset: 'newznab',
+  remote_path: '', local_path: '', download_origins: [],
 };
 
 /** Where a failed action's message belongs. Each one is rendered beside the
@@ -54,8 +59,15 @@ export function AdminAcquisition() {
   const queryClient = useQueryClient();
   const formId = useId();
   const reasonText = useRuntimeReasonText();
+  const protocolErrorText = useAcquisitionErrorText();
 
   const [draft, setDraft] = useState(EMPTY_CONNECTION);
+  const [adapter, setAdapter] = useState('opds');
+  const [editing, setEditing] = useState<string | null>(null);
+  const [loadedPolicy, setLoadedPolicy] = useState<{ endpoint: string; local: boolean; revision: number } | null>(null);
+  const [downloadOrigins, setDownloadOrigins] = useState('');
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const formHeading = useRef<HTMLHeadingElement>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [actionErrors, setActionErrors] = useState<Partial<Record<ActionScope, string>>>({});
   const [probes, setProbes] = useState<Record<string, AcquisitionProbe | { error: string }>>({});
@@ -117,22 +129,37 @@ export function AdminAcquisition() {
   });
 
   const addConnection = useMutation({
-    mutationFn: () => createAcquisitionConnection(draft.label.trim(), {
-      endpoint: draft.endpoint.trim(),
-      auth_kind: draft.auth_kind,
-      username: draft.auth_kind === 'basic' ? draft.username : '',
-      secret: draft.auth_kind === 'none' ? '' : draft.secret,
-      allow_private_network: draft.allow_private_network,
-    }),
+    mutationFn: async () => {
+      const value: Partial<AcquisitionConnectionInput> = {
+        endpoint: draft.endpoint.trim(), auth_kind: draft.auth_kind,
+        username: adapter === 'opds' && draft.auth_kind === 'basic' ? draft.username : '',
+      };
+      if (!editing || loadedPolicy?.local !== draft.allow_private_network || loadedPolicy?.endpoint !== draft.endpoint.trim()) {
+        value.allow_private_network = draft.allow_private_network;
+      }
+      if (!editing || draft.secret) value.secret = adapter === 'opds' && draft.auth_kind === 'none' ? '' : draft.secret;
+      if (adapter === 'newznab') Object.assign(value, { category: draft.category, client_id: draft.client_id, preset: draft.preset, download_origins: downloadOrigins.split(',').map((item) => item.trim()).filter(Boolean) });
+      if (adapter === 'sabnzbd') Object.assign(value, { category: draft.category, remote_path: draft.remote_path, local_path: draft.local_path });
+      if (editing) await editAcquisitionConnection(editing, draft.label.trim(), value, loadedPolicy?.revision);
+      else await createAcquisitionConnection(draft.label.trim(), value as AcquisitionConnectionInput, adapter);
+    },
     onSuccess: () => {
       setDraft(EMPTY_CONNECTION);
+      setEditing(null); setLoadedPolicy(null); setDownloadOrigins('');
+      setAdapter('opds');
       setFormError(null);
       refresh('connections');
-      announce(t('Catalog added. Test it, then switch it on.'));
+      announce(t('Connection saved. Test it, then switch it on.'));
     },
     onError: (error) => {
       const code = errorCode(error);
-      if (code === 'needs_review') {
+      if (code === 'credential_required_for_new_origin') {
+        setFormError(t('Re-enter the credential when changing the connection to a different server.'));
+      } else if (code === 'connection_changed') {
+        setFormError(t('Connection changed. Reload its settings before saving.'));
+      } else if (code === 'conflict') {
+        setFormError(t('Finish or cancel outstanding requests before editing this connection.'));
+      } else if (code === 'needs_review') {
         setFormError(t('Legacy acquisition permissions need review before a catalog can be added.'));
       } else if (code === 'private_network_not_allowed') {
         setFormError(t('That address cannot be reached on a local network. Loopback, link-local and cloud metadata addresses are never allowed.'));
@@ -140,6 +167,30 @@ export function AdminAcquisition() {
         setFormError(t('Check the address and the sign-in details.'));
       }
     },
+  });
+
+  const loadConnection = useMutation({
+    mutationFn: getAcquisitionConnection,
+    onSuccess: (row) => {
+      succeeded('connection');
+      setEditing(row.id); setAdapter(row.adapter); setFormError(null);
+      setLoadedPolicy({ endpoint: row.config.endpoint, local: !!row.config.private_origins?.length, revision: row.revision });
+      setDownloadOrigins(row.config.download_origins?.join(', ') ?? '');
+      setDraft({ ...EMPTY_CONNECTION, ...row.config, label: row.label, secret: '',
+        allow_private_network: !!row.config.private_origins?.length });
+      requestAnimationFrame(() => { formHeading.current?.focus(); formHeading.current?.scrollIntoView({ block: 'center' }); });
+    },
+    onError: () => failed('connection', t('The connection settings could not be loaded.')),
+  });
+  const removeConnection = useMutation({
+    mutationFn: deleteAcquisitionConnection,
+    onSuccess: () => { setDeleting(null); refresh('connections'); announce(t('Connection deleted.')); },
+    onError: () => failed('connection', t('The connection could not be deleted. Finish or cancel outstanding requests first.')),
+  });
+  const reject = useMutation({
+    mutationFn: rejectAcquisitionJob,
+    onSuccess: () => { succeeded('queue'); refresh('queue'); announce(t('Request rejected.')); },
+    onError: () => { failed('queue', t('The request could not be rejected. It may have already moved on.')); refresh('queue'); },
   });
 
   const toggleConnection = useMutation({
@@ -169,7 +220,7 @@ export function AdminAcquisition() {
         ...current,
         [id]: { error: errorCode(error) === 'source_unavailable'
           ? t('The source did not answer with a catalog we can read.')
-          : t('The connection test failed.') },
+          : errorCode(error) ? protocolErrorText(errorCode(error)!) : t('The connection test failed.') },
       }));
     },
   });
@@ -305,7 +356,7 @@ export function AdminAcquisition() {
         <h1>{t('Book sources')}</h1>
       </header>
       <p className={styles.lede}>
-        {t('Let people request books from an OPDS catalog. A requested book is imported into this library through the normal ingest path, credited to the account that asked for it.')}
+        {t('Let people request books from an OPDS catalog or an indexer connected to SABnzbd. A requested book is imported into this library through the normal ingest path, credited to the account that asked for it.')}
       </p>
 
       {/* Reached only with settings still on screen from an earlier, good
@@ -368,7 +419,7 @@ export function AdminAcquisition() {
       </section>
 
       <section className={styles.card} aria-labelledby={`${formId}-connections`}>
-        <h2 id={`${formId}-connections`}>{t('Catalogs')}</h2>
+        <h2 id={`${formId}-connections`}>{t('Catalogs and download clients')}</h2>
 
         {actionErrors.connection && <p className={styles.bad} role="alert">{actionErrors.connection}</p>}
 
@@ -391,6 +442,7 @@ export function AdminAcquisition() {
                 <li key={connection.id} className={styles.connection}>
                   <div className={styles.connectionMain}>
                     <p className={styles.connectionLabel}>{connection.label}</p>
+                    <p className={styles.hint}>{connection.adapter.toUpperCase()}</p>
                     {result && 'error' in result ? (
                       // A failed test announces, the same way a successful one
                       // does. Without this the administrator who is listening
@@ -411,6 +463,13 @@ export function AdminAcquisition() {
                     )}
                   </div>
                   <div className={styles.connectionActions}>
+                    <button type="button" className={styles.secondary}
+                      aria-label={t('Edit {name}', { name: connection.label })}
+                      disabled={loadConnection.isPending}
+                      onClick={() => loadConnection.mutate(connection.id)}>{t('Edit')}</button>
+                    <button type="button" className={styles.secondary}
+                      aria-label={t('Delete {name}', { name: connection.label })}
+                      onClick={() => setDeleting(connection.id)}>{t('Delete')}</button>
                     <button
                       type="button"
                       className={styles.secondary}
@@ -436,9 +495,15 @@ export function AdminAcquisition() {
                         })}
                         onChange={(event) => toggleConnection.mutate({ id: connection.id, enabled: event.target.checked })}
                       />
-                      <span>{t('Available to users')}</span>
+                      <span>{connection.adapter === 'sabnzbd' ? t('Enabled') : t('Available to users')}</span>
                     </label>
                   </div>
+                  {deleting === connection.id && <div className={styles.connectionActions}>
+                    <p>{t('Delete this connection and its saved credentials? Request history is kept.')}</p>
+                    <button type="button" className={styles.secondary} disabled={removeConnection.isPending}
+                      onClick={() => removeConnection.mutate(connection.id)}>{t('Confirm deletion')}</button>
+                    <button type="button" className={styles.secondary} onClick={() => setDeleting(null)}>{t('Keep connection')}</button>
+                  </div>}
                 </li>
               );
             })}
@@ -449,11 +514,57 @@ export function AdminAcquisition() {
           className={styles.form}
           onSubmit={(event) => { event.preventDefault(); addConnection.mutate(); }}
         >
-          <h3>{t('Add a catalog')}</h3>
+          <h3 ref={formHeading} tabIndex={-1}>{editing ? t('Edit connection') : t('Add a connection')}</h3>
+          {editing && <p className={styles.hint}>{t('Leave the credential blank to keep it. Saving switches the connection off and expires old selections; test it before enabling it again.')}</p>}
           <div className={styles.fields}>
+            <label className={styles.field}>
+              <span>{t('Connection type')}</span>
+              <select aria-invalid={formError ? true : undefined} aria-describedby={formError ? `${formId}-error` : undefined} value={adapter} disabled={!!editing} onChange={(event) => {
+                setAdapter(event.target.value);
+                setDraft({ ...EMPTY_CONNECTION, label: draft.label, category: event.target.value === 'sabnzbd' ? 'books' : '7020' });
+              }}>
+                <option value="opds">{t('OPDS catalog')}</option>
+                <option value="newznab">{t('Newznab / Torznab indexer')}</option>
+                <option value="sabnzbd">{t('SABnzbd download client')}</option>
+              </select>
+            </label>
+            {adapter === 'newznab' && <>
+              <label className={styles.field}><span>{t('Indexer preset')}</span>
+                <select aria-invalid={formError ? true : undefined} aria-describedby={formError ? `${formId}-error` : undefined} value={draft.preset} onChange={(event) => setDraft({ ...draft, preset: event.target.value as AcquisitionConnectionInput['preset'] })}>
+                  <option value="newznab">Newznab</option><option value="torznab">Torznab</option>
+                  <option value="prowlarr">Prowlarr</option><option value="jackett">Jackett</option>
+                </select>
+              </label>
+              <label className={styles.field}><span>{t('Additional local download origins')}</span>
+                <input value={downloadOrigins}
+                  placeholder="http://indexer:8090"
+                  aria-describedby={`${formId}-origins-hint`}
+                  onChange={(event) => setDownloadOrigins(event.target.value)} />
+                <span id={`${formId}-origins-hint`}>{t('If Prowlarr redirects to another source on your local network, list its exact origin here. Separate origins with commas. Credentials stay scoped to their original origin.')}</span>
+              </label>
+              <label className={styles.field}><span>{t('Download client')}</span>
+                <select aria-invalid={formError ? true : undefined} aria-describedby={formError ? `${formId}-error` : undefined} value={draft.client_id} required onChange={(event) => setDraft({ ...draft, client_id: event.target.value })}>
+                  <option value="">{t('Choose a SABnzbd connection')}</option>
+                  {rows.filter((row) => row.adapter === 'sabnzbd').map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
+                </select>
+              </label>
+            </>}
+            {adapter !== 'opds' && <label className={styles.field}><span>{adapter === 'sabnzbd' ? t('SABnzbd category') : t('Book category ID')}</span>
+              <input aria-invalid={formError ? true : undefined} aria-describedby={formError ? `${formId}-error` : undefined} value={draft.category} required onChange={(event) => setDraft({ ...draft, category: event.target.value })} />
+            </label>}
+            {adapter === 'sabnzbd' && <>
+              <label className={styles.field}><span>{t('Completed folder as SABnzbd sees it')}</span>
+                <input aria-invalid={formError ? true : undefined} aria-describedby={formError ? `${formId}-error` : undefined} value={draft.remote_path} required placeholder="/downloads/complete" onChange={(event) => setDraft({ ...draft, remote_path: event.target.value })} />
+              </label>
+              <label className={styles.field}><span>{t('Same completed folder inside CWNG')}</span>
+                <input aria-invalid={formError ? true : undefined} aria-describedby={formError ? `${formId}-error` : undefined} value={draft.local_path} required placeholder="/downloads/complete" onChange={(event) => setDraft({ ...draft, local_path: event.target.value })} />
+              </label>
+            </>}
             <label className={styles.field}>
               <span>{t('Name')}</span>
               <input
+                aria-invalid={formError ? true : undefined}
+                aria-describedby={formError ? `${formId}-error` : undefined}
                 value={draft.label}
                 maxLength={200}
                 required
@@ -461,8 +572,10 @@ export function AdminAcquisition() {
               />
             </label>
             <label className={styles.field}>
-              <span>{t('Catalog address')}</span>
+              <span>{adapter === 'opds' ? t('Catalog address') : t('API endpoint')}</span>
               <input
+                aria-invalid={formError ? true : undefined}
+                aria-describedby={formError ? `${formId}-error` : undefined}
                 type="url"
                 inputMode="url"
                 value={draft.endpoint}
@@ -471,7 +584,7 @@ export function AdminAcquisition() {
                 onChange={(event) => setDraft({ ...draft, endpoint: event.target.value })}
               />
             </label>
-            <label className={styles.field}>
+            {adapter === 'opds' && <label className={styles.field}>
               <span>{t('Sign-in')}</span>
               <select
                 value={draft.auth_kind}
@@ -484,21 +597,25 @@ export function AdminAcquisition() {
                 <option value="basic">{t('Username and password')}</option>
                 <option value="bearer">{t('Token')}</option>
               </select>
-            </label>
+            </label>}
             {draft.auth_kind === 'basic' && (
               <label className={styles.field}>
                 <span>{t('Username')}</span>
                 <input
+                aria-invalid={formError ? true : undefined}
+                aria-describedby={formError ? `${formId}-error` : undefined}
                   value={draft.username}
                   autoComplete="off"
                   onChange={(event) => setDraft({ ...draft, username: event.target.value })}
                 />
               </label>
             )}
-            {draft.auth_kind !== 'none' && (
+            {(adapter !== 'opds' || draft.auth_kind !== 'none') && (
               <label className={styles.field}>
-                <span>{draft.auth_kind === 'basic' ? t('Password') : t('Token')}</span>
+                <span>{adapter !== 'opds' ? t('API key') : draft.auth_kind === 'basic' ? t('Password') : t('Token')}</span>
                 <input
+                aria-invalid={formError ? true : undefined}
+                aria-describedby={formError ? `${formId}-error` : undefined}
                   type="password"
                   value={draft.secret}
                   autoComplete="new-password"
@@ -509,6 +626,8 @@ export function AdminAcquisition() {
           </div>
           <label className={styles.switchRow}>
             <input
+                aria-invalid={formError ? true : undefined}
+                aria-describedby={formError ? `${formId}-error` : undefined}
               type="checkbox"
               checked={draft.allow_private_network ?? false}
               onChange={(event) => setDraft({
@@ -524,7 +643,7 @@ export function AdminAcquisition() {
               </span>
             </span>
           </label>
-          {formError && <p className={styles.bad} role="alert">{formError}</p>}
+          {formError && <p id={`${formId}-error`} className={styles.bad} role="alert">{formError}</p>}
           <p className={styles.hint}>
             {t('A new catalog is added switched off. Test it first, then make it available.')}
           </p>
@@ -535,8 +654,11 @@ export function AdminAcquisition() {
               || !draft.label.trim() || !draft.endpoint.trim()}
           >
             <Plus size={15} aria-hidden="true" focusable={false} />
-            <span>{t('Add catalog')}</span>
+            <span>{editing ? t('Save connection') : t('Add connection')}</span>
           </button>
+          {editing && <button type="button" className={styles.secondary} onClick={() => {
+            setEditing(null); setLoadedPolicy(null); setDownloadOrigins(''); setDraft(EMPTY_CONNECTION); setAdapter('opds'); setFormError(null);
+          }}>{t('Cancel editing')}</button>}
         </form>
       </section>
 
@@ -644,11 +766,14 @@ export function AdminAcquisition() {
                   <button
                     type="button"
                     className={styles.primary}
-                    disabled={isRowPending(approve.isPending, approve.variables, job.id)}
+                    disabled={isRowPending(approve.isPending, approve.variables, job.id) || isRowPending(reject.isPending, reject.variables, job.id)}
                     onClick={() => approve.mutate(job.id)}
                   >
                     {t('Approve')}
                   </button>
+                  <button type="button" className={styles.secondary}
+                    disabled={isRowPending(approve.isPending, approve.variables, job.id) || isRowPending(reject.isPending, reject.variables, job.id)}
+                    onClick={() => reject.mutate(job.id)}>{t('Reject')}</button>
                 </li>
               );
             })}

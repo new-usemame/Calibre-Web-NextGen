@@ -66,15 +66,14 @@ export function canEditBookCover(me: Me | undefined | null, inLibrary: boolean):
 /**
  * May this user add books to this shelf, or take them off it?
  *
- * The server's one rule (`cps/shelf.py::check_shelf_edit_permissions`, used by
- * the classic routes and `/api/v1/shelves/*` alike): a private shelf by its
- * owner only, a public shelf only with the "Edit public shelves" role. Owning a
- * public shelf is not enough: an admin can take the role away after the shelf
- * was made public, and the server then refuses its owner too.
+ * Mirrors cps/shelf.py::check_shelf_edit_permissions: signed-in owners retain
+ * control of private and public shelves. The "Edit public shelves" role grants
+ * changes to another reader's public shelf. Guests cannot edit shelves.
  */
 export function canEditShelf(
   me: Me | undefined | null,
   shelf: Pick<Shelf, 'is_public' | 'is_owner'>,
 ): boolean {
-  return shelf.is_public ? !!me?.role?.edit_shelfs : shelf.is_owner;
+  if (!me || me.role?.anonymous) return false;
+  return shelf.is_owner || (shelf.is_public && !!me.role?.edit_shelfs);
 }

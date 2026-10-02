@@ -60,9 +60,11 @@ from .tasks.ops import TaskConvertLibraryRun, TaskEpubFixerRun
 
 switch_theme = Blueprint('switch_theme', __name__)
 library_refresh = Blueprint('library_refresh', __name__)
-def _restart_content_server_when_done(process):
+def _restart_content_server_when_done(process, library_hold):
     process.wait()
-    content_server.start()
+    # A failed wait does not prove the child exited; retain the hold rather
+    # than let the content server reopen the library while it may be in use.
+    library_hold.release()
 
 
 convert_library = Blueprint('convert_library', __name__)
@@ -2076,16 +2078,20 @@ def convert_library_start(queue):
     # to itself. The server comes back only if it was running, and also when the
     # run cannot be launched at all -- otherwise a failed launch left it stopped
     # until the next save or restart (#2210 review).
-    server_paused = content_server.pause()
+    library_hold = content_server.hold_library()
     try:
         cl_process = subprocess.Popen(['python3', os.path.join(constants.SCRIPTS_DIR, 'convert_library.py')])
     except Exception:
-        if server_paused:
-            content_server.start()
+        library_hold.release()
         raise
-    if server_paused:
-        Thread(target=_restart_content_server_when_done, args=(cl_process,), daemon=True).start()
     queue.put(cl_process)
+    try:
+        Thread(target=_restart_content_server_when_done, args=(cl_process, library_hold), daemon=True).start()
+    except RuntimeError:
+        # This function already runs in a native conversion worker. Keep the
+        # child cancellable and wait here if a separate waiter cannot start.
+        log.warning("Cannot start conversion waiter; waiting in the conversion worker")
+        _restart_content_server_when_done(cl_process, library_hold)
 
 def get_tmp_conversion_dir() -> str:
     return f"{constants.tmp_conversion_dir()}/"

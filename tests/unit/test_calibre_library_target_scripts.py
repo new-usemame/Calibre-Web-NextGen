@@ -55,6 +55,7 @@ def target_module(monkeypatch, tmp_path):
     monkeypatch.setattr(module, "app_db_path", lambda: str(app_db))
     monkeypatch.setattr(module, "config_dir", lambda: str(tmp_path))
     monkeypatch.setattr(module, "_is_answering", lambda host, port: True)
+    module.real_decrypt = module._decrypt
     monkeypatch.setattr(module, "_decrypt", lambda token: PASSWORD if token else "")
     module.app_db = app_db
     return module
@@ -175,3 +176,19 @@ def test_an_out_of_range_env_port_is_ignored(target_module, monkeypatch, env_por
     monkeypatch.setenv("CALIBRE_SERVER_PORT", env_port)
 
     assert target_module.library_target(LIBRARY).args[1] == "http://127.0.0.1:7777/#calibre-library"
+
+
+def test_custom_app_database_uses_the_key_beside_that_database(target_module, monkeypatch, tmp_path):
+    """Out-of-process ingest must decrypt the same custom app.db as the Flask config."""
+    from cryptography.fernet import Fernet
+    app_directory = tmp_path / 'custom-app-database'
+    app_directory.mkdir()
+    target_module.app_db = app_directory / 'app.db'
+    monkeypatch.setattr(target_module, 'app_db_path', lambda: str(target_module.app_db))
+    key = Fernet.generate_key()
+    (app_directory / '.key').write_bytes(key)
+    _make_app_db(target_module.app_db, password_e=Fernet(key).encrypt(PASSWORD.encode()).decode())
+    monkeypatch.setattr(target_module, '_decrypt', target_module.real_decrypt)
+    target = target_module.library_target(LIBRARY)
+    assert target.args[1] == 'http://127.0.0.1:7777/#calibre-library'
+    assert target.stdin == PASSWORD + '\n'

@@ -24,15 +24,18 @@ import subprocess
 import sys
 import threading
 import time
-from collections import deque, namedtuple
+from collections import deque
 
 from . import config, constants, logger
+from scripts.calibre_library_target import LibraryTarget, connect_host, library_id, server_target
 
 log = logger.create()
 
 _process = None
 _lock = threading.RLock()
 _stopped_on_purpose = False
+_library_holds = 0
+_restart_on_release = False
 
 PROBE_TIMEOUT = 0.5
 WATCH_INTERVAL = 5
@@ -51,7 +54,6 @@ _recent_output = deque(maxlen=20)
 # ``args`` extend a calibredb command line; ``stdin`` is the payload that
 # command must be fed, or None. They are produced together because the password
 # is passed as ``--password <stdin>`` and means nothing without the payload.
-LibraryTarget = namedtuple("LibraryTarget", "args stdin")
 
 NO_TARGET = LibraryTarget([], None)
 
@@ -68,6 +70,8 @@ SETTING_DEFAULTS = {
     "config_calibre_server_password_e": "",
     "config_calibre_dir": "",
     "config_binariesdir": "",
+    "config_calibre_split": False,
+    "config_calibre_split_dir": "",
 }
 
 
@@ -106,38 +110,10 @@ def settings_problem(port, username, new_password, app_port):
     return None
 
 
-def library_id(library_dir):
-    """The id calibre-server gives a library: its folder name, spaces as ``_``.
 
-    calibre's ``srv.library_broker.library_id_from_path`` rule. The folder name
-    alone is not it: ``#Calibre Library`` (calibre's own default name) matches
-    no library on the server, so every routed calibredb call found nothing.
-    Kept in step with ``scripts/calibre_library_target.py``, which cannot import
-    this module; ``test_both_copies_derive_the_same_library_id`` pins the pair.
-    """
-    return os.path.basename(str(library_dir).rstrip("/")).replace(" ", "_")
-
-
-def connect_host(listen):
-    """Where this host reaches a server listening on ``listen``.
-
-    A wildcard is reached over loopback; a specific address only on itself --
-    calibre-server bound to a LAN address does not answer on 127.0.0.1, and a
-    loopback-only probe then routed every calibredb call to the library path
-    while the server still held it (#2210 review). ``listen`` is validated as
-    an IP address at save; anything else here falls back to loopback, so the
-    address can only ever be one of this host's own. Kept in step with
-    ``scripts/calibre_library_target.py``; a test pins the pair.
-    """
-    listen = (listen or "").strip()
-    if listen in ("", "0.0.0.0"):
-        return "127.0.0.1"
-    if listen == "::":
-        return "::1"
-    try:
-        return str(ipaddress.ip_address(listen))
-    except ValueError:
-        return "127.0.0.1"
+def configuration_identity():
+    """Settings that require a managed process reconciliation after a save."""
+    return tuple(setting(name) for name in SETTING_DEFAULTS)
 
 
 def _url_host(host):
@@ -176,19 +152,15 @@ def library_target():
     It is what keeps ingest and metadata embedding working while Convert Library
     has the server stopped, and after the server has died.
     """
-    if not setting("config_calibre_server_enabled") or not setting("config_calibre_dir"):
-        return NO_TARGET
-    if not is_answering():
-        log.warning("Calibre content server is enabled but not answering on port %s, "
-                    "addressing the library by path instead", setting("config_calibre_server_port"))
-        return NO_TARGET
-    args = ["--with-library", library_url()]
-    if _auth_enabled():
-        # calibredb reads the password from stdin for the literal value
-        # "<stdin>", which keeps it out of the process table.
-        args += ["--username", setting("config_calibre_server_username"), "--password", "<stdin>"]
-        return LibraryTarget(args, setting("config_calibre_server_password_e") + "\n")
-    return LibraryTarget(args, None)
+    return server_target(
+        setting("config_calibre_dir"), setting("config_calibre_server_enabled"),
+        setting("config_calibre_server_port"), setting("config_calibre_server_listen"),
+        setting("config_calibre_server_anonymous_writes"),
+        setting("config_calibre_server_username"), setting("config_calibre_server_password_e"),
+        lambda _host, _port: is_answering(),
+        lambda reason: log.warning("Calibre content server is enabled but %s, "
+                                   "addressing the library by path instead", reason),
+    )
 
 
 def library_arguments():
@@ -208,7 +180,7 @@ def _db_mtime(db_path):
     return mtime
 
 
-def _watch(process, db_path):
+def _watch(process, db_path, last=None):
     """Keep the running content server honest about the library.
 
     Two things happen behind its back. calibre-server keeps the library in
@@ -219,7 +191,6 @@ def _watch(process, db_path):
     process can also die, in which case it is started again rather than left
     down with the setting still switched on.
     """
-    last = None
     changed = None
     while True:
         time.sleep(WATCH_INTERVAL)
@@ -351,11 +322,32 @@ def server_arguments():
     return args
 
 
+
+def _run_lifecycle(callback):
+    """Wait for process work without blocking the production request hub.
+
+    Watchers and task threads already run outside the request hub. HTTP/startup
+    calls use gevent's existing native worker pool, whose wait yields to other
+    requests while the same lifecycle lock serializes process transitions.
+    """
+    if threading.current_thread() is not threading.main_thread():
+        return callback()
+    try:
+        from gevent import get_hub
+    except ImportError:  # minimal/CLI installations without a gevent server
+        return callback()
+    return get_hub().threadpool.apply(callback)
+
+
 def start():
     """Start (or restart) on request: a save, startup, the end of a pause.
 
     A deliberate start clears the give-up count, so saving corrected settings
     is always another attempt."""
+    return _run_lifecycle(_start_blocking)
+
+
+def _start_blocking():
     global _quick_exits
     with _lock:
         _quick_exits = 0
@@ -363,9 +355,16 @@ def start():
 
 
 def _locked_start():
-    global _process, _stopped_on_purpose, _started_at
+    global _process, _stopped_on_purpose, _started_at, _restart_on_release
+    if _library_holds:
+        _restart_on_release = bool(setting("config_calibre_server_enabled"))
+        return
     _locked_stop()
     if not setting("config_calibre_server_enabled") or not setting("config_calibre_dir"):
+        return
+    if setting("config_calibre_split"):
+        log.error("Calibre content server not started: split library mode is unsupported. "
+                  "Disable split library mode before enabling the content server.")
         return
     if not os.path.isfile(server_binary()):
         log.error("calibre-server binary not found: %s", server_binary())
@@ -386,6 +385,8 @@ def _locked_start():
                           setting("config_calibre_server_password_e")):
         return
     _stopped_on_purpose = False
+    db_path = os.path.join(setting("config_calibre_dir"), "metadata.db")
+    initial_mtime = _db_mtime(db_path)
     try:
         _process = subprocess.Popen(server_arguments(), stdout=subprocess.PIPE,
                                     stderr=subprocess.STDOUT, text=True)
@@ -397,27 +398,66 @@ def _locked_start():
     threading.Thread(target=_drain_output, args=(_process.stdout,), daemon=True).start()
     log.info("Calibre content server started on port %s", setting("config_calibre_server_port"))
     threading.Thread(target=_watch,
-                     args=(_process, os.path.join(setting("config_calibre_dir"), "metadata.db")),
+                     args=(_process, db_path, initial_mtime),
                      daemon=True).start()
 
 
 def stop():
+    return _run_lifecycle(_stop_blocking)
+
+
+def _stop_blocking():
     with _lock:
         _locked_stop()
 
 
-def pause():
-    """Stop the server so calibredb can open the library path directly.
 
-    For work calibredb cannot do through a server (``restore_database``,
-    ``check_library``). Returns whether a server was running, so the caller
-    restarts it only in that case -- from a ``finally``, so a failed run does
-    not leave it stopped for good.
+class _LibraryHold:
+    """One owned hold on the library; releasing twice cannot resume it early."""
+    def __init__(self):
+        self.released = False
+
+    def release(self):
+        return _run_lifecycle(self._release_blocking)
+
+    def _release_blocking(self):
+        global _library_holds, _restart_on_release
+        with _lock:
+            if self.released:
+                return
+            self.released = True
+            _library_holds -= 1
+            if not _library_holds:
+                restart = _restart_on_release
+                _restart_on_release = False
+                if restart and setting("config_calibre_server_enabled"):
+                    _locked_start()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_exception):
+        self.release()
+
+
+def hold_library():
+    """Stop the server until every conversion/restore owner releases its hold.
+
+    A hold also protects a currently disabled or stopped server. Enabling or
+    saving settings during that operation defers startup until the last hold
+    is released, rather than taking the database lock back mid-conversion.
     """
+    return _run_lifecycle(_hold_library_blocking)
+
+
+def _hold_library_blocking():
+    global _library_holds, _restart_on_release
     with _lock:
-        was_running = _process is not None and _process.poll() is None
-        _locked_stop()
-    return was_running
+        if not _library_holds:
+            _restart_on_release = _process is not None and _process.poll() is None
+            _locked_stop()
+        _library_holds += 1
+        return _LibraryHold()
 
 
 def _locked_stop():
@@ -429,5 +469,9 @@ def _locked_stop():
             _process.wait(10)
         except subprocess.TimeoutExpired:
             _process.kill()
+            # A kill request does not establish that the database owner has
+            # exited. If reap fails, keep the process reference and propagate
+            # the failure instead of handing the library to another writer.
+            _process.wait(10)
         log.info("Calibre content server stopped")
     _process = None

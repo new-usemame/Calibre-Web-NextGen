@@ -17120,3 +17120,104 @@ msgstr "Mostrar secção de lidos/não lidos"
 #~ msgstr ""
 #~ "Os livros devem primeiro ser arquivados e o dispositivo deve ser "
 #~ "sincronizado antes que um livro possa ser apagado com segurança."
+
+#: cps/admin.py:2993
+msgid "Disable the Calibre content server before enabling split library mode."
+msgstr ""
+
+#: cps/admin.py:3071
+msgid ""
+"Please enter a content server username and password, or allow anonymous "
+"writes"
+msgstr ""
+
+#: cps/admin.py:3077
+msgid "Content server port must be a number from 1 to 65535"
+msgstr ""
+
+#: cps/admin.py:3078
+msgid "Content server port must differ from the port this server listens on"
+msgstr ""
+
+#: cps/admin.py:3079
+msgid ""
+"Content server username may only use the letters A-Z, numbers, spaces, "
+"underscores and hyphens"
+msgstr ""
+
+#: cps/admin.py:3081
+msgid "Content server password must use only ASCII (English) characters"
+msgstr ""
+
+#: cps/admin.py:3088
+#, python-format
+msgid "Invalid content server listen address: %(address)s"
+msgstr ""
+
+#: cps/admin.py:3098
+#, python-format
+msgid "Invalid content server trusted IP/CIDR entry: %(entry)s"
+msgstr ""
+
+#: cps/admin.py:3110
+msgid "Disable split library mode before enabling the Calibre content server."
+msgstr ""
+
+#: cps/templates/config_edit.html:306
+msgid "Enable Calibre Content Server"
+msgstr ""
+
+#: cps/templates/config_edit.html:310
+msgid "Content Server Port"
+msgstr ""
+
+#: cps/templates/config_edit.html:314
+msgid "Content Server Listen Address"
+msgstr ""
+
+#: cps/templates/config_edit.html:316
+msgid ""
+"127.0.0.1 keeps the content server reachable only from this machine. Enter "
+"0.0.0.0 to expose it on the network, which is required to reach it from "
+"another container or host."
+msgstr ""
+
+#: cps/templates/config_edit.html:320
+msgid "Allow Anonymous Writes (no username or password required)"
+msgstr ""
+
+#: cps/templates/config_edit.html:321
+msgid ""
+"Without a username and password, anyone who can reach the listen address can"
+" read the whole library. Behind Docker port mapping or a reverse proxy on "
+"this machine, every client appears to come from the same address, so "
+"allowing that address lets everyone write."
+msgstr ""
+
+#: cps/templates/config_edit.html:325
+msgid ""
+"Addresses Allowed to Write Without a Password (Comma Separated IPs/CIDRs)"
+msgstr ""
+
+#: cps/templates/config_edit.html:327
+msgid ""
+"Leave empty to allow unauthenticated writes only from this machine. Every "
+"address listed here can add, edit and delete books in the library without "
+"any credentials, so keep it as narrow as possible."
+msgstr ""
+
+#: cps/templates/config_edit.html:332
+msgid "Content Server Username"
+msgstr ""
+
+#: cps/templates/config_edit.html:336
+msgid "Content Server Password"
+msgstr ""
+
+#: cps/templates/config_edit.html:340
+msgid "Reset Password"
+msgstr ""
+
+#: cps/templates/config_edit.html:341
+msgid "The content server stays stopped until a new password is saved."
+msgstr ""

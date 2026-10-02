@@ -292,8 +292,11 @@ def _spawns(module, monkeypatch, tmp_path):
     binary.write_text("")
     monkeypatch.setattr(module, "server_binary", lambda: str(binary))
     monkeypatch.setattr(module, "write_userdb", lambda *a, **k: True)
-    monkeypatch.setattr(module.threading, "Thread",
-                        lambda *a, **k: types.SimpleNamespace(start=lambda: None))
+    monkeypatch.setattr(module, "threading", types.SimpleNamespace(
+        Thread=lambda *a, **k: types.SimpleNamespace(start=lambda: None),
+        current_thread=module.threading.current_thread,
+        main_thread=module.threading.main_thread,
+    ))
     launched = []
 
     class _Popen:
@@ -409,9 +412,13 @@ def test_pause_reports_a_running_server_and_stops_it(content_server, monkeypatch
     content_server.start()
     assert len(launched) == 1
 
-    assert content_server.pause() is True
+    first = content_server.hold_library()
     assert content_server._process is None
-    assert content_server.pause() is False
+    second = content_server.hold_library()
+    first.release()
+    assert len(launched) == 1
+    second.release()
+    assert len(launched) == 2
 
 
 def test_a_server_that_keeps_dying_on_startup_is_left_down_with_its_reason(
@@ -483,3 +490,126 @@ class _Closing:
 
     def __exit__(self, *_exc):
         return False
+
+
+@pytest.mark.parametrize('operation', ['start', 'stop', 'hold_library'])
+def test_lifecycle_start_yields_to_other_web_requests(content_server, monkeypatch, operation):
+    """A slow native process start must not park the production gevent request hub."""
+    import time
+    import gevent
+    ticks = []
+    monkeypatch.setattr(content_server, '_locked_start' if operation == 'start' else '_locked_stop',
+                        lambda: time.sleep(0.12))
+    def other_request():
+        for number in range(3):
+            gevent.sleep(0.01)
+            ticks.append(number)
+    peer = gevent.spawn(other_request)
+    getattr(content_server, operation)()
+    observed = list(ticks)
+    peer.join()
+    assert observed == [0, 1, 2], 'unrelated requests stalled behind content-server startup'
+
+
+def test_settings_start_cannot_reopen_library_while_conversion_has_it(content_server, monkeypatch, tmp_path):
+    """A settings save during Convert Library must not reacquire Calibre's exclusive lock."""
+    launched = _spawns(content_server, monkeypatch, tmp_path)
+    content_server.start()
+    hold = content_server.hold_library()
+    content_server.start()
+    assert len(launched) == 1, 'a settings save reopened the library during conversion'
+
+    hold.release()
+    assert len(launched) == 2
+    hold.release()
+    assert len(launched) == 2, 'a repeated release restarted the server twice'
+
+
+def test_enable_during_disabled_library_hold_waits_for_release(content_server, monkeypatch, tmp_path):
+    launched = _spawns(content_server, monkeypatch, tmp_path)
+    content_server.config.config_calibre_server_enabled = False
+    with content_server.hold_library():
+        content_server.config.config_calibre_server_enabled = True
+        content_server.start()
+        assert launched == []
+    assert len(launched) == 1
+
+
+def test_disable_during_library_hold_stays_disabled_on_release(content_server, monkeypatch, tmp_path):
+    launched = _spawns(content_server, monkeypatch, tmp_path)
+    content_server.start()
+    with content_server.hold_library():
+        content_server.config.config_calibre_server_enabled = False
+        content_server.stop()
+    assert len(launched) == 1
+    assert content_server._process is None
+
+
+def test_split_library_cannot_start_a_server_on_the_metadata_only_directory(content_server, monkeypatch, tmp_path):
+    """Calibre's broker requires library-local metadata.db despite the split override."""
+    launched = _spawns(content_server, monkeypatch, tmp_path)
+    content_server.config.config_calibre_split = True
+    content_server.config.config_calibre_split_dir = '/separate-book-files'
+    content_server.start()
+    assert launched == []
+    assert any('split' in message.lower() for message in content_server.log_records)
+
+
+def test_authenticated_target_without_credentials_never_sends_anonymous_server_call(content_server, monkeypatch):
+    """A changed/cleared credential must not silently turn routing into an anonymous call."""
+    content_server.config.config_calibre_server_password_e = ''
+    _answering(content_server, monkeypatch)
+    assert content_server.library_target().args == []
+
+
+def test_external_write_before_first_watch_poll_still_reloads(content_server, monkeypatch, tmp_path):
+    """The initial five-second sleep must not absorb an edit made after cache loading."""
+    launched = _spawns(content_server, monkeypatch, tmp_path)
+    callbacks = []
+    content_server.threading.Thread = lambda target, args=(), **kwargs: types.SimpleNamespace(
+        start=lambda: callbacks.append((target, args)))
+    stamp = {'value': 10}
+    clock = {'value': 0}
+    def sleep(seconds):
+        clock['value'] += seconds
+        if clock['value'] > 40:
+            content_server._process = None
+    monkeypatch.setattr(content_server, 'time', types.SimpleNamespace(
+        monotonic=lambda: clock['value'], time=lambda: clock['value'], sleep=sleep))
+    monkeypatch.setattr(content_server, '_db_mtime', lambda _path: stamp['value'])
+    content_server.start()
+    watcher, args = callbacks[-1]
+    stamp['value'] = 20  # an external write after start, before the watcher wakes
+    watcher(*args)
+    assert len(launched) == 2, 'the first polling delay accepted stale cache as its baseline'
+    assert any('database changed' in message for message in content_server.log_records)
+
+
+@pytest.mark.parametrize('reap_fails', [False, True])
+def test_forced_stop_must_reap_before_handing_library_to_another_owner(content_server, reap_fails):
+    """SIGKILL is a request: the old child still owns the library until wait confirms exit."""
+    calls = []
+    class Process:
+        def poll(self):
+            return None
+        def terminate(self):
+            calls.append('terminate')
+        def kill(self):
+            calls.append('kill')
+        def wait(self, timeout):
+            calls.append(('wait', timeout))
+            if len([x for x in calls if isinstance(x, tuple)]) == 1 or reap_fails:
+                raise content_server.subprocess.TimeoutExpired('calibre-server', timeout)
+            return -9
+    process = Process()
+    content_server._process = process
+    if reap_fails:
+        with pytest.raises(content_server.subprocess.TimeoutExpired):
+            content_server.hold_library()
+        assert content_server._process is process
+        assert content_server._library_holds == 0
+    else:
+        hold = content_server.hold_library()
+        assert calls == ['terminate', ('wait', 10), 'kill', ('wait', 10)]
+        assert content_server._process is None
+        hold.release()

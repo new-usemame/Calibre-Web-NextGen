@@ -24,6 +24,7 @@ def test_windows_calibre_arguments_keep_username_spaces_quotes_and_empty_values(
             '--password', '<stdin>', '--to-dir', r'C:\Temp\Book export',
             '--template', 'title "quoted"', '']
     original = list(args)
+    password_pipe = spawn.return_value.stdin
     wrapper.process_open(args, quotes=[5], stdin_payload='owned-test-password\n')
     expected = ('"C:\\Program Files\\Calibre\\calibredb.exe" export --with-library '
                 'http://127.0.0.1:7777/#Calibre_Library --username "Library Reader" '
@@ -32,4 +33,4 @@ def test_windows_calibre_arguments_keep_username_spaces_quotes_and_empty_values(
     assert spawn.call_args.args[0] == expected
     assert args == original
     assert spawn.call_args.kwargs['shell'] is False
-    assert spawn.return_value.stdin.write.call_args.args[0] == 'owned-test-password\n'
+    assert password_pipe.write.call_args.args[0] == 'owned-test-password\n'

@@ -63,6 +63,7 @@ Format: each row is one fork-PR, mapped to its upstream PR or issue (if any), wi
 
 | Fork PR | Upstream | Description | SHA | Release |
 |---|---|---|---|---|
+| Pending adoption | [#2210](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2210) | Optional managed Calibre content server, based on @benjitobz’s contribution; authenticated shared routing, cooperative lifecycle and owned conversion/restore holds; split-library mode refused pending complete support. | TBD | Pending |
 | [#2395](https://github.com/new-usemame/Calibre-Web-NextGen/pull/2395) | — | **Find books searches shared catalogs together.** Four-source batches, distinct editions/source groups, isolated retry and browse-only states, source-bound requests and pagination, query/withdrawal cancellation. Existing permissions and receipts apply. | TBD | Unreleased |
 | Pending (#1734) | — | Matching ordinary/smart shelf overview, create and settings flows; separate default-on own-sharing permission; owner-only device marks; per-user OPDS and hidden-shelf restoration. | TBD | Unreleased |
 | pending (#2242) | — | **Book detail pages can hide the original imported filename per account.** The setting defaults on, is stored in `User.view_settings`, and affects classic and New UI detail presentation only; the data remains available to metadata-edit screens. | pending | Unreleased |

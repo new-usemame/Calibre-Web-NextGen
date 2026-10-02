@@ -5,9 +5,8 @@
 
 """How the out-of-process scripts should address the Calibre library.
 
-The app-side equivalent is ``cps.content_server.library_target``; this is the
-same decision taken from app.db, for the ingest and enforcement scripts that do
-not import the Flask app.
+The app and standalone scripts share ``server_target``. The scripts load the
+same settings from app.db without importing Flask.
 """
 
 import ipaddress
@@ -36,9 +35,8 @@ LibraryTarget = namedtuple("LibraryTarget", "args stdin")
 def library_id(library_dir):
     """calibre-server's id for a library: folder name, spaces as ``_``.
 
-    Same rule as ``cps.content_server.library_id`` (calibre's
-    ``library_id_from_path``); this script runs outside the app and cannot
-    import it, so a test pins the two copies together.
+    Mirrors Calibre's ``library_id_from_path``; both app and scripts use
+    this implementation.
     """
     return os.path.basename(str(library_dir).rstrip("/")).replace(" ", "_")
 
@@ -93,7 +91,7 @@ def _decrypt(token):
     except ImportError:
         return ""
     try:
-        with open(os.path.join(config_dir(), ".key"), "rb") as handle:
+        with open(os.path.join(os.path.dirname(app_db_path()), ".key"), "rb") as handle:
             key = handle.read()
         return Fernet(key).decrypt(token).decode()
     except (OSError, ValueError, InvalidToken):
@@ -101,8 +99,7 @@ def _decrypt(token):
 
 
 def connect_host(listen):
-    """Where this host reaches the server; same rule as
-    ``cps.content_server.connect_host``, which this script cannot import."""
+    """Where this host reaches the server; shared by app and scripts."""
     listen = (listen or "").strip()
     if listen in ("", "0.0.0.0"):
         return "127.0.0.1"
@@ -120,6 +117,32 @@ def _is_answering(host, port):
             return True
     except (OSError, ValueError):
         return False
+
+
+
+def server_target(library_dir, enabled, port, listen, anonymous_writes, username, password,
+                  is_answering, announce_fallback):
+    """Shared app/script routing policy; an empty target means use the local path.
+
+    Only the explicit anonymous choice can omit credentials. This policy is
+    separate from loading Flask config or encrypted app.db values so both
+    consumers use the same decision and argument boundaries.
+    """
+    if not enabled or not library_dir:
+        return LibraryTarget([], None)
+    if not anonymous_writes and not (username and password):
+        announce_fallback("no content server credentials are configured")
+        return LibraryTarget([], None)
+    host = connect_host(listen)
+    if not is_answering(host, port):
+        announce_fallback("it is not answering on {} port {}".format(host, port))
+        return LibraryTarget([], None)
+    url_host = "[{}]".format(host) if ":" in host else host
+    args = ["--with-library", "http://{}:{}/#{}".format(url_host, port, library_id(library_dir))]
+    if anonymous_writes:
+        return LibraryTarget(args, None)
+    args += ["--username", username, "--password", "<stdin>"]
+    return LibraryTarget(args, password + "\n")
 
 
 def library_target(library_dir):
@@ -140,21 +163,9 @@ def library_target(library_dir):
         return _path_target(library_dir)
     _enabled, port, anonymous_writes, username, password_e, listen = row
     port, username, password = _apply_env(port, username, _decrypt(password_e))
-    host = connect_host(listen)
-    if not _is_answering(host, port):
-        _announce_fallback("it is not answering on {} port {}".format(host, port))
-        return _path_target(library_dir)
-    url_host = "[{}]".format(host) if ":" in host else host
-    args = ["--with-library", "http://{}:{}/#{}".format(url_host, port, library_id(library_dir))]
-    if anonymous_writes:
-        return LibraryTarget(args, None)
-    if not (username and password):
-        _announce_fallback("no content server credentials are configured")
-        return _path_target(library_dir)
-    # calibredb reads the password from stdin for the literal value "<stdin>",
-    # which keeps it out of the process table.
-    args += ["--username", username, "--password", "<stdin>"]
-    return LibraryTarget(args, password + "\n")
+    target = server_target(library_dir, _enabled, port, listen, anonymous_writes, username, password,
+                           _is_answering, _announce_fallback)
+    return target if target.args else _path_target(library_dir)
 
 
 def library_arguments(library_dir):

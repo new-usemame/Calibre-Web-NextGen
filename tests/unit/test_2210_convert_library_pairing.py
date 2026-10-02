@@ -21,9 +21,21 @@ class _Server:
         self.running = running
         self.starts = 0
 
-    def pause(self):
+    def hold_library(self):
         was, self.running = self.running, False
-        return was
+        server = self
+
+        class Hold:
+            released = False
+
+            def release(self):
+                if not self.released:
+                    self.released = True
+                    if was:
+                        server.start()
+
+        self.hold = Hold()
+        return self.hold
 
     def start(self):
         self.starts += 1
@@ -69,7 +81,7 @@ def test_a_launched_run_restarts_the_server_only_after_it_ends(server, monkeypat
     cwa_functions.convert_library_start(queue.Queue())
 
     assert not fake.running and fake.starts == 0
-    assert started == [(cwa_functions._restart_content_server_when_done, ("run",))]
+    assert started == [(cwa_functions._restart_content_server_when_done, ("run", fake.hold))]
 
 
 def test_a_server_that_was_not_running_is_not_started_by_a_run(server, monkeypatch):
@@ -79,4 +91,39 @@ def test_a_server_that_was_not_running_is_not_started_by_a_run(server, monkeypat
 
     cwa_functions.convert_library_start(queue.Queue())
 
-    assert fake.starts == 0 and started == []
+    assert fake.starts == 0
+    assert started == [(cwa_functions._restart_content_server_when_done, ("run", fake.hold))]
+
+
+def test_completion_failure_keeps_library_held_until_exit_is_confirmed(server):
+    fake = server(running=True)
+    hold = fake.hold_library()
+
+    class Process:
+        def wait(self):
+            raise OSError("could not reap")
+
+    with pytest.raises(OSError, match="could not reap"):
+        cwa_functions._restart_content_server_when_done(Process(), hold)
+    assert not fake.running and fake.starts == 0
+    assert not hold.released
+
+
+def test_reaper_thread_failure_keeps_conversion_cancellable_and_waits_before_release(server, monkeypatch):
+    fake = server(running=True)
+    process_queue = queue.Queue()
+    observed = []
+    class Process:
+        def wait(self):
+            observed.append((fake.running, process_queue.get_nowait() is self))
+    process = Process()
+    monkeypatch.setattr(cwa_functions.subprocess, 'Popen', lambda *a, **kw: process)
+    class Thread:
+        def __init__(self, **kw):
+            pass
+        def start(self):
+            raise RuntimeError("can't start new thread")
+    monkeypatch.setattr(cwa_functions, 'Thread', Thread)
+    cwa_functions.convert_library_start(process_queue)
+    assert observed == [(False, True)]
+    assert fake.running and fake.starts == 1

@@ -2988,6 +2988,9 @@ def _db_configuration_update_helper():
     db_change = False
     to_save = request.form.to_dict()
     gdrive_error = None
+    server_before = content_server.configuration_identity()
+    if to_save.get("config_calibre_split") == "on" and content_server.setting("config_calibre_server_enabled"):
+        return _db_configuration_result(_("Disable the Calibre content server before enabling split library mode."), gdrive_error)
 
     incoming = to_save.get('config_calibre_dir')
     if incoming is None:
@@ -3053,13 +3056,61 @@ def _db_configuration_update_helper():
             flash(_("DB is not Writeable"), category="warning")
     calibre_db.update_config(config)
     config.save()
+    if content_server.configuration_identity() != server_before:
+        content_server.start()
     return _db_configuration_result(None, gdrive_error)
+
+
+def _content_server_settings_error(to_save):
+    """Validate the submitted server draft before any shared settings change."""
+    server_username = to_save.get("config_calibre_server_username", content_server.setting("config_calibre_server_username"))
+    server_password = to_save.get("config_calibre_server_password_e") or content_server.setting("config_calibre_server_password_e")
+    if (to_save.get("config_calibre_server_enabled") == "on"
+            and to_save.get("config_calibre_server_anonymous_writes") != "on"
+            and not (server_username and server_password)):
+        return (_('Please enter a content server username and password, or allow anonymous writes'))
+    problem = content_server.settings_problem(
+        to_save.get("config_calibre_server_port", content_server.setting("config_calibre_server_port")),
+        server_username, to_save.get("config_calibre_server_password_e"), getattr(config, "config_port", None))
+    if problem:
+        return ({
+            "port": _('Content server port must be a number from 1 to 65535'),
+            "port-in-use": _('Content server port must differ from the port this server listens on'),
+            "username": _('Content server username may only use the letters A-Z, numbers, spaces, '
+                          'underscores and hyphens'),
+            "password": _('Content server password must use only ASCII (English) characters'),
+        }[problem])
+    listen_address = strip_whitespaces(to_save.get("config_calibre_server_listen", ""))
+    if listen_address:
+        try:
+            ipaddress.ip_address(listen_address)
+        except ValueError:
+            return (_('Invalid content server listen address: %(address)s',
+                                           address=listen_address))
+    trusted_ips = []
+    for entry in to_save.get("config_calibre_server_trusted_ips", "").split(","):
+        entry = strip_whitespaces(entry)
+        if not entry:
+            continue
+        try:
+            ipaddress.ip_network(entry, strict=False)
+        except ValueError:
+            return (_('Invalid content server trusted IP/CIDR entry: %(entry)s', entry=entry))
+        trusted_ips.append(entry)
+    to_save["config_calibre_server_trusted_ips"] = ",".join(trusted_ips)
+    return None
 
 
 def _configuration_update_helper():
     reboot_required = False
     content_server_changed = False
     to_save = request.form.to_dict()
+    server_before = content_server.configuration_identity()
+    if to_save.get("config_calibre_server_enabled") == "on" and content_server.setting("config_calibre_split"):
+        return _configuration_result(_("Disable split library mode before enabling the Calibre content server."))
+    server_error = _content_server_settings_error(to_save)
+    if server_error:
+        return _configuration_result(server_error)
     prev_hardcover_sync = config.hardcover_sync_enabled()
     prev_kobo_prefer_kepub = bool(config.config_kobo_prefer_kepub)
     queue_kepub_backfill = False
@@ -3256,49 +3307,14 @@ def _configuration_update_helper():
         reboot_required |= _config_string(to_save, "config_limiter_uri")
         reboot_required |= _config_string(to_save, "config_limiter_options")
 
-        # Calibre content server configuration
-        server_username = to_save.get("config_calibre_server_username", content_server.setting("config_calibre_server_username"))
-        server_password = to_save.get("config_calibre_server_password_e") or content_server.setting("config_calibre_server_password_e")
-        if (to_save.get("config_calibre_server_enabled") == "on"
-                and to_save.get("config_calibre_server_anonymous_writes") != "on"
-                and not (server_username and server_password)):
-            return _configuration_result(_('Please enter a content server username and password, or allow anonymous writes'))
-        problem = content_server.settings_problem(
-            to_save.get("config_calibre_server_port", content_server.setting("config_calibre_server_port")),
-            server_username, to_save.get("config_calibre_server_password_e"), getattr(config, "config_port", None))
-        if problem:
-            return _configuration_result({
-                "port": _('Content server port must be a number from 1 to 65535'),
-                "port-in-use": _('Content server port must differ from the port this server listens on'),
-                "username": _('Content server username may only use the letters A-Z, numbers, spaces, '
-                              'underscores and hyphens'),
-                "password": _('Content server password must use only ASCII (English) characters'),
-            }[problem])
-        listen_address = strip_whitespaces(to_save.get("config_calibre_server_listen", ""))
-        if listen_address:
-            try:
-                ipaddress.ip_address(listen_address)
-            except ValueError:
-                return _configuration_result(_('Invalid content server listen address: %(address)s',
-                                               address=listen_address))
-        trusted_ips = []
-        for entry in to_save.get("config_calibre_server_trusted_ips", "").split(","):
-            entry = strip_whitespaces(entry)
-            if not entry:
-                continue
-            try:
-                ipaddress.ip_network(entry, strict=False)
-            except ValueError:
-                return _configuration_result(_('Invalid content server trusted IP/CIDR entry: %(entry)s', entry=entry))
-            trusted_ips.append(entry)
-        to_save["config_calibre_server_trusted_ips"] = ",".join(trusted_ips)
+        # Calibre content server configuration (validated before mutation)
         content_server_changed |= _config_checkbox(to_save, "config_calibre_server_enabled")
         content_server_changed |= _config_int(to_save, "config_calibre_server_port")
         content_server_changed |= _config_string(to_save, "config_calibre_server_listen")
         content_server_changed |= _config_checkbox(to_save, "config_calibre_server_anonymous_writes")
         content_server_changed |= _config_string(to_save, "config_calibre_server_trusted_ips")
         content_server_changed |= _config_string(to_save, "config_calibre_server_username")
-        if to_save.get("config_calibre_server_password_e") and not content_server.setting("config_calibre_server_password_e"):
+        if to_save.get("config_calibre_server_password_e"):
             content_server_changed |= _config_string(to_save, "config_calibre_server_password_e")
 
         # Rarfile Content configuration
@@ -3315,7 +3331,7 @@ def _configuration_update_helper():
         _configuration_result(_("Oops! Database Error: %(error)s.", error=e.orig))
 
     config.save()
-    if content_server_changed:
+    if content_server_changed or content_server.configuration_identity() != server_before:
         if content_server.setting("config_calibre_server_enabled"):
             content_server.start()
         else:
@@ -3972,7 +3988,7 @@ def _acquire_restore_service_locks():
 def restore_calibre_db():
     """Restore Calibre metadata.db and clean app.db book-linked tables (last resort recovery)."""
     lock_handles = []
-    content_server_paused = False
+    content_server_hold = None
     try:
         restore_lock = _acquire_restore_lock()
         if restore_lock is None:
@@ -4009,7 +4025,7 @@ def restore_calibre_db():
 
         # calibredb's check_library/restore_database need the library path
         # itself, which a running content server holds open (#2210 review).
-        content_server_paused = content_server.pause()
+        content_server_hold = content_server.hold_library()
 
         # 1. Backup both DBs
         backup_dir = constants.config_path(
@@ -4104,5 +4120,5 @@ def restore_calibre_db():
         return redirect(url_for("admin.db_configuration"))
     finally:
         _release_restore_locks(lock_handles)
-        if content_server_paused:
-            content_server.start()
+        if content_server_hold is not None:
+            content_server_hold.release()

@@ -19187,3 +19187,80 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "Reading status"
+msgstr "État de lecture"
+
+
+#: cps/spa_strings.py
+msgid "Did not finish"
+msgstr "Lecture abandonnée"
+
+
+#: cps/spa_strings.py
+msgid "On hold"
+msgstr "En pause"
+
+
+#: cps/spa_strings.py
+msgid "Update status"
+msgstr "Mettre à jour le statut"
+
+
+#: cps/spa_strings.py
+msgid "Reading status updated"
+msgstr "État de lecture mis à jour"
+
+
+#: cps/spa_strings.py
+msgid "Could not update reading status."
+msgstr "Impossible de mettre à jour l’état de lecture."
+
+
+#: cps/spa_strings.py
+msgid "Could not update reading status. Please try again."
+msgstr "Impossible de mettre à jour l’état de lecture. Veuillez réessayer."
+
+
+#: cps/spa_strings.py
+msgid "Did not finish and On hold keep your reading position."
+msgstr ""
+"Les états « Lecture abandonnée » et « En pause » conservent votre position "
+"de lecture."
+
+
+#: cps/spa_strings.py
+msgid "Show Currently Reading Books"
+msgstr "Afficher les livres en cours de lecture"
+
+
+#: cps/spa_strings.py
+msgid "Show Books You Did Not Finish"
+msgstr "Afficher les lectures abandonnées"
+
+
+#: cps/spa_strings.py
+msgid "Show Books On Hold"
+msgstr "Afficher les livres en pause"
+
+
+
+#: cps/spa_strings.py
+msgid "Invalid reading status"
+msgstr "Statut de lecture invalide"
+
+
+#: cps/spa_strings.py
+msgid "Read status could not be set"
+msgstr "Impossible de définir le statut de lecture"
+
+
+#: cps/spa_strings.py
+msgid "Books you chose not to finish"
+msgstr "Livres dont vous avez abandonné la lecture"
+
+
+#: cps/spa_strings.py
+msgid "Books you have paused for later"
+msgstr "Livres dont vous avez mis la lecture en pause"

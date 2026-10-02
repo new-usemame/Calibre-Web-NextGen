@@ -140,6 +140,8 @@ export interface Me {
   acquisition_access?: boolean;
 }
 
+export type ReadingStatus = 'unread' | 'finished' | 'in_progress' | 'did_not_finish' | 'on_hold';
+
 export interface Book {
   id: number;
   title: string;
@@ -158,6 +160,7 @@ export interface Book {
   read?: boolean;
   /** Caller-owned favorite state, resolved in bulk for every list page. */
   favorited?: boolean | null;
+  read_status?: ReadingStatus;
   /** Sync-driven tri-state marker for library cards; absent on older servers. */
   in_progress?: boolean;
   archived?: boolean;
@@ -273,6 +276,7 @@ export interface BookDetail {
   custom_columns?: CustomColumn[];
   formats: BookFormat[];
   read: boolean;
+  read_status?: ReadingStatus;
   archived: boolean;
   favorited: boolean;
   hidden: boolean;
@@ -361,7 +365,7 @@ export interface AdvancedSearchParams {
   authors?: string;
   publisher?: string;
   comments?: string;
-  read_status?: 'all' | 'read' | 'unread';
+  read_status?: 'all' | 'read' | 'unread' | 'in_progress' | 'did_not_finish' | 'on_hold';
   publishstart?: string;
   publishend?: string;
   rating_high?: string;

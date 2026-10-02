@@ -16702,3 +16702,78 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+#: cps/spa_strings.py
+msgid "Reading status"
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Did not finish"
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "On hold"
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Update status"
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Reading status updated"
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Could not update reading status."
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Could not update reading status. Please try again."
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Did not finish and On hold keep your reading position."
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Show Currently Reading Books"
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Show Books You Did Not Finish"
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Show Books On Hold"
+msgstr ""
+
+
+
+#: cps/spa_strings.py
+msgid "Invalid reading status"
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Read status could not be set"
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Books you chose not to finish"
+msgstr ""
+
+
+#: cps/spa_strings.py
+msgid "Books you have paused for later"
+msgstr ""

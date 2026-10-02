@@ -21,7 +21,9 @@ from ..usermanagement import login_required_if_no_ano
 from ..search import build_adv_search_query
 
 # SPA read-status value -> the term value build_adv_search_query expects.
-_READ_STATUS = {"all": "Any", "read": "True", "unread": "False"}
+_READ_STATUS = {"all": "Any", "read": "True", "unread": "False",
+                "in_progress": "in_progress", "did_not_finish": "did_not_finish",
+                "on_hold": "on_hold"}
 
 
 def _as_str_list(value):

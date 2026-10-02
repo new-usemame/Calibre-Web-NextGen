@@ -18642,3 +18642,78 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py
+msgid "Reading status"
+msgstr "Leesstatus"
+
+
+#: cps/spa_strings.py
+msgid "Did not finish"
+msgstr "Niet uitgelezen"
+
+
+#: cps/spa_strings.py
+msgid "On hold"
+msgstr "Gepauzeerd"
+
+
+#: cps/spa_strings.py
+msgid "Update status"
+msgstr "Status bijwerken"
+
+
+#: cps/spa_strings.py
+msgid "Reading status updated"
+msgstr "Leesstatus bijgewerkt"
+
+
+#: cps/spa_strings.py
+msgid "Could not update reading status."
+msgstr "De leesstatus kon niet worden bijgewerkt."
+
+
+#: cps/spa_strings.py
+msgid "Could not update reading status. Please try again."
+msgstr "De leesstatus kon niet worden bijgewerkt. Probeer het opnieuw."
+
+
+#: cps/spa_strings.py
+msgid "Did not finish and On hold keep your reading position."
+msgstr "Niet uitgelezen en Gepauzeerd behouden je leespositie."
+
+
+#: cps/spa_strings.py
+msgid "Show Currently Reading Books"
+msgstr "Boeken die je leest tonen"
+
+
+#: cps/spa_strings.py
+msgid "Show Books You Did Not Finish"
+msgstr "Niet uitgelezen boeken tonen"
+
+
+#: cps/spa_strings.py
+msgid "Show Books On Hold"
+msgstr "Gepauzeerde boeken tonen"
+
+
+
+#: cps/spa_strings.py
+msgid "Invalid reading status"
+msgstr "Ongeldige leesstatus"
+
+
+#: cps/spa_strings.py
+msgid "Read status could not be set"
+msgstr "Leesstatus kon niet worden ingesteld"
+
+
+#: cps/spa_strings.py
+msgid "Books you chose not to finish"
+msgstr "Boeken die je niet wilde uitlezen"
+
+
+#: cps/spa_strings.py
+msgid "Books you have paused for later"
+msgstr "Boeken die je later wilt verder lezen"

@@ -57,6 +57,9 @@ const READ_FILTERS: { label: string; value: ReadFilter }[] = [
   { label: 'All', value: 'all' },
   { label: 'Unread', value: 'unread' },
   { label: 'Read', value: 'read' },
+  { label: 'Currently reading', value: 'in_progress' },
+  { label: 'Did not finish', value: 'did_not_finish' },
+  { label: 'On hold', value: 'on_hold' },
 ];
 
 // Fork #640 — the plain Library view remembers its sort order and read filter
@@ -1269,7 +1272,7 @@ export function Catalog({ entityKind, entityId, view, defaultFilter }: CatalogPr
             search && !filtered
               ? t('No results for "{q}".', { q: search })
               : readFilter !== 'all'
-                ? t('No {filter} books here.', { filter: readFilter })
+                ? t('No {filter} books here.', { filter: t(READ_FILTERS.find(rf => rf.value === readFilter)!.label) })
                 : view === 'discover' ? t('No unread books in this Discover source.') : t('No books here.')
           }>
           {search && !filtered && personalLibrary && me?.role?.browse_global && (

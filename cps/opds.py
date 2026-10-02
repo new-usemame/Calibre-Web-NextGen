@@ -23,7 +23,7 @@ from .usermanagement import requires_basic_auth_if_no_ano, auth
 from .helper import get_download_link, get_book_cover, hot_books_page
 from .pagination import Pagination
 from .sort_orders import BOOK_SORT_ORDERS
-from .web import render_read_books
+from .web import render_read_books, render_personal_read_status_books
 
 
 opds = Blueprint('opds', __name__)
@@ -141,6 +141,8 @@ OPDS_ROOT_ORDER_DEFAULT = [
     'random',
     'read',
     'currently_reading',
+    'did_not_finish',
+    'on_hold',
     'unread',
     'authors',
     'publishers',
@@ -204,6 +206,18 @@ OPDS_ROOT_ENTRY_DEFS = {
         'endpoint': 'opds.feed_currently_reading',
         'title': N_('Currently Reading'),
         'description': N_('Books currently being read'),
+        'visible': lambda user, __: user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD) and not user.is_anonymous,
+    },
+    'did_not_finish': {
+        'endpoint': 'opds.feed_did_not_finish',
+        'title': N_('Did not finish'),
+        'description': N_('Books you chose not to finish'),
+        'visible': lambda user, __: user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD) and not user.is_anonymous,
+    },
+    'on_hold': {
+        'endpoint': 'opds.feed_on_hold',
+        'title': N_('On hold'),
+        'description': N_('Books you have paused for later'),
         'visible': lambda user, __: user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD) and not user.is_anonymous,
     },
     'unread': {
@@ -1209,6 +1223,36 @@ def feed_currently_reading():
         db.Books.id == db.books_series_link.c.book,
         db.Series,
     )
+    return render_xml_template('feed.xml', entries=result, pagination=pagination)
+
+
+@opds.route("/opds/didnotfinish")
+@requires_basic_auth_if_no_ano
+def feed_did_not_finish():
+    user = auth.current_user()
+    if not (user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD)
+            and not user.is_anonymous):
+        return abort(403)
+    off = request.args.get("offset") or 0
+    result, pagination = render_personal_read_status_books(
+        int(off) // int(config.config_books_per_page) + 1,
+        ub.ReadBook.STATUS_DID_NOT_FINISH, as_xml=True,
+        extra_filter=get_opds_book_filter())
+    return render_xml_template('feed.xml', entries=result, pagination=pagination)
+
+
+@opds.route("/opds/onhold")
+@requires_basic_auth_if_no_ano
+def feed_on_hold():
+    user = auth.current_user()
+    if not (user.check_visibility(constants.SIDEBAR_READ_AND_UNREAD)
+            and not user.is_anonymous):
+        return abort(403)
+    off = request.args.get("offset") or 0
+    result, pagination = render_personal_read_status_books(
+        int(off) // int(config.config_books_per_page) + 1,
+        ub.ReadBook.STATUS_ON_HOLD, as_xml=True,
+        extra_filter=get_opds_book_filter())
     return render_xml_template('feed.xml', entries=result, pagination=pagination)
 
 

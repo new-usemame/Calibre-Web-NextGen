@@ -652,27 +652,11 @@ def update_book_read_status(user, book_id: int, percentage: float):
         # churn the parent feed clock; existing derived state may still be
         # reconciled from the bookmark that survived arbitration below.
         _ensure_visible_reading_state(book_read, user_id, book_id)
+    from ...services.reading_status import update_automatic_read_status
     new_status = read_status_for_percentage(accepted_percentage)
-    old_status = book_read.read_status
-
-    if new_status == ub.ReadBook.STATUS_IN_PROGRESS and (
-            is_new or old_status != ub.ReadBook.STATUS_IN_PROGRESS):
-        book_read.times_started_reading = (book_read.times_started_reading or 0) + 1
-        book_read.last_time_started_reading = datetime.now(timezone.utc)
-        log.info(
-            "User %s started reading book %s (times started: %s)",
-            user_id, book_id, book_read.times_started_reading,
-        )
-    if old_status != new_status:
-        book_read.read_status = new_status
-        book_read.last_modified = datetime.now(timezone.utc)
-        log.info(
-            "User %s book %s status changed: %s -> %s "
-            "(accepted progress: %.1f%%)",
-            user_id, book_id, old_status, new_status, accepted_percentage,
-        )
-    elif outcome.accepted:
-        book_read.last_modified = datetime.now(timezone.utc)
+    status_accepted = update_automatic_read_status(
+        book_read, new_status, touch_unchanged=outcome.accepted,
+    )
 
     if not outcome.accepted:
         log.info(
@@ -680,9 +664,6 @@ def update_book_read_status(user, book_id: int, percentage: float):
             "user=%s, book=%s, incoming=%.2f%%, accepted=%.2f%%",
             user_id, book_id, percentage, accepted_percentage,
         )
-
-    # Merge the record (caller commits)
-    ub.session.merge(book_read)
 
     # Mirror the web read-status path (helper.edit_book_read_status): when an admin has
     # designated a Calibre custom column as the read marker, the book detail page reads
@@ -692,7 +673,8 @@ def update_book_read_status(user, book_id: int, percentage: float):
     # custom-column subset). Sticky semantics: we only SET the marker on FINISHED and never
     # clear it from a sync, so re-opening a finished book in KOReader can't silently un-read
     # it — un-marking stays a manual web toggle, matching "mark as read" intent.
-    if config.config_read_column and new_status == ub.ReadBook.STATUS_FINISHED:
+    if (config.config_read_column and status_accepted
+            and new_status == ub.ReadBook.STATUS_FINISHED):
         _mark_custom_read_column(book_id)
     return outcome
 

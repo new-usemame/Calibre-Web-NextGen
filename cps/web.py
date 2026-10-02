@@ -411,6 +411,27 @@ def toggle_read(book_id):
         return message
 
 
+@web.route("/ajax/readstatus/<int:book_id>", methods=['POST'])
+@user_login_required
+def set_read_status(book_id):
+    status = request.form.get("status")
+    if helper.read_status_code(status) is None:
+        abort(400)
+    if not user_library.contains_book(current_user, book_id):
+        abort(403)
+    visible = calibre_db.get_filtered_book(
+        book_id, allow_show_archived=True, allow_show_hidden=True,
+        allow_show_global=bool(current_user.role_browse_global()),
+        allow_public_shelf_books=True,
+    )
+    if visible is None:
+        abort(404)
+    message = helper.set_explicit_book_read_status(book_id, status)
+    if message:
+        return jsonify({"error": str(message)}), 500
+    return jsonify({"status": status})
+
+
 @web.route("/ajax/togglearchived/<int:book_id>", methods=['POST'])
 @user_login_required
 def toggle_archived(book_id):
@@ -755,6 +776,13 @@ def render_books_list(data, sort_param, book_id, page):
         return render_read_books(page, False, order=order)
     elif data == "read":
         return render_read_books(page, True, order=order)
+    elif data in ("in_progress", "did_not_finish", "on_hold"):
+        status = {
+            "in_progress": ub.ReadBook.STATUS_IN_PROGRESS,
+            "did_not_finish": ub.ReadBook.STATUS_DID_NOT_FINISH,
+            "on_hold": ub.ReadBook.STATUS_ON_HOLD,
+        }[data]
+        return render_personal_read_status_books(page, status, order=order)
     elif data == "hot":
         return render_hot_books(page, order)
     elif data == "download":
@@ -894,6 +922,9 @@ def save_discover_source():
 
 def render_discover_books(book_id):
     if current_user.check_visibility(constants.SIDEBAR_RANDOM):
+        paused_ids = helper.book_ids_with_read_status(
+            getattr(current_user, "id", None),
+            ub.ReadBook.STATUS_DID_NOT_FINISH, ub.ReadBook.STATUS_ON_HOLD)
         if not config.config_read_column:
             db_filter = coalesce(ub.ReadBook.read_status, 0) != ub.ReadBook.STATUS_FINISHED
         else:
@@ -909,6 +940,7 @@ def render_discover_books(book_id):
                 )
                 db_filter = True
 
+        db_filter = and_(db_filter, ~db.Books.id.in_(paused_ids))
         source_filter, source_available = discover_source_service.filter_for(current_user)
         entries, __, ___ = calibre_db.fill_indexpage(
             1, 0, db.Books, db_filter, [func.randomblob(2)],
@@ -1196,19 +1228,33 @@ def render_language_books(page, name, order):
 
 
 def render_read_books(page, are_read, as_xml=False, order=None, extra_filter=None):
+    paused_ids = helper.book_ids_with_read_status(
+        getattr(current_user, "id", None),
+        ub.ReadBook.STATUS_DID_NOT_FINISH,
+        ub.ReadBook.STATUS_ON_HOLD,
+    ) if current_user.is_authenticated else []
     sort_param = order[0] if order else []
     if not config.config_read_column:
         if are_read:
             db_filter = and_(ub.ReadBook.user_id == int(current_user.id),
                              ub.ReadBook.read_status == ub.ReadBook.STATUS_FINISHED)
         else:
-            db_filter = coalesce(ub.ReadBook.read_status, 0) != ub.ReadBook.STATUS_FINISHED
+            db_filter = and_(
+                coalesce(ub.ReadBook.read_status, 0) != ub.ReadBook.STATUS_FINISHED,
+                ~db.Books.id.in_(paused_ids),
+            )
     else:
         try:
             if are_read:
-                db_filter = db.cc_classes[config.config_read_column].value == True
+                db_filter = and_(
+                    db.cc_classes[config.config_read_column].value == True,
+                    ~db.Books.id.in_(paused_ids),
+                )
             else:
-                db_filter = coalesce(db.cc_classes[config.config_read_column].value, False) != True
+                db_filter = and_(
+                    coalesce(db.cc_classes[config.config_read_column].value, False) != True,
+                    ~db.Books.id.in_(paused_ids),
+                )
         except (KeyError, AttributeError, IndexError):
             log.error("Custom Column No.{} does not exist in calibre database".format(config.config_read_column))
             if not as_xml:
@@ -1239,6 +1285,45 @@ def render_read_books(page, are_read, as_xml=False, order=None, extra_filter=Non
             page_name = "unread"
         return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
                                      title=name, page=page_name, order=order[1])
+
+
+def render_personal_read_status_books(page, status, order=None, as_xml=False,
+                                      extra_filter=None):
+    """List one exact personal status, including custom-column overlays."""
+    sort_param = order[0] if order else []
+    book_ids = helper.book_ids_with_read_status(
+        getattr(current_user, "id", None), status)
+    db_filter = db.Books.id.in_(book_ids)
+    if config.config_read_column and status == ub.ReadBook.STATUS_IN_PROGRESS:
+        try:
+            relationship = getattr(db.Books, "custom_column_{}".format(
+                config.config_read_column))
+            db_filter = and_(db_filter, ~relationship.any(
+                db.cc_classes[config.config_read_column].value == True))
+        except (KeyError, AttributeError):
+            log.error("Custom Column No.%s does not exist in calibre database",
+                      config.config_read_column)
+    entries, random, pagination = calibre_db.fill_indexpage(
+        page, 0, db.Books, db_filter, sort_param,
+        True, config.config_read_column,
+        db.books_series_link, db.Books.id == db.books_series_link.c.book,
+        db.Series, extra_filter=extra_filter)
+    if as_xml:
+        return entries, pagination
+    titles = {
+        ub.ReadBook.STATUS_IN_PROGRESS: _("Currently Reading"),
+        ub.ReadBook.STATUS_DID_NOT_FINISH: _("Did not finish"),
+        ub.ReadBook.STATUS_ON_HOLD: _("On hold"),
+    }
+    title = titles[status] + " (" + str(pagination.total_count) + ")"
+    page_name = {
+        ub.ReadBook.STATUS_IN_PROGRESS: "in_progress",
+        ub.ReadBook.STATUS_DID_NOT_FINISH: "did_not_finish",
+        ub.ReadBook.STATUS_ON_HOLD: "on_hold",
+    }[status]
+    return render_title_template('index.html', random=random, entries=entries,
+                                 pagination=pagination, title=title,
+                                 page=page_name, order=order[1] if order else "stored")
 
 
 def render_archived_books(page, sort_param):
@@ -3976,14 +4061,25 @@ def read_book(book_id, book_format):
                     read_status=ub.ReadBook.STATUS_IN_PROGRESS,
                     times_started_reading=1,
                     last_time_started_reading=now,
+                    read_status_choice_at=now,
                 )
                 ub.session.add(read_row)
             else:
                 prev_status = read_row.read_status or 0
+                can_resume = True
+                if (prev_status in (ub.ReadBook.STATUS_DID_NOT_FINISH,
+                                    ub.ReadBook.STATUS_ON_HOLD)
+                        and config.config_read_column):
+                    # Opening the ordinary reader is an explicit resume. A
+                    # prior shared finished marker must not mask that resume.
+                    can_resume = helper.set_custom_read_column_value(
+                        book_id, False, source="web reader resume")
                 if prev_status != ub.ReadBook.STATUS_IN_PROGRESS \
-                        and prev_status != ub.ReadBook.STATUS_FINISHED:
+                        and prev_status != ub.ReadBook.STATUS_FINISHED and can_resume:
                     read_row.times_started_reading = (read_row.times_started_reading or 0) + 1
                     read_row.read_status = ub.ReadBook.STATUS_IN_PROGRESS
+                if can_resume and prev_status != ub.ReadBook.STATUS_FINISHED:
+                    read_row.read_status_choice_at = now
                 read_row.last_time_started_reading = now
             ub.session_commit()
         except Exception as e:
@@ -4092,26 +4188,11 @@ def show_book(book_id):
         read_book = entries[1]
         archived_book = entries[2]
         entry = entries[0]
-        if config.config_read_column:
-            # read_book carries the custom column's boolean value here, which
-            # can never express the in-progress tri-state — KOReader/Kobo sync
-            # writes that only to ub.ReadBook, whatever column is configured.
-            # Overlay it so the currently-reading marker still renders for
-            # custom-read-column users (fork #634).
-            entry.read_status = bool(read_book)
-            entry.read_status_raw = (ub.ReadBook.STATUS_FINISHED if read_book
-                                     else ub.ReadBook.STATUS_UNREAD)
-            if not read_book and current_user.is_authenticated:
-                in_progress = ub.session.query(ub.ReadBook).filter(
-                    ub.ReadBook.user_id == int(current_user.id),
-                    ub.ReadBook.book_id == book_id,
-                    ub.ReadBook.read_status == ub.ReadBook.STATUS_IN_PROGRESS).first()
-                if in_progress:
-                    entry.read_status_raw = ub.ReadBook.STATUS_IN_PROGRESS
-        else:
-            entry.read_status = read_book == ub.ReadBook.STATUS_FINISHED
-            # Raw tri-state for the "currently reading" detail-page marker. fork #509.
-            entry.read_status_raw = read_book or ub.ReadBook.STATUS_UNREAD
+        entry.read_status_name = helper.read_statuses_for_books(
+            ((book_id, read_book),), config.config_read_column,
+            current_user).get(book_id, "unread")
+        entry.read_status_raw = helper.read_status_code(entry.read_status_name)
+        entry.read_status = entry.read_status_raw == ub.ReadBook.STATUS_FINISHED
         entry.is_archived = archived_book
         for lang_index in range(0, len(entry.languages)):
             entry.languages[lang_index].language_name = isoLanguages.get_language_name(get_locale(), entry.languages[

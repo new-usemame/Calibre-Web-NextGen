@@ -2016,3 +2016,34 @@ _("This Discover source is unavailable. Choose another source.")
 _("No unread books in this Discover source.")
 _("Only Discover picks change; books remain in your library.")
 _("A few random picks from your Discover source")
+_('Reading status')
+
+_('Did not finish')
+
+_('On hold')
+
+_('Finished')
+
+_('Update status')
+
+_('Reading status updated')
+
+_('Could not update reading status.')
+
+_('Could not update reading status. Please try again.')
+
+_('Did not finish and On hold keep your reading position.')
+
+_('Show Currently Reading Books')
+
+_('Show Books You Did Not Finish')
+
+_('Show Books On Hold')
+
+_("Invalid reading status")
+
+_("Read status could not be set")
+
+_("Books you chose not to finish")
+
+_("Books you have paused for later")

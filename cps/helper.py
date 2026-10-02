@@ -53,11 +53,12 @@ from .tasks.convert import TaskConvert
 from . import logger, config, db, ub, fs
 from . import gdriveutils as gd
 from .constants import (STATIC_DIR as _STATIC_DIR, CACHE_TYPE_THUMBNAILS, THUMBNAIL_TYPE_COVER, THUMBNAIL_TYPE_SERIES,
-                        SUPPORTED_CALIBRE_BINARIES, EXTENSIONS_CONVERT_FROM, EXTENSIONS_CONVERT_TO)
+                        SUPPORTED_CALIBRE_BINARIES, EXTENSIONS_CONVERT_TO)
 from .subproc_wrapper import process_wait
 from .services.file_move import copy_with_metadata_fallback
 from .services import parallel
 from .services.cover_url_validator import cover_fetch_headers
+from .services.conversion_capabilities import get_conversion_capabilities
 
 # Track books with pending thumbnail generation to prevent duplicate tasks
 _pending_thumbnail_books = set()
@@ -384,11 +385,12 @@ def send_broadcast_email(subject, body_html, recipients, sender_name):
 def get_convert_options(book):
     """Return the allowed source and target conversion formats for a book.
 
-    Mirrors the logic in ``editbooks.render_edit_book`` so the SPA and the
-    legacy edit page agree on what can be converted to what. Source formats are
-    book formats present on the book that calibre's converter can read; target
-    formats depend on whether the calibre converter and/or kepubify are
-    configured and exclude formats the book already has.
+    The configured Calibre installation's active plugin registry determines
+    the formats that its converter can read and write. This keeps the SPA,
+    legacy edit page and conversion API aligned, including explicitly enabled
+    user-installed format plugins. If the bounded capability probe is
+    unavailable, Calibre formats fail closed; independently configured
+    kepubify remains available for EPUB books.
     """
     converter_path = getattr(config, "config_converterpath", "")
     kepubify_path = getattr(config, "config_kepubifypath", "")
@@ -396,20 +398,34 @@ def get_convert_options(book):
     allowed_conversion_formats = list()
     kepub_possible = None
     if converter_path:
+        input_formats, output_formats = get_conversion_capabilities(
+            converter_path,
+            getattr(config, "config_binariesdir", "") or "",
+        )
         for file in book.data:
-            if file.format.lower() in EXTENSIONS_CONVERT_FROM:
-                valid_source_formats.append(file.format.lower())
+            file_format = (file.format or "").lower().lstrip(".")
+            if file_format in input_formats and file_format not in {"zip", "rar"}:
+                valid_source_formats.append(file_format)
     if kepubify_path and 'epub' in [file.format.lower() for file in book.data]:
         kepub_possible = True
-        if not converter_path:
+        if 'epub' not in valid_source_formats:
             valid_source_formats.append('epub')
 
     if converter_path:
-        allowed_conversion_formats = EXTENSIONS_CONVERT_TO[:]
+        # Keep the familiar built-in order, then append custom plugin outputs
+        # deterministically. The historical constants remain an ordering hint,
+        # not an assertion that every Calibre build supports those formats.
+        allowed_conversion_formats = [
+            file_format
+            for file_format in dict.fromkeys(EXTENSIONS_CONVERT_TO)
+            if file_format in output_formats
+        ]
+        allowed_conversion_formats.extend(sorted(output_formats.difference(allowed_conversion_formats)))
         for file in book.data:
-            if file.format.lower() in allowed_conversion_formats:
-                allowed_conversion_formats.remove(file.format.lower())
-    if kepub_possible:
+            file_format = (file.format or "").lower().lstrip(".")
+            if file_format in allowed_conversion_formats:
+                allowed_conversion_formats.remove(file_format)
+    if kepub_possible and 'kepub' not in allowed_conversion_formats:
         allowed_conversion_formats.append('kepub')
     return valid_source_formats, allowed_conversion_formats
 

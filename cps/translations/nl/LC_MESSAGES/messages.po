@@ -1466,6 +1466,14 @@ msgid "Source or destination format for conversion missing"
 msgstr "Bron- of doelformaat ontbreekt voor conversie"
 
 #: cps/editbooks.py
+msgid "Book is unavailable for conversion"
+msgstr "Boek is niet beschikbaar voor conversie"
+
+#: cps/editbooks.py
+msgid "The selected conversion formats are not supported for this book"
+msgstr "De geselecteerde conversieformaten worden niet ondersteund voor dit boek"
+
+#: cps/editbooks.py
 #, python-format
 msgid "Book successfully queued for converting to %(book_format)s"
 msgstr ""

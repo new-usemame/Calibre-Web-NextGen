@@ -107,7 +107,9 @@ Requests belong to the account that created them. Requests for the same indexer 
 
 Imported means that CWNG has recorded the actual library book IDs and completed its import receipt. A download finishing alone does not mean the book is available. The book links still follow normal library visibility rules.
 
-Acquisition preserves an existing same-format edition when Calibre matches its title and author. It does not overwrite that edition, even when ordinary ingest is configured to overwrite duplicates. Its result identifies that the existing edition was retained. A different format may create a separate library record. Existing highlights and reading positions are not reassigned to a downloaded replacement.
+Acquisition reuses an existing same-format record only when its file bytes match the selected artifact after import processing. Matching title, author, language or ISBN alone does not establish that it is the same edition. Different files create separate library records, even when ordinary ingest is configured to overwrite duplicates. Existing files, highlights and reading positions remain attached to their original books. Exact copies reuse an existing record, and the receipt identifies the bytes actually stored. This conservative rule may create separate records for differently packaged copies of the same edition.
+
+New imports and in-progress recovery reinspect older metadata-only retention results before completing an import. Already-completed requests keep their historical receipt and are not automatically reimported. The existing duplicate-request rules still apply.
 
 Before publication, cancellation, revoked account permissions, disabled connections and changes to allowed file formats stop further work. Pausing the feature stops dispatching downloads. An already authorized file entering ingest can still finish and record its receipt while the feature is paused. Its original request information is retained across a failed acknowledgment so retry can recover the same import. Cancelling a request stops its import; it does not delete or cancel client data, because another account may share that download.
 

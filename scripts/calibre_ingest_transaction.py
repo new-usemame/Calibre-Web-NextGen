@@ -18,6 +18,7 @@ import argparse
 import hashlib
 import json
 import os
+from pathlib import Path
 import sys
 
 from calibre.db.adding import run_import_plugins, run_import_plugins_before_metadata
@@ -37,6 +38,20 @@ def content_digest(path):
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def stored_format_digest(cache, path):
+    """Match the receipt verifier's resolved Calibre-library boundary."""
+    if not path:
+        return None
+    try:
+        library = Path(cache.backend.library_path).resolve(strict=True)
+        stored = Path(path).resolve(strict=True)
+        if not stored.is_relative_to(library) or not stored.is_file():
+            return None
+        return content_digest(stored)
+    except (OSError, RuntimeError):
+        return None
 
 
 def marker_type(digest):
@@ -222,14 +237,18 @@ def acquisition_result(cache, digest):
     result = json.loads(values.pop())
     if result["source_sha256"] != digest or not result["book_ids"]:
         raise RuntimeError("invalid acquisition provenance")
+    if (result.get("disposition") == "existing_retained"
+            and result.get("artifact_identity_version") != 1):
+        # Earlier versions retained title/author matches without proving that
+        # the selected artifact was present. Reinspect for future requests;
+        # historical application receipts remain an audit of their old import.
+        cache.backend.execute("DELETE FROM cwng_acquisition_ingest_result WHERE source_sha256=?", (digest,))
+        return None
     for book_id in result["book_ids"]:
         exists = list(cache.backend.execute("SELECT 1 FROM books WHERE id=?", (book_id,)))
         stored_path = cache.format_abspath(book_id, result.get("format", "")) if exists and result.get("format") else None
-        try:
-            current = bool(stored_path and os.path.isfile(stored_path)
-                           and content_digest(stored_path) == result["imported_sha256"])
-        except OSError:
-            current = False
+        stored_digest = stored_format_digest(cache, stored_path)
+        current = bool(stored_digest and stored_digest == result["imported_sha256"])
         if not current:
             # Explicit deletion/replacement invalidates this recovery target.
             # Historical appDB receipts remain audit; new jobs must reinspect.
@@ -241,15 +260,17 @@ def acquisition_result(cache, digest):
 def add_acquisition(cache, metadata, extension, path, source_digest):
     """Keep existing editions untouched, including under global overwrite policy.
 
-    A same-format metadata match retains one deterministic existing book. A new
-    format creates a separate edition instead of changing an annotated record.
+    Metadata matches are candidates only. Identical prepared bytes retain one
+    deterministic existing book; different bytes create a separate record.
     Provenance describes the bytes actually retained/copied, after import plugins.
     """
     candidates = identical_format_paths(cache, metadata, extension)
-    if candidates:
-        selected = candidates[0]
+    prepared_digest = content_digest(path)
+    selected = next((candidate for candidate in candidates
+                     if stored_format_digest(cache, candidate["path"]) == prepared_digest), None)
+    if selected is not None:
         book_ids = {selected["book_id"]}
-        imported_digest = content_digest(selected["path"])
+        imported_digest = prepared_digest
         disposition = "existing_retained"
     else:
         book_ids, _duplicates = cache.add_books(
@@ -259,16 +280,17 @@ def add_acquisition(cache, metadata, extension, path, source_digest):
         if not book_ids:
             raise RuntimeError("acquisition produced no authoritative book IDs")
         stored_paths = [cache.format_abspath(book_id, extension) for book_id in sorted(book_ids)]
-        if any(not stored or not os.path.isfile(stored) for stored in stored_paths):
+        digests = {stored_format_digest(cache, stored) for stored in stored_paths}
+        if None in digests:
             raise RuntimeError("acquisition stored format is unavailable")
-        digests = {content_digest(stored) for stored in stored_paths}
         if len(digests) != 1:
             raise RuntimeError("acquisition stored formats differ")
         imported_digest = digests.pop()
         disposition = "imported"
     result = {"status": "imported", "source_sha256": source_digest,
               "imported_sha256": imported_digest, "book_ids": sorted(book_ids),
-              "disposition": disposition, "format": extension}
+              "disposition": disposition, "format": extension,
+              "artifact_identity_version": 1}
     persisted = json.dumps({key: value for key, value in result.items() if key != "status"}, sort_keys=True)
     attach_marker(cache, book_ids, source_digest)
     cache.backend.execute(

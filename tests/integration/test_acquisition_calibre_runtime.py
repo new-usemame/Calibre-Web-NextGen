@@ -55,8 +55,15 @@ def test_real_acquisition_retention_reinspection_and_durable_receipt(
     assert proof["helper"]["retained"]["disposition"] == "existing_retained"
     assert proof["helper"]["removed_reacquire"]["status"] == "imported"
     assert (
-        proof["helper"]["replacement_reinspect"]["disposition"] == "existing_retained"
+        proof["helper"]["replacement_reinspect"]["disposition"] == "imported"
     )
+    assert proof["helper"]["distinct"]["disposition"] == "imported"
+    assert proof["helper"]["annotations_preserved"]
+    assert [case["existing_language"] for case in proof["languages"]] == [["eng"], []]
+    assert all(case["annotations_preserved"] for case in proof["languages"])
+    assert proof["boundary"]["helper_and_receipt_agree"]
+    assert proof["boundary"]["external_bytes_unchanged"]
+    assert proof["boundary"]["annotations_preserved"]
     assert proof["helper"]["forged_identifier_ignored"]["book_ids"] != [1]
     assert proof["receipt"]["real_ub_schema"]
     assert proof["receipt"]["receipt_failure_rolled_back_membership"]

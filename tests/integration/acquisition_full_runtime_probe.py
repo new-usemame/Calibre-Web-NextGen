@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import zipfile
 from pathlib import Path
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from acquisition_calibre_runtime_probe import ebook, digest, library_format, APP
@@ -209,6 +210,8 @@ def main():
                 )
                 first_hash = None
                 first_id = None
+                first_job_id = None
+                reader_state = None
                 cases = [
                     ("patch", "epub", 1, True),
                     ("duplicate", "epub", 1, False),
@@ -243,6 +246,16 @@ def main():
                     sidecar = Path(str(published) + ".cwa.json")
                     source_hash = digest(files[url])
                     assert digest(published) == source_hash
+                    if name == "duplicate":
+                        # The old version could persist a title/author-only
+                        # retention result. Exercise both processor and helper
+                        # recovery paths without changing the historical receipt.
+                        legacy = dict(source_sha256=source_hash,
+                                      imported_sha256=first_hash, book_ids=[first_id],
+                                      disposition="existing_retained", format="epub")
+                        with sqlite3.connect(library / "metadata.db") as c:
+                            c.execute("INSERT INTO cwng_acquisition_ingest_result VALUES (?,?)",
+                                      (source_hash, json.dumps(legacy)))
                     if fail_receipt:
                         with sqlite3.connect(root / "app.db") as c:
                             c.execute(
@@ -326,10 +339,10 @@ def main():
                             len(memberships)
                             == {
                                 "patch": 1,
-                                "duplicate": 1,
-                                "convert": 2,
-                                "direct": 3,
-                                "public": 4,
+                                "duplicate": 2,
+                                "convert": 3,
+                                "direct": 4,
+                                "public": 5,
                             }[name]
                         )
                     stored = library_format(library, ids[0], target.upper())
@@ -338,9 +351,51 @@ def main():
                     if name == "patch":
                         first_hash = receipt[1]
                         first_id = ids[0]
+                        first_job_id = job.id
                         assert first_hash != source_hash, "patch not exercised"
+                        ub.session.add_all([
+                            ub.Annotation(user_id=owner, book_id=first_id,
+                                          annotation_id="edition-fixture", source="webreader",
+                                          highlighted_text="Original edition passage",
+                                          note_text="Keep this on the original edition",
+                                          cfi_range="epubcfi(/6/2!/4/2/1:0)"),
+                            ub.Bookmark(user_id=owner, book_id=first_id, format="epub",
+                                        bookmark_key="epubcfi(/6/2!/4/2/1:0)"),
+                            ub.ReadBook(user_id=owner, book_id=first_id,
+                                        read_status=ub.ReadBook.STATUS_IN_PROGRESS),
+                        ])
+                        ub.session.commit()
+                        ub.session.close()
+                        # Establish the same migrated annotation/device state
+                        # an existing reader has before the next acquisition.
+                        ub.init_db(str(root / "app.db"))
+                        ub.session.close()
+                        with sqlite3.connect(root / "app.db") as c:
+                            reader_state = {table: c.execute(
+                                "SELECT * FROM " + table + " WHERE user_id=? AND book_id=?",
+                                (owner, first_id),
+                            ).fetchall() for table in ("annotation", "bookmark", "book_read_link")}
+                        assert all(len(rows) == 1 for rows in reader_state.values())
                     if name == "duplicate":
-                        assert ids == [first_id] and receipt[1] == first_hash
+                        assert ids != [first_id] and receipt[1] != first_hash
+                        assert digest(library_format(library, first_id)) == first_hash
+                        with sqlite3.connect(root / "app.db") as c:
+                            historical = c.execute(
+                                "SELECT imported_sha256,book_ids_json FROM acquisition_import_receipt WHERE job_id=?",
+                                (first_job_id,),
+                            ).fetchone()
+                        assert historical[0] == first_hash and json.loads(historical[1]) == [first_id]
+                        with sqlite3.connect(root / "app.db") as c:
+                            for table, rows in reader_state.items():
+                                current = c.execute("SELECT * FROM " + table + " WHERE user_id=? AND book_id=?",
+                                                    (owner, first_id)).fetchall()
+                                assert current == rows, (table, rows, current)
+                                assert c.execute("SELECT count(*) FROM " + table + " WHERE book_id=?",
+                                                 (ids[0],)).fetchone()[0] == 0
+                        with zipfile.ZipFile(stored) as book:
+                            text = b"".join(book.read(path) for path in book.namelist()
+                                            if path.endswith((".xhtml", ".html")))
+                        assert b"Owned duplicate source" in text
                     if name == "convert":
                         assert receipt[1] != source_hash
                     assert gets.count(url) == 1

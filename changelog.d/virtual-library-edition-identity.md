@@ -1,0 +1,1 @@
+When two books shared a title and author, requesting one could silently keep the other. Book sources now compare prepared file bytes before reusing an existing library record. Different files import separately, preserving the old book, annotations and reading position. New requests reinspect older metadata-only retention results; historical completed receipts stay unchanged.

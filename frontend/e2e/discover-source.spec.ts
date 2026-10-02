@@ -65,7 +65,7 @@ test('Discover uses the account shelf across New UI, Classic and OPDS and recove
       await page.route(`**${endpoint}`, route => route.request().method() === 'PUT'
         ? route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'unavailable', message: 'Test outage' } }) }) : route.continue());
       await strip.getByRole('button', { name: 'Save Discover source', exact: true }).click();
-      await expect(strip.getByRole('status')).toContainText('Could not save Discover source. Please try again.');
+      await expect(strip.getByText('Could not save Discover source. Please try again.', { exact: true })).toBeVisible();
       await expect(select).toHaveValue(source);
       await select.focus(); await expect(select).toBeFocused();
       const axe = await new AxeBuilder({ page }).include('[data-testid="discover-section"]').analyze();
@@ -73,7 +73,7 @@ test('Discover uses the account shelf across New UI, Classic and OPDS and recove
       await page.screenshot({ path: testInfo.outputPath(`new-error-${width}.jpg`), type: 'jpeg', quality: 75 });
       await page.unroute(`**${endpoint}`);
       await strip.getByRole('button', { name: 'Save Discover source', exact: true }).click();
-      await expect(strip.getByRole('status')).toContainText('Discover source saved.');
+      await expect(strip.getByText('Discover source saved.', { exact: true })).toBeVisible();
       await expect.poll(() => discoverIds(page)).toEqual([chosen]);
       await expect(strip.locator('a[href*="/book/"]').filter({ hasText: book.title }).first()).toBeVisible();
       await strip.getByRole('button', { name: 'Shuffle picks' }).click();
@@ -124,8 +124,13 @@ test('Discover uses the account shelf across New UI, Classic and OPDS and recove
     const opds = await page.request.get('/opds/discover', { headers: { Authorization: `Basic ${Buffer.from(`${secondaryUser.username}:${secondaryUser.password}`).toString('base64')}` } });
     expect(opds.ok(), await opds.text()).toBeTruthy();
     const xml = await opds.text();
-    expect([...xml.matchAll(/<entry>/g)].length).toBe(1);
-    expect(xml).toContain(book.title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'));
+    const opdsEntries = await page.evaluate((payload) => {
+      const document = new DOMParser().parseFromString(payload, 'application/xml');
+      if (document.querySelector('parsererror')) throw new Error('OPDS response is not valid XML');
+      return [...document.getElementsByTagNameNS('http://www.w3.org/2005/Atom', 'entry')]
+        .map(entry => entry.getElementsByTagNameNS('http://www.w3.org/2005/Atom', 'title')[0]?.textContent);
+    }, xml);
+    expect(opdsEntries).toEqual([book.title]);
     expect((await page.request.post(`/api/v1/shelves/${shelf}/delete`, { headers: h })).ok()).toBeTruthy();
     ownedShelves.splice(ownedShelves.indexOf(shelf), 1);
     expect(await discoverIds(page)).toEqual([]);

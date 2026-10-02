@@ -102,6 +102,60 @@ def attach_marker(cache, book_ids, digest):
         cache.set_field("identifiers", field_values)
 
 
+def validate_folder_label_operation(cache, operation):
+    """Validate the selected Calibre field before changing any book rows."""
+    if operation is None:
+        return None
+    if not isinstance(operation, dict):
+        raise ValueError("invalid ingest folder-label operation")
+    target = operation.get("target")
+    values = operation.get("values")
+    if not isinstance(target, str) or not (target == "tags" or target.startswith("#")):
+        raise ValueError("invalid ingest folder-label target")
+    if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+        raise ValueError("invalid ingest folder-label values")
+
+    metadata = getattr(cache, "field_metadata", None)
+    if metadata is None or target not in metadata:
+        raise ValueError(f"configured ingest folder-label field {target!r} is unavailable")
+    field = metadata[target]
+    datatype = field.get("datatype") if hasattr(field, "get") else None
+    multiple = field.get("is_multiple") if hasattr(field, "get") else None
+    if datatype != "text" or not multiple:
+        raise ValueError(f"configured ingest folder-label field {target!r} is not a multivalue text field")
+    return target, values
+
+
+def apply_folder_labels(cache, book_ids, operation, validated=None):
+    """Union source-folder values into each affected book's selected field."""
+    if operation is None:
+        return
+    target, values = validated or validate_folder_label_operation(cache, operation)
+    if not values:
+        return
+
+    changed = {}
+    for book_id in sorted({int(value) for value in book_ids}):
+        existing = cache.field_for(target, book_id, default_value=[]) or []
+        merged = list(existing)
+        known = {
+            str(value).strip().casefold()
+            for value in merged
+            if value is not None and str(value).strip()
+        }
+        for raw in values:
+            value = raw.strip()
+            key = value.casefold()
+            if value and key not in known:
+                known.add(key)
+                merged.append(value)
+        if list(existing) != merged:
+            changed[book_id] = merged
+    if changed:
+        cache.set_field(target, changed)
+        cache.dump_metadata(book_ids=changed)
+
+
 def identical_format_paths(cache, metadata, extension):
     result = []
     for book_id in sorted(find_identical_books(metadata, cache.data_for_find_identical_books())):
@@ -240,6 +294,26 @@ def run(args):
         database = LibraryDatabase(args.library_path)
         cache = database.new_api
         acquisition = getattr(args, "acquisition", False)
+        if args.action == "apply-folder-labels":
+            operation = json.loads(args.metadata_json).get("ingest_folder_labels")
+            with cache.write_lock, cache.backend.conn:
+                validated = validate_folder_label_operation(cache, operation)
+                if acquisition:
+                    previous = acquisition_result(cache, source_digest)
+                    if not previous:
+                        raise RuntimeError("folder labels require a committed acquisition receipt")
+                    book_ids = previous["book_ids"]
+                else:
+                    book_ids = sorted(marker_book_ids(cache, source_digest))
+                    if not book_ids:
+                        raise RuntimeError("folder labels require a committed source marker")
+                apply_folder_labels(cache, book_ids, operation, validated)
+            return {
+                "status": "already_imported",
+                "source_sha256": source_digest,
+                "imported_sha256": imported_digest,
+                "book_ids": sorted(book_ids),
+            }
         if acquisition:
             # Private provenance cannot be manufactured by ebook identifiers.
             # SQLite backups retain this additive table; Calibre library export
@@ -251,9 +325,19 @@ def run(args):
                 )
                 previous = acquisition_result(cache, source_digest)
                 if previous:
+                    folder_labels = json.loads(args.metadata_json).get("ingest_folder_labels")
+                    if args.action != "inspect" and folder_labels is not None:
+                        validated = validate_folder_label_operation(cache, folder_labels)
+                        apply_folder_labels(cache, previous["book_ids"], folder_labels, validated)
                     return previous
         existing = marker_book_ids(cache, source_digest)
         if existing and not acquisition:
+            overrides = json.loads(args.metadata_json)
+            folder_labels = overrides.get("ingest_folder_labels")
+            if args.action != "inspect" and folder_labels is not None:
+                with cache.write_lock, cache.backend.conn:
+                    validated = validate_folder_label_operation(cache, folder_labels)
+                    apply_folder_labels(cache, existing, folder_labels, validated)
             return {
                 "status": "already_imported",
                 "imported_sha256": imported_digest,
@@ -279,11 +363,21 @@ def run(args):
                 if acquisition:
                     previous = acquisition_result(cache, source_digest)
                     if previous:
+                        folder_labels = overrides.get("ingest_folder_labels")
+                        validated = validate_folder_label_operation(cache, folder_labels)
+                        apply_folder_labels(cache, previous["book_ids"], folder_labels, validated)
                         return previous
+                    folder_labels = overrides.get("ingest_folder_labels")
+                    validated_folder_labels = validate_folder_label_operation(cache, folder_labels)
                     result = add_acquisition(cache, metadata, extension, imported_path, source_digest)
+                    apply_folder_labels(
+                        cache, result["book_ids"], folder_labels, validated_folder_labels
+                    )
                     if args.fail_before_commit:
                         raise RuntimeError("injected failure before transaction commit")
                     return result
+                folder_labels = overrides.get("ingest_folder_labels")
+                validated_folder_labels = validate_folder_label_operation(cache, folder_labels)
                 existing = marker_book_ids(cache, source_digest)
                 if existing:
                     result = {"status": "already_imported", "book_ids": sorted(existing)}
@@ -291,14 +385,15 @@ def run(args):
                     added, updated, marked = add_with_automerge(
                         cache, metadata, extension, imported_path, args.automerge, source_digest
                     )
-                    if args.fail_before_commit:
-                        raise RuntimeError("injected failure before transaction commit")
                     result = {
                         "status": "imported",
                         "added_ids": sorted(added),
                         "updated_ids": sorted(updated),
                         "book_ids": sorted(marked),
                     }
+                apply_folder_labels(cache, result["book_ids"], folder_labels, validated_folder_labels)
+                if args.fail_before_commit:
+                    raise RuntimeError("injected failure before transaction commit")
                 result["imported_sha256"] = imported_digest
                 result["source_sha256"] = source_digest
                 return result
@@ -314,7 +409,9 @@ def run(args):
 
 def parse_args(argv):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--action", choices=("inspect", "import"), default="import")
+    parser.add_argument(
+        "--action", choices=("inspect", "import", "apply-folder-labels"), default="import"
+    )
     parser.add_argument("--library-path", required=True)
     parser.add_argument("--database-path")
     parser.add_argument("--path", required=True)

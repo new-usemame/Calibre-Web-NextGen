@@ -73,6 +73,13 @@ const ADMIN_CONTEXT: ContextSidebarDefinition = {
       label: 'Configuration',
       items: [
         {
+          key: 'ingest-folder-labels',
+          href: '/admin#ingest-folder-labels',
+          label: 'Ingest folder labels',
+          icon: Settings,
+          spa: true,
+        },
+        {
           key: 'library-settings',
           href: '/admin#library-settings',
           label: 'Library',

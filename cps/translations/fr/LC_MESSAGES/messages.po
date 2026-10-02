@@ -1250,6 +1250,15 @@ msgstr ""
 "n'ont pas été enregistrées."
 
 #: cps/cwa_functions.py
+msgid ""
+"Choose Tags or an existing comma-separated text custom column. Folder-label "
+"settings were not saved."
+msgstr ""
+"Choisissez les étiquettes ou une colonne personnalisée existante contenant "
+"du texte séparé par des virgules. Les paramètres des dossiers n’ont pas été "
+"enregistrés."
+
+#: cps/cwa_functions.py
 msgid "Calibre-Web NextGen User Settings"
 msgstr ""
 
@@ -5608,15 +5617,16 @@ msgid "Can upload books"
 msgstr "Peut téléverser des livres"
 
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/book_edit.html
-#: cps/templates/book_table.html cps/templates/config_db.html
-#: cps/templates/config_edit.html cps/templates/config_view_edit.html
-#: cps/templates/cover_picker.html cps/templates/cwa_convert_library.html
-#: cps/templates/cwa_cover_enforcer.html cps/templates/cwa_epub_fixer.html
-#: cps/templates/detail.html cps/templates/duplicates.html
-#: cps/templates/layout.html cps/templates/modal_dialogs.html
-#: cps/templates/read.html cps/templates/schedule_edit.html
-#: cps/templates/shelf.html cps/templates/shelf_edit.html
-#: cps/templates/tasks.html cps/templates/user_edit.html
+#: cps/templates/book_review.html cps/templates/book_table.html
+#: cps/templates/config_db.html cps/templates/config_edit.html
+#: cps/templates/config_view_edit.html cps/templates/cover_picker.html
+#: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
+#: cps/templates/cwa_epub_fixer.html cps/templates/detail.html
+#: cps/templates/duplicates.html cps/templates/layout.html
+#: cps/templates/modal_dialogs.html cps/templates/read.html
+#: cps/templates/schedule_edit.html cps/templates/shelf.html
+#: cps/templates/shelf_edit.html cps/templates/tasks.html
+#: cps/templates/user_edit.html
 msgid "Cancel"
 msgstr "Annuler"
 
@@ -7412,7 +7422,8 @@ msgstr "Chargement des positions de lecture…"
 msgid "Loading reading positions…"
 msgstr "Chargement des positions de lecture…"
 
-#: cps/spa_strings.py cps/templates/cover_picker.html
+#: cps/spa_strings.py cps/templates/book_review.html
+#: cps/templates/cover_picker.html
 msgid "Loading…"
 msgstr "Chargement…"
 
@@ -8620,7 +8631,7 @@ msgstr ""
 msgid "Resume at {percent} from another device"
 msgstr "Reprendre à {percent} depuis un autre appareil"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_review.html
 msgid "Retry"
 msgstr "Réessayer"
 
@@ -9389,7 +9400,7 @@ msgid "Tag removed from {succeeded}; {failed} failed."
 msgstr "Étiquette retirée de {succeeded} ; {failed} en échec."
 
 #: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/search_form.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html
 msgid "Tags"
 msgstr "Étiquettes"
 
@@ -10912,6 +10923,149 @@ msgstr "Microsoft YaHei"
 #: cps/spa_strings.py cps/templates/read.html
 msgid "SimSun"
 msgstr "SimSun"
+
+# Private book reviews (#917).
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Your review"
+msgstr "Votre avis"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Private to your account. This does not change the shared Description."
+msgstr ""
+"Privé et réservé à votre compte. Cela ne modifie pas la Description partagée."
+
+#: cps/spa_strings.py
+msgid "Keep your thoughts about this book here."
+msgstr "Gardez ici vos impressions sur ce livre."
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review or note"
+msgstr "Avis ou note"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Add a review"
+msgstr "Ajouter un avis"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Edit review"
+msgstr "Modifier l’avis"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Save review"
+msgstr "Enregistrer l’avis"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Delete review"
+msgstr "Supprimer l’avis"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Delete your review?"
+msgstr "Supprimer votre avis ?"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "This removes your private review or note for this book."
+msgstr "Cela supprime votre avis ou note privé sur ce livre."
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review saved."
+msgstr "Avis enregistré."
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review deleted."
+msgstr "Avis supprimé."
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not load your review."
+msgstr "Impossible de charger votre avis."
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not save review."
+msgstr "Impossible d’enregistrer l’avis."
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not delete review."
+msgstr "Impossible de supprimer l’avis."
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} of {max} characters"
+msgstr "{n} caractères sur {max}"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review text exceeds 10000 characters"
+msgstr "Le texte de l’avis dépasse 10000 caractères"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Disabled"
+msgstr "Désactivé"
+
+# Ingest folder labels (#1495).
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Ingest folder labels"
+msgstr "Étiquettes des dossiers d’import"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"Add ingest subfolder names to book tags or an existing custom column. "
+"Existing values are kept; files in the ingest root add no labels."
+msgstr ""
+"Ajoutez les noms des sous-dossiers d’import aux étiquettes des livres ou à "
+"une colonne personnalisée existante. Les valeurs existantes sont "
+"conservées ; les fichiers à la racine ne reçoivent aucune étiquette."
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"For example, ingest/James/scifi adds James by default. Include nested "
+"folders to add scifi too."
+msgstr ""
+"Par exemple, ingest/James/scifi ajoute James par défaut. Incluez les "
+"dossiers imbriqués pour ajouter aussi scifi."
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Write subfolder names to"
+msgstr "Écrire les noms des sous-dossiers dans"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Include nested folders"
+msgstr "Inclure les dossiers imbriqués"
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"Custom columns must already exist and use comma-separated text, like tags. "
+"Create them in Calibre desktop first."
+msgstr ""
+"Les colonnes personnalisées doivent déjà exister et contenir du texte séparé "
+"par des virgules, comme les étiquettes. Créez-les d’abord dans Calibre pour "
+"ordinateur."
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+#, python-brace-format
+msgid "Unavailable column: {name}"
+msgstr "Colonne indisponible : {name}"
+
+#: cps/spa_strings.py
+msgid ""
+"The selected column is unavailable. Choose another target or disable folder "
+"labels before importing."
+msgstr ""
+"La colonne sélectionnée est indisponible. Choisissez une autre destination "
+"ou désactivez les étiquettes de dossiers avant d’importer."
+
+#: cps/spa_strings.py
+msgid "Could not load ingest folder settings."
+msgstr "Impossible de charger les paramètres des dossiers d’import."
+
+#: cps/spa_strings.py
+msgid "Could not save ingest folder settings."
+msgstr "Impossible d’enregistrer les paramètres des dossiers d’import."
+
+#: cps/spa_strings.py
+msgid "Ingest folder settings saved."
+msgstr "Paramètres des dossiers d’import enregistrés."
+
+#: cps/spa_strings.py
+msgid "Save ingest folder settings"
+msgstr "Enregistrer les paramètres des dossiers d’import"
 
 #: cps/tasks_status.py
 msgid "Waiting"

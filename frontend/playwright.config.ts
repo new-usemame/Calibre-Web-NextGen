@@ -46,6 +46,7 @@ const SERVER_STATE_SPECS = [
   /my-library-admin-intro\.spec\.ts/,
   /shelf-count-refresh\.spec\.ts/,
   /font-defaults-751\.spec\.ts/,
+  /ingest-folder-labels\.spec\.ts/,
 ];
 const VISUAL_REGRESSION_SPEC = /visual-regression\.spec\.ts/;
 const hostileLoadEnabled = process.env.E2E_HOSTILE_LOAD === '1';

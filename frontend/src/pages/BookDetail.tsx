@@ -1,3 +1,4 @@
+import { BookReview } from '../components/BookReview';
 import { useState, useEffect, useLayoutEffect, useRef, useCallback, Fragment } from 'react';
 import { Link, useParams, useLocation } from 'wouter';
 import { Download, Pencil, Star, Archive, EyeOff, Eye, Send, Highlighter, Image as ImageIcon, Plus, X, BookOpen, BookCheck, BookPlus, BookX, Trash2, RefreshCw, TabletSmartphone, Settings, Upload as UploadIcon } from 'lucide-react';
@@ -938,6 +939,8 @@ export function BookDetail() {
           {book.description_html && (
             <DescriptionBlock html={book.description_html} bookId={book.id} />
           )}
+
+          {me && !me.role?.anonymous && <BookReview key={`${me.id}:${book.id}`} bookId={book.id} accountId={me.id} />}
 
           {/* Tags — inline add/remove for editors (fork #572), read-only links
               otherwise. */}

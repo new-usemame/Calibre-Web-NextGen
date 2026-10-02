@@ -11,7 +11,7 @@ parts they are about.
 from pathlib import Path
 from types import SimpleNamespace
 
-from jinja2 import DictLoader, Environment
+from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -50,10 +50,12 @@ def render_detail(*, user=None, shelves_access=(), books_shelfs=(), **context):
     shelves plus the reader's own) and ``books_shelfs`` the ids of every shelf
     holding the book, whoever owns it.
     """
-    source = (ROOT / "cps" / "templates" / "detail.html").read_text(encoding="utf-8")
     base = "{% block header %}{% endblock %}{% block body %}{% endblock %}"
     environment = Environment(
-        loader=DictLoader({"detail.html": source, "layout.html": base, "fragment.html": base}),
+        loader=ChoiceLoader([
+            DictLoader({"layout.html": base, "fragment.html": base}),
+            FileSystemLoader(str(ROOT / "cps" / "templates")),
+        ]),
         autoescape=True,
     )
     environment.filters.update({

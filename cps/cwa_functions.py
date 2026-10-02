@@ -52,6 +52,11 @@ from .schedule import (
 )
 from .services.worker import WorkerThread, STAT_FINISH_SUCCESS, STAT_FAIL, STAT_ENDED, STAT_CANCELLED
 from .services import ereader_scope
+from .services.ingest_folder_labels import (
+    IngestFolderLabelError,
+    eligible_custom_column_options,
+    validate_target as validate_ingest_folder_label_target,
+)
 # TaskReconnectDatabase deliberately not imported here — the post-ingest
 # reconnect endpoint uses CalibreDB.refresh_for_new_data() instead, to avoid
 # the engine-disposal race in fork issue #192 (PR #199, v4.0.30).
@@ -114,6 +119,51 @@ def _local_calls_only(view):
     return local_only
 
 log = logger.create()
+
+
+def _ingest_folder_label_columns():
+    """Existing tag-like custom columns offered by the ingest setting."""
+    try:
+        from . import db
+        columns = calibre_db.session.query(db.CustomColumns).all()
+        return eligible_custom_column_options(columns)
+    except Exception:
+        log.exception("Could not load custom columns for ingest-folder labels")
+        return []
+
+
+def _folder_label_settings_for_post(result, form, current, columns):
+    """Keep Classic's paired folder-label controls partial-save safe."""
+    target_key = 'auto_ingest_folder_label_target'
+    nested_key = 'auto_ingest_folder_label_nested'
+    target_present = target_key in form
+    nested_present = nested_key in form
+    if not target_present and not nested_present:
+        result.pop(target_key, None)
+        result.pop(nested_key, None)
+        return False
+
+    target = form.get(target_key) if target_present else current.get(target_key, 'disabled')
+    try:
+        validated = validate_ingest_folder_label_target(target, columns)
+    except IngestFolderLabelError:
+        result.pop(target_key, None)
+        result.pop(nested_key, None)
+        return True
+
+    if target_present:
+        result[target_key] = validated
+    else:
+        result.pop(target_key, None)
+    if nested_present:
+        result[nested_key] = 1 if form.get(nested_key) else 0
+    elif target_present:
+        # Posting the target control submits this settings section; an omitted
+        # checkbox then has the ordinary unchecked meaning.
+        result[nested_key] = 0
+    else:
+        result.pop(nested_key, None)
+    return False
 
 
 def _mirror_hardcover_sync_for_rollback(cwa_db):
@@ -853,6 +903,12 @@ def set_cwa_settings():
             result = {"auto_convert_ignored_formats":[], "auto_ingest_ignored_formats":[], "auto_convert_retained_formats":[]}
             # set boolean_settings
             for setting in boolean_settings:
+                if (setting == 'auto_ingest_folder_label_nested'
+                        and 'auto_ingest_folder_label_target' not in request.form
+                        and setting not in request.form):
+                    # Older/partial clients may post unrelated settings only.
+                    # Keep the paired folder-label preference untouched then.
+                    continue
                 value = request.form.get(setting)
                 if value is None:
                     value = 0
@@ -1073,6 +1129,15 @@ def set_cwa_settings():
             config.config_kobo_sync_magic_shelves = 'config_kobo_sync_magic_shelves' in request.form
             config.save()
 
+            # Validate the selected target before writing it. The importer
+            # repeats this check at its Calibre transaction boundary in case
+            # metadata.db changes after the settings form is saved.
+            invalid_folder_label_settings = _folder_label_settings_for_post(
+                result, request.form, cwa_settings, _ingest_folder_label_columns(),
+            )
+            if invalid_folder_label_settings:
+                flash(_("Choose Tags or an existing comma-separated text custom column. Folder-label settings were not saved."), category="error")
+
             # Preserve the legacy CWA column for downgrade compatibility;
             # this page no longer owns a second Hardcover enable switch.
             result['hardcover_auto_fetch_enabled'] = int(
@@ -1177,12 +1242,14 @@ def set_cwa_settings():
         )
     )
 
+    ingest_folder_label_columns = _ingest_folder_label_columns()
     return render_title_template("cwa_settings.html", title=_("Calibre-Web NextGen User Settings"), page="cwa-settings",
                                     cwa_settings=rendered_cwa_settings, ignorable_formats=ignorable_formats, target_formats=target_formats,
                                     automerge_options=automerge_options, autoingest_options=autoingest_options,
                                     hardcover_token_available=hardcover_token_available,
                                     next_duplicate_scan_run=next_scan_run,
                                     processed_books_dir=constants.processed_books_dir(),
+                                    ingest_folder_label_columns=ingest_folder_label_columns,
                                     koreader_sync=ereader_scope.koreader_library_on(),
                                     config=config)
 

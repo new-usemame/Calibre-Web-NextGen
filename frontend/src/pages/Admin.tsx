@@ -11,6 +11,7 @@ import {
 import type { SecurityConfig, SecurityUpdate } from '../lib/queries';
 import { SpinnerCentered } from '../components/Spinner';
 import { EmptyState } from '../components/EmptyState';
+import { IngestFolderLabels } from '../components/IngestFolderLabels';
 import { MyLibraryIntro } from '../components/MyLibraryIntro';
 import { ReaderFontsAdmin } from '../components/ReaderFontsAdmin';
 import type { AdminUser } from '../lib/api';
@@ -365,6 +366,7 @@ export function Admin() {
         })}
       </div>
 
+      <IngestFolderLabels />
       <AdminConfigForm />
       <ReaderFontsAdmin />
       <MailConfigForm />

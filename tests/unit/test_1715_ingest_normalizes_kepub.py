@@ -19,7 +19,6 @@ import os
 import sys
 import zipfile
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -83,13 +82,16 @@ def _ncx_sources(path):
 
 def _run_add(book_path):
     """Call the real method far enough to cover the normalization step."""
-    stub = SimpleNamespace(
+    # Keep the real processor's methods: newly added pre-normalization helpers
+    # must exercise their disabled defaults rather than fail on a fake object.
+    stub = object.__new__(ingest_processor.NewBookProcessor)
+    stub.__dict__.update(dict(
         target_format="kepub",
         is_kindle_epub_fixer=False,
         tmp_conversion_dir=os.path.dirname(book_path),
         cwa_settings={},
         metadata_db="/nonexistent/metadata.db",
-    )
+    ))
     try:
         ingest_processor.NewBookProcessor.add_book_to_library(stub, book_path)
     except Exception:

@@ -1218,6 +1218,12 @@ msgstr ""
 "Неверное cron-выражение для сканирования дубликатов. Изменения не сохранены."
 
 #: cps/cwa_functions.py
+msgid ""
+"Choose Tags or an existing comma-separated text custom column. Folder-label "
+"settings were not saved."
+msgstr ""
+
+#: cps/cwa_functions.py
 msgid "Calibre-Web NextGen User Settings"
 msgstr "Пользовательские настройки Calibre-Web NextGen"
 
@@ -5512,15 +5518,16 @@ msgid "Can upload books"
 msgstr "Можно загружать книги"
 
 #: cps/spa_strings.py cps/templates/admin.html cps/templates/book_edit.html
-#: cps/templates/book_table.html cps/templates/config_db.html
-#: cps/templates/config_edit.html cps/templates/config_view_edit.html
-#: cps/templates/cover_picker.html cps/templates/cwa_convert_library.html
-#: cps/templates/cwa_cover_enforcer.html cps/templates/cwa_epub_fixer.html
-#: cps/templates/detail.html cps/templates/duplicates.html
-#: cps/templates/layout.html cps/templates/modal_dialogs.html
-#: cps/templates/read.html cps/templates/schedule_edit.html
-#: cps/templates/shelf.html cps/templates/shelf_edit.html
-#: cps/templates/tasks.html cps/templates/user_edit.html
+#: cps/templates/book_review.html cps/templates/book_table.html
+#: cps/templates/config_db.html cps/templates/config_edit.html
+#: cps/templates/config_view_edit.html cps/templates/cover_picker.html
+#: cps/templates/cwa_convert_library.html cps/templates/cwa_cover_enforcer.html
+#: cps/templates/cwa_epub_fixer.html cps/templates/detail.html
+#: cps/templates/duplicates.html cps/templates/layout.html
+#: cps/templates/modal_dialogs.html cps/templates/read.html
+#: cps/templates/schedule_edit.html cps/templates/shelf.html
+#: cps/templates/shelf_edit.html cps/templates/tasks.html
+#: cps/templates/user_edit.html
 msgid "Cancel"
 msgstr "Отмена"
 
@@ -7283,7 +7290,8 @@ msgstr "Загрузка мест чтения…"
 msgid "Loading reading positions…"
 msgstr "Загрузка позиций чтения…"
 
-#: cps/spa_strings.py cps/templates/cover_picker.html
+#: cps/spa_strings.py cps/templates/book_review.html
+#: cps/templates/cover_picker.html
 msgid "Loading…"
 msgstr "Загрузка…"
 
@@ -8480,7 +8488,7 @@ msgstr ""
 msgid "Resume at {percent} from another device"
 msgstr "Продолжить с {percent} с другого устройства"
 
-#: cps/spa_strings.py
+#: cps/spa_strings.py cps/templates/book_review.html
 msgid "Retry"
 msgstr "Повторить попытку"
 
@@ -9241,7 +9249,7 @@ msgid "Tag removed from {succeeded}; {failed} failed."
 msgstr ""
 
 #: cps/spa_strings.py cps/templates/book_edit.html
-#: cps/templates/search_form.html
+#: cps/templates/cwa_settings.html cps/templates/search_form.html
 msgid "Tags"
 msgstr "Теги"
 
@@ -10670,6 +10678,136 @@ msgstr ""
 #: cps/spa_strings.py cps/templates/read.html
 msgid "SimSun"
 msgstr "SimSun"
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Your review"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Private to your account. This does not change the shared Description."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Keep your thoughts about this book here."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review or note"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Add a review"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Edit review"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Save review"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Delete review"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Delete your review?"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "This removes your private review or note for this book."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review saved."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review deleted."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not load your review."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not save review."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Could not delete review."
+msgstr ""
+
+#: cps/spa_strings.py
+#, python-brace-format
+msgid "{n} of {max} characters"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/book_review.html
+msgid "Review text exceeds 10000 characters"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Disabled"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Ingest folder labels"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"Add ingest subfolder names to book tags or an existing custom column. "
+"Existing values are kept; files in the ingest root add no labels."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"For example, ingest/James/scifi adds James by default. Include nested "
+"folders to add scifi too."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Write subfolder names to"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid "Include nested folders"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+msgid ""
+"Custom columns must already exist and use comma-separated text, like tags. "
+"Create them in Calibre desktop first."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/cwa_settings.html
+#, python-brace-format
+msgid "Unavailable column: {name}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"The selected column is unavailable. Choose another target or disable folder "
+"labels before importing."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load ingest folder settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not save ingest folder settings."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Ingest folder settings saved."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Save ingest folder settings"
+msgstr ""
 
 #: cps/tasks_status.py
 msgid "Waiting"

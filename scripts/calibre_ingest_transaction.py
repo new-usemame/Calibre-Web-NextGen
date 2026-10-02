@@ -154,6 +154,76 @@ def add_with_automerge(cache, metadata, extension, path, automerge, digest):
     return added_ids, updated_ids, marker_targets
 
 
+
+def acquisition_result(cache, digest):
+    rows = list(cache.backend.execute(
+        "SELECT result_json FROM cwng_acquisition_ingest_result WHERE source_sha256=?",
+        (digest,),
+    ))
+    if not rows:
+        return None
+    values = {row[0] for row in rows}
+    if len(values) != 1:
+        raise RuntimeError("conflicting acquisition provenance")
+    result = json.loads(values.pop())
+    if result["source_sha256"] != digest or not result["book_ids"]:
+        raise RuntimeError("invalid acquisition provenance")
+    for book_id in result["book_ids"]:
+        exists = list(cache.backend.execute("SELECT 1 FROM books WHERE id=?", (book_id,)))
+        stored_path = cache.format_abspath(book_id, result.get("format", "")) if exists and result.get("format") else None
+        try:
+            current = bool(stored_path and os.path.isfile(stored_path)
+                           and content_digest(stored_path) == result["imported_sha256"])
+        except OSError:
+            current = False
+        if not current:
+            # Explicit deletion/replacement invalidates this recovery target.
+            # Historical appDB receipts remain audit; new jobs must reinspect.
+            cache.backend.execute("DELETE FROM cwng_acquisition_ingest_result WHERE source_sha256=?", (digest,))
+            return None
+    return dict(result, status="already_imported")
+
+
+def add_acquisition(cache, metadata, extension, path, source_digest):
+    """Keep existing editions untouched, including under global overwrite policy.
+
+    A same-format metadata match retains one deterministic existing book. A new
+    format creates a separate edition instead of changing an annotated record.
+    Provenance describes the bytes actually retained/copied, after import plugins.
+    """
+    candidates = identical_format_paths(cache, metadata, extension)
+    if candidates:
+        selected = candidates[0]
+        book_ids = {selected["book_id"]}
+        imported_digest = content_digest(selected["path"])
+        disposition = "existing_retained"
+    else:
+        book_ids, _duplicates = cache.add_books(
+            [(metadata, {extension: path})], add_duplicates=True, run_hooks=False
+        )
+        book_ids = set(book_ids)
+        if not book_ids:
+            raise RuntimeError("acquisition produced no authoritative book IDs")
+        stored_paths = [cache.format_abspath(book_id, extension) for book_id in sorted(book_ids)]
+        if any(not stored or not os.path.isfile(stored) for stored in stored_paths):
+            raise RuntimeError("acquisition stored format is unavailable")
+        digests = {content_digest(stored) for stored in stored_paths}
+        if len(digests) != 1:
+            raise RuntimeError("acquisition stored formats differ")
+        imported_digest = digests.pop()
+        disposition = "imported"
+    result = {"status": "imported", "source_sha256": source_digest,
+              "imported_sha256": imported_digest, "book_ids": sorted(book_ids),
+              "disposition": disposition, "format": extension}
+    persisted = json.dumps({key: value for key, value in result.items() if key != "status"}, sort_keys=True)
+    attach_marker(cache, book_ids, source_digest)
+    cache.backend.execute(
+        "INSERT INTO cwng_acquisition_ingest_result (source_sha256,result_json) VALUES (?,?)",
+        (source_digest, persisted),
+    )
+    cache.dump_metadata(book_ids=book_ids)
+    return result
+
 def run(args):
     imported_digest = content_digest(args.path)
     if args.expected_import_sha256 and imported_digest != args.expected_import_sha256:
@@ -169,8 +239,21 @@ def run(args):
     try:
         database = LibraryDatabase(args.library_path)
         cache = database.new_api
+        acquisition = getattr(args, "acquisition", False)
+        if acquisition:
+            # Private provenance cannot be manufactured by ebook identifiers.
+            # SQLite backups retain this additive table; Calibre library export
+            # or rebuild may not. A missing record causes safe reinspection.
+            with cache.write_lock, cache.backend.conn:
+                cache.backend.execute(
+                    "CREATE TABLE IF NOT EXISTS cwng_acquisition_ingest_result "
+                    "(source_sha256 TEXT PRIMARY KEY NOT NULL, result_json TEXT NOT NULL)"
+                )
+                previous = acquisition_result(cache, source_digest)
+                if previous:
+                    return previous
         existing = marker_book_ids(cache, source_digest)
-        if existing:
+        if existing and not acquisition:
             return {
                 "status": "already_imported",
                 "imported_sha256": imported_digest,
@@ -193,6 +276,14 @@ def run(args):
             # Calibre's format-file copy/replace is a filesystem side effect and
             # is deliberately not described as part of that transaction.
             with cache.write_lock, cache.backend.conn:
+                if acquisition:
+                    previous = acquisition_result(cache, source_digest)
+                    if previous:
+                        return previous
+                    result = add_acquisition(cache, metadata, extension, imported_path, source_digest)
+                    if args.fail_before_commit:
+                        raise RuntimeError("injected failure before transaction commit")
+                    return result
                 existing = marker_book_ids(cache, source_digest)
                 if existing:
                     result = {"status": "already_imported", "book_ids": sorted(existing)}
@@ -232,6 +323,7 @@ def parse_args(argv):
     parser.add_argument("--expected-source-sha256")
     parser.add_argument("--automerge", choices=("disabled", "ignore", "new_record", "overwrite"), required=True)
     parser.add_argument("--metadata-json", default="{}")
+    parser.add_argument("--acquisition", action="store_true")
     parser.add_argument("--fail-before-commit", action="store_true", help=argparse.SUPPRESS)
     return parser.parse_args(argv)
 

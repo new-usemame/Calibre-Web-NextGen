@@ -191,3 +191,26 @@ def test_list_query_eager_loads_tags_no_follow_up_selectin(calibre_db):
         "eager-loaded (the lazy selectin fired) — re-add joinedload(Books.tags) "
         "to fill_indexpage_with_archived_books (cps/db.py)."
     )
+
+
+def test_select_all_query_returns_only_ordered_ids_without_loading_book_models(calibre_db):
+    from cps.db import Books
+
+    cdb, _engine = calibre_db
+    loaded = []
+    def record_load(book, _context):
+        loaded.append(book.id)
+
+    event.listen(Books, "load", record_load)
+    try:
+        ids, _random, pagination = cdb.fill_indexpage(
+            page=1, pagesize=3, database=Books, db_filter=true(),
+            order=[Books.id.desc()], join_archive_read=False,
+            config_read_column=0, ids_only=True,
+        )
+    finally:
+        event.remove(Books, "load", record_load)
+
+    assert ids == [5, 4, 3]
+    assert pagination.total_count == 5
+    assert loaded == []

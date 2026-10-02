@@ -109,8 +109,15 @@ export interface Me {
    *  because the mark does nothing until it is on. Absent on older servers →
    *  stay quiet rather than warn wrongly. */
   kobo_only_shelves_sync?: boolean;
+  opds_only_shelves_sync?: boolean;
   features?: ServerFeatures;
   instance_name?: string;
+  /** Instance support links, resolved by the server for this account. */
+  support?: {
+    show_project_links: boolean;
+    url: string | null;
+    label: string | null;
+  };
   display?: {
     books_per_page: number;
     random_books: number;
@@ -126,6 +133,11 @@ export interface Me {
   show_my_library_intro?: boolean;
   can_switch_library_mode?: boolean;
   library_mode_managed?: boolean;
+  /** Virtual library: this account may browse the admin-configured book
+   *  sources. Server-derived (feature on AND the account is granted), so the
+   *  nav gate never has to reason about role bits. Absent on older servers →
+   *  the entry stays hidden, which is the correct default-off behaviour. */
+  acquisition_access?: boolean;
 }
 
 export interface Book {
@@ -133,6 +145,8 @@ export interface Book {
   title: string;
   authors: string[];
   series: string | null;
+  /** First associated series ID, for direct navigation from book cards. */
+  series_id?: number | null;
   series_index: number | null;
   cover_url: string | null;
   formats: string[];
@@ -142,6 +156,8 @@ export interface Book {
   date_added?: string | null;
   last_modified?: string | null;
   read?: boolean;
+  /** Caller-owned favorite state, resolved in bulk for every list page. */
+  favorited?: boolean | null;
   /** Sync-driven tri-state marker for library cards; absent on older servers. */
   in_progress?: boolean;
   archived?: boolean;
@@ -312,6 +328,8 @@ export interface Shelf {
   is_owner: boolean;
   kobo_sync: boolean;
   count: number;
+  can_edit?: boolean;
+  opds_expose?: boolean;
 }
 
 export interface ShelfDetail extends Shelf {
@@ -515,7 +533,7 @@ export interface EditableCustomColumn {
 
 /** Custom columns are sent flat, keyed as the server expects (`custom_column_7`),
  *  not as the definition list the GET returns. */
-export type MetadataListMode = 'add' | 'replace';
+export type MetadataListMode = 'add' | 'replace' | 'remove';
 
 export type MetadataUpdate = Partial<Omit<BookMetadata, 'id' | 'errors' | 'custom_columns'>> & {
   /** Request-level behavior for authors/tags/publishers/languages. Omission is
@@ -659,6 +677,7 @@ export function navigateToLogout(): void {
 
 export interface ApiRequestOptions {
   auth?: 'protected' | 'public';
+  signal?: AbortSignal;
 }
 
 function isProtected(options?: ApiRequestOptions): boolean {
@@ -827,7 +846,7 @@ function clearCsrf() {
 }
 
 export async function apiGet<T>(path: string, options?: ApiRequestOptions): Promise<T> {
-  const res = await classifiedFetch(path, { credentials: 'include' }, options);
+  const res = await classifiedFetch(path, { credentials: 'include', signal: options?.signal }, options);
   if (!res.ok) {
     const parsed = await readApiError(res);
     throw new ApiError(res.status, parsed.message, parsed.detail);

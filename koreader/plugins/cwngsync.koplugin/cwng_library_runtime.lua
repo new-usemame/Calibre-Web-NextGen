@@ -20,6 +20,7 @@ local Library = require("cwng_library")
 local Setup = require("cwng_setup")
 local LuaSettings = require("luasettings")
 local NetworkMgr = require("ui/network/manager")
+local Notification = require("ui/widget/notification")
 local UIManager = require("ui/uimanager")
 local lfs = require("libs/libkoreader-lfs")
 local logger = require("logger")
@@ -35,8 +36,13 @@ local PLACEHOLDER_MAX_BYTES = 1024 * 1024
 local LIBRARY_SYNC_INTERVAL = 5 * 60
 -- Only a guard against a server that never stops paging: a list cut short is
 -- never applied, since every book past the cut would look as if it had left the
--- library. 5000 pages is a million books at the server's page size.
+-- library. 5000 pages is a quarter of a million books at LIBRARY_PAGE_SIZE.
 local MAX_MANIFEST_PAGES = 5000
+-- Books per manifest page. The server reads every listed file to give its
+-- checksum, so on a cold disk a page of its default 200 took tens of seconds,
+-- all of it with KOReader unable to read a tap (#2329). A small page keeps
+-- each blocking request short; the pages in between let input through.
+local LIBRARY_PAGE_SIZE = 50
 local PLACEHOLDER_TIMEOUTS = { 5, 20 }
 -- Steps that download from the server, and how many may fail in a row before
 -- the sync stops rather than waiting out every remaining book's timeouts.
@@ -53,6 +59,10 @@ local SAVE_EVERY_STEPS = 10
 -- few quick steps, hands the next one to the loop this much later instead.
 local STEP_PAUSE_SECONDS = 0.2
 local QUICK_STEPS_PER_PAUSE = 20
+-- The progress notice is renewed this often during a first fill (books added),
+-- and only for a fill at least this big: a few books need no notice.
+local PROGRESS_EVERY_STEPS = 18
+local PROGRESS_MIN_BOOKS = 5
 
 -- Shared by the file browser's and the reader's plugin instances: there is one
 -- library and one sync at a time, whichever instance started it.
@@ -64,6 +74,14 @@ local shared = {
     plugin = nil,
 }
 Runtime._shared = shared
+
+-- One notice at a time: a toast, so a tap still reaches the screen under it.
+-- Renewed rather than stacked while a long first fill runs (#2329).
+local function showProgress(text)
+    if shared.progress then UIManager:close(shared.progress) end
+    shared.progress = Notification:new{ text = text, timeout = 4 }
+    UIManager:show(shared.progress)
+end
 
 local function store()
     if not shared.store then
@@ -204,7 +222,7 @@ function Runtime:libraryProbe()
             if not a or a.mode ~= "file" then return nil end
             return { size = a.size, modification = a.modification }
         end,
-        digest = function(path) return self:getDocumentDigest(path) end,
+        digest = function(path) return self:getDocumentContentDigest(path) end,
         placeholderId = Runtime.readPlaceholderId,
         isOpen = function(path) return openDocumentPath() == path end,
     }
@@ -372,7 +390,7 @@ local function stillAsPlanned(self, action)
         return open ~= action.path and Runtime.readPlaceholderId(action.path) == action.book_id
     elseif op == "remove_download" then
         return open ~= action.path
-            and (action.checksum == nil or self:getDocumentDigest(action.path) == action.checksum)
+            and (action.checksum == nil or self:getDocumentContentDigest(action.path) == action.checksum)
     elseif op == "move_download" then
         return open ~= action.from and lfs.attributes(action.path, "mode") == nil
     end
@@ -424,7 +442,7 @@ function Runtime:performLibraryAction(client, action)
     elseif op == "adopt_download" then
         local info = fileInfo(action.path)
         if not info then return false end
-        info.checksum = self:getDocumentDigest(action.path)
+        info.checksum = self:getDocumentContentDigest(action.path)
         if action.from and not DocSettings:hasSidecarFile(action.path) then
             -- A move whose record was lost may have lost its sidecar move too.
             pcall(DocSettings.updateLocation, action.from, action.path)
@@ -646,11 +664,10 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
     for _, action in ipairs(actions) do
         if action.op == "create_placeholder" then adding = adding + 1 end
     end
-    if adding >= 5 and opts.interactive ~= false then
-        UIManager:show(InfoMessage:new{
-            text = T(_("Adding %1 books to your library…"), adding),
-            timeout = 3,
-        })
+    local show_progress = adding >= PROGRESS_MIN_BOOKS and opts.interactive ~= false
+    local added = 0
+    if show_progress then
+        showProgress(T(_("Adding %1 books to your library…"), adding))
     end
 
     local index = 0
@@ -692,6 +709,7 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
         if ok then
             succeeded = succeeded + 1
             unsaved = unsaved + 1
+            if action.op == "create_placeholder" then added = added + 1 end
             if action.path then changed[#changed + 1] = action.path end
             if action.from then changed[#changed + 1] = action.from end
         elseif action.op ~= "conflict" then
@@ -718,6 +736,10 @@ function Runtime:applyLibraryManifest(books, revision, token, opts, done, shelve
         if #changed >= 18 then
             self:refreshLibraryViews(changed)
             changed = {}
+        end
+        if show_progress and action.op == "create_placeholder" and added > 0
+                and added % PROGRESS_EVERY_STEPS == 0 and added < adding then
+            showProgress(T(_("Adding books to your library: %1 of %2"), added, adding))
         end
         quick_steps = quick_steps + 1
         if downloads or quick_steps >= QUICK_STEPS_PER_PAUSE then
@@ -807,6 +829,10 @@ function Runtime:syncLibrary(opts)
         if shared.running ~= token then return end
         shared.running = nil
         if ok then shared.last_sync = os.time() end
+        if shared.progress then
+            UIManager:close(shared.progress)
+            shared.progress = nil
+        end
         if opts.interactive then
             if ok and type(summary) == "table" and (summary.failed or 0) > 0 then
                 UIManager:show(InfoMessage:new{
@@ -824,6 +850,19 @@ function Runtime:syncLibrary(opts)
             end
         end
         if opts.on_done then opts.on_done(ok, summary) end
+    end
+
+    -- Runs `f` once KOReader has had a chance to read input, still ending the
+    -- sync on an error as the request's own callback does.
+    local function later(f)
+        UIManager:scheduleIn(STEP_PAUSE_SECONDS, function()
+            if shared.running ~= token then return end
+            local ran, err = pcall(f)
+            if not ran then
+                logger.warn("CWNGSync: library sync failed", err)
+                done(false, _("something went wrong while updating the library"))
+            end
+        end)
     end
 
     local function fetch(cursor)
@@ -849,8 +888,10 @@ function Runtime:syncLibrary(opts)
                     end
                     -- Nothing changed on the server; still reconcile the disk
                     -- (a book deleted on the device comes back as a cover).
-                    self:applyLibraryManifest(state.manifest, state.revision, token, opts, done,
-                        state.shelves)
+                    later(function()
+                        self:applyLibraryManifest(state.manifest, state.revision, token, opts, done,
+                            state.shelves)
+                    end)
                     return
                 end
                 if type(body.shelves) == "table" then shelves = body.shelves end
@@ -863,13 +904,23 @@ function Runtime:syncLibrary(opts)
                         return
                     end
                     cursors_seen[cursor_key] = true
-                    fetch(body.next_cursor)
+                    local total = tonumber(body.total)
+                    if opts.interactive ~= false and total and total > LIBRARY_PAGE_SIZE then
+                        showProgress(T(_("Getting your library list: %1 of %2 books"), #books, total))
+                    end
+                    -- A page is a blocking request without Turbo: handing the
+                    -- next one to the loop lets a tap through between pages,
+                    -- instead of holding the screen for the whole list (#2329).
+                    later(function() fetch(body.next_cursor) end)
                     return
                 end
-                self:applyLibraryManifest(books, body.revision, token, opts, done, shelves)
+                local revision = body.revision
+                later(function()
+                    self:applyLibraryManifest(books, revision, token, opts, done, shelves)
+                end)
             end
         client:get_library(self.settings.username, self.settings.password, Device.model,
-            self.device_id, cursor, if_revision,
+            self.device_id, cursor, if_revision, LIBRARY_PAGE_SIZE,
             function(ok, body, reason)
                 -- An error in here would end the request's coroutine without a
                 -- word and leave this sync marked as running: the library would
@@ -898,7 +949,7 @@ function Runtime:downloadLibraryBook(book_id, path, title)
         os.remove(temp)
         return false, _("the download was incomplete")
     end
-    local digest = self:getDocumentDigest(temp)
+    local digest = self:getDocumentContentDigest(temp)
     if checksum and checksum ~= "" and digest ~= checksum then
         os.remove(temp)
         return false, _("the downloaded file was damaged")

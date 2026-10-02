@@ -10,6 +10,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { Router } from 'wouter';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import type { Book } from '../../src/lib/api.ts';
 
@@ -39,11 +40,17 @@ function renderCard(shelves: Book['shelves'], props: Record<string, unknown> = {
     formats: [],
     shelves,
   } as Book;
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  queryClient.setQueryData(['me'], null);
   return renderToStaticMarkup(
     createElement(
-      Router,
-      { hook: () => ['/', () => undefined] },
-      createElement(BookCard, { book, ...props }),
+      QueryClientProvider,
+      { client: queryClient },
+      createElement(
+        Router,
+        { hook: () => ['/', () => undefined] },
+        createElement(BookCard, { book, ...props }),
+      ),
     ),
   );
 }

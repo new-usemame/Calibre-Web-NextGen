@@ -116,6 +116,7 @@ PER_USER_BOOK_MODELS = (
     "UserHiddenBook",
     "BookCoverPreview",
     "UserLibraryBook",
+    "BookReview",
 )
 # These ledgers are user-scoped through Device rather than a user_id column.
 # Keep the device-scoped registry extension separate from the flat-model tuple
@@ -160,6 +161,32 @@ def migrate_user_book_data(from_book_id, to_book_id, session=None):
                 _delete_annotation(session, ann)
         else:
             ann.book_id = to_book_id
+    session.flush()
+
+    # Private book reviews are authored text. If both copies have a note for
+    # the same user, retain both (destination first) instead of discarding
+    # either one; exact duplicate text is kept once. Merged text can exceed
+    # the normal API write limit, but remains readable and intact.
+    for review in session.query(ub.BookReview).filter(
+            ub.BookReview.book_id == from_book_id).all():
+        existing = session.query(ub.BookReview).filter(
+            ub.BookReview.user_id == review.user_id,
+            ub.BookReview.book_id == to_book_id).first()
+        if existing is None:
+            review.book_id = to_book_id
+            continue
+        if existing.text != review.text:
+            if not existing.text:
+                existing.text = review.text
+            elif review.text:
+                existing.text = existing.text + "\n\n" + review.text
+        if _newer(review.updated_at, existing.updated_at):
+            existing.updated_at = review.updated_at
+        if _newer(existing.created_at, review.created_at):
+            # _newer is strict, so swap only when the losing row is older.
+            if review.created_at is not None:
+                existing.created_at = review.created_at
+        session.delete(review)
     session.flush()
 
     # Kobo reading state: UNIQUE(user_id, book_id). If both books have a
@@ -425,7 +452,7 @@ def purge_user_book_data(book_id=None, user_id=None, session=None,
 
     for model in (ub.Bookmark, ub.ReadBook, ub.ArchivedBook, ub.Downloads,
                   ub.KoboSyncedBooks, ub.UserHiddenBook, ub.BookCoverPreview,
-                  ub.UserLibraryBook):
+                  ub.UserLibraryBook, ub.BookReview):
         _scoped(session.query(model), model).delete(synchronize_session=False)
 
     # Per-device entitlement state has no user_id of its own.  Scope a user

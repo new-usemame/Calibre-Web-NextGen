@@ -181,7 +181,7 @@
 {% block modal %}
 {{ delete_confirm_modal() }}
 {{ change_confirm_modal() }}
-{{ restrict_modal() }}
+{{ restrict_modal(restriction_is_bool|default(false)) }}
 {% endblock %}
 {% block js %}
 <script src="{{ url_for('static', filename='js/libs/bootstrap-table/bootstrap-table.min.js') }}"></script>

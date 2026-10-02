@@ -3,13 +3,14 @@ import { useLocation } from 'wouter';
 import { Wand2, Plus, Trash2 } from 'lucide-react';
 import {
   useMagicShelfPreview, useCreateMagicShelf, useEditMagicShelf,
-  useMagicShelfBooks, useMagicShelfRuleSchema,
+  useMagicShelfBooks, useMagicShelfRuleSchema, useMe,
 } from '../lib/queries';
 import type { MagicRule, MagicRuleField, MagicRuleOperator } from '../lib/queries';
 import {
   groupFromStored, groupToStored, leafCount, removeNode, someLeaf, updateNode,
 } from '../lib/magicRuleTree';
 import type { RuleGroup, RuleLeaf } from '../lib/magicRuleTree';
+import { ShelfOptions } from '../components/ShelfOptions';
 import { Button } from '../components/Button';
 import { useT } from '../lib/i18n';
 import { ApiError } from '../lib/api';
@@ -32,6 +33,7 @@ const blankValueFor = (operator?: MagicRuleOperator): MagicRule['value'] =>
  *  stays server-side). */
 export function MagicShelf({ editId }: { editId?: string }) {
   const t = useT();
+  const me = useMe().data;
   const [, navigate] = useLocation();
   const preview = useMagicShelfPreview();
   const create = useCreateMagicShelf();
@@ -43,15 +45,21 @@ export function MagicShelf({ editId }: { editId?: string }) {
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('🪄');
   const [isSystem, setIsSystem] = useState(false);
+  const [isPublic, setPublic] = useState(false);
+  const [koboSync, setKobo] = useState(false);
+  const [opdsExpose, setOpds] = useState(false);
   const [tree, setTree] = useState<RuleGroup>(() => ({ kind: 'group', key: nextKey(), condition: 'AND', rules: [newRule()] }));
   const [seeded, setSeeded] = useState(false);
 
   useEffect(() => {
     if (!editId || seeded || !existing.data) return;
-    const d = existing.data as unknown as { name: string; icon: string; is_system?: boolean; rules?: Parameters<typeof groupFromStored>[0] };
+    const d = existing.data;
     setName(d.name || '');
     setIcon(d.icon || '🪄');
     setIsSystem(Boolean(d.is_system));
+    setPublic(d.is_public);
+    setKobo(!!d.kobo_sync);
+    setOpds(!!d.opds_expose);
     const loaded = groupFromStored(d.rules, nextKey);
     setTree(loaded.rules.length ? loaded : { ...loaded, rules: [newRule()] });
     setSeeded(true);
@@ -199,13 +207,15 @@ export function MagicShelf({ editId }: { editId?: string }) {
     // Discard edits and go back where the user came from; fall back to the shelf
     // view (editing) or the shelves list (creating) on a direct/bookmarked load.
     if (window.history.length > 1) window.history.back();
-    else navigate(editId ? `/magic/${editId}` : '/shelves');
+    else navigate(editId ? `/magic/${editId}` : '/magic');
   };
 
   const onSave = () => {
     setErr(null);
     if (!name.trim()) { setErr(t('Give your smart shelf a name.')); return; }
-    const payload = { name: name.trim(), icon: icon || '🪄', rules: ruleSet() };
+    const owner = !editId || existing.data?.is_owner;
+    const payload = { name: name.trim(), icon: icon || '🪄', rules: ruleSet(), is_public: isPublic,
+      ...(owner ? { kobo_sync: koboSync } : {}), opds_expose: opdsExpose };
     if (editId) {
       edit.mutate(payload, {
         onSuccess: (d) => d.success ? navigate(`/magic/${editId}`) : setErr(d.message || t('Could not save the shelf.')),
@@ -220,7 +230,10 @@ export function MagicShelf({ editId }: { editId?: string }) {
   };
   const saving = create.isPending || edit.isPending;
 
-  if (schemaQuery.isLoading) {
+  if (editId && !existing.isLoading && (existing.error || !existing.data?.can_edit)) {
+    return <div className={styles.container}><p role="alert">{t('You are not allowed to edit this shelf')}</p></div>;
+  }
+  if (schemaQuery.isLoading || (editId && !seeded)) {
     return <div className={styles.container}><h1 className={styles.title}>{t('Loading…')}</h1></div>;
   }
   if (schemaQuery.isError || fields.length === 0) {
@@ -246,6 +259,11 @@ export function MagicShelf({ editId }: { editId?: string }) {
             aria-describedby={err ? 'magic-shelf-error' : undefined} />
         </label>
       </div>
+
+      <ShelfOptions me={me} smart showSharing={!isSystem} owner={!editId || !!existing.data?.is_owner}
+        canShare={!editId || existing.data?.is_owner ? !!me?.role.share_shelfs : !!me?.role.edit_shelfs}
+        isPublic={isPublic} koboSync={koboSync} opdsExpose={opdsExpose}
+        onPublic={setPublic} onKobo={setKobo} onOpds={setOpds} />
 
       <div className={styles.matchRow}>
         {t('Match')}

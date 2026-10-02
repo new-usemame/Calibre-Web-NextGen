@@ -26,6 +26,7 @@ from cps import db, logger
 from cps.services import hardcover
 from cps.services.worker import CalibreTask, STAT_CANCELLED, STAT_ENDED
 from flask_babel import lazy_gettext as N_
+from markupsafe import escape
 
 # Pause between books so a big series add doesn't burst-hammer the API.
 INTER_BOOK_DELAY = 0.2
@@ -103,7 +104,8 @@ class TaskHardcoverBulkSync(CalibreTask):
             if self.errors and not (self.synced or self.already_synced):
                 self._handleError(summary)
             else:
-                self.message = summary
+                # /tasks renders message as HTML; error is escaped there instead
+                self.message = escape(summary)
                 self._handleSuccess()
         finally:
             calibre_db.session.close()

@@ -23,6 +23,7 @@ _UNSET_PREFERENCES = {
     "show_hidden_books": None,
     "card_actions_hidden": None,
     "reading_tags_hidden": None,
+    "show_original_filename": None,
     "shelf_badges_hidden": None,
 }
 
@@ -61,6 +62,7 @@ def test_me_serializes_named_preference_and_unset_state():
         "show_hidden_books": False,
         "card_actions_hidden": True,
         "reading_tags_hidden": False,
+        "show_original_filename": None,
         "shelf_badges_hidden": None,
     }
 

@@ -18,9 +18,11 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/popup.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/reader.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/reader-lookup.css') }}">
 </head>
 
 <body>
+    {% include '_reader_lookup_banner.html' %}
     <div id="sidebar">
         <div id="panels">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -139,11 +141,15 @@
             <div class="rs-section font" id="font">
                 <label class="rs-label">{{_('Font')}}</label>
                 <div class="rs-buttons">
-                    <button type="button" id="default" onclick="selectFont(this.id)"><span>✓</span>{{_('Default')}}</button>
-                    <button type="button" id="Yahei" onclick="selectFont(this.id)"><span></span>{{_('Yahei')}}</button>
-                    <button type="button" id="SimSun" onclick="selectFont(this.id)"><span></span>{{_('SimSun')}}</button>
-                    <button type="button" id="KaiTi" onclick="selectFont(this.id)"><span></span>{{_('KaiTi')}}</button>
-                    <button type="button" id="Arial" onclick="selectFont(this.id)"><span></span>{{_('Arial')}}</button>
+                    <button type="button" data-font="default" onclick="selectFont(this.dataset.font)"><span>✓</span>{{_('Default')}}</button>
+                    <button type="button" data-font="Literata" onclick="selectFont(this.dataset.font)"><span></span>{{_('Literata')}}</button>
+                    <button type="button" data-font="Yahei" onclick="selectFont(this.dataset.font)"><span></span>{{_('Yahei')}}</button>
+                    <button type="button" data-font="SimSun" onclick="selectFont(this.dataset.font)"><span></span>{{_('SimSun')}}</button>
+                    <button type="button" data-font="KaiTi" onclick="selectFont(this.dataset.font)"><span></span>{{_('KaiTi')}}</button>
+                    <button type="button" data-font="Arial" onclick="selectFont(this.dataset.font)"><span></span>{{_('Arial')}}</button>
+                    {% for font in reader_fonts if not font.builtin %}
+                    <button type="button" data-font="{{ font.id }}" onclick="selectFont(this.dataset.font)"><span></span>{{ font.label }}</button>
+                    {% endfor %}
                 </div>
             </div>
 
@@ -174,12 +180,21 @@
         window.calibre = {
             filePath: "{{ url_for('static', filename='js/libs/') }}",
             cssPath: "{{ url_for('static', filename='css/') }}",
-            bookmarkUrl: "{{ url_for('web.set_bookmark', book_id=bookid, book_format=book_format|lower) }}",
+            bookmarkUrl: "{{ url_for('web.set_bookmark', book_id=bookid, book_format=book_format|lower, lookup=1 if lookup_mode else None) }}",
+            lookupMode: {{ lookup_mode|default(false)|tojson }},
             csrfToken: "{{ csrf_token() }}",
             bookUrl: "{{ url_for('web.serve_book', book_id=bookid, book_format=book_format, anyname='file.epub') }}",
             bookmark: "{{ bookmark.bookmark_key if bookmark != None }}",
             useBookmarks: "{{ current_user.is_authenticated | tojson }}",
             readerSettings: {{ reader_settings | default('{}') | safe }},
+            // Injected into every rendered chapter's iframe (see epub.js
+            // hooks.content.register) so the bundled Literata font is
+            // actually available inside book content.
+            customFontFaces: "@font-face{font-family:'Literata';font-weight:normal;font-style:normal;font-display:swap;src:url('{{ url_for('static', filename='fonts/literata/Literata-Regular.woff2') }}') format('woff2');}" +
+                "@font-face{font-family:'Literata';font-weight:normal;font-style:italic;font-display:swap;src:url('{{ url_for('static', filename='fonts/literata/Literata-Italic.woff2') }}') format('woff2');}" +
+                "@font-face{font-family:'Literata';font-weight:bold;font-style:normal;font-display:swap;src:url('{{ url_for('static', filename='fonts/literata/Literata-Bold.woff2') }}') format('woff2');}" +
+                "@font-face{font-family:'Literata';font-weight:bold;font-style:italic;font-display:swap;src:url('{{ url_for('static', filename='fonts/literata/Literata-BoldItalic.woff2') }}') format('woff2');}",
+            readerFonts: {{ reader_fonts | default([]) | tojson }},
             kosyncPercent: {{ kosync_progress | tojson if kosync_progress is not none else 'null' }},
             annotationsApiBase: "{{ url_for('annotations.annotations_view', book_id=bookid).rstrip('/') }}",
             annotationsI18n: {
@@ -242,22 +257,26 @@
         // Font size and font logic (wait for reader to be ready)
         let defaultFont;
         window.selectFont = function(id) {
+          var fontItem = (calibre.readerFonts || []).find(function(item) { return item.id === id; });
+          if (!fontItem) {
+            id = 'default';
+            fontItem = (calibre.readerFonts || []).find(function(item) { return item.id === id; });
+          }
           if (!defaultFont) {
             try {
               defaultFont = reader.rendition.getContents()[0]?.css('font-family');
             } catch (e) { defaultFont = null; }
           }
-          let spans = document.getElementById("font").querySelectorAll("span");
-          for(var i = 0; i < spans.length; i++) {
-            spans[i].textContent = "";
-          }
-          document.getElementById(id).querySelector("span").textContent = "✓";
+          let buttons = document.getElementById("font").querySelectorAll("button[data-font]");
+          buttons.forEach(function(button) { button.querySelector("span").textContent = ""; });
+          let selected = Array.from(buttons).find(function(button) { return button.dataset.font === id; });
+          if (selected) selected.querySelector("span").textContent = "✓";
           ReaderSettings.set("font", id);
           if (id == 'default' && defaultFont) {
             reader.rendition.themes.font(defaultFont);
             return;
           }
-          reader.rendition.themes.font(id);
+          reader.rendition.themes.font(fontItem ? fontItem.family : 'initial');
         }
 
         window.spread = function(id) {

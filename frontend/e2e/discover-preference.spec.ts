@@ -7,14 +7,13 @@ async function csrfHeaders(page: import('@playwright/test').Page) {
   return { 'X-CSRFToken': payload.csrf_token };
 }
 
-async function installReadNowObserver(page: import('@playwright/test').Page) {
+async function installCardActionsObserver(page: import('@playwright/test').Page) {
   await page.addInitScript(() => {
-    const observed = window as typeof window & { __readNowMounted?: boolean };
+    const observed = window as typeof window & { __cardActionsMounted?: boolean };
     const start = () => {
       const mark = () => {
-        if ([...document.querySelectorAll('a')]
-          .some((link) => link.textContent?.trim() === 'Read now')) {
-          observed.__readNowMounted = true;
+        if (document.querySelector('button[aria-label^="Actions for "]')) {
+          observed.__cardActionsMounted = true;
         }
       };
       mark();
@@ -29,17 +28,9 @@ async function installReadNowObserver(page: import('@playwright/test').Page) {
 }
 
 async function expectCardActionsAvailable(page: import('@playwright/test').Page) {
-  if (test.info().project.use.hasTouch === true) {
-    // Coarse pointers show no card actions at all (operator ruling 2026-09-12):
-    // the row is still RENDERED — which is what the preference controls — but
-    // the coarse media rule keeps it out of the layout. The off-state assertion
-    // at each call site is what proves the preference removes it from the DOM,
-    // so "available" here is exactly "still rendered".
-    await expect(page.locator('a[aria-label^="Read "]').first()).toBeAttached();
-    return;
-  }
-
-  await expect(page.getByText('Read now', { exact: true }).first()).toBeVisible();
+  const trigger = page.getByRole('button', { name: /^Actions for / }).first();
+  await expect(trigger).toBeAttached();
+  if (test.info().project.use.hasTouch === true) await expect(trigger).toBeVisible();
 }
 
 function preferenceWrite(
@@ -168,7 +159,7 @@ test('hidden books and card actions adopt local state and follow the account', a
     const payload = request.postDataJSON() as { preferences?: Record<string, boolean> };
     for (const name of Object.keys(payload.preferences ?? {})) adopted.add(name);
   });
-  await installReadNowObserver(page);
+  await installCardActionsObserver(page);
   await page.evaluate(() => {
     localStorage.setItem('cwng_show_hidden_books_v1', '1');
     localStorage.setItem('cwng:card-actions-hidden-v1', '1');
@@ -178,9 +169,9 @@ test('hidden books and card actions adopt local state and follow the account', a
   await expect.poll(() => [...adopted].sort()).toEqual([
     'card_actions_hidden', 'show_hidden_books',
   ]);
-  await expect(page.getByText('Read now', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Actions for / })).toHaveCount(0);
   expect(await page.evaluate(() =>
-    (window as typeof window & { __readNowMounted?: boolean }).__readNowMounted ?? false,
+    (window as typeof window & { __cardActionsMounted?: boolean }).__cardActionsMounted ?? false,
   )).toBe(false);
 
   await page.getByTestId('catalog-view-settings').click();
@@ -196,16 +187,16 @@ test('hidden books and card actions adopt local state and follow the account', a
   try {
     await browserB.addCookies(await context.cookies());
     const pageB = await browserB.newPage();
-    await installReadNowObserver(pageB);
+    await installCardActionsObserver(pageB);
     await pageB.goto('/app');
     await pageB.getByTestId('catalog-view-settings').click();
     const showHidden = pageB.getByTestId('show-hidden-books');
     const showCardActions = pageB.getByTestId('show-card-actions');
     await expect(showHidden).toBeChecked();
     await expect(showCardActions).not.toBeChecked();
-    await expect(pageB.getByText('Read now', { exact: true })).toHaveCount(0);
+    await expect(pageB.getByRole('button', { name: /^Actions for / })).toHaveCount(0);
     expect(await pageB.evaluate(() =>
-      (window as typeof window & { __readNowMounted?: boolean }).__readNowMounted ?? false,
+      (window as typeof window & { __cardActionsMounted?: boolean }).__cardActionsMounted ?? false,
     )).toBe(false);
     await expect.poll(() => pageB.evaluate(() => ({
       showHidden: localStorage.getItem('cwng_show_hidden_books_v1'),

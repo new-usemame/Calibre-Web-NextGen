@@ -58,7 +58,9 @@ from sqlalchemy.orm.exc import NoResultFound
 from .usermanagement import user_login_required
 
 from . import app, config, constants, logger, oauth_auto_redirect, ub
+from . import oauth_config
 from .ui_themes import config_theme_code
+from .ui_font_preferences import seed_new_user_ui_font_defaults
 
 try:
     from .oauth import OAuthBackend, backend_resultcode
@@ -490,9 +492,10 @@ def register_user_from_generic_oauth(token=None):
         # This used to hardcode dark, from when light was deprecated; #845
         # brought six themes back, so honour whatever the admin configured.
         user.theme = config_theme_code(getattr(config, 'config_theme', None))
+        seed_new_user_ui_font_defaults(user, config)
             
-        # Kobo sync setting defaults to 0 (disabled) for new users
-        user.kobo_only_shelves_sync = 0
+        # Match other new accounts: send only selected shelves.
+        user.kobo_only_shelves_sync = 1
         user.opds_only_shelves_sync = 0
         
         try:    
@@ -783,8 +786,15 @@ def generate_oauth_blueprints(application):
         ub.session.add(generic)
         ub.session_commit()
     
-    # Update endpoints from metadata URL if available
-    if generic.metadata_url:
+    environment = application.extensions.get(oauth_config.ENVIRONMENT_EXTENSION)
+    if environment is None:
+        environment = oauth_config.resolve_environment_provider()
+    environment_managed = bool(environment.get("managed"))
+    environment_settings = environment.get("settings") or {}
+
+    # The database path keeps its existing discovery-and-persist behavior.
+    # Deployment-owned settings must never write discovered values to app.db.
+    if not environment_managed and generic.metadata_url:
         metadata = fetch_metadata_from_url(generic.metadata_url)
         if metadata:
             # Update from metadata (takes precedence over manual settings)
@@ -801,7 +811,52 @@ def generate_oauth_blueprints(application):
     
     # Normalize scope: OAuth2Session expects space-separated string, not list
     # Clean up extra whitespace and sort alphabetically to prevent scope mismatch warnings (Issue #715)
-    scope_value = generic.scope or 'openid profile email'
+    provider_values = {
+        "active": generic.active,
+        "scope": generic.scope,
+        "oauth_client_id": generic.oauth_client_id,
+        "oauth_client_secret": generic.oauth_client_secret,
+        "oauth_base_url": generic.oauth_base_url,
+        "oauth_authorize_url": generic.oauth_authorize_url,
+        "oauth_token_url": generic.oauth_token_url,
+        "oauth_userinfo_url": generic.oauth_userinfo_url,
+        "metadata_url": generic.metadata_url,
+        "username_mapper": generic.username_mapper,
+        "email_mapper": generic.email_mapper,
+        "login_button": generic.login_button or 'OpenID Connect',
+        "oauth_admin_group": generic.oauth_admin_group or 'admin',
+        "oauth_group_claim": generic.oauth_group_claim or 'groups',
+        "oauth_allowed_groups": generic.oauth_allowed_groups or '',
+        "oauth_require_group": bool(generic.oauth_require_group),
+        "oauth_default_role": generic.oauth_default_role,
+    }
+    if environment_managed:
+        # Missing/invalid environment configuration deliberately produces an
+        # inactive empty provider. No old DB credential, endpoint, mapper or
+        # role policy can complete a partial deployment declaration.
+        provider_values.update({
+            "active": False,
+            "scope": oauth_config.DEFAULT_SCOPE,
+            "oauth_client_id": "",
+            "oauth_client_secret": "",
+            "oauth_base_url": "",
+            "oauth_authorize_url": "",
+            "oauth_token_url": "",
+            "oauth_userinfo_url": "",
+            "metadata_url": "",
+            "username_mapper": "preferred_username",
+            "email_mapper": "email",
+            "login_button": "OpenID Connect",
+            "oauth_admin_group": "admin",
+            "oauth_group_claim": "groups",
+            "oauth_allowed_groups": "",
+            "oauth_require_group": False,
+            "oauth_default_role": None,
+        })
+        provider_values.update(environment_settings)
+        provider_values["active"] = bool(environment.get("active"))
+
+    scope_value = provider_values["scope"] or 'openid profile email'
     if isinstance(scope_value, str):
         # Clean, sort, and normalize: split then rejoin to remove extra whitespace
         scopes = [s.strip() for s in scope_value.split() if s.strip()]
@@ -821,26 +876,28 @@ def generate_oauth_blueprints(application):
     # role if configured, else the global default), so opening the form shows the
     # real current behavior and saving it unchanged is a no-op.
     effective_default_role = _oauth_effective_default_role(
-        generic.oauth_default_role, config.config_default_role)
+        provider_values["oauth_default_role"], config.config_default_role)
     ele3 = dict(provider_name='generic',
                 id=generic.id,
-                active=generic.active,
+                active=provider_values["active"],
                 scope=scope_value,
-                oauth_client_id=generic.oauth_client_id,
-                oauth_client_secret=generic.oauth_client_secret,
-                oauth_base_url=generic.oauth_base_url,
-                oauth_authorize_url=generic.oauth_authorize_url,
-                oauth_token_url=generic.oauth_token_url,
-                oauth_userinfo_url=generic.oauth_userinfo_url,
-                metadata_url=generic.metadata_url,
-                username_mapper=generic.username_mapper,
-                email_mapper=generic.email_mapper,
-                login_button=generic.login_button or 'OpenID Connect',
-                oauth_admin_group=generic.oauth_admin_group or 'admin',
-                oauth_group_claim=generic.oauth_group_claim or 'groups',
-                oauth_allowed_groups=generic.oauth_allowed_groups or '',
-                oauth_require_group=bool(generic.oauth_require_group),
-                oauth_default_role=generic.oauth_default_role,
+                oauth_client_id=provider_values["oauth_client_id"],
+                oauth_client_secret=provider_values["oauth_client_secret"],
+                oauth_base_url=provider_values["oauth_base_url"],
+                oauth_authorize_url=provider_values["oauth_authorize_url"],
+                oauth_token_url=provider_values["oauth_token_url"],
+                oauth_userinfo_url=provider_values["oauth_userinfo_url"],
+                metadata_url=provider_values["metadata_url"],
+                username_mapper=provider_values["username_mapper"],
+                email_mapper=provider_values["email_mapper"],
+                login_button=provider_values["login_button"],
+                oauth_admin_group=provider_values["oauth_admin_group"],
+                oauth_group_claim=provider_values["oauth_group_claim"],
+                oauth_allowed_groups=provider_values["oauth_allowed_groups"],
+                oauth_require_group=provider_values["oauth_require_group"],
+                oauth_default_role=provider_values["oauth_default_role"],
+                environment_managed=environment_managed,
+                environment_error=environment.get("error"),
                 oauth_default_role_download=_oauth_role_enabled(effective_default_role, constants.ROLE_DOWNLOAD),
                 oauth_default_role_viewer=_oauth_role_enabled(effective_default_role, constants.ROLE_VIEWER),
                 oauth_default_role_upload=_oauth_role_enabled(effective_default_role, constants.ROLE_UPLOAD),
@@ -917,7 +974,11 @@ def generate_oauth_blueprints(application):
                     **blueprint_params
                 )
             except Exception as e:
-                log.error("Failed to create generic OAuth blueprint: %s", e)
+                if element.get("environment_managed"):
+                    log.error("Failed to create environment-managed generic OAuth blueprint (%s)",
+                              type(e).__name__)
+                else:
+                    log.error("Failed to create generic OAuth blueprint: %s", e)
                 # Fallback without redirect_url if it fails
                 blueprint_params.pop('redirect_url', None)
                 blueprint = OAuth2ConsumerBlueprint(

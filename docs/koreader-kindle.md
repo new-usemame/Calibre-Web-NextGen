@@ -97,6 +97,20 @@ the book first under **Recent**.
   library back. To always start in the file browser, turn off **Tools ▸ CWNG library ▸
   Advanced ▸ Start on the library home**.
 
+## Matching sideloaded books by filename
+
+If a conversion or metadata edit changed a sideloaded book's bytes, choose
+**Tools ▸ CWNG library ▸ Advanced ▸ Document matching method ▸ Filename: match exact names**.
+Keep the same filename as the library file or the CWNG download, including its extension.
+The setting is saved for this device and applies to progress, highlights and inventory
+matching. Binary remains the default and can be restored in the same menu.
+
+Filename matching uses the exact name: case, accents and extension matter. Renamed files
+will not match, and different books with identical filenames can match each other. Prefer
+Binary if your library has duplicate names. Already queued offline updates keep their
+original identity; new captures use the selected method. Download verification and the
+checks that protect managed files always use file contents.
+
 ## If something goes wrong
 
 - **"Could not download"**: check that Wi-Fi is on, then tap the book again.

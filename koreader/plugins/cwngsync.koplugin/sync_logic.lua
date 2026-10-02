@@ -35,6 +35,32 @@ function SyncLogic.isRemoteProgressFromThisDevice(body, device_model, device_id)
         and body.device_id == device_id
 end
 
+-- Whether a pulled position this device pushed itself should be dropped.
+--
+-- An own push is normally stale by definition: the device either still sits
+-- there or has read past it without pushing yet (offline, push queued), and
+-- moving back to it would lose that reading. That is the only thing the
+-- same-device check protects, so it only applies while the device has a
+-- position of its own to protect.
+--
+-- After KOReader's history is wiped (#2380: a Kobo whose library and history
+-- were deleted before reinstalling the plugin) the book opens at 0% and the
+-- server's copy of the device's own push is the only record of where the
+-- reader was. Refusing it left them at the front of the book with "Latest
+-- progress is coming from this device". An explicit "Pull progress" is also
+-- never refused: the user asked for the server's position, and the caller
+-- still reports "already synchronized" when it matches.
+--
+-- `local_percentage` is the book's current position (0-1), or nil when the
+-- device has none recorded.
+function SyncLogic.shouldIgnoreOwnRemoteProgress(body, device_model, device_id, interactive, local_percentage)
+    if interactive or not SyncLogic.isRemoteProgressFromThisDevice(body, device_model, device_id) then
+        return false
+    end
+    local p = tonumber(local_percentage)
+    return p ~= nil and p > 0
+end
+
 -- The digest the server matches a sync against is a partial MD5 of the book's
 -- *bytes* — the server computes the same 12 x 1 KiB sample in
 -- cps/progress_syncing/checksums/koreader.py. KOReader caches that value in the

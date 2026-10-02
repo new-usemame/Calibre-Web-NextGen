@@ -26,7 +26,7 @@
 .removeRule { color: var(--text-muted); padding: var(--sp-1); min-width: 24px; min-height: 24px; display: inline-flex; align-items: center; justify-content: center; }
 .removeRule:hover:not(:disabled) { color: var(--danger); }
 .removeRule:disabled { opacity: 0.3; }
-.addRule { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--accent); font-size: var(--fs-sm); align-self: flex-start; padding: var(--sp-1) 0; }
+.addRule { display: inline-flex; align-items: center; gap: var(--sp-1); color: var(--accent-text); font-size: var(--fs-sm); align-self: flex-start; padding: var(--sp-1) 0; }
 .addRow { display: flex; flex-wrap: wrap; gap: var(--sp-4); }
 /* A nested rule group (#2257), indented under a border rail. */
 .group { display: flex; flex-direction: column; gap: var(--sp-2); border-left: 2px solid var(--border); padding-left: var(--sp-3); }

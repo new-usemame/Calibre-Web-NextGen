@@ -1,0 +1,34 @@
+<style>/* Included in full pages and Classic XHR fragments. */
+#private-book-review [hidden] { display: none !important; }
+</style>
+<section id="private-book-review" class="book-detail-description" aria-labelledby="private-review-heading"
+    data-url="{{ url_for('api_v1.book_detail', book_id=entry.id) }}/review"
+    data-saved="{{ _('Review saved.') }}" data-deleted="{{ _('Review deleted.') }}"
+    data-load-error="{{ _('Could not load your review.') }}" data-save-error="{{ _('Could not save review.') }}"
+    data-add="{{ _('Add a review') }}" data-edit="{{ _('Edit review') }}"
+    data-too-long="{{ _('Review text exceeds 10000 characters') }}"
+    data-delete-error="{{ _('Could not delete review.') }}">
+    <h3 id="private-review-heading" tabindex="-1">{{ _('Your review') }}</h3>
+    <p id="private-review-privacy">{{ _('Private to your account. This does not change the shared Description.') }}</p>
+    <p id="private-review-status" role="status" aria-live="polite">{{ _('Loading…') }}</p>
+    <p id="private-review-error" role="alert" hidden></p>
+    <p id="private-review-text" dir="auto" style="white-space: pre-wrap; overflow-wrap: anywhere;" hidden></p>
+    <div id="private-review-actions" hidden>
+        <button id="private-review-edit" class="btn btn-default" type="button" style="min-height:44px">{{ _('Edit review') }}</button>
+        <button id="private-review-delete" class="btn btn-default" type="button" style="min-height:44px" hidden>{{ _('Delete review') }}</button>
+    </div>
+    <button id="private-review-retry" class="btn btn-default" type="button" style="min-height:44px" hidden>{{ _('Retry') }}</button>
+    <form id="private-review-form" hidden>
+        <label for="private-review-draft">{{ _('Review or note') }}</label>
+        <textarea id="private-review-draft" class="form-control" rows="6" required dir="auto" aria-describedby="private-review-privacy private-review-error"></textarea>
+        <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+            <button type="button" id="private-review-cancel" class="btn btn-default" style="min-height:44px">{{ _('Cancel') }}</button>
+            <button type="submit" class="btn btn-primary" style="min-height:44px">{{ _('Save review') }}</button>
+        </div>
+    </form>
+    <div id="private-review-confirm" hidden>
+        <p>{{ _('Delete your review?') }} {{ _('This removes your private review or note for this book.') }}</p>
+        <button type="button" id="private-review-delete-cancel" class="btn btn-default" style="min-height:44px">{{ _('Cancel') }}</button>
+        <button type="button" id="private-review-delete-confirm" class="btn btn-danger" style="min-height:44px">{{ _('Delete review') }}</button>
+    </div>
+</section>

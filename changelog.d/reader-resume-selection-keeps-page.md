@@ -1,0 +1,2 @@
+### Fixed
+- **Selecting text while a synced book opens no longer loses the selection.** When a book has a KOReader or Kobo position and no web-reader position, the New UI reader shows the start while it works out where that position is, then jumps there. If you selected text (or tapped a highlight) on that first page before the jump, the jump still happened and the highlight popup vanished under your finger. Now selecting text or tapping a highlight keeps you on that page, and the synced position is offered as "Resume at N% from another device" instead.

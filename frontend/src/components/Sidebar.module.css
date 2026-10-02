@@ -603,3 +603,14 @@
   font-size: var(--fs-sm);
 }
 .tableVisibility input { width: 18px; height: 18px; accent-color: var(--accent); }
+
+
+.sectionHeader { display: flex; align-items: center; }
+.sectionHeader > a:first-child { flex: 1; min-width: 0; }
+.sectionControl { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 28px; height: 32px; color: var(--text-muted); border-radius: var(--r-sm); background: transparent; border: 0; }
+.sectionControl:hover { color: var(--text); background: var(--surface-3); }
+
+@media (min-width: 768px) and (hover: hover) and (pointer: fine) {
+  .sectionControl { display: none; }
+  :is(.nav, .navOpen):is(.pinned, :hover:not(.hoverSuppressed), :focus-within) .sectionControl { display: inline-flex; }
+}

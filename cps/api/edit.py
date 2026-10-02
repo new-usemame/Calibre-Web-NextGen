@@ -36,7 +36,10 @@ EDITABLE_FIELDS = [
 # ``list_mode`` is request-level and deliberately not part of EDITABLE_FIELDS:
 # it changes how relationship fields are prepared, never what fields are
 # writable. Omission remains the historical replace behaviour for every
-# existing API client.
+# existing API client. ``remove`` (#1703) drops only the named values from each
+# book and applies to relationship fields alone; any other field sent with it
+# is rejected rather than silently replaced.
+LIST_MODES = ("add", "replace", "remove")
 LIST_FIELD_SEPARATORS = {
     "authors": "&",
     "tags": ",",
@@ -148,6 +151,29 @@ def _add_list_values(book, field, raw):
         return None
     joiner = " & " if field == "authors" else ", "
     return joiner.join(existing + additions)
+
+
+def _remove_list_values(book, field, raw):
+    """Drop the named values from a list field, returning the editor value or
+    ``None`` when the book carries none of them.
+
+    Matching uses the same stripping and Unicode-aware case folding as
+    :func:`_add_list_values`; the values the book keeps are emitted unchanged
+    and in their existing order. ``None`` means nothing would change, so the
+    caller must skip the write and leave the book's modified time alone.
+    """
+    separator = LIST_FIELD_SEPARATORS[field]
+    targets = {
+        part.strip().casefold()
+        for part in ("" if raw is None else str(raw)).split(separator)
+        if part.strip()
+    }
+    existing = _book_list_values(book, field)
+    kept = [value for value in existing if value.strip().casefold() not in targets]
+    if len(kept) == len(existing):
+        return None
+    joiner = " & " if field == "authors" else ", "
+    return joiner.join(kept)
 
 
 def _delete_api_response(result):
@@ -450,8 +476,22 @@ def update_metadata(book_id):
 
     data = request.get_json(silent=True) or {}
     list_mode = data.get("list_mode", "replace")
-    if list_mode not in ("add", "replace"):
-        return _err("invalid_request", "list_mode must be 'add' or 'replace'", 400)
+    if list_mode not in LIST_MODES:
+        return _err("invalid_request", "list_mode must be 'add', 'replace' or 'remove'", 400)
+    if list_mode == "remove":
+        # Remove has no meaning for a single-value field, a custom column or an
+        # identifier list; replacing those instead would be a silent overwrite.
+        other = sorted(
+            key for key in data
+            if key != "list_mode" and key not in LIST_FIELD_SEPARATORS
+        )
+        if other:
+            return _err(
+                "invalid_request",
+                "list_mode 'remove' applies only to authors, tags, publishers "
+                "and languages; also sent: " + ", ".join(map(str, other)),
+                400,
+            )
 
     errors = {}
     for field in EDITABLE_FIELDS:
@@ -462,6 +502,15 @@ def update_metadata(book_id):
             value = _add_list_values(book, field, raw)
             if value is None:
                 continue  # A no-op add must not touch modified time or metadata.
+        elif list_mode == "remove" and field in LIST_FIELD_SEPARATORS:
+            value = _remove_list_values(book, field, raw)
+            if value is None:
+                continue  # The book has none of these values: leave it untouched.
+            if field == "authors" and not value:
+                # edit_book_param would substitute "Unknown"; a bulk remove must
+                # never strip a book of its real authorship.
+                errors[field] = "A book must keep at least one author"
+                continue
         else:
             value = "" if raw is None else str(raw)
         # edit_book_param reads vals['pk'] + vals['value']; checkA auto-syncs the

@@ -56,6 +56,172 @@ export interface WhatsNewRelease {
 /** Newest release first. The `whats-new-populate` skill prepends here. */
 export const WHATS_NEW: WhatsNewRelease[] = [
   {
+    version: 'v4.1.45',
+    date: '2026-09-29',
+    items: [
+      {
+        title: 'See which shelves a book is on from its cover',
+        body: 'Book covers in the new interface now carry up to two shelf names in the corner, with a "+N" tag for the rest, so you no longer have to open Add to shelf to find where a book is filed. You see only your own shelves and public ones, and a shelf\'s own page leaves its tag out. View settings → Show shelf tags turns them off, and it is the same setting as the classic grid\'s, so both views agree.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Search by your custom columns',
+        body: 'Advanced search in the new interface now has a field for every custom column you can see: a range for numbers and dates, Yes/No/Empty for yes-no columns, the column\'s own values for fixed lists, a star count for ratings and "contains" for text. Your criteria stay in the page address and in a saved default library view.',
+        category: 'Library',
+        link: { to: '/search', label: 'Open search' },
+      },
+      {
+        title: 'Magic shelves can follow recently updated books',
+        body: 'Last Modified now sits next to Date Added and Publication Date in the magic shelf rule builder, including "in the last N days". A shelf of books updated in the last 30 days keeps itself current, which suits web serials re-fetched as new chapters arrive. Any change to a book\'s metadata, cover or files counts, so a bulk edit moves every book it touches into such a shelf.',
+        category: 'Library',
+        link: { to: '/magic', label: 'Smart shelves' },
+      },
+      {
+        title: 'Reading in the browser updates Hardcover',
+        body: 'With Hardcover sync on and your own API key set, your place in the web reader now reaches Hardcover as you read, just as a Kobo or KOReader\'s does. A book you finish at 99% or more is now marked Read there instead of staying on Currently Reading.',
+        category: 'Reading',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+      {
+        title: 'A page turn while a book opens no longer loses your synced place',
+        body: 'When a book had a Kobo or KOReader position, turning a page in the first seconds after opening it in the web reader used to save the start of the book as your place. Early page turns now wait for the jump to your synced position. If you pick a chapter, link, highlight or search result in that time, the reader keeps your choice and offers the synced position instead.',
+        category: 'Reading',
+      },
+      {
+        title: '"Recent" puts what you are reading first again',
+        body: 'The Library\'s Recent order was treating finished books as "reading", so a long reading history pushed everything unread far down. A finished book now takes its date-added place with the rest, and starting it over brings it back to the top. If you keep read status in a Calibre Yes/No column, that column decides what counts as finished.',
+        category: 'Library',
+        link: { to: '/', label: 'Open your library' },
+      },
+      {
+        title: 'Edit metadata is one click away on the book page',
+        body: 'The new interface\'s book page showed Edit cover in its button row and hid Edit metadata in the gear menu. Anyone who can edit a book now gets Edit metadata in the row, with Edit cover in the gear menu and the metadata editor. A reader who can only change their own cover still sees Edit cover in the row.',
+        category: 'Library',
+      },
+      {
+        title: '"Edit default view" opens on your saved view',
+        body: 'It used to open an empty search form, so changing one thing meant rebuilding the whole view.',
+        category: 'Library',
+      },
+      {
+        title: 'Force a full Kobo sync from the new interface',
+        body: 'The button that makes your Kobo receive your whole library again was left behind on the classic profile page when Kobo pairing moved. It now sits under the Stock Kobo sync URL on the devices page, asks before it does anything, and your Kobo gets every book on its next sync.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Moving your library no longer makes Kobos download their books again',
+        body: 'Copying a library to a new disk without keeping file times, or moving the server to a new address, used to mark every book on a Kobo as changed, so the Kobo downloaded each one again. Books you have really edited, a new cover included, still update on the device.',
+        category: 'Sync',
+      },
+      {
+        title: 'Books without a publication date stay put on your Kobo after a server move',
+        body: 'Undated books were described to Kobo slightly differently depending on the server\'s Python version and operating system, so moving an install (say, from a source install to the Docker image) made every Kobo re-download them and lose its place. Dates are now written the same way everywhere, and a Kobo that synced with the older form keeps its books.',
+        category: 'Sync',
+      },
+      {
+        title: 'KOReader stays responsive while books download',
+        body: 'Collecting several books sent from the website, or turning on Library mode, used to download one file after another while KOReader ignored taps, which on Android looked like "KOReader isn\'t responding". KOReader now reads taps between downloads, and Library mode saves its progress every few books so a restart does not start over. Turning Library mode on leaves your home folder alone, and turning it off restores the settings setup changed.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Remove several files from a KOReader device in one sync',
+        body: 'Marking multiple files for removal on the devices page used to take one sync per file. The sync plugin now works through the whole queue at once, up to 50 files per sync, and a file the device declines to remove no longer holds up the others.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'E-readers set up by copying the KOReader folder count as separate devices',
+        body: 'Copying KOReader\'s settings from one e-reader to another also copied its sync ID, so the server merged the two and each skipped the other\'s reading progress. The sync plugin now notices when its settings came from another e-reader and gives it its own ID. Readers copied before this update still share one: delete the ["device_id"] line from koreader/settings.reader.lua on one of them.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'An e-reader moved to another account works there',
+        body: 'A Kobo or KOReader device used with one account and then paired to another on the same server was refused by the new account, so Send to device, its device page and removing books from it all failed. Each account now gets its own entry for the reader, and switching back finds the first account\'s entry with its name and history intact.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'Tidier devices pages',
+        body: 'The top bar no longer scrolls away on the devices pages, and Pin sidebar now sits at the foot of the sidebar instead of leaving an empty slot in the collapsed desktop view. Paging through a device\'s library keeps your place, landing you at the top of the device card.',
+        category: 'Sync',
+        link: { to: '/account/devices', label: 'Manage devices and browsers' },
+      },
+      {
+        title: 'KOReader and OPDS sign-ins slow password guessing without locking out your devices',
+        body: 'A device or app that keeps sending different wrong passwords is refused for a minute after three, while a device stuck on an old password just gets "wrong password", never a lockout. Your other devices, app-password sign-ins and a right password from your home network keep working straight away, and one misconfigured OPDS app no longer holds up the account\'s others.',
+        category: 'Sync',
+      },
+      {
+        title: 'Slovak is complete, and Russian reads further',
+        body: 'Every remaining Slovak string is translated, including the new interface, My Library, smart shelves, Kobo and KOReader pairing, the cover designer and the admin pages, and existing Slovak wording now matches Calibre-Web-Automated\'s, fixing typos and missing diacritics. Russian gained more translations too.',
+        category: 'Account',
+        link: { to: '/account', label: 'Open account settings' },
+      },
+      {
+        title: 'Local accounts can sign in to the new interface when LDAP is down',
+        body: 'The new interface\'s sign-in now falls back to the stored local password when the directory rejects the account or cannot be reached, as the classic sign-in page already did, so an administrator is not locked out during a directory outage.',
+        category: 'Account',
+      },
+      {
+        title: 'Sign-in and Kobo sync survive a rate-limiter outage',
+        body: 'With the rate limiter using Redis or Memcached, an outage of that store made every Kobo sync fail with "too many requests" and refused web sign-ins. The limits now carry on in the server\'s own memory until the store comes back, so everyone can still sign in and repeated wrong passwords are still slowed down.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Deleting a user removes everything kept for that account',
+        body: 'An account\'s e-readers and browsers, KOReader reading positions, magic shelves, favourites, personal covers, cover designs, linked sign-in providers and notices used to stay behind after the user was deleted. They now go with it, as do public shelves the user owned. Deleting a book also removes the delivery records for its highlights on each e-reader.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Adding a book to a user\'s library confirms it where you clicked',
+        body: 'On User administration the confirmation used to appear at the top of the page, off-screen by the time you had scrolled to that user\'s card, so the add looked silent. It now shows next to the "Add book to this library" button in that card.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Point a non-Docker install at its Calibre library again',
+        body: 'On Windows or bare-metal installs, the library location on the Database Configuration page was read-only and its folder button did nothing, so a first run could not be set up. You can now type or browse to the path everywhere except inside the container, where the startup scan picks the library, unless DISABLE_LIBRARY_AUTOMOUNT=true is set.',
+        category: 'Admin',
+      },
+      {
+        title: 'Admin settings saves behave after an error',
+        body: 'A settings page that fails validation no longer schedules a finished KEPUB repair or backfill to run again. And after the server recovers from a database error, saving settings works again without a restart.',
+        category: 'Admin',
+        link: { to: '/admin', label: 'Open Admin' },
+      },
+      {
+        title: 'Choose which proxies the server trusts',
+        body: 'The server now believes forwarded client addresses and schemes only from this host, private networks and Tailscale; most setups need no change. If your proxy reaches the server from a public address, such as Cloudflare forwarding straight to the container, add it to the new TRUSTED_PROXY_NETWORKS setting, or set it to * to trust every peer as before. The log names any peer whose proxy headers are ignored.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Books replaced by a sync tool appear on their own',
+        body: 'Tools such as rsync, Syncthing and NAS sync apps replace the library database with a new file, and the server kept reading the old one until someone chose "Reconnect Calibre Database". The server now notices the new file within a few seconds and switches to it.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'No more garbled dashes and accents in imported titles',
+        body: 'With the Kindle EPUB fixer on, a book whose metadata held a lone em dash or copyright sign could be saved as "Ghostâ€”Spectres", and aggressive mode could turn "Café" into "Caf√©". This text is now read correctly. Books already imported this way keep the damaged text until you fix the title or import them again.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Split libraries import cleanly',
+        body: 'With book files stored apart from the library database and KOReader sync on, importing a book logged a "no such table: books" error, left an empty metadata.db in the book folder and skipped KOReader sync checksums until the next restart. Imports now find the right database, and the empty metadata.db left by earlier imports is safe to delete.',
+        category: 'Under the hood',
+      },
+      {
+        title: 'Long-running servers stop creeping towards "too many open files"',
+        body: 'Each background task (thumbnails, cleanup, KEPUB repair, annotation backup and sync, conversions) opened database connections that stayed open until a restart. Each task\'s connections now close when it finishes.',
+        category: 'Under the hood',
+      },
+    ],
+  },
+  {
     version: 'v4.1.44',
     date: '2026-09-26',
     summary: 'Your own selection inside a shared library, a page for every reading device, and Kobo and KOReader sync that keeps your books, places and highlights.',

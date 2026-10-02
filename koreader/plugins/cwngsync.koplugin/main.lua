@@ -43,7 +43,7 @@ local CWNGSync = WidgetContainer:extend{
     name = "cwngsync",
     settings_key = "cwngsync",
     title = _("Login to NextGen Server"),
-    version = "4.1.44",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
+    version = "4.1.45",  -- Plugin version mirrors CWNG release tag; keep in lockstep with _meta.lua
 
     push_timestamp = nil,
     pull_timestamp = nil,
@@ -83,6 +83,8 @@ CWNGSync.default_settings = {
     -- Highlight sync writes into the device's KoboReader.sqlite — opt-in,
     -- default off until the user explicitly enables it (Kobo only).
     sync_annotations = false,
+    -- Existing devices keep matching file bytes unless explicitly changed.
+    document_matching = "binary",
     -- The CWNG library folder (covers of every book in scope, downloaded on
     -- tap). Turned on by setup; an existing install keeps its folders.
     library_enabled = false,
@@ -485,6 +487,24 @@ function CWNGSync:getAdvancedMenuItems()
                 separator = true,
             },
             {
+                text = _("Document matching method"),
+                help_text = _([[Binary matches file contents. Filename matches the exact name, including its extension, without reading file contents. Use Filename for sideloaded copies whose bytes changed during conversion or metadata editing, keeping the same library or download name. Renamed files will not match; different books with identical names can match each other. Already queued updates keep the identity they were captured with.]]),
+                sub_item_table = {
+                    {
+                        text = _("Binary: match file contents"),
+                        radio = true,
+                        checked_func = function() return self.settings.document_matching ~= "filename" end,
+                        callback = function() self:setDocumentMatching("binary") end,
+                    },
+                    {
+                        text = _("Filename: match exact names"),
+                        radio = true,
+                        checked_func = function() return self.settings.document_matching == "filename" end,
+                        callback = function() self:setDocumentMatching("filename") end,
+                    },
+                },
+            },
+            {
                 text_func = function()
                     return T(_("Periodically sync every # pages (%1)"), self:getSyncPeriod())
                 end,
@@ -820,12 +840,38 @@ function CWNGSync:getCurrentDocumentFile()
     return nil
 end
 
--- Resolve the digest the server keys this book's progress on. Precedence lives
--- in SyncLogic.resolveDocumentDigest: the bytes on disk win, KOReader's cached
--- sidecar value is only a fallback. See the comment there for why (#991).
+-- A new matching choice affects future captures, not the identity stored in
+-- an offline queue. Persist immediately so the reader and library instances
+-- continue with the same choice after the book closes or KOReader restarts.
+function CWNGSync:setDocumentMatching(method)
+    if method ~= "binary" and method ~= "filename" then return false end
+    self.settings.document_matching = method
+    G_reader_settings:saveSetting(self.settings_key, self.settings)
+    if G_reader_settings.flush then G_reader_settings:flush() end
+    self.push_timestamp = 0
+    self.pull_timestamp = 0
+    return true
+end
+
+-- Resolve the identity used for progress and annotation matching. Filename
+-- matching never substitutes for byte integrity when installing managed files.
 function CWNGSync:getDocumentDigest(file_path)
-    -- When called without a path we are on the open document, whose settings are
-    -- already loaded; with a path we have to open that document's sidecar.
+    if self.settings and self.settings.document_matching == "filename" then
+        file_path = file_path or self:getCurrentDocumentFile()
+        -- Hash the exact UTF-8 basename including its extension, as KOReader's
+        -- KOSync filename channel does. No case folding or sidecar fallback.
+        if type(file_path) ~= "string" then return nil end
+        local filename = file_path:match("([^/]+)$")
+        if not filename then return nil end
+        return md5(filename)
+    end
+    return self:getDocumentContentDigest(file_path)
+end
+
+-- Binary partial MD5 for download verification and managed-file
+-- ownership, independent of the reader's document matching preference.
+-- Bytes on disk win; KOReader's cached sidecar value remains a fallback (#991).
+function CWNGSync:getDocumentContentDigest(file_path)
     local settings_path = file_path
     if not file_path then
         file_path = self:getCurrentDocumentFile()
@@ -1279,7 +1325,7 @@ function CWNGSync:syncDeviceCapabilities(interactive, ensure_networking)
                 local deleted, delete_reason, deleted_path = DeviceActions.deleteNamed(
                     deletion, root_path, {
                         attributes = lfs.attributes,
-                        digest = function(path) return self:getDocumentDigest(path) end,
+                        digest = function(path) return self:getDocumentContentDigest(path) end,
                         remove = util.removeFile,
                     })
                 client:complete_deletion(
@@ -1459,7 +1505,7 @@ function CWNGSync:collectDeliveries(
             local installed, install_error, refusal_space = Delivery.install(delivery, root_path, {
                 receipt = self:getDeliveryReceipt(delivery.id),
                 attributes = lfs.attributes,
-                digest = function(path) return self:getDocumentDigest(path) end,
+                digest = function(path) return self:getDocumentContentDigest(path) end,
                 sanitize = function(name, path)
                     return util.getSafeFilename(name, path, 230, 0)
                 end,
@@ -1602,6 +1648,14 @@ function CWNGSync:refreshLibraryViews(changed_files)
     if self.ui and type(self.ui.getMenuInstance) == "function" then
         refreshMenu(self.ui:getMenuInstance(), "active menu instance")
     end
+end
+
+-- Where a closed book's sidecar says it was, or nil when it has none. Bulk
+-- pull treats every book as unattended: a same-device position is restored
+-- only onto a book with no position of its own (#2380).
+function CWNGSync:readLocalPercentFinished(file_path)
+    local DocSettings = require("docsettings")
+    return DocSettings:open(file_path):readSetting("percent_finished")
 end
 
 function CWNGSync:applyProgressToBook(file_path, progress, percentage)
@@ -1802,7 +1856,10 @@ function CWNGSync:pullLibraryProgress(ensure_networking)
                     return
                 end
 
-                if SyncLogic.isRemoteProgressFromThisDevice(body, Device.model, self.device_id) then
+                -- The sidecar is only read for this device's own pushes.
+                if SyncLogic.isRemoteProgressFromThisDevice(body, Device.model, self.device_id)
+                        and SyncLogic.shouldIgnoreOwnRemoteProgress(body, Device.model, self.device_id, false,
+                            self:readLocalPercentFinished(file_path)) then
                     logger.dbg("CWNGSync: [Bulk Pull] skipping same-device progress for", file_path)
                     pullNextBook()
                     return
@@ -2090,20 +2147,14 @@ function CWNGSync:getProgress(ensure_networking, interactive)
                 return
             end
 
-            if SyncLogic.isRemoteProgressFromThisDevice(body, Device.model, self.device_id) then
+            local progress = self:getLastProgress()
+            local percentage = self:getLastPercent()
+            if SyncLogic.shouldIgnoreOwnRemoteProgress(body, Device.model, self.device_id, interactive, percentage) then
                 logger.dbg("CWNGSync: [Pull] end for", current_file, "latest progress already belongs to this device")
-                if interactive then
-                    UIManager:show(InfoMessage:new{
-                        text = _("Latest progress is coming from this device."),
-                        timeout = 3,
-                    })
-                end
                 return
             end
 
             body.percentage = Math.roundPercent(tonumber(body.percentage) or 0)
-            local progress = self:getLastProgress()
-            local percentage = self:getLastPercent()
             logger.dbg("CWNGSync: Current progress:", percentage * 100, "% =>", progress)
 
             if percentage == body.percentage
@@ -2120,6 +2171,21 @@ function CWNGSync:getProgress(ensure_networking, interactive)
 
             -- The progress needs to be updated.
             if interactive then
+                -- This device's own push, while the book has a position of its
+                -- own: usually the reader has moved on since, so ask rather
+                -- than jump back (#2380). With no local position it applies
+                -- straight away, like any other device's.
+                if percentage > 0 and SyncLogic.isRemoteProgressFromThisDevice(body, Device.model, self.device_id) then
+                    UIManager:show(ConfirmBox:new{
+                        text = T(_("The latest position on the server, %1%, was saved from this device. Go to it?"),
+                                 Math.round(body.percentage * 100)),
+                        ok_callback = function()
+                            self:syncToProgress(remote)
+                            showSyncedMessage()
+                        end,
+                    })
+                    return
+                end
                 -- If user actively pulls progress from other devices,
                 -- we always update the progress without further confirmation.
                 self:syncToProgress(remote)

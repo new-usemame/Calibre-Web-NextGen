@@ -14,7 +14,7 @@ from flask_babel import gettext as _
 from sqlalchemy import func
 
 from . import api_v1
-from .books import SORT_MAP, _rows_to_items
+from .books import MAX_SELECT_ALL_BOOKS, SORT_MAP, _rows_to_items, _selection_response
 from .. import calibre_db, config, db
 from ..cw_login import current_user
 from ..usermanagement import login_required_if_no_ano
@@ -195,8 +195,12 @@ def search_options():
 @login_required_if_no_ano
 def advanced_search():
     data = request.get_json(silent=True) or {}
+    select_all = bool(data.get("select_all"))
     page = max(1, int(data.get("page", 1) or 1))
     per_page = int(data.get("per_page", config.config_books_per_page) or config.config_books_per_page)
+    if select_all:
+        page = 1
+        per_page = MAX_SELECT_ALL_BOOKS + 1
     order = SORT_MAP.get(data.get("sort", "new"), SORT_MAP["new"])
 
     columns = calibre_db.get_cc_columns(config, filter_config_custom_read=True)
@@ -209,6 +213,9 @@ def advanced_search():
     query = query.distinct().order_by(*order)
 
     total = query.count()
+    if select_all:
+        ids = [row[0] for row in query.with_entities(db.Books.id).distinct().limit(per_page).all()]
+        return _selection_response(ids, total)
     rows = query.offset((page - 1) * per_page).limit(per_page).all()
 
     # build_adv_search_query returns the criteria summary as a joined string when

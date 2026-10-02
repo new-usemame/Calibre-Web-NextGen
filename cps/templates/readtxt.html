@@ -16,6 +16,7 @@
 
         <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" type="text/css"/>
         <link rel="stylesheet" href="{{ url_for('static', filename='css/text.css') }}" type="text/css"/>
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/reader-lookup.css') }}" type="text/css"/>
 
         <script src="{{ url_for('static', filename='js/libs/jquery.min.js') }}"></script>
         <script src="{{ url_for('static', filename='js/libs/plugins.js') }}"></script>
@@ -25,6 +26,7 @@
         <script src="{{ url_for('static', filename='js/reading/txt_reader.js') }}"></script>
     </head>
     <body>
+      {% include '_reader_lookup_banner.html' %}
       <div id="readmain" data-load="{{ url_for('web.serve_book', book_id=txtfile, book_format='txt') }}">
         <div id="left" class="arrow" >‹</div>
         <div id="area"><pre id="content" class="content"></pre></div>

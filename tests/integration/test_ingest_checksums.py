@@ -365,6 +365,7 @@ class TestIngestChecksumLogic:
 
         processor = object.__new__(NewBookProcessor)
         processor.library_dir = str(library)
+        processor.metadata_db = str(db_path)
         processor.generate_book_checksums("New Book", book_id=7)
 
         conn = sqlite3.connect(db_path)

@@ -446,9 +446,23 @@ class AutoLibrary:
             )
             return
         try:
-            print("[cwa-auto-library] Updating dirs.json with new library location...")
             with open(self.dirs_path) as f:
                 dirs = json.load(f)
+            existing_library = dirs.get("calibre_library_dir", "")
+            if (
+                isinstance(existing_library, str)
+                and os.path.normpath(existing_library) == os.path.normpath(self.lib_path)
+            ):
+                # The shipped container dirs.json lives in the image tree and
+                # cannot be changed by an arbitrary non-root UID. Do not try to
+                # rewrite an already-correct value; persisting the selected
+                # library in app.db below is still required and writable.
+                print(
+                    "[cwa-auto-library] dirs.json already points to the selected library; "
+                    "leaving it unchanged."
+                )
+                return
+            print("[cwa-auto-library] Updating dirs.json with new library location...")
             dirs["calibre_library_dir"] = self.lib_path
             with open(self.dirs_path, 'w') as f:
                 json.dump(dirs, f, indent=4)

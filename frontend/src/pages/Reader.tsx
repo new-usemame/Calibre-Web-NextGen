@@ -4,7 +4,7 @@ import {
   withResumeTimeout,
 } from "../lib/readerResume";
 import { useEffect, useRef, useState, useCallback, useId, useMemo } from 'react';
-import { Link } from 'wouter';
+import { Link, useSearch } from 'wouter';
 import ePub from 'epubjs';
 import {
   ChevronLeft, ChevronRight, X, List, Sun, Moon, Coffee, Loader2, Trash2,
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import {
   type ReaderSettings, isWorthResending, useBook, useBookmark, useReaderSettings,
-  useReadingSources, useSaveBookmark, useSaveReaderSettings, type ReadingSource,
+  useReadingSources, useSaveBookmark, useSaveReaderSettings, useReaderFonts, type ReadingSource,
 } from '../lib/queries';
 import { apiPost, apiDelete, apiPatch, apiUrl, resourceUrl } from '../lib/api';
 import { Button } from '../components/Button';
@@ -28,12 +28,13 @@ import {
 import { chapterLabelForHref, splitSearchExcerpt } from '../lib/reader/searchUi';
 import { flattenToc, tocFromNavigation, type TocItem } from '../lib/reader/toc';
 import { safeLocalStorageGet, safeLocalStorageSet } from '../lib/safeStorage';
-import { getReaderContentUrl } from '../lib/readerTarget';
+import { getReaderContentUrl, withLookupMode } from '../lib/readerTarget';
 import {
   classifyHref, inBookTarget, isNoteElement, isNoterefAnchor, isOpenableHref,
   sanitizeNoteElement,
 } from '../lib/readerLinks';
 import { hasNativeAnchor, resolveNativeAnnotations } from '../lib/reader/nativeAnnotations';
+import { readerFontFaceCss, readerFontFamily, BUILTIN_READER_FONTS, type ReaderFont } from '../lib/readerFonts';
 import styles from './Reader.module.css';
 
 /*
@@ -218,10 +219,21 @@ const THEME_TO_READER: Record<ReaderSettings['theme'], ReaderTheme> = {
 const READER_TO_THEME: Record<ReaderTheme, ReaderSettings['theme']> = {
   light: 'lightTheme', sepia: 'sepiaTheme', dark: 'darkTheme', black: 'blackTheme',
 };
-const FONT_FAMILY: Record<ReaderSettings['font'], string> = {
-  default: '', Yahei: 'Microsoft YaHei, sans-serif', SimSun: 'SimSun, serif',
-  KaiTi: 'KaiTi, serif', Arial: 'Arial, sans-serif',
-};
+
+// Bundled reading-optimised serif. Content only gets font-family applied via
+// CSS (fontCssFamily / rendition.themes.font) — without an actual @font-face
+// declared inside each chapter iframe's own document, 'Literata' silently
+// falls back to a system font. resourceUrl() keeps this correct behind a
+// reverse-proxy mount prefix, same as every other server asset here.
+const LITERATA_FONT_FACE_CSS = ([
+  ['normal', 'normal', 'Literata-Regular'],
+  ['normal', 'italic', 'Literata-Italic'],
+  ['bold', 'normal', 'Literata-Bold'],
+  ['bold', 'italic', 'Literata-BoldItalic'],
+] as const).map(([weight, style, file]) =>
+  `@font-face{font-family:'Literata';font-weight:${weight};font-style:${style};` +
+  `font-display:swap;src:url('${resourceUrl(`/static/fonts/literata/${file}.woff2`)}') format('woff2');}`
+).join('');
 
 /** The table of contents as nested lists, so every level is reachable and a
  *  screen reader announces where each entry sits in the book's outline. */
@@ -256,12 +268,12 @@ function applyDocumentTheme(doc: Document, theme: ReaderTheme) {
 }
 
 function applyDocumentTypography(doc: Document, settings: {
-  fontPct: number; fontFamily: ReaderSettings['font']; margin: number; lineHeight: number;
+  fontPct: number; fontCssFamily: string; margin: number; lineHeight: number;
 }) {
   if (!doc.body) return;
   doc.body.style.setProperty('font-size', `${settings.fontPct}%`);
   doc.body.style.setProperty('font-family',
-    settings.fontFamily === 'default' ? 'initial' : FONT_FAMILY[settings.fontFamily], 'important');
+    settings.fontCssFamily, 'important');
   doc.body.style.setProperty('line-height', String(settings.lineHeight / 100), 'important');
 }
 
@@ -293,14 +305,29 @@ function readingSourcePercent(value: number): string {
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 }).format(value);
 }
 
+/** True when a book frame holds a non-empty text selection right now. */
+function liveSelection(rendition: any): boolean {
+  try {
+    return (rendition?.getContents?.() || []).some((contents: any) => {
+      const selection = contents?.window?.getSelection?.();
+      return !!selection && !selection.isCollapsed && !!selection.toString().trim();
+    });
+  } catch { return false; /* a disposed frame has no selection */ }
+}
+
 export function Reader({ id }: { id: string }) {
   const t = useT();
   const announce = useAnnouncer();
-  const requestedSource = new URLSearchParams(window.location.search).get('source');
+  const search = useSearch();
+  const lookupMode = new URLSearchParams(search).get('lookup') === '1';
+  const lookupModeRef = useRef(lookupMode);
+  lookupModeRef.current = lookupMode;
+  const requestedSource = new URLSearchParams(search).get('source');
   const [placesOpen, setPlacesOpen] = useState(false);
   const { data: book, isLoading, error } = useBook(id);
   const { data: savedBookmark, isFetched: isBookmarkFetched } = useBookmark(id, 'epub');
   const { data: settingsData, isFetched: isSettingsFetched } = useReaderSettings();
+  const { data: fontCatalog, isFetched: isFontsFetched, error: fontsError } = useReaderFonts();
   const saveBookmark = useSaveBookmark(id);
   const saveSettings = useSaveReaderSettings();
   const readingSources = useReadingSources(id, placesOpen);
@@ -399,6 +426,15 @@ export function Reader({ id }: { id: string }) {
    * an explicit choice and wins over the pending jump.
    */
   const autoResumePendingRef = useRef(false);
+  /*
+   * Set when the reader works with the text on the placeholder page while that
+   * jump is pending -- selecting a passage or tapping one of their highlights.
+   * That is acting on this page, like the highlight choice that already wins
+   * over the jump. Left armed, the late jump re-rendered the view under the
+   * open popover, so the selection and its "Add note" button vanished
+   * mid-gesture. The synced position becomes the "Resume at N%" offer instead.
+   */
+  const actedOnPlaceholderRef = useRef(false);
   // Appearance changes retain the passage explicitly chosen for a preview,
   // which may differ from the first word on its containing page.
   const previewTargetRef = useRef<string | undefined>(undefined);
@@ -475,8 +511,14 @@ export function Reader({ id }: { id: string }) {
   // every section rendered after that. It reads the reader's current choices
   // through this ref: a closure kept the values from when the book opened and
   // put them back at the next chapter (#2254).
-  const appearanceRef = useRef({ theme, fontPct, fontFamily, margin, lineHeight, spread });
-  appearanceRef.current = { theme, fontPct, fontFamily, margin, lineHeight, spread };
+  const fontChoices: ReaderFont[] = useMemo(() => fontCatalog?.items ?? BUILTIN_READER_FONTS, [fontCatalog]);
+  const fontCssFamily = readerFontFamily(fontChoices, fontFamily);
+  const fontFaceCss = useMemo(() => readerFontFaceCss(fontChoices, window.location.origin), [fontChoices]);
+  const appearanceRef = useRef({ theme, fontPct, fontFamily, fontCssFamily, fontFaceCss, margin, lineHeight, spread });
+  appearanceRef.current = { theme, fontPct, fontFamily, fontCssFamily, fontFaceCss, margin, lineHeight, spread };
+  useEffect(() => {
+    if (fontCatalog && !fontCatalog.items.some(font => font.id === fontFamily)) setFontFamily('default');
+  }, [fontCatalog, fontFamily]);
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   const [progress, setProgress] = useState(0);
   // Pending text selection awaiting a highlight-color choice.
@@ -740,6 +782,7 @@ export function Reader({ id }: { id: string }) {
   // Open the edit/remove popover for a highlight the reader was tapped on (#782).
   // Closes the create-color popover so the two never show at once.
   const openHighlightEditor = useCallback((cfiRange: string, annotationId: string, color: string) => {
+    if (autoResumePendingRef.current) actedOnPlaceholderRef.current = true;
     setPendingSel(null);
     setComposer(null);
     setActiveHl({ cfiRange, id: annotationId, color, note: notesRef.current.get(annotationId) || '' });
@@ -1162,6 +1205,7 @@ export function Reader({ id }: { id: string }) {
   // that runs on settle picks up wherever the reader has got to by then. One
   // request, always carrying the newest position, is both correct and less work.
   const flushCfiSave = useCallback(() => {
+    if (lookupModeRef.current) return;
     if (saveInFlight.current) { saveCoalesced.current = true; return; }
     const cfi = lastCfiRef.current;
     if (!cfi) return;
@@ -1212,6 +1256,9 @@ export function Reader({ id }: { id: string }) {
 
   const persistCfi = useCallback(
     (cfi: string, percentage?: number) => {
+      // Lookup is a session-long choice; page turns and transient preview
+      // exits must never arm the debounce or the unmount keepalive save.
+      if (lookupModeRef.current) return;
       lastCfiRef.current = cfi;
       // #324: the CFI is private to this reader; the percentage is what the
       // server can share with the user's Kobo and the book-detail row.
@@ -1271,12 +1318,11 @@ export function Reader({ id }: { id: string }) {
     // normal lifecycle, retaining the book, annotations and reading anchor.
     if (currentCfi) rendition.clear();
     rendition.themes.fontSize(`${fontPct}%`);
-    if (fontFamily === 'default') rendition.themes.font('initial');
-    else rendition.themes.font(FONT_FAMILY[fontFamily]);
+    rendition.themes.font(fontCssFamily);
     try {
       (rendition.getContents?.() || []).forEach((c: any) => {
         if (!c?.document?.body) return;
-        applyDocumentTypography(c.document, { fontPct, fontFamily, margin, lineHeight });
+        applyDocumentTypography(c.document, { fontPct, fontCssFamily, margin, lineHeight });
       });
     } catch { /* same-origin blob content; guard regardless */ }
     // Recalculate the paginator after all typography changes, then keep the
@@ -1288,7 +1334,7 @@ export function Reader({ id }: { id: string }) {
     if (currentCfi) {
       Promise.resolve(rendition.display(currentCfi)).catch(() => { /* disposed rendition */ });
     }
-  }, [fontPct, fontFamily, margin, lineHeight, spread, captureReadingAnchor]);
+  }, [fontPct, fontCssFamily, margin, lineHeight, spread, captureReadingAnchor]);
 
   // A page turn is the reader moving themselves, so it ends any preview: from
   // here on the relocations are theirs and the position saves again -- except
@@ -1548,13 +1594,14 @@ export function Reader({ id }: { id: string }) {
 
   // Build the rendition once the epub format + its download URL are known.
   useEffect(() => {
-    if (!epubFormat || !epubContentUrl || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !settingsHydrated) return;
+    if (!epubFormat || !epubContentUrl || !viewerRef.current || !isBookmarkFetched || !isSettingsFetched || !isFontsFetched || !settingsHydrated) return;
     let cancelled = false;
     let stopSelectionObserver: (() => void) | undefined;
     setRendered(false);
     setRenderError(null);
     previewTargetRef.current = undefined;
     autoResumePendingRef.current = false;
+    actedOnPlaceholderRef.current = false;
     appearanceAnchorRef.current = undefined;
     // Clear rather than carry: wouter reuses this component across an :id
     // change, so a stale RTL flag would invert the next book's page turns.
@@ -1616,12 +1663,23 @@ export function Reader({ id }: { id: string }) {
           void fonts?.ready?.then(() => scheduleLinkSync()).catch(() => {});
         });
 
+        rendition.hooks.content.register((contents: any) => {
+          try {
+            contents.addStylesheetCss(LITERATA_FONT_FACE_CSS, 'literata-font-face');
+          } catch {
+            // non-XHTML content may not support stylesheet injection
+          }
+        });
+
+        rendition.hooks.content.register((contents: any) => {
+          contents.addStylesheetCss(appearanceRef.current.fontFaceCss, 'cwng-reader-fonts');
+        });
+
         Object.entries(THEMES).forEach(([name, t]) => rendition.themes.register(name, t));
         const initialAppearance = appearanceRef.current;
         rendition.themes.select(initialAppearance.theme);
         rendition.themes.fontSize(`${initialAppearance.fontPct}%`);
-        rendition.themes.font(initialAppearance.fontFamily === 'default'
-          ? 'initial' : FONT_FAMILY[initialAppearance.fontFamily]);
+        rendition.themes.font(initialAppearance.fontCssFamily);
 
         // This synchronous hook runs before the manager measures a display()
         // target. Late `rendered` styling reflowed a newly loaded chapter after
@@ -1697,13 +1755,19 @@ export function Reader({ id }: { id: string }) {
             // A slow index may finish after first display. Still apply the
             // percentage hint unless the reader has already chosen a position;
             // page turns from the placeholder start are not a choice. When they
-            // did choose (a chapter, link, highlight or search hit), keep the
+            // did choose (a chapter, link, highlight or search hit, or they
+            // selected text on the placeholder page), keep the
             // synced position as an offer rather than dropping it.
             const pending = autoResumePendingRef.current;
             autoResumePendingRef.current = false;
             if (pending && resume?.mode === 'automatic') {
               const cfi = resumeCfi(epubBook.locations, resume);
-              if (cfi && !readerMoved && previewingRef.current && previewTargetRef.current === undefined) {
+              // A selection still inside epub.js's 250ms debounce has not
+              // reached the 'selected' handler yet, so read the live one too:
+              // an index that lands mid-gesture must not re-render under it.
+              if (liveSelection(rendition)) actedOnPlaceholderRef.current = true;
+              if (cfi && !readerMoved && !actedOnPlaceholderRef.current
+                  && previewingRef.current && previewTargetRef.current === undefined) {
                 previewTargetRef.current = cfi;
                 await rendition.display(cfi);
                 if (cancelled) return;
@@ -1811,6 +1875,7 @@ export function Reader({ id }: { id: string }) {
           let text = '';
           try { text = (contents?.window?.getSelection?.().toString() || '').trim(); } catch { /* noop */ }
           if (cfiRange) {
+            if (autoResumePendingRef.current) actedOnPlaceholderRef.current = true;
             setActiveHl(null);
             setPendingSel({ cfiRange, text });
           }
@@ -1832,7 +1897,7 @@ export function Reader({ id }: { id: string }) {
         clearTimeout(saveTimer.current);
         saveTimer.current = null;
         const cfi = lastCfiRef.current;
-        if (cfi) {
+        if (cfi && !lookupModeRef.current) {
           const pct = lastPercentRef.current;
           void apiPost(
             `/api/v1/books/${id}/bookmark`,
@@ -1849,7 +1914,7 @@ export function Reader({ id }: { id: string }) {
     };
     // Re-render only when the source changes; theme/font are applied imperatively.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [epubContentUrl, isBookmarkFetched, isSettingsFetched, settingsHydrated]);
+  }, [epubContentUrl, isBookmarkFetched, isSettingsFetched, isFontsFetched, settingsHydrated]);
 
   // Apply theme / font changes to a live rendition without rebuilding it, and
   // remember the preference across sessions.
@@ -1965,7 +2030,7 @@ export function Reader({ id }: { id: string }) {
       <div className={styles.fullCenter}>
         <EmptyState message={t('In-browser reading currently supports EPUB. Use download or the classic reader for other formats.')} />
         <div className={styles.fallbackRow}>
-          {other && <a className={styles.exitLink} href={resourceUrl(other.read_url)}>{t('Open classic reader')}</a>}
+          {other && <a className={styles.exitLink} href={resourceUrl(withLookupMode(other.read_url, lookupMode))}>{t('Open classic reader')}</a>}
           <Link href={`/book/${id}`} className={styles.exitLink}>{t('← Back to book')}</Link>
         </div>
       </div>
@@ -2120,7 +2185,13 @@ export function Reader({ id }: { id: string }) {
         </>
       )}
 
-      {previewSource && (
+      {lookupMode && (
+        <div className={styles.resumeNotice} role="status">
+          <span>{t('Progress is not being saved.')}</span>
+        </div>
+      )}
+
+      {previewSource && !lookupMode && (
         <div className={styles.resumeNotice} role="status">
           <span>{t('Previewing {source}. Its saved position will not change.', {
             source: previewSource.label,
@@ -2143,7 +2214,7 @@ export function Reader({ id }: { id: string }) {
         </div>
       )}
 
-      {remoteResume && !requestedSource && !previewSource && (
+      {remoteResume && !lookupMode && !requestedSource && !previewSource && (
         <div className={styles.resumeNotice} role="status">
           <button onClick={() => {
             previewingRef.current = true;
@@ -2363,13 +2434,14 @@ export function Reader({ id }: { id: string }) {
             </fieldset>
             <label className={styles.settingField}>
               <span>{t('Font family')}</span>
+              {fontsError && <span role="status">{t('Could not load reader fonts.')}</span>}
               <select value={fontFamily} onChange={(e) => {
                 const value = e.target.value as ReaderSettings['font'];
                 setFontFamily(value); persistSetting('font', value);
               }}>
-                <option value="default">{t('Book default')}</option>
-                <option value="Arial">Arial</option><option value="Yahei">Microsoft YaHei</option>
-                <option value="SimSun">SimSun</option><option value="KaiTi">KaiTi</option>
+                {fontChoices.map(font => <option key={font.id} value={font.id}>
+                  {font.builtin ? t(font.label) : font.label}
+                </option>)}
               </select>
             </label>
             {([

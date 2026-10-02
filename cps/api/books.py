@@ -25,6 +25,18 @@ from ..usermanagement import login_required_if_no_ano
 
 log = logger.create()
 
+MAX_SELECT_ALL_BOOKS = 100_000
+
+
+def _selection_response(ids, total):
+    if total > MAX_SELECT_ALL_BOOKS:
+        return jsonify({"error": {
+            "code": "selection_too_large",
+            "message": "Select all is limited to 100,000 books. Narrow the current view and try again.",
+            "max_items": MAX_SELECT_ALL_BOOKS,
+        }}), 413
+    return jsonify({"ids": ids, "total": total})
+
 def _detail_custom_columns():
     """Classic-parity display definitions, degrading safely if DB metadata is unavailable.
 
@@ -205,6 +217,22 @@ def _rows_to_items(entries, hidden_ids=None):
     overrides = user_cover.overrides_for_user(
         _real_user_id(), [book.id for book in books])
     shelves_by_book = _visible_shelves_by_book([int(book.id) for book in books])
+    user_id = _real_user_id()
+    page_ids = [int(book.id) for book in books]
+    favorite_ids = set()
+    if user_id is not None and page_ids:
+        try:
+            favorite_ids = {int(row[0]) for row in (
+                ub.session.query(ub.FavoriteBook.book_id)
+                .filter(ub.FavoriteBook.user_id == user_id,
+                        ub.FavoriteBook.book_id.in_(page_ids)).all()
+            )}
+        except SQLAlchemyError:
+            # Favorite badges are optional metadata, like shelf tags. A busy or
+            # unavailable app DB must not turn an otherwise readable catalog
+            # page into a 500; mutations still surface their own write errors.
+            favorite_ids = None
+            log.warning("Could not load favorite badges for catalog page")
     items = []
     for entry, book in zip(entries, books):
         item = _row_to_item(
@@ -212,6 +240,7 @@ def _rows_to_items(entries, hidden_ids=None):
             cover_override=overrides.get(int(book.id)),
         )
         item["shelves"] = shelves_by_book.get(int(book.id), [])
+        item["favorited"] = None if favorite_ids is None else int(book.id) in favorite_ids
         items.append(item)
     return items
 
@@ -284,8 +313,13 @@ def _build_read_filter(filter_val):
 @api_v1.route("/books")
 @login_required_if_no_ano
 def list_books():
-    page = request.args.get("page", 1, type=int)
-    per_page = request.args.get("per_page", config.config_books_per_page, type=int)
+    select_all = request.args.get("select_all", "").strip().lower() in (
+        "1", "true", "yes", "on"
+    )
+    page = 1 if select_all else request.args.get("page", 1, type=int)
+    per_page = (MAX_SELECT_ALL_BOOKS + 1 if select_all else request.args.get(
+        "per_page", config.config_books_per_page, type=int
+    ))
     sort = request.args.get("sort", "new")
     order = _requested_order(sort)
     search = request.args.get("search")
@@ -299,6 +333,16 @@ def list_books():
     to_items = lambda entries: _rows_to_items(entries, hidden_ids)
 
     if search:
+        if select_all:
+            query = calibre_db.search_query(
+                search, config, db.books_series_link,
+                db.Books.id == db.books_series_link.c.book, db.Series,
+                allow_show_hidden=show_hidden,
+            )
+            id_query = query.with_entities(db.Books.id).distinct()
+            total = id_query.count()
+            ids = [row[0] for row in id_query.order_by(*order).limit(per_page).all()]
+            return _selection_response(ids, total)
         offset = (page - 1) * per_page
         join = (
             db.books_series_link,
@@ -335,8 +379,10 @@ def list_books():
         series_join = (db.books_series_link, db.Books.id == db.books_series_link.c.book, db.Series)
         entries, _random, pagination = calibre_db.fill_indexpage_with_archived_books(
             page, db.Books, per_page, archived_filter, order,
-            True, True, config.config_read_column, *series_join,
+            True, True, config.config_read_column, *series_join, ids_only=select_all,
         )
+        if select_all:
+            return _selection_response(entries, pagination.total_count)
         return jsonify({
             "items": to_items(entries),
             "page": pagination.page,
@@ -352,7 +398,9 @@ def list_books():
                    .filter(ub.FavoriteBook.user_id == int(current_user.id)).all())]
         entries, _random, pagination = calibre_db.fill_indexpage(
             page, per_page, db.Books, db.Books.id.in_(fav_ids), order,
-            True, config.config_read_column, *series_join)
+            True, config.config_read_column, *series_join, ids_only=select_all)
+        if select_all:
+            return _selection_response(entries, pagination.total_count)
         return jsonify({"items": to_items(entries),
                         "page": pagination.page, "per_page": pagination.per_page,
                         "total": pagination.total_count})
@@ -362,7 +410,9 @@ def list_books():
         rated_filter = db.Books.ratings.any(db.Ratings.rating > 9)
         entries, _random, pagination = calibre_db.fill_indexpage(
             page, per_page, db.Books, rated_filter, order,
-            True, config.config_read_column, *series_join)
+            True, config.config_read_column, *series_join, ids_only=select_all)
+        if select_all:
+            return _selection_response(entries, pagination.total_count)
         return jsonify({"items": to_items(entries),
                         "page": pagination.page, "per_page": pagination.per_page,
                         "total": pagination.total_count})
@@ -376,13 +426,23 @@ def list_books():
                 disc_filter = coalesce(db.cc_classes[config.config_read_column].value, False) != True  # noqa: E712
             except (KeyError, AttributeError):
                 disc_filter = True
+        discover_per_page = config.config_books_per_page if select_all else per_page
         entries, _random, _pg = calibre_db.fill_indexpage(
-            1, per_page, db.Books, disc_filter, [func.randomblob(2)],
-            True, config.config_read_column)
+            1, discover_per_page, db.Books, disc_filter, [func.randomblob(2)],
+            True, config.config_read_column, ids_only=select_all)
+        if select_all:
+            # Discover is deliberately a random, one-page sample. Its current
+            # cards are the complete view; never expand this request to the
+            # 100,001-row safety probe used by normal full-result selection.
+            return _selection_response(entries, len(entries))
         items = to_items(entries)
         return jsonify({"items": items, "page": 1, "per_page": per_page, "total": len(items)})
 
     if filter_val == "hot":
+        if select_all:
+            entries, total = hot_books_page(calibre_db.common_filters(), BOOK_SORT_ORDERS["hotdesc"],
+                                            0, per_page, ids_only=True)
+            return _selection_response(entries, total)
         entries, total = hot_books_page(calibre_db.common_filters(), BOOK_SORT_ORDERS["hotdesc"],
                                         per_page * (page - 1), per_page)
         return jsonify({"items": to_items(entries),
@@ -423,8 +483,11 @@ def list_books():
     entries, _random, pagination = calibre_db.fill_indexpage(
         page, per_page, db.Books, db_filter, order,
         True, config.config_read_column, *series_join,
+        ids_only=select_all,
         **listing_options,
     )
+    if select_all:
+        return _selection_response(entries, pagination.total_count)
     return jsonify({
         "items": to_items(entries),
         "page": pagination.page,

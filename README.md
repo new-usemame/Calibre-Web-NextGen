@@ -276,6 +276,8 @@ corrected.
 
 The Admin → Settings panel has many optional toggles (auto-convert formats, automatic backups, EPUB fixer, KOReader sync, OAuth, etc.). The [upstream wiki](https://github.com/crocodilestick/Calibre-Web-Automated/wiki) is the source of truth for those; this fork doesn't change them.
 
+For deployment-managed Generic OIDC credentials and endpoint settings, see the [environment configuration guide](docs/OAUTH-ENVIRONMENT-CONFIGURATION.md).
+
 ---
 
 ## Updating
@@ -410,6 +412,21 @@ After Shelfmark starts, open it and pick **Settings → Security → Authenticat
 ---
 
 ## Common configurations
+
+### Writable cache storage
+
+The general derived cache defaults to `cache/` under the configured application
+config directory (`/config/cache` in Docker). Set `CACHE_DIR` to keep an explicit
+cache location; that directory must be writable by the service user. Existing
+thumbnail storage stays at `/config/thumbnails`, and metadata change logs and
+scratch storage keep their existing locations under the config directory.
+
+Upgrades regenerate disposable general cache entries in the new default location.
+The old `cps/cache` directory is left untouched; no user data or existing
+thumbnail cache is moved or deleted. Deployments that explicitly set `CACHE_DIR`
+keep that location. Startup no longer creates or changes ownership of the
+image-owned `cps/cache` directory.
+
 
 ### Network shares (NFS, SMB, ZFS)
 
@@ -790,34 +807,34 @@ The interface ships with the locales below. Completion is auto-refreshed on ever
 | Language | Completion | Strings | Fuzzy |
 |---|---|---:|---:|
 | English (source) | 100% | source | — |
-| Russian (`ru`) | `████████████████████` 100% | 3385/3388 | 0 |
-| Slovak (`sk`) | `████████████████████` 100% | 3382/3388 | 0 |
-| Swedish (`sv`) | `███████████████████░` 97% | 3293/3388 | 0 |
-| Italian (`it`) | `██████████████████░░` 92% | 3104/3388 | 0 |
-| Spanish (`es`) | `██████████████████░░` 91% | 3088/3388 | 0 |
-| French (`fr`) | `█████████████████░░░` 84% | 2850/3388 | 125 |
-| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `████████████████░░░░` 78% | 2655/3388 | 181 |
-| Polish (`pl`) | `███████████████░░░░░` 76% | 2571/3388 | 0 |
-| Dutch (`nl`) | `██████████████░░░░░░` 71% | 2397/3388 | 288 |
-| German (`de`) | `█████████████░░░░░░░` 67% | 2282/3388 | 12 |
-| Hungarian (`hu`) | `██████████░░░░░░░░░░` 48% | 1637/3388 | 119 |
-| Portuguese (Brazil) (`pt_BR`) | `████████░░░░░░░░░░░░` 41% | 1397/3388 | 305 |
-| Japanese (`ja`) | `████████░░░░░░░░░░░░` 39% | 1311/3388 | 244 |
-| Slovenian (`sl`) | `███████░░░░░░░░░░░░░` 36% | 1205/3388 | 312 |
-| Chinese (Simplified, China) (`zh_Hans_CN`) | `███████░░░░░░░░░░░░░` 34% | 1168/3388 | 342 |
-| Korean (`ko`) | `██████░░░░░░░░░░░░░░` 28% | 939/3388 | 266 |
-| Arabic (`ar`) | `█████░░░░░░░░░░░░░░░` 23% | 784/3388 | 281 |
-| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 21% | 697/3388 | 354 |
-| Galician (`gl`) | `████░░░░░░░░░░░░░░░░` 20% | 673/3388 | 355 |
-| Indonesian (`id`) | `████░░░░░░░░░░░░░░░░` 20% | 674/3388 | 356 |
-| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 15% | 505/3388 | 393 |
-| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 14% | 476/3388 | 402 |
-| Ukrainian (`uk`) | `███░░░░░░░░░░░░░░░░░` 13% | 445/3388 | 367 |
-| Norwegian (`no`) | `███░░░░░░░░░░░░░░░░░` 13% | 430/3388 | 430 |
-| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 12% | 423/3388 | 351 |
-| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 10% | 356/3388 | 382 |
-| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 9% | 290/3388 | 379 |
-| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 208/3388 | 339 |
+| Russian (`ru`) | `██████████████████░░` 91% | 3381/3711 | 0 |
+| Slovak (`sk`) | `██████████████████░░` 91% | 3377/3711 | 0 |
+| Swedish (`sv`) | `██████████████████░░` 89% | 3289/3711 | 0 |
+| French (`fr`) | `█████████████████░░░` 85% | 3171/3711 | 125 |
+| Italian (`it`) | `█████████████████░░░` 84% | 3100/3711 | 0 |
+| Spanish (`es`) | `█████████████████░░░` 83% | 3084/3711 | 0 |
+| Dutch (`nl`) | `███████████████░░░░░` 73% | 2719/3711 | 288 |
+| Chinese (Traditional, Taiwan) (`zh_Hant_TW`) | `██████████████░░░░░░` 72% | 2653/3711 | 179 |
+| Polish (`pl`) | `██████████████░░░░░░` 69% | 2566/3711 | 0 |
+| German (`de`) | `█████████████░░░░░░░` 64% | 2365/3711 | 12 |
+| Hungarian (`hu`) | `█████████░░░░░░░░░░░` 46% | 1720/3711 | 119 |
+| Portuguese (Brazil) (`pt_BR`) | `████████░░░░░░░░░░░░` 38% | 1397/3711 | 303 |
+| Japanese (`ja`) | `███████░░░░░░░░░░░░░` 35% | 1310/3711 | 243 |
+| Slovenian (`sl`) | `██████░░░░░░░░░░░░░░` 32% | 1204/3711 | 311 |
+| Chinese (Simplified, China) (`zh_Hans_CN`) | `██████░░░░░░░░░░░░░░` 32% | 1170/3711 | 339 |
+| Korean (`ko`) | `█████░░░░░░░░░░░░░░░` 25% | 939/3711 | 265 |
+| Arabic (`ar`) | `████░░░░░░░░░░░░░░░░` 21% | 784/3711 | 280 |
+| Portuguese (`pt`) | `████░░░░░░░░░░░░░░░░` 19% | 699/3711 | 351 |
+| Galician (`gl`) | `████░░░░░░░░░░░░░░░░` 18% | 675/3711 | 352 |
+| Indonesian (`id`) | `████░░░░░░░░░░░░░░░░` 18% | 676/3711 | 353 |
+| Greek (`el`) | `███░░░░░░░░░░░░░░░░░` 14% | 507/3711 | 389 |
+| Czech (`cs`) | `███░░░░░░░░░░░░░░░░░` 13% | 478/3711 | 399 |
+| Ukrainian (`uk`) | `██░░░░░░░░░░░░░░░░░░` 12% | 447/3711 | 365 |
+| Norwegian (`no`) | `██░░░░░░░░░░░░░░░░░░` 12% | 432/3711 | 426 |
+| Vietnamese (`vi`) | `██░░░░░░░░░░░░░░░░░░` 12% | 425/3711 | 348 |
+| Finnish (`fi`) | `██░░░░░░░░░░░░░░░░░░` 10% | 358/3711 | 379 |
+| Turkish (`tr`) | `██░░░░░░░░░░░░░░░░░░` 8% | 292/3711 | 377 |
+| Khmer (`km`) | `█░░░░░░░░░░░░░░░░░░░` 6% | 209/3711 | 337 |
 <!-- TRANSLATION_STATUS_END -->
 
 ---

@@ -94,6 +94,7 @@ def serialize_user(user):
             "download": user.role_download(),
             "delete_books": user.role_delete_books(),
             "edit_shelfs": user.role_edit_shelfs(),
+            "share_shelfs": user.role_share_shelfs(),
             "viewer": user.role_viewer(),
             "browse_global": bool(
                 getattr(user, "role_browse_global", lambda: False)()
@@ -183,7 +184,9 @@ def cover_url_for(book, resolution, cover_override=None):
 
 def serialize_book_list_item(book, read=False, archived=False, hidden=False,
                              in_progress=False, cover_override=None):
-    series = book.series[0].name if getattr(book, "series", None) else None
+    series_list = getattr(book, "series", None) or []
+    series = series_list[0].name if series_list else None
+    series_id = getattr(series_list[0], "id", None) if series_list else None
     return {
         "id": book.id,
         "title": book.title,
@@ -192,6 +195,7 @@ def serialize_book_list_item(book, read=False, archived=False, hidden=False,
         # SPA cards show a comma, not a pipe (#730). Matches web.py / api/browse.py.
         "authors": [a.name.replace("|", ",") for a in book.authors] if getattr(book, "authors", None) else [],
         "series": series,
+        "series_id": series_id,
         "series_index": book.series_index,
         "cover_url": cover_url_for(book, "sm", cover_override),
         "formats": [d.format for d in book.data] if getattr(book, "data", None) else [],
@@ -375,6 +379,8 @@ def serialize_book_detail(book, read=False, archived=False, favorited=False, hid
         "identifiers": identifiers,
         "custom_columns": _serialize_custom_columns(book, custom_column_definitions),
         "formats": formats,
+        # This diagnostic field remains in API data for edit/diagnostic screens;
+        # the per-account preference controls presentation on book detail only.
         "original_filename": original_filename,
         "read": bool(read),
         "archived": bool(archived),

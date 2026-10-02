@@ -166,6 +166,9 @@
       <a class="btn btn-default" id="basic_config" href="{{url_for('admin.configuration')}}">{{_('Edit Basic Configuration')}}</a>
       <a class="btn btn-default" id="view_config" href="{{url_for('admin.view_configuration')}}">{{_('Edit UI Configuration')}}</a>
       <a class="btn btn-default" id="db_config" href="{{url_for('admin.db_configuration')}}">{{_('Edit Calibre Database Configuration')}}</a>
+      {% if cwng_spa_enabled %}
+      <a class="btn btn-default" id="reader-fonts-admin" href="{{ url_for('spa.spa_shell', path='admin') }}#reader-fonts">{{_('Manage reader fonts')}}</a>
+      {% endif %}
     </div>
   </div>
 {%  if feature_support['scheduler'] %}

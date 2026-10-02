@@ -32,6 +32,7 @@
 <div class="discover" style="padding-inline: 2rem !important;">
   <h3>{{ _('Upcoming scheduled sends') }}</h3>
   <table class="table table-no-bordered" id="upcomingtable"
+       data-escape="true"
        data-url="{{ url_for('cwa_stats.cwa_scheduled_upcoming') }}"
        data-response-handler="upcomingResponse"
        data-locale="{{ current_user.locale }}"
@@ -54,6 +55,7 @@
 <div class="discover" style="padding-inline: 2rem !important;">
   <h3>{{ _('Upcoming scheduled operations') }}</h3>
   <table class="table table-no-bordered" id="upcomingopstable"
+       data-escape="true"
        data-url="{{ url_for('cwa_stats.cwa_scheduled_upcoming_ops') }}"
        data-response-handler="upcomingOpsResponse"
        data-locale="{{ current_user.locale }}"

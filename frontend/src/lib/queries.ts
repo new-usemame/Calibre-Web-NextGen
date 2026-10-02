@@ -1,4 +1,5 @@
 import type { ReaderBookmark } from "./readerResume";
+import type { ReaderFontCatalog } from './readerFonts';
 import { keepPreviousData, useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { QueryClient } from '@tanstack/react-query';
 import {
@@ -506,14 +507,37 @@ export function useBook(id: string | number) {
   });
 }
 
+function invalidateBookCardViews(qc: QueryClient) {
+  // Read/favorite changes can remove a row from a filtered result and shift
+  // every subsequent page. Rebuild the accumulated catalog from page 1 instead
+  // of appending a refreshed single page onto stale membership. This also
+  // refreshes advanced-search/default-filter cards through the shared seam.
+  return refreshLibraryViews(qc);
+}
+
 export function useToggleRead(id: string | number) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (read: boolean) =>
       apiPost<{ read: boolean }>(`/api/v1/books/${id}/read`, { read }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ['book', String(id)] });
-      void queryClient.invalidateQueries({ queryKey: ['books'] });
+      return Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['book', String(id)] }),
+        invalidateBookCardViews(queryClient),
+      ]);
+    },
+  });
+}
+
+/** Remove the local Reading marker while retaining every saved position. */
+export function useStopReading(id: string | number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost<{ ok: boolean; changed: boolean }>(`/api/v1/books/${id}/stop-reading`),
+    onSuccess: () => {
+      for (const queryKey of [['book', String(id)], ['books'], ['magicshelves'], ['magicshelf']]) {
+        void qc.invalidateQueries({ queryKey });
+      }
     },
   });
 }
@@ -524,7 +548,12 @@ export function useToggleFavorite(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: () => apiPost<{ favorited: boolean }>(`/api/v1/books/${id}/favorite`),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ['book', String(id)] }),
+    onSuccess: () => {
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: ['book', String(id)] }),
+        invalidateBookCardViews(qc),
+      ]);
+    },
   });
 }
 
@@ -642,7 +671,7 @@ export function useBookShelves(bookId: string | number, options?: { enabled?: bo
 export function useCreateShelf() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { name: string; is_public?: boolean }) =>
+    mutationFn: (vars: { name: string; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
       apiPost<Shelf>('/api/v1/shelves', vars),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['shelves'] }),
   });
@@ -651,7 +680,7 @@ export function useCreateShelf() {
 export function useUpdateShelf(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (vars: { name?: string; is_public?: boolean; kobo_sync?: boolean }) =>
+    mutationFn: (vars: { name?: string; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
       apiPost<Shelf>(`/api/v1/shelves/${id}`, vars),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['shelves'] });
@@ -733,6 +762,8 @@ export interface AdminConfig {
   config_theme: string;
   config_default_language: string;
   config_default_locale: string;
+  config_default_ui_font_body: string;
+  config_default_ui_font_display: string;
   config_server_announcement: string;
   config_opds_filename_template: string;
   locales: { id: string; name: string }[];
@@ -1038,7 +1069,14 @@ export function useBulkActions() {
   // mode to every selected book via the per-book metadata endpoint.
   const setMetadata = useMutation({
     mutationFn: (v: { ids: number[]; fields: MetadataUpdate }) =>
-      settleById(v.ids, (id) => apiPost(`/api/v1/books/${id}/metadata`, v.fields)),
+      settleById(v.ids, async (id) => {
+        // The endpoint answers 200 even when a field was rejected, naming it in
+        // `errors`; a bulk edit must count that book as failed, not applied.
+        const result = await apiPost<BookMetadata>(`/api/v1/books/${id}/metadata`, v.fields);
+        const fieldErrors = Object.values(result?.errors ?? {});
+        if (fieldErrors.length) throw new Error(fieldErrors.join('; '));
+        return result;
+      }),
     onSuccess: refresh,
   });
   return { markRead, addToShelf, deleteBooks, removeFromMyLibrary, setMetadata };
@@ -1278,7 +1316,8 @@ export function useSetCover(id: string | number) {
 
 export interface ReaderSettings {
   theme: 'lightTheme' | 'sepiaTheme' | 'darkTheme' | 'blackTheme';
-  font: 'default' | 'Yahei' | 'SimSun' | 'KaiTi' | 'Arial';
+  /** Built-in IDs and server-validated custom:<uuid> catalog entries. */
+  font: string;
   fontSize: number;
   margin: number;
   lineHeight: number;
@@ -1308,6 +1347,15 @@ export function useReaderSettings() {
     queryKey: ['reader-settings'],
     queryFn: () => apiGet<{ reader: ReaderSettings }>('/api/v1/reader/settings'),
     staleTime: 60_000,
+    retry: retryUnlessUnauthorized,
+  });
+}
+
+export function useReaderFonts() {
+  return useQuery<ReaderFontCatalog>({
+    queryKey: ['reader-fonts'],
+    queryFn: () => apiGet<ReaderFontCatalog>('/api/v1/reader/fonts'),
+    staleTime: 0,
     retry: retryUnlessUnauthorized,
   });
 }
@@ -1658,16 +1706,18 @@ export function useMagicShelfPreview() {
 }
 
 export function useCreateMagicShelf() {
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet }) =>
+    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
       apiPost<{ success: boolean; shelf_id?: number; message?: string }>('/magicshelf', v),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['magicshelves'] }),
   });
 }
 
 export function useEditMagicShelf(id: string | number) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet }) =>
+    mutationFn: (v: { name: string; icon: string; rules: MagicRuleSet; is_public?: boolean; kobo_sync?: boolean; opds_expose?: boolean }) =>
       apiPost<{ success: boolean; message?: string }>(`/magicshelf/${id}/edit`, v),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['magicshelves'] });
@@ -1699,6 +1749,7 @@ export function useToggleMagicShelfKoboSync(id: string | number) {
 }
 
 export interface MagicShelfItem {
+  rules?: MagicRuleSet;
   id: number;
   name: string;
   icon: string;
@@ -1710,12 +1761,15 @@ export interface MagicShelfItem {
   can_delete: boolean;
   can_duplicate: boolean;
   can_kobo_sync: boolean;
+  opds_expose?: boolean;
+  can_hide?: boolean;
+  is_hidden?: boolean;
 }
 
-export function useMagicShelves() {
+export function useMagicShelves(manage = false) {
   return useQuery<{ items: MagicShelfItem[] }>({
-    queryKey: ['magicshelves'],
-    queryFn: () => apiGet<{ items: MagicShelfItem[] }>('/api/v1/magicshelves'),
+    queryKey: ['magicshelves', { manage }],
+    queryFn: () => apiGet<{ items: MagicShelfItem[] }>(`/api/v1/magicshelves${manage ? '?manage=1' : ''}`),
     staleTime: 30000,
   });
 }
@@ -1863,5 +1917,15 @@ export function useCancelTask() {
     mutationFn: (taskId: number | string) =>
       apiPost(`/api/v1/tasks/${encodeURIComponent(String(taskId))}/cancel`),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['tasks'] }),
+  });
+}
+
+
+export function useMagicShelfVisibility() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; visible: boolean }) =>
+      apiPost(`/api/v1/magicshelves/${v.id}/visibility`, { visible: v.visible }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['magicshelves'] }),
   });
 }

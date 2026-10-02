@@ -577,6 +577,7 @@ def render_title_template(*args, **kwargs):
     except Exception as e:
         log.debug("[cwa-duplicates] Failed to build duplicate notification context: %s", str(e))
     try:
+        from .services.support_policy import support_policy
         return render_template(instance=config.config_calibre_web_title, sidebar=sidebar, simple=simple,
                        accept=config.config_upload_formats.split(','),
                        magic_shelf_routes=magic_shelf_routes,
@@ -587,6 +588,11 @@ def render_title_template(*args, **kwargs):
                        # Fork #323 (@olskar): admin-set custom CSS, injected as the last
                        # stylesheet in layout.html's <head> via |safe. See _style_safe_css.
                        custom_css=_style_safe_css(getattr(config, 'config_custom_css', '')),
+                       support_destinations=support_policy(
+                           config,
+                           is_admin=current_user.role_admin(),
+                           contact_support_label=_("Contact support"),
+                       ),
                        *args, **kwargs)
     except PermissionError:
         log.error("No permission to access {} file.".format(args[0]))

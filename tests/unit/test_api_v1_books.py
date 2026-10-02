@@ -441,10 +441,13 @@ def test_select_all_search_uses_the_filtered_search_query_ids():
 def test_select_all_discover_returns_only_the_current_random_page_ids():
     from cps.api import books as books_mod
 
+    account = SimpleNamespace(id=7, is_authenticated=True, is_anonymous=False,
+                              get_view_property=lambda section, key: None)
     app = flask.Flask(__name__)
     with app.test_request_context("/api/v1/books?filter=discover&select_all=1"):
         with patch.object(books_mod.calibre_db, "fill_indexpage",
                           return_value=([41, 42, 43], None, None)) as fill, \
+             patch.object(books_mod, "current_user", account), \
              patch.object(books_mod.config, "config_books_per_page", 24, create=True), \
              patch.object(books_mod.config, "config_read_column", 0, create=True), \
              patch.object(books_mod, "_real_user_id", return_value=7), \
@@ -455,3 +458,49 @@ def test_select_all_discover_returns_only_the_current_random_page_ids():
     assert json.loads(response.get_data(as_text=True)) == {"ids": [41, 42, 43], "total": 3}
     assert fill.call_args.args[:2] == (1, 24)
     assert fill.call_args.kwargs["ids_only"] is True
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("available", [True, False])
+def test_select_all_discover_keeps_saved_source_filter_and_random_page_bound(available):
+    """Source scope and bounded ID selection must compose at the catalog API seam."""
+    from sqlalchemy import create_engine, select, true
+    from cps.api import books as books_mod
+
+    account = SimpleNamespace(
+        id=7, is_authenticated=True, is_anonymous=False,
+        get_view_property=lambda section, key: "shelf:12",
+    )
+    source = SimpleNamespace(id=12)
+    engine = create_engine("sqlite:///:memory:")
+    app = flask.Flask(__name__)
+    with engine.connect() as connection:
+        connection.exec_driver_sql("ATTACH DATABASE ':memory:' AS app_settings")
+        connection.exec_driver_sql("CREATE TABLE books (id INTEGER PRIMARY KEY)")
+        connection.exec_driver_sql("INSERT INTO books VALUES (1),(2),(3),(4),(5)")
+        connection.exec_driver_sql("CREATE TABLE app_settings.book_shelf_link (book_id INTEGER,shelf INTEGER)")
+        connection.exec_driver_sql("INSERT INTO app_settings.book_shelf_link VALUES (1,12),(3,12),(5,12),(2,13)")
+
+        def fill(page, page_size, *args, ids_only=False, extra_filter=None, **kwargs):
+            assert ids_only, "Select all must request IDs, not serialized cards"
+            predicate = extra_filter if extra_filter is not None else true()
+            ids = connection.execute(
+                select(books_mod.db.Books.id).where(predicate)
+                .order_by(books_mod.db.Books.id).limit(page_size)
+            ).scalars().all()
+            return ids, None, None
+
+        with app.test_request_context("/api/v1/books?filter=discover&select_all=1"):
+            with patch.object(books_mod, "current_user", account), \
+                 patch.object(books_mod, "_real_user_id", return_value=7), \
+                 patch.object(books_mod, "_hidden_book_ids", return_value=set()), \
+                 patch.object(books_mod.config, "config_books_per_page", 2, create=True), \
+                 patch.object(books_mod.config, "config_read_column", 0, create=True), \
+                 patch.object(books_mod.discover_source, "_source_record", return_value=source if available else None), \
+                 patch.object(books_mod.calibre_db, "fill_indexpage", side_effect=fill):
+                response = inspect.unwrap(books_mod.list_books)()
+        assert response.status_code == 200
+        assert json.loads(response.get_data(as_text=True)) == (
+            {"ids": [1, 3], "total": 2} if available else {"ids": [], "total": 0}
+        )
+    engine.dispose()

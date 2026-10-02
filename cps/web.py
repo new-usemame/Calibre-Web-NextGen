@@ -40,7 +40,7 @@ from .services.ereader_send import (
     ereader_addresses, other_users_with_ereader, record_email_activity,
     send_includes_own_address,
 )
-from .services import app_passwords, ereader_scope, reading_position
+from .services import app_passwords, ereader_scope, reading_position, discover_source as discover_source_service
 from .services.read_status import stop_reading as stop_reading_status
 from .search import render_search_results, render_adv_search_results
 from .gdriveutils import getFileFromEbooksFolder, do_gdrive_download
@@ -826,8 +826,11 @@ def render_books_list(data, sort_param, book_id, page):
         except:
             title = _(f'Books ({cwa_get_num_books_in_library()})')
 
-        return render_title_template('index.html', random=random, entries=entries, pagination=pagination,
-                                     title=title, page=website, order=order[1])
+        return render_title_template(
+            'index.html', random=random, entries=entries, pagination=pagination,
+            title=title, page=website, order=order[1],
+            **(_classic_discover_source_context() if website == "root" else {}),
+        )
 
 
 def render_rated_books(page, book_id, order):
@@ -847,6 +850,48 @@ def render_rated_books(page, book_id, order):
         abort(404)
 
 
+def _classic_discover_source_state():
+    if not current_user.is_authenticated or current_user.is_anonymous:
+        return {
+            "source": "library",
+            "available": True,
+            "sources": [{"value": "library", "name": "", "kind": "library"}],
+        }
+    return discover_source_service.settings_payload(current_user)
+
+
+def _classic_discover_source_context():
+    return {"discover_source_state": _classic_discover_source_state()}
+
+
+@web.route("/discover/source", methods=["POST"])
+@login_required_if_no_ano
+def save_discover_source():
+    """Save the signed-in user's Classic Discover source, then return to it."""
+    if not current_user.is_authenticated or current_user.is_anonymous:
+        abort(403)
+
+    try:
+        source = discover_source_service.validate_source(
+            request.form.get("source"), current_user,
+        )
+    except ValueError:
+        flash(_("This Discover source is unavailable. Choose another source."), category="error")
+        return redirect(url_for("web.books_list", data="discover", sort_param="stored"))
+
+    try:
+        current_user.set_view_property("discover", "source", source, commit=False)
+        ub.session.commit()
+        discover_source_service.clear_filter_cache()
+    except Exception:
+        ub.session.rollback()
+        log.exception("Could not save Discover source for user %s", current_user.id)
+        flash(_("Could not save Discover source. Please try again."), category="error")
+    else:
+        flash(_("Discover source saved."), category="success")
+    return redirect(url_for("web.books_list", data="discover", sort_param="stored"))
+
+
 def render_discover_books(book_id):
     if current_user.check_visibility(constants.SIDEBAR_RANDOM):
         if not config.config_read_column:
@@ -864,12 +909,18 @@ def render_discover_books(book_id):
                 )
                 db_filter = True
 
-        entries, __, ___ = calibre_db.fill_indexpage(1, 0, db.Books, db_filter, [func.randomblob(2)],
-                                                            join_archive_read=True,
-                                                            config_read_column=config.config_read_column)
+        source_filter, source_available = discover_source_service.filter_for(current_user)
+        entries, __, ___ = calibre_db.fill_indexpage(
+            1, 0, db.Books, db_filter, [func.randomblob(2)],
+            join_archive_read=True,
+            config_read_column=config.config_read_column,
+            extra_filter=source_filter,
+        )
         pagination = Pagination(1, config.config_books_per_page, config.config_books_per_page)
         return render_title_template('index.html', random=false(), entries=entries, pagination=pagination, id=book_id,
-                                     title=_("Discover (Random Books)"), page="discover")
+                                     title=_("Discover (Random Books)"), page="discover",
+                                     discover_source_state=_classic_discover_source_state(),
+                                     discover_source_available=source_available)
     else:
         abort(404)
 
@@ -886,7 +937,9 @@ def render_hot_books(page, order):
         random = false()
         if current_user.show_detail_random():
             random_query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
+            source_filter, _source_available = discover_source_service.filter_for(current_user)
             random = (random_query.filter(calibre_db.common_filters())
+                     .filter(source_filter)
                      .order_by(func.random())
                      .limit(config.config_random_books).all())
 

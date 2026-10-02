@@ -660,10 +660,14 @@ def feed_new():
 @opds.route("/opds/discover")
 @requires_basic_auth_if_no_ano
 def feed_discover():
-    if not auth.current_user().check_visibility(constants.SIDEBAR_RANDOM):
+    user = auth.current_user()
+    if not user.check_visibility(constants.SIDEBAR_RANDOM):
         abort(404)
     query = calibre_db.generate_linked_query(config.config_read_column, db.Books)
-    entries = query.filter(get_opds_restricted_common_filter()) \
+    from .services import discover_source
+    source_filter, _source_available = discover_source.filter_for(user)
+    entries = query.filter(get_opds_restricted_common_filter(user=user)) \
+        .filter(source_filter) \
         .order_by(func.random()).limit(config.config_books_per_page)
     pagination = Pagination(1, config.config_books_per_page, int(config.config_books_per_page))
     return render_xml_template('feed.xml', entries=entries, pagination=pagination)

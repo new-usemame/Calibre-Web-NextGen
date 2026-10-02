@@ -65,6 +65,10 @@ and preserve the last server output in the application log. Correct the reported
 problem and save the settings to retry. A successful settings save confirms the
 configuration was stored; use the log and the actual client connection to check
 that Calibre started successfully.
+Planned maintenance pauses do not count toward that crash limit. Contention
+defers startup and reload until the writer gate becomes available. Failed or
+busy ingest operations retain their input and add-format intent for the ingest
+service's retry queue instead of acknowledging an uncommitted format.
 
 Split-library mode is currently unsupported. Disable it before enabling the
 content server, or disable the server before enabling split-library mode. The

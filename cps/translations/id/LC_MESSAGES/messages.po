@@ -10390,6 +10390,60 @@ msgstr ""
 msgid "Save ingest folder settings"
 msgstr ""
 
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Discover source"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Current library"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html
+#, python-brace-format
+msgid "Shelf: {name}"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html
+#, python-brace-format
+msgid "Smart shelf: {name}"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Unavailable source"
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Save Discover source"
+msgstr ""
+
+#: cps/spa_strings.py cps/web.py
+msgid "Discover source saved."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not load Discover sources."
+msgstr ""
+
+#: cps/spa_strings.py cps/web.py
+msgid "Could not save Discover source. Please try again."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html cps/web.py
+msgid "This Discover source is unavailable. Choose another source."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "No unread books in this Discover source."
+msgstr ""
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Only Discover picks change; books remain in your library."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "A few random picks from your Discover source"
+msgstr ""
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "Menunggu"

@@ -10895,6 +10895,62 @@ msgstr "Instellingen voor importmappen opgeslagen."
 msgid "Save ingest folder settings"
 msgstr "Instellingen voor importmappen opslaan"
 
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Discover source"
+msgstr "Bron voor ontdekken"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Current library"
+msgstr "Huidige bibliotheek"
+
+#: cps/spa_strings.py cps/templates/index.html
+#, python-brace-format
+msgid "Shelf: {name}"
+msgstr "Boekenplank: {name}"
+
+#: cps/spa_strings.py cps/templates/index.html
+#, python-brace-format
+msgid "Smart shelf: {name}"
+msgstr "Slimme boekenplank: {name}"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Unavailable source"
+msgstr "Bron niet beschikbaar"
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Save Discover source"
+msgstr "Bron voor ontdekken opslaan"
+
+#: cps/spa_strings.py cps/web.py
+msgid "Discover source saved."
+msgstr "Bron voor ontdekken opgeslagen."
+
+#: cps/spa_strings.py
+msgid "Could not load Discover sources."
+msgstr "Kan bronnen voor ontdekken niet laden."
+
+#: cps/spa_strings.py cps/web.py
+msgid "Could not save Discover source. Please try again."
+msgstr "Kan de bron voor ontdekken niet opslaan. Probeer het opnieuw."
+
+#: cps/spa_strings.py cps/templates/index.html cps/web.py
+msgid "This Discover source is unavailable. Choose another source."
+msgstr "Deze bron voor ontdekken is niet beschikbaar. Kies een andere bron."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "No unread books in this Discover source."
+msgstr "Geen ongelezen boeken in deze bron voor ontdekken."
+
+#: cps/spa_strings.py cps/templates/index.html
+msgid "Only Discover picks change; books remain in your library."
+msgstr ""
+"Alleen de suggesties voor ontdekken veranderen; boeken blijven in je "
+"bibliotheek."
+
+#: cps/spa_strings.py
+msgid "A few random picks from your Discover source"
+msgstr "Een paar willekeurige suggesties uit je bron voor ontdekken"
+
 #: cps/tasks_status.py
 msgid "Waiting"
 msgstr "Wachten"

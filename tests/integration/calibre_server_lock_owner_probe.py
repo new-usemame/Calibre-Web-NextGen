@@ -13,13 +13,16 @@ import tempfile
 GUARD = "/app/calibre-web-automated/cps/calibre_server_guard.py"
 
 
-def main():
+def main(root_directory=False):
     spec = importlib.util.spec_from_file_location("guard", GUARD)
     guard = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(guard)
     account = pwd.getpwnam("abc")
     with tempfile.TemporaryDirectory(prefix="cwng-root-lock-") as directory:
-        os.chown(directory, account.pw_uid, account.pw_gid)
+        if root_directory:
+            os.chmod(directory, 0o777)
+        else:
+            os.chown(directory, account.pw_uid, account.pw_gid)
         with guard.operation(directory):
             pass
         for kind in ("maintenance", "owner"):
@@ -51,8 +54,10 @@ print('APP_LOCK_ACCESS_PASS')
             "root_created_locks": 3,
             "service_owned_locks": len(owners),
             "app_acquired_all_locks": True,
+            "root_owned_directory": root_directory,
         }))
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    main("--root-directory" in sys.argv)

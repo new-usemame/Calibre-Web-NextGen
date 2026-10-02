@@ -127,6 +127,72 @@ def harness(tmp_path):
 # --------------------------------------------------------------------------
 # Driving a file that is still being written
 # --------------------------------------------------------------------------
+def test_queued_input_retries_when_maintenance_ends_without_another_event(harness):
+    """A silent live watcher must retry a busy source after its owner releases it."""
+    import shlex
+    book = harness.watch / "queued input.epub"
+    book.write_bytes(b"published book")
+    path = shlex.quote(str(book))
+    processed = harness(f"""
+        run_processor_with_timeout() {{
+            printf '%s\\n' "$2" >> "$PROCESSOR_LOG"
+            [ -f "$WATCH_FOLDER/.maintenance-ended" ] || return 2
+            rm -f -- "$2"
+        }}
+        cwa-as-abc() {{
+            printf 'CLOSE_WRITE %s\\n' {path}
+            sleep 1.25
+            touch "$WATCH_FOLDER/.maintenance-ended"
+            sleep 1.25
+        }}
+        run_fallback >/dev/null 2>&1
+    """)
+    assert len(processed) >= 2, "a queued source was never retried during watcher silence"
+    assert set(processed) == {str(book)}
+    assert not book.exists(), "maintenance ended but the queued source never completed"
+    assert not harness.retry_queue.read_text().strip()
+
+
+def test_timed_event_consumer_keeps_a_fragmented_path_intact(harness):
+    """Retry ticks must not discard bytes already read from a partial event line."""
+    import shlex
+    book = harness.watch / "space and backslash \\ book.epub"
+    book.write_bytes(b"published book")
+    path = shlex.quote(str(book))
+    processed = harness(f"""
+        handle_event() {{ printf '%s\\n' "$1" >> "$PROCESSOR_LOG"; }}
+        cwa-as-abc() {{
+            printf 'CLOSE_WR'
+            sleep 1.25
+            printf 'ITE %s\\n' {path}
+            sleep 1.25
+        }}
+        run_fallback >/dev/null 2>&1
+    """)
+    assert processed == [str(book)], "the timeout consumed part of the event path"
+
+
+def test_retry_processor_stdin_cannot_consume_another_queued_path(harness):
+    """Plugin stdin belongs to the processor, never to the durable queue reader."""
+    first = harness.watch / "first.epub"
+    second = harness.watch / "second.epub"
+    for book in (first, second):
+        book.write_bytes(b"published book")
+    harness.retry_queue.write_text(f"{first}\n{second}\n")
+    processed = harness("""
+        run_processor_with_timeout() {
+            local unexpected_input
+            read -r unexpected_input || true
+            printf '%s\\n' "$2" >> "$PROCESSOR_LOG"
+            rm -f -- "$2"
+        }
+        process_retry_queue >/dev/null 2>&1
+    """)
+    assert processed == [str(first), str(second)], "processor stdin ate the next queue record"
+    assert not first.exists() and not second.exists()
+    assert not harness.retry_queue.read_text().strip()
+
+
 #
 # `wait_for_stable_file` samples the size every STABLE_INTERVAL and calls a
 # file settled after two consecutive equal reads. This harness sets

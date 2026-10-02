@@ -13,8 +13,10 @@ process and avoid concurrent restore/service writers. Release is a no-op too.
 The bespoke cooperative calibre_db_lock protocol is intentionally separate.
 """
 import errno
+import importlib.util
 import logging
 import os
+from pathlib import Path
 import stat
 import time
 
@@ -53,6 +55,18 @@ def open_lock(path, mode=0o600):
             directory = os.stat(os.path.dirname(os.path.abspath(path)))
             if directory.st_uid != 0:
                 os.fchown(fd, directory.st_uid, directory.st_gid)
+            else:
+                # Network-share mode can leave /config owned by root. Reuse
+                # the standalone helpers' configured account, changing only
+                # this dedicated lock rather than the mounted directory.
+                helper = Path(__file__).resolve().parents[2] / "scripts" / "service_user.py"
+                if helper.is_file():
+                    spec = importlib.util.spec_from_file_location("_cwng_lock_service_user", helper)
+                    service_user = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(service_user)
+                    ids = service_user.service_ids()
+                    if ids is not None:
+                        os.fchown(fd, *ids)
         return fd
     except BaseException:
         os.close(fd)

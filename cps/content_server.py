@@ -433,6 +433,9 @@ def _locked_start():
                           setting("config_calibre_server_password_e")):
         return
     _stopped_on_purpose = False
+    # Failed launches are quick exits too, even when no HTTP readiness was
+    # reached. Do not measure them from an earlier successful server's clock.
+    _started_at = time.monotonic()
     db_path = os.path.join(setting("config_calibre_dir"), "metadata.db")
     initial_mtime = _db_mtime(db_path)
     try:

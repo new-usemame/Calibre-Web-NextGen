@@ -3329,6 +3329,7 @@ def main(filepath=None):
                                 print(f"[ingest-processor] Could not find book ID to add retained format for: {nbp.filename}", flush=True)
                         except Exception as e:
                             print(f"[ingest-processor] Error adding retained format: {e}", flush=True)
+                            raise RetryIngestSourceError("Original format was not retained") from e
 
                 elif conversion_attempted and is_rescuable_on_conversion_failure(nbp.input_format): # Conversion failed. Import the original anyway — a failed conversion is no reason to drop the book (#1094)
                     print(f"\n[ingest-processor]: {nbp.filename} could not be converted to {nbp.target_format}, importing the original {nbp.input_format} instead so the book still lands in your library...", flush=True)

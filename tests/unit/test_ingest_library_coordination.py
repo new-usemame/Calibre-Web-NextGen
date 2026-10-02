@@ -109,3 +109,34 @@ def test_failed_add_format_command_is_not_acknowledged_or_deleted(ingest, monkey
     assert source.is_file(), 'failed Calibre command must retain the published source'
     assert manifest.is_file(), 'failed command cannot acknowledge its sidecar intent'
     assert result == 1
+
+
+def test_retained_original_format_failure_keeps_source_for_idempotent_retry(
+        ingest, monkeypatch, tmp_path):
+    """A committed conversion does not acknowledge its uncommitted original format."""
+    module, _routing = ingest
+    source = tmp_path / "incoming.txt"
+    source.write_bytes(b"original format to retain")
+    converted = tmp_path / "converted.epub"
+    converted.write_bytes(b"converted package")
+    p = processor(module, source, tmp_path)
+    p.input_format = "txt"
+    p.is_target_format = False
+    p.is_supported_audiobook = lambda: False
+    p.can_convert = True
+    p.auto_convert_on = True
+    p.convert_ignored_formats = []
+    p.convert_retained_formats = ["txt"]
+    p.target_format = "epub"
+    p.convert_book = lambda: (True, str(converted))
+    p.add_book_to_library = lambda *_args, **_kwargs: None
+    p.last_added_book_id = 7
+
+    def busy_original(*_args):
+        raise module.RetryIngestSourceError("unready library owner")
+
+    p.add_format_to_book = busy_original
+    monkeypatch.setattr(module, "NewBookProcessor", lambda _path: p)
+    result = module.main(str(source))
+    assert source.is_file(), "converted book cleanup deleted its uncommitted retained format"
+    assert result == 1, "retained-format retry was incorrectly acknowledged as success"

@@ -772,6 +772,29 @@ def test_native_windows_saved_enabled_settings_cannot_launch_an_unowned_child(
     assert any("POSIX" in message for message in content_server.log_records)
 
 
+def test_failures_before_readiness_exhaust_the_genuine_crash_budget(
+        content_server, monkeypatch, tmp_path):
+    """Three failed launches must stop even before Calibre answers HTTP."""
+    _spawns(content_server, monkeypatch, tmp_path)
+    launches = []
+
+    def exited(*_args, **_kwargs):
+        process = types.SimpleNamespace(returncode=1, stdout=None, poll=lambda: 1)
+        launches.append(process)
+        return process
+
+    monkeypatch.setattr(content_server.subprocess, "Popen", exited)
+    monkeypatch.setattr(content_server, "is_ready", lambda: False)
+    monkeypatch.setattr(content_server.time, "monotonic", lambda: 1000.0)
+    content_server.start()
+    for _ in range(3):
+        content_server._restart_after_exit(content_server._process)
+    assert len(launches) == 3, "startup failures kept launching after the crash budget"
+    assert content_server._quick_exits == 3
+    assert content_server._process is None
+    assert not any("started on port" in record for record in content_server.log_records)
+
+
 def test_finished_maintenance_exit_does_not_consume_genuine_crash_budget(content_server, monkeypatch):
     """The maintenance lease may be free before the watcher sees the drain exit."""
     callbacks = []

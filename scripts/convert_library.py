@@ -698,13 +698,19 @@ def _child_ownership():
 
 def main():
     global _maintenance_fd
-    with ownership.maintenance(str(app_paths.config_dir())) as fd:
-        _maintenance_fd = fd
-        try:
-            return _main()
-        finally:
-            _maintenance_fd = None
+    try:
+        with ownership.maintenance(str(app_paths.config_dir())) as fd:
+            _maintenance_fd = fd
+            try:
+                return _main()
+            finally:
+                _maintenance_fd = None
+    except (ownership.LibraryBusyError, TimeoutError, PermissionError) as error:
+        print_and_log(f"[convert-library]: Library unavailable; try again after maintenance: {error}")
+        logger.info(f"\nNextGen Convert Library Service - Run Failed: {datetime.now()}")
+        logger.info(f"\nNextGen Convert Library Service - Run Ended: {datetime.now()}")
+        return 2
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

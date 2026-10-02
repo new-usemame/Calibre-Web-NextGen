@@ -291,6 +291,41 @@ queue_retry_file() {
         fi
 }
 
+consume_ingest_events() {
+        # Retry in the same consumer that writes the queue. A background
+        # drain could race its durable read/replace transaction with an event.
+        local interval pending="" fragment line events filepath read_status
+        interval=$(non_negative_integer_or_default "$INGEST_BATCH_QUIET_SECONDS" 5)
+        [ "$interval" -ge 1 ] || interval=1
+        local next_retry=$((SECONDS + interval))
+        while true; do
+                if [ "$SECONDS" -ge "$next_retry" ]; then
+                        process_retry_queue < /dev/null
+                        next_retry=$((SECONDS + interval))
+                fi
+                fragment=""
+                if IFS= read -r -t "$interval" fragment; then
+                        line="${pending}${fragment}"
+                        pending=""
+                        events="${line%% *}"
+                        filepath="${line#* }"
+                        handle_event "$filepath" "$events"
+                else
+                        read_status=$?
+                        [ "$SHUTDOWN_PENDING" = "0" ] || return 0
+                        # Bash consumes partial bytes on timeout. Preserve
+                        # them until the watcher finishes the same event line.
+                        pending="${pending}${fragment}"
+                        if [ "$read_status" -gt 128 ]; then
+                                process_retry_queue < /dev/null
+                                next_retry=$((SECONDS + interval))
+                        else
+                                return 0
+                        fi
+                fi
+        done
+}
+
 run_fallback() {
         echo "[cwa-ingest-service] Falling back to polling watcher" >&2
         cwa-as-abc python3 /app/calibre-web-automated/scripts/watch_fallback.py --path "$WATCH_FOLDER" --interval 5 |
@@ -299,9 +334,7 @@ run_fallback() {
                 # sweep here: watch_fallback.py walks the whole tree on its
                 # first pass, so pre-existing files already arrive as events.
                 process_retry_queue < /dev/null
-                while read -r events filepath; do
-                        handle_event "$filepath" "$events"
-                done
+                consume_ingest_events
         }
 }
 
@@ -662,7 +695,7 @@ process_retry_queue() {
                                 processing_marker=$(processing_marker_for_path "$queued_file")
                                 mkdir -p "$PROCESSING_DIR"
                                 : > "$processing_marker"
-                                run_processor_with_timeout "$safety_timeout" "$queued_file"
+                                run_processor_with_timeout "$safety_timeout" "$queued_file" < /dev/null
                                 local retry_exit=$?
                                 rm -f "$processing_marker" 2>/dev/null || true
 
@@ -867,7 +900,7 @@ handle_event() {
         # Use safety timeout as last resort - processor should handle its own timeout internally
         mkdir -p "$PROCESSING_DIR"
         : > "$processing_marker"
-        run_processor_with_timeout "$safety_timeout" "$filepath"
+        run_processor_with_timeout "$safety_timeout" "$filepath" < /dev/null
         local exit_code=$?
         rm -f "$processing_marker" 2>/dev/null || true
 
@@ -1011,9 +1044,7 @@ run_inotify_with_fallback() {
                         # poll already walks the tree, so sweeping there too would
                         # double-process every pending file.
                         startup_ingest_sweep < /dev/null
-                        while read -r events filepath; do
-                                handle_event "$filepath" "$events"
-                        done
+                        consume_ingest_events
                 }
         ) || run_fallback
 }

@@ -2,9 +2,14 @@
 
 from types import SimpleNamespace
 import inspect
+import json
 import os
+import signal
+import subprocess
 import sys
+import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -161,6 +166,36 @@ def test_opt_in_and_default_plugin_environments_are_distinct_probe_keys(tmp_path
     assert calls[1]["CALIBRE_CONFIG_DIRECTORY"] == "/config/.config/calibre"
 
 
+def test_slow_failure_cache_backoff_starts_when_probe_finishes(tmp_path, monkeypatch):
+    debug = tmp_path / "calibre-debug"
+    debug.write_text("placeholder", encoding="utf-8")
+    debug.chmod(0o755)
+    clock = {"now": 100.0}
+    monkeypatch.setattr(capabilities, "time", SimpleNamespace(monotonic=lambda: clock["now"]))
+    calls = []
+
+    def timed_out_probe(*_args):
+        calls.append(clock["now"])
+        clock["now"] += capabilities._PROBE_TIMEOUT_SECONDS
+        return None
+
+    monkeypatch.setattr(capabilities, "_run_bounded_probe", timed_out_probe)
+    env = {"HOME": str(tmp_path)}
+    converter = str(tmp_path / "ebook-convert")
+    empty = (frozenset(), frozenset())
+    assert capabilities._get_cached_capabilities(converter, "", env) == empty
+    completed = clock["now"]
+
+    for elapsed in (0, capabilities._FAILURE_TTL_SECONDS - .1):
+        clock["now"] = completed + elapsed
+        assert capabilities._get_cached_capabilities(converter, "", env) == empty
+        assert len(calls) == 1, "A slow probe must retain the full failure backoff after completion"
+
+    clock["now"] = completed + capabilities._FAILURE_TTL_SECONDS + .1
+    assert capabilities._get_cached_capabilities(converter, "", env) == empty
+    assert len(calls) == 2, "The failed capability probe must retry when its backoff expires"
+
+
 def test_bare_converter_name_resolves_probe_beside_the_path_executable(tmp_path, monkeypatch):
     binary_dir = tmp_path / "calibre-bin"
     binary_dir.mkdir()
@@ -175,19 +210,123 @@ def test_bare_converter_name_resolves_probe_beside_the_path_executable(tmp_path,
     assert capabilities._calibre_debug_path("ebook-convert") == str(debug)
 
 
-@pytest.mark.parametrize("body,expected_empty", [
-    (f"import sys; sys.stdout.write('x' * {capabilities._MAX_PROBE_OUTPUT + 1000}); sys.stdout.flush()", True),
-    ("import time; time.sleep(5)", True),
-])
-def test_probe_bounds_child_output_and_runtime(tmp_path, monkeypatch, body, expected_empty):
-    debug = tmp_path / "calibre-debug"
-    debug.write_text(f"#!{sys.executable}\n{body}\n", encoding="utf-8")
-    debug.chmod(0o755)
-    monkeypatch.setattr(capabilities, "_PROBE_TIMEOUT_SECONDS", 0.15)
+def _probe_program(tmp_path, monkeypatch, body, processes=None):
+    """Use real child I/O without assuming an interpreter-safe shebang path."""
+    debug = tmp_path / "debug program with spaces.py"
+    started = tmp_path / "started"
+    debug.write_text(
+        "import os, sys, time, subprocess\n"
+        f"open({str(started)!r}, 'w').write('started')\n" + body + "\n",
+        encoding="utf-8",
+    )
+    real_popen = subprocess.Popen
 
+    def launch(command, **kwargs):
+        assert command == [str(debug), "-c", capabilities._PROBE_CODE]
+        process = real_popen([sys.executable, str(debug)], **kwargs)
+        if processes is not None:
+            processes.append(process)
+        return process
+
+    monkeypatch.setattr(capabilities.subprocess, "Popen", launch)
+    return debug, started
+
+
+def test_probe_success_control_runs_child_and_parses_its_registry(tmp_path, monkeypatch):
+    payload = {"inputs": ["epub"], "outputs": ["txt"]}
+    debug, started = _probe_program(
+        tmp_path, monkeypatch,
+        f"print({capabilities._PROBE_MARKER + json.dumps(payload)!r}, flush=True)",
+    )
     result = capabilities._run_bounded_probe(str(debug), os.environ.copy())
+    assert started.read_text() == "started"
+    assert result is not None and result[0] == 0
+    assert capabilities._parse_probe(result[1]) == (frozenset({"epub"}), frozenset({"txt"}))
 
-    assert (result is None) is expected_empty
+
+def test_probe_without_nonblocking_pipe_support_fails_closed_and_reaps_child(tmp_path, monkeypatch):
+    processes = []
+    debug, _started = _probe_program(tmp_path, monkeypatch, "time.sleep(30)", processes)
+
+    def unsupported(_descriptor, _blocking):
+        raise NotImplementedError("This runtime cannot poll pipe output")
+
+    monkeypatch.setattr(capabilities.os, "set_blocking", unsupported)
+    assert capabilities._run_bounded_probe(str(debug), os.environ.copy()) is None
+    assert len(processes) == 1
+    assert processes[0].returncode is not None, "The launched child must be reaped on setup failure"
+    assert processes[0].stdout.closed, "The failed probe must close its output descriptor"
+
+
+@pytest.mark.parametrize("body", [
+    f"sys.stdout.write('x' * {capabilities._MAX_PROBE_OUTPUT + 1000}); sys.stdout.flush()",
+    "time.sleep(5)",
+], ids=["output-overflow", "timeout"])
+def test_probe_bounds_child_output_and_runtime(tmp_path, monkeypatch, body):
+    debug, started = _probe_program(tmp_path, monkeypatch, body)
+    monkeypatch.setattr(capabilities, "_PROBE_TIMEOUT_SECONDS", 1.0)
+
+    before = time.monotonic()
+    result = capabilities._run_bounded_probe(str(debug), os.environ.copy())
+    elapsed = time.monotonic() - before
+
+    assert started.read_text() == "started", "The intended body must run before the bound is tested"
+    assert result is None
+    assert elapsed < 3, f"A five-second sleeper must be terminated, not awaited ({elapsed:.3f}s)"
+
+
+def _process_running(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    # A killed orphan can remain a zombie until the host's reaper collects it.
+    # It holds no executable resources or inherited output descriptors.
+    if sys.platform.startswith("linux"):
+        try:
+            return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[0] != "Z"
+        except FileNotFoundError:
+            return False
+    return True
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX process groups; Windows tree cleanup is a separate platform path")
+@pytest.mark.parametrize("parent_body", [
+    "pass", "time.sleep(30)",
+    f"sys.stdout.write('x' * {capabilities._MAX_PROBE_OUTPUT + 1000}); sys.stdout.flush(); time.sleep(30)",
+], ids=["leader-exits", "timeout", "overflow"])
+def test_failed_probe_reaps_descendant_and_output_reader(tmp_path, monkeypatch, parent_body):
+    """A helper inheriting the pipe must not survive a failed capability probe."""
+    child_pid = tmp_path / "descendant.pid"
+    child_started = tmp_path / "descendant.started"
+    child_code = f"open({str(child_started)!r}, 'w').write('started'); import time; time.sleep(30)"
+    debug, started = _probe_program(
+        tmp_path, monkeypatch,
+        f"child = subprocess.Popen([sys.executable, '-c', {child_code!r}])\n"
+        f"open({str(child_pid)!r}, 'w').write(str(child.pid))\n"
+        f"while not os.path.exists({str(child_started)!r}): time.sleep(.01)\n"
+        + parent_body,
+    )
+    monkeypatch.setattr(capabilities, "_PROBE_TIMEOUT_SECONDS", 1.0)
+    readers_before = {t.ident for t in threading.enumerate() if t.name == "calibre-capability-output"}
+    pid = None
+    try:
+        result = capabilities._run_bounded_probe(str(debug), os.environ.copy())
+        assert started.read_text() == child_started.read_text() == "started"
+        pid = int(child_pid.read_text())
+        assert result is None
+        deadline = time.monotonic() + 1
+        while _process_running(pid) and time.monotonic() < deadline:
+            time.sleep(.01)
+        assert not _process_running(pid), "A failed probe left its inherited-output helper running"
+        readers_after = {t.ident for t in threading.enumerate() if t.name == "calibre-capability-output"}
+        assert readers_after <= readers_before, "A failed probe left an output reader blocked on its helper"
+    finally:
+        # Preserve a seen-red run without leaving its owned process behind.
+        if pid is None and child_pid.exists():
+            pid = int(child_pid.read_text())
+        if pid is not None and _process_running(pid):
+            os.kill(pid, signal.SIGKILL)
 
 
 def test_same_key_probes_coalesce_and_keep_the_gevent_hub_responsive(monkeypatch):

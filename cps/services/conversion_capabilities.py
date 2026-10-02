@@ -23,6 +23,7 @@ import hashlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import threading
 import time
@@ -188,70 +189,67 @@ def _parse_probe(stdout: str) -> tuple[frozenset[str], frozenset[str]] | None:
 
 
 def _run_bounded_probe(debug_path: str, env: dict[str, str]) -> tuple[int, str] | None:
-    """Run the fixed Calibre query with a timeout and bounded combined output."""
+    """Bound child output/runtime and clean up the owned POSIX process group.
+
+    Nonblocking pipe reads avoid a background reader surviving when a helper
+    inherits the pipe. Windows retains direct-child cleanup; a runtime without
+    nonblocking pipe support fails closed instead of starting a blocking reader.
+    """
     try:
         process = subprocess.Popen(
             [debug_path, "-c", _PROBE_CODE],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             env=env,
+            start_new_session=(os.name != "nt"),
         )
     except (OSError, subprocess.SubprocessError, ValueError):
         return None
 
     output = bytearray()
-    overflow = threading.Event()
-
-    def drain_output() -> None:
-        try:
-            assert process.stdout is not None
-            while True:
-                chunk = process.stdout.read(8192)
-                if not chunk:
-                    return
-                remaining = _MAX_PROBE_OUTPUT + 1 - len(output)
-                if remaining > 0:
-                    output.extend(chunk[:remaining])
-                if len(output) > _MAX_PROBE_OUTPUT:
-                    overflow.set()
-                    # Continue draining so the child can exit or be killed
-                    # without blocking on a full pipe; retained memory stays
-                    # capped at MAX+1 bytes.
-        except OSError:
-            overflow.set()
-
-    reader = threading.Thread(target=drain_output, name="calibre-capability-output", daemon=True)
-    reader.start()
-    deadline = time.monotonic() + _PROBE_TIMEOUT_SECONDS
-    timed_out = False
-
-    def kill_if_running() -> None:
-        if process.poll() is None:
+    try:
+        assert process.stdout is not None
+        descriptor = process.stdout.fileno()
+        os.set_blocking(descriptor, False)
+        deadline = time.monotonic() + _PROBE_TIMEOUT_SECONDS
+        pipe_closed = False
+        while time.monotonic() < deadline:
+            if not pipe_closed:
+                try:
+                    chunk = os.read(descriptor, min(8192, _MAX_PROBE_OUTPUT + 1 - len(output)))
+                except BlockingIOError:
+                    chunk = None
+                if chunk == b"":
+                    pipe_closed = True
+                elif chunk:
+                    output.extend(chunk)
+                    if len(output) > _MAX_PROBE_OUTPUT:
+                        return None
+                    # Drain available bytes promptly, checking the deadline
+                    # between reads. Retained memory never exceeds MAX+1.
+                    continue
+            return_code = process.poll()
+            if pipe_closed and return_code is not None:
+                return return_code, output.decode("utf-8", errors="replace")
+            time.sleep(0.02)
+        return None
+    except (OSError, ValueError, NotImplementedError):
+        return None
+    finally:
+        if os.name != "nt":
+            # The leader may already have exited while a helper retains its
+            # pipe. Its private process group still belongs to this probe.
             try:
-                process.kill()
+                os.killpg(process.pid, signal.SIGKILL)
             except OSError:
                 pass
-
-    while process.poll() is None:
-        if overflow.is_set():
-            break
-        remaining = deadline - time.monotonic()
-        if remaining <= 0:
-            timed_out = True
-            break
-        overflow.wait(min(remaining, 0.02))
-    kill_if_running()
-    try:
-        return_code = process.wait(timeout=1)
-    except subprocess.TimeoutExpired:
-        kill_if_running()
-        return_code = process.wait()
-    reader.join(timeout=1)
-    if reader.is_alive():
-        overflow.set()
-    if timed_out or overflow.is_set() or len(output) > _MAX_PROBE_OUTPUT:
-        return None
-    return return_code, output.decode("utf-8", errors="replace")
+        try:
+            if process.poll() is None:
+                process.kill()
+            process.wait(timeout=1)
+        finally:
+            if process.stdout is not None:
+                process.stdout.close()
 
 
 def _get_cached_capabilities(
@@ -276,7 +274,7 @@ def _get_cached_capabilities(
         capabilities = _parse_probe(result[1]) if result and result[0] == 0 else None
     except Exception:
         # This is an optional capability display/validation probe. Unexpected
-        # local executable, filesystem, or thread-launch failures must never
+        # local executable or filesystem failures must never
         # turn into unverified formats or a failed book-detail request.
         capabilities = None
 
@@ -285,6 +283,9 @@ def _get_cached_capabilities(
         ttl = _FAILURE_TTL_SECONDS
     else:
         ttl = _CACHE_TTL_SECONDS
+    # A timed-out probe can outlast the entire failure TTL. Backoff begins
+    # when the result is available, rather than expiring during startup.
+    now = time.monotonic()
     with _CACHE_LOCK:
         if len(_CACHE) >= _CACHE_LIMIT:
             # Expired entries first, then remove the oldest expiry. No user- or

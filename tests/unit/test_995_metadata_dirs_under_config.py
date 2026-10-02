@@ -31,6 +31,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from tests.fixtures.service_sources import service_source
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPTS_DIR = PROJECT_ROOT / "scripts"
@@ -335,10 +336,7 @@ def test_watcher_and_writer_agree_on_the_change_logs_path():
     They are two hardcoded copies of one path. If they drift, the writer writes where
     nobody is watching and enforcement stops with nothing in the logs.
     """
-    run_script = (
-        PROJECT_ROOT
-        / "root/etc/s6-overlay/s6-rc.d/metadata-change-detector/run"
-    ).read_text(encoding="utf-8")
+    run_script = service_source("metadata-change-detector")
 
     watch_line = next(
         (ln for ln in run_script.splitlines() if ln.strip().startswith("WATCH_FOLDER=")),

@@ -35,6 +35,7 @@ import ast
 from pathlib import Path
 
 import pytest
+from tests.fixtures.service_sources import service_source
 
 pytestmark = pytest.mark.unit
 
@@ -141,9 +142,7 @@ def test_metadata_change_detector_invokes_cover_enforcer():
     (e.g. inlines the metadata logic into Flask) still goes red and forces a
     revisit of notes/s6-privilege-drop-audit.md.
     """
-    run = REPO_ROOT / "root" / "etc" / "s6-overlay" / "s6-rc.d" / "metadata-change-detector" / "run"
-    assert run.exists(), f"missing {run}"
-    run_text = run.read_text()
+    run_text = service_source("metadata-change-detector")
     assert "metadata_change_dispatch.py" in run_text, (
         "metadata-change-detector no longer feeds the debouncing dispatcher — "
         "the change-log -> enforcer chain that carries the chown contract has "

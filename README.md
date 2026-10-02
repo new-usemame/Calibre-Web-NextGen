@@ -42,6 +42,7 @@ Library, settings, users, OAuth tokens, and KOReader sync state are preserved. S
 - [Quick start](#quick-start)
 - [Full Docker Compose setup](#full-docker-compose-setup)
 - [Runtime path overrides for packagers](#runtime-path-overrides-for-packagers)
+- [NixOS](#nixos)
 - [First run](#first-run)
 - [Migrating](#migrating)
   - [From upstream CWA](#from-upstream-cwa)
@@ -263,6 +264,49 @@ When `CWA_CALIBRE_LIBRARY_DIR` is set, it is authoritative. Automatic library
 discovery will leave `dirs.json` unchanged; if discovery finds a different
 library, startup stops and reports both paths so the environment file can be
 corrected.
+
+---
+
+## NixOS
+
+The repository is a Nix flake with a package and a NixOS module that runs the
+web app and its background services as systemd units:
+
+```nix
+{
+  inputs.calibre-web-nextgen.url = "github:new-usemame/Calibre-Web-NextGen";
+
+  outputs = { nixpkgs, calibre-web-nextgen, ... }: {
+    nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
+      modules = [
+        calibre-web-nextgen.nixosModules.default
+        {
+          services.calibre-web-nextgen = {
+            enable = true;
+            libraryDir = "/srv/books/library";
+            ingestDir = "/srv/books/ingest";
+          };
+        }
+      ];
+    };
+  };
+}
+```
+
+State lives in `/var/lib/calibre-web-nextgen` (`configDir`). The library and
+ingest folders must already exist and be writable by the service user. On first
+start the service creates `app.db` and an empty library, as the container does.
+The web app listens on `127.0.0.1:8083` by default; `listenAddress`, `port`,
+`openFirewall` and `environment` cover the rest.
+
+Alongside `calibre-web-nextgen.service`, the module starts the ingest watcher,
+the metadata change detector, the nightly backup zipper, the cover-preview cache
+sweeper and the KOReader checksum backfill as `calibre-web-nextgen-*` units,
+from the same `scripts/services` bodies the container runs.
+
+`nix build` builds the package, `nix run` starts it with state in
+`~/.calibre-web-automated`, and `nix flake check` runs a NixOS VM test of the
+module.
 
 ---
 

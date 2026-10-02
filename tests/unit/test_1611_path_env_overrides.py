@@ -515,7 +515,7 @@ def test_ingest_service_resolves_whitespace_env_through_file_fallback(tmp_path):
     )
 
     result = subprocess.run(
-        ["bash", str(S6_DIR / "cwa-ingest-service/run")],
+        ["bash", str(SCRIPTS_DIR / "services/cwa-ingest-service.sh")],
         env=env,
         capture_output=True,
         text=True,
@@ -547,7 +547,7 @@ def test_each_s6_path_caller_fails_closed_on_unusable_resolver_output(
         timeout=10,
     )
     ingest_result = subprocess.run(
-        ["bash", str(S6_DIR / "cwa-ingest-service/run")],
+        ["bash", str(SCRIPTS_DIR / "services/cwa-ingest-service.sh")],
         env=env,
         capture_output=True,
         text=True,
@@ -561,7 +561,7 @@ def test_each_s6_path_caller_fails_closed_on_unusable_resolver_output(
     checksum_env = env.copy()
     checksum_env["PATH"] = f"{bin_dir}:{checksum_env['PATH']}"
     checksum_result = subprocess.run(
-        ["bash", str(S6_DIR / "cwa-checksum-backfill/run")],
+        ["bash", str(SCRIPTS_DIR / "services/cwa-checksum-backfill.sh")],
         env=checksum_env,
         capture_output=True,
         text=True,
@@ -582,7 +582,7 @@ def test_auto_library_s6_wrapper_propagates_child_failure(tmp_path):
     env.pop("DISABLE_LIBRARY_AUTOMOUNT", None)
 
     result = subprocess.run(
-        ["bash", str(S6_DIR / "cwa-auto-library/run")],
+        ["bash", str(SCRIPTS_DIR / "services/cwa-auto-library.sh")],
         env=env,
         capture_output=True,
         text=True,
@@ -597,8 +597,8 @@ def test_shell_consumers_delegate_path_resolution_to_app_paths_cli():
     consumers = {
         REPO_ROOT / "scripts/set_ownership.sh": "all",
         S6_DIR / "cwa-init/run": "ingest_folder",
-        S6_DIR / "cwa-ingest-service/run": "ingest_folder",
-        S6_DIR / "cwa-checksum-backfill/run": "calibre_library_dir",
+        SCRIPTS_DIR / "services/cwa-ingest-service.sh": "ingest_folder",
+        SCRIPTS_DIR / "services/cwa-checksum-backfill.sh": "calibre_library_dir",
     }
     for path, command in consumers.items():
         source = path.read_text(encoding="utf-8")
@@ -606,8 +606,8 @@ def test_shell_consumers_delegate_path_resolution_to_app_paths_cli():
         assert command in source, f"{path.relative_to(REPO_ROOT)} does not resolve {command}"
 
     assert "/app/calibre-web-automated/dirs.json" not in (
-        S6_DIR / "cwa-ingest-service/run"
+        SCRIPTS_DIR / "services/cwa-ingest-service.sh"
     ).read_text(encoding="utf-8")
     assert "json.load(config_file).get(\"calibre_library_dir\")" not in (
-        S6_DIR / "cwa-checksum-backfill/run"
+        SCRIPTS_DIR / "services/cwa-checksum-backfill.sh"
     ).read_text(encoding="utf-8")

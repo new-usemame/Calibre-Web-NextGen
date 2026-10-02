@@ -44,7 +44,8 @@ import pytest
 pytestmark = pytest.mark.unit
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RUN_SCRIPT = REPO_ROOT / "root" / "etc" / "s6-overlay" / "s6-rc.d" / "cwa-ingest-service" / "run"
+# The service body; its s6 run file only execs it (#2094).
+RUN_SCRIPT = REPO_ROOT / "scripts" / "services" / "cwa-ingest-service.sh"
 
 
 # --------------------------------------------------------------------------

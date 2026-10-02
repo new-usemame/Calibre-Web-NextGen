@@ -107,7 +107,9 @@ locks. Network metadata fetch, cover generation and delivery run after the raw
 transaction releases that pause. Raw imports and Convert Library serialize even
 when the optional server is disabled, because both use Calibre directly on the
 same library. Convert Library waits up to two minutes for an existing raw import;
-a busy ingest retains its source and retries through the service queue.
+an uncommitted busy ingest retains its source and retries through the service
+queue. After import commits, optional path and timestamp enrichment failures
+are warnings; they cannot abort cover generation or delivery of that new book.
 A standalone Convert Library run owns its maintenance lock for the whole run,
 including across an app restart. Restore holds the shared writer gate through
 its subprocesses, and settings changes retain that gate until the server uses

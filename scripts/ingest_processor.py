@@ -1371,7 +1371,6 @@ class NewBookProcessor:
                   f"{book_id}: {error}", flush=True)
             return False
 
-    @offline_library_operation
     def _fix_unicode_path(self, book_id: int) -> None:
         """Rename the path calibredb add generated with ascii_filename() to the
         CWA-canonical form produced by get_valid_filename_shared().
@@ -1407,7 +1406,7 @@ class NewBookProcessor:
             return  # user wants ASCII filenames; calibredb already produced them
 
         try:
-            with sqlite3.connect(self.metadata_db, timeout=30) as con:
+            with offline_library_access(), metadata_db_write_lock(), sqlite3.connect(self.metadata_db, timeout=30) as con:
                 if not self._register_title_sort_function(con):
                     print(f"[ingest-processor] INFO: Skipping path fix for book {book_id} (title_sort unavailable).", flush=True)
                     return
@@ -1592,7 +1591,7 @@ class NewBookProcessor:
             except Exception:
                 print("[ingest-processor] WARN: Acquisition post-import follow-up failed", flush=True)
         try:
-            with sqlite3.connect(self.metadata_db, timeout=30) as con:
+            with offline_library_access(), metadata_db_write_lock(), sqlite3.connect(self.metadata_db, timeout=30) as con:
                 if self._register_title_sort_function(con):
                     stamp_books_with_import_time(con, self.last_added_book_ids,
                         datetime.now().strftime("%Y-%m-%d %H:%M:%S+00:00"))
@@ -2700,8 +2699,6 @@ class NewBookProcessor:
                                     print(f"[ingest-processor] INFO: Derived title sort for {resorted} imported book(s) whose embedded sort was the bare title (fork #2219).", flush=True)
                             except sqlite3.Error as e:
                                 print(f"[ingest-processor] WARN: Could not derive title sort for imported book(s) {imported_ids}: {e}", flush=True)
-                except (LibraryBusyError, TimeoutError):
-                    raise
                 except Exception as e:
                     print(f"[ingest-processor] WARN: Failed to set timestamp for new book: {e}", flush=True)
 
@@ -2724,8 +2721,6 @@ class NewBookProcessor:
                         affected = cur.rowcount
                         if affected:
                             print(f"[ingest-processor] INFO: Updated timestamp for {affected} overwritten book(s) to reflect latest import.", flush=True)
-                except (LibraryBusyError, TimeoutError):
-                    raise
                 except Exception as e:
                     print(f"[ingest-processor] WARN: Failed to adjust timestamps after overwrite import: {e}", flush=True)
 

@@ -563,3 +563,33 @@ def test_raw_import_owns_maintenance_but_remote_post_processing_does_not(
     p.add_book_to_library(str(source))
     assert observed == [False], "network metadata fetch unnecessarily holds the offline library"
     assert not routing.ownership.busy(str(tmp_path), "maintenance")
+
+
+def test_committed_import_finishes_followups_when_conversion_takes_maintenance(
+        ingest_processor, monkeypatch, tmp_path):
+    import sqlite3
+    import calibre_library_target as routing
+    monkeypatch.setattr(routing, "config_dir", lambda: str(tmp_path))
+    app_db = tmp_path / "app.db"
+    with sqlite3.connect(app_db) as con:
+        con.execute("CREATE TABLE settings (config_unicode_filename INTEGER)")
+        con.execute("INSERT INTO settings VALUES (0)")
+    monkeypatch.setattr(ingest_processor, "get_app_db_path", lambda: str(app_db))
+    source = tmp_path / "new.epub"
+    source.write_bytes(b"new book committed before competing conversion")
+    p = _processor(ingest_processor, tmp_path)
+    p.cwa_settings["auto_ingest_automerge"] = "new_record"
+    _disable_post_import_work(ingest_processor, p, monkeypatch)
+    p._fix_unicode_path = ingest_processor.NewBookProcessor._fix_unicode_path.__get__(p)
+    p._run_calibre_transaction = lambda *_a: {"status": "imported", "book_ids": [7]}
+    maintenance = routing.ownership.maintenance(str(tmp_path))
+    followups = []
+    p.fetch_metadata_if_enabled = lambda **_kw: maintenance.__enter__()
+    p.generate_missing_cover_if_enabled = lambda _id: followups.append("cover")
+    p.trigger_auto_send_if_enabled = lambda **_kw: followups.append("send")
+    try:
+        p.add_book_to_library(str(source))
+    finally:
+        maintenance.__exit__(None, None, None)
+    assert followups == ["cover", "send"], "a busy optional path fix skipped the committed book's followups"
+    assert p.last_added_book_id == 7

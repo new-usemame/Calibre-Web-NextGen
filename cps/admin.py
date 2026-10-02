@@ -2988,7 +2988,11 @@ def _library_busy_configuration_result():
     return _configuration_result(_("Library maintenance is running; try again when it finishes."))
 
 
-@content_server.configuration_update(on_busy=_library_busy_configuration_result)
+def _library_busy_db_configuration_result():
+    return _db_configuration_result(_("Library maintenance is running; try again when it finishes."))
+
+
+@content_server.configuration_update(on_busy=_library_busy_db_configuration_result)
 def _db_configuration_update_helper():
     db_change = False
     to_save = request.form.to_dict()

@@ -93,7 +93,8 @@ def test_busy_gate_rejects_save_with_recoverable_result_before_mutation(monkeypa
         raise TimeoutError("Restore owns gate")
         yield
     monkeypatch.setattr(content_server.ownership, "operation", blocked)
-    monkeypatch.setattr(admin, "_configuration_result", lambda error, *args: {"error": error})
+    monkeypatch.setattr(admin, "_configuration_result", lambda error, *args: {"error": error, "kind": "json"})
+    monkeypatch.setattr(admin, "_db_configuration_result", lambda error, *args: {"error": error, "kind": "html"})
     monkeypatch.setattr(admin, "_", lambda message: message)
     helper = getattr(admin, helper_name)
     while helper_name == "clear_calibre_server_password" and hasattr(helper, "__wrapped__") and helper.__wrapped__.__name__ == helper.__name__:
@@ -107,3 +108,4 @@ def test_busy_gate_rejects_save_with_recoverable_result_before_mutation(monkeypa
     with Flask(__name__).test_request_context(method="POST", data={}):
         result = helper()
     assert "maintenance" in result["error"].lower()
+    assert result["kind"] == ("html" if helper_name == "_db_configuration_update_helper" else "json")

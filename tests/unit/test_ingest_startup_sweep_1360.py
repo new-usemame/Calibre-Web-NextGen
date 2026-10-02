@@ -578,3 +578,34 @@ def test_startup_sweep_defined_before_test_mode_guard():
     assert text.index("startup_ingest_sweep()") < text.index(
         "CWA_INGEST_SERVICE_TEST_MODE"
     ), "startup_ingest_sweep must be defined before the TEST_MODE guard"
+
+
+@pytest.mark.parametrize("ordinary_succeeds", [True, False])
+def test_successful_busy_retry_triggers_one_ordinary_retry(harness, ordinary_succeeds):
+    """Timer recovery is a successful ingest, so ordinary inputs get the same
+    one-shot retry opportunity as after a newly uploaded book succeeds.
+    """
+    import shlex
+    ordinary = harness.watch / "ordinary.epub"
+    busy = harness.watch / "busy.epub"
+    for book in (ordinary, busy):
+        book.write_bytes(b"retained input")
+    harness.retry_queue.write_text(f"{ordinary}\n{busy}\n")
+    processed = harness(f"""
+        run_processor_with_timeout() {{
+            printf '%s\\n' "$2" >> "$PROCESSOR_LOG"
+            if [ "$2" = {shlex.quote(str(ordinary))} ] && [ {int(ordinary_succeeds)} = 0 ]; then
+                return 1
+            fi
+            rm -f -- "$2"
+        }}
+        BUSY_RETRY_PATHS[{shlex.quote(str(busy))}]=1
+        process_retry_queue busy-only >/dev/null 2>&1
+        for tick in 1 2 3; do
+            process_retry_queue busy-only >/dev/null 2>&1
+        done
+    """)
+    assert processed == [str(busy), str(ordinary)], "timer success did not trigger exactly one ordinary retry"
+    assert not busy.exists()
+    assert ordinary.exists() is not ordinary_succeeds
+    assert harness.retry_queue.read_text() == ("" if ordinary_succeeds else str(ordinary) + "\n")

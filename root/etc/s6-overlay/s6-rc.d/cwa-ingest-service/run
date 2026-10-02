@@ -678,7 +678,7 @@ pause_before_pid_publication_for_test() {
 }
 
 process_retry_queue() {
-        local retry_scope="${1:-all}"
+        local retry_scope="${1:-all}" succeeded=0
         if [ "$retry_scope" = "busy-only" ] && [ "${#BUSY_RETRY_PATHS[@]}" -eq 0 ]; then
                 maybe_run_post_batch_follow_up
                 return 0
@@ -734,6 +734,7 @@ process_retry_queue() {
                                         mark_recent_path "$queued_file"
                                 elif [ $retry_exit -eq 0 ]; then
                                         echo "[cwa-ingest-service] Successfully processed retry: $queued_file"
+                                        succeeded=1
                                         mark_recent_path "$queued_file"
                                         touch "$INGEST_BATCH_LAST_SUCCESS_FILE" 2>/dev/null || true
                                 elif [ $retry_exit -eq 3 ]; then
@@ -771,6 +772,14 @@ process_retry_queue() {
                 if [ -s "$QUEUE_FILE" ]; then
                         echo "[cwa-ingest-service] $(wc -l < "$QUEUE_FILE") files remain in retry queue"
                 fi
+        fi
+        # A timer retry that imports a book has the same after-success trigger
+        # as handle_event. Commit its removals first, then give ordinary queued
+        # failures one opportunity. The all-scope pass never recurses, and a
+        # failure remains ineligible for later idle timer ticks.
+        if [ "$retry_scope" = "busy-only" ] && [ "$succeeded" -eq 1 ] && [ -s "$QUEUE_FILE" ]; then
+                process_retry_queue all
+                return $?
         fi
         maybe_run_post_batch_follow_up
 }

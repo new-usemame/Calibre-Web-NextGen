@@ -4,7 +4,7 @@
 import inspect
 import json
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import flask
 import pytest
@@ -155,10 +155,14 @@ def test_show_hidden_applies_to_library_search_and_marks_results():
     from cps.api import books as books_mod
 
     row = SimpleNamespace(Books=_book(), is_archived=False, read_status=None)
+    query = MagicMock()
+    for method in ("filter", "options", "distinct", "order_by", "offset", "limit", "with_entities"):
+        getattr(query, method).return_value = query
+    query.count.return_value = 1
+    query.all.return_value = [row]
     app = flask.Flask(__name__)
     with app.test_request_context("/api/v1/books?search=plain&show_hidden=true"):
-        with patch.object(books_mod.calibre_db, "get_search_results",
-                          return_value=([row], 1, None)) as search, \
+        with patch.object(books_mod.calibre_db, "search_query", return_value=query) as search, \
              patch.object(books_mod.config, "config_books_per_page", 60, create=True), \
              patch.object(books_mod.config, "config_read_column", 0, create=True), \
              patch.object(books_mod, "current_user",

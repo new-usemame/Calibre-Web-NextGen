@@ -92,6 +92,17 @@ def test_catalog_query_real_sql_combines_search_author_and_unread(monkeypatch):
         text_written = books_api._write_export(text_output, query, "txt")
         assert text_written == 1
         assert text_output.getvalue().decode("utf-8").count("\n") == 1
+
+        # The shared search query must retain the existing hidden-book toggle.
+        monkeypatch.setattr(config, "config_user_hide_enabled", True, raising=False)
+        app_session.add(ub.UserHiddenBook(user_id=viewer.id, book_id=rows[0][0].id))
+        app_session.commit()
+        assert books_api._count_export_rows(books_api._catalog_book_query(
+            search="dune", author_id=target_id, filter_val="unread",
+        )) == 0
+        assert books_api._count_export_rows(books_api._catalog_book_query(
+            search="dune", author_id=target_id, filter_val="unread", show_hidden=True,
+        )) == 1
     finally:
         metadata_session.close()
         app_session.close()

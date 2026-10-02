@@ -2,13 +2,14 @@ import { test, expect, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 const source = (id: string) => ({ id, label: `Catalog ${id}`, adapter: id === 'b' ? 'newznab' : 'opds', enabled: true, revision: 1 });
 const catalog = (id: string, query?: string) => ({ title: id, protocol: 'fixture', publications: query ? [{ title: `${query} edition`, identity: id, authors: ['Author'], languages: [id === 'b' ? 'de' : 'en'], description: null, offers: [{ format: id === 'b' ? 'NZB' : 'EPUB', label: null, identity: id, relation: 'download', offer_id: `${id}-offer` }], navigation: [] }] : [], navigation: [], pagination: query ? [{ title: 'Next page', relations: ['next'], selection: `${id}-next` }] : [], searches: [{ title: '', selection: `${id}-search` }], groups: [], facets: [] });
-async function fixture(page: Page, ids = ['a', 'b', 'browse', 'broken', 'empty', 'six']) {
+async function fixture(page: Page, ids = ['a', 'b', 'browse', 'broken', 'empty', 'six'], labels: Record<string, string> = {}) {
     const calls: {
         id: string;
         selection: string | null;
         query: string | null;
     }[] = [], jobs: Record<string, unknown>[] = [];
-    let broken = true, sources = ids.map(source);
+    const configuredSources = () => ids.map((id) => ({ ...source(id), label: labels[id] ?? source(id).label }));
+    let broken = true, sources = configuredSources();
     await page.route('**/api/v1/auth/me', async (route) => { const response = await route.fetch(); await route.fulfill({ response, json: { ...await response.json(), acquisition_access: true } }); });
     await page.route('**/api/v1/acquisition**', async (route) => {
         const u = new URL(route.request().url());
@@ -38,7 +39,7 @@ async function fixture(page: Page, ids = ['a', 'b', 'browse', 'broken', 'empty',
     });
     await page.goto('/app/find-books');
     await page.getByRole('combobox').selectOption('all');
-    return { calls, jobs, recover: () => { broken = false; }, withdraw: () => { sources = sources.filter((c) => c.id !== 'b'); }, restore: () => { sources = ids.map(source); } };
+    return { calls, jobs, recover: () => { broken = false; }, withdraw: () => { sources = sources.filter((c) => c.id !== 'b'); }, restore: () => { sources = configuredSources(); } };
 }
 async function search(page: Page, query = 'edition') { await page.getByRole('searchbox', { name: 'Search all catalogs' }).fill(query); await page.getByRole('button', { name: 'Search', exact: true }).click(); }
 test('source-bound offers, explicit partial failure and browse-only, isolated retry and remaining batches', async ({ page }) => {
@@ -120,3 +121,16 @@ test('populated shared search keyboard submit and serious axe gate', async ({ pa
     const findings = await new AxeBuilder({ page }).include('main').withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze();
     expect(findings.violations.filter((v) => ['critical', 'serious'].includes(v.impact ?? '')).map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) }))).toEqual([]);
 });
+
+for (const kind of ['query', 'catalog label'] as const) {
+    test(`long ${kind} stays within the phone viewport`, async ({ page }) => {
+        const longText = 'antidisestablishmentarianism'.repeat(3);
+        await fixture(page, ['a', 'b'], kind === 'catalog label' ? { a: longText } : {});
+        await search(page, kind === 'query' ? longText : 'edition');
+        await expect(page.getByRole('status').filter({ hasText: 'Checked 2 catalogs' })).toBeVisible();
+        for (const width of [375, 320]) {
+            await page.setViewportSize({ width, height: 667 });
+            expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
+        }
+    });
+}

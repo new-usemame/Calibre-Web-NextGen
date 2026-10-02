@@ -26,4 +26,6 @@ The full local suite ran once: 10,271 passed, 103 skipped and three failed. One 
 
 The conditional security review inspected the nonempty product diff, including the shared API AbortSignal plumbing, source-bound requests and existing authorization boundary. It found no high-confidence vulnerability.
 
-The PR remains needs-review for the operator. Current-head CI and immutable multi-architecture image checks are required before handoff. No merge, release or production deployment is part of this slice.
+A fresh independent merge review reproduced phone overflow from an accepted 84-character unbroken query. The author reproduced that failure and the same failure with a long configured catalog label: at 375px the page expanded to 553px and 730px respectively. Scoped status and heading wrapping fixes both. The owning browser regressions assert that the populated page stays within 375px and 320px viewports; both were seen red before the CSS fix. The search suite passes all fourteen desktop/phone cases, including keyboard and serious/critical axe checks. Frontend units and typecheck/build also pass.
+
+Current-head CI and immutable multi-architecture image checks are required before merge. The operator authorized a guarded merge after independent review and disposition of findings. No release or production deployment is part of this slice.

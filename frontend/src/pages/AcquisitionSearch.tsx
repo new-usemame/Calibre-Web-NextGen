@@ -83,7 +83,7 @@ export function AcquisitionSearch({ connections, onBrowse, renderCatalog }: {
       </button>
     </form>
     <p className={styles.muted}>{t('Results stay separate by catalog so you can choose the edition and format.')}</p>
-    <p role="status" aria-atomic="true" className={styles.muted}>
+    <p role="status" aria-atomic="true" className={`${styles.muted} ${styles.searchStatus}`}>
       {query && (pending.length
         ? t('Searching catalogs…')
         : t('Checked {count} catalogs for “{query}”.', { count: completed, query }))}

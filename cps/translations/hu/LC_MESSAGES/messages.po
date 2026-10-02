@@ -7387,7 +7387,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "No shelves yet. Create a shelf to start collecting books."
-msgstr ""
+msgstr "Még nincsenek polcok. Hozzon létre egy polcot a könyvek gyűjtéséhez."
 
 #: cps/spa_strings.py
 msgid "No smart shelves yet. Create one to collect books automatically."

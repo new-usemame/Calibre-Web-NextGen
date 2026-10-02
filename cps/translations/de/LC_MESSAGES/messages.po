@@ -7458,7 +7458,7 @@ msgstr ""
 
 #: cps/spa_strings.py
 msgid "No shelves yet. Create a shelf to start collecting books."
-msgstr ""
+msgstr "Noch keine Regale. Erstelle ein Regal, um Bücher zu sammeln."
 
 #: cps/spa_strings.py
 msgid "No smart shelves yet. Create one to collect books automatically."

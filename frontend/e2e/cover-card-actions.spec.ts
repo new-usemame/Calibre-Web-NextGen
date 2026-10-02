@@ -42,6 +42,10 @@ test('cover actions persist favorite/read choices without opening the book', asy
   await open();
   await page.keyboard.press('Escape');
   await expect(trigger).toBeFocused();
+  // Audit the page at its origin: card focus can naturally scroll an unfocused
+  // toolbar control partly behind the sticky header. Focus reachability has
+  // its own natural-scroll regression below. Keep every Axe rule enabled.
+  await page.evaluate(() => window.scrollTo(0, 0));
   const violations = (await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa']).analyze()).violations.filter(v => ['critical', 'serious'].includes(v.impact || ''));
   expect(violations).toEqual([]);
 });

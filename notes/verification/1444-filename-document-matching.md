@@ -20,3 +20,7 @@ Sync identity and file integrity are separate: getDocumentContentDigest retains 
 ## Limits
 
 No physical Kobo/Kindle was touched, and the emulator was not connected to a production server. Emulator settings/menu persistence and real digest computation are observed; physical-device live HTTP progress/highlight exchange is not claimed. Existing server filename-registry contract tests cover the receiving seam. The plugin release version is unchanged for the operator's release train.
+
+## Current-main integration, 2026-10-02
+
+Rebased onto `07c361c2e`, the translation follow-up after #2401. Only the CHANGES table row required resolution; every preceding row and SPA translation anchor is retained. The shipped plugin and its behavioral suites are byte-identical to the originally reviewed `fe8dad0cc` tree. All 21 Lua suites passed again, and the focused plugin/digest/inventory/delivery/server filename-contract packet passed 73 tests with eight existing environment skips. Original emulator persistence/restart and real LuaJIT digest evidence remains applicable; physical-device/live-production sync is not claimed. Fresh exact-head CI is the final merge gate.

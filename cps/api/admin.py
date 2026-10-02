@@ -380,7 +380,7 @@ def admin_update_config():
         try:
             validate_opds_filename_template(data["config_opds_filename_template"])
         except ValueError as error:
-            return _err("invalid_request", str(error), 400)
+            return _err("invalid_opds_filename_template", str(error), 400)
     for key in _UI_CONFIG_INT:
         if key in data:
             try:

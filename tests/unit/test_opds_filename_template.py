@@ -25,7 +25,7 @@ pytestmark = pytest.mark.unit
 def book():
     return NS(
         id=42, title='The Book', sort='Book, The', author_sort='Writer, Ann',
-        authors=[NS(name='Ann Writer'), NS(name='Ben Reader')], isbn='9781234567890',
+        authors=[NS(id=2,name='Ann Writer',sort='Writer, Ann'), NS(id=1,name='Ben Reader',sort='Reader, Ben')], isbn='9781234567890',
         languages=[NS(lang_code='eng'), NS(lang_code='fra')],
         pubdate=datetime(2020, 5, 6), timestamp=datetime(2024, 1, 2),
         last_modified=datetime(2024, 2, 3), publishers=[NS(name='Press')],
@@ -179,9 +179,12 @@ def test_settings_column_is_added_on_upgrade_and_persists(tmp_path):
 def download(monkeypatch, book):
     from cps import helper
     monkeypatch.setattr(helper, 'current_user', NS(is_authenticated=False))
+    orderer = object.__new__(db.CalibreDB)
+    orderer.ensure_session = lambda: None
     monkeypatch.setattr(helper, 'calibre_db', NS(
         get_filtered_book=lambda *args, **kwargs: book,
         get_book_format=lambda *args: NS(name='library-file'), session=None,
+        order_authors=orderer.order_authors,
     ))
     monkeypatch.setattr(helper.config, 'config_unicode_filename', False, raising=False)
     monkeypatch.setattr(helper.config, 'config_title_regex', r'^(The|A|An)\s+', raising=False)
@@ -240,7 +243,7 @@ def admin_config(monkeypatch):
     config = Config(
         config_opds_filename_template='{title}', config_calibre_web_title='Library',
         config_books_per_page=30, config_random_books=6, config_authors_max=3,
-        config_theme=1, config_default_locale='en', config_default_language='all',
+        config_theme=1, config_default_locale='en', config_default_language='all', config_default_role=0,
         config_server_announcement='', save=Mock(),
     )
     monkeypatch.setattr(admin, 'config', config)
@@ -255,9 +258,10 @@ def admin_config(monkeypatch):
     monkeypatch.setattr(admin, 'check_valid_read_column', lambda value: True)
     monkeypatch.setattr(admin, 'check_valid_restricted_column', lambda value: True)
     monkeypatch.setattr(admin, 'before_request', lambda: None)
-    monkeypatch.setattr(admin, 'view_configuration', lambda: 'configuration page')
+    monkeypatch.setattr(admin, 'view_configuration', lambda **kwargs: 'configuration page')
     monkeypatch.setattr(admin, 'flash', Mock())
     monkeypatch.setattr(admin, '_', lambda message, **kw: message % kw if kw else message)
+    monkeypatch.setattr(names, '_', lambda message, **kw: message % kw if kw else message)
     return config, admin, api_admin
 
 
@@ -287,7 +291,7 @@ def test_invalid_template_does_not_partially_change_configuration(admin_config):
     classic.flash.assert_called_once()
     with app.test_request_context('/api/v1/admin/config', method='POST', json=data):
         response, status = inspect.unwrap(api.admin_update_config)()
-        assert status == 400 and response.json['error']['code'] == 'invalid_request'
+        assert status == 400 and response.json['error']['code'] == 'invalid_opds_filename_template'
     assert config.config_opds_filename_template == '{title}'
     assert config.config_calibre_web_title == 'Library'
     config.save.assert_not_called()
@@ -312,18 +316,38 @@ def test_non_admin_cannot_change_template(admin_config, monkeypatch):
     config.save.assert_not_called()
 
 
-def test_classic_template_parses_custom_field_example():
-    # Literal {#...} opens a Jinja comment unless the example is escaped.
-    path = Path(__file__).resolve().parents[2] / 'cps/templates/config_view_edit.html'
-    source = path.read_text()
-    Environment().parse(source)
-    assert 'name="config_opds_filename_template"' in source
+def test_rendered_classic_field_round_trips_through_the_editor(admin_config):
+    from html.parser import HTMLParser
+    class Inputs(HTMLParser):
+        def __init__(self):super().__init__();self.values={}
+        def handle_starttag(self,tag,attrs):
+            attrs=dict(attrs)
+            if tag=='input' and 'name' in attrs:self.values[attrs['name']]=attrs.get('value','')
+    config,classic,_=admin_config
+    config.config_opds_filename_template='{title} "quoted" & {#custom_field}'
+    class RenderConfig:
+        def __getattr__(self,key):
+            if key.startswith(('role_','show_')):return lambda *args:False
+            return getattr(config,key,'')
+    source=Path(__file__).resolve().parents[2]/'cps/templates/config_view_edit.html'
+    env=Environment(autoescape=True,extensions=['jinja2.ext.i18n'])
+    env.install_null_translations()
+    template=env.from_string(source.read_text())
+    ctx=template.new_context({'conf':RenderConfig(),'url_for':lambda *args,**kwargs:'/admin/viewconfig','csrf_token':lambda:'test','sidebar':[],'readColumns':[],'restrictColumns':[],'sortableColumns':[],'translations':[],'languages':[]})
+    html=''.join(template.blocks['body'](ctx));inputs=Inputs();inputs.feed(html)
+    assert inputs.values['config_opds_filename_template']==config.config_opds_filename_template
+    with Flask(__name__).test_request_context('/admin/viewconfig',method='POST',data={'config_opds_filename_template':inputs.values['config_opds_filename_template']}):
+        assert inspect.unwrap(classic.update_view_configuration)()=='configuration page'
+    assert config.config_opds_filename_template==inputs.values['config_opds_filename_template']
 
 
-def test_web_download_ignores_opds_preference(download, monkeypatch):
+def test_real_web_route_ignores_opds_preference(download, monkeypatch):
+    from cps import web
     monkeypatch.setattr(download.config, 'config_opds_filename_template', '{id}', raising=False)
-    response = download.get_download_link(42, 'epub', '')
-    assert parse_options_header(response.headers['Content-Disposition'])[1]['filename'] == 'The Book - Ann Writer.epub'
+    monkeypatch.setattr(web,'get_download_link',download.get_download_link)
+    with Flask(__name__).test_request_context('/download/42/epub'):
+        response=inspect.unwrap(web.download_link)(42,'epub','None')
+    assert parse_options_header(response.headers['Content-Disposition'])[1]['filename']=='The Book - Ann Writer.epub'
 
 
 @pytest.mark.parametrize('requested,client,extension', [
@@ -344,8 +368,10 @@ def test_real_file_response_keeps_custom_header_and_format_fallback(
         config_kepubifypath='kepubify', config_kobo_prefer_kepub=True,
         config_embed_metadata=False, config_binariesdir='', get_book_path=lambda: str(tmp_path),
     ))
+    orderer = object.__new__(db.CalibreDB)
+    orderer.ensure_session = lambda: None
     monkeypatch.setattr(helper, 'calibre_db', NS(
-        get_filtered_book=lambda *a, **kw: book, session=None,
+        get_filtered_book=lambda *a, **kw: book, session=None, order_authors=orderer.order_authors,
         get_book_format=lambda _id, fmt: None if requested == 'fallback' and fmt == 'KEPUB' else NS(name='library-file'),
     ))
     book.path = 'book'
@@ -365,3 +391,61 @@ def test_real_file_response_keeps_custom_header_and_format_fallback(
         assert response.data == b'unchanged book bytes'
         assert parse_options_header(response.headers['Content-Disposition'])[1]['filename'] == 'Book, The (42).' + extension
     assert source.read_bytes() == b'unchanged book bytes'
+
+
+@pytest.mark.parametrize('template', ['{series_index:03}', '{series_index:05s}'])
+def test_ambiguous_zero_width_requires_explicit_alignment(template):
+    with pytest.raises(ValueError):
+        names.validate_template(template)
+
+@pytest.mark.parametrize('has_series,expected', [(True,'Saga, The - 002 - Book, The'),(False,'Book, The')])
+def test_conditional_affixes_make_one_template_work_for_series_and_standalone(book,has_series,expected):
+    if not has_series:book.series=[]
+    assert names.render_filename('{series:|| - }{series_index:0>3s|| - }{title}',book,None)==expected
+
+@pytest.mark.parametrize('template', ['{title:|one}', '{title:|{id}|}', '{title:uppercase()|| - }'])
+def test_conditional_affixes_do_not_enable_nested_fields_or_functions(template):
+    with pytest.raises(ValueError):names.validate_template(template)
+
+@pytest.mark.parametrize('title', ['Invoice\u202Efdp.', 'one\u2066two\u2069', 'a\u2028b\u2029c'])
+def test_filename_omits_invisible_format_and_line_controls(book,title):
+    import unicodedata
+    book.title=book.sort=title
+    result=names.render_filename('{title}',book,None)
+    assert not any(unicodedata.category(c) in ('Cc','Cf','Zl','Zp') for c in result)
+
+def test_entirely_invisible_expansion_uses_documented_book_id(book):
+    book.title=book.sort='\u200b'
+    assert names.render_filename('{title}',book,None)=='book-42'
+
+@pytest.mark.parametrize('torn',[False,True])
+def test_actual_download_orders_linked_authors_and_tolerates_torn_rows(download,book,torn):
+    book.author_sort='Writer, Ann & Reader, Ben'
+    book.authors.reverse()
+    if torn:book.authors.insert(0,None)
+    response=download.get_download_link(42,'epub','',filename_template='{authors}')
+    assert unquote(parse_options_header(response.headers['Content-Disposition'])[1]['filename'])=='Ann Writer & Ben Reader.epub'
+
+
+def test_deep_composite_does_not_poison_later_shallow_field(book, custom_session):
+    import json
+    for number in range(10):
+        target = f'#level_{number + 1}' if number < 9 else '#shelf'
+        custom_session.add(db.CustomColumns(
+            id=20 + number, label=f'level_{number}', datatype='composite',
+            display=json.dumps({'composite_template': '{' + target + '}'}),
+        ))
+    custom_session.commit()
+    assert names.render_filename('{#level_0}{#shelf}', book, custom_session) == 'Favorites'
+
+
+def test_invalid_classic_template_remains_available_for_correction(admin_config, monkeypatch):
+    config, classic, _ = admin_config
+    render = Mock(return_value='invalid form')
+    monkeypatch.setattr(classic, 'view_configuration', render)
+    with Flask(__name__).test_request_context(method='POST', data={'config_opds_filename_template': '{title:03}'}):
+        assert inspect.unwrap(classic.update_view_configuration)() == 'invalid form'
+    assert render.call_args.kwargs['opds_filename_template'] == '{title:03}'
+    assert render.call_args.kwargs['opds_filename_error']
+    assert config.config_opds_filename_template == '{title}'
+    config.save.assert_not_called()

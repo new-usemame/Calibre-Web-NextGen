@@ -18834,3 +18834,88 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/admin.py
+#, python-format
+msgid "Invalid OPDS filename template: %(error)s"
+msgstr "Ongeldig OPDS-bestandsnaamsjabloon: %(error)s"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Example:"
+msgstr "Voorbeeld:"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Filename template fields and examples"
+msgstr "Velden en voorbeelden voor bestandsnaamsjablonen"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "First character:"
+msgstr "Eerste teken:"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "In KOReader, enable Use server filenames for the OPDS catalog."
+msgstr ""
+"Schakel in KOReader Serverbestandsnamen gebruiken in voor de OPDS-catalogus."
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Leave blank to keep the current title and first-author filename. Do not "
+"include the file extension."
+msgstr ""
+"Laat leeg om de huidige bestandsnaam met titel en eerste auteur te behouden."
+" Voeg geen bestandsextensie toe."
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid ""
+"Missing metadata becomes empty text. Title and series use their sort names. "
+"Slashes become underscores, not folders."
+msgstr ""
+"Ontbrekende metadata wordt lege tekst. Titel en reeks gebruiken hun "
+"sorteernamen. Schuine strepen worden onderstrepingstekens, geen mappen."
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "OPDS download filename template"
+msgstr "Bestandsnaamsjabloon voor OPDS-downloads"
+
+#: cps/spa_strings.py cps/templates/config_view_edit.html
+msgid "Padded series number:"
+msgstr "Opgevuld reeksnummer:"
+
+#: cps/services/opds_filename.py
+msgid "Conditional text needs both prefix and suffix separators."
+msgstr ""
+"Voorwaardelijke tekst vereist scheidingstekens voor zowel voorvoegsel als "
+"achtervoegsel."
+
+#: cps/services/opds_filename.py
+msgid "Nested fields are not supported in conditional text."
+msgstr "Geneste velden worden niet ondersteund in voorwaardelijke tekst."
+
+#: cps/services/opds_filename.py
+msgid "Use a text template of at most 1024 characters."
+msgstr "Gebruik een tekstsjabloon van maximaal 1024 tekens."
+
+#: cps/services/opds_filename.py
+msgid "Unmatched braces in the OPDS filename template."
+msgstr "Niet-overeenkomende accolades in het OPDS-bestandsnaamsjabloon."
+
+#: cps/services/opds_filename.py
+#, python-format
+msgid "Unknown or unsupported OPDS filename field: %(field)s"
+msgstr "Onbekend of niet-ondersteund OPDS-bestandsnaamveld: %(field)s"
+
+#: cps/services/opds_filename.py
+msgid "Conversions such as !r are not supported in OPDS filenames."
+msgstr "Conversies zoals !r worden niet ondersteund in OPDS-bestandsnamen."
+
+#: cps/services/opds_filename.py
+msgid "Use string padding such as 0>3s, with a maximum width of 128."
+msgstr "Gebruik tekstopvulling zoals 0>3s, met een maximale breedte van 128."
+
+#: cps/services/opds_filename.py
+msgid "Use explicit alignment for zero padding, such as 0>3s."
+msgstr "Gebruik expliciete uitlijning voor opvulling met nullen, zoals 0>3s."
+
+#: cps/templates/config_view_edit.html
+msgid "OPDS Downloads"
+msgstr "OPDS-downloads"

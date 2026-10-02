@@ -15,7 +15,7 @@ In the Classic interface, it is under Admin → UI Configuration → OPDS Downlo
 2. Enter a template in OPDS download filename template.
 3. Select Save settings in React or Save in Classic.
 
-For example, enter `{series} - {series_index:0>3s} - {title}`.
+For example, enter `{series:|| - }{series_index:0>3s|| - }{title}`.
 For book 2 in “The Saga,” titled “The Book,” this produces `Saga, The - 002 - Book, The.epub`.
 Do not include the extension in the template.
 The server adds the extension for the format it sends, such as `.epub` or `.pdf`.
@@ -34,7 +34,7 @@ Use `{{` and `}}` for literal braces.
 | Field | Value |
 | --- | --- |
 | `{author_sort}` | The author sort string, such as `Writer, Ann`. |
-| `{authors}` | All authors, separated by ` & `. |
+| `{authors}` | All authors in Calibre’s stored author order, separated by ` & `. |
 | `{id}` | The internal Calibre book ID. |
 | `{isbn}` | The ISBN. |
 | `{languages}` | Language codes, separated by commas, such as `eng, fra`. |
@@ -68,8 +68,13 @@ Multiple values use commas. Zero remains `0`, and false remains `No`.
 For a custom series named `#saga`, `{#saga_index}` supplies its number.
 Missing, deleted, or unavailable custom fields produce empty text.
 
-This is a limited Calibre-style template language, not the complete Calibre template engine.
-It does not support template functions, conditional prefixes and suffixes, numeric format codes, or Calibre program mode.
+Conditional text uses `{field:format|prefix|suffix}`. The prefix and suffix appear only when the field has a value.
+For example, `{series:|| - }{series_index:0>3s|| - }{title}` also produces `Book, The.epub` for a standalone book.
+Both separators are required; affixes cannot contain nested fields. Use explicit alignment for zero padding:
+`0>3s` pads a series number on the left, while ambiguous `03` and `05s` are rejected.
+
+This is a limited [Calibre-style template language](https://manual.calibre-ebook.com/template_lang.html), not the complete Calibre template engine.
+It does not support template functions, numeric format codes, or Calibre program mode.
 A computed custom field works when its source template uses the supported syntax.
 Otherwise, that field produces empty text and the server logs a warning.
 Templates cannot access Python attributes or execute code.
@@ -85,7 +90,7 @@ If a stored template is invalid, downloads fall back to the original naming beha
 Do not use `/` or `\` to request subfolders.
 Content-Disposition supplies a filename, not a destination path.
 [HTTP guidance](https://www.rfc-editor.org/rfc/rfc6266.html#section-4.3) tells clients to discard directory components.
-CWNG replaces both separators, control characters, and unsafe filename characters with underscores.
+CWNG removes control, invisible formatting, and Unicode line-separator characters. It replaces path separators and unsafe filename characters with underscores.
 The device controls the download folder.
 
 In KOReader, enable Use server filenames in the OPDS catalog configuration.

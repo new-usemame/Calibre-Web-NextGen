@@ -740,7 +740,7 @@ def calibreweb_alive():
 @admi.route("/admin/viewconfig")
 @user_login_required
 @admin_required
-def view_configuration():
+def view_configuration(opds_filename_template=None, opds_filename_error=None):
     read_column = calibre_db.session.query(db.CustomColumns) \
         .filter(and_(db.CustomColumns.datatype == 'bool', db.CustomColumns.mark_for_delete == 0)).all()
     restrict_columns = calibre_db.session.query(db.CustomColumns) \
@@ -749,7 +749,9 @@ def view_configuration():
     sortable_columns = load_eligible_columns() or []
     languages = calibre_db.speaking_language()
     translations = get_available_locale()
-    return render_title_template("config_view_edit.html", conf=config, readColumns=read_column,
+    return render_title_template("config_view_edit.html", conf=config,
+                                 opds_filename_template=opds_filename_template,
+                                 opds_filename_error=opds_filename_error, readColumns=read_column,
                                  restrictColumns=restrict_columns, sortableColumns=sortable_columns,
                                  restriction_is_bool=(restricted_column_datatype(
                                      config.config_restricted_column) == "bool"),
@@ -1096,7 +1098,8 @@ def update_view_configuration():
             validate_opds_filename_template(to_save["config_opds_filename_template"])
         except ValueError as error:
             flash(_("Invalid OPDS filename template: %(error)s", error=str(error)), category="error")
-            return view_configuration()
+            return view_configuration(opds_filename_template=to_save["config_opds_filename_template"],
+                                      opds_filename_error=str(error))
 
     # Validate a switch to Boolean restrictions before changing any settings:
     # these persisted fields are comma-separated literals, so silently changing

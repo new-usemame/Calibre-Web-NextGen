@@ -3475,14 +3475,16 @@ def get_download_link(book_id, book_format, client, *, allow_public_shelf_books=
             log.error(f"Failed to log download stats: {e}")
 
     file_name = book.title
-    if len(book.authors) > 0:
-        file_name = file_name + ' - ' + book.authors[0].name
+    first_author = next((author for author in book.authors if author is not None and author.name), None)
+    if first_author is not None:
+        file_name = file_name + ' - ' + first_author.name
     if filename_template:
         try:
             file_name = render_opds_filename(
                 filename_template, book, calibre_db.session,
                 title_regex=config.config_title_regex,
                 unicode_filename=config.config_unicode_filename,
+                ordered_authors=calibre_db.order_authors([book]),
             )
         except (ValueError, TypeError):
             # A corrupt or manually changed setting must not prevent downloads.

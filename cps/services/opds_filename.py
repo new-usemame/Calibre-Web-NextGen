@@ -7,10 +7,12 @@ padding. It does not execute Calibre template functions or program mode.
 """
 import json
 import re
+import unicodedata
 from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from string import Formatter
 
+from flask_babel import gettext as _
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -32,24 +34,37 @@ _UNSAFE = re.compile(r'[\x00-\x1f\x7f-\x9f/\\:*?"<>|]')
 _RESERVED = re.compile(r'(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$)', re.I)
 
 
+def _format_parts(spec):
+    parts = spec.split('|')
+    if len(parts) not in (1, 3):
+        raise ValueError(_('Conditional text needs both prefix and suffix separators.'))
+    prefix, suffix = parts[1:] if len(parts) == 3 else ('', '')
+    if any(char in prefix + suffix for char in '{}'):
+        raise ValueError(_('Nested fields are not supported in conditional text.'))
+    return parts[0], prefix, suffix
+
+
 def _parts(template):
     if not isinstance(template, str) or len(template) > MAX_TEMPLATE_LENGTH:
-        raise ValueError('Use a text template of at most 1024 characters.')
+        raise ValueError(_('Use a text template of at most 1024 characters.'))
     try:
         parts = list(Formatter().parse(template))
     except ValueError:
-        raise ValueError('Unmatched braces in the OPDS filename template.') from None
+        raise ValueError(_('Unmatched braces in the OPDS filename template.')) from None
     for literal, field, spec, conversion in parts:
         if field is None:
             continue
         match = _FIELD.fullmatch(field)
         if not match or (match[1] not in _FIELDS and not match[1].startswith('#')):
-            raise ValueError('Unknown or unsupported OPDS filename field: %s' % field)
+            raise ValueError(_('Unknown or unsupported OPDS filename field: %(field)s', field=field))
         if conversion:
-            raise ValueError('Conversions such as !r are not supported in OPDS filenames.')
-        fmt = _FORMAT.fullmatch(spec)
+            raise ValueError(_('Conversions such as !r are not supported in OPDS filenames.'))
+        format_spec, prefix, suffix = _format_parts(spec)
+        fmt = _FORMAT.fullmatch(format_spec)
         if not fmt or any(int(n) > MAX_FILENAME_LENGTH for n in fmt.groups()[1:] if n):
-            raise ValueError('Use string padding such as 0>3s, with a maximum width of 128.')
+            raise ValueError(_('Use string padding such as 0>3s, with a maximum width of 128.'))
+        if not fmt[1] and fmt[2] and fmt[2].startswith('0'):
+            raise ValueError(_('Use explicit alignment for zero padding, such as 0>3s.'))
     return parts
 
 
@@ -70,7 +85,8 @@ def expand_template(template, values):
         if index is not None:
             index = int(index)
             value = value[index:index + 1]
-        result.append(format(value[:MAX_FILENAME_LENGTH], spec) if value else '')
+        format_spec, prefix, suffix = _format_parts(spec)
+        result.append(prefix + format(value[:MAX_FILENAME_LENGTH], format_spec) + suffix if value else '')
     return ''.join(result)
 
 
@@ -122,16 +138,17 @@ def _sorted_name(name, stored_sort, title_regex):
 
 
 class _BookValues(dict):
-    def __init__(self, book, session, title_regex):
+    def __init__(self, book, session, title_regex, ordered_authors=None):
         self.book = book
         self.session = session
         self.columns = None
         self.depth = 0
         series = book.series[0] if book.series else None
+        authors = book.authors if ordered_authors is None else ordered_authors
         super().__init__(
             title=_sorted_name(book.title, book.sort, title_regex),
             author_sort=book.author_sort or '',
-            authors=' & '.join(author.name.replace('|', ',') for author in book.authors),
+            authors=' & '.join(author.name.replace('|', ',') for author in authors if author is not None and author.name),
             id=_value(book.id), isbn=book.isbn or '',
             languages=', '.join(language.lang_code for language in book.languages),
             last_modified=_value(book.last_modified), pubdate=_value(book.pubdate),
@@ -144,10 +161,11 @@ class _BookValues(dict):
         )
 
     def __missing__(self, key):
-        # Install the empty value first to break cycles in composite columns.
-        self[key] = ''
         if not key.startswith('#') or self.depth >= 10:
             return ''
+        # A depth cutoff is not a missing value: a later shallow reference may
+        # resolve it. Install a placeholder only for lookups actually started.
+        self[key] = ''
         self.depth += 1
         try:
             self[key] = self._custom_value(key[1:])
@@ -205,10 +223,12 @@ class _BookValues(dict):
         return ', '.join(_value(v) for v in values if v is not None)
 
 
-def render_filename(template, book, session, title_regex='', unicode_filename=False):
+def render_filename(template, book, session, title_regex='', unicode_filename=False, ordered_authors=None):
     """Return a safe basename. The download helper adds the actual extension."""
-    values = _BookValues(book, session, title_regex)
-    rendered = expand_template(template, values).strip(' .') or 'book-%s' % book.id
+    values = _BookValues(book, session, title_regex, ordered_authors)
+    rendered = expand_template(template, values)
+    rendered = ''.join(char for char in rendered if unicodedata.category(char) not in ('Cc', 'Cf', 'Zl', 'Zp'))
+    rendered = rendered.strip().strip(' .') or 'book-%s' % book.id
     rendered = get_valid_filename_shared(
         rendered, replace_whitespace=False, chars=MAX_FILENAME_LENGTH,
         unicode_filename=unicode_filename,

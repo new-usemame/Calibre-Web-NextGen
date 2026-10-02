@@ -341,11 +341,12 @@ for (const classic of [false, true]) {
   });
 }
 
-test('New UI preserves an existing built-in choice when the optional catalog is unavailable', async ({}, testInfo) => {
+for (const builtin of ['Arial', 'Literata']) {
+ test(`New UI preserves ${builtin} when the optional catalog is unavailable`, async ({}, testInfo) => {
   const page = pageForTest();
   await verifyViewport(page, testInfo);
   const save = await page.request.post('/api/v1/reader/settings', {
-    headers: { 'X-CSRFToken': await csrfToken(page) }, data: { font: 'Arial' },
+    headers: { 'X-CSRFToken': await csrfToken(page) }, data: { font: builtin },
   });
   expect(save.ok()).toBeTruthy();
   await page.route('**/api/v1/reader/fonts', route => route.fulfill({
@@ -355,11 +356,20 @@ test('New UI preserves an existing built-in choice when the optional catalog is 
   await expect.poll(() => page.locator('iframe').first().evaluate(element => {
     const doc = (element as HTMLIFrameElement).contentDocument!;
     return doc.defaultView!.getComputedStyle(doc.querySelector('p')!).fontFamily;
-  })).toContain('Arial');
+  })).toContain(builtin);
+  if (builtin === 'Literata') {
+    await expect.poll(() => page.locator('iframe').first().evaluate(element => {
+      const doc = (element as HTMLIFrameElement).contentDocument!;
+      return Array.from(doc.fonts).some(face => face.family.replace(/["']/g, '') === 'Literata'
+        && face.weight === 'normal' && face.style === 'normal' && face.status === 'loaded');
+    })).toBe(true);
+  }
   await openAppearance(page, testInfo.project.name === 'mobile');
-  await expect(page.getByLabel('Font family')).toHaveValue('Arial');
+  await expect(page.getByLabel('Font family')).toHaveValue(builtin);
   await expect(page.getByLabel('Font family').locator('option')).toHaveCount(6);
   await expect(page.getByLabel('Font family').locator('option[value="Literata"]')).toHaveText('Literata');
   await expect(page.getByText('Could not load reader fonts.', { exact: true })).toBeVisible();
-  expect(await savedReaderFont(page)).toBe('Arial');
+  expect(await savedReaderFont(page)).toBe(builtin);
 });
+
+}

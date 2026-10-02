@@ -297,7 +297,7 @@ test('classic EPUB reader applies and persists Literata using the served font', 
   } else {
     await page.locator('#setting').click();
   }
-  await page.locator('#Literata').click();
+  await page.locator('#settings-modal').getByRole('button', { name: 'Literata', exact: true }).click();
   await assertFontRequest(fontResponse);
 
   await expect.poll(() => savedReaderFont(page)).toBe('Literata');

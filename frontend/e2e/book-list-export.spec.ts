@@ -70,7 +70,7 @@ test('Classic export remains disabled until its action script binds', async ({ s
     await route.continue();
   });
   try {
-    await page.goto('/search?query=the', { waitUntil: 'commit' });
+    await page.goto('/search?query=cwng-export-empty-' + secondaryUser.username, { waitUntil: 'commit' });
     const box = page.locator('.book-list-export');
     await expect(box).toBeVisible();
     await expect(box.getByRole('button', { name: 'Export CSV', exact: true })).toBeDisabled();
@@ -80,7 +80,13 @@ test('Classic export remains disabled until its action script binds', async ({ s
     await expect(box.getByRole('button', { name: 'Export CSV', exact: true })).toBeEnabled();
     const downloaded = page.waitForEvent('download');
     await box.getByRole('button', { name: 'Export CSV', exact: true }).click();
-    expect((await downloaded).suggestedFilename()).toBe('calibre-web-books.csv');
+    const file = await downloaded;
+    expect(file.suggestedFilename()).toBe('calibre-web-books.csv');
+    const stream = await file.createReadStream();
+    expect(stream).not.toBeNull();
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
+    expect(Buffer.concat(chunks).toString()).toBe('Title,Authors,Series,Tags,Rating,Read,Formats,Date added\r\n');
   } finally { release(); }
 });
 

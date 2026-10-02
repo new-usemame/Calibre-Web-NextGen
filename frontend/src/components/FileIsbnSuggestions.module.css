@@ -1,0 +1,9 @@
+.box { margin-top: var(--sp-3); padding: var(--sp-3); border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }
+.box button { min-height: 44px; white-space: normal; }
+.hint, .status { font-size: var(--fs-sm); color: var(--text-muted); margin: var(--sp-2) 0 0; }
+.error { color: var(--danger-text); margin: var(--sp-2) 0 0; }
+.list { padding: 0; margin: var(--sp-3) 0 0; list-style: none; }
+.candidate { display: flex; flex-wrap: wrap; gap: var(--sp-3); align-items: center; padding: var(--sp-3) 0; border-top: 1px solid var(--border); }
+.text { min-width: 0; flex: 1 1 200px; overflow-wrap: anywhere; }
+.text p { margin: var(--sp-2) 0 0; font-size: var(--fs-sm); }
+.format { margin-inline-start: var(--sp-2); color: var(--text-muted); font-size: var(--fs-sm); }

@@ -16583,3 +16583,79 @@ msgstr ""
 msgid "Show Read/Unread Section"
 msgstr ""
 
+
+#: cps/spa_strings.py
+msgid "ISBN suggestions from book files"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Scanning book files…"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Find ISBN in book files"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Scan EPUB, PDF or text files for ISBNs. Check the edition before using a "
+"suggestion."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid ""
+"Using a suggestion replaces only ISBN identifiers in this form. Save changes"
+" to keep it."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "ISBN suggestions found: {n}."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No valid ISBN found in the scanned text."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "No supported book file could be scanned."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Could not scan book files. Please try again."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "ISBN extraction is unavailable for Google Drive books."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "ISBN extraction is unavailable on this server platform."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Scanned formats: {formats}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Formats not scanned: {formats}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Unavailable files: {formats}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Files that could not be parsed: {formats}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "The scan reached its limit. More ISBNs may be present in the file."
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "Use ISBN {isbn}"
+msgstr ""
+
+#: cps/spa_strings.py
+msgid "ISBN added to the form. Save changes to keep it."
+msgstr ""

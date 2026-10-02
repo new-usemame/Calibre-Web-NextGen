@@ -18513,3 +18513,85 @@ msgstr "Toon gelezen/niet gelezen selectie"
 #~ msgstr ""
 #~ "Boeken moeten eerst worden gearchiveerd en het apparaat moet worden "
 #~ "gesynchroniseerd, voordat een boek veilig kan worden verwijderd."
+
+#: cps/spa_strings.py
+msgid "ISBN suggestions from book files"
+msgstr "ISBN-suggesties uit boekbestanden"
+
+#: cps/spa_strings.py
+msgid "Scanning book files…"
+msgstr "Boekbestanden scannen…"
+
+#: cps/spa_strings.py
+msgid "Find ISBN in book files"
+msgstr "ISBN in boekbestanden zoeken"
+
+#: cps/spa_strings.py
+msgid ""
+"Scan EPUB, PDF or text files for ISBNs. Check the edition before using a "
+"suggestion."
+msgstr ""
+"Zoek ISBN’s in EPUB-, PDF- of tekstbestanden. Controleer de editie voordat u"
+" een suggestie gebruikt."
+
+#: cps/spa_strings.py
+msgid ""
+"Using a suggestion replaces only ISBN identifiers in this form. Save changes"
+" to keep it."
+msgstr ""
+"Een suggestie vervangt alleen ISBN-identificaties in dit formulier. Sla de "
+"wijzigingen op om deze te bewaren."
+
+#: cps/spa_strings.py
+msgid "ISBN suggestions found: {n}."
+msgstr "ISBN-suggesties gevonden: {n}."
+
+#: cps/spa_strings.py
+msgid "No valid ISBN found in the scanned text."
+msgstr "Geen geldig ISBN gevonden in de gescande tekst."
+
+#: cps/spa_strings.py
+msgid "No supported book file could be scanned."
+msgstr "Geen ondersteund boekbestand kon worden gescand."
+
+#: cps/spa_strings.py
+msgid "Could not scan book files. Please try again."
+msgstr "Boekbestanden konden niet worden gescand. Probeer het opnieuw."
+
+#: cps/spa_strings.py
+msgid "ISBN extraction is unavailable for Google Drive books."
+msgstr "ISBN-extractie is niet beschikbaar voor boeken op Google Drive."
+
+#: cps/spa_strings.py
+msgid "ISBN extraction is unavailable on this server platform."
+msgstr "ISBN-extractie is niet beschikbaar op dit serverplatform."
+
+#: cps/spa_strings.py
+msgid "Scanned formats: {formats}"
+msgstr "Gescande formaten: {formats}"
+
+#: cps/spa_strings.py
+msgid "Formats not scanned: {formats}"
+msgstr "Niet-gescande formaten: {formats}"
+
+#: cps/spa_strings.py
+msgid "Unavailable files: {formats}"
+msgstr "Niet-beschikbare bestanden: {formats}"
+
+#: cps/spa_strings.py
+msgid "Files that could not be parsed: {formats}"
+msgstr "Bestanden die niet konden worden gelezen: {formats}"
+
+#: cps/spa_strings.py
+msgid "The scan reached its limit. More ISBNs may be present in the file."
+msgstr ""
+"De scan heeft zijn limiet bereikt. Het bestand kan meer ISBN’s bevatten."
+
+#: cps/spa_strings.py
+msgid "Use ISBN {isbn}"
+msgstr "ISBN {isbn} gebruiken"
+
+#: cps/spa_strings.py
+msgid "ISBN added to the form. Save changes to keep it."
+msgstr ""
+"ISBN toegevoegd aan het formulier. Sla de wijzigingen op om het te bewaren."

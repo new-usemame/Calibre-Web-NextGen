@@ -19059,3 +19059,87 @@ msgstr "Afficher la section Lu / Non lu"
 #~ msgstr ""
 #~ "Les livres doivent d'abord être archivés et l'appareil synchronisé avant "
 #~ "qu'un livre puisse être supprimé en tout sécurité."
+
+#: cps/spa_strings.py
+msgid "ISBN suggestions from book files"
+msgstr "Suggestions d’ISBN provenant des fichiers du livre"
+
+#: cps/spa_strings.py
+msgid "Scanning book files…"
+msgstr "Analyse des fichiers du livre…"
+
+#: cps/spa_strings.py
+msgid "Find ISBN in book files"
+msgstr "Rechercher un ISBN dans les fichiers du livre"
+
+#: cps/spa_strings.py
+msgid ""
+"Scan EPUB, PDF or text files for ISBNs. Check the edition before using a "
+"suggestion."
+msgstr ""
+"Recherchez des ISBN dans les fichiers EPUB, PDF ou texte. Vérifiez l’édition"
+" avant d’utiliser une suggestion."
+
+#: cps/spa_strings.py
+msgid ""
+"Using a suggestion replaces only ISBN identifiers in this form. Save changes"
+" to keep it."
+msgstr ""
+"Une suggestion remplace uniquement les identifiants ISBN de ce formulaire. "
+"Enregistrez les modifications pour la conserver."
+
+#: cps/spa_strings.py
+msgid "ISBN suggestions found: {n}."
+msgstr "Suggestions d’ISBN trouvées : {n}."
+
+#: cps/spa_strings.py
+msgid "No valid ISBN found in the scanned text."
+msgstr "Aucun ISBN valide trouvé dans le texte analysé."
+
+#: cps/spa_strings.py
+msgid "No supported book file could be scanned."
+msgstr "Aucun fichier de livre pris en charge n’a pu être analysé."
+
+#: cps/spa_strings.py
+msgid "Could not scan book files. Please try again."
+msgstr "Impossible d’analyser les fichiers du livre. Réessayez."
+
+#: cps/spa_strings.py
+msgid "ISBN extraction is unavailable for Google Drive books."
+msgstr ""
+"L’extraction d’ISBN n’est pas disponible pour les livres sur Google Drive."
+
+#: cps/spa_strings.py
+msgid "ISBN extraction is unavailable on this server platform."
+msgstr ""
+"L’extraction d’ISBN n’est pas disponible sur cette plateforme serveur."
+
+#: cps/spa_strings.py
+msgid "Scanned formats: {formats}"
+msgstr "Formats analysés : {formats}"
+
+#: cps/spa_strings.py
+msgid "Formats not scanned: {formats}"
+msgstr "Formats non analysés : {formats}"
+
+#: cps/spa_strings.py
+msgid "Unavailable files: {formats}"
+msgstr "Fichiers indisponibles : {formats}"
+
+#: cps/spa_strings.py
+msgid "Files that could not be parsed: {formats}"
+msgstr "Fichiers qui n’ont pas pu être lus : {formats}"
+
+#: cps/spa_strings.py
+msgid "The scan reached its limit. More ISBNs may be present in the file."
+msgstr ""
+"L’analyse a atteint sa limite. Le fichier peut contenir d’autres ISBN."
+
+#: cps/spa_strings.py
+msgid "Use ISBN {isbn}"
+msgstr "Utiliser l’ISBN {isbn}"
+
+#: cps/spa_strings.py
+msgid "ISBN added to the form. Save changes to keep it."
+msgstr ""
+"ISBN ajouté au formulaire. Enregistrez les modifications pour le conserver."

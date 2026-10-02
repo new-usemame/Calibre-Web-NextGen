@@ -12,6 +12,9 @@ NAMED_BOOLEAN_PREFERENCE_PATHS = {
     "show_hidden_books": ("preferences", "show_hidden_books"),
     "card_actions_hidden": ("preferences", "card_actions_hidden"),
     "reading_tags_hidden": ("preferences", "reading_tags_hidden"),
+    # The original import name helps diagnose filenames on a detail page, but
+    # is noisy in previews. Missing means the historical visible behavior.
+    "show_original_filename": ("preferences", "show_original_filename"),
     # The classic grid's "Hide shelf badges on covers" toggle already stores
     # this; sharing its path keeps one answer across both UIs (#1254).
     "shelf_badges_hidden": ("cover", "hide_shelf_badges"),
@@ -45,3 +48,22 @@ def set_named_preferences(user, updates):
     for name, value in updates.items():
         section, prop = NAMED_BOOLEAN_PREFERENCE_PATHS[name]
         setter(section, prop, value, commit=False)
+
+
+def set_checkbox_preference_from_form(user, form, name, presence_field):
+    """Apply one classic checkbox only when its form explicitly owns it.
+
+    HTML omits an unchecked checkbox, while partial/older form posts may omit
+    the setting entirely. The hidden presence field separates those cases.
+    Shared Guest state is never written by the profile form.
+    """
+    if name not in NAMED_BOOLEAN_PREFERENCE_PATHS:
+        raise ValueError("Unknown preference: %s" % name)
+    if presence_field not in form or getattr(user, "is_anonymous", False):
+        return False
+    setter = getattr(user, "set_view_property", None)
+    if not callable(setter):
+        raise AttributeError("User preference store is unavailable")
+    section, prop = NAMED_BOOLEAN_PREFERENCE_PATHS[name]
+    setter(section, prop, form.get(name) == "on", commit=False)
+    return True

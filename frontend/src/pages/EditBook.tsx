@@ -98,6 +98,7 @@ function stripTags(s: string) { return s.replace(/<[^>]*>/g, ' ').replace(/\s+/g
 export function EditBook({ id }: { id: string }) {
   const t = useT();
   const { data: meta, isLoading, error } = useBookMetadata(id);
+  const { data: book } = useBook(id);
   const update = useUpdateMetadata(id);
   const setCover = useSetCover(id);
   const me = useMe().data;
@@ -255,6 +256,9 @@ export function EditBook({ id }: { id: string }) {
           </Button>
         )}
       </div>
+      {book?.original_filename && (
+        <p className={styles.hint}>{t('Imported as')}: {book.original_filename}</p>
+      )}
       {deleteError && <p className={styles.deleteErr} role="alert">{deleteError}</p>}
 
       <CoverManager id={id} />

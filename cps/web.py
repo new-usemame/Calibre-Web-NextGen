@@ -72,6 +72,7 @@ from .reader_settings import (
     reader_setting_int as _reader_setting_int,
     sanitize_reader_settings,
 )
+from .user_preferences import set_checkbox_preference_from_form
 
 # CWA Imports
 import shutil
@@ -3318,6 +3319,13 @@ def change_profile(kobo_support, hardcover_support, local_oauth_check, oauth_sta
             current_user.kobo_two_way_annotation_sync = int(
                 to_save.get("kobo_two_way_annotation_sync") == "on"
             ) or 0
+        # The hidden sentinel distinguishes an unchecked control from a
+        # partial/older form submission. Guests always use the default-visible
+        # behavior and cannot change the shared Guest preference.
+        set_checkbox_preference_from_form(
+            current_user, to_save, "show_original_filename",
+            "show_original_filename_present",
+        )
         current_user.hardcover_token = to_save.get("hardcover_token","" ).replace("Bearer ","" ) or None
         # Auto-send and metadata fetch settings
         current_user.auto_send_enabled = to_save.get("auto_send_enabled") == "on"
@@ -4073,10 +4081,18 @@ def show_book(book_id):
 
         original_filename_row = ub.session.query(ub.BookOriginalFilename).filter(
             ub.BookOriginalFilename.book_id == book_id).first()
+        show_original_filename = True
+        if not current_user.is_anonymous:
+            stored_filename_preference = current_user.get_view_property(
+                "preferences", "show_original_filename"
+            )
+            if type(stored_filename_preference) is bool:
+                show_original_filename = stored_filename_preference
         return render_title_template('detail.html',
                                      entry=entry,
                                      original_filename=(original_filename_row.filename
                                                         if original_filename_row else None),
+                                     show_original_filename=show_original_filename,
                                      cc=cc,
                                      hierarchical_cc_ids=calibre_db.get_hierarchical_column_ids(),
                                      is_xhr=request.headers.get('X-Requested-With') == 'XMLHttpRequest',

@@ -682,9 +682,13 @@ test.describe('reader column count (#325)', () => {
         const doc = frame?.contentDocument;
         if (!doc) return null;
         const el = doc.querySelector('body') || doc.documentElement;
+        const container = document.querySelector('.epub-container');
+        // Changing columns replaces the frame. Its document can exist before
+        // it has a root element; keep polling until a layout can be measured.
+        if (!el || !doc.defaultView || !container) return null;
         return {
-          column: parseFloat(doc.defaultView!.getComputedStyle(el).columnWidth),
-          viewport: document.querySelector('.epub-container')!.clientWidth,
+          column: parseFloat(doc.defaultView.getComputedStyle(el).columnWidth),
+          viewport: container.clientWidth,
         };
       });
 

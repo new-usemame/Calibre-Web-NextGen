@@ -933,7 +933,7 @@
                                     </button>
                                 </div>
                             {% endif %}
-                            {% if original_filename %}
+                            {% if original_filename and show_original_filename is not sameas false %}
                                 <div class="book-original-filename meta-chip">
                                     <span>{{ _('Imported as') }}:</span>
                                     <span class="meta-value">{{ original_filename }}</span>

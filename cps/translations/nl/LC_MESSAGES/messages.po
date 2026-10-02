@@ -4802,6 +4802,22 @@ msgid "Unused by this arrangement"
 msgstr "Niet gebruikt door deze opmaak"
 
 #: cps/spa_strings.py
+msgid "Book details"
+msgstr "Boekgegevens"
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Show original filename"
+msgstr "Oorspronkelijke bestandsnaam tonen"
+
+#: cps/spa_strings.py
+msgid "Keep the imported file name visible on book detail pages."
+msgstr "Toon de bestandsnaam waarmee het boek is geïmporteerd op boekpagina's."
+
+#: cps/spa_strings.py cps/templates/user_edit.html
+msgid "Shows the name a book had when it was imported."
+msgstr "Toont de naam die het boek had toen het werd geïmporteerd."
+
+#: cps/spa_strings.py
 msgid "(no text captured)"
 msgstr "(geen tekst vastgelegd)"
 

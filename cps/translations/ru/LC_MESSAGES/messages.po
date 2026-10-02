@@ -7600,7 +7600,7 @@ msgstr "Полок пока нет — создайте первую ниже."
 
 #: cps/spa_strings.py
 msgid "No shelves yet. Create a shelf to start collecting books."
-msgstr ""
+msgstr "Полок пока нет. Создайте полку, чтобы собирать книги."
 
 #: cps/spa_strings.py
 msgid "No smart shelves yet. Create one to collect books automatically."

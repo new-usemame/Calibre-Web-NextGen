@@ -396,6 +396,7 @@ function AdminConfigForm() {
       config_default_ui_font_body: cfg.config_default_ui_font_body,
       config_default_ui_font_display: cfg.config_default_ui_font_display,
       config_server_announcement: cfg.config_server_announcement,
+      config_opds_filename_template: cfg.config_opds_filename_template,
     });
   }, [cfg]);
 
@@ -484,6 +485,24 @@ function AdminConfigForm() {
           </p>
         </label>
       </div>
+      <label className={styles.field}>
+        <span>{t('OPDS download filename template')}</span>
+        <input value={String(form.config_opds_filename_template ?? '')} maxLength={1024}
+          placeholder="{title} - {authors}"
+          onChange={(e) => set('config_opds_filename_template', e.target.value)} />
+        <p className={styles.fieldHint}>
+          {t('Leave blank to keep the current title and first-author filename. Do not include the file extension.')}
+          {' '}{t('Missing metadata becomes empty text. Title and series use their sort names. Slashes become underscores, not folders.')}
+        </p>
+      </label>
+      <details>
+        <summary>{t('Filename template fields and examples')}</summary>
+        <p><code>{'{author}, {author_sort}, {authors}, {id}, {identifiers}, {isbn}, {languages}, {last_modified}, {pubdate}, {publisher}, {rating}, {series}, {series_index}, {tags}, {timestamp}, {title}, {title_sort}, {#custom_field}'}</code></p>
+        <p>{t('First character:')} <code>{'{author_sort[0]}'}</code>.{' '}
+          {t('Padded series number:')} <code>{'{series_index:0>3s}'}</code>.</p>
+        <p>{t('Example:')} <code>{'{series} - {series_index:0>3s} - {title}'}</code></p>
+        <p>{t('In KOReader, enable Use server filenames for the OPDS catalog.')}</p>
+      </details>
       <label className={styles.field}>
         <span>{t('Server announcement (shown to all users)')}</span>
         <input value={String(form.config_server_announcement ?? '')}

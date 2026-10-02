@@ -43,6 +43,7 @@ from .gdriveutils import is_gdrive_ready, gdrive_support
 from .render_template import render_title_template, get_sidebar_config
 from .services import file_lock
 from .services.worker import WorkerThread
+from .services.opds_filename import validate_template as validate_opds_filename_template
 from .services.kobo_import import (
     KoboContentDatabaseError,
     KoboUploadError,
@@ -1089,6 +1090,12 @@ def update_table_settings():
 @admin_required
 def update_view_configuration():
     to_save = request.form.to_dict()
+    if "config_opds_filename_template" in to_save:
+        try:
+            validate_opds_filename_template(to_save["config_opds_filename_template"])
+        except ValueError as error:
+            flash(_("Invalid OPDS filename template: %(error)s", error=str(error)), category="error")
+            return view_configuration()
 
     # Validate a switch to Boolean restrictions before changing any settings:
     # these persisted fields are comma-separated literals, so silently changing
@@ -1175,6 +1182,7 @@ def update_view_configuration():
     for key, value in font_updates.items():
         setattr(config, key, value)
     _config_string(to_save, "config_opds_default_locale")
+    _config_string(to_save, "config_opds_filename_template")
 
     # Fork #463 (@Andrew-H2O): site-wide appearance settings live on the UI
     # Configuration page, not buried under Logfile Configuration on the Basic
